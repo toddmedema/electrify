@@ -1,4 +1,6 @@
+import path from "node:path";
 import { expect, test } from "./fixtures";
+import { foregroundContrast } from "./contrast";
 import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
@@ -44,39 +46,7 @@ for (const theme of ["light", "dark"] as const) {
     // The dock's Build action is an icon on the dock surface: measure the icon against the
     // nearest painted background, to the 3:1 non-text contrast an icon-only control needs.
     const build = page.locator("#buildNav");
-    const contrast = await build.evaluate((element) => {
-      const style = getComputedStyle(element);
-      let surface: Element | null = element;
-      while (
-        surface &&
-        /^rgba\(.*,\s*0\)$|^transparent$/.test(
-          getComputedStyle(surface).backgroundColor,
-        )
-      )
-        surface = surface.parentElement;
-      const luminance = (rgb: string) => {
-        const channels = rgb
-          .match(/[\d.]+/g)!
-          .slice(0, 3)
-          .map((channel) => {
-            const value = Number(channel) / 255;
-            return value <= 0.04045
-              ? value / 12.92
-              : Math.pow((value + 0.055) / 1.055, 2.4);
-          });
-        return (
-          channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
-        );
-      };
-      const foreground = luminance(style.color);
-      const background = luminance(
-        getComputedStyle(surface ?? document.body).backgroundColor,
-      );
-      return (
-        (Math.max(foreground, background) + 0.05) /
-        (Math.min(foreground, background) + 0.05)
-      );
-    });
+    const contrast = await foregroundContrast(build);
     expect(contrast).toBeGreaterThanOrEqual(3);
     await build.click();
     await page.locator(".button-buildGenerator").click();
@@ -101,5 +71,81 @@ for (const theme of ["light", "dark"] as const) {
     expect(type.value).toBeGreaterThan(type.label);
     expect(type.value).toBeGreaterThanOrEqual(14);
     expect(type.numeric).toContain("tabular-nums");
+  });
+
+  test(`tutorial action label meets small-text contrast in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem(
+        "plays",
+        JSON.stringify({
+          plays: [{ scenarioId: 0, timesPlayed: 1, date: "2026-10-20" }],
+        }),
+      );
+    }, theme);
+    await page.goto("/");
+    await page
+      .getByRole("button", { name: "Start playing", exact: true })
+      .click();
+    const action = page.locator(".tutorialSpotlightAction");
+    await expect(action).toBeVisible();
+    expect(await foregroundContrast(action)).toBeGreaterThanOrEqual(4.5);
+    const shots = process.env.REVIEW_SCREENSHOT_DIR;
+    if (shots && theme === "light" && testInfo.project.name === "mobile-390px")
+      await page.screenshot({
+        path: path.join(shots, "tutorial-action-mobile-light.png"),
+        animations: "disabled",
+      });
+  });
+
+  test(`upcoming event numbers meet small-text contrast in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=106");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await expect(page.locator(".facilities")).toBeVisible();
+    await page.keyboard.press("0");
+    const insights = page.getByRole("region", {
+      name: "Insights",
+      exact: true,
+    });
+    await openPane(
+      insights,
+      page.getByRole("button", { name: "Insights", exact: true }),
+    );
+    // The compact mission header can prioritize a cash warning over the upcoming event.
+    // Open the same event rail directly and include the announced years in its range.
+    await insights
+      .getByRole("button", { name: "Fit full timeline", exact: true })
+      .click();
+    const numbers = page.locator(".insightEventNumber");
+    await expect(numbers.first()).toBeVisible();
+    for (const number of await numbers.all())
+      expect(await foregroundContrast(number)).toBeGreaterThanOrEqual(4.5);
+    const shots = process.env.REVIEW_SCREENSHOT_DIR;
+    if (
+      shots &&
+      ((theme === "light" && testInfo.project.name === "desktop-chromium") ||
+        (theme === "dark" && testInfo.project.name === "mobile-390px"))
+    ) {
+      if (!testInfo.project.use.hasTouch)
+        await insights.locator(".insightEventChip").first().click();
+      await page.screenshot({
+        path: path.join(
+          shots,
+          `event-numbers-${testInfo.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
   });
 }

@@ -283,7 +283,15 @@ for (const theme of ["light", "dark"]) {
     await expect(chart.locator(".chartPointDetails")).toHaveCount(0);
     await image.focus();
     await image.press("Home");
-    await expect(details).toBeVisible();
+    // Touch compatibility events may leave the plot after keyboard selection. Exercise the
+    // real uPlot handler in that order, rather than depending on the browser to race this run.
+    await plot.dispatchEvent("mouseleave");
+    await expect(
+      details,
+      "pointer leave must preserve keyboard selection",
+    ).toBeVisible();
+    const selectedTime = await time.textContent();
+    await expect(chart.getByRole("status")).toContainText(selectedTime!);
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
     await expect(details).toContainText("Total supply:");
     await expect(details).toContainText("Total load:");
@@ -295,9 +303,29 @@ for (const theme of ["light", "dark"]) {
     await details.screenshot({
       path: info.outputPath(`storage-details-${theme}.png`),
     });
+    await chart.screenshot({
+      path: info.outputPath(`keyboard-selection-${theme}.png`),
+    });
+    // An intentional pointer move takes over from keyboard selection. Screenshots may
+    // scroll the plot on phones, so let the locator resolve its current viewport position.
+    await plot.hover({ position: { x: bounds.width * 0.6, y: 8 } });
+    await expect(chart.getByRole("status")).toBeEmpty();
+    await expect(time).not.toHaveText(selectedTime!);
+    await image.press("Home");
+    await expect(details).toBeVisible();
     await image.press("Escape");
     await expect(details).toBeHidden();
+    await expect(chart.getByRole("status")).toBeEmpty();
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    // Blur also releases keyboard ownership, so the next hover can inspect another point.
+    await image.press("Home");
+    await expect(details).toBeVisible();
+    await speed
+      .getByRole("button", { name: "normal speed", exact: true })
+      .first()
+      .focus();
+    await expect(details).toBeHidden();
+    await expect(chart.getByRole("status")).toBeEmpty();
     // Hover details stay within the plot, including at opposite corners on narrow screens.
     await chart.scrollIntoViewIfNeeded();
     const hoverBounds = (await plot.boundingBox())!;
@@ -352,6 +380,7 @@ for (const theme of ["light", "dark"]) {
       });
     }
     await page.mouse.move(0, 0);
+    await expect(details).toBeHidden();
     await page.evaluate(() => document.fonts.ready);
     await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
     await chart.screenshot({ path: info.outputPath(`storage-${theme}.png`) });
@@ -523,6 +552,12 @@ test("blackout periods remain visible when imports supplement fuel production", 
   });
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const speed = page.locator("#appbar:visible");
+  // Freeze fixture setup, then explicitly advance the real reducer for a shortage sample.
+  await speed
+    .getByRole("button", { name: "pause", exact: true })
+    .first()
+    .click();
   await openPane(pane, navigation);
   for (const name of ["Natural Gas CC", "Nuclear"]) {
     await pane
@@ -541,9 +576,17 @@ test("blackout periods remain visible when imports supplement fuel production", 
     chart.getByText("Supply to customers", { exact: true }),
   ).toHaveCount(0);
   await expect(chart.getByText("Blackout", { exact: true })).toHaveCount(0);
+  await speed
+    .getByRole("button", { name: "normal speed", exact: true })
+    .first()
+    .click();
   await expect(chart.getByRole("img")).toHaveAccessibleName(
     /blackout periods? shaded/,
   );
+  await speed
+    .getByRole("button", { name: "pause", exact: true })
+    .first()
+    .click();
   const game = (await readSavedGame(page))!;
   const shortage = game.timeline.findIndex(
     (tick) => tick.demandW > tick.supplyW && (tick.importedW || 0) > 0,

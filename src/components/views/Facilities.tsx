@@ -73,6 +73,7 @@ import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
+import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 
 interface FacilityListItemProps {
   arriving: boolean;
@@ -96,8 +97,7 @@ interface FacilityListItemProps {
 
 /**
  * A weather outage leads the row's status line, in amber, so a damaged plant reads as damaged
- * before its reduced output does. The long and short forms swap on row width like the reservoir
- * reading.
+ * before its reduced output does. The long and short forms swap on row width like upgrade details.
  */
 function hazardStatusText(status: FacilityHazardStatusType): {
   long: string;
@@ -208,9 +208,8 @@ const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
   DISCHARGING: "discharging",
 };
 
-// Display only: the row turns its reservoir reading red when the *displayed* integer falls below
-// this, so the number and its colour always agree -- which puts the effective cutoff at 19.5%,
-// the point where rounding first lands on 19. Deliberately above LOW_RESERVOIR_FRACTION
+// Display only: the row turns its water status red below 20%, rounded to a whole percent.
+// Deliberately above LOW_RESERVOIR_FRACTION
 // (HydroOutlook), which marks the point where output is already being held back and drives the
 // "Nearly empty." forecast lead -- the row warns before that bites.
 const RESERVOIR_WARNING_FRACTION = 0.2;
@@ -241,6 +240,7 @@ function FacilityActions(props: {
         // Refunds in full and returns the plant to service at once, so it needs no confirmation
         <Button
           className="facilityCancelConstruction"
+          variant="outlined"
           startIcon={<CancelIcon />}
           aria-label={"Cancel upgrade of " + facility.name}
           onClick={() => onCancelRetrofit(facility.id)}
@@ -250,6 +250,7 @@ function FacilityActions(props: {
       )}
       {!underConstruction && !upgrading && (
         <Button
+          variant="outlined"
           startIcon={
             <ConceptIcon concept={facility.paused ? "play" : "pause"} />
           }
@@ -271,6 +272,7 @@ function FacilityActions(props: {
       )}
       <Button
         className={underConstruction ? "facilityCancelConstruction" : undefined}
+        variant="outlined"
         startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
         aria-label={
           (underConstruction ? "Cancel construction of " : "Sell ") +
@@ -440,20 +442,30 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } else {
     reading = formatWattsOfPeak(facility.currentW, facility.peakW);
     if (fuel === "Hydro" && facility.reservoirCapacityWh) {
-      const reservoirFraction =
-        (facility.reservoirWh || 0) / facility.reservoirCapacityWh;
-      const reservoirPercent = Math.round(reservoirFraction * 100);
-      // A dam this far down is heading for the minimum generating level, which is worth seeing
-      // without opening the row. The reading turns red, and an off-screen "low" carries the
-      // same message for anyone who can't use the colour.
-      const low = reservoirPercent < RESERVOIR_WARNING_FRACTION * 100;
-      // Only one of these shows, picked by how wide the row is
+      // Last-tick water balance stays meaningful on mount and selection. Paused turbines can
+      // retain ramping currentW internally, so exclude their output from the water balance.
+      const generatedWh = facility.paused
+        ? 0
+        : (facility.currentW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+      const changeWh = Math.round(
+        (facility.hydroLastInflowWh || 0) -
+          (facility.hydroLastSpillWh || 0) -
+          (facility.hydroLastBypassWh || 0) -
+          generatedWh,
+      );
+      const waterStatus =
+        changeWh > 0
+          ? "filling"
+          : changeWh < 0
+            ? "draining"
+            : facility.hydroLastSpillWh
+              ? "spilling"
+              : "steady";
+      const low =
+        Math.round(capacityFraction! * 100) < RESERVOIR_WARNING_FRACTION * 100;
       detail = (
         <span className={low ? "facilityStatusLow" : undefined}>
-          <span className="facilityStatusLong">
-            reservoir {reservoirPercent}%
-          </span>
-          <span className="facilityStatusShort">{reservoirPercent}%</span>
+          {waterStatus}
           {low && <span className="srOnly"> low</span>}
         </span>
       );
@@ -556,24 +568,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               aria-expanded={selected}
               onClick={() => onSelect(selected ? null : facility.id)}
             >
-              {/* v9 dropped ListItem's `disabled` prop; it only ever dimmed the row, which is
-              all under-construction facilities need here. */}
-              <ListItem
-                className="facility"
-                sx={
-                  offlineForWork
-                    ? {
-                        // The progress bar stays at full strength so the build is legible
-                        "& .MuiListItemText-primary, & .MuiListItemText-secondary":
-                          {
-                            opacity: (theme) =>
-                              theme.palette.action.disabledOpacity,
-                          },
-                      }
-                    : undefined
-                }
-                component="span"
-              >
+              <ListItem className="facility" component="span">
                 {reorderDisabled && icon}
                 <span className="facilityText">
                   <ListItemText
@@ -681,17 +676,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             </ConfirmDialog>
           )}
           {selected && (
-            <MemoizedFacilityActions
-              facility={facility}
-              readOnly={readOnly}
-              upgrading={upgrading}
-              onPause={onPause}
-              onTogglePause={onTogglePause}
-              onCancelRetrofit={props.onCancelRetrofit}
-              onOpenSell={toggleDialog}
-            />
-          )}
-          {selected && (
             <FacilityDetails
               facility={facility}
               date={game.date}
@@ -700,6 +684,17 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               game={game}
               readOnly={readOnly}
               onRetrofit={props.onRetrofit}
+            />
+          )}
+          {selected && (
+            <MemoizedFacilityActions
+              facility={facility}
+              readOnly={readOnly}
+              upgrading={upgrading}
+              onPause={onPause}
+              onTogglePause={onTogglePause}
+              onCancelRetrofit={props.onCancelRetrofit}
+              onOpenSell={toggleDialog}
             />
           )}
         </div>

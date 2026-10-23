@@ -25,7 +25,7 @@ async function restrictions(code, filePath) {
   );
 }
 
-test("simulation lint rejects ambient draws, aliases and computed or unsafe literal powers", async () => {
+test("simulation lint rejects ambient draws, platform transcendentals, aliases and unsafe powers", async () => {
   for (const filePath of simulationPaths) {
     for (const expression of [
       "Math.random()",
@@ -49,6 +49,14 @@ test("simulation lint rejects ambient draws, aliases and computed or unsafe lite
       "value ** -2",
       // A pinned cross-platform mismatch in helpers/Pow.test.ts, missed by the old selector.
       "2.70816 ** 3.711",
+      // Transcendentals round differently on arm64; helpers/Libm.test.ts pins examples.
+      "Math.log(value)",
+      "Math['exp'](value)",
+      "Math.sin",
+      "const { cos: cosine } = Math",
+      "Math.atan2(y, x)",
+      "Math.log10(value)",
+      "Math.cbrt(value)",
     ]) {
       assert.equal(
         (await restrictions(expression + ";", filePath)).length,
@@ -77,13 +85,14 @@ test("qualified global Math access cannot bypass the direct-Math restrictions", 
   }
 });
 
-test("simulation lint permits deterministic helpers, squares and exact powers of two", async () => {
+test("simulation lint permits deterministic helpers, exact Math, squares and exact powers of two", async () => {
   const code = `import { pow } from "./Pow";
+    import { log, sin } from "./Libm";
     import { randomAt, normalAt, RANDOM_STREAM } from "./Math";
     export const values = [pow(2, exponent), randomAt(seed, RANDOM_STREAM.economy, 0),
-      normalAt(seed, RANDOM_STREAM.weather, 0), Math.sin(value) ** 2,
+      normalAt(seed, RANDOM_STREAM.weather, 0), sin(value) ** 2, log(value),
       value ** 2, value ** 2.0, 2 ** 0, 2 ** 32, 2 ** -1022, 2 ** +32, 2 ** 1_009,
-      Math.max(value, 0)];`;
+      Math.max(value, 0), Math.sqrt(value), Math.hypot(x, y), Math.PI];`;
   for (const filePath of simulationPaths)
     assert.deepEqual(await restrictions(code, filePath), [], filePath);
 });
@@ -101,7 +110,7 @@ test("simulation lint keeps test and spec oracles and presentation math outside 
   ])
     assert.deepEqual(
       await restrictions(
-        "Math.random(); Math.pow(2, exponent); value ** -exponent; globalThis.Math.random();",
+        "Math.random(); Math.pow(2, exponent); Math.log(value); value ** -exponent; globalThis.Math.random();",
         filePath,
       ),
       [],

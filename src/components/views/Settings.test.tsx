@@ -7,6 +7,7 @@ import Settings, { Props } from "./Settings";
 import { clearAppCache } from "../../helpers/Cache";
 import settingsReducer from "../../reducers/Settings";
 import type { DesktopBridge } from "../../Desktop";
+import { updateInputPresentation } from "../../desktop/InputPresentation";
 
 jest.mock("../../AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
@@ -35,6 +36,7 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onSoundEffectsVolumeChange: () => undefined,
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
+    onTextSizeChange: () => undefined,
     onManageSaves: () => undefined,
     onBack: () => undefined,
     ...overrides,
@@ -52,6 +54,7 @@ function renderSettings(overrides: Partial<Props> = {}) {
 
 describe("Settings", () => {
   afterEach(() => {
+    act(() => updateInputPresentation({ active: false }));
     delete window.electrifyDesktop;
     localStorage.removeItem("controllerVibrationEnabled");
     localStorage.removeItem("steamTimelineEnabled");
@@ -119,6 +122,26 @@ describe("Settings", () => {
     expect(localStorage.getItem("steamTimelineEnabled")).toBe("true");
     expect(screen.getByRole("switch", { name: /^Sound$/ })).not.toBeChecked();
   });
+  it("keeps mod management and quitting out of Settings even with a desktop bridge", async () => {
+    const state = {
+      display: { fullscreen: true, width: 1, height: 1, resolutions: [] },
+      steam: { available: false, online: false, cloudEnabled: false },
+    };
+    window.electrifyDesktop = {
+      apiVersion: 1,
+      getState: jest.fn(async () => state),
+      onStateChanged: jest.fn(() => () => {}),
+      mods: jest.fn(async () => ({ entries: [] })),
+      quit: jest.fn(),
+    } as unknown as DesktopBridge;
+    renderSettings();
+    await screen.findByRole("switch", { name: "Controller vibration" });
+    expect(screen.queryByText("Manage mods")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Mods" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Quit" })).toBeNull();
+    expect(window.electrifyDesktop.mods).not.toHaveBeenCalled();
+  });
+
   it("changes appearance and units with direct choices", async () => {
     const onThemeChange = jest.fn();
     const onUnitsChange = jest.fn();
@@ -129,6 +152,38 @@ describe("Settings", () => {
 
     expect(onThemeChange).toHaveBeenCalledWith("dark");
     expect(onUnitsChange).toHaveBeenCalledWith("imperial");
+  });
+
+  it("offers a standard default and explicit larger text sizes", async () => {
+    const onTextSizeChange = jest.fn();
+    renderSettings({ onTextSizeChange });
+    const sizes = screen.getByRole("group", { name: "Text size" });
+    expect(
+      within(sizes).getByRole("button", { name: "Standard" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(
+      within(sizes).getByRole("button", { name: /^Large$/ }),
+    );
+    await userEvent.click(
+      within(sizes).getByRole("button", { name: /^Larger$/ }),
+    );
+    expect(onTextSizeChange.mock.calls).toEqual([["large"], ["larger"]]);
+  });
+
+  it("keeps physical keyboard shortcuts out of active controller help", () => {
+    renderSettings();
+    expect(
+      screen.getByRole("heading", { name: "Keyboard shortcuts" }),
+    ).toBeInTheDocument();
+    act(() => updateInputPresentation({ active: true }));
+    expect(
+      screen.queryByRole("heading", { name: "Keyboard shortcuts" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Text size" })).toBeVisible();
+    act(() => updateInputPresentation({ active: false }));
+    expect(
+      screen.getByRole("heading", { name: "Keyboard shortcuts" }),
+    ).toBeInTheDocument();
   });
 
   it("controls independent volumes while sound is enabled and hides them otherwise", () => {
@@ -201,7 +256,7 @@ describe("Settings", () => {
   it("offers a subtle cache reset at the bottom", async () => {
     renderSettings();
 
-    expect(screen.getByText("Electrify v26sept26-1507")).toBeInTheDocument();
+    expect(screen.getByText("26sept26-1507")).toBeInTheDocument();
     const button = screen.getByRole("button", { name: "Clear cache" });
     expect(
       within(screen.getByRole("contentinfo")).getByRole("button", {
@@ -211,6 +266,45 @@ describe("Settings", () => {
     await userEvent.click(button);
 
     expect(mockedClearAppCache).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens bundled credits and restores the Settings footer after closing", async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn(
+      async () =>
+        ({
+          ok: true,
+          json: async () => ({
+            notices: [
+              {
+                title: "Game redistribution license",
+                text: "MIT with Commons Clause",
+              },
+            ],
+            chromium: false,
+          }),
+        }) as Response,
+    );
+    try {
+      renderSettings();
+      const button = screen.getByRole("button", {
+        name: "Credits and licenses",
+      });
+      await userEvent.click(button);
+      const dialog = await screen.findByRole("dialog", {
+        name: "Credits and licenses",
+      });
+      expect(
+        await within(dialog).findByText("Game redistribution license"),
+      ).toBeInTheDocument();
+      await userEvent.click(
+        within(dialog).getByRole("button", { name: "Close" }),
+      );
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(button).toHaveFocus();
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   it("returns focus to the control that opened Settings", () => {

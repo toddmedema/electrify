@@ -38,6 +38,7 @@ export interface DispatchProps {
   onContinue: () => void;
   onSavedGames: () => void;
   onSettings: () => void;
+  onMods: () => void;
   onAchievements?: () => void;
   onManual: () => void;
   onStart: () => void;
@@ -186,6 +187,11 @@ const MainMenu = (props: Props): React.JSX.Element => {
           <Button variant="text" color="primary" onClick={props.onManual}>
             Manual
           </Button>
+          {desktopApp && getDesktop()?.mods && (
+            <Button data-mods-trigger variant="text" onClick={props.onMods}>
+              Mods
+            </Button>
+          )}
           <Button
             data-settings-trigger
             variant="text"

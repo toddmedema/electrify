@@ -4,6 +4,7 @@ const {
   dialog,
   ipcMain,
   protocol,
+  powerMonitor,
   screen,
   session,
   shell,
@@ -24,7 +25,13 @@ const {
 const { atomicWrite, readJson, DesktopSaveStore } = require("./storage.cjs");
 const { SteamService } = require("./steam.cjs");
 const { SteamMultiplayer, lobbyFromArgs } = require("./steam-multiplayer.cjs");
-const { applyConfirmedDisplay, createDisplayQueue } = require("./display.cjs");
+const { ModStore } = require("./mods.cjs");
+const { SteamWorkshop } = require("./steam-workshop.cjs");
+const {
+  applyConfirmedDisplay,
+  createDisplayQueue,
+  showWithConfirmedDisplay,
+} = require("./display.cjs");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -69,6 +76,9 @@ if (
 // the running game's rich presence, or clear it again while it exits.
 const primaryInstance = app.requestSingleInstanceLock();
 const steam = new SteamService();
+let modStore;
+let workshop;
+
 if (primaryInstance)
   steam.initialize(
     app,
@@ -85,6 +95,7 @@ let finalizingQuit = false;
 let quitRequested = false;
 let quitTimer;
 let rendererReady = false;
+let power = { phase: "awake", generation: 0 };
 let rendererCrashed = false;
 let quitWarningOpen = false;
 let resizeTimer;
@@ -92,6 +103,9 @@ let displayUpdating = false;
 let manualResize = false;
 const preferenceFile = path.join(app.getPath("userData"), "display.json");
 const root = path.join(app.getAppPath(), "build");
+const runtimeNotices = app.isPackaged
+  ? path.join(process.resourcesPath, "runtime-notices")
+  : path.join(app.getAppPath(), "node_modules/electron/dist");
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -128,6 +142,7 @@ function state() {
     ? screen.getDisplayMatching(window.getBounds())
     : screen.getPrimaryDisplay();
   return {
+    power: { ...power },
     display: {
       ...preferences,
       resolutions: resolutionsFor(display, preferences),
@@ -142,13 +157,38 @@ function publishState() {
 }
 
 function publishGameFocus() {
+  steam.setInputEnabled(
+    !!window &&
+      !window.isDestroyed() &&
+      window.isFocused() &&
+      !steam.overlayActive &&
+      !steam.textInput?.active &&
+      !steam.dialogs?.active &&
+      !quitRequested &&
+      rendererReady &&
+      power.phase === "awake",
+  );
   if (window && !window.isDestroyed())
     window.webContents.send(
       "desktop:focus-changed",
-      window.isFocused() && !steam.overlayActive,
+      window.isFocused() &&
+        !steam.overlayActive &&
+        !steam.textInput?.active &&
+        !steam.dialogs?.active &&
+        !quitRequested &&
+        power.phase === "awake",
     );
 }
 steam.onOverlayChanged = publishGameFocus;
+
+function publishPower(phase) {
+  power = { phase, generation: power.generation + 1 };
+  // Gate native input before notifying the renderer, even if the OS keeps our window focused.
+  steam.setInputEnabled(false);
+  if (window && !window.isDestroyed())
+    window.webContents.send("desktop:power-changed", { ...power });
+  publishGameFocus();
+}
 
 function savePreferences() {
   atomicWrite(preferenceFile, JSON.stringify(preferences));
@@ -165,11 +205,17 @@ function applyDisplay(input) {
 async function updateDisplay(input) {
   const display = screen.getDisplayMatching(window.getBounds());
   const next = normalizeDisplay(input, display);
+  const [width, height] = window.getContentSize();
+  // Saved startup preferences are intent until the first native transition completes.
+  // Roll back to the actual mode, retaining the stored windowed size while fullscreen.
+  const previous = window.isFullScreen()
+    ? { ...preferences, fullscreen: true }
+    : { fullscreen: false, width, height };
   displayUpdating = true;
   manualResize = false;
   clearTimeout(resizeTimer);
   try {
-    await applyConfirmedDisplay(window, preferences, next, (confirmed) => {
+    await applyConfirmedDisplay(window, previous, next, (confirmed) => {
       preferences = confirmed;
       savePreferences();
     });
@@ -201,33 +247,35 @@ async function quitFailure() {
   quitWarningOpen = true;
   let response;
   try {
-    ({ response } = await dialog.showMessageBox(
-      window,
-      crashed
-        ? {
-            type: "warning",
-            title: "Restart or quit",
-            message: "The game stopped unexpectedly.",
-            detail:
-              "Your previous saves are safe. Restart to reload the game using the last saved state, or quit.",
-            buttons: ["Restart game", "Quit with previous save"],
-            defaultId: 0,
-            cancelId: 0,
-          }
-        : {
-            type: "warning",
-            title: "Save before quitting",
-            message: "Your latest game could not finish saving.",
-            detail:
-              "Your previous saves are safe. You can retry, return to the game, or quit using the last saved state.",
-            buttons: [
-              "Retry saving",
-              "Return to game",
-              "Quit with previous save",
-            ],
-            defaultId: 0,
-            cancelId: 1,
-          },
+    ({ response } = await steam.withNativeDialog(() =>
+      dialog.showMessageBox(
+        window,
+        crashed
+          ? {
+              type: "warning",
+              title: "Restart or quit",
+              message: "The game stopped unexpectedly.",
+              detail:
+                "Your previous saves are safe. Restart to reload the game using the last saved state, or quit.",
+              buttons: ["Restart game", "Quit with previous save"],
+              defaultId: 0,
+              cancelId: 0,
+            }
+          : {
+              type: "warning",
+              title: "Save before quitting",
+              message: "Your latest game could not finish saving.",
+              detail:
+                "Your previous saves are safe. You can retry, return to the game, or quit using the last saved state.",
+              buttons: [
+                "Retry saving",
+                "Return to game",
+                "Quit with previous save",
+              ],
+              defaultId: 0,
+              cancelId: 1,
+            },
+      ),
     ));
   } finally {
     quitWarningOpen = false;
@@ -235,6 +283,7 @@ async function quitFailure() {
   if (response === (crashed ? 1 : 2)) return finishQuit();
   quitRequested = false;
   displayChanges.resume();
+  publishGameFocus();
   if (!window || window.isDestroyed()) return finishQuit();
   // The renderer can also die while the ordinary save warning is already open.
   // Both Retry and Return then recover the game instead of pretending to save it.
@@ -247,6 +296,7 @@ function requestQuit() {
   if (!window || window.isDestroyed() || (!rendererReady && !rendererCrashed))
     return finishQuit();
   quitRequested = true;
+  publishGameFocus();
   displayChanges.pause();
   if (rendererCrashed) return quitFailure();
   window.webContents.send("desktop:before-quit");
@@ -266,8 +316,20 @@ function handle(channel, callback) {
 handle("desktop:state", () => {
   rendererReady = true;
   rendererCrashed = false;
+  publishGameFocus();
   void steam.flushScores();
   return state();
+});
+handle("desktop:resume-ready", (generation) => {
+  if (!Number.isSafeInteger(generation) || generation < 0)
+    throw new Error("Invalid power generation");
+  // An old checkpoint completing after another sleep must never re-enable held input.
+  if (power.phase !== "resuming" || generation !== power.generation) return;
+  power = { ...power, phase: "awake" };
+  window.webContents.send("desktop:power-changed", { ...power });
+  publishGameFocus();
+  publishState();
+  void steam.flushScores();
 });
 handle("desktop:display", applyDisplay);
 handle("desktop:quit", requestQuit);
@@ -295,8 +357,27 @@ handle("desktop:friends", () => {
 });
 handle("desktop:activity", (activity) => steam.setActivity(activity));
 handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
+handle("desktop:input-context", (context) => steam.setInputContext(context));
+handle("desktop:text-input", (input) => {
+  if (
+    !window?.isFocused() ||
+    steam.overlayActive ||
+    steam.dialogs?.active ||
+    quitRequested ||
+    power.phase !== "awake"
+  )
+    return { status: "unavailable" };
+  return steam.showTextInput(input);
+});
 handle("desktop:achievements", (intent) => steam.submitAchievements(intent));
 handle("desktop:readAchievements", () => steam.readAchievements());
+// Like the multiplayer bridge, mod requests resolve with player-facing errors rather than
+// rejecting, so the renderer never shows Electron's IPC wrapper text.
+handle("desktop:mods", (input) =>
+  modStore
+    ? modStore.request(input)
+    : { entries: [], error: "Mod management is still starting. Try again." },
+);
 function multiplayerRequest(input) {
   if (!steam.multiplayer && (!steam.state().online || !steam.dispatcher)) {
     if (input?.kind === "state")
@@ -360,6 +441,18 @@ function openExternal(url) {
   }
 }
 
+/** Opens a Steam Community page in the overlay, or the browser when Steam isn't running. */
+function openSteamPage(url) {
+  if (steam.state().online && steam.client)
+    try {
+      steam.client.overlay.activateToWebPage(url);
+      return;
+    } catch (error) {
+      console.warn(`Steam overlay unavailable: ${error.message}`);
+    }
+  openExternal(url);
+}
+
 async function createWindow() {
   if (!fs.existsSync(path.join(root, "index.html")))
     throw new Error("Run npm run desktop:build before opening Electrify");
@@ -370,6 +463,35 @@ async function createWindow() {
     preferences = normalizeDisplay(null, display);
   }
   saves = new DesktopSaveStore(app.getPath("userData"), steam);
+  modStore = new ModStore(app.getPath("userData"), {
+    appId: config.appId,
+    workshop: () => {
+      if (!steam.state().online || !steam.dispatcher) return null;
+      workshop ??= new SteamWorkshop(steam, config.appId);
+      return workshop;
+    },
+    chooseFile: () =>
+      steam.withNativeDialog(async () => {
+        const result = await dialog.showOpenDialog(window, {
+          title: "Import data-only scenario mod",
+          properties: ["openFile"],
+          filters: [{ name: "Scenario package", extensions: ["json"] }],
+        });
+        return result.canceled ? undefined : result.filePaths[0];
+      }),
+    chooseSave: () =>
+      steam.withNativeDialog(async () => {
+        const result = await dialog.showSaveDialog(window, {
+          title: "Save scenario mod template",
+          defaultPath: "scenario.json",
+          filters: [{ name: "Scenario package", extensions: ["json"] }],
+        });
+        return result.canceled ? undefined : result.filePath;
+      }),
+    openUrl: openSteamPage,
+  });
+  // Upload stages from an earlier session; a failure is logged and never blocks launch.
+  void modStore.cleanupStages();
   steam.configureScoreQueue(saves.directory);
   steam.configureAchievements(saves.directory, config.appId);
   if (steam.state().online) {
@@ -398,7 +520,7 @@ async function createWindow() {
   const policy = contentPolicy();
   await isolatedSession.protocol.handle("electrify", async (request) => {
     try {
-      const filename = resolveAsset(root, request.url);
+      const filename = resolveAsset(root, request.url, runtimeNotices);
       const data = await fs.promises.readFile(filename);
       const headers = {
         "Content-Type":
@@ -436,7 +558,6 @@ async function createWindow() {
     width: preferences.width,
     height: preferences.height,
     useContentSize: true,
-    fullscreen: preferences.fullscreen,
     fullscreenable: true,
     show: false,
     minWidth: Math.min(800, display.workAreaSize.width),
@@ -499,10 +620,22 @@ async function createWindow() {
     // A crashed renderer can't answer the save handshake; don't make Quit wait for it.
     rendererReady = false;
     rendererCrashed = true;
+    steam.setInputEnabled(false);
     if (quitRequested && !finalizingQuit) void quitFailure();
   });
   window.on("blur", publishGameFocus);
   window.on("focus", publishGameFocus);
+  window.webContents.on("did-start-loading", () => {
+    rendererReady = false;
+    steam.setInputEnabled(false);
+  });
+  const inputManifest = app.isPackaged
+    ? path.join(process.resourcesPath, "steam-input", "actions.vdf")
+    : path.join(app.getAppPath(), "steamworks", "input", "actions.vdf");
+  steam.configureInput(inputManifest, (frame) => {
+    if (window && !window.isDestroyed() && rendererReady)
+      window.webContents.send("desktop:input-event", frame);
+  });
   window.on("leave-full-screen", () => {
     if (displayUpdating) return;
     preferences.fullscreen = false;
@@ -540,15 +673,11 @@ async function createWindow() {
     }
   });
   window.once("ready-to-show", () => {
-    if (preferences.fullscreen) window.show();
-    else
-      void applyDisplay(preferences)
-        .catch((error) =>
-          console.error("Display change failed:", error.message),
-        )
-        .then(() => {
-          if (!window.isDestroyed()) window.show();
-        });
+    void showWithConfirmedDisplay(
+      window,
+      { ...preferences },
+      applyDisplay,
+    ).catch((error) => console.error("Display change failed:", error.message));
   });
   await window.loadURL(APP_URL);
   let previousSteamState = JSON.stringify(steam.state());
@@ -564,6 +693,7 @@ async function createWindow() {
   }, 5000);
   steamTimer.unref();
   window.once("closed", () => {
+    steam.input?.dispose();
     clearInterval(steamTimer);
     clearTimeout(resizeTimer);
   });
@@ -594,7 +724,15 @@ else {
   });
   app
     .whenReady()
-    .then(createWindow)
+    .then(() => {
+      powerMonitor.on("suspend", () => {
+        if (power.phase !== "suspended") publishPower("suspended");
+      });
+      powerMonitor.on("resume", () => {
+        if (power.phase === "suspended") publishPower("resuming");
+      });
+      return createWindow();
+    })
     .catch((error) => {
       console.error("Electrify startup failed:", error);
       dialog.showErrorBox("Electrify could not start", error.message);

@@ -53,6 +53,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "--config=e2e/playwright.config.ts",
       "multiline-text.spec.ts",
       "modal-layout.spec.ts",
+      "wildfire-scenario.spec.ts",
       ...projects,
       "--project=mobile-360px",
     ]),

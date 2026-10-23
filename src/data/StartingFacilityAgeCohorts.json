@@ -1,0 +1,7007 @@
+{
+  "firstYear": 2010,
+  "referenceYear": 2020,
+  "source": {
+    "title": "World Resources Institute Global Power Plant Database v1.3.0",
+    "url": "https://raw.githubusercontent.com/wri/global-power-plant-database/7a91cfbb2a4e272597acbc00506d61fc1ec73b3d/output_database/global_power_plant_database.csv",
+    "commit": "7a91cfbb2a4e272597acbc00506d61fc1ec73b3d",
+    "sha256": "4b1f93e0fd93664f18684d9b05d0a52ed9658c6a8cf0d21ff2520791379ba7fc",
+    "license": "CC BY 4.0",
+    "plantCount": 34936
+  },
+  "global": {
+    "Biomass": {
+      "capacityMW": 34281.3,
+      "knownCapacityMW": 20713.41,
+      "ages": [18, 17, 17, 17, 17, 17, 18, 18, 19, 20, 21]
+    },
+    "Coal": {
+      "capacityMW": 1965541,
+      "knownCapacityMW": 1722337.26,
+      "ages": [17, 17, 17, 17, 18, 18, 18, 18, 19, 20, 21]
+    },
+    "Geothermal": {
+      "capacityMW": 12687.75,
+      "knownCapacityMW": 7435.5,
+      "ages": [20, 20, 21, 22, 22, 22, 22, 23, 24, 24, 25]
+    },
+    "Hydro": {
+      "capacityMW": 1053159.62,
+      "knownCapacityMW": 604220.08,
+      "ages": [30, 30, 31, 30, 30, 30, 30, 31, 31, 32, 33]
+    },
+    "Natural Gas": {
+      "capacityMW": 1493050.6,
+      "knownCapacityMW": 965405.9,
+      "ages": [17, 18, 18, 19, 19, 19, 20, 21, 21, 22, 23]
+    },
+    "Oil": {
+      "capacityMW": 264303.29,
+      "knownCapacityMW": 125844.69,
+      "ages": [23, 22, 23, 23, 21, 21, 22, 21, 22, 23, 24]
+    },
+    "Sun": {
+      "capacityMW": 188312.32,
+      "knownCapacityMW": 44984.02,
+      "ages": [10, 7, 5, 4, 3, 3, 3, 3, 4, 4, 5]
+    },
+    "Uranium": {
+      "capacityMW": 407911.76,
+      "knownCapacityMW": 155062.96,
+      "ages": [26, 27, 28, 29, 30, 31, 31, 32, 33, 34, 35]
+    },
+    "Wind": {
+      "capacityMW": 263053.73,
+      "knownCapacityMW": 144068.42,
+      "ages": [4, 4, 5, 5, 6, 6, 6, 7, 7, 8, 8]
+    }
+  },
+  "regions": {
+    "Africa": {
+      "Biomass": {
+        "capacityMW": 265.69,
+        "knownCapacityMW": 3.5,
+        "ages": [null, null, null, null, 1, 2, 3, 4, 5, 6, 7]
+      },
+      "Coal": {
+        "capacityMW": 45097.3,
+        "knownCapacityMW": 43139,
+        "ages": [26, 27, 28, 29, 30, 31, 32, 33, 34, 34, 35]
+      },
+      "Geothermal": {
+        "capacityMW": 761.3,
+        "knownCapacityMW": 761.3,
+        "ages": [29, 30, 31, 32, 32, 24, 16, 17, 18, 19, 20]
+      },
+      "Hydro": {
+        "capacityMW": 28014.11,
+        "knownCapacityMW": 19665.7,
+        "ages": [33, 32, 33, 34, 34, 35, 33, 33, 34, 35, 36]
+      },
+      "Natural Gas": {
+        "capacityMW": 63376.75,
+        "knownCapacityMW": 31152,
+        "ages": [13, 12, 12, 12, 12, 12, 12, 12, 13, 14, 15]
+      },
+      "Oil": {
+        "capacityMW": 7396.95,
+        "knownCapacityMW": 3656.6,
+        "ages": [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+      },
+      "Sun": {
+        "capacityMW": 4847.14,
+        "knownCapacityMW": 2055.54,
+        "ages": [null, null, null, 1, 1, 1, 2, 2, 3, 4, 5]
+      },
+      "Uranium": {
+        "capacityMW": 1800,
+        "knownCapacityMW": 1800,
+        "ages": [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+      },
+      "Wind": {
+        "capacityMW": 4469.16,
+        "knownCapacityMW": 3322.26,
+        "ages": [5, 5, 6, 7, 5, 3, 3, 3, 4, 5, 6]
+      }
+    },
+    "Caucasus": {
+      "Hydro": {
+        "capacityMW": 4520.4,
+        "knownCapacityMW": 973,
+        "ages": [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]
+      },
+      "Natural Gas": {
+        "capacityMW": 5571,
+        "knownCapacityMW": 2661,
+        "ages": [4, 4, 5, 6, 6, 7, 8, 9, 10, 11, 12]
+      },
+      "Oil": {
+        "capacityMW": 2400,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 375,
+        "knownCapacityMW": 375,
+        "ages": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+      }
+    },
+    "Central Asia": {
+      "Coal": {
+        "capacityMW": 18390,
+        "knownCapacityMW": 15250,
+        "ages": [29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
+      },
+      "Hydro": {
+        "capacityMW": 3468.55,
+        "knownCapacityMW": 2082,
+        "ages": [37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]
+      },
+      "Natural Gas": {
+        "capacityMW": 9020,
+        "knownCapacityMW": 7220,
+        "ages": [26, 27, 28, 29, 30, 28, 29, 30, 31, 32, 33]
+      },
+      "Oil": {
+        "capacityMW": 300,
+        "knownCapacityMW": 300,
+        "ages": [54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64]
+      },
+      "Sun": {
+        "capacityMW": 390,
+        "knownCapacityMW": 50,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 4, 5]
+      }
+    },
+    "East Asia": {
+      "Biomass": {
+        "capacityMW": 688,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 1091430.22,
+        "knownCapacityMW": 1028821.17,
+        "ages": [9, 10, 10, 10, 11, 11, 12, 12, 13, 14, 15]
+      },
+      "Geothermal": {
+        "capacityMW": 636.4,
+        "knownCapacityMW": 372.4,
+        "ages": [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
+      },
+      "Hydro": {
+        "capacityMW": 341944.6,
+        "knownCapacityMW": 200091.54,
+        "ages": [20, 20, 20, 20, 19, 18, 19, 19, 20, 21, 22]
+      },
+      "Natural Gas": {
+        "capacityMW": 263085.77,
+        "knownCapacityMW": 118050.64,
+        "ages": [38, 37, 38, 38, 38, 37, 37, 37, 38, 39, 40]
+      },
+      "Oil": {
+        "capacityMW": 52203.27,
+        "knownCapacityMW": 1044,
+        "ages": [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+      },
+      "Sun": {
+        "capacityMW": 61653.92,
+        "knownCapacityMW": 292.5,
+        "ages": [null, null, 1, 2, 3, 3, 3, 3, 4, 5, 6]
+      },
+      "Uranium": {
+        "capacityMW": 132397,
+        "knownCapacityMW": 7480,
+        "ages": [19, 20, 21, 16, 17, 18, 19, 20, 21, 22, 23]
+      },
+      "Wind": {
+        "capacityMW": 51828.82,
+        "knownCapacityMW": 467.26,
+        "ages": [5, 6, 7, 8, 8, 8, 9, 10, 11, 12, 13]
+      }
+    },
+    "Europe": {
+      "Biomass": {
+        "capacityMW": 8944.64,
+        "knownCapacityMW": 2775.9,
+        "ages": [13, 14, 15, 15, 14, 15, 16, 17, 18, 19, 20]
+      },
+      "Coal": {
+        "capacityMW": 231023.43,
+        "knownCapacityMW": 160257.88,
+        "ages": [34, 35, 36, 37, 38, 38, 38, 39, 39, 40, 41]
+      },
+      "Geothermal": {
+        "capacityMW": 1550.3,
+        "knownCapacityMW": 1457.8,
+        "ages": [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+      },
+      "Hydro": {
+        "capacityMW": 206354.51,
+        "knownCapacityMW": 92618.7,
+        "ages": [44, 45, 45, 45, 46, 47, 48, 48, 49, 50, 51]
+      },
+      "Natural Gas": {
+        "capacityMW": 288025.46,
+        "knownCapacityMW": 160450,
+        "ages": [29, 29, 29, 29, 30, 30, 31, 32, 33, 34, 35]
+      },
+      "Oil": {
+        "capacityMW": 28803.44,
+        "knownCapacityMW": 8654.97,
+        "ages": [26, 27, 28, 29, 29, 30, 31, 32, 33, 32, 33]
+      },
+      "Sun": {
+        "capacityMW": 32512.66,
+        "knownCapacityMW": 2559.1,
+        "ages": [1, 2, 2, 2, 3, 4, 5, 5, 6, 7, 8]
+      },
+      "Uranium": {
+        "capacityMW": 164054.66,
+        "knownCapacityMW": 34984.86,
+        "ages": [24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+      },
+      "Wind": {
+        "capacityMW": 63952.32,
+        "knownCapacityMW": 24158.3,
+        "ages": [4, 5, 6, 6, 7, 7, 7, 8, 9, 10, 11]
+      }
+    },
+    "Middle East": {
+      "Coal": {
+        "capacityMW": 22547,
+        "knownCapacityMW": 5713,
+        "ages": [22, 23, 24, 25, 26, 27, 26, 27, 22, 23, 24]
+      },
+      "Geothermal": {
+        "capacityMW": 480,
+        "knownCapacityMW": 298,
+        "ages": [1, 2, 3, 3, 2, 3, 3, 4, 5, 6, 7]
+      },
+      "Hydro": {
+        "capacityMW": 28775.5,
+        "knownCapacityMW": 9139.5,
+        "ages": [22, 23, 21, 20, 19, 20, 19, 20, 21, 22, 23]
+      },
+      "Natural Gas": {
+        "capacityMW": 186664.22,
+        "knownCapacityMW": 107485.72,
+        "ages": [10, 11, 10, 11, 11, 11, 11, 12, 13, 14, 15]
+      },
+      "Oil": {
+        "capacityMW": 72962.23,
+        "knownCapacityMW": 55838.03,
+        "ages": [14, 12, 13, 13, 10, 10, 11, 10, 11, 12, 13]
+      },
+      "Sun": {
+        "capacityMW": 4054.7,
+        "knownCapacityMW": 543.3,
+        "ages": [1, 2, 3, 3, 1, 2, 2, 3, 4, 4, 5]
+      },
+      "Uranium": {
+        "capacityMW": 1000,
+        "knownCapacityMW": 1000,
+        "ages": [null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+      },
+      "Wind": {
+        "capacityMW": 532.5,
+        "knownCapacityMW": 282.5,
+        "ages": [10, 11, 2, 3, 4, 3, 4, 5, 5, 6, 7]
+      }
+    },
+    "North America": {
+      "Biomass": {
+        "capacityMW": 9471.6,
+        "knownCapacityMW": 6003.3,
+        "ages": [26, 27, 28, 28, 29, 29, 29, 30, 31, 32, 33]
+      },
+      "Coal": {
+        "capacityMW": 265296.7,
+        "knownCapacityMW": 249670,
+        "ages": [32, 33, 33, 34, 35, 36, 37, 38, 39, 40, 41]
+      },
+      "Geothermal": {
+        "capacityMW": 5447.55,
+        "knownCapacityMW": 3982,
+        "ages": [22, 23, 24, 24, 24, 25, 25, 26, 27, 27, 28]
+      },
+      "Hydro": {
+        "capacityMW": 199482.06,
+        "knownCapacityMW": 102618.7,
+        "ages": [46, 47, 48, 49, 50, 50, 51, 52, 53, 54, 55]
+      },
+      "Natural Gas": {
+        "capacityMW": 593010.6,
+        "knownCapacityMW": 547199.8,
+        "ages": [16, 17, 17, 18, 19, 19, 20, 21, 22, 22, 23]
+      },
+      "Oil": {
+        "capacityMW": 61561.65,
+        "knownCapacityMW": 40377.4,
+        "ages": [29, 30, 30, 31, 32, 33, 34, 35, 36, 37, 38]
+      },
+      "Sun": {
+        "capacityMW": 43645.1,
+        "knownCapacityMW": 38250.6,
+        "ages": [14, 11, 8, 5, 3, 3, 3, 3, 3, 4, 4]
+      },
+      "Uranium": {
+        "capacityMW": 119997.1,
+        "knownCapacityMW": 104233.1,
+        "ages": [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38]
+      },
+      "Wind": {
+        "capacityMW": 118495.5,
+        "knownCapacityMW": 104548,
+        "ages": [3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8]
+      }
+    },
+    "Oceania": {
+      "Biomass": {
+        "capacityMW": 613.8,
+        "knownCapacityMW": 10,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 4, 5]
+      },
+      "Coal": {
+        "capacityMW": 26043,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Geothermal": {
+        "capacityMW": 696,
+        "knownCapacityMW": 564,
+        "ages": [13, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+      },
+      "Hydro": {
+        "capacityMW": 13283.3,
+        "knownCapacityMW": 1532,
+        "ages": [44, 45, 46, 46, 47, 48, 49, 50, 51, 52, 53]
+      },
+      "Natural Gas": {
+        "capacityMW": 20590.72,
+        "knownCapacityMW": 463,
+        "ages": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+      },
+      "Oil": {
+        "capacityMW": 1468.45,
+        "knownCapacityMW": 247,
+        "ages": [11, 12, 4, 5, 6, 7, 6, 7, 8, 9, 10]
+      },
+      "Sun": {
+        "capacityMW": 4159.67,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 6207.28,
+        "knownCapacityMW": 461.65,
+        "ages": [3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      }
+    },
+    "South America": {
+      "Biomass": {
+        "capacityMW": 13670.41,
+        "knownCapacityMW": 11918.71,
+        "ages": [13, 11, 11, 11, 11, 11, 12, 13, 14, 15, 16]
+      },
+      "Coal": {
+        "capacityMW": 14014.55,
+        "knownCapacityMW": 8986.68,
+        "ages": [29, 30, 29, 30, 29, 30, 31, 31, 32, 33, 34]
+      },
+      "Hydro": {
+        "capacityMW": 155545.91,
+        "knownCapacityMW": 123034.82,
+        "ages": [26, 26, 26, 26, 26, 27, 27, 27, 28, 29, 30]
+      },
+      "Natural Gas": {
+        "capacityMW": 49363.59,
+        "knownCapacityMW": 24835.42,
+        "ages": [14, 15, 16, 16, 16, 16, 17, 18, 19, 20, 21]
+      },
+      "Oil": {
+        "capacityMW": 13622.46,
+        "knownCapacityMW": 8166.95,
+        "ages": [19, 15, 14, 15, 14, 15, 16, 16, 17, 18, 19]
+      },
+      "Sun": {
+        "capacityMW": 6953.93,
+        "knownCapacityMW": 25.49,
+        "ages": [null, null, 1, 1, 2, 3, 4, 5, 6, 7, 8]
+      },
+      "Uranium": {
+        "capacityMW": 3753,
+        "knownCapacityMW": 3753,
+        "ages": [20, 21, 22, 23, 24, 20, 21, 22, 23, 24, 25]
+      },
+      "Wind": {
+        "capacityMW": 12847.4,
+        "knownCapacityMW": 10280.75,
+        "ages": [2, 3, 3, 3, 4, 3, 3, 3, 4, 5, 6]
+      }
+    },
+    "South Asia": {
+      "Biomass": {
+        "capacityMW": 1003.26,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 209177.22,
+        "knownCapacityMW": 203761,
+        "ages": [13, 12, 12, 12, 11, 11, 11, 11, 12, 12, 13]
+      },
+      "Hydro": {
+        "capacityMW": 55780.72,
+        "knownCapacityMW": 47655.07,
+        "ages": [21, 22, 22, 23, 23, 24, 24, 25, 25, 26, 27]
+      },
+      "Natural Gas": {
+        "capacityMW": 36567.51,
+        "knownCapacityMW": 30147.21,
+        "ages": [10, 10, 11, 11, 12, 12, 13, 13, 14, 15, 16]
+      },
+      "Oil": {
+        "capacityMW": 10298.84,
+        "knownCapacityMW": 6793.14,
+        "ages": [22, 22, 21, 21, 22, 23, 24, 25, 26, 27, 28]
+      },
+      "Sun": {
+        "capacityMW": 26334.9,
+        "knownCapacityMW": 678.5,
+        "ages": [null, null, 1, 2, 1, 2, 2, 3, 4, 5, 6]
+      },
+      "Uranium": {
+        "capacityMW": 10247,
+        "knownCapacityMW": 6917,
+        "ages": [15, 16, 17, 18, 19, 20, 15, 16, 17, 18, 19]
+      },
+      "Wind": {
+        "capacityMW": 4282.15,
+        "knownCapacityMW": 400,
+        "ages": [null, null, null, null, null, 1, 2, 2, 3, 4, 5]
+      }
+    },
+    "Southeast Asia": {
+      "Biomass": {
+        "capacityMW": 147.9,
+        "knownCapacityMW": 2,
+        "ages": [null, null, null, null, null, 1, 2, 3, 4, 5, 6]
+      },
+      "Coal": {
+        "capacityMW": 73001.3,
+        "knownCapacityMW": 36428.7,
+        "ages": [7, 7, 7, 8, 9, 9, 10, 9, 9, 10, 11]
+      },
+      "Geothermal": {
+        "capacityMW": 3190.2,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 37230.84,
+        "knownCapacityMW": 26253.39,
+        "ages": [14, 12, 12, 10, 11, 11, 11, 12, 13, 14, 15]
+      },
+      "Natural Gas": {
+        "capacityMW": 77428.9,
+        "knownCapacityMW": 14968.55,
+        "ages": [14, 14, 15, 16, 17, 15, 15, 15, 16, 17, 18]
+      },
+      "Oil": {
+        "capacityMW": 7859.53,
+        "knownCapacityMW": 98,
+        "ages": [9, 10, 11, 12, 13, 14, 15, 10, 10, 11, 12]
+      },
+      "Sun": {
+        "capacityMW": 4515.8,
+        "knownCapacityMW": 686.2,
+        "ages": [null, null, null, null, null, null, null, 1, 2, 3, 4]
+      },
+      "Wind": {
+        "capacityMW": 449.9,
+        "knownCapacityMW": 155,
+        "ages": [8, 9, 10, 11, 12, 13, 14, 1, 2, 3, 4]
+      }
+    }
+  },
+  "countries": {
+    "Afghanistan": {
+      "Hydro": {
+        "capacityMW": 238.55,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 42,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 20,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Algeria": {
+      "Hydro": {
+        "capacityMW": 24,
+        "knownCapacityMW": 24,
+        "ages": [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68]
+      },
+      "Natural Gas": {
+        "capacityMW": 15179,
+        "knownCapacityMW": 9548,
+        "ages": [9, 8, 9, 10, 7, 8, 8, 8, 9, 10, 11]
+      },
+      "Sun": {
+        "capacityMW": 670.8,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Angola": {
+      "Hydro": {
+        "capacityMW": 770.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 163.68,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 136.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Argentina": {
+      "Coal": {
+        "capacityMW": 4857.4,
+        "knownCapacityMW": 4844.2,
+        "ages": [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42]
+      },
+      "Hydro": {
+        "capacityMW": 9999.71,
+        "knownCapacityMW": 9921.51,
+        "ages": [25, 26, 27, 27, 28, 29, 30, 31, 32, 33, 34]
+      },
+      "Natural Gas": {
+        "capacityMW": 13041.84,
+        "knownCapacityMW": 9904.96,
+        "ages": [13, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+      },
+      "Oil": {
+        "capacityMW": 1199.29,
+        "knownCapacityMW": 35.49,
+        "ages": [67, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+      },
+      "Sun": {
+        "capacityMW": 515.7,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 1763,
+        "knownCapacityMW": 1763,
+        "ages": [30, 31, 32, 33, 34, 20, 21, 22, 23, 24, 25]
+      },
+      "Wind": {
+        "capacityMW": 211.68,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Armenia": {
+      "Hydro": {
+        "capacityMW": 965,
+        "knownCapacityMW": 404,
+        "ages": [33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43]
+      },
+      "Natural Gas": {
+        "capacityMW": 1931,
+        "knownCapacityMW": 271,
+        "ages": [null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      },
+      "Uranium": {
+        "capacityMW": 375,
+        "knownCapacityMW": 375,
+        "ages": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+      }
+    },
+    "Australia": {
+      "Biomass": {
+        "capacityMW": 589.5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 25543,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 8521.3,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 20011.72,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 1099.57,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 4159.67,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 5738.63,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Austria": {
+      "Hydro": {
+        "capacityMW": 9072.1,
+        "knownCapacityMW": 8641.1,
+        "ages": [37, 38, 36, 37, 38, 39, 40, 41, 42, 43, 44]
+      },
+      "Natural Gas": {
+        "capacityMW": 2067,
+        "knownCapacityMW": 2067,
+        "ages": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+      },
+      "Wind": {
+        "capacityMW": 88,
+        "knownCapacityMW": 67,
+        "ages": [10, 11, 12, 13, 14, 4, 4, 5, 6, 7, 8]
+      }
+    },
+    "Azerbaijan": {
+      "Hydro": {
+        "capacityMW": 974,
+        "knownCapacityMW": 569,
+        "ages": [44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54]
+      },
+      "Natural Gas": {
+        "capacityMW": 2390,
+        "knownCapacityMW": 2390,
+        "ages": [4, 5, 6, 7, 6, 7, 8, 9, 10, 11, 12]
+      },
+      "Oil": {
+        "capacityMW": 2400,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Bahamas": {},
+    "Bahrain": {
+      "Natural Gas": {
+        "capacityMW": 7574,
+        "knownCapacityMW": 3465,
+        "ages": [7, 8, 9, 6, 7, 8, 9, 10, 11, 12, 13]
+      },
+      "Oil": {
+        "capacityMW": 7.3,
+        "knownCapacityMW": 7.3,
+        "ages": [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
+      },
+      "Sun": {
+        "capacityMW": 5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Bangladesh": {
+      "Coal": {
+        "capacityMW": 250,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 230,
+        "knownCapacityMW": 230,
+        "ages": [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58]
+      },
+      "Natural Gas": {
+        "capacityMW": 8767,
+        "knownCapacityMW": 3533,
+        "ages": [10, 11, 12, 12, 13, 14, 15, 16, 17, 18, 19]
+      },
+      "Oil": {
+        "capacityMW": 2560,
+        "knownCapacityMW": 1061,
+        "ages": [34, 35, 28, 21, 22, 23, 24, 25, 26, 27, 28]
+      },
+      "Sun": {
+        "capacityMW": 33,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Barbados": {},
+    "Belarus": {
+      "Natural Gas": {
+        "capacityMW": 8302,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 232.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Belgium": {
+      "Biomass": {
+        "capacityMW": 363,
+        "knownCapacityMW": 95,
+        "ages": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+      },
+      "Coal": {
+        "capacityMW": 470,
+        "knownCapacityMW": 470,
+        "ages": [42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52]
+      },
+      "Hydro": {
+        "capacityMW": 1393.3,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 3855.8,
+        "knownCapacityMW": 2817,
+        "ages": [12, 11, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+      },
+      "Oil": {
+        "capacityMW": 182,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 116.2,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 5925.8,
+        "knownCapacityMW": 5925.8,
+        "ages": [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37]
+      },
+      "Wind": {
+        "capacityMW": 875.3,
+        "knownCapacityMW": 564.6,
+        "ages": [null, 1, 2, 3, 2, 3, 4, 5, 6, 7, 8]
+      }
+    },
+    "Bolivia": {
+      "Hydro": {
+        "capacityMW": 449.1,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 1053.42,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 60.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Botswana": {
+      "Coal": {
+        "capacityMW": 746,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Brazil": {
+      "Biomass": {
+        "capacityMW": 12843.81,
+        "knownCapacityMW": 11888.71,
+        "ages": [13, 11, 11, 11, 11, 11, 12, 13, 14, 15, 16]
+      },
+      "Coal": {
+        "capacityMW": 2792.88,
+        "knownCapacityMW": 2749.48,
+        "ages": [26, 26, 23, 24, 18, 19, 20, 21, 22, 23, 24]
+      },
+      "Hydro": {
+        "capacityMW": 98039.38,
+        "knownCapacityMW": 97631.91,
+        "ages": [26, 26, 26, 26, 26, 27, 27, 27, 28, 29, 30]
+      },
+      "Natural Gas": {
+        "capacityMW": 11286,
+        "knownCapacityMW": 11164.46,
+        "ages": [8, 9, 9, 10, 11, 11, 12, 12, 13, 14, 15]
+      },
+      "Oil": {
+        "capacityMW": 8281.47,
+        "knownCapacityMW": 7902.46,
+        "ages": [19, 15, 14, 15, 14, 15, 16, 16, 17, 18, 19]
+      },
+      "Sun": {
+        "capacityMW": 1807.37,
+        "knownCapacityMW": 5.49,
+        "ages": [null, null, 1, 2, 3, 2, 3, 4, 5, 6, 7]
+      },
+      "Uranium": {
+        "capacityMW": 1990,
+        "knownCapacityMW": 1990,
+        "ages": [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+      },
+      "Wind": {
+        "capacityMW": 10294.95,
+        "knownCapacityMW": 10280.75,
+        "ages": [2, 3, 3, 3, 4, 3, 3, 3, 4, 5, 6]
+      }
+    },
+    "Brunei": {
+      "Natural Gas": {
+        "capacityMW": 586,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Bulgaria": {
+      "Coal": {
+        "capacityMW": 4859,
+        "knownCapacityMW": 4569,
+        "ages": [33, 34, 30, 31, 32, 33, 34, 35, 36, 37, 38]
+      },
+      "Hydro": {
+        "capacityMW": 1958,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 279.2,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 2000,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 156,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Burkina Faso": {
+      "Hydro": {
+        "capacityMW": 30,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 146.41,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 52.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Cambodia": {
+      "Biomass": {
+        "capacityMW": 2,
+        "knownCapacityMW": 2,
+        "ages": [null, null, null, null, null, 1, 2, 3, 4, 5, 6]
+      },
+      "Coal": {
+        "capacityMW": 505,
+        "knownCapacityMW": 505,
+        "ages": [null, null, null, null, null, 1, 1, 2, 3, 4, 5]
+      },
+      "Hydro": {
+        "capacityMW": 909,
+        "knownCapacityMW": 909,
+        "ages": [8, 9, 2, 3, 3, 2, 3, 4, 5, 6, 7]
+      },
+      "Oil": {
+        "capacityMW": 53.6,
+        "knownCapacityMW": 53.6,
+        "ages": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+      },
+      "Sun": {
+        "capacityMW": 22.8,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Canada": {
+      "Biomass": {
+        "capacityMW": 2741.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 9772,
+        "knownCapacityMW": 98,
+        "ages": [52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62]
+      },
+      "Hydro": {
+        "capacityMW": 80683,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 19786.4,
+        "knownCapacityMW": 1869,
+        "ages": [15, 16, 17, 18, 19, 19, 20, 21, 22, 23, 24]
+      },
+      "Oil": {
+        "capacityMW": 2344,
+        "knownCapacityMW": 244,
+        "ages": [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]
+      },
+      "Sun": {
+        "capacityMW": 1826.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 14254,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 12133.8,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Chile": {
+      "Biomass": {
+        "capacityMW": 383.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 4839.27,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 6410,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 2998.11,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 2993.8,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 3953.75,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 896.82,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "China": {
+      "Coal": {
+        "capacityMW": 955718,
+        "knownCapacityMW": 942686,
+        "ages": [7, 7, 8, 8, 9, 9, 10, 10, 11, 12, 13]
+      },
+      "Geothermal": {
+        "capacityMW": 26.1,
+        "knownCapacityMW": 26.1,
+        "ages": [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42]
+      },
+      "Hydro": {
+        "capacityMW": 259025.6,
+        "knownCapacityMW": 169141.3,
+        "ages": [13, 13, 14, 14, 13, 13, 14, 14, 15, 16, 17]
+      },
+      "Natural Gas": {
+        "capacityMW": 59774.5,
+        "knownCapacityMW": 13314.6,
+        "ages": [5, 5, 6, 7, 7, 8, 9, 10, 11, 12, 13]
+      },
+      "Oil": {
+        "capacityMW": 1329,
+        "knownCapacityMW": 300,
+        "ages": [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
+      },
+      "Sun": {
+        "capacityMW": 54801.82,
+        "knownCapacityMW": 100,
+        "ages": [null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+      },
+      "Uranium": {
+        "capacityMW": 33402,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 50990.36,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Colombia": {
+      "Coal": {
+        "capacityMW": 1393,
+        "knownCapacityMW": 1393,
+        "ages": [22, 23, 24, 25, 26, 27, 28, 26, 27, 28, 29]
+      },
+      "Hydro": {
+        "capacityMW": 6694,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 2553,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 188,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 96,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Costa Rica": {
+      "Geothermal": {
+        "capacityMW": 198.95,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 1298,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 466.45,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Croatia": {
+      "Coal": {
+        "capacityMW": 330,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 1622.7,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 581.8,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 740,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Cuba": {
+      "Natural Gas": {
+        "capacityMW": 411,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 3366.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 10.2,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Czechia": {
+      "Coal": {
+        "capacityMW": 8363,
+        "knownCapacityMW": 7923,
+        "ages": [38, 39, 40, 41, 42, 40, 41, 38, 39, 40, 41]
+      },
+      "Hydro": {
+        "capacityMW": 1827,
+        "knownCapacityMW": 1302,
+        "ages": [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42]
+      },
+      "Natural Gas": {
+        "capacityMW": 1320,
+        "knownCapacityMW": 1320,
+        "ages": [14, 15, 16, 17, 18, 8, 9, 10, 11, 12, 13]
+      },
+      "Sun": {
+        "capacityMW": 1188.7,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 4173,
+        "knownCapacityMW": 2133,
+        "ages": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+      }
+    },
+    "DR Congo": {
+      "Hydro": {
+        "capacityMW": 3018.8,
+        "knownCapacityMW": 2950.8,
+        "ages": [37, 38, 37, 38, 39, 40, 41, 41, 40, 41, 42]
+      },
+      "Natural Gas": {
+        "capacityMW": 25,
+        "knownCapacityMW": 25,
+        "ages": [null, null, null, 1, 2, 3, 4, 5, 6, 7, 8]
+      },
+      "Oil": {
+        "capacityMW": 13.24,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Denmark": {
+      "Biomass": {
+        "capacityMW": 88,
+        "knownCapacityMW": 88,
+        "ages": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      },
+      "Coal": {
+        "capacityMW": 5089,
+        "knownCapacityMW": 3492,
+        "ages": [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38]
+      },
+      "Geothermal": {
+        "capacityMW": 14,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 571,
+        "knownCapacityMW": 473,
+        "ages": [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+      },
+      "Oil": {
+        "capacityMW": 664,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 251.1,
+        "knownCapacityMW": 63.1,
+        "ages": [null, null, null, null, 1, 2, 3, 1, 2, 3, 4]
+      },
+      "Wind": {
+        "capacityMW": 1408.1,
+        "knownCapacityMW": 1362.8,
+        "ages": [8, 6, 7, 8, 6, 7, 8, 9, 10, 11, 12]
+      }
+    },
+    "Dominican Republic": {
+      "Coal": {
+        "capacityMW": 305,
+        "knownCapacityMW": 305,
+        "ages": [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
+      },
+      "Hydro": {
+        "capacityMW": 227.09,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 319,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 842,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 113,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 52,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Ecuador": {
+      "Hydro": {
+        "capacityMW": 3254.32,
+        "knownCapacityMW": 1565,
+        "ages": [null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      },
+      "Natural Gas": {
+        "capacityMW": 473.3,
+        "knownCapacityMW": 146,
+        "ages": [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42]
+      },
+      "Oil": {
+        "capacityMW": 467.86,
+        "knownCapacityMW": 229,
+        "ages": [16, 17, 18, 19, 20, 13, 14, 15, 16, 17, 18]
+      },
+      "Sun": {
+        "capacityMW": 50,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Egypt": {
+      "Hydro": {
+        "capacityMW": 2800,
+        "knownCapacityMW": 2800,
+        "ages": [38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48]
+      },
+      "Natural Gas": {
+        "capacityMW": 29077,
+        "knownCapacityMW": 8550,
+        "ages": [10, 9, 7, 6, 7, 6, 7, 8, 9, 10, 11]
+      },
+      "Oil": {
+        "capacityMW": 1000,
+        "knownCapacityMW": 23,
+        "ages": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+      },
+      "Sun": {
+        "capacityMW": 759.5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 547,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "El Salvador": {
+      "Geothermal": {
+        "capacityMW": 204,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 469.3,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 475.2,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 270,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Estonia": {
+      "Natural Gas": {
+        "capacityMW": 423,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 1841,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 277.9,
+        "knownCapacityMW": 241.9,
+        "ages": [2, 3, 4, 3, 4, 5, 6, 7, 8, 9, 10]
+      }
+    },
+    "Ethiopia": {
+      "Geothermal": {
+        "capacityMW": 7.3,
+        "knownCapacityMW": 7.3,
+        "ages": [null, null, null, null, 1, 2, 3, 4, 5, 6, 7]
+      },
+      "Hydro": {
+        "capacityMW": 3812.6,
+        "knownCapacityMW": 3728.2,
+        "ages": [15, 9, 9, 10, 11, 12, 7, 8, 9, 10, 11]
+      },
+      "Wind": {
+        "capacityMW": 204,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Fiji": {
+      "Biomass": {
+        "capacityMW": 24.3,
+        "knownCapacityMW": 10,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 4, 5]
+      },
+      "Hydro": {
+        "capacityMW": 209,
+        "knownCapacityMW": 209,
+        "ages": [26, 27, 28, 24, 25, 26, 27, 28, 29, 30, 31]
+      },
+      "Oil": {
+        "capacityMW": 73.98,
+        "knownCapacityMW": 68,
+        "ages": [11, 12, 13, 14, 15, 16, 6, 7, 8, 9, 10]
+      },
+      "Wind": {
+        "capacityMW": 10.1,
+        "knownCapacityMW": 10.1,
+        "ages": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      }
+    },
+    "Finland": {
+      "Biomass": {
+        "capacityMW": 2180.44,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 1340,
+        "knownCapacityMW": 170,
+        "ages": [29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
+      },
+      "Hydro": {
+        "capacityMW": 2382.32,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 1924.1,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 858.8,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 2752,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 76.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "France": {
+      "Biomass": {
+        "capacityMW": 792.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 3575,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Geothermal": {
+        "capacityMW": 4.5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 19505.78,
+        "knownCapacityMW": 3509.4,
+        "ages": [54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64]
+      },
+      "Natural Gas": {
+        "capacityMW": 5007,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 4388,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 4910.42,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 63130,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 9062.63,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "French Polynesia": {},
+    "Georgia": {
+      "Hydro": {
+        "capacityMW": 2581.4,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 1250,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Germany": {
+      "Biomass": {
+        "capacityMW": 1655.3,
+        "knownCapacityMW": 1402.3,
+        "ages": [14, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+      },
+      "Coal": {
+        "capacityMW": 47772.9,
+        "knownCapacityMW": 43013.4,
+        "ages": [28, 29, 30, 29, 30, 30, 30, 31, 32, 33, 34]
+      },
+      "Hydro": {
+        "capacityMW": 9984.1,
+        "knownCapacityMW": 7474.4,
+        "ages": [48, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57]
+      },
+      "Natural Gas": {
+        "capacityMW": 24430.25,
+        "knownCapacityMW": 13597.75,
+        "ages": [17, 17, 18, 19, 20, 20, 21, 22, 23, 24, 25]
+      },
+      "Oil": {
+        "capacityMW": 2851.2,
+        "knownCapacityMW": 2308.3,
+        "ages": [30, 31, 31, 32, 33, 34, 35, 36, 37, 38, 39]
+      },
+      "Sun": {
+        "capacityMW": 6770.56,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 11171,
+        "knownCapacityMW": 11171,
+        "ages": [24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+      },
+      "Wind": {
+        "capacityMW": 5059.36,
+        "knownCapacityMW": 4659.36,
+        "ages": [6, 7, 8, 9, 9, 7, 4, 5, 6, 7, 8]
+      }
+    },
+    "Ghana": {
+      "Hydro": {
+        "capacityMW": 1598,
+        "knownCapacityMW": 1598,
+        "ages": [46, 47, 48, 49, 38, 39, 40, 41, 42, 43, 44]
+      },
+      "Natural Gas": {
+        "capacityMW": 490,
+        "knownCapacityMW": 160,
+        "ages": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      },
+      "Sun": {
+        "capacityMW": 20,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Greece": {
+      "Coal": {
+        "capacityMW": 4995,
+        "knownCapacityMW": 4375,
+        "ages": [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
+      },
+      "Hydro": {
+        "capacityMW": 3501,
+        "knownCapacityMW": 3021,
+        "ages": [30, 31, 30, 31, 32, 33, 34, 35, 36, 37, 38]
+      },
+      "Natural Gas": {
+        "capacityMW": 5205,
+        "knownCapacityMW": 2743,
+        "ages": [7, 5, 5, 5, 6, 7, 8, 9, 10, 11, 12]
+      },
+      "Oil": {
+        "capacityMW": 501,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 217.7,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 214.95,
+        "knownCapacityMW": 214.95,
+        "ages": [6, 7, 8, 9, 10, 8, 8, 9, 10, 11, 12]
+      }
+    },
+    "Guatemala": {
+      "Biomass": {
+        "capacityMW": 880.1,
+        "knownCapacityMW": 880.1,
+        "ages": [15, 16, 15, 15, 16, 13, 14, 15, 16, 17, 18]
+      },
+      "Coal": {
+        "capacityMW": 572.2,
+        "knownCapacityMW": 572.2,
+        "ages": [9, 10, 11, 8, 8, 9, 10, 6, 7, 8, 9]
+      },
+      "Geothermal": {
+        "capacityMW": 53.8,
+        "knownCapacityMW": 53.8,
+        "ages": [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+      },
+      "Hydro": {
+        "capacityMW": 1007.6,
+        "knownCapacityMW": 1007.6,
+        "ages": [22, 20, 21, 20, 21, 22, 22, 23, 24, 25, 26]
+      },
+      "Oil": {
+        "capacityMW": 983.4,
+        "knownCapacityMW": 630.4,
+        "ages": [11, 12, 13, 14, 14, 15, 16, 17, 18, 19, 20]
+      },
+      "Sun": {
+        "capacityMW": 115,
+        "knownCapacityMW": 85,
+        "ages": [null, null, null, null, null, 1, 1, 2, 3, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 71.1,
+        "knownCapacityMW": 71.1,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 4, 5]
+      }
+    },
+    "Guyana": {
+      "Biomass": {
+        "capacityMW": 30,
+        "knownCapacityMW": 30,
+        "ages": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      },
+      "Oil": {
+        "capacityMW": 106.3,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Haiti": {},
+    "Honduras": {
+      "Biomass": {
+        "capacityMW": 50,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Geothermal": {
+        "capacityMW": 39,
+        "knownCapacityMW": 39,
+        "ages": [null, null, null, null, null, null, null, null, 1, 2, 3]
+      },
+      "Hydro": {
+        "capacityMW": 515.17,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 39.2,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 788.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 604.45,
+        "knownCapacityMW": 320.55,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 126,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Hungary": {
+      "Coal": {
+        "capacityMW": 1194,
+        "knownCapacityMW": 1194,
+        "ages": [33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43]
+      },
+      "Natural Gas": {
+        "capacityMW": 2955.3,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 170,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 84.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 1886.8,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Iceland": {
+      "Geothermal": {
+        "capacityMW": 572,
+        "knownCapacityMW": 572,
+        "ages": [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
+      },
+      "Hydro": {
+        "capacityMW": 1912.6,
+        "knownCapacityMW": 1769.6,
+        "ages": [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+      }
+    },
+    "India": {
+      "Biomass": {
+        "capacityMW": 1003.26,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 204919.22,
+        "knownCapacityMW": 199753,
+        "ages": [13, 12, 12, 12, 11, 11, 11, 11, 12, 12, 13]
+      },
+      "Hydro": {
+        "capacityMW": 45561.47,
+        "knownCapacityMW": 45561.47,
+        "ages": [22, 22, 23, 23, 24, 24, 25, 25, 26, 26, 27]
+      },
+      "Natural Gas": {
+        "capacityMW": 24947.51,
+        "knownCapacityMW": 24368.21,
+        "ages": [10, 11, 12, 11, 12, 12, 13, 13, 14, 15, 16]
+      },
+      "Oil": {
+        "capacityMW": 1680.84,
+        "knownCapacityMW": 1321.14,
+        "ages": [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+      },
+      "Sun": {
+        "capacityMW": 25549.1,
+        "knownCapacityMW": 277.5,
+        "ages": [null, null, 1, 2, 1, 2, 3, 4, 5, 6, 7]
+      },
+      "Uranium": {
+        "capacityMW": 8780,
+        "knownCapacityMW": 6780,
+        "ages": [14, 15, 16, 17, 18, 19, 14, 15, 16, 17, 18]
+      },
+      "Wind": {
+        "capacityMW": 3647.15,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Indonesia": {
+      "Coal": {
+        "capacityMW": 29333,
+        "knownCapacityMW": 6675,
+        "ages": [4, 5, 3, 3, 4, 5, 5, 5, 6, 7, 8]
+      },
+      "Geothermal": {
+        "capacityMW": 1342,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 4559.59,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 12810,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 706.83,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Iran": {
+      "Hydro": {
+        "capacityMW": 10857.5,
+        "knownCapacityMW": 6373.5,
+        "ages": [18, 19, 16, 14, 13, 14, 13, 14, 15, 16, 17]
+      },
+      "Natural Gas": {
+        "capacityMW": 38003,
+        "knownCapacityMW": 18961,
+        "ages": [10, 11, 8, 9, 9, 9, 9, 10, 11, 12, 13]
+      },
+      "Oil": {
+        "capacityMW": 11310.6,
+        "knownCapacityMW": 818,
+        "ages": [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+      },
+      "Sun": {
+        "capacityMW": 91,
+        "knownCapacityMW": 17,
+        "ages": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      },
+      "Uranium": {
+        "capacityMW": 1000,
+        "knownCapacityMW": 1000,
+        "ages": [null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+      },
+      "Wind": {
+        "capacityMW": 100,
+        "knownCapacityMW": 100,
+        "ages": [null, null, null, null, null, 1, 2, 3, 4, 5, 6]
+      }
+    },
+    "Iraq": {
+      "Hydro": {
+        "capacityMW": 2574,
+        "knownCapacityMW": 2574,
+        "ages": [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38]
+      },
+      "Natural Gas": {
+        "capacityMW": 9546.6,
+        "knownCapacityMW": 7724.6,
+        "ages": [6, 7, 5, 3, 3, 4, 5, 5, 6, 7, 8]
+      },
+      "Oil": {
+        "capacityMW": 6040,
+        "knownCapacityMW": 4180,
+        "ages": [24, 25, 26, 27, 20, 21, 22, 23, 24, 25, 26]
+      }
+    },
+    "Ireland": {
+      "Biomass": {
+        "capacityMW": 137,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 915,
+        "knownCapacityMW": 915,
+        "ages": [24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+      },
+      "Hydro": {
+        "capacityMW": 405,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 3692.5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 1145.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 1287.05,
+        "knownCapacityMW": 1261.05,
+        "ages": [3, 4, 5, 5, 6, 6, 6, 6, 7, 8, 9]
+      }
+    },
+    "Israel": {
+      "Coal": {
+        "capacityMW": 4840,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 9213,
+        "knownCapacityMW": 4739,
+        "ages": [22, 16, 17, 18, 19, 15, 11, 12, 13, 14, 15]
+      },
+      "Sun": {
+        "capacityMW": 570.8,
+        "knownCapacityMW": 373.3,
+        "ages": [null, null, null, null, 1, 1, 2, 2, 3, 3, 4]
+      },
+      "Wind": {
+        "capacityMW": 42,
+        "knownCapacityMW": 42,
+        "ages": [null, null, null, null, null, null, null, null, 1, 2, 3]
+      }
+    },
+    "Italy": {
+      "Coal": {
+        "capacityMW": 9012,
+        "knownCapacityMW": 9012,
+        "ages": [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
+      },
+      "Geothermal": {
+        "capacityMW": 857,
+        "knownCapacityMW": 857,
+        "ages": [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+      },
+      "Hydro": {
+        "capacityMW": 13384.18,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 38570.65,
+        "knownCapacityMW": 18235,
+        "ages": [8, 8, 9, 10, 10, 11, 12, 13, 14, 15, 16]
+      },
+      "Oil": {
+        "capacityMW": 8828.7,
+        "knownCapacityMW": 1017,
+        "ages": [39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]
+      },
+      "Sun": {
+        "capacityMW": 1952.69,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 105.24,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Ivory Coast": {
+      "Hydro": {
+        "capacityMW": 599,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 604,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Jamaica": {
+      "Hydro": {
+        "capacityMW": 14.8,
+        "knownCapacityMW": 14.8,
+        "ages": [57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67]
+      },
+      "Natural Gas": {
+        "capacityMW": 120,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 599,
+        "knownCapacityMW": 251.5,
+        "ages": [16, 17, 18, 19, 15, 16, 17, 18, 19, 20, 21]
+      },
+      "Sun": {
+        "capacityMW": 20,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 38.7,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Japan": {
+      "Coal": {
+        "capacityMW": 41513,
+        "knownCapacityMW": 41513,
+        "ages": [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+      },
+      "Geothermal": {
+        "capacityMW": 536.3,
+        "knownCapacityMW": 346.3,
+        "ages": [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+      },
+      "Hydro": {
+        "capacityMW": 27439,
+        "knownCapacityMW": 556,
+        "ages": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+      },
+      "Natural Gas": {
+        "capacityMW": 53362.75,
+        "knownCapacityMW": 2387,
+        "ages": [19, 20, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+      },
+      "Oil": {
+        "capacityMW": 44120.2,
+        "knownCapacityMW": 720,
+        "ages": [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37]
+      },
+      "Sun": {
+        "capacityMW": 5686.6,
+        "knownCapacityMW": 32.3,
+        "ages": [null, null, null, null, null, 1, 1, 2, 3, 4, 5]
+      },
+      "Uranium": {
+        "capacityMW": 42537,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 150,
+        "knownCapacityMW": 112,
+        "ages": [7, 7, 8, 9, 10, 9, 10, 11, 12, 13, 14]
+      }
+    },
+    "Jordan": {
+      "Natural Gas": {
+        "capacityMW": 3754,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 382,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 567.5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Kazakhstan": {
+      "Coal": {
+        "capacityMW": 15868,
+        "knownCapacityMW": 12728,
+        "ages": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+      },
+      "Hydro": {
+        "capacityMW": 2090,
+        "knownCapacityMW": 1051,
+        "ages": [34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44]
+      },
+      "Natural Gas": {
+        "capacityMW": 400,
+        "knownCapacityMW": 400,
+        "ages": [37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]
+      },
+      "Sun": {
+        "capacityMW": 270,
+        "knownCapacityMW": 50,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 4, 5]
+      }
+    },
+    "Kenya": {
+      "Geothermal": {
+        "capacityMW": 754,
+        "knownCapacityMW": 754,
+        "ages": [29, 30, 31, 32, 33, 24, 16, 17, 18, 19, 20]
+      },
+      "Hydro": {
+        "capacityMW": 785.2,
+        "knownCapacityMW": 785.2,
+        "ages": [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37]
+      },
+      "Oil": {
+        "capacityMW": 555.5,
+        "knownCapacityMW": 446.5,
+        "ages": [7, 8, 8, 7, 8, 9, 10, 11, 12, 13, 14]
+      },
+      "Sun": {
+        "capacityMW": 55.7,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 335.5,
+        "knownCapacityMW": 335.5,
+        "ages": [17, 18, 19, 20, 21, 22, 23, 24, 3, 4, 5]
+      }
+    },
+    "Kuwait": {
+      "Natural Gas": {
+        "capacityMW": 17819.5,
+        "knownCapacityMW": 2795,
+        "ages": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      },
+      "Sun": {
+        "capacityMW": 10,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Laos": {
+      "Coal": {
+        "capacityMW": 1878,
+        "knownCapacityMW": 1878,
+        "ages": [null, null, null, null, null, null, null, 1, 2, 3, 4]
+      },
+      "Hydro": {
+        "capacityMW": 3108.86,
+        "knownCapacityMW": 2968,
+        "ages": [16, 6, 5, 5, 6, 7, 8, 9, 10, 11, 12]
+      }
+    },
+    "Latvia": {
+      "Hydro": {
+        "capacityMW": 1536,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 1001,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Lebanon": {
+      "Natural Gas": {
+        "capacityMW": 940,
+        "knownCapacityMW": 940,
+        "ages": [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+      },
+      "Oil": {
+        "capacityMW": 1130.3,
+        "knownCapacityMW": 1130.3,
+        "ages": [29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
+      }
+    },
+    "Libya": {
+      "Natural Gas": {
+        "capacityMW": 5916,
+        "knownCapacityMW": 5916,
+        "ages": [14, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22]
+      },
+      "Oil": {
+        "capacityMW": 315,
+        "knownCapacityMW": 315,
+        "ages": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+      }
+    },
+    "Lithuania": {
+      "Hydro": {
+        "capacityMW": 1000.8,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 2490,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Madagascar": {
+      "Coal": {
+        "capacityMW": 120,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 112.65,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 29.57,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 72.71,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 25,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Malaysia": {
+      "Biomass": {
+        "capacityMW": 12,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 13004,
+        "knownCapacityMW": 13004,
+        "ages": [4, 4, 5, 6, 7, 8, 9, 8, 9, 10, 11]
+      },
+      "Hydro": {
+        "capacityMW": 1989,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 13330,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 178,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 281.5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Maldives": {},
+    "Mali": {
+      "Hydro": {
+        "capacityMW": 311.5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Mauritius": {
+      "Biomass": {
+        "capacityMW": 101.85,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 224.7,
+        "knownCapacityMW": 210,
+        "ages": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+      },
+      "Hydro": {
+        "capacityMW": 51.38,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 499.44,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 111.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Mexico": {
+      "Biomass": {
+        "capacityMW": 676.4,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 5378.4,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Geothermal": {
+        "capacityMW": 903.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 12442.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 25674.2,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 11522.4,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 2671.2,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 1510,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 1586.8,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Mongolia": {
+      "Coal": {
+        "capacityMW": 804,
+        "knownCapacityMW": 804,
+        "ages": [26, 27, 28, 29, 30, 24, 25, 26, 27, 28, 29]
+      },
+      "Sun": {
+        "capacityMW": 50,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 50,
+        "knownCapacityMW": 50,
+        "ages": [null, null, null, null, 1, 2, 3, 4, 5, 6, 7]
+      }
+    },
+    "Morocco": {
+      "Coal": {
+        "capacityMW": 2835,
+        "knownCapacityMW": 2835,
+        "ages": [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+      },
+      "Hydro": {
+        "capacityMW": 1676.5,
+        "knownCapacityMW": 1655.7,
+        "ages": [22, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+      },
+      "Natural Gas": {
+        "capacityMW": 1666,
+        "knownCapacityMW": 1666,
+        "ages": [3, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      },
+      "Oil": {
+        "capacityMW": 777.3,
+        "knownCapacityMW": 777.3,
+        "ages": [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33]
+      },
+      "Sun": {
+        "capacityMW": 533,
+        "knownCapacityMW": 510,
+        "ages": [null, null, null, null, null, null, null, 1, 2, 2, 3]
+      },
+      "Wind": {
+        "capacityMW": 1209.76,
+        "knownCapacityMW": 1123.86,
+        "ages": [3, 4, 5, 6, 5, 4, 5, 4, 5, 6, 7]
+      }
+    },
+    "Mozambique": {
+      "Hydro": {
+        "capacityMW": 2285,
+        "knownCapacityMW": 2285,
+        "ages": [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]
+      }
+    },
+    "Myanmar": {
+      "Coal": {
+        "capacityMW": 165,
+        "knownCapacityMW": 165,
+        "ages": [5, 6, 7, 8, 9, 10, 11, 12, 10, 11, 12]
+      },
+      "Hydro": {
+        "capacityMW": 2725.2,
+        "knownCapacityMW": 2725.2,
+        "ages": [9, 7, 7, 8, 9, 10, 11, 12, 12, 13, 14]
+      },
+      "Natural Gas": {
+        "capacityMW": 1046.9,
+        "knownCapacityMW": 582.55,
+        "ages": [27, 28, 29, 30, 31, 32, 24, 25, 16, 17, 18]
+      },
+      "Sun": {
+        "capacityMW": 50,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Namibia": {
+      "Coal": {
+        "capacityMW": 120,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 240,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 59.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 82.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Nepal": {
+      "Hydro": {
+        "capacityMW": 557.95,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 30,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Netherlands": {
+      "Coal": {
+        "capacityMW": 5015,
+        "knownCapacityMW": 4425,
+        "ages": [19, 20, 21, 22, 23, 24, 14, 11, 12, 13, 14]
+      },
+      "Natural Gas": {
+        "capacityMW": 9312,
+        "knownCapacityMW": 7323,
+        "ages": [14, 9, 10, 11, 10, 11, 12, 13, 14, 15, 16]
+      },
+      "Sun": {
+        "capacityMW": 245.1,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 485,
+        "knownCapacityMW": 485,
+        "ages": [37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]
+      },
+      "Wind": {
+        "capacityMW": 1936.59,
+        "knownCapacityMW": 1936.59,
+        "ages": [4, 5, 5, 6, 7, 7, 7, 5, 6, 7, 8]
+      }
+    },
+    "New Caledonia": {},
+    "New Zealand": {
+      "Coal": {
+        "capacityMW": 500,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Geothermal": {
+        "capacityMW": 666,
+        "knownCapacityMW": 534,
+        "ages": [13, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+      },
+      "Hydro": {
+        "capacityMW": 4388,
+        "knownCapacityMW": 1323,
+        "ages": [47, 48, 48, 49, 50, 51, 52, 53, 54, 55, 56]
+      },
+      "Natural Gas": {
+        "capacityMW": 507,
+        "knownCapacityMW": 463,
+        "ages": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+      },
+      "Oil": {
+        "capacityMW": 155,
+        "knownCapacityMW": 155,
+        "ages": [null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+      },
+      "Wind": {
+        "capacityMW": 458.55,
+        "knownCapacityMW": 451.55,
+        "ages": [3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      }
+    },
+    "Nicaragua": {
+      "Geothermal": {
+        "capacityMW": 159,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 104.4,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 65,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 406.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 12.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Niger": {
+      "Coal": {
+        "capacityMW": 37.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 122.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 7,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Nigeria": {
+      "Hydro": {
+        "capacityMW": 1900,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 4350,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 10,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Norway": {
+      "Hydro": {
+        "capacityMW": 30474,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 1454,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 623,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Oman": {
+      "Natural Gas": {
+        "capacityMW": 4872,
+        "knownCapacityMW": 4872,
+        "ages": [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+      },
+      "Sun": {
+        "capacityMW": 1138.8,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Pakistan": {
+      "Coal": {
+        "capacityMW": 3108,
+        "knownCapacityMW": 3108,
+        "ages": [15, 16, 17, 18, 19, 20, 21, 18, 3, 3, 4]
+      },
+      "Hydro": {
+        "capacityMW": 7989.6,
+        "knownCapacityMW": 1817.6,
+        "ages": [7, 8, 9, 10, 11, 12, 13, 14, 14, 15, 16]
+      },
+      "Natural Gas": {
+        "capacityMW": 2853,
+        "knownCapacityMW": 2246,
+        "ages": [8, 8, 8, 9, 10, 9, 10, 11, 12, 13, 14]
+      },
+      "Oil": {
+        "capacityMW": 4853,
+        "knownCapacityMW": 3401,
+        "ages": [23, 21, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+      },
+      "Sun": {
+        "capacityMW": 678.4,
+        "knownCapacityMW": 401,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 4, 5]
+      },
+      "Uranium": {
+        "capacityMW": 1467,
+        "knownCapacityMW": 137,
+        "ages": [39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]
+      },
+      "Wind": {
+        "capacityMW": 506,
+        "knownCapacityMW": 400,
+        "ages": [null, null, null, null, null, 1, 2, 2, 3, 4, 5]
+      }
+    },
+    "Panama": {
+      "Coal": {
+        "capacityMW": 120,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 1062.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 160,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 262.4,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 27.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Papua New Guinea": {
+      "Geothermal": {
+        "capacityMW": 30,
+        "knownCapacityMW": 30,
+        "ages": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+      },
+      "Hydro": {
+        "capacityMW": 165,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 72,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 139.9,
+        "knownCapacityMW": 24,
+        "ages": [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+      }
+    },
+    "Paraguay": {
+      "Hydro": {
+        "capacityMW": 8760,
+        "knownCapacityMW": 8760,
+        "ages": [24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+      }
+    },
+    "Peru": {
+      "Coal": {
+        "capacityMW": 132,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 2735.4,
+        "knownCapacityMW": 2112.4,
+        "ages": [33, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
+      },
+      "Natural Gas": {
+        "capacityMW": 4262.2,
+        "knownCapacityMW": 644,
+        "ages": [null, 1, 2, 3, 1, 2, 3, 4, 5, 6, 7]
+      },
+      "Sun": {
+        "capacityMW": 240.5,
+        "knownCapacityMW": 20,
+        "ages": [null, null, null, 1, 2, 3, 4, 5, 6, 7, 8]
+      },
+      "Wind": {
+        "capacityMW": 62,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Philippines": {
+      "Biomass": {
+        "capacityMW": 23.3,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 8731.3,
+        "knownCapacityMW": 8221.7,
+        "ages": [8, 9, 10, 11, 11, 12, 13, 11, 11, 11, 12]
+      },
+      "Geothermal": {
+        "capacityMW": 1848.2,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 3401.1,
+        "knownCapacityMW": 1,
+        "ages": [null, null, null, null, null, null, null, null, 1, 2, 3]
+      },
+      "Natural Gas": {
+        "capacityMW": 3411,
+        "knownCapacityMW": 550,
+        "ages": [null, null, null, null, null, null, null, 1, 2, 3, 4]
+      },
+      "Oil": {
+        "capacityMW": 2056.1,
+        "knownCapacityMW": 44.4,
+        "ages": [null, null, null, null, null, null, null, 1, 2, 3, 4]
+      },
+      "Sun": {
+        "capacityMW": 1196.4,
+        "knownCapacityMW": 686.2,
+        "ages": [null, null, null, null, null, null, null, 1, 2, 3, 4]
+      },
+      "Wind": {
+        "capacityMW": 51.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Poland": {
+      "Biomass": {
+        "capacityMW": 215,
+        "knownCapacityMW": 215,
+        "ages": [2, 3, 4, 1, 2, 3, 4, 5, 6, 7, 8]
+      },
+      "Coal": {
+        "capacityMW": 30959,
+        "knownCapacityMW": 7311,
+        "ages": [36, 36, 37, 38, 39, 40, 41, 42, 31, 32, 33]
+      },
+      "Hydro": {
+        "capacityMW": 2078,
+        "knownCapacityMW": 2074,
+        "ages": [34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44]
+      },
+      "Natural Gas": {
+        "capacityMW": 1804,
+        "knownCapacityMW": 1127,
+        "ages": [19, 20, 21, 22, 23, 24, 25, 26, 17, 18, 19]
+      },
+      "Oil": {
+        "capacityMW": 655,
+        "knownCapacityMW": 655,
+        "ages": [13, 14, 15, 16, 17, 18, 19, 20, 21, 3, 4]
+      },
+      "Sun": {
+        "capacityMW": 17,
+        "knownCapacityMW": 17,
+        "ages": [null, null, 1, 2, 3, 2, 2, 3, 4, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 2174,
+        "knownCapacityMW": 2054,
+        "ages": [2, 3, 3, 3, 4, 5, 5, 6, 7, 8, 9]
+      }
+    },
+    "Portugal": {
+      "Biomass": {
+        "capacityMW": 452.9,
+        "knownCapacityMW": 452.9,
+        "ages": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+      },
+      "Coal": {
+        "capacityMW": 1978,
+        "knownCapacityMW": 1978,
+        "ages": [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+      },
+      "Geothermal": {
+        "capacityMW": 28.8,
+        "knownCapacityMW": 28.8,
+        "ages": [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+      },
+      "Hydro": {
+        "capacityMW": 2760.45,
+        "knownCapacityMW": 1350.45,
+        "ages": [41, 41, 42, 43, 44, 45, 42, 43, 44, 45, 46]
+      },
+      "Natural Gas": {
+        "capacityMW": 3829,
+        "knownCapacityMW": 2002,
+        "ages": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+      },
+      "Sun": {
+        "capacityMW": 621.58,
+        "knownCapacityMW": 285.98,
+        "ages": [2, 3, 3, 4, 4, 4, 4, 5, 6, 7, 8]
+      },
+      "Wind": {
+        "capacityMW": 4942.33,
+        "knownCapacityMW": 4942.33,
+        "ages": [4, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+      }
+    },
+    "Puerto Rico": {},
+    "Qatar": {
+      "Natural Gas": {
+        "capacityMW": 10548,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Romania": {
+      "Coal": {
+        "capacityMW": 5807,
+        "knownCapacityMW": 5147,
+        "ages": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+      },
+      "Hydro": {
+        "capacityMW": 3332,
+        "knownCapacityMW": 1496,
+        "ages": [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]
+      },
+      "Natural Gas": {
+        "capacityMW": 3352,
+        "knownCapacityMW": 1080,
+        "ages": [3, 4, 5, 2, 3, 4, 5, 6, 7, 8, 9]
+      },
+      "Sun": {
+        "capacityMW": 471.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 1298,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 386,
+        "knownCapacityMW": 140,
+        "ages": [null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+      }
+    },
+    "Russia": {
+      "Biomass": {
+        "capacityMW": 580,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 46072.22,
+        "knownCapacityMW": 33440.17,
+        "ages": [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58]
+      },
+      "Geothermal": {
+        "capacityMW": 74,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 45591.44,
+        "knownCapacityMW": 28009.94,
+        "ages": [47, 48, 49, 45, 46, 47, 48, 49, 50, 51, 52]
+      },
+      "Natural Gas": {
+        "capacityMW": 106722.62,
+        "knownCapacityMW": 81265.04,
+        "ages": [45, 46, 47, 48, 48, 47, 48, 49, 50, 51, 52]
+      },
+      "Oil": {
+        "capacityMW": 99.07,
+        "knownCapacityMW": 24,
+        "ages": [79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89]
+      },
+      "Sun": {
+        "capacityMW": 840.7,
+        "knownCapacityMW": 160.2,
+        "ages": [null, null, null, null, null, 1, 1, 2, 3, 4, 5]
+      },
+      "Uranium": {
+        "capacityMW": 28168,
+        "knownCapacityMW": 5480,
+        "ages": [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+      },
+      "Wind": {
+        "capacityMW": 42.3,
+        "knownCapacityMW": 7.3,
+        "ages": [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+      }
+    },
+    "Rwanda": {
+      "Hydro": {
+        "capacityMW": 127.6,
+        "knownCapacityMW": 127.6,
+        "ages": [35, 35, 36, 37, 38, 31, 32, 33, 34, 35, 36]
+      },
+      "Natural Gas": {
+        "capacityMW": 26,
+        "knownCapacityMW": 26,
+        "ages": [null, null, null, null, null, null, null, 1, 2, 3, 4]
+      },
+      "Oil": {
+        "capacityMW": 27.8,
+        "knownCapacityMW": 27.8,
+        "ages": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      },
+      "Sun": {
+        "capacityMW": 8.5,
+        "knownCapacityMW": 8.5,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 4, 5]
+      }
+    },
+    "Saudi Arabia": {
+      "Natural Gas": {
+        "capacityMW": 34502.12,
+        "knownCapacityMW": 34502.12,
+        "ages": [12, 11, 12, 13, 14, 11, 11, 11, 12, 13, 14]
+      },
+      "Oil": {
+        "capacityMW": 49702.43,
+        "knownCapacityMW": 49702.43,
+        "ages": [11, 9, 10, 10, 7, 8, 9, 8, 9, 10, 11]
+      },
+      "Sun": {
+        "capacityMW": 137,
+        "knownCapacityMW": 14,
+        "ages": [null, null, null, 1, 2, 3, 4, 5, 6, 7, 8]
+      }
+    },
+    "Senegal": {
+      "Hydro": {
+        "capacityMW": 120,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 470.46,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 105.7,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Serbia": {
+      "Coal": {
+        "capacityMW": 5568,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 2390,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Singapore": {
+      "Natural Gas": {
+        "capacityMW": 9552,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 3950,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Solomon Islands": {},
+    "South Africa": {
+      "Biomass": {
+        "capacityMW": 13.6,
+        "knownCapacityMW": 3.5,
+        "ages": [null, null, null, null, 1, 2, 3, 4, 5, 6, 7]
+      },
+      "Coal": {
+        "capacityMW": 39794,
+        "knownCapacityMW": 39794,
+        "ages": [27, 28, 29, 30, 31, 32, 33, 34, 35, 35, 36]
+      },
+      "Hydro": {
+        "capacityMW": 2019.57,
+        "knownCapacityMW": 2007,
+        "ages": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+      },
+      "Natural Gas": {
+        "capacityMW": 342,
+        "knownCapacityMW": 342,
+        "ages": [34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44]
+      },
+      "Oil": {
+        "capacityMW": 2067,
+        "knownCapacityMW": 2067,
+        "ages": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+      },
+      "Sun": {
+        "capacityMW": 2313.04,
+        "knownCapacityMW": 1537.04,
+        "ages": [null, null, null, 1, 1, 1, 2, 2, 3, 4, 5]
+      },
+      "Uranium": {
+        "capacityMW": 1800,
+        "knownCapacityMW": 1800,
+        "ages": [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+      },
+      "Wind": {
+        "capacityMW": 2030.9,
+        "knownCapacityMW": 1790.9,
+        "ages": [2, 1, 2, 3, 4, 1, 2, 2, 3, 4, 5]
+      }
+    },
+    "South Korea": {
+      "Biomass": {
+        "capacityMW": 108,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 33133,
+        "knownCapacityMW": 8088,
+        "ages": [25, 26, 18, 19, 20, 18, 19, 11, 8, 9, 10]
+      },
+      "Hydro": {
+        "capacityMW": 6063.06,
+        "knownCapacityMW": 1340.8,
+        "ages": [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+      },
+      "Natural Gas": {
+        "capacityMW": 31552.9,
+        "knownCapacityMW": 17289,
+        "ages": [9, 8, 9, 8, 8, 8, 7, 8, 9, 10, 11]
+      },
+      "Oil": {
+        "capacityMW": 4655,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 160.5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 23076,
+        "knownCapacityMW": 2000,
+        "ages": [null, null, null, 1, 2, 3, 4, 5, 6, 7, 8]
+      },
+      "Wind": {
+        "capacityMW": 401.1,
+        "knownCapacityMW": 128,
+        "ages": [5, 6, 7, 8, 9, 10, 11, 12, 10, 11, 12]
+      }
+    },
+    "Spain": {
+      "Biomass": {
+        "capacityMW": 20,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 8783.31,
+        "knownCapacityMW": 8783.31,
+        "ages": [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
+      },
+      "Hydro": {
+        "capacityMW": 15659.14,
+        "knownCapacityMW": 14630.76,
+        "ages": [36, 37, 38, 38, 39, 40, 41, 42, 43, 44, 45]
+      },
+      "Natural Gas": {
+        "capacityMW": 26159.14,
+        "knownCapacityMW": 25761.21,
+        "ages": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+      },
+      "Oil": {
+        "capacityMW": 4666.67,
+        "knownCapacityMW": 4650.67,
+        "ages": [22, 23, 23, 24, 24, 25, 26, 27, 28, 29, 30]
+      },
+      "Sun": {
+        "capacityMW": 4901.31,
+        "knownCapacityMW": 2032.81,
+        "ages": [1, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9]
+      },
+      "Uranium": {
+        "capacityMW": 7120.06,
+        "knownCapacityMW": 7120.06,
+        "ages": [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
+      },
+      "Wind": {
+        "capacityMW": 11337.38,
+        "knownCapacityMW": 6432.72,
+        "ages": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+      }
+    },
+    "Sri Lanka": {
+      "Coal": {
+        "capacityMW": 900,
+        "knownCapacityMW": 900,
+        "ages": [null, null, null, null, 1, 2, 3, 4, 5, 6, 7]
+      },
+      "Hydro": {
+        "capacityMW": 1441.7,
+        "knownCapacityMW": 46,
+        "ages": [59, 60, 61, 62, 63, 64, 65, 66, 17, 18, 19]
+      },
+      "Oil": {
+        "capacityMW": 1205,
+        "knownCapacityMW": 1010,
+        "ages": [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+      },
+      "Sun": {
+        "capacityMW": 44.4,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 129,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Sudan": {
+      "Biomass": {
+        "capacityMW": 126,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 1540.01,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 319,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 813.1,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Suriname": {
+      "Sun": {
+        "capacityMW": 5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Sweden": {
+      "Biomass": {
+        "capacityMW": 876.7,
+        "knownCapacityMW": 522.7,
+        "ages": [39, 40, 41, 42, 12, 13, 14, 15, 16, 17, 18]
+      },
+      "Coal": {
+        "capacityMW": 80,
+        "knownCapacityMW": 80,
+        "ages": [47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57]
+      },
+      "Hydro": {
+        "capacityMW": 12822.9,
+        "knownCapacityMW": 9779.7,
+        "ages": [54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64]
+      },
+      "Natural Gas": {
+        "capacityMW": 1340,
+        "knownCapacityMW": 639,
+        "ages": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+      },
+      "Oil": {
+        "capacityMW": 840,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 9762,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 697.1,
+        "knownCapacityMW": 273.7,
+        "ages": [5, 6, 5, 6, 7, 7, 7, 8, 9, 10, 11]
+      }
+    },
+    "Switzerland": {
+      "Hydro": {
+        "capacityMW": 9667.8,
+        "knownCapacityMW": 9560.35,
+        "ages": [48, 49, 50, 51, 52, 53, 54, 49, 50, 51, 52]
+      },
+      "Sun": {
+        "capacityMW": 20.2,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 3430,
+        "knownCapacityMW": 2670,
+        "ages": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+      }
+    },
+    "Syria": {
+      "Hydro": {
+        "capacityMW": 1505,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 2914,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 3547,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Taiwan": {
+      "Coal": {
+        "capacityMW": 14190,
+        "knownCapacityMW": 2290,
+        "ages": [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+      },
+      "Hydro": {
+        "capacityMW": 3825.5,
+        "knownCapacityMW": 1043.5,
+        "ages": [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+      },
+      "Natural Gas": {
+        "capacityMW": 11673,
+        "knownCapacityMW": 3795,
+        "ages": [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+      },
+      "Oil": {
+        "capacityMW": 2000,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 114.3,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 5214,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 195.06,
+        "knownCapacityMW": 169.96,
+        "ages": [4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+      }
+    },
+    "Tanzania": {
+      "Hydro": {
+        "capacityMW": 561,
+        "knownCapacityMW": 540,
+        "ages": [24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+      },
+      "Natural Gas": {
+        "capacityMW": 333.5,
+        "knownCapacityMW": 63,
+        "ages": [null, null, null, 1, 2, 3, 4, 5, 6, 7, 8]
+      },
+      "Oil": {
+        "capacityMW": 100,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Thailand": {
+      "Biomass": {
+        "capacityMW": 88.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 5260,
+        "knownCapacityMW": 5260,
+        "ages": [11, 12, 13, 12, 13, 14, 15, 16, 17, 18, 19]
+      },
+      "Hydro": {
+        "capacityMW": 3788,
+        "knownCapacityMW": 3008,
+        "ages": [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
+      },
+      "Natural Gas": {
+        "capacityMW": 28959,
+        "knownCapacityMW": 13836,
+        "ages": [14, 14, 14, 15, 16, 15, 14, 15, 16, 17, 18]
+      },
+      "Sun": {
+        "capacityMW": 1348.7,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 210,
+        "knownCapacityMW": 3,
+        "ages": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+      }
+    },
+    "Tunisia": {
+      "Hydro": {
+        "capacityMW": 54.2,
+        "knownCapacityMW": 54.2,
+        "ages": [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46]
+      },
+      "Natural Gas": {
+        "capacityMW": 4856,
+        "knownCapacityMW": 4856,
+        "ages": [18, 19, 18, 19, 20, 19, 18, 19, 20, 21, 22]
+      },
+      "Wind": {
+        "capacityMW": 142,
+        "knownCapacityMW": 72,
+        "ages": [null, null, null, null, 1, 2, 3, 4, 5, 6, 7]
+      }
+    },
+    "Turkey": {
+      "Coal": {
+        "capacityMW": 17707,
+        "knownCapacityMW": 5713,
+        "ages": [22, 23, 24, 25, 26, 27, 26, 27, 22, 23, 24]
+      },
+      "Geothermal": {
+        "capacityMW": 480,
+        "knownCapacityMW": 298,
+        "ages": [1, 2, 3, 3, 2, 3, 3, 4, 5, 6, 7]
+      },
+      "Hydro": {
+        "capacityMW": 13839,
+        "knownCapacityMW": 192,
+        "ages": [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+      },
+      "Natural Gas": {
+        "capacityMW": 17491,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 842.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 694.6,
+        "knownCapacityMW": 19,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 390.5,
+        "knownCapacityMW": 140.5,
+        "ages": [10, 11, 2, 3, 4, 4, 5, 6, 7, 8, 9]
+      }
+    },
+    "Uganda": {
+      "Biomass": {
+        "capacityMW": 12,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 666.5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 50,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 44,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Ukraine": {
+      "Coal": {
+        "capacityMW": 26550,
+        "knownCapacityMW": 23960,
+        "ages": [39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]
+      },
+      "Hydro": {
+        "capacityMW": 5729,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 1740,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 715.8,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 13835,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "United Arab Emirates": {
+      "Natural Gas": {
+        "capacityMW": 29487,
+        "knownCapacityMW": 29487,
+        "ages": [10, 10, 10, 11, 12, 13, 14, 14, 15, 16, 17]
+      },
+      "Sun": {
+        "capacityMW": 840,
+        "knownCapacityMW": 120,
+        "ages": [null, null, null, null, 1, 2, 3, 4, 5, 6, 7]
+      }
+    },
+    "United Kingdom": {
+      "Biomass": {
+        "capacityMW": 1583.7,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 12296,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 6364.9,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 29916.3,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 372.4,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 8675,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Uranium": {
+        "capacityMW": 8918,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 23202.48,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "United States": {
+      "Biomass": {
+        "capacityMW": 5123.2,
+        "knownCapacityMW": 5123.2,
+        "ages": [28, 28, 29, 30, 31, 31, 32, 33, 34, 35, 36]
+      },
+      "Coal": {
+        "capacityMW": 249149.1,
+        "knownCapacityMW": 248694.8,
+        "ages": [32, 33, 33, 34, 35, 36, 37, 38, 39, 40, 41]
+      },
+      "Geothermal": {
+        "capacityMW": 3889.2,
+        "knownCapacityMW": 3889.2,
+        "ages": [23, 23, 24, 24, 24, 25, 25, 26, 27, 28, 28]
+      },
+      "Hydro": {
+        "capacityMW": 101656.9,
+        "knownCapacityMW": 101596.3,
+        "ages": [46, 47, 48, 49, 50, 50, 51, 52, 53, 54, 55]
+      },
+      "Natural Gas": {
+        "capacityMW": 546435.8,
+        "knownCapacityMW": 545330.8,
+        "ages": [16, 17, 17, 18, 19, 19, 20, 21, 22, 22, 23]
+      },
+      "Oil": {
+        "capacityMW": 39505,
+        "knownCapacityMW": 39251.5,
+        "ages": [29, 30, 31, 32, 33, 33, 34, 35, 36, 37, 38]
+      },
+      "Sun": {
+        "capacityMW": 37970.35,
+        "knownCapacityMW": 37845.05,
+        "ages": [14, 11, 8, 5, 3, 3, 3, 3, 3, 4, 4]
+      },
+      "Uranium": {
+        "capacityMW": 104233.1,
+        "knownCapacityMW": 104233.1,
+        "ages": [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38]
+      },
+      "Wind": {
+        "capacityMW": 104476.9,
+        "knownCapacityMW": 104476.9,
+        "ages": [3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8]
+      }
+    },
+    "Uruguay": {
+      "Biomass": {
+        "capacityMW": 412.7,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 1538,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Natural Gas": {
+        "capacityMW": 265.72,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 385.74,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 225.01,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 1381.95,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Uzbekistan": {
+      "Coal": {
+        "capacityMW": 2522,
+        "knownCapacityMW": 2522,
+        "ages": [24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+      },
+      "Hydro": {
+        "capacityMW": 1140,
+        "knownCapacityMW": 1031,
+        "ages": [39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]
+      },
+      "Natural Gas": {
+        "capacityMW": 8578,
+        "knownCapacityMW": 6820,
+        "ages": [26, 27, 28, 29, 30, 27, 28, 29, 30, 31, 32]
+      },
+      "Oil": {
+        "capacityMW": 300,
+        "knownCapacityMW": 300,
+        "ages": [54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64]
+      },
+      "Sun": {
+        "capacityMW": 100,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Venezuela": {
+      "Hydro": {
+        "capacityMW": 17666,
+        "knownCapacityMW": 3044,
+        "ages": [null, null, 1, 2, 3, 4, 5, 6, 2, 3, 4]
+      },
+      "Natural Gas": {
+        "capacityMW": 13430,
+        "knownCapacityMW": 2976,
+        "ages": [53, 54, 44, 36, 36, 37, 38, 39, 40, 41, 42]
+      }
+    },
+    "Vietnam": {
+      "Biomass": {
+        "capacityMW": 22,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 14125,
+        "knownCapacityMW": 720,
+        "ages": [null, null, null, null, null, null, 1, 2, 1, 2, 3]
+      },
+      "Hydro": {
+        "capacityMW": 16750.09,
+        "knownCapacityMW": 16642.19,
+        "ages": [12, 11, 11, 9, 9, 10, 9, 10, 11, 12, 13]
+      },
+      "Natural Gas": {
+        "capacityMW": 7734,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Oil": {
+        "capacityMW": 915,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 1616.4,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 188,
+        "knownCapacityMW": 152,
+        "ages": [null, null, null, null, null, null, null, 1, 2, 3, 4]
+      }
+    },
+    "Zambia": {
+      "Biomass": {
+        "capacityMW": 12.24,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Coal": {
+        "capacityMW": 300,
+        "knownCapacityMW": 300,
+        "ages": [null, null, null, null, null, null, null, 1, 2, 3, 4]
+      },
+      "Hydro": {
+        "capacityMW": 2160,
+        "knownCapacityMW": 1110,
+        "ages": [38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48]
+      },
+      "Oil": {
+        "capacityMW": 169.6,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Sun": {
+        "capacityMW": 47.5,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Zimbabwe": {
+      "Coal": {
+        "capacityMW": 920,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Hydro": {
+        "capacityMW": 750,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    }
+  }
+}

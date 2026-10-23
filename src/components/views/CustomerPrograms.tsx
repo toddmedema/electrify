@@ -24,12 +24,10 @@ import FactoryIcon from "@mui/icons-material/Factory";
 import ThermostatIcon from "@mui/icons-material/Thermostat";
 import ElectricCarIcon from "@mui/icons-material/ElectricCar";
 import BatteryChargingFullIcon from "@mui/icons-material/BatteryChargingFull";
-import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import NavigableCardRow from "../base/NavigableCardRow";
 import {
   cancelPolicy,
-  chooseScenarioResponse,
   closePolicyDecision,
   openPolicyDecision,
   schedulePolicy,
@@ -53,7 +51,6 @@ import {
 import { electricVehicleEligibility } from "../../data/ElectricVehicles";
 import { customerBatteryFleet } from "../../helpers/CustomerBatteries";
 import { GENERATORS } from "../../data/Facilities";
-import { SCENARIO_PREPARATION_MONTHS } from "../../data/ScenarioPreparation";
 import {
   deriveExpandedSummary,
   MINUTES_PER_MONTH,
@@ -84,16 +81,6 @@ import {
   PolicyPreviewResult,
   previewPolicy,
 } from "../../helpers/PolicyPreview";
-import {
-  previewWildfire,
-  WildfirePreviewResult,
-  wildfirePreviewMonth,
-} from "../../helpers/WildfirePreview";
-import {
-  wildfirePreparedness,
-  wildfireSeasonOdds,
-  WildfirePreparednessType,
-} from "../../helpers/Wildfire";
 import CatalogTitleBar from "../base/CatalogTitleBar";
 import {
   buildoutImpact,
@@ -125,15 +112,8 @@ const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
   evCharging: ElectricCarIcon,
   battery: BatteryChargingFullIcon,
 };
-const WILDFIRE_SUMMARY =
-  "Crews, inspections and vegetation clearing reduce wildfire damage. Fires and restoration costs remain.";
 
 const BUILDOUT_IDS: BuildoutPolicyId[] = ["efficiency", "solar"];
-
-const BUILDOUT_SHORT_NAME: Record<BuildoutPolicyId, string> = {
-  efficiency: "Efficiency",
-  solar: "Rooftop solar",
-};
 
 interface ProgramFact {
   label: string;
@@ -445,7 +425,7 @@ function useEstimateSnapshot(game: GameType): GameType {
 
 interface EstimateRequest<T> {
   key: string;
-  message: { game: GameType; month: number; change?: PolicyChangeType };
+  message: { game: GameType; month: number; change: PolicyChangeType };
   estimate: () => T;
 }
 
@@ -485,204 +465,17 @@ function useEstimate<T>(
   return {};
 }
 
-/** Keep the standing program's status and yearly budget visible in the list. */
-function preparednessStatus(preparedness: WildfirePreparednessType): string {
-  return `${preparedness.active ? "On" : "Off"} · ${formatPercent(preparedness.effectiveness)} effective · ${formatMoneyConcise(preparedness.annualCost)}/yr`;
-}
-
-/** Season facts and a simulated typical wildfire, met with and without funded crews. */
-function WildfireDetails({
-  game,
-  preparedness,
-  month,
-  result,
-  error,
-}: {
-  game: GameType;
-  preparedness: WildfirePreparednessType;
-  month?: number;
-  result?: WildfirePreviewResult;
-  error?: string;
-}) {
-  const { season, effectiveness, remainingMonths, active } = preparedness;
-  const importedFire =
-    game.scenarioId === 999 &&
-    game.customScenario?.eventScenarioIds?.includes(111);
-  const fireMonth = 12 + SCENARIO_PREPARATION_MONTHS[111];
-  const progress = active
-    ? effectiveness >= 1
-      ? "Fully effective"
-      : `Ramping up · ${Math.ceil(remainingMonths)} months to full effectiveness`
-    : effectiveness > 0
-      ? `Fading · ${Math.ceil(remainingMonths)} months of protection remaining`
-      : "No protection";
-  const offLabel = active ? "Stop now" : "Keep off";
-  const onLabel = active ? "Keep on" : "Start now";
-  const facts: ProgramFact[] = [
-    {
-      label: "Annual budget",
-      value: `${formatMoneyConcise(preparedness.annualCost)}/yr`,
-      detail: `${formatMoneyConcise(preparedness.annualCost / 12)}/mo while on · no upfront payment`,
-    },
-    {
-      label: "At full effectiveness",
-      value: "50% fewer disconnections",
-      detail: "Generator losses also halved",
-    },
-  ];
-  const terms: ProgramFact[] = [
-    { label: "Builds and fades", value: "12 months each" },
-    {
-      label: importedFire ? "Scenario wildfire" : "Next wildfire season",
-      value: importedFire
-        ? `${labelMonth(game, fireMonth)} to ${labelMonth(game, fireMonth + 1)}`
-        : `${labelMonth(game, season.startMonth)} to ${labelMonth(game, season.endMonth - 1)}`,
-    },
-  ];
-  const standard = result?.standardIncident;
-  const prepared = result?.preparedIncident;
-  return (
-    <Box sx={{ display: "grid", gap: 2 }}>
-      <Typography>{WILDFIRE_SUMMARY}</Typography>
-      <Box
-        className="customerProgramProject"
-        sx={{ display: "grid", gap: 1.5 }}
-      >
-        <Typography variant="subtitle2">
-          {formatPercent(effectiveness)} effective
-        </Typography>
-        <LinearProgress
-          variant="determinate"
-          value={effectiveness * 100}
-          aria-label="Wildfire preparedness effectiveness"
-          aria-valuetext={`${formatPercent(effectiveness)} effective · ${progress}`}
-          color={effectiveness >= 1 ? "success" : "primary"}
-          sx={{ height: 8, borderRadius: 1 }}
-        />
-        <Typography variant="body2">{progress}</Typography>
-      </Box>
-      <ProgramFacts facts={facts} />
-      <ProgramDetails label="Protection & fire season">
-        <ProgramFacts facts={terms} secondary />
-        <Typography variant="body2" color="text.secondary">
-          {importedFire
-            ? "Protection when the fire starts determines its impact."
-            : wildfireSeasonOdds(preparedness.profile)}
-        </Typography>
-      </ProgramDetails>
-      {!importedFire && month === undefined && (
-        <Typography variant="body2" color="textSecondary">
-          The next wildfire season starts after this run ends; protection still
-          applies to earlier fires.
-        </Typography>
-      )}
-      {!importedFire && month !== undefined && (
-        <>
-          <Box>
-            <Typography component="h3" variant="subtitle1">
-              Next wildfire season · simulated fire in {labelMonth(game, month)}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              A simulated fire in the season’s highest-risk month; actual fires
-              may differ.
-            </Typography>
-          </Box>
-          {error ? (
-            <Alert severity="error">{error}</Alert>
-          ) : !result || !standard || !prepared ? (
-            <>
-              <Typography variant="body2">
-                {offLabel} ━ · {onLabel} ┄
-              </Typography>
-              <PolicyDemandChartPlaceholder />
-              <Box aria-hidden>
-                {Array.from({ length: 2 }, (_, i) => (
-                  <Typography key={i}>
-                    <Skeleton width={i % 2 ? "60%" : "80%"} />
-                  </Typography>
-                ))}
-              </Box>
-            </>
-          ) : (
-            <>
-              <Typography variant="body2">
-                {offLabel} ━ · {onLabel} ┄
-              </Typography>
-              <PolicyDemandChart
-                current={result.standardDemandW}
-                changed={result.preparedDemandW}
-                labels={[offLabel, onLabel]}
-                ariaLabel={`Customer demand still connected during a simulated wildfire: ${offLabel} and ${onLabel}, over a representative day`}
-              />
-              <Box role="status">
-                <Typography>
-                  Customer load disconnected:{" "}
-                  {formatPercent(standard.disconnectedDemand)} →{" "}
-                  {formatPercent(prepared.disconnectedDemand)}
-                </Typography>
-                <Typography>
-                  Cash benefit: {formatMoneyConcise(result.cashBenefit)} before
-                  program cost
-                </Typography>
-              </Box>
-              <ProgramDetails label="Fire impact details">
-                <ProgramFacts
-                  facts={[
-                    {
-                      label: "Effectiveness at this fire",
-                      value: `${formatPercent(result.standardEffectiveness)} → ${formatPercent(result.preparedEffectiveness)}`,
-                      detail: `${offLabel} → ${onLabel}`,
-                    },
-                    ...(standard.selectedFacilityNames.length > 0
-                      ? [
-                          {
-                            label: "Generator output",
-                            value: `${formatPercent(standard.outputMultiplier)} → ${formatPercent(prepared.outputMultiplier)}`,
-                            detail: standard.selectedFacilityNames.join(", "),
-                          },
-                        ]
-                      : []),
-                    {
-                      label: "Electricity supplied",
-                      value: `${formatWattHours(result.standard.supplyWh)} → ${formatWattHours(result.prepared.supplyWh)}`,
-                      detail: `${labelMonth(game, month)} · ${formatWattHours(result.noFire.supplyWh)} with no fire`,
-                    },
-                    ...(standard.restorationCostPerMonth > 0
-                      ? [
-                          {
-                            label: "Restoration",
-                            value: `${formatMoneyConcise(standard.restorationCostPerMonth)}/mo`,
-                            detail: "Same with either plan",
-                          },
-                        ]
-                      : []),
-                  ]}
-                  secondary
-                />
-              </ProgramDetails>
-            </>
-          )}
-        </>
-      )}
-    </Box>
-  );
-}
-
 /** The catalog of programs, grouped by the problem each one helps solve. */
 function ProgramList({
   game,
   programs,
   policiesOn,
-  preparedness,
   onOpen,
-  onOpenWildfire,
 }: {
   game: GameType;
   programs: Record<PolicyId, PolicyProgramType>;
   policiesOn: boolean;
-  preparedness: WildfirePreparednessType | undefined;
   onOpen: (id: PolicyId) => void;
-  onOpenWildfire: () => void;
 }) {
   const finished = (id: PolicyId) =>
     !isOperatingPolicy(id) &&
@@ -765,17 +558,6 @@ function ProgramList({
             choice,
           ),
         )}
-      {preparedness &&
-        section("Resilience", [
-          row({
-            id: "wildfire",
-            name: "Wildfire preparedness",
-            status: preparednessStatus(preparedness),
-            Icon: LocalFireDepartmentIcon,
-            active: preparedness.active,
-            onOpen: onOpenWildfire,
-          }),
-        ])}
       {policiesOn &&
         section("Completed", POLICY_IDS.filter(finished).map(choice))}
     </Box>
@@ -972,7 +754,7 @@ function PolicyProgramDetail({
   );
 }
 
-type Selection = PolicyId | "wildfire";
+type Selection = PolicyId;
 
 export function ProgramsScreen({
   onClose,
@@ -1012,10 +794,7 @@ export function ProgramsScreen({
       lastSelection.current = selected;
       headingRef.current?.focus({ preventScroll: true });
     } else if (lastSelection.current) {
-      const name =
-        lastSelection.current === "wildfire"
-          ? "Wildfire preparedness"
-          : POLICIES[lastSelection.current].name;
+      const name = POLICIES[lastSelection.current].name;
       Array.from(
         bodyRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? [],
       )
@@ -1061,12 +840,11 @@ export function ProgramsScreen({
   }, [dispatch, token, reviewingDecision, game.replayPlayback]);
   const snapshot = useEstimateSnapshot(game);
   const policiesOn = policyAvailable(game);
-  const preparedness = wildfirePreparedness(game);
   const cash = currentCash(game);
   const effective = game.date.monthsElapsed + 1;
   const end = activeScenario(game)?.durationMonths ?? 0;
   const programs = game.policies?.programs ?? emptyPolicies().programs;
-  const policy = selected && selected !== "wildfire" ? selected : undefined;
+  const policy = selected;
   const current = policy ? programs[policy] : undefined;
   const buildout =
     policy && !isOperatingPolicy(policy) && !isFlexibilityPolicy(policy)
@@ -1111,21 +889,6 @@ export function ProgramsScreen({
       : undefined,
     snapshot,
   );
-  const fireMonth =
-    selected === "wildfire" &&
-    !game.customScenario?.eventScenarioIds?.includes(111)
-      ? wildfirePreviewMonth(snapshot)
-      : undefined;
-  const wildfireEstimate = useEstimate<WildfirePreviewResult>(
-    fireMonth === undefined
-      ? undefined
-      : {
-          key: `wildfire/${fireMonth}/${snapshot.date.minute}`,
-          message: { game: snapshot, month: fireMonth },
-          estimate: () => previewWildfire(snapshot, fireMonth),
-        },
-    snapshot,
-  );
   const operating = policy
     ? isOperatingPolicy(policy) || isFlexibilityPolicy(policy)
     : false;
@@ -1157,12 +920,7 @@ export function ProgramsScreen({
         (program.tier !== "Off" ? 17 : suggestedPolicyStartHour(game)),
     );
   };
-  const canChangePreparedness = !!preparedness && !game.replayPlayback;
-  const title = selected
-    ? selected === "wildfire"
-      ? "Wildfire preparedness"
-      : POLICIES[selected].name
-    : undefined;
+  const title = selected ? POLICIES[selected].name : undefined;
   const content = (
     <>
       {!embedded && (
@@ -1205,9 +963,7 @@ export function ProgramsScreen({
               game={game}
               programs={programs}
               policiesOn={policiesOn}
-              preparedness={preparedness}
               onOpen={open}
-              onOpenWildfire={() => setSelected("wildfire")}
             />
           </>
         ) : (
@@ -1226,44 +982,28 @@ export function ProgramsScreen({
                 variant="body2"
                 className="customerProgramState"
               >
-                {selected === "wildfire"
-                  ? preparedness?.active
-                    ? "On"
-                    : "Off"
-                  : operating
-                    ? current!.tier
-                    : programStatus(game, selected, current!)}
+                {operating
+                  ? current!.tier
+                  : programStatus(game, selected, current!)}
               </Typography>
             </Box>
-            {selected === "wildfire" ? (
-              preparedness && (
-                <WildfireDetails
-                  game={game}
-                  preparedness={preparedness}
-                  month={fireMonth}
-                  result={wildfireEstimate.result}
-                  error={wildfireEstimate.error}
-                />
-              )
-            ) : (
-              <PolicyProgramDetail
-                game={game}
-                selected={selected}
-                current={current!}
-                buildout={buildout}
-                complete={complete}
-                cancelling={cancelling}
-                operating={operating}
-                effective={effective}
-                end={end}
-                month={month}
-                tier={tier}
-                startHour={startHour}
-                onStartHourChange={setStartHour}
-                result={result}
-                error={error}
-              />
-            )}
+            <PolicyProgramDetail
+              game={game}
+              selected={selected}
+              current={current!}
+              buildout={buildout}
+              complete={complete}
+              cancelling={cancelling}
+              operating={operating}
+              effective={effective}
+              end={end}
+              month={month}
+              tier={tier}
+              startHour={startHour}
+              onStartHourChange={setStartHour}
+              result={result}
+              error={error}
+            />
           </Box>
         )}
       </div>
@@ -1272,6 +1012,7 @@ export function ProgramsScreen({
           <Button onClick={() => setSelected(undefined)}>Back</Button>
           {policy && operating && current!.pending && (
             <Button
+              disabled={!!game.replayPlayback}
               onClick={() => {
                 dispatch(cancelPolicy({ id: policy, ...current!.pending! }));
                 setSelected(undefined);
@@ -1302,77 +1043,54 @@ export function ProgramsScreen({
                 Turn off next month
               </Button>
             )}
-          {selected === "wildfire"
-            ? preparedness?.choice && (
-                <Button
-                  variant="contained"
-                  disabled={!canChangePreparedness}
-                  onClick={() => {
-                    dispatch(
-                      chooseScenarioResponse({
-                        decisionId: preparedness.choice!.id,
-                        optionId: preparedness.active ? "stop" : "prepare",
-                      }),
-                    );
-                    setSelected(undefined);
-                  }}
-                >
-                  {preparedness.active
-                    ? "Turn off preparedness"
-                    : `Start preparedness (${formatMoneyConcise(preparedness.annualCost)}/yr)`}
-                </Button>
-              )
-            : !complete &&
-              (!operating || !unchanged) && (
-                <Button
-                  variant="contained"
-                  disabled={
-                    // Undoing a scheduled change needs no estimate.
-                    (!cancelling && (unchanged || !result)) ||
-                    effective >= end ||
-                    (policy &&
-                      isFlexibilityPolicy(policy) &&
-                      tier === "On" &&
-                      !flexibilityAvailable(game, policy, effective) &&
-                      current!.adoption === 0) ||
-                    !!game.replayPlayback
-                  }
-                  onClick={() => {
-                    if (cancelling)
-                      dispatch(
-                        cancelPolicy({ id: policy!, ...current!.pending! }),
-                      );
-                    else
-                      dispatch(
-                        schedulePolicy({
-                          id: policy!,
-                          tier,
-                          month: effective,
-                          ...(operating ? { startHour } : {}),
-                        }),
-                      );
-                    setSelected(undefined);
-                  }}
-                >
-                  {operating
-                    ? tier === "Off"
-                      ? "Turn off next month"
-                      : planned !== "Off"
-                        ? "Update next month"
-                        : "Turn on next month"
-                    : current!.pending
-                      ? current!.pending.tier === "Off"
-                        ? "Cancel scheduled pause"
-                        : current!.adoption > 0
-                          ? "Cancel scheduled resume"
-                          : "Cancel scheduled start"
-                      : tier === "Off"
-                        ? "Pause new installations next month"
-                        : current!.adoption > 0
-                          ? "Resume build-out next month"
-                          : "Start next month"}
-                </Button>
-              )}
+          {!complete && (!operating || !unchanged) && (
+            <Button
+              variant="contained"
+              disabled={
+                // Undoing a scheduled change needs no estimate.
+                (!cancelling && (unchanged || !result)) ||
+                effective >= end ||
+                (policy &&
+                  isFlexibilityPolicy(policy) &&
+                  tier === "On" &&
+                  !flexibilityAvailable(game, policy, effective) &&
+                  current!.adoption === 0) ||
+                !!game.replayPlayback
+              }
+              onClick={() => {
+                if (cancelling)
+                  dispatch(cancelPolicy({ id: policy!, ...current!.pending! }));
+                else
+                  dispatch(
+                    schedulePolicy({
+                      id: policy!,
+                      tier,
+                      month: effective,
+                      ...(operating ? { startHour } : {}),
+                    }),
+                  );
+                setSelected(undefined);
+              }}
+            >
+              {operating
+                ? tier === "Off"
+                  ? "Turn off next month"
+                  : planned !== "Off"
+                    ? "Update next month"
+                    : "Turn on next month"
+                : current!.pending
+                  ? current!.pending.tier === "Off"
+                    ? "Cancel scheduled pause"
+                    : current!.adoption > 0
+                      ? "Cancel scheduled resume"
+                      : "Cancel scheduled start"
+                  : tier === "Off"
+                    ? "Pause new installations next month"
+                    : current!.adoption > 0
+                      ? "Resume build-out next month"
+                      : "Start next month"}
+            </Button>
+          )}
         </div>
       )}
     </>
@@ -1397,71 +1115,5 @@ export function ProgramsScreen({
     >
       {content}
     </Dialog>
-  );
-}
-
-export default function CustomerPrograms({ game }: { game: GameType }) {
-  const [open, setOpen] = React.useState(false);
-  const policiesOn = policyAvailable(game);
-  const preparedness = wildfirePreparedness(game);
-  if ((!policiesOn && !preparedness) || game.replayPlayback) return null;
-  const programs = game.policies?.programs ?? emptyPolicies().programs;
-  // A finished build-out costs nothing more, so it is neither active nor in the rebate total.
-  const building = policiesOn
-    ? BUILDOUT_IDS.filter(
-        (id) =>
-          programs[id].tier === "On" &&
-          !buildoutComplete(programs[id].adoption),
-      )
-    : [];
-  const active =
-    (policiesOn
-      ? POLICY_IDS.filter(
-          (id) =>
-            (isOperatingPolicy(id) || isFlexibilityPolicy(id)) &&
-            programs[id].tier !== "Off",
-        ).length
-      : 0) +
-    building.length +
-    (preparedness?.active ? 1 : 0);
-  const pending = POLICY_IDS.some((id) => programs[id].pending);
-  const budget = building.reduce(
-    (sum, id) => sum + policyBudget(game, id, "On", game.date.monthsElapsed),
-    0,
-  );
-  const progress = building.map(
-    (id) =>
-      ` · ${BUILDOUT_SHORT_NAME[id]} build-out · month ${buildoutMonthsDone(id, programs[id].adoption)} of ${buildoutMonths(id)}`,
-  );
-  const flexibilityBudget = FLEXIBILITY_IDS.reduce(
-    (sum, id) =>
-      sum +
-      (programs[id].tier === "On"
-        ? flexibilityMonthlyCost(game, id, game.date.monthsElapsed) +
-          (buildoutComplete(programs[id].adoption)
-            ? 0
-            : flexibilityCapitalCost(game, id, game.date.monthsElapsed) /
-              flexibilityMonths(id))
-        : 0),
-    0,
-  );
-  return (
-    <Box className="customerProgramsControl">
-      <Button
-        aria-label="Customer programs"
-        title={
-          pending
-            ? `Customer programs: change starts ${labelMonth(game, game.date.monthsElapsed + 1)}`
-            : `Customer programs: ${active} active${progress.join("")}${budget > 0 ? ` · ${formatMoneyConcise(budget)}/month in rebates` : ""}${flexibilityBudget > 0 ? ` · ${formatMoneyConcise(flexibilityBudget)}/month in flexibility programs` : ""}${preparedness?.active ? ` · wildfire preparedness ${formatMoneyConcise(preparedness.annualCost)}/yr` : ""}`
-        }
-        color="primary"
-        variant="contained"
-        startIcon={<GroupsIcon />}
-        onClick={() => setOpen(true)}
-      >
-        <span className="customerProgramsLabel">Programs</span>
-      </Button>
-      {open && <ProgramsScreen onClose={() => setOpen(false)} />}
-    </Box>
   );
 }

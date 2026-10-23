@@ -10,17 +10,21 @@ import {
   absoluteMonth,
   demandServed,
   formatRequiredShare,
-  reliabilityMonths,
   hasChronicBlackouts,
   blackoutFiringThreshold,
-  retentionBaseline,
-  retentionUnreachable,
+  gameObjectiveResults,
 } from "./ObjectiveRules";
-import { customerMarketSizeAt } from "./Customers";
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
-import { MONTHS, TICK_MINUTES } from "../Constants";
+import { TICK_MINUTES } from "../Constants";
 import { formatMoneyConcise, formatCount } from "./Format";
 import { selectProjection } from "./Projection";
+import type { ObjectiveResult } from "../data/ScenarioObjectives";
+import {
+  objectiveObservedText,
+  objectiveTargetText,
+  objectiveValueText,
+  objectiveWindowText,
+} from "./ObjectivePresentation";
 
 export interface MissionRequirement {
   id: string;
@@ -32,6 +36,9 @@ export interface MissionRequirement {
   status:
     "pending" | "in-progress" | "completed" | "failed" | "unknown" | "waived";
   deadline: number;
+  definition?: string;
+  required?: boolean;
+  reason?: string;
 }
 
 // A month that fell a hair short must never print as a whole "100%": the reliability
@@ -52,103 +59,65 @@ export function completedMissionHistory(game: GameType): MonthlyHistoryType[] {
     );
 }
 
-/** Presentation only: missing evidence never changes the canonical end-of-term evaluator. */
+/** A presentation adapter for the canonical verdict, never another measurement or judgment. */
+function objectiveRequirement(
+  result: ObjectiveResult,
+  startingYear: number,
+  durationMonths: number,
+): MissionRequirement {
+  const objective = result.objective;
+  const last =
+    "throughMonth" in objective
+      ? objective.throughMonth
+      : objective.metric === "fuelRetirement"
+        ? durationMonths - 1
+        : objective.deadlineMonth;
+  const first =
+    "fromMonth" in objective ? objective.fromMonth : objective.deadlineMonth;
+  const statuses = {
+    pending: "pending",
+    inProgress: "in-progress",
+    completed: "completed",
+    failed: "failed",
+    unverifiable: "unknown",
+  } as const;
+  const target = objectiveTargetText(objective);
+  const current = objectiveObservedText(result);
+  const window = objectiveWindowText(objective, startingYear, durationMonths);
+  const observed =
+    result.observed === undefined
+      ? "pending"
+      : objectiveValueText(objective, result.observed, result.target);
+  const compact =
+    objective.metric === "monthlyReliability"
+      ? `Demand served ≥ ${objectiveValueText(objective, result.target)} (${observed})`
+      : `${target} (${observed})`;
+  return {
+    id: result.id,
+    label: result.label,
+    definition: result.definition,
+    required: result.required,
+    reason: result.reason,
+    current,
+    target: `${target} · ${window}`,
+    compact: `${result.required ? "" : "Optional · "}${compact}${result.status === "unverifiable" ? " · incomplete history" : ""}`,
+    timing: `Completed months ${(first % 12) + 1}/${startingYear + Math.floor(first / 12)}–${(last % 12) + 1}/${startingYear + Math.floor(last / 12)}${result.required ? "" : "; optional, does not end the run"}`,
+    status: statuses[result.status],
+    deadline: startingYear * 12 + last + 1,
+  };
+}
+
+/** Objectives render the same completed-month verdict used by live and headless termination. */
 export function getMissionStatus(game: GameType) {
   const scenario = activeScenario(game);
   const duration = scenario?.durationMonths || 240;
   const monthsRemaining = Math.max(0, duration - game.date.monthsElapsed);
-  const end = game.startingYear * 12 + duration;
   const currentMonth = absoluteMonth(game.date.year, game.date.monthNumber);
   const history = completedMissionHistory(game);
   const now = currentTick(game);
-  const requirements: MissionRequirement[] = [];
-  const objective = scenario?.reliabilityObjective;
-  if (objective) {
-    const first = absoluteMonth(objective.year, objective.month);
-    const count = objective.durationMonths || 1;
-    const rows = reliabilityMonths(scenario!, history);
-    const observed = new Set(
-      rows.map((row) => absoluteMonth(row.year, row.month)),
-    ).size;
-    const elapsed = Math.max(0, Math.min(count, currentMonth - first));
-    const missing = observed < elapsed;
-    const failed = rows.some(
-      (row) => demandServed(row) < objective.minimumDemandServed,
-    );
-    const minimum = rows.length
-      ? Math.min(...rows.map(demandServed))
-      : undefined;
-    const last = first + count - 1;
-    const lastYear = Math.floor(last / 12);
-    const window =
-      objective.month === 1 && count === 12
-        ? `${objective.year}`
-        : count === 1
-          ? `${MONTHS[objective.month - 1]} ${objective.year}`
-          : objective.year === lastYear
-            ? `${MONTHS[objective.month - 1]}–${MONTHS[last % 12]} ${objective.year}`
-            : `${MONTHS[objective.month - 1]} ${objective.year}–${MONTHS[last % 12]} ${lastYear}`;
-    requirements.push({
-      id: "reliability",
-      label: objective.goal ?? `Serve demand during the ${objective.label}`,
-      compact: `Demand served ≥ ${formatRequiredShare(objective.minimumDemandServed)} (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
-      current:
-        (minimum === undefined
-          ? `0/${count} months completed`
-          : `Lowest ${formatServed(minimum)} · ${observed}/${count} months completed`) +
-        (missing || (monthsRemaining === 0 && observed < count)
-          ? " · history incomplete, not verifiable"
-          : ""),
-      target: `≥${formatRequiredShare(objective.minimumDemandServed)} of demand monthly · ${window}`,
-      timing: `Completed months ${objective.month}/${objective.year}–${((first + count - 1) % 12) + 1}/${Math.floor((first + count - 1) / 12)}; a month below target ends the run`,
-      status: missing
-        ? "unknown"
-        : failed
-          ? "failed"
-          : currentMonth < first
-            ? "pending"
-            : observed === count
-              ? "completed"
-              : monthsRemaining === 0
-                ? "unknown"
-                : "in-progress",
-      deadline: first + count,
-    });
-  }
-  const retentionStart = scenario
-    ? retentionBaseline(scenario, game.customerMarketSize)
-    : undefined;
-  if (
-    scenario?.minimumCustomerRetention !== undefined &&
-    retentionStart !== undefined
-  ) {
-    const threshold = retentionStart * scenario.minimumCustomerRetention;
-    // Honest about recovery: once even best-case growth in the time left cannot reach the
-    // threshold, the requirement has failed rather than being something that can still change
-    const unreachable = now
-      ? retentionUnreachable(scenario, now.customers, {
-          startingCustomers: retentionStart,
-          monthsRemaining,
-          marketSize: customerMarketSizeAt(game.customerMarketSize, now.minute),
-        })
-      : undefined;
-    requirements.push({
-      id: "retention",
-      label: "Retain the community",
-      compact: `Customers ≥ ${formatCount(Math.ceil(threshold))} (${now ? formatCount(now.customers) : "unavailable"})`,
-      current: now
-        ? `${formatCount(now.customers)} customers now`
-        : "Current customers unavailable",
-      target: `Retain ≥${formatCount(Math.ceil(threshold))} customers at term end`,
-      timing: unreachable
-        ? `No longer reachable: at most ${formatCount(unreachable.bestCase)} customers by term end`
-        : scenario.ownership === "Public"
-          ? "Required at term end; public customers grow slowly and cannot be won back with price"
-          : "Required at term end; a lower rate wins customers back",
-      status: unreachable ? "failed" : now ? "in-progress" : "unknown",
-      deadline: end,
-    });
-  }
+  const requirements: MissionRequirement[] = gameObjectiveResults(game).map(
+    (result) => objectiveRequirement(result, game.startingYear, duration),
+  );
   requirements.push({
     id: "cash",
     label: "Keep the utility solvent",
@@ -206,8 +175,9 @@ export function getMissionStatus(game: GameType) {
     )
     .sort(
       (a, b) =>
-        Number(b.item.status === "failed") -
-          Number(a.item.status === "failed") ||
+        Number(b.item.status === "failed" && b.item.required !== false) -
+          Number(a.item.status === "failed" && a.item.required !== false) ||
+        Number(a.item.required === false) - Number(b.item.required === false) ||
         a.item.deadline - b.item.deadline ||
         a.index - b.index,
     )[0]?.item;
@@ -216,8 +186,7 @@ export function getMissionStatus(game: GameType) {
     requirements,
     prominent,
     headline:
-      requirements.find((item) => item.id === "reliability") ||
-      requirements.find((item) => item.id === "retention") ||
+      requirements.find((item) => item.required && item.definition) ||
       prominent,
     monthsRemaining,
     finalNote:
@@ -316,15 +285,19 @@ export function selectMissionRisk(
       };
   }
   const mission = suppliedStatus ?? getMissionStatus(game);
-  if (
-    mission.requirements.some(
-      (row) => row.id === "reliability" && row.status === "failed",
-    )
-  )
+  const missed = mission.requirements.find(
+    (row) =>
+      row.required !== false &&
+      row.status === "failed" &&
+      (row.definition || row.id === "reliability"),
+  );
+  if (missed)
     return {
-      id: "reliability",
-      label: "Required reliability window missed · Scenario",
-      shortLabel: "Reliability missed",
+      id:
+        missed.id === "reliability" ? "reliability" : `objective:${missed.id}`,
+      label: `${missed.label} missed · Scenario`,
+      shortLabel:
+        missed.id === "reliability" ? "Reliability missed" : "Objective missed",
       target: "mission-details",
     };
   // A shortage later in today's operating sample is reported by the grid readout beside this

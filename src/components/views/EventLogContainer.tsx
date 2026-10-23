@@ -1,9 +1,5 @@
 import { connect } from "react-redux";
-import {
-  AppStateType,
-  NavigateActionType,
-  StoryActionTargetType,
-} from "../../Types";
+import { AppStateType, StoryActionTargetType } from "../../Types";
 import EventLog, { DispatchProps, StateProps } from "./EventLog";
 import type { AppDispatch } from "../../Store";
 import { markEventsRead } from "../../reducers/Game";
@@ -12,21 +8,8 @@ import { TickThrottle } from "../../helpers/RenderThrottle";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import {
   selectUpcomingStoryEvents,
-  selectWildfireRiskNotice,
   UpcomingStoryEventType,
 } from "./StoryEventSelectors";
-
-export function navigationForStoryTarget(
-  target: StoryActionTargetType,
-): NavigateActionType {
-  return {
-    name:
-      target.card === "FACILITIES" && target.view === "BUILD_GENERATORS"
-        ? "BUILD_GENERATORS"
-        : target.card,
-    storyTarget: target,
-  };
-}
 
 const NO_ONGOING: UpcomingStoryEventType[] = [];
 
@@ -88,7 +71,6 @@ export const makeMapStateToProps = () => {
         ),
         ongoing,
         upcoming: selectUpcomingStoryEvents(state),
-        riskNotice: selectWildfireRiskNotice(state),
       };
       throttle.rendered(game.date.minute);
       previous = state;

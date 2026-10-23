@@ -1,0 +1,82 @@
+{
+  "$schema": "../scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "choice-recipes",
+  "title": "Connection choice recipe",
+  "creator": "Electrify examples",
+  "version": "1",
+  "description": "Edit one bounded planning rule at a time, then validate and simulate it.",
+  "scenario": {
+    "startingYear": 2020,
+    "durationMonths": 6,
+    "startingCustomers": 10000,
+    "cash": 1000000000
+  },
+  "events": [
+    {
+      "id": "campus",
+      "title": "Campus connection",
+      "message": "A permanent campus connects to your grid.",
+      "preview": "A 0.1 MW campus will connect in {{event}}.",
+      "startMonth": 3,
+      "loads": [
+        {
+          "id": "campus-load",
+          "startMonth": 3,
+          "peakMW": 0.1,
+          "loadFactor": 0.8,
+          "demandType": "Data Centers"
+        }
+      ]
+    },
+    {
+      "id": "prepared-support",
+      "title": "Connection support",
+      "message": "Your grid receives the committed contribution.",
+      "preview": "Accepting funding will provide a contribution in {{event}}.",
+      "startMonth": 2,
+      "durationMonths": "untilEnd",
+      "requiresChoice": { "choiceId": "funding", "optionIds": ["accept"] },
+      "effects": {
+        "transactions": [{ "kind": "grant", "amountDollars": 1000 }]
+      }
+    }
+  ],
+  "choices": [
+    {
+      "id": "funding",
+      "title": "Connection funding",
+      "prompt": "Choose the funding and connection schedule for your grid.",
+      "dueMonth": 2,
+      "options": [
+        {
+          "id": "accept",
+          "label": "Accept funding",
+          "description": "Receive 100,000 dollars and connect a 0.1 MW load in {{start+2 months}}.",
+          "message": "Your grid accepted the funding and connection.",
+          "grantDollars": 100000,
+          "replaceLoad": {
+            "loadId": "campus-load",
+            "with": [
+              {
+                "id": "funded-campus",
+                "startMonth": 3,
+                "peakMW": 0.1,
+                "loadFactor": 0.8,
+                "demandType": "Data Centers"
+              }
+            ]
+          }
+        },
+        {
+          "id": "decline",
+          "label": "Keep the current grid",
+          "description": "Forgo funding and cancel the future campus load.",
+          "message": "Your grid declined funding and the future load.",
+          "replaceLoad": { "loadId": "campus-load", "with": [] }
+        }
+      ]
+    }
+  ]
+}

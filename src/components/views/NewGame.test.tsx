@@ -9,7 +9,6 @@ function props(overrides: Partial<Props> = {}): Props {
     onBack: jest.fn(),
     onCustomGame: jest.fn(),
     onDetails: jest.fn(),
-    onManual: jest.fn(),
     onTutorial: jest.fn(),
     ...overrides,
   };
@@ -68,6 +67,37 @@ describe("NewGame", () => {
     expect(
       screen.getByTestId(`mission-row-${CUSTOM_SCENARIO_ID}`),
     ).toHaveTextContent("Custom Game");
+  });
+
+  it("offers community scenarios when supported, including for a co-op host", () => {
+    const onCommunityScenarios = jest.fn();
+    const { unmount } = render(<NewGame {...props()} />);
+    expect(screen.queryByTestId("community-scenarios")).toBeNull();
+    unmount();
+    const view = render(<NewGame {...props({ onCommunityScenarios })} />);
+    fireEvent.click(screen.getByLabelText("Open community scenarios"));
+    expect(onCommunityScenarios).toHaveBeenCalledTimes(1);
+    view.unmount();
+    const utils = render(
+      <NewGame
+        {...props({
+          onCommunityScenarios,
+          coop: { role: "host", players: [] } as unknown as Props["coop"],
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("Open community scenarios"));
+    expect(onCommunityScenarios).toHaveBeenCalledTimes(2);
+    utils.unmount();
+    render(
+      <NewGame
+        {...props({
+          onCommunityScenarios,
+          coop: { role: "guest", players: [] } as unknown as Props["coop"],
+        })}
+      />,
+    );
+    expect(screen.queryByTestId("community-scenarios")).toBeNull();
   });
 
   it("expands tutorials in authored order and shows all challenges by latest timeframe", () => {

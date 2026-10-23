@@ -1,5 +1,6 @@
 import numbro from "numbro";
 import { pow } from "./Pow";
+import { log10 } from "./Libm";
 
 /**
  * Format power using its actual magnitude, without promoting sub-GW values to GW. Values of 10 or
@@ -18,7 +19,7 @@ export function floorToTwoSignificantDigits(i: number): number {
   if (!(i > 0) || !Number.isFinite(i)) {
     return 0;
   }
-  const step = pow(10, Math.floor(Math.log10(i)) - 1);
+  const step = pow(10, Math.floor(log10(i)) - 1);
   return Math.floor(i / step + 1e-9) * step;
 }
 

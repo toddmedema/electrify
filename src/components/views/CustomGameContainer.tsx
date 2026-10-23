@@ -8,7 +8,8 @@ import { getCustomScenario, recordCustomScenario } from "../../LocalStorage";
 import { getHistoryApi } from "../../Globals";
 import { customEventFromSearch, scenarioListUrl } from "../../ScenarioUrl";
 import { navigateBack } from "../../reducers/Card";
-import { delta, start, quit } from "../../reducers/Game";
+import { launchCustomScenario } from "../../reducers/Game";
+import { withoutMod } from "../../helpers/ScenarioMod";
 import { store } from "../../Store";
 import { delta as uiDelta } from "../../reducers/UI";
 import { startWithSaveGuard } from "./StartGame";
@@ -18,12 +19,17 @@ import { coopControls } from "../../multiplayer/Registry";
 
 const coopRole = () => store.getState().ui.coop?.role;
 
-const mapStateToProps = (state: AppStateType): StateProps => {
+export const mapStateToProps = (state: AppStateType): StateProps => {
   const coop = state.ui.coop;
   // A co-op guest sees the host's setup rather than the one it played last.
+  // A modded run is not a setup to tweak: its rules belong to the mod, so fall back to the
+  // last custom setup instead.
+  const current = state.game.customScenario?.mod
+    ? undefined
+    : state.game.customScenario;
   const scenario =
     (coop?.role === "guest" && coop.custom) ||
-    state.game.customScenario ||
+    current ||
     getCustomScenario(DEFAULT_CUSTOM_SCENARIO);
   const eventId = customEventFromSearch(window.location.search);
   return {
@@ -41,7 +47,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
+export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onBack: () => {
       if (coopRole() === "guest") {
@@ -63,7 +69,8 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       if (coop?.role === "host")
         dispatch(uiDelta({ coop: { ...coop, custom } }));
     },
-    onStart: (scenario: ScenarioType) => {
+    onStart: (setup: ScenarioType) => {
+      const scenario = withoutMod(setup);
       const role = coopRole();
       if (role) {
         if (role === "host") {
@@ -86,14 +93,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         const difficulty =
           store.getState().ui.previewDifficulty ??
           store.getState().game.difficulty;
-        dispatch(quit());
-        dispatch(delta({ difficulty }));
-        // The scenario has to be on the slice before start(), since the loading screen resolves
-        // it straight back out of there
-        dispatch(
-          delta({ scenarioId: CUSTOM_SCENARIO_ID, customScenario: scenario }),
-        );
-        dispatch(start(CUSTOM_SCENARIO_ID));
+        launchCustomScenario(dispatch, scenario, difficulty);
       });
     },
   };

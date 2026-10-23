@@ -1,67 +1,122 @@
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   Alert,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
+  IconButton,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import PersonAddIcon from "@mui/icons-material/PersonAddAlt1";
 import type { MultiplayerSession } from "./Session";
+import { seatAssignments } from "./Slots";
+import "./Lobby.css";
 
 /**
- * Gathering friends. Once everyone is here the host chooses a game in the normal scenario
- * screens, and everyone else follows along there.
+ * Friends host or join here. A guest waits here until the host shows a game, and the whole lobby
+ * gathers here to pick companies before resuming a multiplayer save.
  */
 export default function Lobby({
   session,
-  choosing,
-  onChoose,
+  onHosted,
+  onChooseNew,
+  onCopyCode,
   onClose,
   onLeave,
 }: {
   session: MultiplayerSession;
-  /** The host has already started choosing; closing returns to the scenario screens. */
-  choosing: boolean;
-  onChoose: () => void;
+  /** The host's new lobby goes straight to choosing a game. */
+  onHosted: () => void;
+  /** Host: set the multiplayer save aside and choose a new game. */
+  onChooseNew: () => void;
+  onCopyCode: () => void;
   onClose: () => void;
   onLeave: () => void;
 }) {
-  const { lobby, busy, error } = useSyncExternalStore(
+  const { lobby, pendingCampaign, busy, error } = useSyncExternalStore(
     session.subscribe,
     session.getSnapshot,
   );
   const [code, setCode] = useState("");
   const [failure, setFailure] = useState<string>();
+  const title = useRef<HTMLHeadingElement>(null);
+  const mode = !lobby.lobbyId
+    ? "entry"
+    : pendingCampaign
+      ? "campaign"
+      : "waiting";
+  useEffect(() => title.current?.focus(), [mode]);
   const host = lobby.selfId === lobby.hostId;
   const hostName =
     lobby.members.find((member) => member.id === lobby.hostId)?.name ||
-    "The host";
+    "the host";
   const connected = (id: string) =>
     id === lobby.selfId || lobby.connected.includes(id);
-  const everyoneHere =
-    lobby.members.length >= 2 &&
-    lobby.members.every((member) => connected(member.id));
   const run = (action: () => Promise<unknown>) => {
     setFailure(undefined);
-    void action().catch((e) => setFailure(e.message));
+    void action().catch((error) =>
+      setFailure(error instanceof Error ? error.message : "Please try again."),
+    );
   };
+  const notice = failure || error || lobby.error;
   return (
     <Dialog
+      className="coopLobby"
       open
       fullWidth
       maxWidth="sm"
-      onClose={choosing || !lobby.lobbyId ? onClose : onLeave}
+      onClose={
+        busy
+          ? undefined
+          : mode === "entry"
+            ? onClose
+            : mode === "campaign" && host
+              ? onChooseNew
+              : undefined
+      }
       aria-labelledby="multiplayer-lobby-title"
+      slotProps={{
+        transition: { onEntered: () => title.current?.focus() },
+      }}
     >
-      <DialogTitle id="multiplayer-lobby-title">Play with friends</DialogTitle>
+      <DialogTitle
+        component="div"
+        // Only the heading inside names the dialog, not the Back button beside it.
+        id="multiplayer-lobby-header"
+        className={mode === "entry" ? "coopLobbyHeader" : undefined}
+      >
+        {mode === "entry" && (
+          <IconButton
+            aria-label="Back"
+            edge="start"
+            color="primary"
+            disabled={busy}
+            onClick={onClose}
+          >
+            <ChevronLeftIcon />
+          </IconButton>
+        )}
+        <Typography
+          component="h2"
+          variant="h6"
+          id="multiplayer-lobby-title"
+          ref={title}
+          tabIndex={-1}
+          sx={{ outline: "none", overflowWrap: "anywhere", minWidth: 0 }}
+        >
+          {pendingCampaign ? "Pick your company" : "Play with friends"}
+        </Typography>
+      </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
-          {(failure || error || lobby.error) && (
+          {notice && (
             <Alert
               severity="warning"
               onClose={() => {
@@ -69,117 +124,214 @@ export default function Lobby({
                 session.dismissError();
               }}
             >
-              {failure || error || lobby.error}
+              {notice}
             </Alert>
           )}
-          <Typography>
-            Run neighboring electricity companies in any scenario or custom
-            game. Each company starts with a tier 1 intertie to every other
-            player.
-          </Typography>
-          {!lobby.lobbyId ? (
+          {mode === "entry" && (
             <>
               <Button
                 variant="contained"
+                size="large"
                 disabled={!lobby.available || busy}
-                onClick={() => run(() => session.create())}
-              >
-                Host a Steam lobby
-              </Button>
-              <Divider>or join friends</Divider>
-              <TextField
-                label="Lobby code"
-                value={code}
-                onChange={(e) => setCode(e.target.value.trim())}
-                slotProps={{
-                  htmlInput: { inputMode: "numeric", maxLength: 20 },
-                }}
-              />
-              <Button
-                variant="outlined"
-                disabled={
-                  !lobby.available || busy || !/^[0-9]{17,20}$/.test(code)
+                onClick={() =>
+                  run(async () => {
+                    await session.create();
+                    onHosted();
+                  })
                 }
-                onClick={() => run(() => session.join(code))}
               >
-                Join lobby
+                Host a game
               </Button>
-            </>
-          ) : (
-            <>
-              <TextField
-                label="Lobby code"
-                value={lobby.lobbyId}
-                slotProps={{ input: { readOnly: true } }}
-              />
-              {/* Until a friend arrives, inviting is the host's next step. */}
-              <Button
-                variant={host && !everyoneHere ? "outlined" : "text"}
-                onClick={() => run(() => session.invite())}
-              >
-                Invite Steam friends
-              </Button>
-              <ul className="coopLobbyRoster" aria-label="Players">
-                {lobby.members.map((member) => (
-                  <li key={member.id}>
-                    <span>
-                      {member.name}
-                      {member.id === lobby.selfId ? " (you)" : ""}
-                    </span>
-                    <Typography
-                      component="span"
-                      variant="body2"
-                      color="textSecondary"
-                    >
-                      {member.id === lobby.hostId
-                        ? "Host"
-                        : connected(member.id)
-                          ? "Connected"
-                          : "Connecting…"}
-                    </Typography>
-                  </li>
-                ))}
-              </ul>
-              {host ? (
-                <>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    disabled={busy || !everyoneHere}
-                    onClick={onChoose}
-                  >
-                    {choosing ? "Back to choosing" : "Choose a game together"}
-                  </Button>
-                  {!everyoneHere && (
-                    <Typography role="status" variant="body2">
-                      Waiting for a friend to join…
-                    </Typography>
-                  )}
-                  <Button
-                    disabled={busy}
-                    onClick={() => run(() => session.start({ saved: true }))}
-                  >
-                    Resume last shared save
-                  </Button>
-                </>
-              ) : (
-                <Typography role="status">
-                  {hostName} will choose a game.
-                </Typography>
-              )}
+              <Divider>or join a friend</Divider>
+              <div className="coopJoinRow">
+                <TextField
+                  label="Invite code"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value.trim())}
+                  slotProps={{
+                    htmlInput: { inputMode: "numeric", maxLength: 20 },
+                  }}
+                />
+                <Button
+                  variant="outlined"
+                  disabled={
+                    !lobby.available || busy || !/^[0-9]{17,20}$/.test(code)
+                  }
+                  onClick={() => run(() => session.join(code))}
+                >
+                  Join
+                </Button>
+              </div>
             </>
           )}
-          {busy && (
-            <Typography role="status">Preparing the shared grids…</Typography>
+          {mode === "waiting" && (
+            <Stack
+              direction="row"
+              spacing={1}
+              role="status"
+              sx={{ alignItems: "center" }}
+            >
+              <CircularProgress size={20} />
+              <Typography>
+                {host
+                  ? "Opening your lobby…"
+                  : connected(lobby.hostId!)
+                    ? `Waiting for ${hostName} to choose a game…`
+                    : `Connecting to ${hostName}…`}
+              </Typography>
+            </Stack>
+          )}
+          {mode === "campaign" && pendingCampaign && (
+            <CampaignSlots
+              session={session}
+              host={host}
+              hostName={hostName}
+              onCopyCode={onCopyCode}
+              onFailure={setFailure}
+            />
+          )}
+          {busy && mode !== "waiting" && (
+            <CircularProgress size={20} aria-label="Loading multiplayer" />
           )}
         </Stack>
       </DialogContent>
-      <DialogActions>
-        {lobby.lobbyId && <Button onClick={onLeave}>Leave lobby</Button>}
-        {(choosing || !lobby.lobbyId) && (
-          <Button onClick={onClose}>{choosing ? "Close" : "Back"}</Button>
-        )}
-      </DialogActions>
+      {mode !== "entry" && (
+        <DialogActions>
+          {mode === "campaign" && host && (
+            <Button disabled={busy} onClick={onChooseNew}>
+              Choose a new game
+            </Button>
+          )}
+          <Button disabled={busy} onClick={onLeave}>
+            Leave lobby
+          </Button>
+        </DialogActions>
+      )}
     </Dialog>
+  );
+}
+
+/**
+ * Each saved company, labelled with the player who saved it. Whoever is in the lobby takes an
+ * open company; a returning player keeps their own unless they pick another.
+ */
+function CampaignSlots({
+  session,
+  host,
+  hostName,
+  onCopyCode,
+  onFailure,
+}: {
+  session: MultiplayerSession;
+  host: boolean;
+  hostName: string;
+  onCopyCode: () => void;
+  onFailure: (message?: string) => void;
+}) {
+  const { lobby, pendingCampaign, busy } = useSyncExternalStore(
+    session.subscribe,
+    session.getSnapshot,
+  );
+  const campaign = pendingCampaign!;
+  const { bySeat } = seatAssignments(campaign, lobby.members);
+  const blocker = session.resumeBlocker();
+  const connected = (id: string) =>
+    id === lobby.selfId || lobby.connected.includes(id);
+  const run = (action: () => Promise<unknown>) => {
+    onFailure(undefined);
+    void action().catch((error) =>
+      onFailure(error instanceof Error ? error.message : "Please try again."),
+    );
+  };
+  return (
+    <>
+      <ul className="coopLobbyRoster coopSlots" aria-label="Companies">
+        {campaign.players.map((player) => {
+          const retired = !campaign.requiredPlayerIds.includes(player.id);
+          const occupant = bySeat.get(player.id);
+          const mine = occupant?.id === lobby.selfId;
+          const canTake = !occupant && (!retired || player.id === lobby.selfId);
+          return (
+            <li key={player.id} aria-label={`${player.name}'s company`}>
+              <span className="coopSlotName">
+                <Typography component="span" variant="subtitle2">
+                  {player.name}
+                </Typography>
+                <Typography
+                  component="span"
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  {retired ? "Retired company" : "Saved company"}
+                </Typography>
+              </span>
+              <span className="coopSlotState">
+                {canTake ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={busy}
+                    aria-label={`Take ${player.name}'s company`}
+                    onClick={() => run(() => session.claimSlot(player.id))}
+                  >
+                    Take
+                  </Button>
+                ) : (
+                  <Typography
+                    component="span"
+                    variant="body2"
+                    color={
+                      occupant || retired ? "text.secondary" : "warning.main"
+                    }
+                  >
+                    {occupant
+                      ? `${mine ? "You" : occupant.name}${connected(occupant.id) ? "" : " · Connecting…"}`
+                      : retired
+                        ? "Not needed"
+                        : "Open"}
+                  </Typography>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {blocker && (
+        <Typography role="status" variant="body2" color="text.secondary">
+          {blocker}
+        </Typography>
+      )}
+      {host ? (
+        <>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+            <Button
+              variant="outlined"
+              startIcon={<PersonAddIcon />}
+              disabled={busy}
+              onClick={() => run(() => session.invite())}
+            >
+              Invite friends
+            </Button>
+            <Button disabled={busy} onClick={onCopyCode}>
+              Copy invite code
+            </Button>
+          </Stack>
+          <Button
+            variant="contained"
+            size="large"
+            disabled={busy || !!blocker}
+            onClick={() =>
+              run(() => session.start({ saved: true, id: campaign.id }))
+            }
+          >
+            Resume game
+          </Button>
+        </>
+      ) : (
+        <Typography role="status" color="text.secondary">
+          Waiting for {hostName} to resume…
+        </Typography>
+      )}
+    </>
   );
 }

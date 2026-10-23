@@ -7,9 +7,11 @@ import {
 import { validPolicyChange } from "./helpers/Policies";
 import cloneDeep from "lodash.clonedeep";
 import { APP_VERSION } from "./AppVersion";
-import { isValidLocation } from "./helpers/Locations";
+import { isValidLocation, getScenarioLocation } from "./helpers/Locations";
+import { canonicalRuleJson } from "./helpers/RuleIdentity";
 import { isValidDifficulty } from "./helpers/Difficulty";
 import { validReplayResult } from "./SaveModel";
+import { validScenarioMod } from "./helpers/ScenarioMod";
 import {
   GameType,
   MonthlyHistoryType,
@@ -169,6 +171,9 @@ export function serializeReplay(
     difficulty: game.difficulty,
     seed: game.seed,
     location: cloneDeep(game.location),
+    ...(game.customScenario?.mod
+      ? { customScenario: cloneDeep(game.customScenario) }
+      : {}),
     actions: cloneDeep(game.replayLog),
     meaningfulDecisionGateWaived:
       game.meaningfulDecisionGateWaived || undefined,
@@ -339,7 +344,11 @@ export function decodeReplay(raw: unknown): ReplayType | null {
   const doc = raw as Partial<ReplayDocType>;
   if (
     !isFiniteNumber(doc.scenarioId) ||
+    (doc.scenarioId === 999 && doc.customScenario === undefined) ||
     !isFiniteNumber(doc.seed) ||
+    !Number.isInteger(doc.seed) ||
+    doc.seed < 0 ||
+    doc.seed > 4294967295 ||
     typeof doc.appVersion !== "string" ||
     !isValidDifficulty(doc.difficulty) ||
     (doc.meaningfulDecisionGateWaived !== undefined &&
@@ -347,6 +356,13 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     // Checked in full rather than trusted: the location's id becomes the path of the weather file
     // the loading screen fetches, and its lat/long drive the sun model
     !isValidLocation(doc.location) ||
+    (doc.customScenario !== undefined &&
+      (doc.scenarioId !== 999 ||
+        !validScenarioMod(doc.customScenario?.mod, doc.customScenario) ||
+        doc.customScenario.mod.rules.seed !== doc.seed ||
+        doc.customScenario.mod.rules.difficulty !== doc.difficulty ||
+        canonicalRuleJson(getScenarioLocation(doc.customScenario)) !==
+          canonicalRuleJson(doc.location))) ||
     (doc.monthlyCash !== undefined &&
       (!Array.isArray(doc.monthlyCash) ||
         doc.monthlyCash.length > MAX_REPLAY_MONTHS ||
@@ -365,6 +381,9 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     difficulty: doc.difficulty as ReplayType["difficulty"],
     seed: doc.seed,
     location: doc.location,
+    ...(doc.customScenario
+      ? { customScenario: cloneDeep(doc.customScenario) }
+      : {}),
     actions,
     meaningfulDecisionGateWaived: doc.meaningfulDecisionGateWaived || undefined,
     monthlyCash: doc.monthlyCash,

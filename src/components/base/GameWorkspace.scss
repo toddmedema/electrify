@@ -73,15 +73,19 @@
   border: 1px solid transparent;
   border-radius: 12px;
   color: var(--interactive-strong);
+  background: transparent;
   font-size: 12px;
   line-height: 16px;
 
   > .MuiBadge-root > svg {
     font-size: 24px;
   }
-  &:hover {
-    background: var(--bg-sunken);
-    color: var(--interactive-strong);
+  // Touch browsers can retain :hover after closing a tool. Only a mouse needs this fill.
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--bg-sunken);
+      color: var(--interactive-strong);
+    }
   }
   &.gameDockActionOpen {
     color: var(--interactive-strong);
@@ -91,6 +95,19 @@
   &:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
+  }
+
+  .gameDockEmergency .MuiBadge-badge {
+    min-width: 16px;
+    height: 16px;
+    padding: 0;
+    border-radius: 50%;
+    color: var(--blackout-red);
+    background: var(--bg-raised);
+
+    > svg {
+      font-size: 16px;
+    }
   }
 }
 

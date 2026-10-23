@@ -1,4 +1,5 @@
 import { customEventContext } from "../helpers/CustomScenarioEvents";
+import { FACILITY_FUELS } from "./FacilityFuels";
 import { getHydroAvailability } from "./HydroSites";
 import {
   batteryYearsToBuild,
@@ -12,6 +13,7 @@ import { hasFuelPrices } from "./FuelPrices";
 import { getCostTableDeflator, getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
 import { costBetween } from "../helpers/Math";
+import { facilityModifier, modScaledValue } from "../helpers/ScenarioMod";
 import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
 import {
   getAirborneWindCapacityFactor,
@@ -25,9 +27,12 @@ import {
   getViableLocationCount,
   getViableLocationsRemaining,
 } from "./FacilitySites";
-import { resolveStoryAtDate } from "./WorldEvents";
+import { resolveStoryAtDate, combineStoryEffects } from "./WorldEvents";
+import { scenarioRules } from "../helpers/ScenarioRules";
+import { getScenario } from "./Scenarios";
 import { applyDefaultResilience } from "../helpers/Hazards";
 import { pow } from "../helpers/Pow";
+import { exp, log10 } from "../helpers/Libm";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. The tables
@@ -160,7 +165,7 @@ export function constructionKgco2eCurve(
   floor: number,
 ): number {
   if (declineK <= 0 || year <= referenceYear) return base;
-  return floor + (base - floor) * Math.exp(-declineK * (year - referenceYear));
+  return floor + (base - floor) * exp(-declineK * (year - referenceYear));
 }
 
 /** 2023 reference, re-based to 2025 so the whole dataset shares one vintage. */
@@ -245,7 +250,7 @@ function batteryCostPerWh2024(year: number): number {
     // exp rather than a power: V8's exp is platform-independent (fdlibm)
     return (
       cost2020 *
-      Math.exp(((2020 - year) / BATTERY_PRE_2020_DOUBLING_YEARS) * Math.LN2)
+      exp(((2020 - year) / BATTERY_PRE_2020_DOUBLING_YEARS) * Math.LN2)
     );
   }
   return costBetween(year, 2020, cost2020, 2024, 0.192);
@@ -286,7 +291,7 @@ export function GENERATORS(
   offshoreWindSpeedsKph: number[] = [],
   airborneWindSpeedsKph: number[] = [],
 ) {
-  const magnitude = Math.log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
+  const magnitude = log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
   const storySnapshot = buildStorySnapshot(
     state.monthlyHistory || [],
@@ -294,6 +299,10 @@ export function GENERATORS(
     state.date.minute,
   );
   const storyContext = {
+    rules: scenarioRules(
+      getScenario(state.scenarioId, state.customScenario),
+      state,
+    ),
     seed: state.seed,
     scenarioId: state.scenarioId,
     customEvents: customEventContext(state.customScenario),
@@ -318,8 +327,16 @@ export function GENERATORS(
     );
     const fee = state.storyEffectsDisabled
       ? state.feePerKgCO2e
-      : (resolveStoryAtDate({ ...storyContext, date }).effects
-          .carbonFeePerKgCO2e ?? state.feePerKgCO2e);
+      : (combineStoryEffects(
+          resolveStoryAtDate({ ...storyContext, date }).active.filter(
+            (event) =>
+              event.forecastable !== false ||
+              date.minute <= state.date.minute ||
+              state.worldEvents?.occurrences.some(
+                (recorded) => recorded.key === event.key,
+              ),
+          ),
+        ).carbonFeePerKgCO2e ?? state.feePerKgCO2e);
     carbonFeeCache.set(monthOffset, fee);
     return fee;
   };
@@ -355,7 +372,7 @@ export function GENERATORS(
     // FUELED
     {
       name: "Coal",
-      fuel: "Coal",
+      fuel: FACILITY_FUELS.Coal,
       description:
         "Runs on demand, with slow ramping and high direct emissions",
       available: true, // Coal was first type of electric plant
@@ -396,7 +413,7 @@ export function GENERATORS(
     },
     {
       name: "Nuclear",
-      fuel: "Uranium",
+      fuel: FACILITY_FUELS.Nuclear,
       description:
         "Low direct emissions and steady output, but very slow to change",
       available: year > 1956, // First full scale plant was Calder Hall in 1956
@@ -427,7 +444,7 @@ export function GENERATORS(
     },
     {
       name: "Natural Gas Peaker",
-      fuel: "Natural Gas",
+      fuel: FACILITY_FUELS["Natural Gas Peaker"],
       gasCycle: "simple",
       description:
         "A single gas turbine: cheap to build and running in minutes, but it burns about half again as much gas per MWh as a combined cycle",
@@ -465,7 +482,7 @@ export function GENERATORS(
     },
     {
       name: "Natural Gas CC",
-      fuel: "Natural Gas",
+      fuel: FACILITY_FUELS["Natural Gas CC"],
       gasCycle: "combined",
       description:
         "Reuses the turbine's hot exhaust to raise steam for a second turbine, burning about a third less gas per MWh, but it is slow to start and ramp",
@@ -510,7 +527,7 @@ export function GENERATORS(
     },
     {
       name: "Oil",
-      fuel: "Oil",
+      fuel: FACILITY_FUELS.Oil,
       description:
         "Starts quickly, but fuel is costly and produces direct emissions",
       available: true,
@@ -546,7 +563,7 @@ export function GENERATORS(
     },
     {
       name: "Biomass",
-      fuel: "Biomass",
+      fuel: FACILITY_FUELS.Biomass,
       description:
         "Runs on demand using renewable fuel, with large fuel volumes and direct CO2 emissions",
       available: true,
@@ -581,7 +598,7 @@ export function GENERATORS(
     // RENEWABLE
     {
       name: "Wind",
-      fuel: "Wind",
+      fuel: FACILITY_FUELS.Wind,
       description:
         "Output changes with local wind and is often strongest in spring and fall",
       available: year > 1941, // First megawatt-size turbine was in Vermont in 1941
@@ -615,7 +632,7 @@ export function GENERATORS(
     },
     {
       name: "Offshore Wind",
-      fuel: "Offshore Wind",
+      fuel: FACILITY_FUELS["Offshore Wind"],
       description: "Steadier and stronger than onshore, at a price",
       available: year > 1991 && hasOffshoreWind(state.location),
       // Vindeby, Denmark, was the first offshore wind farm, at 4.95MW in 1991:
@@ -645,7 +662,7 @@ export function GENERATORS(
     },
     {
       name: "Airborne Wind",
-      fuel: "Airborne Wind",
+      fuel: FACILITY_FUELS["Airborne Wind"],
       description:
         "Uses steadier high-altitude wind; new technology with frequent maintenance",
       // NAWEP's current schedule reaches commissioning in 2028 and mature operation in 2030.
@@ -671,7 +688,7 @@ export function GENERATORS(
     },
     {
       name: "Solar",
-      fuel: "Sun",
+      fuel: FACILITY_FUELS.Solar,
       description:
         "Produces only in daylight and usually peaks near sunny midday",
       available: year > 1982, // First megawatt-sized installations around 1982 https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
@@ -704,7 +721,7 @@ export function GENERATORS(
     },
     {
       name: "Hydro",
-      fuel: "Hydro",
+      fuel: FACILITY_FUELS.Hydro,
       description:
         "Low direct emissions and controllable output, but limited by water and suitable sites",
       available: year > 1882 && hydroAvailability.status === "available",
@@ -730,7 +747,7 @@ export function GENERATORS(
     },
     {
       name: "Geothermal",
-      fuel: "Geothermal",
+      fuel: FACILITY_FUELS.Geothermal,
       description:
         "Steady low-carbon output, but only at suitable underground heat sources",
       available: (geothermalLocations || 0) > 0,
@@ -759,7 +776,7 @@ export function GENERATORS(
     },
     {
       name: "Enhanced Geothermal",
-      fuel: "Geothermal",
+      fuel: FACILITY_FUELS["Enhanced Geothermal"],
       description:
         "Steady low-carbon output in more locations than conventional geothermal",
       available: year >= 2030,
@@ -793,6 +810,22 @@ export function GENERATORS(
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
   generators = generators.filter((g: GeneratorShoppingType) => {
+    const mod = facilityModifier(state, g.name);
+    g.buildCost = modScaledValue(
+      g.buildCost,
+      mod?.buildCost,
+      `facilities.${g.name}.buildCost`,
+    );
+    g.annualOperatingCost = modScaledValue(
+      g.annualOperatingCost,
+      mod?.annualOperatingCost,
+      `facilities.${g.name}.annualOperatingCost`,
+    );
+    g.yearsToBuild = modScaledValue(
+      g.yearsToBuild,
+      mod?.yearsToBuild,
+      `facilities.${g.name}.yearsToBuild`,
+    );
     g.buildCost *= difficulty.buildCost * inflation;
     g.buildCost *=
       currentStoryEffects.buildCostMultipliersByFuel?.[g.fuel] || 1;
@@ -804,6 +837,12 @@ export function GENERATORS(
       g.costPerStart *= difficulty.expensesOM * inflation;
     }
     g.yearsToBuild *= difficulty.buildTime;
+    if (
+      ![g.buildCost, g.annualOperatingCost, g.yearsToBuild].every(
+        Number.isFinite,
+      )
+    )
+      throw new Error(`Nonfinite facility quote for ${g.name}.`);
     // Priced on the scaled cost so the option's share is exact; cold-climate gas is winterized by
     // default. The build dialog can then toggle it with withResilienceOption.
     Object.assign(g, applyDefaultResilience(g, state));
@@ -836,7 +875,7 @@ export function windAnnualOutputDegradation(commissioningYear: number): number {
 
 export function STORAGE(state: GameType, peakWh: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
-  const magnitude = Math.log10(peakWh) - 6;
+  const magnitude = log10(peakWh) - 6;
   const year = state.date.year;
   const pumpedHydroLocations = getViableLocationCount(
     state.location,
@@ -917,9 +956,31 @@ export function STORAGE(state: GameType, peakWh: number) {
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
   storage = storage.filter((g: StorageShoppingType) => {
+    const mod = facilityModifier(state, g.name);
+    g.buildCost = modScaledValue(
+      g.buildCost,
+      mod?.buildCost,
+      `facilities.${g.name}.buildCost`,
+    );
+    g.annualOperatingCost = modScaledValue(
+      g.annualOperatingCost,
+      mod?.annualOperatingCost,
+      `facilities.${g.name}.annualOperatingCost`,
+    );
+    g.yearsToBuild = modScaledValue(
+      g.yearsToBuild,
+      mod?.yearsToBuild,
+      `facilities.${g.name}.yearsToBuild`,
+    );
     g.buildCost *= difficulty.buildCost * inflation;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
     g.yearsToBuild *= difficulty.buildTime;
+    if (
+      ![g.buildCost, g.annualOperatingCost, g.yearsToBuild].every(
+        Number.isFinite,
+      )
+    )
+      throw new Error(`Nonfinite facility quote for ${g.name}.`);
     return g.available;
   });
 

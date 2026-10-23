@@ -19,7 +19,6 @@ import {
 } from "../../Types";
 import ConceptIcon from "../base/ConceptIcon";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
-import { WildfireRiskNoticeType } from "../../helpers/Wildfire";
 import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
 import { isPaneLayout } from "../../Globals";
 import { EvidenceTargetType, GameType } from "../../Types";
@@ -92,7 +91,6 @@ export interface StateProps {
   events: GameEventType[];
   upcoming?: UpcomingStoryEventType[];
   ongoing?: UpcomingStoryEventType[];
-  riskNotice?: WildfireRiskNoticeType;
 }
 
 export interface DispatchProps {
@@ -109,6 +107,13 @@ export interface Props extends StateProps, DispatchProps {}
 
 export default function EventLog(props: Props): React.JSX.Element {
   const operations = isPaneLayout() && !!props.game;
+  const multiplayer = props.game?.multiplayer;
+  const companyName =
+    multiplayer?.clock?.players.find((player) => player.id === multiplayer.seat)
+      ?.name ??
+    multiplayer?.results?.find((result) => result.id === multiplayer.seat)
+      ?.name ??
+    "your company";
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const openedForEvidence = React.useRef(!!evidenceRequest);
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
@@ -127,14 +132,7 @@ export default function EventLog(props: Props): React.JSX.Element {
       );
     }
   }, [evidenceRequest, facilityDragActive, onEvidenceReady, operations]);
-  const {
-    events,
-    onOpen,
-    onSelect,
-    upcoming = [],
-    ongoing = [],
-    riskNotice,
-  } = props;
+  const { events, onOpen, onSelect, upcoming = [], ongoing = [] } = props;
   const [historyFilters, setHistoryFilters] = React.useState<
     EventHistoryFilterType[]
   >(() => {
@@ -195,21 +193,6 @@ export default function EventLog(props: Props): React.JSX.Element {
           ref={historyAnchor}
           tabIndex={operations ? -1 : undefined}
         >
-          {riskNotice && (
-            <section
-              className="eventLogSection wildfireRiskNotice"
-              aria-labelledby="wildfireRiskNoticeTitle"
-            >
-              <header className="eventLogSectionHeader">
-                <Typography id="wildfireRiskNoticeTitle" variant="subtitle2">
-                  {riskNotice.title}
-                </Typography>
-              </header>
-              <Typography variant="body2" color="textSecondary">
-                {riskNotice.message}
-              </Typography>
-            </section>
-          )}
           {ongoing.length > 0 && (
             <section
               className="eventLogSection ongoingEvents"
@@ -220,6 +203,15 @@ export default function EventLog(props: Props): React.JSX.Element {
                   Ongoing events
                 </Typography>
               </header>
+              {props.game?.multiplayer && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 1, overflowWrap: "anywhere" }}
+                >
+                  Events for {companyName}.
+                </Typography>
+              )}
               <ul className="eventLogList">
                 {ongoing.map((event) => (
                   <StoryEventCard
@@ -246,6 +238,15 @@ export default function EventLog(props: Props): React.JSX.Element {
                   Upcoming events
                 </Typography>
               </header>
+              {props.game?.multiplayer && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 1, overflowWrap: "anywhere" }}
+                >
+                  Events for {companyName}.
+                </Typography>
+              )}
               <ul className="eventLogList">
                 {upcoming.map((event) => (
                   <StoryEventCard
@@ -279,7 +280,7 @@ export default function EventLog(props: Props): React.JSX.Element {
               >
                 <Button
                   id="eventHistoryFilterButton"
-                  className={`eventHistoryFilterButton${allSelected ? "" : " active"}`}
+                  className="eventHistoryFilterButton"
                   size="small"
                   onClick={(event) => setFilterAnchor(event.currentTarget)}
                   aria-label={`Filter event history, ${filterLabel}`}
@@ -369,6 +370,15 @@ export default function EventLog(props: Props): React.JSX.Element {
                   : activeFilters.length === 1
                     ? activeFilters[0].emptyMessage
                     : "No events match the selected types yet."}
+              </Typography>
+            )}
+            {props.game?.multiplayer && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 1, overflowWrap: "anywhere" }}
+              >
+                Events for {companyName}.
               </Typography>
             )}
             <ul className="eventLogList">

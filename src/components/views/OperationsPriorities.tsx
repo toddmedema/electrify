@@ -75,7 +75,7 @@ export default function OperationsPriorities({
         className="operationsSection"
       >
         <header className="operationsSectionHeader">
-          <h3 id="operationsGoalsTitle">Pinned goals</h3>
+          <h3 id="operationsGoalsTitle">Goals</h3>
           <IconButton
             size="small"
             onClick={(event) => setGoalAnchor(event.currentTarget)}
@@ -122,6 +122,7 @@ export default function OperationsPriorities({
                 {pinned.includes(goal.id) && <CheckIcon fontSize="small" />}
               </span>
               {goal.label}
+              {goal.required === false ? " · Optional" : ""}
             </MenuItem>
           ))}
         </Menu>
@@ -135,11 +136,16 @@ export default function OperationsPriorities({
                 // A failed goal is harmful, so it takes the same red edge as a critical event.
                 className={`status-${goal.status}${goal.status === "failed" ? " importance-CRITICAL" : ""}`}
                 icon={<ConceptIcon concept="goal" fontSize="small" />}
-                heading={goal.label}
+                heading={`${goal.label}${goal.required === false ? " · Optional" : ""}`}
                 meta={GOAL_STATUS[goal.status]}
                 onActivate={() => onEvidence(goalEvidence(id))}
                 tooltip={`${goal.target}. ${goal.timing}`}
               >
+                {goal.definition && (
+                  <span className="operationsGoalTarget">
+                    {goal.definition}
+                  </span>
+                )}
                 {goal.current}
                 <span className="operationsGoalTarget">{goal.target}</span>
               </EventCard>

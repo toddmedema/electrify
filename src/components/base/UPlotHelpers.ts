@@ -1,5 +1,6 @@
 import uPlot from "uplot";
 import { chartPalette, INTERFACE_FONT_FAMILY, withAlpha } from "../../Theme";
+import { getTextScale } from "../../TextSize";
 import { ChartEventMarker } from "./ChartAnnotationsContext";
 import {
   axisTicksAreYearly,
@@ -34,7 +35,7 @@ export const MAX_CHART_SCALE = 1.4;
 
 /** Design units to CSS pixels for a chart of `width`. */
 export function chartScale(width: number): number {
-  return Math.min(width / DESIGN_WIDTH, MAX_CHART_SCALE);
+  return Math.min(width / DESIGN_WIDTH, MAX_CHART_SCALE) * getTextScale();
 }
 
 export const CHART_FONT_FAMILY = INTERFACE_FONT_FAMILY;
@@ -97,8 +98,8 @@ export const FORECAST_AXIS_RIGHT = 48;
 export const FORECAST_RIGHT_PAD = 24;
 
 /** Tick labels: the app's small caption, whatever the chart's width. */
-export const CHART_TICK_PX = 11;
-/** Legends and annotations: one step up from the ticks. */
+export const CHART_TICK_PX = 12;
+/** Legends and annotations share caption-sized type. */
 export const CHART_LABEL_PX = 12;
 
 /**
@@ -112,7 +113,7 @@ export const CHART_LABEL_PX = 12;
  * rewriting the ".9" of "43.9px" and handing the canvas a font it can't parse.
  */
 export function chartFont(pxRatio = 1, sizePx = CHART_TICK_PX): string {
-  return `${Math.max(1, Math.round(sizePx * pxRatio))}px ${CHART_FONT_FAMILY}`;
+  return `${Math.max(1, Math.round(sizePx * getTextScale() * pxRatio))}px ${CHART_FONT_FAMILY}`;
 }
 
 /**
@@ -142,16 +143,6 @@ function textWidth(text: string, font: string, sizePx: number): number {
   }
   measureCtx.font = font;
   return measureCtx.measureText(text).width;
-}
-
-export interface LegendItem {
-  name: string;
-  fill: string;
-  /**
-   * Draws a line sample in the series' own stroke instead of a dot, so series that share a hue
-   * family are still told apart by width and dash rather than by colour alone.
-   */
-  line?: { width: number; dash?: number[] };
 }
 
 interface AxisOptions {
@@ -286,7 +277,7 @@ export function forecastMonthAxis(
  */
 export function yAxis(scale: number, o: AxisOptions): uPlot.Axis {
   const font = chartFont();
-  const fontSize = CHART_TICK_PX;
+  const fontSize = CHART_TICK_PX * getTextScale();
   const fixed = (TICK_SIZE + LABEL_GAP + LABEL_EDGE_PAD) * scale;
   return {
     ...axisCommon(scale, o),
@@ -606,90 +597,12 @@ export function eventMarkersPlugin(
           u.ctx.fill();
           u.ctx.stroke();
           u.ctx.fillStyle = palette.interactive;
-          u.ctx.font = chartFont(1, Math.round(10 * scale));
+          // The badge geometry already contains the selected text scale.
+          u.ctx.font = chartFont(1, (10 * scale) / getTextScale());
           u.ctx.textAlign = "center";
           u.ctx.textBaseline = "middle";
           u.ctx.fillText(String(marker.number), x, badgeY);
           u.ctx.setLineDash([4 * scale, 3 * scale]);
-        }
-        u.ctx.restore();
-      },
-    },
-  };
-}
-
-/**
- * A legend inside the plot, where Victory's was.
- *
- * `inset` is how far in from the plot's own edge the block sits, in design units, and `align`
- * says which edge that is: "left" pins the dots to the left edge, "right" pins the end of the
- * longest label to the right one, so a legend sits flush whatever its labels happen to be.
- *
- * Measured off `u.bbox` rather than the canvas, for the same reason titlePlugin is: the y axis
- * is only as wide as its labels, so the plot no longer starts or ends where a fixed offset from
- * the canvas edge would put it. `designY` stays a canvas offset, which is what the title uses
- * too -- it is the top padding these charts share, not anything the axes move.
- */
-export function legendPlugin(
-  getItems: () => LegendItem[],
-  inset: number,
-  designY: number,
-  align: "left" | "right" = "left",
-): uPlot.Plugin {
-  return {
-    hooks: {
-      draw: (u: uPlot) => {
-        const items = getItems();
-        if (items.length === 0) {
-          return;
-        }
-        const scale = canvasScale(u);
-        const px = uPlot.pxRatio;
-        const radius = 3.5 * px;
-        const swatch = 16 * px;
-        const gap = 5 * px;
-        const lineHeight = 16 * px;
-        const hasLines = items.some((item) => item.line);
-        const markWidth = hasLines ? swatch : radius * 2;
-        u.ctx.save();
-        u.ctx.font = chartFont(px, CHART_LABEL_PX);
-        // The axes leave their own alignment on the context, so say what this wants
-        u.ctx.textAlign = "left";
-        u.ctx.textBaseline = "middle";
-        // The dots share a column, so the block is only as wide as its longest label
-        let x;
-        if (align === "right") {
-          const widest = Math.max(
-            ...items.map((item) => u.ctx.measureText(item.name).width),
-          );
-          x =
-            u.bbox.left +
-            u.bbox.width -
-            inset * scale -
-            (markWidth + gap + widest);
-        } else {
-          x = u.bbox.left + inset * scale;
-        }
-        let y = designY * scale;
-        for (const item of items) {
-          if (item.line) {
-            u.ctx.strokeStyle = item.fill;
-            u.ctx.lineWidth = item.line.width * px;
-            u.ctx.setLineDash((item.line.dash || []).map((d) => d * px));
-            u.ctx.beginPath();
-            u.ctx.moveTo(x, y);
-            u.ctx.lineTo(x + markWidth, y);
-            u.ctx.stroke();
-            u.ctx.setLineDash([]);
-          } else {
-            u.ctx.fillStyle = item.fill;
-            u.ctx.beginPath();
-            u.ctx.arc(x + markWidth / 2, y, radius, 0, Math.PI * 2);
-            u.ctx.fill();
-          }
-          u.ctx.fillStyle = chartPalette().legendText;
-          u.ctx.fillText(item.name, x + markWidth + gap, y);
-          y += lineHeight;
         }
         u.ctx.restore();
       },

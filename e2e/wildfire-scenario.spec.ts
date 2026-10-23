@@ -1,73 +1,114 @@
 import path from "path";
 import { expect, test } from "./fixtures";
+import { openPane } from "./layout";
+import { readSavedGame } from "./save-fixture";
 
-const REVIEW_PROJECTS = new Set(["desktop-chromium", "mobile-390px"]);
-
-test("wildfire briefing and ongoing emergency stay usable", async ({
-  page,
-}, testInfo) => {
-  test.skip(!REVIEW_PROJECTS.has(testInfo.project.name));
-  await page.addInitScript(() => window.localStorage.clear());
-  await page.goto("/?scenario=111");
-
-  await expect(
-    page.getByRole("heading", { name: "Wildfire Emergency" }),
-  ).toBeVisible();
-  await expect(page.getByText("LOS ANGELES, CA")).toBeVisible();
-  await expect(page.getByText(/Safety shutoffs will cut sales/)).toBeVisible();
-
-  const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
-  if (reviewDir && testInfo.project.name === "desktop-chromium") {
-    // Let the incoming details card finish sliding over the main menu before capturing the frame.
-    await page.waitForTimeout(400);
-    await page.screenshot({
-      path: path.join(reviewDir, "wildfire-briefing-desktop.png"),
-    });
-  }
-
-  await page.getByRole("button", { name: "Start game" }).click();
-  await expect(page.getByText("Natural Gas CC", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Events", exact: true }).click();
-  await page
-    .locator("#appbar:visible")
-    .getByRole("button", { name: "fast speed" })
-    .first()
-    .click();
-
-  await page
-    .getByRole("button", { name: "Keep cash" })
-    .click({ timeout: 75000 });
-  await page
-    .locator("#appbar:visible")
-    .getByRole("button", { name: "fast speed" })
-    .first()
-    .click();
-
-  await expect(
-    page.getByRole("heading", { name: "Ongoing events" }),
-  ).toBeVisible({ timeout: 25000 });
-  // The status bar's event chip names it too; check the ongoing card itself
-  await expect(
-    page
-      .locator(".ongoingEvents:visible")
-      .getByText("Wildfire emergency", { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText("Through Feb 2025")).toBeVisible();
-  await expect(page.getByText(/restoration costs \$0\.7M/)).toBeVisible();
-  await expect(page.getByText("Red-flag warning")).toBeVisible();
-
-  const horizontalOverflow = await page
-    .locator(".eventLog:visible")
-    .last()
-    .evaluate((element) =>
-      Math.max(0, element.scrollWidth - element.clientWidth),
+for (const theme of ["light", "dark"] as const) {
+  test(`wildfire intertie outage is clear and inspectable in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120000);
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      // A new game mints its seed from Math.random, and the seed decides which hazards strike.
+      // Critical ones such as hail pause the clock for the player, so an unseeded run could stop
+      // years before the outage. A constant pins the seed however many other draws come first.
+      Math.random = () => 0.25;
+    }, theme);
+    await page.goto("/?scenario=111");
+    await expect(
+      page.getByRole("heading", { name: "Wildfire Emergency" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Your existing northern intertie will lose 90%/),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    // This run has no pausing hazard before the outage
+    await expect
+      .poll(async () => (await readSavedGame(page))?.seed)
+      .toBe(0.25 * 2 ** 32);
+    await expect(
+      page.getByRole("button", { name: /Inspect Northern intertie/ }),
+    ).toBeVisible();
+    const events = page.locator(".eventLog");
+    await openPane(
+      events,
+      page.getByRole("button", { name: "Events", exact: true }),
     );
-  expect(horizontalOverflow).toBeLessThanOrEqual(1);
-
-  if (reviewDir) {
-    await page.screenshot({
-      path: path.join(reviewDir, `wildfire-event-${testInfo.project.name}.png`),
-      fullPage: true,
+    const appbar = page.locator("#appbar:visible");
+    await appbar.getByRole("button", { name: "fast speed" }).first().click();
+    const ongoing = page.locator(".ongoingEvents:visible");
+    const outage = ongoing.getByText("Northern intertie capacity down 90%", {
+      exact: true,
     });
-  }
-});
+    const paused = appbar
+      .getByRole("button", { name: "pause", exact: true })
+      .and(page.locator('[aria-pressed="true"]'))
+      .first();
+    await expect(outage.or(paused).first()).toBeVisible({ timeout: 90000 });
+    await expect(
+      outage,
+      "the seeded run paused for an event before the outage",
+    ).toBeVisible({ timeout: 1000 });
+    await expect(ongoing).toContainText("Through Feb 2025");
+    await expect(ongoing).toContainText("10% capacity through February");
+    const screenshotDir = process.env.REVIEW_SCREENSHOT_DIR;
+    if (screenshotDir && theme === "light") {
+      await page.mouse.move(0, 0);
+      await page.screenshot({
+        path: path.join(
+          screenshotDir,
+          `wildfire-events-${testInfo.project.name}.png`,
+        ),
+        fullPage: true,
+      });
+    }
+    await openPane(
+      page.locator(".facilities"),
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    const line = page.locator(".transmissionLine").filter({
+      has: page.getByRole("button", { name: /Inspect Northern intertie/ }),
+    });
+    const limit = line.getByLabel(
+      "Temporarily limited to 10% of rated capacity",
+    );
+    await expect(limit).toBeVisible();
+    await expect(limit).toHaveText("10% limit");
+    const name = line.getByText("Northern intertie", { exact: true });
+    const [nameBox, limitBox] = await Promise.all([
+      name.boundingBox(),
+      limit.boundingBox(),
+    ]);
+    expect(nameBox).not.toBeNull();
+    expect(limitBox).not.toBeNull();
+    expect(limitBox!.x).toBeGreaterThanOrEqual(nameBox!.x + nameBox!.width);
+    expect(
+      Math.abs(
+        nameBox!.y + nameBox!.height / 2 - limitBox!.y - limitBox!.height / 2,
+      ),
+    ).toBeLessThanOrEqual(2);
+    const inspect = line.getByRole("button", {
+      name: /Inspect Northern intertie/,
+    });
+    if ((await inspect.getAttribute("aria-expanded")) !== "true")
+      await inspect.click();
+    await expect(
+      line.getByText("Import available now", { exact: true }),
+    ).toBeVisible();
+    expect(
+      await line.evaluate((el) => Math.max(0, el.scrollWidth - el.clientWidth)),
+    ).toBeLessThanOrEqual(1);
+    if (screenshotDir && theme === "light") {
+      await page.mouse.move(0, 0);
+      await page.screenshot({
+        path: path.join(
+          screenshotDir,
+          `wildfire-route-${testInfo.project.name}.png`,
+        ),
+        fullPage: true,
+      });
+    }
+  });
+}

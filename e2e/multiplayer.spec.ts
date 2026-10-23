@@ -1,9 +1,17 @@
 import { test, expect, Page, Browser } from "@playwright/test";
 import { gzipSync } from "node:zlib";
+import fs from "node:fs/promises";
+import path from "node:path";
+import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
+import type { GameType } from "../src/Types";
+import { wToSliderTick } from "../src/helpers/BuildSizing";
+import { openPane } from "./layout";
+import { advanceWorldSave } from "./advance-world";
 import type {
   LobbyState,
   NativeEvent,
   NativeRequest,
+  SharedSaveLibrary,
 } from "../src/multiplayer/Native";
 import type { RoomView, World } from "../src/multiplayer/Types";
 import { verifyMenuKeyboard } from "./menu-keyboard";
@@ -14,6 +22,19 @@ type SteamTestWindow = typeof window & {
   releaseMockSteamDelivery?: () => void;
   receivedMockSteamEvent?: unknown;
   mockSteamGeneration?: number;
+  mockSharedSaveRequests?: number;
+  mockScoreSubmissions?: number;
+  mockAchievementSubmissions?: number;
+  nativeWorkerSequence?: number;
+  nativeForecasts?: {
+    id: string;
+    scenarioId: number;
+    hasCustomScenario: boolean;
+    seed: number;
+    loads: GameType["loadAdditions"];
+    responses: { key: string; optionId: string }[];
+  }[];
+  nativeForecastReplies?: string[];
 };
 
 test.afterEach(async ({ browser }) => {
@@ -154,8 +175,39 @@ async function createSteamTransport(page: Page) {
   };
 }
 
+/** Steam persona names, by player index, so the game shows names rather than seat numbers. */
+const STEAM_NAMES = ["SolarSam", "WindyWren", "HydroHal", "VoltVera"];
+
 class SteamRoom {
-  constructor(private readonly createTransport = createSteamTransport) {}
+  constructor(
+    private readonly createTransport = createSteamTransport,
+    private readonly installedMods: InstalledMod[][] = [],
+    private readonly personaNames: readonly string[] = STEAM_NAMES,
+  ) {}
+  modEntries = new Map<string, InstalledMod[]>();
+  modRequests = new Map<string, ModRequest[]>();
+  subscriptions = new Map<string, Set<string>>();
+  heldScenarios = new Set<string>();
+  pendingScenarios = new Map<string, NativeEvent>();
+  async releaseScenario(id: string) {
+    this.heldScenarios.delete(id);
+    const pending = this.pendingScenarios.get(id);
+    this.pendingScenarios.delete(id);
+    if (pending) await this.event(id, pending);
+  }
+  async mods(id: string, input: ModRequest): Promise<ModLibrary> {
+    this.modRequests.get(id)!.push(structuredClone(input));
+    let entries = this.modEntries.get(id)!;
+    if (input.kind === "enable")
+      entries = entries.map((entry) =>
+        entry.key === input.key ? { ...entry, enabled: input.enabled } : entry,
+      );
+    if (input.kind === "remove")
+      entries = entries.filter((entry) => entry.key !== input.key);
+    if (input.kind === "subscribe") this.subscriptions.get(id)!.add(input.id);
+    this.modEntries.set(id, entries);
+    return { entries: structuredClone(entries) };
+  }
   private info = test.info();
   transportErrors: string[] = [];
   audioRequests: string[] = [];
@@ -166,6 +218,12 @@ class SteamRoom {
   >();
   members: LobbyState["members"] = [];
   checkpoint?: World;
+  campaignName = "Friends campaign";
+  campaignCloudState: SharedSaveLibrary["cloudState"] = "ready";
+  campaignWarning?: string;
+  campaignError?: string;
+  campaignListHold?: Promise<void>;
+  invites: string[] = [];
   views = new Map<string, RoomView>();
   pendingViews = new Map<string, NativeEvent>();
   deliveringViews = new Set<string>();
@@ -205,6 +263,14 @@ class SteamRoom {
     };
   }
   async event(id: string, event: NativeEvent) {
+    if (
+      event.kind === "message" &&
+      event.payload.kind === "scenario" &&
+      this.heldScenarios.has(id)
+    ) {
+      this.pendingScenarios.set(id, event);
+      return;
+    }
     // Native leave closes peer channels; unsent frames cannot enter a departed renderer.
     if (
       event.kind === "message" &&
@@ -245,7 +311,9 @@ class SteamRoom {
     }
   }
   async publish() {
-    for (const id of this.pages.keys())
+    // A registered page may still be navigating before it joins. Its decoder cannot yet ACK.
+    // Capture this lobby's recipients before awaiting delivery so new pages cannot join the loop.
+    for (const id of this.members.map((member) => member.id))
       await this.event(id, { kind: "state", state: this.state(id) });
   }
   async request(id: string, input: NativeRequest): Promise<unknown> {
@@ -256,13 +324,13 @@ class SteamRoom {
       if (!this.members.some((m) => m.id === id))
         this.members.push({
           id,
-          name: `Player ${this.members.length + 1}`,
+          name: this.personaNames[Number(id.slice(-1)) - 1],
         });
       await this.publish();
       return this.state(id);
     }
     if (input.kind === "member") {
-      this.members.find((m) => m.id === id)!.ready = input.value;
+      this.members.find((m) => m.id === id)![input.key] = input.value;
       await this.publish();
       return this.state(id);
     }
@@ -292,6 +360,31 @@ class SteamRoom {
       return this.state(id);
     }
     if (input.kind === "read-checkpoint") return this.checkpoint;
+    if (input.kind === "delete-save") this.checkpoint = undefined;
+    if (input.kind === "invite") {
+      this.invites.push(id);
+      return;
+    }
+    if (input.kind === "list-saves" || input.kind === "delete-save") {
+      if (input.kind === "list-saves") await this.campaignListHold;
+      if (this.campaignError) throw new Error(this.campaignError);
+      return {
+        cloudState: this.campaignCloudState,
+        warning: this.campaignWarning,
+        slots: this.checkpoint
+          ? [
+              {
+                id: "saved-campaign",
+                name: this.campaignName,
+                updatedAt: Date.now(),
+                matchId: this.checkpoint.matchId,
+                schema: this.checkpoint.schema,
+                players: this.checkpoint.seats.map((s) => s.name),
+              },
+            ]
+          : [],
+      };
+    }
     if (input.kind === "reconnect") {
       this.dropped.delete(id);
       await this.publish();
@@ -301,6 +394,8 @@ class SteamRoom {
       this.members = this.members.filter((m) => m.id !== id);
       this.pendingViews.delete(id);
       this.heldViews.delete(id);
+      this.pendingScenarios.delete(id);
+      this.heldScenarios.delete(id);
       await this.transports.get(id)!.reset();
       if (this.members.some((member) => member.id === this.host))
         await this.event(this.host, { kind: "disconnected", sender: id });
@@ -315,6 +410,17 @@ class SteamRoom {
     openLobby = true,
   ) {
     const id = `7656119800000000${index + 1}`;
+    const initialMods = structuredClone(this.installedMods[index] ?? []);
+    this.modEntries.set(id, initialMods);
+    this.modRequests.set(id, []);
+    this.subscriptions.set(
+      id,
+      new Set(
+        initialMods.flatMap((entry) =>
+          entry.workshopId ? [entry.workshopId] : [],
+        ),
+      ),
+    );
     const context = await browser.newContext({
       viewport: mobile
         ? { width: 390, height: 844 }
@@ -322,6 +428,7 @@ class SteamRoom {
       colorScheme: index % 2 ? "dark" : "light",
       hasTouch: mobile,
       isMobile: mobile,
+      permissions: ["clipboard-read", "clipboard-write"],
     });
     const page = await context.newPage();
     page.on("request", (request) => {
@@ -337,6 +444,9 @@ class SteamRoom {
     await page.exposeBinding(
       "mockSteamRequest",
       (_source, input: NativeRequest) => this.request(id, input),
+    );
+    await page.exposeBinding("mockModsRequest", (_source, input: ModRequest) =>
+      this.mods(id, input),
     );
     await page.addInitScript(
       ({ id }) => {
@@ -375,16 +485,46 @@ class SteamRoom {
           }),
           writeSaveLibrary: async () => ({ cloudState: "disabled" }),
           getLeaderboard: async () => [],
-          submitScore: async () => {},
+          submitScore: async () => {
+            const target = window as SteamTestWindow;
+            target.mockScoreSubmissions =
+              (target.mockScoreSubmissions ?? 0) + 1;
+          },
+          readAchievements: async () => ({
+            version: 1,
+            earned: [],
+            tutorials: [],
+            wins: [],
+          }),
+          submitAchievements: async () => {
+            const target = window as SteamTestWindow;
+            target.mockAchievementSubmissions =
+              (target.mockAchievementSubmissions ?? 0) + 1;
+          },
+          mods: (input) =>
+            (
+              window as unknown as {
+                mockModsRequest: (input: ModRequest) => Promise<ModLibrary>;
+              }
+            ).mockModsRequest(input),
           openFriends: async () => {},
           setActivity: async () => {},
           addTimelineEvent: async () => {},
-          multiplayerRequest: (input) =>
-            (
-              window as unknown as {
-                mockSteamRequest: (input: NativeRequest) => Promise<unknown>;
+          multiplayerRequest: async (input) => {
+            try {
+              return await (
+                window as unknown as {
+                  mockSteamRequest: (input: NativeRequest) => Promise<unknown>;
+                }
+              ).mockSteamRequest(input);
+            } finally {
+              if (input.kind === "list-saves") {
+                const target = window as SteamTestWindow;
+                target.mockSharedSaveRequests =
+                  (target.mockSharedSaveRequests || 0) + 1;
               }
-            ).mockSteamRequest(input),
+            }
+          },
           onMultiplayerEvent: (callback) => {
             const handler = (event: Event) =>
               callback((event as CustomEvent<NativeEvent>).detail);
@@ -403,6 +543,404 @@ class SteamRoom {
     return page;
   }
 }
+
+/** Hosting goes straight to choosing a game, where friends can join at any time. */
+async function hostGame(page: Page) {
+  await page.getByRole("button", { name: "Host a game", exact: true }).click();
+  await expect(page.getByTestId("mission-row-999")).toBeVisible();
+}
+async function joinGame(page: Page, room: SteamRoom) {
+  await page.getByLabel("Invite code", { exact: true }).fill(room.lobbyId);
+  await page.getByRole("button", { name: "Join", exact: true }).click();
+}
+async function openSaves(page: Page) {
+  await page
+    .getByRole("button", { name: "Load multiplayer save", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Multiplayer saves", exact: true }),
+  ).toBeFocused();
+}
+async function loadSave(page: Page, name: string) {
+  await openSaves(page);
+  await page
+    .getByRole("article", { name, exact: true })
+    .getByRole("button", { name: "Load save", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Pick your company", exact: true }),
+  ).toBeVisible();
+}
+const company = (page: Page, name: string) =>
+  page.getByRole("listitem", { name: `${name}'s company`, exact: true });
+
+// Each width runs in one theme; both themes stay covered.
+for (const [width, theme] of [
+  [1280, "light"],
+  [390, "dark"],
+  [360, "dark"],
+] as const) {
+  test(`multiplayer saves offer direct resume and safe deletion at ${width}px in ${theme}`, async ({
+    browser,
+  }) => {
+    const room = new SteamRoom();
+    room.checkpoint = {
+      schema: 3,
+      matchId: "library-campaign",
+      seats: [
+        { id: room.host, name: "SolarSam" },
+        { id: "76561198000000002", name: "WindyWren" },
+      ],
+      outcomes: {},
+    } as unknown as World;
+    const checkpoint = room.checkpoint;
+    const mobile = width < 600;
+    const page = await room.player(browser, 0, mobile);
+    await page.setViewportSize({
+      width,
+      height: width === 360 ? 640 : mobile ? 844 : 900,
+    });
+    await page.emulateMedia({ colorScheme: theme });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    const capture = async (state: string) => {
+      if (!process.env.CAMPAIGN_DESIGN_SCREENSHOTS) return;
+      await page.mouse.move(0, 0);
+      await page.screenshot({
+        path: `${process.env.CAMPAIGN_DESIGN_SCREENSHOTS}/${width}-${theme}-${state}.png`,
+        animations: "disabled",
+        style: ".MuiTouchRipple-root { visibility: hidden !important; }",
+      });
+    };
+    const bounded = async (
+      region = page.getByRole("dialog").last(),
+      minimum = mobile ? 44 : 40,
+    ) => {
+      expect(
+        await region.evaluate((el) => el.scrollWidth - el.clientWidth),
+      ).toBeLessThanOrEqual(1);
+      const bounds = await region.boundingBox();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+      for (const button of await region.getByRole("button").evaluateAll((els) =>
+        els
+          .filter((el) => el.getBoundingClientRect().height > 0)
+          .map((el) => ({
+            label: el.getAttribute("aria-label") || el.textContent,
+            height: el.getBoundingClientRect().height,
+          })),
+      )) {
+        expect(
+          button.height,
+          `${button.label} touch target`,
+        ).toBeGreaterThanOrEqual(minimum);
+      }
+    };
+    // Play with friends offers only hosting or joining with a code.
+    const entry = page.getByRole("dialog", {
+      name: "Play with friends",
+      exact: true,
+    });
+    // Back is the header's arrow, as on every screen; there are no bottom actions.
+    await expect(entry.getByRole("button")).toHaveText([
+      "",
+      "Host a game",
+      "Join",
+    ]);
+    await expect(entry.getByRole("button").first()).toHaveAccessibleName(
+      "Back",
+    );
+    const [field, join] = await Promise.all([
+      entry.getByLabel("Invite code", { exact: true }).boundingBox(),
+      entry.getByRole("button", { name: "Join", exact: true }).boundingBox(),
+    ]);
+    // The code and Join share one row.
+    expect(Math.abs(field!.y - join!.y)).toBeLessThan(12);
+    expect(join!.x).toBeGreaterThan(field!.x + field!.width);
+    await bounded();
+    await capture("entry");
+    await hostGame(page);
+    const bar = page
+      .getByRole("region", { name: "Playing together", exact: true })
+      .last();
+    await expect(
+      bar.getByRole("img", { name: "Host", exact: true }),
+    ).toBeVisible();
+    await expect(bar.getByText(/Invite friends to play|can join/)).toHaveCount(
+      0,
+    );
+    await expect(
+      bar.getByRole("button", { name: "Invite friends", exact: true }),
+    ).toHaveClass(/MuiButton-contained/);
+    await bar
+      .getByRole("button", { name: "Copy invite code", exact: true })
+      .click();
+    await expect(page.getByText("Invite code copied")).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe(room.lobbyId);
+    await expect(
+      page.getByRole("button", { name: "Invite a friend to start" }),
+    ).toHaveCount(0);
+    await bounded(bar);
+    await capture("host-alone");
+    await openSaves(page);
+    const save = page.getByRole("article", {
+      name: room.campaignName,
+      exact: true,
+    });
+    await expect(save).toBeVisible();
+    await expect(
+      save.getByText("SolarSam, WindyWren", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      save.getByRole("button", { name: "Load save", exact: true }),
+    ).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: /rename|export|import/i }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText(
+        /Saved on this computer|Differing Steam Cloud|Host a lobby and invite|[Ss]hared campaign/,
+      ),
+    ).toHaveCount(0);
+    await bounded();
+    await capture("saved");
+    await page.keyboard.press("Escape");
+    room.campaignCloudState = "offline";
+    await openSaves(page);
+    await expect(
+      page.getByText(/Saved on this computer|Steam Cloud is offline/),
+    ).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    room.campaignError =
+      "Save files could not be read. Your existing files have been kept.";
+    await openSaves(page);
+    await expect(page.getByRole("alert")).toContainText(room.campaignError);
+    await capture("error");
+    await page
+      .getByRole("alert")
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Back", exact: true })
+      .click();
+    room.campaignError = undefined;
+    // Closing the list while it loads leaves the scenario screen as it was.
+    let release!: () => void;
+    const completed = await page.evaluate(
+      () => (window as SteamTestWindow).mockSharedSaveRequests || 0,
+    );
+    room.campaignListHold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page
+      .getByRole("button", { name: "Load multiplayer save", exact: true })
+      .click();
+    await expect(page.getByRole("status").last()).toContainText(
+      "Loading multiplayer saves…",
+    );
+    await page.keyboard.press("Escape");
+    release();
+    room.campaignListHold = undefined;
+    await page.waitForFunction(
+      (before) =>
+        ((window as SteamTestWindow).mockSharedSaveRequests || 0) > before,
+      completed,
+    );
+    await expect(
+      page.getByRole("heading", { name: "Multiplayer saves", exact: true }),
+    ).toHaveCount(0);
+    await expect(page.getByTestId("mission-row-999")).toBeVisible();
+    await loadSave(page, room.campaignName);
+    await expect(company(page, "SolarSam")).toContainText("You");
+    await expect(company(page, "WindyWren")).toContainText("Saved company");
+    await expect(
+      page.getByRole("button", { name: "Resume game", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByText("Someone must take WindyWren's company"),
+    ).toBeVisible();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Invite friends", exact: true })
+      .click();
+    await expect.poll(() => room.invites).toEqual([room.host]);
+    await bounded();
+    await capture("resume-invite");
+    const guest = await room.player(browser, 1, mobile);
+    await joinGame(guest, room);
+    await expect(company(page, "WindyWren")).toContainText("WindyWren");
+    await expect(company(guest, "WindyWren")).toContainText("You");
+    await expect(
+      page.getByRole("button", { name: "Resume game", exact: true }),
+    ).toBeEnabled();
+    await capture("resume-ready");
+    // Choosing a new game instead brings both friends back to the scenario screens.
+    await page
+      .getByRole("button", { name: "Choose a new game", exact: true })
+      .click();
+    await page.getByTestId("mission-row-999").click();
+    await expect(
+      guest.getByText("Custom setup", { exact: true }).last(),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Back", exact: true })
+      .last()
+      .click();
+    room.campaignName = "A".repeat(80);
+    await openSaves(page);
+    const longSave = page.getByRole("article", {
+      name: room.campaignName,
+      exact: true,
+    });
+    await expect(longSave).toBeVisible();
+    await bounded();
+    await capture("long-name");
+    await longSave
+      .getByRole("button", { name: "Load save", exact: true })
+      .click();
+    for (const peer of [page, guest])
+      await expect(
+        peer.getByRole("dialog", { name: "Pick your company", exact: true }),
+      ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Resume game", exact: true }),
+    ).toBeEnabled();
+    await page
+      .getByRole("button", { name: "Choose a new game", exact: true })
+      .click();
+    await openSaves(page);
+    const openDelete = async () => {
+      await longSave
+        .getByRole("button", {
+          name: `Actions for ${room.campaignName}`,
+          exact: true,
+        })
+        .click();
+      await expect(page.getByRole("menuitem")).toHaveCount(1);
+      await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+      const confirmation = page.getByRole("dialog", {
+        name: "Delete multiplayer save?",
+        exact: true,
+      });
+      await expect(
+        confirmation.getByRole("button", { name: "Cancel", exact: true }),
+      ).toBeFocused();
+      await expect(
+        confirmation.getByRole("button", { name: "Delete", exact: true }),
+      ).toBeInViewport();
+      return confirmation;
+    };
+    let confirmation = await openDelete();
+    await bounded();
+    await capture("delete");
+    await confirmation
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    await expect(longSave).toBeVisible();
+    confirmation = await openDelete();
+    await confirmation
+      .getByRole("button", { name: "Delete", exact: true })
+      .click();
+    await expect(
+      page.getByText("No multiplayer saves yet", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Multiplayer saves", exact: true }),
+    ).toBeFocused();
+    await capture("empty");
+    await page.keyboard.press("Escape");
+    // Without saves, the scenario screen offers only a new game.
+    await expect(
+      page.getByRole("button", { name: "Load multiplayer save" }),
+    ).toHaveCount(0);
+    expect(room.members).toHaveLength(2);
+    room.checkpoint = checkpoint;
+    expect(room.transportErrors).toEqual([]);
+  });
+}
+
+test("friends join and leave freely before the start, and claim saved companies to resume", async ({
+  browser,
+}) => {
+  const room = new SteamRoom();
+  room.checkpoint = {
+    schema: 3,
+    matchId: "claim-campaign",
+    seats: [
+      { id: room.host, name: "SolarSam" },
+      { id: "76561198000000002", name: "WindyWren" },
+    ],
+    outcomes: {},
+  } as unknown as World;
+  const host = await room.player(browser, 0);
+  const errors: string[] = [];
+  host.on("pageerror", (error) => errors.push(error.message));
+  await hostGame(host);
+  // A friend joins, leaves and another joins while the host is choosing.
+  const hydro = await room.player(browser, 2);
+  await joinGame(hydro, room);
+  await expect(hydro.getByText("Following SolarSam").last()).toBeVisible();
+  const roster = host
+    .getByRole("list", { name: "Players", exact: true })
+    .last();
+  await expect(roster.getByText("HydroHal", { exact: true })).toBeVisible();
+  await hydro
+    .getByRole("button", { name: "Leave", exact: true })
+    .last()
+    .click();
+  await hydro.getByRole("button", { name: "Leave lobby", exact: true }).click();
+  await expect(
+    hydro.getByRole("button", { name: "Play with friends", exact: true }),
+  ).toBeVisible();
+  await expect(roster.getByText("HydroHal", { exact: true })).toHaveCount(0);
+  await expect(host.getByRole("dialog")).toHaveCount(0);
+  await hydro
+    .getByRole("button", { name: "Play with friends", exact: true })
+    .click();
+  await joinGame(hydro, room);
+  await expect(hydro.getByText("Following SolarSam").last()).toBeVisible();
+  // A friend who was not in the save takes an open company.
+  await loadSave(host, room.campaignName);
+  await expect(company(hydro, "WindyWren")).toBeVisible();
+  await expect(host.getByText("HydroHal must pick a company")).toBeVisible();
+  await hydro
+    .getByRole("button", { name: "Take WindyWren's company", exact: true })
+    .click();
+  await expect(company(host, "WindyWren")).toContainText("HydroHal");
+  await expect(
+    host.getByRole("button", { name: "Resume game", exact: true }),
+  ).toBeEnabled();
+  // The saved player joins too; the explicit claim holds, so they must pick.
+  const windy = await room.player(browser, 1);
+  await joinGame(windy, room);
+  await expect(host.getByText("WindyWren must pick a company")).toBeVisible();
+  await expect(
+    host.getByRole("button", { name: "Resume game", exact: true }),
+  ).toBeDisabled();
+  // Once the newcomer leaves, the returning player gets their own company back.
+  await hydro.getByRole("button", { name: "Leave lobby", exact: true }).click();
+  await expect(company(host, "WindyWren")).toContainText("WindyWren");
+  await expect(company(windy, "WindyWren")).toContainText("You");
+  await expect(
+    host.getByRole("button", { name: "Resume game", exact: true }),
+  ).toBeEnabled();
+  // When the host leaves, friends go home with an explanation instead of a reconnect prompt.
+  await host.getByRole("button", { name: "Leave lobby", exact: true }).click();
+  const home = windy.getByRole("dialog", {
+    name: "Play with friends",
+    exact: true,
+  });
+  await expect(home.getByRole("alert")).toContainText(
+    "The host closed the lobby.",
+  );
+  await expect(
+    home.getByRole("button", { name: "Host a game", exact: true }),
+  ).toBeEnabled();
+  expect(errors).toEqual([]);
+  expect(room.transportErrors).toEqual([]);
+});
 
 test("mock Steam publishes only to players with an initialized transport", async ({
   browser,
@@ -434,6 +972,40 @@ test("mock Steam publishes only to players with an initialized transport", async
   }
   expect(room.pages.size).toBe(1);
   await expect(room.publish()).resolves.toBeUndefined();
+  expect(room.transportErrors).toEqual([]);
+});
+
+test("mock Steam lobby publication skips registered players who have not joined", async ({
+  browser,
+}) => {
+  let transports = 0;
+  const room = new SteamRoom(async (page) => {
+    const transport = await createSteamTransport(page);
+    if (++transports === 2)
+      return {
+        ...transport,
+        send: async () => {
+          throw new Error("Unjoined renderer is navigating");
+        },
+      };
+    return transport;
+  });
+  const host = await room.player(browser, 0);
+  await hostGame(host);
+  await room.player(browser, 1, false, false);
+  await host.evaluate(() => {
+    window.addEventListener("mockSteamEvent", (event) => {
+      (window as SteamTestWindow).receivedMockSteamEvent = (
+        event as CustomEvent<NativeEvent>
+      ).detail;
+    });
+  });
+  await expect(room.publish()).resolves.toBeUndefined();
+  expect(
+    await host.evaluate(
+      () => (window as SteamTestWindow).receivedMockSteamEvent,
+    ),
+  ).toEqual({ kind: "state", state: room.state(room.host) });
   expect(room.transportErrors).toEqual([]);
 });
 
@@ -596,24 +1168,15 @@ async function startSharedGame(browser: Browser, count: number) {
     );
     page.on("pageerror", (error) => errors.push(error.message));
     pages.push(page);
-    if (index === 0)
-      await page.getByRole("button", { name: "Host a Steam lobby" }).click();
-    else {
-      await page.getByLabel("Lobby code", { exact: true }).fill(room.lobbyId);
-      await page
-        .getByRole("button", { name: "Join lobby", exact: true })
-        .click();
-    }
+    // The host chooses in the normal scenario screens; every guest follows along read-only.
+    if (index === 0) await hostGame(page);
+    else await joinGame(page, room);
   }
-  // The host chooses in the normal scenario screens; every guest follows along read-only.
-  await pages[0]
-    .getByRole("button", { name: "Choose a game together", exact: true })
-    .click();
   // 999 is CUSTOM_SCENARIO_ID: the custom game row sits at the end of the list.
   await pages[0].getByTestId("mission-row-999").click();
   for (const guest of pages.slice(1)) {
     // The outgoing card stays mounted while the next one slides in, so check the newest.
-    await expect(guest.getByText("Following Player 1").last()).toBeVisible();
+    await expect(guest.getByText("Following SolarSam").last()).toBeVisible();
     await expect(
       guest.getByText("Custom setup", { exact: true }).last(),
     ).toBeVisible();
@@ -623,8 +1186,11 @@ async function startSharedGame(browser: Browser, count: number) {
     ).toHaveAttribute("aria-pressed", "true");
   }
   await expect(
-    pages[0].getByText(`${count - 1} of ${count - 1} ready`).last(),
-  ).toBeVisible();
+    pages[0]
+      .getByRole("list", { name: "Players", exact: true })
+      .last()
+      .getByRole("img", { name: "Ready", exact: true }),
+  ).toHaveCount(count - 1);
   await pages[0]
     .getByRole("button", { name: "Start for everyone", exact: true })
     .click();
@@ -932,6 +1498,171 @@ async function saveAndQuit(page: Page) {
     page.getByRole("button", { name: "Play with friends", exact: true }),
   ).toBeVisible();
 }
+
+for (const width of [1280, 390]) {
+  test(`multiplayer creation and resume walkthrough at ${width}px`, async ({
+    browser,
+  }) => {
+    const room = new SteamRoom();
+    room.campaignName = "Campaign 1";
+    const mobile = width < 600;
+    const host = await room.player(browser, 0, mobile);
+    const guest = await room.player(browser, 1, mobile);
+    await guest.emulateMedia({ colorScheme: "light" });
+    const errors: string[] = [];
+    for (const page of [host, guest])
+      page.on("pageerror", (error) => errors.push(error.message));
+    const capture = async (step: string, page = host, actionName?: string) => {
+      if (!process.env.CAMPAIGN_WALKTHROUGH_SCREENSHOTS) return;
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole("tooltip")).toBeHidden();
+      await expect(
+        page.getByText("Calculating forecast…", { exact: true }),
+      ).toBeHidden({ timeout: 30000 });
+      await expect(
+        page.getByText("Calculating Year 1 outlook…", { exact: true }).last(),
+      ).toBeHidden({ timeout: 30000 });
+      if (actionName) {
+        const action = page.getByRole("button", {
+          name: actionName,
+          exact: true,
+        });
+        await action.scrollIntoViewIfNeeded();
+        await expect(action).toBeInViewport({ ratio: 1 });
+      }
+      await page.screenshot({
+        path: `${process.env.CAMPAIGN_WALKTHROUGH_SCREENSHOTS}/${width}-${step}.png`,
+        animations: "disabled",
+        style: ".MuiTouchRipple-root { visibility: hidden !important; }",
+      });
+    };
+    await capture("01-play-with-friends");
+    await hostGame(host);
+    await host
+      .getByRole("button", { name: "Invite friends", exact: true })
+      .click();
+    await expect.poll(() => room.invites).toEqual([room.host]);
+    await capture("02-host-and-invite");
+    await guest.getByLabel("Invite code", { exact: true }).fill(room.lobbyId);
+    await expect(guest.getByLabel("Invite code", { exact: true })).toHaveValue(
+      room.lobbyId,
+    );
+    await guest.getByLabel("Invite code", { exact: true }).blur();
+    await capture("03-join-with-code", guest);
+    await guest.getByRole("button", { name: "Join", exact: true }).click();
+    const roster = host.getByRole("list", { name: "Players", exact: true });
+    await expect(
+      roster.last().getByRole("img", { name: "Reviewing", exact: true }),
+    ).toBeVisible();
+    await capture("04-friend-joined");
+    await host.getByTestId("mission-row-999").click();
+    await expect(
+      host.getByRole("button", { name: "Start for everyone", exact: true }),
+    ).toBeEnabled();
+    await capture("05-configure-game");
+    await expect(guest.getByText("Following SolarSam").last()).toBeVisible();
+    await expect(
+      guest.getByText("Custom setup", { exact: true }).last(),
+    ).toBeVisible();
+    await capture("06-friend-ready", guest, "I'm ready");
+    await guest.getByRole("button", { name: "I'm ready", exact: true }).click();
+    await expect(
+      roster.last().getByRole("img", { name: "Ready", exact: true }),
+    ).toBeVisible();
+    await capture("07-ready-to-start", host, "Start for everyone");
+    await host
+      .getByRole("button", { name: "Start for everyone", exact: true })
+      .click();
+    for (const page of [host, guest]) {
+      await expect(page.locator(".facilities:visible")).toBeVisible();
+      await expectClockMeaning(page, "pause", "pause");
+    }
+    await capture("08-game-paused");
+    // A multiplayer save persists actual running progress, not merely a freshly created world.
+    const initialDate = { ...room.views.get("76561198000000002")!.game!.date };
+    for (const page of [host, guest]) await ready(page);
+    await expect(clock(host)).toHaveAttribute("data-active-speed", "SLOW");
+    await expect
+      .poll(() => room.views.get("76561198000000002")?.game?.date)
+      .not.toEqual(initialDate);
+    // Hovering a speed names each player at it.
+    await expect(
+      clock(host).getByRole("button", { name: "slow speed", exact: true }),
+    ).toHaveAttribute("title", "1×: SolarSam (you), WindyWren");
+    await host.getByRole("button", { name: "pause", exact: true }).click();
+    await host.getByRole("button", { name: /^menu/ }).click();
+    await expect(
+      host.getByRole("menuitem", { name: "Saved games", exact: true }),
+    ).toHaveCount(0);
+    await capture("09-save-and-quit");
+    await host.keyboard.press("Escape");
+    await saveAndQuit(guest);
+    await saveAndQuit(host);
+    const savedDates = room.checkpoint!.grids.map((grid) => ({ ...grid.date }));
+    const savedFacilities = room.checkpoint!.grids.map(
+      (grid) => grid.facilities.length,
+    );
+    await capture("10-saved");
+    await host
+      .getByRole("button", { name: "Play with friends", exact: true })
+      .click();
+    await hostGame(host);
+    await expect(
+      host.getByRole("button", { name: "Load multiplayer save", exact: true }),
+    ).toBeVisible();
+    await capture("11-load-save-bar");
+    await openSaves(host);
+    await expect(
+      host.getByRole("article", { name: "Campaign 1", exact: true }),
+    ).toBeVisible();
+    await capture("12-multiplayer-saves");
+    await host.getByRole("button", { name: "Load save", exact: true }).click();
+    await expect(company(host, "SolarSam")).toContainText("You");
+    await expect(
+      company(host, "WindyWren").getByRole("button", {
+        name: "Take WindyWren's company",
+      }),
+    ).toBeVisible();
+    await expect(
+      host.getByRole("button", { name: "Resume game", exact: true }),
+    ).toBeDisabled();
+    await host
+      .getByRole("dialog")
+      .getByRole("button", { name: "Invite friends", exact: true })
+      .click();
+    await expect.poll(() => room.invites).toEqual([room.host, room.host]);
+    await capture("13-pick-companies");
+    await guest
+      .getByRole("button", { name: "Play with friends", exact: true })
+      .click();
+    await joinGame(guest, room);
+    // The returning friend takes back their own company by default.
+    await expect(company(guest, "WindyWren")).toContainText("You");
+    await expect(
+      host.getByRole("button", { name: "Resume game", exact: true }),
+    ).toBeEnabled();
+    await capture("14-friend-rejoined", guest);
+    await capture("15-resume-ready", host, "Resume game");
+    await host
+      .getByRole("button", { name: "Resume game", exact: true })
+      .click();
+    for (const page of [host, guest]) {
+      await expect(page.locator(".facilities:visible")).toBeVisible();
+      await expectClockMeaning(page, "pause", "pause");
+    }
+    await expect
+      .poll(() => room.views.get("76561198000000002")?.game?.date)
+      .toEqual(savedDates[1]);
+    await expect
+      .poll(() => room.views.get("76561198000000002")?.game?.facilities.length)
+      .toBe(savedFacilities[1]);
+    await capture("16-restored-paused");
+    await capture("17-friend-restored-paused", guest);
+    expect(errors).toEqual([]);
+    expect(room.transportErrors).toEqual([]);
+  });
+}
+
 for (const count of [2, 4]) {
   test(
     count +
@@ -994,14 +1725,14 @@ for (const count of [2, 4]) {
       for (const page of pages)
         await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
       await expect(clock(pages[0])).toHaveAccessibleDescription(
-        /Player 1 \(you\) selected 24×/,
+        /SolarSam \(you\) selected 24×/,
       );
       await expect(clock(pages[0])).toHaveAccessibleDescription(
-        count === 4 ? /Player 2 selected 3×/ : /Player 2 selected 1×/,
+        count === 4 ? /WindyWren selected 3×/ : /WindyWren selected 1×/,
       );
       if (count === 4)
         await expect(clock(pages[0])).toHaveAccessibleDescription(
-          /Player 3 selected 1×/,
+          /HydroHal selected 1×/,
         );
       await expect(
         pages[0].getByRole("button", { name: /Player speeds;/ }),
@@ -1061,24 +1792,24 @@ for (const count of [2, 4]) {
       if (count === 2) {
         // Normal inspectors and purchase dialogs upgrade one shared player wire.
         await pages[0]
-          .getByRole("button", { name: /^Inspect Player 2,/ })
+          .getByRole("button", { name: /^Inspect WindyWren,/ })
           .click();
         await pages[0]
           .getByRole("button", {
-            name: "Review upgrade of Player 2",
+            name: "Review upgrade of WindyWren",
             exact: true,
           })
           .click();
         await pages[0]
           .getByRole("button", { name: "Pay cash", exact: true })
           .click();
-        await buyer.getByRole("button", { name: /^Inspect Player 1,/ }).click();
+        await buyer.getByRole("button", { name: /^Inspect SolarSam,/ }).click();
         await expect(
-          buyer.getByText(/Player 1 requested this upgrade/),
+          buyer.getByText(/SolarSam requested this upgrade/),
         ).toBeVisible();
         await buyer
           .getByRole("button", {
-            name: "Review upgrade of Player 1",
+            name: "Review upgrade of SolarSam",
             exact: true,
           })
           .click();
@@ -1093,9 +1824,9 @@ for (const count of [2, 4]) {
           )
           .toBe(starting.transmission!.lines[0].capacityW * 1.5);
         await pages[0]
-          .getByRole("button", { name: /^Inspect Player 2,/ })
+          .getByRole("button", { name: /^Inspect WindyWren,/ })
           .click();
-        await buyer.getByRole("button", { name: /^Inspect Player 1,/ }).click();
+        await buyer.getByRole("button", { name: /^Inspect SolarSam,/ }).click();
       }
       const dropped = buyerId;
       room.dropped.add(dropped);
@@ -1150,26 +1881,28 @@ for (const count of [2, 4]) {
       ).toBe(true);
       for (let i = 1; i < count - 1; i++) await saveAndQuit(pages[i]);
       await saveAndQuit(pages[0]);
-      for (let i = 0; i < count; i++) {
+      await pages[0]
+        .getByRole("button", { name: "Play with friends", exact: true })
+        .click();
+      await hostGame(pages[0]);
+      await loadSave(pages[0], "Friends campaign");
+      await room.deliver(buyerId, {
+        kind: "message",
+        sender: room.host,
+        payload: { kind: "view", view: oldView },
+      });
+      await expect(buyer.locator(".facilities:visible")).toHaveCount(0);
+      await expect(
+        pages[0].getByRole("button", { name: "Resume game", exact: true }),
+      ).toBeDisabled();
+      for (let i = 1; i < count; i++) {
         await pages[i]
           .getByRole("button", { name: "Play with friends", exact: true })
           .click();
-        if (i === 0)
-          await pages[i]
-            .getByRole("button", { name: "Host a Steam lobby", exact: true })
-            .click();
-        else {
-          await pages[i]
-            .getByLabel("Lobby code", { exact: true })
-            .fill(room.lobbyId);
-          await pages[i]
-            .getByRole("button", { name: "Join lobby", exact: true })
-            .click();
-        }
-        if (i === 0) await deliverOldView();
+        await joinGame(pages[i], room);
       }
       await pages[0]
-        .getByRole("button", { name: "Resume last shared save", exact: true })
+        .getByRole("button", { name: "Resume game", exact: true })
         .click();
       for (const page of pages)
         await expect(page.locator(".facilities:visible")).toBeVisible();
@@ -1181,4 +1914,973 @@ for (const count of [2, 4]) {
       expect(room.audioRequests).toEqual([]);
     },
   );
+}
+
+const cooperativeMod = (published: boolean): InstalledMod => ({
+  key: "local:cooperative-grid",
+  source: "local",
+  enabled: true,
+  ...(published ? { workshopId: "777" } : {}),
+  pack: {
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "cooperative-grid",
+    title: "Cooperative Grid",
+    creator: "Community engineer",
+    version: "1.0",
+    description: "Choose funding for your grid before its first month begins.",
+    seed: 42,
+    baseScenarioId: 999,
+    officialArcs: [],
+    scenario: {
+      durationMonths: 6,
+      startingYear: 2020,
+      startingCustomers: 10000,
+      cash: 1000000000,
+      dollarsPerkWh: 0.2,
+    },
+    objectives: [
+      {
+        id: "serve-customers",
+        label: "Keep your grid reliable",
+        metric: "monthlyReliability",
+        minDemandServedShare: 0.5,
+        fromMonth: 1,
+        throughMonth: 6,
+      },
+    ],
+    choices: [
+      {
+        id: "funding",
+        title: "Grid funding",
+        prompt: "Choose whether your company accepts support.",
+        dueMonth: 1,
+        options: [
+          {
+            id: "accept",
+            label: "Accept funding",
+            description: "Receive support for your own grid.",
+            message: "Your company accepted funding.",
+            grantDollars: 1000000,
+          },
+          {
+            id: "decline",
+            label: "Keep the current plan",
+            description: "Keep your current plan without a grant.",
+            message: "Your company kept its current plan.",
+            costDollars: 0,
+          },
+        ],
+      },
+    ],
+    events: [
+      {
+        id: "announced-support",
+        title: "Opening grid support",
+        message: "Operating costs fall for your grid.",
+        preview: "Operating costs will fall for your grid.",
+        startMonth: 1,
+        durationMonths: 2,
+        effects: { operatingCostMultipliersByFuel: { "Natural Gas": 0.9 } },
+      },
+      {
+        id: "hidden-change",
+        title: "Private surprise",
+        message: "Supply conditions change for your grid.",
+        startMonth: 4,
+        durationMonths: 1,
+        visibility: "surprise",
+        effects: { outputMultipliersByFuel: { "Natural Gas": 0.9 } },
+      },
+    ],
+  },
+});
+
+for (const width of [1280, 390, 360]) {
+  test(`a shared mod needs no guest setup and survives library removal at ${width}px`, async ({
+    browser,
+  }) => {
+    // Valid Steam names can be a single long word. Test the company identity inside
+    // each scrollable surface: the dialog's outer box can fit while its text clips.
+    const companyNames = ["W".repeat(32), "M".repeat(32)];
+    const hostEntry = cooperativeMod(width !== 390);
+    const guestEntry: InstalledMod = {
+      ...cooperativeMod(true),
+      key: "workshop:888",
+      source: "workshop",
+      workshopId: "888",
+      pack: {
+        ...hostEntry.pack,
+        id: "guest-only-grid",
+        title: "Guest's own grid",
+        version: "different installed version",
+      },
+    };
+    const disabledEntry: InstalledMod = {
+      ...hostEntry,
+      key: "local:disabled-grid",
+      enabled: false,
+      pack: { ...hostEntry.pack, id: "disabled-grid", title: "Disabled Grid" },
+    };
+    const room = new SteamRoom(
+      createSteamTransport,
+      [[hostEntry, disabledEntry], [guestEntry]],
+      [...companyNames, ...STEAM_NAMES.slice(2)],
+    );
+    const hostId = room.host;
+    const guestId = "76561198000000002";
+    const host = await room.player(browser, 0, width < 600);
+    const guest = await room.player(browser, 1, width < 600);
+    const errors: string[] = [];
+    for (const page of [host, guest]) {
+      page.on("pageerror", (error) => errors.push(error.message));
+      await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+    }
+    const guestLibrary = structuredClone(room.modEntries.get(guestId));
+    const guestSubscriptions = [...room.subscriptions.get(guestId)!];
+    const unchangedGuest = () => {
+      expect(room.modEntries.get(guestId)).toEqual(guestLibrary);
+      expect([...room.subscriptions.get(guestId)!]).toEqual(guestSubscriptions);
+      expect(room.modRequests.get(guestId)).toEqual([]);
+    };
+    const capture = async (name: string, page: Page) => {
+      await expect(
+        page.locator("iframe#webpack-dev-server-client-overlay"),
+      ).toHaveCount(0);
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth -
+            document.documentElement.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+      if (!process.env.REVIEW_SCREENSHOT_DIR) return;
+      await fs.mkdir(process.env.REVIEW_SCREENSHOT_DIR, { recursive: true });
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole("tooltip")).toBeHidden();
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `coop-mod-${width}-${name}.png`,
+        ),
+        animations: "disabled",
+        style: ".MuiTouchRipple-root { visibility: hidden !important; }",
+      });
+    };
+    await hostGame(host);
+    await joinGame(guest, room);
+    await host.getByTestId("community-scenarios").click();
+    await expect(
+      host.getByRole("button", { name: "Play Cooperative Grid", exact: true }),
+    ).toBeEnabled();
+    await expect(
+      host.getByRole("button", { name: "Play Disabled Grid", exact: true }),
+    ).toHaveCount(0);
+    room.heldScenarios.add(guestId);
+    const choose = async (difficulty: "Easy" | "Medium") => {
+      await host
+        .getByRole("button", { name: "Play Cooperative Grid", exact: true })
+        .click();
+      const dialog = host.getByRole("dialog", {
+        name: "Play Cooperative Grid",
+        exact: true,
+      });
+      await dialog
+        .getByRole("button", { name: difficulty, exact: true })
+        .click();
+      await dialog
+        .getByRole("button", { name: "Choose for everyone", exact: true })
+        .click();
+    };
+    await choose("Easy");
+    await expect(
+      guest.getByRole("button", { name: "Receiving scenario…", exact: true }),
+    ).toBeDisabled();
+    await expect.poll(() => room.pendingScenarios.has(guestId)).toBe(true);
+    const originalSelection = room.pendingScenarios.get(guestId)!;
+    await capture("receiving-dark", guest);
+    unchangedGuest();
+    await room.releaseScenario(guestId);
+    await expect(
+      guest.getByRole("button", { name: "I'm ready", exact: true }),
+    ).toBeEnabled();
+    for (const page of [host, guest]) {
+      const preview = page.locator(".coopModPreview");
+      await expect(
+        preview.getByRole("heading", { name: "Cooperative Grid", exact: true }),
+      ).toBeVisible();
+      await expect(preview).toContainText("By Community engineer · v1.0");
+      await expect(preview).toContainText(
+        "Modded · Unranked · No achievements",
+      );
+      await expect(preview).toContainText("Keep your grid reliable");
+      await expect(preview).toContainText(
+        "Delivered customer electricity divided by customer demand each completed month.",
+      );
+      await expect(preview).toContainText("Grid funding");
+      await expect(preview).not.toContainText("Private surprise");
+      expect(
+        await preview.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+    }
+    if (hostEntry.workshopId)
+      await expect(
+        guest.getByRole("button", {
+          name: "Keep a copy from Workshop",
+          exact: true,
+        }),
+      ).toBeVisible();
+    else
+      await expect(
+        guest.getByText("This is the host's local mod.", { exact: true }),
+      ).toBeVisible();
+    await guest.getByRole("button", { name: "I'm ready", exact: true }).click();
+    await expect(
+      guest.getByRole("button", { name: "Ready", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    // A newly frozen difficulty is a new agreement, even when the package is unchanged.
+    await host
+      .getByRole("button", {
+        name: "Choose another community scenario",
+        exact: true,
+      })
+      .click();
+    room.heldScenarios.add(guestId);
+    await choose("Medium");
+    await expect(
+      guest.getByRole("button", { name: "Receiving scenario…", exact: true }),
+    ).toBeDisabled();
+    await expect.poll(() => room.pendingScenarios.has(guestId)).toBe(true);
+    expect(room.pendingScenarios.get(guestId)).not.toEqual(originalSelection);
+    await room.releaseScenario(guestId);
+    const readyButton = guest.getByRole("button", {
+      name: "I'm ready",
+      exact: true,
+    });
+    await expect(readyButton).toHaveAttribute("aria-pressed", "false");
+    await readyButton.focus();
+    await guest.keyboard.press("Enter");
+    await expect(
+      guest.getByRole("button", { name: "Ready", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const start = host.getByRole("button", {
+      name: "Start for everyone",
+      exact: true,
+    });
+    await expect(start).toBeEnabled();
+    await start.scrollIntoViewIfNeeded();
+    await capture("preview-light", host);
+    await capture("preview-dark", guest);
+    unchangedGuest();
+    await start.click();
+    const hostChoice = host.getByRole("dialog", { name: /Grid funding/ });
+    const guestChoice = guest.getByRole("dialog", { name: /Grid funding/ });
+    for (const [page, dialog, companyName] of [
+      [host, hostChoice, companyNames[0]],
+      [guest, guestChoice, companyNames[1]],
+    ] as const) {
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toContainText(`Your company: ${companyName}`);
+      await expect(dialog).toContainText(
+        `Still deciding: ${companyNames.join(", ")}`,
+      );
+      await expect(dialog).toContainText("One-time grant: $1M");
+      const bounds = await dialog.boundingBox();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+      expect(
+        await dialog.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        await dialog
+          .locator(".MuiDialogContent-root")
+          .evaluate((element) => element.scrollWidth - element.clientWidth),
+      ).toBeLessThanOrEqual(1);
+      for (const button of await dialog.getByRole("button").all())
+        expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      const primary = dialog.getByRole("button", {
+        name: "Accept funding",
+        exact: true,
+      });
+      const secondary = dialog.getByRole("button", {
+        name: "Keep the current plan",
+        exact: true,
+      });
+      await expect(primary).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(secondary).toBeFocused();
+      await expect(secondary).toBeInViewport();
+      await page.keyboard.press("Shift+Tab");
+      await expect(primary).toBeFocused();
+      await capture(page === host ? "choice-light" : "choice-dark", page);
+    }
+    await expect(
+      hostChoice.getByRole("button", { name: "Accept funding", exact: true }),
+    ).toBeFocused();
+    await host.keyboard.press("Enter");
+    await expect(hostChoice).toBeHidden();
+    await expect(guestChoice).toContainText(
+      `Still deciding: ${companyNames[1]}`,
+    );
+    await ready(host);
+    await expect
+      .poll(
+        () =>
+          room.views
+            .get(guestId)
+            ?.game?.multiplayer?.clock?.players.find(
+              (player) => player.id === guestId,
+            )?.pauseReason,
+      )
+      .toBe("Choosing a response");
+    expect(room.views.get(guestId)?.speed).toBe("PAUSED");
+    expect(room.views.get(guestId)?.game?.date.minute).toBe(0);
+    await expect(
+      guestChoice.getByRole("button", { name: "Accept funding", exact: true }),
+    ).toBeFocused();
+    await guest.keyboard.press("Tab");
+    await expect(
+      guestChoice.getByRole("button", {
+        name: "Keep the current plan",
+        exact: true,
+      }),
+    ).toBeFocused();
+    await guest.keyboard.press("Space");
+    await expect(guestChoice).toBeHidden();
+    await ready(guest);
+    await expect
+      .poll(() => room.views.get(guestId)?.game?.date.minute ?? 0)
+      .toBeGreaterThan(0);
+    await clock(host)
+      .getByRole("button", { name: "pause", exact: true })
+      .click();
+    for (const [page, companyName, outcome] of [
+      [host, companyNames[0], "Your company accepted funding."],
+      [guest, companyNames[1], "Your company kept its current plan."],
+    ] as const) {
+      const events = page.locator(".eventLog");
+      await openPane(
+        events,
+        page.getByRole("button", { name: "Events", exact: true }),
+      );
+      await expect(events).toContainText(`Events for ${companyName}.`);
+      await expect(events).toContainText(outcome);
+      expect(
+        await events
+          .locator(".scrollable")
+          .evaluate((element) => element.scrollWidth - element.clientWidth),
+      ).toBeLessThanOrEqual(1);
+      await capture(page === host ? "events-light" : "events-dark", page);
+      await page
+        .getByRole("button", { name: "Close Events", exact: true })
+        .click();
+      await expect(events).toBeHidden();
+    }
+    const scenarioPanel = guest.getByRole("region", {
+      name: "Scenario",
+      exact: true,
+    });
+    await openPane(
+      scenarioPanel,
+      guest.getByRole("button", { name: "Scenario", exact: true }),
+    );
+    await expect(scenarioPanel).toContainText("Keep your grid reliable");
+    await guest.keyboard.press("Escape");
+    await saveAndQuit(guest);
+    await saveAndQuit(host);
+    const checkpoint = structuredClone(room.checkpoint!);
+    const digest = checkpoint.spec.customScenario!.mod!.runtimeDigest;
+    expect(checkpoint.spec.customScenario!.mod!.parameters.difficulty).toBe(
+      "Manager",
+    );
+    checkpoint.grids.forEach((grid, index) => {
+      expect(grid.scenarioId).toBe(999);
+      expect(grid.runIdentity).toBeUndefined();
+      expect(grid.customScenario!.mod!.runtimeDigest).toBe(digest);
+      const receipts = grid.worldEvents.occurrences.filter(
+        (event) => event.key === "mod:cooperative-grid:funding",
+      );
+      expect(receipts).toHaveLength(1);
+      expect(receipts[0].attributes.choice).toBe(
+        index === 0 ? "accept" : "decline",
+      );
+      expect(receipts[0].attributes.upfrontGrant).toBe(
+        index === 0 ? 1000000 : 0,
+      );
+    });
+    unchangedGuest();
+    // Simulate removing the host's installed package while its frozen match is closed.
+    room.modEntries.set(hostId, []);
+    await host
+      .getByRole("button", { name: "Play with friends", exact: true })
+      .click();
+    await hostGame(host);
+    await loadSave(host, room.campaignName);
+    await guest
+      .getByRole("button", { name: "Play with friends", exact: true })
+      .click();
+    await joinGame(guest, room);
+    await expect(
+      host.getByRole("button", { name: "Resume game", exact: true }),
+    ).toBeEnabled();
+    await host
+      .getByRole("button", { name: "Resume game", exact: true })
+      .click();
+    for (const page of [host, guest]) {
+      await expect(page.locator(".facilities:visible")).toBeVisible();
+      await expect(
+        page.getByRole("dialog", { name: /Grid funding/ }),
+      ).toBeHidden();
+      await expect(
+        page.locator("iframe#webpack-dev-server-client-overlay"),
+      ).toHaveCount(0);
+      expect(
+        await page.evaluate(() => ({
+          scores: (window as SteamTestWindow).mockScoreSubmissions ?? 0,
+          achievements:
+            (window as SteamTestWindow).mockAchievementSubmissions ?? 0,
+        })),
+      ).toEqual({ scores: 0, achievements: 0 });
+    }
+    await expect
+      .poll(() => room.views.get(guestId)?.game?.date)
+      .toEqual(checkpoint.grids[1].date);
+    await expect
+      .poll(() => room.views.get(guestId)?.scenarioDigest)
+      .toBe(digest);
+    expect(room.modEntries.get(hostId)).toEqual([]);
+    unchangedGuest();
+    expect(errors).toEqual([]);
+    expect(room.transportErrors).toEqual([]);
+  });
+}
+
+/** Observe the real projection worker boundary; requests and replies are passed through intact. */
+async function observeNativeForecasts(page: Page) {
+  await page.addInitScript(() => {
+    const target = window as SteamTestWindow;
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      private readonly observationId: number;
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        this.observationId = target.nativeWorkerSequence =
+          (target.nativeWorkerSequence ?? 0) + 1;
+        this.addEventListener("message", (event) => {
+          if (event.data.transport)
+            (target.nativeForecastReplies ??= []).push(
+              `${this.observationId}:${event.data.requestId}`,
+            );
+        });
+      }
+      postMessage(
+        message: unknown,
+        options?: Transferable[] | StructuredSerializeOptions,
+      ) {
+        if (
+          message &&
+          typeof message === "object" &&
+          "game" in message &&
+          "now" in message &&
+          "requestId" in message
+        ) {
+          const request = message as { requestId: number; game: GameType };
+          (target.nativeForecasts ??= []).push({
+            id: `${this.observationId}:${request.requestId}`,
+            scenarioId: request.game.scenarioId,
+            hasCustomScenario: request.game.customScenario !== undefined,
+            seed: request.game.seed,
+            loads: request.game.loadAdditions.map((load) => ({ ...load })),
+            responses: request.game.worldEvents.occurrences
+              .filter((event) => typeof event.attributes.choice === "string")
+              .map((event) => ({
+                key: event.key,
+                optionId: String(event.attributes.choice),
+              })),
+          });
+        }
+        if (Array.isArray(options)) super.postMessage(message, options);
+        else super.postMessage(message, options);
+      }
+    };
+  });
+}
+
+async function buyNativeBackup(page: Page, peakW: number, rate: number) {
+  await page.locator(".button-buildFacility").click();
+  await page.locator(".button-buildGenerator").click();
+  const capacity = page.getByRole("slider", { name: /^Capacity/ });
+  await capacity.press("Home");
+  for (let tick = 0; tick < wToSliderTick(peakW); tick++)
+    await capacity.press("ArrowRight");
+  await expect(page.locator("#construction-capacity")).toContainText(
+    peakW === 50e6 ? /50\s?MW/ : /2\s?GW/,
+  );
+  await page
+    .getByRole("button", {
+      name: "Review purchase of Natural Gas Peaker",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Take loan", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Build", exact: true }),
+  ).toHaveCount(0);
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
+  await openPane(
+    programs,
+    page.getByRole("button", { name: "Programs", exact: true }),
+  );
+  const price = programs.getByRole("slider", {
+    name: "The rate you charge for electricity generation",
+    exact: true,
+  });
+  const opening = Number(await price.getAttribute("aria-valuenow"));
+  for (let tick = 0; tick < Math.round((rate - opening) / 0.01); tick++)
+    await price.press("ArrowRight");
+  if (rate === 0.1) {
+    expect(Number(await price.getAttribute("aria-valuenow"))).toBeCloseTo(
+      0.1,
+      12,
+    );
+    await expect(price).toHaveAttribute(
+      "aria-valuetext",
+      /^\$0\.1 per kilowatt hour/,
+    );
+  } else await expect(price).toHaveAttribute("aria-valuenow", String(rate));
+  await page.keyboard.press("Escape");
+}
+
+for (const scenarioId of [106, 107] as const) {
+  for (const width of [1280, 390, 360]) {
+    test(`native ${scenarioId} companies choose independently and preserve rules on resume at ${width}px`, async ({
+      browser,
+    }) => {
+      test.setTimeout(240000);
+      const room = new SteamRoom(async (page) => {
+        await observeNativeForecasts(page);
+        return createSteamTransport(page);
+      });
+      room.campaignName = `Official ${scenarioId} campaign`;
+      const host = await room.player(browser, 0, width < 600);
+      const guest = await room.player(browser, 1, width < 600);
+      const guestId = "76561198000000002";
+      const pages = [host, guest];
+      const errors: string[] = [];
+      const resumeSaved = async () => {
+        await host
+          .getByRole("button", { name: "Play with friends", exact: true })
+          .click();
+        await hostGame(host);
+        await loadSave(host, room.campaignName);
+        await guest
+          .getByRole("button", { name: "Play with friends", exact: true })
+          .click();
+        await joinGame(guest, room);
+        const resume = host.getByRole("button", {
+          name: "Resume game",
+          exact: true,
+        });
+        await expect(resume).toBeEnabled();
+        await resume.click();
+        for (const page of pages)
+          await expect(page.locator(".facilities:visible")).toBeVisible();
+      };
+      const advanceSaved = async (month: number) => {
+        await saveAndQuit(guest);
+        await saveAndQuit(host);
+        room.checkpoint = await advanceWorldSave(
+          room.checkpoint!,
+          month,
+          test.info().outputPath("native-world.json"),
+        );
+        await resumeSaved();
+      };
+      for (const page of pages) {
+        page.on("pageerror", (error) => errors.push(error.message));
+        await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
+        await page.emulateMedia({ reducedMotion: "reduce" });
+      }
+      const capture = async (name: string, page: Page) => {
+        await expect(
+          page.locator("iframe#webpack-dev-server-client-overlay"),
+        ).toHaveCount(0);
+        expect(
+          await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          ),
+        ).toBeLessThanOrEqual(1);
+        if (!process.env.REVIEW_SCREENSHOT_DIR) return;
+        await fs.mkdir(process.env.REVIEW_SCREENSHOT_DIR, { recursive: true });
+        await page.mouse.move(0, 0);
+        await expect(page.getByRole("tooltip")).toBeHidden();
+        await expect(page.locator(".snackbarContent")).toBeHidden();
+        await page.screenshot({
+          path: path.join(process.env.REVIEW_SCREENSHOT_DIR, name),
+          animations: "disabled",
+          style: ".MuiTouchRipple-root { visibility: hidden !important; }",
+        });
+      };
+      const goal =
+        scenarioId === 106
+          ? "Retain the community"
+          : "Keep the lights on through the freeze";
+      const scenarioPanel = (page: Page) =>
+        page.getByRole("region", { name: "Scenario", exact: true });
+      const showGoal = async (page: Page) => {
+        const panel = scenarioPanel(page);
+        await openPane(
+          panel,
+          page.getByRole("button", { name: "Scenario", exact: true }),
+        );
+        await expect(panel).toContainText(goal);
+        await expect(panel).not.toContainText("Modded");
+        return panel;
+      };
+      await hostGame(host);
+      await joinGame(guest, room);
+      await host.getByTestId(`mission-row-${scenarioId}`).click();
+      const easy = host.getByRole("button", { name: "Easy", exact: true });
+      await easy.focus();
+      await host.keyboard.press("Enter");
+      await expect(easy).toHaveAttribute("aria-pressed", "true");
+      await expect(guest.getByText("Following SolarSam").last()).toBeVisible();
+      const readyButton = guest.getByRole("button", {
+        name: "I'm ready",
+        exact: true,
+      });
+      await readyButton.focus();
+      await guest.keyboard.press("Enter");
+      await expect(
+        guest.getByRole("button", { name: "Ready", exact: true }),
+      ).toHaveAttribute("aria-pressed", "true");
+      for (const page of pages)
+        await expect(page.locator(".coopModPreview")).toHaveCount(0);
+      await host
+        .getByRole("button", { name: "Start for everyone", exact: true })
+        .click();
+      await expect
+        .poll(() => room.views.get(guestId)?.game?.scenarioId)
+        .toBe(scenarioId);
+      expect(room.views.get(guestId)!.game!.customScenario).toBeUndefined();
+      expect(room.views.get(guestId)!.game!.difficulty).toBe("Employee");
+      expect(room.views.get(guestId)!.scenarioDigest).toBeUndefined();
+      const seed = room.views.get(guestId)!.game!.seed;
+      if (scenarioId === 107) expect(seed).toBe(268107);
+      await test.info().attach("Native shared seed and paid route", {
+        body: JSON.stringify({
+          scenarioId,
+          seed,
+          width,
+          difficulty: "Employee",
+          backupW: scenarioId === 106 ? 50e6 : 2e9,
+          financed: true,
+          rate: scenarioId === 106 ? 0.12 : 0.1,
+        }),
+        contentType: "application/json",
+      });
+      for (const page of pages) {
+        await expect(page.locator(".facilities:visible")).toBeVisible();
+        await buyNativeBackup(
+          page,
+          scenarioId === 106 ? 50e6 : 2e9,
+          scenarioId === 106 ? 0.12 : 0.1,
+        );
+        await expect(await showGoal(page)).toContainText(
+          "0/1 months completed",
+        );
+        await page.keyboard.press("Escape");
+      }
+      const dueMonth = scenarioId === 106 ? 48 : 36;
+      // Simulate the long lead-in from the UI's purchases, then cross the actual decision
+      // boundary in the production worker. This avoids a CI timer-speed dependency.
+      await advanceSaved(dueMonth - 1);
+      for (const page of pages)
+        await clock(page)
+          .getByRole("button", { name: "ultra speed", exact: true })
+          .click();
+      const choiceTitle =
+        scenarioId === 106
+          ? "Negotiate the data-center connection"
+          : "Prepare for the deep freeze";
+      const dialogs = pages.map((page) =>
+        page.getByRole("dialog", { name: new RegExp(choiceTitle) }),
+      );
+      await expect(dialogs[0]).toBeVisible({ timeout: 120000 });
+      await expect(dialogs[1]).toBeVisible();
+      await expect
+        .poll(() => room.views.get(guestId)?.game?.date.monthsElapsed)
+        .toBe(dueMonth);
+      await expect
+        .poll(() =>
+          room.checkpoint?.grids.map((game) => game.date.monthsElapsed),
+        )
+        .toEqual([dueMonth, dueMonth]);
+      const pending = structuredClone(room.checkpoint!);
+      const decisionKey =
+        scenarioId === 106
+          ? "story:106:data-center-boom:connection"
+          : "story:107:texas-deep-freeze:winterization";
+      for (const game of pending.grids) {
+        expect(game.scenarioId).toBe(scenarioId);
+        expect(game.customScenario).toBeUndefined();
+        expect(game.runIdentity).toBeUndefined();
+        expect(game.seed).toBe(seed);
+        expect(game.facilities).toContainEqual(
+          expect.objectContaining({
+            name: "Natural Gas Peaker",
+            peakW: scenarioId === 106 ? 50e6 : 2e9,
+          }),
+        );
+        expect(
+          game.worldEvents.occurrences.some(
+            (event) => event.key === decisionKey,
+          ),
+        ).toBe(false);
+        expect(game.monthlyHistory).toHaveLength(dueMonth);
+      }
+      for (const [index, dialog] of dialogs.entries()) {
+        await expect(dialog).toContainText(
+          `Your company: ${index === 0 ? "SolarSam" : "WindyWren"}`,
+        );
+        await expect(dialog).toContainText(
+          "Each company chooses for its own grid.",
+        );
+        for (const button of await dialog.getByRole("button").all()) {
+          const bounds = (await button.boundingBox())!;
+          expect(bounds.height).toBeGreaterThanOrEqual(44);
+          expect(bounds.x).toBeGreaterThanOrEqual(0);
+          expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+        }
+      }
+      await guest.keyboard.press("Escape");
+      await expect(dialogs[1]).toBeVisible();
+      if (scenarioId === 106 && [1280, 360].includes(width))
+        await capture(
+          `native-106-${width}-choice-${width === 1280 ? "light" : "dark"}.png`,
+          width === 1280 ? host : guest,
+        );
+      const responses =
+        scenarioId === 106
+          ? ["fast-track", "phased"]
+          : ["winterize", "standard"];
+      const buttons =
+        scenarioId === 106
+          ? [/^Accept funded connection$/, /^Require phased connections$/]
+          : [/^Fund winterization/, /^Keep construction budget$/];
+      await dialogs[0].getByRole("button", { name: buttons[0] }).focus();
+      await host.keyboard.press("Enter");
+      await expect(dialogs[0]).toBeHidden();
+      await expect(dialogs[1]).toContainText("Still deciding: WindyWren");
+      // Keep the shared clock paused after the second commitment while its forecast is inspected.
+      await clock(host)
+        .getByRole("button", { name: "pause", exact: true })
+        .click();
+      await dialogs[1].getByRole("button", { name: buttons[1] }).focus();
+      await guest.keyboard.press("Enter");
+      await expect(dialogs[1]).toBeHidden();
+      for (const [index, page] of pages.entries()) {
+        await openPane(
+          page.locator(".insights"),
+          page.getByRole("button", { name: "Insights", exact: true }),
+        );
+        await expect
+          .poll(
+            () =>
+              page.evaluate(
+                ({ key, response }) => {
+                  const target = window as SteamTestWindow;
+                  return target.nativeForecasts?.some(
+                    (request) =>
+                      request.responses.some(
+                        (choice) =>
+                          choice.key === key && choice.optionId === response,
+                      ) && target.nativeForecastReplies?.includes(request.id),
+                  );
+                },
+                { key: decisionKey, response: responses[index] },
+              ),
+            { timeout: 60000 },
+          )
+          .toBe(true);
+        const request = await page.evaluate(
+          ({ key, response }) =>
+            (window as SteamTestWindow).nativeForecasts!.findLast((request) =>
+              request.responses.some(
+                (choice) => choice.key === key && choice.optionId === response,
+              ),
+            ),
+          { key: decisionKey, response: responses[index] },
+        );
+        expect(request!.scenarioId).toBe(scenarioId);
+        expect(request!.hasCustomScenario).toBe(false);
+        expect(request!.seed).toBe(seed);
+        if (scenarioId === 106)
+          expect(
+            request!.loads.map((load) => ({
+              peakW: load.peakW,
+              year: load.startsYear,
+            })),
+          ).toEqual(
+            index === 0
+              ? [{ peakW: 100e6, year: 2026 }]
+              : [
+                  { peakW: 50e6, year: 2026 },
+                  { peakW: 50e6, year: 2028 },
+                ],
+          );
+        const chart = page
+          .locator(".insights:visible")
+          .getByRole("img", { name: /^(Chart of|Monthly ranges of)/ })
+          .first();
+        await expect(chart).toBeVisible({ timeout: 60000 });
+        await expect(chart).toHaveAttribute("aria-label", /demand|supply/i);
+        await page.keyboard.press("Escape");
+      }
+      await expect
+        .poll(() =>
+          room.checkpoint?.grids.map(
+            (game) =>
+              game.worldEvents.occurrences.find(
+                (event) => event.key === decisionKey,
+              )?.attributes.choice,
+          ),
+        )
+        .toEqual(responses);
+      for (const [index, game] of room.checkpoint!.grids.entries()) {
+        const receipt = game.worldEvents.occurrences.find(
+          (event) => event.key === decisionKey,
+        )!;
+        expect(receipt.attributes.cost).toBe(
+          scenarioId === 107 && index === 0 ? 90e6 : 0,
+        );
+        expect(receipt.attributes.upfrontGrant).toBe(
+          scenarioId === 106 && index === 0 ? 15e6 : 0,
+        );
+        expect(game.date.monthsElapsed).toBe(dueMonth);
+      }
+      if (scenarioId === 107) {
+        // Keep the February freeze and goal rollover in the browser; simulate its lead-in.
+        await advanceSaved(49);
+        for (const page of pages)
+          await clock(page)
+            .getByRole("button", { name: "ultra speed", exact: true })
+            .click();
+        await expect
+          .poll(() => room.views.get(guestId)?.game?.date.monthsElapsed, {
+            timeout: 60000,
+          })
+          .toBeGreaterThanOrEqual(50);
+        await clock(host)
+          .getByRole("button", { name: "pause", exact: true })
+          .click();
+        const keepWatching = guest.getByRole("button", {
+          name: "Keep watching",
+          exact: true,
+        });
+        if (await keepWatching.isVisible()) await keepWatching.click();
+        for (const page of pages) {
+          const panel = await showGoal(page);
+          await expect(panel).toContainText("1/1 months completed");
+          await expect(panel.getByText("Met", { exact: true })).toBeVisible();
+          await page.keyboard.press("Escape");
+        }
+        if (width === 390) {
+          const panel = await showGoal(guest);
+          const title = panel.getByText(goal, { exact: true });
+          const observed = panel.getByText(/1\/1 months completed/);
+          await title.scrollIntoViewIfNeeded();
+          await observed.scrollIntoViewIfNeeded();
+          await expect(title).toBeInViewport();
+          await expect(observed).toBeInViewport();
+          await expect(
+            panel.getByText("Met", { exact: true }),
+          ).toBeInViewport();
+          await capture("native-107-390-goal-dark.png", guest);
+          await guest.keyboard.press("Escape");
+        }
+      } else {
+        await expect(await showGoal(guest)).toContainText(
+          "0/1 months completed",
+        );
+        await guest.keyboard.press("Escape");
+      }
+      await saveAndQuit(guest);
+      await saveAndQuit(host);
+      const saved = structuredClone(room.checkpoint!);
+      if (scenarioId === 107)
+        for (const game of saved.grids) {
+          const february = game.monthlyHistory.find(
+            (month) => month.year === 2021 && month.month === 2,
+          )!;
+          expect(february).toBeDefined();
+          expect(february.demandWh).toBeGreaterThan(0);
+          expect(
+            game.objectiveProgress!.entries.find(
+              (entry) => entry.id === "reliability",
+            )!.observations,
+          ).toEqual([[49, february.supplyWh, february.demandWh]]);
+        }
+      const facts = (game: GameType) => ({
+        date: game.date,
+        history: game.monthlyHistory,
+        facilities: game.facilities,
+        events: game.worldEvents,
+        progress: game.objectiveProgress,
+        rate: game.dollarsPerkWh,
+      });
+      await resumeSaved();
+      for (const page of pages) {
+        await expect(page.locator(".facilities:visible")).toBeVisible();
+        await expect(
+          page.getByRole("dialog", { name: new RegExp(choiceTitle) }),
+        ).toBeHidden();
+        await expect(
+          page.locator("iframe#webpack-dev-server-client-overlay"),
+        ).toHaveCount(0);
+        expect(
+          await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          ),
+        ).toBeLessThanOrEqual(1);
+        expect(
+          await page.evaluate(() => ({
+            scores: (window as SteamTestWindow).mockScoreSubmissions ?? 0,
+            achievements:
+              (window as SteamTestWindow).mockAchievementSubmissions ?? 0,
+          })),
+        ).toEqual({ scores: 0, achievements: 0 });
+      }
+      await expect
+        .poll(
+          () =>
+            room.views.get(guestId)?.game &&
+            facts(room.views.get(guestId)!.game!),
+        )
+        .toEqual(facts(saved.grids[1]));
+      await expect
+        .poll(() => room.checkpoint?.grids.map(facts))
+        .toEqual(saved.grids.map(facts));
+      expect(room.checkpoint!.spec).toEqual({
+        scenarioId,
+        difficulty: "Employee",
+      });
+      expect(room.views.get(guestId)!.game!.customScenario).toBeUndefined();
+      expect(room.views.get(guestId)!.scenarioDigest).toBeUndefined();
+      expect(errors).toEqual([]);
+      expect(room.transportErrors).toEqual([]);
+    });
+  }
 }

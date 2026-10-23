@@ -69,6 +69,28 @@ function describeSharedClock(
   return `Game speed: ${selectionLabel(multiplayer.activeSpeed)}. Your selection: ${selectionLabel(speed)}. ${reason}${players}.${resume ? " Select a speed to resume." : ""}`;
 }
 
+/** Hovering a shared-clock speed names every player at it, by their Steam name. */
+function playersAtSpeed(
+  multiplayer: MultiplayerSpeedOptionsProps,
+  option: SpeedType,
+): string {
+  const names = multiplayer.players
+    .filter(
+      (player) =>
+        player.selectedSpeed === option ||
+        (option === "PAUSED" && !!player.pauseReason),
+    )
+    .map((player) => {
+      const you = player.id === multiplayer.selfId ? " (you)" : "";
+      const why =
+        option === "PAUSED" && player.pauseReason
+          ? `: ${player.pauseReason}`
+          : "";
+      return `${player.name}${you}${why}`;
+    });
+  return `${selectionLabel(option)}: ${names.length ? names.join(", ") : "nobody"}`;
+}
+
 function speedOptions(
   { speed, onSpeedChange, desktop, multiplayer }: SpeedOptionsProps,
   descriptionId?: string,
@@ -119,7 +141,9 @@ function speedOptions(
               value={option}
               aria-label={SPEED_ARIA_LABELS[option]}
               aria-describedby={descriptionId}
-              title={description}
+              title={
+                multiplayer ? playersAtSpeed(multiplayer, option) : description
+              }
               data-active-speed={
                 multiplayer?.activeSpeed === option ? "true" : undefined
               }

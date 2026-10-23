@@ -125,7 +125,6 @@ import PowerExchangeSummary, {
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
 import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
 import { ToolScrollMemory } from "../base/GameToolMemory";
-import "./Insights.scss";
 
 export type InsightLayerId =
   | "supplyDemand"
@@ -322,19 +321,12 @@ function scenarioEndMinute(game: GameType): number | undefined {
   return months ? months * MINUTES_PER_MONTH : undefined;
 }
 
-// Begin with the coming operating year. Whole-campaign planning remains one tap away.
+// Begin with the scenario's planning horizon; unbounded games use twenty years.
 function initialViewport(game: GameType): ChartViewportRange {
   const bounds = forecastViewportBounds(game);
-  const monthStart = game.date.monthsElapsed * MINUTES_PER_MONTH;
   return clampChartViewport(
     bounds,
-    [
-      monthStart,
-      Math.min(
-        monthStart + 12 * MINUTES_PER_MONTH,
-        scenarioEndMinute(game) ?? bounds[1],
-      ),
-    ],
+    [0, scenarioEndMinute(game) ?? 20 * 12 * MINUTES_PER_MONTH],
     MINUTES_PER_MONTH,
   );
 }
@@ -349,16 +341,10 @@ function advanceViewport(
   const bounds = forecastViewportBounds(game);
   const delta = elapsedMonths * MINUTES_PER_MONTH;
   const end = scenarioEndMinute(game);
-  const followsOperatingYear =
-    viewport[0] ===
-      (game.date.monthsElapsed - elapsedMonths) * MINUTES_PER_MONTH &&
-    viewport[1] - viewport[0] === 12 * MINUTES_PER_MONTH;
   return clampChartViewport(
     bounds,
     [
-      viewport[0] === bounds[0] && !followsOperatingYear
-        ? bounds[0]
-        : viewport[0] + delta,
+      viewport[0] === bounds[0] ? bounds[0] : viewport[0] + delta,
       viewport[1] === end ? end : viewport[1] + delta,
     ],
     MINUTES_PER_MONTH,
@@ -2270,16 +2256,6 @@ export default class Insights extends React.Component<Props, State> {
             viewportRange,
             minViewportSpan,
           )}
-          <div className="insightsTimelineKey" aria-label="Chart time key">
-            <span>
-              <i aria-hidden="true" />
-              Recorded
-            </span>
-            <span>
-              <i className="forecast" aria-hidden="true" />
-              Forecast
-            </span>
-          </div>
           {!!upcomingEvents.length && (
             <InsightEventRail
               events={upcomingEvents}

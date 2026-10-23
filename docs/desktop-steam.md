@@ -148,6 +148,10 @@ Bundled pages, simulation data, fonts, audio, images and worker chunks load from
 protocol. Desktop gameplay does not use Firebase login, Firebase Cloud backup, analytics or a
 web service worker. Native Steam calls run outside the renderer.
 
+**Settings → Credits and licenses** opens the bundled game, asset and dependency notices,
+including desktop privacy information. These remain available offline. The website's privacy
+page also distinguishes Steam services from the browser edition's optional Firebase services.
+
 ## Steamworks configuration and acceptance
 
 ### Achievements
@@ -160,6 +164,8 @@ authoritative list of stable API names, English display names, descriptions and 
 `public/images/`. Define all 35 achievements in Steamworks with those exact API names, Client
 unlocks, and reviewed unlocked/locked raster versions of the listed artwork; publish the
 configuration. Re-upload both rasters whenever a catalog icon changes.
+The [achievement artwork package](../steamworks/achievement-artwork/README.md) contains all 70
+locked/unlocked 256 × 256 PNGs and an upload map. Regenerate it with `npm run achievements:artwork`.
 When Steam is available, its achievement interface and notifications are used. Without Steam,
 the game provides bottom-right unlock notifications and an Achievements page from the main and
 game menus. See [shared achievements](achievements.md) for device storage and Firebase sync.
@@ -213,8 +219,13 @@ stats callbacks through the existing sole manual dispatcher. SetAchievement and 
 run in Steam Offline Mode, using Steam's offline cache. Pending intents remain on disk until a
 successful, matching UserStatsStored callback acknowledges that submitted batch. Boolean API
 returns, unrelated callbacks, failed writes and later awards cannot acknowledge it. Already
-cached achievements are not set again; retries never reset achievements or completed flags.
-Steam outages leave local play available.
+cached achievements are imported as earned and are not set again; a cache read alone cannot
+confirm storage. Retries never reset achievements or completed flags. Native-interface failures
+leave local earning usable. Failed journal writes retry synchronization later; cache imports
+and receipts update the in-memory journal only after an atomic write succeeds. Missing receipts
+retry the same frozen batch at most once a minute. Because StoreStats receipts have no request
+ID, confirmation counts conservatively account for every older accepted request; late receipts
+cannot acknowledge a newer batch. Fully received requests reset that accounting.
 
 Automated tests cover threshold boundaries, all scenario/difficulty completions, save/resume,
 forecast/replay exclusion, offline earning/reconnect/relaunch, callback packing for all supported
@@ -261,6 +272,136 @@ replay exclusion, offline/reconnect and quit. SDK capability tests do not verify
 References: [Rich Presence localization](https://partner.steamgames.com/doc/api/ISteamFriends#richpresencelocalization),
 [Steam Timeline guidance](https://partner.steamgames.com/doc/features/timeline), and the
 [Valve v001 SDK header](https://github.com/rlabrecque/Steamworks.NET/blob/7e5ab1859e30dab8162de2327d7fcfd176ce1064/CodeGen/steam/isteamtimeline.h).
+
+### Semantic Steam Input
+
+The desktop edition uses native Steam Input actions rather than mapping controller buttons to
+keyboard shortcuts. [`steamworks/input/actions.vdf`](../steamworks/input/actions.vdf) defines the
+`Menu` and `Gameplay` action sets. Menu navigation, selection and Back are shared; gameplay adds
+pause/resume, speed, pane switching, Build and chart switching. Build opens the catalog, and
+purchases still require an explicit review and confirmation. The existing controls also handle
+rate and capacity adjustments, chart inspection and Save & Quit.
+
+On Windows and Linux, the packaged manifest lives at `resources/steam-input/actions.vdf`; on
+macOS it lives at `Electrify.app/Contents/Resources/steam-input/actions.vdf`. The native process
+registers its absolute path with Steam Input. Button hints use Steam's current action origins and labels,
+so they follow the controller and the player's bindings. The hints appear after controller
+input and yield to keyboard or pointer input. Directional actions repeat while held; selection,
+Back and gameplay shortcuts require a new press. Returning from an overlay, changing action sets
+or reconnecting requires held buttons to be released first. A disconnected controller pauses
+the game; reconnecting does not resume it automatically.
+
+In the actual App ID's Steamworks **Steam Input** settings, enable **Custom Configuration
+(Bundled with game)** and set the manifest path to the packaged location for that platform.
+Publish the changes before accepting a Steam build. The adjacent `controller_*.vdf` files supply
+defaults for Xbox 360/One, Steam Deck (`neptune`), PlayStation 4/5 and Switch Pro. Keep the action
+names stable when updating bindings: configurations refer to the action-set-prefixed API names
+such as `Menu_confirm` and `Gameplay_confirm`. The repository files alone do not publish a
+Steamworks configuration. See Valve's [action manifest setup](https://partner.steamgames.com/doc/features/steam_controller/action_manifest_file).
+
+The default Xbox layout uses the D-pad or left stick to navigate, A to select, B to go back,
+X to open Build, Y or Start to pause/resume, bumpers for panes, triggers for charts and the right
+stick's up/down directions for speed. Steam's displayed origins describe the equivalent inputs
+on other controllers and follow player customization.
+
+Confirming an editable text field opens Steam's gamepad text editor. Submitted text follows the
+field's normal validation and React change handling; cancelling preserves the original value.
+Controller actions are suspended while the editor is open and require release before continuing.
+Read-only fields do not open the editor. When Steam's editor is unavailable, physical keyboard
+input remains available.
+
+Windowless browser coverage uses a replacement native bridge while retaining the production
+desktop renderer, real controls, reducers and save repository:
+
+```sh
+# Choose an unused task-specific port and keep it for this task's browser checks.
+export E2E_PORT=3217
+npm run desktop:build
+STEAM_INPUT_BUILD_DIR=build npm run test:steam-input
+```
+
+`npm run check:ci` runs this production-renderer suite as its controller gate. The native CI
+matrix also runs it once on the full-dependency macOS browser worker. It is headless and uses
+semantic controller actions through a replacement native bridge, retaining the real controls,
+reducers, and save repository. Its matrix covers 1280×800 and 1280×720 in light and dark themes,
+a docked 1920×1080 view, and 390/360 px touch layouts. Coverage includes gameplay, construction,
+rate changes, charts, reordering, custom-city selection, text size, Workshop navigation, and
+multiplayer invite entry. These checks do not establish physical controller compatibility,
+Steam configuration delivery, or Deck Gaming Mode acceptance.
+
+Before release, launch a private Steam build with the real App ID and test:
+
+- Steam Deck's built-in controls and supported Xbox, PlayStation and Switch controllers. Check
+  that displayed origins match each device and a player-edited binding.
+- Start a new game, inspect and buy a facility, adjust its size and the electricity rate, inspect
+  chart points, change game speed, pause/resume and Save & Quit without a mouse or touchscreen.
+  Confirm that visible focus and hints remain readable in light and dark themes.
+- Hold Select while opening a purchase review or another dialog: it must require a fresh press
+  to confirm. Check Back through chart details, nested decisions, tool panels and the game menu.
+- Open/close the Steam overlay, change action sets, disconnect/reconnect and hot-swap controllers
+  while holding controls. There must be no unintended action on return, and disconnect must
+  leave the game paused until the player resumes it.
+- Reload the saved game and verify its purchases and rate. Repeat offline, where locally
+  installed configurations and local saves must remain usable.
+- Enter a lobby code, rename a save and search the manual using the controller text editor.
+  Check Unicode text, cancellation, returning focus and holding Confirm while closing the editor.
+
+### Handheld readability and system sleep
+
+Settings offers Standard (100%), Large (112.5%) and Larger (125%) text. This preference stays on
+the device. It scales interface typography, chart labels and controller hints together without
+changing the OS resolution or zooming the viewport. Controller navigation suppresses keyboard-only
+shortcut prompts; a physical keyboard restores them. Native mod import/template dialogs and the
+save-failure close warning temporarily request Steam's controller-to-mouse/keyboard navigation.
+Returning from a native dialog restores semantic controls and requires held buttons to be released.
+This integration still needs an actual SteamOS file-portal acceptance pass.
+
+Electron handles system suspend separately from losing focus. Sleep gates native input and
+pauses simulation/audio even when the window remains focused. Solo and shared-game checkpoints
+are best effort: the OS can freeze the process before a write completes. Periodic checkpoints
+remain the recovery boundary after a process kill or battery loss.
+
+Wake renews the existing save writer and attempts another checkpoint before releasing the input
+gate. Old wake acknowledgements cannot unlock a later sleep. The game stays paused until the
+player resumes it; closing a purchase, help, or other blocking screen cannot restore an earlier
+running speed. Multiplayer sleep also preserves the shared save and requires consent to continue.
+A wake checkpoint failure uses the existing visible save error and retry path.
+
+### Steam Deck release acceptance
+
+Use a private Steam branch with the real App ID and the intended Linux runtime. For each release,
+record the build/commit, SteamOS version, device model, runtime, controller configuration, and
+pass/fail evidence. Run on an LCD and OLED Deck when available; repeat dock/undock with an
+external controller and display. A browser viewport or Linux Xvfb run is not a substitute.
+
+- **Launch and defaults:** install and start in Gaming Mode without a keyboard, launch arguments,
+  compatibility overrides, or a community configuration. Verify the Linux executable and all
+  bundled assets, audio, overlay and text entry. Confirm the published default bindings arrive.
+- **Every player flow:** complete the tutorial path and a challenge; create a custom game and
+  choose a city; buy/resize/upgrade facilities; reorder plants and interties; change pricing and
+  programs; inspect charts; answer event/policy decisions; rename/load/delete a save; navigate
+  installed mods and Workshop; host, join, reconnect and resume co-op. No flow may require touch
+  or a physical keyboard. Check mod import/template dialogs with Steam's automatic native-dialog
+  navigation, including cancellation, save-failure recovery and a sleep while a chooser is open.
+  External authoring tools need their own usability check when advertised as supported.
+- **Prompts and focus:** verify Deck glyphs and a player-edited binding; inspect tooltips, manual
+  help, settings and charts for stray keyboard prompts. Test nested Back, modal focus restoration,
+  held Confirm across dialogs, and controller replacement/disconnection.
+- **Readability:** inspect default and Larger text at 1280×800 and 1280×720, both themes, at normal
+  handheld distance. Check charts, numeric controls, selected focus, tool panels and the controller
+  footer for clipping, overlap and unexpected page scrolling. Repeat docked and after undocking.
+- **Sleep and recovery:** sleep during FAST play, construction review, text entry and an active
+  save; wait beyond the save lease duration; wake while holding a button. Expect a paused game,
+  correct saved progress, usable focus and audio, and no catch-up or unintended purchase. Repeat
+  sleep/wake, go offline while asleep, and test a sleeping co-op host and guest with separate
+  Steam accounts. Confirm save failures are recoverable without discarding local progress.
+- **Offline and cross-device saves:** start with Steam Offline Mode, play/save/relaunch, and move
+  saves between Deck and PC after clean exits. Preserve conflicts and device display/text settings.
+  Dynamic Cloud Sync is not enabled by this implementation; seamless transfer while a game
+  remains suspended requires a separate integration and acceptance pass.
+- **Valve review:** submit the tested shipping build for Steam Deck compatibility review and
+  resolve reported issues before advertising Verified support. Automated checks cannot award
+  Valve's compatibility rating.
 
 ### Partner setup and release acceptance
 
@@ -321,12 +462,14 @@ through Valve's normal review process.
 
 ## Realtime Steam co-op
 
-**Play with friends** on the desktop title screen opens a friends-only Steam lobby. Host a room,
-then invite friends through Steam or share its full numeric lobby code. Once two to four players
-are connected, the host presses **Choose a game together** and picks any authored scenario or a
-custom game in the normal selection screens. Guests follow the host's screen, scenario,
-difficulty and custom settings read-only, and mark **Ready** for exactly what is shown; any change
-by the host clears it. **Start for everyone** launches that scenario for the lobby. Everyone
+**Play with friends** on the desktop title screen offers **Host a game** or joining with an
+invite code. Hosting opens a friends-only Steam lobby and goes straight to the normal selection
+screens, where the top bar's **Invite friends** opens Steam's invitation overlay and **Copy invite
+code** copies the full numeric lobby code. Two to four players can join or leave at any time before
+the start. The host picks any authored scenario or a custom game. Guests follow the host's screen,
+scenario, difficulty and custom settings read-only, and mark **Ready** for exactly what is shown;
+any change by the host clears it. **Start for everyone** launches that scenario for the lobby once
+a friend has joined and everyone is connected. Everyone
 selects a running speed to begin. Tutorials, challenge links, replays and Data Center setup are
 single-player only. See [co-op scenario selection](multiplayer-scenario-selection.md).
 
@@ -391,8 +534,29 @@ computer's persisted acknowledgement. The bundle includes all grids, canonical e
 commitment metadata and command receipts. Normal host exit joins the existing desktop quit save
 handshake. Local persistence does not wait for an absent player's acknowledgement. Manual resume
 uses one complete bundle, the original roster and a fresh epoch; pending old commands are dropped.
-The first co-op save schema requires the same rules/build. Unsupported bundles remain on disk;
-whole-match version migrations are required before promising cross-update campaign support.
+Co-op checkpoint schema 3 records the solo save schema for its grids. Resume upgrades the entire
+bundle, including supported schema 2 checkpoints, and validates every grid and shared connection
+before publishing a current-rules baseline. Players in the same session must still run matching
+game code and data. Newer or unsupported bundles remain preserved; individual grids never migrate
+independently during play.
+
+When the host has multiplayer saves, the scenario list shows **Load multiplayer save** across the
+top. It lists each save with its players and save time, and its menu offers deletion with
+confirmation. Loading a save gathers the lobby to pick companies: each row is labelled with the
+Steam name that saved it. A returning player takes back their own company by default, and anyone
+in the lobby can take an open one; the host resumes once every company still playing has a
+connected player. A company handed to a new player is saved under that player's Steam ID and name.
+New and resumed games start with every player
+paused, using the same speed controls as ordinary play.
+The account-specific `co-op-library.json` holds up to 32 campaigns and 64 MiB; a checkpoint is
+limited to 16 MiB. The old `co-op.json` is retained and imported as the last multiplayer save. An
+immutable `co-op-original-<digest>.json` preserves a checkpoint before a rules or schema upgrade;
+the rotating `.previous` file also protects interrupted writes.
+
+Steam Cloud uses separate `electrify/co-op-device-<32-hex-device-id>.json` libraries. Different
+checkpoints are retained as separate Cloud copies, with deletion history to suppress a deleted
+copy's return. Budget Cloud quota for both solo and co-op libraries on each computer. Local
+saving remains available while Steam or Cloud is offline.
 
 Run `npm run test:multiplayer` for windowless two- and four-player browser sessions with the real
 worker and an in-memory Steam bridge. CI serves the verified production desktop renderer. To

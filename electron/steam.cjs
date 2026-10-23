@@ -14,8 +14,22 @@ const {
 const { SteamActivity } = require("./steam-activity.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
+const {
+  SteamNativeDialogs,
+  loadDialogFunctions,
+} = require("./steam-dialog.cjs");
 const { SteamDispatcher } = require("./steam-dispatch.cjs");
 const { SteamAchievements } = require("./steam-achievements.cjs");
+const {
+  SteamInput,
+  loadInputFunctions,
+  validateInputContext,
+} = require("./steam-input.cjs");
+const {
+  SteamTextInput,
+  loadTextInputFunctions,
+  validateTextInput,
+} = require("./steam-text-input.cjs");
 
 const CLOUD_PREFIX = /^electrify\/device-[a-f0-9]{32}\.json$/;
 const MAX_CLOUD_FILE_BYTES = 100 * 1024 * 1024;
@@ -34,6 +48,9 @@ class SteamService {
       this.multiplayer?.dispose();
       this.achievements?.dispose();
       this.activity?.dispose();
+      this.input?.dispose();
+      this.textInput?.dispose();
+      this.dialogs?.dispose();
       this.stopped = true;
       this.leaderboards?.dispose();
       this.dispatcher?.dispose();
@@ -76,12 +93,30 @@ class SteamService {
           this.onOverlayChanged?.(active);
         },
         (error) => {
+          this.textInput?.dispose();
           this.overlayActive = false;
           this.onOverlayChanged?.(false);
           console.warn(`Steam callbacks unavailable: ${error.message}`);
         },
       );
       this.dispatcher.start();
+      try {
+        this.textInput = new SteamTextInput(
+          loadTextInputFunctions(),
+          this.dispatcher,
+          () => this.onOverlayChanged?.(this.overlayActive),
+        );
+      } catch (error) {
+        console.warn(`Steam text input unavailable: ${error.message}`);
+      }
+      this.dialogs = new SteamNativeDialogs(
+        loadDialogFunctions(),
+        () => this.onOverlayChanged?.(this.overlayActive),
+        (error) =>
+          console.warn(
+            `Steam native dialog input unavailable: ${error.message}`,
+          ),
+      );
       this.leaderboards = new SteamLeaderboards(this.native, this.dispatcher);
     } catch (error) {
       console.warn(
@@ -90,6 +125,10 @@ class SteamService {
       // Successful identity/cloud initialization remains useful if a leaderboard interface fails.
       if (!this.identity.steamId) this.client = null;
     }
+  }
+
+  withNativeDialog(open) {
+    return this.dialogs ? this.dialogs.run(open) : open();
   }
 
   state() {
@@ -120,16 +159,57 @@ class SteamService {
     };
   }
 
+  configureInput(manifest, publish) {
+    if (!this.client || this.stopped) return;
+    try {
+      this.input = new SteamInput(
+        loadInputFunctions(),
+        manifest,
+        publish,
+        (error) => console.warn(`Steam Input unavailable: ${error.message}`),
+      );
+      this.input.start();
+    } catch (error) {
+      console.warn(`Steam Input unavailable: ${error.message}`);
+    }
+  }
+
+  setInputContext(context) {
+    validateInputContext(context);
+    return (
+      this.input?.setContext(context) ?? {
+        connected: false,
+        actions: [],
+        glyphs: {},
+      }
+    );
+  }
+
+  setInputEnabled(enabled) {
+    this.input?.setEnabled(enabled && !this.stopped && !this.textInput?.active);
+  }
+
+  showTextInput(input) {
+    validateTextInput(input);
+    return (
+      this.textInput?.show(input) ?? Promise.resolve({ status: "unavailable" })
+    );
+  }
+
   cloudState() {
     const state = this.state();
     if (!state.available || !state.cloudEnabled) return "disabled";
     return state.online ? "ready" : "offline";
   }
 
-  readCloudLibraries() {
+  readCloudLibraries(kind = "solo") {
+    const prefix =
+      kind === "coop"
+        ? /^electrify\/co-op-device-[a-f0-9]{32}\.json$/
+        : CLOUD_PREFIX;
     const files = this.client.cloud
       .listFiles()
-      .filter((file) => CLOUD_PREFIX.test(file.name));
+      .filter((file) => prefix.test(file.name));
     if (files.length > 128)
       throw new Error("Too many Steam Cloud device libraries");
     let bytes = 0;
@@ -147,11 +227,12 @@ class SteamService {
     });
   }
 
-  writeCloudLibrary(name, json) {
-    if (
-      !CLOUD_PREFIX.test(name) ||
-      Buffer.byteLength(json) > MAX_CLOUD_FILE_BYTES
-    )
+  writeCloudLibrary(name, json, kind = "solo") {
+    const prefix =
+      kind === "coop"
+        ? /^electrify\/co-op-device-[a-f0-9]{32}\.json$/
+        : CLOUD_PREFIX;
+    if (!prefix.test(name) || Buffer.byteLength(json) > MAX_CLOUD_FILE_BYTES)
       throw new Error("Steam Cloud library is too large");
     return this.client.cloud.writeFile(name, json);
   }

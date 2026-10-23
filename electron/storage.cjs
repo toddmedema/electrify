@@ -23,7 +23,11 @@ function atomicWrite(filename, data) {
 }
 
 /** The same atomic replacement without blocking Electron's main thread on large files. */
-async function atomicWriteAsync(filename, data) {
+async function atomicWriteAsync(
+  filename,
+  data,
+  { preservePrevious = false } = {},
+) {
   await fs.promises.mkdir(path.dirname(filename), { recursive: true });
   const temporary = `${filename}.${crypto.randomBytes(8).toString("hex")}.tmp`;
   const handle = await fs.promises.open(temporary, "wx", 0o600);
@@ -34,11 +38,12 @@ async function atomicWriteAsync(filename, data) {
     await handle.close();
   }
   try {
-    await fs.promises
-      .copyFile(filename, `${filename}.previous`)
-      .catch((error) => {
-        if (error.code !== "ENOENT") throw error;
-      });
+    if (!preservePrevious)
+      await fs.promises
+        .copyFile(filename, `${filename}.previous`)
+        .catch((error) => {
+          if (error.code !== "ENOENT") throw error;
+        });
     await fs.promises.rename(temporary, filename);
   } finally {
     await fs.promises.rm(temporary, { force: true });

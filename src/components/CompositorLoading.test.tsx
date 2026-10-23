@@ -1,5 +1,5 @@
 import * as React from "react";
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { store } from "../Store";
 import { CARD_TRANSITION_ANIMATION_MS } from "../Constants";
 import Compositor, { Props } from "./Compositor";
@@ -73,6 +73,51 @@ it("starts a fresh loader when retry occurs before the previous loader exits", (
       />,
     );
     expect(mounted).toHaveBeenCalledTimes(3);
+  } finally {
+    view.unmount();
+    renderCard.mockRestore();
+    jest.useRealTimers();
+  }
+});
+
+it("keeps toast results visible through page clicks while allowing timeout and explicit dismissal", () => {
+  jest.useFakeTimers();
+  const renderCard = jest
+    .spyOn(
+      Compositor.prototype as unknown as {
+        renderCard: () => React.JSX.Element;
+      },
+      "renderCard",
+    )
+    .mockReturnValue(<button>Another mod action</button>);
+  const state = store.getState();
+  const closeSnackbar = jest.fn();
+  const props: Props = {
+    card: state.card,
+    settings: state.settings,
+    ui: {
+      ...state.ui,
+      snackbar: { open: true, message: "Mod imported.", timeout: 10000 },
+    },
+    transition: "next",
+    scenarioId: 1,
+    tutorialStep: -1,
+    closeDialog: jest.fn(),
+    closeSnackbar,
+    onTutorialStep: jest.fn(),
+    onTutorialEnd: jest.fn(),
+  };
+  const view = render(<Compositor {...props} />);
+  try {
+    act(() => jest.advanceTimersByTime(1));
+    fireEvent.click(screen.getByRole("button", { name: "Another mod action" }));
+    expect(closeSnackbar).not.toHaveBeenCalled();
+    act(() => jest.advanceTimersByTime(10000));
+    expect(closeSnackbar).toHaveBeenCalledTimes(1);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Dismiss notification" }),
+    );
+    expect(closeSnackbar).toHaveBeenCalledTimes(2);
   } finally {
     view.unmount();
     renderCard.mockRestore();

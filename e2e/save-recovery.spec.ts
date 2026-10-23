@@ -3,7 +3,7 @@ import { expect, Locator, Page, Route, test } from "./fixtures";
 import { decodeSave } from "../src/SaveEncoding";
 import { SAVE_DATABASE_NAME } from "../src/SaveRepository";
 import type { SaveFileType, SaveGameType } from "../src/Types";
-import { openPane } from "./layout";
+import { openPane, openSavedGames } from "./layout";
 import {
   copySavedGame,
   editSavedGame,
@@ -68,16 +68,6 @@ async function startGame(page: Page, initialFailure = false) {
   return id!;
 }
 
-async function openSaves(page: Page) {
-  await page.getByRole("button", { name: "menu", exact: true }).click();
-  await page
-    .getByRole("menuitem", { name: "Saved games", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Saved games", exact: true }),
-  ).toBeVisible();
-}
-
 async function saveAndQuit(page: Page) {
   await page.getByRole("button", { name: "menu", exact: true }).click();
   await page
@@ -87,15 +77,12 @@ async function saveAndQuit(page: Page) {
 
 /** Make a real decision while paused, without relying on elapsed simulation time. */
 async function changeRate(page: Page): Promise<number> {
-  const insights = page.locator(".insights:visible");
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
   await openPane(
-    insights,
-    page.getByRole("button", { name: "Insights", exact: true }),
+    programs,
+    page.getByRole("button", { name: "Programs", exact: true }),
   );
-  await expect(insights).toHaveCount(1);
-  const showRate = insights.getByRole("button", { name: "Show rate slider" });
-  if (await showRate.isVisible()) await showRate.click();
-  const slider = insights.getByRole("slider", {
+  const slider = programs.getByRole("slider", {
     name: "The rate you charge for electricity generation",
   });
   const before = await slider.getAttribute("aria-valuenow");
@@ -294,7 +281,7 @@ test("a failed first save remains exportable and Retry creates the original pend
 }) => {
   const id = await startGame(page, true);
   expect(await readSaveRecords(page)).toHaveLength(0);
-  await openSaves(page);
+  await openSavedGames(page);
   const pending = page.getByRole("article", { name: "Unsaved current game" });
   await expect(pending).toBeVisible();
   await expect(
@@ -321,7 +308,7 @@ test("a never-saved game can be discarded without creating or resurrecting a rec
   page,
 }) => {
   await startGame(page, true);
-  await openSaves(page);
+  await openSavedGames(page);
   const pending = page.getByRole("article", { name: "Unsaved current game" });
   await pending
     .getByRole("button", { name: "Discard and leave", exact: true })
@@ -350,7 +337,7 @@ test("failed active deletion restores its writer and successful deletion cannot 
   page,
 }) => {
   const id = await startGame(page);
-  await openSaves(page);
+  await openSavedGames(page);
   const row = page.locator('[data-save-id="' + id + '"]');
   await setStorageFault(page, true);
   await row.getByRole("button", { name: /^Actions for/ }).click();
@@ -373,7 +360,7 @@ test("failed active deletion restores its writer and successful deletion cannot 
     .toBe(rate);
   await expect(saveState(page)).toHaveAttribute("data-save-state", "saved");
 
-  await openSaves(page);
+  await openSavedGames(page);
   await row.getByRole("button", { name: /^Actions for/ }).click();
   await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   await deleting.getByRole("button", { name: "Delete", exact: true }).click();
@@ -390,7 +377,7 @@ test("failed Resume data loading releases the target, preserves played order, an
   page,
 }) => {
   const id = await startGame(page);
-  await openSaves(page);
+  await openSavedGames(page);
   const copyId = await importCopy(page, id);
   await page.route("**/data/weather/**", (route) => route.abort("failed"));
   await page
@@ -424,7 +411,7 @@ test("a delayed Resume cannot commit after a fresh writer takes its expired leas
   context,
 }) => {
   const id = await startGame(page);
-  await openSaves(page);
+  await openSavedGames(page);
   const copyId = await importCopy(page, id);
   const held: Route[] = [];
   await page.route("**/data/weather/**", (route) => {
@@ -476,7 +463,7 @@ test("a damaged inactive save offers recovery data without blocking a healthy cu
   page,
 }) => {
   const id = await startGame(page);
-  await openSaves(page);
+  await openSavedGames(page);
   const copyId = await importCopy(page, id);
   await page.evaluate(
     ({ databaseName, saveId }) =>
@@ -602,6 +589,12 @@ test("completed saves remain writable and historical results leave the current r
     .click();
   const victory = page.getByRole("dialog", { name: "Mission complete" });
   await expect(victory).toBeVisible();
+  // Completion awards can cover the result actions on phones, as in victory-actions.spec.ts.
+  const notification = page.locator(".achievementToastPanel");
+  await expect(notification).toBeVisible();
+  while (await notification.isVisible()) {
+    await notification.getByRole("button", { name: /^Dismiss/ }).click();
+  }
   await victory
     .getByRole("button", { name: "Keep playing", exact: true })
     .click();
@@ -618,7 +611,7 @@ test("completed saves remain writable and historical results leave the current r
       .metadata.status,
   ).toBe("completed");
 
-  await openSaves(page);
+  await openSavedGames(page);
   const copyId = await importCopy(page, id);
   const before = (await readSaveRecords(page)).find(
     (record) => record.metadata.id === id,

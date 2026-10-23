@@ -2,8 +2,13 @@ import * as React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { store } from "../../Store";
-import { delta } from "../../reducers/Game";
+import { delta, markEventsRead } from "../../reducers/Game";
+import { ActiveWorldEventType } from "../../Types";
 import Navigation from "./Navigation";
+import {
+  resetInputPresentation,
+  updateInputPresentation,
+} from "../../desktop/InputPresentation";
 
 function renderNavigation(onToggle = jest.fn()) {
   return render(
@@ -35,14 +40,112 @@ afterAll(() => {
   window.PointerEvent = originalPointerEvent;
 });
 afterEach(() => {
+  resetInputPresentation();
   document.elementFromPoint = originalElementFromPoint;
   jest.useRealTimers();
 });
 
 describe("Navigation", () => {
   beforeEach(() => {
-    store.dispatch(delta({ scenarioId: 103, tutorialStep: 0 }));
+    store.dispatch(
+      delta({
+        scenarioId: 103,
+        tutorialStep: 0,
+        worldEvents: { active: [], occurrences: [], checkedKeys: [] },
+        eventLog: [],
+        eventLogReadThroughId: 0,
+      }),
+    );
   });
+
+  it("keeps an emergency alert after reading events and resuming until the last emergency ends", () => {
+    const minute = store.getState().game.date.minute;
+    const emergency: ActiveWorldEventType = {
+      key: "wildfire",
+      definitionId: "wildfire",
+      startsMinute: minute,
+      endsMinute: minute + 10,
+      importance: "CRITICAL",
+      attributes: {},
+      effects: {},
+    };
+    store.dispatch(
+      delta({
+        speed: "PAUSED",
+        worldEvents: {
+          active: [
+            emergency,
+            { ...emergency, key: "other", endsMinute: minute + 20 },
+          ],
+          occurrences: [],
+          checkedKeys: [],
+        },
+        eventLog: [
+          { id: 1, kind: "WORLD_EVENT", label: "Now", message: "Wildfire" },
+        ],
+      }),
+    );
+    renderNavigation();
+    const events = screen.getByRole("button", { name: "Events" });
+    expect(events).toHaveAccessibleDescription(/Ongoing emergency/);
+    expect(screen.getByTestId("ErrorIcon")).toBeVisible();
+    act(() => {
+      store.dispatch(markEventsRead());
+      store.dispatch(delta({ speed: "NORMAL" }));
+    });
+    expect(events).toHaveAccessibleDescription("Ongoing emergency");
+    for (const elapsed of [10, 19]) {
+      act(() =>
+        store.dispatch(
+          delta({
+            date: { ...store.getState().game.date, minute: minute + elapsed },
+          }),
+        ),
+      );
+      expect(screen.getByTestId("ErrorIcon")).toBeVisible();
+    }
+    act(() =>
+      store.dispatch(
+        delta({ date: { ...store.getState().game.date, minute: minute + 20 } }),
+      ),
+    );
+    expect(screen.queryByTestId("ErrorIcon")).toBeNull();
+    expect(events).not.toHaveAccessibleDescription();
+  });
+
+  it.each(["NOTABLE", "future", "expired"])(
+    "does not mark %s events as ongoing emergencies",
+    (kind) => {
+      const minute = store.getState().game.date.minute;
+      store.dispatch(
+        delta({
+          worldEvents: {
+            active: [
+              {
+                key: kind,
+                definitionId: kind,
+                startsMinute: minute + (kind === "future" ? 1 : 0),
+                endsMinute: minute + (kind === "expired" ? 0 : 10),
+                importance: kind === "NOTABLE" ? "NOTABLE" : "CRITICAL",
+                attributes: {},
+                effects: {},
+              },
+            ],
+            occurrences: [],
+            checkedKeys: [],
+          },
+          eventLog: [
+            { id: 1, kind: "WORLD_EVENT", label: "Now", message: "Update" },
+          ],
+        }),
+      );
+      renderNavigation();
+      expect(screen.queryByTestId("ErrorIcon")).toBeNull();
+      expect(
+        screen.getByRole("button", { name: "Events" }),
+      ).toHaveAccessibleDescription("Unread events");
+    },
+  );
   it("groups the four game tools in a labeled action dock", () => {
     renderNavigation();
 
@@ -115,6 +218,16 @@ describe("Navigation", () => {
     await act(async () => programs.focus());
     expect(screen.getByRole("tooltip", { name: "Programs (W)" })).toBeVisible();
     expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it("keeps dock help free of keyboard prompts while the controller is active", async () => {
+    renderNavigation();
+    const build = screen.getByRole("button", { name: "Build" });
+    act(() => updateInputPresentation({ active: true, connected: true }));
+    await act(async () => build.focus());
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build$/);
+    act(() => updateInputPresentation({ active: false }));
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(Q\)$/);
   });
 
   it("previews labels after holding the dock padding and scrubbing, without activating on release", () => {

@@ -10,17 +10,15 @@ import {
   PARADISE_BALANCE,
   RENEWABLES_BALANCE,
   resolveStoryAtDate,
-  resolveStoryPhase,
-  resolveStoryScheduleMonth,
-  STORY_ARC_DEFINITIONS,
-  StoryArcDefinitionType,
-  storyPhaseKey,
   upcomingStoryPhases,
   validateStoryDifficultyMonotonicity,
-  WILDFIRE_DECISION_KEY,
 } from "./WorldEvents";
 import { DifficultyType } from "../Types";
 import { SCENARIO_PREPARATION_MONTHS } from "./ScenarioPreparation";
+import { OFFICIAL_SCENARIO_RULES } from "./OfficialScenarioRules";
+import { getScenario } from "./Scenarios";
+import type { RuleEvent, ScenarioRuleDefinitions } from "./ScenarioRules";
+import { compileScenarioRules, scenarioRules } from "../helpers/ScenarioRules";
 
 const EMPTY_SNAPSHOT: StorySnapshotType = {
   deliveredWhByFuel12m: {},
@@ -34,39 +32,87 @@ const EMPTY_SNAPSHOT: StorySnapshotType = {
   facilities: [],
 };
 
-const definition: StoryArcDefinitionType = {
-  id: "test-arc",
-  scenarioId: 103,
-  phases: [
-    {
-      id: "warning",
-      schedule: { atMonth: 2 },
-      preview: () => null,
-      describe: () => ({ kind: "FUEL_PRICE", message: "Warning" }),
-    },
+const definition: ScenarioRuleDefinitions = {
+  objectives: [],
+  events: [
+    { id: "warning", title: "Warning", message: "Warning", startMonth: 3 },
     {
       id: "onset",
-      schedule: {
-        seededMonthRange: { firstMonth: 4, lastMonth: 8 },
-        randomKey: "onset-month",
-      },
+      title: "Prices change",
+      message: "Prices change.",
+      startMonth: { from: 5, to: 9 },
       durationMonths: 3,
-      preview: () => ({ message: "Prices will change." }),
-      describe: (_context, random) => {
-        const size = Math.round(10 + random("size") * 90);
-        return {
-          kind: "FUEL_PRICE",
-          message: `Change ${size}`,
-          attributes: { size },
-          effects: {
-            demandMultiplier: 1.1,
-            fuelPriceMultipliers: { "Natural Gas": 0.75 },
+      preview: "Prices will change.",
+      effects: {
+        demandMultiplier: 1.1,
+        fuelPriceMultipliers: { "Natural Gas": 0.75 },
+        outputMultipliersBySelector: [
+          {
+            target: {
+              selector: "seededOperatingCapacityShare",
+              targetCapacityShare: 0.5,
+            },
+            outputMultiplier: 0.5,
           },
-        };
+        ],
       },
     },
   ],
 };
+const compile = (seed = 12345, events = definition.events!) =>
+  compileScenarioRules(
+    { ...definition, events },
+    {
+      namespace: { kind: "official", scenarioId: 103, arcId: "test-arc" },
+      difficulty: "Manager",
+      seed,
+      startingYear: 2006,
+      durationMonths: 24,
+      startingPeakW: 300,
+      startingAssetIds: [],
+    },
+  );
+const onsetMonth = (seed = 12345) =>
+  compile(seed).events.find((event) => event.id === "onset")!.startMonth;
+const scheduledMonth = (scenarioId: number, phaseId: string, seed = 12345) =>
+  scenarioRules(getScenario(scenarioId), {
+    difficulty: "Manager",
+    seed,
+  })!.events.find((event) => event.id === phaseId)!.startMonth -
+  (SCENARIO_PREPARATION_MONTHS[scenarioId] ?? 0);
+const fixtureContext = (month: number, rules = compile()) => ({
+  ...context(month, 103, rules.seed),
+  rules,
+  snapshot: {
+    ...EMPTY_SNAPSHOT,
+    facilities: [
+      {
+        id: 1,
+        name: "Coal",
+        fuel: "Coal" as const,
+        ageYears: 10,
+        peakW: 100,
+        operational: true,
+      },
+      {
+        id: 2,
+        name: "Gas",
+        fuel: "Natural Gas" as const,
+        ageYears: 10,
+        peakW: 100,
+        operational: true,
+      },
+      {
+        id: 3,
+        name: "Wind",
+        fuel: "Wind" as const,
+        ageYears: 10,
+        peakW: 100,
+        operational: true,
+      },
+    ],
+  },
+});
 
 function context(month: number, scenarioId = 103, seed = 12345) {
   return {
@@ -85,85 +131,74 @@ function context(month: number, scenarioId = 103, seed = 12345) {
 
 describe("deterministic story schedules", () => {
   it("resolves fixed months relative to the scenario start", () => {
-    const result = resolveStoryAtDate(context(2), [definition]);
+    const result = resolveStoryAtDate(fixtureContext(2));
     expect(result.occurrences.map((event) => event.key)).toEqual([
       "story:103:test-arc:warning",
     ]);
   });
 
-  it("keeps seeded timing and attributes stable for a seed", () => {
-    const key = storyPhaseKey(103, "test-arc", "onset");
-    const month = resolveStoryScheduleMonth(
-      definition.phases[1].schedule,
-      12345,
-      key,
-    );
-    const first = resolveStoryAtDate(context(month), [definition]);
-    const second = resolveStoryAtDate(context(month), [definition]);
+  it("keeps seeded timing and target attributes stable for a seed", () => {
+    const month = onsetMonth();
+    const first = resolveStoryAtDate(fixtureContext(month));
+    const second = resolveStoryAtDate(fixtureContext(month));
     expect(first).toEqual(second);
+    expect(first.occurrences[0].attributes.selectedFacilityIds).toHaveLength(2);
     expect(month).toBeGreaterThanOrEqual(4);
     expect(month).toBeLessThanOrEqual(8);
   });
 
   it("varies a seeded schedule across a seed sample", () => {
-    const key = storyPhaseKey(103, "test-arc", "onset");
     const months = new Set(
-      Array.from({ length: 20 }, (_, seed) =>
-        resolveStoryScheduleMonth(definition.phases[1].schedule, seed + 1, key),
-      ),
+      Array.from({ length: 20 }, (_, seed) => onsetMonth(seed + 1)),
     );
     expect(months.size).toBeGreaterThan(1);
   });
 
   it("is independent of definition order", () => {
-    const other: StoryArcDefinitionType = {
+    const other: RuleEvent = {
       id: "unrelated",
-      scenarioId: 103,
-      phases: [
-        {
-          id: "phase",
-          schedule: {
-            seededMonthRange: { firstMonth: 1, lastMonth: 20 },
-            randomKey: "other",
-          },
-          preview: () => ({ message: "Another change will arrive." }),
-          describe: () => ({ kind: "FUEL_PRICE", message: "Other" }),
-        },
-      ],
+      title: "Other",
+      message: "Other",
+      startMonth: { from: 2, to: 21 },
+      preview: "Another change will arrive.",
     };
-    const key = storyPhaseKey(103, "test-arc", "onset");
-    const month = resolveStoryScheduleMonth(
-      definition.phases[1].schedule,
-      12345,
-      key,
+    const events = [...definition.events!, other];
+    const month = onsetMonth();
+    const expected = resolveStoryAtDate(
+      fixtureContext(month, compile(12345, events)),
     );
-    const expected = resolveStoryAtDate(context(month), [definition, other]);
-    const reordered = resolveStoryAtDate(context(month), [other, definition]);
+    const reordered = resolveStoryAtDate(
+      fixtureContext(month, compile(12345, [...events].reverse())),
+    );
     expect(reordered).toEqual(expected);
   });
 
-  it("scopes definitions to their authored scenario, including custom games", () => {
+  it("scopes authored rules to their scenario and explicitly selected custom arcs", () => {
     expect(
-      resolveStoryAtDate(context(2, 100), [definition]).occurrences,
-    ).toEqual([]);
+      resolveStoryAtDate(context(48, 103)).effects.fuelPriceMultipliers,
+    ).toEqual({ "Natural Gas": 0.75 });
+    const otherScenario = resolveStoryAtDate(context(48, 100));
     expect(
-      resolveStoryAtDate(context(2, 999), [definition]).occurrences,
-    ).toEqual([]);
+      otherScenario.occurrences.some((event) =>
+        event.key.startsWith("story:103:"),
+      ),
+    ).toBe(false);
+    expect(otherScenario.effects.fuelPriceMultipliers).toBeUndefined();
+    expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
+    expect(
+      resolveStoryAtDate({
+        ...context(48, 999),
+        customEvents: [{ scenarioId: 103, moneyScale: 1 }],
+      }).effects.fuelPriceMultipliers,
+    ).toEqual({ "Natural Gas": 0.75 });
   });
 
   it("returns the same scheduled effect throughout its forecast window", () => {
-    const key = storyPhaseKey(103, "test-arc", "onset");
-    const month = resolveStoryScheduleMonth(
-      definition.phases[1].schedule,
-      12345,
-      key,
+    const month = onsetMonth();
+    expect(resolveStoryAtDate(fixtureContext(month)).effects).toEqual(
+      resolveStoryAtDate(fixtureContext(month + 2)).effects,
     );
-    expect(resolveStoryAtDate(context(month), [definition]).effects).toEqual(
-      resolveStoryAtDate(context(month + 2), [definition]).effects,
-    );
-    expect(
-      resolveStoryAtDate(context(month + 3), [definition]).effects,
-    ).toEqual({});
+    expect(resolveStoryAtDate(fixtureContext(month + 3)).effects).toEqual({});
   });
 });
 
@@ -268,21 +303,20 @@ describe("The Shale Boom pilot arc", () => {
     ]);
     expect(upcoming.map(({ title, message }) => ({ title, message }))).toEqual([
       {
-        title: "Gas prices will fall",
-        message: "A regional shale glut will make local gas cheaper.",
+        title: "Gas prices falling",
+        message: "Regional shale glut lowering local gas prices.",
       },
       {
-        title: "Winter freeze will hit",
-        message: "Gas costs will spike and gas plants will produce less.",
+        title: "Winter freeze approaching",
+        message: "Gas costs spiking and gas plants producing less.",
       },
       {
-        title: "Gas output will recover",
-        message:
-          "Plant limits will lift and lower boom-era prices will resume.",
+        title: "Gas output recovering",
+        message: "Plant limits lifting and lower boom-era prices returning.",
       },
       {
-        title: "Gas boom will end",
-        message: "Natural gas prices will return to normal.",
+        title: "Gas boom ending",
+        message: "Natural gas prices returning to normal.",
       },
     ]);
     expect(resolveStoryAtDate(shaleContext(47)).effects).toEqual({});
@@ -303,14 +337,14 @@ describe("The Shale Boom pilot arc", () => {
       "seasonal-warning",
       "advance-warning",
       "contingency-review",
-      "red-flag-warning",
-      "restoration-complete",
+      "readiness",
+      "restored",
       "maintenance-backlog",
       "poor-rains-forecast",
       "summer-outlook",
     ]);
 
-    STORY_ARC_DEFINITIONS.forEach((arc) => {
+    OFFICIAL_SCENARIO_RULES.forEach((arc) => {
       const upcomingIds = upcomingStoryPhases(context(0, arc.scenarioId)).map(
         (phase) => phase.key.split(":").at(-1),
       );
@@ -320,101 +354,106 @@ describe("The Shale Boom pilot arc", () => {
 });
 
 describe("authored upcoming-event previews", () => {
-  it.each(STORY_ARC_DEFINITIONS.map((arc) => [arc.id, arc] as const))(
-    "%s hides exact outcomes in native and custom forecasts",
-    (_id, arc) => {
-      const difficulties: DifficultyType[] = [
-        "Intern",
-        "Employee",
-        "Manager",
-        "VP",
-        "CEO",
-      ];
-      for (const difficulty of difficulties) {
-        for (const scenarioId of [arc.scenarioId, 999]) {
-          const start = {
-            ...context(0, scenarioId),
-            difficulty,
-            customEvents:
-              scenarioId === 999
-                ? [{ scenarioId: arc.scenarioId, moneyScale: 2 }]
-                : undefined,
-          };
-          const events = upcomingStoryPhases(start);
-          for (const event of events) {
-            expect(`${event.title} ${event.message}`).not.toMatch(/[\d%$]/);
-            expect(event.startsMinute).toBeGreaterThan(start.date.minute);
-          }
-          // Current results and plant names cannot stand in for a future event's outcome.
-          const withResults = upcomingStoryPhases({
-            ...start,
-            snapshot: {
-              ...EMPTY_SNAPSHOT,
-              deliveredWhByFuel12m: { Coal: 80, "Natural Gas": 10 },
-              demandWh12m: 100,
-              unservedWh12m: 30,
-              netIncome12m: -100,
-              facilities: [
+  it.each(
+    OFFICIAL_SCENARIO_RULES.filter((arc) => arc.scenarioId !== 111).map(
+      (arc) => [arc.arcId, arc] as const,
+    ),
+  )("%s hides exact outcomes in native and custom forecasts", (_id, arc) => {
+    const difficulties: DifficultyType[] = [
+      "Intern",
+      "Employee",
+      "Manager",
+      "VP",
+      "CEO",
+    ];
+    for (const difficulty of difficulties) {
+      for (const scenarioId of [arc.scenarioId, 999]) {
+        const start = {
+          ...context(0, scenarioId),
+          difficulty,
+          customEvents:
+            scenarioId === 999
+              ? [{ scenarioId: arc.scenarioId, moneyScale: 2 }]
+              : undefined,
+        };
+        const events = upcomingStoryPhases(start);
+        for (const event of events) {
+          expect(`${event.title} ${event.message}`).not.toMatch(/[\d%$]/);
+          expect(event.startsMinute).toBeGreaterThan(start.date.minute);
+        }
+        // Current results and plant names cannot stand in for a future event's outcome.
+        const withResults = upcomingStoryPhases({
+          ...start,
+          snapshot: {
+            ...EMPTY_SNAPSHOT,
+            deliveredWhByFuel12m: { Coal: 80, "Natural Gas": 10 },
+            demandWh12m: 100,
+            unservedWh12m: 30,
+            netIncome12m: -100,
+            facilities: [
+              {
+                id: 1,
+                name: "Current coal plant",
+                fuel: "Coal",
+                ageYears: 40,
+                peakW: 100,
+                operational: true,
+              },
+            ],
+          },
+        });
+        expect(
+          withResults.map(({ key, title, message }) => ({
+            key,
+            title,
+            message,
+          })),
+        ).toEqual(
+          events.map(({ key, title, message }) => ({ key, title, message })),
+        );
+        const hiddenIds = (arc.definitions.events ?? [])
+          .filter(
+            (event) =>
+              event.visibility === "surprise" ||
+              arc.presentation[event.id]?.hidePreview ||
+              !event.preview,
+          )
+          .map((event) => event.id);
+        expect(
+          events.filter((event) =>
+            hiddenIds.some((id) => event.key.endsWith(`:${id}`)),
+          ),
+        ).toEqual([]);
+        const previews = (arc.definitions.events ?? []).flatMap((event) =>
+          event.preview
+            ? [
                 {
-                  id: 1,
-                  name: "Current coal plant",
-                  fuel: "Coal",
-                  ageYears: 40,
-                  peakW: 100,
-                  operational: true,
+                  title:
+                    arc.presentation[event.id]?.previewTitle ?? event.title,
+                  message: event.preview,
                 },
-              ],
-            },
-          });
-          expect(
-            withResults.map(({ key, title, message }) => ({
-              key,
-              title,
-              message,
-            })),
-          ).toEqual(
-            events.map(({ key, title, message }) => ({ key, title, message })),
-          );
-          const hiddenIds = arc.phases
-            .filter(
-              (phase) =>
-                phase.forecastable === false ||
-                phase.preview(start, () => 0.5) === null,
-            )
-            .map((phase) => phase.id);
-          expect(
-            events.filter((event) =>
-              hiddenIds.some((id) => event.key.endsWith(`:${id}`)),
-            ),
-          ).toEqual([]);
-          const previews = arc.phases.flatMap((phase) => {
-            const preview = phase.preview(start, () => 0.5);
-            return preview ? [preview] : [];
-          });
-          for (const preview of previews) {
-            // Also review the opening phase, which may already be active at month zero.
-            expect(`${preview.title} ${preview.message}`).not.toMatch(/[\d%$]/);
-          }
+              ]
+            : [],
+        );
+        for (const preview of previews) {
+          // Also review the opening phase, which may already be active at month zero.
+          expect(`${preview.title} ${preview.message}`).not.toMatch(/[\d%$]/);
         }
       }
-    },
-  );
+    }
+  });
 
   it("keeps load-shedding forecasts vague and exact reductions in live history", () => {
     const start = { ...context(0, 113), difficulty: "Employee" as const };
     const forecasts = upcomingStoryPhases(start);
     expect(forecasts.map((event) => event.message)).toEqual([
-      "Coal output will decrease.",
-      ...Array(3).fill("Coal output will decrease further."),
+      "Coal output decreasing.",
+      ...Array(3).fill("Coal output decreasing further."),
     ]);
-    const arc = STORY_ARC_DEFINITIONS.find(
-      (story) => story.scenarioId === 113,
-    )!;
-    const phase = arc.phases[1];
-    const live = resolveStoryPhase(arc, phase, {
+    const live = resolveStoryAtDate({
       ...start,
       date: context(12, 113).date,
-    });
+    }).occurrences[0];
     expect(live.title).toBe("Breakdowns outpace repairs");
     expect(live.message).toBe("Coal output is down to 67%.");
     expect(live.effects).toMatchObject({
@@ -427,23 +466,12 @@ describe("authored upcoming-event previews", () => {
     ).toHaveLength(3);
   });
 
-  it("describes future wildfire preparation without giving an exact damage reduction", () => {
-    const upcoming = upcomingStoryPhases({
-      ...context(0, 111),
-      occurrences: [
-        {
-          key: WILDFIRE_DECISION_KEY,
-          definitionId: "preparedness",
-          startsMinute: 0,
-          endsMinute: 0,
-          effects: {},
-          attributes: { choice: "prepare" },
-        },
-      ],
-    });
+  it("previews the single major wildfire transmission restriction", () => {
+    const upcoming = upcomingStoryPhases(context(0, 111));
     expect(upcoming).toHaveLength(1);
+    expect(upcoming[0].key).toBe("story:111:wildfire-intertie:outage");
     expect(upcoming[0].message).toBe(
-      "Safety shutoffs may disrupt supply; prepared crews will reduce generation losses.",
+      "The northern intertie will lose 90% of its capacity through February. Prepare replacement supply.",
     );
   });
 });
@@ -540,6 +568,7 @@ describe("generation and storage reliability scenarios", () => {
         {
           id: 7,
           name: "Grand Nuclear Unit",
+          startingAssetId: "scenario-110-grand-nuclear-unit",
           fuel: "Uranium",
           ageYears: 22,
           peakW: 500_000_000,
@@ -552,13 +581,7 @@ describe("generation and storage reliability scenarios", () => {
     expect(
       upcomingStoryPhases(before).some((phase) => phase.key.endsWith(":trip")),
     ).toBe(false);
-    const arc = STORY_ARC_DEFINITIONS.find((item) => item.scenarioId === 110)!;
-    const tripPhase = arc.phases.find((phase) => phase.id === "trip")!;
-    const month = resolveStoryScheduleMonth(
-      tripPhase.schedule,
-      77,
-      storyPhaseKey(110, arc.id, tripPhase.id),
-    );
+    const month = scheduledMonth(110, "trip", 77);
     expect(month).toBeGreaterThanOrEqual(30);
     expect(month).toBeLessThanOrEqual(36);
     const trip = resolveStoryAtDate({
@@ -573,89 +596,30 @@ describe("generation and storage reliability scenarios", () => {
   });
 });
 
-describe("California wildfire emergency", () => {
-  const wildfireContext = (month: number) => ({
-    ...context(month, 111, 2468),
-    location: LOCATIONS.LA,
-    snapshot: {
-      ...EMPTY_SNAPSHOT,
-      facilities: [
-        {
-          id: 10,
-          name: "Natural Gas",
-          fuel: "Natural Gas" as const,
-          ageYears: 18,
-          peakW: 60,
-          operational: true,
-        },
-        {
-          id: 11,
-          name: "Solar Portfolio",
-          fuel: "Sun" as const,
-          ageYears: 6,
-          peakW: 40,
-          operational: true,
-        },
-        {
-          id: 12,
-          name: "Battery",
-          ageYears: 4,
-          peakW: 100,
-          operational: true,
-        },
-      ],
-    },
-  });
-
-  it("applies the fixed January 2025 emergency only to scenario 111", () => {
-    const january = resolveStoryAtDate(wildfireContext(12));
-    const february = resolveStoryAtDate(wildfireContext(13));
-
-    expect(january.occurrences[0]).toMatchObject({
-      key: "story:111:california-wildfire-2025:firestorm",
-      title: "Wildfire emergency",
+describe("wildfire intertie emergency", () => {
+  it("limits only the northern route for exactly the two emergency months", () => {
+    const start = resolveStoryAtDate(context(12, 111));
+    expect(start.occurrences[0]).toMatchObject({
+      key: "story:111:wildfire-intertie:outage",
       importance: "CRITICAL",
-      effects: { demandMultiplier: 0.94 },
-    });
-    expect(january.effects.facilityOutputMultipliersById).toBeDefined();
-    expect(january.effects.operatingExpensePerMonth).toBe(1_000_000);
-    expect(february.effects).toEqual(january.effects);
-    expect(resolveStoryAtDate(wildfireContext(14)).effects).toEqual({});
-    expect(
-      resolveStoryAtDate({ ...wildfireContext(12), scenarioId: 999 })
-        .occurrences,
-    ).toEqual([]);
-    expect(
-      resolveStoryAtDate({ ...wildfireContext(12), scenarioId: 0 }).occurrences,
-    ).toEqual([]);
-  });
-
-  it("previews one emergency and reports the recorded restoration result", () => {
-    const upcoming = upcomingStoryPhases(wildfireContext(0));
-    expect(upcoming.map((phase) => phase.key)).toEqual([
-      "story:111:california-wildfire-2025:firestorm",
-    ]);
-    expect(upcoming[0].message).toMatch(/safety shutoffs/i);
-
-    const onset = resolveStoryAtDate(wildfireContext(12)).occurrences[0];
-    const restoration = resolveStoryAtDate({
-      ...wildfireContext(14),
-      periodSnapshots: {
-        2: {
-          deliveredWhByFuel: {},
-          demandWh: 100,
-          unservedWh: 1,
-          netIncome: -10,
-          peakDemandW: 10,
-        },
+      effects: {
+        transmissionCapacityLimitsWByCorridor: { "california-north": 4e6 },
       },
-      occurrences: [onset],
-    }).occurrences[0];
-    expect(restoration).toMatchObject({
-      key: "story:111:california-wildfire-2025:restoration-complete",
-      attributes: { reliability: 0.99 },
     });
-    expect(restoration.message).toMatch(/met 99% of connected demand/i);
+    expect(start.effects.demandMultiplier ?? 1).toBe(1);
+    expect(start.effects.facilityOutputMultipliersById).toBeUndefined();
+    expect(start.effects.operatingExpensePerMonth).toBeUndefined();
+    expect(resolveStoryAtDate(context(13, 111)).effects).toEqual(start.effects);
+    expect(resolveStoryAtDate(context(14, 111)).effects).toEqual({});
+    expect(resolveStoryAtDate(context(12, 999)).active).toEqual([]);
+    expect(resolveStoryAtDate(context(12, 0)).active).toEqual([]);
+  });
+  it("announces restoration exactly once at the end of the outage", () => {
+    expect(resolveStoryAtDate(context(14, 111)).occurrences[0]).toMatchObject({
+      key: "story:111:wildfire-intertie:restored",
+      message: "The northern intertie is back at full capacity.",
+    });
+    expect(resolveStoryAtDate(context(15, 111)).occurrences).toEqual([]);
   });
 });
 
@@ -748,12 +712,7 @@ describe("remaining scored story arcs", () => {
         },
       ],
     };
-    const landfallMonth = resolveStoryScheduleMonth(
-      STORY_ARC_DEFINITIONS.find((arc) => arc.scenarioId === 104)!.phases[1]
-        .schedule,
-      77,
-      storyPhaseKey(104, "hurricane-2008", "landfall"),
-    );
+    const landfallMonth = scheduledMonth(104, "landfall", 77);
     const resolve = (facilities: StorySnapshotType["facilities"]) =>
       resolveStoryAtDate({
         ...context(landfallMonth, 104, 77),
@@ -770,14 +729,7 @@ describe("remaining scored story arcs", () => {
   });
 
   it("reports exact hurricane restoration-window totals", () => {
-    const hurricane = STORY_ARC_DEFINITIONS.find(
-      (arc) => arc.scenarioId === 104,
-    )!;
-    const landfallMonth = resolveStoryScheduleMonth(
-      hurricane.phases[1].schedule,
-      77,
-      storyPhaseKey(104, "hurricane-2008", "landfall"),
-    );
+    const landfallMonth = scheduledMonth(104, "landfall", 77);
     const restoration = resolveStoryAtDate({
       ...context(landfallMonth + 4, 104, 77),
       periodSnapshots: {

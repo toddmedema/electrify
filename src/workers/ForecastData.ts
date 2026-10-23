@@ -1,12 +1,8 @@
 import { initEconomy } from "../data/Economy";
 import { initFuelPrices } from "../data/FuelPrices";
 import { initWeather } from "../data/Weather";
+import { waitForLoad } from "../helpers/WaitForLoad";
 import type { GameType } from "../Types";
-
-const load = (initialize: (done: (error?: string) => void) => void) =>
-  new Promise<void>((resolve, reject) =>
-    initialize((error) => (error ? reject(new Error(error)) : resolve())),
-  );
 
 /** Each persistent worker owns its data and resets seeded forecasts only when the run changes. */
 export function createForecastDataLoader(): (game: GameType) => Promise<void> {
@@ -24,18 +20,18 @@ export function createForecastDataLoader(): (game: GameType) => Promise<void> {
       weather = undefined;
       weatherKey = undefined;
     }
-    economy ??= load(initEconomy).catch((error: unknown) => {
+    economy ??= waitForLoad(initEconomy).catch((error: unknown) => {
       economy = undefined;
       throw error;
     });
-    fuelPrices ??= load(initFuelPrices).catch((error: unknown) => {
+    fuelPrices ??= waitForLoad(initFuelPrices).catch((error: unknown) => {
       fuelPrices = undefined;
       throw error;
     });
     const key = JSON.stringify([game.location.id, game.location.watershedId]);
     if (weatherKey !== key || !weather) {
       weatherKey = key;
-      weather = load((done) => initWeather(game.location, done)).catch(
+      weather = waitForLoad((done) => initWeather(game.location, done)).catch(
         (error: unknown) => {
           weather = undefined;
           throw error;

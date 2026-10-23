@@ -191,14 +191,20 @@ export function stableGridSummary(
   )} reserve`;
 }
 
-const STABLE_TOOLTIP_MS = 2500;
+const STATUS_TOOLTIP_MS = 2500;
 
 /**
- * A stable grid on a phone: a checked bolt whose tooltip carries the full readout. Hover and
+ * Grid health on a phone: a fixed-size icon whose tooltip carries the full readout. Hover and
  * keyboard focus open it as usual; a tap toggles it, until a tap elsewhere or a few seconds.
- * Unmounted whenever the grid leaves the stable state, so it never reopens on its own.
+ * Reset when the status changes so a previously pinned tooltip does not reopen on its own.
  */
-function CompactStableStatus({ summary }: { summary: string }) {
+function CompactGridStatus({
+  health,
+  summary,
+}: {
+  health: GridHealth;
+  summary: string;
+}) {
   const [open, setOpen] = React.useState(false);
   // A tap pins the tooltip: the browser follows a touch with a synthetic mouseleave, which
   // would otherwise close it the moment the finger lifts.
@@ -208,11 +214,11 @@ function CompactStableStatus({ summary }: { summary: string }) {
     const timer = setTimeout(() => {
       setPinned(false);
       setOpen(false);
-    }, STABLE_TOOLTIP_MS);
+    }, STATUS_TOOLTIP_MS);
     return () => clearTimeout(timer);
   }, [pinned]);
   return (
-    <div className="gridHealth gridHealth-stable gridHealth-compact">
+    <div className={`gridHealth gridHealth-${health.state} gridHealth-compact`}>
       <ClickAwayListener
         onClickAway={() => {
           setPinned(false);
@@ -237,16 +243,24 @@ function CompactStableStatus({ summary }: { summary: string }) {
         >
           <button
             type="button"
-            className="gridHealthStableButton"
+            className="gridHealthStatusButton"
             aria-label={`Current grid status: ${summary}`}
             onClick={() => {
               setOpen(!pinned);
               setPinned(!pinned);
             }}
           >
-            <span className="gridHealthStableIcon" aria-hidden="true">
-              <FlashOnIcon className="gridHealthStableBolt" />
-              <CheckCircleIcon className="gridHealthStableCheck" />
+            <span className="gridHealthStatusIcon" aria-hidden="true">
+              {health.state === "stable" ? (
+                <>
+                  <FlashOnIcon className="gridHealthStableBolt" />
+                  <CheckCircleIcon className="gridHealthStableCheck" />
+                </>
+              ) : (
+                <ConceptIcon
+                  concept={health.state === "blackout" ? "blackout" : "danger"}
+                />
+              )}
             </span>
           </button>
         </Tooltip>
@@ -302,6 +316,7 @@ export function GameAppBar(props: Props) {
     }
   }, [singleRow]);
   const multiplayer = game.multiplayer;
+  const inMultiplayer = !!multiplayer;
   const clock = multiplayer?.clock;
   const speed = clock?.selectedSpeed ?? game.speed;
   // Watching somebody else's run rather than playing your own. The speed controls stay live --
@@ -390,7 +405,9 @@ export function GameAppBar(props: Props) {
           {!steamAvailable && (
             <MenuItem onClick={props.onAchievements}>Achievements</MenuItem>
           )}
-          <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
+          {!inMultiplayer && (
+            <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
+          )}
           <MenuItem onClick={() => openWindow("/about.html#feedback")}>
             Send feedback
           </MenuItem>
@@ -428,6 +445,7 @@ export function GameAppBar(props: Props) {
       onManual,
       onSettings,
       props.onSavedGames,
+      inMultiplayer,
       props.onAchievements,
       steamAvailable,
       onNextTutorial,
@@ -454,15 +472,21 @@ export function GameAppBar(props: Props) {
   // Tutorials have no mission row, so the readout would be too short to hold a full-size control;
   // their HUD tells the story instead.
   const activeEvents = (!isTutorial && props.activeEvents) || NO_ACTIVE_EVENTS;
-  // Phones keep a stable grid to a checked bolt, handing the row's width to the mission; the
-  // full readout is one tap (or hover) away. Any other state keeps its words on screen.
-  const compactStable = gridHealth.state === "stable" && !isPaneLayout();
-  const stableSummary = stableGridSummary(game, now);
+  // Every phone status uses the same space; changing reserve must not resize the header.
+  const compactStatus = !isPaneLayout();
+  const summary =
+    gridHealth.state === "stable"
+      ? stableGridSummary(game, now)
+      : `${gridHealth.label}, ${gridHealth.metric}`;
 
   const statusRow = (
     <div className="gameStatusBar">
-      {compactStable ? (
-        <CompactStableStatus summary={stableSummary} />
+      {compactStatus ? (
+        <CompactGridStatus
+          key={gridHealth.state}
+          health={gridHealth}
+          summary={summary}
+        />
       ) : (
         <div
           className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
@@ -552,6 +576,16 @@ export function GameAppBar(props: Props) {
         />
       )}
       {!singleRow && statusRow}
+      {game.customScenario?.mod && (
+        <Typography
+          className="modRunStatus"
+          variant="caption"
+          color="textSecondary"
+          sx={{ px: 2, pb: 0.5 }}
+        >
+          Modded · Unranked
+        </Typography>
+      )}
       {game.challenge && (
         <Typography
           variant="caption"

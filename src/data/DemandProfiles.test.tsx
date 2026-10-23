@@ -1,7 +1,6 @@
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { LocationType } from "../Types";
 import {
-  annualLoadAdditionWh,
   dataCenterLoadShare,
   DEMAND_TYPES,
   demandByTypeAt,
@@ -203,13 +202,6 @@ describe("demand profiles", () => {
       expect(before["Data Centers"]).toBe(0);
       expect(after["Data Centers"]).toBe(90_000_000);
       expect(total(after)).toBeGreaterThan(100_000_000);
-    });
-
-    it("locks the non-cumulative 100 MW and 260 MW annual arithmetic", () => {
-      expect(annualLoadAdditionWh(addition) / 1_000_000).toBe(788_400);
-      expect(
-        annualLoadAdditionWh({ ...addition, peakW: 260_000_000 }) / 1_000_000,
-      ).toBe(2_049_840);
     });
   });
 });

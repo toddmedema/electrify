@@ -65,6 +65,30 @@ describe("ManualLink", () => {
     expect(preview()).toBeNull();
   });
 
+  it("consumes Escape before workspace navigation and suppresses hover until leaving", () => {
+    const link = showLink();
+    const workspaceEscape = jest.fn();
+    document.addEventListener("keydown", workspaceEscape);
+    try {
+      fireEvent.pointerEnter(link, { pointerType: "mouse" });
+      settle();
+      expect(preview()).not.toBeNull();
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      settle();
+      expect(preview()).toBeNull();
+      expect(workspaceEscape).not.toHaveBeenCalled();
+      fireEvent.pointerEnter(link, { pointerType: "mouse" });
+      settle();
+      expect(preview()).toBeNull();
+      fireEvent.pointerLeave(link, { pointerType: "mouse" });
+      fireEvent.pointerEnter(link, { pointerType: "mouse" });
+      settle();
+      expect(preview()).not.toBeNull();
+    } finally {
+      document.removeEventListener("keydown", workspaceEscape);
+    }
+  });
+
   it("leaves touch to the tap, which pins the entry open", () => {
     const link = showLink();
     fireEvent.pointerEnter(link, { pointerType: "touch" });

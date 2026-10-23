@@ -34,6 +34,9 @@ test("challenge details have a shareable URL and return to the catalog", async (
   await expect(
     page.getByRole("heading", { name: "Choose a game" }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "How to play" })).toHaveCount(
+    0,
+  );
   await expect(page).not.toHaveURL(/scenario=/);
 
   await page.getByRole("button", { name: "All challenges" }).click();

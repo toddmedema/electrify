@@ -25,10 +25,41 @@ import {
   withoutDataCenterGrowth,
 } from "./DataCenterScenario";
 import { LocationType } from "../Types";
+import { facilityAgeYears } from "./Financials";
 
 const profileFor = (location: LocationType): DataCenterCustomerProfile =>
   getDataCenterCustomerProfile(location, loadDataCenterCustomerSources());
 const accountsFor = (location: LocationType) => profileFor(location).customers;
+
+it("inherits an established regional fleet and preserves its ages in saves", () => {
+  const location = getSimLocation("SF")!;
+  loadSimData(location);
+  const scenario = createDataCenterScenario(
+    location,
+    2026,
+    accountsFor(location),
+  );
+  for (const facility of scenario.facilities) {
+    expect(facility.initialAgeYears).toBeGreaterThan(0);
+  }
+  const game = createGame({
+    scenarioId: 999,
+    scenario,
+    difficulty: DATA_CENTER_DIFFICULTY,
+    seed: DATA_CENTER_SEED,
+  });
+  const ages = game.facilities.map((facility) =>
+    facilityAgeYears(facility, game.date.minute),
+  );
+  expect(ages.every((age) => age > 0)).toBe(true);
+  expect(new Set(ages).size).toBeGreaterThan(1);
+  const saved = parseSave(serializeSave(game))!.game;
+  expect(
+    saved.facilities.map((facility) =>
+      facilityAgeYears(facility, saved.date.minute),
+    ),
+  ).toEqual(ages);
+});
 
 it("derives reproducible local assumptions and keeps a full current year", () => {
   const sf = getSimLocation("SF")!;
@@ -249,6 +280,11 @@ it.each([
     expect(summarizeYearOneOutlook(timeline).worstShortfallW).toBe(0);
     expect(Math.min(...timeline.map((tick) => tick.cash))).toBeGreaterThan(0);
     expect(scenario.facilities.length).toBeGreaterThan(0);
+    expect(
+      scenario.facilities.every(
+        (facility) => (facility.initialAgeYears || 0) > 0,
+      ),
+    ).toBe(true);
     // A modest increase must exceed the opening fleet; the calibrator cannot
     // leave the old 3–5x oversized portfolio in place.
     const stressed = forecastCustomGameTimeline(

@@ -73,6 +73,12 @@ const AchievementGallery = React.lazy(() =>
   ).then(({ AchievementGallery }) => ({ default: AchievementGallery })),
 );
 
+// Desktop-only: web builds drop the screen and its mod parser entirely.
+const Mods =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? React.lazy(() => import("./views/Mods"))
+    : () => null;
+
 const GAME_WORKSPACE_KEY = "GAME_WORKSPACE";
 
 // How many facilities the number row can reach. Nine because that is how many number keys
@@ -104,6 +110,15 @@ const NON_TEXT_INPUT_TYPES = new Set([
 ]);
 configure({
   ignoreEventsCondition: (event: KeyboardEvent) => {
+    if (event.defaultPrevented) return true;
+    if (
+      event.key === " " &&
+      event.target instanceof Element &&
+      event.target.closest(
+        'button, input, select, textarea, summary, [role="button"], [role="checkbox"], [role="radio"], [role="switch"]',
+      )
+    )
+      return true;
     if (document.querySelector(".MuiModal-root:not(.MuiModal-hidden)"))
       return true;
     if (document.querySelector('[data-data-center-guide="true"]')) return true;
@@ -521,6 +536,12 @@ export default class Compositor extends React.Component<Props, {}> {
         );
       case "SAVED_GAMES":
         return <SavedGames />;
+      case "MODS":
+        return (
+          <React.Suspense fallback={<p role="status">Loading mods…</p>}>
+            <Mods />
+          </React.Suspense>
+        );
       case "MAIN_MENU":
         return <MainMenuContainer />;
       case "MANUAL":
@@ -745,7 +766,11 @@ export default class Compositor extends React.Component<Props, {}> {
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
           open={ui.snackbar.open}
           autoHideDuration={ui.snackbar.timeout}
-          onClose={closeSnackbar}
+          onClose={(_event, reason) => {
+            // A page action can open a new toast during the same click. Its click-away
+            // event must not immediately dismiss that result.
+            if (reason !== "clickaway") closeSnackbar();
+          }}
         >
           <SnackbarContent
             ref={this.snackbarContentRef}

@@ -1,0 +1,75 @@
+"Action Manifest"
+{
+  "major_revision" "1"
+  "minor_revision" "0"
+  "configurations"
+  {
+    "controller_xbox360" { "0" { "path" "controller_xbox360.vdf" } }
+    "controller_xboxone" { "0" { "path" "controller_xboxone.vdf" } }
+    "controller_neptune" { "0" { "path" "controller_neptune.vdf" } }
+    "controller_ps4" { "0" { "path" "controller_ps4.vdf" } }
+    "controller_ps5" { "0" { "path" "controller_ps5.vdf" } }
+    "controller_switch_pro" { "0" { "path" "controller_switch_pro.vdf" } }
+  }
+  "actions"
+  {
+    "Menu"
+    {
+      "title" "#Set_Menu"
+      "legacy_set" "0"
+      "Button"
+      {
+        "Menu_up" "#Action_up"
+        "Menu_down" "#Action_down"
+        "Menu_left" "#Action_left"
+        "Menu_right" "#Action_right"
+        "Menu_confirm" "#Action_confirm"
+        "Menu_back" "#Action_back"
+      }
+    }
+    "Gameplay"
+    {
+      "title" "#Set_Gameplay"
+      "legacy_set" "0"
+      "Button"
+      {
+        "Gameplay_up" "#Action_up"
+        "Gameplay_down" "#Action_down"
+        "Gameplay_left" "#Action_left"
+        "Gameplay_right" "#Action_right"
+        "Gameplay_confirm" "#Action_confirm"
+        "Gameplay_back" "#Action_back"
+        "Gameplay_pause" "#Action_pause"
+        "Gameplay_speedUp" "#Action_speedUp"
+        "Gameplay_speedDown" "#Action_speedDown"
+        "Gameplay_previousPane" "#Action_previousPane"
+        "Gameplay_nextPane" "#Action_nextPane"
+        "Gameplay_build" "#Action_build"
+        "Gameplay_previousChart" "#Action_previousChart"
+        "Gameplay_nextChart" "#Action_nextChart"
+      }
+    }
+  }
+  "localization"
+  {
+    "english"
+    {
+      "Set_Menu" "Menus"
+      "Set_Gameplay" "Gameplay"
+      "Action_up" "Move up"
+      "Action_down" "Move down"
+      "Action_left" "Move left"
+      "Action_right" "Move right"
+      "Action_confirm" "Confirm"
+      "Action_back" "Back"
+      "Action_pause" "Pause or resume"
+      "Action_speedUp" "Increase speed"
+      "Action_speedDown" "Decrease speed"
+      "Action_previousPane" "Previous pane"
+      "Action_nextPane" "Next pane"
+      "Action_build" "Build facility"
+      "Action_previousChart" "Previous chart"
+      "Action_nextChart" "Next chart"
+    }
+  }
+}

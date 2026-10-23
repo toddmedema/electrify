@@ -1,4 +1,36 @@
+import {
+  matchesStartingFacility,
+  startingFacilitySearch,
+  startingFacilityQuote,
+} from "../helpers/StartingFacilities";
 import { customEventContext } from "../helpers/CustomScenarioEvents";
+import { validScenarioMod } from "../helpers/ScenarioMod";
+import {
+  scenarioRules,
+  scenarioRulesIdentity,
+  isOfficialCatalogRules,
+} from "../helpers/ScenarioRules";
+import { canonicalRuleJson } from "../helpers/RuleIdentity";
+import { getScenarioLocation } from "../helpers/Locations";
+import { getStartingCustomers } from "../data/LocationProfiles";
+import {
+  scenarioRuleChoiceLoadPlan,
+  scenarioRuleLoadOrder,
+  scenarioRuleReplacedLoadIds,
+} from "../helpers/ScenarioRuleDecisions";
+import type {
+  CompiledRuleChoice,
+  CompiledRuleOption,
+  CompiledScenarioRules,
+} from "../data/ScenarioRules";
+import {
+  captureRuleReportObservation,
+  ruleConditionMet,
+  ruleEffectsForOccurrence,
+  ruleLoadKey,
+  ruleEvents,
+  scenarioRuleForecastOccurrences,
+} from "../helpers/ScenarioRuleRuntime";
 import { desktopSimulationHooks } from "../achievements/SimulationHooks";
 import {
   gasConversionQuote,
@@ -22,7 +54,12 @@ import {
   generatorsAboveDemandFloor,
   mothballAdvice,
 } from "../helpers/Mothball";
-import { runFailure } from "../helpers/ObjectiveRules";
+import {
+  runFailure,
+  initializeGameObjectiveProgress,
+  recordGameObjectiveMonth,
+  gameObjectiveResults,
+} from "../helpers/ObjectiveRules";
 import { chooseScenarioResponse } from "./GameActions";
 import {
   validBuildFacility,
@@ -31,8 +68,9 @@ import {
 import { defaultDispatchIndex } from "../helpers/DispatchOrder";
 import { startingFacilityStarts } from "../helpers/StartingFacilityStarts";
 import {
-  optionalScenarioChoice,
   pendingScenarioChoice,
+  pendingScenarioRuleChoice,
+  scenarioChoicesForGame,
   validScenarioResponse,
 } from "../helpers/ScenarioChoices";
 import { getViableLocationCount } from "../data/FacilitySites";
@@ -72,6 +110,7 @@ import {
   openPolicyDecision,
   closePolicyDecision,
   pageHidden,
+  systemSuspend,
   pageVisible,
 } from "./GameActions";
 import type { AppDispatch } from "../Store";
@@ -124,7 +163,7 @@ import {
   formatWatts,
   formatWattHours,
 } from "../helpers/Format";
-import { arrayMove, newSeed, roundToSignificantDigits } from "../helpers/Math";
+import { arrayMove, newSeed } from "../helpers/Math";
 import {
   computeScoreBreakdown,
   startingDollarRevenue,
@@ -174,34 +213,8 @@ import {
   demandByTypeAt,
   temperatureDemandWattsPerCustomer,
 } from "../data/DemandProfiles";
-import {
-  combineStoryEffects,
-  resolveStoryAtDate,
-  STORY_ARC_DEFINITIONS,
-} from "../data/WorldEvents";
-import {
-  getMonthlyClimatology,
-  getRawSolarIrradianceWM2,
-  getWeather,
-} from "../data/Weather";
-import {
-  wildfirePreparednessEffectiveness,
-  wildfirePreparedness,
-  wildfirePreparednessAnnualCost,
-  wildfirePreparednessChange,
-  activeWildfire,
-  dailyFireWeatherReading,
-  isWildfireHazardEligible,
-  sampleWildfireIncident,
-  WILDFIRE_DEFINITION_ID,
-  wildfireDraw,
-  wildfireInCooldown,
-  wildfireMonthlyProbability,
-  wildfireIncidentEffects,
-  wildfireOccurrenceKey,
-  weatherFireRiskModifier,
-} from "../helpers/Wildfire";
-import { getWildfireProfile } from "../data/WildfireProfiles";
+import { combineStoryEffects, resolveStoryAtDate } from "../data/WorldEvents";
+import { getRawSolarIrradianceWM2, getWeather } from "../data/Weather";
 import { COLD_MAX_GAS_PRICE_MULTIPLIER } from "../data/Hazards";
 import {
   activeWeatherHazardsFor,
@@ -297,6 +310,7 @@ import {
   ActiveWorldEventType,
   ConstructionEmissions,
   DateType,
+  DifficultyType,
   FacilityOperatingType,
   FacilityShoppingType,
   FuelPricesType,
@@ -327,11 +341,13 @@ import {
 } from "../Types";
 import { pow } from "../helpers/Pow";
 import {
+  isPeerCorridorId,
   PEER_TRADE_BASE_PRICE_PER_MWH,
   PEER_TRADE_GAS_HEAT_RATE,
   PEER_TRADE_MIN_PRICE_PER_MWH,
   PEER_TRADE_RESERVE_FRACTION,
 } from "../data/Multiplayer";
+import { exp } from "../helpers/Libm";
 
 interface BuildFacilityAction {
   facility: FacilityShoppingType;
@@ -396,6 +412,7 @@ const BLOCKING_CARDS = new Set([
   "MAIN_MENU",
   "ACHIEVEMENTS",
   "SAVED_GAMES",
+  "MODS",
   "MANUAL",
   "BUILD_GENERATORS",
   "BUILD_STORAGE",
@@ -655,21 +672,85 @@ export function logFuelCrossovers(state: GameType) {
 
 const MAX_WORLD_EVENT_CHECKS = 2400;
 
+/** All story entry points share the same definitions, activation facts and observations. */
+function storyContextAt(state: GameType, date = state.date) {
+  const rules = scenarioRules(
+    getScenario(state.scenarioId, state.customScenario),
+    state,
+  );
+  return {
+    rules,
+    seed: state.seed,
+    scenarioId: state.scenarioId,
+    customEvents: customEventContext(state.customScenario),
+    difficulty: state.difficulty,
+    date,
+    location: state.location,
+    snapshot: buildStorySnapshot(
+      state.monthlyHistory,
+      state.facilities,
+      date.minute,
+    ),
+    occurrences:
+      rules && date.minute > state.date.minute
+        ? scenarioRuleForecastOccurrences(
+            rules,
+            state.worldEvents.occurrences,
+            date.monthsElapsed,
+          )
+        : state.worldEvents.occurrences,
+    monthlyHistory: state.monthlyHistory,
+    completedMonths: state.date.monthsElapsed,
+    startingRateDollarsPerKWh: getScenario(
+      state.scenarioId,
+      state.customScenario,
+    )?.dollarsPerkWh,
+    endingRateDollarsPerKWh: state.dollarsPerkWh,
+  };
+}
+
+function openingRuleTransactions(state: GameType) {
+  return state.worldEvents.occurrences
+    .filter(
+      (event) =>
+        event.attributes.ruleEvent === true &&
+        event.startsMinute === state.date.minute,
+    )
+    .reduce(
+      (sum, event) =>
+        sum +
+        Number(event.attributes.upfrontGrant ?? 0) -
+        Number(event.attributes.cost ?? 0),
+      0,
+    );
+}
+
 /** A standing program must outlive the bounded historical event log that records its changes. */
 function trimWorldEventOccurrences(state: GameType) {
   const occurrences = state.worldEvents.occurrences;
   if (occurrences.length <= MAX_WORLD_EVENT_CHECKS) return;
-  const program = wildfirePreparednessChange(
-    occurrences,
-    state.location.id,
-    state.date.minute,
-  );
   const retained = occurrences.slice(-MAX_WORLD_EVENT_CHECKS);
-  if (program && !retained.includes(program)) {
-    retained.shift();
-    retained.unshift(program);
-  }
-  state.worldEvents.occurrences = retained;
+  // Rules are bounded at compilation. Their receipts and onset identities are run facts,
+  // independent of the rolling regional-hazard log.
+  const retainedSet = new Set(retained);
+  const rules = scenarioRules(
+    getScenario(state.scenarioId, state.customScenario),
+    state,
+  );
+  const declaredKeys = new Set(
+    rules ? ruleEvents(rules).map((event) => event.key) : [],
+  );
+  state.worldEvents.occurrences = occurrences.filter(
+    (event) =>
+      retainedSet.has(event) ||
+      declaredKeys.has(event.key) ||
+      event.attributes.ruleEvent === true ||
+      event.attributes.ruleEventEnd === true ||
+      event.attributes.ruleObservation === true ||
+      (rules &&
+        event.attributes.scenarioChoice === true &&
+        !event.key.startsWith("wildfire:")),
+  );
 }
 
 /** Starts/ends authored events before this month's forecast is built. */
@@ -687,33 +768,32 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
   );
   if (
     state.storyEffectsDisabled ||
-    (!state.customScenario?.eventScenarioIds?.length &&
-      !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId))
+    (!scenarioRules(
+      getScenario(state.scenarioId, state.customScenario),
+      state,
+    ) &&
+      !state.customScenario?.eventScenarioIds?.length)
   ) {
     return storyPriceFuels;
   }
+  const context = storyContextAt(state);
+  captureRuleReportObservation(state, context);
   const resolved = resolveStoryAtDate({
-    seed: state.seed,
-    scenarioId: state.scenarioId,
-    customEvents: customEventContext(state.customScenario),
-    difficulty: state.difficulty,
-    date: state.date,
-    location: state.location,
-    snapshot: buildStorySnapshot(
-      state.monthlyHistory,
-      state.facilities,
-      state.date.minute,
-    ),
+    ...context,
     periodSnapshots: Object.fromEntries(
       [1, 2, 3, 4, 5, 6].map((months) => [
         months,
         buildStoryPeriodSnapshot(state.monthlyHistory, months),
       ]),
     ),
-    occurrences: state.worldEvents.occurrences,
   });
   resolved.occurrences.forEach((occurrence) => {
-    if (state.worldEvents.checkedKeys.includes(occurrence.key)) {
+    if (
+      state.worldEvents.checkedKeys.includes(occurrence.key) ||
+      state.worldEvents.occurrences.some(
+        (event) => event.key === occurrence.key,
+      )
+    ) {
       return;
     }
     state.worldEvents.checkedKeys.push(occurrence.key);
@@ -744,169 +824,34 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
     );
   }
   trimWorldEventOccurrences(state);
-  return storyPriceFuels;
-}
-
-/**
- * Runs the recurring regional wildfire hazard check at monthly rollover, before this month's
- * forecast is built. An eligible location (a profiled area in a custom game -- never the authored
- * scenario 111, whose fixed firestorm is preserved) rolls one addressed draw per month. An
- * ignition persists a time-bounded occurrence whose effects flow through the same story-effect
- * machinery as authored events, so disconnected load, constrained generators and restoration cost
- * are accounted exactly once. The check is a pure function of (seed, location, absolute month),
- * so saving, forecasting or reordering evaluation cannot reroll it; the dedupe key keeps a resumed
- * month from announcing twice.
- */
-function updateWildfireHazards(state: GameType): void {
-  if (!isWildfireHazardEligible(state)) {
-    return;
-  }
-  const profile = getWildfireProfile(state.location.id);
-  if (!profile) {
-    return;
-  }
-  const locationId = state.location.id;
-  const monthsElapsed = state.date.monthsElapsed;
-  // Report restoration for any wildfire that just expired at the start of this month. Occurrences
-  // retain expired incidents, so this is detected from them (active no longer holds it).
-  state.worldEvents.occurrences.forEach((event) => {
-    if (event.definitionId !== WILDFIRE_DEFINITION_ID) {
-      return;
-    }
-    if (!event.key.startsWith(`wildfire:${locationId}:`)) {
-      return;
-    }
-    if (event.endsMinute !== state.date.minute) {
-      return; // Still active, or expired in an earlier month.
-    }
-    const selectedNames = (event.attributes.selectedFacilityNames ||
-      []) as string[];
-    logGameEvent(
-      state,
-      "WORLD_EVENT",
-      `Wildfire restoration complete: safety shutoffs are lifted and ${selectedNames.length ? selectedNames.join(", ") : "affected generators"} return to normal.`,
-      {
-        importance: "NOTABLE",
-        actionTarget: { card: "FACILITIES", view: "FLEET" },
-        title: "Wildfire restoration complete",
-        concept: "supply",
-        storyPhaseKey: event.key,
-        reportedKey: `wildfire-recovery:${event.key}`,
-      },
-    );
-  });
-  // One active wildfire per region, and a cooldown after each incident.
-  if (activeWildfire(state.worldEvents.active, locationId)) {
-    return;
-  }
-  if (
-    wildfireInCooldown(
+  if (context.rules) {
+    const replaced = scenarioRuleReplacedLoadIds(
+      context.rules,
       state.worldEvents.occurrences,
-      locationId,
-      monthsElapsed,
-      profile,
-    )
-  ) {
-    return;
-  }
-  const occurrenceKey = wildfireOccurrenceKey(locationId, monthsElapsed);
-  if (state.worldEvents.checkedKeys.includes(occurrenceKey)) {
-    return; // Already checked this month (e.g. a save resumed mid-month).
-  }
-  const monthIndex = state.date.monthNumber - 1;
-  const modifier = weatherFireRiskModifier(
-    dailyFireWeatherReading(state.date, state.seed),
-    getMonthlyClimatology(monthIndex),
-  );
-  const probability = wildfireMonthlyProbability(profile, monthIndex, modifier);
-  const ignites =
-    wildfireDraw(state.seed, locationId, monthsElapsed, "occurrence") <
-    probability;
-  if (!ignites) {
-    state.worldEvents.checkedKeys.push(occurrenceKey);
-    if (state.worldEvents.checkedKeys.length > MAX_WORLD_EVENT_CHECKS) {
-      state.worldEvents.checkedKeys.splice(
-        0,
-        state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
-      );
-    }
-    return;
-  }
-  const snapshot = buildStorySnapshot(
-    state.monthlyHistory,
-    state.facilities,
-    state.date.minute,
-  );
-  const effectiveness = wildfirePreparednessEffectiveness(
-    state.worldEvents.occurrences,
-    locationId,
-    monthsElapsed * MINUTES_PER_MONTH,
-  );
-  const prepared = effectiveness > 0;
-  const incident = sampleWildfireIncident({
-    profile,
-    seed: state.seed,
-    locationId,
-    monthsElapsed,
-    snapshot,
-    effectiveness,
-  });
-  const startsMinute = monthsElapsed * MINUTES_PER_MONTH;
-  const endsMinute =
-    (monthsElapsed + incident.durationMonths) * MINUTES_PER_MONTH;
-  const affected = incident.selectedFacilityNames.length
-    ? incident.selectedFacilityNames.join(", ")
-    : "no operating generators";
-  const endLabel = getDateFromMinute(endsMinute - 1, state.startingYear);
-  const message = `${prepared ? `Prepared crews are in place. Preparedness is ${Math.round(effectiveness * 100)}% effective. ` : ""}${Math.round(incident.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affected} are limited to ${Math.round(incident.outputMultiplier * 100)}% output, with restoration costing ${formatMoneyConcise(incident.restorationCostPerMonth)} per month through ${endLabel.month} ${endLabel.year}.`;
-  const occurrence: ActiveWorldEventType = {
-    key: occurrenceKey,
-    definitionId: WILDFIRE_DEFINITION_ID,
-    startsMinute,
-    endsMinute,
-    // A hidden surprise until it happens; once persisted its effects still enter forecasts.
-    forecastable: false,
-    title: "Wildfire emergency",
-    message,
-    concept: "danger",
-    importance: "CRITICAL",
-    actionTarget: { card: "FACILITIES", view: "FLEET" },
-    attributes: {
-      locationId,
-      monthsElapsed,
-      prepared,
-      preparednessEffectiveness: effectiveness,
-      severity: incident.severity,
-      disconnectedDemand: incident.disconnectedDemand,
-      outputMultiplier: incident.outputMultiplier,
-      targetCapacityShare: incident.targetCapacityShare,
-      durationMonths: incident.durationMonths,
-      selectedFacilityIds: incident.selectedFacilityIds,
-      selectedFacilityNames: incident.selectedFacilityNames,
-      restorationCostPerMonth: incident.restorationCostPerMonth,
-    },
-    effects: wildfireIncidentEffects(incident),
-  };
-  state.worldEvents.checkedKeys.push(occurrenceKey);
-  state.worldEvents.active.push(occurrence);
-  state.worldEvents.occurrences.push(occurrence);
-  if (state.worldEvents.checkedKeys.length > MAX_WORLD_EVENT_CHECKS) {
-    state.worldEvents.checkedKeys.splice(
-      0,
-      state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
     );
+    for (const load of context.rules.loads) {
+      const key = ruleLoadKey(context.rules, load.id);
+      if (
+        replaced.has(key) ||
+        !ruleConditionMet(
+          load.requiresChoice,
+          context.rules,
+          state.worldEvents.occurrences,
+        ) ||
+        state.loadAdditions.some((existing) => existing.id === key)
+      )
+        continue;
+      const {
+        eventId: _eventId,
+        startMonth: _startMonth,
+        requiresChoice: _requiresChoice,
+        ...addition
+      } = load;
+      state.loadAdditions.push({ ...addition, id: key });
+    }
+    state.loadAdditions = scenarioRuleLoadOrder(state.loadAdditions);
   }
-  trimWorldEventOccurrences(state);
-  logGameEvent(state, "WORLD_EVENT", message, {
-    importance: "CRITICAL",
-    actionTarget: occurrence.actionTarget,
-    title: occurrence.title,
-    concept: occurrence.concept,
-    storyPhaseKey: occurrence.key,
-    turningPointPriority: 120,
-    reportedKey: occurrence.key,
-    pause: true,
-  });
+  return storyPriceFuels;
 }
 
 /** Keeps the hazard dedupe and occurrence records bounded, like the authored-story path. */
@@ -928,7 +873,7 @@ function formatDays(days: number): string {
 }
 
 /**
- * Hail and extreme-cold checks at monthly rollover, after the authored story and wildfire, before
+ * Hail and extreme-cold checks at monthly rollover, after the authored story, before
  * the month's forecast is built. Each check is keyed by (hazard, location, absolute month) and
  * every draw is addressed, so saving, forecasting or reordering the fleet cannot reroll it and a
  * resumed month cannot announce twice. Hail persists one occurrence per damaged solar facility,
@@ -1251,8 +1196,7 @@ function endWeatherHazardsForFacility(state: GameType, id: number) {
           : event.endsMinute,
     };
   });
-  // The effects cache keys active events by key, not by their effects, and a cold snap keeps its
-  // key and window here. Selling is rare, so dropping the whole cache is the cheap correct fix.
+  // Selling changes the affected equipment; discard cached effects after the edit.
   if (edited) storyEffectsCache.clear();
 }
 
@@ -1282,7 +1226,13 @@ function occurrencesKey(occurrences: ActiveWorldEventType[]): number {
     return cached.id;
   }
   const json = JSON.stringify(
-    occurrences.map((event) => [event.key, event.attributes]),
+    occurrences.map((event) => [
+      event.key,
+      event.startsMinute,
+      event.endsMinute,
+      event.attributes,
+      event.effects,
+    ]),
   );
   let id = occurrencesKeyIds.get(json);
   if (id === undefined) {
@@ -1305,12 +1255,10 @@ function occurrencesKey(occurrences: ActiveWorldEventType[]): number {
 
 function scheduledStoryCacheKey(date: DateType, state: GameType): string {
   const fleetSensitive =
-    !!state.customScenario?.eventScenarioIds?.length ||
-    state.scenarioId === 104 ||
-    state.scenarioId === 111 ||
-    (state.scenarioId === 102 &&
-      date.monthsElapsed >= 72 &&
-      date.monthsElapsed < 96);
+    !!scenarioRules(
+      getScenario(state.scenarioId, state.customScenario),
+      state,
+    ) || !!state.customScenario?.eventScenarioIds?.length;
   const fleetKey = fleetSensitive
     ? state.facilities
         .map((facility) =>
@@ -1321,6 +1269,8 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
             facility.yearsToBuildLeft <= 0,
             facility.paused,
             facility.minuteOperational,
+            facility.minuteCreated,
+            facility.startingAssetId,
           ].join(":"),
         )
         .sort()
@@ -1328,6 +1278,13 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
     : "";
   return [
     state.scenarioId,
+    state.customScenario?.mod?.runtimeDigest ??
+      scenarioRulesIdentity(
+        scenarioRules(
+          getScenario(state.scenarioId, state.customScenario),
+          state,
+        ),
+      ),
     JSON.stringify(customEventContext(state.customScenario)),
     state.difficulty,
     state.seed,
@@ -1339,7 +1296,7 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
 
 function storyEffectsAt(date: DateType, state: GameType) {
   const activeKey = state.worldEvents.active
-    .map((event) => event.key)
+    .map((event) => JSON.stringify([event.key, event.effects]))
     .join("|");
   const lastOccurrence = state.worldEvents.occurrences.at(-1);
   // Immer produces a fresh draft identity on every reducer call and forecasts use shallow state
@@ -1367,14 +1324,19 @@ function storyEffectsAt(date: DateType, state: GameType) {
   if (cached) {
     return cached;
   }
-  const persisted = state.worldEvents.active.filter(
-    (event) =>
-      date.minute >= event.startsMinute && date.minute < event.endsMinute,
-  );
+  const context = storyContextAt(state, date);
+  const persisted = state.worldEvents.active
+    .filter(
+      (event) =>
+        date.minute >= event.startsMinute && date.minute < event.endsMinute,
+    )
+    .map((event) => ({
+      ...event,
+      effects: ruleEffectsForOccurrence(event, context),
+    }));
   if (
     state.storyEffectsDisabled ||
-    (!state.customScenario?.eventScenarioIds?.length &&
-      !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId))
+    (!context.rules && !state.customScenario?.eventScenarioIds?.length)
   ) {
     const effects = combineStoryEffects(persisted);
     storyEffectsCache.set(cacheKey, effects);
@@ -1382,18 +1344,7 @@ function storyEffectsAt(date: DateType, state: GameType) {
   }
   const persistedKeys = new Set(persisted.map((event) => event.key));
   const scheduled = resolveStoryAtDate({
-    seed: state.seed,
-    scenarioId: state.scenarioId,
-    customEvents: customEventContext(state.customScenario),
-    difficulty: state.difficulty,
-    date,
-    location: state.location,
-    snapshot: buildStorySnapshot(
-      state.monthlyHistory,
-      state.facilities,
-      date.minute,
-    ),
-    occurrences: state.worldEvents.occurrences,
+    ...context,
   }).active.filter(
     (event) =>
       !persistedKeys.has(event.key) &&
@@ -1529,6 +1480,20 @@ function setForegroundSpeed(state: GameType, speed: SpeedType) {
   }
 }
 
+function enterBlockingCard(state: GameType, name: string) {
+  if (!state.inGame) return;
+  const enteringFlow = speedBeforeBlockingCard === undefined;
+  if (enteringFlow) {
+    speedBeforeBlockingCard =
+      state.policyPause?.speed ?? foregroundSpeed(state);
+    delete state.policyPause;
+  }
+  blockingCardAllowsSpeed = name.startsWith("BUILD_");
+  // Build tabs retain a chosen speed; strict destinations always freeze their own clock.
+  if (enteringFlow || !blockingCardAllowsSpeed)
+    setForegroundSpeed(state, "PAUSED");
+}
+
 // Puts the clock back the way the player left it before a full-screen card paused it
 function restoreSpeedAfterBlockingCard(state: GameType) {
   if (speedBeforeBlockingCard === undefined) {
@@ -1601,6 +1566,7 @@ export const gameSlice = createSlice({
         policies: _policies,
         policyPause: _policyPause,
         scenarioChoicePause: _scenarioChoicePause,
+        objectiveProgress: _objectiveProgress,
         ...payload
       } = action.payload;
       if (
@@ -1646,7 +1612,10 @@ export const gameSlice = createSlice({
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
       delete state.desktopAchievements;
+      delete state.legacyWildfireIntertieAccess;
+      delete state.scenarioRuleHistoryStartMinute;
       delete state.lowCashWarningMonth;
+      delete state.objectiveProgress;
       delete state.tutorialIntertieStress;
       delete state.policies;
       delete state.policyPause;
@@ -1667,6 +1636,27 @@ export const gameSlice = createSlice({
       state.seed = a.seed !== undefined ? a.seed : newSeed();
       const scenario =
         getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
+      if (scenario.id === CUSTOM_SCENARIO_ID && scenario.rules !== undefined)
+        throw new Error(
+          "Community rules require a validated Modded · Unranked snapshot.",
+        );
+      if (
+        scenario.mod &&
+        (!validScenarioMod(scenario.mod, scenario) ||
+          scenario.mod.parameters.difficulty !== state.difficulty ||
+          scenario.mod.parameters.seed !== state.seed ||
+          a.cash !== scenario.cash ||
+          a.customers !==
+            (scenario.startingCustomers ??
+              getStartingCustomers(getScenarioLocation(scenario))) ||
+          canonicalRuleJson(a.facilities) !==
+            canonicalRuleJson(scenario.facilities) ||
+          canonicalRuleJson(a.location) !==
+            canonicalRuleJson(getScenarioLocation(scenario)))
+      )
+        throw new Error(
+          "This mod's runtime snapshot is invalid. Reimport a valid package before playing.",
+        );
       const canonicalIdentity = captureRunIdentity(
         scenario,
         state.seed,
@@ -1701,7 +1691,7 @@ export const gameSlice = createSlice({
       state.startingYear = scenario.startingYear;
       // A company on day one has no track record, no debt and nothing but cash, so it borrows at
       // whatever prime was in the year the scenario opens -- 4.75% in 2019, 21.5% in 1980. It is
-      // repriced against its own results at the first month rollover, and every one after.
+      // repriced when it borrows and against its results at each month rollover.
       state.creditPremium = getCreditPremium(
         getCreditInputs([], startingCash, startingCash, []),
       );
@@ -1716,6 +1706,7 @@ export const gameSlice = createSlice({
       state.rateFollowsTarget =
         !checkpoint && followedTargetRate(state) !== undefined;
       state.customerMarketSize = startingCustomers * CUSTOMER_MARKET_MULTIPLIER;
+      initializeGameObjectiveProgress(state);
       state.startingDemandScale = scenario.startingDemandScale ?? 1;
       state.demandShapeExponent = scenario.demandShapeExponent;
       state.loadAdditions = cloneDeep(scenario.loadAdditions || []);
@@ -1726,6 +1717,16 @@ export const gameSlice = createSlice({
         startingFacilities,
         getHydroInventoryKey(state),
       );
+      if (scenario.mod) {
+        const missing = startingFacilities.flatMap((search, index) =>
+          startingFacilityQuote(state, search)
+            ? []
+            : [
+                `Starting asset ${index + 1} (${search.label || search.name || search.fuel || "facility"}) is unavailable in ${scenario.startingYear}.`,
+              ],
+        );
+        if (missing.length) throw new Error(missing.join("\n"));
+      }
       if (scenario.startingYear <= 1882 && hydroAssignments.some(Boolean))
         throw new Error(
           "Starting Hydro technology is unavailable before 1883.",
@@ -1744,38 +1745,22 @@ export const gameSlice = createSlice({
           // Age is scenario metadata rather than a catalog property, so exclude it from the exact
           // technology match and pass it to the completed operating asset separately.
           const {
-            hydroSiteId: _hydroSiteId,
             initialAgeYears = 0,
             initialReservoirFraction,
             label,
-            ...facilitySearch
           } = search;
-          // Scenario research may carry more precision than is useful to a player. Resolve the
-          // catalog quote from the rounded size so its costs and technology-derived fields agree
-          // with the two-significant-digit nameplate the operating facility receives.
-          if (
-            facilitySearch.peakW !== undefined &&
-            facilitySearch.name !== "Hydro" &&
-            facilitySearch.fuel !== "Hydro"
-          ) {
-            facilitySearch.peakW = roundToSignificantDigits(
-              facilitySearch.peakW,
-              2,
-            );
-          }
-          if (facilitySearch.peakWh !== undefined) {
-            facilitySearch.peakWh = roundToSignificantDigits(
-              facilitySearch.peakWh,
-              2,
-            );
-          }
+          const facilitySearch = startingFacilitySearch(search);
           const generator = GENERATORS(
-            state,
+            // These are inherited assets, already committed before month-one timed discounts.
+            // Static package factors still apply through the retained custom scenario.
+            scenarioRules(scenario, state)?.namespace.kind === "mod"
+              ? { ...state, storyEffectsDisabled: true }
+              : state,
             facilitySearch.peakW || 1000000,
             [],
             [],
           ).find((g: FacilityShoppingType) =>
-            matchesFacilitySearch(g, facilitySearch),
+            matchesStartingFacility(g, facilitySearch),
           );
           if (hydroAssignments[startingIndex] && !generator)
             throw new Error(
@@ -1792,12 +1777,13 @@ export const gameSlice = createSlice({
               initialReservoirFraction,
               hydroAssignments[startingIndex],
             );
-            if (label) {
+            if (label || search.assetId) {
               const built = state.facilities.find(
                 ({ id }) => !existingIds.has(id),
               );
               if (built) {
-                built.name = label;
+                if (label) built.name = label;
+                if (search.assetId) built.startingAssetId = search.assetId;
               }
             }
           } else {
@@ -1805,7 +1791,7 @@ export const gameSlice = createSlice({
               state,
               facilitySearch.peakWh || 1000000,
             ).find((g: FacilityShoppingType) =>
-              matchesFacilitySearch(g, facilitySearch),
+              matchesStartingFacility(g, facilitySearch),
             );
             if (storage) {
               const existingIds = new Set(state.facilities.map(({ id }) => id));
@@ -1817,12 +1803,13 @@ export const gameSlice = createSlice({
                 initialAgeYears,
                 initialReservoirFraction,
               );
-              if (label) {
+              if (label || search.assetId) {
                 const built = state.facilities.find(
                   ({ id }) => !existingIds.has(id),
                 );
                 if (built) {
-                  built.name = label;
+                  if (label) built.name = label;
+                  if (search.assetId) built.startingAssetId = search.assetId;
                 }
               }
             } else {
@@ -1861,11 +1848,52 @@ export const gameSlice = createSlice({
         ...state.facilities.filter((facility) => !variable(facility)),
       ];
 
+      if (state.transmission) {
+        state.transmission.lines = (scenario.startingInterties || []).map(
+          (corridorId, index) => {
+            const quote = intertieBuildQuote(
+              corridorId,
+              state.startingYear,
+              1,
+              accessContextForGame(state),
+            );
+            if (!quote)
+              throw new Error(`Invalid starting intertie: ${corridorId}`);
+            return {
+              id: index + 1,
+              corridorId,
+              name: quote.name,
+              capacityW: quote.capacityW,
+              buildCost: quote.buildCost,
+              annualOperatingCost: quote.annualOperatingCost,
+              yearsToBuildLeft: 0,
+              minuteCreated: 0,
+              financed: false,
+              loanAmountLeft: 0,
+              loanMonthlyPayment: 0,
+              interestRate: 0,
+              currentFlowW: 0,
+            };
+          },
+        );
+      }
+
       desktopSimulationHooks()?.initialize(state);
+      const rules = scenarioRules(scenario, state);
+      if (rules && !isOfficialCatalogRules(rules)) {
+        updateWorldEvents(state);
+        const opening = state.timeline[0];
+        const transaction = openingRuleTransactions(state);
+        opening.cash += transaction;
+        opening.netWorth += transaction;
+      }
       // The first blank timeline is created before the authored fleet is resolved. Hydrology is
       // intentionally skipped for a fleet with no Hydro, so refresh it now that a starting dam
       // may exist; otherwise its first forecast has zero inflow for every month.
-      if (state.facilities.some((facility) => facility.fuel === "Hydro")) {
+      if (
+        rules ||
+        state.facilities.some((facility) => facility.fuel === "Hydro")
+      ) {
         state.timeline = reforecastWeatherAndPrices(state);
       }
       // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
@@ -1879,6 +1907,8 @@ export const gameSlice = createSlice({
         );
       }
       state.timeline = reforecastSupply(state);
+      resolveAutomaticScenarioChoices(state);
+      if (pendingScenarioChoice(state)) setForegroundSpeed(state, "PAUSED");
       // Establish the comparison before time moves. A fleet that was already dearer on day one
       // has not crossed anything; the first monthly ordering change is the event.
       state.fuelCostSnapshot = currentFuelCosts(state);
@@ -2135,6 +2165,7 @@ export const gameSlice = createSlice({
         // The loading screen reads this back rather than looking the scenario's location up,
         // which is what makes the replay run against the weather the original player saw
         location: cloneDeep(replay.location),
+        customScenario: cloneDeep(replay.customScenario),
         meaningfulDecisionGateWaived: !!replay.meaningfulDecisionGateWaived,
         replayPlayback: {
           actions: cloneDeep(replay.actions),
@@ -2145,6 +2176,33 @@ export const gameSlice = createSlice({
       };
     });
     builder.addCase(loaded, (state) => {
+      if (state.wildfireForecastRefresh) {
+        const snapshot = current(state);
+        const recorded = snapshot.timeline.filter(
+          (tick) => tick.minute <= snapshot.date.minute,
+        );
+        const latest = recorded.at(-1);
+        const futureTicks = snapshot.timeline.length - recorded.length;
+        if (latest && futureTicks > 0) {
+          state.timeline = [
+            ...recorded,
+            ...generateNewTimeline(
+              {
+                ...snapshot,
+                date: getDateFromMinute(
+                  snapshot.date.minute + TICK_MINUTES,
+                  snapshot.startingYear,
+                ),
+                timeline: recorded,
+              },
+              latest.cash,
+              latest.customers,
+              futureTicks,
+            ),
+          ];
+        }
+        delete state.wildfireForecastRefresh;
+      }
       // Saves carry the commitment forecast, so this only runs for one that somehow lacks it.
       // Rebuild just that metadata after the data tables have loaded, and keep every recorded
       // value: a full reforecast re-dispatches the tick that already happened, rewriting its
@@ -2189,17 +2247,12 @@ export const gameSlice = createSlice({
       if (!name || !BLOCKING_CARDS.has(name)) {
         // Navigating anywhere else (rather than backing out) still counts as leaving it
         restoreSpeedAfterBlockingCard(state);
-      } else if (state.inGame && speedBeforeBlockingCard === undefined) {
-        blockingCardAllowsSpeed = name.startsWith("BUILD_");
-        speedBeforeBlockingCard =
-          state.policyPause?.speed ?? foregroundSpeed(state);
-        delete state.policyPause;
-        setForegroundSpeed(state, "PAUSED");
-      }
+      } else enterBlockingCard(state, name);
     });
     builder.addCase(navigateBack, (state, action) => {
       if (!action.payload || !BLOCKING_CARDS.has(action.payload))
         restoreSpeedAfterBlockingCard(state);
+      else enterBlockingCard(state, action.payload);
     });
     builder.addCase(manualHelpOpen, (state) => {
       if (state.inGame && speedBeforeManualHelp === undefined) {
@@ -2228,6 +2281,19 @@ export const gameSlice = createSlice({
         ensureTicking(state);
       }
     });
+    builder.addCase(systemSuspend, (state) => {
+      state.speed = "PAUSED";
+      speedBeforeDialog = "PAUSED";
+      if (speedBeforeHidden !== undefined) speedBeforeHidden = "PAUSED";
+      if (speedBeforeBlockingCard !== undefined)
+        speedBeforeBlockingCard = "PAUSED";
+      if (speedBeforeManualHelp !== undefined) speedBeforeManualHelp = "PAUSED";
+      if (speedBeforeCloudSavePrompt !== undefined)
+        speedBeforeCloudSavePrompt = "PAUSED";
+      if (state.policyPause) state.policyPause.speed = "PAUSED";
+      if (state.scenarioChoicePause !== undefined)
+        state.scenarioChoicePause = "PAUSED";
+    });
     builder.addCase(pageHidden, (state) => {
       if (state.inGame && speedBeforeHidden === undefined) {
         speedBeforeHidden = state.speed;
@@ -2252,18 +2318,15 @@ export const gameSlice = createSlice({
       ensureTicking(state);
     });
     builder.addCase(chooseScenarioResponse, (state, action) => {
+      const blocking = !!pendingScenarioChoice(state);
       if (
         !state.replayPlayback &&
         applyScenarioResponse(state, action.payload)
       ) {
         recordReplayAction(state, "chooseScenarioResponse", action.payload);
-        if (
-          !pendingScenarioChoice(state) &&
-          state.scenarioChoicePause !== undefined
-        ) {
-          setForegroundSpeed(state, state.scenarioChoicePause);
+        if (blocking) {
           delete state.scenarioChoicePause;
-          ensureTicking(state);
+          setForegroundSpeed(state, "PAUSED");
         }
       }
     });
@@ -2343,16 +2406,27 @@ export default gameSlice.reducer;
  * reproduce the original run rather than an approximation of it: there is one implementation of
  * "the player built a plant", not two that have to be kept in step.
  */
-function matchesFacilitySearch(
-  candidate: FacilityShoppingType,
-  search: Partial<FacilityShoppingType>,
-): boolean {
-  if (candidate.viableLocationsRemaining === 0) {
-    return false;
-  }
-  return (Object.keys(search) as Array<keyof FacilityShoppingType>).every(
-    (property) => candidate[property] === search[property],
+function refreshInterestRate(
+  state: GameType,
+  cash: number,
+  netWorth = getNetWorth(
+    state.facilities,
+    cash,
+    state.date.minute,
+    state.transmission?.lines,
+  ),
+) {
+  state.creditPremium = getCreditPremium(
+    getCreditInputs(
+      state.monthlyHistory,
+      cash,
+      netWorth,
+      state.facilities,
+      state.transmission?.lines,
+    ),
   );
+  state.interestRate =
+    getPrimeRate(state.date, state.seed) * state.creditPremium;
 }
 
 function applyBuildFacility(
@@ -2403,6 +2477,8 @@ function applyBuildFacility(
   state = buildFacilityHelper(state, built, payload.financed);
   const added = state.facilities.find(({ id }) => !existingIds.has(id));
   if (!added) return false;
+  // Book this loan at the quoted rate, then price the next one against the new debt and cash.
+  if (payload.financed) refreshInterestRate(state, now.cash);
   if (isMaterialCapacityDecision(state, added.peakW)) {
     recordMeaningfulDecision(state, {
       lever: `asset-build:${added.id}`,
@@ -2620,6 +2696,7 @@ function applyBuildTransmissionLine(
     constructionKgco2eTotal: corridor.constructionKgco2eTotal,
   };
   state.transmission.lines.push(line);
+  if (financed) refreshInterestRate(state, now.cash);
   recordMeaningfulDecision(state, {
     lever: `intertie:${line.id}`,
     label: `Build ${line.name}`,
@@ -2730,6 +2807,7 @@ function applyUpgradeTransmissionLine(
     constructionKgco2eTotal: quote.constructionKgco2eTotal,
     constructionKgco2eEmitted: 0,
   };
+  if (financed) refreshInterestRate(state, now.cash);
   recordMeaningfulDecision(state, {
     lever: `intertie-upgrade:${line.id}`,
     label: `Upgrade ${line.name}`,
@@ -2897,15 +2975,39 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
   return true;
 }
 
+/** Immediate company transfers are separate from delivered-energy sales and facility income. */
+function bookScenarioTransaction(
+  now: TickPresentFutureType,
+  cost: number,
+  grant: number,
+): void {
+  now.cash += grant - cost;
+  now.netWorth += grant - cost;
+  now.revenue += grant;
+  now.revenueGrants = (now.revenueGrants ?? 0) + grant;
+  now.expensesOM += cost;
+}
+
 /** Accepts one authored choice for live play, replay and headless simulation. */
 function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   if (!validScenarioResponse(payload)) return false;
+  const compiled = pendingScenarioRuleChoice(state);
+  if (compiled?.key === payload.decisionId) {
+    const rules = scenarioChoicesForGame(state).rules!;
+    const option = compiled.options.find(
+      (option) => option.id === payload.optionId,
+    );
+    if (
+      !option ||
+      !applyCompiledScenarioResponse(state, rules, compiled, option)
+    )
+      return false;
+    resolveAutomaticScenarioChoices(state);
+    return true;
+  }
   // A pending story choice the clock waits on, or an optional one the player chose to take up
-  const optional = optionalScenarioChoice(state);
-  const decision = [pendingScenarioChoice(state), optional].find(
-    (choice) => choice?.id === payload.decisionId,
-  );
-  if (!decision) return false;
+  const decision = pendingScenarioChoice(state);
+  if (!decision || decision.id !== payload.decisionId) return false;
   const option = decision.options.find(
     (option) => option.id === payload.optionId,
   );
@@ -2916,11 +3018,7 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
     return false;
   const upfrontGrant = option.upfrontGrant?.(state.difficulty) ?? 0;
   if (!Number.isFinite(upfrontGrant) || upfrontGrant < 0) return false;
-  now.cash += upfrontGrant - cost;
-  now.netWorth += upfrontGrant - cost;
-  now.revenue += upfrontGrant;
-  now.revenueGrants = (now.revenueGrants || 0) + upfrontGrant;
-  now.expensesOM += cost;
+  bookScenarioTransaction(now, cost, upfrontGrant);
   if (option.loadAdditions)
     state.loadAdditions = cloneDeep(option.loadAdditions);
   state.worldEvents.occurrences.push({
@@ -2933,19 +3031,6 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
       cost,
       upfrontGrant,
       scenarioChoice: true,
-      ...(decision.id === optional?.id
-        ? {
-            startEffectiveness: wildfirePreparednessEffectiveness(
-              state.worldEvents.occurrences,
-              state.location.id,
-              state.date.minute,
-            ),
-            annualCost:
-              option.id === "prepare"
-                ? wildfirePreparedness(state)!.annualCost
-                : 0,
-          }
-        : {}),
     },
     effects: {},
     title: decision.title,
@@ -2959,22 +3044,144 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   });
   if (option.meaningful !== false)
     recordMeaningfulDecision(state, {
-      lever:
-        decision.id === optional?.id
-          ? `wildfire:${state.location.id.toLowerCase()}:preparedness`
-          : decision.id,
+      lever: decision.id,
       label: decision.title,
       kind: "policy",
-      before:
-        decision.id === optional?.id
-          ? option.id === "prepare"
-            ? "stop"
-            : "prepare"
-          : "undecided",
+      before: "undecided",
       after: option.id,
     });
   state.timeline = reforecastSupply(state, true);
   return true;
+}
+
+function applyCompiledScenarioResponse(
+  state: GameType,
+  rules: CompiledScenarioRules,
+  decision: CompiledRuleChoice,
+  option: CompiledRuleOption,
+): boolean {
+  const sharedStoryRules = !!scenarioRules(
+    getScenario(state.scenarioId, state.customScenario),
+    state,
+  );
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  if (
+    !now ||
+    state.date.minute !== decision.dueMonth * MINUTES_PER_MONTH ||
+    state.worldEvents.occurrences.some((event) => event.key === decision.key) ||
+    !Number.isFinite(option.cost) ||
+    option.cost < 0 ||
+    (option.cost > 0 && now.cash < option.cost) ||
+    !Number.isFinite(option.grant) ||
+    option.grant < 0
+  )
+    return false;
+  const loads = scenarioRuleChoiceLoadPlan(state, rules, decision, option);
+  if (!loads) return false;
+  const before = new Set(
+    state.worldEvents.occurrences.map((event) => event.key),
+  );
+  const beforeEffects = sharedStoryRules
+    ? storyEffectsAt(state.date, state)
+    : undefined;
+  const previousLoadIds = new Set(state.loadAdditions.map((load) => load.id));
+  bookScenarioTransaction(now, option.cost, option.grant);
+  state.loadAdditions = loads;
+  const message = decision.automatic
+    ? `Resolved automatically: ${option.label}. ${option.message}`
+    : option.message;
+  state.worldEvents.occurrences.push({
+    key: decision.key,
+    definitionId: decision.key,
+    startsMinute: state.date.minute,
+    endsMinute: state.date.minute,
+    attributes: {
+      choice: option.id,
+      cost: option.cost,
+      upfrontGrant: option.grant,
+      scenarioChoice: true,
+      ...(rules.namespace.kind === "mod" || !decision.source
+        ? { ruleChoice: true, automatic: !!decision.automatic }
+        : {}),
+    },
+    effects: {},
+    title: decision.title,
+    message,
+  });
+  logGameEvent(state, "WORLD_EVENT", message, {
+    title: decision.title,
+    importance: "NOTABLE",
+    storyPhaseKey: decision.key,
+    turningPointPriority: 115,
+  });
+  if (!decision.automatic && option.meaningful !== false)
+    recordMeaningfulDecision(state, {
+      lever: decision.key,
+      label: decision.title,
+      kind: "policy",
+      before: "undecided",
+      after: option.id,
+    });
+  if (sharedStoryRules && (rules.namespace.kind === "mod" || !decision.source))
+    updateWorldEvents(state);
+  for (const event of state.worldEvents.occurrences) {
+    if (
+      before.has(event.key) ||
+      event.attributes.ruleEvent !== true ||
+      event.startsMinute !== state.date.minute
+    )
+      continue;
+    const grant = Number(event.attributes.upfrontGrant ?? 0),
+      cost = Number(event.attributes.cost ?? 0);
+    bookScenarioTransaction(now, cost, grant);
+  }
+  const effects = sharedStoryRules
+    ? storyEffectsAt(state.date, state)
+    : undefined;
+  const connectsNow = state.loadAdditions.some(
+    (load) =>
+      !previousLoadIds.has(load.id) &&
+      (load.startsYear - state.startingYear) * 12 +
+        (load.startsMonth ?? 1) -
+        1 <=
+        state.date.monthsElapsed,
+  );
+  // A future connection or protection commitment must not project customer growth a second
+  // time into this already forecast frame. Rebuild demand only when this opening changes it.
+  if (
+    connectsNow ||
+    effects?.demandMultiplier !== beforeEffects?.demandMultiplier ||
+    effects?.temperatureOffsetC !== beforeEffects?.temperatureOffsetC
+  ) {
+    state.timeline = generateNewTimeline(
+      state,
+      now.cash,
+      now.customers,
+      state.timeline.length,
+    );
+  } else {
+    if (
+      effects?.hydroRunoffMultiplier !== beforeEffects?.hydroRunoffMultiplier ||
+      canonicalRuleJson(effects?.fuelPriceMultipliers ?? {}) !==
+        canonicalRuleJson(beforeEffects?.fuelPriceMultipliers ?? {})
+    )
+      state.timeline = reforecastWeatherAndPrices(state);
+    state.timeline = reforecastSupply(state, true);
+  }
+  return true;
+}
+
+/** Automatic arc branches use the same atomic transition, without adding a player replay action. */
+function resolveAutomaticScenarioChoices(state: GameType): void {
+  let choice = pendingScenarioRuleChoice(state, true);
+  while (choice) {
+    const rules = scenarioChoicesForGame(state).rules!;
+    const freeOptionId = choice.freeOptionId;
+    const option = choice.options.find((option) => option.id === freeOptionId);
+    if (!option || !applyCompiledScenarioResponse(state, rules, choice, option))
+      return;
+    choice = pendingScenarioRuleChoice(state, true);
+  }
 }
 
 function applyPolicyEdit(
@@ -3276,6 +3483,31 @@ export function startTutorial(dispatch: AppDispatch, scenarioId: number) {
 }
 
 /**
+ * Ends whatever is running and starts a custom scenario, whether set up on the custom game screen
+ * or resolved from a mod. The scenario has to be on the slice before start(), since the loading
+ * screen resolves it straight back out of there.
+ */
+export function launchCustomScenario(
+  dispatch: AppDispatch,
+  scenario: ScenarioType,
+  difficulty: DifficultyType,
+) {
+  if (
+    scenario.rules !== undefined ||
+    (scenario.mod &&
+      (!validScenarioMod(scenario.mod, scenario) ||
+        scenario.mod.parameters.difficulty !== difficulty))
+  )
+    throw new Error(
+      "This mod's runtime snapshot is invalid. Reimport a valid package before playing.",
+    );
+  dispatch(quit());
+  dispatch(delta({ difficulty }));
+  dispatch(delta({ scenarioId: CUSTOM_SCENARIO_ID, customScenario: scenario }));
+  dispatch(start(CUSTOM_SCENARIO_ID));
+}
+
+/**
  * The end of a tutorial, which is a different moment from the end of a scenario: there's no score
  * to report and the useful next step is the next tutorial, so this celebrates, says where the
  * player is in the sequence, and offers that next tutorial rather than a scoreboard.
@@ -3361,6 +3593,14 @@ function tickWorkingState(state: GameType): GameType {
 }
 
 /** Isolate each frame just before it is settled, including frames after a batch rolls over. */
+function completedMonthCount(state: GameType): number {
+  const latest = state.monthlyHistory[0];
+  return Math.max(
+    state.objectiveProgress?.completedMonths ?? 0,
+    latest ? (latest.year - state.startingYear) * 12 + latest.month : 0,
+  );
+}
+
 function tickWorkingStateStep(state: GameType, saveEffects?: RunSaveEffects) {
   const minute = state.date.minute + TICK_MINUTES;
   const frame = getTimeFromTimeline(minute, state.timeline);
@@ -3369,7 +3609,7 @@ function tickWorkingStateStep(state: GameType, saveEffects?: RunSaveEffects) {
     copyCommitmentMetadata(frame, copy);
     state.timeline[state.timeline.indexOf(frame)] = copy;
   }
-  if (state.monthlyHistory.length < Math.floor(minute / MINUTES_PER_MONTH)) {
+  if (completedMonthCount(state) < Math.floor(minute / MINUTES_PER_MONTH)) {
     state.monthlyHistory = [...state.monthlyHistory];
     if (state.policies) state.policies = cloneDeep(state.policies);
     state.worldEvents = {
@@ -3522,35 +3762,23 @@ export function* tickStatePhases(
     // One row per completed month is both the rollover signal and the persisted checkpoint. It
     // avoids module-level calendar state leaking between concurrent simulations or a second game,
     // and unlike an empty sentinel it cannot count the opening forecast as completed history.
-    if (history.length < state.date.monthsElapsed) {
+    if (completedMonthCount(state) < state.date.monthsElapsed) {
       const { cash, customers } = now;
       state.customerRate = now.customerRate;
 
       // Record final history for the month, then generate the new timeline
       history.unshift(summarizeTimeline(state.timeline, state.startingYear));
+      recordGameObjectiveMonth(state, history[0]);
       if (state.replayPlayback && replayDiverged(state.replayPlayback, history))
         logEvent("replay_diverged", {
           scenarioId: state.scenarioId,
           month: history.length,
         });
       // Reprice the company's credit off the year that just closed, before the forecast is built
-      // against it. Once a month, not once a tick: a lender looks at a year of results, and a
-      // rate that moved every tick would be unplannable.
-      state.creditPremium = getCreditPremium(
-        getCreditInputs(
-          history,
-          cash,
-          now.netWorth,
-          state.facilities,
-          state.transmission?.lines,
-        ),
-      );
-      state.interestRate =
-        getPrimeRate(state.date, state.seed) * state.creditPremium;
+      // against it. Operating results reprice monthly; new borrowing reprices immediately.
+      refreshInterestRate(state, cash, now.netWorth);
       const storyPriceFuels = updateWorldEvents(state);
       // The recurring regional hazard resolves on its own path, after the authored story, so a
-      // custom game in a profiled area can meet a wildfire without inheriting any authored arc.
-      updateWildfireHazards(state);
       updateWeatherHazards(state).forEach((fuel) => storyPriceFuels.add(fuel));
       const activatedPrograms = advancePolicies(
         state,
@@ -3567,7 +3795,12 @@ export function* tickStatePhases(
         const target = followedTargetRate(state);
         if (target !== undefined) state.dollarsPerkWh = target;
       }
-      state.timeline = generateNewTimeline(state, cash, customers);
+      state.timeline = generateNewTimeline(
+        state,
+        cash + openingRuleTransactions(state),
+        customers,
+      );
+      resolveAutomaticScenarioChoices(state);
       logFuelPriceMoves(state, storyPriceFuels);
       logFuelCrossovers(state);
       // Advised once per plant: a paused-and-resumed plant is the player's informed choice
@@ -3629,7 +3862,10 @@ export function* tickStatePhases(
       // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
       // and rules the player gave themselves - would be scored against each other as if they
       // were the same scenario. Replays likewise belong to the original player, not the viewer.
+      // Mods always run as the custom scenario, so this is also their single exclusion point
+      // from scores, official replays and completion records.
       const ranked = scenario.id !== CUSTOM_SCENARIO_ID && !isReplay;
+      const modded = !!state.customScenario?.mod;
 
       /**
        * All non-tutorial endings use one scoring path. In particular, bankruptcy and firing used
@@ -3678,6 +3914,8 @@ export function* tickStatePhases(
           state.eventLog,
           state.monthlyHistory,
           state.dollarsPerkWh,
+          state.worldEvents.occurrences,
+          gameObjectiveResults(state),
         );
 
         if (!isReplay) {
@@ -3739,6 +3977,7 @@ export function* tickStatePhases(
                   ? endMessage()
                   : endMessage,
               ranked,
+              modded,
               previousBest,
               outcome: recorded?.outcome ?? outcome,
               debrief,
@@ -3932,13 +4171,11 @@ function getDemandW(
             sun.sunset - date.minuteOfDay,
           ) / 420;
   const minutesFromDarkLogistics =
-    1 / (1 + Math.exp(-minutesFromDarkNormalized * 6));
+    1 / (1 + exp(-minutesFromDarkNormalized * 6));
   const minutesFrom9amNormalized = Math.abs(date.minuteOfDay - 540) / 120;
-  const minutesFrom9amLogistics =
-    1 / (1 + Math.exp(-minutesFrom9amNormalized * 2));
+  const minutesFrom9amLogistics = 1 / (1 + exp(-minutesFrom9amNormalized * 2));
   const minutesFrom5pmNormalized = Math.abs(date.minuteOfDay - 1020) / 240;
-  const minutesFrom5pmLogistics =
-    1 / (1 + Math.exp(-minutesFrom5pmNormalized * 2));
+  const minutesFrom5pmLogistics = 1 / (1 + exp(-minutesFrom5pmNormalized * 2));
   const temperatureDemandW = temperatureDemandWattsPerCustomer(
     now.temperatureC,
     game.location,
@@ -4257,7 +4494,7 @@ function* supplyFacilitiesFinancesPhases(
   stepMinutes = TICK_MINUTES,
   advanceConstruction = true,
 ): Generator<PeerPlan, TickPresentFutureType, PeerSettlement | undefined> {
-  const { facilities, date } = state;
+  const { facilities } = state;
   const tickScale = stepMinutes / TICK_MINUTES;
   const ticksPerHour = 60 / stepMinutes;
   const ticksPerMonth = TICKS_PER_MONTH / tickScale;
@@ -4485,6 +4722,10 @@ function* supplyFacilitiesFinancesPhases(
     [];
   const startedFacilityIds = new Set<number>();
   const tickStoryEffects = storyEffectsAt(tickDate, state);
+  if (tickStoryEffects.transmissionCapacityLimitsWByCorridor)
+    now.transmissionCapacityLimitsWByCorridor =
+      tickStoryEffects.transmissionCapacityLimitsWByCorridor;
+  else delete now.transmissionCapacityLimitsWByCorridor;
   const carbonFee = tickStoryEffects.carbonFeePerKgCO2e ?? state.feePerKgCO2e;
   // Read once per tick, and only when a live co-op grid prices its spare output.
   let peerTickFuelPrices: FuelPricesType | undefined;
@@ -4740,7 +4981,11 @@ function* supplyFacilitiesFinancesPhases(
         const targetW = Math.max(0, now.demandW - (supply - charge));
         if (g.currentWh > 0 && targetW > 0) {
           // If there's a need and we have charge, discharge
-          g.currentW = Math.min(g.peakW, targetW, g.currentWh * ticksPerHour);
+          g.currentW = Math.min(
+            availablePeakW,
+            targetW,
+            g.currentWh * ticksPerHour,
+          );
           g.currentWh = Math.max(0, g.currentWh - g.currentW / ticksPerHour);
           supply += g.currentW;
           dischargedW += g.currentW;
@@ -4774,7 +5019,10 @@ function* supplyFacilitiesFinancesPhases(
       // Keep this response window fixed even when long forecasts integrate hourly samples.
       // Ramping, weather/event derates and remaining water/charge constrain that headroom.
       if (isStorage(g)) {
-        const dischargeW = Math.min(g.peakW, g.currentWh * TICKS_PER_HOUR);
+        const dischargeW = Math.min(
+          availablePeakW,
+          g.currentWh * TICKS_PER_HOUR,
+        );
         const currentGridW =
           g.currentW < 0 ? g.currentW / g.roundTripEfficiency : g.currentW;
         reachableHeadroomW += Math.max(0, dischargeW - currentGridW);
@@ -4880,7 +5128,8 @@ function* supplyFacilitiesFinancesPhases(
     }
   }
   const operatingLines = transmission.lines.filter(
-    ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0 && !state.multiplayer,
+    ({ yearsToBuildLeft, corridorId }) =>
+      yearsToBuildLeft <= 0 && !isPeerCorridorId(corridorId),
   );
   const intertieContext = intertieContextForGame(state);
   const tradingYear = intertieYear(now.minute, state.startingYear);
@@ -5042,19 +5291,60 @@ function* supplyFacilitiesFinancesPhases(
   const rebookingFrame = prev === now;
   const bookedThisFrame = (event: ActiveWorldEventType) =>
     event.startsMinute === now.minute;
-  const choiceGrant = state.worldEvents.occurrences
+  // Forecast payments are virtual receipts through this same transaction owner. Live state
+  // only receives a receipt when updateWorldEvents activates the event at its owning boundary.
+  const rules = scenarioRules(
+    getScenario(state.scenarioId, state.customScenario),
+    state,
+  );
+  const futureContext =
+    rules &&
+    now.minute > state.date.minute &&
+    now.minute % MINUTES_PER_MONTH === 0
+      ? storyContextAt(state, tickDate)
+      : undefined;
+  const futureReceipts =
+    rules &&
+    !state.storyEffectsDisabled &&
+    now.minute > state.date.minute &&
+    now.minute % MINUTES_PER_MONTH === 0
+      ? [
+          ...resolveStoryAtDate(futureContext!).occurrences,
+          ...futureContext!.occurrences.filter(
+            (event) =>
+              event.attributes.ruleChoice === true &&
+              event.attributes.automatic === true &&
+              event.startsMinute === now.minute,
+          ),
+        ].filter(
+          (event) =>
+            (event.attributes.ruleEvent === true ||
+              event.attributes.ruleChoice === true) &&
+            event.forecastable !== false &&
+            !state.worldEvents.occurrences.some(
+              (recorded) => recorded.key === event.key,
+            ),
+        )
+      : [];
+  const transactionOccurrences = futureReceipts.length
+    ? [...state.worldEvents.occurrences, ...futureReceipts]
+    : state.worldEvents.occurrences;
+  const choiceGrant = transactionOccurrences
     .filter(
       (event) =>
-        event.attributes.scenarioChoice === true && bookedThisFrame(event),
+        (event.attributes.scenarioChoice === true ||
+          event.attributes.ruleEvent === true) &&
+        bookedThisFrame(event),
     )
     .reduce(
       (total, event) => total + Number(event.attributes.upfrontGrant || 0),
       0,
     );
-  const immediateCosts = state.worldEvents.occurrences
+  const immediateCosts = transactionOccurrences
     .filter(
       (event) =>
         (event.attributes.scenarioChoice === true ||
+          event.attributes.ruleEvent === true ||
           event.attributes.retrofit === true) &&
         bookedThisFrame(event),
     )
@@ -5070,12 +5360,6 @@ function* supplyFacilitiesFinancesPhases(
   // plant, such as field crews and rebuilding damaged distribution equipment.
   let expensesOM =
     (tickStoryEffects.operatingExpensePerMonth || 0) / ticksPerMonth;
-  expensesOM +=
-    wildfirePreparednessAnnualCost(
-      state.worldEvents.occurrences,
-      state.location.id,
-      now.minute,
-    ) / ticksPerYear;
   if (!rebookingFrame) expensesOM += immediateCosts;
   // Hail repair costs fall due one tick after onset, in the window (prev, now]. The pre-roll
   // frames and a forecast's first frame share prev and now minutes, so they never charge one.
@@ -5088,10 +5372,14 @@ function* supplyFacilitiesFinancesPhases(
   let principalRepayment = 0;
   // Hoisted out of the loop below, the way the demand pass at the top of this file already does
   // it: prices move by the month, and this is per facility per tick
+  // At rollover the live clock has advanced beyond the timeline and rebooks its last frame
+  // using the closing clock's price. Preserve that accounting while pricing future samples
+  // at their own month, rather than the forecast's starting month.
+  const fuelDate = now.minute < state.date.minute ? state.date : tickDate;
   const fuelPrices = getEffectiveFuelPrices(
-    date,
+    fuelDate,
     state,
-    date.minute === now.minute ? tickStoryEffects : undefined,
+    fuelDate.minute === now.minute ? tickStoryEffects : undefined,
   );
   // Attribute sales proportionally to gross local output and imports. Using net supply
   // after charging or exports would credit local facilities with more than the company earned.
@@ -5738,8 +6026,13 @@ function buildFacilityHelper(
     const {
       viableLocationsRemaining: _viableLocationsRemaining,
       resilienceExtraBuildCost: _resilienceExtraBuildCost,
+      startingAssetId: _startingAssetId,
+      assetId: _assetId,
       ...facilitySnapshot
-    } = g;
+    } = g as FacilityShoppingType & {
+      startingAssetId?: string;
+      assetId?: string;
+    };
     const facility = {
       ...facilitySnapshot,
       hydroSiteId: hydroSiteId ?? g.hydroSiteId,

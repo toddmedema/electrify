@@ -30,6 +30,7 @@ import {
   retrofitCost,
 } from "../../helpers/Hazards";
 import { formatMoneyConcise } from "../../helpers/Format";
+import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
@@ -120,6 +121,33 @@ function rows(): HTMLElement[] {
 describe("the fleet list", () => {
   // Long enough that both generators have a record worth reporting in an expanded row
   const game = playedGame(60);
+
+  it.each([
+    [2000, 0, 0, false, "filling"],
+    [500, 0, 0, false, "draining"],
+    [1000, 0, 0, false, "steady"],
+    [2000, 1000, 0, false, "spilling"],
+    [500, 0, 1000, true, "draining"],
+    [500, 0, 0, true, "filling"],
+  ])(
+    "reports hydro water movement on mount and selection",
+    async (inflow, spill, bypass, paused, label) => {
+      const hydroGame = createGame({ scenarioId: 108 });
+      const hydro = hydroGame.facilities.find((f) => f.fuel === "Hydro")!;
+      hydroGame.facilities = [hydro];
+      hydro.reservoirWh = hydro.reservoirCapacityWh! / (spill ? 1 : 2);
+      hydro.currentW = (1000 * TICKS_PER_HOUR) / GAME_TO_REAL_YEARS;
+      hydro.hydroLastInflowWh = Number(inflow);
+      hydro.hydroLastSpillWh = Number(spill);
+      hydro.hydroLastBypassWh = Number(bypass);
+      hydro.paused = Boolean(paused);
+      renderFacilities(hydroGame, null);
+      expect(rows()[0]).toHaveTextContent(String(label));
+      expect(rows()[0]).not.toHaveTextContent("50%");
+      await user.click(rows()[0]);
+      expect(rows()[0]).toHaveTextContent(String(label));
+    },
+  );
 
   it("keeps facility icons inspectable while a tutorial hides reordering", async () => {
     const tutorial = createGame({ scenarioId: 0 });
@@ -382,6 +410,37 @@ describe("the fleet list", () => {
 
     expect(onSell).toHaveBeenCalledWith(facility.id);
   });
+
+  it.each([0, 150e6])(
+    "shows capacity and the cash refund before cancelling a build with a %s loan",
+    async (loanAmountLeft) => {
+      const game = createGame({ scenarioId: 100 });
+      const facility = game.facilities[0];
+      facility.peakW = 320e6;
+      facility.yearsToBuildLeft = 2;
+      facility.buildCost = 200e6;
+      facility.loanAmountLeft = loanAmountLeft;
+      const { onSell } = renderFacilities(game, facility.id);
+      const construction = screen.getByRole("region", { name: "Construction" });
+      expect(construction).toHaveTextContent("Nameplate capacity320MW");
+      const refund = formatMoneyConcise(200e6 - loanAmountLeft);
+      expect(construction).toHaveTextContent(`Refund if cancelled${refund}`);
+      expect(
+        within(construction).queryByText("After settling the loan") !== null,
+      ).toBe(loanAmountLeft > 0);
+      await user.click(
+        screen.getByRole("button", {
+          name: `Cancel construction of ${facility.name}`,
+        }),
+      );
+      const dialog = screen.getByRole("dialog");
+      expect(dialog).toHaveTextContent(`You will receive ${refund}`);
+      await user.click(
+        within(dialog).getByRole("button", { name: "Cancel construction" }),
+      );
+      expect(onSell).toHaveBeenCalledWith(facility.id);
+    },
+  );
 });
 
 function renderProjects(game: GameType, onBuild = jest.fn()) {
@@ -692,7 +751,9 @@ describe("the interties view", () => {
         return { ...result, buildCost: result.id === cheap ? 1e6 : 2e6 };
       });
     try {
-      renderProjects(createGame({ scenarioId: 111 }));
+      const game = createGame({ scenarioId: 111 });
+      game.transmission!.lines = [];
+      renderProjects(game);
       const first = () => screen.getAllByTestId(/^transmission-project-/)[0];
       expect(first()).toHaveAttribute("data-corridor-id", "california-north");
       const select = async (label: string) => {
@@ -720,21 +781,23 @@ describe("the interties view", () => {
   });
   it("updates capacity and purchase quote when selecting a larger tier", async () => {
     const onBuild = jest.fn();
-    renderProjects(createGame({ scenarioId: 111 }), onBuild);
+    const game = createGame({ scenarioId: 111 });
+    game.transmission!.lines = [];
+    renderProjects(game, onBuild);
     const north = screen.getByTestId("transmission-project-california-north");
     const slider = screen.getByRole("slider");
-    expect(north).toHaveTextContent("Import capacity4MW");
+    expect(north).toHaveTextContent("Import capacity40MW");
     expect(north).toHaveTextContent("Export capacity5MW");
     fireEvent.change(slider, { target: { value: 3 } });
     expect(slider).toHaveAttribute("aria-valuenow", "3");
     expect(north).not.toHaveTextContent("Line capacity");
-    expect(north).toHaveTextContent("Import capacity5MW");
+    expect(north).toHaveTextContent("Import capacity50MW");
     expect(north).toHaveTextContent("Export capacity5MW");
     await user.click(
       within(north).getByRole("button", { name: /Review purchase/ }),
     );
     expect(screen.getByRole("dialog")).toHaveTextContent("Tier 3");
-    expect(screen.getByRole("dialog")).toHaveTextContent("Import capacity5MW");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Import capacity50MW");
     expect(screen.getByRole("dialog")).toHaveTextContent("Export capacity5MW");
     await user.click(screen.getByRole("button", { name: "Pay cash" }));
     expect(onBuild).toHaveBeenCalledWith("california-north", false, 3);
@@ -797,6 +860,35 @@ describe("unified connections", () => {
     }));
     return game;
   }
+
+  it.each([
+    [55, 0, 1],
+    [90, 0, 1],
+    [95, 0, 0],
+    [55, 1, 0],
+  ] as const)(
+    "labels an operating intertie at %d%% capacity with %d years of construction left",
+    (percent, yearsToBuildLeft, badgeCount) => {
+      const game = connectedGame();
+      const line = game.transmission!.lines[0];
+      line.yearsToBuildLeft = yearsToBuildLeft;
+      getTimeFromTimeline(
+        game.date.minute,
+        game.timeline,
+      )!.transmissionCapacityLimitsWByCorridor = {
+        [line.corridorId]: (line.capacityW * percent) / 100,
+      };
+      renderFacilities(game, null);
+      expect(screen.queryAllByText(`${percent}% limit`)).toHaveLength(
+        badgeCount,
+      );
+      expect(
+        screen.queryAllByLabelText(
+          `Temporarily limited to ${percent}% of rated capacity`,
+        ),
+      ).toHaveLength(badgeCount);
+    },
+  );
 
   it("keeps connections outside dispatch and reports network flow only once", async () => {
     const game = connectedGame();
@@ -873,6 +965,10 @@ describe("unified connections", () => {
     expect(building).not.toHaveTextContent("Line capacity");
     expect(building).toHaveTextContent("Import capacity180MW");
     expect(building).toHaveTextContent("Export capacity150MW");
+    expect(building).toHaveTextContent(
+      `Refund if cancelled${formatMoneyConcise(game.transmission!.lines[1].buildCost - 1000)}`,
+    );
+    expect(building).toHaveTextContent("After settling the loan");
     expect(building).toHaveTextContent("Emissions");
     expect(building).not.toHaveTextContent("Import available now");
     expect(building).toHaveTextContent("Typical price");

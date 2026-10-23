@@ -7,8 +7,9 @@ import { getScenario } from "../data/Scenarios";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import type { GameType, SaveFileType, SavedRunResult } from "../Types";
 import { serializeSave } from "../SaveGame";
+import { upgradeSave } from "../SaveUpgrade";
 
-/** Small valid payload without initializing weather/economics or advancing the simulation. */
+/** Small transport fixture representing a native run saved before story journals existed. */
 export function fakeSaveGame(overrides: Partial<GameType> = {}): GameType {
   const game = {
     scenarioId: 101,
@@ -36,7 +37,12 @@ export function fakeSaveGame(overrides: Partial<GameType> = {}): GameType {
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (scenario && intertiesEnabledForScenario(scenario, game.location))
     game.transmission = emptyTransmissionState();
-  return game;
+  // Let the native migration owner record the historical journal boundary. Custom
+  // scenarios retain their current data and never acquire a native exemption.
+  const upgraded = upgradeSave({ schemaVersion: 5, game });
+  if (!upgraded || !upgraded.game)
+    throw new Error("The save test fixture could not be upgraded.");
+  return upgraded.game as GameType;
 }
 
 export function fakeSaveFile(

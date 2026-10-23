@@ -38,6 +38,8 @@ const STATUS_LABELS: Record<MissionRequirement["status"], string> = {
 };
 
 function statusLabel(requirement: MissionRequirement): string {
+  if (requirement.definition && requirement.status === "unknown")
+    return "Unavailable";
   return requirement.id === "retention" && requirement.status === "failed"
     ? "Out of reach"
     : STATUS_LABELS[requirement.status];
@@ -307,12 +309,39 @@ export function ScenarioDetailsContent({
               <Typography
                 component="dt"
                 variant="body2"
-                sx={{ mt: 2, fontWeight: 600 }}
+                sx={{ mt: 2, fontWeight: 600, overflowWrap: "anywhere" }}
               >
-                {requirement.target}
+                <span>
+                  {requirement.definition
+                    ? requirement.label
+                    : requirement.target}
+                </span>
+                {requirement.required === false && (
+                  <Typography
+                    component="span"
+                    variant="body2"
+                    sx={{ ml: 1, color: "text.secondary" }}
+                  >
+                    Optional
+                  </Typography>
+                )}
               </Typography>
+              {requirement.definition && (
+                <Typography
+                  component="dd"
+                  variant="body2"
+                  sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                >
+                  {requirement.definition}
+                </Typography>
+              )}
+              {requirement.definition && (
+                <Typography component="dd" variant="body2">
+                  {requirement.target}
+                </Typography>
+              )}
               <Typography component="dd" variant="body2">
-                {requirement.status !== "unknown" &&
+                {(requirement.status !== "unknown" || requirement.definition) &&
                   requirement.status !== "in-progress" && (
                     <span
                       className="missionRequirementStatus"
@@ -323,6 +352,15 @@ export function ScenarioDetailsContent({
                   )}{" "}
                 <span>{requirement.current}</span>
               </Typography>
+              {requirement.reason && (
+                <Typography
+                  component="dd"
+                  variant="body2"
+                  sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                >
+                  {requirement.reason}
+                </Typography>
+              )}
             </React.Fragment>
           ))}
         </Box>

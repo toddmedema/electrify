@@ -5,11 +5,27 @@ import type {
   CommandEnvelope,
   MatchSpec,
   RoomView,
+  Seat,
   World,
 } from "./Types";
-import type { LobbyState, NativeEvent, NativeRequest } from "./Native";
+import type {
+  LobbyState,
+  NativeEvent,
+  NativeRequest,
+  PendingCampaign,
+  SharedSaveLibrary,
+} from "./Native";
 import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
-import { validBrowseState, type BrowseState } from "./Browse";
+import {
+  selectionKey,
+  validBrowseState,
+  type BrowseState,
+  type HostBrowseSelection,
+} from "./Browse";
+import { modBrowseSummary, validSelectedMod } from "./ModBrowse";
+import type { ScenarioType } from "../Types";
+import { validScenarioMod } from "../helpers/ScenarioMod";
+import { resumeBlocker, resumeSeats, slotClaim } from "./Slots";
 import {
   BROWSE_RESEND_MS,
   COMMAND_RESEND_MS,
@@ -20,6 +36,43 @@ import {
   VIEW_INTERVAL_MS,
 } from "./Timing";
 
+function validPendingCampaign(value: unknown): value is PendingCampaign {
+  if (!value || typeof value !== "object") return false;
+  const campaign = value as PendingCampaign;
+  if (
+    typeof campaign.id !== "string" ||
+    !campaign.id ||
+    campaign.id.length > 64 ||
+    typeof campaign.name !== "string" ||
+    !campaign.name.trim() ||
+    campaign.name.length > 80 ||
+    !Array.isArray(campaign.players) ||
+    campaign.players.length < 2 ||
+    campaign.players.length > 4 ||
+    !campaign.players.every(
+      (player) =>
+        player &&
+        typeof player.id === "string" &&
+        /^[a-zA-Z0-9-]{1,64}$/.test(player.id) &&
+        typeof player.name === "string" &&
+        !!player.name.trim() &&
+        player.name.length <= 200,
+    ) ||
+    !Array.isArray(campaign.requiredPlayerIds)
+  )
+    return false;
+  const ids = new Set(campaign.players.map((player) => player.id));
+  return (
+    ids.size === campaign.players.length &&
+    new Set(campaign.requiredPlayerIds).size ===
+      campaign.requiredPlayerIds.length &&
+    campaign.requiredPlayerIds.every((id) => ids.has(id))
+  );
+}
+
+/** A guest's lobby closed before the match began, because its host left. */
+export const HOST_LEFT = "The host closed the lobby.";
+
 export interface SessionState {
   lobby: LobbyState;
   view?: RoomView;
@@ -29,6 +82,12 @@ export interface SessionState {
   error?: string;
   /** The scenario selection the lobby is browsing; the host authors it, guests follow it. */
   browse?: BrowseState;
+  /** Validated, detached scenario; never written into the installed library. */
+  scenarioSnapshot?: ScenarioType;
+  pendingCampaign?: PendingCampaign;
+  /** The host's multiplayer saves, loaded when it opens a lobby. */
+  library?: SharedSaveLibrary;
+  loadingSaves: boolean;
 }
 export class MultiplayerSession {
   private state: SessionState = {
@@ -36,7 +95,9 @@ export class MultiplayerSession {
     pending: false,
     busy: false,
     waitingForHost: false,
+    loadingSaves: false,
   };
+  private libraryRequest = 0;
   private listeners = new Set<() => void>();
   private worker?: Worker;
   private stopEvents?: () => void;
@@ -56,6 +117,9 @@ export class MultiplayerSession {
   private connected = new Set<string>();
   private timer?: ReturnType<typeof setInterval>;
   private lifecycle = 0;
+  private startGeneration = 0;
+  private campaignGeneration = 0;
+  private startupCleanup: Promise<unknown> = Promise.resolve();
   private saveRequests = new Map<
     string,
     { resolve: () => void; reject: (error: Error) => void }
@@ -67,6 +131,9 @@ export class MultiplayerSession {
   private browseTimer?: ReturnType<typeof setTimeout>;
   private lastBrowseSend = 0;
   private browsePeers = new Set<string>();
+  private pendingScenarioView?: RoomView;
+  private outboundScenario = new Map<string, string>();
+  private receivedScenario?: { key: string; scenario: ScenarioType };
   constructor(
     private bridge: DesktopBridge,
     private workerFactory: () => Promise<Worker>,
@@ -123,6 +190,12 @@ export class MultiplayerSession {
         Date.now() - this.lastBrowseSend > BROWSE_RESEND_MS
       )
         this.sendBrowse();
+      if (
+        this.isHost() &&
+        this.state.pendingCampaign &&
+        Date.now() - this.lastBrowseSend > BROWSE_RESEND_MS
+      )
+        this.sendCampaign();
       const waitingForHost =
         !!this.state.view &&
         !this.worker &&
@@ -134,6 +207,21 @@ export class MultiplayerSession {
   }
   private event(event: NativeEvent) {
     if (event.kind === "state") {
+      const { hostId, lobbyId, members } = event.state;
+      // Before a match, a lobby without its host has nobody left to choose or start a game.
+      if (
+        lobbyId &&
+        hostId &&
+        hostId !== event.state.selfId &&
+        !this.state.view &&
+        !this.closing &&
+        members.length > 0 &&
+        !members.some((member) => member.id === hostId)
+      ) {
+        this.update({ lobby: event.state });
+        void this.hostLeft();
+        return;
+      }
       this.update({ lobby: event.state });
       if (this.isHost()) {
         // A friend who just joined lands on the page the host is showing, straight away.
@@ -141,7 +229,13 @@ export class MultiplayerSession {
           (id) => !this.browsePeers.has(id),
         );
         this.browsePeers = new Set(event.state.connected);
-        if (joined.length) this.sendBrowse(joined);
+        for (const id of this.outboundScenario.keys())
+          if (!event.state.connected.includes(id))
+            this.outboundScenario.delete(id);
+        if (joined.length) {
+          this.sendBrowse(joined);
+          this.sendCampaign(joined);
+        }
       }
       if (this.worker) {
         const now = new Set(event.state.connected);
@@ -154,10 +248,14 @@ export class MultiplayerSession {
       }
     } else if (event.kind === "disconnected") {
       if (this.worker) this.post({ kind: "disconnect", sender: event.sender });
+      // A friend leaving before the match begins is routine; only a guest loses its game.
+      else if (this.isHost() || event.sender !== this.state.lobby.hostId)
+        return;
+      else if (!this.state.view) void this.hostLeft();
       else
         this.update({
           error:
-            "Connection lost. Reconnect to continue, or resume the shared save in a new lobby.",
+            "Connection lost. Reconnect to continue, or resume the multiplayer save in a new lobby.",
         });
     } else if (event.kind === "message") {
       if (this.worker && event.payload.kind === "save-request") {
@@ -168,12 +266,40 @@ export class MultiplayerSession {
             to: event.sender,
             payload: { kind: "save-result", requestId, error },
           });
-        void this.save()
+        const suspended = event.payload.suspended === true;
+        void this.save(suspended, suspended)
           .then(
             () => respond(),
             (error) => respond(error.message),
           )
           .catch(() => undefined);
+        return;
+      }
+      if (
+        !this.worker &&
+        event.sender === this.state.lobby.hostId &&
+        event.payload.kind === "campaign"
+      ) {
+        if (
+          event.payload.campaign === undefined ||
+          validPendingCampaign(event.payload.campaign)
+        ) {
+          this.receivedScenario = undefined;
+          this.pendingScenarioView = undefined;
+          this.update({
+            pendingCampaign: event.payload.campaign,
+            browse: undefined,
+            scenarioSnapshot: undefined,
+          });
+        }
+        return;
+      }
+      if (
+        !this.worker &&
+        event.sender === this.state.lobby.hostId &&
+        event.payload.kind === "scenario"
+      ) {
+        this.acceptScenario(event.payload.selectionKey, event.payload.scenario);
         return;
       }
       if (
@@ -236,7 +362,56 @@ export class MultiplayerSession {
       }
     }
   }
-  private acceptView(view: RoomView) {
+  private acceptView(input: RoomView, trustedWorker = false) {
+    let view = input;
+    const game = input.game;
+    if (!trustedWorker && game) {
+      const selected = this.state.browse?.mod;
+      const pinned =
+        this.state.scenarioSnapshot ??
+        (!selected ? this.receivedScenario?.scenario : undefined);
+      const modded =
+        !!selected ||
+        !!input.scenarioDigest ||
+        !!game.customScenario?.mod ||
+        !!this.state.view?.game?.customScenario?.mod;
+      if (modded) {
+        // A view cannot introduce definitions through the larger world-message channel.
+        if (
+          game.customScenario !== undefined ||
+          !input.scenarioDigest ||
+          !/^sha256-[a-f0-9]{64}$/.test(input.scenarioDigest)
+        ) {
+          this.update({
+            error: "The host's game does not match the validated scenario.",
+          });
+          return;
+        }
+        if (!pinned) {
+          if (!selected || selected.runtimeDigest === input.scenarioDigest)
+            this.pendingScenarioView = input;
+          else
+            this.update({
+              error: "The host's game does not match the selected scenario.",
+            });
+          return;
+        }
+        const parameters = pinned.mod!.parameters;
+        if (
+          input.scenarioDigest !== pinned.mod!.runtimeDigest ||
+          game.scenarioId !== 999 ||
+          game.seed !== parameters.seed ||
+          game.difficulty !== parameters.difficulty ||
+          game.startingYear !== parameters.startingYear
+        ) {
+          this.update({
+            error: "The host's game does not match the validated scenario.",
+          });
+          return;
+        }
+        view = { ...input, game: { ...game, customScenario: pinned } };
+      }
+    }
     const previous = this.state.view;
     if (
       previous &&
@@ -276,6 +451,7 @@ export class MultiplayerSession {
     else this.sequence = Math.max(this.sequence, view.lastSequence);
     this.update({
       view,
+      pendingCampaign: undefined,
       waitingForHost: false,
       busy: false,
       pending: !!this.pending,
@@ -285,7 +461,7 @@ export class MultiplayerSession {
           : this.state.error,
     });
     this.flushActivity();
-    if (!this.pending && this.queued.length) {
+    while (!this.pending && !this.closing && this.queued.length) {
       const queued = this.queued.shift()!;
       this.completion = queued;
       this.sendCommand(queued.command);
@@ -401,7 +577,8 @@ export class MultiplayerSession {
     this.transmit();
   }
   async create() {
-    this.update({ busy: true, error: undefined });
+    this.campaignGeneration++;
+    this.update({ busy: true, error: undefined, pendingCampaign: undefined });
     try {
       this.update({
         lobby: (await this.request({
@@ -414,7 +591,8 @@ export class MultiplayerSession {
     }
   }
   async join(lobbyId: string) {
-    this.update({ busy: true, error: undefined });
+    this.campaignGeneration++;
+    this.update({ busy: true, error: undefined, pendingCampaign: undefined });
     try {
       this.update({
         lobby: (await this.request({
@@ -436,39 +614,235 @@ export class MultiplayerSession {
       error: undefined,
     });
   }
-  /** Starts the host's chosen scenario for the lobby, or resumes the last shared save. */
-  async start(choice: { spec: MatchSpec } | { saved: true }) {
+  /** Reloads the multiplayer saves; only the newest request may replace the list. */
+  async refreshSaves(sync = true) {
+    return this.loadLibrary(
+      () =>
+        this.request({
+          kind: "list-saves",
+          sync,
+        }) as Promise<SharedSaveLibrary>,
+    );
+  }
+  private async loadLibrary(read: () => Promise<SharedSaveLibrary>) {
+    const request = ++this.libraryRequest;
+    this.update({ loadingSaves: true });
+    try {
+      const library = await read();
+      if (request === this.libraryRequest) this.update({ library });
+      return library;
+    } finally {
+      if (request === this.libraryRequest) this.update({ loadingSaves: false });
+    }
+  }
+  async deleteSharedSave(id: string) {
+    const library = await this.loadLibrary(
+      () =>
+        this.request({ kind: "delete-save", id }) as Promise<SharedSaveLibrary>,
+    );
+    if (this.state.pendingCampaign?.id === id) {
+      this.campaignGeneration++;
+      this.update({ pendingCampaign: undefined });
+      this.sendCampaign(undefined, true);
+    }
+    return library;
+  }
+  /** Selecting a campaign opens its invitation lobby before starting any saved grids. */
+  async prepareResume(id: string, name: string) {
+    const generation = ++this.campaignGeneration;
+    const lifecycle = this.lifecycle;
+    const current = () =>
+      generation === this.campaignGeneration && lifecycle === this.lifecycle;
     this.update({ busy: true, error: undefined });
     try {
+      const world = (await this.request({
+        kind: "read-checkpoint",
+        id,
+      })) as World | null;
+      if (!current()) return;
+      if (!world) throw new Error("This multiplayer save could not be found");
+      if (!Array.isArray(world.seats))
+        throw new Error("This multiplayer save could not be read");
+      const players = world.seats.map((seat) => ({
+        ...seat,
+        name:
+          seat?.name === undefined ||
+          (typeof seat.name === "string" &&
+            seat.name.length <= 200 &&
+            !seat.name.trim())
+            ? seat?.id
+            : seat.name,
+      }));
+      const campaign: PendingCampaign = {
+        id,
+        name,
+        players,
+        requiredPlayerIds: players
+          .filter((seat) => !world.outcomes?.[seat.id])
+          .map((seat) => seat.id),
+      };
+      if (!validPendingCampaign(campaign))
+        throw new Error("This multiplayer save could not be read");
+      if (this.state.lobby.lobbyId && !this.isHost())
+        throw new Error("Only the host can choose a save");
+      if (!this.state.lobby.lobbyId) {
+        const lobby = (await this.request({
+          kind: "create",
+          rules: manifest.multiplayerCompatibilityId,
+        })) as LobbyState;
+        if (!current()) return;
+        this.update({ lobby });
+      }
+      clearTimeout(this.browseTimer);
+      this.browseTimer = undefined;
+      this.publishedSelection = undefined;
+      this.update({ pendingCampaign: campaign, browse: undefined });
+      this.sendCampaign();
+    } finally {
+      if (current()) this.update({ busy: false });
+    }
+  }
+  /** The host sets the saved campaign aside to choose a new game instead. */
+  cancelCampaign() {
+    if (!this.isHost() || !this.state.pendingCampaign) return;
+    this.campaignGeneration++;
+    this.update({ pendingCampaign: undefined });
+    this.sendCampaign(undefined, true);
+  }
+  /** Takes one saved company for this player; Steam shares the claim with the lobby. */
+  async claimSlot(seatId: string) {
+    const campaign = this.state.pendingCampaign;
+    if (!campaign) return;
+    this.update({
+      lobby: (await this.request({
+        kind: "member",
+        key: "slot",
+        value: slotClaim(campaign.id, seatId),
+      })) as LobbyState,
+    });
+  }
+  /** Why the lobby cannot resume its saved campaign yet. */
+  resumeBlocker() {
+    const campaign = this.state.pendingCampaign;
+    if (!campaign) return "Choose a multiplayer save";
+    const { members, connected, selfId } = this.state.lobby;
+    return resumeBlocker(
+      campaign,
+      members,
+      (id) => id === selfId || connected.includes(id),
+    );
+  }
+  canResumeCampaign() {
+    return this.isHost() && !this.resumeBlocker();
+  }
+  private rosterError(seats: Seat[], required: Seat[]) {
+    const { members, connected, selfId } = this.state.lobby;
+    if (seats.length < 2) return "Invite a friend to play together";
+    if (required.some((s) => s.id !== selfId && !connected.includes(s.id)))
+      return "Every player in this match must be connected";
+    const ids = new Set(seats.map((s) => s.id));
+    if (
+      members.some((member) => !ids.has(member.id)) ||
+      required.some((seat) => !members.some((m) => m.id === seat.id))
+    )
+      return "The lobby must contain only the saved match's players";
+  }
+  /** Starts the host's chosen scenario for the lobby, or resumes the last multiplayer save. */
+  async start(choice: { spec: MatchSpec } | { saved: true; id?: string }) {
+    const generation = ++this.startGeneration;
+    const lifecycle = this.lifecycle;
+    const current = () =>
+      generation === this.startGeneration && lifecycle === this.lifecycle;
+    let locked = false;
+    let receivedView = false;
+    const rollback = (message: string) => {
+      if (!current()) return;
+      this.startGeneration++;
+      this.worker?.terminate();
+      this.worker = undefined;
+      this.update({ busy: false, error: message });
+      const browse = this.state.browse;
+      if (browse)
+        this.publishBrowse({
+          phase: "browsing",
+          card: browse.card,
+          scenarioId: browse.scenarioId,
+          difficulty: browse.difficulty,
+          custom: browse.custom,
+          mod: browse.mod,
+          scenarioSnapshot: this.state.scenarioSnapshot,
+        });
+      if (locked)
+        this.startupCleanup = this.request({ kind: "unlock" }).catch(
+          () => undefined,
+        );
+    };
+    this.update({ busy: true, error: undefined });
+    try {
+      // A retry must acquire its lock after the failed attempt releases its own.
+      await this.startupCleanup;
+      if (!current()) return;
       const world =
         "saved" in choice
-          ? ((await this.request({ kind: "read-checkpoint" })) as World | null)
+          ? ((await this.request({
+              kind: "read-checkpoint",
+              ...(choice.id && { id: choice.id }),
+            })) as World | null)
           : null;
       if ("saved" in choice && !world)
-        throw new Error("No shared save on this computer yet");
-      const { members, connected, selfId } = this.state.lobby;
-      const seats =
-        world?.seats || members.map(({ id, name }) => ({ id, name }));
-      // A resumed match needs every company still playing; retired ones may stay away.
-      const required = seats.filter((s) => !world?.outcomes?.[s.id]);
-      if (required.some((s) => s.id !== selfId && !connected.includes(s.id)))
-        throw new Error("Every player in this match must be connected");
-      const ids = new Set(seats.map((s) => s.id));
+        throw new Error("No multiplayer save on this computer yet");
+      const { members } = this.state.lobby;
+      if ("spec" in choice && choice.spec.customScenario?.mod) {
+        const browse = this.state.browse;
+        if (
+          !browse?.mod ||
+          !validSelectedMod(browse.mod, choice.spec.customScenario) ||
+          choice.spec.difficulty !== browse.difficulty ||
+          members.some(
+            (member) =>
+              member.id !== this.state.lobby.selfId &&
+              member.ready !== selectionKey(browse),
+          )
+        )
+          throw new Error(
+            "Wait for every player to receive the scenario and mark Ready.",
+          );
+      }
+      const campaign = this.state.pendingCampaign;
       if (
-        members.some((member) => !ids.has(member.id)) ||
-        required.some((seat) => !members.some((m) => m.id === seat.id))
+        world &&
+        (!campaign || !("saved" in choice) || campaign.id !== choice.id)
       )
-        throw new Error(
-          "The lobby must contain only the saved match's players",
-        );
+        throw new Error("Choose the multiplayer save again");
+      // A resumed match hands each saved company to whoever claimed it; retired ones may stay away.
+      const seats = world
+        ? resumeSeats(campaign!, members)
+        : members.map(({ id, name }) => ({ id, name }));
+      const rosterError = world
+        ? this.resumeBlocker()
+        : this.rosterError(seats, seats);
+      if (rosterError) throw new Error(rosterError);
       await this.request({ kind: "lock", ids: seats.map((s) => s.id) });
+      locked = true;
+      if (!current()) {
+        await this.request({ kind: "unlock" }).catch(() => undefined);
+        return;
+      }
       // A previous start can fail inside the worker; never leave that thread running.
+      this.outboundScenario.clear();
       this.worker?.terminate();
-      this.worker = await this.workerFactory();
+      const worker = await this.workerFactory();
+      if (!current()) {
+        worker.terminate();
+        return;
+      }
+      this.worker = worker;
       this.connected = new Set(this.state.lobby.connected);
       this.worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
+        if (!current() || this.worker !== worker) return;
         if (data.kind === "error") {
-          this.update({ error: data.message, busy: false });
+          if (!receivedView) rollback(data.message);
+          else this.update({ error: data.message, busy: false });
           return;
         }
         if (data.kind === "checkpoint") {
@@ -478,7 +852,7 @@ export class MultiplayerSession {
               this.request({ kind: "checkpoint", world: data.world }),
             );
           void this.saving.catch((error) =>
-            this.update({ error: `Shared save failed: ${error.message}` }),
+            this.update({ error: `Multiplayer save failed: ${error.message}` }),
           );
           if (data.requestId) {
             const request = this.saveRequests.get(data.requestId);
@@ -507,25 +881,70 @@ export class MultiplayerSession {
                 !this.state.lobby.connected.includes(g.seat.id),
             )
             .map((g) => g.seat.id);
-          if (id === this.state.lobby.selfId) this.acceptView(view);
-          else if (this.state.lobby.connected.includes(id))
-            void this.request({
-              kind: "send",
-              to: id,
-              payload: { kind: "view", view },
-            }).catch(() => this.post({ kind: "disconnect", sender: id }));
+          if (id === this.state.lobby.selfId) {
+            receivedView = true;
+            this.acceptView(view, true);
+          } else if (this.state.lobby.connected.includes(id)) {
+            const scenario = view.game?.customScenario;
+            const digest = scenario?.mod?.runtimeDigest;
+            const wireView =
+              digest && scenario && view.game
+                ? {
+                    ...view,
+                    scenarioDigest: digest,
+                    game: { ...view.game, customScenario: undefined },
+                  }
+                : view;
+            const send = async () => {
+              if (
+                digest &&
+                scenario &&
+                this.outboundScenario.get(id) !== digest
+              ) {
+                const summary = modBrowseSummary(scenario);
+                const key = selectionKey({
+                  session: "match",
+                  revision: 0,
+                  phase: "playing",
+                  card: "MODS",
+                  difficulty: summary.difficulty,
+                  mod: summary,
+                });
+                this.outboundScenario.set(id, digest);
+                try {
+                  await this.request({
+                    kind: "send",
+                    to: id,
+                    payload: { kind: "scenario", selectionKey: key, scenario },
+                  });
+                } catch (error) {
+                  this.outboundScenario.delete(id);
+                  throw error;
+                }
+              }
+              await this.request({
+                kind: "send",
+                to: id,
+                payload: { kind: "view", view: wireView },
+              });
+            };
+            void send().catch(() =>
+              this.post({ kind: "disconnect", sender: id }),
+            );
+          }
         }
       };
-      this.worker.onerror = () =>
-        this.update({
-          busy: false,
-          error:
-            "The simulation worker stopped. Resume the shared save to continue.",
-        });
+      this.worker.onerror = () => {
+        if (!current() || this.worker !== worker) return;
+        const error =
+          "The simulation worker stopped. Resume the multiplayer save to continue.";
+        if (!receivedView) rollback(error);
+        else this.update({ busy: false, error });
+      };
       const epoch = crypto.randomUUID();
       this.post(
         world
-          ? { kind: "restore", world, epoch }
+          ? { kind: "restore", world, epoch, seats }
           : {
               kind: "create",
               spec: (choice as { spec: MatchSpec }).spec,
@@ -535,13 +954,29 @@ export class MultiplayerSession {
             },
       );
     } catch (error) {
-      this.worker?.terminate();
-      this.worker = undefined;
-      this.update({ busy: false });
+      rollback(error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
-  async save(pause = false) {
+  async save(pause = false, keepOpen = false) {
+    if (keepOpen) {
+      // Unsent pre-sleep readiness cannot count as fresh consent after the safety checkpoint.
+      // Already sent envelopes keep their sequence/receipt identity and precede the checkpoint.
+      this.queued = this.queued.filter((queued) => {
+        const { command } = queued;
+        if (
+          command.kind !== "ready" &&
+          !(command.kind === "speed" && command.speed !== "PAUSED")
+        )
+          return true;
+        queued.reject(
+          new Error(
+            "The device went to sleep. Choose a speed again when ready.",
+          ),
+        );
+        return false;
+      });
+    }
     if (!this.worker) {
       if (!this.state.view) return;
       const requestId = crypto.randomUUID();
@@ -556,7 +991,11 @@ export class MultiplayerSession {
           void this.request({
             kind: "send",
             to: this.state.lobby.hostId!,
-            payload: { kind: "save-request", requestId },
+            payload: {
+              kind: "save-request",
+              requestId,
+              ...(keepOpen ? { suspended: true } : {}),
+            },
           }).catch(reject);
         });
       } finally {
@@ -565,7 +1004,7 @@ export class MultiplayerSession {
       }
       return;
     }
-    if (pause) this.closing = true;
+    if (pause && !keepOpen) this.closing = true;
     const requestId = crypto.randomUUID();
     let timeout: ReturnType<typeof setTimeout>;
     try {
@@ -575,10 +1014,15 @@ export class MultiplayerSession {
           () => reject(new Error("The host could not finish the save")),
           SAVE_TIMEOUT_MS,
         );
-        this.post({ kind: "checkpoint", requestId, pause });
+        this.post({
+          kind: "checkpoint",
+          requestId,
+          pause,
+          ...(keepOpen ? { suspended: true } : {}),
+        });
       });
     } catch (error) {
-      if (pause) this.closing = false;
+      if (pause && !keepOpen) this.closing = false;
       throw error;
     } finally {
       clearTimeout(timeout!);
@@ -587,10 +1031,11 @@ export class MultiplayerSession {
   }
   /**
    * Saves, then leaves the match: the host checkpoints its world and a guest waits for the
-   * host's save. skipSave keeps the last shared save instead, so a player can always leave a
+   * host's save. skipSave keeps the last multiplayer save instead, so a player can always leave a
    * match whose host is gone.
    */
   async leave({ skipSave = false }: { skipSave?: boolean } = {}) {
+    this.campaignGeneration++;
     this.closing = true;
     try {
       if (!skipSave) await this.save(!!this.worker);
@@ -599,6 +1044,7 @@ export class MultiplayerSession {
       this.closing = false;
       throw error;
     }
+    this.startGeneration++;
     this.worker?.terminate();
     this.worker = undefined;
     this.pending = undefined;
@@ -620,8 +1066,16 @@ export class MultiplayerSession {
       this.browseSession = undefined;
       this.publishedSelection = undefined;
       this.browsePeers = new Set();
+      this.receivedScenario = undefined;
+      this.pendingScenarioView = undefined;
+      this.outboundScenario.clear();
+      ++this.libraryRequest;
       this.update({
         browse: undefined,
+        scenarioSnapshot: undefined,
+        pendingCampaign: undefined,
+        library: undefined,
+        loadingSaves: false,
         lobby: {
           ...this.state.lobby,
           lobbyId: undefined,
@@ -637,6 +1091,11 @@ export class MultiplayerSession {
       this.closing = false;
     }
   }
+  /** The guest returns to the title screen, where the host's departure is explained. */
+  private async hostLeft() {
+    await this.leave({ skipSave: true }).catch(() => undefined);
+    this.update({ error: HOST_LEFT });
+  }
   private isHost() {
     const { lobbyId, hostId, selfId } = this.state.lobby;
     return !!lobbyId && !!hostId && hostId === selfId;
@@ -645,13 +1104,32 @@ export class MultiplayerSession {
    * The host mirrors what it is looking at. Changes coalesce to the view rate; an unchanged
    * selection is not resent except as the periodic catch-up.
    */
-  publishBrowse(selection: Omit<BrowseState, "session" | "revision">) {
+  publishBrowse(input: HostBrowseSelection) {
     if (!this.isHost()) return;
+    const { scenarioSnapshot, ...selection } = input;
     const body = JSON.stringify(selection);
     if (body === this.publishedSelection) return;
+    const next: BrowseState = {
+      ...selection,
+      session: this.browseSession ?? "pending",
+      revision: this.browseRevision + 1,
+    };
+    if (
+      !validBrowseState(next) ||
+      (selection.mod &&
+        (!scenarioSnapshot ||
+          !validSelectedMod(selection.mod, scenarioSnapshot)))
+    ) {
+      this.update({ error: "This scenario selection could not be validated." });
+      return;
+    }
     this.publishedSelection = body;
     this.browseSession ??= crypto.randomUUID();
     this.update({
+      pendingCampaign: undefined,
+      scenarioSnapshot: selection.mod
+        ? JSON.parse(JSON.stringify(scenarioSnapshot))
+        : undefined,
       browse: {
         ...selection,
         session: this.browseSession,
@@ -667,12 +1145,42 @@ export class MultiplayerSession {
     const { browse, lobby } = this.state;
     if (!browse || !this.isHost()) return;
     this.lastBrowseSend = Date.now();
+    for (const id of to ?? lobby.connected) {
+      if (id === lobby.selfId) continue;
+      void this.request({
+        kind: "send",
+        to: id,
+        payload: { kind: "browse", browse },
+      }).catch(() => {});
+      const scenario = this.state.scenarioSnapshot;
+      if (
+        browse.mod &&
+        scenario &&
+        (to ||
+          lobby.members.find((member) => member.id === id)?.ready !==
+            selectionKey(browse))
+      )
+        void this.request({
+          kind: "send",
+          to: id,
+          payload: {
+            kind: "scenario",
+            selectionKey: selectionKey(browse),
+            scenario,
+          },
+        }).catch(() => {});
+    }
+  }
+  private sendCampaign(to?: string[], clear = false) {
+    const { pendingCampaign, lobby } = this.state;
+    if ((!pendingCampaign && !clear) || !this.isHost()) return;
+    this.lastBrowseSend = Date.now();
     for (const id of to ?? lobby.connected)
       if (id !== lobby.selfId)
         void this.request({
           kind: "send",
           to: id,
-          payload: { kind: "browse", browse },
+          payload: { kind: "campaign", campaign: pendingCampaign },
         }).catch(() => {});
   }
   /** A guest follows only the newest valid selection from its own host. */
@@ -693,10 +1201,84 @@ export class MultiplayerSession {
     if (!this.state.view) this.lastHostMessage = Date.now();
     // Back in the lobby after a match: the finished match's view goes, and the guest follows on.
     if (browse.phase === "browsing" && this.state.view) this.endLocalMatch();
-    this.update({ browse });
+    this.pendingScenarioView = undefined;
+    const received = this.receivedScenario;
+    const snapshot =
+      browse.mod &&
+      received?.key === selectionKey(browse) &&
+      validSelectedMod(browse.mod, received.scenario)
+        ? received.scenario
+        : undefined;
+    this.update({
+      browse,
+      scenarioSnapshot: snapshot,
+      pendingCampaign: undefined,
+    });
+    if (
+      browse.mod &&
+      !snapshot &&
+      this.state.lobby.members.find(
+        (member) => member.id === this.state.lobby.selfId,
+      )?.ready
+    )
+      void this.setReady("").catch(() => undefined);
+  }
+  private acceptScenario(key: string, value: unknown) {
+    if (
+      typeof key !== "string" ||
+      key.length > 256 ||
+      !value ||
+      typeof value !== "object"
+    )
+      return;
+    const scenario = value as ScenarioType;
+    if (!validScenarioMod(scenario.mod, scenario)) {
+      this.update({
+        error:
+          "The host's scenario could not be validated. Ask the host to choose it again.",
+      });
+      return;
+    }
+    const summary = modBrowseSummary(scenario);
+    const stamp = selectionKey({
+      session: "snapshot",
+      revision: 0,
+      phase: "browsing",
+      card: "MODS",
+      difficulty: summary.difficulty,
+      mod: summary,
+    });
+    if (key !== stamp) {
+      this.update({
+        error: "The host's scenario does not match the selected content.",
+      });
+      return;
+    }
+    const detached = JSON.parse(JSON.stringify(scenario)) as ScenarioType;
+    this.receivedScenario = { key, scenario: detached };
+    const browse = this.state.browse;
+    if (
+      browse?.mod &&
+      selectionKey(browse) === key &&
+      validSelectedMod(browse.mod, detached)
+    )
+      this.update({ scenarioSnapshot: detached, error: undefined });
+    const pending = this.pendingScenarioView;
+    if (pending && pending.scenarioDigest === detached.mod?.runtimeDigest) {
+      this.pendingScenarioView = undefined;
+      this.acceptView(pending);
+    }
   }
   /** Marks Ready for exactly this selection; any later change by the host clears it. */
   async setReady(key: string) {
+    const browse = this.state.browse;
+    if (
+      key &&
+      (!browse ||
+        key !== selectionKey(browse) ||
+        (browse.mod && !this.state.scenarioSnapshot))
+    )
+      throw new Error("Receiving scenario…");
     this.update({
       lobby: (await this.request({
         kind: "member",
@@ -710,7 +1292,7 @@ export class MultiplayerSession {
     if (!this.isHost()) return;
     this.closing = true;
     try {
-      // Keep the finished match's final state as the shared save; a failed write isn't fatal.
+      // Keep the finished match's final state as the multiplayer save; a failed write isn't fatal.
       if (this.worker) await this.save(true).catch(() => undefined);
       this.endLocalMatch();
       await this.request({ kind: "unlock" }).catch(() => undefined);
@@ -719,6 +1301,10 @@ export class MultiplayerSession {
     }
   }
   private endLocalMatch() {
+    this.receivedScenario = undefined;
+    this.pendingScenarioView = undefined;
+    this.outboundScenario.clear();
+    this.startGeneration++;
     this.worker?.terminate();
     this.worker = undefined;
     this.pending = undefined;
@@ -737,8 +1323,12 @@ export class MultiplayerSession {
     });
   }
   dispose() {
+    this.receivedScenario = undefined;
+    this.pendingScenarioView = undefined;
+    this.outboundScenario.clear();
     clearTimeout(this.browseTimer);
     this.lifecycle++;
+    this.campaignGeneration++;
     this.stopEvents?.();
     clearInterval(this.timer);
     this.worker?.terminate();

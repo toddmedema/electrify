@@ -1,3 +1,8 @@
+import type { CompiledScenarioRules } from "./data/ScenarioRules";
+import type {
+  ObjectiveProgress,
+  ObjectiveResult,
+} from "./data/ScenarioObjectives";
 import type { FieldValue, Timestamp } from "firebase/firestore";
 import type * as React from "react";
 import type { Action } from "@reduxjs/toolkit";
@@ -206,6 +211,7 @@ export type CardNameType =
   | "SETTINGS"
   | "ACHIEVEMENTS"
   | "SAVED_GAMES"
+  | "MODS"
   | "CUSTOM_GAME"
   | "DATA_CENTER_SETUP"
   | "CHALLENGE";
@@ -368,6 +374,8 @@ export interface ReplayType {
   // own location, and an authored one could be given a location that isn't in LOCATIONS -- so
   // without it a replay would silently be re-simulated against a different city's weather
   location: LocationType;
+  /** Internal deterministic playback carries a mod's exact detached launch snapshot. */
+  customScenario?: ScenarioType;
   actions: ReplayActionType[];
   meaningfulDecisionGateWaived?: boolean;
   // Month-end cash of the original run in cents, oldest first, so playback can tell when a later
@@ -494,6 +502,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     importedW?: number;
     exportedW?: number;
     transmissionCapacityW?: number;
+    /** Resolved route restrictions shared by dispatch and intertie forecasts. */
+    transmissionCapacityLimitsWByCorridor?: Record<string, number>;
     marketPricePerMWh?: number;
     renewableCapacityFactors?: Record<string, number>;
   };
@@ -590,6 +600,7 @@ export function isStorage<T extends { peakWh?: number }>(
 
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
+  startingAssetId?: string;
   id: number; // Monotonically increasing
   // Signed for storage: negative while charging
   currentW: number;
@@ -888,7 +899,82 @@ export interface ScenarioBriefingType {
   threat: string;
 }
 
+/** Facility catalog names a data-only scenario mod may adjust. */
+export type ModFacilityNameType =
+  | "Coal"
+  | "Nuclear"
+  | "Natural Gas Peaker"
+  | "Natural Gas CC"
+  | "Oil"
+  | "Biomass"
+  | "Wind"
+  | "Offshore Wind"
+  | "Airborne Wind"
+  | "Solar"
+  | "Hydro"
+  | "Geothermal"
+  | "Enhanced Geothermal"
+  | "Battery"
+  | "Pumped Hydro";
+
+/** Multipliers on a facility's normal catalog calculation. */
+export interface FacilityModifierType {
+  buildCost?: number;
+  annualOperatingCost?: number;
+  yearsToBuild?: number;
+}
+
+/** A detached first-release runtime; no installed package/library is consulted by simulation. */
+export interface ScenarioModType {
+  runtimeVersion: 1;
+  gameApi: 1;
+  packageDigest: string;
+  setupDigest: string;
+  runtimeDigest: string;
+  modRuntimeId: string;
+  source: {
+    id: string;
+    title: string;
+    creator: string;
+    version: string;
+    description: string;
+    /** Frozen provenance; none remains readable for older saved runs. Packages use optional goal lists. */
+    objectiveMode: "inherit" | "replace" | "none";
+    workshopId?: string;
+  };
+  parameters: {
+    baseScenarioId: number;
+    startingYear: number;
+    durationMonths: number;
+    seed: number;
+    difficulty: DifficultyType;
+    startingCustomers: number;
+    startingDemandScale: number;
+  };
+  rules: CompiledScenarioRules;
+  facilities?: Partial<Record<ModFacilityNameType, FacilityModifierType>>;
+  programs?: Partial<Record<Extract<PolicyId, "efficiency" | "solar">, number>>;
+}
+
+/** Detached, versioned researched rights for a newly inherited starting connection. */
+export interface FrozenStartingIntertieAccessType {
+  version: 1;
+  sourceScenarioId: 111;
+  locationId: "LA";
+  allocations: {
+    corridorId: string;
+    capacityW: number;
+    availableSupplyW: number;
+    importAccessWByTier: [number, number, number, number];
+    availableDemandW: number;
+  }[];
+}
+
 export interface ScenarioType {
+  /** Trusted built-ins use the common rules without assigning mod provenance. */
+  rules?: CompiledScenarioRules;
+  /** Immutable mod effects; installed updates never mutate a running game. */
+  mod?: ScenarioModType;
   /** Opt-in official event arcs for a custom run; location and starting fleet stay custom. */
   eventScenarioIds?: number[];
   hydroInventoryKey?: string;
@@ -911,6 +997,10 @@ export interface ScenarioType {
   tutorialSteps?: TutorialStepType[];
   /** Explicit scenario override. Tutorials default off; ordinary games use location availability. */
   intertiesEnabled?: boolean;
+  /** Pre-existing, debt-free operational connections using this scenario's access allocation. */
+  startingInterties?: string[];
+  /** Frozen rights for inherited connections; absent snapshots retain their original access. */
+  startingIntertieAccess?: FrozenStartingIntertieAccessType;
   // Pins the run's RNG so it plays out identically every time. Every authored scenario leaves
   // this off and draws a fresh seed each play; only the custom game screen sets it
   seed?: number;
@@ -950,6 +1040,8 @@ export interface ScenarioType {
 
 /** An authored starting asset may already have spent years in service when a scenario opens. */
 export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
+  /** Catalog identity of the original asset; never transferred to a replacement. */
+  assetId?: string;
   initialAgeYears?: number;
   /**
    * Share of its reservoir a starting hydro plant holds on the opening tick. Defaults to the
@@ -1030,35 +1122,6 @@ export interface GameEventType {
 export type StoryAttributeValueType =
   string | number | boolean | string[] | number[];
 
-/**
- * Authored regional wildfire hazard for recurring, location-aware emergencies.
- *
- * These are explicitly simplified game balance values, not observed fire statistics: the monthly
- * weights shape a seasonal risk that is never a guaranteed fire, and the severity bounds are the
- * readable range an incident may land in. Unknown locations carry no profile and therefore no
- * inferred risk.
- */
-export interface WildfireProfileType {
-  /** Expected disruptive incidents per year at baseline weather (sum of monthly weights is one). */
-  annualHazard: number;
-  /** Twelve monthly weights, index 0 = January, summing to one over the year. */
-  monthlyWeights: number[];
-  /** Share of customer load disconnected by safety shutoffs, sampled per incident. */
-  disconnectedDemand: { min: number; max: number };
-  /** Output retained by affected generators, sampled per incident. */
-  outputMultiplier: { min: number; max: number };
-  /** Share of fleet peak capacity constrained, sampled per incident. */
-  targetCapacityShare: { min: number; max: number };
-  /** Restoration cost per MWh of exposed monthly demand, charged each active month. */
-  restorationCostPerMWh: number;
-  /** Months after an incident before the next one may start. */
-  cooldownMonths: number;
-  /** Month (0-based) each fire season starts, used for the preparedness preview. */
-  preparednessMonth: number;
-  /** How many months the fire season lasts; ongoing preparedness also covers off-season fires. */
-  preparednessDurationMonths: number;
-}
-
 export type WeatherHazardType = "HAIL" | "EXTREME_COLD";
 export type ResilienceUpgradeType =
   "hailResistant" | "coldWeatherPackage" | "solarTrackers";
@@ -1111,6 +1174,8 @@ export interface FacilityUpgradeInProgressType {
 }
 
 export interface WorldEventEffectsType {
+  /** Surviving nameplate capacity of each affected corridor, in watts, including upgrades. */
+  transmissionCapacityLimitsWByCorridor?: Record<string, number>;
   fuelPriceMultipliers?: Partial<Record<FuelNameType, number>>;
   temperatureOffsetC?: number;
   demandMultiplier?: number;
@@ -1143,6 +1208,8 @@ export interface StorySnapshotType {
     ageYears: number;
     peakW: number;
     operational: boolean;
+    minuteCreated?: number;
+    startingAssetId?: string;
   }>;
 }
 
@@ -1242,6 +1309,7 @@ export interface CompanyOutcomeType {
 }
 /** One row of the co-op result table. */
 export interface CompanyResultType extends CompanyOutcomeType {
+  objectiveResults?: ObjectiveResult[];
   id: string;
   name: string;
   cash: number;
@@ -1342,6 +1410,8 @@ export interface GameType {
   startingYear: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
+  /** Completed-month objective facts, retained independently of presentation history. */
+  objectiveProgress?: ObjectiveProgress;
   // Newest first, capped at MAX_EVENTS.
   eventLog: GameEventType[];
   // Keys outlive the capped event log: a once-per-run lesson must not repeat just because its
@@ -1358,9 +1428,14 @@ export interface GameType {
   // Headless balance harness only: baseline matrix cells run the identical strategy with authored
   // effects disabled. Undefined means enabled and is what every browser save/replay uses.
   storyEffectsDisabled?: boolean;
-  // Headless balance harness only: run the identical strategy with the recurring regional wildfire
-  // hazard switched off, to isolate its effect. Undefined means enabled (the browser default).
+  // Legacy verification flag: keep earlier unranked runs ineligible for achievements.
   wildfireHazardDisabled?: boolean;
+  /** One-time future forecast refresh after retiring legacy wildfire systems. */
+  wildfireForecastRefresh?: boolean;
+  /** Preserve pre-redesign transmission assets, loans and co-op topology in scenario-111 saves. */
+  legacyWildfireIntertieAccess?: boolean;
+  /** Earliest reliable native story journal boundary after a supported legacy save migration. */
+  scenarioRuleHistoryStartMinute?: number;
   // Headless balance harness only: run the identical strategy with hail and extreme-cold hazards
   // switched off. Undefined means enabled (the browser default).
   weatherHazardsDisabled?: boolean;
@@ -1395,6 +1470,8 @@ export type ThemeModeType = "light" | "dark";
 // follow the OS rather than a palette of its own, and it can change while the game is open
 export type ThemeChoiceType = ThemeModeType | "system";
 
+export type TextSizeType = "standard" | "large" | "larger";
+
 export interface SettingsType {
   audioEnabled?: boolean;
   // Independent buses: zero mutes one without silencing the other. audioEnabled is the master
@@ -1405,6 +1482,8 @@ export interface SettingsType {
   steamTimelineEnabled?: boolean;
   units: UnitSystemType;
   theme: ThemeChoiceType;
+  // Device preference: old settings and saved fixtures use the standard size.
+  textSize?: TextSizeType;
 }
 
 export interface DialogType {
@@ -1454,6 +1533,8 @@ export interface VictoryType {
   // Whether the run counts for the leaderboard. A custom game (every one shares an id) or a
   // replay of someone else's run gets the breakdown without a rank or a personal best
   ranked: boolean;
+  // A community mod run, which is never ranked and never earns achievements
+  modded?: boolean;
   // The player's best on this scenario BEFORE this run, read at the moment the scenario ended so
   // that "was 640" reports the run before this one rather than the one just finished
   previousBest?: number;
@@ -1545,6 +1626,7 @@ export interface SaveLease {
 
 /** A compact, serializable story of the run captured before the reducer's Immer draft expires. */
 export interface VictoryDebriefType {
+  objectiveResults?: ObjectiveResult[];
   demandWh?: number;
   startingFleet: VictoryFleetCapacityType[];
   finalFleet: VictoryFleetCapacityType[];
@@ -1582,8 +1664,17 @@ export interface CoopSelectionType {
   starting: boolean;
   /** The custom game the host is setting up, mirrored to guests. */
   custom?: ScenarioType;
+  /** A selected, validated community snapshot; separate from the Custom Game editor. */
+  modScenario?: ScenarioType;
+  /** Summary while the separate host scenario transfer is arriving. */
+  modSummary?: import("./multiplayer/ModBrowse").ModBrowseSummary;
+  receivingScenario?: boolean;
   /** What the host has open, in words, such as "Deep Freeze on Easy". */
   viewing?: string;
+  /** Host only: the code friends can enter to join. */
+  lobbyId?: string;
+  /** Host only: this computer has multiplayer saves to load instead. */
+  hasSaves?: boolean;
 }
 export interface UIType {
   /** Set while this player chooses a co-op game together with their lobby. */

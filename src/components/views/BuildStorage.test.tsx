@@ -2,7 +2,7 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor,
+  waitForElementToBeRemoved,
   within,
 } from "@testing-library/react";
 import { createGame } from "../../testing/Simulator";
@@ -93,10 +93,9 @@ it("deduplicates storage purchase impact and shows loan terms inline", async () 
     screen.queryByRole("table", { name: "Financing terms" }),
   ).not.toBeInTheDocument();
 
-  fireEvent.click(
-    within(screen.getByRole("dialog")).getByRole("button", { name: "close" }),
-  );
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  const dialog = screen.getByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("button", { name: "close" }));
+  await waitForElementToBeRemoved(dialog);
 });
 
 it("offers an oversized storage project its max size", () => {

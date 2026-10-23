@@ -1,0 +1,80 @@
+import { defineConfig } from "@playwright/test";
+import path from "node:path";
+import base from "./playwright.config";
+
+const port = process.env.E2E_PORT || "3197";
+const outputDir =
+  process.env.ELECTRIFY_E2E_OUTPUT_DIR ||
+  path.resolve(__dirname, "../test-results/steam-input");
+const productionBuild = process.env.STEAM_INPUT_BUILD_DIR;
+const productionRoot = productionBuild
+  ? path.resolve(__dirname, "..", productionBuild)
+  : undefined;
+if (productionRoot)
+  require("../scripts/verify-edition-bundle").verifyEditionBundle(
+    productionRoot,
+    "desktop",
+  );
+
+// The renderer is unchanged: only the sandboxed native input/save bridge is replaced.
+export default defineConfig({
+  ...base,
+  testMatch: "steam-input.spec.ts",
+  testIgnore: [],
+  outputDir,
+  reporter: [
+    ["list"],
+    ["json", { outputFile: path.join(outputDir, "results.json") }],
+  ],
+  // Keep retries as diagnostics while rejecting a failed first attempt.
+  failOnFlakyTests: true,
+  fullyParallel: false,
+  workers: 1,
+  timeout: 90000,
+  projects: [
+    ...([800, 720] as const).flatMap((height) =>
+      (["light", "dark"] as const).map((colorScheme) => ({
+        name: `deck-${height}-${colorScheme}`,
+        use: {
+          browserName: "chromium" as const,
+          viewport: { width: 1280, height },
+          colorScheme,
+        },
+      })),
+    ),
+    {
+      name: "docked-light",
+      use: {
+        browserName: "chromium",
+        viewport: { width: 1920, height: 1080 },
+        colorScheme: "light",
+      },
+    },
+    ...base
+      .projects!.filter((project) =>
+        ["mobile-390px", "mobile-360px"].includes(project.name!),
+      )
+      .map((project) => ({
+        ...project,
+        use: { ...project.use, colorScheme: "dark" as const },
+      })),
+  ],
+  use: { ...base.use, baseURL: `http://127.0.0.1:${port}` },
+  webServer: {
+    command: productionRoot ? "node scripts/ci/serve.js" : "npm start",
+    cwd: path.resolve(__dirname, ".."),
+    url: `http://127.0.0.1:${port}`,
+    timeout: 180000,
+    reuseExistingServer: false,
+    env: {
+      BROWSER: "none",
+      HOST: "127.0.0.1",
+      PORT: port,
+      ELECTRIFY_E2E: "1",
+      REACT_APP_DESKTOP: "true",
+      ...(productionRoot
+        ? { E2E_BUILD_DIR: productionRoot, E2E_PORT: port }
+        : {}),
+    },
+  },
+});

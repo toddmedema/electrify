@@ -10,6 +10,7 @@ import { pause, resume } from "../data/Audio";
 import { DEFAULT_UNIT_SYSTEM, UNIT_SYSTEMS } from "../helpers/Units";
 import { THEME_CHOICES } from "../Theme";
 import { isDesktopApp } from "../Desktop";
+import { normalizeTextSize, TEXT_SIZES } from "../TextSize";
 
 function storedVolume(key: string): number {
   const value = getStorageNumber(key, 1);
@@ -26,6 +27,7 @@ export const initialSettings: SettingsType = {
   // Following the OS is the only default that is right for both kinds of player without being
   // asked, and it is what every other app on their machine does
   theme: getStorageChoice("theme", THEME_CHOICES, "system"),
+  textSize: getStorageChoice("textSize", TEXT_SIZES, "standard"),
 };
 
 if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
@@ -42,7 +44,9 @@ export const settingsSlice = createSlice({
   initialState: initialSettings,
   reducers: {
     change: (state, action: PayloadAction<Partial<SettingsType>>) => {
-      const changes = action.payload || {};
+      const changes = { ...action.payload };
+      if (Object.prototype.hasOwnProperty.call(changes, "textSize"))
+        changes.textSize = normalizeTextSize(changes.textSize);
       // Update values in local storage. Object.entries rather than keys + lookup so the value
       // stays tied to its key's type instead of needing a string index into SettingsType.
       Object.entries(changes).forEach(([key, value]) => {

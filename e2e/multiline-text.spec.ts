@@ -1,5 +1,6 @@
 import { expectDialogToFit } from "./dialog-layout";
 import { expect, Locator, test } from "./fixtures";
+import { openBuild } from "./layout";
 
 async function expectTextToFit(elements: Locator) {
   await expect(elements.first()).toBeVisible();
@@ -40,10 +41,7 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "Start game", exact: true })
         .click();
       await page.getByRole("button", { name: "pause", exact: true }).click();
-      await page.getByRole("button", { name: "Build", exact: true }).click();
-      await expect(
-        page.getByRole("region", { name: "Build", exact: true }),
-      ).toBeVisible();
+      await openBuild(page);
       await expect(page.locator("main.base_main")).toHaveCount(1);
     });
 
@@ -65,12 +63,32 @@ for (const theme of ["light", "dark"] as const) {
       });
       const cash = status.locator(".gameStatusValue").first();
       await expect(speeds).toBeVisible();
-      const boxes = await Promise.all(
-        [title, close, hud, status, speeds].map((el) => el.boundingBox()),
-      );
-      const [heading, dismiss, hudBar, statusBox, clock] = boxes.map(
-        (box) => box!,
-      );
+      await page.evaluate(() => document.fonts.ready);
+      await build.evaluate(async (element) => {
+        await Promise.all(
+          element.getAnimations().map((animation) => animation.finished),
+        );
+      });
+      // Separate boundingBox calls can straddle animation frames and invent a misalignment.
+      // Sample the actual controls together, keeping the one-pixel alignment contract.
+      const [heading, dismiss, hudBar, statusBox, clock] =
+        await header.evaluate((element) => {
+          const controls = [
+            element.querySelector("h2"),
+            element.querySelector('button[aria-label="Close Build"]'),
+            document.querySelector("#topbar"),
+            document.querySelector("#topbar .gameStatus"),
+            document.querySelector(
+              '#topbar [role="group"][aria-label="game speed"]',
+            ),
+          ];
+          return controls.map((control) => {
+            if (!control)
+              throw new Error("Build header or HUD control is missing");
+            const { x, y, width, height } = control.getBoundingClientRect();
+            return { x, y, width, height };
+          });
+        });
       // The tool header has a separator below its 56px control area.
       expect(
         await header.evaluate((element) => element.clientHeight),

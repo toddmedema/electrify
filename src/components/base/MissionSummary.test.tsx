@@ -6,7 +6,12 @@ import MissionSummary from "./MissionSummary";
 
 const mockSelectProjection = jest.fn();
 const mockSelectMissionRisk = jest.fn();
-const mockRequirements: { id: string; status: string }[] = [];
+const mockRequirements: {
+  id: string;
+  status: string;
+  required?: boolean;
+  definition?: string;
+}[] = [];
 const mockGetMissionStatus = jest.fn();
 jest.mock("../../helpers/Projection", () => ({
   projectionSignature: (game: GameType) => `month ${game.date.monthsElapsed}`,
@@ -197,6 +202,39 @@ describe("an early risk that appears on the rollover frame replaces the kept one
     });
     view.rerender(summary(makeGame(2)));
     expect(screen.getByText("Reliability missed")).toBeTruthy();
+  });
+
+  it("a required authored objective uses the settled verdict immediately", () => {
+    const view = steadyState(event);
+    mockRequirements.push({
+      id: "bills",
+      status: "failed",
+      required: true,
+      definition: "Billed customer revenue.",
+    });
+    mockSelectMissionRisk.mockReturnValue({
+      id: "objective:bills",
+      label: "Billed rate ceiling missed",
+      shortLabel: "Objective missed",
+      target: "mission-details",
+    });
+    view.rerender(summary(makeGame(2)));
+    expect(screen.getByText("Objective missed")).toBeInTheDocument();
+    expect(mockSelectProjection).not.toHaveBeenCalled();
+  });
+
+  it("a failed optional objective does not replace the current decision warning", () => {
+    const view = steadyState(event);
+    mockRequirements.push({
+      id: "bills",
+      status: "failed",
+      required: false,
+      definition: "Billed customer revenue.",
+    });
+    mockSelectMissionRisk.mockReturnValue(runway(2));
+    view.rerender(summary(makeGame(2)));
+    expect(screen.getByText("Upcoming: Winter freeze")).toBeInTheDocument();
+    expect(mockSelectMissionRisk).not.toHaveBeenCalled();
   });
 });
 

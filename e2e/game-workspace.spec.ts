@@ -1,4 +1,5 @@
 import { expect, Page, test } from "./fixtures";
+import path from "node:path";
 
 test.setTimeout(90_000);
 
@@ -29,6 +30,127 @@ async function settleSheets(page: Page) {
         panel.getAnimations().map((animation) => animation.finished),
       ),
     );
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`mobile grid status keeps the header height during a blackout in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(page.viewportSize()!.width >= 700);
+    await startGame(page, theme);
+    const status = page.locator(".gridHealth");
+    await expect(status).toHaveClass(/gridHealth-stable/);
+    const initialHeight = (await page.locator("#appbar").boundingBox())!.height;
+    await page
+      .getByRole("button", { name: "Inspect Coal", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
+    await expect(status).toHaveClass(/gridHealth-blackout/);
+    await expect(status.locator(".gridHealthMetric")).toHaveCount(0);
+    const icon = status.getByRole("button", {
+      name: /^Current grid status: Blackout/,
+    });
+    await expect(icon).toHaveCSS("height", "44px");
+    expect((await page.locator("#appbar").boundingBox())!.height).toBe(
+      initialHeight,
+    );
+    await icon.tap();
+    await expect(
+      page.getByRole("tooltip", { name: /^Blackout, .* short/ }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`grid-blackout-${theme}.png`),
+      animations: "disabled",
+    });
+  });
+
+  test(`program statuses always sit below their names in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await startGame(page, theme, 111);
+    await page.locator("#programsNav").click();
+    const programs = page.getByRole("region", {
+      name: "Programs",
+      exact: true,
+    });
+    await settleSheets(page);
+    await expect(programs.locator(".customerProgramTitle")).toHaveCount(7);
+    for (const title of await programs.locator(".customerProgramTitle").all()) {
+      const name = await title.locator(":scope > span").first().boundingBox();
+      const status = await title
+        .locator(".customerProgramStatus")
+        .boundingBox();
+      expect(name).not.toBeNull();
+      expect(status).not.toBeNull();
+      expect(status!.y).toBeGreaterThanOrEqual(name!.y + name!.height - 1);
+      expect(Math.abs(status!.x - name!.x)).toBeLessThanOrEqual(1);
+    }
+    expect(
+      await programs.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    if (
+      process.env.REVIEW_SCREENSHOT_DIR &&
+      theme === "light" &&
+      testInfo.project.name === "mobile-390px"
+    ) {
+      await programs.locator(".customerProgramsBody").evaluate((body) => {
+        body.scrollTop = body.scrollHeight;
+      });
+      await settleSheets(page);
+      await programs.locator(".customerProgramList").screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          "programs-mobile-light.png",
+        ),
+        animations: "disabled",
+      });
+    }
+  });
+
+  test(`touch closes dock tools without a lingering highlight in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(!testInfo.project.use.hasTouch);
+    await startGame(page, theme);
+    const insights = page.locator("#insightsNav");
+    const build = page.locator("#buildNav");
+    const insightsPane = page.getByRole("region", {
+      name: "Insights",
+      exact: true,
+    });
+    await insights.tap();
+    await expect(insightsPane).toBeVisible();
+    await expect(insights).toHaveAttribute("aria-expanded", "true");
+    await insights.tap();
+    await expect(insightsPane).toHaveCount(0);
+    await expect(insights).toHaveAttribute("aria-expanded", "false");
+    // Some phone browsers retain :hover after a tap. Exercise that state explicitly.
+    const session = await page.context().newCDPSession(page);
+    await session.send("DOM.enable");
+    await session.send("CSS.enable");
+    const { root } = await session.send("DOM.getDocument");
+    const { nodeId } = await session.send("DOM.querySelector", {
+      nodeId: root.nodeId,
+      selector: "#insightsNav",
+    });
+    await session.send("CSS.forcePseudoState", {
+      nodeId,
+      forcedPseudoClasses: ["hover"],
+    });
+    await expect(insights).toHaveCSS(
+      "background-color",
+      await build.evaluate((el) => getComputedStyle(el).backgroundColor),
+    );
+    await session.detach();
+    await expect(insights).not.toHaveClass(/Mui-focusVisible/);
+    // A physical keyboard on the same touch device still receives visible focus when closing.
+    await page.keyboard.press("e");
+    await expect(insightsPane).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(insights).toBeFocused();
+    await expect(insights).toHaveCSS("outline-style", "solid");
+    await expect(insights).toHaveCSS("outline-width", "2px");
   });
 }
 
@@ -522,7 +644,9 @@ test("Programs keeps points visible through monthly forecast refreshes", async (
     animations: "disabled",
   });
   await page.locator("#insightsNav").click();
-  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Zoom out", exact: true }),
+  ).toBeDisabled();
   await expect(
     page.getByLabel("Displayed date range: 2017–23", { exact: true }),
   ).toBeVisible();

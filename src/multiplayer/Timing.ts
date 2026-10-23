@@ -8,7 +8,7 @@ export const CONTROL_VIEW_INTERVAL_MS = 100;
 export const HOST_KEEPALIVE_MS = 1000;
 /** The worker pauses the match when the renderer's heartbeat is silent this long. */
 export const CONTROL_HEARTBEAT_TIMEOUT_MS = 5000;
-/** The host writes a shared save at least this often while a match runs. */
+/** The host writes a multiplayer save at least this often while a match runs. */
 export const CHECKPOINT_INTERVAL_MS = 10000;
 
 /** How often a session sends heartbeats, retries commands and checks host silence. */

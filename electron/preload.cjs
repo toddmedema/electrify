@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld(
   "electrifyDesktop",
   Object.freeze({
     apiVersion: 1,
+    mods: (input) => ipcRenderer.invoke("desktop:mods", input),
     getState: () => ipcRenderer.invoke("desktop:state"),
     setDisplay: (display) => ipcRenderer.invoke("desktop:display", display),
     quit: () => ipcRenderer.invoke("desktop:quit"),
@@ -34,7 +35,15 @@ contextBridge.exposeInMainWorld(
     setActivity: (activity) => ipcRenderer.invoke("desktop:activity", activity),
     addTimelineEvent: (event) =>
       ipcRenderer.invoke("desktop:timeline-event", event),
+    setInputContext: (context) =>
+      ipcRenderer.invoke("desktop:input-context", context),
+    onInput: (callback) => subscribe("desktop:input-event", callback),
+    showTextInput: (input) => ipcRenderer.invoke("desktop:text-input", input),
     onStateChanged: (callback) => subscribe("desktop:state-changed", callback),
+    onPowerStateChanged: (callback) =>
+      subscribe("desktop:power-changed", callback),
+    readyAfterResume: (generation) =>
+      ipcRenderer.invoke("desktop:resume-ready", generation),
     onBeforeQuit: (callback) => subscribe("desktop:before-quit", callback),
     onGameFocusChanged: (callback) =>
       subscribe("desktop:focus-changed", callback),

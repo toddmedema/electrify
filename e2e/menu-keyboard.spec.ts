@@ -19,6 +19,72 @@ test("main menu and settings work entirely with arrows, Enter and Escape", async
   await verifyMenuKeyboard(page);
 });
 
+test("Space activates Start playing", async ({ page }) => {
+  await page.goto("/");
+  const start = page.getByRole("button", {
+    name: "Start playing",
+    exact: true,
+  });
+  await start.focus();
+  await expect(start).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(page.locator(".facilities:visible")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Step 1 of 4", exact: true }),
+  ).toBeVisible();
+});
+
+test("Space opens Settings", async ({ page }) => {
+  await page.goto("/");
+  const settings = page.getByRole("button", { name: "Settings", exact: true });
+  await settings.focus();
+  await expect(settings).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeVisible();
+});
+
+test("Space toggles Sound", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const sound = page.getByRole("switch", { name: "Sound", exact: true });
+  await sound.focus();
+  await expect(sound).toBeFocused();
+  await expect(sound).not.toBeChecked();
+  await page.keyboard.press("Space");
+  await expect(sound).toBeChecked();
+  await page.keyboard.press("Space");
+  await expect(sound).not.toBeChecked();
+});
+
+test("Space activates game navigation while body Space pauses", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=106");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const speed = page.getByRole("group", { name: "game speed", exact: true });
+  await expect(speed).toBeVisible();
+  await page.keyboard.press("1");
+  const slow = speed.getByRole("button", { name: "slow speed", exact: true });
+  const paused = speed.getByRole("button", { name: "pause", exact: true });
+  await expect(slow).toHaveAttribute("aria-pressed", "true");
+  const events = page.getByRole("button", { name: "Events", exact: true });
+  await events.focus();
+  await expect(events).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(
+    page.getByRole("region", { name: "Events", exact: true }),
+  ).toBeVisible();
+  await expect(slow).toHaveAttribute("aria-pressed", "true");
+  await expect(paused).toHaveAttribute("aria-pressed", "false");
+  // Blur the tool heading onto the game surface: this Space still owns the global pause.
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await expect(page.locator("body")).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(paused).toHaveAttribute("aria-pressed", "true");
+});
+
 test("selection is visible in both themes without horizontal overflow", async ({
   page,
 }, testInfo) => {

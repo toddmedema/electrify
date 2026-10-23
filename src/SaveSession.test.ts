@@ -12,6 +12,7 @@ import {
   snapshotSavedGame,
   checkpointForDesktopExit,
   releaseDesktopSaveWriter,
+  renewDesktopSaveWriter,
 } from "./SaveSession";
 import { downloadSave } from "./SaveFile";
 import { store } from "./Store";
@@ -676,4 +677,23 @@ test("a co-op player whose host cannot save can still leave the match", async ()
   } finally {
     registerMultiplayerRuntime(undefined);
   }
+});
+
+test("waking renews the same desktop writer without releasing or stealing its lease", async () => {
+  const repository = await openActive();
+  repository.release.mockClear();
+  repository.renew.mockClear();
+  await renewDesktopSaveWriter();
+  expect(repository.renew).toHaveBeenCalledWith(
+    expect.objectContaining({ saveId: "A", writerToken: "handoff-A" }),
+  );
+  expect(repository.release).not.toHaveBeenCalled();
+  repository.renew.mockRejectedValueOnce(
+    new SaveRepositoryError("conflict", "Game changed while asleep"),
+  );
+  await expect(renewDesktopSaveWriter()).rejects.toThrow(
+    "Game changed while asleep",
+  );
+  expect(store.getState().saves.saveState).toBe("failed");
+  expect(repository.release).not.toHaveBeenCalled();
 });

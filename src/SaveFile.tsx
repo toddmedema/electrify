@@ -1,6 +1,5 @@
-import { getScenario } from "./data/Scenarios";
 import { parseSave } from "./SaveGame";
-import { SaveRepositoryError, validateSaveFileEnvelope } from "./SaveModel";
+import { validateSaveFileEnvelope } from "./SaveModel";
 import { encodeSave } from "./SaveEncoding";
 import type { SaveFileType } from "./Types";
 
@@ -50,56 +49,3 @@ function downloadJson(filename: string, raw: unknown): void {
 }
 
 export const MAX_SAVE_FILE_BYTES = 8 * 1024 * 1024;
-
-export interface ImportedSaveType {
-  file?: SaveFileType;
-  error?: string;
-}
-
-/** Import validates all payload/result fields before the caller creates a fresh local save. */
-export async function readSaveFile(file: File): Promise<ImportedSaveType> {
-  if (file.size > MAX_SAVE_FILE_BYTES)
-    return { error: "This save file is too large." };
-  let text: string;
-  try {
-    text = await readText(file);
-  } catch (_error) {
-    return { error: "Couldn't read that file." };
-  }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch (_error) {
-    return { error: "That file isn't an Electrify save game." };
-  }
-  try {
-    const imported = validateSaveFileEnvelope(raw, parseSave);
-    const scenario = getScenario(
-      imported.save.game.scenarioId,
-      imported.save.game.customScenario,
-    );
-    if (!scenario)
-      return {
-        error: "This save uses a scenario unavailable in this version.",
-      };
-    if (scenario.tutorialSteps?.length)
-      return { error: "Tutorials cannot be imported as saved games." };
-    return { file: imported };
-  } catch (error) {
-    return {
-      error:
-        error instanceof SaveRepositoryError
-          ? error.message
-          : "That file isn't a valid Electrify save game.",
-    };
-  }
-}
-
-function readText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsText(file);
-  });
-}

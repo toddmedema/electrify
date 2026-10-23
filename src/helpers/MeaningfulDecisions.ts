@@ -1,23 +1,6 @@
-import {
-  GameType,
-  MeaningfulDecisionKindType,
-  MeaningfulDecisionType,
-} from "../Types";
+import { GameType, MeaningfulDecisionType } from "../Types";
 
 export const MAX_MEANINGFUL_DECISIONS = 1000;
-
-export const MEANINGFUL_DECISION_CATEGORY_LABELS: Record<
-  MeaningfulDecisionKindType,
-  string
-> = {
-  asset: "grid investments",
-  sale: "retirements and sales",
-  rate: "customer pricing",
-  policy: "customer programs",
-  operation: "plant operations",
-  dispatch: "dispatch planning",
-  trading: "regional trading",
-};
 
 export type DecisionChangeType = Omit<MeaningfulDecisionType, "key" | "month">;
 

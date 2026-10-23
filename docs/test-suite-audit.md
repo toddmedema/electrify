@@ -1,5 +1,208 @@
 # Test-suite audit
 
+The wildfire-specific keep decisions below describe the system at audit time. The later
+[intertie mission redesign](wildfire-intertie.md) retires those smoke and preparedness suites
+and replaces them with route-limit, save/replay, seeded balance and three-width browser checks.
+
+## CI failure review, October 22, 2026
+
+The latest 100 pull-request workflow runs, from October 16–22, contained 69 passes,
+24 failures and seven cancellations. Excluding cancellations, 26% failed. Failures
+appeared on 15 of the 53 branches in that sample. These are run and branch counts,
+not a count of distinct pull requests or a claim that every failure had one cause.
+
+| Failed gate              | Runs affected | Representative evidence                                                                                                                                                                                                                                                                 |
+| ------------------------ | ------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Covered unit tests       |             7 | [Wildfire PR](https://github.com/toddmedema/electrify/actions/runs/39805411120), [loading animation](https://github.com/toddmedema/electrify/actions/runs/39718943350), [Steam hardening](https://github.com/toddmedema/electrify/actions/runs/39688988001)                             |
+| Packaged Electron tests  |            10 | [Native keyboard journey](https://github.com/toddmedema/electrify/actions/runs/39731522677), [quit-checkpoint fixture](https://github.com/toddmedema/electrify/actions/runs/39573431898), [Mac fullscreen transition](https://github.com/toddmedema/electrify/actions/runs/39488670840) |
+| Production browser tests |             5 | [Build dialog](https://github.com/toddmedema/electrify/actions/runs/39069149669), [changed workspace navigation](https://github.com/toddmedema/electrify/actions/runs/38975988514)                                                                                                      |
+| Multiplayer renderer     |             4 | [Shared speed](https://github.com/toddmedema/electrify/actions/runs/39353213733), [peer transport](https://github.com/toddmedema/electrify/actions/runs/38993990000)                                                                                                                    |
+| Bundle size              |             2 | [CSS ceiling](https://github.com/toddmedema/electrify/actions/runs/38986456084)                                                                                                                                                                                                         |
+| Build prerequisite       |             1 | [Missing Electron distribution](https://github.com/toddmedema/electrify/actions/runs/39642311317)                                                                                                                                                                                       |
+
+Gate counts overlap when one run failed in several places. Required fan-in and
+coverage jobs that repeated an upstream failure are not counted as extra causes.
+Six of the seven covered-unit failures included a test timeout. The same Insights
+zoom/pan test exceeded its 15-second deadline in five runs across four branches;
+DataCenterSetup also timed out in two runs, one shared with Insights. The remaining
+unit failure was a dialog-close assertion, rather than a Jest timeout.
+
+The CI scheduler had a reproducible resource-isolation defect: it ran covered Jest
+and simulations concurrently with the native renderer on one runner, while local
+`check:ci` runs those heavy gates serially. In the failed wildfire run, the native
+suite ran from 15:33:05–15:35:29 UTC and both Jest suites started at 15:33:48 UTC.
+Insights took 165 seconds for the suite and its zoom/pan case timed out. This
+overlap is a source of timing pressure that local validation did not reproduce;
+the logs alone cannot attribute every timeout to CPU contention.
+
+`platform-tests.execute` now runs each CPU and UI phase sequentially while still
+attempting every planned gate after failures. Its behavioral regression failed
+against the previous scheduler because three heavy phases overlapped, and passes
+with a maximum of one. Platform plans, both CPU shards, browser shards, coverage
+floors, native targets, worker counts and test deadlines are retained. Native
+platform behavior, stale UI journeys and genuine bundle regressions require their
+own fixes; serial scheduling does not make those failures disappear. Remote CI
+must establish the resulting reliability under hosted-runner load.
+
+## Follow-up: why a local pass was insufficient
+
+This review starts from `b4afcd80`, after the scheduler fix above was merged. It
+independently inspected the latest 80 workflow runs available on October 22
+(October 17–22): **60 successes, 17 failures, three cancellations**. All 17 failed
+runs were read through `ci:failures`; representative raw logs were also checked
+because the summarizer omitted some Jest failures. Excluding cancellations,
+17/77 runs failed (22%). This overlaps the earlier 100-run sample; do not add the
+counts together. A later successful run does not prove that an earlier failure
+was unrelated or flaky, and the logs do not establish which local command ran
+against each exact pushed commit.
+
+| Failure family       | Failed runs | Why local results could differ                                                                                                                                                       | Status on this base                                                                                                                                                                                                                                          |
+| -------------------- | ----------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Covered React tests  |           7 | CI overlapped Jest, simulations and Electron; local checks serialized them. Repeated DOM queries also competed with transition timers.                                               | Scheduling is already fixed in `5a020bf6`; dialog removal is fixed in `9ffa635f`.                                                                                                                                                                            |
+| Packaged Electron    |           6 | The local windowless check cannot exercise native fullscreen/focus, process teardown, or target-specific packaged bytes. Some renderer journeys were also only run through Electron. | Fullscreen readiness (`47d07a9d`), focus handoff (`f5398d69`), retained process ownership (`0ea2f73b`), runtime preparation (`27b06e4d`), target notice verification (`076059a1`), and a headless desktop keyboard journey (`9724de36`) are already present. |
+| Production browser   |           3 | Some UI changes left CI journeys stale. The diagnostic tool suggested the development server, and successful retries could be hidden in the local check's output.                    | The production reproduction path and retry acceptance policy are repaired in this follow-up.                                                                                                                                                                 |
+| Multiplayer renderer |           1 | CI uses the desktop production bundle; a web/dev-only check does not exercise that boundary.                                                                                         | The local multiplayer gate already builds the desktop renderer. Keep the observed speed disagreement separate from the Jest contention diagnosis.                                                                                                            |
+| Build prerequisite   |           1 | A warm local Electron installation concealed a missing distribution in a clean build.                                                                                                | Explicit runtime preparation is already present.                                                                                                                                                                                                             |
+
+The categories overlap in the Mods run, which failed both covered tests and the
+native keyboard journey. Fan-in/coverage jobs repeating upstream failures are
+not additional root causes. This sample contained no bundle-ceiling failure;
+the earlier sample did, and a real bundle regression needs a size fix.
+
+### What the evidence establishes
+
+- [Insights on the wildfire PR](https://github.com/toddmedema/electrify/actions/runs/39805411120)
+  exceeded 15 seconds while covered tests, simulations and Electron overlapped.
+  [The scheduler-only follow-up](https://github.com/toddmedema/electrify/actions/runs/39811928114)
+  passed all five jobs; the Insights suite fell from 165 to 70 seconds. A local
+  isolated, instrumented zoom/pan run in this review passed in 994 ms. Isolation
+  is evidence of the pressure difference, not proof of immunity to future flakes.
+- [The Mods failure](https://github.com/toddmedema/electrify/actions/runs/39731522677)
+  expected Settings to have focus after an arrow press that now selected Mods.
+  It failed on all three native platforms. That was a stale journey, not a slow
+  runner; increasing the focus timeout would never fix it. The existing headless
+  desktop-bridge test now covers that same journey locally.
+- [Native quit tests](https://github.com/toddmedema/electrify/actions/runs/39573431898)
+  called `app.process()` after Playwright had disposed its app proxy. The fix
+  retains the process before shutdown. [Fullscreen/focus failures](https://github.com/toddmedema/electrify/actions/runs/39488670840)
+  likewise need native lifecycle synchronization, not longer arbitrary waits.
+- [The clean build](https://github.com/toddmedema/electrify/actions/runs/39642311317)
+  lacked `node_modules/electron/dist`.
+  [The Windows notice mismatch](https://github.com/toddmedema/electrify/actions/runs/39653467213)
+  compared Windows runtime bytes with a Linux-built manifest. These are artifact
+  preparation/ownership problems, not test timing problems.
+- [The browser failures](https://github.com/toddmedema/electrify/actions/runs/39065510670)
+  included old dock-position/visibility expectations, while
+  [another run](https://github.com/toddmedema/electrify/actions/runs/39363777755)
+  recorded a chart tooltip that passed on retry. These are distinct from the
+  covered-unit timeouts. The current local runner sets `CI=true`, enabling two
+  retries, and discards successful command output. Playwright normally exits zero
+  after a passed retry, so a local “ok Production browser” did not mean every
+  attempt passed. The available history does not prove that a particular local
+  validation actually retried; the acceptance defect is reproduced directly.
+
+### Changes made by this follow-up
+
+Production browser runs now share one configuration for the real static server,
+worker policy, timeouts, retry behavior and acceptance criteria. Both hosted CI
+and local `check:ci` retain two retries for diagnostics but fail if any test is
+flaky. A stable test passes; a deliberately failing first attempt followed by a
+successful retry returns exit code 1. This prevents an intermittent defect from
+being silently reported as a clean local check. It may initially expose more red
+runs; those failures require investigation, not automatic retries or relaxed gates.
+
+`ci:failures` now retains Jest suite paths with duration suffixes/interleaved
+progress, timeout messages and matcher failures. Covered-unit failures point to
+the covered local gate; simulations point to their separate gate. All three
+desktop-renderer spec families (multiplayer, Steam Input and mods) point to the
+desktop-renderer gate. Failed and flaky browser cases point to a web production
+build followed by `test:e2e:production`, which can select a spec outside the CI
+smoke allowlist without starting a dev compiler. Web rebuilding comes after any
+multiplayer reproduction because both editions write `build/`.
+
+For example, with an unused task-specific `E2E_PORT` already set:
+
+```sh
+npm run build
+npm run test:e2e:production -- e2e/game-workspace.spec.ts:31 --project=desktop-chromium
+```
+
+The regression tests exercise Playwright's actual resolved configurations and
+exit codes. Disabling the new flaky-test policy reproduces the false-green exit
+and fails the regression; restoring the old diagnostics implementation fails the
+Jest and production-reproduction regressions. These checks keep the existing
+browser matrix, assertions, coverage floors, simulation outputs and deadlines.
+
+Native Electron remains a necessary CI-only boundary under the repository's
+windowless-local-testing rule. A Windows local pass cannot establish macOS native
+correctness. CI also tests the PR merge checkout, which can include base changes
+absent from a local branch; the run's `headSha` identifies the PR head, not proof
+that GitHub checked out that exact tree. None of these changes makes every CI-only
+failure impossible. They remove the demonstrated hidden-retry and reproduction
+mismatches while retaining the already merged resource-isolation fix.
+
+Validation of this follow-up: the integrated `npm run check:ci` ran all 14 gates.
+Thirteen passed, including the stricter production browser matrix and multiplayer.
+The unchanged benchmark initially measured Immer overhead at 1.67 against its
+1.63 ceiling; one isolated `npm run check -- --steps bench` rerun passed without
+any source or baseline change. All 14 gates therefore have passing results, with
+that benchmark retry recorded rather than described as a clean first run.
+
+### Tooltip race and validation evidence follow-up
+
+The first hosted run of this follow-up, [39874667124](https://github.com/toddmedema/electrify/actions/runs/39874667124),
+failed the macOS production-browser gate after the 390 px dark chart tooltip passed
+on retry. This was the same assertion at `facilities-production-chart.spec.ts:125`
+as the earlier light-mode failure already cited above. The native macOS suite passed.
+The tested merge tree matched the PR head, so neither native-only coverage nor base
+drift explained this failure. Enforcing retry acceptance had exposed a known runtime
+defect without repairing it.
+
+The chart stored keyboard selection in React while uPlot independently owned cursor
+visibility. A delayed compatibility `mouseleave` could reset the cursor after Home,
+hiding the tooltip while the accessible description still announced its selected
+point. A diagnostic against the exact hosted production artifact reproduced that
+ordering after eight original-journey passes. Keyboard selection now owns cursor
+position synchronously until Escape, blur, or intentional pointer input releases it.
+
+The existing browser journey now sends `mouseleave` through real uPlot immediately
+after Home and checks the visible tooltip and accessible selection. It also checks
+pointer takeover, Escape, blur, and normal hover dismissal in both themes. The new
+assertion failed against the original artifact at the intended keyboard-selection
+assertion; it does not rely on encountering the browser's intermittent event timing.
+
+The stricter integrated browser matrix also exposed a Build-header layout check that
+sampled its animated heading and close button in separate frames. It now waits for
+font and panel-animation readiness and measures the controls together. The one-pixel
+alignment limit and all readability assertions remain unchanged.
+
+The local production matrix also uses the same two browser workers as hosted CI.
+A six-worker local rerun under concurrent machine load exhausted multiple unrelated
+desktop test deadlines; its failures remain recorded. A configuration regression now
+rejects a local/hosted worker mismatch without increasing timeouts.
+
+Validation results are now retained instead of disappearing with a successful command:
+
+- Local `check` invocations keep separate `.tmp/check-runs/` reports with commit/tree,
+  dirty-source fingerprints, platform/Node/worker settings, commands, selected and
+  unrun gates, explicit pass/fail/skip states, and complete command logs.
+- Production browser and multiplayer configurations always write JSON attempt reports.
+  Hosted diagnostics already archive their output directories; local checks give each
+  invocation its own report, trace, and screenshot directory. Missing or invalid required
+  reports fail the gate, and reruns cannot overwrite or borrow an earlier run's evidence.
+- The runner compares source identities before and after execution and fails a run
+  whose source fingerprint differs at completion. This guards an individual invocation;
+  it does not automatically combine partial runs or certify their validity after later edits.
+
+The reporting regressions exercise the real CLI, including a successful command's
+stdout/stderr, source mutation by an otherwise successful gate, and a missing report
+after an earlier successful run. The Playwright acceptance regression now reads the
+persisted report and requires both the failed first attempt and successful retry to
+remain available while the gate still fails. Local evidence and hosted CI completion
+remain separate claims.
+
+## Original test inventory review, October 15, 2026
+
 Reviewed the complete tracked test inventory at master commit `0f71ec68` on October 15, 2026: **358 executable test files plus the golden-output snapshot**. Three subagents reviewed browser tests, React components, simulation/domain tests, and the remaining runtime/platform suites. The primary agent also reviewed saves, achievements, audio, native runtime, Firestore rules, CI tooling and the combined diff.
 
 | Review area                                                                  | Original executable files |
@@ -479,3 +682,40 @@ The long seeded scenario economics files, golden outputs, all-scenario and CEO l
 | src/workers/Projection.worker.test.ts                      | Retain             | Retain same-run initialization/cache reuse, city/watershed/seed invalidation and selective failed-load retries.                                                                                                               |
 
 | src/testing/**snapshots**/GoldenOutputs.sim.test.tsx.snap | Retain unchanged | Reviewed protected absolute scenario-output baselines; no rebaseline. |
+
+## Performance follow-up: October 21, 2026
+
+The timing inventory and focused runs pointed to repeated forecast work in Insights. Layer,
+preset and viewport controls now reuse a frozen real game and its frozen real projection,
+with simulation data reset before each case. Cache-invalidation regressions keep independent
+games. The overlapping unsaved/saved preset journeys share their editing setup while retaining
+both remounts and restore behavior, and now verify the displayed layer order. An icon-component
+assertion was replaced with the enabled, named control it represented.
+
+Projection tests inspect the real generator's arguments and a detached copy of its enumerable
+output, avoiding four duplicate twenty-year simulations. Copying before returning preserves
+detection of downstream mutations; omitting hidden metadata matches the original equality.
+
+Paired local runs on Node 24.14.0 used `test:ci -- --runInBand --runTestsByPath` with the two
+files below and coverage enabled. These are single-run timings, not runtime ceilings or an
+estimate of whole-suite savings.
+
+| Suite                                    |   Before |                After |
+| ---------------------------------------- | -------: | -------------------: |
+| `src/components/views/Insights.test.tsx` | 27.456 s |             23.058 s |
+| `src/helpers/Projection.test.ts`         |  6.113 s |              5.833 s |
+| Combined suite time                      | 33.569 s | 28.891 s (14% lower) |
+
+All 42 retained cases passed, compared with 43 before consolidation. The focused coverage
+runs do not meet repository-wide coverage thresholds on their own. Valid forecast cases passed;
+temporary wrong-input and in-place-output mutations both failed at the intended assertions.
+The merged preset journey and a viewport case also passed individually. A subagent review
+identified output aliasing and mutable simulation-data leakage; both were corrected before
+integrated validation.
+
+All fourteen `npm run check:ci` gates passed, including repository-wide coverage thresholds,
+long simulations, tick performance, production builds, browser layouts and multiplayer.
+
+Weather validation was already below one second locally. The data-center calibration matrix,
+simulation seed/difficulty matrices, golden outputs and import/replay safety checks remain:
+their distinct domain coverage does not justify further trimming in this pass.

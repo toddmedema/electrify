@@ -1,0 +1,168 @@
+{
+  "$schema": "../scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "bridge-the-maintenance-gap",
+  "title": "Bridge the maintenance gap",
+  "creator": "Electrify examples",
+  "version": "2",
+  "description": "Keep Manassas supplied while its gas peaker is overhauled. Pay for a shorter outage or accept funding for a longer one.",
+  "scenario": {
+    "startingYear": 2020,
+    "durationMonths": 24,
+    "startingCustomers": 16500,
+    "startingDemandScale": 7.7,
+    "cash": 25000000,
+    "dollarsPerkWh": 0.1,
+    "ownership": "Public",
+    "location": {
+      "id": "Manassas",
+      "name": "Manassas, VA",
+      "admin": "VA",
+      "country": "United States",
+      "region": "North America",
+      "lat": 38.7509,
+      "long": -77.4753,
+      "timeZone": "America/New_York"
+    },
+    "startingFleet": [
+      {
+        "name": "Natural Gas Peaker",
+        "id": "gas-peaker",
+        "peakMW": 75.0
+      },
+      {
+        "name": "Oil",
+        "peakMW": 55.0,
+        "ageYears": 27
+      }
+    ],
+    "endTitle": "Maintenance complete",
+    "endMessage": "The overhaul is complete. Review your service and costs."
+  },
+  "objectives": [
+    {
+      "id": "maintenance-service",
+      "label": "Keep Manassas supplied",
+      "metric": "monthlyReliability",
+      "fromMonth": 13,
+      "throughMonth": 24,
+      "minDemandServedShare": 0.995
+    },
+    {
+      "id": "maintenance-bills",
+      "label": "Keep bills affordable",
+      "metric": "monthlyBilledRate",
+      "fromMonth": 1,
+      "throughMonth": 24,
+      "maxDollarsPerKWh": 0.13
+    }
+  ],
+  "events": [
+    {
+      "id": "accelerate-overhaul",
+      "title": "Gas peaker overhaul",
+      "message": "The original gas peaker is offline until {{event+3 months}}.",
+      "preview": "The original gas peaker will be offline from {{event}} until {{event+3 months}}.",
+      "startMonth": 13,
+      "durationMonths": 3,
+      "requiresChoice": {
+        "choiceId": "overhaul-schedule",
+        "optionIds": ["accelerate"]
+      },
+      "effects": {
+        "outputMultipliersBySelector": [
+          {
+            "target": {
+              "selector": "startingAsset",
+              "assetId": "gas-peaker"
+            },
+            "outputMultiplier": 0
+          }
+        ]
+      },
+      "endMessage": "The original gas peaker overhaul is complete.",
+      "report": {
+        "id": "accelerate-target",
+        "kind": "affectedFacilities",
+        "eventId": "accelerate-overhaul"
+      }
+    },
+    {
+      "id": "standard-overhaul",
+      "title": "Gas peaker overhaul",
+      "message": "The original gas peaker is offline until {{event+6 months}}.",
+      "preview": "The original gas peaker will be offline from {{event}} until {{event+6 months}}.",
+      "startMonth": 13,
+      "durationMonths": 6,
+      "requiresChoice": {
+        "choiceId": "overhaul-schedule",
+        "optionIds": ["standard"]
+      },
+      "effects": {
+        "outputMultipliersBySelector": [
+          {
+            "target": {
+              "selector": "startingAsset",
+              "assetId": "gas-peaker"
+            },
+            "outputMultiplier": 0
+          }
+        ]
+      },
+      "endMessage": "The original gas peaker overhaul is complete.",
+      "report": {
+        "id": "standard-target",
+        "kind": "affectedFacilities",
+        "eventId": "standard-overhaul"
+      }
+    }
+  ],
+  "choices": [
+    {
+      "id": "overhaul-schedule",
+      "dueMonth": 7,
+      "title": "Overhaul schedule",
+      "prompt": "The original gas peaker goes offline in {{start+12 months}}. Shorten the outage or take funding.",
+      "options": [
+        {
+          "id": "accelerate",
+          "label": "Shorten the outage",
+          "description": "Finish the overhaul in three months.",
+          "message": "You paid for the three-month overhaul.",
+          "costDollars": {
+            "byDifficulty": {
+              "Intern": 1500000,
+              "Employee": 3000000,
+              "Manager": 4000000,
+              "VP": 5000000,
+              "CEO": 6000000
+            }
+          }
+        },
+        {
+          "id": "standard",
+          "label": "Take funding",
+          "description": "The outage lasts six months.",
+          "message": "You accepted support for the six-month overhaul.",
+          "grantDollars": 2000000
+        }
+      ]
+    }
+  ],
+  "debriefReports": [
+    {
+      "id": "maintenance-review",
+      "kind": "reliability",
+      "fromMonth": 13,
+      "throughMonth": 18,
+      "minDemandServedShare": 0.995
+    },
+    {
+      "id": "maintenance-finance",
+      "kind": "profitLoss",
+      "fromMonth": 7,
+      "throughMonth": 18
+    }
+  ]
+}

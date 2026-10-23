@@ -1,3 +1,4 @@
+import { validScenarioMod } from "./helpers/ScenarioMod";
 import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
 import { maxLoanAmount } from "./helpers/Financials";
 import {
@@ -24,7 +25,12 @@ import {
 import { APP_VERSION } from "./AppVersion";
 import { decodeSave } from "./SaveEncoding";
 import { SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
-import { validWorldEvent } from "./helpers/WorldEventValidation";
+import {
+  validWorldEvent,
+  validTransmissionCapacityLimits,
+} from "./helpers/WorldEventValidation";
+import { validScenarioRuleState } from "./helpers/ScenarioRuleValidation";
+import { validGameObjectiveProgress } from "./helpers/ObjectiveRules";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
@@ -57,6 +63,7 @@ import {
 } from "./data/AdjacentMarkets";
 import { getScenario } from "./data/Scenarios";
 import { pow } from "./helpers/Pow";
+import { log } from "./helpers/Libm";
 
 /**
  * Saving and restoring a game.
@@ -136,7 +143,7 @@ function validConstruction(
 function validUpgradedCapacity(capacityW: number, corridorW: number): boolean {
   if (!(corridorW > 0) || !(capacityW > 0)) return false;
   const steps = Math.round(
-    Math.log(capacityW / corridorW) / Math.log(INTERTIE_UPGRADE_STEP),
+    log(capacityW / corridorW) / log(INTERTIE_UPGRADE_STEP),
   );
   if (steps < 0 || steps > MAX_INTERTIE_UPGRADES) return false;
   return (
@@ -161,8 +168,7 @@ function validLineInvestment(
   let yearsToBuild = corridor.yearsToBuild;
   let constructionKgco2e = corridorConstructionKgco2e(corridor);
   const steps = Math.round(
-    Math.log(line.capacityW! / corridor.capacityW) /
-      Math.log(INTERTIE_UPGRADE_STEP),
+    log(line.capacityW! / corridor.capacityW) / log(INTERTIE_UPGRADE_STEP),
   );
   for (let step = 0; step < steps; step++) {
     const quote = intertieUpgradeQuote(expected, year, 1, 1, context);
@@ -336,6 +342,9 @@ export function parseSave(raw: unknown): SaveGameType | null {
     !isValidDifficulty(game.difficulty) ||
     typeof game.scenarioId !== "number" ||
     typeof game.seed !== "number" ||
+    !Number.isInteger(game.seed) ||
+    game.seed < 0 ||
+    game.seed > 4294967295 ||
     typeof game.startingYear !== "number" ||
     !Number.isFinite(game.startingYear) ||
     typeof game.customerMarketSize !== "number" ||
@@ -451,6 +460,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
         current.generatingLastRealTick,
       ].some((value) => value !== undefined && typeof value !== "boolean");
       return (
+        typeof current.name !== "string" ||
+        current.name.trim().length === 0 ||
         !validConstruction(
           current,
           Number(current.peakW) * 20 + Number(current.peakWh || 0),
@@ -478,6 +489,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
     game.timeline.some(
       (tick) =>
         !validEmissions(tick) ||
+        (tick.transmissionCapacityLimitsWByCorridor !== undefined &&
+          !validTransmissionCapacityLimits(
+            tick.transmissionCapacityLimitsWByCorridor,
+          )) ||
         typeof tick.reserveW !== "number" ||
         !Number.isFinite(tick.reserveW) ||
         [
@@ -556,6 +571,16 @@ export function parseSave(raw: unknown): SaveGameType | null {
     typeof game.meaningfulDecisionGateWaived !== "boolean"
   )
     return null;
+  if (
+    game.wildfireForecastRefresh !== undefined &&
+    typeof game.wildfireForecastRefresh !== "boolean"
+  )
+    return null;
+  if (
+    game.legacyWildfireIntertieAccess !== undefined &&
+    typeof game.legacyWildfireIntertieAccess !== "boolean"
+  )
+    return null;
   const worldEvents = game.worldEvents as
     Partial<GameType["worldEvents"]> | undefined;
   if (
@@ -611,6 +636,26 @@ export function parseSave(raw: unknown): SaveGameType | null {
   const transmission = game.transmission;
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!validCustomEventScenario(game.customScenario)) return null;
+  if (
+    game.customScenario?.mod !== undefined &&
+    (!validScenarioMod(game.customScenario.mod, game.customScenario) ||
+      game.customScenario.mod.parameters.difficulty !== game.difficulty ||
+      game.customScenario.mod.parameters.seed !== game.seed ||
+      game.scenarioId !== 999 ||
+      game.customScenario.id !== 999)
+  )
+    return null;
+  // Validate the frozen definition before interpreting its receipts. Native/custom catalog
+  // compilation can also reject unsupported saved setup; an import must return null, not throw.
+  try {
+    if (
+      !validScenarioRuleState(game as GameType) ||
+      !validGameObjectiveProgress(game as GameType)
+    )
+      return null;
+  } catch {
+    return null;
+  }
   const transmissionEnabled = !!(
     scenario && intertiesEnabledForScenario(scenario, game.location)
   );

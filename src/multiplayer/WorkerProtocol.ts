@@ -14,7 +14,8 @@ export type WorkerRequest =
       matchId: string;
       epoch: string;
     }
-  | { kind: "restore"; world: unknown; epoch: string }
+  /** seats hands each saved company, in saved order, to the player resuming it. */
+  | { kind: "restore"; world: unknown; epoch: string; seats?: Seat[] }
   | {
       kind: "command";
       sender: string;
@@ -22,7 +23,12 @@ export type WorkerRequest =
       allowReady?: boolean;
     }
   | { kind: "disconnect"; sender: string }
-  | { kind: "checkpoint"; requestId?: string; pause?: boolean };
+  | {
+      kind: "checkpoint";
+      requestId?: string;
+      pause?: boolean;
+      suspended?: boolean;
+    };
 export type WorkerResponse =
   | { kind: "views"; views: Record<string, RoomView> }
   | { kind: "keepalive"; matchId: string; epoch: string; revision: number }

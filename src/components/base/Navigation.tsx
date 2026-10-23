@@ -3,6 +3,7 @@ import { Badge, Button, Tooltip } from "@mui/material";
 import HistoryIcon from "@mui/icons-material/History";
 import InsertChartIcon from "@mui/icons-material/InsertChart";
 import GroupsIcon from "@mui/icons-material/Groups";
+import ErrorIcon from "@mui/icons-material/Error";
 import { useAppSelector, useAppDispatch } from "../../Store";
 import { CardNameType, CardType, GameToolType } from "../../Types";
 import { navigate, selectCardName } from "../../reducers/Card";
@@ -10,6 +11,7 @@ import { getScenario } from "../../data/Scenarios";
 import ConceptIcon from "./ConceptIcon";
 import useDockLabels from "./useDockLabels";
 import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
+import { useControllerInput } from "../../desktop/InputPresentation";
 import { selectTutorialActions } from "../../reducers/Tutorial";
 
 export interface StateProps {
@@ -68,11 +70,20 @@ export default function Navigation({
   onToggle?: (tool: GameTool) => void;
 }) {
   const dispatch = useAppDispatch();
+  const controllerInput = useControllerInput();
   const cardName = useAppSelector(selectCardName);
   const readOnly = useAppSelector((state) => !!state.game.replayPlayback);
   const unreadEvents = useAppSelector(
     (state) =>
       (state.game.eventLog[0]?.id || 0) > state.game.eventLogReadThroughId,
+  );
+  const emergency = useAppSelector((state) =>
+    state.game.worldEvents.active.some(
+      (event) =>
+        event.importance === "CRITICAL" &&
+        event.startsMinute <= state.game.date.minute &&
+        event.endsMinute > state.game.date.minute,
+    ),
   );
   // Tutorials have no term goal or score to show; their own HUD carries the objective
   const hasScenarioDetails = useAppSelector(
@@ -103,7 +114,7 @@ export default function Navigation({
           <Tooltip
             key={tool.id}
             title={
-              fromTouch
+              fromTouch || controllerInput
                 ? tool.label
                 : `${tool.label} (${TOOL_SHORTCUTS[tool.id]})`
             }
@@ -122,8 +133,13 @@ export default function Navigation({
               aria-label={tool.label}
               aria-keyshortcuts={TOOL_SHORTCUTS[tool.id]}
               aria-describedby={
-                tool.id === "EVENTS" && unreadEvents
-                  ? "eventsUnread"
+                tool.id === "EVENTS"
+                  ? [
+                      emergency && "eventsEmergency",
+                      unreadEvents && "eventsUnread",
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
                   : undefined
               }
               aria-controls={open ? `tool-${tool.id}` : undefined}
@@ -134,12 +150,28 @@ export default function Navigation({
               }
             >
               <Badge
+                key={tool.id === "EVENTS" && emergency ? "emergency" : "unread"}
+                className={
+                  tool.id === "EVENTS" && emergency
+                    ? "gameDockEmergency"
+                    : undefined
+                }
                 color="primary"
-                variant="dot"
-                invisible={tool.id !== "EVENTS" || !unreadEvents}
+                variant={tool.id === "EVENTS" && emergency ? "standard" : "dot"}
+                badgeContent={
+                  tool.id === "EVENTS" && emergency ? <ErrorIcon /> : undefined
+                }
+                invisible={
+                  tool.id !== "EVENTS" || (!unreadEvents && !emergency)
+                }
               >
                 {tool.icon}
               </Badge>
+              {tool.id === "EVENTS" && emergency && (
+                <span className="srOnly" id="eventsEmergency">
+                  Ongoing emergency
+                </span>
+              )}
               {tool.id === "EVENTS" && unreadEvents && (
                 <span className="srOnly" id="eventsUnread">
                   Unread events

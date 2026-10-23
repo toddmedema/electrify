@@ -93,6 +93,9 @@ class SteamAchievements {
     this.appId = BigInt(appId || 0);
     this.steamId = BigInt(steamId || 0);
     this.platform = platform;
+    this.storeAttempts = 0;
+    this.storeReceipts = 0;
+    this.storeSuccesses = 0;
     this.data = empty();
     for (const candidate of [filename, `${filename}.previous`]) {
       try {
@@ -112,9 +115,13 @@ class SteamAchievements {
         }
       }
     }
-    this.stats = api?.stats();
+    try {
+      this.stats = api?.stats();
+    } catch {
+      // Steam may disappear during startup; the durable journal still works.
+    }
     this.unsubscribe = [];
-    if (this.stats && dispatcher) {
+    if (api && dispatcher) {
       this.unsubscribe.push(
         dispatcher.onCallback(1101, (payload) => this.received(payload)),
         dispatcher.onCallback(1102, (payload) => this.stored(payload)),
@@ -122,8 +129,8 @@ class SteamAchievements {
     }
   }
 
-  persist() {
-    atomicWrite(this.filename, JSON.stringify(this.data));
+  persist(data = this.data) {
+    atomicWrite(this.filename, JSON.stringify(data));
   }
   add(input) {
     const { earned, completion } = validateIntent(input);
@@ -150,24 +157,22 @@ class SteamAchievements {
     }
     this.refresh();
   }
-  aggregate() {
-    for (const win of this.data.wins) {
+  aggregate(data = this.data) {
+    for (const win of data.wins) {
       const [scenarioId, difficulty] = win.split(":");
       const entry = catalog.find(
         (item) => item.scenarioId === Number(scenarioId),
       );
-      this.data.earned = union(this.data.earned, [entry.id, "STAYING_POWER"]);
+      data.earned = union(data.earned, [entry.id, "STAYING_POWER"]);
       if (difficulty === "CEO")
-        this.data.earned = union(this.data.earned, [
-          "CHIEF_ELECTRICITY_OFFICER",
-        ]);
+        data.earned = union(data.earned, ["CHIEF_ELECTRICITY_OFFICER"]);
     }
-    if (this.data.tutorials.includes(0))
-      this.data.earned = union(this.data.earned, ["FIRST_SPARK"]);
-    if (TUTORIAL_IDS.every((id) => this.data.tutorials.includes(id)))
-      this.data.earned = union(this.data.earned, ["GRID_GRADUATE"]);
-    if (OFFICIAL_IDS.every((id) => this.data.wins.includes(`${id}:CEO`)))
-      this.data.earned = union(this.data.earned, ["MASTER_OF_THE_GRID"]);
+    if (data.tutorials.includes(0))
+      data.earned = union(data.earned, ["FIRST_SPARK"]);
+    if (TUTORIAL_IDS.every((id) => data.tutorials.includes(id)))
+      data.earned = union(data.earned, ["GRID_GRADUATE"]);
+    if (OFFICIAL_IDS.every((id) => data.wins.includes(`${id}:CEO`)))
+      data.earned = union(data.earned, ["MASTER_OF_THE_GRID"]);
   }
   pending() {
     return (
@@ -181,12 +186,17 @@ class SteamAchievements {
   refresh(now = Date.now()) {
     if (
       this.stopped ||
-      !this.stats ||
-      this.inFlight ||
-      now < (this.retryAt || 0)
+      !this.api ||
+      now < (this.retryAt || 0) ||
+      (this.inFlight && now < this.storeUntil)
     )
       return;
     try {
+      this.stats ||= this.api.stats();
+      if (!this.stats) {
+        this.retryAt = now + 60000;
+        return;
+      }
       if (!this.ready) {
         if (now < (this.requestUntil || 0)) return;
         // The pinned SDK v012 requires RequestCurrentStats, including Offline Mode.
@@ -195,7 +205,7 @@ class SteamAchievements {
         return;
       }
       if (!this.pending()) return;
-      const batch = JSON.parse(JSON.stringify(this.data));
+      const batch = this.inFlight || JSON.parse(JSON.stringify(this.data));
       let accepted = true;
       for (const id of batch.earned.filter(
         (id) => !batch.confirmed.includes(id),
@@ -221,15 +231,18 @@ class SteamAchievements {
         this.retryAt = now + 60000;
         return;
       }
-      // Snapshot before StoreStats: a callback confirms only this batch, never awards
-      // earned while it was outstanding. Its boolean return alone is not a receipt.
+      // Retry a missing receipt at most once a minute, keeping the same frozen
+      // batch. UserStatsStored has no request ID and old receipts may arrive late.
+      const previous = this.inFlight;
+      if (!previous) this.confirmAfter = this.storeAttempts + 1;
       this.inFlight = batch;
-      if (!this.api.storeStats(this.stats)) {
-        this.inFlight = null;
+      this.storeUntil = now + 60000;
+      if (this.api.storeStats(this.stats)) this.storeAttempts++;
+      else {
+        this.inFlight = previous || null;
         this.retryAt = now + 60000;
       }
     } catch {
-      this.inFlight = null;
       this.ready = false;
       this.retryAt = now + 60000;
     }
@@ -238,66 +251,89 @@ class SteamAchievements {
     const size = this.platform === "win32" ? 24 : 20;
     if (
       this.stopped ||
+      !this.stats ||
       payload.length !== size ||
       payload.readBigUInt64LE(0) !== this.appId ||
       payload.readBigUInt64LE(this.platform === "win32" ? 16 : 12) !==
         this.steamId
     )
       return;
-    this.ready = payload.readInt32LE(8) === 1;
-    if (!this.ready) return;
-    for (const stat of STATS) {
-      const value = Buffer.alloc(4);
-      if (
-        !this.api.getStat(this.stats, stat.name, value) ||
-        value.readInt32LE(0) !== 1
-      )
-        continue;
-      if (stat.tutorial !== undefined)
-        this.data.tutorials = union(this.data.tutorials, [stat.tutorial]);
-      else this.data.wins = union(this.data.wins, [stat.win]);
-    }
-    // Existing Steam achievements are authoritative. Pending local intents still need
-    // a storage confirmation, even if SetAchievement survived in Steam's offline cache.
-    for (const { id } of catalog) {
-      const unlocked = Buffer.alloc(1);
-      if (
-        this.api.getAchievement(this.stats, id, unlocked) &&
-        unlocked[0] &&
-        !this.data.earned.includes(id)
-      ) {
-        this.data.earned.push(id);
-        this.data.confirmed.push(id);
+    this.ready = false;
+    if (payload.readInt32LE(8) !== 1) return;
+    try {
+      const next = JSON.parse(JSON.stringify(this.data));
+      for (const stat of STATS) {
+        const value = Buffer.alloc(4);
+        if (
+          !this.api.getStat(this.stats, stat.name, value) ||
+          value.readInt32LE(0) !== 1
+        )
+          continue;
+        if (stat.tutorial !== undefined)
+          next.tutorials = union(next.tutorials, [stat.tutorial]);
+        else next.wins = union(next.wins, [stat.win]);
       }
+      // A cached unlock can still be awaiting upload. Import it as earned and let
+      // StoreStats acknowledge it, without repeating SetAchievement or clearing it.
+      for (const { id } of catalog) {
+        const unlocked = Buffer.alloc(1);
+        if (this.api.getAchievement(this.stats, id, unlocked) && unlocked[0])
+          next.earned = union(next.earned, [id]);
+      }
+      this.aggregate(next);
+      if (JSON.stringify(next) !== JSON.stringify(this.data))
+        this.persist(next);
+      this.data = next;
+      this.ready = true;
+      this.refresh();
+    } catch {
+      // Publish imported history only after it is durable. A later stats request
+      // can recover from a disk error or disappearing Steam client.
+      this.retryAt = Date.now() + 60000;
     }
-    this.aggregate();
-    this.persist();
-    this.refresh();
   }
+
   stored(payload) {
     const size = this.platform === "win32" ? 16 : 12;
     if (
       this.stopped ||
-      !this.inFlight ||
+      this.storeReceipts >= this.storeAttempts ||
       payload.length !== size ||
       payload.readBigUInt64LE(0) !== this.appId
     )
       return;
-    const batch = this.inFlight;
-    this.inFlight = null;
+    this.storeReceipts++;
     this.retryAt = Date.now() + 60000;
-    if (payload.readInt32LE(8) !== 1) {
-      this.ready = false;
-      return;
+    const success = payload.readInt32LE(8) === 1;
+    if (success) this.storeSuccesses++;
+    else this.ready = false;
+    // At most confirmAfter-1 successful receipts can belong to older batches.
+    // Reaching this threshold proves a store containing the frozen batch succeeded,
+    // even if responses arrive out of order or an earlier receipt never arrives.
+    if (this.inFlight && success && this.storeSuccesses >= this.confirmAfter) {
+      const batch = this.inFlight;
+      this.inFlight = null;
+      const next = {
+        ...this.data,
+        confirmed: union(this.data.confirmed, batch.earned),
+        storedTutorials: union(this.data.storedTutorials, batch.tutorials),
+        storedWins: union(this.data.storedWins, batch.wins),
+      };
+      try {
+        this.persist(next);
+        this.data = next;
+      } catch {
+        // The receipt must also be durable; retry this still-pending batch later.
+      }
     }
-    const next = {
-      ...this.data,
-      confirmed: union(this.data.confirmed, batch.earned),
-      storedTutorials: union(this.data.storedTutorials, batch.tutorials),
-      storedWins: union(this.data.storedWins, batch.wins),
-    };
-    atomicWrite(this.filename, JSON.stringify(next));
-    this.data = next;
+    if (this.storeReceipts === this.storeAttempts) {
+      // Every accepted request has replied, so no older receipt can acknowledge
+      // the next batch. Failed or non-durable confirmations remain in the journal.
+      this.storeAttempts = 0;
+      this.storeReceipts = 0;
+      this.storeSuccesses = 0;
+      this.inFlight = null;
+    }
   }
   dispose() {
     this.stopped = true;

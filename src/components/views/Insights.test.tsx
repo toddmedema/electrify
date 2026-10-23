@@ -1,4 +1,4 @@
-import { configureStore } from "@reduxjs/toolkit";
+import { configureStore, createNextState } from "@reduxjs/toolkit";
 import {
   act,
   isInaccessible,
@@ -18,6 +18,12 @@ import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
 import { cancelPolicy, schedulePolicy } from "../../reducers/GameActions";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
+import { loadSimData } from "../../testing/SimData";
+import {
+  cacheProjection,
+  ProjectionView,
+  selectProjection,
+} from "../../helpers/Projection";
 import { GameType, TickPresentFutureType } from "../../Types";
 import Insights, {
   INSIGHT_PRESETS,
@@ -244,16 +250,19 @@ jest.mock("../base/ChartForecastSupplyDemand", () => ({
 }));
 jest.mock("../base/ChartSupplyDemandRanges", () => ({
   __esModule: true,
-  default: ({ syncKey, timeline, domain, currentMinute }: ChartMockProps) => (
-    <div
-      role="img"
-      data-testid="supply-demand-chart"
-      data-forecast-start={currentMinute}
-      data-sync-key={syncKey}
-      data-points={timeline?.length}
-      data-domain={domainValue(domain)}
-    />
-  ),
+  default: ({ syncKey, timeline, domain, currentMinute }: ChartMockProps) => {
+    mockSupplyDemandPaints++;
+    return (
+      <div
+        role="img"
+        data-testid="supply-demand-chart"
+        data-forecast-start={currentMinute}
+        data-sync-key={syncKey}
+        data-points={timeline?.length}
+        data-domain={domainValue(domain)}
+      />
+    );
+  },
 }));
 jest.mock("../base/ChartForecastStorage", () => ({
   __esModule: true,
@@ -296,6 +305,8 @@ jest.mock("../base/ChartForecastWeather", () => ({
 }));
 
 const user = userEvent.setup({ delay: null });
+
+let overviewGame: GameType;
 
 it("reframes the same event after its selected chip leaves the viewport", () => {
   localStorage.clear();
@@ -411,10 +422,8 @@ it("reorders configured charts while ending temporary reveal without saving it",
     screen.getByRole("button", { name: "Move Finance details up" }),
   ).toBeDisabled();
   expect(
-    within(
-      screen.getByRole("button", { name: "Keep Finance details" }),
-    ).getByTestId("AddIcon"),
-  ).toBeInTheDocument();
+    screen.getByRole("button", { name: "Keep Finance details" }),
+  ).toBeEnabled();
   rerender(<Insights {...props} />);
   await user.click(screen.getByRole("button", { name: "Move Cash up" }));
   expect(screen.queryByText(/Temporary evidence/)).not.toBeInTheDocument();
@@ -437,7 +446,10 @@ function renderInsights(
 ) {
   return render(
     <Insights
-      game={suppliedGame || createGame({ scenarioId })}
+      game={
+        suppliedGame ||
+        (scenarioId === 100 ? overviewGame : createGame({ scenarioId }))
+      }
       selectedFacilityId={null}
       facilityDragActive={false}
       upcomingEvents={upcomingEvents}
@@ -508,14 +520,30 @@ function storeCustomPreset(name: string) {
 }
 
 describe("Insights layers", () => {
-  beforeEach(() => localStorage.clear());
+  let overviewProjection: ProjectionView;
+  beforeAll(() => {
+    // Layer/preset controls share immutable real inputs and a real forecast. Cache
+    // regression cases still create independent games with distinct history identities.
+    overviewGame = createNextState(createGame({ scenarioId: 100 }), () => {});
+    overviewProjection = createNextState(
+      selectProjection(overviewGame, overviewGame.timeline[0]),
+      () => {},
+    );
+  });
+  beforeEach(() => {
+    localStorage.clear();
+    // Other cases play different seeds and locations. Reusing the immutable game
+    // must not inherit their mutable weather/fuel/economy projection caches.
+    loadSimData(overviewGame.location);
+    cacheProjection(overviewGame, overviewProjection);
+  });
 
   it("shows expanded finance rows and both rate graphs", () => {
     localStorage.setItem(
       "insightsLayers",
       JSON.stringify(["financeDetails", "inflationInterest"]),
     );
-    const game = createGame({ scenarioId: 100 });
+    const game = overviewGame;
     renderInsights(100, game);
     for (const label of [
       "Fuel",
@@ -562,9 +590,7 @@ describe("Insights layers", () => {
     expect(
       screen.queryByRole("button", { name: "Remove Cash" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Chart time key")).toHaveTextContent(
-      "RecordedForecast",
-    );
+    expect(screen.queryByLabelText("Chart time key")).not.toBeInTheDocument();
     await user.click(labelledButton(/Layers/));
     expect(labelledButton("Remove Cash")).toBeEnabled();
     expect(labelledButton("Move Cash up")).toBeEnabled();
@@ -617,9 +643,9 @@ describe("Insights layers", () => {
       },
       {
         key: "later-event",
-        startsMinute: 18 * MINUTES_PER_MONTH,
-        endsMinute: 19 * MINUTES_PER_MONTH,
-        label: "Expected Jul 2024",
+        startsMinute: 180 * MINUTES_PER_MONTH,
+        endsMinute: 181 * MINUTES_PER_MONTH,
+        label: "Expected Jan 2035",
         title: "Outside range",
         message: "This should not be shown.",
       },
@@ -628,9 +654,8 @@ describe("Insights layers", () => {
     const region = screen.getByRole("region", {
       name: "Upcoming scenario events",
     });
-    expect(region).toHaveTextContent("Upcoming");
     expect(region).toHaveTextContent("Jul 2023");
-    expect(region).not.toHaveTextContent("Higher pollution fee begins");
+    expect(region).toHaveTextContent("Higher pollution fee begins");
     const event = within(region).getByRole("button", {
       name: "Expected Jul 2023: Higher pollution fee begins",
     });
@@ -682,14 +707,14 @@ describe("Insights layers", () => {
     const initial = JSON.parse(supply.getAttribute("data-domain") || "[]");
     expect(cash).toHaveAttribute("data-domain", JSON.stringify(initial));
     expect(labelledButton("Pan earlier")).toBeDisabled();
-    expect(labelledButton("Zoom out")).toBeEnabled();
+    expect(labelledButton("Zoom out")).toBeDisabled();
 
     await user.click(labelledButton("Zoom in"));
     const zoomed = JSON.parse(supply.getAttribute("data-domain") || "[]");
     expect(zoomed[1] - zoomed[0]).toBeCloseTo((initial[1] - initial[0]) / 2);
     expect(cash).toHaveAttribute("data-domain", JSON.stringify(zoomed));
     expect(
-      screen.getByLabelText("Displayed date range: Apr–Sep 2020"),
+      screen.getByLabelText("Displayed date range: 2023–28"),
     ).toBeVisible();
     expect(labelledButton("Pan earlier")).toBeEnabled();
     expect(labelledButton("Pan later")).toBeEnabled();
@@ -714,10 +739,10 @@ describe("Insights layers", () => {
     ).toBeVisible();
   });
 
-  it.each([60, 0])(
-    "zooms out to the scenario span, with a 20-year fallback for duration %s",
-    async (durationMonths) => {
-      const game = gameWithHistory();
+  it.each([1, 12, 60, 192, 0])(
+    "opens on the scenario span, with a 20-year fallback for duration %s",
+    (durationMonths) => {
+      const game = overviewGame;
       const months = durationMonths || 20 * 12;
       renderInsights(100, {
         ...game,
@@ -728,7 +753,6 @@ describe("Insights layers", () => {
           durationMonths,
         },
       });
-      await user.click(labelledButton("Zoom out"));
       expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
         "data-domain",
         JSON.stringify([0, months * MINUTES_PER_MONTH]),
@@ -737,13 +761,13 @@ describe("Insights layers", () => {
     },
   );
 
-  it("opens on the operating year and follows it as the game advances", () => {
-    const game = createGame({ scenarioId: 100 });
+  it("opens on the full scenario and keeps its endpoints as the game advances", () => {
+    const game = overviewGame;
     const view = renderInsights(100, game);
     const supply = screen.getByTestId("supply-demand-chart");
     expect(supply).toHaveAttribute(
       "data-domain",
-      JSON.stringify([0, 12 * MINUTES_PER_MONTH]),
+      JSON.stringify([0, getScenario(100)!.durationMonths * MINUTES_PER_MONTH]),
     );
 
     const nextGame = {
@@ -764,7 +788,7 @@ describe("Insights layers", () => {
 
     expect(supply).toHaveAttribute(
       "data-domain",
-      JSON.stringify([MINUTES_PER_MONTH, 13 * MINUTES_PER_MONTH]),
+      JSON.stringify([0, getScenario(100)!.durationMonths * MINUTES_PER_MONTH]),
     );
   });
 
@@ -773,23 +797,21 @@ describe("Insights layers", () => {
     game.facilities = [];
     renderInsights(100, game);
     const note = screen.getByRole("note", {
-      name: /^Forecast shortfall for Jan–Dec 2020:/,
+      name: /^Forecast shortfall for 2020–31:/,
     });
-    expect(note).toHaveTextContent(
-      /^Shortfall, Jan–Dec 2020:\s*~.+ unmet · peak ~/,
-    );
+    expect(note).toHaveTextContent(/^Shortfall, 2020–31:\s*~.+ unmet · peak ~/);
     const wholeScenario = note.textContent;
 
     await user.click(labelledButton("Zoom in"));
     expect(
       screen.getByRole("note", {
-        name: /^Forecast shortfall for Apr–Sep 2020:/,
+        name: /^Forecast shortfall for 2023–28:/,
       }),
     ).not.toHaveTextContent(wholeScenario!);
   });
 
   it("reports the viewport and reopens on it after the pane remounts", async () => {
-    const game = createGame({ scenarioId: 100 });
+    const game = overviewGame;
     const onViewportChange = jest.fn();
     const view = render(
       <Insights
@@ -825,7 +847,7 @@ describe("Insights layers", () => {
     // React keeps derived state out of the update queue's base state while the component has
     // pending work, so every synchronous render until that work lands derives the month's
     // viewport again. Automatic following needs no Redux update, even with pending work.
-    const game = createGame({ scenarioId: 100 });
+    const game = overviewGame;
     const nextMonth = {
       ...game,
       date: {
@@ -899,7 +921,7 @@ describe("Insights layers", () => {
   });
 
   it("slides both ends of an unanchored viewport as the game advances", async () => {
-    const game = createGame({ scenarioId: 100 });
+    const game = overviewGame;
     const view = renderInsights(100, game);
     const supply = screen.getByTestId("supply-demand-chart");
     await user.click(labelledButton("Zoom in"));
@@ -981,27 +1003,26 @@ describe("Insights layers", () => {
       );
   });
 
-  it("persists custom visibility and ordering across a remount", async () => {
-    const view = renderInsights();
+  it("persists edited layer order, saves the preset, and restores its original layers", async () => {
+    let view = renderInsights();
     await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
     await user.click(labelledButton("Move Revenue up"));
 
-    const stored = JSON.parse(localStorage.getItem("insightsLayers") || "[]");
-    expect(stored).toContain("revenue");
+    const layers = ["supplyDemand", "cash", "revenue", "emissions"];
+    expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual(layers);
     view.unmount();
-
-    renderInsights();
+    view = renderInsights();
     expect(screen.getByText("Revenue", { selector: "h6" })).toBeVisible();
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("OverviewEdited");
-  });
-
-  it("saves default preset changes across a remount and restores its original layers", async () => {
-    const view = renderInsights();
-    await user.click(labelledButton(/Layers/));
-    await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
+    const headings = screen
+      .getAllByRole("heading", { level: 6 })
+      .map((heading) => heading.textContent);
+    expect(headings.indexOf("Revenue")).toBeLessThan(
+      headings.indexOf("Emissions (CO2e)"),
+    );
 
     await user.click(labelledButton("Preset actions"));
     await user.click(
@@ -1011,11 +1032,16 @@ describe("Insights layers", () => {
     const library = JSON.parse(
       localStorage.getItem("insightsPresetLibrary") || "{}",
     );
-    expect(library.defaults.overview).toContain("revenue");
+    expect(library.defaults.overview).toEqual(layers);
     view.unmount();
 
     renderInsights();
     expect(screen.getByText("Revenue", { selector: "h6" })).toBeVisible();
+    expect(
+      screen
+        .getAllByRole("heading", { level: 6 })
+        .map((heading) => heading.textContent),
+    ).toEqual(headings);
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("Overview");
@@ -1271,7 +1297,7 @@ describe("Insights layers", () => {
 
 function labelledButton(label: string | RegExp): HTMLElement {
   const button = screen.getByLabelText(label, {
-    selector: "button:not(.insightsShortRateToggle)",
+    selector: "button",
   });
   expect(button).toBeVisible();
   expect(isInaccessible(button)).toBe(false);

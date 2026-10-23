@@ -1,28 +1,32 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { runInNewContext } from "vm";
+import { createHash, webcrypto } from "crypto";
 
 const workerSource = readFileSync(
   resolve(process.cwd(), "public/service-worker.js"),
   "utf8",
 );
 
-function response(ok = true) {
-  return { ok, clone: () => response(ok) };
-}
-
-function jsonResponse(payload: unknown) {
+function response(ok = true, body = "") {
   return {
-    ok: true,
-    clone: () => jsonResponse(payload),
-    json: async () => payload,
+    ok,
+    clone: () => response(ok, body),
+    text: async () => body,
+    json: async () => JSON.parse(body),
+    arrayBuffer: async () => Uint8Array.from(Buffer.from(body)).buffer,
   };
 }
 
+function jsonResponse(payload: unknown) {
+  return response(true, JSON.stringify(payload));
+}
+
 type WorkerResponse = ReturnType<typeof response>;
-type FetchRequest = string | { url: string; method: string; mode: string };
+type FetchRequest =
+  string | { url: string; method: string; mode: string; integrity?: string };
 type FetchEvent = {
-  request: { url: string; method: string; mode: string };
+  request: Exclude<FetchRequest, string>;
   respondWith: (result: Promise<WorkerResponse>) => void;
   waitUntil: (work: Promise<unknown>) => void;
 };
@@ -48,6 +52,11 @@ function worker() {
   const open = jest.fn().mockResolvedValue({ put, match: cacheMatch });
   runInNewContext(workerSource, {
     URL,
+    crypto: webcrypto,
+    btoa: (value: string) => Buffer.from(value, "binary").toString("base64"),
+    Response: function (body: string) {
+      return response(true, body);
+    },
     fetch,
     caches: { match, open },
     self: {
@@ -62,14 +71,15 @@ function worker() {
     match,
     cacheMatch,
     open,
-    request(mode = "cors") {
+    request(mode = "cors", path = "/static/main.js", integrity?: string) {
       let result: Promise<WorkerResponse> | undefined;
       const work: Promise<unknown>[] = [];
       handlers.get("fetch")!({
         request: {
-          url: "https://electrify.test/static/main.js",
+          url: `https://electrify.test${path}`,
           method: "GET",
           mode,
+          integrity,
         },
         respondWith: (promise) => {
           result = promise;
@@ -175,6 +185,175 @@ it("still reports a failed request when no cached asset exists", async () => {
   const event = sw.request();
   await expect(event.result).rejects.toThrow("offline");
   await Promise.all(event.work);
+});
+
+const integrityFor = (body: string) =>
+  `sha256-${createHash("sha256").update(body).digest("base64")}`;
+
+/** A persistent cache shared by consecutive events, as in the real worker. */
+function dataWorker() {
+  const sw = worker();
+  const entries = new Map<string, WorkerResponse>();
+  const path = (request: FetchRequest) =>
+    new URL(
+      typeof request === "string" ? request : request.url,
+      "https://electrify.test",
+    ).pathname;
+  sw.match.mockImplementation(async (request) =>
+    entries.get(path(request))?.clone(),
+  );
+  sw.cacheMatch.mockImplementation(async (request) =>
+    entries.get(path(request))?.clone(),
+  );
+  sw.put.mockImplementation(
+    async (request: FetchRequest, value: WorkerResponse) => {
+      entries.set(path(request), value.clone());
+    },
+  );
+  sw.open.mockResolvedValue({
+    put: sw.put,
+    match: sw.cacheMatch,
+    keys: async () =>
+      [...entries.keys()].map((key) => ({
+        url: `https://electrify.test${key}`,
+      })),
+  });
+  return { ...sw, entries, path };
+}
+
+describe("simulation data integrity", () => {
+  const url = "/data/weather/PIT.bin";
+  it.each([url, "/data/FuelPricesRaw.csv"])(
+    "replaces obsolete %s bytes, then serves the current build offline",
+    async (url) => {
+      const sw = dataWorker();
+      sw.entries.set(url, response(true, "old"));
+      sw.fetch.mockResolvedValue(response(true, "fresh"));
+      expect(
+        await (
+          await sw.request("cors", url, integrityFor("fresh")).result
+        ).text(),
+      ).toBe("fresh");
+      expect(await sw.entries.get(url)!.text()).toBe("fresh");
+      expect(sw.fetch).toHaveBeenCalledWith(
+        expect.objectContaining({ integrity: integrityFor("fresh") }),
+        { cache: "no-cache" },
+      );
+      sw.fetch.mockRejectedValue(new Error("offline"));
+      expect(
+        await (
+          await sw.request("cors", url, integrityFor("fresh")).result
+        ).text(),
+      ).toBe("fresh");
+      expect(sw.fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["offline", "wrong bytes"])(
+    "rejects stale cache when the network gives %s",
+    async (failure) => {
+      const sw = dataWorker();
+      sw.entries.set(url, response(true, "old"));
+      if (failure === "offline")
+        sw.fetch.mockRejectedValue(new Error("offline"));
+      else sw.fetch.mockResolvedValue(response(true, "wrong"));
+      await expect(
+        sw.request("cors", url, integrityFor("fresh")).result,
+      ).rejects.toThrow();
+      expect(await sw.entries.get(url)!.text()).toBe("old");
+    },
+  );
+
+  it("returns verified network data even if its cache write fails", async () => {
+    const sw = dataWorker();
+    sw.put.mockRejectedValue(new Error("quota"));
+    sw.fetch.mockResolvedValue(response(true, "fresh"));
+    expect(
+      await (
+        await sw.request("cors", url, integrityFor("fresh")).result
+      ).text(),
+    ).toBe("fresh");
+  });
+
+  it("never coalesces integrity-free prefetches or different build hashes", async () => {
+    const sw = dataWorker();
+    let release!: () => void;
+    const waiting = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    sw.fetch.mockImplementation(async (request) => {
+      if (sw.path(request) !== url) return response();
+      await waiting;
+      const integrity =
+        typeof request === "string" ? undefined : request.integrity;
+      return response(
+        true,
+        integrity === integrityFor("fresh") ? "fresh" : "old",
+      );
+    });
+    const prefetch = sw.message({
+      type: "CACHE_SCENARIO_DATA",
+      locationIds: ["PIT"],
+    });
+    const current = sw.request("cors", url, integrityFor("fresh")).result;
+    const older = sw.request("cors", url, integrityFor("old")).result;
+    release();
+    expect(await (await current).text()).toBe("fresh");
+    expect(await (await older).text()).toBe("old");
+    await Promise.all(prefetch);
+    expect(
+      sw.fetch.mock.calls.filter(([request]) => sw.path(request) === url),
+    ).toHaveLength(3);
+  });
+});
+
+describe("SYNC_OFFLINE_DATA", () => {
+  it.each(["network", "cache", "marker"])(
+    "retries a failed %s write/download even when the ordinary index is current",
+    async (failure) => {
+      const sw = dataWorker();
+      const weather = "/data/weather/PIT.bin";
+      const index = JSON.stringify({ updated: "new", cities: { PIT: {} } });
+      sw.entries.set("/data/weather/index.json", response(true, index));
+      sw.entries.set(weather, response(true, "old"));
+      let failing = true;
+      sw.fetch.mockImplementation(async (request) => {
+        const path = sw.path(request);
+        if (path === "/data/weather/index.json") return response(true, index);
+        if (path === weather && failing && failure === "network")
+          throw new Error("offline");
+        return response(true, "fresh");
+      });
+      const durablePut = sw.put.getMockImplementation()!;
+      sw.put.mockImplementation(
+        async (request: FetchRequest, value: WorkerResponse) => {
+          if (
+            failing &&
+            ((failure === "cache" && sw.path(request) === weather) ||
+              (failure === "marker" &&
+                sw.path(request) === "/__offline-data-revision"))
+          )
+            throw new Error("quota");
+          return durablePut(request, value);
+        },
+      );
+      await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
+      expect(sw.entries.has("/__offline-data-revision")).toBe(false);
+      expect(await sw.entries.get(weather)!.text()).toBe(
+        failure === "marker" ? "fresh" : "old",
+      );
+      failing = false;
+      await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
+      expect(await sw.entries.get(weather)!.text()).toBe("fresh");
+      expect(
+        sw.fetch.mock.calls.filter(([request]) => sw.path(request) === weather),
+      ).toHaveLength(2);
+      await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
+      expect(
+        sw.fetch.mock.calls.filter(([request]) => sw.path(request) === weather),
+      ).toHaveLength(2);
+    },
+  );
 });
 
 describe("CACHE_ICONS", () => {

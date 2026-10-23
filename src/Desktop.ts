@@ -11,7 +11,12 @@ export interface DesktopDisplay {
   height: number;
   resolutions: { width: number; height: number }[];
 }
+export interface DesktopPowerState {
+  phase: "awake" | "suspended" | "resuming";
+  generation: number;
+}
 export interface DesktopState {
+  power?: DesktopPowerState;
   display: DesktopDisplay;
   steam: {
     available: boolean;
@@ -46,7 +51,53 @@ export interface DesktopTimelineEvent {
   scenarioId: number;
   year: number;
 }
+export type DesktopInputContext = "Menu" | "Gameplay";
+export type DesktopInputAction =
+  | "up"
+  | "down"
+  | "left"
+  | "right"
+  | "confirm"
+  | "back"
+  | "pause"
+  | "speedUp"
+  | "speedDown"
+  | "previousPane"
+  | "nextPane"
+  | "build"
+  | "previousChart"
+  | "nextChart";
+export interface DesktopInputFrame {
+  connected: boolean;
+  disconnected?: boolean;
+  actions: DesktopInputAction[];
+  glyphs: Partial<
+    Record<DesktopInputAction, { label: string; image?: string }>
+  >;
+}
+export interface DesktopTextInput {
+  description: string;
+  text: string;
+  maxLength: number;
+  multiline: boolean;
+  password: boolean;
+}
+export type DesktopTextInputResult =
+  | { status: "submitted"; text: string }
+  | { status: "cancelled" | "unavailable" };
 export interface DesktopBridge {
+  // Optional methods are feature-detected by the renderer, so adding one never bumps apiVersion.
+  // apiVersion changes only when an existing method changes incompatibly.
+  mods?(
+    input: import("./mods/Types").ModRequest,
+  ): Promise<import("./mods/Types").ModLibrary>;
+  setInputContext?(context: DesktopInputContext): Promise<DesktopInputFrame>;
+  onPowerStateChanged?(
+    callback: (power: DesktopPowerState) => void,
+  ): () => void;
+  readyAfterResume?(generation: number): Promise<void>;
+  onInput?(callback: (frame: DesktopInputFrame) => void): () => void;
+  showTextInput?(input: DesktopTextInput): Promise<DesktopTextInputResult>;
   multiplayerRequest?(
     input: import("./multiplayer/Native").NativeRequest,
   ): Promise<unknown>;

@@ -1,0 +1,3201 @@
+{
+  "firstYear": 2010,
+  "referenceYear": 2024,
+  "source": {
+    "title": "Ember Yearly Electricity Data, retrieved 2026-10-20",
+    "url": "https://files.ember-energy.org/public-downloads/yearly_full_release_long_format.csv",
+    "sha256": "259e1095ee8ffeaf0aff37ad557916ae1823a2da13312da50ba4cec6b4574c3b",
+    "license": "CC BY 4.0",
+    "method": "capacity-net-additions"
+  },
+  "global": {
+    "Sun": {
+      "capacityMW": 1880370,
+      "knownCapacityMW": 1880370,
+      "ages": [3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5]
+    },
+    "Wind": {
+      "capacityMW": 1132550,
+      "knownCapacityMW": 1132550,
+      "ages": [5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8]
+    }
+  },
+  "regions": {
+    "Africa": {
+      "Sun": {
+        "capacityMW": 17240,
+        "knownCapacityMW": 17240,
+        "ages": [12, 4, 4, 4, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 9310,
+        "knownCapacityMW": 9310,
+        "ages": [6, 6, 6, 7, 5, 5, 4, 5, 5, 5, 6, 6, 7, 7, 7]
+      }
+    },
+    "Caucasus": {
+      "Sun": {
+        "capacityMW": 910,
+        "knownCapacityMW": 910,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          2,
+          3,
+          3,
+          2,
+          2,
+          2
+        ]
+      },
+      "Wind": {
+        "capacityMW": 90,
+        "knownCapacityMW": 90,
+        "ages": [null, null, null, null, null, null, 1, 1, 2, 2, 3, 4, 5, 6, 6]
+      }
+    },
+    "Central Asia": {
+      "Sun": {
+        "capacityMW": 4480,
+        "knownCapacityMW": 4480,
+        "ages": [null, null, null, 1, 2, 2, 2, 3, 4, 2, 2, 2, 3, 3, 3]
+      },
+      "Wind": {
+        "capacityMW": 2020,
+        "knownCapacityMW": 2020,
+        "ages": [null, null, null, null, null, 1, 2, 2, 3, 4, 3, 2, 3, 3, 3]
+      }
+    },
+    "East Asia": {
+      "Sun": {
+        "capacityMW": 1020060,
+        "knownCapacityMW": 1020060,
+        "ages": [5, 5, 4, 3, 2, 2, 3, 3, 3, 3, 4, 4, 4, 5, 4]
+      },
+      "Wind": {
+        "capacityMW": 536030,
+        "knownCapacityMW": 536030,
+        "ages": [3, 3, 3, 3, 3, 4, 4, 4, 5, 5, 6, 5, 6, 6, 6]
+      }
+    },
+    "Europe": {
+      "Sun": {
+        "capacityMW": 336800,
+        "knownCapacityMW": 336800,
+        "ages": [3, 2, 2, 3, 3, 4, 5, 5, 6, 7, 7, 7, 7, 7, 6]
+      },
+      "Wind": {
+        "capacityMW": 271440,
+        "knownCapacityMW": 271440,
+        "ages": [6, 6, 7, 7, 7, 7, 8, 8, 8, 9, 9, 10, 10, 10, 11]
+      }
+    },
+    "Middle East": {
+      "Sun": {
+        "capacityMW": 45900,
+        "knownCapacityMW": 45900,
+        "ages": [1, 2, 2, 2, 2, 2, 3, 3, 2, 2, 3, 3, 4, 4, 3]
+      },
+      "Wind": {
+        "capacityMW": 14800,
+        "knownCapacityMW": 14800,
+        "ages": [3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7]
+      }
+    },
+    "North America": {
+      "Sun": {
+        "capacityMW": 200620,
+        "knownCapacityMW": 200620,
+        "ages": [7, 5, 4, 4, 3, 3, 4, 3, 4, 4, 4, 5, 5, 5, 5]
+      },
+      "Wind": {
+        "capacityMW": 179570,
+        "knownCapacityMW": 179570,
+        "ages": [4, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 8, 8, 9, 9]
+      }
+    },
+    "Oceania": {
+      "Sun": {
+        "capacityMW": 36890,
+        "knownCapacityMW": 36890,
+        "ages": [3, 2, 3, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5]
+      },
+      "Wind": {
+        "capacityMW": 16890,
+        "knownCapacityMW": 16890,
+        "ages": [4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 6, 7, 7, 8]
+      }
+    },
+    "South America": {
+      "Sun": {
+        "capacityMW": 68450,
+        "knownCapacityMW": 68450,
+        "ages": [4, 5, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3]
+      },
+      "Wind": {
+        "capacityMW": 44800,
+        "knownCapacityMW": 44800,
+        "ages": [2, 3, 3, 3, 3, 2, 3, 3, 4, 4, 5, 5, 5, 5, 6]
+      }
+    },
+    "South Asia": {
+      "Sun": {
+        "capacityMW": 104870,
+        "knownCapacityMW": 104870,
+        "ages": [3, 3, 2, 2, 2, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 50340,
+        "knownCapacityMW": 50340,
+        "ages": [5, 6, 5, 6, 7, 6, 7, 7, 7, 7, 8, 9, 9, 10, 10]
+      }
+    },
+    "Southeast Asia": {
+      "Sun": {
+        "capacityMW": 31530,
+        "knownCapacityMW": 31530,
+        "ages": [3, 4, 3, 2, 2, 2, 3, 2, 3, 4, 3, 2, 3, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 8310,
+        "knownCapacityMW": 8310,
+        "ages": [3, 3, 4, 3, 3, 2, 3, 3, 4, 3, 4, 4, 3, 3, 4]
+      }
+    }
+  },
+  "countries": {
+    "Afghanistan": {
+      "Sun": {
+        "capacityMW": 60,
+        "knownCapacityMW": 60,
+        "ages": [null, null, null, 1, 2, 3, 4, 5, 6, 7, 4, 5, 6, 7, 8]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Algeria": {
+      "Sun": {
+        "capacityMW": 460,
+        "knownCapacityMW": 460,
+        "ages": [null, 1, 2, 3, 4, 5, 4, 2, 2, 3, 4, 5, 6, 6, 7]
+      },
+      "Wind": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [null, null, null, null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      }
+    },
+    "Angola": {
+      "Sun": {
+        "capacityMW": 360,
+        "knownCapacityMW": 360,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Argentina": {
+      "Sun": {
+        "capacityMW": 1740,
+        "knownCapacityMW": 1740,
+        "ages": [null, null, 1, 2, 3, 4, 5, 6, 7, 1, 2, 2, 2, 3, 4]
+      },
+      "Wind": {
+        "capacityMW": 4320,
+        "knownCapacityMW": 4320,
+        "ages": [null, null, 1, 1, 2, 2, 3, 4, 5, 2, 2, 2, 3, 4, 4]
+      }
+    },
+    "Armenia": {
+      "Sun": {
+        "capacityMW": 490,
+        "knownCapacityMW": 490,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Australia": {
+      "Sun": {
+        "capacityMW": 36000,
+        "knownCapacityMW": 36000,
+        "ages": [3, 2, 3, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5]
+      },
+      "Wind": {
+        "capacityMW": 15560,
+        "knownCapacityMW": 15560,
+        "ages": [4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 7, 7]
+      }
+    },
+    "Austria": {
+      "Sun": {
+        "capacityMW": 8900,
+        "knownCapacityMW": 8900,
+        "ages": [4, 3, 3, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5, 5, 4]
+      },
+      "Wind": {
+        "capacityMW": 4090,
+        "knownCapacityMW": 4090,
+        "ages": [6, 7, 8, 7, 7, 6, 6, 7, 8, 8, 9, 10, 10, 11, 11]
+      }
+    },
+    "Azerbaijan": {
+      "Sun": {
+        "capacityMW": 280,
+        "knownCapacityMW": 280,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          4,
+          4,
+          5,
+          2
+        ]
+      },
+      "Wind": {
+        "capacityMW": 70,
+        "knownCapacityMW": 70,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 2, 3, 4, 5, 6, 6]
+      }
+    },
+    "Bahamas": {
+      "Sun": {
+        "capacityMW": 20,
+        "knownCapacityMW": 20,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          2,
+          3
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Bahrain": {
+      "Sun": {
+        "capacityMW": 70,
+        "knownCapacityMW": 70,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          4,
+          2,
+          3
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Bangladesh": {
+      "Sun": {
+        "capacityMW": 850,
+        "knownCapacityMW": 850,
+        "ages": [2, 2, 2, 2, 3, 3, 4, 5, 5, 5, 6, 6, 5, 6, 5]
+      },
+      "Wind": {
+        "capacityMW": 60,
+        "knownCapacityMW": 60,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Barbados": {
+      "Sun": {
+        "capacityMW": 70,
+        "knownCapacityMW": 70,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          3,
+          3,
+          3,
+          4,
+          5
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Belarus": {
+      "Sun": {
+        "capacityMW": 260,
+        "knownCapacityMW": 260,
+        "ages": [null, null, null, null, null, null, 1, 1, 2, 2, 3, 4, 5, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 120,
+        "knownCapacityMW": 120,
+        "ages": [null, null, null, null, 1, 2, 2, 2, 2, 3, 3, 4, 5, 6, 7]
+      }
+    },
+    "Belgium": {
+      "Sun": {
+        "capacityMW": 9640,
+        "knownCapacityMW": 9640,
+        "ages": [1, 2, 2, 2, 3, 4, 5, 5, 6, 6, 7, 7, 7, 7, 7]
+      },
+      "Wind": {
+        "capacityMW": 5640,
+        "knownCapacityMW": 5640,
+        "ages": [3, 3, 4, 4, 4, 5, 5, 6, 6, 6, 6, 6, 7, 7, 8]
+      }
+    },
+    "Bolivia": {
+      "Sun": {
+        "capacityMW": 180,
+        "knownCapacityMW": 180,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 1, 2, 2, 3, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 140,
+        "knownCapacityMW": 140,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    "Botswana": {
+      "Sun": {
+        "capacityMW": 70,
+        "knownCapacityMW": 70,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Brazil": {
+      "Sun": {
+        "capacityMW": 53110,
+        "knownCapacityMW": 53110,
+        "ages": [null, null, 1, 2, 3, 3, 2, 2, 1, 2, 2, 2, 2, 2, 3]
+      },
+      "Wind": {
+        "capacityMW": 32920,
+        "knownCapacityMW": 32920,
+        "ages": [3, 3, 3, 3, 4, 3, 3, 3, 4, 4, 5, 5, 5, 6, 6]
+      }
+    },
+    "Brunei": {
+      "Sun": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Bulgaria": {
+      "Sun": {
+        "capacityMW": 4560,
+        "knownCapacityMW": 4560,
+        "ages": [null, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 8, 7, 5]
+      },
+      "Wind": {
+        "capacityMW": 710,
+        "knownCapacityMW": 710,
+        "ages": [2, 2, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+      }
+    },
+    "Burkina Faso": {
+      "Sun": {
+        "capacityMW": 210,
+        "knownCapacityMW": 210,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          4,
+          3
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Cambodia": {
+      "Sun": {
+        "capacityMW": 970,
+        "knownCapacityMW": 970,
+        "ages": [null, null, null, null, 1, 2, 3, 3, 3, 3, 2, 2, 2, 3, 4]
+      }
+    },
+    "Canada": {
+      "Sun": {
+        "capacityMW": 5820,
+        "knownCapacityMW": 5820,
+        "ages": [1, 1, 2, 2, 2, 2, 3, 4, 4, 5, 6, 6, 6, 6, 6]
+      },
+      "Wind": {
+        "capacityMW": 17400,
+        "knownCapacityMW": 17400,
+        "ages": [4, 4, 4, 4, 4, 5, 5, 6, 7, 7, 8, 9, 10, 10, 10]
+      }
+    },
+    "Chile": {
+      "Sun": {
+        "capacityMW": 11020,
+        "knownCapacityMW": 11020,
+        "ages": [null, null, null, null, 1, 1, 1, 2, 2, 3, 3, 4, 4, 3, 4]
+      },
+      "Wind": {
+        "capacityMW": 4720,
+        "knownCapacityMW": 4720,
+        "ages": [1, 2, 3, 4, 3, 2, 3, 4, 4, 4, 4, 5, 5, 5, 5]
+      }
+    },
+    "China": {
+      "Sun": {
+        "capacityMW": 887100,
+        "knownCapacityMW": 887100,
+        "ages": [4, 3, 2, 2, 2, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 521270,
+        "knownCapacityMW": 521270,
+        "ages": [2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 6, 5, 5, 6, 6]
+      }
+    },
+    "Colombia": {
+      "Sun": {
+        "capacityMW": 1420,
+        "knownCapacityMW": 1420,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      "Wind": {
+        "capacityMW": 30,
+        "knownCapacityMW": 30,
+        "ages": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 12, 13]
+      }
+    },
+    "Costa Rica": {
+      "Sun": {
+        "capacityMW": 70,
+        "knownCapacityMW": 70,
+        "ages": [null, null, null, null, null, null, 1, 2, 2, 2, 2, 3, 4, 5, 6]
+      },
+      "Wind": {
+        "capacityMW": 400,
+        "knownCapacityMW": 400,
+        "ages": [9, 10, 10, 10, 11, 9, 8, 8, 7, 8, 9, 10, 11, 12, 12]
+      }
+    },
+    "Croatia": {
+      "Sun": {
+        "capacityMW": 900,
+        "knownCapacityMW": 900,
+        "ages": [null, null, null, null, 1, 2, 2, 3, 4, 4, 5, 4, 4, 4, 3]
+      },
+      "Wind": {
+        "capacityMW": 1300,
+        "knownCapacityMW": 1300,
+        "ages": [2, 3, 3, 3, 3, 3, 4, 4, 5, 5, 6, 6, 6, 7, 7]
+      }
+    },
+    "Cuba": {
+      "Sun": {
+        "capacityMW": 390,
+        "knownCapacityMW": 390,
+        "ages": [null, null, null, null, 1, 2, 2, 2, 2, 2, 3, 3, 3, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 20,
+        "knownCapacityMW": 20,
+        "ages": [3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+      }
+    },
+    "Czechia": {
+      "Sun": {
+        "capacityMW": 3980,
+        "knownCapacityMW": 3980,
+        "ages": [1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 11, 11, 9]
+      },
+      "Wind": {
+        "capacityMW": 360,
+        "knownCapacityMW": 360,
+        "ages": [3, 4, 5, 5, 6, 6, 7, 8, 9, 9, 10, 11, 12, 13, 14]
+      }
+    },
+    "DR Congo": {
+      "Sun": {
+        "capacityMW": 30,
+        "knownCapacityMW": 30,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          3,
+          4,
+          5
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Denmark": {
+      "Sun": {
+        "capacityMW": 3940,
+        "knownCapacityMW": 3940,
+        "ages": [null, 1, 2, 1, 2, 3, 3, 4, 5, 5, 6, 6, 5, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 7510,
+        "knownCapacityMW": 7510,
+        "ages": [12, 12, 12, 13, 12, 13, 13, 14, 14, 14, 15, 15, 15, 15, 16]
+      }
+    },
+    "Dominican Republic": {
+      "Sun": {
+        "capacityMW": 1420,
+        "knownCapacityMW": 1420,
+        "ages": [null, null, null, null, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3]
+      },
+      "Wind": {
+        "capacityMW": 430,
+        "knownCapacityMW": 430,
+        "ages": [null, null, 1, 1, 2, 3, 4, 4, 5, 5, 3, 4, 5, 6, 7]
+      }
+    },
+    "Ecuador": {
+      "Sun": {
+        "capacityMW": 80,
+        "knownCapacityMW": 80,
+        "ages": [null, null, null, null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      },
+      "Wind": {
+        "capacityMW": 70,
+        "knownCapacityMW": 70,
+        "ages": [null, null, null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 4]
+      }
+    },
+    "Egypt": {
+      "Sun": {
+        "capacityMW": 2550,
+        "knownCapacityMW": 2550,
+        "ages": [null, 1, 1, 2, 3, 4, 4, 4, 2, 2, 2, 3, 4, 5, 5]
+      },
+      "Wind": {
+        "capacityMW": 2200,
+        "knownCapacityMW": 2200,
+        "ages": [6, 6, 7, 8, 9, 10, 8, 9, 10, 8, 9, 8, 8, 9, 9]
+      }
+    },
+    "El Salvador": {
+      "Sun": {
+        "capacityMW": 740,
+        "knownCapacityMW": 740,
+        "ages": [null, null, null, null, null, null, 1, 2, 1, 2, 2, 2, 3, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 50,
+        "knownCapacityMW": 50,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    "Estonia": {
+      "Sun": {
+        "capacityMW": 880,
+        "knownCapacityMW": 880,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 2, 2, 2, 2, 3, 3]
+      },
+      "Wind": {
+        "capacityMW": 690,
+        "knownCapacityMW": 690,
+        "ages": [3, 4, 3, 3, 4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 12]
+      }
+    },
+    "Ethiopia": {
+      "Sun": {
+        "capacityMW": 20,
+        "knownCapacityMW": 20,
+        "ages": [null, null, null, null, null, 1, 2, 3, 4, 5, 6, 4, 5, 6, 7]
+      },
+      "Wind": {
+        "capacityMW": 400,
+        "knownCapacityMW": 400,
+        "ages": [null, null, 1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 9, 8, 9]
+      }
+    },
+    "Fiji": {
+      "Sun": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      "Wind": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+      }
+    },
+    "Finland": {
+      "Sun": {
+        "capacityMW": 1220,
+        "knownCapacityMW": 1220,
+        "ages": [2, 3, 4, 5, 6, 7, 5, 3, 3, 3, 3, 3, 3, 3, 3]
+      },
+      "Wind": {
+        "capacityMW": 8360,
+        "knownCapacityMW": 8360,
+        "ages": [8, 7, 8, 7, 5, 5, 4, 4, 4, 5, 5, 6, 5, 4, 4]
+      }
+    },
+    "France": {
+      "Sun": {
+        "capacityMW": 25460,
+        "knownCapacityMW": 25460,
+        "ages": [2, 2, 2, 2, 3, 3, 4, 5, 6, 6, 6, 6, 6, 6, 6]
+      },
+      "Wind": {
+        "capacityMW": 24240,
+        "knownCapacityMW": 24240,
+        "ages": [3, 3, 4, 4, 5, 6, 6, 6, 6, 7, 7, 8, 8, 8, 9]
+      }
+    },
+    "French Polynesia": {
+      "Sun": {
+        "capacityMW": 80,
+        "knownCapacityMW": 80,
+        "ages": [null, null, 1, 2, 2, 2, 3, 4, 5, 5, 6, 7, 7, 8, 9]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Georgia": {
+      "Sun": {
+        "capacityMW": 140,
+        "knownCapacityMW": 140,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          2
+        ]
+      },
+      "Wind": {
+        "capacityMW": 20,
+        "knownCapacityMW": 20,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      }
+    },
+    "Germany": {
+      "Sun": {
+        "capacityMW": 91200,
+        "knownCapacityMW": 91200,
+        "ages": [3, 3, 3, 3, 4, 5, 6, 6, 7, 8, 8, 8, 9, 9, 9]
+      },
+      "Wind": {
+        "capacityMW": 72740,
+        "knownCapacityMW": 72740,
+        "ages": [7, 7, 8, 8, 9, 9, 8, 9, 9, 9, 10, 11, 11, 12, 12]
+      }
+    },
+    "Ghana": {
+      "Sun": {
+        "capacityMW": 190,
+        "knownCapacityMW": 190,
+        "ages": [null, null, null, null, null, 1, 1, 2, 3, 3, 3, 3, 3, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Greece": {
+      "Sun": {
+        "capacityMW": 8830,
+        "knownCapacityMW": 8830,
+        "ages": [1, 1, 1, 2, 2, 3, 4, 5, 6, 7, 7, 7, 7, 6, 6]
+      },
+      "Wind": {
+        "capacityMW": 5370,
+        "knownCapacityMW": 5370,
+        "ages": [7, 7, 7, 7, 8, 8, 9, 9, 9, 9, 8, 8, 8, 9, 9]
+      }
+    },
+    "Guatemala": {
+      "Sun": {
+        "capacityMW": 100,
+        "knownCapacityMW": 100,
+        "ages": [null, null, null, null, null, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8]
+      },
+      "Wind": {
+        "capacityMW": 110,
+        "knownCapacityMW": 110,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 3, 4, 5, 6, 7, 8]
+      }
+    },
+    "Guyana": {
+      "Sun": {
+        "capacityMW": 20,
+        "knownCapacityMW": 20,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          4
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Haiti": {
+      "Sun": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Honduras": {
+      "Sun": {
+        "capacityMW": 550,
+        "knownCapacityMW": 550,
+        "ages": [null, null, null, 1, 2, 3, 1, 2, 3, 4, 4, 5, 6, 7, 8]
+      },
+      "Wind": {
+        "capacityMW": 240,
+        "knownCapacityMW": 240,
+        "ages": [null, null, 1, 2, 3, 3, 4, 4, 4, 5, 6, 7, 8, 9, 10]
+      }
+    },
+    "Hungary": {
+      "Sun": {
+        "capacityMW": 7170,
+        "knownCapacityMW": 7170,
+        "ages": [null, null, null, 1, 1, 2, 2, 2, 3, 2, 2, 2, 3, 3, 3]
+      },
+      "Wind": {
+        "capacityMW": 320,
+        "knownCapacityMW": 320,
+        "ages": [2, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+      }
+    },
+    "Iceland": {
+      "Sun": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "India": {
+      "Sun": {
+        "capacityMW": 98480,
+        "knownCapacityMW": 98480,
+        "ages": [4, 3, 1, 2, 2, 2, 2, 2, 2, 2, 3, 4, 4, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 48160,
+        "knownCapacityMW": 48160,
+        "ages": [5, 6, 5, 6, 7, 7, 7, 7, 7, 8, 8, 9, 10, 10, 11]
+      }
+    },
+    "Indonesia": {
+      "Sun": {
+        "capacityMW": 940,
+        "knownCapacityMW": 940,
+        "ages": [3, 4, 3, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 4, 3]
+      },
+      "Wind": {
+        "capacityMW": 150,
+        "knownCapacityMW": 150,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      }
+    },
+    "Iran": {
+      "Sun": {
+        "capacityMW": 780,
+        "knownCapacityMW": 780,
+        "ages": [null, null, null, null, null, 1, 2, 2, 1, 2, 3, 3, 4, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 380,
+        "knownCapacityMW": 380,
+        "ages": [5, 6, 7, 7, 8, 7, 8, 7, 6, 7, 7, 8, 9, 9, 10]
+      }
+    },
+    "Iraq": {
+      "Sun": {
+        "capacityMW": 40,
+        "knownCapacityMW": 40,
+        "ages": [null, null, null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Ireland": {
+      "Sun": {
+        "capacityMW": 1490,
+        "knownCapacityMW": 1490,
+        "ages": [null, null, null, null, null, null, 1, 2, 2, 2, 2, 2, 2, 3, 2]
+      },
+      "Wind": {
+        "capacityMW": 4940,
+        "knownCapacityMW": 4940,
+        "ages": [5, 5, 6, 6, 7, 7, 7, 7, 7, 7, 8, 8, 9, 10, 10]
+      }
+    },
+    "Israel": {
+      "Sun": {
+        "capacityMW": 5610,
+        "knownCapacityMW": 5610,
+        "ages": [1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 350,
+        "knownCapacityMW": 350,
+        "ages": [8, 9, 10, 11, 12, 13, 14, 6, 7, 8, 9, 10, 11, 3, 2]
+      }
+    },
+    "Italy": {
+      "Sun": {
+        "capacityMW": 35440,
+        "knownCapacityMW": 35440,
+        "ages": [2, 2, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 10, 9]
+      },
+      "Wind": {
+        "capacityMW": 12960,
+        "knownCapacityMW": 12960,
+        "ages": [5, 5, 5, 5, 6, 7, 8, 8, 9, 10, 10, 11, 12, 12, 13]
+      }
+    },
+    "Ivory Coast": {
+      "Sun": {
+        "capacityMW": 40,
+        "knownCapacityMW": 40,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          2
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Jamaica": {
+      "Sun": {
+        "capacityMW": 120,
+        "knownCapacityMW": 120,
+        "ages": [null, null, null, null, null, null, 1, 1, 2, 3, 2, 3, 4, 5, 6]
+      },
+      "Wind": {
+        "capacityMW": 100,
+        "knownCapacityMW": 100,
+        "ages": [6, 4, 5, 6, 7, 8, 9, 5, 6, 7, 8, 9, 10, 11, 12]
+      }
+    },
+    "Japan": {
+      "Sun": {
+        "capacityMW": 89600,
+        "knownCapacityMW": 89600,
+        "ages": [6, 6, 5, 5, 3, 3, 3, 3, 4, 4, 5, 5, 6, 7, 7]
+      },
+      "Wind": {
+        "capacityMW": 5860,
+        "knownCapacityMW": 5860,
+        "ages": [5, 5, 6, 7, 8, 8, 9, 9, 9, 10, 10, 11, 11, 12, 11]
+      }
+    },
+    "Jordan": {
+      "Sun": {
+        "capacityMW": 2200,
+        "knownCapacityMW": 2200,
+        "ages": [null, null, null, null, null, null, 1, 1, 2, 2, 3, 3, 3, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 630,
+        "knownCapacityMW": 630,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 3, 3, 3, 4, 5, 6]
+      }
+    },
+    "Kazakhstan": {
+      "Sun": {
+        "capacityMW": 1230,
+        "knownCapacityMW": 1230,
+        "ages": [null, null, null, null, null, 1, 1, 2, 3, 2, 2, 2, 3, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 1520,
+        "knownCapacityMW": 1520,
+        "ages": [null, null, null, null, null, 1, 2, 2, 3, 4, 3, 2, 3, 3, 3]
+      }
+    },
+    "Kenya": {
+      "Sun": {
+        "capacityMW": 550,
+        "knownCapacityMW": 550,
+        "ages": [null, null, null, null, 1, 2, 2, 3, 3, 2, 3, 4, 3, 3, 3]
+      },
+      "Wind": {
+        "capacityMW": 440,
+        "knownCapacityMW": 440,
+        "ages": [null, 1, 2, 3, 4, 5, 3, 4, 5, 1, 2, 3, 4, 5, 6]
+      }
+    },
+    "Kuwait": {
+      "Sun": {
+        "capacityMW": 100,
+        "knownCapacityMW": 100,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          2,
+          2,
+          3,
+          4,
+          4,
+          5
+        ]
+      },
+      "Wind": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      }
+    },
+    "Laos": {
+      "Sun": {
+        "capacityMW": 60,
+        "knownCapacityMW": 60,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          1,
+          2,
+          3,
+          3,
+          4,
+          5
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Latvia": {
+      "Sun": {
+        "capacityMW": 660,
+        "knownCapacityMW": 660,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "Wind": {
+        "capacityMW": 130,
+        "knownCapacityMW": 130,
+        "ages": [8, 9, 8, 6, 6, 7, 8, 9, 9, 10, 11, 12, 13, 14, 10]
+      }
+    },
+    "Lebanon": {
+      "Sun": {
+        "capacityMW": 1080,
+        "knownCapacityMW": 1080,
+        "ages": [null, null, null, null, null, null, 1, 2, 2, 2, 3, 3, 2, 2, 2]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Libya": {
+      "Sun": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Lithuania": {
+      "Sun": {
+        "capacityMW": 2580,
+        "knownCapacityMW": 2580,
+        "ages": [null, null, null, 1, 1, 2, 3, 4, 5, 5, 4, 3, 3, 3, 2]
+      },
+      "Wind": {
+        "capacityMW": 1830,
+        "knownCapacityMW": 1830,
+        "ages": [2, 3, 3, 3, 4, 5, 4, 5, 6, 6, 7, 8, 8, 6, 6]
+      }
+    },
+    "Madagascar": {
+      "Sun": {
+        "capacityMW": 60,
+        "knownCapacityMW": 60,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          3,
+          3
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Malaysia": {
+      "Sun": {
+        "capacityMW": 3070,
+        "knownCapacityMW": 3070,
+        "ages": [null, null, null, 1, 1, 2, 2, 3, 4, 3, 3, 3, 4, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Maldives": {
+      "Sun": {
+        "capacityMW": 70,
+        "knownCapacityMW": 70,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          2,
+          2,
+          3,
+          4,
+          4,
+          5
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Mali": {
+      "Sun": {
+        "capacityMW": 140,
+        "knownCapacityMW": 140,
+        "ages": [null, null, null, null, null, null, 1, 2, 3, 4, 5, 2, 2, 3, 4]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Mauritius": {
+      "Sun": {
+        "capacityMW": 160,
+        "knownCapacityMW": 160,
+        "ages": [null, null, null, null, null, null, 1, 2, 2, 2, 2, 3, 4, 5, 5]
+      },
+      "Wind": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      }
+    },
+    "Mexico": {
+      "Sun": {
+        "capacityMW": 11990,
+        "knownCapacityMW": 11990,
+        "ages": [10, 11, 9, 6, 5, 4, 3, 3, 3, 2, 2, 3, 3, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 7510,
+        "knownCapacityMW": 7510,
+        "ages": [2, 3, 4, 2, 3, 3, 4, 4, 5, 6, 5, 5, 6, 7, 8]
+      }
+    },
+    "Mongolia": {
+      "Sun": {
+        "capacityMW": 140,
+        "knownCapacityMW": 140,
+        "ages": [2, 3, 4, 5, 6, 7, 8, 5, 3, 3, 3, 4, 5, 6, 7]
+      },
+      "Wind": {
+        "capacityMW": 160,
+        "knownCapacityMW": 160,
+        "ages": [null, null, null, null, 1, 2, 3, 4, 3, 3, 4, 5, 6, 7, 8]
+      }
+    },
+    "Morocco": {
+      "Sun": {
+        "capacityMW": 950,
+        "knownCapacityMW": 950,
+        "ages": [20, 8, 9, 8, 9, 10, 3, 4, 5, 2, 3, 4, 5, 6, 7]
+      },
+      "Wind": {
+        "capacityMW": 2390,
+        "knownCapacityMW": 2390,
+        "ages": [6, 7, 7, 8, 5, 4, 5, 6, 6, 6, 7, 7, 8, 8, 7]
+      }
+    },
+    "Mozambique": {
+      "Sun": {
+        "capacityMW": 180,
+        "knownCapacityMW": 180,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          2,
+          3
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Myanmar": {
+      "Sun": {
+        "capacityMW": 220,
+        "knownCapacityMW": 220,
+        "ages": [null, null, null, null, null, 1, 2, 2, 3, 3, 3, 4, 4, 3, 4]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Namibia": {
+      "Sun": {
+        "capacityMW": 240,
+        "knownCapacityMW": 240,
+        "ages": [null, null, null, null, null, null, 1, 1, 2, 2, 2, 3, 4, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      }
+    },
+    "Nepal": {
+      "Sun": {
+        "capacityMW": 170,
+        "knownCapacityMW": 170,
+        "ages": [null, null, 1, 2, 3, 4, 5, 6, 2, 3, 4, 4, 4, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Netherlands": {
+      "Sun": {
+        "capacityMW": 24770,
+        "knownCapacityMW": 24770,
+        "ages": [8, 7, 5, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 11700,
+        "knownCapacityMW": 11700,
+        "ages": [6, 7, 8, 9, 9, 9, 9, 8, 9, 10, 10, 8, 8, 8, 7]
+      }
+    },
+    "New Caledonia": {
+      "Sun": {
+        "capacityMW": 210,
+        "knownCapacityMW": 210,
+        "ages": [null, null, null, null, null, null, 1, 2, 2, 2, 2, 3, 3, 3, 4]
+      },
+      "Wind": {
+        "capacityMW": 60,
+        "knownCapacityMW": 60,
+        "ages": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 12, 13]
+      }
+    },
+    "New Zealand": {
+      "Sun": {
+        "capacityMW": 580,
+        "knownCapacityMW": 580,
+        "ages": [null, null, null, null, 1, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 1260,
+        "knownCapacityMW": 1260,
+        "ages": [4, 5, 6, 7, 8, 8, 9, 10, 11, 12, 13, 14, 11, 12, 12]
+      }
+    },
+    "Nicaragua": {
+      "Sun": {
+        "capacityMW": 40,
+        "knownCapacityMW": 40,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "Wind": {
+        "capacityMW": 190,
+        "knownCapacityMW": 190,
+        "ages": [1, 2, 3, 2, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      }
+    },
+    "Niger": {
+      "Sun": {
+        "capacityMW": 80,
+        "knownCapacityMW": 80,
+        "ages": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Nigeria": {
+      "Sun": {
+        "capacityMW": 230,
+        "knownCapacityMW": 230,
+        "ages": [null, null, null, null, null, null, 1, 2, 2, 3, 3, 3, 3, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Norway": {
+      "Sun": {
+        "capacityMW": 790,
+        "knownCapacityMW": 790,
+        "ages": [2, 3, 4, 5, 6, 7, 8, 4, 4, 3, 3, 4, 4, 3, 3]
+      },
+      "Wind": {
+        "capacityMW": 5160,
+        "knownCapacityMW": 5160,
+        "ages": [5, 6, 6, 5, 6, 6, 7, 8, 7, 6, 4, 4, 4, 5, 6]
+      }
+    },
+    "Oman": {
+      "Sun": {
+        "capacityMW": 670,
+        "knownCapacityMW": 670,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          3
+        ]
+      },
+      "Wind": {
+        "capacityMW": 50,
+        "knownCapacityMW": 50,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      }
+    },
+    "Pakistan": {
+      "Sun": {
+        "capacityMW": 3720,
+        "knownCapacityMW": 3720,
+        "ages": [1, 2, 2, 2, 2, 2, 2, 2, 3, 4, 4, 4, 4, 4, 3]
+      },
+      "Wind": {
+        "capacityMW": 1850,
+        "knownCapacityMW": 1850,
+        "ages": [2, 3, 4, 2, 2, 2, 2, 2, 3, 3, 4, 5, 5, 5, 6]
+      }
+    },
+    "Panama": {
+      "Sun": {
+        "capacityMW": 740,
+        "knownCapacityMW": 740,
+        "ages": [null, null, null, null, null, null, 1, 1, 2, 2, 3, 4, 3, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 340,
+        "knownCapacityMW": 340,
+        "ages": [null, null, null, null, null, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8]
+      }
+    },
+    "Papua New Guinea": {
+      "Sun": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Paraguay": {
+      "Sun": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Peru": {
+      "Sun": {
+        "capacityMW": 530,
+        "knownCapacityMW": 530,
+        "ages": [4, 5, 4, 2, 3, 3, 4, 5, 3, 4, 5, 6, 7, 8, 7]
+      },
+      "Wind": {
+        "capacityMW": 1030,
+        "knownCapacityMW": 1030,
+        "ages": [null, null, null, null, null, 1, 2, 3, 4, 3, 4, 5, 6, 5, 4]
+      }
+    },
+    "Philippines": {
+      "Sun": {
+        "capacityMW": 2990,
+        "knownCapacityMW": 2990,
+        "ages": [null, null, null, null, null, 1, 1, 1, 2, 3, 4, 5, 4, 5, 5]
+      },
+      "Wind": {
+        "capacityMW": 440,
+        "knownCapacityMW": 440,
+        "ages": [5, 6, 7, 8, 9, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      }
+    },
+    "Poland": {
+      "Sun": {
+        "capacityMW": 21720,
+        "knownCapacityMW": 21720,
+        "ages": [null, null, null, null, null, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3]
+      },
+      "Wind": {
+        "capacityMW": 10150,
+        "knownCapacityMW": 10150,
+        "ages": [3, 3, 3, 3, 3, 4, 4, 4, 5, 6, 7, 8, 8, 8, 8]
+      }
+    },
+    "Portugal": {
+      "Sun": {
+        "capacityMW": 5810,
+        "knownCapacityMW": 5810,
+        "ages": [2, 3, 3, 3, 3, 3, 4, 5, 5, 5, 5, 5, 4, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 5600,
+        "knownCapacityMW": 5600,
+        "ages": [4, 4, 5, 6, 6, 7, 8, 9, 10, 11, 12, 13, 13, 14, 15]
+      }
+    },
+    "Puerto Rico": {
+      "Sun": {
+        "capacityMW": 960,
+        "knownCapacityMW": 960,
+        "ages": [null, null, 1, 2, 2, 3, 2, 3, 3, 4, 5, 5, 5, 5, 4]
+      },
+      "Wind": {
+        "capacityMW": 130,
+        "knownCapacityMW": 130,
+        "ages": [null, null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      }
+    },
+    "Qatar": {
+      "Sun": {
+        "capacityMW": 810,
+        "knownCapacityMW": 810,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          1,
+          2
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Romania": {
+      "Sun": {
+        "capacityMW": 4260,
+        "knownCapacityMW": 4260,
+        "ages": [null, null, null, 1, 1, 2, 3, 3, 4, 5, 6, 7, 8, 7, 5]
+      },
+      "Wind": {
+        "capacityMW": 3100,
+        "knownCapacityMW": 3100,
+        "ages": [1, 1, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      }
+    },
+    "Russia": {
+      "Sun": {
+        "capacityMW": 2260,
+        "knownCapacityMW": 2260,
+        "ages": [null, null, null, null, null, 1, 2, 3, 3, 3, 3, 3, 4, 5, 6]
+      },
+      "Wind": {
+        "capacityMW": 2570,
+        "knownCapacityMW": 2570,
+        "ages": [8, 9, 10, 11, 12, 2, 3, 4, 4, 4, 5, 2, 2, 3, 4]
+      }
+    },
+    "Rwanda": {
+      "Sun": {
+        "capacityMW": 20,
+        "knownCapacityMW": 20,
+        "ages": [null, null, null, null, null, 1, 2, 3, 4, 5, 6, 7, 8, 5, 6]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Saudi Arabia": {
+      "Sun": {
+        "capacityMW": 6200,
+        "knownCapacityMW": 6200,
+        "ages": [null, null, null, 1, 2, 3, 4, 5, 4, 3, 3, 2, 3, 4, 2]
+      },
+      "Wind": {
+        "capacityMW": 400,
+        "knownCapacityMW": 400,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2
+        ]
+      }
+    },
+    "Senegal": {
+      "Sun": {
+        "capacityMW": 270,
+        "knownCapacityMW": 270,
+        "ages": [null, 1, 2, 3, 4, 5, 6, 2, 2, 2, 3, 4, 4, 5, 6]
+      },
+      "Wind": {
+        "capacityMW": 160,
+        "knownCapacityMW": 160,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    "Serbia": {
+      "Sun": {
+        "capacityMW": 300,
+        "knownCapacityMW": 300,
+        "ages": [null, null, null, 1, 2, 3, 3, 4, 5, 6, 7, 5, 4, 3, 3]
+      },
+      "Wind": {
+        "capacityMW": 600,
+        "knownCapacityMW": 600,
+        "ages": [null, null, null, null, null, null, 1, 2, 2, 1, 2, 3, 4, 5, 5]
+      }
+    },
+    "Singapore": {
+      "Sun": {
+        "capacityMW": 1210,
+        "knownCapacityMW": 1210,
+        "ages": [null, null, null, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3]
+      }
+    },
+    "Solomon Islands": {
+      "Sun": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "South Africa": {
+      "Sun": {
+        "capacityMW": 9060,
+        "knownCapacityMW": 9060,
+        "ages": [null, null, 1, 2, 1, 1, 2, 2, 3, 4, 4, 4, 5, 5, 4]
+      },
+      "Wind": {
+        "capacityMW": 3440,
+        "knownCapacityMW": 3440,
+        "ages": [2, 3, 4, 5, 1, 2, 2, 2, 3, 4, 5, 5, 6, 6, 6]
+      }
+    },
+    "South Korea": {
+      "Sun": {
+        "capacityMW": 26680,
+        "knownCapacityMW": 26680,
+        "ages": [2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5]
+      },
+      "Wind": {
+        "capacityMW": 2260,
+        "knownCapacityMW": 2260,
+        "ages": [4, 5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 7, 8, 8, 8]
+      }
+    },
+    "Spain": {
+      "Sun": {
+        "capacityMW": 38160,
+        "knownCapacityMW": 38160,
+        "ages": [2, 3, 3, 4, 5, 6, 7, 8, 9, 9, 7, 7, 7, 5, 5]
+      },
+      "Wind": {
+        "capacityMW": 32180,
+        "knownCapacityMW": 32180,
+        "ages": [5, 6, 7, 7, 8, 9, 10, 11, 12, 13, 13, 13, 14, 14, 14]
+      }
+    },
+    "Sri Lanka": {
+      "Sun": {
+        "capacityMW": 1580,
+        "knownCapacityMW": 1580,
+        "ages": [2, 3, 4, 5, 6, 4, 3, 3, 2, 2, 3, 3, 3, 3, 4]
+      },
+      "Wind": {
+        "capacityMW": 270,
+        "knownCapacityMW": 270,
+        "ages": [null, 1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 7, 6, 7, 7]
+      }
+    },
+    "Sudan": {
+      "Sun": {
+        "capacityMW": 190,
+        "knownCapacityMW": 190,
+        "ages": [null, null, null, 1, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 5]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Suriname": {
+      "Sun": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [null, null, null, null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Sweden": {
+      "Sun": {
+        "capacityMW": 4850,
+        "knownCapacityMW": 4850,
+        "ages": [3, 4, 5, 4, 3, 3, 3, 3, 3, 3, 2, 3, 3, 3, 3]
+      },
+      "Wind": {
+        "capacityMW": 16820,
+        "knownCapacityMW": 16820,
+        "ages": [6, 5, 5, 5, 5, 5, 5, 6, 7, 7, 7, 7, 7, 7, 7]
+      }
+    },
+    "Switzerland": {
+      "Sun": {
+        "capacityMW": 7760,
+        "knownCapacityMW": 7760,
+        "ages": [7, 5, 4, 3, 3, 3, 3, 4, 4, 5, 5, 5, 5, 5, 5]
+      },
+      "Wind": {
+        "capacityMW": 100,
+        "knownCapacityMW": 100,
+        "ages": [4, 3, 3, 4, 5, 6, 7, 6, 7, 8, 9, 9, 10, 11, 12]
+      }
+    },
+    "Syria": {
+      "Sun": {
+        "capacityMW": 1610,
+        "knownCapacityMW": 1610,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Taiwan": {
+      "Sun": {
+        "capacityMW": 14280,
+        "knownCapacityMW": 14280,
+        "ages": [2, 2, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 3910,
+        "knownCapacityMW": 3910,
+        "ages": [3, 3, 4, 4, 5, 6, 7, 8, 8, 9, 9, 9, 9, 7, 5]
+      }
+    },
+    "Tanzania": {
+      "Sun": {
+        "capacityMW": 10,
+        "knownCapacityMW": 10,
+        "ages": [null, null, null, null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Thailand": {
+      "Sun": {
+        "capacityMW": 3390,
+        "knownCapacityMW": 3390,
+        "ages": [3, 4, 3, 2, 2, 2, 3, 3, 3, 4, 5, 6, 7, 8, 8]
+      },
+      "Wind": {
+        "capacityMW": 1540,
+        "knownCapacityMW": 1540,
+        "ages": [1, 2, 3, 1, 2, 3, 4, 3, 3, 3, 3, 4, 5, 6, 7]
+      }
+    },
+    "Tunisia": {
+      "Sun": {
+        "capacityMW": 770,
+        "knownCapacityMW": 770,
+        "ages": [null, null, null, 1, 2, 2, 2, 3, 3, 4, 4, 4, 5, 4, 2]
+      },
+      "Wind": {
+        "capacityMW": 250,
+        "knownCapacityMW": 250,
+        "ages": [6, 7, 8, 3, 4, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+      }
+    },
+    "Turkey": {
+      "Sun": {
+        "capacityMW": 20230,
+        "knownCapacityMW": 20230,
+        "ages": [null, 1, 2, 3, 3, 2, 1, 1, 1, 2, 3, 3, 4, 4, 4]
+      },
+      "Wind": {
+        "capacityMW": 12870,
+        "knownCapacityMW": 12870,
+        "ages": [2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 7, 7]
+      }
+    },
+    "Uganda": {
+      "Sun": {
+        "capacityMW": 100,
+        "knownCapacityMW": 100,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          1,
+          2,
+          3,
+          3,
+          4,
+          5,
+          5
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Ukraine": {
+      "Sun": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [null, null, 1, 2, 2, 3, 4, 4, 4, 4, 2, 3, 4, 5, null]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [7, 8, 6, 4, 4, 4, 5, 6, 6, 7, 4, 5, 5, 6, null]
+      }
+    },
+    "United Arab Emirates": {
+      "Sun": {
+        "capacityMW": 6500,
+        "knownCapacityMW": 6500,
+        "ages": [1, 2, 3, 4, 1, 2, 3, 4, 3, 3, 2, 2, 3, 3, 3]
+      },
+      "Wind": {
+        "capacityMW": 110,
+        "knownCapacityMW": 110,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1
+        ]
+      }
+    },
+    "United Kingdom": {
+      "Sun": {
+        "capacityMW": 19000,
+        "knownCapacityMW": 19000,
+        "ages": [4, 2, 1, 2, 2, 2, 2, 3, 4, 4, 5, 6, 7, 8, 8]
+      },
+      "Wind": {
+        "capacityMW": 32150,
+        "knownCapacityMW": 32150,
+        "ages": [5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 8, 8, 8, 9]
+      }
+    },
+    "United States": {
+      "Sun": {
+        "capacityMW": 177590,
+        "knownCapacityMW": 177590,
+        "ages": [7, 5, 4, 4, 4, 4, 4, 3, 4, 4, 5, 5, 5, 5, 5]
+      },
+      "Wind": {
+        "capacityMW": 152650,
+        "knownCapacityMW": 152650,
+        "ages": [4, 4, 5, 5, 6, 6, 7, 7, 7, 8, 8, 8, 8, 9, 9]
+      }
+    },
+    "Uruguay": {
+      "Sun": {
+        "capacityMW": 340,
+        "knownCapacityMW": 340,
+        "ages": [null, null, null, null, null, null, 1, 2, 2, 3, 4, 4, 5, 6, 7]
+      },
+      "Wind": {
+        "capacityMW": 1520,
+        "knownCapacityMW": 1520,
+        "ages": [1, 2, 3, 3, 4, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9]
+      }
+    },
+    "Uzbekistan": {
+      "Sun": {
+        "capacityMW": 3190,
+        "knownCapacityMW": 3190,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          1
+        ]
+      },
+      "Wind": {
+        "capacityMW": 500,
+        "knownCapacityMW": 500,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Venezuela": {
+      "Sun": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "Wind": {
+        "capacityMW": 50,
+        "knownCapacityMW": 50,
+        "ages": [null, null, null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      }
+    },
+    "Vietnam": {
+      "Sun": {
+        "capacityMW": 18670,
+        "knownCapacityMW": 18670,
+        "ages": [null, null, null, null, null, 1, 2, 3, 4, 1, 1, 1, 2, 3, 4]
+      },
+      "Wind": {
+        "capacityMW": 6180,
+        "knownCapacityMW": 6180,
+        "ages": [1, 1, 2, 3, 3, 4, 2, 3, 4, 4, 4, 4, 1, 2, 3]
+      }
+    },
+    "Zambia": {
+      "Sun": {
+        "capacityMW": 190,
+        "knownCapacityMW": 190,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          4,
+          4
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "Zimbabwe": {
+      "Sun": {
+        "capacityMW": 100,
+        "knownCapacityMW": 100,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          1,
+          2,
+          3,
+          2,
+          3,
+          3
+        ]
+      },
+      "Wind": {
+        "capacityMW": 0,
+        "knownCapacityMW": 0,
+        "ages": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    }
+  }
+}

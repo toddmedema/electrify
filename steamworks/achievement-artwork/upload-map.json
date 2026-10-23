@@ -1,0 +1,317 @@
+[
+  {
+    "apiName": "FIRST_SPARK",
+    "name": "First Spark",
+    "description": "Complete Mission 1: Electricity, including its final challenge.",
+    "source": "public/images/solar.svg",
+    "sourceSha256": "dfae975a623f1ae15e987f2d29879bd0613b72f6732174ebbb0b7714db110605",
+    "achieved": "uploads/FIRST_SPARK_ACHIEVED.png",
+    "unachieved": "uploads/FIRST_SPARK_UNACHIEVED.png"
+  },
+  {
+    "apiName": "GRID_GRADUATE",
+    "name": "Grid Graduate",
+    "description": "Complete all seven tutorial missions.",
+    "source": "public/images/transmission.svg",
+    "sourceSha256": "7a1c9d555a18c69d3d9e1cd8c62ec9240679e4e48031219496a733626e7be6a3",
+    "achieved": "uploads/GRID_GRADUATE_ACHIEVED.png",
+    "unachieved": "uploads/GRID_GRADUATE_UNACHIEVED.png"
+  },
+  {
+    "apiName": "STAYING_POWER",
+    "name": "Staying Power",
+    "description": "Successfully finish an official scenario.",
+    "source": "public/images/achievement-staying-power.svg",
+    "sourceSha256": "06849a24b49584298e299d2a9fc9171f3ba37c119592f50db271a7626f5457e0",
+    "achieved": "uploads/STAYING_POWER_ACHIEVED.png",
+    "unachieved": "uploads/STAYING_POWER_UNACHIEVED.png"
+  },
+  {
+    "apiName": "CHIEF_ELECTRICITY_OFFICER",
+    "name": "Chief Electricity Officer",
+    "description": "Successfully finish an official scenario on CEO.",
+    "source": "public/images/achievement-chief-electricity-officer.svg",
+    "sourceSha256": "752b44fdd04e92acfafa95ac492450952c9ffba80461a3d0088dee52cd4bb816",
+    "achieved": "uploads/CHIEF_ELECTRICITY_OFFICER_ACHIEVED.png",
+    "unachieved": "uploads/CHIEF_ELECTRICITY_OFFICER_UNACHIEVED.png"
+  },
+  {
+    "apiName": "LIGHTS_ON",
+    "name": "Lights On",
+    "description": "Serve at least 99.9% of demand for 12 consecutive completed months.",
+    "source": "public/images/transmission.svg",
+    "sourceSha256": "7a1c9d555a18c69d3d9e1cd8c62ec9240679e4e48031219496a733626e7be6a3",
+    "achieved": "uploads/LIGHTS_ON_ACHIEVED.png",
+    "unachieved": "uploads/LIGHTS_ON_UNACHIEVED.png"
+  },
+  {
+    "apiName": "FOUR_NINES",
+    "name": "Four Nines",
+    "description": "Successfully finish with at least 99.99% of lifetime demand served.",
+    "source": "public/images/nuclear.svg",
+    "sourceSha256": "411225092f91e831dcb9f7b4c6b27a0135693f77fe6c74a8fc7e4ffe132749c5",
+    "achieved": "uploads/FOUR_NINES_ACHIEVED.png",
+    "unachieved": "uploads/FOUR_NINES_UNACHIEVED.png"
+  },
+  {
+    "apiName": "BACK_ON_THE_GRID",
+    "name": "Back on the Grid",
+    "description": "Recover from a month below 99% reliability with three consecutive months at 99.9%.",
+    "source": "public/images/load shedding.svg",
+    "sourceSha256": "0c80ea4fbf6b520299ec61565b55ef953fbab81b255c9acf6f10e4284e03875a",
+    "achieved": "uploads/BACK_ON_THE_GRID_ACHIEVED.png",
+    "unachieved": "uploads/BACK_ON_THE_GRID_UNACHIEVED.png"
+  },
+  {
+    "apiName": "CLEAN_FINISH",
+    "name": "Clean Finish",
+    "description": "Successfully finish with at most 100 kgCO2e/MWh over 12 reliable months.",
+    "source": "public/images/rise of renewables.svg",
+    "sourceSha256": "64167907f9f0dff98d59d35e7543d52fdfb335e4b4295f49f3765b4a4579f492",
+    "achieved": "uploads/CLEAN_FINISH_ACHIEVED.png",
+    "unachieved": "uploads/CLEAN_FINISH_UNACHIEVED.png"
+  },
+  {
+    "apiName": "HALF_THE_CARBON",
+    "name": "Half the Carbon",
+    "description": "Successfully finish with final-year emissions intensity at least 50% below the first year, with reliable service.",
+    "source": "public/images/carbon fee.svg",
+    "sourceSha256": "09cd0411593cfa7c68a97bc9f2e14eb48e87e945a0a2d996ef5b680f71db90da",
+    "achieved": "uploads/HALF_THE_CARBON_ACHIEVED.png",
+    "unachieved": "uploads/HALF_THE_CARBON_UNACHIEVED.png"
+  },
+  {
+    "apiName": "COALS_LAST_SHIFT",
+    "name": "Coal's Last Shift",
+    "description": "Start with coal and successfully finish with no customer-delivered coal generation in the final reliable year.",
+    "source": "public/images/the end of an era.svg",
+    "sourceSha256": "a2c487c6eb69fd92060e2cd767fa084e244e9c8df6a7b5513ca08747b91a5afe",
+    "achieved": "uploads/COALS_LAST_SHIFT_ACHIEVED.png",
+    "unachieved": "uploads/COALS_LAST_SHIFT_UNACHIEVED.png"
+  },
+  {
+    "apiName": "HERE_COMES_THE_SUN",
+    "name": "Here Comes the Sun",
+    "description": "Successfully finish with solar supplying at least half of customer energy in the final reliable year.",
+    "source": "public/images/solar.svg",
+    "sourceSha256": "dfae975a623f1ae15e987f2d29879bd0613b72f6732174ebbb0b7714db110605",
+    "achieved": "uploads/HERE_COMES_THE_SUN_ACHIEVED.png",
+    "unachieved": "uploads/HERE_COMES_THE_SUN_UNACHIEVED.png"
+  },
+  {
+    "apiName": "WINDS_OF_CHANGE",
+    "name": "Winds of Change",
+    "description": "Successfully finish with wind supplying at least half of customer energy in the final reliable year.",
+    "source": "public/images/wind.svg",
+    "sourceSha256": "79f4a38bdb95230ec4bf4093a686af9d86b6548219d83e6cf6b71d143ad685f8",
+    "achieved": "uploads/WINDS_OF_CHANGE_ACHIEVED.png",
+    "unachieved": "uploads/WINDS_OF_CHANGE_UNACHIEVED.png"
+  },
+  {
+    "apiName": "STRENGTH_IN_DIVERSITY",
+    "name": "Strength in Diversity",
+    "description": "Successfully finish with four fuels each supplying at least 10% of customer energy in the final reliable year.",
+    "source": "public/images/rise of renewables.svg",
+    "sourceSha256": "64167907f9f0dff98d59d35e7543d52fdfb335e4b4295f49f3765b4a4579f492",
+    "achieved": "uploads/STRENGTH_IN_DIVERSITY_ACHIEVED.png",
+    "unachieved": "uploads/STRENGTH_IN_DIVERSITY_UNACHIEVED.png"
+  },
+  {
+    "apiName": "NIGHT_SHIFT",
+    "name": "Night Shift",
+    "description": "Player-built storage supplies at least 25% of evening customer energy over a reliable month.",
+    "source": "public/images/battery.svg",
+    "sourceSha256": "68897274b2b1be29e67a6631d72c7aea381126f72f5c8720cb94ce66404575be",
+    "achieved": "uploads/NIGHT_SHIFT_ACHIEVED.png",
+    "unachieved": "uploads/NIGHT_SHIFT_UNACHIEVED.png"
+  },
+  {
+    "apiName": "GRID_CONNECTED",
+    "name": "Grid Connected",
+    "description": "Commission a player-built intertie and import at least 10% of demand over a reliable month.",
+    "source": "public/images/transmission.svg",
+    "sourceSha256": "7a1c9d555a18c69d3d9e1cd8c62ec9240679e4e48031219496a733626e7be6a3",
+    "achieved": "uploads/GRID_CONNECTED_ACHIEVED.png",
+    "unachieved": "uploads/GRID_CONNECTED_UNACHIEVED.png"
+  },
+  {
+    "apiName": "GOOD_NEIGHBOR",
+    "name": "Good Neighbor",
+    "description": "Export at least 10% of customer demand over a reliable month.",
+    "source": "public/images/transmission.svg",
+    "sourceSha256": "7a1c9d555a18c69d3d9e1cd8c62ec9240679e4e48031219496a733626e7be6a3",
+    "achieved": "uploads/GOOD_NEIGHBOR_ACHIEVED.png",
+    "unachieved": "uploads/GOOD_NEIGHBOR_UNACHIEVED.png"
+  },
+  {
+    "apiName": "WASTE_NOT",
+    "name": "Waste Not",
+    "description": "Complete a peaker's combined-cycle retrofit and deliver 1 GWh from that plant afterwards.",
+    "source": "public/images/natural gas cc.svg",
+    "sourceSha256": "6610b3eb2b43960991e09329fe9ada89a65ec0e3b7d24af71d563f53d4dd73d1",
+    "achieved": "uploads/WASTE_NOT_ACHIEVED.png",
+    "unachieved": "uploads/WASTE_NOT_UNACHIEVED.png"
+  },
+  {
+    "apiName": "A_WATT_SAVED",
+    "name": "A Watt Saved",
+    "description": "Efficiency rebates prevent at least 10% of eligible demand over a reliable month.",
+    "source": "public/images/achievement-a-watt-saved.svg",
+    "sourceSha256": "ddd8c17916fa990975a8859078e8a72dd4c1d4e19907fcf3fe21915edf2210e8",
+    "achieved": "uploads/A_WATT_SAVED_ACHIEVED.png",
+    "unachieved": "uploads/A_WATT_SAVED_UNACHIEVED.png"
+  },
+  {
+    "apiName": "POWER_TO_THE_PEOPLE",
+    "name": "Power to the People",
+    "description": "Successfully finish a Public utility with lifetime real customer rates no higher than the starting rate and a reliable final year.",
+    "source": "public/images/carbon fee.svg",
+    "sourceSha256": "09cd0411593cfa7c68a97bc9f2e14eb48e87e945a0a2d996ef5b680f71db90da",
+    "achieved": "uploads/POWER_TO_THE_PEOPLE_ACHIEVED.png",
+    "unachieved": "uploads/POWER_TO_THE_PEOPLE_UNACHIEVED.png"
+  },
+  {
+    "apiName": "THE_PRICE_OF_CARBON",
+    "name": "The Price of Carbon",
+    "description": "Successfully finish Carbon Fee on any difficulty.",
+    "source": "public/images/carbon fee.svg",
+    "sourceSha256": "09cd0411593cfa7c68a97bc9f2e14eb48e87e945a0a2d996ef5b680f71db90da",
+    "achieved": "uploads/THE_PRICE_OF_CARBON_ACHIEVED.png",
+    "unachieved": "uploads/THE_PRICE_OF_CARBON_UNACHIEVED.png"
+  },
+  {
+    "apiName": "BOOM_AND_BEYOND",
+    "name": "Boom and Beyond",
+    "description": "Successfully finish The Shale Boom on any difficulty.",
+    "source": "public/images/the shale boom.svg",
+    "sourceSha256": "3bd665ba17f3df5c8e1f6bf36a390edab6d7927c3ec79e46b2a7672da455c35f",
+    "achieved": "uploads/BOOM_AND_BEYOND_ACHIEVED.png",
+    "unachieved": "uploads/BOOM_AND_BEYOND_UNACHIEVED.png"
+  },
+  {
+    "apiName": "ISLAND_INDEPENDENCE",
+    "name": "Island Independence",
+    "description": "Successfully finish Paradise on any difficulty.",
+    "source": "public/images/paradise.svg",
+    "sourceSha256": "a15db35355cdcd355a71f409c8750d8e7373686b0e511b22da970056760f3dff",
+    "achieved": "uploads/ISLAND_INDEPENDENCE_ACHIEVED.png",
+    "unachieved": "uploads/ISLAND_INDEPENDENCE_UNACHIEVED.png"
+  },
+  {
+    "apiName": "A_BRIGHTER_FUTURE",
+    "name": "A Brighter Future",
+    "description": "Successfully finish Rise of Renewables on any difficulty.",
+    "source": "public/images/rise of renewables.svg",
+    "sourceSha256": "64167907f9f0dff98d59d35e7543d52fdfb335e4b4295f49f3765b4a4579f492",
+    "achieved": "uploads/A_BRIGHTER_FUTURE_ACHIEVED.png",
+    "unachieved": "uploads/A_BRIGHTER_FUTURE_UNACHIEVED.png"
+  },
+  {
+    "apiName": "WEATHER_THE_STORM",
+    "name": "Weather the Storm",
+    "description": "Successfully finish Hurricane Season on any difficulty.",
+    "source": "public/images/hurricane season.svg",
+    "sourceSha256": "b2f7289fde8987211ffa68a68059bdd46356cd2edeb739faf5828d44994f57f9",
+    "achieved": "uploads/WEATHER_THE_STORM_ACHIEVED.png",
+    "unachieved": "uploads/WEATHER_THE_STORM_UNACHIEVED.png"
+  },
+  {
+    "apiName": "THE_NEXT_ERA",
+    "name": "The Next Era",
+    "description": "Successfully finish The End of an Era on any difficulty.",
+    "source": "public/images/the end of an era.svg",
+    "sourceSha256": "a2c487c6eb69fd92060e2cd767fa084e244e9c8df6a7b5513ca08747b91a5afe",
+    "achieved": "uploads/THE_NEXT_ERA_ACHIEVED.png",
+    "unachieved": "uploads/THE_NEXT_ERA_UNACHIEVED.png"
+  },
+  {
+    "apiName": "AHEAD_OF_THE_BOOM",
+    "name": "Ahead of the Boom",
+    "description": "Successfully finish Data Center Boom on any difficulty.",
+    "source": "public/images/ai data center boom.svg",
+    "sourceSha256": "3e29a7e76c39d7d900d02804f5ec0cfe57dee020a94b38fbdee09e903c9f1c14",
+    "achieved": "uploads/AHEAD_OF_THE_BOOM_ACHIEVED.png",
+    "unachieved": "uploads/AHEAD_OF_THE_BOOM_UNACHIEVED.png"
+  },
+  {
+    "apiName": "COLD_COMFORT",
+    "name": "Cold Comfort",
+    "description": "Successfully finish Deep Freeze on any difficulty.",
+    "source": "public/images/texas deep freeze.svg",
+    "sourceSha256": "7e24e3228e5eb7b8ea5d80df4de8b343db408c20cbfddb61ba585dfc3d831982",
+    "achieved": "uploads/COLD_COMFORT_ACHIEVED.png",
+    "unachieved": "uploads/COLD_COMFORT_UNACHIEVED.png"
+  },
+  {
+    "apiName": "COOL_UNDER_PRESSURE",
+    "name": "Cool Under Pressure",
+    "description": "Successfully finish Heatwave + Drought on any difficulty.",
+    "source": "public/images/heatwave-drought.svg",
+    "sourceSha256": "9d0cb4dd77f785ec9e66ae0e737a17c982f402b01994155eb9de7705fd7b5ca8",
+    "achieved": "uploads/COOL_UNDER_PRESSURE_ACHIEVED.png",
+    "unachieved": "uploads/COOL_UNDER_PRESSURE_UNACHIEVED.png"
+  },
+  {
+    "apiName": "BACKUP_PLAN",
+    "name": "Backup Plan",
+    "description": "Successfully finish Sudden Nuclear Shutdown on any difficulty.",
+    "source": "public/images/sudden-nuclear-trip.svg",
+    "sourceSha256": "e6db5be37b4199df1bb62ae434b5b1c93cd12d463dc011c2f7f62b3c1ac141ab",
+    "achieved": "uploads/BACKUP_PLAN_ACHIEVED.png",
+    "unachieved": "uploads/BACKUP_PLAN_UNACHIEVED.png"
+  },
+  {
+    "apiName": "FIREBREAK",
+    "name": "Firebreak",
+    "description": "Successfully finish Wildfire Emergency on any difficulty.",
+    "source": "public/images/wildfire emergency.svg",
+    "sourceSha256": "94ab2145a8d71080b919d28eaa56ee844ab7375327afbb3f041b90d6432bdc0f",
+    "achieved": "uploads/FIREBREAK_ACHIEVED.png",
+    "unachieved": "uploads/FIREBREAK_UNACHIEVED.png"
+  },
+  {
+    "apiName": "THE_END_OF_LOAD_SHEDDING",
+    "name": "The End of Load Shedding",
+    "description": "Successfully finish Load Shedding on any difficulty.",
+    "source": "public/images/load shedding.svg",
+    "sourceSha256": "0c80ea4fbf6b520299ec61565b55ef953fbab81b255c9acf6f10e4284e03875a",
+    "achieved": "uploads/THE_END_OF_LOAD_SHEDDING_ACHIEVED.png",
+    "unachieved": "uploads/THE_END_OF_LOAD_SHEDDING_UNACHIEVED.png"
+  },
+  {
+    "apiName": "BEYOND_THE_RIVER",
+    "name": "Beyond the River",
+    "description": "Successfully finish The River Runs Dry on any difficulty.",
+    "source": "public/images/river runs dry.svg",
+    "sourceSha256": "e2a3f01b0d36528e1f90c6e12a913c77bbbdf9069ad8d0afff7270dbcd91a897",
+    "achieved": "uploads/BEYOND_THE_RIVER_ACHIEVED.png",
+    "unachieved": "uploads/BEYOND_THE_RIVER_UNACHIEVED.png"
+  },
+  {
+    "apiName": "BEAT_THE_HEAT",
+    "name": "Beat the Heat",
+    "description": "Successfully finish Delhi Summer on any difficulty.",
+    "source": "public/images/delhi summer.svg",
+    "sourceSha256": "976c5218d204d2fd2e4d63a3025f5b4c13bb8ab481e0782f916919f8d1271293",
+    "achieved": "uploads/BEAT_THE_HEAT_ACHIEVED.png",
+    "unachieved": "uploads/BEAT_THE_HEAT_UNACHIEVED.png"
+  },
+  {
+    "apiName": "MASTER_OF_THE_GRID",
+    "name": "Master of the Grid",
+    "description": "Successfully finish all 14 official scenarios on CEO.",
+    "source": "public/images/achievement-master-of-the-grid.svg",
+    "sourceSha256": "37683077455b2a2c08ab6412b964514000ece40b08c4b297fe10c7fdd8981606",
+    "achieved": "uploads/MASTER_OF_THE_GRID_ACHIEVED.png",
+    "unachieved": "uploads/MASTER_OF_THE_GRID_UNACHIEVED.png"
+  },
+  {
+    "apiName": "OUT_OF_JUICE",
+    "name": "Out of Juice",
+    "description": "Go bankrupt in an official scenario on any difficulty.",
+    "source": "public/images/achievement-out-of-juice.svg",
+    "sourceSha256": "c0e929ce3c405eaa0e438b5ec18844a1afd89cb67ea31bb215fd0627267aa7a6",
+    "achieved": "uploads/OUT_OF_JUICE_ACHIEVED.png",
+    "unachieved": "uploads/OUT_OF_JUICE_UNACHIEVED.png"
+  }
+]

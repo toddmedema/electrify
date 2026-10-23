@@ -15,7 +15,14 @@ import {
   Typography,
 } from "@mui/material";
 import { ChevronDownGlyph } from "../base/Glyphs";
-import { SettingsType, ThemeChoiceType, UnitSystemType } from "../../Types";
+import {
+  SettingsType,
+  TextSizeType,
+  ThemeChoiceType,
+  UnitSystemType,
+} from "../../Types";
+import { TEXT_SIZES, TEXT_SIZE_LABELS } from "../../TextSize";
+import { useControllerInput } from "../../desktop/InputPresentation";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts, { SHORTCUTS } from "../base/KeyboardShortcuts";
@@ -26,6 +33,7 @@ import { clearAppCache } from "../../helpers/Cache";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { useMenuKeys } from "../base/useMenuKeys";
+const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
     ? React.lazy(() => import("../base/DesktopDisplaySettings"))
@@ -51,6 +59,7 @@ export interface DispatchProps {
   onSoundEffectsVolumeChange: (change: number) => void;
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
+  onTextSizeChange: (change: TextSizeType) => void;
   onManageSaves: () => void;
   onBack: () => void;
 }
@@ -185,9 +194,11 @@ function VolumeSlider(props: {
 }
 
 export default function Settings(props: Props): React.JSX.Element {
+  const [creditsOpen, setCreditsOpen] = React.useState(false);
   const canInstallApp = useCanInstallApp();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
   const desktop = useDesktopState();
+  const controllerInput = useControllerInput();
   const onBack = () => {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
@@ -258,6 +269,38 @@ export default function Settings(props: Props): React.JSX.Element {
                   {THEME_CHOICES.map((choice: ThemeChoiceType) => (
                     <ToggleButton value={choice} key={choice}>
                       {choice === "system" ? "System" : THEME_LABELS[choice]}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </SettingRow>
+
+              <SettingRow
+                label="Text size"
+                description="Enlarge text, chart labels and controls on this device."
+                stackOnMobile
+              >
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={props.settings.textSize ?? "standard"}
+                  aria-label="Text size"
+                  onChange={(
+                    _e: React.MouseEvent<HTMLElement>,
+                    value: TextSizeType | null,
+                  ) => value && props.onTextSizeChange(value)}
+                  sx={{
+                    width: { xs: "100%", sm: "auto" },
+                    "& .MuiToggleButton-root": {
+                      flex: { xs: 1, sm: "0 0 auto" },
+                      minWidth: { sm: 76 },
+                      px: { xs: 1, sm: 1.5 },
+                      textTransform: "none",
+                    },
+                  }}
+                >
+                  {TEXT_SIZES.map((size) => (
+                    <ToggleButton value={size} key={size}>
+                      {TEXT_SIZE_LABELS[size]}
                     </ToggleButton>
                   ))}
                 </ToggleButtonGroup>
@@ -459,21 +502,6 @@ export default function Settings(props: Props): React.JSX.Element {
             </SettingRow>
           </SettingsGroup>
 
-          {desktopApp && (
-            <SettingsGroup id="exit-settings" title="Game">
-              <SettingRow
-                label="Quit game"
-                description="Save your progress and close Electrify."
-              >
-                <Button
-                  variant="outlined"
-                  onClick={() => void getDesktop()?.quit()}
-                >
-                  Quit
-                </Button>
-              </SettingRow>
-            </SettingsGroup>
-          )}
           {!desktopApp && canInstallApp && (
             <SettingsGroup id="app-settings" title="Install Electrify">
               <SettingRow
@@ -485,38 +513,40 @@ export default function Settings(props: Props): React.JSX.Element {
             </SettingsGroup>
           )}
 
-          <SettingsGroup id="keyboard-settings" title="Keyboard shortcuts">
-            <Accordion
-              disableGutters
-              elevation={0}
-              sx={{
-                "&::before": { display: "none" },
-                backgroundColor: "transparent",
-              }}
-            >
-              <AccordionSummary
-                expandIcon={<ChevronDownGlyph className="rowChevron" />}
-                aria-controls="keyboard-shortcuts-content"
-                id="keyboard-shortcuts-summary"
-                sx={{ minHeight: 56, px: 2 }}
+          {!controllerInput && (
+            <SettingsGroup id="keyboard-settings" title="Keyboard shortcuts">
+              <Accordion
+                disableGutters
+                elevation={0}
+                sx={{
+                  "&::before": { display: "none" },
+                  backgroundColor: "transparent",
+                }}
               >
-                <Box>
-                  <Typography sx={{ fontWeight: 600 }}>
-                    Keys for faster play
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    View {SHORTCUTS.length} shortcuts
-                  </Typography>
-                </Box>
-              </AccordionSummary>
-              <AccordionDetails
-                id="keyboard-shortcuts-content"
-                sx={{ px: 2, pt: 0 }}
-              >
-                <KeyboardShortcuts />
-              </AccordionDetails>
-            </Accordion>
-          </SettingsGroup>
+                <AccordionSummary
+                  expandIcon={<ChevronDownGlyph className="rowChevron" />}
+                  aria-controls="keyboard-shortcuts-content"
+                  id="keyboard-shortcuts-summary"
+                  sx={{ minHeight: 56, px: 2 }}
+                >
+                  <Box>
+                    <Typography sx={{ fontWeight: 600 }}>
+                      Keys for faster play
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      View {SHORTCUTS.length} shortcuts
+                    </Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails
+                  id="keyboard-shortcuts-content"
+                  sx={{ px: 2, pt: 0 }}
+                >
+                  <KeyboardShortcuts />
+                </AccordionDetails>
+              </Accordion>
+            </SettingsGroup>
+          )}
 
           <Stack
             component="footer"
@@ -528,11 +558,29 @@ export default function Settings(props: Props): React.JSX.Element {
               justifyContent: "center",
               flexWrap: "wrap",
               color: "text.secondary",
+              "& .MuiButton-root": {
+                color: "text.secondary",
+                fontSize: "0.8125rem",
+              },
             }}
           >
-            <Typography variant="caption" sx={{ px: 1 }}>
-              Electrify v{APP_VERSION}
+            <Typography
+              variant="caption"
+              sx={{
+                px: 1,
+                width: { xs: "100%", sm: "auto" },
+                textAlign: "center",
+              }}
+            >
+              {APP_VERSION}
             </Typography>
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => setCreditsOpen(true)}
+            >
+              Credits and licenses
+            </Button>
             <Button
               component="a"
               href="https://github.com/toddmedema/electrify"
@@ -540,7 +588,6 @@ export default function Settings(props: Props): React.JSX.Element {
               rel="noreferrer"
               variant="text"
               size="small"
-              sx={{ color: "text.secondary", fontSize: "0.75rem" }}
             >
               GitHub
             </Button>
@@ -549,12 +596,16 @@ export default function Settings(props: Props): React.JSX.Element {
                 variant="text"
                 size="small"
                 onClick={() => void clearAppCache()}
-                sx={{ color: "text.secondary", fontSize: "0.75rem" }}
               >
                 Clear cache
               </Button>
             )}
           </Stack>
+          {creditsOpen && (
+            <React.Suspense fallback={null}>
+              <CreditsDialog onClose={() => setCreditsOpen(false)} />
+            </React.Suspense>
+          )}
         </Stack>
       </Box>
     </ScreenPage>

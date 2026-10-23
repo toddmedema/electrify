@@ -69,6 +69,10 @@ export function buildStorySnapshot(
       ageYears: facilityAgeYears(facility, currentMinute),
       peakW: facility.peakW,
       operational: facility.yearsToBuildLeft <= 0 && !facility.paused,
+      minuteCreated: facility.minuteCreated,
+      ...(facility.startingAssetId
+        ? { startingAssetId: facility.startingAssetId }
+        : {}),
     };
   });
   let firmPeakW = 0;

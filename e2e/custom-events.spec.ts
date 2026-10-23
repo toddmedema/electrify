@@ -32,10 +32,13 @@ test("custom scenario events compose and persist without overflowing setup", asy
     exact: true,
   });
   await events.click();
+  await expect(
+    page.getByRole("option", { name: "Wildfire Emergency", exact: true }),
+  ).toHaveCount(0);
   for (const name of [
     "Data Center Boom",
     "Heatwave + Drought",
-    "Wildfire Emergency",
+    "Sudden Nuclear Shutdown",
   ]) {
     const option = page.getByRole("option", { name, exact: true });
     await option.click();
@@ -43,7 +46,7 @@ test("custom scenario events compose and persist without overflowing setup", asy
   }
   await page.keyboard.press("Escape");
   await expect(events).toContainText("Data Center Boom");
-  await expect(events).toContainText("Wildfire Emergency");
+  await expect(events).toContainText("Sudden Nuclear Shutdown");
   await expect(outlook).toContainText("Demand covered", { timeout: 30000 });
   expect(
     await events.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -69,7 +72,7 @@ test("custom scenario events compose and persist without overflowing setup", asy
     .poll(
       async () => (await readSavedGame(page))?.customScenario?.eventScenarioIds,
     )
-    .toEqual([106, 108, 111]);
+    .toEqual([106, 108, 110]);
   const scenario = (await readSavedGame(page))!.customScenario!;
   expect(
     scenario.loadAdditions!.some(

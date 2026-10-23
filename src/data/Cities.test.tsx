@@ -116,7 +116,7 @@ describe("getCities", () => {
   });
 
   it("drops entries that could not be played", async () => {
-    // A location without coordinates would reach suncalc as undefined and come back with a
+    // A location without coordinates would reach the solar model as undefined and come back with a
     // sunrise of NaN, which is a game where the sun never rises rather than an error
     respondWith({
       cities: {

@@ -24,9 +24,7 @@ for (const layout of [
       .getByRole("button", { name: "Events", exact: true })
       .click();
     if (layout.pane) {
-      await expect(
-        page.getByRole("heading", { name: "Pinned goals" }),
-      ).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Goals" })).toBeVisible();
       await expect(
         page.locator(".operationsGoals > .eventLogItem"),
       ).toHaveCount(2);
@@ -48,14 +46,22 @@ for (const layout of [
           ) || 40,
         ),
       );
-      for (const item of await page
-        .getByRole("menu", { name: "Pinned goals" })
-        .locator(".MuiMenuItem-root")
-        .all()) {
-        expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(
-          minimum,
-        );
-      }
+      // A visible MUI menu can still be at its initial entrance scale. Measure all
+      // choices together and wait for the actual control-size contract, not a delay.
+      await expect
+        .poll(() =>
+          page
+            .getByRole("menu", { name: "Pinned goals" })
+            .locator(".MuiMenuItem-root")
+            .evaluateAll((items) =>
+              items.length
+                ? Math.min(
+                    ...items.map((item) => item.getBoundingClientRect().height),
+                  )
+                : 0,
+            ),
+        )
+        .toBeGreaterThanOrEqual(minimum);
       await page.keyboard.press("Escape");
       await expect(goals).toBeFocused();
       for (const row of await page
@@ -85,7 +91,7 @@ for (const layout of [
       await expect(page.getByText(/^Calculating forecast/)).toHaveCount(0, {
         timeout: 45000,
       });
-      await page.getByRole("heading", { name: "Pinned goals" }).click();
+      await page.getByRole("heading", { name: "Goals" }).click();
       await page.screenshot({
         path: testInfo.outputPath(
           `operations-${layout.width}-${layout.theme}.png`,
@@ -139,7 +145,7 @@ test("history stays below priorities in a short pane without duplicate upcoming 
   for (const name of [
     "Data Center Boom",
     "Heatwave + Drought",
-    "Wildfire Emergency",
+    "Sudden Nuclear Shutdown",
   ]) {
     await page.getByRole("option", { name, exact: true }).click();
   }

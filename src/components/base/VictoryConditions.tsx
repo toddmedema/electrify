@@ -1,20 +1,23 @@
 import * as React from "react";
 import { DifficultyType, ScenarioType } from "../../Types";
+import { Box, Typography } from "@mui/material";
+import { objectiveDefinition } from "../../helpers/ScenarioObjectives";
+import {
+  objectiveTargetText,
+  objectiveWindowText,
+} from "../../helpers/ObjectivePresentation";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import { scoreRuleText } from "../../helpers/Scoring";
 import {
   blackoutFiringThreshold,
   formatRequiredShare,
+  scenarioObjectiveDefinitions,
 } from "../../helpers/ObjectiveRules";
 
 export interface Props {
-  ownership: ScenarioType["ownership"];
-  dollarsPerkWh: number;
+  scenario: ScenarioType;
   difficulty: DifficultyType;
-  startingCustomers?: number;
-  minimumCustomerRetention?: number;
-  reliabilityObjective?: ScenarioType["reliabilityObjective"];
 }
 
 /**
@@ -24,12 +27,9 @@ export interface Props {
  * The score rules come from helpers/Scoring `SCORE_RULES`; the Manual describes them by hand.
  */
 export default function VictoryConditions(props: Props): React.JSX.Element {
-  const {
-    ownership,
-    dollarsPerkWh,
-    minimumCustomerRetention,
-    reliabilityObjective,
-  } = props;
+  const { scenario } = props;
+  const { ownership, dollarsPerkWh } = scenario;
+  const objectives = scenarioObjectiveDefinitions(scenario);
   const units = useUnits();
   const perEmissions = formatLargeMassApprox(KG_PER_MEGATONNE, units);
   const requiredObjectives = (
@@ -39,24 +39,42 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
         {formatRequiredShare(blackoutFiringThreshold(props.difficulty))} of
         demand in three consecutive months.
       </p>
-      {reliabilityObjective !== undefined && (
-        <p>
-          Required: serve at least{" "}
-          {formatRequiredShare(reliabilityObjective.minimumDemandServed)} of
-          demand during the {reliabilityObjective.label}
-          {(reliabilityObjective.durationMonths || 1) > 1
-            ? " in every event month"
-            : ""}
-          .
-        </p>
-      )}
-      {minimumCustomerRetention !== undefined && (
-        <p>
-          Required: retain at least {Math.round(minimumCustomerRetention * 100)}
-          % of starting customers
-          {props.startingCustomers !== undefined &&
-            ` (at least ${Math.ceil(props.startingCustomers * minimumCustomerRetention).toLocaleString("en-US")} customers, from ${props.startingCustomers.toLocaleString("en-US")} at the start)`}
-        </p>
+      {objectives.length > 0 && (
+        <Box component="section" aria-label="Mission objectives">
+          {objectives.map((objective) => (
+            <Box key={objective.id} sx={{ mt: 2, overflowWrap: "anywhere" }}>
+              <Typography component="p" sx={{ fontWeight: 600, mb: 0.5 }}>
+                {objective.required ? "Required" : "Optional"}:{" "}
+                {objective.label}
+              </Typography>
+              <Typography
+                component="p"
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 0.5 }}
+              >
+                {objectiveDefinition(objective.metric)}
+              </Typography>
+              <Typography component="p" variant="body2">
+                {objectiveTargetText(objective)} ·{" "}
+                {objectiveWindowText(
+                  objective,
+                  scenario.startingYear,
+                  scenario.durationMonths,
+                )}
+              </Typography>
+              {!objective.required && (
+                <Typography
+                  component="p"
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  Stretch goal; does not end or fail the run.
+                </Typography>
+              )}
+            </Box>
+          ))}
+        </Box>
       )}
     </>
   );

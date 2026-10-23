@@ -7,7 +7,6 @@ import {
   CardActionArea,
   CardHeader,
   Chip,
-  IconButton,
   LinearProgress,
   List,
   ListSubheader,
@@ -23,8 +22,8 @@ import {
   ChevronUpGlyph,
 } from "../base/Glyphs";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import SortIcon from "@mui/icons-material/Sort";
+import ExtensionOutlinedIcon from "@mui/icons-material/ExtensionOutlined";
 import NavigableCardRow from "../base/NavigableCardRow";
 import ScreenPage from "../base/ScreenPage";
 import { getScenarioPlayCounts } from "../../LocalStorage";
@@ -52,8 +51,9 @@ export interface StateProps {
 export interface DispatchProps {
   onBack: () => void;
   onCustomGame: () => void;
+  /** Desktop builds with mod support: open the installed community scenarios. */
+  onCommunityScenarios?: () => void;
   onDetails: (delta: Partial<GameType>) => void;
-  onManual: () => void;
   onTutorial: (scenarioId: number) => void;
 }
 
@@ -320,23 +320,8 @@ export default function NewGame(props: Props): React.JSX.Element {
       id="listCard"
       title={props.coop ? "Choose a game together" : "Choose a game"}
       onBack={props.onBack}
-      trailing={
-        // Otherwise the Manual is only reachable from the title screen and the in-game
-        // overflow menu, so players who stop partway through never find out it exists.
-        // Auto margin rather than absolute positioning, so it can't sit on top of the
-        // title on narrow screens
-        <IconButton
-          sx={{ marginLeft: "auto" }}
-          onClick={props.onManual}
-          aria-label="How to play"
-          color="primary"
-          size="large"
-        >
-          <HelpOutlineIcon />
-        </IconButton>
-      }
     >
-      <CoopBrowseBar coop={props.coop} />
+      <CoopBrowseBar coop={props.coop} offerSaves />
       <List
         dense
         className="scrollable cardList missionList"
@@ -491,6 +476,29 @@ export default function NewGame(props: Props): React.JSX.Element {
             readOnly={guest}
           />
         </div>
+        {props.onCommunityScenarios && !guest && (
+          <>
+            <MissionSectionHeader>Community scenarios</MissionSectionHeader>
+            <div className="groupedList">
+              <NavigableCardRow
+                testId="community-scenarios"
+                onOpen={props.onCommunityScenarios}
+                ariaLabel="Open community scenarios"
+                avatar={
+                  <Avatar aria-hidden>
+                    <ExtensionOutlinedIcon />
+                  </Avatar>
+                }
+                title={<span>Mods</span>}
+                description={
+                  <span>
+                    Scenarios from files and Steam Workshop. Unranked.
+                  </span>
+                }
+              />
+            </div>
+          </>
+        )}
       </List>
     </ScreenPage>
   );

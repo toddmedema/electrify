@@ -5,30 +5,43 @@ import {
   removeDesktopProfile,
 } from "./desktop-fixture";
 
-for (const { width, height, colorScheme, reducedMotion } of [
+for (const { width, height, colorScheme, reducedMotion, returning } of [
   {
     width: 1440,
     height: 900,
     colorScheme: "dark",
     reducedMotion: "no-preference",
+    returning: false,
   },
   {
     width: 390,
     height: 844,
     colorScheme: "light",
     reducedMotion: "no-preference",
+    returning: true,
   },
-  { width: 360, height: 640, colorScheme: "dark", reducedMotion: "reduce" },
+  {
+    width: 360,
+    height: 640,
+    colorScheme: "dark",
+    reducedMotion: "reduce",
+    returning: false,
+  },
 ] as const) {
-  test(`native entrance hands off at ${width}px in ${colorScheme}`, async () => {
+  test(`native ${returning ? "returning" : "first"} entrance hands off at ${width}px in ${colorScheme}`, async () => {
     const profile = await createDesktopProfile();
     const { app, page, errors } = await launchDesktop(profile);
     try {
       await page.setViewportSize({ width, height });
       await page.emulateMedia({ colorScheme, reducedMotion });
       await page.evaluate(
-        (theme) => localStorage.setItem("theme", theme),
-        colorScheme,
+        ({ theme, returning }) => {
+          localStorage.setItem("theme", theme);
+          if (returning)
+            localStorage.setItem("electrify-startup-complete", "true");
+          else localStorage.removeItem("electrify-startup-complete");
+        },
+        { theme: colorScheme, returning },
       );
       await app.evaluate(({ ipcMain }) => {
         ipcMain.removeHandler("desktop:read-saves");
@@ -63,7 +76,7 @@ for (const { width, height, colorScheme, reducedMotion } of [
           animations.forEach((animation) => animation.pause());
           return animations.length;
         });
-      expect(animations > 0).toBe(reducedMotion !== "reduce");
+      expect(animations > 0).toBe(!returning && reducedMotion !== "reduce");
       await app.evaluate(({ ipcMain }) => {
         ipcMain.emit("test:release-startup");
       });

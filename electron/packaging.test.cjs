@@ -1,8 +1,11 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const { finished } = require("node:stream/promises");
+const { FileMatcher } = require("app-builder-lib/out/fileMatcher");
 const {
   installMacNativeSlices,
   packageConfiguration,
@@ -13,8 +16,13 @@ const {
   assertAsset,
   verifyBuild,
   verifyArchiveAssets,
+  verifyInputResources,
   digest,
 } = require("../scripts/desktop-verify.js");
+const {
+  preserveRuntimeNotices,
+  verifyRuntimeNotices,
+} = require("../scripts/runtime-notices.js");
 
 test("packaged app metadata uses the renderer artifact's build version", () => {
   const version = "26sept26-1507";
@@ -25,9 +33,209 @@ test("packaged app metadata uses the renderer artifact's build version", () => {
     assert.equal(config.extraMetadata.main, "electron/main.cjs");
   }
   assert.equal(
-    require("../electron-builder.config.cjs").extraMetadata.version,
+    require("./electron-builder.config.cjs").extraMetadata.version,
     undefined,
   );
+});
+
+test("the packaged mod parser loads, validates and digests without checkout dependencies", (t) => {
+  const source = path.resolve(__dirname, "..");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "electrify-packaged-mods-"),
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const probe = `
+    const assert = require("node:assert/strict");
+    const { ModStore } = require("./electron/mods.cjs");
+    const codec = require("./electron/coop-codec.cjs");
+    assert.deepEqual(codec.parse(codec.stringify({ value: Infinity })), { value: Infinity });
+    const { parseMod, packageDigest } = require("./src/mods/ModSchema.js");
+    assert.equal(typeof ModStore, "function");
+    const pack = {
+      schemaVersion: 1, gameApi: 1, id: "packaged-grid", title: "Packaged Grid",
+      creator: "Creator", version: "1", description: "A grid planning challenge.",
+      seed: 42,
+      events: [{
+        id: "dry-year", title: "A dry year", message: "Water inflow has fallen.",
+        startMonth: 1, durationMonths: 12, preview: "Water inflow will fall.",
+        effects: { hydroInflowMultiplier: { byDifficulty: {
+          Intern: 0.9, Employee: 0.8, Manager: 0.7, VP: 0.6, CEO: 0.5
+        } } }
+      }]
+    };
+    const parsed = parseMod(JSON.stringify(pack));
+    assert.deepEqual(parsed, pack);
+    const digest = packageDigest(parsed);
+    assert.match(digest, /^sha256-[a-f0-9]{64}$/);
+    assert.equal(packageDigest({ ...parsed, $schema: "./scenario.schema.json" }), digest);
+    assert.notEqual(packageDigest({ ...parsed, seed: 43 }), digest);
+    assert.throws(() => parseMod(JSON.stringify({ ...pack, gameApi: 2 })), /gameApi/);
+    process.stdout.write(JSON.stringify({ id: parsed.id, digest }));
+  `;
+  for (const mode of ["steam", "offline"]) {
+    const directory = path.join(root, mode);
+    const configured = new FileMatcher(
+      source,
+      directory,
+      (value) => value,
+      packageConfiguration(mode).files,
+    ).createFilter();
+    const stagedSources = [];
+    const stage = (relative) => {
+      const filename = path.join(source, relative);
+      const stat = fs.statSync(filename);
+      if (!configured(filename, stat)) return;
+      if (stat.isDirectory()) {
+        for (const name of fs.readdirSync(filename))
+          stage(path.join(relative, name));
+      } else {
+        const target = path.join(directory, relative);
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.copyFileSync(filename, target);
+        if (relative.startsWith(`src${path.sep}`)) stagedSources.push(relative);
+      }
+    };
+    for (const relative of ["src", "electron", "package.json"]) stage(relative);
+    assert(stagedSources.every((file) => file.endsWith(".js")));
+    const run = () =>
+      spawnSync(process.execPath, ["-e", probe], {
+        cwd: directory,
+        encoding: "utf8",
+        env: { ...process.env, NODE_PATH: "", NODE_OPTIONS: "" },
+      });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).id, "packaged-grid");
+    for (const dependency of [
+      "ScenarioRulesSchema.js",
+      "RuleIdentity.js",
+      "ScenarioText.js",
+    ]) {
+      const filename = path.join(directory, "src", "helpers", dependency);
+      const original = fs.readFileSync(filename);
+      fs.unlinkSync(filename);
+      const missing = run();
+      assert.notEqual(missing.status, 0);
+      assert.match(missing.stderr, /MODULE_NOT_FOUND/);
+      assert(missing.stderr.includes(path.basename(dependency, ".js")));
+      fs.writeFileSync(filename, original);
+    }
+    assert.equal(
+      run().status,
+      0,
+      "Restoring the dependency must restore parser loading",
+    );
+  }
+});
+
+test("packaging preserves and verifies each target runtime's original notices before branding", (t) => {
+  const temporaryRoot = path.resolve(".tmp", "native-tests");
+  fs.mkdirSync(temporaryRoot, { recursive: true });
+  const root = fs.mkdtempSync(path.join(temporaryRoot, "runtime-notices-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const version = require("../package-lock.json").packages[
+    "node_modules/electron"
+  ].version;
+  for (const platform of ["win32", "linux", "darwin"]) {
+    const appOutDir = path.join(root, platform);
+    fs.mkdirSync(appOutDir);
+    const licenseName =
+      platform === "darwin" ? "LICENSE" : "LICENSE.electron.txt";
+    const originals = {
+      LICENSE: Buffer.from(`Electron ${platform} MIT notice\r\nCopyright\r\n`),
+      "LICENSES.chromium.html": Buffer.from(
+        `\ufeff<html>Chromium ${platform} original terms</html>\r\n`,
+      ),
+    };
+    fs.writeFileSync(path.join(appOutDir, licenseName), originals.LICENSE);
+    fs.writeFileSync(
+      path.join(appOutDir, "LICENSES.chromium.html"),
+      originals["LICENSES.chromium.html"],
+    );
+    const context = {
+      appOutDir,
+      electronPlatformName: platform,
+      packager: { info: { framework: { version } } },
+    };
+    for (const mode of ["steam", "offline"])
+      assert.equal(
+        packageConfiguration(mode).afterExtract,
+        preserveRuntimeNotices,
+      );
+    packageConfiguration("offline").afterExtract(context);
+    const resources =
+      platform === "darwin"
+        ? path.join(appOutDir, "Electron.app", "Contents", "Resources")
+        : path.join(appOutDir, "resources");
+    const target = path.join(resources, "runtime-notices");
+    for (const [name, original] of Object.entries(originals))
+      assert.deepEqual(fs.readFileSync(path.join(target, name)), original);
+    // Mac branding removes the archive-root notices. Verification must use the
+    // copies that remain inside the final application's resources directory.
+    fs.rmSync(path.join(appOutDir, licenseName));
+    fs.rmSync(path.join(appOutDir, "LICENSES.chromium.html"));
+    assert.doesNotThrow(() => verifyRuntimeNotices(resources));
+
+    fs.appendFileSync(path.join(target, "LICENSES.chromium.html"), "modified");
+    assert.throws(() => verifyRuntimeNotices(resources), /notice mismatch/);
+    fs.writeFileSync(
+      path.join(target, "LICENSES.chromium.html"),
+      originals["LICENSES.chromium.html"],
+    );
+    fs.rmSync(path.join(target, "LICENSE"));
+    assert.throws(() => verifyRuntimeNotices(resources), /ENOENT/);
+    fs.writeFileSync(path.join(target, "LICENSE"), originals.LICENSE);
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(target, "manifest.json"), "utf8"),
+    );
+    manifest.version = "0.0.0";
+    fs.writeFileSync(
+      path.join(target, "manifest.json"),
+      JSON.stringify(manifest),
+    );
+    assert.throws(
+      () => verifyRuntimeNotices(resources),
+      /Packaged Electron notice manifest differs from the runtime/,
+    );
+    assert.throws(
+      () =>
+        preserveRuntimeNotices({
+          ...context,
+          packager: { info: { framework: { version: "0.0.0" } } },
+        }),
+      /lockfile/,
+    );
+    fs.writeFileSync(path.join(appOutDir, licenseName), " \n");
+    assert.throws(
+      () => preserveRuntimeNotices(context),
+      /Empty Electron runtime notice/,
+    );
+  }
+});
+
+test("packaged Steam Input actions and defaults remain external to ASAR and match authored bytes", (t) => {
+  const temporaryRoot = path.resolve(".tmp", "native-tests");
+  fs.mkdirSync(temporaryRoot, { recursive: true });
+  const resources = fs.mkdtempSync(path.join(temporaryRoot, "steam-input-"));
+  t.after(() => fs.rmSync(resources, { recursive: true, force: true }));
+  const source = path.join(__dirname, "../steamworks/input");
+  const config = packageConfiguration("steam");
+  const mapping = config.extraResources.find(
+    (entry) => entry.from === "steamworks/input",
+  );
+  assert.equal(mapping.to, "steam-input");
+  const target = path.join(resources, mapping.to);
+  fs.cpSync(source, target, { recursive: true });
+  assert.doesNotThrow(() => verifyInputResources(resources, source));
+  const file = path.join(target, "controller_neptune.vdf");
+  fs.appendFileSync(file, "\nchanged during packaging\n");
+  assert.throws(
+    () => verifyInputResources(resources, source),
+    /Steam Input configuration mismatch/,
+  );
+  fs.copyFileSync(path.join(source, "controller_neptune.vdf"), file);
+  fs.unlinkSync(path.join(target, "actions.vdf"));
+  assert.throws(() => verifyInputResources(resources, source), /ENOENT/);
 });
 
 test("packaging refuses Git LFS pointer text and empty assets", () => {

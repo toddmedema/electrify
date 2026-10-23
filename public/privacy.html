@@ -78,26 +78,28 @@
         <p class="eyebrow">Your data and your choices</p>
         <h1 id="page-title">Privacy, in plain language.</h1>
         <p class="hero__lede">
-          Play without an account. Keep your game on your device. Choose if you
-          want to join the public leaderboard.
+          Keep your game on your device. Choose the online features you use in
+          the browser and Steam editions.
         </p>
       </div>
     </section>
 
     <main class="page-content privacy-layout" id="main-content">
       <article class="policy-article">
-        <p class="updated">Last updated September 1, 2026</p>
+        <p class="updated">Last updated October 21, 2026</p>
 
         <section class="policy-section" aria-labelledby="local-data">
-          <h2 id="local-data">Your game stays in your browser</h2>
+          <h2 id="local-data">Your game saves on your device</h2>
           <p>
-            Electrify is playable without an account. Your current game and
-            preferences are saved in this browser on your device.
+            The browser edition is playable without an account. Your current
+            game and preferences are saved in this browser on your device. The
+            desktop edition stores its saves and preferences locally and can
+            play offline after installation through Steam.
           </p>
         </section>
 
         <section class="policy-section" aria-labelledby="online-features">
-          <h2 id="online-features">Optional online features</h2>
+          <h2 id="online-features">Browser online features</h2>
           <p>
             If you sign in with Google, Electrify receives your account
             identifier and basic profile name so you can claim a separate public
@@ -122,11 +124,56 @@
         </section>
 
         <section class="policy-section" aria-labelledby="analytics">
-          <h2 id="analytics">Analytics</h2>
+          <h2 id="analytics">Browser analytics</h2>
           <p>
-            Electrify uses aggregate usage analytics to understand which screens
-            and missions are used and where errors occur. Shared links use
-            simple campaign parameters; the game does not use fingerprinting.
+            The browser edition uses aggregate usage analytics to understand
+            which screens and missions are used and where errors occur. Shared
+            links use simple campaign parameters; the game does not use
+            fingerprinting.
+          </p>
+        </section>
+
+        <section class="policy-section" aria-labelledby="steam-features">
+          <h2 id="steam-features">Steam desktop features</h2>
+          <h3>Your identity and progress</h3>
+          <p>
+            The desktop game uses your signed-in Steam account identifier and
+            profile name. It has no Google sign-in or Firebase analytics. When
+            enabled in Steam, Steam Cloud synchronizes supported solo and co-op
+            saves through Valve. Achievements synchronize through Steam's stats
+            service independently of the Cloud setting. Achievements and
+            submitted leaderboard scores are associated with your Steam account.
+            Public leaderboards show your Steam profile name and score; Steam
+            profile privacy settings control achievement visibility. Offline
+            progress may be queued until Steam reconnects.
+          </p>
+          <p>
+            Steam rich presence tells friends your game mode or scenario. Co-op
+            lobbies share Steam identity and membership, and connected players
+            exchange game actions and campaign state through Steam networking.
+            Host checkpoints include player identifiers and are stored by the
+            host and connected guests, with account-specific Cloud backup when
+            enabled.
+          </p>
+          <h3>Workshop and highlights</h3>
+          <p>
+            Workshop subscriptions and publishing use Steam; publishing uploads
+            your chosen scenario package, title and creator name to Valve and
+            initially shares the item publicly. You can manage visibility later
+            on the Steam item page. Downloaded scenarios and subscription
+            metadata stay on your device. Recorded Steam highlights are optional
+            in Settings.
+          </p>
+          <h3>Your controls</h3>
+          <p>
+            You can play offline, disable Steam Cloud, choose Workshop
+            visibility and manage Steam profile privacy in Steam. Deleting a
+            local save does not delete an independently shared Workshop item.
+            Valve handles Steam service data under its
+            <a href="https://store.steampowered.com/privacy_agreement/"
+              >Privacy Policy</a
+            >. A copy of this desktop privacy explanation and bundled license
+            notices is available offline in Settings → Credits and licenses.
           </p>
         </section>
 
@@ -152,8 +199,9 @@
 
       <aside class="summary-card" aria-labelledby="summary-title">
         <h2 id="summary-title">At a glance</h2>
+        <h3>In your browser</h3>
         <ul class="summary-list">
-          <li>No account is required to play.</li>
+          <li>No account is required for browser play.</li>
           <li>Game progress and preferences are stored on your device.</li>
           <li>Signing in backs up saves privately to the cloud.</li>
           <li>Shared saves are available to anyone with their link.</li>
@@ -161,12 +209,23 @@
           <li>Email updates are optional and you can unsubscribe anytime.</li>
           <li>You can request deletion of leaderboard data.</li>
         </ul>
+        <h3>On Steam</h3>
+        <ul class="summary-list">
+          <li>Steam services use your Steam identity and privacy settings.</li>
+          <li>The desktop game has no Firebase analytics.</li>
+        </ul>
       </aside>
     </main>
 
     <footer class="site-footer">
       <div class="site-footer__inner">
-        <p>Free and open source under the MIT license.</p>
+        <p>
+          Source available under the
+          <a
+            href="https://github.com/toddmedema/electrify/blob/master/LICENSE.md"
+            >MIT License with Commons Clause</a
+          >.
+        </p>
         <nav aria-label="Footer navigation">
           <a href="/about.html">About</a>
           <a href="https://github.com/toddmedema/electrify">GitHub</a>

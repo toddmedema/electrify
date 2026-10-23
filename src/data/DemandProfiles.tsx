@@ -7,6 +7,7 @@ import {
 } from "../Types";
 import { DAYS_PER_YEAR, TICK_MINUTES, TICKS_PER_DAY } from "../Constants";
 import { pow } from "../helpers/Pow";
+import { cos, exp } from "../helpers/Libm";
 
 export const DEMAND_TYPES: readonly DemandTypeNameType[] = [
   "Residential",
@@ -404,7 +405,7 @@ export function temperatureDemandWattsPerCustomer(
 function hourShape(type: DemandTypeNameType, minuteOfDay: number): number {
   const hour = minuteOfDay / 60;
   const peak = (at: number, width: number) =>
-    Math.exp(-pow(hour - at, 2) / (2 * width * width));
+    exp(-pow(hour - at, 2) / (2 * width * width));
   switch (type) {
     case "Residential":
       return 0.65 + 0.45 * peak(7, 1.8) + 0.75 * peak(19, 2.5);
@@ -563,13 +564,6 @@ export function scheduledLoadAdditionWAt(
   const monthOfCycle = (currentMonth - scheduledMonth) % 12;
   const loadFactor = Math.max(0, Math.min(1, addition.loadFactor));
   const multiplier =
-    loadFactor + (1 - loadFactor) * Math.cos((2 * Math.PI * monthOfCycle) / 12);
+    loadFactor + (1 - loadFactor) * cos((2 * Math.PI * monthOfCycle) / 12);
   return Math.max(0, addition.peakW) * multiplier;
-}
-
-/** Nameplate/load-factor arithmetic, independent of the game's representative-day calendar. */
-export function annualLoadAdditionWh(
-  addition: ScenarioLoadAdditionType,
-): number {
-  return addition.peakW * addition.loadFactor * 8760;
 }

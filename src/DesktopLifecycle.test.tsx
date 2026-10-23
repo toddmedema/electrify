@@ -1,7 +1,7 @@
 import { act, render } from "@testing-library/react";
 import { Provider } from "react-redux";
 import App from "./App";
-import { DesktopBridge } from "./Desktop";
+import { DesktopBridge, DesktopPowerState } from "./Desktop";
 import { store } from "./Store";
 import { delta as gameDelta } from "./reducers/Game";
 import { change } from "./reducers/Settings";
@@ -32,7 +32,7 @@ jest.mock("firebase/auth", () => ({
   getAuth: jest.fn(),
 }));
 
-it("keeps gameplay and audio paused through visibility/pageshow events until native focus returns", () => {
+it("keeps gameplay and audio paused through visibility/pageshow events until native focus returns", async () => {
   const focusListeners = new Set<(focused: boolean) => void>();
   const focused = (value: boolean) =>
     focusListeners.forEach((listener) => listener(value));
@@ -59,7 +59,7 @@ it("keeps gameplay and audio paused through visibility/pageshow events until nat
     </Provider>,
   );
   try {
-    act(() => focused(false));
+    await act(async () => focused(false));
     expect(store.getState().game.speed).toBe("PAUSED");
     expect(pause).toHaveBeenCalled();
     (resume as jest.Mock).mockClear();
@@ -79,4 +79,75 @@ it("keeps gameplay and audio paused through visibility/pageshow events until nat
   }
   expect(unsubscribe).toHaveBeenCalled();
   expect(focusListeners.size).toBe(0);
+});
+
+it("system sleep pauses a focused game and ignores stale state after waking", async () => {
+  let powerChanged: ((power: DesktopPowerState) => void) | undefined;
+  let focusChanged: ((focused: boolean) => void) | undefined;
+  let stateChanged:
+    | ((state: Awaited<ReturnType<DesktopBridge["getState"]>>) => void)
+    | undefined;
+  const stopPower = jest.fn();
+  window.electrifyDesktop = {
+    apiVersion: 1,
+    onGameFocusChanged: (listener: (focused: boolean) => void) => {
+      focusChanged = listener;
+      return () => {};
+    },
+    onPowerStateChanged: (listener: (power: DesktopPowerState) => void) => {
+      powerChanged = listener;
+      return stopPower;
+    },
+    onStateChanged: (
+      listener: (state: Awaited<ReturnType<DesktopBridge["getState"]>>) => void,
+    ) => {
+      stateChanged = listener;
+      return () => {};
+    },
+    onBeforeQuit: () => () => {},
+    getState: jest.fn().mockResolvedValue({
+      steam: {},
+      power: { phase: "awake", generation: 0 },
+    }),
+    setActivity: jest.fn().mockResolvedValue(undefined),
+  } as unknown as DesktopBridge;
+  store.dispatch(gameDelta({ inGame: true, speed: "NORMAL" }));
+  store.dispatch(change({ audioEnabled: true }));
+  const view = render(
+    <Provider store={store}>
+      <App />
+    </Provider>,
+  );
+  try {
+    expect(powerChanged).toBeDefined();
+    await act(async () => powerChanged!({ phase: "suspended", generation: 1 }));
+    expect(store.getState().game.speed).toBe("PAUSED");
+    (resume as jest.Mock).mockClear();
+    act(() => {
+      focusChanged!(true);
+      window.dispatchEvent(new Event("pageshow"));
+      powerChanged!({ phase: "resuming", generation: 2 });
+    });
+    expect(resume).not.toHaveBeenCalled();
+    expect(store.getState().game.speed).toBe("PAUSED");
+    act(() => {
+      powerChanged!({ phase: "awake", generation: 2 });
+      focusChanged!(true);
+    });
+    expect(resume).toHaveBeenCalled();
+    expect(store.getState().game.speed).toBe("PAUSED");
+    // A getState response captured before the wake acknowledgement must not hide us again.
+    act(() =>
+      stateChanged!({
+        steam: {},
+        power: { phase: "resuming", generation: 2 },
+      } as Awaited<ReturnType<DesktopBridge["getState"]>>),
+    );
+    expect(store.getState().game.speed).toBe("PAUSED");
+  } finally {
+    view.unmount();
+    delete window.electrifyDesktop;
+    store.dispatch(quit());
+  }
+  expect(stopPower).toHaveBeenCalledTimes(1);
 });

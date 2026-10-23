@@ -1,0 +1,95 @@
+.coopLobby .MuiDialogTitle-root {
+  padding-bottom: 12px;
+}
+
+.coopLobby .MuiDialogContent-root {
+  scroll-padding: 16px;
+}
+
+.coopLobby .MuiAlert-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.coopLobby .MuiButton-root,
+.coopLobby .MuiIconButton-root {
+  min-height: 40px;
+}
+
+.coopCampaigns {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.coopCampaignHeading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 8px;
+}
+
+.coopCampaignHeading h2 {
+  font-weight: 600;
+}
+
+.coopCampaignResume {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.coopLobbyRoster li > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.coopLobbyRoster li > span:last-child {
+  flex-shrink: 0;
+}
+
+@media (max-width: 599px) {
+  .coopCampaignResume .MuiButton-root {
+    width: 100%;
+  }
+}
+
+@media (pointer: coarse) {
+  .coopLobby .MuiButton-root,
+  .coopLobby .MuiIconButton-root {
+    min-height: 44px;
+  }
+}
+
+.coopSlots li {
+  align-items: center;
+  min-height: 48px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.coopSlotName {
+  display: grid;
+}
+
+/* The app's one back glyph sits before the title, as on every screen header. */
+.coopLobbyHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* The code fills the row; Join takes about a fifth of it. */
+.coopJoinRow {
+  display: flex;
+  gap: 8px;
+}
+
+.coopJoinRow .MuiTextField-root {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.coopJoinRow .MuiButton-root {
+  flex: 0 0 20%;
+  min-width: 72px;
+}

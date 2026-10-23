@@ -9,6 +9,7 @@ import { AppStateType, GameType } from "../../Types";
 import NewGame, { DispatchProps, StateProps } from "./NewGame";
 import { coopControls } from "../../multiplayer/Registry";
 import { store } from "../../Store";
+import { getDesktop } from "../../Desktop";
 
 // A co-op guest follows the host's screens, so its own clicks don't navigate.
 const guest = () => store.getState().ui.coop?.role === "guest";
@@ -30,6 +31,12 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onCustomGame: () => {
       if (!guest()) dispatch(navigate("CUSTOM_GAME"));
     },
+    onCommunityScenarios:
+      process.env.REACT_APP_DESKTOP === "true" && getDesktop()?.mods
+        ? () => {
+            if (!guest()) dispatch(navigate("MODS"));
+          }
+        : undefined,
     onDetails: (d: Partial<GameType>) => {
       if (guest()) return;
       dispatch(uiDelta({ scenarioPreview: d.scenarioId }));
@@ -41,9 +48,6 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           }),
         );
       }
-    },
-    onManual: () => {
-      dispatch(navigate("MANUAL"));
     },
     onTutorial: (scenarioId: number) => {
       if (coop()) return;

@@ -5,7 +5,6 @@ import {
   PUBLIC_RATE_POINTS_PER_CENT,
   scoreLabel,
   scoreRuleText,
-  publicRateScoreChange,
   publicRateScore,
   publicRateYearContribution,
   startingDollarRevenue,
@@ -163,42 +162,6 @@ describe("inflation and the public rate target", () => {
   });
 });
 
-describe("publicRateScoreChange", () => {
-  const kWh = (n: number) => n * 1000;
-
-  it("credits a first year the full distance of its rate from the target", () => {
-    // Nothing sold yet: the category starts neutral, then lands on the year's own average
-    expect(
-      publicRateScoreChange(
-        0.1,
-        { revenue: 0, supplyWh: 0 },
-        { revenue: 0.08 * 1000, supplyWh: kWh(1000) },
-      ),
-    ).toBe(160);
-  });
-
-  it("moves an established average less than a fresh one", () => {
-    // Three years at the target, then one at 2¢ under: the average only falls by 0.5¢
-    expect(
-      publicRateScoreChange(
-        0.1,
-        { revenue: 0.1 * 3000, supplyWh: kWh(3000) },
-        { revenue: 0.08 * 1000, supplyWh: kWh(1000) },
-      ),
-    ).toBe(40);
-  });
-
-  it("takes points back when a cheap history is followed by a dear year", () => {
-    expect(
-      publicRateScoreChange(
-        0.1,
-        { revenue: 0.08 * 1000, supplyWh: kWh(1000) },
-        { revenue: 0.12 * 1000, supplyWh: kWh(1000) },
-      ),
-    ).toBe(-160);
-  });
-});
-
 describe("publicRateYearContribution", () => {
   const kWh = (n: number) => n * 1000;
 
@@ -217,7 +180,6 @@ describe("publicRateYearContribution", () => {
     // the target, so the change-based figure shows a gain while the rate is still 5¢ over.
     const past = { revenue: 0.2 * 12000, supplyWh: kWh(12000) };
     const next = { revenue: 0.15 * 12000, supplyWh: kWh(12000) };
-    expect(publicRateScoreChange(0.1, past, next)).toBeGreaterThan(0);
     expect(publicRateYearContribution(0.1, past, next, 0.15)).toBe(-200);
   });
 

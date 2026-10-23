@@ -10,6 +10,9 @@ const crypto = require("crypto");
 const root = path.resolve(__dirname, "..");
 const output = "src/data/RunCompatibility.json";
 const rulesRevision = 1;
+const sourceExtension = /\.(?:[cm]?[jt]sx?|json)$/;
+const productionSource = (file) =>
+  sourceExtension.test(file) && !/\.(test|spec)\./.test(file);
 
 function filesUnder(directory) {
   return fs
@@ -20,24 +23,7 @@ function filesUnder(directory) {
     });
 }
 
-const sourceFiles = ["src/data", "src/helpers", "src/reducers"]
-  .flatMap(filesUnder)
-  .filter((file) => /\.(tsx?|json)$/.test(file))
-  .filter((file) => !/\.(test|spec)\./.test(file) && file !== output);
-const dataFiles = filesUnder("public/data").filter((file) =>
-  /\.(bin|csv|json)$/.test(file),
-);
-const inputs = [
-  "src/Constants.tsx",
-  "src/Types.tsx",
-  "package-lock.json",
-  ...sourceFiles,
-  ...dataFiles,
-].sort();
-const digest = crypto.createHash("sha256");
-const dataIntegrity = {};
-digest.update(`electrify-rules:${rulesRevision}\n`);
-for (const file of inputs) {
+function readInput(file) {
   const raw = fs.readFileSync(path.join(root, file));
   if (
     raw
@@ -53,7 +39,31 @@ for (const file of inputs) {
   const content = file.endsWith(".bin")
     ? raw
     : Buffer.from(raw.toString("utf8").replace(/\r\n/g, "\n"));
-  const inputDigest = crypto.createHash("sha256").update(content).digest("hex");
+  return {
+    raw,
+    content,
+    inputDigest: crypto.createHash("sha256").update(content).digest("hex"),
+  };
+}
+
+const sourceFiles = ["src/data", "src/helpers", "src/reducers"]
+  .flatMap(filesUnder)
+  .filter((file) => productionSource(file) && file !== output);
+const dataFiles = filesUnder("public/data").filter((file) =>
+  /\.(bin|csv|json)$/.test(file),
+);
+const inputs = [
+  "src/Constants.tsx",
+  "src/Types.tsx",
+  "package-lock.json",
+  ...sourceFiles,
+  ...dataFiles,
+].sort();
+const digest = crypto.createHash("sha256");
+const dataIntegrity = {};
+digest.update(`electrify-rules:${rulesRevision}\n`);
+for (const file of inputs) {
+  const { raw, content, inputDigest } = readInput(file);
   digest.update(`${file}\0${inputDigest}\n`);
   if (file.startsWith("public/data/")) {
     // Integrity checks consume raw HTTP bytes, so shipped text must have the
@@ -66,25 +76,36 @@ for (const file of inputs) {
   }
 }
 const compatibilityId = `rules-${rulesRevision}-${digest.digest("hex")}`;
+// Package parsing and the installed library can change without changing official runs. Shared
+// rules/compiler owners stay above, even when first introduced for community packages.
+const modDigest = crypto.createHash("sha256");
+modDigest.update(
+  `electrify-mod-runtime:${rulesRevision}\n${compatibilityId}\n`,
+);
+for (const file of [
+  ...filesUnder("src/mods").filter(productionSource),
+  "electron/mods.cjs",
+  "electron/steam-workshop.cjs",
+].sort()) {
+  modDigest.update(`${file}\0${readInput(file).inputDigest}\n`);
+}
+const modRuntimeId = `mod-${rulesRevision}-${modDigest.digest("hex")}`;
 // Steam leaderboards are named after compatibilityId, so co-op transport and interface edits must
 // not move it. Co-op lobbies and shared saves also require the same co-op code on every peer.
 const multiplayerDigest = crypto.createHash("sha256");
-multiplayerDigest.update(`${compatibilityId}\n`);
+multiplayerDigest.update(`${compatibilityId}\n${modRuntimeId}\n`);
 for (const file of [
-  ...filesUnder("src/multiplayer").filter(
-    (file) => /\.(tsx?|json)$/.test(file) && !/\.(test|spec)\./.test(file),
-  ),
+  ...filesUnder("src/multiplayer").filter(productionSource),
   "src/workers/Multiplayer.worker.ts",
   "electron/steam-multiplayer.cjs",
+  "electron/coop-codec.cjs",
 ].sort()) {
-  const raw = fs.readFileSync(path.join(root, file));
-  const content = Buffer.from(raw.toString("utf8").replace(/\r\n/g, "\n"));
-  const inputDigest = crypto.createHash("sha256").update(content).digest("hex");
-  multiplayerDigest.update(`${file}\0${inputDigest}\n`);
+  multiplayerDigest.update(`${file}\0${readInput(file).inputDigest}\n`);
 }
 const manifest = {
   rulesRevision,
   compatibilityId,
+  modRuntimeId,
   multiplayerCompatibilityId: `coop-${rulesRevision}-${multiplayerDigest.digest("hex")}`,
   dataIntegrity,
 };

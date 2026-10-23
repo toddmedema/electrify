@@ -5,7 +5,6 @@ import {
   LOCATION_TRANSMISSION_PROFILE_IDS,
   TRANSMISSION_CORRIDORS,
   adjacentMarketForCorridor,
-  adjacentMarketsForLocation,
   corridorsForLocation,
   transmissionAvailable,
 } from "./AdjacentMarkets";
@@ -121,7 +120,6 @@ describe("researched transmission profiles", () => {
     for (const id of suppressed) {
       expect(transmissionAvailable(location(id))).toBe(false);
       expect(corridorsForLocation(location(id))).toEqual([]);
-      expect(adjacentMarketsForLocation(location(id))).toEqual([]);
     }
 
     expect(transmissionAvailable(location("custom-unknown"))).toBe(false);

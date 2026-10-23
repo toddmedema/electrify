@@ -1,3 +1,5 @@
+import { validWorldEvent } from "./helpers/WorldEventValidation";
+import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 const object = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
 
@@ -39,6 +41,186 @@ const migrations: ((
       game: { ...save.game, policies: { ...policies, programs } },
     };
   },
+  // 3 -> 4: retire the old wildfire plant lottery prospectively. Historical occurrences and
+  // booked results remain evidence of the rules that produced them; active copies suppress
+  // rerolling the same authored phase until its original end.
+  (save) => {
+    if (!object(save.game)) return save;
+    const game = save.game;
+    if (!object(game.worldEvents)) return save;
+    const worldEvents = game.worldEvents;
+    if (!Array.isArray(worldEvents.active) || !object(game.date)) return save;
+    const minute = game.date.minute;
+    if (typeof minute !== "number" || !Number.isFinite(minute)) return save;
+    let retired = false;
+    const active = worldEvents.active.map((event) => {
+      if (
+        !object(event) ||
+        !validWorldEvent(event) ||
+        !object(event.attributes) ||
+        typeof event.endsMinute !== "number" ||
+        event.endsMinute <= minute ||
+        !(
+          event.definitionId === "recurring-wildfire" ||
+          (event.definitionId === "california-wildfire-2025:firestorm" &&
+            ("outputMultiplier" in event.attributes ||
+              "selectedFacilityIds" in event.attributes))
+        )
+      )
+        return event;
+      retired = true;
+      return {
+        ...event,
+        effects: {},
+        message:
+          "Earlier wildfire impacts remain in recorded history. No further generator restrictions or restoration charges apply to this event.",
+      };
+    });
+    if (!retired) return save;
+    return {
+      ...save,
+      game: {
+        ...game,
+        wildfireForecastRefresh: true,
+        worldEvents: { ...worldEvents, active },
+      },
+    };
+  },
+  // 4 -> 5: remove retired smoke, service-interruption and backup effects. Keep all
+  // recorded accounts, actions and results; refresh only ticks after the saved instant.
+  (save) => {
+    if (!object(save.game)) return save;
+    const game = save.game;
+    if (!object(game.worldEvents)) return save;
+    const events = game.worldEvents;
+    if (!Array.isArray(events.active) || !Array.isArray(events.occurrences))
+      return save;
+    const retired = (event: unknown) =>
+      object(event) &&
+      (event.definitionId === "recurring-wildfire" ||
+        event.definitionId === "wildfire-smoke" ||
+        (typeof event.definitionId === "string" &&
+          event.definitionId.startsWith("california-wildfire-2025:")) ||
+        (typeof event.key === "string" && event.key.startsWith("wildfire:")));
+    const hadRetired = [...events.active, ...events.occurrences].some(retired);
+    const removedSelection =
+      object(game.customScenario) &&
+      Array.isArray(game.customScenario.eventScenarioIds) &&
+      game.customScenario.eventScenarioIds.includes(111);
+    const legacyLines =
+      game.scenarioId === 111 &&
+      object(game.transmission) &&
+      Array.isArray(game.transmission.lines) &&
+      game.transmission.lines.some(
+        (line) =>
+          object(line) &&
+          ((line.corridorId === "california-north" &&
+            typeof line.capacityW === "number" &&
+            line.capacityW < 40e6) ||
+            (line.corridorId === "california-south" &&
+              [7.5e6, 11.25e6, 16.875e6, 25.3125e6].includes(
+                line.capacityW as number,
+              ))),
+      );
+    const occurrences = events.occurrences.map((event) => {
+      if (!retired(event) || !object(event) || !object(event.effects))
+        return event;
+      const effects = { ...event.effects };
+      for (const key of [
+        "solarIrradianceMultiplier",
+        "solarIrradianceMultipliersByHour",
+        "serviceInterruptionFraction",
+        "localBackupWhPerMonth",
+      ])
+        delete effects[key];
+      return { ...event, effects };
+    });
+    const customScenario =
+      object(game.customScenario) &&
+      Array.isArray(game.customScenario.eventScenarioIds)
+        ? {
+            ...game.customScenario,
+            eventScenarioIds: game.customScenario.eventScenarioIds.filter(
+              (id) => id !== 111,
+            ),
+          }
+        : game.customScenario;
+    return {
+      ...save,
+      game: {
+        ...game,
+        customScenario,
+        ...(hadRetired || removedSelection || game.scenarioId === 111
+          ? { wildfireForecastRefresh: true }
+          : {}),
+        ...(legacyLines || (game.scenarioId === 111 && object(game.multiplayer))
+          ? { legacyWildfireIntertieAccess: true }
+          : {}),
+        worldEvents: {
+          ...events,
+          active: events.active.filter((event) => !retired(event)),
+          occurrences,
+        },
+      },
+    };
+  },
+  // 5 -> 6: earlier native runs did not record the current story catalog. Preserve their
+  // physical history and bound any missing earlier source receipts to this saved instant.
+  (save) => {
+    if (!object(save.game)) return save;
+    const game = save.game;
+    if (
+      game.customScenario !== undefined ||
+      !object(game.date) ||
+      !object(game.worldEvents)
+    )
+      return save;
+    const minute = game.date.minute;
+    const events = game.worldEvents;
+    if (
+      typeof minute !== "number" ||
+      !Number.isSafeInteger(minute) ||
+      minute < 0 ||
+      !Array.isArray(events.active) ||
+      !Array.isArray(events.occurrences)
+    )
+      return save;
+    const occurrences = events.occurrences;
+    const preStory =
+      game.scenarioId === 101 &&
+      game.objectiveProgress === undefined &&
+      events.active.length === 0 &&
+      occurrences.length === 0;
+    const wildfireTransition =
+      game.scenarioId === 111 &&
+      (game.wildfireForecastRefresh === true ||
+        game.legacyWildfireIntertieAccess === true) &&
+      // These are the schema-5 source openings, not a second live schedule evaluator.
+      (
+        [
+          ["readiness", 25],
+          ["outage", 36],
+          ["restored", 38],
+        ] as const
+      ).some(
+        ([phase, month]) =>
+          month * MINUTES_PER_MONTH <= minute &&
+          !occurrences.some(
+            (event) =>
+              object(event) &&
+              event.key === `story:111:wildfire-intertie:${phase}`,
+          ),
+      );
+    if (!preStory && !wildfireTransition) return save;
+    return {
+      ...save,
+      game: {
+        ...game,
+        scenarioRuleHistoryStartMinute: minute,
+        ...(wildfireTransition ? { wildfireForecastRefresh: true } : {}),
+      },
+    };
+  },
 ];
 
 /** Save structure evolves independently of simulation rules and app releases. */
@@ -65,6 +247,13 @@ export function upgradeSave(raw: unknown): Record<string, unknown> | null {
   if (!object(raw)) return null;
   const version = schemaVersion(raw);
   if (version === undefined || version > SAVE_SCHEMA_VERSION) return null;
+  // This boundary is minted only by 5 -> 6. Earlier files cannot supply a future exemption.
+  if (
+    version <= 5 &&
+    object(raw.game) &&
+    raw.game.scenarioRuleHistoryStartMinute !== undefined
+  )
+    return null;
   let save = raw;
   for (let step = version; step < SAVE_SCHEMA_VERSION; step++)
     save = { ...migrations[step](save), schemaVersion: step + 1 };

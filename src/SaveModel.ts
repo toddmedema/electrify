@@ -10,6 +10,7 @@ import type {
   VictoryType,
 } from "./Types";
 import { isFutureSave } from "./SaveUpgrade";
+import { validObjectiveResult } from "./helpers/ScenarioObjectives";
 
 export type SaveErrorCode =
   "quota" | "unavailable" | "invalid" | "incompatible" | "missing" | "conflict";
@@ -258,7 +259,13 @@ export function parseSavedRunResult(raw: unknown): SavedRunResult | null {
               !text(metric.label) ||
               !text(metric.value) ||
               !concepts.has(metric.concept as string),
-          )))
+          ))) ||
+      (summary.objectiveResults !== undefined &&
+        (!Array.isArray(summary.objectiveResults) ||
+          summary.objectiveResults.length > 16 ||
+          !summary.objectiveResults.every(validObjectiveResult) ||
+          new Set(summary.objectiveResults.map((result) => result.id)).size !==
+            summary.objectiveResults.length))
     )
       return null;
     // JSON round-tripping selects plain immutable data and drops no valid optional values.
@@ -288,6 +295,13 @@ export function parseSavedRunResult(raw: unknown): SavedRunResult | null {
               value,
               concept,
             })),
+          }),
+      ...(summary.objectiveResults === undefined
+        ? {}
+        : {
+            objectiveResults: JSON.parse(
+              JSON.stringify(summary.objectiveResults),
+            ),
           }),
       highlights: (
         summary.highlights as NonNullable<typeof debrief>["highlights"]

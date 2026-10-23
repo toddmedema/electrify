@@ -41,6 +41,9 @@ export const mapDispatchToProps = (
     onSettings: () => {
       dispatch(navigate("SETTINGS"));
     },
+    onMods: () => {
+      dispatch(navigate("MODS"));
+    },
     onAchievements: () => {
       dispatch(navigate("ACHIEVEMENTS"));
     },

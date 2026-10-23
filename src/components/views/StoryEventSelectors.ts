@@ -5,17 +5,19 @@ import {
   GameEventImportanceType,
   StoryActionTargetType,
 } from "../../Types";
-import {
-  WILDFIRE_DECISION_KEY,
-  STORY_ARC_DEFINITIONS,
-  upcomingStoryPhases,
-} from "../../data/WorldEvents";
-import {
-  wildfireRiskNotice,
-  WildfireRiskNoticeType,
-} from "../../helpers/Wildfire";
+import { upcomingStoryPhases } from "../../data/WorldEvents";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { buildStorySnapshot } from "../../helpers/Story";
+import {
+  scenarioRules,
+  scenarioRulesIdentity,
+} from "../../helpers/ScenarioRules";
+import { getScenario } from "../../data/Scenarios";
+import { scenarioChoicesForGame } from "../../helpers/ScenarioChoices";
+import {
+  ruleConditionMet,
+  scenarioRuleForecastOccurrences,
+} from "../../helpers/ScenarioRuleRuntime";
 
 export interface UpcomingStoryEventType {
   key: string;
@@ -38,18 +40,13 @@ export function selectUpcomingStoryEvents(
   state: AppStateType,
 ): UpcomingStoryEventType[] {
   const game = state.game;
+  const rules = scenarioRules(
+    getScenario(game.scenarioId, game.customScenario),
+    game,
+  );
   const customEvents = customEventContext(game.customScenario);
-  if (
-    !game.loadAdditions?.length &&
-    !STORY_ARC_DEFINITIONS.some(
-      (arc) =>
-        arc.scenarioId === game.scenarioId ||
-        (game.scenarioId === 999 &&
-          customEvents?.some((event) => event.scenarioId === arc.scenarioId)),
-    )
-  ) {
+  if (!game.loadAdditions?.length && !rules && !customEvents?.length)
     return NO_UPCOMING;
-  }
   const fleetKey = game.facilities
     .map((facility) =>
       [
@@ -86,16 +83,25 @@ export function selectUpcomingStoryEvents(
     .join("|");
   const key = [
     game.seed,
+    game.customScenario?.mod?.runtimeDigest ??
+      scenarioRulesIdentity(
+        scenarioRules(getScenario(game.scenarioId, game.customScenario), game),
+      ),
     game.scenarioId,
     game.difficulty,
     game.date.monthsElapsed,
     game.startingYear,
     game.location.id,
-    game.worldEvents.occurrences.find(
-      (event) => event.key === WILDFIRE_DECISION_KEY,
-    )?.attributes.choice || "standard",
     JSON.stringify(game.loadAdditions),
     JSON.stringify(customEvents),
+    JSON.stringify(
+      game.worldEvents.occurrences.map((event) => [
+        event.key,
+        event.startsMinute,
+        event.attributes.choice,
+        event.attributes.ruleTargets,
+      ]),
+    ),
     historyKey,
     fleetKey,
   ].join("|");
@@ -103,13 +109,23 @@ export function selectUpcomingStoryEvents(
     return upcomingCache.events;
   }
   const events: UpcomingStoryEventType[] = upcomingStoryPhases({
+    rules: scenarioRules(
+      getScenario(game.scenarioId, game.customScenario),
+      game,
+    ),
     seed: game.seed,
     scenarioId: game.scenarioId,
     customEvents,
     difficulty: game.difficulty,
     date: game.date,
     location: game.location,
-    occurrences: game.worldEvents.occurrences,
+    occurrences: rules
+      ? scenarioRuleForecastOccurrences(
+          rules,
+          game.worldEvents.occurrences,
+          rules.durationMonths - 1,
+        )
+      : game.worldEvents.occurrences,
     snapshot: buildStorySnapshot(
       game.monthlyHistory,
       game.facilities,
@@ -122,6 +138,42 @@ export function selectUpcomingStoryEvents(
       label: `Expected ${date.month} ${date.year}`,
     };
   });
+  const choiceContext = scenarioChoicesForGame(game);
+  for (const choice of choiceContext.choices) {
+    if (
+      choice.dueMonth < game.date.monthsElapsed ||
+      game.worldEvents.occurrences.some((event) => event.key === choice.key) ||
+      (choice.requiresChoice &&
+        (!choiceContext.rules ||
+          !ruleConditionMet(
+            choice.requiresChoice,
+            choiceContext.rules,
+            game.worldEvents.occurrences,
+          )))
+    )
+      continue;
+    const startsMinute = choice.dueMonth * MINUTES_PER_MONTH;
+    const date = getDateFromMinute(startsMinute, game.startingYear);
+    const free = choice.options.find(
+      (option) => option.id === choice.freeOptionId,
+    )!;
+    events.push({
+      key: choice.key,
+      startsMinute,
+      label: choice.automatic
+        ? `Automatic response · ${date.month} ${date.year}`
+        : startsMinute === game.date.minute
+          ? "Decision required · Paused"
+          : `Decision · ${date.month} ${date.year}`,
+      title: choice.title,
+      message: choice.automatic
+        ? `This will resolve automatically: ${free.label}. ${free.description}`
+        : choice.prompt,
+      concept: "goal",
+      importance: "NOTABLE",
+      actionTarget: { card: "EVENTS" },
+    });
+  }
   for (const addition of game.loadAdditions ?? []) {
     const startsMinute =
       ((addition.startsYear - game.startingYear) * 12 +
@@ -134,8 +186,8 @@ export function selectUpcomingStoryEvents(
       key: `load:${addition.id}`,
       startsMinute,
       label: `Expected ${date.month} ${date.year}`,
-      title: `${addition.label} will connect`,
-      message: "Demand will rise as new load comes online.",
+      title: `${addition.label} coming online`,
+      message: "Demand rising as new load connects.",
       concept: "demand",
       importance: "NOTABLE",
       actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
@@ -144,36 +196,6 @@ export function selectUpcomingStoryEvents(
   events.sort((a, b) => (a.startsMinute ?? 0) - (b.startsMinute ?? 0));
   upcomingCache = { key, events };
   return events;
-}
-
-let riskNoticeCache:
-  { key: string; notice: WildfireRiskNoticeType | undefined } | undefined;
-
-/**
- * The seasonal fire-risk notice for the Events pane, or undefined when there is none. Cached by
- * the inputs that can change it (the weather reading is not free to recompute on every render).
- */
-export function selectWildfireRiskNotice(
-  state: AppStateType,
-): WildfireRiskNoticeType | undefined {
-  const game = state.game;
-  if (!game.inGame) {
-    return undefined;
-  }
-  const key = [
-    game.seed,
-    game.scenarioId,
-    game.location.id,
-    game.date.monthsElapsed,
-    game.storyEffectsDisabled ? 1 : 0,
-    game.wildfireHazardDisabled ? 1 : 0,
-  ].join("|");
-  if (riskNoticeCache?.key === key) {
-    return riskNoticeCache.notice;
-  }
-  const notice = wildfireRiskNotice(game);
-  riskNoticeCache = { key, notice };
-  return notice;
 }
 
 /** Occurrences of one ongoing event, e.g. hail at four plants, summarised for the status bar. */
@@ -216,8 +238,17 @@ export function selectActiveEventGroups(
   if (inEffect.length === 0) {
     return NO_ACTIVE_GROUPS;
   }
-  const cacheKey =
-    game.startingYear + "|" + inEffect.map((event) => event.key).join("|");
+  const cacheKey = JSON.stringify([
+    game.startingYear,
+    inEffect.map((event) => [
+      event.key,
+      event.title,
+      event.concept,
+      event.importance,
+      event.startsMinute,
+      event.endsMinute,
+    ]),
+  ]);
   if (activeGroupsCache?.key === cacheKey) {
     return activeGroupsCache.groups;
   }

@@ -2,6 +2,7 @@ import { TICK_MS } from "../Constants";
 import type { SpeedType } from "../Types";
 import type { World } from "../multiplayer/Types";
 import type { WorkerRequest } from "../multiplayer/WorkerProtocol";
+import { SAVE_SCHEMA_VERSION } from "../SaveUpgrade";
 
 jest.mock("../data/Economy", () => ({
   initEconomy: (done: () => void) => done(),
@@ -16,6 +17,7 @@ jest.mock("../multiplayer/World", () => ({
   createWorld: jest.fn(),
   matchScenario: jest.fn(() => ({ location: { id: "SF" } })),
   restoreWorld: jest.fn(),
+  savedMatchSpec: jest.requireActual("../multiplayer/World").savedMatchSpec,
   applyCommand: jest.fn(),
   stepWorld: jest.fn(),
   roomView: jest.fn(() => ({})),
@@ -101,6 +103,32 @@ test("the host worker schedules every tick at the shared speed and reschedules s
       jest.advanceTimersByTime(Math.floor(TICK_MS[speed]));
       expect(ticks).toBe(before + (speed === "PAUSED" ? 0 : 1));
     }
+    await send({
+      kind: "command",
+      sender: "host",
+      envelope: {
+        matchId: "match",
+        epoch: "epoch",
+        sequence: 6,
+        command: { kind: "speed", speed: "NORMAL" },
+      },
+    });
+    await send({
+      kind: "checkpoint",
+      requestId: "sleep",
+      pause: true,
+      suspended: true,
+    });
+    expect(world.paused).toBe(true);
+    expect(world.reason).toMatch(/sleep/);
+    const beforeSleep = ticks;
+    jest.advanceTimersByTime(1000);
+    expect(ticks).toBe(beforeSleep);
+    expect(post).toHaveBeenCalledWith({
+      kind: "checkpoint",
+      world,
+      requestId: "sleep",
+    });
   } finally {
     jest.clearAllTimers();
     timeout.mockRestore();
@@ -210,6 +238,8 @@ test("a fresh worker loads the saved match's location before validating and rest
   const { matchScenario } = jest.requireMock("../multiplayer/World");
   const spec = { scenarioId: 101, difficulty: "Employee" as const };
   const saved = {
+    schema: 3,
+    gameSchema: SAVE_SCHEMA_VERSION,
     speed: "PAUSED",
     paused: true,
     spec,
@@ -218,6 +248,11 @@ test("a fresh worker loads the saved match's location before validating and rest
       { id: "guest", name: "Guest" },
     ],
   } as unknown as World;
+  // The players resuming it, who claimed the saved companies.
+  const seats = [
+    { id: "host", name: "Host" },
+    { id: "friend", name: "Friend" },
+  ];
   globalThis.fetch = jest.fn().mockResolvedValue({
     ok: true,
     arrayBuffer: async () => new ArrayBuffer(0),
@@ -233,9 +268,9 @@ test("a fresh worker loads the saved match's location before validating and rest
   try {
     require("./Multiplayer.worker");
     await scope.onmessage!({
-      data: { kind: "restore", world: saved, epoch: "restored" },
+      data: { kind: "restore", world: saved, epoch: "restored", seats },
     } as MessageEvent<WorkerRequest>);
-    expect(restoreWorld).toHaveBeenCalledWith(saved, "restored");
+    expect(restoreWorld).toHaveBeenCalledWith(saved, "restored", seats);
     expect(post).toHaveBeenCalledWith({ kind: "checkpoint", world: saved });
   } finally {
     jest.clearAllTimers();
@@ -245,6 +280,51 @@ test("a fresh worker loads the saved match's location before validating and rest
     jest.useRealTimers();
   }
 });
+
+test.each([
+  { schema: 99, gameSchema: SAVE_SCHEMA_VERSION },
+  { schema: 3, gameSchema: SAVE_SCHEMA_VERSION + 1 },
+])(
+  "a future shared envelope %j is rejected before loading its scenario data",
+  async (version) => {
+    jest.useFakeTimers();
+    const scope = globalThis as unknown as Worker;
+    const previousMessage = scope.onmessage;
+    const previousFetch = globalThis.fetch;
+    const post = jest.spyOn(scope, "postMessage").mockImplementation(() => {});
+    const { restoreWorld, matchScenario } = jest.requireMock(
+      "../multiplayer/World",
+    );
+    const { initWeather } = jest.requireMock("../data/Weather");
+    globalThis.fetch = jest.fn();
+    const saved = {
+      ...version,
+      spec: { scenarioId: 101, difficulty: "Employee" },
+    };
+    try {
+      require("./Multiplayer.worker");
+      await scope.onmessage!({
+        data: { kind: "restore", world: saved, epoch: "future" },
+      } as MessageEvent<WorkerRequest>);
+      expect(matchScenario).not.toHaveBeenCalled();
+      expect(initWeather).not.toHaveBeenCalled();
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(restoreWorld).not.toHaveBeenCalled();
+      expect(post).toHaveBeenCalledWith({
+        kind: "error",
+        message: expect.stringMatching(
+          /newer game.*original save is preserved/,
+        ),
+      });
+    } finally {
+      jest.clearAllTimers();
+      post.mockRestore();
+      scope.onmessage = previousMessage;
+      globalThis.fetch = previousFetch;
+      jest.useRealTimers();
+    }
+  },
+);
 
 test("a command that throws mid-match stops the shared clock for everyone and refuses later commands", async () => {
   jest.useFakeTimers();
@@ -317,7 +397,7 @@ test("a command that throws mid-match stops the shared clock for everyone and re
     expect(applyCommand).not.toHaveBeenCalled();
     expect(post).toHaveBeenCalledWith({
       kind: "error",
-      message: "Resume the last complete shared save in a new lobby",
+      message: "Resume the last complete multiplayer save in a new lobby",
     });
   } finally {
     jest.clearAllTimers();

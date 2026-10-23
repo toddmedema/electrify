@@ -1,8 +1,5 @@
 import { getTotalDebt } from "../helpers/Financials";
-import {
-  optionalScenarioChoice,
-  pendingScenarioChoice,
-} from "../helpers/ScenarioChoices";
+import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { chooseScenarioResponse } from "../reducers/GameActions";
 // The game reducer dispatches follow-up actions of its own (the construction complete snackbar,
 // the end of game dialogs), so it needs a live store to reach even though the simulation drives
@@ -23,7 +20,6 @@ import gameReducer, {
   delta,
   initGame,
   hasChronicBlackouts,
-  scenarioObjectiveFailure,
   reprioritizeFacility,
   setTradingPolicy,
   start,
@@ -37,14 +33,9 @@ import { GENERATORS, STORAGE } from "../data/Facilities";
 import { SCENARIOS } from "../data/Scenarios";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { getTimeFromTimeline } from "../helpers/DateTime";
-import { customerMarketSizeAt } from "../helpers/Customers";
-import {
-  decidedObjectiveFailure,
-  retentionBaseline,
-} from "../helpers/ObjectiveRules";
+import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { getScenarioLocation } from "../helpers/Locations";
 import { meaningfulDecisionCategoryCount } from "../helpers/MeaningfulDecisions";
-import { summarizeWildfireImpact } from "../helpers/Wildfire";
 import { summarizeWeatherHazardImpact } from "../helpers/Hazards";
 import {
   ActiveWorldEventType,
@@ -73,6 +64,7 @@ export type StrategyType = "none" | "keepUp";
 interface InitialBuildBaseType {
   name: string;
   financed: boolean;
+  priority?: "default" | "reserve";
 }
 
 export type InitialBuildType = InitialBuildBaseType &
@@ -119,6 +111,8 @@ function scenarioLocation(scenario: ScenarioType): LocationType {
 export interface SimOptionsType {
   // Explicit branch coverage; unspecified decisions retain the baseline first-free response.
   scenarioResponses?: Record<string, string>;
+  // Authoring CLI requires a deliberate branch policy; ordinary simulation keeps its free bot.
+  scenarioResponseMode?: "strict" | "freeFallback";
   initialPrograms?: Partial<Record<PolicyId, PolicyTier>>;
   scenarioId: number;
   // A scenario that isn't in SCENARIOS - a custom game, or one being tried out. Its id wins over
@@ -133,9 +127,6 @@ export interface SimOptionsType {
   sellFacilityId?: number;
   sellAtMonth?: number;
   storyEffectsEnabled?: boolean;
-  // Recurring regional wildfire hazard, on by default. Off runs the identical strategy without it,
-  // isolating its effect for balance comparison.
-  wildfireHazardEnabled?: boolean;
   // Hail and extreme-cold hazards, on by default. Off runs the identical strategy without them.
   weatherHazardsEnabled?: boolean;
   // On by default, like the real game: a decided objective ends the run. Accounting checks that
@@ -159,7 +150,6 @@ export interface ResolvedSimOptionsType {
   sellFacilityId: number | null;
   sellAtMonth: number;
   storyEffectsEnabled: boolean;
-  wildfireHazardEnabled: boolean;
   weatherHazardsEnabled: boolean;
   endOnDecidedObjective: boolean;
   waiveDecisionGate: boolean;
@@ -200,9 +190,7 @@ export interface SimResultType {
   violationCountByRule: { [rule: string]: number };
   violationCount: number;
   storyOccurrences: ActiveWorldEventType[];
-  // Aggregate impact of the recurring regional wildfire hazard over the run (zeroed when it never
-  // fired or was disabled), for many-seed balance comparison.
-  wildfireImpact: import("../helpers/Wildfire").WildfireImpactSummaryType;
+  objectiveResults: import("../data/ScenarioObjectives").ObjectiveResult[];
   // Aggregate hail and extreme-cold impact over the run (zeroed when disabled or never fired).
   weatherHazardImpact: import("../helpers/Hazards").WeatherHazardImpactSummaryType;
 }
@@ -230,6 +218,32 @@ export function createGame(options: SimOptionsType): GameType {
     SCENARIOS[0];
   loadSimData(scenarioLocation(scenario));
   return setUpGame(scenario, resolveOptions(scenario, options));
+}
+
+/** Rejected purchases leave dispatch alone; successful reserve orders use recorded player moves. */
+function applyBuildPriority(
+  before: GameType,
+  after: GameType,
+  priority: InitialBuildType["priority"],
+): GameType {
+  if (
+    priority !== undefined &&
+    priority !== "default" &&
+    priority !== "reserve"
+  )
+    throw new Error("Build priority must be default or reserve.");
+  if (priority !== "reserve") return after;
+  const priorIds = new Set(before.facilities.map(({ id }) => id));
+  const added = after.facilities.find(({ id }) => !priorIds.has(id));
+  if (!added) return after;
+  let state = after;
+  for (
+    let spotInList = state.facilities.findIndex(({ id }) => id === added.id);
+    spotInList < state.facilities.length - 1;
+    spotInList++
+  )
+    state = gameReducer(state, reprioritizeFacility({ spotInList, delta: 1 }));
+  return state;
 }
 
 function setUpGame(
@@ -268,9 +282,6 @@ function setUpGame(
   if (!options.storyEffectsEnabled) {
     state = gameReducer(state, delta({ storyEffectsDisabled: true }));
   }
-  if (!options.wildfireHazardEnabled) {
-    state = gameReducer(state, delta({ wildfireHazardDisabled: true }));
-  }
   if (!options.weatherHazardsEnabled) {
     state = gameReducer(state, delta({ weatherHazardsDisabled: true }));
   }
@@ -278,6 +289,7 @@ function setUpGame(
     state = gameReducer(state, delta({ meaningfulDecisionGateWaived: true }));
   }
   if (options.initialBuild) {
+    const beforeBuild = state;
     const build =
       options.initialBuild.peakWh !== undefined
         ? STORAGE(state, options.initialBuild.peakWh).find(
@@ -311,6 +323,11 @@ function setUpGame(
         financed: options.initialBuild.financed,
       }),
     );
+    state = applyBuildPriority(
+      beforeBuild,
+      state,
+      options.initialBuild.priority,
+    );
   }
   if (options.sellFacilityId !== null && options.sellAtMonth === 0) {
     state = gameReducer(state, sellFacility(options.sellFacilityId));
@@ -334,7 +351,12 @@ function setUpGame(
  * history to see what a balance change actually did.
  */
 export function createGameFromReplay(replay: ReplayType): GameType {
+  if (replay.scenarioId === 999 && !replay.customScenario)
+    throw new Error(
+      "A mod replay requires its exact normalized scenario snapshot.",
+    );
   const scenario =
+    replay.customScenario ||
     SCENARIOS.find((s: ScenarioType) => s.id === replay.scenarioId) ||
     SCENARIOS[0];
   // The replay's own location, not the scenario's: that is the whole point of recording it, and
@@ -423,7 +445,6 @@ function resolveOptions(
     sellFacilityId: options.sellFacilityId ?? null,
     sellAtMonth: options.sellAtMonth || 0,
     storyEffectsEnabled: options.storyEffectsEnabled !== false,
-    wildfireHazardEnabled: options.wildfireHazardEnabled !== false,
     weatherHazardsEnabled: options.weatherHazardsEnabled !== false,
     endOnDecidedObjective: options.endOnDecidedObjective !== false,
     waiveDecisionGate: options.waiveDecisionGate === true,
@@ -493,18 +514,23 @@ export function runSimulation(options: SimOptionsType): SimResultType {
             );
             break;
           case "build": {
+            const beforeBuild = state;
             const facility = shoppingFacility(state, action.build);
             if (!facility)
               throw new Error(
                 `Cannot build ${action.build.name} in ${scenario.name}`,
               );
             state = cloneDeep(
-              gameReducer(
-                state,
-                buildFacility({
-                  facility,
-                  financed: action.build.financed,
-                }),
+              applyBuildPriority(
+                beforeBuild,
+                gameReducer(
+                  state,
+                  buildFacility({
+                    facility,
+                    financed: action.build.financed,
+                  }),
+                ),
+                action.build.priority,
               ),
             );
             const added = state.facilities.find(
@@ -597,7 +623,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
   let prevTick: TickPresentFutureType | null = null;
   let justBuilt = false;
   let lastTick: TickPresentFutureType | null = null;
-  let offerCheckedMonth: number | undefined;
 
   // tickState fires the game's end-of-run dialogs through setTimeout, which never run here, so the
   // loop watches state directly instead and stops on the same conditions the player would hit:
@@ -608,6 +633,10 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     if (decision && !state.replayPlayback) {
       const choiceDifficulty = state.difficulty;
       const requested = resolved.scenarioResponses[decision.id];
+      if (requested === undefined && options.scenarioResponseMode === "strict")
+        throw new Error(
+          `Simulation has no response for ${decision.id} at month ${state.date.monthsElapsed + 1}. Add it to --responses or use --free-fallback.`,
+        );
       const option = decision.options.find((option) =>
         requested !== undefined
           ? option.id === requested
@@ -632,29 +661,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
         );
       }
       // Upfront response costs are explicit actions, not unexplained tick expenses.
-      prevTick = null;
-    }
-    // Optional choices (wildfire preparedness) are only taken up when the run asks for them; an
-    // unknown option leaves the ongoing program unchanged.
-    // They change at most monthly, so the bot looks once at the start of each month.
-    const offer =
-      state.replayPlayback || offerCheckedMonth === state.date.monthsElapsed
-        ? undefined
-        : optionalScenarioChoice(state);
-    offerCheckedMonth = state.date.monthsElapsed;
-    const offered = offer?.options.find(
-      (option) => option.id === resolved.scenarioResponses[offer.id],
-    );
-    if (offer && offered) {
-      state = cloneDeep(
-        gameReducer(
-          state,
-          chooseScenarioResponse({
-            decisionId: offer.id,
-            optionId: offered.id,
-          }),
-        ),
-      );
       prevTick = null;
     }
     tickState(state);
@@ -710,14 +716,9 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       resolved.endOnDecidedObjective &&
       state.date.monthsElapsed < scenario.durationMonths &&
       !scenario.tutorialSteps &&
-      decidedObjectiveFailure(scenario, state.monthlyHistory, {
-        startingCustomers: retentionBaseline(
-          scenario,
-          state.customerMarketSize,
-        ),
-        monthsRemaining: scenario.durationMonths - state.date.monthsElapsed,
-        marketSize: customerMarketSizeAt(state.customerMarketSize, now.minute),
-      })
+      gameObjectiveResults(state).some(
+        (result) => result.required && result.status === "failed",
+      )
     ) {
       firedAtMonth = state.date.monthsElapsed;
       break;
@@ -762,10 +763,10 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     firedAtMonth === null &&
     bankruptAtMonth === null &&
     state.date.monthsElapsed >= scenario.durationMonths &&
-    scenarioObjectiveFailure(
-      scenario,
-      state.monthlyHistory,
-      retentionBaseline(scenario, state.customerMarketSize),
+    gameObjectiveResults(state).some(
+      (result) =>
+        result.required &&
+        (result.status === "failed" || result.status === "unverifiable"),
     )
   ) {
     firedAtMonth = state.date.monthsElapsed;
@@ -814,11 +815,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     violationCountByRule: collector.getCountByRule(),
     violationCount: collector.getTotalCount(),
     storyOccurrences: state.worldEvents.occurrences,
-    wildfireImpact: summarizeWildfireImpact(
-      [...state.monthlyHistory].reverse(),
-      state.worldEvents.occurrences,
-      state.startingYear,
-    ),
+    objectiveResults: gameObjectiveResults(state),
     weatherHazardImpact: summarizeWeatherHazardImpact(
       state.worldEvents.occurrences,
     ),

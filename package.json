@@ -21,7 +21,6 @@
     "react-redux": "^9.3.0",
     "react-transition-group": "^4.4.5",
     "steamworks.js": "0.4.0",
-    "suncalc": "^2.0.1",
     "uplot": "^1.6.32"
   },
   "devDependencies": {
@@ -57,9 +56,12 @@
     "test:ci-core": "node scripts/ci/platform-tests.js 2 --cpu-only",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "test:e2e:ci": "playwright test --config e2e/ci.playwright.config.ts",
+    "test:e2e:production": "playwright test --config e2e/production.playwright.config.ts",
     "pretest:e2e:ci": "npm run compatibility:generate",
     "test:rules": "npx --yes firebase-tools@15.32.1 emulators:exec --only firestore --project demo-electrify-achievements \"node --test firebase/achievements.test.cjs\"",
     "sim": "node scripts/sim.js",
+    "mods:arcs": "node scripts/mods-arcs.js",
+    "premods:arcs": "npm run compatibility:generate",
     "perf:bench": "node scripts/perf/bench.js",
     "perf:bundle": "node scripts/perf/bundle-size.js",
     "perf:rebaseline": "node scripts/perf/rebaseline.js",
@@ -67,10 +69,10 @@
     "update-weather": "node scripts/update-weather.js",
     "fetch-watersheds": "node scripts/fetch-watersheds.js",
     "eject": "react-scripts eject",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\" \"electron-builder.config.cjs\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\" \"electron-builder.config.cjs\"",
-    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" \"electron-builder.config.cjs\" --max-warnings=0",
-    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" \"electron-builder.config.cjs\" --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" --max-warnings=0",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" --fix",
     "typecheck": "tsc --noEmit && tsc -p e2e",
     "check": "node scripts/check.js",
     "check:ci": "node scripts/check.js --ci",
@@ -80,6 +82,8 @@
     "deploy": "./scripts/deploy.sh",
     "compatibility:generate": "node scripts/run-compatibility.js",
     "icons:generate": "node scripts/generate-icon-manifest.js",
+    "notices:generate": "node scripts/generate-notices.js",
+    "achievements:artwork": "node steamworks/achievement-artwork/export.cjs",
     "prestart": "npm run compatibility:generate && npm run icons:generate",
     "prebuild": "npm run compatibility:generate && npm run icons:generate",
     "pretest": "npm run compatibility:generate && npm run icons:generate",
@@ -96,7 +100,13 @@
     "desktop:verify": "node scripts/desktop-verify.js",
     "test:desktop:native": "node --test electron/*.test.cjs",
     "test:desktop": "playwright test --config e2e/desktop.playwright.config.ts",
-    "test:multiplayer": "playwright test --config e2e/multiplayer.playwright.config.ts"
+    "test:multiplayer": "playwright test --config e2e/multiplayer.playwright.config.ts",
+    "mods:validate": "node scripts/mods-validate.js",
+    "premods:validate": "npm run compatibility:generate",
+    "mods:schema": "node scripts/mods-schema.js",
+    "mods:recipes": "node scripts/mods-recipes.js",
+    "test:steam-input": "playwright test --config e2e/steam-input.playwright.config.ts",
+    "pretest:steam-input": "npm run compatibility:generate && npm run icons:generate"
   },
   "eslintConfig": {
     "extends": [
@@ -156,6 +166,106 @@
               "object": "Math",
               "property": "pow",
               "message": "Math.pow's last bit depends on the platform's C library. Use pow from helpers/Pow so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "exp",
+              "message": "Math.exp rounds differently on arm64 than on x86-64. Use exp from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "expm1",
+              "message": "Math.expm1 rounds differently on arm64 than on x86-64. Use expm1 from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "log",
+              "message": "Math.log rounds differently on arm64 than on x86-64. Use log from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "log1p",
+              "message": "Math.log1p rounds differently on arm64 than on x86-64. Use log1p from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "log2",
+              "message": "Math.log2 rounds differently on arm64 than on x86-64. Use log2 from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "log10",
+              "message": "Math.log10 rounds differently on arm64 than on x86-64. Use log10 from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "sin",
+              "message": "Math.sin rounds differently on arm64 than on x86-64. Use sin from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "cos",
+              "message": "Math.cos rounds differently on arm64 than on x86-64. Use cos from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "tan",
+              "message": "Math.tan rounds differently on arm64 than on x86-64. Use tan from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "asin",
+              "message": "Math.asin rounds differently on arm64 than on x86-64. Use asin from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "acos",
+              "message": "Math.acos rounds differently on arm64 than on x86-64. Use acos from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "atan",
+              "message": "Math.atan rounds differently on arm64 than on x86-64. Use atan from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "atan2",
+              "message": "Math.atan2 rounds differently on arm64 than on x86-64. Use atan2 from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "sinh",
+              "message": "Math.sinh rounds differently on arm64 than on x86-64. Use sinh from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "cosh",
+              "message": "Math.cosh rounds differently on arm64 than on x86-64. Use cosh from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "tanh",
+              "message": "Math.tanh rounds differently on arm64 than on x86-64. Use tanh from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "asinh",
+              "message": "Math.asinh rounds differently on arm64 than on x86-64. Use asinh from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "acosh",
+              "message": "Math.acosh rounds differently on arm64 than on x86-64. Use acosh from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "atanh",
+              "message": "Math.atanh rounds differently on arm64 than on x86-64. Use atanh from helpers/Libm so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "cbrt",
+              "message": "Math.cbrt rounds differently on arm64 than on x86-64. Use cbrt from helpers/Libm so simulations replay identically everywhere."
             },
             {
               "object": "Math",
@@ -231,10 +341,11 @@
       "src/**/*.{ts,tsx}",
       "!src/**/*.test.{ts,tsx}",
       "!src/testing/SimulationTestHelpers.ts",
-      "!src/react-app-env.d.ts",
+      "!src/**/*.d.ts",
       "!src/helpers/CustomGameForecastClient.ts",
       "!src/helpers/DataCenterSetupClient.ts",
       "!src/helpers/PolicyPreviewClient.ts",
+      "!src/helpers/ScenarioStartingPeakClient.ts",
       "!src/components/base/ProjectionWorkerClient.ts",
       "!src/components/base/OutlookWorkerClient.ts",
       "!src/multiplayer/WorkerClient.ts",
@@ -270,5 +381,9 @@
     },
     "uuid": "^11.1.1"
   },
-  "main": "electron/main.cjs"
+  "main": "electron/main.cjs",
+  "prettier": {
+    "trailingComma": "all",
+    "endOfLine": "lf"
+  }
 }

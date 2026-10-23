@@ -62,7 +62,7 @@ test("settings fill the shared menu container on desktop", async ({
 
   const bounds = await preferences.boundingBox();
   expect(bounds).not.toBeNull();
-  const frame = (await page.locator(".screenPage").boundingBox())!;
+  const frame = (await page.locator(".screenHeaderBar").boundingBox())!;
   expect(bounds!.x).toBeCloseTo(frame.x + 16, 0);
   expect(bounds!.width).toBeCloseTo(frame.width - 32, 0);
 });

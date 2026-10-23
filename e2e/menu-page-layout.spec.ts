@@ -11,16 +11,24 @@ async function expectPageLayout(page: Page, title: string) {
   const container = (await page
     .locator(".app_container.menu-layout")
     .boundingBox())!;
-  expect(bounds.width).toBeCloseTo(Math.min(viewport.width, 1040), 0);
+  expect(bounds.width).toBeCloseTo(viewport.width, 0);
   expect(bounds.width).toBeCloseTo(container.width, 0);
   expect(bounds.x).toBeCloseTo(container.x, 0);
   expect(bounds.x).toBeCloseTo((viewport.width - bounds.width) / 2, 0);
   const body = frame.locator(":scope > .scrollable");
-  for (const element of [header, toolbar, body]) {
+  for (const element of [header, body]) {
     const box = (await element.boundingBox())!;
     expect(box.x).toBeCloseTo(bounds.x, 0);
     expect(box.width).toBeCloseTo(bounds.width, 0);
   }
+  const toolbarBox = (await toolbar.boundingBox())!;
+  expect(toolbarBox.width).toBeCloseTo(Math.min(viewport.width, 1040), 0);
+  expect(toolbarBox.x).toBeCloseTo((viewport.width - toolbarBox.width) / 2, 0);
+  expect(
+    await header.evaluate(
+      (element) => getComputedStyle(element, "::after").content,
+    ),
+  ).toBe("none");
   const inset = await body.evaluate((element) => {
     const style = getComputedStyle(element);
     const left = parseFloat(style.paddingLeft);
@@ -41,6 +49,7 @@ async function expectPageLayout(page: Page, title: string) {
     "Challenge unavailable": [],
     Settings: [".settingsGroup"],
     Manual: [".manual-entry"],
+    Achievements: [".achievementSummary", ".achievementList"],
     "Saved games": [".savedGames"],
     "Explore data center growth": [".dataCenterSetupContent"],
   };
@@ -74,6 +83,7 @@ async function expectPageLayout(page: Page, title: string) {
 
 async function captureReview(page: Page, filename: string) {
   await page.evaluate(() => document.fonts.ready);
+  await page.locator(".screenHeaderTitle").click();
   await page.mouse.move(0, 0);
   const leaderboard = filename.startsWith("pr-details")
     ? await page.locator(".leaderboard").boundingBox()
@@ -125,10 +135,7 @@ for (const theme of ["light", "dark"] as const) {
       await page.goto("/");
       await expect(page.locator(".app_container.menu-layout")).toBeVisible();
       const home = (await page.locator(".app_container").boundingBox())!;
-      expect(home.width).toBeCloseTo(
-        Math.min(page.viewportSize()!.width, 1040),
-        0,
-      );
+      expect(home.width).toBeCloseTo(page.viewportSize()!.width, 0);
       await page
         .getByRole("button", { name: "Start playing", exact: true })
         .click();
@@ -176,9 +183,21 @@ for (const theme of ["light", "dark"] as const) {
         await captureReview(page, "pr-details-dark-mobile-390px.png");
       await back();
       await back();
-      for (const title of ["Settings", "Manual"]) {
+      for (const title of ["Settings", "Manual", "Achievements"]) {
         await page.getByRole("button", { name: title, exact: true }).click();
         await expectPageLayout(page, title);
+        if (
+          screenshots &&
+          theme === "dark" &&
+          ["desktop-chromium", "mobile-390px"].includes(
+            testInfo.project.name,
+          ) &&
+          title === "Achievements"
+        )
+          await captureReview(
+            page,
+            `pr-achievements-${testInfo.project.name}.png`,
+          );
         await back();
       }
       await page.goto("/?scenario=100");
@@ -190,6 +209,13 @@ for (const theme of ["light", "dark"] as const) {
         /menu-layout/,
       );
       await page.getByRole("button", { name: "menu", exact: true }).click();
+      const menu = page.getByRole("menu");
+      await expect(
+        menu.getByRole("menuitem", { name: "Manual", exact: true }),
+      ).toHaveCSS(
+        "color",
+        await menu.evaluate((element) => getComputedStyle(element).color),
+      );
       await page
         .getByRole("menuitem", { name: "Saved games", exact: true })
         .click();

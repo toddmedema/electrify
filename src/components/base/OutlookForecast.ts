@@ -7,10 +7,14 @@ import {
 import { generateNewTimeline } from "../../reducers/Game";
 import type { GameType, TickPresentFutureType } from "../../Types";
 
-/** Only these four fields feed the neighboring market's outlook. */
+/** Weather, load and route restrictions needed by the neighboring market outlook. */
 export type IntertieForecastTick = Pick<
   TickPresentFutureType,
-  "minute" | "demandW" | "temperatureC" | "solarIrradianceWM2"
+  | "minute"
+  | "demandW"
+  | "temperatureC"
+  | "solarIrradianceWM2"
+  | "transmissionCapacityLimitsWByCorridor"
 >;
 
 /** Within an hourly forecast, moving the live clock only changes the outlook at this boundary. */
@@ -75,11 +79,20 @@ export function computeOutlook<K extends OutlookKind>(
   );
   // Return hundreds of four-number readings rather than thousands of economic properties.
   return hourly.map(
-    ({ minute, demandW, temperatureC, solarIrradianceWM2 }) => ({
+    ({
       minute,
       demandW,
       temperatureC,
       solarIrradianceWM2,
+      transmissionCapacityLimitsWByCorridor,
+    }) => ({
+      minute,
+      demandW,
+      temperatureC,
+      solarIrradianceWM2,
+      ...(transmissionCapacityLimitsWByCorridor
+        ? { transmissionCapacityLimitsWByCorridor }
+        : {}),
     }),
   ) as OutlookResults[K];
 }

@@ -2,12 +2,14 @@ import GasConversion from "./GasConversion";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import { currentCash } from "../../helpers/GameSelectors";
 import { HYDRO_SITES } from "../../data/HydroSites";
+import { combineStoryEffects } from "../../data/WorldEvents";
 import * as React from "react";
 import { DialogContentText, Typography } from "@mui/material";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import ConfirmDialog from "./ConfirmDialog";
 import {
   facilityAgeYears,
+  facilityCashBack,
   facilityEquivalentCycles,
   facilityLifetime,
   facilityOutputFactor,
@@ -40,6 +42,7 @@ import {
   resilienceName,
 } from "./WeatherResilienceText";
 import { RETROFIT_COST_MULTIPLIER } from "../../data/Hazards";
+import { storyOutputMultiplier } from "../../helpers/Story";
 import {
   DateType,
   FacilityOperatingType,
@@ -312,12 +315,20 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
     props.game && !underConstruction
       ? facilityHazardStatus(props.game, facility)
       : undefined;
-  // Age wear and an active weather outage both cap output, and the simulation multiplies them
-  const maxOutputFactor = outputFactor * (hazard?.availableFraction ?? 1);
-  const maxOutputCauses = [
-    outputFactor < 1 ? "age" : "",
-    hazard ? (hazard.hazard === "HAIL" ? "hail" : "cold") : "",
-  ].filter(Boolean);
+  // Use the simulation's event composition, including weather outages exactly once, so this
+  // maximum accounts for the same temporary limits as the fleet row's limit chip.
+  const activeEffects = combineStoryEffects(
+    (props.game?.worldEvents?.active ?? []).filter(
+      (event) =>
+        date.minute >= event.startsMinute && date.minute < event.endsMinute,
+    ),
+  );
+  const maxOutputFactor =
+    outputFactor * storyOutputMultiplier(facility, activeEffects);
+  const maxOutputPercent =
+    maxOutputFactor < 1 && Math.round(maxOutputFactor * 100) === 100
+      ? "<100%"
+      : formatPercent(maxOutputFactor);
 
   // Price history only changes at a month boundary. Selected-facility lifetime totals still
   // refresh visually, but the twelve table lookups and sparkline input do not run every tick.
@@ -350,12 +361,51 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           {HYDRO_SITES[facility.hydroSiteId]?.name || facility.hydroSiteId}
         </Typography>
       )}
+      {underConstruction && (
+        <section className="facilityDetailSection" aria-label="Construction">
+          <dl className="facilityStats">
+            <Stat
+              label="Nameplate capacity"
+              value={formatWatts(facility.peakW)}
+            />
+            {storage && (
+              <Stat
+                label="Energy capacity"
+                value={formatWattHours(storage.peakWh)}
+              />
+            )}
+            <Stat
+              label="Refund if cancelled"
+              value={
+                <>
+                  {formatMoneyConcise(facilityCashBack(facility, date.minute))}
+                  {facility.loanAmountLeft > 0 && (
+                    <span className="facilityStatNote">
+                      After settling the loan
+                    </span>
+                  )}
+                </>
+              }
+            />
+          </dl>
+        </section>
+      )}
       {!underConstruction && (
         <section className="facilityDetailSection" aria-label="Operation">
           <Typography component="h3" className="facilityDetailHeading">
             Operation
           </Typography>
           <dl className="facilityStats">
+            <Stat
+              label="Nameplate capacity"
+              value={formatWatts(facility.peakW)}
+            />
+            {!storage && maxOutputFactor < 1 && (
+              <Stat
+                label="Current max output"
+                value={`${formatWatts(facility.peakW * maxOutputFactor)} (${maxOutputPercent})`}
+              />
+            )}
             <Stat
               label="Age"
               value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr${ageYears >= facility.lifespanYears ? " · beyond" : ""}`}
@@ -413,19 +463,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                         : "Until month end"}
                     </span>
                   </span>
-                }
-              />
-            )}
-            {!storage && maxOutputFactor < 1 && (
-              <Stat
-                label="Current maximum output"
-                value={
-                  <>
-                    {formatWatts(facility.peakW * maxOutputFactor)}
-                    <span className="facilityStatNote">
-                      {`Limited to ${formatPercent(maxOutputFactor)} (${maxOutputCauses.join(", ")})`}
-                    </span>
-                  </>
                 }
               />
             )}

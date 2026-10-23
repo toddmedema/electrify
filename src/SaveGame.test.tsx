@@ -1,4 +1,3 @@
-import { summarizeTimeline } from "./helpers/DateTime";
 import { DIFFICULTIES } from "./Constants";
 import gameReducer, {
   buildTransmissionLine,
@@ -8,6 +7,7 @@ import gameReducer, {
 import { isResumedGame, parseSave, serializeSave } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
+import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "./data/Scenarios";
 
 jest.mock("./AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
@@ -29,6 +29,45 @@ describe("SaveGame", () => {
     expect(save!.appVersion).toBe("26sept26-1507");
     expect(save!.game).not.toBe(game);
     expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
+  });
+
+  it.each([NaN, Infinity, -1, 0.5, 4294967296])(
+    "rejects an invalid scenario seed %p without compiling it",
+    (seed) => {
+      expect(
+        parseSave({ ...serializeSave(game), game: { ...game, seed } }),
+      ).toBeNull();
+    },
+  );
+
+  it.each([{}, { namespace: { kind: "mod", id: "broken" } }])(
+    "rejects malformed frozen rules %p before interpreting saved receipts",
+    (rules) => {
+      const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+      raw.game.scenarioId = CUSTOM_SCENARIO_ID;
+      raw.game.customScenario = {
+        ...DEFAULT_CUSTOM_SCENARIO,
+        mod: { rules, parameters: { baseScenarioId: CUSTOM_SCENARIO_ID } },
+      };
+      expect(parseSave(raw)).toBeNull();
+    },
+  );
+
+  it.each([undefined, null, 123, "", "   "])(
+    "rejects malformed saved facility names %p",
+    (name) => {
+      const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+      raw.game.facilities[0].name = name;
+      expect(parseSave(raw)).toBeNull();
+    },
+  );
+
+  it("accepts narrative facility names", () => {
+    const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+    raw.game.facilities[0].name = "The town's original power station";
+    expect(parseSave(raw)?.game.facilities[0].name).toBe(
+      raw.game.facilities[0].name,
+    );
   });
 
   it.each([NaN, Infinity, 0, -1, 9, "2", null])(
@@ -225,11 +264,8 @@ describe("SaveGame", () => {
   );
 
   it("round trips every monthly chart layer and rejects corrupt chart values", () => {
-    const recorded = {
-      ...game,
-      date: { ...game.date, minute: 1440 },
-      monthlyHistory: [summarizeTimeline(game.timeline, game.startingYear)],
-    };
+    const recorded = createGame(OPTIONS);
+    while (recorded.date.monthsElapsed < 1) tickState(recorded);
     const raw = JSON.parse(JSON.stringify(serializeSave(recorded)));
     const restored = parseSave(raw);
     expect(restored?.game.monthlyHistory[0].chartAverage).toEqual(
@@ -322,11 +358,11 @@ describe("SaveGame", () => {
     "revenueExports",
     "revenueGrants",
   ])("rejects missing or corrupt current accounting field %s", (field) => {
-    const recorded = {
-      ...game,
-      date: { ...game.date, minute: 1440 },
-      monthlyHistory: [summarizeTimeline(game.timeline, game.startingYear)],
-    };
+    const recorded = createGame(OPTIONS);
+    while (recorded.date.monthsElapsed < 1) tickState(recorded);
+    expect(
+      parseSave(JSON.parse(JSON.stringify(serializeSave(recorded)))),
+    ).not.toBeNull();
     for (const collection of ["timeline", "monthlyHistory"]) {
       for (const value of [undefined, null, "0", -1, Infinity]) {
         const raw = JSON.parse(JSON.stringify(serializeSave(recorded)));
@@ -443,21 +479,28 @@ describe("SaveGame", () => {
   });
 
   it("persists and validates scenario demand calibration state", () => {
-    const configured: GameType = {
-      ...game,
-      startingDemandScale: 7.5,
-      loadAdditions: [
-        {
-          id: "fixture",
-          label: "Fixture load",
-          startsYear: 2026,
-          startsMonth: 4,
-          peakW: 100_000_000,
-          loadFactor: 0.9,
-          demandType: "Data Centers",
-        },
-      ],
-    };
+    const loadAdditions: GameType["loadAdditions"] = [
+      {
+        id: "fixture",
+        label: "Fixture load",
+        startsYear: 2026,
+        startsMonth: 4,
+        peakW: 100_000_000,
+        loadFactor: 0.9,
+        demandType: "Data Centers",
+      },
+    ];
+    const configured = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...DEFAULT_CUSTOM_SCENARIO,
+        locationId: game.location.id,
+        location: game.location,
+        startingDemandScale: 7.5,
+        loadAdditions,
+      },
+      seed: OPTIONS.seed,
+    });
     expect(parseSave(serializeSave(configured))!.game).toMatchObject({
       startingDemandScale: 7.5,
       loadAdditions: configured.loadAdditions,

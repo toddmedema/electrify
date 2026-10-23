@@ -1,6 +1,5 @@
 import { defineConfig } from "@playwright/test";
-import path from "node:path";
-import base from "./playwright.config";
+import production from "./production.playwright.config";
 
 const smoke = [
   "build-options.spec.ts",
@@ -17,16 +16,17 @@ const smoke = [
   "intertie-order.spec.ts",
   "operations-priorities.spec.ts",
 ];
-const layout = ["multiline-text.spec.ts", "modal-layout.spec.ts"];
-const port = process.env.E2E_PORT || "3100";
+const layout = [
+  "multiline-text.spec.ts",
+  "modal-layout.spec.ts",
+  "wildfire-scenario.spec.ts",
+];
 
 // Run the PR smoke matrix at 1280/390 px and layout checks at 1280/390/360 px.
 // One invocation lets Playwright shard all cases together without starting a dev compiler.
 export default defineConfig({
-  ...base,
-  outputDir: path.resolve(__dirname, "../test-results/browser"),
-  workers: 2,
-  projects: base
+  ...production,
+  projects: production
     .projects!.filter((project) =>
       ["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
         project.name!,
@@ -39,12 +39,4 @@ export default defineConfig({
           ? [...layout, "tutorial-actions.spec.ts", "main-menu.spec.ts"]
           : [...smoke, ...layout],
     })),
-  webServer: {
-    command: "node scripts/ci/serve.js",
-    cwd: path.resolve(__dirname, ".."),
-    url: `http://127.0.0.1:${port}`,
-    reuseExistingServer: false,
-    timeout: 30000,
-  },
-  use: { ...base.use, baseURL: `http://127.0.0.1:${port}` },
 });

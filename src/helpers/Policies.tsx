@@ -1,3 +1,4 @@
+import { modScaledValue } from "./ScenarioMod";
 import type {
   GameType,
   DeferredResidentialLoad,
@@ -187,11 +188,18 @@ export function policyTotalCost(
         residentialSolarCostPerW(date.year) *
         POLICIES.solar.cap
       : POLICIES.efficiency.costPerCustomer;
-  return (
-    programCustomers(game) *
-    perCustomer *
-    getInflationIndex(date, game.startingYear, game.seed)
+  const customers = modScaledValue(
+    programCustomers(game),
+    game.customScenario?.mod?.programs?.[id],
+    `programs.${id}`,
   );
+  const result =
+    customers *
+    perCustomer *
+    getInflationIndex(date, game.startingYear, game.seed);
+  if (!Number.isFinite(result))
+    throw new Error(`Nonfinite program quote for ${id}.`);
+  return result;
 }
 /** Share of an efficiency cohort's savings still working at the given age. */
 export function efficiencySurvival(ageMonths: number): number {
