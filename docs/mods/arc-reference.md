@@ -2,26 +2,18 @@
 
 Use these phase, choice and load IDs when importing bundled challenge arcs with `officialArcs`.
 
-Month 1 is the receiving grid's January opening; offsets start at 0. Dates include preparation time, and ranges show every possible onset. Durations use Easy (Employee); check Author report for other difficulties and your grid's resolved load sizes and costs.
+Month 1 is the receiving grid's January opening; offsets start at 0. Dates include preparation time, and ranges show every possible onset. Durations use Easy (Employee); check Author report for other difficulties and your grid's resolved load sizes and costs. An arc with no preparation lead, choices or permanent loads omits that section.
 
 Conditions use `{arc: scenarioId, choiceId, optionIds}`; load replacements use `{arc: scenarioId, loadId}`. With `includeChoices: false`, each choice takes its listed free response automatically, including any grant and associated rules.
 
 ## 100 · Carbon Fee
-
-Preparation lead: 0 months.
 
 | Phase ID            | Relocated offset | Playable month | Active duration (Easy) |
 | ------------------- | ---------------- | -------------- | ---------------------- |
 | `published-ratchet` | 12               | 13             | Message only           |
 | `ratchet-onset`     | 48               | 49             | 96 months              |
 
-No choices.
-
-No permanent loads.
-
 ## 101 · Rise of Renewables
-
-Preparation lead: 0 months.
 
 | Phase ID                  | Relocated offset | Playable month | Active duration (Easy) |
 | ------------------------- | ---------------- | -------------- | ---------------------- |
@@ -32,13 +24,7 @@ Preparation lead: 0 months.
 | `clean-tech-load`         | 120              | 121            | 24 months              |
 | `integration-review`      | 132              | 133            | Message only           |
 
-No choices.
-
-No permanent loads.
-
 ## 102 · The End of an Era
-
-Preparation lead: 0 months.
 
 | Phase ID             | Relocated offset | Playable month | Active duration (Easy) |
 | -------------------- | ---------------- | -------------- | ---------------------- |
@@ -49,13 +35,7 @@ Preparation lead: 0 months.
 | `compliance`         | 180              | 181            | 60 months              |
 | `successor-review`   | 216              | 217            | Message only           |
 
-No choices.
-
-No permanent loads.
-
 ## 103 · The Shale Boom
-
-Preparation lead: 0 months.
 
 | Phase ID                | Relocated offset | Playable month | Active duration (Easy) |
 | ----------------------- | ---------------- | -------------- | ---------------------- |
@@ -66,23 +46,13 @@ Preparation lead: 0 months.
 | `freeze-recovery`       | 99               | 100            | Message only           |
 | `normalization`         | 122              | 123            | Message only           |
 
-No choices.
-
-No permanent loads.
-
 ## 104 · Hurricane Season
-
-Preparation lead: 0 months.
 
 | Phase ID      | Relocated offset | Playable month | Active duration (Easy) |
 | ------------- | ---------------- | -------------- | ---------------------- |
 | `outlook`     | 60               | 61             | Message only           |
 | `landfall`    | 101–106          | 102–107        | 3 months               |
 | `restoration` | 104–109          | 105–110        | Message only           |
-
-No choices.
-
-No permanent loads.
 
 ## 105 · Paradise
 
@@ -98,13 +68,7 @@ Preparation lead: 12 months.
 | `cargo-restored`      | 131              | 132            | Message only           |
 | `local-energy-review` | 132              | 133            | Message only           |
 
-No choices.
-
-No permanent loads.
-
 ## 106 · Data Center Boom
-
-Preparation lead: 0 months.
 
 This arc has no timed phases; its load and decision are listed below.
 
@@ -120,8 +84,6 @@ This arc has no timed phases; its load and decision are listed below.
 
 ## 107 · Deep Freeze
 
-Preparation lead: 0 months.
-
 | Phase ID | Relocated offset | Playable month | Active duration (Easy) |
 | -------- | ---------------- | -------------- | ---------------------- |
 | `uri`    | 49               | 50             | 1 month                |
@@ -130,8 +92,6 @@ Preparation lead: 0 months.
 | Choice ID       | Due month | Option IDs              | Automatic response without choices |
 | --------------- | --------- | ----------------------- | ---------------------------------- |
 | `winterization` | 37        | `standard`, `winterize` | `standard`                         |
-
-No permanent loads.
 
 ## 108 · Heatwave + Drought
 
@@ -145,10 +105,6 @@ Preparation lead: 12 months.
 | `heatwave-month-3` | 43               | 44             | 1 month                |
 | `cooler-weather`   | 44               | 45             | Message only           |
 
-No choices.
-
-No permanent loads.
-
 ## 110 · Sudden Nuclear Shutdown
 
 Preparation lead: 12 months.
@@ -157,10 +113,6 @@ Preparation lead: 12 months.
 | -------------------- | ---------------- | -------------- | ---------------------- |
 | `contingency-review` | 13               | 14             | Message only           |
 | `trip`               | 42–48            | 43–49          | 48 months              |
-
-No choices.
-
-No permanent loads.
 
 ## 111 · Wildfire Emergency
 
@@ -171,10 +123,6 @@ Preparation lead: 24 months.
 | `readiness` | 25               | 26             | Message only           |
 | `outage`    | 36               | 37             | 2 months               |
 | `restored`  | 38               | 39             | Message only           |
-
-No choices.
-
-No permanent loads.
 
 ## 113 · Load Shedding
 
@@ -188,10 +136,6 @@ Preparation lead: 24 months.
 | `availability-step-3` | 60               | 61             | 12 months              |
 | `availability-step-4` | 72               | 73             | 12 months              |
 
-No choices.
-
-No permanent loads.
-
 ## 114 · The River Runs Dry
 
 Preparation lead: 24 months.
@@ -203,8 +147,6 @@ Preparation lead: 24 months.
 | `reservoir-step-2`    | 42               | 43             | 6 months               |
 | `reservoir-step-3`    | 48               | 49             | 12 months              |
 | `reservoir-step-4`    | 60               | 61             | 12 months              |
-
-No choices.
 
 | Load ID            | Starts in playable month | Branch                                 |
 | ------------------ | ------------------------ | -------------------------------------- |
@@ -221,7 +163,3 @@ Preparation lead: 36 months.
 | `summer-peak-2`  | 52               | 53             | 3 months               |
 | `summer-peak-3`  | 64               | 65             | 3 months               |
 | `summer-peak-4`  | 76               | 77             | 3 months               |
-
-No choices.
-
-No permanent loads.

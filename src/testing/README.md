@@ -143,10 +143,9 @@ Change `optionId` to `standard` to try the funded, longer outage with the same
 reserve plan. `--free-fallback` also selects that option when no answer is supplied.
 
 See the [authoring guide](../../docs/mods/authoring.md) and
-[example packages](../../docs/mods/examples/README.md) for building mods. Maintainers
-can find parser, runtime, save/replay and co-op tests in the
-[verification map](../../docs/mods/coverage-matrix.md). Load simulation data before
-calling a resolver directly in a test; the CLI handles this automatically.
+[example packages](../../docs/mods/examples/README.md) for building mods. Load
+simulation data before calling a resolver directly in a test; the CLI handles this
+automatically.
 
 Regenerate authoring references with `npm run mods:schema`, `npm run mods:recipes`
 and `npm run mods:arcs`; add `-- --check` to detect drift. For maximum-content

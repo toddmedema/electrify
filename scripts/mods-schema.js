@@ -8,11 +8,9 @@ const target = path.resolve(
   "mods",
   "scenario.schema.json",
 );
-async function main() {
-  const content = await require("prettier").format(
-    JSON.stringify(createModEditorSchema()),
-    { parser: "json", ...require("../package.json").prettier },
-  );
+function main() {
+  // Machine-generated and minified; it is excluded from Prettier so the diff stays one line.
+  const content = JSON.stringify(createModEditorSchema()) + "\n";
   if (process.argv.includes("--check")) {
     if (!fs.existsSync(target) || fs.readFileSync(target, "utf8") !== content) {
       process.stderr.write(
@@ -25,7 +23,9 @@ async function main() {
     fs.writeFileSync(target, content);
   }
 }
-main().catch((error) => {
+try {
+  main();
+} catch (error) {
   process.stderr.write(error.message + "\n");
   process.exitCode = 1;
-});
+}

@@ -136,50 +136,54 @@ export function formatModArcReference(arcs: ArcReference[]): string {
     "",
     "Use these phase, choice and load IDs when importing bundled challenge arcs with `officialArcs`.",
     "",
-    "Month 1 is the receiving grid's January opening; offsets start at 0. Dates include preparation time, and ranges show every possible onset. Durations use Easy (Employee); check Author report for other difficulties and your grid's resolved load sizes and costs.",
+    "Month 1 is the receiving grid's January opening; offsets start at 0. Dates include preparation time, and ranges show every possible onset. Durations use Easy (Employee); check Author report for other difficulties and your grid's resolved load sizes and costs. An arc with no preparation lead, choices or permanent loads omits that section.",
     "",
     "Conditions use `{arc: scenarioId, choiceId, optionIds}`; load replacements use `{arc: scenarioId, loadId}`. With `includeChoices: false`, each choice takes its listed free response automatically, including any grant and associated rules.",
     "",
-    ...arcs.flatMap((arc) => [
-      `## ${arc.id} · ${escape(arc.name)}`,
-      "",
-      `Preparation lead: ${arc.preparationMonths} months.`,
-      "",
-      ...(arc.phases.length
-        ? [
-            "| Phase ID | Relocated offset | Playable month | Active duration (Easy) |",
-            "| --- | --- | --- | --- |",
-            ...arc.phases.map(
-              (phase) =>
-                `| \`${phase.id}\` | ${range(phase.offset.from, phase.offset.to)} | ${range(phase.offset.from + 1, phase.offset.to + 1)} | ${phase.untilEnd ? "Through run end" : phase.durationMonths ? `${phase.durationMonths} month${phase.durationMonths === 1 ? "" : "s"}` : "Message only"} |`,
-            ),
-          ]
-        : [
-            "This arc has no timed phases; its load and decision are listed below.",
-          ]),
-      "",
-      ...(arc.choices.length
-        ? [
-            "| Choice ID | Due month | Option IDs | Automatic response without choices |",
-            "| --- | --- | --- | --- |",
-            ...arc.choices.map(
-              (choice) =>
-                `| \`${choice.id}\` | ${choice.dueMonth} | ${choice.options.map((id) => `\`${id}\``).join(", ")} | \`${choice.automaticResponse}\` |`,
-            ),
-          ]
-        : ["No choices."]),
-      "",
-      ...(arc.loads.length
-        ? [
-            "| Load ID | Starts in playable month | Branch |",
-            "| --- | --- | --- |",
-            ...arc.loads.map(
-              (load) =>
-                `| \`${load.id}\` | ${load.month} | ${load.branch ? `\`${load.branch}\`` : "Base schedule; replaceable by a choice"} |`,
-            ),
-          ]
-        : ["No permanent loads."]),
-      "",
-    ]),
+    ...arcs.flatMap((arc) =>
+      // Each block is a paragraph or table; empty sections are omitted.
+      [
+        [`## ${arc.id} · ${escape(arc.name)}`],
+        ...(arc.preparationMonths
+          ? [[`Preparation lead: ${arc.preparationMonths} months.`]]
+          : []),
+        arc.phases.length
+          ? [
+              "| Phase ID | Relocated offset | Playable month | Active duration (Easy) |",
+              "| --- | --- | --- | --- |",
+              ...arc.phases.map(
+                (phase) =>
+                  `| \`${phase.id}\` | ${range(phase.offset.from, phase.offset.to)} | ${range(phase.offset.from + 1, phase.offset.to + 1)} | ${phase.untilEnd ? "Through run end" : phase.durationMonths ? `${phase.durationMonths} month${phase.durationMonths === 1 ? "" : "s"}` : "Message only"} |`,
+              ),
+            ]
+          : [
+              "This arc has no timed phases; its load and decision are listed below.",
+            ],
+        ...(arc.choices.length
+          ? [
+              [
+                "| Choice ID | Due month | Option IDs | Automatic response without choices |",
+                "| --- | --- | --- | --- |",
+                ...arc.choices.map(
+                  (choice) =>
+                    `| \`${choice.id}\` | ${choice.dueMonth} | ${choice.options.map((id) => `\`${id}\``).join(", ")} | \`${choice.automaticResponse}\` |`,
+                ),
+              ],
+            ]
+          : []),
+        ...(arc.loads.length
+          ? [
+              [
+                "| Load ID | Starts in playable month | Branch |",
+                "| --- | --- | --- |",
+                ...arc.loads.map(
+                  (load) =>
+                    `| \`${load.id}\` | ${load.month} | ${load.branch ? `\`${load.branch}\`` : "Base schedule; replaceable by a choice"} |`,
+                ),
+              ],
+            ]
+          : []),
+      ].flatMap((block) => [...block, ""]),
+    ),
   ].join("\n");
 }

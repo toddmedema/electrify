@@ -4,3 +4,4 @@ package-lock.json
 public/data
 src/testing/fixtures/saves/native-*.json
 src/testing/fixtures/saves/ordinary-custom-*.json
+docs/mods/scenario.schema.json
