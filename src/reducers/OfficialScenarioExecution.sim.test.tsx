@@ -21,7 +21,6 @@ import {
   validCompiledScenarioRules,
 } from "../helpers/ScenarioRules";
 import { buildStorySnapshot } from "../helpers/Story";
-import { validScenarioRuleState } from "../helpers/ScenarioRuleValidation";
 import { serializeReplay } from "../Replay";
 import { parseSave, serializeSave } from "../SaveGame";
 import { getStore } from "../StoreRegistry";

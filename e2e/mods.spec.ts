@@ -276,8 +276,8 @@ async function observeExampleForecasts(page: Page) {
 
 // Each outcome runs in one theme.
 for (const [theme, winning] of [
-  ["light", true],
-  ["dark", false],
+  ["dark", true],
+  ["light", false],
 ] as const) {
   test(`finished connection example reaches ${winning ? "success" : "failure"} in ${theme}`, async ({
     page,
