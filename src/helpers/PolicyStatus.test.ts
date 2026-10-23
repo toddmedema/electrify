@@ -1,4 +1,5 @@
 import { POLICIES } from "../data/Policies";
+import { createGame } from "../testing/Simulator";
 import { GameType, PolicyProgramType } from "../Types";
 import {
   choiceStatus,
@@ -22,6 +23,21 @@ describe("labelMonth", () => {
 });
 
 describe("programStatus", () => {
+  it.each(["thermal", "evCharging", "battery"] as const)(
+    "only shows %s rollout after enrollment starts",
+    (id) => {
+      const modern = createGame({ scenarioId: 106 });
+      modern.startingYear = 2030;
+      expect(programStatus(modern, id, program({}))).toBe("Off");
+      expect(programStatus(modern, id, program({ tier: "On" }))).toBe("On");
+      expect(programStatus(modern, id, program({ adoption: 0.25 }))).toBe(
+        "Off · rollout 25%",
+      );
+      expect(
+        programStatus(modern, id, program({ tier: "On", adoption: 1 })),
+      ).toBe("On · rollout 100%");
+    },
+  );
   it("reports an operating offer's tier", () => {
     expect(programStatus(game, "timeOfUse", program({ tier: "On" }))).toBe(
       "On",

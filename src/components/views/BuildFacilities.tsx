@@ -52,6 +52,18 @@ export default function BuildFacilities({
   const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
   const intertiesRef = useToolScroll<HTMLDivElement>(`build.${active}.scroll`);
   const close = closeTool ?? (() => dispatch(navigate("FACILITIES")));
+  const gesture = React.useRef<{ id: number; x: number; y: number } | null>(
+    null,
+  );
+  const changeCategory = (name: (typeof categories)[number][0]) =>
+    dispatch(
+      navigate({
+        name,
+        dontRemember: true,
+        replaceCurrentCard: true,
+        skipBrowserHistory: true,
+      }),
+    );
 
   return (
     <div
@@ -76,16 +88,7 @@ export default function BuildFacilities({
             value={active}
             variant="fullWidth"
             aria-label="Build categories"
-            onChange={(_event, value) =>
-              dispatch(
-                navigate({
-                  name: value,
-                  dontRemember: true,
-                  replaceCurrentCard: true,
-                  skipBrowserHistory: true,
-                }),
-              )
-            }
+            onChange={(_event, value) => changeCategory(value)}
           >
             {visibleCategories.map(([name, label, className]) => (
               <Tab
@@ -106,6 +109,55 @@ export default function BuildFacilities({
         aria-labelledby={introductoryChoices ? undefined : `tab-${active}`}
         aria-label={introductoryChoices ? "Generators" : undefined}
         className="constructionPanel"
+        style={{ touchAction: "pan-y pinch-zoom" }}
+        onTouchStart={(event) => {
+          gesture.current = null;
+          if (
+            introductoryChoices ||
+            event.touches.length !== 1 ||
+            (event.target as Element).closest(
+              ".constructionHeader, .MuiSlider-root, button, input, select, [role='slider']",
+            )
+          )
+            return;
+          const touch = event.touches[0];
+          gesture.current = {
+            id: touch.identifier,
+            x: touch.clientX,
+            y: touch.clientY,
+          };
+        }}
+        onTouchMove={(event) => {
+          const start = gesture.current;
+          if (!start) return;
+          const touch = event.touches[0];
+          if (
+            event.touches.length !== 1 ||
+            Math.abs(touch.clientY - start.y) >
+              Math.max(12, Math.abs(touch.clientX - start.x))
+          )
+            gesture.current = null;
+        }}
+        onTouchCancel={() => {
+          gesture.current = null;
+        }}
+        onTouchEnd={(event) => {
+          const start = gesture.current;
+          gesture.current = null;
+          if (!start || event.touches.length) return;
+          const touch = Array.from(event.changedTouches).find(
+            (touch) => touch.identifier === start.id,
+          );
+          if (!touch) return;
+          const dx = touch.clientX - start.x;
+          const dy = touch.clientY - start.y;
+          if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+          const index = visibleCategories.findIndex(
+            ([name]) => name === active,
+          );
+          const next = visibleCategories[index + (dx < 0 ? 1 : -1)];
+          if (next) changeCategory(next[0]);
+        }}
       >
         {active === "BUILD_GENERATORS" && <BuildGeneratorsContainer />}
         {active === "BUILD_STORAGE" && <BuildStorageContainer />}

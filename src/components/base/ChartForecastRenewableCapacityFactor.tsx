@@ -20,13 +20,7 @@ import {
 } from "../../Types";
 import ChartLegend from "./ChartLegend";
 import UPlotChart, { BuildContext } from "./UPlotChart";
-import {
-  FORECAST_AXIS_LEFT,
-  FORECAST_RIGHT_PAD,
-  stepTicks,
-  xAxis,
-  yAxis,
-} from "./UPlotHelpers";
+import { FORECAST_RIGHT_PAD, stepTicks, xAxis, yAxis } from "./UPlotHelpers";
 
 const WEATHER_RENEWABLES = new Set([
   "Wind",
@@ -116,7 +110,6 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       }),
       yAxis(scale, {
         grid: true,
-        size: FORECAST_AXIS_LEFT,
         values: (_u, splits) => splits.map((split) => formatPercent(split)),
       }),
     ],

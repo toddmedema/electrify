@@ -392,7 +392,7 @@ export function formatProductionTooltip(
   const time = `${hour % 12 || 12}:${minute} ${hour < 12 ? "AM" : "PM"}`;
   const loads: Array<[string, number | undefined]> = [
     ["Storage charging", d.storageChargeW],
-    ["Interties exporting", d.exportedW],
+    ["Interties", d.exportedW],
   ];
   return [
     time,
@@ -644,7 +644,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           "Total supply",
           "Demand",
           "Storage charging",
-          "Interties exporting",
+          "Interties",
           "Total load",
         ]}
         buildOptions={buildOptions}

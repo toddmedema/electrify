@@ -2,7 +2,6 @@ import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
-  FORECAST_AXIS_LEFT,
   FORECAST_RIGHT_PAD,
   forecastMonthAxis,
   verticalLinePlugin,
@@ -172,7 +171,6 @@ function buildOptions(
     axes: [
       forecastMonthAxis(scale, getState, showXLabels),
       yAxis(scale, {
-        size: FORECAST_AXIS_LEFT,
         values: (_u, splits) => splits.map((t) => formatWattsAxis(t, splits)),
       }),
     ],

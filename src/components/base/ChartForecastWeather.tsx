@@ -2,8 +2,6 @@ import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
-  AXIS_LABEL_SIZE,
-  FORECAST_AXIS_LEFT,
   FORECAST_RIGHT_PAD,
   padRange,
   SPLINE,
@@ -70,7 +68,6 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         grid: true,
         label: `Heat (${temperatureUnit(getState().units)})`,
         stroke: chartPalette().temperatureAxis,
-        size: FORECAST_AXIS_LEFT - AXIS_LABEL_SIZE,
         values: (_u, splits) => splits.map((t) => String(Math.round(t))),
       }),
     ],

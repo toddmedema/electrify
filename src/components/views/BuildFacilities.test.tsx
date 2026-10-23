@@ -8,14 +8,27 @@ import { createGame } from "../../testing/Simulator";
 import BuildFacilities from "./BuildFacilities";
 
 jest.mock("./BuildGeneratorsContainer", () => () => (
-  <div>Generator catalog</div>
+  <div>
+    Generator catalog
+    <div className="constructionHeader">
+      <div
+        className="constructionControls"
+        role="group"
+        aria-label="Capacity controls"
+      >
+        <input type="range" aria-label="Capacity" />
+      </div>
+    </div>
+  </div>
 ));
 jest.mock("./BuildStorageContainer", () => () => <div>Storage catalog</div>);
+jest.mock("./TransmissionPanel", () => () => <div>Intertie catalog</div>);
 
-function setup(scenarioId = 103, tutorialStep = 0) {
+function setup(scenarioId = 103, tutorialStep = 0, isolated = true) {
   const game = createGame({ scenarioId });
   game.tutorialStep = tutorialStep;
-  game.location = { ...game.location, id: "HNL", name: "Honolulu, HI" };
+  if (isolated)
+    game.location = { ...game.location, id: "HNL", name: "Honolulu, HI" };
   const store = configureStore({
     reducer: { game: () => game, card: cardReducer, ui: uiReducer },
     preloadedState: {
@@ -55,6 +68,58 @@ it("shares one build screen, defaults to generators and keeps tab changes out of
   expect(window.history.length).toBe(browserHistoryLength);
   fireEvent.click(screen.getByRole("button", { name: "close" }));
   expect(store.getState().card.name).toBe("FACILITIES");
+});
+
+function swipe(target: Element, dx: number, dy = 0) {
+  const touch = { identifier: 1, clientX: 200, clientY: 100 };
+  fireEvent.touchStart(target, { touches: [touch] });
+  const end = {
+    ...touch,
+    clientX: touch.clientX + dx,
+    clientY: touch.clientY + dy,
+  };
+  fireEvent.touchMove(target, { touches: [end] });
+  fireEvent.touchEnd(target, { touches: [], changedTouches: [end] });
+}
+
+it("swipes through the available categories in either direction without wrapping or adding history", () => {
+  const store = setup(103, 0, false);
+  const panel = () => screen.getByRole("tabpanel");
+  swipe(panel(), 100);
+  expect(panel()).toHaveAccessibleName("Generators");
+  swipe(panel(), -100);
+  expect(panel()).toHaveAccessibleName("Storage");
+  swipe(panel(), -100);
+  expect(panel()).toHaveAccessibleName("Interties");
+  swipe(panel(), -100);
+  expect(panel()).toHaveAccessibleName("Interties");
+  swipe(panel(), 100);
+  expect(panel()).toHaveAccessibleName("Storage");
+  swipe(panel(), 100);
+  expect(panel()).toHaveAccessibleName("Generators");
+  expect(store.getState().card.history).toHaveLength(1);
+});
+
+it("leaves sliders, their control area, vertical scrolls, short drags and cancelled gestures alone", () => {
+  setup();
+  const panel = screen.getByRole("tabpanel");
+  swipe(screen.getByRole("slider"), -100);
+  swipe(screen.getByRole("group", { name: "Capacity controls" }), -100);
+  swipe(panel, -25);
+  swipe(panel, -100, 150);
+  fireEvent.touchStart(panel, {
+    touches: [{ identifier: 1, clientX: 200, clientY: 100 }],
+  });
+  fireEvent.touchCancel(panel);
+  fireEvent.touchEnd(panel, {
+    touches: [],
+    changedTouches: [{ identifier: 1, clientX: 0, clientY: 100 }],
+  });
+  expect(panel).toHaveAccessibleName("Generators");
+  swipe(panel, -100);
+  expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Storage");
+  swipe(screen.getByRole("tabpanel"), -100);
+  expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Storage");
 });
 
 it("supports standard keyboard navigation between build tabs", async () => {

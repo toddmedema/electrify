@@ -10,12 +10,7 @@ import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { chartPalette, demandTypeColors } from "../../Theme";
 import UPlotChart, { BuildContext } from "./UPlotChart";
-import {
-  FORECAST_AXIS_LEFT,
-  FORECAST_RIGHT_PAD,
-  forecastMonthAxis,
-  yAxis,
-} from "./UPlotHelpers";
+import { FORECAST_RIGHT_PAD, forecastMonthAxis, yAxis } from "./UPlotHelpers";
 
 export interface Props {
   height?: number;
@@ -61,7 +56,6 @@ function buildOptions(showXLabels: boolean) {
     axes: [
       forecastMonthAxis(scale, getState, showXLabels),
       yAxis(scale, {
-        size: FORECAST_AXIS_LEFT,
         values: (_u, splits) =>
           splits.map((value) => formatWattsAxis(value, splits)),
       }),

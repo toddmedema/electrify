@@ -64,21 +64,6 @@ const LABEL_EDGE_PAD = 4;
 export const AXIS_LABEL_SIZE = 16;
 
 /**
- * The gutters the stacked forecast charts leave either side of their plots, in design units:
- * the left axis below, and the trailing pad or right axis after it.
- *
- * They read as one picture under one shared x axis, which only works if every plot starts and
- * ends at the same place: an axis sized to its own labels would put "1.2GWh" and "$12" on
- * different left edges, and the month labels under the bottom chart would then line up with
- * nothing above them.
- *
- * Wide enough for the widest label any of them draws, since a fixed size clips rather than
- * grows: the left is set by watt-hours ("800MWh" is as long as a niceSplits tick gets), and
- * includes the AXIS_LABEL_SIZE that the axes carrying a label spend on it.
- */
-export const FORECAST_AXIS_LEFT = 60;
-
-/**
  * The width of the one right axis a forecast chart carries -- water's reservoir scale, whose
  * labels are watt-hours. It includes the AXIS_LABEL_SIZE its "Reservoir" label spends, so the
  * axis itself gets the rest.
