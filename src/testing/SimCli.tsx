@@ -15,6 +15,7 @@ import { generateNewTimeline } from "../reducers/Game";
 import {
   createGame,
   runSimulation,
+  InitialBuildType,
   SimOptionsType,
   StrategyType,
 } from "./Simulator";
@@ -61,6 +62,8 @@ function baseOptions(): Omit<SimOptionsType, "scenarioId"> {
             ? { peakW: (envNumber("SIM_BUILD_MW") || 300) * 1000000 }
             : { peakWh: initialBuildMWh * 1000000 }),
           financed: process.env.SIM_FINANCE === "1",
+          priority: process.env
+            .SIM_BUILD_PRIORITY as InitialBuildType["priority"],
         }
       : undefined,
     sellFacilityId: envNumber("SIM_SELL_ID"),

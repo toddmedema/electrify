@@ -17,6 +17,7 @@ fields and limits.
 | [Prepare before the freeze](prepare-before-freeze.json)                 | Keep a challenge's goals and add a report around its main event.                    |
 | [Two dry years](two-dry-years.json)                                     | Write timed effects and choices that enable conditional events.                     |
 | [Retire coal without a bill shock](retire-coal-without-bill-shock.json) | Change construction costs and combine retirement, bill, debt and reliability goals. |
+| [Bridge the maintenance gap](bridge-the-maintenance-gap.json) | Target an original asset and let a paid or funded choice determine its outage window. |
 
 ## Funded or phased connection
 
@@ -70,3 +71,15 @@ after retirement.
 Use this pattern to make a transition involve several tradeoffs. Leave enough
 time to build replacements before the retirement deadline; paused and unfinished
 coal plants still count as owned.
+
+## Bridge the maintenance gap
+
+`baseScenarioId: 106` keeps Manassas's starting grid; `officialArcs: []` omits
+the data-center story. Two events use `requiresChoice` to give the original gas
+peaker a shorter paid overhaul or a longer funded one. Their `startingAsset`
+selector leaves newly purchased generators available.
+
+Use this pattern for maintenance or retirement preparation. Align reliability
+goals with the outage and include the decision month in financial report windows
+so the review captures its payment or grant. The [simulator guide](../../../src/testing/README.md#validate-and-simulate-a-json-mod)
+shows how to put a purchased reserve behind the starting fleet.

@@ -64,6 +64,7 @@ export type StrategyType = "none" | "keepUp";
 interface InitialBuildBaseType {
   name: string;
   financed: boolean;
+  priority?: "default" | "reserve";
 }
 
 export type InitialBuildType = InitialBuildBaseType &
@@ -219,6 +220,32 @@ export function createGame(options: SimOptionsType): GameType {
   return setUpGame(scenario, resolveOptions(scenario, options));
 }
 
+/** Rejected purchases leave dispatch alone; successful reserve orders use recorded player moves. */
+function applyBuildPriority(
+  before: GameType,
+  after: GameType,
+  priority: InitialBuildType["priority"],
+): GameType {
+  if (
+    priority !== undefined &&
+    priority !== "default" &&
+    priority !== "reserve"
+  )
+    throw new Error("Build priority must be default or reserve.");
+  if (priority !== "reserve") return after;
+  const priorIds = new Set(before.facilities.map(({ id }) => id));
+  const added = after.facilities.find(({ id }) => !priorIds.has(id));
+  if (!added) return after;
+  let state = after;
+  for (
+    let spotInList = state.facilities.findIndex(({ id }) => id === added.id);
+    spotInList < state.facilities.length - 1;
+    spotInList++
+  )
+    state = gameReducer(state, reprioritizeFacility({ spotInList, delta: 1 }));
+  return state;
+}
+
 function setUpGame(
   scenario: ScenarioType,
   options: ResolvedSimOptionsType,
@@ -262,6 +289,7 @@ function setUpGame(
     state = gameReducer(state, delta({ meaningfulDecisionGateWaived: true }));
   }
   if (options.initialBuild) {
+    const beforeBuild = state;
     const build =
       options.initialBuild.peakWh !== undefined
         ? STORAGE(state, options.initialBuild.peakWh).find(
@@ -294,6 +322,11 @@ function setUpGame(
         facility: build,
         financed: options.initialBuild.financed,
       }),
+    );
+    state = applyBuildPriority(
+      beforeBuild,
+      state,
+      options.initialBuild.priority,
     );
   }
   if (options.sellFacilityId !== null && options.sellAtMonth === 0) {
@@ -481,18 +514,23 @@ export function runSimulation(options: SimOptionsType): SimResultType {
             );
             break;
           case "build": {
+            const beforeBuild = state;
             const facility = shoppingFacility(state, action.build);
             if (!facility)
               throw new Error(
                 `Cannot build ${action.build.name} in ${scenario.name}`,
               );
             state = cloneDeep(
-              gameReducer(
-                state,
-                buildFacility({
-                  facility,
-                  financed: action.build.financed,
-                }),
+              applyBuildPriority(
+                beforeBuild,
+                gameReducer(
+                  state,
+                  buildFacility({
+                    facility,
+                    financed: action.build.financed,
+                  }),
+                ),
+                action.build.priority,
               ),
             );
             const added = state.facilities.find(

@@ -24,6 +24,7 @@ import {
   resolveScenarioRuleChoice,
   ruleChoices,
   scenarioRuleChoiceEnvelope,
+  scenarioRuleConditionsCanCoexist,
   type ScenarioRuleChoiceGraph,
 } from "../helpers/ScenarioRuleDependencies";
 import {
@@ -235,6 +236,100 @@ function monthlyAdditiveRanges(
     },
   );
 }
+
+// Keep small reports readable in place; larger repeated selector text uses short references.
+const INLINE_SELECTOR_TEXT_BUDGET = 64 * 1024;
+
+/** Complete declarations appear once; monthly references never guess onset-selected identities. */
+function selectorFacts(
+  rules: CompiledScenarioRules,
+  graph: ScenarioRuleChoiceGraph,
+  events: CompiledRuleEvent[],
+) {
+  const declarations = events
+    .filter((event) => event.targets.length)
+    .map((event, index) => {
+      const reference = `S${index + 1}`;
+      const throughMonth = event.durationUntilEnd
+        ? rules.durationMonths - 1
+        : Math.min(
+            rules.durationMonths - 1,
+            event.possibleStartMonths.to + event.durationMonths - 1,
+          );
+      const condition =
+        conditionText(rules, event.requiresChoice) ?? "Unconditional.";
+      const activeWindow = `Possible active window: ${window(event.possibleStartMonths.from, throughMonth, rules.startingYear)}.`;
+      const targets = event.targets.map(
+        (target) =>
+          `Selector output limit from ${event.id}: ×${number(target.outputMultiplier)}. ${modSelectorDescription(target.target)}`,
+      );
+      return {
+        event,
+        reference,
+        inline: [...targets, condition, activeWindow].join(" "),
+        possibleMonths:
+          event.durationMonths > 0
+            ? Math.max(0, throughMonth - event.possibleStartMonths.from + 1)
+            : 0,
+        row: {
+          label: `${reference} · ${event.key}`,
+          value: `${condition} ${activeWindow}`,
+          details: targets,
+        },
+      };
+    });
+  // Estimate before expanding months, including room for timing text and separators.
+  const compact =
+    declarations.reduce(
+      (size, declaration) =>
+        size + (declaration.inline.length + 64) * declaration.possibleMonths,
+      0,
+    ) > INLINE_SELECTOR_TEXT_BUDGET;
+  return {
+    rows: declarations.map(({ row }) => row),
+    atMonth(month: number): string[] {
+      const possible = declarations.filter(
+        ({ event }) =>
+          scenarioRulePossibleAt(event, month, rules.durationMonths) &&
+          scenarioRuleConditionsCanCoexist(
+            graph,
+            [event.requiresChoice],
+            month,
+          ),
+      );
+      const guaranteed = ({ event }: (typeof declarations)[number]) =>
+        scenarioRuleGuaranteedAt(event, month, rules.durationMonths);
+      if (!compact)
+        return possible.map(
+          (declaration) =>
+            `${declaration.inline} ${
+              guaranteed(declaration)
+                ? "Active this month when enabled."
+                : "May be active this month; start timing varies."
+            }`,
+        );
+      const active = possible
+        .filter(guaranteed)
+        .map(({ reference }) => reference);
+      const uncertain = possible
+        .filter((declaration) => !guaranteed(declaration))
+        .map(({ reference }) => reference);
+      return [
+        ...(active.length
+          ? [
+              `Selector output limits active when enabled: ${active.join(", ")}. See Target selector semantics for conditions and limits.`,
+            ]
+          : []),
+        ...(uncertain.length
+          ? [
+              `Possible selector output limits (start timing varies): ${uncertain.join(", ")}. See Target selector semantics for conditions and limits.`,
+            ]
+          : []),
+      ];
+    },
+  };
+}
+
 function facts(
   scenario: ScenarioType,
   author: boolean,
@@ -469,6 +564,7 @@ function facts(
   });
   if (author) {
     const graph = createScenarioRuleChoiceGraph(rules);
+    const selectors = selectorFacts(rules, graph, events);
     sections.push({
       id: "monthly",
       title: "Month-by-month openings and composed factors",
@@ -477,16 +573,18 @@ function facts(
         modStaticCostFactors(mod.facilities),
       ).map(({ month, factors }) => {
         const additive = monthlyAdditiveRanges(rules, month, graph, events);
+        const monthlySelectors = selectors.atMonth(month);
         return {
           label: at(month, scenario.startingYear),
           value:
-            factors.length || additive.length
+            factors.length || additive.length || monthlySelectors.length
               ? [
                   ...factors.map(
                     (factor) =>
                       `${factor.path}: ×${number(factor.min)}–${number(factor.max)}`,
                   ),
                   ...additive,
+                  ...monthlySelectors,
                 ].join("; ")
               : "No static or timed multiplier changes.",
           details: events
@@ -536,13 +634,7 @@ function facts(
     sections.push({
       id: "selectors",
       title: "Target selector semantics",
-      rows: events.flatMap((event) =>
-        event.targets.map((target) => ({
-          label: event.id,
-          value: modSelectorDescription(target.target),
-          details: [`Output multiplier: ×${number(target.outputMultiplier)}`],
-        })),
-      ),
+      rows: selectors.rows,
     });
     sections.push({
       id: "carbon",

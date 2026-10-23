@@ -22,6 +22,7 @@ const FLAGS = {
   "--build": "SIM_BUILD",
   "--build-mw": "SIM_BUILD_MW",
   "--build-mwh": "SIM_BUILD_MWH",
+  "--build-priority": "SIM_BUILD_PRIORITY",
   "--sell-id": "SIM_SELL_ID",
   "--sell-month": "SIM_SELL_MONTH",
   "--mod": "SIM_MOD",
@@ -67,6 +68,7 @@ Runs the game's simulation headlessly and reports what happened.
                          (a real recorded player action)
   --build-mw <n>         Generator size for --build in MW (default 300)
   --build-mwh <n>        Storage energy size for --build in MWh
+  --build-priority <name> default (normal purchase position) | reserve (last in dispatch)
   --finance              Finance --build instead of paying cash
   --sell-id <n>          Sell one starting facility by facility id
   --sell-month <n>       Wait until this month to apply --sell-id (default 0)
@@ -106,6 +108,11 @@ function parseSimArguments(args, inherited = process.env) {
       continue;
     }
     throw new Error(`Unknown option ${arg}`);
+  }
+  if (env.SIM_BUILD_PRIORITY !== undefined) {
+    if (!["default", "reserve"].includes(env.SIM_BUILD_PRIORITY))
+      throw new Error("--build-priority must be default or reserve.");
+    if (!env.SIM_BUILD) throw new Error("--build-priority requires --build.");
   }
   if (env.SIM_MOD) {
     for (const [flag, variable] of Object.entries({

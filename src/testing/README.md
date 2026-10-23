@@ -122,6 +122,26 @@ answers are errors. Reached choices without answers fail unless `--free-fallback
 selects their free options; each fallback is printed. Valid answers that the run
 never reaches produce warnings. Ordinary simulations keep their free-response bot.
 
+For a reserve purchase, add `--build-priority reserve` to move the new facility
+behind the existing fleet through the normal dispatch actions. The default keeps
+the game's purchase position. This flag requires `--build`; rejected cash
+purchases leave existing priorities unchanged.
+
+For **Bridge the maintenance gap**, save this as `responses.json`:
+
+```json
+{ "responses": [{ "choiceId": "overhaul-schedule", "optionId": "accelerate" }] }
+```
+
+Then run the paid route with a financed reserve and a $0.12/kWh rate:
+
+```sh
+npm run sim -- --mod docs/mods/examples/bridge-the-maintenance-gap.json --responses responses.json --build Oil --build-mw 50 --finance --build-priority reserve --rate 0.12 --seeds 609,610 --difficulties Employee,Manager
+```
+
+Change `optionId` to `standard` to try the funded, longer outage with the same
+reserve plan. `--free-fallback` also selects that option when no answer is supplied.
+
 See the [authoring guide](../../docs/mods/authoring.md) and
 [example packages](../../docs/mods/examples/README.md) for building mods. Maintainers
 can find parser, runtime, save/replay and co-op tests in the

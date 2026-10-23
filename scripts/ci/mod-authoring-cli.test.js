@@ -107,6 +107,69 @@ test("mod CLI rejects mixed scenario ownership and ambiguous matrices before lau
   );
 });
 
+test("initial build priority is explicit and rejects unknown or unbound placement", () => {
+  for (const priority of ["default", "reserve"])
+    assert.equal(
+      parseSimArguments(["--build", "Oil", "--build-priority", priority], {})
+        .env.SIM_BUILD_PRIORITY,
+      priority,
+    );
+  assert.throws(
+    () =>
+      parseSimArguments(["--build", "Oil", "--build-priority", "cheat"], {}),
+    /must be default or reserve/,
+  );
+  assert.throws(
+    () => parseSimArguments(["--build-priority", "reserve"], {}),
+    /requires --build/,
+  );
+  assert.throws(
+    () =>
+      parseSimArguments([], { SIM_BUILD: "Oil", SIM_BUILD_PRIORITY: "last" }),
+    /must be default or reserve/,
+  );
+});
+
+test("public CLI places a paid reserve so the maintenance example can complete", () => {
+  const env = { ...process.env, CI: "true" };
+  for (const key of Object.keys(env))
+    if (key.startsWith("SIM_")) delete env[key];
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.resolve(__dirname, "../sim.js"),
+      "--mod",
+      "docs/mods/examples/bridge-the-maintenance-gap.json",
+      "--free-fallback",
+      "--build",
+      "Oil",
+      "--build-mw",
+      "50",
+      "--finance",
+      "--build-priority",
+      "reserve",
+      "--rate",
+      "0.12",
+      "--seeds",
+      "609,610",
+      "--difficulties",
+      "Employee,Manager",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), env, encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    (result.stdout.match(/Outcome: completed/g) ?? []).length,
+    4,
+    result.stdout,
+  );
+  assert.equal(
+    (result.stdout.match(/Invariants: all passed/g) ?? []).length,
+    4,
+  );
+  assert.doesNotMatch(result.stdout, /bankrupt|fired/);
+});
+
 test("validation CLI accepts one file and independent JSON/explain modes, rejecting unknown input", () => {
   assert.deepEqual(
     parseValidationArguments(["scenario.json", "--json", "--explain"]),
