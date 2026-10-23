@@ -61,6 +61,25 @@ describe("TutorialHud", () => {
     act(() => updateInputPresentation({ active: false }));
     expect(screen.getByText("Tap the target")).toBeInTheDocument();
   });
+  it("asks controller players to move sliders rather than drag them", () => {
+    act(() => updateInputPresentation({ active: true, connected: true }));
+    render(
+      <TutorialHud
+        {...props({
+          step: objective({
+            action: "Drag the rate slider below the market price",
+            content: <TutorialPrompt text="Then drag it back and tap 1×." />,
+          }),
+        })}
+      />,
+    );
+    expect(
+      screen.getByText("Move the rate slider below the market price"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Then move it back and select 1×."),
+    ).toBeInTheDocument();
+  });
   it("names a deliberate challenge transition without advancing from unrelated controls", async () => {
     const user = userEvent.setup();
     const hudProps = props({

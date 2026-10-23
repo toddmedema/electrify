@@ -6,11 +6,15 @@ export function tutorialInputText(
   text: string,
   controllerInput: boolean,
 ): string {
-  return controllerInput
-    ? text.replace(/\btap\b/gi, (word) =>
-        word[0] === "T" ? "Select" : "select",
-      )
-    : text;
+  if (!controllerInput) return text;
+  // A controller moves sliders with directions rather than dragging them.
+  const words: Record<string, string> = { tap: "select", drag: "move" };
+  return text.replace(/\b(tap|drag)\b/gi, (word) => {
+    const replacement = words[word.toLowerCase()];
+    return word[0] === word[0].toUpperCase()
+      ? replacement[0].toUpperCase() + replacement.slice(1)
+      : replacement;
+  });
 }
 
 export interface TutorialPromptProps {

@@ -292,7 +292,7 @@ export default function Settings(props: Props): React.JSX.Element {
                     width: { xs: "100%", sm: "auto" },
                     "& .MuiToggleButton-root": {
                       flex: { xs: 1, sm: "0 0 auto" },
-                      minHeight: 44,
+                      minWidth: { sm: 76 },
                       px: { xs: 1, sm: 1.5 },
                       textTransform: "none",
                     },
