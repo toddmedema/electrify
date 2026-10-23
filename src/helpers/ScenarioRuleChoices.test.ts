@@ -12,7 +12,7 @@ import {
   officialArcMoneyAmount,
 } from "./ScenarioRuleArcs";
 import type { RuleArc, RuleDiagnostic } from "../data/ScenarioRules";
-import type { DifficultyType, ScenarioChoiceType } from "../Types";
+import type { ScenarioChoiceType } from "../Types";
 import { DIFFICULTY_IDS } from "../Constants";
 import { digest } from "../testing/CanonicalHash";
 
