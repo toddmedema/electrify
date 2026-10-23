@@ -169,7 +169,9 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
   await expect.poll(gap).toBeGreaterThanOrEqual(8);
   await expect.poll(gap).toBeLessThanOrEqual(24);
   const close = popup.getByRole("button", { name: /Dismiss First Spark/ });
-  expect((await close.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect
+    .poll(async () => (await close.boundingBox())?.height ?? 0)
+    .toBeGreaterThanOrEqual(44);
   await screenshot(page, info, "popup");
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await screenshot(page, info, "popup-dark");

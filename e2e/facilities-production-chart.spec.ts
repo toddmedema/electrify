@@ -391,6 +391,12 @@ test("blackout periods remain visible when imports supplement fuel production", 
   });
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const speed = page.locator("#appbar:visible");
+  // Freeze fixture setup, then explicitly advance the real reducer for a shortage sample.
+  await speed
+    .getByRole("button", { name: "pause", exact: true })
+    .first()
+    .click();
   await openPane(pane, navigation);
   for (const name of ["Natural Gas CC", "Nuclear"]) {
     await pane
@@ -409,9 +415,17 @@ test("blackout periods remain visible when imports supplement fuel production", 
     chart.getByText("Supply to customers", { exact: true }),
   ).toHaveCount(0);
   await expect(chart.getByText("Blackout", { exact: true })).toHaveCount(0);
+  await speed
+    .getByRole("button", { name: "normal speed", exact: true })
+    .first()
+    .click();
   await expect(chart.getByRole("img")).toHaveAccessibleName(
     /blackout periods? shaded/,
   );
+  await speed
+    .getByRole("button", { name: "pause", exact: true })
+    .first()
+    .click();
   const game = (await readSavedGame(page))!;
   const shortage = game.timeline.findIndex(
     (tick) => tick.demandW > tick.supplyW && (tick.importedW || 0) > 0,
