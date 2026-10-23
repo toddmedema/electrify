@@ -1,6 +1,7 @@
 import path from "path";
 import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
+import { readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
   test(`wildfire intertie outage is clear and inspectable in ${theme}`, async ({
@@ -10,6 +11,10 @@ for (const theme of ["light", "dark"] as const) {
     await page.addInitScript((mode) => {
       localStorage.clear();
       localStorage.setItem("theme", mode);
+      // A new game mints its seed from Math.random, and the seed decides which hazards strike.
+      // Critical ones such as hail pause the clock for the player, so an unseeded run could stop
+      // years before the outage. A constant pins the seed however many other draws come first.
+      Math.random = () => 0.25;
     }, theme);
     await page.goto("/?scenario=111");
     await expect(
@@ -19,6 +24,10 @@ for (const theme of ["light", "dark"] as const) {
       page.getByText(/Your existing northern intertie will lose 90%/),
     ).toBeVisible();
     await page.getByRole("button", { name: "Start game", exact: true }).click();
+    // This run has no pausing hazard before the outage
+    await expect
+      .poll(async () => (await readSavedGame(page))?.seed)
+      .toBe(0.25 * 2 ** 32);
     await expect(
       page.getByRole("button", { name: /Inspect Northern intertie/ }),
     ).toBeVisible();
@@ -27,15 +36,21 @@ for (const theme of ["light", "dark"] as const) {
       events,
       page.getByRole("button", { name: "Events", exact: true }),
     );
-    await page
-      .locator("#appbar:visible")
-      .getByRole("button", { name: "fast speed" })
-      .first()
-      .click();
+    const appbar = page.locator("#appbar:visible");
+    await appbar.getByRole("button", { name: "fast speed" }).first().click();
     const ongoing = page.locator(".ongoingEvents:visible");
+    const outage = ongoing.getByText("Northern intertie capacity down 90%", {
+      exact: true,
+    });
+    const paused = appbar
+      .getByRole("button", { name: "pause", exact: true })
+      .and(page.locator('[aria-pressed="true"]'))
+      .first();
+    await expect(outage.or(paused).first()).toBeVisible({ timeout: 90000 });
     await expect(
-      ongoing.getByText("Northern intertie capacity down 90%", { exact: true }),
-    ).toBeVisible({ timeout: 90000 });
+      outage,
+      "the seeded run paused for an event before the outage",
+    ).toBeVisible({ timeout: 1000 });
     await expect(ongoing).toContainText("Through Feb 2025");
     await expect(ongoing).toContainText("10% capacity through February");
     const screenshotDir = process.env.REVIEW_SCREENSHOT_DIR;
