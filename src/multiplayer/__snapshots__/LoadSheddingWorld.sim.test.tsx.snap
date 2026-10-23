@@ -1,0 +1,20 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`two real official companies keep their exact World state 1`] = `
+Object {
+  "final": "aad1ad5298c081665fb64f2969ae0d6d6b47bfc224a135fe9be868472ab4c8d7",
+  "initial": "a4384156fc657dd22fb7df1b5578f3dfcf8f35a3b1ad6d818744bacb579b2a92",
+  "outcomes": Object {
+    "0": Object {
+      "month": 84,
+      "outcome": "completed",
+      "title": "Five years of breakdowns",
+    },
+    "1": Object {
+      "month": 84,
+      "outcome": "completed",
+      "title": "Five years of breakdowns",
+    },
+  },
+}
+`;

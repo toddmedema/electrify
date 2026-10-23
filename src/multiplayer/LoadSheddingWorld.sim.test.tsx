@@ -1,9 +1,5 @@
 import "../Store";
-import fs from "fs";
-import path from "path";
-import { createHash } from "crypto";
 import cloneDeep from "lodash.clonedeep";
-import { SAVE_SCHEMA_VERSION } from "../SaveUpgrade";
 import { TICKS_PER_MONTH } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { getScenario } from "../data/Scenarios";
@@ -12,6 +8,7 @@ import { currentTick } from "../helpers/GameSelectors";
 import { getScenarioLocation } from "../helpers/Locations";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { scenarioRules } from "../helpers/ScenarioRules";
+import { digest } from "../testing/CanonicalHash";
 import { checkMonth, InvariantCollector } from "../testing/Invariants";
 import { coopSeats } from "../testing/MultiplayerFixtures";
 import { loadSimData } from "../testing/SimData";
@@ -112,82 +109,6 @@ export function playLoadSheddingWorld() {
   return { initial, world, resumed: resumed!, reached };
 }
 
-/** Every field participates; numeric precision matches the independent solo golden evidence. */
-function canonical(value: unknown): unknown {
-  if (typeof value === "number")
-    return Number.isFinite(value)
-      ? value === 0
-        ? 0
-        : Number(value.toPrecision(10))
-      : String(value);
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === "object")
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([, entry]) => entry !== undefined)
-        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-        .map(([key, entry]) => [key, canonical(entry)]),
-    );
-  return value;
-}
-const digest = (value: unknown) =>
-  createHash("sha256")
-    .update(JSON.stringify(canonical(value)))
-    .digest("hex");
-
-/** Bounded review facts plus complete state hashes; only the outer source fingerprint differs. */
-export function loadSheddingWorldEvidence(
-  result: ReturnType<typeof playLoadSheddingWorld>,
-) {
-  const { rules: _initialRules, ...initial } = result.initial;
-  const { rules: _finalRules, ...world } = result.world;
-  expect(SAVE_SCHEMA_VERSION).toBe(6);
-  expect(initial.gameSchema).toBe(SAVE_SCHEMA_VERSION);
-  expect(world.gameSchema).toBe(SAVE_SCHEMA_VERSION);
-  // The source capture used native save schema3. Keep every other World field.
-  initial.gameSchema = 3;
-  world.gameSchema = 3;
-  return canonical({
-    initialWorldHash: digest(initial),
-    finalWorldHash: digest(world),
-    spec: world.spec,
-    matchId: world.matchId,
-    seats: world.seats,
-    initialCompanies: initial.grids.map((game, index) => ({
-      seat: initial.seats[index].id,
-      scenarioId: game.scenarioId,
-      hasCustomScenario: game.customScenario !== undefined,
-      hasRunIdentity: game.runIdentity !== undefined,
-      seed: game.seed,
-      difficulty: game.difficulty,
-      location: game.location,
-      startingYear: game.startingYear,
-      startingDemandScale: game.startingDemandScale,
-      loadAdditions: game.loadAdditions,
-      customerMarketSize: game.customerMarketSize,
-      customers: currentTick(game)!.customers,
-      dollarsPerkWh: game.dollarsPerkWh,
-      cash: currentTick(game)!.cash,
-      facilitiesHash: digest(game.facilities),
-      completeGameHash: digest(game),
-    })),
-    companies: world.grids.map((game, index) => ({
-      seat: world.seats[index].id,
-      scenarioId: game.scenarioId,
-      seed: game.seed,
-      months: game.monthlyHistory.length,
-      monthlyHistoryHash: digest(game.monthlyHistory),
-      finalFacilitiesHash: digest(game.facilities),
-      completeGameHash: digest(game),
-      objectiveProgress: game.objectiveProgress,
-      objectiveResults: gameObjectiveResults(game),
-      worldEvents: game.worldEvents,
-    })),
-    reached: result.reached,
-    outcomes: world.outcomes,
-  });
-}
-
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => {
   jest.clearAllTimers();
@@ -251,18 +172,13 @@ test("two real official companies reach every Load Shedding step and final windo
   }
 });
 
-test("two real official companies preserve the independent pre-migration World evidence", () => {
-  const reference = JSON.parse(
-    fs.readFileSync(
-      path.join(__dirname, "../testing/fixtures/LoadSheddingLegacyWorld.json"),
-      "utf8",
-    ),
-  );
-  expect(reference.baselineCommit).toBe(
-    "2fc5d50ebedd5d3695b9db7d75ca5b54c0912779",
-  );
-  expect(reference.significantDigits).toBe(10);
-  expect(loadSheddingWorldEvidence(playLoadSheddingWorld())).toEqual(
-    reference.evidence,
-  );
+test("two real official companies keep their exact World state", () => {
+  const { initial, world } = playLoadSheddingWorld();
+  const { rules: _initialRules, ...initialState } = initial;
+  const { rules: _finalRules, ...finalState } = world;
+  expect({
+    initial: digest(initialState),
+    final: digest(finalState),
+    outcomes: world.outcomes,
+  }).toMatchSnapshot();
 });

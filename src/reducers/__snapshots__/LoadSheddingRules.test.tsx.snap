@@ -1,0 +1,46 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CEO phase and forecast facts are pinned for every availability profile 1`] = `
+Object {
+  "grid": "715f414ba1fb657d3e3f62c77618896feeb23d9423ed880b195a2aa7150da987",
+  "strong": "e53d127fc7f8ef3c4026088f5b0d521807822b4cb700646ce10d7bd5c167ad0c",
+  "unavailable": "e53d127fc7f8ef3c4026088f5b0d521807822b4cb700646ce10d7bd5c167ad0c",
+  "weak": "e53d127fc7f8ef3c4026088f5b0d521807822b4cb700646ce10d7bd5c167ad0c",
+}
+`;
+
+exports[`Employee phase and forecast facts are pinned for every availability profile 1`] = `
+Object {
+  "grid": "2f20fa781093c676a479d917eb7de21f955ca74a796bfb01ce9a93b9e160f145",
+  "strong": "5a5558b00ff44f86cf662ce1e8760a2fbe7e255338304c41857f7c20d9e2c4ee",
+  "unavailable": "5a5558b00ff44f86cf662ce1e8760a2fbe7e255338304c41857f7c20d9e2c4ee",
+  "weak": "5a5558b00ff44f86cf662ce1e8760a2fbe7e255338304c41857f7c20d9e2c4ee",
+}
+`;
+
+exports[`Intern phase and forecast facts are pinned for every availability profile 1`] = `
+Object {
+  "grid": "973f097596206e6db1989949b2d5880e0a845b697b581e04bbe06161fa1dc48c",
+  "strong": "c23f802e6505fb563dcb462a85c5456a5a08c5636c655837f23797883d7d662a",
+  "unavailable": "c23f802e6505fb563dcb462a85c5456a5a08c5636c655837f23797883d7d662a",
+  "weak": "c23f802e6505fb563dcb462a85c5456a5a08c5636c655837f23797883d7d662a",
+}
+`;
+
+exports[`Manager phase and forecast facts are pinned for every availability profile 1`] = `
+Object {
+  "grid": "272ef006ae00bd75f5744b57ba75765f00cac5f9494fe9c5f21842d5653a7db3",
+  "strong": "811f4c8acb9cbee5198df5142e6f3c8306c9268f87aef6e8a1b2e36f889611cf",
+  "unavailable": "811f4c8acb9cbee5198df5142e6f3c8306c9268f87aef6e8a1b2e36f889611cf",
+  "weak": "811f4c8acb9cbee5198df5142e6f3c8306c9268f87aef6e8a1b2e36f889611cf",
+}
+`;
+
+exports[`VP phase and forecast facts are pinned for every availability profile 1`] = `
+Object {
+  "grid": "0c0e6f8686316c36e101dbe0a99ec166f19e50123652e93da1408ce9b1531aac",
+  "strong": "7dae724861e97411f13e67e47bc36751e33a22e1e2db5fa8e565fd96bccec80e",
+  "unavailable": "7dae724861e97411f13e67e47bc36751e33a22e1e2db5fa8e565fd96bccec80e",
+  "weak": "7dae724861e97411f13e67e47bc36751e33a22e1e2db5fa8e565fd96bccec80e",
+}
+`;

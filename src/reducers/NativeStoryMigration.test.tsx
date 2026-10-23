@@ -5,12 +5,11 @@ import { SAVE_SCHEMA_VERSION } from "../SaveUpgrade";
 import { WILDFIRE_DECISION_KEY } from "../data/ScenarioChoiceRules";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
-import reference from "../testing/fixtures/NativeWildfireAnsweredReference.json";
+import answered from "../testing/fixtures/saves/native-wildfire-answered.json";
 import { createGame } from "../testing/Simulator";
 import { runMonths } from "../testing/SimulationTestHelpers";
 
-const oldSave = () =>
-  cloneDeep(reference.nativeAnsweredSave) as unknown as SaveGameType;
+const oldSave = () => cloneDeep(answered) as unknown as SaveGameType;
 
 test("an actual old native wildfire payment remains booked history after prospective retirement", () => {
   const original = oldSave();

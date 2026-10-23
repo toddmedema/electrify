@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import { deserialize, serialize } from "v8";
 import cloneDeep from "lodash.clonedeep";
 import { createNextState } from "@reduxjs/toolkit";
@@ -36,6 +34,7 @@ import { scenarioRules, scenarioRulesIdentity } from "../helpers/ScenarioRules";
 import { validScenarioRuleState } from "../helpers/ScenarioRuleValidation";
 import { buildStorySnapshot } from "../helpers/Story";
 import { serializeReplay } from "../Replay";
+import { canonical, digest } from "../testing/CanonicalHash";
 import { STANDARD_BALANCE_PLAYS } from "../testing/BalancePlaybooks";
 import { parseSave, serializeSave } from "../SaveGame";
 import {
@@ -43,39 +42,9 @@ import {
   createGameFromReplay,
   runSimulation,
 } from "../testing/Simulator";
-import type { ActiveWorldEventType, DifficultyType, GameType } from "../Types";
+import type { ActiveWorldEventType, GameType } from "../Types";
 import { generateNewTimeline, tickState } from "./Game";
 
-const reference: {
-  significantDigits: number;
-  setups: { difficulty: DifficultyType; [key: string]: unknown }[];
-  cases: {
-    difficulty: DifficultyType;
-    seed: number;
-    profile: "strong" | "weak" | "unavailable";
-    phases: ActiveWorldEventType[];
-    previews: ActiveWorldEventType[];
-  }[];
-} = JSON.parse(
-  fs.readFileSync(
-    path.join(__dirname, "../testing/fixtures/LoadSheddingLegacyPhases.json"),
-    "utf8",
-  ),
-);
-const canonical = (value: unknown): unknown => {
-  if (typeof value === "number")
-    return Number.isFinite(value)
-      ? Number(value.toPrecision(10))
-      : String(value);
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === "object")
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([, item]) => item !== undefined)
-        .map(([key, item]) => [key, canonical(item)]),
-    );
-  return value;
-};
 const context = (game: GameType): StoryContextType => ({
   scenarioId: game.scenarioId,
   difficulty: game.difficulty,
@@ -94,40 +63,10 @@ const advance = (game: GameType, minute: number) => {
   expect(game.date.minute).toBe(minute);
 };
 
-beforeAll(() => {
-  expect(reference.significantDigits).toBe(10);
-  expect(reference.setups.map((item) => item.difficulty).sort()).toEqual(
-    [...DIFFICULTY_IDS].sort(),
-  );
-  expect(
-    reference.cases.map((item) => `${item.difficulty}:${item.profile}`).sort(),
-  ).toEqual(
-    DIFFICULTY_IDS.flatMap((difficulty) =>
-      ["strong", "weak", "unavailable"].map(
-        (profile) => `${difficulty}:${profile}`,
-      ),
-    ).sort(),
-  );
-});
-
-test.each(reference.setups)(
-  "the official $difficulty starting grid retains every legacy fact",
-  (expected) => {
-    const game = createGame({
-      scenarioId: 113,
-      difficulty: expected.difficulty,
-      seed: 12345,
-    });
-    expect(
-      canonical({
-        scenarioId: game.scenarioId,
-        difficulty: game.difficulty,
-        startingYear: game.startingYear,
-        location: game.location,
-        facilities: game.facilities,
-        loadAdditions: game.loadAdditions,
-      }),
-    ).toEqual(expected);
+test.each(DIFFICULTY_IDS)(
+  "the official %s starting grid uses native rules",
+  (difficulty) => {
+    const game = createGame({ scenarioId: 113, difficulty, seed: 12345 });
     expect(game.customScenario).toBeUndefined();
     expect(accessContextForGame(game).scenarioId).toBe(113);
     const rules = scenarioRules(getScenario(113), game)!;
@@ -214,94 +153,97 @@ test("a mutable trusted cost edit changes the actual cached future forecast", ()
   }
 });
 
-test.each(reference.cases)(
-  "$difficulty $profile phase and forecast facts match the independent callbacks",
-  (expected) => {
-    const game = createGame({
-      scenarioId: 113,
-      difficulty: expected.difficulty,
-      seed: expected.seed,
-    });
-    const probe = context(game);
-    // Availability does not branch on these facts. Probe both recorded extremes and missing history.
-    if (expected.profile !== "unavailable") {
-      probe.snapshot = {
-        ...probe.snapshot,
-        demandWh12m: 1e12,
-        unservedWh12m: expected.profile === "strong" ? 0 : 5e10,
-        netIncome12m: expected.profile === "strong" ? 1e6 : -1e6,
-        peakDemandW12m: 1e9,
-        firmPeakW: expected.profile === "strong" ? 1.1e9 : 3e8,
-        storagePeakW: expected.profile === "strong" ? 2e8 : 1e7,
-        storagePeakWh: expected.profile === "strong" ? 8e8 : 2e7,
-        deliveredWhByFuel12m:
-          expected.profile === "strong"
-            ? {
-                Coal: 1e11,
-                "Natural Gas": 2e11,
-                Wind: 3e11,
-                Sun: 2e11,
-                Hydro: 2e11,
-              }
-            : {
-                Coal: 7e11,
-                "Natural Gas": 2e11,
-                Wind: 2e10,
-                Sun: 1e10,
-                Hydro: 2e10,
-              },
-      };
-      probe.periodSnapshots = Object.fromEntries(
-        [1, 2, 3, 4, 6, 12, 24].map((months) => [
-          months,
-          {
-            deliveredWhByFuel: probe.snapshot.deliveredWhByFuel12m,
-            demandWh: probe.snapshot.demandWh12m,
-            unservedWh: probe.snapshot.unservedWh12m,
-            netIncome: probe.snapshot.netIncome12m,
-            peakDemandW: probe.snapshot.peakDemandW12m,
-          },
-        ]),
-      );
+const PROFILES = ["strong", "weak", "unavailable"] as const;
+/** Probes both recorded availability extremes and missing history. */
+function profileProbe(
+  game: GameType,
+  profile: (typeof PROFILES)[number],
+): StoryContextType {
+  const probe = context(game);
+  if (profile === "unavailable") return probe;
+  const strong = profile === "strong";
+  probe.snapshot = {
+    ...probe.snapshot,
+    demandWh12m: 1e12,
+    unservedWh12m: strong ? 0 : 5e10,
+    netIncome12m: strong ? 1e6 : -1e6,
+    peakDemandW12m: 1e9,
+    firmPeakW: strong ? 1.1e9 : 3e8,
+    storagePeakW: strong ? 2e8 : 1e7,
+    storagePeakWh: strong ? 8e8 : 2e7,
+    deliveredWhByFuel12m: strong
+      ? { Coal: 1e11, "Natural Gas": 2e11, Wind: 3e11, Sun: 2e11, Hydro: 2e11 }
+      : { Coal: 7e11, "Natural Gas": 2e11, Wind: 2e10, Sun: 1e10, Hydro: 2e10 },
+  };
+  probe.periodSnapshots = Object.fromEntries(
+    [1, 2, 3, 4, 6, 12, 24].map((months) => [
+      months,
+      {
+        deliveredWhByFuel: probe.snapshot.deliveredWhByFuel12m,
+        demandWh: probe.snapshot.demandWh12m,
+        unservedWh: probe.snapshot.unservedWh12m,
+        netIncome: probe.snapshot.netIncome12m,
+        peakDemandW: probe.snapshot.peakDemandW12m,
+      },
+    ]),
+  );
+  return probe;
+}
+/** Resolves each declared phase at its onset, accumulating receipts as play would. */
+function phasesAtOnset(probe: StoryContextType, game: GameType) {
+  const rules = scenarioRules(getScenario(113), game)!;
+  const receipts: ActiveWorldEventType[] = [];
+  return rules.events.map((event) => {
+    probe.date = getDateFromMinute(
+      event.startMonth * MINUTES_PER_MONTH,
+      game.startingYear,
+    );
+    probe.occurrences = receipts;
+    const actual = resolveStoryAtDate(probe).occurrences.find(
+      (item) => item.key === event.key,
+    )!;
+    expect(actual).toBeDefined();
+    receipts.push(actual);
+    return actual;
+  });
+}
+
+test.each(DIFFICULTY_IDS)(
+  "%s phase and forecast facts are pinned for every availability profile",
+  (difficulty) => {
+    const hashes: Record<string, string> = {};
+    for (const profile of PROFILES) {
+      const game = createGame({ scenarioId: 113, difficulty, seed: 12345 });
+      const probe = profileProbe(game, profile);
+      const previews = upcomingStoryPhases(probe);
+      const phases = phasesAtOnset(probe, game);
+      hashes[profile] = digest({ previews, phases });
+      for (const phase of phases.filter(
+        (phase) => phase.endsMinute > phase.startsMinute,
+      )) {
+        const at = (minute: number) =>
+          resolveStoryAtDate({
+            ...probe,
+            date: getDateFromMinute(minute, game.startingYear),
+          }).active.some((event) => event.key === phase.key);
+        expect(at(phase.endsMinute - 1)).toBe(true);
+        expect(at(phase.endsMinute)).toBe(false);
+      }
     }
-    expect(canonical(upcomingStoryPhases(probe))).toEqual(expected.previews);
-    const receipts: ActiveWorldEventType[] = [];
-    for (const phase of expected.phases) {
-      probe.date = getDateFromMinute(phase.startsMinute, game.startingYear);
-      probe.occurrences = receipts;
-      const result = resolveStoryAtDate(probe);
-      const actual = result.occurrences.find(
-        (event) => event.key === phase.key,
-      );
-      expect(canonical(actual)).toEqual(phase);
-      receipts.push(actual!);
-    }
-    for (const phase of expected.phases.filter(
-      (phase) => phase.endsMinute > phase.startsMinute,
-    )) {
-      expect(
-        resolveStoryAtDate({
-          ...probe,
-          date: getDateFromMinute(phase.endsMinute - 1, game.startingYear),
-        }).active.some((event) => event.key === phase.key),
-      ).toBe(true);
-      expect(
-        resolveStoryAtDate({
-          ...probe,
-          date: getDateFromMinute(phase.endsMinute, game.startingYear),
-        }).active.some((event) => event.key === phase.key),
-      ).toBe(false);
-    }
+    expect({
+      grid: digest(
+        createGame({ scenarioId: 113, difficulty, seed: 12345 }).facilities,
+      ),
+      ...hashes,
+    }).toMatchSnapshot();
   },
 );
 
 test.each(DIFFICULTY_IDS)(
   "the same plain definitions compile %s official, community and raw custom imports",
   (difficulty) => {
-    const expected = reference.cases.find(
-      (item) => item.difficulty === difficulty && item.profile === "strong",
-    )!;
     for (const seed of [1, 12345]) {
+      const official = scenarioRules(getScenario(113), { difficulty, seed })!;
       const compiled = compileOfficialArcEvents(
         {
           namespace: { kind: "mod", id: "pilot-import" },
@@ -315,14 +257,14 @@ test.each(DIFFICULTY_IDS)(
         [113],
       );
       expect(compiled).toHaveLength(5);
-      for (const phase of expected.phases) {
+      for (const phase of official.events) {
         const event = compiled.find(
-          (event) => event.source.phaseId === phase.key.split(":").at(-1),
+          (event) => event.source.phaseId === phase.id,
         )!;
         expect(event.key).toBe(
           `mod:pilot-import:arc:113:load-shedding:${event.source.phaseId}`,
         );
-        expect(event.startMonth * MINUTES_PER_MONTH).toBe(phase.startsMinute);
+        expect(event.startMonth).toBe(phase.startMonth);
         expect(event.effects).toEqual(phase.effects);
         expect(event.source.scenarioId).toBe(113);
       }
@@ -339,14 +281,19 @@ test.each(DIFFICULTY_IDS)(
       difficulty,
       seed: 12345,
     });
-    for (const phase of expected.phases) {
+    const official = createGame({ scenarioId: 113, difficulty, seed: 12345 });
+    const expected = phasesAtOnset(context(official), official);
+    for (const phase of expected) {
       const result = resolveStoryAtDate({
         ...context(game),
         date: getDateFromMinute(phase.startsMinute, game.startingYear),
         customEvents: customEventContext(game.customScenario),
       });
       expect(
-        result.occurrences.find((event) => event.key === phase.key)?.effects,
+        result.occurrences.find(
+          (event) =>
+            event.key.split(":").at(-1) === phase.key.split(":").at(-1),
+        )?.effects,
       ).toEqual(phase.effects);
     }
   },

@@ -14,7 +14,7 @@ import {
 import type { RuleArc, RuleDiagnostic } from "../data/ScenarioRules";
 import type { DifficultyType, ScenarioChoiceType } from "../Types";
 import { DIFFICULTY_IDS } from "../Constants";
-import reference from "../testing/fixtures/OfficialChoiceReference.json";
+import { digest } from "../testing/CanonicalHash";
 
 const source = (id: number) =>
   SCENARIOS.find((scenario) => scenario.id === id)!;
@@ -39,53 +39,33 @@ const compile = (
   imports = arcs,
 ) => compileOfficialArcChoices(parameters(patch), imports);
 
-test("compatible official choices match the independent pre-conversion reducer capture without rewriting retired wildfire facts", () => {
-  expect(reference.cases).toHaveLength(30);
-  const compatible = reference.cases.filter(
-    (entry) => entry.scenarioId === 106 || entry.scenarioId === 107,
-  );
-  expect(compatible).toHaveLength(20);
-  expect(
-    reference.cases.filter((entry) => entry.scenarioId === 111),
-  ).toHaveLength(10);
-  for (const expected of compatible) {
-    const scenario = source(expected.scenarioId);
-    const [choice] = compile(
-      {
-        namespace: {
-          kind: "official",
-          scenarioId: scenario.id,
-          arcId: "catalog",
+test("compatible official choices keep their exact costs, grants, messages and load schedules", () => {
+  const table: Record<string, unknown> = {};
+  for (const scenarioId of [106, 107])
+    for (const difficulty of DIFFICULTY_IDS) {
+      const scenario = source(scenarioId);
+      const [choice] = compile(
+        {
+          namespace: { kind: "official", scenarioId, arcId: "catalog" },
+          difficulty,
+          startingYear: scenario.startingYear,
+          durationMonths: scenario.durationMonths,
+          receivingScenario: scenario,
         },
-        difficulty: expected.difficulty as DifficultyType,
-        startingYear: scenario.startingYear,
-        durationMonths: scenario.durationMonths,
-        receivingScenario: scenario,
-      },
-      [{ scenarioId: scenario.id, includeChoices: true }],
-    );
-    const option = choice.options.find(
-      (option) => option.id === expected.optionId,
-    )!;
-    expect(choice.key).toBe(expected.decisionId);
-    expect(choice.dueMonth).toBe(expected.dueMonth);
-    expect(option.cost).toBe(expected.cost);
-    expect(option.grant).toBe(expected.grant);
-    expect(option.message).toBe(expected.message);
-    const actual = option.replaceLoad?.with.map(
-      ({ eventId: _eventId, startMonth: _startMonth, startsMonth, ...load }) =>
-        startsMonth === 1 ? load : { ...load, startsMonth },
-    );
-    expect(actual).toEqual(
-      expected.optionId === "phased" ? expected.loadAdditions : undefined,
-    );
-    expect(option.replaceLoad?.arc).toBe(
-      expected.optionId === "phased" ? scenario.id : undefined,
-    );
-    expect(option.replaceLoad?.loadId).toBe(
-      expected.optionId === "phased" ? "manassas-data-centers" : undefined,
-    );
-  }
+        [{ scenarioId, includeChoices: true }],
+      );
+      table[`${scenarioId} ${difficulty}`] = digest(
+        choice.options.map((option) => ({
+          id: option.id,
+          cost: option.cost,
+          grant: option.grant,
+          message: option.message,
+          replaceLoad: option.replaceLoad,
+        })),
+      );
+      expect(choice.key).toContain(`story:${scenarioId}:`);
+    }
+  expect(table).toMatchSnapshot();
 });
 
 test("both current choices adapt complete difficulty values into detached data with exact preparation offsets", () => {

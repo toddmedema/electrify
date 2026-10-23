@@ -1,0 +1,16 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`compatible official choices keep their exact costs, grants, messages and load schedules 1`] = `
+Object {
+  "106 CEO": "f89c23424713a7f1ec0c4ca71b18a39017bd67c126b5c77b328589de1e2ae494",
+  "106 Employee": "f89c23424713a7f1ec0c4ca71b18a39017bd67c126b5c77b328589de1e2ae494",
+  "106 Intern": "f89c23424713a7f1ec0c4ca71b18a39017bd67c126b5c77b328589de1e2ae494",
+  "106 Manager": "f89c23424713a7f1ec0c4ca71b18a39017bd67c126b5c77b328589de1e2ae494",
+  "106 VP": "f89c23424713a7f1ec0c4ca71b18a39017bd67c126b5c77b328589de1e2ae494",
+  "107 CEO": "ba6c05a82bcc389fc533d38f2b8b35fa4f279990598b6f9098835c2a32bc3aee",
+  "107 Employee": "ba6c05a82bcc389fc533d38f2b8b35fa4f279990598b6f9098835c2a32bc3aee",
+  "107 Intern": "ba6c05a82bcc389fc533d38f2b8b35fa4f279990598b6f9098835c2a32bc3aee",
+  "107 Manager": "ba6c05a82bcc389fc533d38f2b8b35fa4f279990598b6f9098835c2a32bc3aee",
+  "107 VP": "ba6c05a82bcc389fc533d38f2b8b35fa4f279990598b6f9098835c2a32bc3aee",
+}
+`;

@@ -5,18 +5,14 @@ import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { validScenarioRuleState } from "../helpers/ScenarioRuleValidation";
 import { loadSimData } from "../testing/SimData";
-import reference from "../testing/fixtures/NativeWildfireBeforeDecisionReference.json";
+import beforeDecision from "../testing/fixtures/saves/native-wildfire-before-decision.json";
+import pendingDecision from "../testing/fixtures/saves/native-wildfire-pending-decision.json";
 import { tickState } from "./Game";
 
 beforeAll(() => loadSimData("LA"));
 
 test("an actual native111 save before the retired decision carries physical history forward without inventing receipts", () => {
-  expect(reference.baselineCommit).toBe(
-    "2fc5d50ebedd5d3695b9db7d75ca5b54c0912779",
-  );
-  const source = cloneDeep(
-    reference.nativeBeforeDecisionSave,
-  ) as unknown as SaveGameType;
+  const source = cloneDeep(beforeDecision) as unknown as SaveGameType;
   expect(source.schemaVersion).toBe(3);
   expect(source.game.date.monthsElapsed).toBe(30);
   expect(
@@ -71,9 +67,7 @@ test("an actual native111 save before the retired decision carries physical hist
 });
 
 test("an actual native111 pending legacy decision retires prospectively without charging or inventing a response", () => {
-  const source = cloneDeep(
-    reference.nativePendingSave,
-  ) as unknown as SaveGameType;
+  const source = cloneDeep(pendingDecision) as unknown as SaveGameType;
   expect(source.schemaVersion).toBe(3);
   expect(source.game.date.monthsElapsed).toBe(35);
   expect(source.game.scenarioChoicePause).toBeDefined();
