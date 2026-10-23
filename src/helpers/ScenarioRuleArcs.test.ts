@@ -426,38 +426,17 @@ const targetFleet: ScenarioRuleTargetFacility[] = [
   },
 ];
 
-// Captured from the pre-conversion callbacks. Keep these independent when those callbacks retire.
+// Independent expected targets for the current hurricane landfall event.
 const expectedTargets = {
-  104: {
-    Intern: [[2], [2], [2]],
-    Employee: [[2], [2], [2]],
-    Manager: [[2], [2], [2]],
-    VP: [[2], [2], [2]],
-    CEO: [
-      [2, 3],
-      [2, 1, 4],
-      [2, 3],
-    ],
-  },
-  111: {
-    Intern: [[2], [1, 2], [2]],
-    Employee: [[2], [1, 2], [2]],
-    Manager: [
-      [2, 1],
-      [1, 2],
-      [2, 1],
-    ],
-    VP: [
-      [2, 1, 3],
-      [1, 2, 3],
-      [2, 1, 4],
-    ],
-    CEO: [
-      [2, 1, 3],
-      [1, 2, 3],
-      [2, 1, 4, 3],
-    ],
-  },
+  Intern: [[2], [2], [2]],
+  Employee: [[2], [2], [2]],
+  Manager: [[2], [2], [2]],
+  VP: [[2], [2], [2]],
+  CEO: [
+    [2, 3],
+    [2, 1, 4],
+    [2, 3],
+  ],
 };
 const expectedNames: Record<number, string> = {
   1: "Old coal",
@@ -466,44 +445,25 @@ const expectedNames: Record<number, string> = {
   4: "Solar",
 };
 
-test.each([104, 111] as const)(
-  "preserves independent pre-conversion IDs and names for all fifteen %s target draws",
-  (scenarioId) => {
-    for (const difficulty of DIFFICULTY_IDS) {
-      for (const [index, seed] of [1, 42, 12345].entries()) {
-        const shares = {
-          Intern: 0.3,
-          Employee: 0.4,
-          Manager: 0.5,
-          VP: 0.6,
-          CEO: 0.7,
-        };
-        const event =
-          scenarioId === 104
-            ? compile([104], { difficulty, seed }).find(
-                (item) => item.source.phaseId === "landfall",
-              )!
-            : undefined;
-        const selector = event?.targets[0].target ?? {
-          selector: "seededOperatingCapacityShare" as const,
-          targetCapacityShare: shares[difficulty],
-        };
-        const ids = expectedTargets[scenarioId][difficulty][index];
-        for (const facilities of [targetFleet, [...targetFleet].reverse()]) {
-          const targets = resolveScenarioRuleTargets(selector, {
-            seed,
-            eventKey: event?.key ?? "mod:selector-proof:draw",
-            officialDrawKey:
-              event?.source.drawKey ??
-              "story:111:california-wildfire-2025:firestorm",
-            facilities,
-          }).targets;
-          expect(targets.map((target) => target.id)).toEqual(ids);
-          expect(targets.map((target) => target.name)).toEqual(
-            ids.map((id) => expectedNames[id]),
-          );
-        }
+test("preserves independent IDs and names for all fifteen hurricane target draws", () => {
+  for (const difficulty of DIFFICULTY_IDS) {
+    for (const [index, seed] of [1, 42, 12345].entries()) {
+      const event = compile([104], { difficulty, seed }).find(
+        (item) => item.source.phaseId === "landfall",
+      )!;
+      const ids = expectedTargets[difficulty][index];
+      for (const facilities of [targetFleet, [...targetFleet].reverse()]) {
+        const targets = resolveScenarioRuleTargets(event.targets[0].target, {
+          seed,
+          eventKey: event.key,
+          officialDrawKey: event.source.drawKey,
+          facilities,
+        }).targets;
+        expect(targets.map((target) => target.id)).toEqual(ids);
+        expect(targets.map((target) => target.name)).toEqual(
+          ids.map((id) => expectedNames[id]),
+        );
       }
     }
-  },
-);
+  }
+});

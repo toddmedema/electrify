@@ -1,6 +1,6 @@
 # Realtime multiplayer proposal
 
-Version 2, 14 October 2026. Two to four players, one shared clock, automatic live trading. This is a separate alternative to the [annual multiplayer proposal](multiplayer-proposal.md).
+Two to four players, one shared clock, automatic live trading. See the [desktop guide](desktop-steam.md) for the implemented setup and save behavior.
 
 **Play neighboring electricity companies together. Everyone sees the same moment. When your grid has spare power and another player needs it, electricity flows automatically.** Build more generation or improve the connection to help more. Your neighbor pays for the energy actually delivered.
 
@@ -71,7 +71,7 @@ Steam hosting keeps the operating burden low: one trusted friend is the authorit
 | A guest disconnects      | Pause everyone and preserve the seat. Reconnect to the current shared state, keep waiting, or save and end the session.   |
 | The host leaves normally | Pause, distribute a complete shared save, obtain a saved-copy acknowledgement, then close.                                |
 | The host crashes         | Stop the session. A player with a shared save can create a new lobby and resume it. Progress after that save may be lost. |
-| A company fails          | That company retires at the month it failed; the others keep playing (see multiplayer-scenario-selection.md).             |
+| A company fails          | That company retires at the month it failed; the others keep playing (see desktop-steam.md).                              |
 
 Do not substitute the old NPC when someone disconnects. Their fleet, assets, customers, and finances stay in the save. Rejoining restores the same seat. Late additions of new seats can wait; the original roster stays fixed for the campaign.
 
@@ -81,7 +81,9 @@ Always retain a complete local host save too. If remote persistence is unavailab
 
 This avoids seamless host migration in the first release. Steam lobby ownership changing does not transfer the running simulation or its save automatically. Resume is an explicit new session from one complete checkpoint. Everyone must use matching game code and data during that session.
 
-Before public launch, support **whole-match migration at resume**: versioned migrations upgrade the shared bundle once, validate all grids and edges together, and give everyone one current-build starting state. Lobby readiness approves that common baseline before play. Reuse existing single-player migrations where valid, with a separate versioned schema for shared state. Preserve the original bundle if migration is unsupported. Version tags alone do not guarantee that a campaign can resume after Steam updates its players; never upgrade individual members independently during play.
+Resume accepts only current world and save schemas with a matching multiplayer rules
+fingerprint. Validate all grids and edges together before play. Unsupported formats
+remain untouched; do not migrate individual grids or entire checkpoints.
 
 ## Engineering appendix
 
@@ -160,7 +162,7 @@ Require these before release:
 
 - **Market correctness:** source capacity sold once; mirrored flows, payments, and energy; no battery/water double consumption; ramp limits from pre-tick output; no exports from unsupported cold starts; no startup-cost auction hidden in the allocator.
 - **Four-player fairness:** the numerical shortage example; a constrained graph that requires reassignment; both zero-NPC and one-NPC locations joining a four-player match; tier 1 links to every player; stable ratings after disconnect/rejoin; no NPC fallback or immediate re-export.
-- **Recovery:** duplicate purchases, delayed/out-of-order updates, lost acknowledgements, guest loss, host crash during saving, damaged bundles, whole-match migration, and a crash immediately after a shared failure. Test resolving mandatory choices and buying while paused, and rejecting old-session command retries after resume. Only a fully persisted checkpoint may be offered for resume.
+- **Recovery:** duplicate purchases, delayed/out-of-order updates, lost acknowledgements, guest loss, host crash during saving, damaged bundles, unsupported schemas, and a crash immediately after a shared failure. Test resolving mandatory choices and buying while paused, and rejecting old-session command retries after resume. Only a fully persisted checkpoint may be offered for resume.
 - **Performance:** host tick time and simultaneous month rollovers with four grids; Steam callback responsiveness; compressed update/checkpoint sizes; upload bandwidth; slow-client behavior; minimize, sleep, and resume. Measure before enabling FAST or ULTRA.
 - **Enjoyment:** a player understands why help stopped through the normal game interface; running gas assistance feels immediate; all four players contribute; pause frequency is acceptable; wires do not replace generation. Test an idle gas plant whose owner's customers are covered by renewables while a neighbor needs power. If that restriction repeatedly frustrates players, expand dispatch before release.
 
@@ -168,8 +170,8 @@ Keep protocol details behind the interface. The main screen should need only a c
 
 ## Review findings
 
-| Round | Design and technical challenge                                                                                     | Resolution                                                                                                                          |
-| ----- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | Four independent grid ticks can create or double-sell power; authored geography cannot supply all peer slots       | One shared world step and six canonical edges for four players, with explicit added slots                                           |
-| 2     | Startup-aware auctions recreate complexity; disconnected automatic grids introduce unresolved choices              | One posted price, running-unit export headroom first, and pause/reconnect/save on disconnection                                     |
-| 3     | Paused commands can deadlock; old purchases can replay after recovery; version tags do not preserve future resumes | Keep command handling active while paused, enforce session epochs, migrate whole matches together, and explain offline plant limits |
+| Round | Design and technical challenge                                                                               | Resolution                                                                                                                           |
+| ----- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1     | Four independent grid ticks can create or double-sell power; authored geography cannot supply all peer slots | One shared world step and six canonical edges for four players, with explicit added slots                                            |
+| 2     | Startup-aware auctions recreate complexity; disconnected automatic grids introduce unresolved choices        | One posted price, running-unit export headroom first, and pause/reconnect/save on disconnection                                      |
+| 3     | Paused commands can deadlock; old purchases can replay after recovery; unsupported versions cannot resume    | Keep command handling active while paused, enforce session epochs, validate whole matches together, and explain offline plant limits |

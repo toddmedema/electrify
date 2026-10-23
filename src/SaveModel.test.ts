@@ -40,7 +40,7 @@ function summary(
 }
 
 describe("SaveModel", () => {
-  it("upgrades an older encoded run without mutating the original", () => {
+  it("round trips a current encoded run without mutating the original", () => {
     const file = fakeSaveFile();
     file.save.game.runIdentity = captureRunIdentity(
       getScenario(101)!,
@@ -52,7 +52,6 @@ describe("SaveModel", () => {
     const raw = JSON.parse(JSON.stringify(encodeSaveFile(file))) as ReturnType<
       typeof encodeSaveFile
     >;
-    raw.save.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
     const original = JSON.stringify(raw);
     const upgraded = validateSaveFileEnvelope(raw, parseSave);
     expect(upgraded.save.game.runIdentity).toEqual(current);

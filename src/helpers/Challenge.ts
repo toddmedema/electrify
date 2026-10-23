@@ -1,6 +1,5 @@
 import { ChallengeInvitation, VictoryType } from "../Types";
 import {
-  carryInvitationForward,
   expandAuthoredRunReference,
   projectAuthoredRunReference,
   sameRunIdentity,
@@ -41,9 +40,7 @@ export function parseChallengeUrl(href: string): ChallengeRoute | undefined {
   )
     return failed;
   try {
-    const value = carryInvitationForward(
-      JSON.parse(url.searchParams.get("challenge")!),
-    );
+    const value = JSON.parse(url.searchParams.get("challenge")!);
     if (value && typeof value === "object") {
       const id = (value as ChallengeInvitation).run?.scenarioId;
       if (SCENARIOS.some((s) => s.id === id && !s.tutorialSteps))

@@ -50,8 +50,9 @@ export default function RenameSaveDialog(props: {
       slotProps={{
         transition: {
           onEntered: () => {
-            input.current?.focus();
-            input.current?.select();
+            // Autofocus already ran; preserve any navigation during the animation.
+            if (document.activeElement === input.current)
+              input.current?.select();
           },
         },
       }}

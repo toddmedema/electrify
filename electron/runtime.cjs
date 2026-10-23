@@ -111,10 +111,9 @@ function validateBoard(input) {
     input.scenarioId < 0 ||
     input.scenarioId > 100000 ||
     !difficulties.includes(input.difficulty) ||
-    (input.challengeId !== undefined &&
-      (typeof input.challengeId !== "string" ||
-        input.challengeId.length > 100 ||
-        !/^[a-zA-Z0-9:_-]+$/.test(input.challengeId)))
+    typeof input.challengeId !== "string" ||
+    input.challengeId.length > 100 ||
+    !/^[a-zA-Z0-9:_-]+$/.test(input.challengeId)
   )
     throw new Error("Invalid leaderboard selection");
   return {

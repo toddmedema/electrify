@@ -63,14 +63,13 @@ test("a differing or missing grid snapshot is never repaired by a claimed matchi
   assert.deepEqual(parse(stringify(source)), source);
 });
 
-test("legacy full JSON, official worlds, unknown world versions and nonfinite values retain their representation", () => {
+test("full JSON, official worlds, unknown world versions and nonfinite values retain their representation", () => {
   const full = world();
   full.grids.forEach((grid) => {
     grid.facilities = [];
   });
   assert.deepEqual(parse(JSON.stringify(full)), full);
   for (const source of [
-    { ...full, schema: 2 },
     { ...full, schema: 4 },
     { ...full, spec: { scenarioId: 113 } },
     { schema: 3, spec: {}, grids: [{}, {}, {}, {}, {}] },
@@ -108,9 +107,6 @@ test("edited references cannot claim another snapshot or carry hidden fields", (
     },
     (value) => {
       value.spec.customScenario.mod.runtimeDigest = 123;
-    },
-    (value) => {
-      value.schema = 2;
     },
   ]) {
     const encoded = JSON.parse(stringify(world()));

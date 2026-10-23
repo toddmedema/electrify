@@ -12,7 +12,6 @@ import type {
 } from "./Types";
 import { getStore } from "./StoreRegistry";
 import { refreshToUpdate } from "./helpers/Cache";
-import { saveTitle } from "./helpers/SaveDisplay";
 import { getScenario } from "./data/Scenarios";
 import { parseSave, serializeSave } from "./SaveGame";
 import { SaveRepository } from "./SaveRepository";
@@ -972,7 +971,9 @@ function afterLoaded(): void {
   if (!active) {
     const name = suggestedSaveName(
       scenario.name,
-      getStore().getState().saves.entries.map(saveTitle),
+      getStore()
+        .getState()
+        .saves.entries.map((save) => save.name),
     );
     const id = newSaveToken();
     active = new ActiveSaveSession(

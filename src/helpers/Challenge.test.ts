@@ -127,16 +127,13 @@ it("rejects transport ambiguity, malformed payload and obsolete fields without a
     parseChallengeUrl(url(invitation) + "&scenario=101")?.invitation,
   ).toEqual(invitation);
 });
-it("opens a link from an earlier deploy as the same run under current rules", () => {
+it("rejects a challenge from different rules", () => {
   const old = {
     ...invitation,
     run: { ...run, compatibilityId: `rules-1-${"0".repeat(64)}` },
   };
   expect(validInvitation(old)).toBe(false);
-  expect(parseChallengeUrl(url(old))).toEqual({
-    invitation,
-    scenarioId: run.scenarioId,
-  });
+  expect(parseChallengeUrl(url(old))?.error).toBeTruthy();
   expect(
     parseChallengeUrl(url({ ...old, run: { ...old.run, seed: -1 } }))?.error,
   ).toBeTruthy();

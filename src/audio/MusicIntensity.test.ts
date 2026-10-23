@@ -31,7 +31,7 @@ it("keeps a stable grid at the quieter baseline", () => {
 it("builds tension as usable reserves run out before an actual blackout", () => {
   expect(musicIntensityForGame(grid({ reserveW: 5 }))).toBeCloseTo(0.25);
   expect(musicIntensityForGame(grid({ reserveW: 0 }))).toBeCloseTo(0.5);
-  // Older saves may not carry the reducer's more accurate reserve measurement.
+  // Ticks without a reserve measurement use the available supply margin.
   expect(
     musicIntensityForGame(grid({ supplyW: 105, reserveW: undefined })),
   ).toBeCloseTo(0.25);

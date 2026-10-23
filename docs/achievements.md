@@ -8,10 +8,10 @@ difficulty unless a requirement specifies CEO; tutorials require their final cha
 games, replay playback, forecasts and modified simulation harnesses do not earn achievements.
 
 The `achievements` lazy chunk installs the evaluator before game saves are parsed or restored.
-The existing optional `game.desktopAchievements` save key is retained for compatibility; its
-shape and schema have not changed. Older saves begin observing new counters on resume and cannot
-invent missing history. A save whose telemetry fails validation (a newer catalog, or a tampered
-file) still loads without it, and resume starts observing afresh. Evidence already in a loaded
+Per-run evidence is stored in optional `game.desktopAchievements` telemetry. A save whose
+telemetry fails validation still loads without it, and resume starts observing afresh.
+Missing or invalid telemetry never invents past facility provenance or counts a partially
+observed month toward counter-based awards. Evidence already in a loaded
 save or shared link is never credited: only awards earned during live play count, so opening a
 friend's finished CEO run, or another account's save, cannot unlock anything. `achievements-ui` contains the gallery and popup components. Steam-only
 submission, presence and SDK code remain behind the Electron build guard and named `electron`
@@ -75,7 +75,7 @@ do not replay notifications. Steam availability clears/suppresses the web popup 
 Offline Mode continues using Steam's notification interface.
 
 The renderer can read the current native player's existing achievement history through a bounded
-IPC response, so upgrading an offline Electron profile preserves its prior awards in the gallery.
+IPC response, so connecting an offline Electron profile preserves its prior awards in the gallery.
 Native paths, SDK pointers and acknowledgement metadata never enter the renderer.
 
 Tests cover evaluator thresholds, merges, local reloads, guest claims, account switches, late

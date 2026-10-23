@@ -9,7 +9,7 @@ import type {
   SaveStatus,
   VictoryType,
 } from "./Types";
-import { isFutureSave } from "./SaveUpgrade";
+import { isFutureSave } from "./SaveSchema";
 import { validObjectiveResult } from "./helpers/ScenarioObjectives";
 
 export type SaveErrorCode =
@@ -25,7 +25,7 @@ export class SaveRepositoryError extends Error {
   }
 }
 
-/** A newer app wrote this save; keep it intact rather than call it corrupt. */
+/** A newer schema cannot be read by this app; leave its payload intact. */
 export function assertSupportedSaveSchema(raw: unknown): void {
   if (isFutureSave(raw))
     throw new SaveRepositoryError(

@@ -187,16 +187,14 @@ export function ModFacts({
 /** Solo and co-op read the same generated definitions and consequences from frozen rules. */
 export default function ModDetails({
   scenario,
-  objectiveIntent,
   diagnostics,
 }: {
   scenario: ScenarioType;
-  objectiveIntent?: "inherit" | "replace" | "none";
   diagnostics?: ModDiagnostic[];
 }) {
   const facts = useMemo(
-    () => modPlayerFacts(scenario, { objectiveIntent, diagnostics }),
-    [scenario, objectiveIntent, diagnostics],
+    () => modPlayerFacts(scenario, { diagnostics }),
+    [scenario, diagnostics],
   );
   return <ModFacts facts={facts} />;
 }

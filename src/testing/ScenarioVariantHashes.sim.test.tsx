@@ -6,7 +6,7 @@
 import { DIFFICULTY_IDS } from "../Constants";
 import type { ScenarioType } from "../Types";
 import { digest } from "./CanonicalHash";
-import customSave from "./fixtures/saves/ordinary-custom-schema5.json";
+import customScenario from "./fixtures/scenarios/all-official-arcs.json";
 import { expectNoViolations } from "./SimulationTestHelpers";
 import { runSimulation, type SimOptionsType } from "./Simulator";
 
@@ -50,7 +50,7 @@ it("pins the redesigned wildfire and load shedding arcs at every difficulty", ()
 });
 
 it("pins an ordinary custom game that selects every official arc", () => {
-  const scenario = customSave.game.customScenario as unknown as ScenarioType;
+  const scenario = customScenario as unknown as ScenarioType;
   expect(scenario.mod).toBeUndefined();
   expect(
     runHash({ scenarioId: 999, scenario, difficulty: "Employee" }),

@@ -88,44 +88,6 @@ async function screenshot(
   });
 }
 
-test("a save from an earlier deploy upgrades silently and keeps its run", async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
-    localStorage.setItem("electrify-cloud-save-prompt-seen", "true");
-  });
-  await startGame(page);
-  const id = (await readSaveRecords(page))[0].metadata.id;
-  const original = await editSavedGame(
-    page,
-    (save) => {
-      delete save.schemaVersion;
-      save.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
-      return save.game;
-    },
-    id,
-  );
-  await page.reload();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.locator("#appbar:visible")).toBeVisible();
-  const upgraded = (await readSavedGame(page, id))!;
-  expect(upgraded.runIdentity?.compatibilityId).not.toBe(
-    original.runIdentity!.compatibilityId,
-  );
-  expect(upgraded.runIdentity?.seed).toBe(original.runIdentity!.seed);
-  expect(upgraded.date).toEqual(original.date);
-  expect(upgraded.facilities).toEqual(original.facilities);
-  expect(upgraded.monthlyHistory).toEqual(original.monthlyHistory);
-  await openSavedGames(page);
-  const row = page.locator(`[data-save-id="${id}"]`);
-  await expect(
-    row.getByRole("button", { name: "Load", exact: true }),
-  ).toBeEnabled();
-  await expect(row).not.toContainText(/updated|version/i);
-  await expect(page.getByText(/Some saves couldn't sync/)).toHaveCount(0);
-  expect((await readSaveRecords(page))[0].metadata.id).toBe(id);
-});
-
 for (const theme of ["light", "dark"]) {
   test(`cloud status sits beside the title and explains itself in ${theme}`, async ({
     page,

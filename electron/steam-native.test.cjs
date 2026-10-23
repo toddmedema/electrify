@@ -117,6 +117,7 @@ test("Steam uploads the full build version in integer score details", async () =
   await boards.upload({
     scenarioId: 101,
     difficulty: "CEO",
+    challengeId: "rules-a",
     score: 800,
     appVersion,
   });
@@ -161,7 +162,7 @@ for (const platform of ["win32", "linux", "darwin"]) {
 test("global and own-score reads use documented request enums and ranges", async () => {
   const { api, calls, dispatcher } = mockNative("win32");
   const boards = new SteamLeaderboards(api, dispatcher, "win32");
-  const input = { scenarioId: 101, difficulty: "CEO" };
+  const input = { scenarioId: 101, difficulty: "CEO", challengeId: "rules-a" };
   await boards.read({ ...input, scope: "global" });
   await boards.read({ ...input, scope: "player" });
   assert.deepEqual(
@@ -178,12 +179,22 @@ test("failed call results reject and do not fabricate successful score writes", 
   const boards = new SteamLeaderboards(api, dispatcher, "win32");
   api.result = () => false;
   await assert.rejects(
-    boards.upload({ scenarioId: 101, difficulty: "CEO", score: 1 }),
+    boards.upload({
+      scenarioId: 101,
+      difficulty: "CEO",
+      challengeId: "rules-a",
+      score: 1,
+    }),
     /failed/,
   );
   api.find = () => 0n;
   await assert.rejects(
-    boards.read({ scenarioId: 101, difficulty: "CEO", scope: "global" }),
+    boards.read({
+      scenarioId: 101,
+      difficulty: "CEO",
+      challengeId: "rules-a",
+      scope: "global",
+    }),
     /could not start/,
   );
 });
@@ -215,6 +226,7 @@ test("yielded requests cannot use native pointers after SDK shutdown begins", as
   const request = boards.read({
     scenarioId: 101,
     difficulty: "CEO",
+    challengeId: "rules-a",
     scope: "friends",
   });
   await new Promise((resolve) => setImmediate(resolve));
@@ -267,7 +279,12 @@ test("shutdown after download resolves prevents reading native entry and persona
   api.entry = () => assert.fail("Entry interface used after shutdown");
   api.persona = () => assert.fail("Friends interface used after shutdown");
   await assert.rejects(
-    boards.read({ scenarioId: 101, difficulty: "CEO", scope: "friends" }),
+    boards.read({
+      scenarioId: 101,
+      difficulty: "CEO",
+      challengeId: "rules-a",
+      scope: "friends",
+    }),
     /shutting down/,
   );
 });

@@ -14,7 +14,7 @@ export function validCustomEventIds(value: unknown): boolean {
   return validEventIds(value, CUSTOM_EVENT_SCENARIOS);
 }
 
-/** Community snapshots retain all bundled arcs, including already-frozen retired native data. */
+/** Community packages can select every current official arc. */
 export function validOfficialArcIds(value: unknown): boolean {
   return validEventIds(
     value,

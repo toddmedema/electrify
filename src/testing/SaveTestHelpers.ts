@@ -4,12 +4,11 @@ import {
   intertiesEnabledForScenario,
 } from "../data/AdjacentMarkets";
 import { getScenario } from "../data/Scenarios";
-import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { getDateFromMinute } from "../helpers/DateTime";
 import type { GameType, SaveFileType, SavedRunResult } from "../Types";
 import { serializeSave } from "../SaveGame";
-import { upgradeSave } from "../SaveUpgrade";
 
-/** Small transport fixture representing a native run saved before story journals existed. */
+/** Small current-format transport fixture, before the first story event. */
 export function fakeSaveGame(overrides: Partial<GameType> = {}): GameType {
   const game = {
     scenarioId: 101,
@@ -21,7 +20,7 @@ export function fakeSaveGame(overrides: Partial<GameType> = {}): GameType {
     startingDemandScale: 1,
     loadAdditions: [],
     location: LOCATIONS.PIT,
-    date: getDateFromMinute(185 * MINUTES_PER_MONTH + 1000, 2020),
+    date: getDateFromMinute(1000, 2020),
     commissionedHydroSiteIds: [],
     facilities: [],
     timeline: [],
@@ -37,12 +36,7 @@ export function fakeSaveGame(overrides: Partial<GameType> = {}): GameType {
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (scenario && intertiesEnabledForScenario(scenario, game.location))
     game.transmission = emptyTransmissionState();
-  // Let the native migration owner record the historical journal boundary. Custom
-  // scenarios retain their current data and never acquire a native exemption.
-  const upgraded = upgradeSave({ schemaVersion: 5, game });
-  if (!upgraded || !upgraded.game)
-    throw new Error("The save test fixture could not be upgraded.");
-  return upgraded.game as GameType;
+  return game;
 }
 
 export function fakeSaveFile(

@@ -1,3 +1,4 @@
+import manifest from "./data/RunCompatibility.json";
 import cloneDeep from "lodash.clonedeep";
 import { LOCATIONS } from "./Constants";
 import { decodeReplay, encodeReplay, serializeReplay } from "./Replay";
@@ -154,6 +155,8 @@ test.each([
 test("official replay location selection remains available without mod provenance", () => {
   const official: ReplayType = {
     appVersion: "fixture",
+    compatibilityId: manifest.compatibilityId,
+    monthlyCash: [],
     scenarioId: 100,
     seed: 2468,
     difficulty: "Employee",
