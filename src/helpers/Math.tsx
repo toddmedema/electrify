@@ -1,4 +1,5 @@
 import { pow } from "./Pow";
+import { cos, log } from "./Libm";
 // http://jsfiddle.net/justin_c_rounds/Gd2S2/light/
 export function getIntersectionX(
   line1StartX: number,
@@ -126,7 +127,7 @@ export function normalAt(
   // half open -- a draw of exactly 0 would return -Infinity
   const u1 = Math.max(Number.MIN_VALUE, uniformAt(seed, stream, index * 2));
   const u2 = uniformAt(seed, stream, index * 2 + 1);
-  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  return Math.sqrt(-2 * log(u1)) * cos(2 * Math.PI * u2);
 }
 
 // Seeds are mixed as 32 bit integers, so a wider one (a float, or Date.now() times something) is

@@ -161,7 +161,11 @@ describe("tolerant full-demand objectives", () => {
     const heatwave = scenario(108);
     expect(heatwave.reliabilityObjective?.minimumDemandServed).toBe(0.995);
     expect(
-      scenarioObjectiveFailure(heatwave, [row(2026, 7, 0.9996)]),
+      scenarioObjectiveFailure(heatwave, [
+        row(2026, 6, 1),
+        row(2026, 7, 0.9996),
+        row(2026, 8, 1),
+      ]),
     ).toBeUndefined();
     expect(scenarioObjectiveFailure(heatwave, [row(2026, 7, 0.99)])).toMatch(
       /served 99\.00% .* requires 99\.5%\.$/,
@@ -202,4 +206,29 @@ it("does not declare attainable public retention impossible", () => {
       monthsRemaining: 84,
     }),
   ).toBeUndefined();
+});
+
+describe("complete reliability evidence", () => {
+  it.each(SCENARIOS.filter((s) => s.reliabilityObjective))(
+    "requires every exact month once for $name",
+    (target) => {
+      const objective = target.reliabilityObjective!;
+      const first = objective.year * 12 + objective.month - 1;
+      const rows = Array.from(
+        { length: objective.durationMonths || 1 },
+        (_, i) => row(Math.floor((first + i) / 12), ((first + i) % 12) + 1, 1),
+      );
+      expect(scenarioObjectiveFailure(target, rows)).toBeUndefined();
+      expect(scenarioObjectiveFailure(target, [])).toMatch(/unverifiable/i);
+      expect(scenarioObjectiveFailure(target, [...rows, rows[0]])).toMatch(
+        /unverifiable/i,
+      );
+      expect(scenarioObjectiveFailure(target, rows.slice(1))).toMatch(
+        /unverifiable/i,
+      );
+      expect(scenarioObjectiveFailure(target, rows.slice(0, -1))).toMatch(
+        /unverifiable/i,
+      );
+    },
+  );
 });

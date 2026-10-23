@@ -1,3 +1,8 @@
+import type { CompiledScenarioRules } from "./data/ScenarioRules";
+import type {
+  ObjectiveProgress,
+  ObjectiveResult,
+} from "./data/ScenarioObjectives";
 import type { FieldValue, Timestamp } from "firebase/firestore";
 import type * as React from "react";
 import type { Action } from "@reduxjs/toolkit";
@@ -369,6 +374,8 @@ export interface ReplayType {
   // own location, and an authored one could be given a location that isn't in LOCATIONS -- so
   // without it a replay would silently be re-simulated against a different city's weather
   location: LocationType;
+  /** Internal deterministic playback carries a mod's exact detached launch snapshot. */
+  customScenario?: ScenarioType;
   actions: ReplayActionType[];
   meaningfulDecisionGateWaived?: boolean;
   // Month-end cash of the original run in cents, oldest first, so playback can tell when a later
@@ -593,6 +600,7 @@ export function isStorage<T extends { peakWh?: number }>(
 
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
+  startingAssetId?: string;
   id: number; // Monotonically increasing
   // Signed for storage: negative while charging
   currentW: number;
@@ -916,32 +924,55 @@ export interface FacilityModifierType {
   yearsToBuild?: number;
 }
 
-export interface ScenarioNoticeType {
-  /** Months from the start of the run. */
-  month: number;
-  title: string;
-  message: string;
-}
-
-/**
- * A data-only mod's run-local effects, frozen into the run when it starts. Saves keep this small
- * runtime shape rather than the authoring package, so later schema, catalog or scenario changes
- * cannot make a modded save unreadable: unknown facility names simply match nothing.
- */
+/** A detached first-release runtime; no installed package/library is consulted by simulation. */
 export interface ScenarioModType {
+  runtimeVersion: 1;
+  gameApi: 1;
+  packageDigest: string;
+  setupDigest: string;
+  runtimeDigest: string;
+  modRuntimeId: string;
   source: {
     id: string;
     title: string;
     creator: string;
     version: string;
+    description: string;
+    /** Frozen provenance; none remains readable for older saved runs. Packages use optional goal lists. */
+    objectiveMode: "inherit" | "replace" | "none";
     workshopId?: string;
   };
+  parameters: {
+    baseScenarioId: number;
+    startingYear: number;
+    durationMonths: number;
+    seed: number;
+    difficulty: DifficultyType;
+    startingCustomers: number;
+    startingDemandScale: number;
+  };
+  rules: CompiledScenarioRules;
   facilities?: Partial<Record<ModFacilityNameType, FacilityModifierType>>;
   programs?: Partial<Record<Extract<PolicyId, "efficiency" | "solar">, number>>;
-  notifications?: ScenarioNoticeType[];
+}
+
+/** Detached, versioned researched rights for a newly inherited starting connection. */
+export interface FrozenStartingIntertieAccessType {
+  version: 1;
+  sourceScenarioId: 111;
+  locationId: "LA";
+  allocations: {
+    corridorId: string;
+    capacityW: number;
+    availableSupplyW: number;
+    importAccessWByTier: [number, number, number, number];
+    availableDemandW: number;
+  }[];
 }
 
 export interface ScenarioType {
+  /** Trusted built-ins use the common rules without assigning mod provenance. */
+  rules?: CompiledScenarioRules;
   /** Immutable mod effects; installed updates never mutate a running game. */
   mod?: ScenarioModType;
   /** Opt-in official event arcs for a custom run; location and starting fleet stay custom. */
@@ -968,6 +999,8 @@ export interface ScenarioType {
   intertiesEnabled?: boolean;
   /** Pre-existing, debt-free operational connections using this scenario's access allocation. */
   startingInterties?: string[];
+  /** Frozen rights for inherited connections; absent snapshots retain their original access. */
+  startingIntertieAccess?: FrozenStartingIntertieAccessType;
   // Pins the run's RNG so it plays out identically every time. Every authored scenario leaves
   // this off and draws a fresh seed each play; only the custom game screen sets it
   seed?: number;
@@ -1007,6 +1040,8 @@ export interface ScenarioType {
 
 /** An authored starting asset may already have spent years in service when a scenario opens. */
 export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
+  /** Catalog identity of the original asset; never transferred to a replacement. */
+  assetId?: string;
   initialAgeYears?: number;
   /**
    * Share of its reservoir a starting hydro plant holds on the opening tick. Defaults to the
@@ -1173,6 +1208,8 @@ export interface StorySnapshotType {
     ageYears: number;
     peakW: number;
     operational: boolean;
+    minuteCreated?: number;
+    startingAssetId?: string;
   }>;
 }
 
@@ -1272,6 +1309,7 @@ export interface CompanyOutcomeType {
 }
 /** One row of the co-op result table. */
 export interface CompanyResultType extends CompanyOutcomeType {
+  objectiveResults?: ObjectiveResult[];
   id: string;
   name: string;
   cash: number;
@@ -1372,6 +1410,8 @@ export interface GameType {
   startingYear: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
+  /** Completed-month objective facts, retained independently of presentation history. */
+  objectiveProgress?: ObjectiveProgress;
   // Newest first, capped at MAX_EVENTS.
   eventLog: GameEventType[];
   // Keys outlive the capped event log: a once-per-run lesson must not repeat just because its
@@ -1394,6 +1434,8 @@ export interface GameType {
   wildfireForecastRefresh?: boolean;
   /** Preserve pre-redesign transmission assets, loans and co-op topology in scenario-111 saves. */
   legacyWildfireIntertieAccess?: boolean;
+  /** Earliest reliable native story journal boundary after a supported legacy save migration. */
+  scenarioRuleHistoryStartMinute?: number;
   // Headless balance harness only: run the identical strategy with hail and extreme-cold hazards
   // switched off. Undefined means enabled (the browser default).
   weatherHazardsDisabled?: boolean;
@@ -1584,6 +1626,7 @@ export interface SaveLease {
 
 /** A compact, serializable story of the run captured before the reducer's Immer draft expires. */
 export interface VictoryDebriefType {
+  objectiveResults?: ObjectiveResult[];
   demandWh?: number;
   startingFleet: VictoryFleetCapacityType[];
   finalFleet: VictoryFleetCapacityType[];
@@ -1621,6 +1664,11 @@ export interface CoopSelectionType {
   starting: boolean;
   /** The custom game the host is setting up, mirrored to guests. */
   custom?: ScenarioType;
+  /** A selected, validated community snapshot; separate from the Custom Game editor. */
+  modScenario?: ScenarioType;
+  /** Summary while the separate host scenario transfer is arriving. */
+  modSummary?: import("./multiplayer/ModBrowse").ModBrowseSummary;
+  receivingScenario?: boolean;
   /** What the host has open, in words, such as "Deep Freeze on Easy". */
   viewing?: string;
   /** Host only: the code friends can enter to join. */

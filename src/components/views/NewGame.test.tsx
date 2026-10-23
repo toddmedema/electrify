@@ -69,7 +69,7 @@ describe("NewGame", () => {
     ).toHaveTextContent("Custom Game");
   });
 
-  it("offers community scenarios only when the desktop app supports mods and not in co-op", () => {
+  it("offers community scenarios when supported, including for a co-op host", () => {
     const onCommunityScenarios = jest.fn();
     const { unmount } = render(<NewGame {...props()} />);
     expect(screen.queryByTestId("community-scenarios")).toBeNull();
@@ -78,11 +78,22 @@ describe("NewGame", () => {
     fireEvent.click(screen.getByLabelText("Open community scenarios"));
     expect(onCommunityScenarios).toHaveBeenCalledTimes(1);
     view.unmount();
-    render(
+    const utils = render(
       <NewGame
         {...props({
           onCommunityScenarios,
           coop: { role: "host", players: [] } as unknown as Props["coop"],
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("Open community scenarios"));
+    expect(onCommunityScenarios).toHaveBeenCalledTimes(2);
+    utils.unmount();
+    render(
+      <NewGame
+        {...props({
+          onCommunityScenarios,
+          coop: { role: "guest", players: [] } as unknown as Props["coop"],
         })}
       />,
     );

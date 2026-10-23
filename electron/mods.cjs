@@ -1,11 +1,19 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const {
   parseMod,
   validateMod,
   MAX_MOD_BYTES,
   MOD_API_VERSION,
+  ModValidationError,
+  packageDigest,
 } = require("../src/mods/ModSchema.js");
+const { createAuthoringTemplate } = require("../src/mods/ModRecipes.js");
+const { createModEditorSchema } = require("../src/mods/ModEditorSchema.js");
+const {
+  validatePublicationDescription,
+} = require("../src/mods/ModPublication.js");
 const { atomicWriteAsync } = require("./storage.cjs");
 const { itemId } = require("./steam-workshop.cjs");
 const MAX_PACKAGES = 32;
@@ -49,6 +57,11 @@ function libraryEntry(value) {
   throw new Error("Invalid mod entry.");
 }
 
+const metadata = (pack) =>
+  Object.fromEntries(
+    ["id", "title", "creator", "version"].map((key) => [key, pack[key]]),
+  );
+
 /**
  * The installed mod library. Each library write is atomic and keeps the previous copy, so a
  * failed or partial change never replaces the last good library. Mutations are serialized;
@@ -65,6 +78,7 @@ class ModStore {
     this.appId = options.appId;
     this.pending = Promise.resolve();
     this.uploading = false;
+    this.pendingImport = undefined;
   }
 
   /**
@@ -136,6 +150,7 @@ class ModStore {
       published[id] = {
         workshopId: record.workshopId,
         uploaded: record.uploaded,
+        ...(record.agreement ? { agreement: true } : {}),
       };
     }
     return { entries, published };
@@ -151,7 +166,10 @@ class ModStore {
       return await this.readFile(this.filename);
     } catch {
       try {
-        return await this.readFile(`${this.filename}.previous`);
+        return {
+          ...(await this.readFile(`${this.filename}.previous`)),
+          recovered: true,
+        };
       } catch {
         throw new LibraryUnreadableError(
           "Your mod library couldn't be read. Reset it to start over; the old files are kept.",
@@ -165,20 +183,25 @@ class ModStore {
       throw new Error(
         `Electrify can install at most ${MAX_PACKAGES} mods. Remove one first.`,
       );
-    await atomicWriteAsync(
-      this.filename,
-      JSON.stringify({
-        version: 2,
-        entries: library.entries,
-        published: library.published,
-      }),
-    );
+    const serialized = JSON.stringify({
+      version: 2,
+      entries: library.entries,
+      published: library.published,
+    });
+    if (await this.exists(this.filename)) {
+      if ((await fs.promises.readFile(this.filename, "utf8")) === serialized)
+        return;
+    }
+    await atomicWriteAsync(this.filename, serialized, {
+      preservePrevious: !!library.recovered,
+    });
   }
 
   /** What the renderer sees: local packages carry their published Workshop item, if any. */
   view(library) {
     return library.entries.map((entry) =>
-      entry.source === "local" && library.published[entry.pack.id]
+      entry.source === "local" &&
+      Object.hasOwn(library.published, entry.pack.id)
         ? { ...entry, workshopId: library.published[entry.pack.id].workshopId }
         : entry,
     );
@@ -187,6 +210,7 @@ class ModStore {
   /** Never rejects: failures come back as player-facing `error` text with a fresh list. */
   async request(input) {
     if (input?.kind === "list") return this.respond(() => ({}));
+    if (input?.kind === "browse") return this.respond(() => this.browse(input));
     const operation = this.pending.then(() =>
       this.respond(() => this.perform(input)),
     );
@@ -207,8 +231,19 @@ class ModStore {
       return {
         ...result,
         entries: this.view(library),
+        agreements: Object.values(library.published)
+          .filter((record) => record.agreement)
+          .map((record) => record.workshopId),
+        ...(library.recovered ? { recovered: true } : {}),
         uploading: this.uploading,
-        ...(failure ? { error: reason(failure) } : {}),
+        ...(failure
+          ? {
+              error: reason(failure),
+              ...(failure instanceof ModValidationError
+                ? { diagnostics: failure.diagnostics }
+                : {}),
+            }
+          : {}),
       };
     } catch (error) {
       return {
@@ -250,20 +285,72 @@ class ModStore {
         const filename = await this.chooseFile();
         if (!filename) return {};
         const pack = await readPackage(filename);
-        const key = `local:${pack.id}`;
-        const previous = library.entries.find((e) => e.key === key);
-        library.entries = library.entries.filter((e) => e.key !== key);
-        library.entries.push({
-          key,
-          source: "local",
-          enabled: previous?.enabled ?? true,
+        const previous = library.entries.find(
+          (e) => e.key === `local:${pack.id}`,
+        );
+        if (previous) {
+          const token = crypto.randomUUID();
+          this.pendingImport = {
+            token,
+            pack,
+            previous: JSON.stringify(previous.pack),
+          };
+          return {
+            importConflict: {
+              token,
+              existing: metadata(previous.pack),
+              incoming: metadata(pack),
+            },
+          };
+        }
+        return this.install(library, pack);
+      }
+      case "resolveImport": {
+        const pending = this.pendingImport;
+        if (!pending || pending.token !== input.token)
+          throw new Error(
+            "This import preview expired. Import the file again.",
+          );
+        if (input.action === "cancel") {
+          this.pendingImport = undefined;
+          return {};
+        }
+        if (!["copy", "update"].includes(input.action))
+          throw new Error("Choose Update or Install as copy.");
+        const previous = library.entries.find(
+          (e) => e.key === `local:${pending.pack.id}`,
+        );
+        if (!previous || JSON.stringify(previous.pack) !== pending.previous)
+          throw new Error(
+            "The installed mod changed. Import the file again to review it.",
+          );
+        let pack = pending.pack;
+        if (input.action === "copy") {
+          const occupied = new Set([
+            ...library.entries.map((e) => e.pack.id),
+            ...Object.keys(library.published),
+          ]);
+          let id;
+          do {
+            id = `${pack.id.slice(0, 48)}-copy-${crypto.randomBytes(4).toString("hex")}`;
+          } while (occupied.has(id));
+          pack = { ...pack, id };
+        }
+        const result = await this.install(
+          library,
           pack,
-        });
+          input.action === "update" ? previous : undefined,
+        );
+        this.pendingImport = undefined;
+        return result;
+      }
+      case "dismissAgreement": {
+        itemId(input.workshopId);
+        for (const record of Object.values(library.published)) {
+          if (record.workshopId === input.workshopId) delete record.agreement;
+        }
         await this.write(library);
-        return {
-          message: `${previous ? "Updated" : "Imported"} ${pack.title}.`,
-          focusKey: key,
-        };
+        return {};
       }
       case "enable": {
         if (typeof input.enabled !== "boolean")
@@ -293,10 +380,31 @@ class ModStore {
       case "refresh":
         return this.refresh(library);
       case "publish":
-        return this.publish(library, find());
+        return this.publish(
+          library,
+          find(),
+          input.packageDigest,
+          input.rulesDescription,
+        );
       default:
         throw new Error("Unknown mod action.");
     }
+  }
+
+  async install(library, pack, previous) {
+    const key = `local:${pack.id}`;
+    library.entries = library.entries.filter((e) => e.key !== key);
+    library.entries.push({
+      key,
+      source: "local",
+      enabled: previous?.enabled ?? true,
+      pack,
+    });
+    await this.write(library);
+    return {
+      message: `${previous ? "Updated" : "Imported"} ${pack.title}.`,
+      focusKey: key,
+    };
   }
 
   async reset() {
@@ -326,28 +434,18 @@ class ModStore {
   }
 
   async template() {
-    const pack = validateMod({
-      schemaVersion: 1,
-      gameApi: MOD_API_VERSION,
-      id: "my-grid",
-      title: "My Grid",
-      creator: "Your name",
-      version: "1.0.0",
-      seed: 42,
-      baseScenarioId: 999,
-      scenario: { durationMonths: 240, eventScenarioIds: [100] },
-      facilities: { Solar: { buildCost: 0.8 } },
-      programs: { efficiency: 0.8 },
-      notifications: [
-        {
-          month: 12,
-          title: "First year",
-          message: "Review your grid before the next year.",
-        },
-      ],
-    });
+    const pack = validateMod(createAuthoringTemplate());
     const filename = await this.chooseSave();
     if (!filename) return {};
+    if (path.basename(filename) === "scenario.schema.json")
+      throw new Error(
+        "Choose scenario.json or another package filename; scenario.schema.json is reserved for its paired editor schema.",
+      );
+    await fs.promises.writeFile(
+      path.join(path.dirname(filename), "scenario.schema.json"),
+      JSON.stringify(createModEditorSchema(), null, 2) + "\n",
+      { mode: 0o600 },
+    );
     await fs.promises.writeFile(
       filename,
       JSON.stringify(pack, null, 2) + "\n",
@@ -367,6 +465,7 @@ class ModStore {
     let added = 0;
     let updated = 0;
     let downloading = 0;
+    const downloads = [];
     let overLimit = 0;
     const skipped = [];
     for (const id of subscribed) {
@@ -374,6 +473,11 @@ class ModStore {
       const index = next.findIndex((e) => e.key === key);
       if (index < 0 && next.length >= MAX_PACKAGES) {
         overLimit++;
+        downloads.push({
+          id,
+          status: "skipped",
+          message: "The 32-mod install limit has been reached.",
+        });
         continue;
       }
       try {
@@ -381,6 +485,10 @@ class ModStore {
         const info = workshop.installedOrQueueDownload(id);
         if (!info) {
           downloading++;
+          downloads.push({
+            id,
+            status: workshop.downloadStatus?.(id) || "downloading",
+          });
           continue;
         }
         // Packages may reference only game-bundled assets; no archives, scripts or loose media.
@@ -410,7 +518,9 @@ class ModStore {
         }
       } catch (error) {
         // Keep the last good copy of this item, if any, and carry on with the rest.
-        skipped.push(`Skipped Workshop item ${id}: ${reason(error)}`);
+        const message = `Skipped Workshop item ${id}: ${reason(error)}`;
+        skipped.push(message);
+        downloads.push({ id, status: "skipped", message });
       }
     }
     library.entries = next;
@@ -430,12 +540,22 @@ class ModStore {
         `Electrify can install ${MAX_PACKAGES} mods, so ${plural(overLimit, "subscription")} ${overLimit === 1 ? "wasn't" : "weren't"} installed. Unsubscribe from some on Steam, then refresh.`,
       );
     return {
+      downloads,
       ...(parts.length ? { message: parts.join(" ") } : {}),
       ...(skipped.length ? { warning: skipped.join(" ") } : {}),
     };
   }
 
-  async publish(library, entry) {
+  async publish(library, entry, validatedDigest, rulesDescription) {
+    const pack = validateMod(entry.pack);
+    if (
+      typeof validatedDigest !== "string" ||
+      validatedDigest !== packageDigest(pack)
+    )
+      throw new Error(
+        "The package digest differs from the package validated for publishing. Review and validate it again.",
+      );
+    const description = validatePublicationDescription(rulesDescription, pack);
     if (entry.source !== "local")
       throw new Error("Only your own local mods can be published.");
     if (entry.pack.gameApi !== MOD_API_VERSION)
@@ -451,11 +571,17 @@ class ModStore {
       throw new Error(
         "Too many unfinished uploads. Restart Electrify before publishing again.",
       );
-    let record = library.published[entry.pack.id];
+    let record = Object.hasOwn(library.published, entry.pack.id)
+      ? library.published[entry.pack.id]
+      : undefined;
     let agreement = false;
     if (!record) {
       const created = await workshop.create();
-      record = { workshopId: created.id, uploaded: false };
+      record = {
+        workshopId: created.id,
+        uploaded: false,
+        ...(created.agreement ? { agreement: true } : {}),
+      };
       library.published[entry.pack.id] = record;
       agreement = created.agreement;
       // Persist creation before uploading so retrying a failed upload updates the same item.
@@ -475,12 +601,15 @@ class ModStore {
     try {
       result = await workshop.publish(record.workshopId, entry.pack, stage, {
         setVisibility: !record.uploaded,
+        description,
       });
     } finally {
       this.uploading = false;
     }
     agreement ||= result.agreement;
     record.uploaded = true;
+    if (agreement) record.agreement = true;
+    else delete record.agreement;
     await this.write(library);
     await fs.promises.rm(stage, { recursive: true, force: true });
     return {

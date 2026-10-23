@@ -1,0 +1,102 @@
+{
+  "$schema": "../scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "retire-coal-without-bill-shock",
+  "title": "Retire coal without a bill shock",
+  "creator": "Electrify examples",
+  "version": "1",
+  "description": "Replace the coal fleet by {{start+24 months}} while keeping bills and debt under control.",
+  "scenario": {
+    "startingYear": 2020,
+    "durationMonths": 36,
+    "startingCustomers": 1000000,
+    "cash": 160000000,
+    "dollarsPerkWh": 0.1,
+    "ownership": "Investor",
+    "location": {
+      "id": "PIT",
+      "name": "Pittsburgh, PA",
+      "lat": 40.4406,
+      "long": -79.9959,
+      "timeZone": "America/New_York",
+      "country": "United States",
+      "admin": "PA",
+      "region": "North America",
+      "watershedId": "AlleghenyUpper",
+      "watershedName": "Upper Allegheny watershed",
+      "resources": {
+        "hydro": true
+      }
+    },
+    "startingFleet": [
+      {
+        "name": "Coal",
+        "peakMW": 200.0,
+        "ageYears": 35
+      },
+      {
+        "name": "Coal",
+        "peakMW": 300.0,
+        "ageYears": 20
+      }
+    ]
+  },
+  "facilities": {
+    "Natural Gas CC": {
+      "buildCost": 0.8,
+      "yearsToBuild": 0.5
+    },
+    "Solar": {
+      "buildCost": 0.8
+    }
+  },
+  "objectives": [
+    {
+      "id": "retire-coal",
+      "label": "Retire coal by {{start+24 months}}",
+      "metric": "fuelRetirement",
+      "fuel": "Coal",
+      "deadlineMonth": 25
+    },
+    {
+      "id": "no-bill-shock",
+      "label": "Avoid a bill shock",
+      "metric": "monthlyBilledRate",
+      "fromMonth": 1,
+      "throughMonth": 36,
+      "maxDollarsPerKWh": 0.11
+    },
+    {
+      "id": "debt-ceiling",
+      "label": "Limit debt",
+      "metric": "monthEndDebt",
+      "fromMonth": 1,
+      "throughMonth": 36,
+      "maxDebtDollars": 300000000
+    },
+    {
+      "id": "replacement-reliability",
+      "label": "Keep customers supplied",
+      "metric": "monthlyReliability",
+      "fromMonth": 25,
+      "throughMonth": 36,
+      "minDemandServedShare": 0.995
+    }
+  ],
+  "debriefReports": [
+    {
+      "id": "transition-review",
+      "kind": "fuelMix",
+      "fromMonth": 25,
+      "throughMonth": 36,
+      "fuels": ["Natural Gas", "Sun", "Wind"]
+    },
+    {
+      "id": "transition-finance",
+      "kind": "profitLoss",
+      "fromMonth": 25,
+      "throughMonth": 36
+    }
+  ]
+}

@@ -476,7 +476,7 @@ export default function NewGame(props: Props): React.JSX.Element {
             readOnly={guest}
           />
         </div>
-        {props.onCommunityScenarios && !props.coop && (
+        {props.onCommunityScenarios && !guest && (
           <>
             <MissionSectionHeader>Community scenarios</MissionSectionHeader>
             <div className="groupedList">

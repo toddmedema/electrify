@@ -66,6 +66,7 @@ async function uploadReplay(
   uid: string,
   replay: ReplayType,
 ): Promise<string | undefined> {
+  if (replay.scenarioId === 999 || replay.customScenario?.mod) return undefined;
   const doc = encodeReplay(replay);
   const bytes = replayByteLength(doc);
   if (bytes > MAX_REPLAY_BYTES) {

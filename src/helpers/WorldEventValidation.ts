@@ -1,3 +1,4 @@
+import { validRuleTargetBindings } from "./ScenarioRuleValidation";
 /** Resolved physical route availability shared by saved events and forecast ticks. */
 export function validTransmissionCapacityLimits(value: unknown): boolean {
   return (
@@ -55,6 +56,11 @@ export function validWorldEvent(value: unknown): boolean {
   // Money amounts the tick books directly. The reducer only ever records them as non-negative,
   // so a negative one in a save could only come from an edit that turns a charge into income.
   const attributes = value.attributes;
+  if (
+    attributes.ruleEvent === true &&
+    !validRuleTargetBindings(attributes.ruleTargets)
+  )
+    return false;
   if (
     value.key.includes(":preparedness:") &&
     value.key.startsWith("wildfire:")

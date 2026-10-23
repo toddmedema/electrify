@@ -1,8 +1,11 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const { finished } = require("node:stream/promises");
+const { FileMatcher } = require("app-builder-lib/out/fileMatcher");
 const {
   installMacNativeSlices,
   packageConfiguration,
@@ -33,6 +36,96 @@ test("packaged app metadata uses the renderer artifact's build version", () => {
     require("./electron-builder.config.cjs").extraMetadata.version,
     undefined,
   );
+});
+
+test("the packaged mod parser loads, validates and digests without checkout dependencies", (t) => {
+  const source = path.resolve(__dirname, "..");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "electrify-packaged-mods-"),
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const probe = `
+    const assert = require("node:assert/strict");
+    const { ModStore } = require("./electron/mods.cjs");
+    const codec = require("./electron/coop-codec.cjs");
+    assert.deepEqual(codec.parse(codec.stringify({ value: Infinity })), { value: Infinity });
+    const { parseMod, packageDigest } = require("./src/mods/ModSchema.js");
+    assert.equal(typeof ModStore, "function");
+    const pack = {
+      schemaVersion: 1, gameApi: 1, id: "packaged-grid", title: "Packaged Grid",
+      creator: "Creator", version: "1", description: "A grid planning challenge.",
+      seed: 42,
+      events: [{
+        id: "dry-year", title: "A dry year", message: "Water inflow has fallen.",
+        startMonth: 1, durationMonths: 12, preview: "Water inflow will fall.",
+        effects: { hydroInflowMultiplier: { byDifficulty: {
+          Intern: 0.9, Employee: 0.8, Manager: 0.7, VP: 0.6, CEO: 0.5
+        } } }
+      }]
+    };
+    const parsed = parseMod(JSON.stringify(pack));
+    assert.deepEqual(parsed, pack);
+    const digest = packageDigest(parsed);
+    assert.match(digest, /^sha256-[a-f0-9]{64}$/);
+    assert.equal(packageDigest({ ...parsed, $schema: "./scenario.schema.json" }), digest);
+    assert.notEqual(packageDigest({ ...parsed, seed: 43 }), digest);
+    assert.throws(() => parseMod(JSON.stringify({ ...pack, gameApi: 2 })), /gameApi/);
+    process.stdout.write(JSON.stringify({ id: parsed.id, digest }));
+  `;
+  for (const mode of ["steam", "offline"]) {
+    const directory = path.join(root, mode);
+    const configured = new FileMatcher(
+      source,
+      directory,
+      (value) => value,
+      packageConfiguration(mode).files,
+    ).createFilter();
+    const stagedSources = [];
+    const stage = (relative) => {
+      const filename = path.join(source, relative);
+      const stat = fs.statSync(filename);
+      if (!configured(filename, stat)) return;
+      if (stat.isDirectory()) {
+        for (const name of fs.readdirSync(filename))
+          stage(path.join(relative, name));
+      } else {
+        const target = path.join(directory, relative);
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.copyFileSync(filename, target);
+        if (relative.startsWith(`src${path.sep}`)) stagedSources.push(relative);
+      }
+    };
+    for (const relative of ["src", "electron", "package.json"]) stage(relative);
+    assert(stagedSources.every((file) => file.endsWith(".js")));
+    const run = () =>
+      spawnSync(process.execPath, ["-e", probe], {
+        cwd: directory,
+        encoding: "utf8",
+        env: { ...process.env, NODE_PATH: "", NODE_OPTIONS: "" },
+      });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).id, "packaged-grid");
+    for (const dependency of [
+      "ScenarioRulesSchema.js",
+      "RuleIdentity.js",
+      "ScenarioText.js",
+    ]) {
+      const filename = path.join(directory, "src", "helpers", dependency);
+      const original = fs.readFileSync(filename);
+      fs.unlinkSync(filename);
+      const missing = run();
+      assert.notEqual(missing.status, 0);
+      assert.match(missing.stderr, /MODULE_NOT_FOUND/);
+      assert(missing.stderr.includes(path.basename(dependency, ".js")));
+      fs.writeFileSync(filename, original);
+    }
+    assert.equal(
+      run().status,
+      0,
+      "Restoring the dependency must restore parser loading",
+    );
+  }
 });
 
 test("packaging preserves and verifies each target runtime's original notices before branding", (t) => {

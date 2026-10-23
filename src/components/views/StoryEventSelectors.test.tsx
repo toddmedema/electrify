@@ -6,6 +6,8 @@ import {
   selectActiveEventGroups,
   selectUpcomingStoryEvents,
 } from "./StoryEventSelectors";
+import { modScenario } from "../../mods/ModScenario";
+import type { ModPackage } from "../../mods/ModSchema";
 
 function event(
   key: string,
@@ -32,7 +34,126 @@ function stateAt(minute: number, active: ActiveWorldEventType[]) {
   return { game } as AppStateType;
 }
 
+test("mod-only upcoming events use previews and keep surprises hidden without imported arcs or loads", () => {
+  const scenario = modScenario({
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "upcoming-fixture",
+    title: "Upcoming",
+    creator: "Creator",
+    version: "1",
+    description: "A forecast fixture.",
+    baseScenarioId: 999,
+    seed: 42,
+    officialArcs: [],
+    objectives: [],
+    events: [
+      {
+        id: "announced",
+        title: "Output limit",
+        message: "Output is lower.",
+        preview: "Output will fall.",
+        startMonth: 2,
+        durationMonths: 1,
+        effects: { outputMultipliersByFuel: { Coal: 0.5 } },
+      },
+      {
+        id: "hidden",
+        title: "Surprise",
+        message: "An unexpected event.",
+        visibility: "surprise",
+        startMonth: 2,
+      },
+    ],
+  });
+  const game = createGame({ scenarioId: 999, scenario, seed: 42 });
+  const before = JSON.stringify(game);
+  const events = selectUpcomingStoryEvents({ game } as AppStateType);
+  expect(events.map((event) => [event.title, event.message])).toEqual([
+    ["Output limit", "Output will fall."],
+  ]);
+  expect(JSON.stringify(game)).toBe(before);
+});
+
 describe("active event groups", () => {
+  it("uses the updated run's title and expiry when a package reuses its event ID", () => {
+    const input = (
+      version: string,
+      title: string,
+      duration: number,
+    ): ModPackage => ({
+      schemaVersion: 1,
+      gameApi: 1,
+      id: "updated-active-event",
+      title: "Status review",
+      creator: "Author",
+      version,
+      description: "A scenario with an opening output warning.",
+      baseScenarioId: 999,
+      seed: 42,
+      objectives: [],
+      officialArcs: [],
+      scenario: { startingYear: 2020, durationMonths: 6, cash: 1e9 },
+      events: [
+        {
+          id: "warning",
+          title,
+          message: "Prepare local supply.",
+          preview: "A warning will appear.",
+          startMonth: 1,
+          durationMonths: duration,
+          effects: { demandMultiplier: 1.1 },
+        },
+      ],
+    });
+    const oldGame = createGame({
+      scenarioId: 999,
+      scenario: modScenario(input("1", "Original warning", 1)),
+      seed: 42,
+    });
+    const oldGroups = selectActiveEventGroups({
+      game: oldGame,
+    } as AppStateType);
+    expect(oldGroups).toEqual([
+      expect.objectContaining({
+        title: "Original warning",
+        throughLabel: "through Jan 2020",
+      }),
+    ]);
+    expect(
+      selectActiveEventGroups({
+        game: {
+          ...oldGame,
+          worldEvents: { ...oldGame.worldEvents, active: [] },
+        },
+      } as unknown as AppStateType),
+    ).toEqual([]);
+    const newGame = createGame({
+      scenarioId: 999,
+      scenario: modScenario(input("2", "Updated warning", 3)),
+      seed: 42,
+    });
+    expect(newGame.customScenario!.mod!.runtimeDigest).not.toBe(
+      oldGame.customScenario!.mod!.runtimeDigest,
+    );
+    expect(newGame.worldEvents.active[0].title).toBe("Updated warning");
+    const newGroups = selectActiveEventGroups({
+      game: newGame,
+    } as AppStateType);
+    expect(newGroups).toEqual([
+      expect.objectContaining({
+        title: "Updated warning",
+        throughLabel: "through Mar 2020",
+      }),
+    ]);
+    expect(selectActiveEventGroups({ game: newGame } as AppStateType)).toBe(
+      newGroups,
+    );
+    expect(selectActiveEventGroups({ game: oldGame } as AppStateType)).toEqual(
+      oldGroups,
+    );
+  });
+
   it("includes only critical and notable events in effect now", () => {
     const now = 13 * MINUTES_PER_MONTH;
     const groups = selectActiveEventGroups(

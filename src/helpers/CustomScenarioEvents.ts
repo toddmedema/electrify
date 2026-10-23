@@ -4,30 +4,62 @@ import { inEraMoney } from "../data/FuelPrices";
 import { inEraRate } from "../data/RetailRates";
 import { ScenarioType } from "../Types";
 import { getScenarioLocation } from "./Locations";
+import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
 
 export const CUSTOM_EVENT_SCENARIOS = SCENARIOS.filter(
   (scenario) => !scenario.tutorialSteps && scenario.id !== 111,
 );
 
 export function validCustomEventIds(value: unknown): boolean {
+  return validEventIds(value, CUSTOM_EVENT_SCENARIOS);
+}
+
+/** Community snapshots retain all bundled arcs, including already-frozen retired native data. */
+export function validOfficialArcIds(value: unknown): boolean {
+  return validEventIds(
+    value,
+    SCENARIOS.filter((scenario) => !scenario.tutorialSteps),
+  );
+}
+
+function validEventIds(
+  value: unknown,
+  scenarios: readonly ScenarioType[],
+): boolean {
   return (
     value === undefined ||
     (Array.isArray(value) &&
-      value.length <= CUSTOM_EVENT_SCENARIOS.length &&
+      value.length <= scenarios.length &&
       new Set(value).size === value.length &&
-      value.every((id) =>
-        CUSTOM_EVENT_SCENARIOS.some((scenario) => scenario.id === id),
-      ))
+      value.every((id) => scenarios.some((scenario) => scenario.id === id)))
   );
 }
 
 export function validCustomEventScenario(scenario?: ScenarioType): boolean {
+  return validEventScenario(scenario, !!scenario?.mod);
+}
+
+/** Fresh community resolution runs before the validated runtime snapshot has been attached. */
+export function validOfficialArcScenario(scenario?: ScenarioType): boolean {
+  return validEventScenario(scenario, true);
+}
+
+function validEventScenario(
+  scenario: ScenarioType | undefined,
+  community: boolean,
+): boolean {
   if (!scenario) return true;
+  if (scenario.id === 999 && scenario.rules !== undefined) return false;
   const positive = (value: unknown) =>
     value === undefined ||
     (typeof value === "number" && Number.isFinite(value) && value > 0);
   return (
-    validCustomEventIds(scenario.eventScenarioIds) &&
+    (community ? validOfficialArcIds : validCustomEventIds)(
+      scenario.eventScenarioIds,
+    ) &&
+    (community ||
+      (scenario.startingInterties === undefined &&
+        scenario.startingIntertieAccess === undefined)) &&
     Number.isInteger(scenario.startingYear) &&
     scenario.startingYear >= 1980 &&
     scenario.startingYear <= 2100 &&
@@ -89,18 +121,28 @@ export function prepareCustomScenario(scenario: ScenarioType): ScenarioType {
           (load.startsYear === source.startingYear &&
             (load.startsMonth || 1) > 1),
       )
-      .map((load) => ({
-        ...load,
-        id: `custom-${source.id}-${load.id}`,
-        startsYear:
-          scenario.startingYear +
-          Math.max(3, load.startsYear - source.startingYear),
-        peakW:
-          (load.peakW * demand) /
-          ((source.startingCustomers ||
-            getStartingCustomers(getScenarioLocation(source))) *
-            (source.startingDemandScale || 1)),
-      })),
+      .map((load) => {
+        const month = relocateOfficialArcMonth(
+          source.id,
+          (load.startsYear - source.startingYear) * 12 +
+            (load.startsMonth ?? 1) -
+            1,
+          "load",
+        );
+        return {
+          ...load,
+          id: `custom-${source.id}-${load.id}`,
+          startsYear: scenario.startingYear + Math.floor(month / 12),
+          ...(load.startsMonth === undefined && month % 12 === 0
+            ? {}
+            : { startsMonth: (month % 12) + 1 }),
+          peakW:
+            (load.peakW * demand) /
+            ((source.startingCustomers ||
+              getStartingCustomers(getScenarioLocation(source))) *
+              (source.startingDemandScale || 1)),
+        };
+      }),
   );
   return {
     ...scenario,

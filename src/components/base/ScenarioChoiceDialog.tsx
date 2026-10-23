@@ -24,9 +24,27 @@ export default function ScenarioChoiceDialog() {
       ? pendingScenarioChoice(game)
       : undefined;
   if (!decision) return null;
+  const company = game.multiplayer?.clock?.players.find(
+    (player) => player.id === game.multiplayer?.seat,
+  )?.name;
+  const deciding =
+    game.multiplayer?.clock?.players
+      .filter((player) => player.pauseReason === "Choosing a response")
+      .map((player) => player.name) ?? [];
   const cash = currentCash(game);
+  const options = decision.options.map((option) => {
+    const cost = option.cost(game.difficulty);
+    return {
+      option,
+      cost,
+      grant: option.upfrontGrant?.(game.difficulty) ?? 0,
+      affordable: cost === 0 || cash >= cost,
+    };
+  });
+  const primaryOption = options.find(({ affordable }) => affordable)?.option.id;
   return (
     <Dialog
+      key={decision.id}
       open
       fullWidth
       maxWidth="sm"
@@ -59,7 +77,9 @@ export default function ScenarioChoiceDialog() {
           },
         }}
       >
-        <span style={{ flex: 1 }}>{decision.title}</span>
+        <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
+          {decision.title}
+        </span>
         <span className="pausedChip">
           <span aria-hidden="true">
             <ConceptIcon concept="pause" fontSize="small" />
@@ -68,7 +88,29 @@ export default function ScenarioChoiceDialog() {
         </span>
       </DialogTitle>
       <DialogContent sx={{ px: { xs: 2, sm: 3 }, pb: 3 }}>
-        <Typography id="scenarioChoiceDescription" sx={{ mb: 2 }}>
+        {company && (
+          <Typography
+            variant="subtitle2"
+            sx={{ mb: 1, overflowWrap: "anywhere" }}
+          >
+            Your company: {company}
+          </Typography>
+        )}
+        {!!deciding.length && (
+          <Typography
+            role="status"
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 2, overflowWrap: "anywhere" }}
+          >
+            Still deciding: {deciding.join(", ")}. Each company chooses for its
+            own grid.
+          </Typography>
+        )}
+        <Typography
+          id="scenarioChoiceDescription"
+          sx={{ mb: 2, overflowWrap: "anywhere" }}
+        >
           {decision.message}
         </Typography>
         <Box
@@ -78,18 +120,25 @@ export default function ScenarioChoiceDialog() {
             gap: 2,
           }}
         >
-          {decision.options.map((option, index) => {
-            const cost = option.cost(game.difficulty);
-            const affordable = cost === 0 || cash >= cost;
+          {options.map(({ option, cost, grant, affordable }) => {
             return (
               <Box key={option.id}>
                 <Button
                   fullWidth
-                  autoFocus={index === 0 && affordable}
-                  variant={index === 0 ? "contained" : "outlined"}
+                  autoFocus={option.id === primaryOption}
+                  variant={
+                    option.id === primaryOption ? "contained" : "outlined"
+                  }
                   disabled={!affordable}
-                  aria-describedby={`scenarioChoiceOption-${option.id}`}
-                  sx={{ minHeight: 44, whiteSpace: "normal" }}
+                  aria-describedby={[
+                    `scenarioChoiceOption-${option.id}`,
+                    ...(grant > 0 ? [`scenarioChoiceGrant-${option.id}`] : []),
+                  ].join(" ")}
+                  sx={{
+                    minHeight: 44,
+                    whiteSpace: "normal",
+                    overflowWrap: "anywhere",
+                  }}
                   onClick={() =>
                     dispatch(
                       chooseScenarioResponse({
@@ -106,11 +155,24 @@ export default function ScenarioChoiceDialog() {
                 <Typography
                   id={`scenarioChoiceOption-${option.id}`}
                   variant="body2"
-                  sx={{ color: "text.secondary", mt: 0.5 }}
+                  sx={{
+                    color: "text.secondary",
+                    mt: 0.5,
+                    overflowWrap: "anywhere",
+                  }}
                 >
                   {scenarioChoiceDescription(option, game.difficulty)}
                   {!affordable && " · Insufficient cash"}
                 </Typography>
+                {grant > 0 && (
+                  <Typography
+                    id={`scenarioChoiceGrant-${option.id}`}
+                    variant="body2"
+                    sx={{ mt: 0.5 }}
+                  >
+                    One-time grant: {formatMoneyConcise(grant)}
+                  </Typography>
+                )}
               </Box>
             );
           })}

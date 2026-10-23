@@ -8,50 +8,23 @@
  *
  * Every finite number is rounded to 10 significant digits before hashing, so last-bit libm or
  * V8 drift doesn't flake the gate while any real behavior change still moves the hash. The
- * hashes hold on every OS only because simulation code raises powers with helpers/Pow rather
- * than Math.pow, whose last bit comes from the platform's C library (see docs/perf-plan.md).
+ * hashes hold on every OS and CPU only because simulation code raises powers with helpers/Pow
+ * rather than Math.pow, whose last bit comes from the platform's C library, and takes exp, log,
+ * sin and the rest from helpers/Libm rather than Math, whose last bit differs on arm64 (see
+ * docs/perf-plan.md).
  *
  * An intended behavior change: rebaseline with `npm run perf:rebaseline` (which runs
  * `react-scripts test --watchAll=false GoldenOutputs -u`), after all other edits and alongside
  * `npm run compatibility:generate`, and explain the move in the PR. Never hand-edit the
  * snapshot. CI's `--ci` mode never writes snapshots, so a changed hash fails there.
  */
-import { createHash } from "crypto";
+import { digest } from "./CanonicalHash";
 import { SCENARIOS } from "../data/Scenarios";
 import { ScenarioType } from "../Types";
 import { expectNoViolations } from "./SimulationTestHelpers";
 import { runSimulation } from "./Simulator";
 
 jest.setTimeout(600000);
-
-const SIGNIFICANT_DIGITS = 10;
-
-/** Rounds finite numbers and sorts object keys so the JSON is stable across engines. */
-function canonicalize(value: unknown): unknown {
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
-      return String(value);
-    }
-    // Normalizes -0 as well, which JSON.stringify would already print as 0
-    return value === 0 ? 0 : Number(value.toPrecision(SIGNIFICANT_DIGITS));
-  }
-  if (Array.isArray(value)) {
-    return value.map(canonicalize);
-  }
-  if (value !== null && typeof value === "object") {
-    const sorted: Record<string, unknown> = {};
-    Object.keys(value)
-      .sort()
-      .forEach((key) => {
-        const entry = (value as Record<string, unknown>)[key];
-        if (entry !== undefined) {
-          sorted[key] = canonicalize(entry);
-        }
-      });
-    return sorted;
-  }
-  return value;
-}
 
 function goldenHash(scenario: ScenarioType): string {
   const result = runSimulation({ scenarioId: scenario.id, scenario });
@@ -63,10 +36,7 @@ function goldenHash(scenario: ScenarioType): string {
     facilityCount: result.finalFacilities.length,
     facilityNames: result.finalFacilities.map((facility) => facility.name),
   };
-  const json = JSON.stringify(
-    canonicalize({ monthlyHistory: result.months, summary }),
-  );
-  return createHash("sha256").update(json).digest("hex");
+  return digest({ monthlyHistory: result.months, summary });
 }
 
 it("keeps every scenario's golden output", () => {

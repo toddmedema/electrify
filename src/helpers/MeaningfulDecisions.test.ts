@@ -1,7 +1,13 @@
 import { MEANINGFUL_DECISION_REQUIREMENTS } from "../testing/DecisionBenchmarks";
 import { SCENARIOS } from "../data/Scenarios";
 import { scenarioObjectiveFailure } from "../reducers/Game";
+import { createGame } from "../testing/Simulator";
 import { GameType, MeaningfulDecisionKindType } from "../Types";
+import {
+  EMPTY_HISTORY,
+  getDateFromMinute,
+  MINUTES_PER_MONTH,
+} from "./DateTime";
 import {
   isMaterialCapacityDecision,
   meaningfulDecisionCategoryCount,
@@ -134,7 +140,29 @@ describe("meaningful decisions", () => {
       "VP",
       "CEO",
     ] as const) {
-      expect(scenarioObjectiveFailure(scenario, [])).toBeUndefined();
+      const state = createGame({ scenarioId: scenario.id, difficulty });
+      const startingCustomers = state.timeline[0].customers;
+      const history = Array.from(
+        { length: scenario.durationMonths },
+        (_, month) => {
+          const date = getDateFromMinute(
+            month * MINUTES_PER_MONTH,
+            scenario.startingYear,
+          );
+          return {
+            ...EMPTY_HISTORY,
+            year: date.year,
+            month: date.monthNumber,
+            customers: startingCustomers,
+          };
+        },
+      ).reverse();
+      expect(
+        scenarioObjectiveFailure(scenario, history, startingCustomers),
+      ).toBeUndefined();
+      expect(
+        scenarioObjectiveFailure(scenario, [], startingCustomers),
+      ).toContain("Exactly one completed record");
       expect(
         MEANINGFUL_DECISION_REQUIREMENTS[difficulty].count,
       ).toBeGreaterThan(0);

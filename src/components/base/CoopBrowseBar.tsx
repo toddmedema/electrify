@@ -120,8 +120,9 @@ export default function CoopBrowseBar({
                       onClick={() => coopControls()?.copyCode()}
                     >
                       {/* Phones drop "invite" so the host's three actions share one row. */}
-                      Copy <span className="coopWideOnly">invite&nbsp;</span>
-                      code
+                      <span>
+                        Copy <span className="coopWideOnly">invite </span>code
+                      </span>
                     </Button>
                   )}
                 </>
@@ -154,7 +155,10 @@ export function CoopStartButton({
   if (coop.role === "host") {
     // A friend still connecting, or nobody here yet, would leave a company without a player.
     const waiting =
-      coop.players.length < 2 || coop.players.some((p) => !p.connected);
+      coop.players.length < 2 ||
+      coop.players.some(
+        (p) => !p.connected || (!!coop.modSummary && !p.host && !p.ready),
+      );
     return (
       <Button
         className={className}
@@ -179,12 +183,16 @@ export function CoopStartButton({
       size="large"
       variant={coop.ready ? "outlined" : "contained"}
       color="primary"
-      disabled={coop.starting || disabled}
+      disabled={coop.starting || disabled || coop.receivingScenario}
       aria-pressed={coop.ready}
       onClick={() => coopControls()?.ready(!coop.ready)}
       startIcon={coop.ready ? <CheckIcon /> : undefined}
     >
-      {coop.ready ? "Ready" : "I'm ready"}
+      {coop.receivingScenario
+        ? "Receiving scenario…"
+        : coop.ready
+          ? "Ready"
+          : "I'm ready"}
     </Button>
   );
 }

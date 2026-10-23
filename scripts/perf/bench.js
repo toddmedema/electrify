@@ -12,6 +12,7 @@
  *   --runs <n>   warmed runs to take the median of (default 3; a discarded 24-month warmup precedes them)
  *   --months <n> shorten the workload while iterating locally (gating is skipped)
  *   --json       print only the machine-readable result on stdout
+ *   --mods       maximum community rules,1200-month histories and four-company save/worker sizes
  *   --update     rewrite the ceilings from this run's ratios plus the tolerance headroom
  */
 const { spawnSync } = require("child_process");
@@ -28,11 +29,17 @@ const DEFAULT_TOLERANCE = 0.25;
 const GATED = ["immerOverheadRatio", "rolloverImmerRatio"];
 
 const USAGE = `
-Usage: npm run perf:bench -- [--runs <n>] [--months <n>] [--json] [--update]
+Usage: npm run perf:bench -- [--runs <n>] [--months <n>] [--json] [--update] [--mods]
 `;
 
 function parseArgs(argv) {
-  const options = { runs: 3, months: undefined, json: false, update: false };
+  const options = {
+    runs: 3,
+    months: undefined,
+    json: false,
+    update: false,
+    mods: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") {
@@ -42,6 +49,8 @@ function parseArgs(argv) {
       options.json = true;
     } else if (arg === "--update") {
       options.update = true;
+    } else if (arg === "--mods") {
+      options.mods = true;
     } else if (arg === "--runs" || arg === "--months") {
       const value = Number(argv[i + 1]);
       if (!Number.isInteger(value) || value < 1) {
@@ -81,6 +90,12 @@ function gate(ratios, ceilings) {
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const shortened = options.months !== undefined;
+  if (options.mods && (shortened || options.update)) {
+    process.stderr.write(
+      "--mods has a fixed maximum workload and no recorded timing ceilings; drop --months and --update\n",
+    );
+    process.exit(1);
+  }
   if (options.update && shortened) {
     process.stderr.write("--update needs the full workload; drop --months\n");
     process.exit(1);
@@ -106,7 +121,9 @@ function main() {
       require.resolve("./jest-baseline"),
       "--watchAll=false",
       "--testMatch",
-      "**/src/testing/PerfBench.tsx",
+      options.mods
+        ? "**/src/testing/ModPerfBench.tsx"
+        : "**/src/testing/PerfBench.tsx",
     ],
     // With --json, keep stdout for the JSON alone by sending jest's output to stderr
     {
@@ -123,6 +140,17 @@ function main() {
   fs.rmSync(path.dirname(resultFile), { recursive: true, force: true });
   result.wallSeconds = (Date.now() - started) / 1000;
   result.node = process.version;
+
+  if (options.mods) {
+    result.gates = [];
+    if (options.json)
+      process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+    else
+      process.stdout.write(
+        `\n  Maximum-rule workload: timings reported, existing transport and schema bounds enforced.\n  perf:bench took ${result.wallSeconds.toFixed(1)} s on Node ${process.version}\n\n`,
+      );
+    return;
+  }
 
   const baselines = readBaselines();
   const tolerance = baselines.tolerance ?? DEFAULT_TOLERANCE;

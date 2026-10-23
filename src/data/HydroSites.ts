@@ -24,6 +24,9 @@ export const HYDRO_INVENTORIES = catalogue.inventories as Record<
   string,
   HydroInventory
 >;
+const authoredInventories = Object.entries(HYDRO_INVENTORIES).filter(
+  ([, inventory]) => inventory.authoredScenarioId !== undefined,
+);
 type HydroState = Pick<
   GameType,
   | "location"
@@ -50,17 +53,46 @@ function canonicalLocation(location: LocationType | undefined): boolean {
     (builtIn?.long ?? inventory?.locationLong) === location.long
   );
 }
-export function getHydroInventoryKey(
-  state: Pick<HydroState, "location" | "scenarioId" | "customScenario">,
+type HydroContext = Pick<
+  HydroState,
+  "location" | "scenarioId" | "customScenario"
+>;
+function authoredInventoryKey(
+  scenarioId: number | undefined,
+  locationId: string,
 ): string | undefined {
+  return authoredInventories.find(
+    ([, inventory]) =>
+      inventory.authoredScenarioId === scenarioId &&
+      inventory.locationId === locationId,
+  )?.[0];
+}
+/** A validated mod can inherit its base's inventory; a free-form custom key grants no rights. */
+export function validHydroInventorySource(state: HydroContext): boolean {
+  const custom = state.customScenario;
+  if (!custom) return true;
+  if (!custom.mod) return custom.hydroInventoryKey === undefined;
+  if (state.scenarioId !== custom.id) return false;
+  const baseScenarioId = custom.mod.parameters?.baseScenarioId;
+  if (!Number.isSafeInteger(baseScenarioId)) return false;
+  const inherited = authoredInventoryKey(baseScenarioId, custom.locationId);
+  if (custom.hydroInventoryKey !== inherited) return false;
+  if (inherited === undefined) return true;
+  return (
+    custom.locationId === state.location?.id &&
+    canonicalLocation(state.location) &&
+    canonicalLocation(custom.location ?? LOCATIONS[custom.locationId])
+  );
+}
+export function getHydroInventoryKey(state: HydroContext): string | undefined {
   if (!canonicalLocation(state.location)) return undefined;
-  if (!state.customScenario) {
-    const exception = Object.entries(HYDRO_INVENTORIES).find(
-      ([, inventory]) =>
-        inventory.authoredScenarioId === state.scenarioId &&
-        inventory.locationId === state.location.id,
+  const custom = state.customScenario;
+  if (!custom || (custom.mod && validHydroInventorySource(state))) {
+    const exception = authoredInventoryKey(
+      custom?.mod?.parameters?.baseScenarioId ?? state.scenarioId,
+      state.location.id,
     );
-    if (exception) return exception[0];
+    if (exception) return exception;
   }
   return state.location.id;
 }
@@ -208,7 +240,7 @@ export function resolveStartingHydroSites(
 export function validHydroClaims(state: HydroState): boolean {
   if (
     !Array.isArray(state.commissionedHydroSiteIds) ||
-    state.customScenario?.hydroInventoryKey !== undefined ||
+    !validHydroInventorySource(state) ||
     Object.prototype.hasOwnProperty.call(state, "hydroInventoryKey")
   )
     return false;

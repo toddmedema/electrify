@@ -6,6 +6,7 @@ import { isValidLocationId } from "../helpers/Locations";
 import { decodeWeather } from "./WeatherBinary";
 import { simulationDataRequest } from "../helpers/SimulationDataIntegrity";
 import { pow } from "../helpers/Pow";
+import { exp } from "../helpers/Libm";
 
 // The first year any location has data for, Jan 1st. Everything after the recorded years is
 // forecast indefinitely, but nothing exists to run backwards from, so this is the floor on when a
@@ -51,6 +52,12 @@ let loadedLocation: string | undefined;
 export function selectWeatherLocation(id: string): void {
   if (!weatherSeries.has(id)) throw new Error(`Weather not loaded for ${id}`);
   loadedLocation = id;
+}
+/** A menu forecast needs actual local and watershed records, never a dummy reading. */
+export function hasWeather(location: LocationType): boolean {
+  return [location.id, location.watershedId].every(
+    (id) => !id || weatherSeries.has(id),
+  );
 }
 const DUMMY_WEATHER = {
   YEAR: 0,
@@ -496,7 +503,7 @@ export function getRawSolarIrradianceWM2(
       date.minuteOfDay - sunrise,
       sunset - date.minuteOfDay,
     );
-    return irradiance / (1 + Math.exp(-0.015 * (minutesFromDark - 200)));
+    return irradiance / (1 + exp(-0.015 * (minutesFromDark - 200)));
   }
   return 0;
 }

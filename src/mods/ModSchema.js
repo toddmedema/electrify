@@ -1,49 +1,43 @@
-/* Shared by the renderer and Electron main. Keep this parser dependency-free. */
-
-/**
- * The game contract a package targets: which facility names, base scenarios, event arcs and
- * modifier meanings it may rely on. Bump it deliberately, and only when a change would make an
- * existing package mean something different or stop working (a facility or scenario removed or
- * renamed, a modifier's meaning changed). Additive changes keep the same version. Ordinary
- * releases never invalidate installed mods; ModSchema.test.ts pins the version 1 catalog.
- */
+const {
+  scenarioTextError,
+  scenarioTextLength,
+} = require("../helpers/ScenarioText");
+/* Package-only parsing; Electron main must never import the TypeScript catalog. */
+const {
+  ruleDiagnostics,
+  isRuleJson,
+  ID_PATTERN,
+  UNSAFE_TEXT,
+  UNSAFE_MARKUP,
+  FACILITY_NAMES,
+  FACILITY_MODIFIER_KEYS,
+  PROGRAM_KEYS,
+} = require("../helpers/ScenarioRulesSchema");
+const { ruleDigest, utf8Bytes } = require("../helpers/RuleIdentity");
 const MOD_API_VERSION = 1;
 const MOD_SCENARIO_IDS = [
   100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115,
 ];
 const MAX_MOD_BYTES = 256 * 1024;
-// Steam Workshop titles are limited to 128 bytes of UTF-8.
-const MAX_TITLE_BYTES = 128;
-const FACILITY_NAMES = [
-  "Coal",
-  "Nuclear",
-  "Natural Gas Peaker",
-  "Natural Gas CC",
-  "Oil",
-  "Biomass",
-  "Wind",
-  "Offshore Wind",
-  "Airborne Wind",
-  "Solar",
-  "Hydro",
-  "Geothermal",
-  "Enhanced Geothermal",
-  "Battery",
-  "Pumped Hydro",
-];
 const PACKAGE_KEYS = [
+  "$schema",
   "schemaVersion",
   "gameApi",
   "id",
   "title",
   "creator",
   "version",
+  "description",
   "seed",
   "baseScenarioId",
   "scenario",
   "facilities",
   "programs",
-  "notifications",
+  "officialArcs",
+  "events",
+  "choices",
+  "objectives",
+  "debriefReports",
 ];
 const SCENARIO_OVERRIDE_KEYS = [
   "cash",
@@ -53,106 +47,153 @@ const SCENARIO_OVERRIDE_KEYS = [
   "dollarsPerkWh",
   "durationMonths",
   "feePerKgCO2e",
-  "eventScenarioIds",
   "ownership",
   "endTitle",
   "endMessage",
+  "location",
+  "startingFleet",
 ];
-const FACILITY_MODIFIER_KEYS = [
-  "buildCost",
-  "annualOperatingCost",
-  "yearsToBuild",
+const COMPUTED_KEYS = [
+  "runtimeVersion",
+  "packageDigest",
+  "setupDigest",
+  "runtimeDigest",
+  "modRuntimeId",
+  "multiplayerCompatibilityId",
+  "compatibilityId",
 ];
-const PROGRAM_KEYS = ["efficiency", "solar"];
-const NOTIFICATION_KEYS = ["month", "title", "message"];
-// Control characters, zero-width marks and bidirectional overrides can disguise text.
-// eslint-disable-next-line no-control-regex
-const UNSAFE_TEXT = /[\x00-\x1f\x7f-\x9f​-‏‪-‮⁦-⁩]/;
-const ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
-
-class ModValidationError extends Error {}
-function fail(path, reason) {
-  throw new ModValidationError(`${path} ${reason}`);
-}
-function plainObject(value) {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
-function object(value, path, keys, noun = "field") {
-  if (!plainObject(value)) fail(path, "must be an object.");
-  for (const key of Object.keys(value))
-    if (!keys.includes(key))
-      fail(
-        path ? `${path}.${key}` : key,
-        `is not a supported ${noun}. Use one of: ${keys.join(", ")}.`,
-      );
-}
-function text(value, path, max) {
-  if (typeof value !== "string" || !value.trim())
-    fail(path, "must be non-empty text.");
-  if (value.length > max) fail(path, `must be at most ${max} characters.`);
-  if (UNSAFE_TEXT.test(value))
-    fail(path, "must not contain control or text-direction characters.");
-}
-const formatNumber = (value) => value.toLocaleString("en-US");
-function number(value, path, min, max, integer = false) {
-  if (
-    typeof value !== "number" ||
-    !Number.isFinite(value) ||
-    value < min ||
-    value > max ||
-    (integer && !Number.isInteger(value))
-  )
-    fail(
-      path,
-      `must be ${integer ? "a whole number" : "a number"} from ${formatNumber(min)} to ${formatNumber(max)}.`,
-    );
-}
-function required(value, key, path = key) {
-  if (value[key] === undefined) fail(path, "is required.");
-}
-
-/** Validates an already-decoded package and returns a detached copy. */
-function validateMod(value) {
-  let p;
-  try {
-    p = JSON.parse(JSON.stringify(value));
-  } catch {
-    fail("Package", "must be plain JSON data.");
+class ModValidationError extends Error {
+  constructor(diagnostics) {
+    super(diagnostics.map((d) => d.message).join("\n"));
+    this.name = "ModValidationError";
+    this.diagnostics = diagnostics;
   }
-  if (!plainObject(p)) fail("Package", "must be a JSON object.");
+}
+function modDiagnostics(p) {
+  const diagnostics = [];
+  const add = (code, path, message) =>
+    diagnostics.push({
+      code,
+      path,
+      severity: "error",
+      message: `${path} ${message}`,
+    });
+  if (!isRuleJson(p)) {
+    add(
+      "invalid-json",
+      "Package",
+      "must contain only finite plain JSON data, without functions, accessors or cycles.",
+    );
+    return diagnostics;
+  }
+  const object = (v, path, keys) => {
+    if (!v || typeof v !== "object" || Array.isArray(v)) {
+      add("invalid-object", path, "must be an object.");
+      return false;
+    }
+    Object.keys(v).forEach((key) => {
+      if (!keys.includes(key))
+        add(
+          COMPUTED_KEYS.includes(key) ? "computed-field" : "unknown-field",
+          path ? `${path}.${key}` : key,
+          COMPUTED_KEYS.includes(key)
+            ? "is computed by the game and must not be authored."
+            : `is not a supported field. Use one of: ${keys.join(", ")}.`,
+        );
+    });
+    return true;
+  };
+  const text = (v, path, max) => {
+    if (typeof v !== "string" || !v.trim()) {
+      add("invalid-text", path, "must be non-empty text.");
+      return;
+    }
+    const templateError =
+      v.includes("{{") &&
+      !["description", "scenario.endTitle", "scenario.endMessage"].includes(
+        path,
+      )
+        ? "date templates belong in descriptions and closing messages, not metadata."
+        : scenarioTextError(v);
+    if (templateError) add("date-template", path, templateError);
+    if (scenarioTextLength(v, false) > max)
+      add(
+        "text-limit",
+        path,
+        `must be at most ${max} characters after date substitution.`,
+      );
+    if (UNSAFE_TEXT.test(v) || UNSAFE_MARKUP.test(v))
+      add(
+        "unsafe-text",
+        path,
+        "must be plain text without control characters, HTML or URLs.",
+      );
+  };
+  const number = (v, path, min, max, integer = false) => {
+    if (
+      typeof v !== "number" ||
+      !Number.isFinite(v) ||
+      v < min ||
+      v > max ||
+      (integer && !Number.isInteger(v))
+    )
+      add(
+        "number-bounds",
+        path,
+        `must be ${integer ? "a whole number" : "a number"} from ${min} to ${max}.`,
+      );
+  };
+  if (!object(p, "", PACKAGE_KEYS)) return diagnostics;
   if (p.schemaVersion !== 1)
-    fail("schemaVersion", "must be 1. Export a new authoring template.");
-  object(p, "", PACKAGE_KEYS);
-  for (const key of [
-    "schemaVersion",
-    "gameApi",
-    "id",
-    "title",
-    "creator",
-    "version",
-    "seed",
-    "baseScenarioId",
-  ])
-    required(p, key);
-  number(p.gameApi, "gameApi", 1, 1000, true);
+    add(
+      "schema-version",
+      "schemaVersion",
+      "must be 1. Export a new authoring template.",
+    );
+  if (p.gameApi !== 1)
+    add(
+      "game-api",
+      "gameApi",
+      "must be 1. This package targets an unsupported game contract.",
+    );
   if (typeof p.id !== "string" || !ID_PATTERN.test(p.id))
-    fail(
+    add(
+      "invalid-id",
       "id",
       "must be 1–64 lowercase letters, digits or hyphens, starting and ending with a letter or digit.",
     );
   text(p.title, "title", 100);
-  if (new TextEncoder().encode(p.title).length > MAX_TITLE_BYTES)
-    fail("title", `must fit Steam's ${MAX_TITLE_BYTES}-byte title limit.`);
+  if (typeof p.title === "string" && utf8Bytes(p.title).length > 128)
+    add("title-bytes", "title", "must fit Steam's 128-byte title limit.");
   text(p.creator, "creator", 100);
   text(p.version, "version", 40);
-  number(p.seed, "seed", 0, 4294967295, true);
-  if (p.baseScenarioId !== 999 && !MOD_SCENARIO_IDS.includes(p.baseScenarioId))
-    fail(
+  text(p.description, "description", 2000);
+  if (p.seed !== undefined) number(p.seed, "seed", 0, 4294967295, true);
+  if (
+    p.$schema !== undefined &&
+    (typeof p.$schema !== "string" ||
+      p.$schema.length > 2048 ||
+      UNSAFE_TEXT.test(p.$schema))
+  )
+    add(
+      "editor-schema",
+      "$schema",
+      "must be an editor schema string of at most 2048 safe characters.",
+    );
+  if (
+    p.baseScenarioId !== undefined &&
+    p.baseScenarioId !== 999 &&
+    !MOD_SCENARIO_IDS.includes(p.baseScenarioId)
+  )
+    add(
+      "unknown-base",
       "baseScenarioId",
       `is not a scenario. Use 999 or one of: ${MOD_SCENARIO_IDS.join(", ")}.`,
     );
-  if (p.scenario !== undefined) {
-    object(p.scenario, "scenario", SCENARIO_OVERRIDE_KEYS);
+  if (
+    p.scenario !== undefined &&
+    object(p.scenario, "scenario", SCENARIO_OVERRIDE_KEYS)
+  ) {
     const bounds = {
       cash: [0, 1e12],
       startingYear: [1980, 2100, true],
@@ -169,77 +210,243 @@ function validateMod(value) {
       p.scenario.ownership !== undefined &&
       !["Investor", "Public"].includes(p.scenario.ownership)
     )
-      fail("scenario.ownership", "must be Investor or Public.");
+      add(
+        "invalid-ownership",
+        "scenario.ownership",
+        "must be Investor or Public.",
+      );
     for (const key of ["endTitle", "endMessage"])
       if (p.scenario[key] !== undefined)
         text(p.scenario[key], `scenario.${key}`, 500);
-    const ids = p.scenario.eventScenarioIds;
-    if (ids !== undefined) {
-      if (!Array.isArray(ids) || ids.length > 20)
-        fail("scenario.eventScenarioIds", "must be a list of at most 20 IDs.");
-      if (new Set(ids).size !== ids.length)
-        fail("scenario.eventScenarioIds", "must not repeat an ID.");
-      ids.forEach((id, index) => {
-        if (!MOD_SCENARIO_IDS.includes(id))
-          fail(
-            `scenario.eventScenarioIds[${index}]`,
-            `is not a scenario. Use one of: ${MOD_SCENARIO_IDS.join(", ")}.`,
+  }
+  if (
+    p.scenario?.location !== undefined &&
+    object(p.scenario.location, "scenario.location", [
+      "id",
+      "name",
+      "lat",
+      "long",
+      "admin",
+      "timeZone",
+      "region",
+      "country",
+      "elevation",
+      "watershedId",
+      "watershedName",
+      "offshore",
+      "resources",
+    ])
+  ) {
+    const l = p.scenario.location;
+    if (typeof l.id !== "string" || !/^[A-Za-z0-9_-]{1,32}$/.test(l.id))
+      add("invalid-id", "scenario.location.id", "must be a safe location ID.");
+    text(l.name, "scenario.location.name", 100);
+    number(l.lat, "scenario.location.lat", -90, 90);
+    number(l.long, "scenario.location.long", -180, 180);
+    for (const key of [
+      "admin",
+      "timeZone",
+      "region",
+      "country",
+      "watershedName",
+    ])
+      if (l[key] !== undefined) text(l[key], `scenario.location.${key}`, 100);
+    if (l.timeZone !== undefined) {
+      try {
+        new Intl.DateTimeFormat("en", { timeZone: l.timeZone });
+      } catch (_) {
+        add(
+          "invalid-zone",
+          "scenario.location.timeZone",
+          "must be an IANA time zone.",
+        );
+      }
+    }
+    if (l.elevation !== undefined)
+      number(l.elevation, "scenario.location.elevation", -500, 10000);
+    if (
+      l.watershedId !== undefined &&
+      (typeof l.watershedId !== "string" ||
+        !/^[A-Za-z0-9_-]{1,32}$/.test(l.watershedId))
+    )
+      add(
+        "invalid-id",
+        "scenario.location.watershedId",
+        "must be a safe location ID.",
+      );
+    if (l.offshore !== undefined && typeof l.offshore !== "boolean")
+      add(
+        "invalid-value",
+        "scenario.location.offshore",
+        "must be true or false.",
+      );
+    if (
+      l.resources !== undefined &&
+      object(l.resources, "scenario.location.resources", [
+        "hydro",
+        "geothermal",
+      ])
+    )
+      for (const [key, value] of Object.entries(l.resources))
+        if (typeof value !== "boolean")
+          add(
+            "invalid-value",
+            `scenario.location.resources.${key}`,
+            "must be true or false.",
+          );
+  }
+  if (p.scenario?.startingFleet !== undefined) {
+    const fleet = p.scenario.startingFleet;
+    if (!Array.isArray(fleet) || fleet.length > 100)
+      add(
+        "invalid-list",
+        "scenario.startingFleet",
+        "must be a list of at most 100 facilities.",
+      );
+    else {
+      const ids = new Set();
+      fleet.forEach((asset, i) => {
+        const path = `scenario.startingFleet[${i}]`;
+        if (
+          !object(asset, path, [
+            "id",
+            "name",
+            "peakMW",
+            "peakMWh",
+            "ageYears",
+            "hydroSiteId",
+            "reservoirFraction",
+          ])
+        )
+          return;
+        const id = asset.id ?? `starting-${i + 1}`;
+        if (typeof id !== "string" || !ID_PATTERN.test(id))
+          add("invalid-id", `${path}.id`, "must be a lowercase asset ID.");
+        if (ids.has(id)) add("duplicate-id", `${path}.id`, "must be unique.");
+        ids.add(id);
+        if (!FACILITY_NAMES.includes(asset.name))
+          add(
+            "invalid-value",
+            `${path}.name`,
+            "must name a buildable facility.",
+          );
+        const storage = ["Battery", "Pumped Hydro"].includes(asset.name);
+        if (asset.peakMW !== undefined || !storage)
+          number(asset.peakMW, `${path}.peakMW`, 0.001, 100000);
+        if (asset.peakMWh !== undefined || storage)
+          number(asset.peakMWh, `${path}.peakMWh`, 0.001, 1000000);
+        if (!storage && asset.peakMWh !== undefined)
+          add("invalid-value", `${path}.peakMWh`, "is only used for storage.");
+        if (asset.ageYears !== undefined)
+          number(asset.ageYears, `${path}.ageYears`, 0, 200);
+        if (asset.reservoirFraction !== undefined)
+          number(asset.reservoirFraction, `${path}.reservoirFraction`, 0, 1);
+        if (asset.hydroSiteId !== undefined)
+          text(asset.hydroSiteId, `${path}.hydroSiteId`, 64);
+        if (
+          asset.name !== "Hydro" &&
+          (asset.hydroSiteId !== undefined ||
+            asset.reservoirFraction !== undefined)
+        )
+          add(
+            "invalid-value",
+            path,
+            "only Hydro uses a site or reservoir level.",
           );
       });
     }
   }
-  if (p.facilities !== undefined) {
-    object(p.facilities, "facilities", FACILITY_NAMES, "facility");
-    for (const [name, value] of Object.entries(p.facilities)) {
-      object(value, `facilities.${name}`, FACILITY_MODIFIER_KEYS);
-      for (const [key, factor] of Object.entries(value))
-        number(factor, `facilities.${name}.${key}`, 0.1, 10);
-    }
-  }
-  if (p.programs !== undefined) {
-    object(p.programs, "programs", PROGRAM_KEYS, "program");
-    for (const [key, factor] of Object.entries(p.programs))
-      number(factor, `programs.${key}`, 0.1, 10);
-  }
-  if (p.notifications !== undefined) {
-    if (!Array.isArray(p.notifications) || p.notifications.length > 100)
-      fail("notifications", "must be a list of at most 100 notifications.");
-    p.notifications.forEach((n, index) => {
-      const path = `notifications[${index}]`;
-      object(n, path, NOTIFICATION_KEYS);
-      for (const key of NOTIFICATION_KEYS) required(n, key, `${path}.${key}`);
-      number(n.month, `${path}.month`, 1, 1200, true);
-      text(n.title, `${path}.title`, 100);
-      text(n.message, `${path}.message`, 500);
+  if (
+    p.facilities !== undefined &&
+    object(p.facilities, "facilities", FACILITY_NAMES)
+  )
+    for (const [name, v] of Object.entries(p.facilities))
+      if (object(v, `facilities.${name}`, FACILITY_MODIFIER_KEYS))
+        for (const [key, n] of Object.entries(v))
+          if (FACILITY_MODIFIER_KEYS.includes(key))
+            number(n, `facilities.${name}.${key}`, 0.1, 10);
+  if (p.programs !== undefined && object(p.programs, "programs", PROGRAM_KEYS))
+    for (const [key, n] of Object.entries(p.programs))
+      if (PROGRAM_KEYS.includes(key)) number(n, `programs.${key}`, 0.1, 10);
+  const definitions = {
+    objectives: p.objectives === undefined ? [] : p.objectives,
+  };
+  for (const key of ["events", "choices", "debriefReports", "officialArcs"])
+    if (p[key] !== undefined) definitions[key] = p[key];
+  diagnostics.push(...ruleDiagnostics(definitions));
+  if (Array.isArray(p.officialArcs)) {
+    const seen = new Set();
+    p.officialArcs.forEach((arc, i) => {
+      if (!arc || !MOD_SCENARIO_IDS.includes(arc.scenarioId))
+        add(
+          "unknown-arc",
+          `officialArcs[${i}].scenarioId`,
+          "must name an importable non-tutorial scenario.",
+        );
+      else if (seen.has(arc.scenarioId))
+        add(
+          "duplicate-id",
+          `officialArcs[${i}].scenarioId`,
+          "must not repeat an arc.",
+        );
+      else seen.add(arc.scenarioId);
     });
   }
-  return p;
+  return diagnostics;
 }
-
-/** Decodes and validates one scenario.json. */
+function validateMod(value) {
+  const diagnostics = modDiagnostics(value);
+  if (diagnostics.length) throw new ModValidationError(diagnostics);
+  const json = JSON.stringify(value);
+  if (utf8Bytes(json).length > MAX_MOD_BYTES)
+    throw new ModValidationError([
+      {
+        code: "package-bytes",
+        path: "Package",
+        severity: "error",
+        message: "Package must be at most 256 KiB.",
+      },
+    ]);
+  return JSON.parse(json);
+}
 function parseMod(input) {
-  if (typeof input !== "string") fail("scenario.json", "must be UTF-8 text.");
-  if (new TextEncoder().encode(input).length > MAX_MOD_BYTES)
-    fail("scenario.json", "must be at most 256 KiB.");
+  if (typeof input !== "string" || utf8Bytes(input).length > MAX_MOD_BYTES)
+    throw new ModValidationError([
+      {
+        code: "package-bytes",
+        path: "scenario.json",
+        severity: "error",
+        message: "Choose scenario.json UTF-8 text under 256 KiB.",
+      },
+    ]);
   let value;
   try {
     value = JSON.parse(input);
   } catch (error) {
-    fail(
-      "scenario.json",
-      `is not valid JSON (${error instanceof Error ? error.message : "syntax error"}).`,
-    );
+    throw new ModValidationError([
+      {
+        code: "invalid-json",
+        path: "scenario.json",
+        severity: "error",
+        message: `scenario.json is not valid JSON (${error.message}).`,
+      },
+    ]);
   }
   return validateMod(value);
 }
-
+function packageDigest(value) {
+  const { $schema: _schema, ...content } = validateMod(value);
+  return ruleDigest(content);
+}
 module.exports = {
-  parseMod,
+  modDiagnostics,
   validateMod,
+  parseMod,
+  packageDigest,
   ModValidationError,
   MOD_API_VERSION,
-  MAX_MOD_BYTES,
   MOD_SCENARIO_IDS,
+  MAX_MOD_BYTES,
   FACILITY_NAMES,
   SCENARIO_OVERRIDE_KEYS,
   FACILITY_MODIFIER_KEYS,

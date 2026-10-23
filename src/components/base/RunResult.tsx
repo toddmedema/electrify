@@ -1,4 +1,4 @@
-import { Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import numbro from "numbro";
 import { VictoryDebriefType, VictoryType } from "../../Types";
 import ConceptIcon from "./ConceptIcon";
@@ -6,6 +6,11 @@ import { formatMoneyConcise, formatScore } from "../../helpers/Format";
 import { scoreLabel } from "../../helpers/Scoring";
 import { formatLargeMass } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
+import {
+  objectiveObservedText,
+  objectiveStatusText,
+  objectiveTargetText,
+} from "../../helpers/ObjectivePresentation";
 
 export function resultTitle(
   result: Pick<VictoryType, "outcome" | "endTitle">,
@@ -93,6 +98,74 @@ export function RunDebrief({
           <span>{metric.label}</span>
         </div>
       ))}
+      {!!debrief.objectiveResults?.length && (
+        <Box
+          component="section"
+          aria-label="Objective results"
+          sx={{ gridColumn: "1 / -1", mt: 1, minWidth: 0 }}
+        >
+          <Typography
+            component="h3"
+            variant="subtitle1"
+            sx={{ fontWeight: 600 }}
+          >
+            Objectives
+          </Typography>
+          {debrief.objectiveResults.map((result) => {
+            const first =
+              "fromMonth" in result.objective
+                ? result.objective.fromMonth
+                : result.objective.deadlineMonth;
+            const last =
+              "throughMonth" in result.objective
+                ? result.objective.throughMonth
+                : result.metric === "fuelRetirement"
+                  ? first + result.requiredMonths - 1
+                  : first;
+            return (
+              <Box
+                key={result.id}
+                sx={{ mt: 1.5, overflowWrap: "anywhere" }}
+                data-objective-status={result.status}
+              >
+                <Typography
+                  component="p"
+                  variant="body2"
+                  sx={{ fontWeight: 600 }}
+                >
+                  {result.label} · {result.required ? "Required" : "Optional"} ·{" "}
+                  {objectiveStatusText[result.status]}
+                </Typography>
+                <Typography
+                  component="p"
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  {result.definition}
+                </Typography>
+                <Typography component="p" variant="body2">
+                  {objectiveTargetText(result.objective)} ·{" "}
+                  {first === last
+                    ? `Month ${first + 1}`
+                    : `Months ${first + 1}–${last + 1}`}
+                </Typography>
+                <Typography component="p" variant="body2">
+                  {objectiveObservedText(result)}
+                </Typography>
+                {result.reason && (
+                  <Typography
+                    component="p"
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    {result.reason}
+                  </Typography>
+                )}
+              </Box>
+            );
+          })}
+        </Box>
+      )}
     </section>
   );
 }

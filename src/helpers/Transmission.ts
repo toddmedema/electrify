@@ -40,6 +40,7 @@ import {
   TransmissionLineOperatingType,
 } from "../Types";
 import { pow } from "./Pow";
+import { log } from "./Libm";
 
 export interface TransmissionConditions {
   transmissionCapacityLimitsWByCorridor?: Record<string, number>;
@@ -709,8 +710,7 @@ export function intertieUpgradeCount(
   return Math.max(
     0,
     Math.round(
-      Math.log(line.capacityW / corridor.capacityW) /
-        Math.log(INTERTIE_UPGRADE_STEP),
+      log(line.capacityW / corridor.capacityW) / log(INTERTIE_UPGRADE_STEP),
     ),
   );
 }

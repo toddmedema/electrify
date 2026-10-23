@@ -26,7 +26,10 @@ type MissionStatus = ReturnType<typeof getMissionStatus>;
 function readsProjection(risk: MissionRisk | undefined): boolean {
   return !(
     risk &&
-    (risk.id === "shortage" || risk.id === "cash" || risk.id === "reliability")
+    (risk.id === "shortage" ||
+      risk.id === "cash" ||
+      risk.id === "reliability" ||
+      risk.id.startsWith("objective:"))
   );
 }
 
@@ -46,7 +49,10 @@ function earlyRiskDue(game: GameType, mission: MissionStatus): boolean {
     return true;
   }
   return mission.requirements.some(
-    (row) => row.id === "reliability" && row.status === "failed",
+    (row) =>
+      row.status === "failed" &&
+      row.required !== false &&
+      (row.definition || row.id === "reliability"),
   );
 }
 

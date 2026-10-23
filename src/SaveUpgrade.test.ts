@@ -1,6 +1,5 @@
 import reducer, { generateNewTimeline } from "./reducers/Game";
 import { loaded } from "./reducers/GameActions";
-import { getDateFromMinute, MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { DEFAULT_CUSTOM_SCENARIO } from "./data/Scenarios";
 import legacyFile from "./testing/fixtures/saves/legacy-rules-save.json";
 import { isFutureSave, SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
@@ -423,7 +422,8 @@ it("preserves a previous wildfire mission's purchased connection, debt and cash"
 
 it("refreshes only future wildfire forecast ticks after migration", () => {
   const game = createGame({ scenarioId: 111, seed: 7 });
-  game.date = getDateFromMinute(36 * MINUTES_PER_MONTH, game.startingYear);
+  runMonths(game, 36);
+  expect(game.date.monthsElapsed).toBe(36);
   game.timeline = generateNewTimeline(
     { ...game, storyEffectsDisabled: true },
     1e9,

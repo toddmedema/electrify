@@ -45,6 +45,7 @@ import { getInflationIndex, hasEconomy } from "../data/Economy";
 import { TICK_MINUTES } from "../Constants";
 import { randomAt, RANDOM_STREAM } from "./Math";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
+import { exp, sin } from "./Libm";
 
 /**
  * Hail damage to solar and extreme cold for gas (issue #73), as pure functions of game state.
@@ -140,7 +141,7 @@ export function hailMonthlyProbability(
     weight = NORTHERN_HAIL_MONTHLY_WEIGHTS[month];
   }
   const lambda = profile.damagingHailPerYear * weight;
-  return lambda > 0 ? 1 - Math.exp(-lambda) : 0;
+  return lambda > 0 ? 1 - exp(-lambda) : 0;
 }
 
 /** Whether this month's addressed occurrence draw lands a damaging hailstorm. */
@@ -367,7 +368,7 @@ export function trackerOutputMultiplier(
     return 1;
   }
   const hourAngle = ((minuteOfDay / 60 - 12) / 12) * Math.PI;
-  return 1 + TRACKER_SHOULDER_GAIN * Math.sin(hourAngle) ** 2;
+  return 1 + TRACKER_SHOULDER_GAIN * sin(hourAngle) ** 2;
 }
 
 /** The upgrade a standing plant of this technology can have added later, if any. */

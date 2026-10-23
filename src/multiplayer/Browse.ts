@@ -4,12 +4,19 @@ import { storyHash } from "../data/WorldEvents";
 import { getScenarioLocation, isValidLocation } from "../helpers/Locations";
 import type { DifficultyType, ScenarioType } from "../Types";
 import type { MatchSpec } from "./Types";
+import {
+  validModBrowseSummary,
+  validSelectedMod,
+  type ModBrowseSummary,
+} from "./ModBrowse";
+import { utf8Bytes } from "../helpers/RuleIdentity";
 
 /** The selection screens a lobby browses together, in the order a host usually visits them. */
 export const BROWSE_CARDS = [
   "NEW_GAME",
   "NEW_GAME_DETAILS",
   "CUSTOM_GAME",
+  "MODS",
 ] as const;
 export type BrowseCard = (typeof BROWSE_CARDS)[number];
 
@@ -29,10 +36,26 @@ export interface BrowseState {
   difficulty: DifficultyType;
   /** The custom game being set up. */
   custom?: ScenarioType;
+  /** Community selection facts only; its frozen snapshot has a separate bounded transfer. */
+  mod?: ModBrowseSummary;
 }
+export type HostBrowseSelection = Omit<BrowseState, "session" | "revision"> & {
+  scenarioSnapshot?: ScenarioType;
+};
 
 /** The match the host would start from this selection, if it names one. */
-export function browseSpec(browse: BrowseState): MatchSpec | undefined {
+export function browseSpec(
+  browse: BrowseState,
+  snapshot?: ScenarioType,
+): MatchSpec | undefined {
+  if (browse.mod)
+    return snapshot && validSelectedMod(browse.mod, snapshot)
+      ? {
+          scenarioId: CUSTOM_SCENARIO_ID,
+          difficulty: browse.difficulty,
+          customScenario: snapshot,
+        }
+      : undefined;
   if (browse.card === "CUSTOM_GAME" && browse.custom)
     return {
       scenarioId: CUSTOM_SCENARIO_ID,
@@ -49,6 +72,8 @@ export function browseSpec(browse: BrowseState): MatchSpec | undefined {
  * to the scenario, difficulty or custom settings clears it without another message.
  */
 export function selectionKey(browse: BrowseState): string {
+  if (browse.mod)
+    return `mod|${browse.difficulty}|${browse.mod.seed}|${browse.mod.packageDigest}|${browse.mod.runtimeDigest}`;
   const spec = browseSpec(browse);
   if (!spec) return "";
   const custom = spec.customScenario
@@ -67,6 +92,7 @@ function validCustom(value: unknown): value is ScenarioType {
   return (
     custom.id === CUSTOM_SCENARIO_ID &&
     custom.mod === undefined &&
+    custom.rules === undefined &&
     typeof custom.name === "string" &&
     Number.isSafeInteger(custom.startingYear) &&
     Number.isSafeInteger(custom.durationMonths) &&
@@ -83,6 +109,27 @@ function validCustom(value: unknown): value is ScenarioType {
 export function validBrowseState(value: unknown): value is BrowseState {
   if (!value || typeof value !== "object") return false;
   const browse = value as BrowseState;
+  try {
+    if (utf8Bytes(JSON.stringify(value)).length > 16 * 1024) return false;
+  } catch {
+    return false;
+  }
+  if (
+    Object.keys(value).some(
+      (key) =>
+        ![
+          "session",
+          "revision",
+          "phase",
+          "card",
+          "scenarioId",
+          "difficulty",
+          "custom",
+          "mod",
+        ].includes(key),
+    )
+  )
+    return false;
   return (
     typeof browse.session === "string" &&
     browse.session.length > 0 &&
@@ -96,6 +143,11 @@ export function validBrowseState(value: unknown): value is BrowseState {
       (Number.isSafeInteger(browse.scenarioId) &&
         !getScenario(browse.scenarioId)?.tutorialSteps &&
         !!getScenario(browse.scenarioId))) &&
-    (browse.custom === undefined || validCustom(browse.custom))
+    (browse.custom === undefined || validCustom(browse.custom)) &&
+    (browse.mod === undefined ||
+      (browse.card === "MODS" &&
+        browse.custom === undefined &&
+        validModBrowseSummary(browse.mod) &&
+        browse.mod.difficulty === browse.difficulty))
   );
 }

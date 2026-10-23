@@ -1,0 +1,117 @@
+{
+  "$schema": "./scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "worked-timeline",
+  "title": "A year after the decision",
+  "creator": "Electrify examples",
+  "version": "1",
+  "description": "Choose a demand plan, then keep the grid reliable.",
+  "scenario": {
+    "startingYear": 2020,
+    "cash": 1000000000,
+    "feePerKgCO2e": 0.05,
+    "dollarsPerkWh": 0.11,
+    "startingCustomers": 10000,
+    "location": {
+      "id": "SF",
+      "name": "San Francisco, CA",
+      "lat": 37.7749,
+      "long": -122.4194,
+      "timeZone": "America/Los_Angeles",
+      "country": "United States",
+      "region": "North America",
+      "admin": "CA"
+    },
+    "startingFleet": [
+      {
+        "name": "Natural Gas CC",
+        "peakMW": 200,
+        "ageYears": 10
+      },
+      {
+        "name": "Coal",
+        "peakMW": 300,
+        "ageYears": 30
+      }
+    ],
+    "durationMonths": 25
+  },
+  "choices": [
+    {
+      "id": "grid-plan",
+      "title": "Choose your grid plan",
+      "prompt": "Keep the current demand, fund an upgrade, or accept support for new demand.",
+      "dueMonth": 13,
+      "options": [
+        {
+          "id": "maintain",
+          "label": "Maintain the current plan",
+          "description": "Keep demand unchanged.",
+          "message": "Your current demand plan is unchanged."
+        },
+        {
+          "id": "upgrade",
+          "label": "Fund the upgrade",
+          "description": "Raise demand 10%.",
+          "message": "You funded the upgrade and enabled higher demand.",
+          "costDollars": 1000
+        },
+        {
+          "id": "subsidize",
+          "label": "Accept support",
+          "description": "Raise demand 10%.",
+          "message": "You received support and enabled higher demand.",
+          "grantDollars": 10000
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "maintenance-expense",
+      "title": "Scheduled maintenance",
+      "message": "Maintenance costs you $1,000 this month.",
+      "preview": "Maintenance will cost you $1,000 in {{start+11 months}}.",
+      "startMonth": 12,
+      "durationMonths": 1,
+      "effects": {
+        "operatingExpenseDollarsPerMonth": 1000
+      }
+    },
+    {
+      "id": "new-demand",
+      "title": "The selected demand plan begins",
+      "message": "Demand is up 10%.",
+      "preview": "Demand will rise 10% from {{event}}.",
+      "startMonth": 13,
+      "durationMonths": "untilEnd",
+      "requiresChoice": {
+        "choiceId": "grid-plan",
+        "optionIds": ["upgrade", "subsidize"]
+      },
+      "effects": {
+        "demandMultiplier": 1.1
+      }
+    }
+  ],
+  "objectives": [
+    {
+      "id": "reliable-year",
+      "label": "Keep the declared year reliable",
+      "metric": "monthlyReliability",
+      "fromMonth": 13,
+      "throughMonth": 24,
+      "minDemandServedShare": 0.99
+    }
+  ],
+  "debriefReports": [
+    {
+      "id": "year-review",
+      "kind": "reliability",
+      "fromMonth": 13,
+      "throughMonth": 24,
+      "minDemandServedShare": 0.99
+    }
+  ]
+}

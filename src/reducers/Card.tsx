@@ -137,6 +137,7 @@ export const cardSlice = createSlice({
           "NEW_GAME",
           "NEW_GAME_DETAILS",
           "CUSTOM_GAME",
+          "MODS",
         ].includes(state.name)
       ) {
         state.name = "FACILITIES";

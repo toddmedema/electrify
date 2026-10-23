@@ -103,7 +103,12 @@ different path on Windows. Simulation code therefore calls `pow` from `src/helpe
 of glibc's, bit-identical to CI's Linux `Math.pow`), and lint rejects `Math.pow` and unsafe `**`
 in simulation data, helpers, reducers, save export, tools and workers. Only squares and literal
 integer powers of two may use `**`; other powers use the portable helper.
-The other Math functions are V8's own fdlibm port and agree everywhere.
+The other transcendental Math functions are V8's own fdlibm port, but arm64 builds fuse its
+multiply-adds, so an Apple silicon Mac and x86-64 CI disagree in the last bit of about one
+`Math.log` in fifty. One such bit forked scenario 110 at CEO on seed 1. Simulation code therefore
+calls `exp`, `log`, `sin` and the rest from `src/helpers/Libm.ts` (a port bit-identical to x86-64
+`Math`), sun times come from its suncalc port in `src/helpers/SunCalc.ts`, and lint rejects those
+`Math` methods in the same files. `Math.sqrt`, `hypot` and rounding are exact and stay allowed.
 Rebaseline with `npm run perf:rebaseline` (Jest `-u` on that suite); CI's `--ci` mode never writes
 snapshots, so a changed hash fails. The snapshot diff shows which scenarios moved, which also helps
 review balance work. Regenerate last; never hand-edit.

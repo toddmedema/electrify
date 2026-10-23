@@ -76,6 +76,7 @@ export default function MultiplayerRoot() {
     const next = coopSelection(
       current,
       host ? app.ui.coop?.custom : browse?.custom,
+      host ? app.ui.coop?.modScenario : current.scenarioSnapshot,
     );
     if (JSON.stringify(next) !== JSON.stringify(app.ui.coop))
       store.dispatch(uiDelta({ coop: next }));

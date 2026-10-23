@@ -1,3 +1,5 @@
+import { multiplayerSnapshot } from "./GameActions";
+import type { GameType } from "../Types";
 import cardReducer, {
   manualTrailCleared,
   navigate,
@@ -162,4 +164,15 @@ it("debounces only the same destination and records accepted navigation time", (
     now.mockRestore();
     push.mockRestore();
   }
+});
+
+test("a shared mod launch leaves its selection preview for the grid", () => {
+  const selected = cardReducer(undefined, navigate("MODS"));
+  const launched = cardReducer(selected, multiplayerSnapshot({} as GameType));
+  expect(launched.name).toBe("FACILITIES");
+  expect(launched.history).toEqual(["FACILITIES", "MAIN_MENU"]);
+  const reading = cardReducer(launched, navigate("MANUAL"));
+  expect(cardReducer(reading, multiplayerSnapshot({} as GameType)).name).toBe(
+    "MANUAL",
+  );
 });

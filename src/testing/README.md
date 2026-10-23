@@ -27,7 +27,8 @@ npm run sim -- --scenario 103 --strategy keepUp
 which prints a month by month table (customers, demand, supplied, unserved, cash, net worth,
 profit, emissions), the number of recorded player actions, totals for the run, the fleet it
 finished with, and any invariant violations. Outcomes match the real game: completed, bankrupt,
-or fired after three consecutive months below 90% supplied (95% on CEO difficulty).
+or fired after three consecutive months below 90% supplied (95% on CEO difficulty),
+or when a required scenario objective is decided against the company.
 `npm run sim -- --help` lists the flags; `--list` shows the scenario ids.
 One explicit storage decision can be replayed with, for example,
 `--build Battery --build-mwh 800 --finance`; generator builds use `--build-mw`.
@@ -84,6 +85,72 @@ baseline rate is the exception before 2020: `inEraRate` follows EIA's recorded U
 retail price there, so a 2020 scenario moved to 1980 opens at 1980's rates rather than 2020's.
 `--location` alone leaves money unchanged. An explicit `--rate` is the player's rate, applied
 at face value after initialization; the competing market's baseline still follows the era.
+
+## Validate and simulate a JSON mod
+
+```sh
+npm run mods:validate -- docs/mods/examples/two-dry-years.json --explain
+npm run sim -- --mod docs/mods/examples/two-dry-years.json --responses responses.json
+npm run sim -- --mod docs/mods/examples/two-dry-years.json --free-fallback --seeds 1,2 --difficulties Employee,Manager
+```
+
+Validation checks every difficulty. Errors exit nonzero; warnings alone do not.
+`--explain` adds resolved setup, dates, effects, goals and imported IDs. Add `--json`
+for one machine-readable report on stdout. The game's **Author report** shows the
+same information.
+
+`--mod` defaults to the package's seed. It cannot be combined with `--scenario`,
+`--year`, `--location`, `--all` or `--matrix`. `--seeds` and `--difficulties` allow up
+to 20 combinations. A shortened `--months` run reports `inProgress`. Output includes
+seed, difficulty, package/runtime digests, reached choices, goal results, outcome
+and invariant violations.
+
+Packages with choices require `--responses` or `--free-fallback`. A responses file
+can contain authored and imported choice references:
+
+```json
+{
+  "responses": [
+    { "choiceId": "grid-bond", "optionId": "accept" },
+    { "arc": 106, "choiceId": "connection", "optionId": "phased" }
+  ]
+}
+```
+
+Use IDs from the package's author report. Unknown choices/options and duplicate
+answers are errors. Reached choices without answers fail unless `--free-fallback`
+selects their free options; each fallback is printed. Valid answers that the run
+never reaches produce warnings. Ordinary simulations keep their free-response bot.
+
+For a reserve purchase, add `--build-priority reserve` to move the new facility
+behind the existing fleet through the normal dispatch actions. The default keeps
+the game's purchase position. This flag requires `--build`; rejected cash
+purchases leave existing priorities unchanged.
+
+For **Bridge the maintenance gap**, save this as `responses.json`:
+
+```json
+{ "responses": [{ "choiceId": "overhaul-schedule", "optionId": "accelerate" }] }
+```
+
+Then run the paid route with a financed reserve and a $0.12/kWh rate:
+
+```sh
+npm run sim -- --mod docs/mods/examples/bridge-the-maintenance-gap.json --responses responses.json --build Oil --build-mw 50 --finance --build-priority reserve --rate 0.12 --seeds 609,610 --difficulties Employee,Manager
+```
+
+Change `optionId` to `standard` to try the funded, longer outage with the same
+reserve plan. `--free-fallback` also selects that option when no answer is supplied.
+
+See the [authoring guide](../../docs/mods/authoring.md) and
+[example packages](../../docs/mods/examples/README.md) for building mods. Load
+simulation data before calling a resolver directly in a test; the CLI handles this
+automatically.
+
+Regenerate authoring references with `npm run mods:schema`, `npm run mods:recipes`
+and `npm run mods:arcs`; add `-- --check` to detect drift. For maximum-content
+benchmarks, use `npm run perf:bench -- --mods --runs 1 --json` and follow the
+[performance plan](../../docs/perf-plan.md).
 
 ## What it checks
 

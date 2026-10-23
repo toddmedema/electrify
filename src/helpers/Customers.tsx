@@ -7,6 +7,7 @@ import {
 import { getRateInflationIndex } from "../data/Economy";
 import { DateType } from "../Types";
 import { pow } from "./Pow";
+import { exp } from "./Libm";
 
 /** A new investor starts with half of the customers it could eventually serve. */
 export const CUSTOMER_MARKET_MULTIPLIER = 2;
@@ -156,7 +157,7 @@ export function bestReachableCustomers(
   // The live model adds annual growth / ticks per year on each tick. Continuous
   // compounding bounds that growth from above; taking the twelfth root of (1 + growth)
   // underestimates it and can end a recoverable run.
-  const monthlyGrowth = Math.exp(ORGANIC_GROWTH_MAX_ANNUAL / 12);
+  const monthlyGrowth = exp(ORGANIC_GROWTH_MAX_ANNUAL / 12);
   let best = customers;
   let market = marketSize;
   for (let month = 0; month < months; month++) {

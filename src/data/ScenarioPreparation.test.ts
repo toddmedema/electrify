@@ -1,8 +1,6 @@
 import { SCENARIOS } from "./Scenarios";
-import { STORY_ARC_DEFINITIONS, resolveStoryPhase } from "./WorldEvents";
-import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
-import { getScenarioLocation } from "../helpers/Locations";
-import { StorySnapshotType } from "../Types";
+import { scenarioRules } from "../helpers/ScenarioRules";
+import { getDateFromMinute } from "../helpers/DateTime";
 
 // Pin historical headline dates while checking the actual engine schedule, including seeded arcs.
 const HEADLINERS: Record<
@@ -24,17 +22,6 @@ const HEADLINERS: Record<
   114: { year: 2014, month: 12, phase: "reservoir-step-1" },
   115: { year: 2021, month: 4, phase: "summer-peak-1" },
 };
-const snapshot: StorySnapshotType = {
-  deliveredWhByFuel12m: {},
-  demandWh12m: 0,
-  unservedWh12m: 0,
-  netIncome12m: 0,
-  peakDemandW12m: 0,
-  firmPeakW: 0,
-  storagePeakW: 0,
-  storagePeakWh: 0,
-  facilities: [],
-};
 
 test.each(SCENARIOS.filter((scenario) => !scenario.tutorialSteps))(
   "$name opens in January at least 36 months before its headline event",
@@ -52,20 +39,10 @@ test.each(SCENARIOS.filter((scenario) => !scenario.tutorialSteps))(
           1
         );
       }
-      const arc = STORY_ARC_DEFINITIONS.find(
-        (item) => item.scenarioId === scenario.id,
-      )!;
-      const phase = arc.phases.find((item) => item.id === headline.phase)!;
-      return (
-        resolveStoryPhase(arc, phase, {
-          seed,
-          scenarioId: scenario.id,
-          difficulty: "Manager",
-          date,
-          location: getScenarioLocation(scenario)!,
-          snapshot,
-        }).startsMinute / MINUTES_PER_MONTH
-      );
+      const rules = scenarioRules(scenario, { difficulty: "Manager", seed })!;
+      const event = rules.events.find((item) => item.id === headline.phase)!;
+      expect(event).toBeDefined();
+      return event.startMonth;
     });
     for (const lead of leadMonths) {
       expect(lead).toBeGreaterThanOrEqual(36);

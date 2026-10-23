@@ -15,10 +15,13 @@ import { generateNewTimeline } from "../reducers/Game";
 import {
   createGame,
   runSimulation,
+  InitialBuildType,
   SimOptionsType,
   StrategyType,
 } from "./Simulator";
 import { STANDARD_BALANCE_PLAYS } from "./BalancePlaybooks";
+import { formatModSimulation, runModSimulation } from "./ModCli";
+import { readModCliJson } from "./ModCliFiles";
 
 export const STANDARD_BALANCE_SEEDS = Array.from(
   { length: 20 },
@@ -59,6 +62,8 @@ function baseOptions(): Omit<SimOptionsType, "scenarioId"> {
             ? { peakW: (envNumber("SIM_BUILD_MW") || 300) * 1000000 }
             : { peakWh: initialBuildMWh * 1000000 }),
           financed: process.env.SIM_FINANCE === "1",
+          priority: process.env
+            .SIM_BUILD_PRIORITY as InitialBuildType["priority"],
         }
       : undefined,
     sellFacilityId: envNumber("SIM_SELL_ID"),
@@ -316,8 +321,51 @@ function runSingle() {
   );
 }
 
+function runMod() {
+  const values = (raw: string) => {
+    const items = raw.split(",").map((value) => value.trim());
+    if (items.some((value) => !value))
+      throw new Error(
+        "Matrix lists must contain comma-separated non-empty values.",
+      );
+    return items;
+  };
+  const { seed, difficulty, ...simulation } = baseOptions();
+  if (simulation.strategy && !["none", "keepUp"].includes(simulation.strategy))
+    throw new Error("Choose --strategy none or keepUp.");
+  const runs = runModSimulation(readModCliJson(process.env.SIM_MOD!), {
+    responses: process.env.SIM_RESPONSES
+      ? readModCliJson(process.env.SIM_RESPONSES)
+      : undefined,
+    freeFallback: process.env.SIM_FREE_FALLBACK === "1",
+    seeds: process.env.SIM_SEEDS
+      ? values(process.env.SIM_SEEDS).map(Number)
+      : seed === undefined
+        ? undefined
+        : [seed],
+    difficulties: process.env.SIM_DIFFICULTIES
+      ? (values(process.env.SIM_DIFFICULTIES) as DifficultyType[])
+      : difficulty === undefined
+        ? undefined
+        : [difficulty],
+    simulation,
+  });
+  runs.forEach((run) => {
+    write(formatModSimulation(run));
+    if (process.env.SIM_FULL === "1") {
+      write("Recorded completed months:");
+      run.result.months.forEach((month) => write(JSON.stringify(month)));
+    }
+    write("");
+  });
+  if (runs.some((run) => run.result.violationCount > 0))
+    throw new Error("The mod simulation reported invariant violations.");
+}
+
 it("simulation", () => {
-  if (process.env.SIM_STORY_BENCHMARK === "1") {
+  if (process.env.SIM_MOD) {
+    runMod();
+  } else if (process.env.SIM_STORY_BENCHMARK === "1") {
     runStoryBenchmark();
   } else if (process.env.SIM_MATRIX === "1") {
     runMatrix();

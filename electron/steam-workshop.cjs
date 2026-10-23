@@ -1,4 +1,7 @@
 const { nativeLibraryPath } = require("./steam-native.cjs");
+const {
+  MAX_WORKSHOP_DESCRIPTION_BYTES,
+} = require("../src/mods/ModPublication.js");
 // SDK 1.60 / ISteamUGC020. Async operations use the app's sole manual dispatcher.
 const DECLARATIONS = {
   ugc: "void * SteamAPI_SteamUGC_v020()",
@@ -6,6 +9,8 @@ const DECLARATIONS = {
   start:
     "uint64_t SteamAPI_ISteamUGC_StartItemUpdate(void *, uint32_t, uint64_t)",
   title: "bool SteamAPI_ISteamUGC_SetItemTitle(void *, uint64_t, const char *)",
+  description:
+    "bool SteamAPI_ISteamUGC_SetItemDescription(void *, uint64_t, const char *)",
   content:
     "bool SteamAPI_ISteamUGC_SetItemContent(void *, uint64_t, const char *)",
   visibility:
@@ -113,11 +118,23 @@ class SteamWorkshop {
     };
   }
   /** Uploads one staged package. Visibility is set only on a new item's first upload. */
-  async publish(id, pack, directory, { setVisibility = false } = {}) {
+  async publish(
+    id,
+    pack,
+    directory,
+    { setVisibility = false, description = pack.description } = {},
+  ) {
+    if (
+      typeof description !== "string" ||
+      Buffer.byteLength(description, "utf8") > MAX_WORKSHOP_DESCRIPTION_BYTES ||
+      description.includes("\0")
+    )
+      throw new Error("Workshop description must fit 7,999 UTF-8 bytes.");
     const handle = this.api.start(this.ugc, this.appId, itemId(id));
     if (
       !validUpdateHandle(handle) ||
       !this.api.title(this.ugc, handle, pack.title) ||
+      !this.api.description(this.ugc, handle, description) ||
       !this.api.content(this.ugc, handle, directory) ||
       (setVisibility && !this.api.visibility(this.ugc, handle, 0))
     )
@@ -141,6 +158,10 @@ class SteamWorkshop {
     return this.steam.client.workshop
       .getSubscribedItems()
       .map((id) => id.toString());
+  }
+  downloadStatus(id) {
+    const state = this.steam.client.workshop.state(itemId(id));
+    return state & 16 ? "downloading" : "queued";
   }
   /** Install info for a finished download; otherwise asks Steam to download it and returns null. */
   installedOrQueueDownload(id) {

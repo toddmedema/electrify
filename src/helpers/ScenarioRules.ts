@@ -1,0 +1,1431 @@
+import { renderScenarioText } from "./ScenarioText";
+import type {
+  CompiledRuleEvent,
+  CompiledRuleLoad,
+  CompiledRuleObjective,
+  CompiledScenarioRules,
+  RuleCondition,
+  RuleDiagnostic,
+  RuleLoad,
+  RuleNumber,
+  RuleObjective,
+  RuleReport,
+  ScenarioRuleDefinitions,
+} from "../data/ScenarioRules";
+import type {
+  GameType,
+  DifficultyType,
+  ScenarioType,
+  WorldEventEffectsType,
+} from "../Types";
+import {
+  ruleDiagnostics,
+  RULE_LIMITS,
+  isRuleJson,
+  RULE_DIFFICULTIES,
+  ID_PATTERN,
+} from "./ScenarioRulesSchema";
+import { canonicalRuleJson, utf8Bytes, ruleDigest } from "./RuleIdentity";
+import { officialScenarioRuleDefinition } from "../data/OfficialScenarioRules";
+import { compileOfficialArcChoices } from "./ScenarioRuleChoices";
+import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
+import { randomAt, RANDOM_STREAM } from "./Math";
+import { scenarioRuleCompositionDiagnostics } from "./ScenarioRuleComposition";
+import {
+  validOfficialArcMetadata,
+  officialArcLoadScale,
+} from "./ScenarioRuleArcs";
+import { SCENARIOS } from "../data/Scenarios";
+import { inEraMoney } from "../data/FuelPrices";
+import { getScenarioLocation } from "./Locations";
+import { validOfficialArcChoiceMetadata } from "./ScenarioRuleChoices";
+import { scenarioRuleDependencyDiagnostics } from "./ScenarioRuleDependencies";
+import { requiredFuelShareFeasibility } from "./ScenarioFuelShares";
+import { TRANSMISSION_CORRIDORS } from "../data/AdjacentMarkets";
+
+export class RuleCompilationError extends Error {
+  constructor(public diagnostics: RuleDiagnostic[]) {
+    super(diagnostics.map((d) => d.message).join("\n"));
+    this.name = "RuleCompilationError";
+  }
+}
+export interface RuleCompileParameters {
+  namespace: CompiledScenarioRules["namespace"];
+  difficulty: DifficultyType;
+  seed: number;
+  startingYear: number;
+  durationMonths: number;
+  startingPeakW: number;
+  startingAssetIds: string[];
+  inheritedObjectiveIds?: string[];
+  diagnostics?: RuleDiagnostic[];
+  /** Trusted catalog draw addresses retain the registered story stream; author data cannot set them. */
+  eventScheduleAddresses?: Record<string, string>;
+}
+export const ruleNumber = (
+  value: RuleNumber,
+  difficulty: DifficultyType,
+): number =>
+  typeof value === "number" ? value : value.byDifficulty[difficulty];
+const officialRulesCache = new WeakMap<
+  ScenarioType,
+  Map<string, CompiledScenarioRules>
+>();
+const identityCache = new WeakMap<CompiledScenarioRules, string>();
+const freezePlain = <T>(value: T): T => {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.values(value).forEach(freezePlain);
+    Object.freeze(value);
+  }
+  return value;
+};
+
+/** Trusted definitions are compiled once per actual run parameters, without community provenance. */
+export function officialScenarioRules(
+  scenario: ScenarioType,
+  parameters: Pick<GameType, "difficulty" | "seed">,
+  setup: Partial<Pick<ScenarioType, "startingYear" | "durationMonths">> = {},
+): CompiledScenarioRules | undefined {
+  const catalog = officialScenarioRuleDefinition(scenario.id);
+  if (!catalog) return undefined;
+  const startingYear = setup.startingYear ?? scenario.startingYear;
+  const durationMonths = setup.durationMonths ?? scenario.durationMonths;
+  const key = `${parameters.difficulty}:${parameters.seed}:${startingYear}:${durationMonths}`;
+  let cache = officialRulesCache.get(scenario);
+  if (!cache) {
+    cache = new Map();
+    officialRulesCache.set(scenario, cache);
+  }
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const eventScheduleAddresses: Record<string, string> = {};
+  const definitions: ScenarioRuleDefinitions = {
+    ...catalog.definitions,
+    events: (catalog.definitions.events ?? []).map((event) => {
+      const presentation = catalog.presentation[event.id];
+      const offset =
+        presentation?.scheduleOffsetMonths === undefined
+          ? 0
+          : ruleNumber(
+              presentation.scheduleOffsetMonths,
+              parameters.difficulty,
+            );
+      const relocate = (month: number) =>
+        relocateOfficialArcMonth(scenario.id, month - 1 + offset, "phase") + 1;
+      if (presentation?.scheduleRandomKey)
+        eventScheduleAddresses[event.id] =
+          `story:${scenario.id}:${catalog.arcId}:${presentation.scheduleAddress ?? event.id}|${presentation.scheduleRandomKey}`;
+      return {
+        ...event,
+        startMonth:
+          typeof event.startMonth === "number"
+            ? relocate(event.startMonth)
+            : {
+                from: relocate(event.startMonth.from),
+                to: relocate(event.startMonth.to),
+              },
+        title:
+          presentation?.titleByDifficulty?.[parameters.difficulty] ??
+          event.title,
+        message:
+          presentation?.messageByDifficulty?.[parameters.difficulty] ??
+          event.message,
+      };
+    }),
+  };
+  const rules = compileScenarioRules(definitions, {
+    namespace: {
+      kind: "official",
+      scenarioId: scenario.id,
+      arcId: catalog.arcId,
+    },
+    difficulty: parameters.difficulty,
+    seed: parameters.seed,
+    startingYear,
+    durationMonths,
+    startingPeakW: 0,
+    startingAssetIds: scenario.facilities.flatMap((asset) =>
+      asset.assetId ? [asset.assetId] : [],
+    ),
+    inheritedObjectiveIds: definitions.objectives.map((goal) => goal.id),
+    eventScheduleAddresses,
+  });
+  rules.events = rules.events.map((event) => ({
+    ...event,
+    ...(catalog.presentation[event.id]?.protection
+      ? { protection: catalog.presentation[event.id].protection }
+      : {}),
+    ...(catalog.presentation[event.id]?.reports?.length ||
+    catalog.presentation[event.id]?.relativeReports?.length
+      ? {
+          reports: [
+            ...(catalog.presentation[event.id].reports ?? []).map(
+              normalizeReport,
+            ),
+            ...(catalog.presentation[event.id].relativeReports ?? []).map(
+              (report) => ({
+                id: report.id,
+                kind: report.kind,
+                fromMonth: Math.max(
+                  0,
+                  event.startMonth -
+                    ruleNumber(report.monthsBefore, parameters.difficulty),
+                ),
+                throughMonth: event.startMonth - 1,
+                ...(report.minDemandServedShare === undefined
+                  ? {}
+                  : { minDemandServedShare: report.minDemandServedShare }),
+              }),
+            ),
+          ],
+        }
+      : {}),
+    source: {
+      ...catalog.presentation[event.id]?.source,
+      scenarioId: scenario.id,
+      arcId: catalog.arcId,
+      phaseId: event.id,
+      ...(catalog.presentation[event.id]?.previewTitle
+        ? { previewTitle: catalog.presentation[event.id].previewTitle }
+        : {}),
+    },
+  }));
+  rules.officialArcs = [{ scenarioId: scenario.id, includeChoices: true }];
+  rules.arcChoices = compileOfficialArcChoices(
+    {
+      namespace: rules.namespace,
+      difficulty: parameters.difficulty,
+      seed: parameters.seed,
+      startingYear,
+      durationMonths,
+      startingAssetIds: rules.startingAssetIds,
+      receivingScenario: scenario,
+    },
+    rules.officialArcs,
+  );
+  freezePlain(rules);
+  identityCache.set(rules, ruleDigest(rules));
+  if (cache.size >= 32) cache.delete(cache.keys().next().value!);
+  cache.set(key, rules);
+  return rules;
+}
+
+const customStoryCache = new Map<string, CompiledScenarioRules>();
+/** Existing custom-game arc selection resolves physical units once without community provenance. */
+function customScenarioRules(
+  scenario: ScenarioType,
+  parameters: Pick<GameType, "difficulty" | "seed">,
+): CompiledScenarioRules | undefined {
+  if (!scenario.eventScenarioIds?.length) return undefined;
+  const key = JSON.stringify([
+    parameters.difficulty,
+    parameters.seed,
+    scenario.eventScenarioIds,
+    scenario.startingYear,
+    scenario.durationMonths,
+    scenario.startingCustomers,
+    scenario.startingDemandScale,
+    getScenarioLocation(scenario),
+    scenario.facilities.map((asset) => asset.assetId),
+  ]);
+  const cached = customStoryCache.get(key);
+  if (cached) return cached;
+  const events: CompiledRuleEvent[] = [];
+  for (const id of scenario.eventScenarioIds) {
+    const source = SCENARIOS.find(
+      (candidate) => candidate.id === id && !candidate.tutorialSteps,
+    );
+    if (!source) continue;
+    const compiled = officialScenarioRules(source, parameters, {
+      startingYear: scenario.startingYear,
+    });
+    if (!compiled) continue;
+    const moneyScale =
+      officialArcLoadScale(source, scenario) *
+      inEraMoney(1, scenario.startingYear, source.startingYear);
+    for (const original of compiled.events) {
+      const event: CompiledRuleEvent = JSON.parse(JSON.stringify(original));
+      event.id = `arc-${id}-${original.id}`;
+      if (event.effects.operatingExpensePerMonth !== undefined)
+        event.effects.operatingExpensePerMonth *= moneyScale;
+      event.targets = event.targets.map((operation) =>
+        operation.target.selector === "startingAsset"
+          ? {
+              ...operation,
+              target: { selector: "largestOperating", fuel: "Uranium" },
+            }
+          : operation,
+      );
+      events.push(event);
+    }
+  }
+  const rules: CompiledScenarioRules = {
+    runtimeVersion: 1,
+    namespace: { kind: "official", scenarioId: 999, arcId: "custom-arcs" },
+    difficulty: parameters.difficulty,
+    seed: parameters.seed,
+    startingYear: scenario.startingYear,
+    durationMonths: scenario.durationMonths,
+    startingPeakW: 0,
+    startingAssetIds: scenario.facilities.flatMap((asset) =>
+      asset.assetId ? [asset.assetId] : [],
+    ),
+    officialArcs: scenario.eventScenarioIds.map((scenarioId) => ({
+      scenarioId,
+      includeChoices: false,
+    })),
+    events: events.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)),
+    choices: [],
+    loads: [],
+    objectives: [],
+    debriefReports: [],
+  };
+  freezePlain(rules);
+  identityCache.set(rules, ruleDigest(rules));
+  if (customStoryCache.size >= 32)
+    customStoryCache.delete(customStoryCache.keys().next().value!);
+  customStoryCache.set(key, rules);
+  return rules;
+}
+
+/** Static objective/catalog readers use fixed defaults; every live/forecast reader binds its game. */
+export function scenarioRules(
+  scenario?: ScenarioType,
+  parameters?: Pick<GameType, "difficulty" | "seed">,
+): CompiledScenarioRules | undefined {
+  if (!scenario) return undefined;
+  if (scenario.id === 999)
+    return (
+      scenario.mod?.rules ??
+      customScenarioRules(
+        scenario,
+        parameters ?? { difficulty: "Employee", seed: scenario.seed ?? 0 },
+      )
+    );
+  if (
+    scenario.rules?.namespace.kind === "official" &&
+    scenario.rules.namespace.scenarioId === scenario.id
+  )
+    return scenario.rules;
+  return officialScenarioRules(
+    scenario,
+    parameters ?? { difficulty: "Employee", seed: scenario.seed ?? 0 },
+  );
+}
+
+export const isOfficialCatalogRules = (
+  rules: CompiledScenarioRules | undefined,
+): boolean => !!rules && identityCache.has(rules);
+
+/** Trusted cached rules are immutable; manually supplied mutable objects are hashed afresh. */
+export function scenarioRulesIdentity(rules?: CompiledScenarioRules): string {
+  if (!rules) return "";
+  return identityCache.get(rules) ?? ruleDigest(rules);
+}
+const sorted = <T extends { id: string }>(values: readonly T[]): T[] =>
+  [...values].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+/** Effect operations commute. Canonical order gives targeting/receipts stable internal addresses. */
+const sortedOperations = <T>(values: T[]): T[] =>
+  values.sort((a, b) =>
+    canonicalRuleJson(a) < canonicalRuleJson(b)
+      ? -1
+      : canonicalRuleJson(a) > canonicalRuleJson(b)
+        ? 1
+        : 0,
+  );
+const detached = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+function hashAddress(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash | 0;
+}
+function keyOf(
+  namespace: CompiledScenarioRules["namespace"],
+  id: string,
+): string {
+  return namespace.kind === "mod"
+    ? `mod:${namespace.id}:${id}`
+    : `story:${namespace.scenarioId}:${namespace.arcId}:${id}`;
+}
+function normalizeReport(report: RuleReport): RuleReport {
+  return "fromMonth" in report
+    ? {
+        ...report,
+        fromMonth: report.fromMonth - 1,
+        throughMonth: report.throughMonth - 1,
+      }
+    : { ...report };
+}
+function normalizedObjective(
+  objective: RuleObjective,
+  inherited: boolean,
+): CompiledRuleObjective {
+  const base = {
+    ...objective,
+    required: objective.required ?? true,
+    ...(inherited ? { inherited: true } : {}),
+  };
+  if ("deadlineMonth" in base)
+    return { ...base, deadlineMonth: base.deadlineMonth - 1 };
+  const window = {
+    fromMonth: base.fromMonth - 1,
+    throughMonth: base.throughMonth - 1,
+  };
+  if (base.metric === "emissionsBudget") {
+    const { budgetTonnesCO2e, ...rest } = base;
+    return { ...rest, ...window, budgetKgCO2e: budgetTonnesCO2e * 1000 };
+  }
+  if (base.metric === "monthEndDebt") {
+    const { maxDebtDollars, ...rest } = base;
+    return { ...rest, ...window, maxDebt: maxDebtDollars };
+  }
+  return { ...base, ...window };
+}
+/** Compile data only. Official identity belongs to the caller's trusted catalog, never the rules. */
+export function compileScenarioRules(
+  definitions: ScenarioRuleDefinitions,
+  params: RuleCompileParameters,
+): CompiledScenarioRules {
+  const diagnostics = ruleDiagnostics(definitions);
+  const add = (
+    code: string,
+    path: string,
+    message: string,
+    severity: RuleDiagnostic["severity"] = "error",
+  ) => diagnostics.push({ code, path, severity, message });
+  if (!isRuleJson(definitions))
+    add(
+      "invalid-json",
+      "rules",
+      "Rules must contain plain finite JSON data only.",
+    );
+  if (
+    !RULE_DIFFICULTIES.includes(params.difficulty) ||
+    !Number.isInteger(params.seed) ||
+    params.seed < 0 ||
+    params.seed > 4294967295 ||
+    !Number.isInteger(params.startingYear) ||
+    params.startingYear < 1980 ||
+    params.startingYear > 2100 ||
+    !Number.isInteger(params.durationMonths) ||
+    params.durationMonths < 1 ||
+    params.durationMonths > 1200 ||
+    !Number.isFinite(params.startingPeakW) ||
+    params.startingPeakW < 0 ||
+    params.startingPeakW > 1e15
+  )
+    add(
+      "invalid-parameters",
+      "rules",
+      "Resolved difficulty, seed, year, duration and peak demand must be valid bounded values.",
+    );
+  if (diagnostics.some((d) => d.severity === "error"))
+    throw new RuleCompilationError(diagnostics);
+  const namespace = params.namespace;
+  const namespaceKeys =
+    namespace?.kind === "mod"
+      ? ["kind", "id"]
+      : ["kind", "scenarioId", "arcId"];
+  if (
+    !namespace ||
+    Object.keys(namespace).some((key) => !namespaceKeys.includes(key)) ||
+    (namespace.kind === "mod"
+      ? !ID_PATTERN.test(namespace.id)
+      : namespace.kind !== "official" ||
+        !Number.isInteger(namespace.scenarioId) ||
+        namespace.scenarioId < 100 ||
+        namespace.scenarioId > 998 ||
+        !ID_PATTERN.test(namespace.arcId)) ||
+    !Array.isArray(params.startingAssetIds) ||
+    params.startingAssetIds.length > 40 ||
+    new Set(params.startingAssetIds).size !== params.startingAssetIds.length ||
+    params.startingAssetIds.some(
+      (id) => typeof id !== "string" || !ID_PATTERN.test(id),
+    )
+  )
+    add(
+      "invalid-namespace",
+      "rules.namespace",
+      "Only a bounded mod namespace or trusted official catalog namespace and unique catalog asset IDs are supported.",
+    );
+  const ids = new Map<string, string>();
+  const register = (id: string, path: string) => {
+    if (ids.has(id))
+      add(
+        "duplicate-id",
+        path,
+        `${path} repeats ${id}, already used at ${ids.get(id)}. Events, choices, objectives, reports and loads share one namespace.`,
+      );
+    else ids.set(id, path);
+  };
+  const within = (month: number, path: string) => {
+    if (month > params.durationMonths)
+      add(
+        "outside-term",
+        path,
+        `${path} is month ${month}, after this run ends in month ${params.durationMonths}. Extend the term or move it earlier.`,
+      );
+  };
+  const choices = definitions.choices ?? [],
+    events = definitions.events ?? [];
+  const checkReport = (report: RuleReport | undefined, path: string) => {
+    if (!report) return;
+    register(report.id, `${path}.id`);
+    if ("fromMonth" in report) {
+      within(report.fromMonth, `${path}.fromMonth`);
+      within(report.throughMonth, `${path}.throughMonth`);
+      if (
+        report.kind === "deepFreeze" &&
+        report.throughMonth - report.fromMonth !== 2
+      )
+        add(
+          "invalid-report-window",
+          path,
+          "A deep-freeze report needs exactly three completed months: before, impact and recovery.",
+        );
+    }
+  };
+  const checkLoad = (load: RuleLoad, path: string) => {
+    register(load.id, `${path}.id`);
+    within(load.startMonth, `${path}.startMonth`);
+    if (load.peakShareOfStartingPeak !== undefined && params.startingPeakW <= 0)
+      add(
+        "missing-starting-peak",
+        `${path}.peakShareOfStartingPeak`,
+        "Resolve the real starting grid's peak demand before compiling a capacity-share load.",
+      );
+  };
+  events.forEach((event, i) => {
+    register(event.id, `events[${i}].id`);
+    const last =
+      typeof event.startMonth === "number"
+        ? event.startMonth
+        : event.startMonth.to;
+    within(last, `events[${i}].startMonth`);
+    checkReport(event.report, `events[${i}].report`);
+    checkReport(event.endReport, `events[${i}].endReport`);
+    event.loads?.forEach((load, j) =>
+      checkLoad(load, `events[${i}].loads[${j}]`),
+    );
+    for (const corridor of Object.keys(
+      event.effects?.transmissionCapacityLimitsMWByCorridor ?? {},
+    ))
+      if (!TRANSMISSION_CORRIDORS.some((route) => route.id === corridor))
+        add(
+          "unknown-corridor",
+          `events[${i}].effects.transmissionCapacityLimitsMWByCorridor.${corridor}`,
+          `${corridor} is not a registered transmission corridor.`,
+        );
+    event.effects?.outputMultipliersBySelector?.forEach((target, j) => {
+      if (
+        target.target.selector === "startingAsset" &&
+        !params.startingAssetIds.includes(target.target.assetId)
+      )
+        add(
+          "unknown-starting-asset",
+          `events[${i}].effects.outputMultipliersBySelector[${j}].target.assetId`,
+          `${target.target.assetId} is not supplied by this base scenario. Use an available starting-asset ID.`,
+        );
+    });
+  });
+  choices.forEach((choice, i) => {
+    register(choice.id, `choices[${i}].id`);
+    within(choice.dueMonth, `choices[${i}].dueMonth`);
+    const options = new Set<string>();
+    choice.options.forEach((o, j) => {
+      if (options.has(o.id))
+        add(
+          "duplicate-option",
+          `choices[${i}].options[${j}].id`,
+          "Option IDs must be unique within their choice.",
+        );
+      options.add(o.id);
+      o.replaceLoad?.with.forEach((load, k) =>
+        checkLoad(load, `choices[${i}].options[${j}].replaceLoad.with[${k}]`),
+      );
+    });
+    if (
+      !choice.options.some(
+        (o) =>
+          o.costDollars === undefined ||
+          ruleNumber(o.costDollars, params.difficulty) === 0,
+      )
+    )
+      add(
+        "missing-free-option",
+        `choices[${i}].options`,
+        "Every choice needs an unconditional free option at every difficulty.",
+      );
+  });
+  definitions.objectives.forEach((o, i) => {
+    register(o.id, `objectives[${i}].id`);
+    if ("deadlineMonth" in o)
+      within(o.deadlineMonth, `objectives[${i}].deadlineMonth`);
+    else {
+      within(o.fromMonth, `objectives[${i}].fromMonth`);
+      within(o.throughMonth, `objectives[${i}].throughMonth`);
+    }
+  });
+  // Required fuel shares over one aggregate window must admit a normalized fuel mix.
+  // Optional stretch goals may intentionally compete, so only required constraints combine.
+  const shareWindows = new Map<
+    string,
+    Array<{
+      index: number;
+      id: string;
+      fuels: Extract<RuleObjective, { metric: "localFuelShare" }>["fuels"];
+      minShare: number;
+    }>
+  >();
+  definitions.objectives.forEach((objective, index) => {
+    if (objective.metric !== "localFuelShare" || objective.required === false)
+      return;
+    const key = `${objective.fromMonth}:${objective.throughMonth}`;
+    shareWindows.set(key, [
+      ...(shareWindows.get(key) ?? []),
+      {
+        index,
+        id: objective.id,
+        fuels: objective.fuels,
+        minShare: objective.minShare,
+      },
+    ]);
+  });
+  shareWindows.forEach((entries) => {
+    const result = requiredFuelShareFeasibility(entries);
+    if (result.status === "feasible") return;
+    add(
+      result.status === "infeasible"
+        ? "contradictory-objectives"
+        : "objective-analysis-limit",
+      `objectives[${entries[entries.length - 1].index}]`,
+      result.status === "infeasible"
+        ? "Required local fuel-share objectives over the same window cannot all be met by one fuel mix. Reduce a target or make a competing goal optional."
+        : "Fuel-share compatibility could not be verified within the bounded analysis work. Simplify the required goals before launching.",
+    );
+  });
+  definitions.debriefReports?.forEach((report, i) =>
+    checkReport(report, `debriefReports[${i}]`),
+  );
+  const choiceById = new Map(choices.map((c) => [c.id, c]));
+  const checkCondition = (
+    condition: RuleCondition | undefined,
+    month: number,
+    path: string,
+  ) => {
+    if (!condition) return;
+    if (condition.arc !== undefined) {
+      if (
+        !definitions.officialArcs?.some((a) => a.scenarioId === condition.arc)
+      )
+        add(
+          "unknown-arc-reference",
+          path,
+          "The referenced arc must be included in officialArcs.",
+        );
+      return;
+    }
+    const choice = choiceById.get(condition.choiceId);
+    if (!choice) {
+      add(
+        "unknown-choice",
+        `${path}.choiceId`,
+        `${condition.choiceId} is not a defined choice.`,
+      );
+      return;
+    }
+    if (choice.dueMonth > month)
+      add(
+        "later-decision",
+        path,
+        `The dependency is due in month ${choice.dueMonth}, after month ${month}.`,
+      );
+    const options = new Set(choice.options.map((o) => o.id));
+    condition.optionIds.forEach((id) => {
+      if (!options.has(id))
+        add(
+          "unknown-option",
+          `${path}.optionIds`,
+          `${id} is not an option of ${choice.id}.`,
+        );
+    });
+    if (
+      condition.optionIds.length === options.size &&
+      condition.optionIds.every((id) => options.has(id))
+    )
+      add(
+        "unnecessary-condition",
+        path,
+        "This names every option. Remove requiresChoice instead.",
+      );
+  };
+  choices.forEach((c, i) =>
+    checkCondition(
+      c.requiresChoice,
+      c.dueMonth,
+      `choices[${i}].requiresChoice`,
+    ),
+  );
+  events.forEach((e, i) =>
+    checkCondition(
+      e.requiresChoice,
+      typeof e.startMonth === "number" ? e.startMonth : e.startMonth.from,
+      `events[${i}].requiresChoice`,
+    ),
+  );
+  const visiting = new Set<string>(),
+    visited = new Set<string>();
+  const visit = (id: string) => {
+    if (visiting.has(id)) {
+      add("choice-cycle", "choices", `Choice dependency cycle includes ${id}.`);
+      return;
+    }
+    if (visited.has(id)) return;
+    visiting.add(id);
+    const parent = choiceById.get(id)?.requiresChoice;
+    if (parent?.arc === undefined && parent?.choiceId) visit(parent.choiceId);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  choices.forEach((c) => visit(c.id));
+  const loadById = new Map(
+    events.flatMap((e) => (e.loads ?? []).map((l) => [l.id, l] as const)),
+  );
+  choices.forEach((choice, i) =>
+    choice.options.forEach((option, j) => {
+      const replacement = option.replaceLoad;
+      if (replacement && !replacement.arc) {
+        const load = loadById.get(replacement.loadId);
+        if (!load)
+          add(
+            "unknown-load",
+            `choices[${i}].options[${j}].replaceLoad.loadId`,
+            "replaceLoad must name an authored load, or use an arc-scoped reference.",
+          );
+        else if (load.startMonth <= choice.dueMonth)
+          add(
+            "load-already-started",
+            `choices[${i}].options[${j}].replaceLoad`,
+            "A choice can replace a load only before its start month.",
+          );
+      }
+      option.eventIds?.forEach((id) => {
+        const event = events.find((e) => e.id === id);
+        if (
+          !event ||
+          event.requiresChoice?.choiceId !== choice.id ||
+          !event.requiresChoice.optionIds.includes(option.id)
+        )
+          add(
+            "invalid-event-link",
+            `choices[${i}].options[${j}].eventIds`,
+            `${id} must name an event conditioned on this choice and option.`,
+          );
+      });
+    }),
+  );
+  for (const [i, report] of (definitions.debriefReports ?? []).entries())
+    if (
+      report.kind === "affectedFacilities" &&
+      !events.some((e) => e.id === report.eventId)
+    )
+      add(
+        "unknown-event",
+        `debriefReports[${i}].eventId`,
+        "The affected-facilities report must name a defined event.",
+      );
+  if (diagnostics.some((d) => d.severity === "error"))
+    throw new RuleCompilationError(diagnostics);
+  const load = (
+    definition: RuleLoad,
+    eventId: string,
+    condition?: RuleCondition,
+  ): CompiledRuleLoad => ({
+    id: definition.id,
+    eventId,
+    startMonth: definition.startMonth - 1,
+    label: definition.demandType,
+    demandType: definition.demandType,
+    startsYear:
+      params.startingYear + Math.floor((definition.startMonth - 1) / 12),
+    startsMonth: ((definition.startMonth - 1) % 12) + 1,
+    peakW:
+      definition.peakMW !== undefined
+        ? definition.peakMW * 1e6
+        : definition.peakShareOfStartingPeak! * params.startingPeakW,
+    loadFactor: definition.loadFactor,
+    ...(definition.supplementsBackground === undefined
+      ? {}
+      : { supplementsBackground: definition.supplementsBackground }),
+    ...(condition ? { requiresChoice: condition } : {}),
+  });
+  const renderReport = (
+    report: RuleReport,
+    eventMonth?: number,
+  ): RuleReport => ({
+    ...normalizeReport(report),
+    ...(report.label
+      ? {
+          label: renderScenarioText(
+            report.label,
+            params.startingYear,
+            eventMonth,
+          ),
+        }
+      : {}),
+  });
+  const compiledEvents = sorted(events).map((event): CompiledRuleEvent => {
+    const first =
+        typeof event.startMonth === "number"
+          ? event.startMonth
+          : event.startMonth.from,
+      last =
+        typeof event.startMonth === "number"
+          ? event.startMonth
+          : event.startMonth.to;
+    const key = keyOf(params.namespace, event.id);
+    const startMonth =
+      first -
+      1 +
+      Math.floor(
+        randomAt(
+          params.seed,
+          RANDOM_STREAM.worldEvents,
+          hashAddress(
+            params.eventScheduleAddresses?.[event.id] ?? `${key}|schedule`,
+          ),
+        ) *
+          (last - first + 1),
+      );
+    const durationMonths =
+      event.durationMonths === "untilEnd"
+        ? params.durationMonths - startMonth
+        : event.durationMonths === undefined
+          ? 0
+          : ruleNumber(event.durationMonths, params.difficulty);
+    if (
+      event.durationMonths !== "untilEnd" &&
+      last - 1 + durationMonths > params.durationMonths
+    )
+      add(
+        "truncated-event",
+        `events.${event.id}.durationMonths`,
+        `${event.title} may continue beyond the term; only months inside the run are observed.`,
+        "warning",
+      );
+    const effects: WorldEventEffectsType = {},
+      source = event.effects ?? {};
+    if (source.transmissionCapacityLimitsMWByCorridor)
+      effects.transmissionCapacityLimitsWByCorridor = Object.fromEntries(
+        Object.entries(source.transmissionCapacityLimitsMWByCorridor).map(
+          ([corridor, value]) => [
+            corridor,
+            ruleNumber(value, params.difficulty) * 1e6,
+          ],
+        ),
+      );
+    for (const [author, engine] of [
+      ["fuelPriceMultipliers", "fuelPriceMultipliers"],
+      ["outputMultipliersByFuel", "facilityOutputMultipliersByFuel"],
+      ["constructionCostMultipliersByFuel", "buildCostMultipliersByFuel"],
+      ["operatingCostMultipliersByFuel", "operatingCostMultipliersByFuel"],
+    ] as const)
+      if (source[author])
+        effects[engine] = Object.fromEntries(
+          Object.entries(source[author]!).map(([fuel, value]) => [
+            fuel,
+            ruleNumber(value!, params.difficulty),
+          ]),
+        );
+    if (source.demandMultiplier !== undefined)
+      effects.demandMultiplier = ruleNumber(
+        source.demandMultiplier,
+        params.difficulty,
+      );
+    if (source.temperatureOffsetC !== undefined)
+      effects.temperatureOffsetC = ruleNumber(
+        source.temperatureOffsetC,
+        params.difficulty,
+      );
+    if (source.hydroInflowMultiplier !== undefined)
+      effects.hydroRunoffMultiplier = ruleNumber(
+        source.hydroInflowMultiplier,
+        params.difficulty,
+      );
+    if (source.operatingExpenseDollarsPerMonth !== undefined)
+      effects.operatingExpensePerMonth = ruleNumber(
+        source.operatingExpenseDollarsPerMonth,
+        params.difficulty,
+      );
+    if (source.carbonFeeDollarsPerTonneCO2e !== undefined)
+      effects.carbonFeePerKgCO2e =
+        ruleNumber(source.carbonFeeDollarsPerTonneCO2e, params.difficulty) /
+        1000;
+    return {
+      id: event.id,
+      key,
+      title: renderScenarioText(event.title, params.startingYear, startMonth),
+      message: renderScenarioText(
+        event.message,
+        params.startingYear,
+        startMonth,
+      ),
+      startMonth,
+      possibleStartMonths: { from: first - 1, to: last - 1 },
+      durationMonths,
+      ...(event.durationMonths === "untilEnd"
+        ? { durationUntilEnd: true as const }
+        : {}),
+      visibility: event.visibility ?? "forecast",
+      ...(event.preview
+        ? {
+            preview: renderScenarioText(
+              event.preview,
+              params.startingYear,
+              startMonth,
+            ),
+          }
+        : {}),
+      ...(event.endMessage
+        ? {
+            endMessage: renderScenarioText(
+              event.endMessage,
+              params.startingYear,
+              startMonth,
+            ),
+          }
+        : {}),
+      ...(event.requiresChoice ? { requiresChoice: event.requiresChoice } : {}),
+      effects,
+      targets: sortedOperations(
+        (source.outputMultipliersBySelector ?? []).map((t) => ({
+          target:
+            t.target.selector === "seededOperatingCapacityShare"
+              ? {
+                  ...t.target,
+                  targetCapacityShare: ruleNumber(
+                    t.target.targetCapacityShare,
+                    params.difficulty,
+                  ),
+                }
+              : t.target,
+          outputMultiplier: ruleNumber(t.outputMultiplier, params.difficulty),
+        })),
+      ),
+      transactions: sortedOperations(
+        (source.transactions ?? []).map((t) => ({
+          kind: t.kind,
+          amount: ruleNumber(t.amountDollars, params.difficulty),
+        })),
+      ),
+      ...(event.report
+        ? { report: renderReport(event.report, startMonth) }
+        : {}),
+      ...(event.endReport
+        ? { endReport: renderReport(event.endReport, startMonth) }
+        : {}),
+    };
+  });
+  const result: CompiledScenarioRules = {
+    runtimeVersion: 1,
+    namespace: params.namespace,
+    difficulty: params.difficulty,
+    seed: params.seed,
+    startingYear: params.startingYear,
+    durationMonths: params.durationMonths,
+    startingPeakW: params.startingPeakW,
+    startingAssetIds: [...params.startingAssetIds].sort(),
+    officialArcs: (definitions.officialArcs ?? [])
+      .map((arc) => ({ ...arc, includeChoices: arc.includeChoices ?? true }))
+      .sort((a, b) => a.scenarioId - b.scenarioId),
+    events: compiledEvents,
+    choices: sorted(choices).map((c) => ({
+      id: c.id,
+      key: keyOf(params.namespace, c.id),
+      title: renderScenarioText(c.title, params.startingYear, c.dueMonth - 1),
+      prompt: renderScenarioText(c.prompt, params.startingYear, c.dueMonth - 1),
+      dueMonth: c.dueMonth - 1,
+      ...(c.requiresChoice ? { requiresChoice: c.requiresChoice } : {}),
+      freeOptionId: sorted(c.options).find(
+        (o) =>
+          o.costDollars === undefined ||
+          ruleNumber(o.costDollars, params.difficulty) === 0,
+      )!.id,
+      options: sorted(c.options).map((o) => ({
+        id: o.id,
+        label: renderScenarioText(o.label, params.startingYear, c.dueMonth - 1),
+        description: renderScenarioText(
+          o.description,
+          params.startingYear,
+          c.dueMonth - 1,
+        ),
+        message: renderScenarioText(
+          o.message,
+          params.startingYear,
+          c.dueMonth - 1,
+        ),
+        cost:
+          o.costDollars === undefined
+            ? 0
+            : ruleNumber(o.costDollars, params.difficulty),
+        grant:
+          o.grantDollars === undefined
+            ? 0
+            : ruleNumber(o.grantDollars, params.difficulty),
+        ...(o.replaceLoad
+          ? {
+              replaceLoad: {
+                ...o.replaceLoad,
+                with: sorted(o.replaceLoad.with).map((l) =>
+                  load(l, c.id, c.requiresChoice),
+                ),
+              },
+            }
+          : {}),
+        ...(o.eventIds ? { eventIds: [...o.eventIds].sort() } : {}),
+      })),
+    })),
+    objectives: sorted(definitions.objectives).map((o) => ({
+      ...normalizedObjective(
+        o,
+        params.inheritedObjectiveIds?.includes(o.id) ?? false,
+      ),
+      label: renderScenarioText(o.label, params.startingYear),
+    })),
+    loads: sorted(
+      events.flatMap((e) =>
+        (e.loads ?? []).map((l) => load(l, e.id, e.requiresChoice)),
+      ),
+    ),
+    debriefReports: sorted(definitions.debriefReports ?? []).map((report) =>
+      renderReport(report),
+    ),
+  };
+  const dependencyDiagnostics = scenarioRuleDependencyDiagnostics(result, {
+    allowUnresolvedArcChoices: true,
+  });
+  diagnostics.push(
+    ...dependencyDiagnostics.filter((d) => d.severity === "warning"),
+  );
+  const composition = scenarioRuleCompositionDiagnostics(result, [], {
+    allowUnresolvedArcChoices: true,
+  });
+  if (composition.length) throw new RuleCompilationError(composition);
+  if (utf8Bytes(canonicalRuleJson(result)).length > RULE_LIMITS.compiledBytes)
+    throw new RuleCompilationError([
+      {
+        code: "compiled-bytes",
+        path: "rules",
+        severity: "error",
+        message:
+          "Compiled rules, including imported content, exceed the 512 KiB snapshot limit.",
+      },
+    ]);
+  params.diagnostics?.push(...diagnostics);
+  return detached(result);
+}
+
+function authoredReport(report: RuleReport): RuleReport {
+  return "fromMonth" in report
+    ? {
+        ...report,
+        fromMonth: report.fromMonth + 1,
+        throughMonth: report.throughMonth + 1,
+      }
+    : { ...report };
+}
+function authoredObjective(objective: CompiledRuleObjective): RuleObjective {
+  const { inherited: _inherited, ...base } = objective;
+  if ("deadlineMonth" in base)
+    return { ...base, deadlineMonth: base.deadlineMonth + 1 };
+  const window = {
+    fromMonth: base.fromMonth + 1,
+    throughMonth: base.throughMonth + 1,
+  };
+  if (base.metric === "emissionsBudget") {
+    const { budgetKgCO2e, ...rest } = base;
+    return { ...rest, ...window, budgetTonnesCO2e: budgetKgCO2e / 1000 };
+  }
+  if (base.metric === "monthEndDebt") {
+    const { maxDebt, ...rest } = base;
+    return { ...rest, ...window, maxDebtDollars: maxDebt };
+  }
+  return { ...base, ...window };
+}
+/** Used only for validating normalized data; it does not recover the installed authoring package. */
+export function ruleDefinitionsFromSnapshot(
+  rules: CompiledScenarioRules,
+): ScenarioRuleDefinitions {
+  const load = (l: CompiledRuleLoad): RuleLoad => ({
+    id: l.id,
+    startMonth: l.startMonth + 1,
+    demandType: l.demandType as "Data Centers" | "Mining",
+    loadFactor: l.loadFactor,
+    peakMW: l.peakW / 1e6,
+    ...(l.supplementsBackground === undefined
+      ? {}
+      : { supplementsBackground: l.supplementsBackground }),
+  });
+  return {
+    officialArcs: rules.officialArcs,
+    events: rules.events.map((e) => {
+      const effects: NonNullable<
+        import("../data/ScenarioRules").RuleEvent["effects"]
+      > = {};
+      if (e.effects.transmissionCapacityLimitsWByCorridor)
+        effects.transmissionCapacityLimitsMWByCorridor = Object.fromEntries(
+          Object.entries(e.effects.transmissionCapacityLimitsWByCorridor).map(
+            ([corridor, value]) => [corridor, value / 1e6],
+          ),
+        );
+      for (const [engine, author] of [
+        ["fuelPriceMultipliers", "fuelPriceMultipliers"],
+        ["facilityOutputMultipliersByFuel", "outputMultipliersByFuel"],
+        ["buildCostMultipliersByFuel", "constructionCostMultipliersByFuel"],
+        ["operatingCostMultipliersByFuel", "operatingCostMultipliersByFuel"],
+      ] as const)
+        if (e.effects[engine]) effects[author] = e.effects[engine];
+      if (e.effects.demandMultiplier !== undefined)
+        effects.demandMultiplier = e.effects.demandMultiplier;
+      if (e.effects.temperatureOffsetC !== undefined)
+        effects.temperatureOffsetC = e.effects.temperatureOffsetC;
+      if (e.effects.hydroRunoffMultiplier !== undefined)
+        effects.hydroInflowMultiplier = e.effects.hydroRunoffMultiplier;
+      if (e.effects.operatingExpensePerMonth !== undefined)
+        effects.operatingExpenseDollarsPerMonth =
+          e.effects.operatingExpensePerMonth;
+      if (e.effects.carbonFeePerKgCO2e !== undefined)
+        effects.carbonFeeDollarsPerTonneCO2e =
+          e.effects.carbonFeePerKgCO2e * 1000;
+      if (e.targets.length) effects.outputMultipliersBySelector = e.targets;
+      if (e.transactions.length)
+        effects.transactions = e.transactions.map((t) => ({
+          kind: t.kind,
+          amountDollars: t.amount,
+        }));
+      const loads = rules.loads.filter((l) => l.eventId === e.id).map(load);
+      return {
+        id: e.id,
+        title: e.title,
+        message: e.message,
+        startMonth:
+          e.possibleStartMonths.from === e.possibleStartMonths.to
+            ? e.possibleStartMonths.from + 1
+            : {
+                from: e.possibleStartMonths.from + 1,
+                to: e.possibleStartMonths.to + 1,
+              },
+        ...(e.durationUntilEnd
+          ? { durationMonths: "untilEnd" as const }
+          : e.durationMonths
+            ? { durationMonths: e.durationMonths }
+            : {}),
+        visibility: e.visibility,
+        ...(e.preview ? { preview: e.preview } : {}),
+        ...(e.endMessage ? { endMessage: e.endMessage } : {}),
+        ...(e.requiresChoice ? { requiresChoice: e.requiresChoice } : {}),
+        ...(Object.keys(effects).length ? { effects } : {}),
+        ...(loads.length ? { loads } : {}),
+        ...(e.report ? { report: authoredReport(e.report) } : {}),
+        ...(e.endReport ? { endReport: authoredReport(e.endReport) } : {}),
+      };
+    }),
+    choices: rules.choices.map((c) => ({
+      id: c.id,
+      dueMonth: c.dueMonth + 1,
+      title: c.title,
+      prompt: c.prompt,
+      ...(c.requiresChoice ? { requiresChoice: c.requiresChoice } : {}),
+      options: c.options.map((o) => ({
+        id: o.id,
+        label: o.label,
+        description: o.description,
+        message: o.message,
+        ...(o.grant ? { grantDollars: o.grant } : { costDollars: o.cost }),
+        ...(o.replaceLoad
+          ? {
+              replaceLoad: {
+                ...o.replaceLoad,
+                with: o.replaceLoad.with.map(load),
+              },
+            }
+          : {}),
+        ...(o.eventIds ? { eventIds: o.eventIds } : {}),
+      })),
+    })),
+    objectives: rules.objectives.map(authoredObjective),
+    debriefReports: rules.debriefReports.map(authoredReport),
+  };
+}
+function comparableNumbers(value: unknown): unknown {
+  if (typeof value === "number") return Number(value.toPrecision(14));
+  if (Array.isArray(value)) return value.map(comparableNumbers);
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value).map(([key, v]) => [key, comparableNumbers(v)]),
+    );
+  return value;
+}
+/** One normalized-rules validator for save import, host transfers and multiplayer saves. */
+export function validCompiledScenarioRules(
+  value: unknown,
+): value is CompiledScenarioRules {
+  try {
+    if (
+      !isRuleJson(value) ||
+      utf8Bytes(JSON.stringify(value)).length > RULE_LIMITS.compiledBytes
+    )
+      return false;
+    const rules = value as CompiledScenarioRules;
+    if (rules.runtimeVersion !== 1) return false;
+    const definitions = ruleDefinitionsFromSnapshot(rules);
+    const catalog =
+      rules.namespace.kind === "official"
+        ? officialScenarioRuleDefinition(rules.namespace.scenarioId)
+        : undefined;
+    const eventScheduleAddresses = Object.fromEntries(
+      rules.events.flatMap((event) => {
+        const presentation = catalog?.presentation[event.id];
+        return presentation?.scheduleRandomKey &&
+          rules.namespace.kind === "official"
+          ? [
+              [
+                event.id,
+                `story:${rules.namespace.scenarioId}:${rules.namespace.arcId}:${presentation.scheduleAddress ?? event.id}|${presentation.scheduleRandomKey}`,
+              ],
+            ]
+          : [];
+      }),
+    );
+    const normalized = compileScenarioRules(definitions, {
+      eventScheduleAddresses,
+      namespace: rules.namespace,
+      difficulty: rules.difficulty,
+      seed: rules.seed,
+      startingYear: rules.startingYear,
+      durationMonths: rules.durationMonths,
+      startingPeakW: rules.startingPeakW,
+      startingAssetIds: rules.startingAssetIds,
+      inheritedObjectiveIds: rules.objectives
+        .filter((o) => o.inherited)
+        .map((o) => o.id),
+    });
+    if (rules.namespace.kind === "official") {
+      for (const event of rules.events) {
+        if (
+          event.source &&
+          (!validOfficialArcMetadata(event) ||
+            event.source.scenarioId !== rules.namespace.scenarioId ||
+            event.source.arcId !== rules.namespace.arcId ||
+            event.source.phaseId !== event.id)
+        )
+          return false;
+        if (
+          event.reports &&
+          (ruleDiagnostics({
+            objectives: [],
+            debriefReports: event.reports.map(authoredReport),
+          }).some((diagnostic) => diagnostic.severity === "error") ||
+            event.reports.some(
+              (report) =>
+                report.kind === "affectedFacilities" &&
+                !rules.events.some(
+                  (candidate) => candidate.id === report.eventId,
+                ),
+            ))
+        )
+          return false;
+      }
+      normalized.events = normalized.events.map((event) => {
+        const original = rules.events.find(
+          (candidate) => candidate.id === event.id,
+        )!;
+        return original.source
+          ? {
+              ...event,
+              source: original.source,
+              ...(original.protection
+                ? { protection: original.protection }
+                : {}),
+              ...(original.reports ? { reports: original.reports } : {}),
+            }
+          : event;
+      });
+    }
+    if (rules.arcChoices !== undefined) {
+      if (!Array.isArray(rules.arcChoices) || rules.arcChoices.length > 200)
+        return false;
+      const seen = new Set<string>();
+      for (const choice of rules.arcChoices) {
+        if (
+          !validOfficialArcChoiceMetadata(choice) ||
+          !choice.source ||
+          !rules.officialArcs.some(
+            (arc) =>
+              arc.scenarioId === choice.source!.scenarioId &&
+              !!choice.automatic === !arc.includeChoices,
+          ) ||
+          seen.has(choice.key)
+        )
+          return false;
+        seen.add(choice.key);
+        const expectedKey =
+          rules.namespace.kind === "mod"
+            ? `mod:${rules.namespace.id}:arc:${choice.source.scenarioId}:choice:${choice.source.choiceId}`
+            : `story:${choice.source.scenarioId}:${choice.source.arcId}:${choice.source.choiceId}`;
+        if (choice.key !== expectedKey) return false;
+        const {
+          source: _source,
+          automatic: _automatic,
+          ...plainChoice
+        } = choice;
+        const meaningful = plainChoice.options.map(
+          ({ meaningful, ...option }) => ({ option, meaningful }),
+        );
+        const genericChoice = {
+          ...plainChoice,
+          options: meaningful.map((entry) => entry.option),
+        };
+        const probe = {
+          ...rules,
+          choices: [genericChoice],
+          events: [],
+          loads: [],
+          objectives: [],
+          debriefReports: [],
+        };
+        delete probe.arcEvents;
+        delete probe.arcChoices;
+        const definitions = ruleDefinitionsFromSnapshot(probe);
+        const checked = compileScenarioRules(definitions, {
+          namespace: rules.namespace,
+          difficulty: rules.difficulty,
+          seed: rules.seed,
+          startingYear: rules.startingYear,
+          durationMonths: rules.durationMonths,
+          startingPeakW: rules.startingPeakW,
+          startingAssetIds: rules.startingAssetIds,
+        });
+        const canonicalChoice = { ...checked.choices[0], key: choice.key };
+        if (
+          canonicalRuleJson(comparableNumbers(canonicalChoice)) !==
+          canonicalRuleJson(comparableNumbers(genericChoice))
+        )
+          return false;
+      }
+      normalized.arcChoices = rules.arcChoices;
+    }
+    if (rules.arcEvents !== undefined) {
+      if (!Array.isArray(rules.arcEvents) || rules.arcEvents.length > 200)
+        return false;
+      const seen = new Set<string>();
+      for (const event of rules.arcEvents) {
+        if (
+          !validOfficialArcMetadata(event) ||
+          !event.source ||
+          !rules.officialArcs.some(
+            (arc) => arc.scenarioId === event.source!.scenarioId,
+          ) ||
+          seen.has(event.key)
+        )
+          return false;
+        seen.add(event.key);
+        const expectedKey =
+          rules.namespace.kind === "mod"
+            ? `mod:${rules.namespace.id}:arc:${event.source.scenarioId}:${event.source.arcId}:${event.source.phaseId}`
+            : `story:${event.source.scenarioId}:${event.source.arcId}:${event.source.phaseId}`;
+        if (
+          event.key !== expectedKey ||
+          !Number.isInteger(event.startMonth) ||
+          event.startMonth < 0 ||
+          event.startMonth >= rules.durationMonths ||
+          !event.possibleStartMonths ||
+          !Number.isInteger(event.possibleStartMonths.from) ||
+          !Number.isInteger(event.possibleStartMonths.to) ||
+          event.possibleStartMonths.from < 0 ||
+          event.possibleStartMonths.from > event.startMonth ||
+          event.possibleStartMonths.to < event.startMonth ||
+          event.possibleStartMonths.to >= rules.durationMonths
+        )
+          return false;
+        const {
+          source: _source,
+          protection: _protection,
+          reports: _reports,
+          ...plainEvent
+        } = event;
+        const probe = {
+          ...rules,
+          officialArcs: [],
+          events: [
+            {
+              ...plainEvent,
+              possibleStartMonths: {
+                from: event.startMonth,
+                to: event.startMonth,
+              },
+            },
+          ],
+          choices: [],
+          objectives: [],
+          loads: [],
+          debriefReports: event.reports ?? [],
+        };
+        delete probe.arcEvents;
+        const eventDefinitions = ruleDefinitionsFromSnapshot(probe);
+        eventDefinitions.events![0].startMonth = event.startMonth + 1;
+        eventDefinitions.events![0].preview ??= "This event will occur.";
+        for (const report of event.reports ?? []) {
+          if (
+            report.kind === "affectedFacilities" &&
+            !eventDefinitions.events!.some(
+              (definition) => definition.id === report.eventId,
+            )
+          )
+            eventDefinitions.events!.push({
+              id: report.eventId,
+              title: "Observed event",
+              message: "Observed event.",
+              preview: "This event will occur.",
+              startMonth: 1,
+            });
+        }
+        const checked = compileScenarioRules(eventDefinitions, {
+          namespace: rules.namespace,
+          difficulty: rules.difficulty,
+          seed: rules.seed,
+          startingYear: rules.startingYear,
+          durationMonths: rules.durationMonths,
+          startingPeakW: rules.startingPeakW,
+          startingAssetIds: rules.startingAssetIds,
+        });
+        const canonicalEvent = {
+          ...checked.events.find((definition) => definition.id === event.id)!,
+          key: event.key,
+          possibleStartMonths: event.possibleStartMonths,
+        };
+        if (event.preview === undefined) delete canonicalEvent.preview;
+        if (
+          canonicalRuleJson(comparableNumbers(canonicalEvent)) !==
+            canonicalRuleJson(comparableNumbers(plainEvent)) ||
+          canonicalRuleJson(checked.debriefReports) !==
+            canonicalRuleJson(event.reports ?? [])
+        )
+          return false;
+      }
+      normalized.arcEvents = rules.arcEvents;
+    }
+    if (scenarioRuleCompositionDiagnostics(normalized).length) return false;
+    // Unit conversion can change the last binary digit on a round trip. Structural keys and all
+    // bounds are checked first; this comparison permits only that insignificant numeric drift.
+    return (
+      canonicalRuleJson(comparableNumbers(normalized)) ===
+      canonicalRuleJson(comparableNumbers(rules))
+    );
+  } catch {
+    return false;
+  }
+}

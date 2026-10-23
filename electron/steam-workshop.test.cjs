@@ -14,6 +14,7 @@ function fakeApi(overrides = {}) {
       create: () => 2n,
       start: () => 3n,
       title: () => true,
+      description: () => true,
       content: () => true,
       visibility: (_ugc, _handle, value) => {
         visibility.push(value);
@@ -51,7 +52,7 @@ for (const platform of ["win32", "linux", "darwin"])
     assert.deepEqual(
       await workshop.publish(
         "123",
-        { title: "Test", version: "1" },
+        { title: "Test", version: "1", description: "A community scenario." },
         "/tmp/stage",
         { setVisibility: true },
       ),
@@ -59,7 +60,11 @@ for (const platform of ["win32", "linux", "darwin"])
     );
     await workshop.publish(
       "123",
-      { title: "Test", version: "2" },
+      {
+        title: "Test",
+        version: "2",
+        description: "An updated community scenario.",
+      },
       "/tmp/stage",
     );
     // Public only on the first upload; later updates keep the creator's Steam setting.
@@ -119,10 +124,109 @@ test("an invalid update handle never starts an upload", async () => {
       fakeApi({ start: () => handle }).api,
     );
     await assert.rejects(
-      workshop.publish("123", { title: "T", version: "1" }, "/tmp/stage"),
+      workshop.publish(
+        "123",
+        { title: "T", version: "1", description: "A community scenario." },
+        "/tmp/stage",
+      ),
       /could not start/,
     );
   }
+});
+
+test("each upload sets its regenerated description before submitting", async () => {
+  const calls = [];
+  const workshop = new SteamWorkshop(
+    online(async () => {
+      const result = Buffer.alloc(16);
+      result.writeInt32LE(1);
+      return result;
+    }),
+    480,
+    fakeApi({
+      description: (_ugc, _handle, value) => {
+        calls.push(["description", value]);
+        return true;
+      },
+      submit: () => {
+        calls.push(["submit"]);
+        return 4n;
+      },
+    }).api,
+  );
+  const pack = { title: "Grid", version: "1", description: "Authored claim." };
+  for (const description of [
+    "Authored claim.\n\nRules\nDuration: 6 months",
+    "Updated claim.\n\nRules\nDuration: 12 months",
+  ])
+    await workshop.publish("123", pack, "/tmp/stage", { description });
+  assert.deepEqual(calls, [
+    ["description", "Authored claim.\n\nRules\nDuration: 6 months"],
+    ["submit"],
+    ["description", "Updated claim.\n\nRules\nDuration: 12 months"],
+    ["submit"],
+  ]);
+});
+
+test("Workshop descriptions honor the UTF-8 byte limit before starting an update", async () => {
+  const started = [];
+  const descriptions = [];
+  const workshop = new SteamWorkshop(
+    online(async () => {
+      const result = Buffer.alloc(16);
+      result.writeInt32LE(1);
+      return result;
+    }),
+    480,
+    fakeApi({
+      start: () => {
+        started.push(true);
+        return 3n;
+      },
+      description: (_ugc, _handle, text) => {
+        descriptions.push(text);
+        return true;
+      },
+    }).api,
+  );
+  const pack = { title: "Grid", version: "1", description: "A grid." };
+  for (const description of ["x".repeat(7999), "é".repeat(3999) + "x"])
+    await workshop.publish("123", pack, "/tmp/stage", { description });
+  assert.deepEqual(
+    descriptions.map((text) => Buffer.byteLength(text)),
+    [7999, 7999],
+  );
+  for (const description of [
+    "x".repeat(8000),
+    "é".repeat(4000),
+    "invalid\0text",
+  ])
+    await assert.rejects(
+      workshop.publish("123", pack, "/tmp/stage", { description }),
+      /7,999 UTF-8 bytes/,
+    );
+  assert.equal(started.length, 2);
+  assert.equal(descriptions.length, 2);
+});
+
+test("Steam rejection of the description stops the upload before content and submit", async () => {
+  const workshop = new SteamWorkshop(
+    online(() => assert.fail("must not submit")),
+    480,
+    fakeApi({
+      description: () => false,
+      content: () => assert.fail("must not stage rejected metadata"),
+      submit: () => assert.fail("must not submit"),
+    }).api,
+  );
+  await assert.rejects(
+    workshop.publish(
+      "123",
+      { title: "Grid", version: "1", description: "A grid." },
+      "/tmp/stage",
+    ),
+    /could not start/,
+  );
 });
 
 test("Workshop IDs reject path strings, truncation and uint64 overflow", () => {

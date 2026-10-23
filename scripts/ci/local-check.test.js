@@ -221,32 +221,38 @@ test("asset preflight checks manual originals under docs/manual-images", (t) => 
   );
 });
 
-test("the simulation CLI uses an in-process Jest run and a worktree-local cache", () => {
+test("the simulation CLI uses an in-process Jest run and a worktree-local cache", (t) => {
+  const repoRoot = path.resolve(__dirname, "../..");
+  const parent = path.join(repoRoot, ".tmp", "check-cli-tests");
+  fs.mkdirSync(parent, { recursive: true });
+  const root = fs.mkdtempSync(path.join(parent, "sim-config-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const preload = path.join(root, "show-config.cjs");
   // Ask the CLI's actual Jest invocation for its resolved config, without running a simulation.
+  fs.writeFileSync(
+    preload,
+    `const cp = require('node:child_process');
+     const spawn = cp.spawnSync;
+     cp.spawnSync = (command, args, options) => {
+       const result = spawn(command, [...args, '--showConfig'], {
+         ...options, stdio: 'pipe', encoding: 'utf8'
+       });
+       process.stdout.write(result.stdout || '');
+       process.stderr.write(result.stderr || '');
+       return result;
+     };`,
+  );
   const result = spawnSync(
     process.execPath,
-    [
-      "-e",
-      `const cp = require('node:child_process');
-       const spawn = cp.spawnSync;
-       cp.spawnSync = (command, args, options) => {
-         const result = spawn(command, [...args, '--showConfig'], {
-           ...options, stdio: 'pipe', encoding: 'utf8'
-         });
-         process.stdout.write(result.stdout || '');
-         process.stderr.write(result.stderr || '');
-         return result;
-       };
-       require('./scripts/sim');`,
-    ],
-    { encoding: "utf8", windowsHide: true },
+    ["--require", preload, path.join(repoRoot, "scripts", "sim.js")],
+    { encoding: "utf8", windowsHide: true, cwd: repoRoot },
   );
   assert.equal(result.status, 0, result.stderr);
   const config = JSON.parse(result.stdout);
   assert.equal(config.globalConfig.maxWorkers, 1);
   assert.equal(
     path.resolve(config.configs[0].cacheDirectory),
-    path.resolve(".tmp/jest-sim-cli"),
+    path.join(repoRoot, ".tmp", "jest-sim-cli"),
   );
   assert.deepEqual(config.configs[0].testMatch, ["**/src/testing/SimCli.tsx"]);
 });

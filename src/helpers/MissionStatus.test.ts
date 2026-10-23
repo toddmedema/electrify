@@ -1,6 +1,11 @@
 import { createNextState as produce } from "@reduxjs/toolkit";
 import { createGame } from "../testing/Simulator";
-import { SCENARIOS, TUTORIALS, CUSTOM_SCENARIO_ID } from "../data/Scenarios";
+import {
+  SCENARIOS,
+  TUTORIALS,
+  CUSTOM_SCENARIO_ID,
+  DEFAULT_CUSTOM_SCENARIO,
+} from "../data/Scenarios";
 import { GameType, MonthlyHistoryType } from "../Types";
 import {
   EMPTY_HISTORY,
@@ -32,6 +37,7 @@ function fixture(month = 0): GameType {
       draft.startingYear,
     );
     draft.monthlyHistory = [];
+    delete draft.objectiveProgress;
     draft.timeline = [
       Object.assign({}, draft.timeline[0], {
         minute: draft.date.minute,
@@ -91,14 +97,14 @@ test("reliability progress never rounds a failed month up to its target", () => 
   });
   expect(requirement(game, "reliability")).toMatchObject({
     status: "failed",
-    current: "Lowest 99.4% · 1/2 months completed",
+    current: "Lowest 99.499% · 1/2 months completed",
   });
 });
 
 test("wildfire window is pending, partial, complete or failed using completed months", () => {
   expect(getMissionStatus(fixture(35)).headline?.id).toBe("reliability");
   expect(requirement(fixture(35), "reliability").status).toBe("pending");
-  expect(requirement(fixture(36), "reliability").status).toBe("in-progress");
+  expect(requirement(fixture(36), "reliability").status).toBe("pending");
   const partial = createNextState(fixture(37), (g) => {
     g.monthlyHistory = [monthRow(2025, 2, 0), monthRow(2025, 1)];
   });
@@ -121,7 +127,7 @@ test("wildfire window is pending, partial, complete or failed using completed mo
   ).toContain("99.00%");
 });
 
-test("empty and partial required history stay unknown even at term end without changing canonical outcome", () => {
+test("empty and partial required history show the canonical unavailable verdict", () => {
   for (const months of [38, 60]) {
     for (const rows of [[], [monthRow(2025, 1)]]) {
       const game = createNextState(fixture(months), (g) => {
@@ -134,9 +140,9 @@ test("empty and partial required history stay unknown even at term end without c
       expect(getMissionStatus(game).headline?.compact).toContain(
         "incomplete history",
       );
-      expect(
-        GameModule.scenarioObjectiveFailure(wildfire, rows),
-      ).toBeUndefined();
+      expect(GameModule.scenarioObjectiveFailure(wildfire, rows)).toContain(
+        "unverifiable",
+      );
     }
   }
   expect(getMissionStatus(fixture(60)).finalNote).toContain(
@@ -145,7 +151,7 @@ test("empty and partial required history stay unknown even at term end without c
   expect(getMissionStatus(fixture(60)).monthsRemaining).toBe(0);
 });
 
-test("zero demand shares evaluator measurement and cannot invent blackout failure", () => {
+test("zero demand is unverifiable and cannot invent blackout failure", () => {
   const game = createNextState(fixture(38), (g) => {
     g.monthlyHistory = [
       monthRow(2025, 2, 0, 0),
@@ -153,11 +159,11 @@ test("zero demand shares evaluator measurement and cannot invent blackout failur
       monthRow(2024, 12, 0, 0),
     ];
   });
-  expect(requirement(game, "reliability").status).toBe("completed");
+  expect(requirement(game, "reliability").status).toBe("unknown");
   expect(requirement(game, "survival").status).toBe("in-progress");
   expect(
     GameModule.scenarioObjectiveFailure(wildfire, game.monthlyHistory),
-  ).toBeUndefined();
+  ).toContain("unverifiable");
 });
 
 test("survival is chronological completed evidence and ignores current partial history", () => {
@@ -211,7 +217,7 @@ test("Expert survival text and verdict use the 95% firing threshold", () => {
   ).toBe("in-progress");
 });
 
-test("retention shows current customers against final target while recoverable", () => {
+test("retention shows completed-month customers against the final target while recoverable", () => {
   const scenario = SCENARIOS.find(
     (s) => s.minimumCustomerRetention !== undefined && s.ownership === "Public",
   )!;
@@ -221,16 +227,21 @@ test("retention shows current customers against final target while recoverable",
   // Below target now, but organic growth over the whole term can still recover it
   const recoverable = Math.ceil(threshold * 0.95);
   const low = createNextState(game, (g) => {
-    g.timeline[0].customers = recoverable;
+    delete g.objectiveProgress;
+    g.date = getDateFromMinute(MINUTES_PER_MONTH, g.startingYear);
+    g.monthlyHistory = [
+      { ...monthRow(g.startingYear, 1), customers: recoverable },
+    ];
+    g.timeline[0].customers = 1;
   });
   expect(requirement(low, "retention").status).toBe("in-progress");
   expect(getMissionStatus(low).headline?.id).toBe("retention");
   expect(getMissionStatus(low).headline?.compact).toMatch(
-    new RegExp(`^Customers ≥ .* \\(${recoverable.toLocaleString()}\\)$`),
+    /^Retain ≥.*% of starting customers/,
   );
-  expect(requirement(low, "retention").target).toContain("customers");
-  expect(requirement(low, "retention").timing).toContain(
-    "Required at term end",
+  expect(requirement(low, "retention").target).toContain("starting customers");
+  expect(requirement(low, "retention").definition).toContain(
+    "recorded starting customers",
   );
 });
 
@@ -240,11 +251,14 @@ test("retention reads as failed once best-case growth cannot recover it", () => 
   )!;
   const game = createGame({ scenarioId: scenario.id });
   const lost = createNextState(game, (g) => {
-    g.timeline[0].customers = 1;
+    delete g.objectiveProgress;
+    g.date = getDateFromMinute(MINUTES_PER_MONTH, g.startingYear);
+    g.monthlyHistory = [{ ...monthRow(g.startingYear, 1), customers: 1 }];
+    g.timeline[0].customers = scenario.startingCustomers!;
   });
   expect(requirement(lost, "retention").status).toBe("failed");
-  expect(requirement(lost, "retention").timing).toMatch(
-    /^No longer reachable: at most 1 customers by term end$/,
+  expect(requirement(lost, "retention").reason).toContain(
+    "Even the fastest possible growth",
   );
 });
 
@@ -517,7 +531,11 @@ test.each([
       draft.customScenario =
         duration === undefined
           ? undefined
-          : { ...wildfire, durationMonths: duration };
+          : {
+              ...DEFAULT_CUSTOM_SCENARIO,
+              startingYear: draft.startingYear,
+              durationMonths: duration,
+            };
     });
     const generate = jest
       .spyOn(GameModule, "generateNewTimeline")

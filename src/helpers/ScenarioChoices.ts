@@ -2,7 +2,124 @@ import { DifficultyType, GameType, ScenarioChoiceType } from "../Types";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
-import { SCENARIO_PREPARATION_MONTHS } from "../data/ScenarioPreparation";
+import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
+import { scenarioRules } from "./ScenarioRules";
+import { getScenario } from "../data/Scenarios";
+import { ruleConditionMet } from "./ScenarioRuleRuntime";
+import { ruleChoices } from "./ScenarioRuleDependencies";
+import type { CompiledRuleChoice } from "../data/ScenarioRules";
+import { compileOfficialArcChoices } from "./ScenarioRuleChoices";
+import type { CompiledScenarioRules } from "../data/ScenarioRules";
+
+const catalogChoices = new Map<string, CompiledRuleChoice[]>();
+
+/** Read launch-bound choices from the shared compiled rules. */
+export function scenarioChoicesForGame(game: GameType): {
+  choices: CompiledRuleChoice[];
+  rules?: CompiledScenarioRules;
+} {
+  const scenario = getScenario(game.scenarioId, game.customScenario);
+  const rules = scenarioRules(scenario, game);
+  if (rules) return { choices: ruleChoices(rules), rules };
+  if (
+    !scenario ||
+    !SCENARIO_CHOICES.some((choice) => choice.scenarioId === game.scenarioId)
+  )
+    return { choices: [] };
+  const key = `${game.scenarioId}:${game.difficulty}:${game.seed}:${game.startingYear}`;
+  let choices = catalogChoices.get(key);
+  if (!choices) {
+    choices = compileOfficialArcChoices(
+      {
+        namespace: {
+          kind: "official",
+          scenarioId: scenario.id,
+          arcId: "catalog",
+        },
+        difficulty: game.difficulty,
+        seed: game.seed,
+        startingYear: game.startingYear,
+        durationMonths: scenario.durationMonths,
+        startingAssetIds: scenario.facilities.flatMap((asset) =>
+          asset.assetId ? [asset.assetId] : [],
+        ),
+        receivingScenario: scenario,
+      },
+      [{ scenarioId: scenario.id, includeChoices: true }],
+    );
+    catalogChoices.set(key, choices);
+  }
+  return {
+    choices,
+    rules: {
+      runtimeVersion: 1,
+      namespace: {
+        kind: "official",
+        scenarioId: scenario.id,
+        arcId: "catalog",
+      },
+      difficulty: game.difficulty,
+      seed: game.seed,
+      startingYear: game.startingYear,
+      durationMonths: scenario.durationMonths,
+      startingPeakW: 0,
+      startingAssetIds: scenario.facilities.flatMap((asset) =>
+        asset.assetId ? [asset.assetId] : [],
+      ),
+      officialArcs: [{ scenarioId: scenario.id, includeChoices: true }],
+      choices: [],
+      arcChoices: choices,
+      events: [],
+      loads: [],
+      objectives: [],
+      debriefReports: [],
+    },
+  };
+}
+
+/** The UI adapter is ephemeral; the saved definition stays plain data. */
+export function scenarioRuleChoiceView(
+  choice: CompiledRuleChoice,
+  scenarioId: number,
+): ScenarioChoiceType {
+  return {
+    id: choice.key,
+    scenarioId,
+    atMonth: choice.dueMonth,
+    title: choice.title,
+    message: choice.prompt,
+    options: choice.options.map((option) => ({
+      id: option.id,
+      label: option.label,
+      description: option.description,
+      message: option.message,
+      cost: () => option.cost,
+      upfrontGrant: () => option.grant,
+      meaningful: option.meaningful,
+    })),
+  };
+}
+
+export function pendingScenarioRuleChoice(
+  game: GameType,
+  automatic = false,
+): CompiledRuleChoice | undefined {
+  const { choices, rules } = scenarioChoicesForGame(game);
+  if (game.storyEffectsDisabled) return undefined;
+  return choices.find(
+    (choice) =>
+      !!choice.automatic === automatic &&
+      game.date.monthsElapsed >= choice.dueMonth &&
+      !game.worldEvents.occurrences.some((event) => event.key === choice.key) &&
+      (!choice.requiresChoice ||
+        (!!rules &&
+          ruleConditionMet(
+            choice.requiresChoice,
+            rules,
+            game.worldEvents.occurrences,
+          ))),
+  );
+}
 
 /** Keep the price and consequence in one sentence, using the active difficulty's terms. */
 export function scenarioChoiceDescription(
@@ -29,12 +146,15 @@ export function pendingScenarioChoice(
   definitions: ScenarioChoiceType[] = SCENARIO_CHOICES,
 ) {
   if (game.storyEffectsDisabled) return undefined;
+  if (definitions === SCENARIO_CHOICES) {
+    const choice = pendingScenarioRuleChoice(game);
+    return choice ? scenarioRuleChoiceView(choice, game.scenarioId) : undefined;
+  }
   return definitions.find(
     (choice) =>
       choice.scenarioId === game.scenarioId &&
       game.date.minute >=
-        (choice.atMonth +
-          (SCENARIO_PREPARATION_MONTHS[choice.scenarioId] || 0)) *
+        relocateOfficialArcMonth(choice.scenarioId, choice.atMonth, "choice") *
           MINUTES_PER_MONTH &&
       !game.worldEvents.occurrences.some((event) => event.key === choice.id),
   );

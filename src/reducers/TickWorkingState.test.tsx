@@ -313,6 +313,33 @@ describe("live presentation tick batches", () => {
     expect(actual.timeline[20]).toBe(before.timeline[20]);
   });
 
+  it.each([12, 120])(
+    "stops and resumes at the declarative official onset in a real %i-step ULTRA/catch-up batch",
+    (steps) => {
+      const state = createGame({ scenarioId: 113, difficulty: "CEO", seed: 1 });
+      for (let i = 0; i < 36 * TICKS_PER_MONTH - 1; i++) tickState(state);
+      const { actual, before } = presentBatch(state, steps);
+      expect(actual.date.minute - before.date.minute).toBe(TICK_MINUTES);
+      expect(actual.speed).toBe("PAUSED");
+      expect(actual.worldEvents.active).toContainEqual(
+        expect.objectContaining({
+          key: "story:113:load-shedding:availability-step-1",
+        }),
+      );
+      expect(actual.customScenario).toBeUndefined();
+      const continued = presentBatch(mutableCopy(actual), steps);
+      expect(continued.actual.date.minute - continued.before.date.minute).toBe(
+        steps * TICK_MINUTES,
+      );
+      expect(
+        continued.actual.worldEvents.occurrences.filter(
+          (event) =>
+            event.key === "story:113:load-shedding:availability-step-1",
+        ),
+      ).toHaveLength(1);
+    },
+  );
+
   it("stops a catch-up batch when a tutorial pauses before rollover", () => {
     const state = createGame({ scenarioId: 103, seed: 12345 });
     for (let i = 0; i < TICKS_PER_MONTH - 1; i++) tickState(state);

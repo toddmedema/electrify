@@ -412,7 +412,8 @@ export function checkTick(
         GAME_TO_REAL_YEARS) /
         1000) *
         now.customerBillingRate +
-      (now.revenueExports || 0);
+      (now.revenueExports || 0) +
+      (now.revenueGrants || 0);
     if (
       !isFinite_(now.customerBillingRate) ||
       now.customerBillingRate < 0 ||
@@ -420,7 +421,7 @@ export function checkTick(
         Math.max(1, Math.abs(billedRevenue) * RELATIVE_TOLERANCE)
     ) {
       collector.add(
-        "revenue bills only delivered energy at the effective rate",
+        "revenue separates delivered-energy bills, exports and recorded grants",
         when,
         `recorded revenue ${now.revenue}, delivered-energy bill ${billedRevenue}`,
       );

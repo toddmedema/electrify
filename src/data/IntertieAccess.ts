@@ -1,5 +1,6 @@
 import { getScenario } from "./Scenarios";
-import type { GameType } from "../Types";
+import type { FrozenStartingIntertieAccessType, GameType } from "../Types";
+import { validFrozenStartingIntertieScenario } from "../helpers/FrozenStartingInterties";
 import { INTERTIE_UPGRADE_STEP, MAX_INTERTIE_UPGRADES } from "../Constants";
 import {
   adjacentMarketForCorridor,
@@ -7,11 +8,13 @@ import {
   corridorsForLocation,
 } from "./AdjacentMarkets";
 import { corridorOpenInYear } from "./IntertieTrends";
+import { log } from "../helpers/Libm";
 
 export interface IntertieAccessContext {
   peers?: NonNullable<GameType["multiplayer"]>["peers"];
   scenarioId?: number;
   legacyWildfireIntertieAccess?: boolean;
+  frozenStartingIntertieAccess?: FrozenStartingIntertieAccessType;
   locationId?: string;
 }
 export interface ScenarioIntertieAccess {
@@ -265,11 +268,15 @@ export function accessContextForGame(
   game: Pick<GameType, "scenarioId" | "location" | "customScenario"> &
     Partial<Pick<GameType, "multiplayer" | "legacyWildfireIntertieAccess">>,
 ): IntertieAccessContext {
+  const custom = game.customScenario;
   return {
     peers: game.multiplayer?.peers,
     legacyWildfireIntertieAccess: game.legacyWildfireIntertieAccess,
     scenarioId: game.customScenario ? undefined : game.scenarioId,
     locationId: game.location.id,
+    ...(custom?.mod && validFrozenStartingIntertieScenario(custom)
+      ? { frozenStartingIntertieAccess: custom.startingIntertieAccess }
+      : {}),
   };
 }
 const LEGACY_WILDFIRE_ACCESS: readonly ScenarioIntertieAccess[] = [
@@ -293,6 +300,13 @@ const LEGACY_WILDFIRE_ACCESS: readonly ScenarioIntertieAccess[] = [
   },
 ];
 function allocation(corridorId: string, context?: IntertieAccessContext) {
+  if (
+    context?.frozenStartingIntertieAccess &&
+    context.frozenStartingIntertieAccess.locationId === context.locationId
+  )
+    return context.frozenStartingIntertieAccess.allocations.find(
+      (row) => row.corridorId === corridorId,
+    );
   const allocations = context?.legacyWildfireIntertieAccess
     ? LEGACY_WILDFIRE_ACCESS
     : SCENARIO_INTERTIE_ACCESS;
@@ -340,8 +354,8 @@ export function effectiveMarket(
               Math.min(
                 MAX_INTERTIE_UPGRADES,
                 Math.round(
-                  Math.log((capacityW ?? access.capacityW) / access.capacityW) /
-                    Math.log(INTERTIE_UPGRADE_STEP),
+                  log((capacityW ?? access.capacityW) / access.capacityW) /
+                    log(INTERTIE_UPGRADE_STEP),
                 ),
               ),
             )

@@ -5,12 +5,19 @@ import {
   GameEventImportanceType,
   StoryActionTargetType,
 } from "../../Types";
-import {
-  STORY_ARC_DEFINITIONS,
-  upcomingStoryPhases,
-} from "../../data/WorldEvents";
+import { upcomingStoryPhases } from "../../data/WorldEvents";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { buildStorySnapshot } from "../../helpers/Story";
+import {
+  scenarioRules,
+  scenarioRulesIdentity,
+} from "../../helpers/ScenarioRules";
+import { getScenario } from "../../data/Scenarios";
+import { scenarioChoicesForGame } from "../../helpers/ScenarioChoices";
+import {
+  ruleConditionMet,
+  scenarioRuleForecastOccurrences,
+} from "../../helpers/ScenarioRuleRuntime";
 
 export interface UpcomingStoryEventType {
   key: string;
@@ -33,18 +40,13 @@ export function selectUpcomingStoryEvents(
   state: AppStateType,
 ): UpcomingStoryEventType[] {
   const game = state.game;
+  const rules = scenarioRules(
+    getScenario(game.scenarioId, game.customScenario),
+    game,
+  );
   const customEvents = customEventContext(game.customScenario);
-  if (
-    !game.loadAdditions?.length &&
-    !STORY_ARC_DEFINITIONS.some(
-      (arc) =>
-        arc.scenarioId === game.scenarioId ||
-        (game.scenarioId === 999 &&
-          customEvents?.some((event) => event.scenarioId === arc.scenarioId)),
-    )
-  ) {
+  if (!game.loadAdditions?.length && !rules && !customEvents?.length)
     return NO_UPCOMING;
-  }
   const fleetKey = game.facilities
     .map((facility) =>
       [
@@ -81,6 +83,10 @@ export function selectUpcomingStoryEvents(
     .join("|");
   const key = [
     game.seed,
+    game.customScenario?.mod?.runtimeDigest ??
+      scenarioRulesIdentity(
+        scenarioRules(getScenario(game.scenarioId, game.customScenario), game),
+      ),
     game.scenarioId,
     game.difficulty,
     game.date.monthsElapsed,
@@ -88,6 +94,14 @@ export function selectUpcomingStoryEvents(
     game.location.id,
     JSON.stringify(game.loadAdditions),
     JSON.stringify(customEvents),
+    JSON.stringify(
+      game.worldEvents.occurrences.map((event) => [
+        event.key,
+        event.startsMinute,
+        event.attributes.choice,
+        event.attributes.ruleTargets,
+      ]),
+    ),
     historyKey,
     fleetKey,
   ].join("|");
@@ -95,13 +109,23 @@ export function selectUpcomingStoryEvents(
     return upcomingCache.events;
   }
   const events: UpcomingStoryEventType[] = upcomingStoryPhases({
+    rules: scenarioRules(
+      getScenario(game.scenarioId, game.customScenario),
+      game,
+    ),
     seed: game.seed,
     scenarioId: game.scenarioId,
     customEvents,
     difficulty: game.difficulty,
     date: game.date,
     location: game.location,
-    occurrences: game.worldEvents.occurrences,
+    occurrences: rules
+      ? scenarioRuleForecastOccurrences(
+          rules,
+          game.worldEvents.occurrences,
+          rules.durationMonths - 1,
+        )
+      : game.worldEvents.occurrences,
     snapshot: buildStorySnapshot(
       game.monthlyHistory,
       game.facilities,
@@ -114,6 +138,42 @@ export function selectUpcomingStoryEvents(
       label: `Expected ${date.month} ${date.year}`,
     };
   });
+  const choiceContext = scenarioChoicesForGame(game);
+  for (const choice of choiceContext.choices) {
+    if (
+      choice.dueMonth < game.date.monthsElapsed ||
+      game.worldEvents.occurrences.some((event) => event.key === choice.key) ||
+      (choice.requiresChoice &&
+        (!choiceContext.rules ||
+          !ruleConditionMet(
+            choice.requiresChoice,
+            choiceContext.rules,
+            game.worldEvents.occurrences,
+          )))
+    )
+      continue;
+    const startsMinute = choice.dueMonth * MINUTES_PER_MONTH;
+    const date = getDateFromMinute(startsMinute, game.startingYear);
+    const free = choice.options.find(
+      (option) => option.id === choice.freeOptionId,
+    )!;
+    events.push({
+      key: choice.key,
+      startsMinute,
+      label: choice.automatic
+        ? `Automatic response · ${date.month} ${date.year}`
+        : startsMinute === game.date.minute
+          ? "Decision required · Paused"
+          : `Decision · ${date.month} ${date.year}`,
+      title: choice.title,
+      message: choice.automatic
+        ? `This will resolve automatically: ${free.label}. ${free.description}`
+        : choice.prompt,
+      concept: "goal",
+      importance: "NOTABLE",
+      actionTarget: { card: "EVENTS" },
+    });
+  }
   for (const addition of game.loadAdditions ?? []) {
     const startsMinute =
       ((addition.startsYear - game.startingYear) * 12 +
@@ -178,8 +238,17 @@ export function selectActiveEventGroups(
   if (inEffect.length === 0) {
     return NO_ACTIVE_GROUPS;
   }
-  const cacheKey =
-    game.startingYear + "|" + inEffect.map((event) => event.key).join("|");
+  const cacheKey = JSON.stringify([
+    game.startingYear,
+    inEffect.map((event) => [
+      event.key,
+      event.title,
+      event.concept,
+      event.importance,
+      event.startsMinute,
+      event.endsMinute,
+    ]),
+  ]);
   if (activeGroupsCache?.key === cacheKey) {
     return activeGroupsCache.groups;
   }

@@ -130,6 +130,7 @@ test.beforeEach(async ({ page }) => {
           title: "Deck Grid",
           creator: "QA",
           version: "1.0.0",
+          description: "A small grid for controller checks.",
           seed: 42,
           baseScenarioId: 999,
         },
@@ -645,9 +646,11 @@ test("controller opens Workshop and enters a multiplayer invite with Steam text 
     name: "Deck Grid enabled",
     exact: true,
   });
+  // Play appears once the mod's peak demand is prepared, after initial focus has settled below it.
   await select(
     page,
     page.getByRole("button", { name: "Play Deck Grid", exact: true }),
+    "up",
   );
   await input(page, "right");
   await expect(enabled).toBeFocused();

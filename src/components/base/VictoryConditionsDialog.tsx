@@ -32,14 +32,7 @@ export default function VictoryConditionsDialog({
         </Button>
       }
     >
-      <VictoryConditions
-        difficulty={difficulty}
-        ownership={scenario.ownership}
-        dollarsPerkWh={scenario.dollarsPerkWh}
-        startingCustomers={scenario.startingCustomers}
-        minimumCustomerRetention={scenario.minimumCustomerRetention}
-        reliabilityObjective={scenario.reliabilityObjective}
-      />
+      <VictoryConditions difficulty={difficulty} scenario={scenario} />
     </DecisionDialog>
   );
 }
