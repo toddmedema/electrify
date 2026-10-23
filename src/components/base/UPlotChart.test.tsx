@@ -103,7 +103,7 @@ describe("UPlotChart resizing", () => {
     expect(screen.getByRole("img", { name: /Text size chart/ })).toBeVisible();
   });
 
-  it("uses Escape for an open chart tooltip, then lets Back leave the chart", () => {
+  function renderInteractiveChart() {
     render(
       <UPlotChart
         ariaLabel="Demand chart"
@@ -126,13 +126,45 @@ describe("UPlotChart resizing", () => {
         idx: position.left < 0 ? null : position.left,
       };
     });
-    const chart = screen.getByRole("img", { name: /Demand chart/ });
+    return { chart: screen.getByRole("img", { name: /Demand chart/ }) };
+  }
+
+  it("uses Escape for an open chart tooltip, then lets Back leave the chart", () => {
+    const { chart } = renderInteractiveChart();
     expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(true);
     fireEvent.keyDown(chart, { key: "Enter" });
     expect(screen.getByRole("status")).toHaveTextContent("Point 0");
     expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(false);
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(true);
+  });
+
+  it("keeps compatibility moves from dismissing keyboard selection and hands off to intentional pointer input", () => {
+    const { chart } = renderInteractiveChart();
+    const pointer = (type: string, x: number, pointerType = "mouse") => {
+      const event = new Event(type, { bubbles: true });
+      // Chromium mobile emulation can report zero movement deltas despite changed coordinates.
+      Object.assign(event, {
+        clientX: x,
+        clientY: 20,
+        pointerType,
+        movementX: 0,
+        movementY: 0,
+      });
+      fireEvent(chart, event);
+    };
+    pointer("pointerdown", 80, "touch");
+    fireEvent.keyDown(chart, { key: "Home" });
+    pointer("pointermove", 80);
+    expect(screen.getByRole("status")).toHaveTextContent("Point 0");
+    pointer("pointermove", 50);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    fireEvent.keyDown(chart, { key: "Home" });
+    pointer("pointerdown", 80, "touch");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    fireEvent.keyDown(chart, { key: "Home" });
+    fireEvent.blur(chart);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
   it("continues a chart tutorial once when Confirm inspects a point", async () => {

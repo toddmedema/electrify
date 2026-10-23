@@ -46,14 +46,22 @@ for (const layout of [
           ) || 40,
         ),
       );
-      for (const item of await page
-        .getByRole("menu", { name: "Pinned goals" })
-        .locator(".MuiMenuItem-root")
-        .all()) {
-        expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(
-          minimum,
-        );
-      }
+      // A visible MUI menu can still be at its initial entrance scale. Measure all
+      // choices together and wait for the actual control-size contract, not a delay.
+      await expect
+        .poll(() =>
+          page
+            .getByRole("menu", { name: "Pinned goals" })
+            .locator(".MuiMenuItem-root")
+            .evaluateAll((items) =>
+              items.length
+                ? Math.min(
+                    ...items.map((item) => item.getBoundingClientRect().height),
+                  )
+                : 0,
+            ),
+        )
+        .toBeGreaterThanOrEqual(minimum);
       await page.keyboard.press("Escape");
       await expect(goals).toBeFocused();
       for (const row of await page

@@ -3,6 +3,9 @@ import path from "node:path";
 import base from "./playwright.config";
 
 const port = process.env.E2E_PORT || "3197";
+const outputDir =
+  process.env.ELECTRIFY_E2E_OUTPUT_DIR ||
+  path.resolve(__dirname, "../test-results/steam-input");
 const productionBuild = process.env.STEAM_INPUT_BUILD_DIR;
 const productionRoot = productionBuild
   ? path.resolve(__dirname, "..", productionBuild)
@@ -18,7 +21,13 @@ export default defineConfig({
   ...base,
   testMatch: "steam-input.spec.ts",
   testIgnore: [],
-  outputDir: "../test-results/steam-input",
+  outputDir,
+  reporter: [
+    ["list"],
+    ["json", { outputFile: path.join(outputDir, "results.json") }],
+  ],
+  // Keep retries as diagnostics while rejecting a failed first attempt.
+  failOnFlakyTests: true,
   fullyParallel: false,
   workers: 1,
   timeout: 90000,

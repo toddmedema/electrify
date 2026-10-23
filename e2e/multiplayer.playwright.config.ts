@@ -2,6 +2,9 @@ import { defineConfig } from "@playwright/test";
 import path from "node:path";
 
 const port = process.env.E2E_PORT || "3115";
+const outputDir =
+  process.env.ELECTRIFY_E2E_OUTPUT_DIR ||
+  path.resolve(__dirname, "../test-results/multiplayer");
 const productionBuild =
   process.env.MULTIPLAYER_BUILD_DIR ||
   (process.env.GITHUB_ACTIONS === "true" ? "build" : undefined);
@@ -27,12 +30,20 @@ if (productionRoot) {
 export default defineConfig({
   testDir: ".",
   testMatch: ["multiplayer.spec.ts", "mods.spec.ts"],
-  outputDir: "../test-results/multiplayer",
+  outputDir,
   fullyParallel: false,
   workers: 1,
   timeout: 120000,
   expect: { timeout: 20000 },
-  reporter: "list",
+  reporter: [
+    ["list"],
+    [
+      "json",
+      {
+        outputFile: path.join(outputDir, "results.json"),
+      },
+    ],
+  ],
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     headless: true,
