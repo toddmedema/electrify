@@ -373,41 +373,34 @@ test("the author can inspect every difficulty's complete resolved report", async
   );
   setup([entry]);
   await userEvent.click(
-    await screen.findByRole("button", {
-      name: "Author validation report for Community Grid",
-    }),
+    await screen.findByLabelText("Author validation report for Community Grid"),
   );
   const dialog = screen.getByRole("dialog", {
     name: "Author validation report: Community Grid",
   });
-  expect(within(dialog).getByRole("button", { name: "Easy" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await userEvent.click(within(dialog).getByRole("button", { name: "Expert" }));
+  // Direct labels/text avoid repeating JSDOM's style-heavy accessible-name scan
+  // across every accordion; keep the full report interactions and visibility checks.
+  expect(
+    within(dialog).getByText("Easy", { selector: "button" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await userEvent.click(
-    within(dialog).getByRole("button", { name: "Resolved setup" }),
+    within(dialog).getByText("Expert", { selector: "button" }),
   );
-  expect(
-    within(dialog).getByRole("region", { name: "Resolved setup" }),
-  ).toHaveTextContent(expertPeak);
-  expect(
-    within(dialog).getByRole("region", { name: "Resolved setup" }),
-  ).toHaveTextContent(
+  await userEvent.click(within(dialog).getByText("Resolved setup"));
+  expect(within(dialog).getByLabelText("Resolved setup")).toBeVisible();
+  expect(within(dialog).getByLabelText("Resolved setup")).toHaveTextContent(
+    expertPeak,
+  );
+  expect(within(dialog).getByLabelText("Resolved setup")).toHaveTextContent(
     expertSetup.rows.find((row) => row.label === "Difficulty")!.value,
   );
-  await userEvent.click(
-    within(dialog).getByRole("button", {
-      name: expertTimeline.title,
-    }),
-  );
-  const timeline = within(dialog).getByRole("region", {
-    name: expertTimeline.title,
-  });
+  await userEvent.click(within(dialog).getByText(expertTimeline.title));
+  const timeline = within(dialog).getByLabelText(expertTimeline.title);
+  expect(timeline).toBeVisible();
   expect(timeline).toHaveTextContent("Active for 5 months");
   expect(timeline).toHaveTextContent("Natural Gas fuel price: 120% of normal");
   await userEvent.click(
-    within(dialog).getByRole("button", { name: "Beginner" }),
+    within(dialog).getByText("Beginner", { selector: "button" }),
   );
   expect(timeline).toHaveTextContent("Active for 1 month");
   expect(timeline).toHaveTextContent("Natural Gas fuel price: 80% of normal");
@@ -417,20 +410,16 @@ test("the author can inspect every difficulty's complete resolved report", async
       name: "Inherited objectives: replace-ready JSON",
     }),
   ).toBeEnabled();
-  await userEvent.click(
-    within(dialog).getByRole("button", {
-      name: "Difficulty validation",
-    }),
-  );
+  await userEvent.click(within(dialog).getByText("Difficulty validation"));
   expect(
-    within(dialog).getByRole("region", { name: "Difficulty validation" }),
+    within(dialog).getByLabelText("Difficulty validation"),
   ).toHaveTextContent("CEO");
   expect(
-    within(dialog).getByRole("region", { name: "Scenario diagnostics" }),
+    within(dialog).getByLabelText("Scenario diagnostics"),
   ).toHaveTextContent("scenario.durationMonths");
   expect(launchCustomScenario).not.toHaveBeenCalled();
   await userEvent.click(
-    within(dialog).getByRole("button", { name: "Close report" }),
+    within(dialog).getByText("Close report", { selector: "button" }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   await userEvent.click(
@@ -476,21 +465,19 @@ test("private event warnings remain available only in the explicit author report
       /private-transformer|Surprise transformer failure/,
     ),
   ).toHaveLength(0);
-  await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  await userEvent.click(
+    within(dialog).getByText("Cancel", { selector: "button" }),
+  );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   await userEvent.click(
-    screen.getByRole("button", {
-      name: "Author validation report for Community Grid",
-    }),
+    screen.getByLabelText("Author validation report for Community Grid"),
   );
-  expect(
-    screen.getByRole("region", { name: "Scenario diagnostics" }),
-  ).toHaveTextContent(
+  expect(screen.getByLabelText("Scenario diagnostics")).toHaveTextContent(
     "Surprise transformer failure may continue beyond the term",
   );
-  expect(
-    screen.getByRole("region", { name: "Scenario diagnostics" }),
-  ).toHaveTextContent("events.private-transformer.durationMonths");
+  expect(screen.getByLabelText("Scenario diagnostics")).toHaveTextContent(
+    "events.private-transformer.durationMonths",
+  );
 });
 
 test("publishing stays open while uploading and offers the Steam page afterwards", async () => {

@@ -59,15 +59,17 @@ beforeAll(() => loadSimData("SF"));
 test("player details separate author claims from engine facts and hide surprise rules", async () => {
   const scenario = modScenario(pack, undefined, "Employee");
   render(<ModDetails scenario={scenario} objectiveIntent="replace" />);
-  expect(
-    screen.getByRole("region", { name: "Author description" }),
-  ).toHaveTextContent(pack.description);
-  const goals = screen.getByRole("region", { name: "Scenario objectives" });
+  expect(screen.getByLabelText("Author description")).toHaveTextContent(
+    pack.description,
+  );
+  const goals = screen.getByLabelText("Scenario objectives");
+  expect(goals).toBeVisible();
   expect(goals).toHaveTextContent("Serve demand");
   expect(goals).toHaveTextContent(
     "Delivered customer electricity divided by customer demand each completed month.",
   );
-  const timeline = screen.getByRole("region", { name: "Announced timeline" });
+  const timeline = screen.getByLabelText("Announced timeline");
+  expect(timeline).toBeVisible();
   expect(timeline).toHaveTextContent("Announced fuel support");
   expect(timeline).toHaveTextContent("Feb 2020");
   expect(
@@ -76,12 +78,13 @@ test("player details separate author claims from engine facts and hide surprise 
   await userEvent.click(
     screen.getByRole("button", { name: /Starting fleet/i }),
   );
-  const fleet = screen.getByRole("region", { name: /Starting fleet/i });
+  const fleet = screen.getByLabelText("Starting fleet");
+  expect(fleet).toBeVisible();
   expect(fleet).toHaveTextContent(scenario.facilities[0].assetId!);
   expect(fleet).toHaveTextContent("MW");
-  expect(
-    screen.getByRole("region", { name: "Scenario diagnostics" }),
-  ).toHaveTextContent("No validation issues.");
+  expect(screen.getByLabelText("Scenario diagnostics")).toHaveTextContent(
+    "No validation issues.",
+  );
 });
 
 test("the author report exposes the same complete resolved timeline behind an explicit author tool", async () => {
@@ -92,7 +95,7 @@ test("the author report exposes the same complete resolved timeline behind an ex
   const button = screen.getByRole("button", { name: timeline!.title });
   expect(button).toHaveAttribute("aria-expanded", "false");
   await userEvent.click(button);
-  const region = screen.getByRole("region", { name: timeline!.title });
+  const region = screen.getByLabelText(timeline!.title);
   expect(region).toHaveTextContent("Private fuel shock");
   const row = timeline!.rows.find(
     (item) =>
