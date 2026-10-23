@@ -342,6 +342,9 @@ export function parseSave(raw: unknown): SaveGameType | null {
     !isValidDifficulty(game.difficulty) ||
     typeof game.scenarioId !== "number" ||
     typeof game.seed !== "number" ||
+    !Number.isInteger(game.seed) ||
+    game.seed < 0 ||
+    game.seed > 4294967295 ||
     typeof game.startingYear !== "number" ||
     !Number.isFinite(game.startingYear) ||
     typeof game.customerMarketSize !== "number" ||
@@ -593,11 +596,6 @@ export function parseSave(raw: unknown): SaveGameType | null {
     return null;
   }
   if (
-    !validScenarioRuleState(game as GameType) ||
-    !validGameObjectiveProgress(game as GameType)
-  )
-    return null;
-  if (
     game.policies !== undefined &&
     !validPolicies(
       game.policies,
@@ -647,6 +645,17 @@ export function parseSave(raw: unknown): SaveGameType | null {
       game.customScenario.id !== 999)
   )
     return null;
+  // Validate the frozen definition before interpreting its receipts. Native/custom catalog
+  // compilation can also reject unsupported saved setup; an import must return null, not throw.
+  try {
+    if (
+      !validScenarioRuleState(game as GameType) ||
+      !validGameObjectiveProgress(game as GameType)
+    )
+      return null;
+  } catch {
+    return null;
+  }
   const transmissionEnabled = !!(
     scenario && intertiesEnabledForScenario(scenario, game.location)
   );

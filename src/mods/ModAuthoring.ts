@@ -32,11 +32,8 @@ import {
   scenarioRuleGuaranteedAt,
 } from "../helpers/ScenarioRuleComposition";
 import { validScenarioMod } from "../helpers/ScenarioMod";
-import {
-  inheritedModObjectives,
-  modAuthoringScenarios,
-  modStaticCostFactors,
-} from "./ModScenario";
+import { inheritedModObjectives, modAuthoringScenarios } from "./ModScenario";
+import { modStaticCostFactors } from "../helpers/ModStaticCosts";
 import { packageDigest, validateMod, ModValidationError } from "./ModSchema";
 import { validatePublicationDescription } from "./ModPublication";
 import type { ModDiagnostic, ModPackage } from "./ModSchema";
@@ -477,12 +474,7 @@ function facts(
       title: "Month-by-month openings and composed factors",
       rows: scenarioRuleCompositionRanges(
         rules,
-        modStaticCostFactors(
-          scenario,
-          mod.facilities,
-          rules.difficulty,
-          rules.seed,
-        ),
+        modStaticCostFactors(mod.facilities),
       ).map(({ month, factors }) => {
         const additive = monthlyAdditiveRanges(rules, month, graph, events);
         return {

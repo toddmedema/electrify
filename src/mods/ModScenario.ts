@@ -14,6 +14,7 @@ import {
   resolveStartingHydroSites,
 } from "../data/HydroSites";
 import { startingFacilityQuote } from "../helpers/StartingFacilities";
+import { modStaticCostFactors } from "../helpers/ModStaticCosts";
 import {
   CUSTOM_SCENARIO_ID,
   DEFAULT_CUSTOM_SCENARIO,
@@ -186,33 +187,6 @@ export async function prepareModStartingPeak(input: unknown): Promise<void> {
   await prepareScenarioStartingPeak(resolveModSetup(input).resolved);
 }
 
-/** Quote ownership supplies the fuel mapping; reports never maintain a second catalogue. */
-export function modStaticCostFactors(
-  scenario: ScenarioType,
-  facilities: ModPackage["facilities"],
-  difficulty: DifficultyType,
-  seed: number,
-) {
-  const quoteState = {
-    date: getDateFromMinute(0, scenario.startingYear),
-    startingYear: scenario.startingYear,
-    difficulty,
-    seed,
-    feePerKgCO2e: scenario.feePerKgCO2e,
-    location: getScenarioLocation(scenario),
-    facilities: [],
-    commissionedHydroSiteIds: [],
-    scenarioId: scenario.id,
-    customScenario: scenario,
-  } as unknown as GameType;
-  return Object.entries(facilities ?? {}).flatMap(([name, factors]) => {
-    const quote = startingFacilityQuote(quoteState, { name });
-    return quote?.fuel
-      ? [{ fuel: quote.fuel, facility: name, ...factors }]
-      : [];
-  });
-}
-
 function resolveMod(
   input: unknown,
   workshopId: string | undefined,
@@ -329,12 +303,7 @@ function resolveMod(
             });
         }
       }
-      const staticCosts = modStaticCostFactors(
-        resolved,
-        pack.facilities,
-        atDifficulty,
-        pack.seed,
-      );
+      const staticCosts = modStaticCostFactors(pack.facilities);
       diagnostics.push(
         ...scenarioRuleCompositionDiagnostics(compiled, staticCosts),
       );

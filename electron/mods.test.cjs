@@ -492,6 +492,39 @@ test("refresh beyond the install limit installs what fits and explains the rest"
   );
 });
 
+test("a mod ID matching an inherited object property creates and retains its own Workshop item", async (t) => {
+  const pack = fixture({ id: "constructor" });
+  let creates = 0;
+  const { file, store } = setup(t, {
+    workshop: () => ({
+      create: async () => {
+        creates++;
+        return { id: "456", agreement: false };
+      },
+      publish: async (id) => {
+        assert.equal(id, "456");
+        return { id, agreement: false };
+      },
+    }),
+  });
+  fs.writeFileSync(file, JSON.stringify(pack));
+  const imported = await store.request({ kind: "import" });
+  assert.equal(imported.error, undefined);
+  assert.equal(Object.hasOwn(imported.entries[0], "workshopId"), false);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await store.request({
+      kind: "publish",
+      key: "local:constructor",
+      packageDigest: packageDigest(pack),
+      rulesDescription: pack.description + "\n\nRules\nBase: Custom game",
+    });
+    assert.equal(result.error, undefined);
+    assert.deepEqual(result.published, { workshopId: "456", agreement: false });
+    assert.equal(result.entries[0].workshopId, "456");
+  }
+  assert.equal(creates, 1);
+});
+
 test("publishing retries update the same created item, keep it after removal, and upload only the validated package", async (t) => {
   let creates = 0;
   const uploads = [];

@@ -276,7 +276,8 @@ class ModStore {
   /** What the renderer sees: local packages carry their published Workshop item, if any. */
   view(library) {
     return library.entries.map((entry) =>
-      entry.source === "local" && library.published[entry.pack.id]
+      entry.source === "local" &&
+      Object.hasOwn(library.published, entry.pack.id)
         ? { ...entry, workshopId: library.published[entry.pack.id].workshopId }
         : entry,
     );
@@ -662,7 +663,9 @@ class ModStore {
       throw new Error(
         "Too many unfinished uploads. Restart Electrify before publishing again.",
       );
-    let record = library.published[entry.pack.id];
+    let record = Object.hasOwn(library.published, entry.pack.id)
+      ? library.published[entry.pack.id]
+      : undefined;
     let agreement = false;
     if (!record) {
       const created = await workshop.create();

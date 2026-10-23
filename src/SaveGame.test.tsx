@@ -31,6 +31,28 @@ describe("SaveGame", () => {
     expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
   });
 
+  it.each([NaN, Infinity, -1, 0.5, 4294967296])(
+    "rejects an invalid scenario seed %p without compiling it",
+    (seed) => {
+      expect(
+        parseSave({ ...serializeSave(game), game: { ...game, seed } }),
+      ).toBeNull();
+    },
+  );
+
+  it.each([{}, { namespace: { kind: "mod", id: "broken" } }])(
+    "rejects malformed frozen rules %p before interpreting saved receipts",
+    (rules) => {
+      const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+      raw.game.scenarioId = CUSTOM_SCENARIO_ID;
+      raw.game.customScenario = {
+        ...DEFAULT_CUSTOM_SCENARIO,
+        mod: { rules, parameters: { baseScenarioId: CUSTOM_SCENARIO_ID } },
+      };
+      expect(parseSave(raw)).toBeNull();
+    },
+  );
+
   it.each([undefined, null, 123, "", "   "])(
     "rejects malformed saved facility names %p",
     (name) => {

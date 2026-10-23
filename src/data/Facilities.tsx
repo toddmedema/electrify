@@ -1,4 +1,5 @@
 import { customEventContext } from "../helpers/CustomScenarioEvents";
+import { FACILITY_FUELS } from "./FacilityFuels";
 import { getHydroAvailability } from "./HydroSites";
 import {
   batteryYearsToBuild,
@@ -370,7 +371,7 @@ export function GENERATORS(
     // FUELED
     {
       name: "Coal",
-      fuel: "Coal",
+      fuel: FACILITY_FUELS.Coal,
       description:
         "Runs on demand, with slow ramping and high direct emissions",
       available: true, // Coal was first type of electric plant
@@ -411,7 +412,7 @@ export function GENERATORS(
     },
     {
       name: "Nuclear",
-      fuel: "Uranium",
+      fuel: FACILITY_FUELS.Nuclear,
       description:
         "Low direct emissions and steady output, but very slow to change",
       available: year > 1956, // First full scale plant was Calder Hall in 1956
@@ -442,7 +443,7 @@ export function GENERATORS(
     },
     {
       name: "Natural Gas Peaker",
-      fuel: "Natural Gas",
+      fuel: FACILITY_FUELS["Natural Gas Peaker"],
       gasCycle: "simple",
       description:
         "A single gas turbine: cheap to build and running in minutes, but it burns about half again as much gas per MWh as a combined cycle",
@@ -480,7 +481,7 @@ export function GENERATORS(
     },
     {
       name: "Natural Gas CC",
-      fuel: "Natural Gas",
+      fuel: FACILITY_FUELS["Natural Gas CC"],
       gasCycle: "combined",
       description:
         "Reuses the turbine's hot exhaust to raise steam for a second turbine, burning about a third less gas per MWh, but it is slow to start and ramp",
@@ -525,7 +526,7 @@ export function GENERATORS(
     },
     {
       name: "Oil",
-      fuel: "Oil",
+      fuel: FACILITY_FUELS.Oil,
       description:
         "Starts quickly, but fuel is costly and produces direct emissions",
       available: true,
@@ -561,7 +562,7 @@ export function GENERATORS(
     },
     {
       name: "Biomass",
-      fuel: "Biomass",
+      fuel: FACILITY_FUELS.Biomass,
       description:
         "Runs on demand using renewable fuel, with large fuel volumes and direct CO2 emissions",
       available: true,
@@ -596,7 +597,7 @@ export function GENERATORS(
     // RENEWABLE
     {
       name: "Wind",
-      fuel: "Wind",
+      fuel: FACILITY_FUELS.Wind,
       description:
         "Output changes with local wind and is often strongest in spring and fall",
       available: year > 1941, // First megawatt-size turbine was in Vermont in 1941
@@ -630,7 +631,7 @@ export function GENERATORS(
     },
     {
       name: "Offshore Wind",
-      fuel: "Offshore Wind",
+      fuel: FACILITY_FUELS["Offshore Wind"],
       description: "Steadier and stronger than onshore, at a price",
       available: year > 1991 && hasOffshoreWind(state.location),
       // Vindeby, Denmark, was the first offshore wind farm, at 4.95MW in 1991:
@@ -660,7 +661,7 @@ export function GENERATORS(
     },
     {
       name: "Airborne Wind",
-      fuel: "Airborne Wind",
+      fuel: FACILITY_FUELS["Airborne Wind"],
       description:
         "Uses steadier high-altitude wind; new technology with frequent maintenance",
       // NAWEP's current schedule reaches commissioning in 2028 and mature operation in 2030.
@@ -686,7 +687,7 @@ export function GENERATORS(
     },
     {
       name: "Solar",
-      fuel: "Sun",
+      fuel: FACILITY_FUELS.Solar,
       description:
         "Produces only in daylight and usually peaks near sunny midday",
       available: year > 1982, // First megawatt-sized installations around 1982 https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
@@ -719,7 +720,7 @@ export function GENERATORS(
     },
     {
       name: "Hydro",
-      fuel: "Hydro",
+      fuel: FACILITY_FUELS.Hydro,
       description:
         "Low direct emissions and controllable output, but limited by water and suitable sites",
       available: year > 1882 && hydroAvailability.status === "available",
@@ -745,7 +746,7 @@ export function GENERATORS(
     },
     {
       name: "Geothermal",
-      fuel: "Geothermal",
+      fuel: FACILITY_FUELS.Geothermal,
       description:
         "Steady low-carbon output, but only at suitable underground heat sources",
       available: (geothermalLocations || 0) > 0,
@@ -774,7 +775,7 @@ export function GENERATORS(
     },
     {
       name: "Enhanced Geothermal",
-      fuel: "Geothermal",
+      fuel: FACILITY_FUELS["Enhanced Geothermal"],
       description:
         "Steady low-carbon output in more locations than conventional geothermal",
       available: year >= 2030,

@@ -346,6 +346,9 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     !isFiniteNumber(doc.scenarioId) ||
     (doc.scenarioId === 999 && doc.customScenario === undefined) ||
     !isFiniteNumber(doc.seed) ||
+    !Number.isInteger(doc.seed) ||
+    doc.seed < 0 ||
+    doc.seed > 4294967295 ||
     typeof doc.appVersion !== "string" ||
     !isValidDifficulty(doc.difficulty) ||
     (doc.meaningfulDecisionGateWaived !== undefined &&

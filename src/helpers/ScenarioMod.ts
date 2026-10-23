@@ -22,6 +22,8 @@ import { canonicalRuleJson, ruleDigest, utf8Bytes } from "./RuleIdentity";
 import { getScenarioLocation, isValidLocation } from "./Locations";
 import { validHydroInventorySource } from "../data/HydroSites";
 import { validFrozenStartingIntertieScenario } from "./FrozenStartingInterties";
+import { modStaticCostFactors } from "./ModStaticCosts";
+import { scenarioRuleCompositionDiagnostics } from "./ScenarioRuleComposition";
 
 export function facilityModifier(
   game: Pick<GameType, "customScenario">,
@@ -488,6 +490,14 @@ export function validScenarioMod(
         (scenario.startingDemandScale ?? 1) !== params.startingDemandScale ||
         canonicalRuleJson(scenario.facilities.map((f) => f.assetId).sort()) !==
           canonicalRuleJson(rules.startingAssetIds))
+    )
+      return false;
+    const staticCosts = modStaticCostFactors(mod.facilities);
+    if (
+      staticCosts.length &&
+      scenarioRuleCompositionDiagnostics(rules, staticCosts).some(
+        (diagnostic) => diagnostic.severity === "error",
+      )
     )
       return false;
     return true;

@@ -8,7 +8,7 @@ import {
   scenarioRuleCompositionRanges,
 } from "./ScenarioRuleComposition";
 import { modScenario } from "../mods/ModScenario";
-import { validScenarioMod } from "./ScenarioMod";
+import { modRuntimeDigest, validScenarioMod } from "./ScenarioMod";
 import { DIFFICULTY_IDS } from "../Constants";
 import * as dependencies from "./ScenarioRuleDependencies";
 import type { ModPackage } from "../mods/ModSchema";
@@ -243,6 +243,38 @@ test("all fourteen imported arcs validate as complete detached snapshots in ever
       expect(validScenarioMod(restored.mod, restored)).toBe(true);
     }
   }
+});
+
+test("restored snapshots enforce the same static and timed cost bounds as package compilation", () => {
+  const scenario = modScenario({
+    ...pack(999),
+    facilities: { Coal: { buildCost: 5 } },
+    events: [
+      event("construction", { constructionCostMultipliersByFuel: { Coal: 2 } }),
+    ],
+  });
+  expect(validScenarioMod(scenario.mod, scenario)).toBe(true);
+  scenario.mod!.facilities!.Coal!.buildCost = 5.01;
+  scenario.mod!.runtimeDigest = modRuntimeDigest(scenario.mod!);
+  expect(validScenarioMod(scenario.mod, scenario)).toBe(false);
+});
+
+test("cost composition covers technologies that unlock after the starting year", () => {
+  const future = {
+    ...pack(999),
+    scenario: { startingYear: 2020, durationMonths: 240 },
+    facilities: { "Airborne Wind": { buildCost: 5 } },
+    events: [
+      event(
+        "construction",
+        { constructionCostMultipliersByFuel: { "Airborne Wind": 2 } },
+        121,
+      ),
+    ],
+  };
+  expect(() => modScenario(future)).not.toThrow();
+  future.facilities["Airborne Wind"].buildCost = 5.01;
+  expect(() => modScenario(future)).toThrow(/Static/);
 });
 
 test("composition diagnostics are structured compile failures", () => {

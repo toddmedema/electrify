@@ -6,6 +6,7 @@ import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import type { GameType } from "../src/Types";
 import { wToSliderTick } from "../src/helpers/BuildSizing";
 import { openPane } from "./layout";
+import { advanceWorldSave } from "./advance-world";
 import type {
   LobbyState,
   NativeEvent,
@@ -2442,6 +2443,35 @@ for (const scenarioId of [106, 107] as const) {
       const guestId = "76561198000000002";
       const pages = [host, guest];
       const errors: string[] = [];
+      const resumeSaved = async () => {
+        await host
+          .getByRole("button", { name: "Play with friends", exact: true })
+          .click();
+        await hostGame(host);
+        await loadSave(host, room.campaignName);
+        await guest
+          .getByRole("button", { name: "Play with friends", exact: true })
+          .click();
+        await joinGame(guest, room);
+        const resume = host.getByRole("button", {
+          name: "Resume game",
+          exact: true,
+        });
+        await expect(resume).toBeEnabled();
+        await resume.click();
+        for (const page of pages)
+          await expect(page.locator(".facilities:visible")).toBeVisible();
+      };
+      const advanceSaved = async (month: number) => {
+        await saveAndQuit(guest);
+        await saveAndQuit(host);
+        room.checkpoint = await advanceWorldSave(
+          room.checkpoint!,
+          month,
+          test.info().outputPath("native-world.json"),
+        );
+        await resumeSaved();
+      };
       for (const page of pages) {
         page.on("pageerror", (error) => errors.push(error.message));
         await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
@@ -2539,11 +2569,14 @@ for (const scenarioId of [106, 107] as const) {
         );
         await page.keyboard.press("Escape");
       }
+      const dueMonth = scenarioId === 106 ? 48 : 36;
+      // Simulate the long lead-in from the UI's purchases, then cross the actual decision
+      // boundary in the production worker. This avoids a CI timer-speed dependency.
+      await advanceSaved(dueMonth - 1);
       for (const page of pages)
         await clock(page)
           .getByRole("button", { name: "ultra speed", exact: true })
           .click();
-      const dueMonth = scenarioId === 106 ? 48 : 36;
       const choiceTitle =
         scenarioId === 106
           ? "Negotiate the data-center connection"
@@ -2705,6 +2738,8 @@ for (const scenarioId of [106, 107] as const) {
         expect(game.date.monthsElapsed).toBe(dueMonth);
       }
       if (scenarioId === 107) {
+        // Keep the February freeze and goal rollover in the browser; simulate its lead-in.
+        await advanceSaved(49);
         for (const page of pages)
           await clock(page)
             .getByRole("button", { name: "ultra speed", exact: true })
@@ -2772,21 +2807,7 @@ for (const scenarioId of [106, 107] as const) {
         progress: game.objectiveProgress,
         rate: game.dollarsPerkWh,
       });
-      await host
-        .getByRole("button", { name: "Play with friends", exact: true })
-        .click();
-      await hostGame(host);
-      await loadSave(host, room.campaignName);
-      await guest
-        .getByRole("button", { name: "Play with friends", exact: true })
-        .click();
-      await joinGame(guest, room);
-      await expect(
-        host.getByRole("button", { name: "Resume game", exact: true }),
-      ).toBeEnabled();
-      await host
-        .getByRole("button", { name: "Resume game", exact: true })
-        .click();
+      await resumeSaved();
       for (const page of pages) {
         await expect(page.locator(".facilities:visible")).toBeVisible();
         await expect(

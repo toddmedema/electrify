@@ -335,6 +335,17 @@ describe("encodeReplay", () => {
 });
 
 describe("decodeReplay", () => {
+  it.each([NaN, Infinity, -1, 0.5, 4294967296])(
+    "rejects an invalid scenario seed %p before playback",
+    (seed) => {
+      expect(decodeReplay({ ...encodeReplay(aReplay()), seed })).toBeNull();
+    },
+  );
+
+  it.each([0, 4294967295])("accepts the boundary scenario seed %p", (seed) => {
+    expect(decodeReplay({ ...encodeReplay(aReplay()), seed })?.seed).toBe(seed);
+  });
+
   it.each([undefined, null, 1, "", "Expert", "constructor", "toString"])(
     "rejects an unsupported difficulty %p before playback",
     (difficulty) => {
