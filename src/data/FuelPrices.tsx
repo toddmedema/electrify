@@ -9,6 +9,7 @@ import { normalAt, RANDOM_STREAM } from "../helpers/Math";
 import { regionalizeFuelPrices } from "./LocationProfiles";
 import { pow } from "../helpers/Pow";
 import { BASE_INFLATION } from "./Economy";
+import { exp, log } from "../helpers/Libm";
 
 // Sources: every column is nominal (that month's own dollars) per million Btu delivered to the
 // generator, so a fuel's price times a plant's heat rate is its fuel cost per MWh.
@@ -245,7 +246,7 @@ function measureDeparture(prices: number[]): DepartureType {
   if (n < 24) {
     return NO_DEPARTURE; // Too little to fit a trend through, let alone measure a spread around one
   }
-  const logs = prices.map(Math.log);
+  const logs = prices.map(log);
   const meanIndex = (n - 1) / 2;
   const meanLog = logs.reduce((a, b) => a + b, 0) / n;
   let covariance = 0;
@@ -457,7 +458,7 @@ function projectYear(
       // A fuel the record shows sitting still has nothing to carry and nothing to shock, so it
       // rides the trend exactly rather than being frozen at its last recorded price
       const previousDeparture = trend.departureSd
-        ? Math.log(prices[fuel] / anchorPrice(trend, thisMonth - 1))
+        ? log(prices[fuel] / anchorPrice(trend, thisMonth - 1))
         : 0;
       const departure =
         trend.persistence * previousDeparture +
@@ -466,7 +467,7 @@ function projectYear(
       const limit = MAX_DEPARTURE_SDS * trend.departureSd;
       prices[fuel] =
         anchorPrice(trend, thisMonth) *
-        Math.exp(Math.min(limit, Math.max(-limit, departure)));
+        exp(Math.min(limit, Math.max(-limit, departure)));
     });
     fuelPrices[year][month] = Object.freeze(prices);
     previous = prices;

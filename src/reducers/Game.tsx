@@ -347,6 +347,7 @@ import {
   PEER_TRADE_MIN_PRICE_PER_MWH,
   PEER_TRADE_RESERVE_FRACTION,
 } from "../data/Multiplayer";
+import { exp } from "../helpers/Libm";
 
 interface BuildFacilityAction {
   facility: FacilityShoppingType;
@@ -4170,13 +4171,11 @@ function getDemandW(
             sun.sunset - date.minuteOfDay,
           ) / 420;
   const minutesFromDarkLogistics =
-    1 / (1 + Math.exp(-minutesFromDarkNormalized * 6));
+    1 / (1 + exp(-minutesFromDarkNormalized * 6));
   const minutesFrom9amNormalized = Math.abs(date.minuteOfDay - 540) / 120;
-  const minutesFrom9amLogistics =
-    1 / (1 + Math.exp(-minutesFrom9amNormalized * 2));
+  const minutesFrom9amLogistics = 1 / (1 + exp(-minutesFrom9amNormalized * 2));
   const minutesFrom5pmNormalized = Math.abs(date.minuteOfDay - 1020) / 240;
-  const minutesFrom5pmLogistics =
-    1 / (1 + Math.exp(-minutesFrom5pmNormalized * 2));
+  const minutesFrom5pmLogistics = 1 / (1 + exp(-minutesFrom5pmNormalized * 2));
   const temperatureDemandW = temperatureDemandWattsPerCustomer(
     now.temperatureC,
     game.location,

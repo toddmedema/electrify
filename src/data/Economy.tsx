@@ -1,6 +1,7 @@
 import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { getRandomRangeAt, RANDOM_STREAM } from "../helpers/Math";
 import { pow } from "../helpers/Pow";
+import { sin } from "../helpers/Libm";
 
 // Rates only move with the calendar month, so this asks for just that rather than a whole
 // DateType. A DateType satisfies it, so callers holding one pass it straight through - and the
@@ -274,7 +275,7 @@ function getCycle(month: number, seed: number): CycleType {
 // Climbs, rests near the top, falls, rests near the bottom. Phase 0 sits at the resting value on
 // the way up, so a cycle always begins where the one before it ended.
 function plateauWave(phase: number): number {
-  return clamp(Math.sin(2 * Math.PI * phase) * PLATEAU_SHARPNESS, -1, 1);
+  return clamp(sin(2 * Math.PI * phase) * PLATEAU_SHARPNESS, -1, 1);
 }
 
 // Maps a -1..1 wave onto a range that is deliberately lopsided: there is a lot more room above

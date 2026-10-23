@@ -1,10 +1,10 @@
-import { getPosition, getTimes } from "suncalc";
 import {
   getWindCapacityFactor,
   getOffshoreWindCapacityFactor,
   getAirborneWindCapacityFactor,
   getSolarCapacityFactor,
 } from "./Energy";
+import { getSunAltitude, getSunriseSunsetTimes } from "./SunCalc";
 import {
   DAYS_PER_MONTH,
   DAYS_PER_YEAR,
@@ -458,7 +458,7 @@ export interface SunriseSunsetType {
 /**
  * Sun times only move with the month, the year and the location, so a whole game month's worth
  * of ticks all get the same answer. Working it out from scratch each time was the single most
- * expensive thing in the simulation: parsing a date out of a string and running suncalc's full
+ * expensive thing in the simulation: parsing a date out of a string and running the full
  * solar model costs ~17us a call, and a year-long forecast asks for one per tick -- twice, once
  * for irradiance and once for demand. Caching turns tens of milliseconds per forecast into a
  * map lookup. One entry per month played (plus however far the forecasts look ahead), so the
@@ -508,9 +508,9 @@ export function getSunriseSunset(
   }
 
   // Built in UTC rather than parsed from a string, which Date reads in the runner's zone -- the
-  // instant handed to suncalc would otherwise shift with the machine too. Midday keeps the
+  // instant handed to the solar model would otherwise shift with the machine too. Midday keeps the
   // instant well inside the day being asked about whatever the location's offset is.
-  const calc = getTimes(
+  const calc = getSunriseSunsetTimes(
     new Date(Date.UTC(date.year, date.monthNumber - 1, 1, 12)),
     location.lat,
     location.long,
@@ -519,14 +519,14 @@ export function getSunriseSunset(
   const valid = (d: Date | null): d is Date => !!d && !isNaN(d.getTime());
   let times: SunriseSunsetType;
   if (!valid(calc.sunrise) || !valid(calc.sunset)) {
-    // There is no sunrise or sunset during a polar day/night. SunCalc's altitude tells which one
+    // There is no sunrise or sunset during a polar day/night. The sun's altitude tells which one
     // it is; sentinels keep every existing daylight calculation simple and truthful.
     const sunUp =
-      getPosition(
+      getSunAltitude(
         new Date(Date.UTC(date.year, date.monthNumber - 1, 1, 12)),
         location.lat,
         location.long,
-      ).altitude > 0;
+      ) > 0;
     times = sunUp
       ? { sunrise: 0, sunset: 1440, daylight: "polar-day" }
       : { sunrise: 0, sunset: 0, daylight: "polar-night" };

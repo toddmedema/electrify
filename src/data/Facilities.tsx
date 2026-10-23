@@ -32,6 +32,7 @@ import { scenarioRules } from "../helpers/ScenarioRules";
 import { getScenario } from "./Scenarios";
 import { applyDefaultResilience } from "../helpers/Hazards";
 import { pow } from "../helpers/Pow";
+import { exp, log10 } from "../helpers/Libm";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. The tables
@@ -164,7 +165,7 @@ export function constructionKgco2eCurve(
   floor: number,
 ): number {
   if (declineK <= 0 || year <= referenceYear) return base;
-  return floor + (base - floor) * Math.exp(-declineK * (year - referenceYear));
+  return floor + (base - floor) * exp(-declineK * (year - referenceYear));
 }
 
 /** 2023 reference, re-based to 2025 so the whole dataset shares one vintage. */
@@ -249,7 +250,7 @@ function batteryCostPerWh2024(year: number): number {
     // exp rather than a power: V8's exp is platform-independent (fdlibm)
     return (
       cost2020 *
-      Math.exp(((2020 - year) / BATTERY_PRE_2020_DOUBLING_YEARS) * Math.LN2)
+      exp(((2020 - year) / BATTERY_PRE_2020_DOUBLING_YEARS) * Math.LN2)
     );
   }
   return costBetween(year, 2020, cost2020, 2024, 0.192);
@@ -290,7 +291,7 @@ export function GENERATORS(
   offshoreWindSpeedsKph: number[] = [],
   airborneWindSpeedsKph: number[] = [],
 ) {
-  const magnitude = Math.log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
+  const magnitude = log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
   const storySnapshot = buildStorySnapshot(
     state.monthlyHistory || [],
@@ -874,7 +875,7 @@ export function windAnnualOutputDegradation(commissioningYear: number): number {
 
 export function STORAGE(state: GameType, peakWh: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
-  const magnitude = Math.log10(peakWh) - 6;
+  const magnitude = log10(peakWh) - 6;
   const year = state.date.year;
   const pumpedHydroLocations = getViableLocationCount(
     state.location,

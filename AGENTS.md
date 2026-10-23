@@ -239,7 +239,9 @@ untracked. Agents without a verified hook should format the files they changed b
 
 - Keep seeded simulation paths deterministic. Use the seed helpers in `src/helpers/Math.tsx`, not
   ambient randomness, for any outcome that affects a replay. Raise powers with `pow` from
-  `src/helpers/Pow.ts`: `Math.pow` and `**` round differently on Windows than on Linux CI.
+  `src/helpers/Pow.ts`: `Math.pow` and `**` round differently on Windows than on Linux CI. Take
+  `exp`, `log`, `sin` and other transcendentals from `src/helpers/Libm.ts`: `Math`'s round
+  differently on arm64 than on x86-64.
 - Load simulation data before calling weather or fuel-price helpers from a non-browser entry point;
   the simulator does this through `loadSimData`.
 - Preserve the import-order boundary around `StoreRegistry`: the game reducer dispatches follow-up

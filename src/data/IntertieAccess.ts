@@ -8,6 +8,7 @@ import {
   corridorsForLocation,
 } from "./AdjacentMarkets";
 import { corridorOpenInYear } from "./IntertieTrends";
+import { log } from "../helpers/Libm";
 
 export interface IntertieAccessContext {
   peers?: NonNullable<GameType["multiplayer"]>["peers"];
@@ -353,8 +354,8 @@ export function effectiveMarket(
               Math.min(
                 MAX_INTERTIE_UPGRADES,
                 Math.round(
-                  Math.log((capacityW ?? access.capacityW) / access.capacityW) /
-                    Math.log(INTERTIE_UPGRADE_STEP),
+                  log((capacityW ?? access.capacityW) / access.capacityW) /
+                    log(INTERTIE_UPGRADE_STEP),
                 ),
               ),
             )

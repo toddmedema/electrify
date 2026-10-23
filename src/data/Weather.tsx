@@ -6,6 +6,7 @@ import { isValidLocationId } from "../helpers/Locations";
 import { decodeWeather } from "./WeatherBinary";
 import { simulationDataRequest } from "../helpers/SimulationDataIntegrity";
 import { pow } from "../helpers/Pow";
+import { exp } from "../helpers/Libm";
 
 // The first year any location has data for, Jan 1st. Everything after the recorded years is
 // forecast indefinitely, but nothing exists to run backwards from, so this is the floor on when a
@@ -502,7 +503,7 @@ export function getRawSolarIrradianceWM2(
       date.minuteOfDay - sunrise,
       sunset - date.minuteOfDay,
     );
-    return irradiance / (1 + Math.exp(-0.015 * (minutesFromDark - 200)));
+    return irradiance / (1 + exp(-0.015 * (minutesFromDark - 200)));
   }
   return 0;
 }

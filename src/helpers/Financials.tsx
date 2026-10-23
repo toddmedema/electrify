@@ -21,6 +21,7 @@ import {
   reduceHistories,
 } from "./DateTime";
 import { pow } from "./Pow";
+import { exp, log, log1p } from "./Libm";
 
 // Project finance tenors run shorter than the asset: about 15-20 years for renewables and storage.
 const LOAN_TENOR_SHARE_OF_LIFE = 0.8;
@@ -211,9 +212,7 @@ export function capitalRecoveryFactor(rate: number, years: number): number {
   if (!(years > 0)) return 1;
   // exp/log1p rather than a power: V8 evaluates those with its own fdlibm port, so the result is
   // the same on every platform (see helpers/Pow on the coordinator branch)
-  return rate > 0
-    ? rate / (1 - Math.exp(-years * Math.log1p(rate)))
-    : 1 / years;
+  return rate > 0 ? rate / (1 - exp(-years * log1p(rate))) : 1 / years;
 }
 
 /**
@@ -338,7 +337,7 @@ export function degradedLifetimeYears(
     return 0;
   }
   const retention = 1 - annualOutputDegradation;
-  return (pow(retention, lifespanYears) - 1) / Math.log(retention);
+  return (pow(retention, lifespanYears) - 1) / log(retention);
 }
 
 /**

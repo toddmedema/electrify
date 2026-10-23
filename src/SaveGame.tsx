@@ -63,6 +63,7 @@ import {
 } from "./data/AdjacentMarkets";
 import { getScenario } from "./data/Scenarios";
 import { pow } from "./helpers/Pow";
+import { log } from "./helpers/Libm";
 
 /**
  * Saving and restoring a game.
@@ -142,7 +143,7 @@ function validConstruction(
 function validUpgradedCapacity(capacityW: number, corridorW: number): boolean {
   if (!(corridorW > 0) || !(capacityW > 0)) return false;
   const steps = Math.round(
-    Math.log(capacityW / corridorW) / Math.log(INTERTIE_UPGRADE_STEP),
+    log(capacityW / corridorW) / log(INTERTIE_UPGRADE_STEP),
   );
   if (steps < 0 || steps > MAX_INTERTIE_UPGRADES) return false;
   return (
@@ -167,8 +168,7 @@ function validLineInvestment(
   let yearsToBuild = corridor.yearsToBuild;
   let constructionKgco2e = corridorConstructionKgco2e(corridor);
   const steps = Math.round(
-    Math.log(line.capacityW! / corridor.capacityW) /
-      Math.log(INTERTIE_UPGRADE_STEP),
+    log(line.capacityW! / corridor.capacityW) / log(INTERTIE_UPGRADE_STEP),
   );
   for (let step = 0; step < steps; step++) {
     const quote = intertieUpgradeQuote(expected, year, 1, 1, context);

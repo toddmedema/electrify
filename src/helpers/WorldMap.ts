@@ -1,3 +1,4 @@
+import { cos, sin } from "./Libm";
 export interface MapLocation {
   id: string;
   lat: number;
@@ -22,10 +23,10 @@ export function nearestGeographicLocation<T extends MapLocation>(
   let shortest = Infinity;
   for (const location of locations) {
     const distance =
-      Math.sin(((location.lat - latitude) * radians) / 2) ** 2 +
-      Math.cos(latitude * radians) *
-        Math.cos(location.lat * radians) *
-        Math.sin(((location.long - longitude) * radians) / 2) ** 2;
+      sin(((location.lat - latitude) * radians) / 2) ** 2 +
+      cos(latitude * radians) *
+        cos(location.lat * radians) *
+        sin(((location.long - longitude) * radians) / 2) ** 2;
     if (distance < shortest) {
       shortest = distance;
       nearest = location;

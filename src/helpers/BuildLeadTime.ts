@@ -1,5 +1,6 @@
 import { DIFFICULTIES } from "../Constants";
 import { DifficultyType } from "../Types";
+import { log10 } from "./Libm";
 
 /**
  * Construction time formulas shared by the build catalog (data/Facilities) and story warnings, so
@@ -7,7 +8,7 @@ import { DifficultyType } from "../Types";
  * Facilities because WorldEvents is imported by Facilities and must not import it back.
  * Magnitude is 0 at 1 MW (or MWh) and rises by one for each tenfold size.
  */
-export const sizeMagnitude = (size: number): number => Math.log10(size) - 6;
+export const sizeMagnitude = (size: number): number => log10(size) - 6;
 
 /** Simple-cycle peaker: EIA AEO2025's 419 MW H-class reference takes 40 months. */
 export const naturalGasYearsToBuild = (peakW: number): number =>
