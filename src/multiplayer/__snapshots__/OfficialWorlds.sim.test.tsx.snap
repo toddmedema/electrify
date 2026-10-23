@@ -1,0 +1,60 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`two real official companies keep their exact World state in scenario 110 1`] = `
+Object {
+  "final": "1c94af871d73f090eee3307b50a5e340c2b6142efbad4927b2e48fe8bc158470",
+  "initial": "161c9a29af3dc4c36b8ef5a6a4a60040863e165e0b3fccf3cfba47462f9c37a5",
+  "outcomes": Object {
+    "0": Object {
+      "month": 43,
+      "outcome": "fired",
+      "reason": "You served 74.62% of demand during the reactor shutdown window and recovery; this mission requires 99.5%.",
+      "title": "Mission objective missed",
+    },
+    "1": Object {
+      "month": 43,
+      "outcome": "fired",
+      "reason": "You served 74.62% of demand during the reactor shutdown window and recovery; this mission requires 99.5%.",
+      "title": "Mission objective missed",
+    },
+  },
+}
+`;
+
+exports[`two real official companies keep their exact World state in scenario 111 1`] = `
+Object {
+  "final": "862828c3576fb434e1330b732339dc0cb21909b63e65d941c370634ad04e8b26",
+  "initial": "25bc709d43d548b3bd55a16e56c5e9795a8118c3f95e3e8f2ff124c9e26f43c6",
+  "outcomes": Object {
+    "0": Object {
+      "month": 60,
+      "outcome": "completed",
+      "title": "After the wildfire outage",
+    },
+    "1": Object {
+      "month": 60,
+      "outcome": "completed",
+      "title": "After the wildfire outage",
+    },
+  },
+}
+`;
+
+exports[`two real official companies keep their exact World state in scenario 113 1`] = `
+Object {
+  "final": "dc805c078a127f17a55606f889d81068b71502088db871f3404b101607415392",
+  "initial": "1704469996f4d949f7b0a3023d2cd29997c679be3800655c07901561f647df46",
+  "outcomes": Object {
+    "0": Object {
+      "month": 84,
+      "outcome": "completed",
+      "title": "Five years of breakdowns",
+    },
+    "1": Object {
+      "month": 84,
+      "outcome": "completed",
+      "title": "Five years of breakdowns",
+    },
+  },
+}
+`;

@@ -37,6 +37,7 @@ import { serializeReplay } from "../Replay";
 import { canonical, digest } from "../testing/CanonicalHash";
 import { STANDARD_BALANCE_PLAYS } from "../testing/BalancePlaybooks";
 import { parseSave, serializeSave } from "../SaveGame";
+import { expectSaveForgeries } from "../testing/SaveForgery";
 import {
   createGame,
   createGameFromReplay,
@@ -153,42 +154,6 @@ test("a mutable trusted cost edit changes the actual cached future forecast", ()
   }
 });
 
-const PROFILES = ["strong", "weak", "unavailable"] as const;
-/** Probes both recorded availability extremes and missing history. */
-function profileProbe(
-  game: GameType,
-  profile: (typeof PROFILES)[number],
-): StoryContextType {
-  const probe = context(game);
-  if (profile === "unavailable") return probe;
-  const strong = profile === "strong";
-  probe.snapshot = {
-    ...probe.snapshot,
-    demandWh12m: 1e12,
-    unservedWh12m: strong ? 0 : 5e10,
-    netIncome12m: strong ? 1e6 : -1e6,
-    peakDemandW12m: 1e9,
-    firmPeakW: strong ? 1.1e9 : 3e8,
-    storagePeakW: strong ? 2e8 : 1e7,
-    storagePeakWh: strong ? 8e8 : 2e7,
-    deliveredWhByFuel12m: strong
-      ? { Coal: 1e11, "Natural Gas": 2e11, Wind: 3e11, Sun: 2e11, Hydro: 2e11 }
-      : { Coal: 7e11, "Natural Gas": 2e11, Wind: 2e10, Sun: 1e10, Hydro: 2e10 },
-  };
-  probe.periodSnapshots = Object.fromEntries(
-    [1, 2, 3, 4, 6, 12, 24].map((months) => [
-      months,
-      {
-        deliveredWhByFuel: probe.snapshot.deliveredWhByFuel12m,
-        demandWh: probe.snapshot.demandWh12m,
-        unservedWh: probe.snapshot.unservedWh12m,
-        netIncome: probe.snapshot.netIncome12m,
-        peakDemandW: probe.snapshot.peakDemandW12m,
-      },
-    ]),
-  );
-  return probe;
-}
 /** Resolves each declared phase at its onset, accumulating receipts as play would. */
 function phasesAtOnset(probe: StoryContextType, game: GameType) {
   const rules = scenarioRules(getScenario(113), game)!;
@@ -208,33 +173,28 @@ function phasesAtOnset(probe: StoryContextType, game: GameType) {
   });
 }
 
+// Availability does not branch on recent supply, income or fleet facts, so one probe suffices.
 test.each(DIFFICULTY_IDS)(
-  "%s phase and forecast facts are pinned for every availability profile",
+  "%s phase and forecast facts are pinned",
   (difficulty) => {
-    const hashes: Record<string, string> = {};
-    for (const profile of PROFILES) {
-      const game = createGame({ scenarioId: 113, difficulty, seed: 12345 });
-      const probe = profileProbe(game, profile);
-      const previews = upcomingStoryPhases(probe);
-      const phases = phasesAtOnset(probe, game);
-      hashes[profile] = digest({ previews, phases });
-      for (const phase of phases.filter(
-        (phase) => phase.endsMinute > phase.startsMinute,
-      )) {
-        const at = (minute: number) =>
-          resolveStoryAtDate({
-            ...probe,
-            date: getDateFromMinute(minute, game.startingYear),
-          }).active.some((event) => event.key === phase.key);
-        expect(at(phase.endsMinute - 1)).toBe(true);
-        expect(at(phase.endsMinute)).toBe(false);
-      }
+    const game = createGame({ scenarioId: 113, difficulty, seed: 12345 });
+    const probe = context(game);
+    const previews = upcomingStoryPhases(probe);
+    const phases = phasesAtOnset(probe, game);
+    for (const phase of phases.filter(
+      (phase) => phase.endsMinute > phase.startsMinute,
+    )) {
+      const at = (minute: number) =>
+        resolveStoryAtDate({
+          ...probe,
+          date: getDateFromMinute(minute, game.startingYear),
+        }).active.some((event) => event.key === phase.key);
+      expect(at(phase.endsMinute - 1)).toBe(true);
+      expect(at(phase.endsMinute)).toBe(false);
     }
     expect({
-      grid: digest(
-        createGame({ scenarioId: 113, difficulty, seed: 12345 }).facilities,
-      ),
-      ...hashes,
+      grid: digest(game.facilities),
+      phases: digest({ previews, phases }),
     }).toMatchSnapshot();
   },
 );
@@ -347,89 +307,53 @@ test("an actual onset preserves plain, Immer batch, worker, save and internal re
   expect(replay.facilities).toEqual(plain.facilities);
 });
 
-test("missing, duplicate, forged and future official receipts reject beside an intact save", () => {
+test("missing, duplicate, forged, future and active-copy edits reject beside an intact save", () => {
   const game = createGame({
     scenarioId: 113,
     difficulty: "Manager",
     seed: 12345,
   });
   advance(game, 36 * MINUTES_PER_MONTH);
-  expect(validScenarioRuleState(game)).toBe(true);
-  expect(
-    parseSave(JSON.parse(JSON.stringify(serializeSave(game)))),
-  ).not.toBeNull();
-  const edits: ((copy: GameType) => void)[] = [
-    (copy) => {
-      copy.worldEvents.occurrences.pop();
-    },
-    (copy) => {
-      copy.worldEvents.occurrences.push(
-        cloneDeep(copy.worldEvents.occurrences[0]),
-      );
-    },
-    (copy) => {
-      copy.worldEvents.occurrences.at(
-        -1,
-      )!.effects.facilityOutputMultipliersByFuel = { Coal: 1 };
-    },
-    (copy) => {
-      copy.worldEvents.occurrences.at(-1)!.message = "Edited outcome";
-    },
-    (copy) => {
-      copy.worldEvents.occurrences.at(-1)!.startsMinute += MINUTES_PER_MONTH;
-    },
-  ];
-  for (const edit of edits) {
-    const forged = cloneDeep(game);
-    edit(forged);
-    expect(validScenarioRuleState(forged)).toBe(false);
-    expect(
-      parseSave(JSON.parse(JSON.stringify(serializeSave(forged)))),
-    ).toBeNull();
-  }
-  expect(validScenarioRuleState(game)).toBe(true);
-});
-
-test("edited active official copies cannot bypass strict save validation", () => {
-  const game = createGame({
-    scenarioId: 113,
-    difficulty: "Manager",
-    seed: 12345,
-  });
-  advance(game, 36 * MINUTES_PER_MONTH);
-  expect(
-    parseSave(JSON.parse(JSON.stringify(serializeSave(game)))),
-  ).not.toBeNull();
-  const edits: ((copy: GameType) => void)[] = [
-    (copy) => {
-      copy.worldEvents.active.find((event) =>
-        event.key.endsWith("availability-step-1"),
-      )!.effects.facilityOutputMultipliersByFuel = { Coal: 1 };
-    },
-    (copy) => {
-      copy.worldEvents.active.find((event) =>
-        event.key.endsWith("availability-step-1"),
-      )!.message = "Forged active outcome";
-    },
-    (copy) => {
-      copy.worldEvents.active.push(
-        cloneDeep(
-          copy.worldEvents.active.find((event) =>
-            event.key.endsWith("availability-step-1"),
-          )!,
+  const step = (copy: GameType) =>
+    copy.worldEvents.active.find((event) =>
+      event.key.endsWith("availability-step-1"),
+    )!;
+  const last = (copy: GameType) => copy.worldEvents.occurrences.at(-1)!;
+  expectSaveForgeries(game, [
+    ["missing receipt", (copy) => void copy.worldEvents.occurrences.pop()],
+    [
+      "duplicate receipt",
+      (copy) =>
+        void copy.worldEvents.occurrences.push(
+          cloneDeep(copy.worldEvents.occurrences[0]),
         ),
-      );
-    },
-  ];
-  for (const edit of edits) {
-    const forged = cloneDeep(game);
-    edit(forged);
-    expect(
-      parseSave(JSON.parse(JSON.stringify(serializeSave(forged)))),
-    ).toBeNull();
-    expect(validScenarioRuleState(forged)).toBe(false);
-  }
-  expect(validScenarioRuleState(game)).toBe(true);
+    ],
+    [
+      "edited effects",
+      (copy) => {
+        last(copy).effects.facilityOutputMultipliersByFuel = { Coal: 1 };
+      },
+    ],
+    ["edited message", (copy) => void (last(copy).message = "Edited outcome")],
+    [
+      "future start",
+      (copy) => void (last(copy).startsMinute += MINUTES_PER_MONTH),
+    ],
+    [
+      "edited active effects",
+      (copy) => {
+        step(copy).effects.facilityOutputMultipliersByFuel = { Coal: 1 };
+      },
+    ],
+    [
+      "edited active message",
+      (copy) => void (step(copy).message = "Forged active outcome"),
+    ],
+    [
+      "duplicate active copy",
+      (copy) => void copy.worldEvents.active.push(cloneDeep(step(copy))),
+    ],
+  ]);
 });
 
 test("rolling regional journal retention cannot discard declared official onset facts", () => {

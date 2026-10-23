@@ -16,42 +16,13 @@
  * `npm run compatibility:generate`, and explain the move in the PR. Never hand-edit the
  * snapshot. CI's `--ci` mode never writes snapshots, so a changed hash fails there.
  */
-import { createHash } from "crypto";
+import { digest } from "./CanonicalHash";
 import { SCENARIOS } from "../data/Scenarios";
 import { ScenarioType } from "../Types";
 import { expectNoViolations } from "./SimulationTestHelpers";
 import { runSimulation } from "./Simulator";
 
 jest.setTimeout(600000);
-
-const SIGNIFICANT_DIGITS = 10;
-
-/** Rounds finite numbers and sorts object keys so the JSON is stable across engines. */
-function canonicalize(value: unknown): unknown {
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
-      return String(value);
-    }
-    // Normalizes -0 as well, which JSON.stringify would already print as 0
-    return value === 0 ? 0 : Number(value.toPrecision(SIGNIFICANT_DIGITS));
-  }
-  if (Array.isArray(value)) {
-    return value.map(canonicalize);
-  }
-  if (value !== null && typeof value === "object") {
-    const sorted: Record<string, unknown> = {};
-    Object.keys(value)
-      .sort()
-      .forEach((key) => {
-        const entry = (value as Record<string, unknown>)[key];
-        if (entry !== undefined) {
-          sorted[key] = canonicalize(entry);
-        }
-      });
-    return sorted;
-  }
-  return value;
-}
 
 function goldenHash(scenario: ScenarioType): string {
   const result = runSimulation({ scenarioId: scenario.id, scenario });
@@ -63,10 +34,7 @@ function goldenHash(scenario: ScenarioType): string {
     facilityCount: result.finalFacilities.length,
     facilityNames: result.finalFacilities.map((facility) => facility.name),
   };
-  const json = JSON.stringify(
-    canonicalize({ monthlyHistory: result.months, summary }),
-  );
-  return createHash("sha256").update(json).digest("hex");
+  return digest({ monthlyHistory: result.months, summary });
 }
 
 it("keeps every scenario's golden output", () => {

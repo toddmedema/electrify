@@ -14,7 +14,6 @@ import {
 import type { RuleArc, RuleDiagnostic } from "../data/ScenarioRules";
 import type { ScenarioChoiceType } from "../Types";
 import { DIFFICULTY_IDS } from "../Constants";
-import { digest } from "../testing/CanonicalHash";
 
 const source = (id: number) =>
   SCENARIOS.find((scenario) => scenario.id === id)!;
@@ -40,32 +39,63 @@ const compile = (
 ) => compileOfficialArcChoices(parameters(patch), imports);
 
 test("compatible official choices keep their exact costs, grants, messages and load schedules", () => {
-  const table: Record<string, unknown> = {};
-  for (const scenarioId of [106, 107])
-    for (const difficulty of DIFFICULTY_IDS) {
-      const scenario = source(scenarioId);
-      const [choice] = compile(
-        {
-          namespace: { kind: "official", scenarioId, arcId: "catalog" },
-          difficulty,
-          startingYear: scenario.startingYear,
-          durationMonths: scenario.durationMonths,
-          receivingScenario: scenario,
-        },
-        [{ scenarioId, includeChoices: true }],
-      );
-      table[`${scenarioId} ${difficulty}`] = digest(
-        choice.options.map((option) => ({
-          id: option.id,
-          cost: option.cost,
-          grant: option.grant,
-          message: option.message,
-          replaceLoad: option.replaceLoad,
-        })),
-      );
-      expect(choice.key).toContain(`story:${scenarioId}:`);
-    }
-  expect(table).toMatchSnapshot();
+  const rows: unknown[] = [];
+  for (const scenarioId of [106, 107]) {
+    const scenario = source(scenarioId);
+    const [choice] = compile(
+      {
+        namespace: { kind: "official", scenarioId, arcId: "catalog" },
+        startingYear: scenario.startingYear,
+        durationMonths: scenario.durationMonths,
+        receivingScenario: scenario,
+      },
+      [{ scenarioId, includeChoices: true }],
+    );
+    for (const option of choice.options)
+      rows.push([
+        scenarioId,
+        option.id,
+        option.cost,
+        option.grant,
+        option.message,
+        option.replaceLoad?.with.length,
+      ]);
+  }
+  // Costs and grants do not vary by difficulty; [arc, option, cost, grant, message, replacement loads].
+  expect(rows).toEqual([
+    [
+      106,
+      "fast-track",
+      0,
+      15e6,
+      "Funding received. Connect 100 MW in January 2026.",
+      undefined,
+    ],
+    [
+      106,
+      "phased",
+      0,
+      0,
+      "Connect 50 MW in January 2026 and 50 MW in January 2028. No funding received.",
+      2,
+    ],
+    [
+      107,
+      "standard",
+      0,
+      0,
+      "Construction budget kept. February 2021 output losses apply in full.",
+      undefined,
+    ],
+    [
+      107,
+      "winterize",
+      90e6,
+      0,
+      "Winterization halves February 2021 output losses. Demand and gas prices still surge.",
+      undefined,
+    ],
+  ]);
 });
 
 test("both current choices adapt complete difficulty values into detached data with exact preparation offsets", () => {

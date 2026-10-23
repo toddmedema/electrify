@@ -7,6 +7,7 @@ import { accessContextForGame } from "../data/IntertieAccess";
 import { currentTick } from "../helpers/GameSelectors";
 import { getScenarioLocation } from "../helpers/Locations";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
+import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { scenarioRules } from "../helpers/ScenarioRules";
 import { digest } from "../testing/CanonicalHash";
 import { checkMonth, InvariantCollector } from "../testing/Invariants";
@@ -172,13 +173,69 @@ test("two real official companies reach every Load Shedding step and final windo
   }
 });
 
-test("two real official companies keep their exact World state", () => {
-  const { initial, world } = playLoadSheddingWorld();
-  const { rules: _initialRules, ...initialState } = initial;
-  const { rules: _finalRules, ...finalState } = world;
-  expect({
-    initial: digest(initialState),
-    final: digest(finalState),
-    outcomes: world.outcomes,
-  }).toMatchSnapshot();
-});
+/** Both companies build one quoted peaker, then answer each choice with their own seat's option. */
+function playWorld(scenarioId: number) {
+  const scenario = getScenario(scenarioId)!;
+  loadSimData(getScenarioLocation(scenario)!);
+  const world = createWorld(
+    { scenarioId, difficulty: "Employee" },
+    coopSeats(2),
+    `world-hash-${scenarioId}`,
+    "initial",
+  );
+  const initial = cloneDeep(world);
+  for (const [index, seat] of world.seats.entries()) {
+    const game = world.grids[index];
+    const facility = GENERATORS(
+      game,
+      100e6,
+      game.timeline.map((tick) => tick.windKph),
+      game.timeline.map((tick) => tick.solarIrradianceWM2),
+    ).find((quote) => quote.name === "Natural Gas Peaker" && quote.available)!;
+    command(world, seat.id, {
+      kind: "action",
+      name: "buildFacility",
+      payload: { facility, financed: true },
+    });
+    command(world, seat.id, { kind: "ready" });
+  }
+  for (
+    let steps = 0;
+    Object.keys(world.outcomes).length < world.seats.length &&
+    steps < (scenario.durationMonths + 1) * TICKS_PER_MONTH;
+    steps++
+  ) {
+    for (const [index, seat] of world.seats.entries()) {
+      const choice = world.outcomes[seat.id]
+        ? undefined
+        : pendingScenarioChoice(world.grids[index]);
+      if (choice)
+        command(world, seat.id, {
+          kind: "action",
+          name: "chooseScenarioResponse",
+          payload: {
+            decisionId: choice.id,
+            optionId:
+              choice.options[Math.min(index, choice.options.length - 1)].id,
+          },
+        });
+    }
+    stepWorld(world);
+  }
+  return { initial, world };
+}
+
+test.each([113, 111, 110])(
+  "two real official companies keep their exact World state in scenario %i",
+  (scenarioId) => {
+    const { initial, world } = playWorld(scenarioId);
+    expect(Object.keys(world.outcomes)).toHaveLength(2);
+    const { rules: _initialRules, ...initialState } = initial;
+    const { rules: _finalRules, ...finalState } = world;
+    expect({
+      initial: digest(initialState),
+      final: digest(finalState),
+      outcomes: world.outcomes,
+    }).toMatchSnapshot();
+  },
+);

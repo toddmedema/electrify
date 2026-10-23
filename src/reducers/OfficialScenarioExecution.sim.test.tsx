@@ -32,6 +32,7 @@ import {
   officialQuote,
   playOfficialExecution,
 } from "../testing/OfficialScenarioExecutionFixtures";
+import { expectSaveForgeries } from "../testing/SaveForgery";
 import { createGameFromReplay } from "../testing/Simulator";
 import type { GameType } from "../Types";
 import { canonical, digest } from "../testing/CanonicalHash";
@@ -470,117 +471,66 @@ test.each([104])(
   },
 );
 
-test("native report receipts reject forged payment markers without changing the intact neighboring run", () => {
-  const rules = scenarioRules(getScenario(104), {
+// Each row forges one receipt attribute on a real saved run; the intact run must keep loading.
+test.each([
+  [
+    "report receipts reject forged payment markers",
+    104,
+    "landfall",
+    [
+      { ruleEvent: true },
+      { upfrontGrant: 1000000000 },
+      { cost: 1 },
+      { ruleEvent: true, upfrontGrant: 1000000000, cost: 0 },
+    ],
+  ],
+  [
+    "the restoration review rejects a forged reportAvailable flag",
+    104,
+    "restoration",
+    [{ reportAvailable: true }],
+  ],
+  [
+    "the aging warning rejects malformed or duplicate selected IDs",
+    102,
+    "aging-warning",
+    [
+      "1",
+      [1, 1],
+      [-1],
+      [1.5],
+      [NaN],
+      [Infinity],
+      [Number.MAX_SAFE_INTEGER + 1],
+    ].map((selectedFacilityIds) => ({ selectedFacilityIds })),
+  ],
+])("native %s", (_name, scenarioId, eventId, patches) => {
+  const event = scenarioRules(getScenario(scenarioId), {
     difficulty: "CEO",
     seed: 12345,
-  })!;
-  const event = rules.events.find((item) => item.id === "landfall")!;
-  const { game } = playOfficialExecution(104, {
+  })!.events.find((item) => item.id === eventId)!;
+  const { game } = playOfficialExecution(scenarioId, {
     throughMonth: event.startMonth,
   });
   const unchanged = digest(physical(game));
-  expect(validScenarioRuleState(game)).toBe(true);
-  expectSave(game, "intact native review receipt");
-  for (const attributes of [
-    { ruleEvent: true },
-    { upfrontGrant: 1000000000 },
-    { cost: 1 },
-    { ruleEvent: true, upfrontGrant: 1000000000, cost: 0 },
-  ]) {
-    const forged = copyOfficialGame(game);
-    const recorded = forged.worldEvents.occurrences.find(
-      (receipt) => receipt.key === event.key,
-    )!;
-    Object.assign(recorded.attributes, attributes);
-    // Matching both copies ensures this checks the receipt owner, not an unrelated active-copy mismatch.
-    const active = forged.worldEvents.active.find(
-      (receipt) => receipt.key === event.key,
-    )!;
-    active.attributes = { ...recorded.attributes };
-    expect(validScenarioRuleState(forged)).toBe(false);
-    expect(
-      parseSave(JSON.parse(JSON.stringify(serializeSave(forged)))),
-    ).toBeNull();
-  }
+  expectSave(game, `intact ${eventId}`);
+  // Both copies are edited so this checks the receipt owner, not an active-copy mismatch.
+  expectSaveForgeries(
+    game,
+    patches.map((patch, index) => [
+      `${eventId} ${index}`,
+      (forged) => {
+        for (const receipt of [
+          ...forged.worldEvents.occurrences,
+          ...forged.worldEvents.active,
+        ])
+          if (receipt.key === event.key)
+            Object.assign(receipt.attributes, patch);
+      },
+    ]),
+  );
   expect(digest(physical(game))).toBe(unchanged);
-  expect(validScenarioRuleState(game)).toBe(true);
-  expectSave(game, "unchanged native review neighbor");
-});
-
-test("the native restoration review rejects a forged reportAvailable flag beside its intact saved neighbor", () => {
-  const rules = scenarioRules(getScenario(104), {
-    difficulty: "CEO",
-    seed: 12345,
-  })!;
-  const event = rules.events.find((item) => item.id === "restoration")!;
-  const { game } = playOfficialExecution(104, {
-    throughMonth: event.startMonth,
-  });
-  const unchanged = digest(physical(game));
-  const original = game.worldEvents.occurrences.find(
-    (receipt) => receipt.key === event.key,
-  )!;
-  expect(original.attributes.reportAvailable).toBeUndefined();
-  expect(original.attributes.reliability).toBeGreaterThan(0);
-  expect(validScenarioRuleState(game)).toBe(true);
-  expectSave(game, "intact restoration review");
-  const forged = copyOfficialGame(game);
-  for (const receipt of [
-    ...forged.worldEvents.occurrences,
-    ...forged.worldEvents.active,
-  ])
-    if (receipt.key === event.key) receipt.attributes.reportAvailable = true;
-  expect(validScenarioRuleState(forged)).toBe(false);
-  expect(
-    parseSave(JSON.parse(JSON.stringify(serializeSave(forged)))),
-  ).toBeNull();
-  expect(digest(physical(game))).toBe(unchanged);
-  expect(validScenarioRuleState(game)).toBe(true);
-  expectSave(game, "unchanged restoration review neighbor");
-});
-
-test("the native aging warning rejects malformed or duplicate selected IDs beside its real saved neighbor", () => {
-  const rules = scenarioRules(getScenario(102), {
-    difficulty: "CEO",
-    seed: 12345,
-  })!;
-  const warning = rules.events.find((event) => event.id === "aging-warning")!;
-  const { game } = playOfficialExecution(102, {
-    throughMonth: warning.startMonth,
-  });
-  const unchanged = digest(physical(game));
-  const original = game.worldEvents.occurrences.find(
-    (event) => event.key === warning.key,
-  )!;
-  // This legal route has sold the qualifying old coal plant; its empty warning receipt stays valid.
-  expect(original.attributes.selectedFacilityIds).toEqual([]);
-  expect(original.attributes.selectedFacilityNames).toEqual([]);
-  expect(validScenarioRuleState(game)).toBe(true);
-  expectSave(game, "intact aging warning");
-  for (const ids of [
-    "1",
-    [1, 1],
-    [-1],
-    [1.5],
-    [NaN],
-    [Infinity],
-    [Number.MAX_SAFE_INTEGER + 1],
-  ]) {
-    const forged = copyOfficialGame(game);
-    for (const event of [
-      ...forged.worldEvents.occurrences,
-      ...forged.worldEvents.active,
-    ])
-      if (event.key === warning.key) event.attributes.selectedFacilityIds = ids;
-    expect(validScenarioRuleState(forged)).toBe(false);
-    expect(
-      parseSave(JSON.parse(JSON.stringify(serializeSave(forged)))),
-    ).toBeNull();
-  }
-  expect(digest(physical(game))).toBe(unchanged);
-  expect(validScenarioRuleState(game)).toBe(true);
-  expectSave(game, "unchanged aging warning neighbor");
+  expectSave(game, `unchanged ${eventId} neighbor`);
 });
 
 test("native111 keeps its surviving-route cap through a real upgrade without attaching generator targets", () => {

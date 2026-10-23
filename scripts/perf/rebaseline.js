@@ -37,9 +37,8 @@ run(
     // Hash snapshots of runs the goldens do not play (see CanonicalHash.ts).
     "**/src/testing/ScenarioVariantHashes.sim.test.tsx",
     "**/src/testing/WildfireIntertieRules.test.tsx",
-    "**/src/multiplayer/LoadSheddingWorld.sim.test.tsx",
+    "**/src/multiplayer/OfficialWorlds.sim.test.tsx",
     "**/src/reducers/LoadSheddingRules.test.tsx",
-    "**/src/helpers/ScenarioRuleChoices.test.ts",
     "-u",
   ],
   { CI: "true" },
