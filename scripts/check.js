@@ -1,5 +1,8 @@
 #!/usr/bin/env node
-const { spawn } = require("node:child_process");
+const { spawn, execFileSync } = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
+const { createHash } = require("node:crypto");
 const os = require("node:os");
 const { checkAssets } = require("./check-assets");
 
@@ -68,7 +71,7 @@ const steps = [
     ci: true,
     assets: true,
     needs: "build",
-    args: ["--", "--reporter=list"],
+    reports: ["results.json"],
   },
   {
     id: "desktop-build",
@@ -85,6 +88,7 @@ const steps = [
     ci: true,
     needs: "desktop-build",
     env: { MULTIPLAYER_BUILD_DIR: "build" },
+    reports: ["results.json"],
   },
 ];
 const usage = `Usage: npm run check -- [--ci] [--steps ${steps.map((step) => step.id).join(",")}]`;
@@ -124,7 +128,56 @@ function workerCount(env, cores = os.availableParallelism()) {
   return value === undefined ? Math.min(4, cores) : Number(value);
 }
 
-function run(step, workers) {
+// Include dirty and untracked inputs: a commit ID alone does not identify code checked
+// before committing. Ignored build products and generated manifests are deliberately excluded.
+function sourceSnapshot() {
+  const options = {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    maxBuffer: 64 * 1024 * 1024,
+  };
+  let root;
+  try {
+    root = execFileSync(
+      "git",
+      ["rev-parse", "--show-toplevel"],
+      options,
+    ).trim();
+  } catch {
+    // The runner also supports source archives without Git metadata.
+    return null;
+  }
+  const git = (...args) => execFileSync("git", args, { ...options, cwd: root });
+  const commit = git("rev-parse", "HEAD").trim();
+  const tree = git("rev-parse", "HEAD^{tree}").trim();
+  const status = git("status", "--porcelain=v1", "--untracked-files=all");
+  const hash = createHash("sha256")
+    .update(commit)
+    .update(status)
+    .update(git("diff", "--binary", "HEAD"));
+  for (const file of git("ls-files", "--others", "--exclude-standard", "-z")
+    .split("\0")
+    .filter(Boolean)
+    .sort()) {
+    const target = path.join(root, file);
+    hash
+      .update(file)
+      .update("\0")
+      .update(
+        fs.lstatSync(target).isSymbolicLink()
+          ? fs.readlinkSync(target)
+          : fs.readFileSync(target),
+      );
+  }
+  return {
+    commit,
+    tree,
+    dirty: status.length > 0,
+    fingerprint: hash.digest("hex"),
+  };
+}
+
+function run(step, workers, directory) {
   const started = Date.now();
   console.error(
     `Starting ${step.name}${step.jest ? ` (${workers} workers)` : ""}...`,
@@ -142,11 +195,21 @@ function run(step, workers) {
           ]
         : step.args || []),
     ];
+    const reportEnv = step.reports?.length
+      ? { ELECTRIFY_E2E_OUTPUT_DIR: path.join(directory, step.id) }
+      : {};
     const options = {
-      env: { ...process.env, CI: "true", NO_COLOR: "1", ...step.env },
+      env: {
+        ...process.env,
+        CI: "true",
+        NO_COLOR: "1",
+        ...step.env,
+        ...reportEnv,
+      },
       windowsHide: true,
     };
-    // Only allowlisted script names, flags and validated worker counts reach the Windows shell.
+    // Output paths travel in the environment, keeping dynamic paths out of the Windows shell.
+    // Each invocation owns its artifacts; reruns cannot replace or borrow earlier evidence.
     const child =
       process.platform === "win32"
         ? spawn(["npm", ...args].join(" "), { ...options, shell: true })
@@ -155,14 +218,43 @@ function run(step, workers) {
     child.stdout.on("data", (chunk) => (output += chunk));
     child.stderr.on("data", (chunk) => (output += chunk));
     child.on("error", (error) => (output += `\n${error.message}`));
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       const seconds = (Date.now() - started) / 1000;
-      if (code !== 0)
+      const log = `${step.id}.log`;
+      const reports = [];
+      const reportErrors = [];
+      for (const file of step.reports || []) {
+        try {
+          const retained = path.join(step.id, file);
+          JSON.parse(fs.readFileSync(path.join(directory, retained), "utf8"));
+          reports.push(retained);
+        } catch (error) {
+          reportErrors.push(
+            `Required report ${file} is missing or invalid: ${error.message}`,
+          );
+        }
+      }
+      const ok = code === 0 && !reportErrors.length;
+      if (reportErrors.length) output += `\n${reportErrors.join("\n")}\n`;
+      fs.writeFileSync(path.join(directory, log), output);
+      if (!ok)
         console.error(`\n===== ${step.name} failed =====\n${output.trimEnd()}`);
       console.error(
-        `${code === 0 ? "ok  " : "FAIL"} ${step.name.padEnd(18)} ${seconds.toFixed(0)}s${code !== 0 && step.fix ? `  fix: ${step.fix}` : ""}`,
+        `${ok ? "ok  " : "FAIL"} ${step.name.padEnd(18)} ${seconds.toFixed(0)}s${!ok && step.fix ? `  fix: ${step.fix}` : ""}`,
       );
-      resolve({ ...step, ok: code === 0, seconds });
+      resolve({
+        ...step,
+        ok,
+        status: ok ? "passed" : "failed",
+        seconds,
+        exitCode: code,
+        signal,
+        command: ["npm", ...args],
+        env: { CI: "true", ...step.env, ...reportEnv },
+        log,
+        reports,
+        reportErrors,
+      });
     });
   });
 }
@@ -176,7 +268,13 @@ async function execute(selected, runStep) {
     const needed = results.find((result) => result.id === step.needs);
     if (needed && !needed.ok) {
       console.error(`skip ${step.name} (${needed.name} failed)`);
-      results.push({ ...step, ok: false, seconds: 0 });
+      results.push({
+        ...step,
+        ok: false,
+        status: "skipped",
+        reason: `${needed.name} failed`,
+        seconds: 0,
+      });
     } else results.push(await runStep(step));
   }
   return results;
@@ -193,11 +291,89 @@ async function main(argv = process.argv.slice(2)) {
   const started = Date.now();
   const full = isFullCheck(selected);
   const available = full ? selected.length : steps.length;
+  const parent = path.resolve(".tmp", "check-runs");
+  fs.mkdirSync(parent, { recursive: true });
+  const directory = fs.mkdtempSync(
+    path.join(parent, `${new Date().toISOString().replaceAll(/[:.]/g, "-")}-`),
+  );
+  const reportPath = path.join(directory, "report.json");
+  const report = {
+    schemaVersion: 1,
+    status: "running",
+    startedAt: new Date(started).toISOString(),
+    command: ["node", "scripts/check.js", ...argv],
+    source: { before: sourceSnapshot(), after: null, changedDuringRun: false },
+    environment: {
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      cores: os.availableParallelism(),
+      jestWorkers: workers,
+      githubActions: process.env.GITHUB_ACTIONS === "true",
+      e2ePort: process.env.E2E_PORT || "3100",
+      webBuildDirectory: process.env.E2E_BUILD_DIR || "build",
+    },
+    scope: {
+      profile: selected.some((step) => step.ci) ? "ci" : "quick",
+      full,
+      selected: selected.map((step) => step.id),
+      notSelected: steps
+        .filter((step) => !selected.includes(step))
+        .map((step) => step.id),
+      ciOnly: ["packaged-electron"],
+      separateChecks: ["firestore-rules"],
+    },
+    gates: selected.map(({ id, name, script, env }) => ({
+      id,
+      name,
+      script,
+      env: { CI: "true", ...env },
+      status: "pending",
+    })),
+  };
+  const saveReport = () =>
+    fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  saveReport();
   console.error(`Running ${selected.length}/${available} check gates.`);
-  const results = await execute(selected, (step) => run(step, workers));
+  console.error(`Validation report: ${reportPath}`);
+  const results = await execute(selected, async (step) => {
+    const gate = report.gates.find((entry) => entry.id === step.id);
+    Object.assign(gate, {
+      status: "running",
+      startedAt: new Date().toISOString(),
+    });
+    saveReport();
+    const result = await run(step, workers, directory);
+    Object.assign(gate, result, { finishedAt: new Date().toISOString() });
+    saveReport();
+    return result;
+  });
+  // Dependency failures do not invoke run(), so record their skipped status explicitly.
+  for (const result of results)
+    Object.assign(
+      report.gates.find((gate) => gate.id === result.id),
+      result,
+    );
   const failed = results.filter((result) => !result.ok);
+  report.source.after = sourceSnapshot();
+  report.source.changedDuringRun =
+    !!report.source.before &&
+    report.source.before.fingerprint !== report.source.after?.fingerprint;
+  report.status = report.source.changedDuringRun
+    ? "invalidated"
+    : failed.length
+      ? "failed"
+      : "passed";
+  report.finishedAt = new Date().toISOString();
+  saveReport();
+  if (report.source.changedDuringRun) {
+    console.error(
+      "Source changed during validation; these results do not validate one source tree. Rerun the integrated check.",
+    );
+    process.exitCode = 1;
+  }
   console.error(
-    `\n${failed.length ? `Failed ${failed.length}/${results.length}` : `Passed ${results.length}`} gates in ${((Date.now() - started) / 1000).toFixed(0)}s.${full ? "" : " Partial check only."}${full && !selected.some((step) => step.ci) ? " Run npm run check:ci before pushing a pull request." : ""}`,
+    `\n${report.source.changedDuringRun ? `Invalidated ${results.length}` : failed.length ? `Failed ${failed.length}/${results.length}` : `Passed ${results.length}`} gates in ${((Date.now() - started) / 1000).toFixed(0)}s.${full ? "" : " Partial check only."}${full && !selected.some((step) => step.ci) ? " Run npm run check:ci before pushing a pull request." : ""}`,
   );
   if (full && selected.some((step) => step.ci))
     console.error(

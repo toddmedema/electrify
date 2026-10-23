@@ -1,22 +1,31 @@
 import { defineConfig } from "@playwright/test";
-import os from "node:os";
 import path from "node:path";
 import base from "./playwright.config";
 
 const port = process.env.E2E_PORT || "3100";
+const outputDir =
+  process.env.ELECTRIFY_E2E_OUTPUT_DIR ||
+  path.resolve(__dirname, "../test-results/browser");
 // Local and hosted checks use the same production server and acceptance policy.
 // Keep retries for diagnostics, but never report a passing gate after a failed attempt.
 export default defineConfig({
   ...base,
   testIgnore: [...(base.testIgnore as string[]), "mods.spec.ts"],
-  outputDir: path.resolve(__dirname, "../test-results/browser"),
+  outputDir,
+  reporter: [
+    [process.env.GITHUB_ACTIONS === "true" ? "github" : "list"],
+    [
+      "json",
+      {
+        outputFile: path.join(outputDir, "results.json"),
+      },
+    ],
+  ],
   forbidOnly: true,
   failOnFlakyTests: true,
   retries: 2,
-  workers:
-    process.env.GITHUB_ACTIONS === "true"
-      ? 2
-      : Math.max(2, Math.min(6, Math.floor(os.availableParallelism() / 2))),
+  // Match hosted concurrency so local evidence does not depend on spare machine cores.
+  workers: 2,
   webServer: {
     command: "node scripts/ci/serve.js",
     cwd: path.resolve(__dirname, ".."),

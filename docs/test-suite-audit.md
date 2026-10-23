@@ -148,6 +148,59 @@ The unchanged benchmark initially measured Immer overhead at 1.67 against its
 any source or baseline change. All 14 gates therefore have passing results, with
 that benchmark retry recorded rather than described as a clean first run.
 
+### Tooltip race and validation evidence follow-up
+
+The first hosted run of this follow-up, [39874667124](https://github.com/toddmedema/electrify/actions/runs/39874667124),
+failed the macOS production-browser gate after the 390 px dark chart tooltip passed
+on retry. This was the same assertion at `facilities-production-chart.spec.ts:125`
+as the earlier light-mode failure already cited above. The native macOS suite passed.
+The tested merge tree matched the PR head, so neither native-only coverage nor base
+drift explained this failure. Enforcing retry acceptance had exposed a known runtime
+defect without repairing it.
+
+The chart stored keyboard selection in React while uPlot independently owned cursor
+visibility. A delayed compatibility `mouseleave` could reset the cursor after Home,
+hiding the tooltip while the accessible description still announced its selected
+point. A diagnostic against the exact hosted production artifact reproduced that
+ordering after eight original-journey passes. Keyboard selection now owns cursor
+position synchronously until Escape, blur, or intentional pointer input releases it.
+
+The existing browser journey now sends `mouseleave` through real uPlot immediately
+after Home and checks the visible tooltip and accessible selection. It also checks
+pointer takeover, Escape, blur, and normal hover dismissal in both themes. The new
+assertion failed against the original artifact at the intended keyboard-selection
+assertion; it does not rely on encountering the browser's intermittent event timing.
+
+The stricter integrated browser matrix also exposed a Build-header layout check that
+sampled its animated heading and close button in separate frames. It now waits for
+font and panel-animation readiness and measures the controls together. The one-pixel
+alignment limit and all readability assertions remain unchanged.
+
+The local production matrix also uses the same two browser workers as hosted CI.
+A six-worker local rerun under concurrent machine load exhausted multiple unrelated
+desktop test deadlines; its failures remain recorded. A configuration regression now
+rejects a local/hosted worker mismatch without increasing timeouts.
+
+Validation results are now retained instead of disappearing with a successful command:
+
+- Local `check` invocations keep separate `.tmp/check-runs/` reports with commit/tree,
+  dirty-source fingerprints, platform/Node/worker settings, commands, selected and
+  unrun gates, explicit pass/fail/skip states, and complete command logs.
+- Production browser and multiplayer configurations always write JSON attempt reports.
+  Hosted diagnostics already archive their output directories; local checks give each
+  invocation its own report, trace, and screenshot directory. Missing or invalid required
+  reports fail the gate, and reruns cannot overwrite or borrow an earlier run's evidence.
+- The runner compares source identities before and after execution and fails a run
+  whose source fingerprint differs at completion. This guards an individual invocation;
+  it does not automatically combine partial runs or certify their validity after later edits.
+
+The reporting regressions exercise the real CLI, including a successful command's
+stdout/stderr, source mutation by an otherwise successful gate, and a missing report
+after an earlier successful run. The Playwright acceptance regression now reads the
+persisted report and requires both the failed first attempt and successful retry to
+remain available while the gate still fails. Local evidence and hosted CI completion
+remain separate claims.
+
 ## Original test inventory review, October 15, 2026
 
 Reviewed the complete tracked test inventory at master commit `0f71ec68` on October 15, 2026: **358 executable test files plus the golden-output snapshot**. Three subagents reviewed browser tests, React components, simulation/domain tests, and the remaining runtime/platform suites. The primary agent also reviewed saves, achievements, audio, native runtime, Firestore rules, CI tooling and the combined diff.

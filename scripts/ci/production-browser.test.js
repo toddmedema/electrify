@@ -4,14 +4,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-function playwright(args, env = {}) {
+function playwright(args, env = {}, configuredReporters = false) {
   return spawnSync(
     process.execPath,
     [
       require.resolve("@playwright/test/cli"),
       "test",
       ...args,
-      "--reporter=json",
+      ...(configuredReporters ? [] : ["--reporter=json"]),
     ],
     {
       encoding: "utf8",
@@ -39,7 +39,11 @@ test("production reproduction and CI use the same server and acceptance policy",
       assert.equal(config.forbidOnly, true);
       assert.equal(config.failOnFlakyTests, true);
       assert(config.projects.every((project) => project.retries === 2));
-      if (hosted === "true") assert.equal(config.workers, 2);
+      assert.equal(
+        config.workers,
+        2,
+        "local and hosted production workloads must match",
+      );
     }
     assert.deepEqual(configs[0].webServer, configs[1].webServer);
     assert.equal(configs[0].workers, configs[1].workers);
@@ -64,12 +68,15 @@ test("a failed first attempt cannot become a green production gate on retry", (t
     fs.rmSync(directory, { recursive: true, force: true });
   });
   const config = path.join(directory, "playwright.config.ts");
+  const reportFile = path.join(directory, "attempts.json");
   fs.writeFileSync(
     config,
     `
     import production from ${JSON.stringify(path.resolve("e2e/production.playwright.config").replaceAll("\\", "/"))};
     export default { ...production, testDir: '.', testMatch: 'policy.spec.ts',
       projects: [{ name: 'policy' }], workers: 1, webServer: undefined,
+      reporter: Array.isArray(production.reporter) ? production.reporter.map(([name, options]) =>
+        name === 'json' ? [name, { outputFile: ${JSON.stringify(reportFile)} }] : [name, options]) : production.reporter,
       outputDir: ${JSON.stringify(path.join(directory, "results"))} };
   `,
   );
@@ -82,11 +89,27 @@ test("a failed first attempt cannot become a green production gate on retry", (t
     test('flaky', ({}, info) => expect(info.retry).toBeGreaterThan(0));
   `,
   );
-  const stable = playwright([`--config=${config}`, "--grep=stable"]);
+  const stable = playwright([`--config=${config}`, "--grep=stable"], {}, true);
   assert.equal(stable.status, 0, stable.stderr || stable.stdout);
-  const flaky = playwright([`--config=${config}`, "--grep=flaky"]);
-  const report = JSON.parse(flaky.stdout);
+  assert(
+    fs.existsSync(reportFile),
+    "successful production runs must retain a structured report",
+  );
+  assert.equal(
+    JSON.parse(fs.readFileSync(reportFile, "utf8")).stats.expected,
+    1,
+  );
+  const flaky = playwright([`--config=${config}`, "--grep=flaky"], {}, true);
+  const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
   assert.equal(report.stats.flaky, 1);
   assert.equal(report.stats.unexpected, 0, "the retry really passed");
   assert.equal(flaky.status, 1, "a passed retry must still fail the gate");
+  const attempts = report.suites[0].specs[0].tests[0].results;
+  assert.deepEqual(
+    attempts.map(({ status, retry }) => ({ status, retry })),
+    [
+      { status: "failed", retry: 0 },
+      { status: "passed", retry: 1 },
+    ],
+  );
 });
