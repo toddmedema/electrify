@@ -87,10 +87,6 @@ for (const theme of ["light", "dark"]) {
     expect(tipBounds.y).toBeGreaterThanOrEqual(0);
     expect(tipBounds.x + tipBounds.width).toBeLessThanOrEqual(viewport.width);
     expect(tipBounds.y + tipBounds.height).toBeLessThanOrEqual(viewport.height);
-    if (!info.project.use.hasTouch) {
-      await tooltip.hover();
-      await expect(tooltip).toBeVisible();
-    }
     if (process.env.REVIEW_SCREENSHOT_DIR) {
       await page.screenshot({
         path: path.join(
@@ -99,6 +95,10 @@ for (const theme of ["light", "dark"]) {
         ),
         animations: "disabled",
       });
+    }
+    if (!info.project.use.hasTouch) {
+      await tooltip.hover();
+      await expect(tooltip).toBeVisible();
     }
     if (info.project.use.hasTouch) {
       await bar.tap();
@@ -142,6 +142,59 @@ for (const theme of ["light", "dark"]) {
       elements.map((el) => (el as HTMLElement).style.width).sort(),
     );
     expect(shares).toEqual(["25%", "75%"]);
+
+    if (!info.project.use.hasTouch) {
+      await page.mouse.move(0, 0);
+      const track = (await bar.locator(".productionMixTrack").boundingBox())!;
+      const target = (await bar.boundingBox())!;
+      const rows = tooltip.locator(".productionMixSource");
+      for (const [index, segment] of (await segments.all()).entries()) {
+        const resting = (await segment.boundingBox())!;
+        await page.mouse.move(resting.x + resting.width / 2, target.y + 10);
+        await expect(segment).toHaveCSS("height", "6px");
+        const highlighted = (await segment.boundingBox())!;
+        expect(highlighted.y).toBe(track.y - 1);
+        expect(highlighted.y + highlighted.height).toBe(
+          track.y + track.height + 1,
+        );
+        expect(highlighted.x).toBe(resting.x);
+        expect(highlighted.width).toBe(resting.width);
+        // The fixture has only Wind and Nuclear output, even when zero-output
+        // sources appear between them in the tooltip's dispatch order.
+        const name =
+          (await segment.evaluate((el) => (el as HTMLElement).style.width)) ===
+          "25%"
+            ? "Wind"
+            : "Nuclear";
+        for (const row of await rows.all()) {
+          const selected = await row.getByText(name, { exact: true }).count();
+          await expect(row).toHaveCSS("font-weight", selected ? "700" : "400");
+        }
+        await expect(
+          bar.locator(".productionMixSegment.isHovered"),
+        ).toHaveCount(1);
+        await expect(segments.nth(1 - index)).toHaveCSS("height", "4px");
+      }
+      if (process.env.REVIEW_SCREENSHOT_DIR) {
+        await page.screenshot({
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            `mix-${info.project.name}-${theme}-fuel-hover.png`,
+          ),
+          animations: "disabled",
+        });
+      }
+      await page.mouse.move(0, 0);
+      await expect(bar.locator(".productionMixSegment.isHovered")).toHaveCount(
+        0,
+      );
+      await expect(
+        tooltip.locator(".productionMixSource.isHovered"),
+      ).toHaveCount(0);
+      for (const segment of await segments.all()) {
+        await expect(segment).toHaveCSS("height", "4px");
+      }
+    }
 
     // The same inspectable target remains when the entire fleet is idle.
     await editSavedGame(page, (save) => {
@@ -710,6 +763,23 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
     expect(
       await mixDetails.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
+    if (!info.project.use.hasTouch) {
+      const segments = mix.locator(".productionMixSegment");
+      for (const index of [0, 6, 11, 12]) {
+        await segments.nth(index).hover();
+        await expect(segments.nth(index)).toHaveCSS("height", "6px");
+        await expect(
+          mixDetails.locator(".productionMixSource").nth(index),
+        ).toHaveCSS("font-weight", "700");
+        await expect(
+          mix.locator(".productionMixSegment.isHovered"),
+        ).toHaveCount(1);
+        await expect(
+          mixDetails.locator(".productionMixSource.isHovered"),
+        ).toHaveCount(1);
+      }
+      await page.mouse.move(0, 0);
+    }
     await mix.press("End");
     expect(
       await mixDetails

@@ -19,7 +19,7 @@ import { ScenarioType } from "../../Types";
 import DataCenterSetup from "./DataCenterSetup";
 
 // Keep the real map and year options, but avoid repeatedly computing their accessibility
-// styles when a control has an explicit label. CI shares CPU with the simulation shard.
+// styles when a control has an explicit label, keeping coverage runs responsive on CI.
 jest.setTimeout(30000);
 
 jest.mock("../../helpers/DataCenterSetupClient", () => ({

@@ -63,6 +63,70 @@ it("supports keyboard inspection and dismissal", async () => {
   );
 });
 
+it("keeps the highlighted source under a stationary mouse as live production changes", async () => {
+  const { rerender } = render(
+    <ProductionMixBar
+      tick={{ supplyByFuel: { Wind: 60e6, Uranium: 40e6 } }}
+      fuelOrder={["Wind", "Uranium"]}
+    />,
+  );
+  const button = screen.getByRole("button");
+  jest.spyOn(button, "getBoundingClientRect").mockReturnValue({
+    x: 0,
+    y: 0,
+    left: 0,
+    right: 100,
+    top: 0,
+    bottom: 40,
+    width: 100,
+    height: 40,
+    toJSON: () => ({}),
+  });
+  fireEvent.click(button);
+  await screen.findByRole("tooltip");
+  // jsdom has no PointerEvent; preserve the mouse type and coordinates React reads.
+  fireEvent(
+    button,
+    Object.assign(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 40 }),
+      { pointerType: "mouse" },
+    ),
+  );
+  expect(screen.getAllByTestId("production-mix-source")[0]).toHaveClass(
+    "isHovered",
+  );
+  expect(screen.getAllByTestId("production-mix-segment")[0]).toHaveClass(
+    "isHovered",
+  );
+
+  rerender(
+    <ProductionMixBar
+      tick={{ supplyByFuel: { Wind: 20e6, Uranium: 80e6 } }}
+      fuelOrder={["Wind", "Uranium"]}
+    />,
+  );
+  expect(screen.getAllByTestId("production-mix-source")[0]).not.toHaveClass(
+    "isHovered",
+  );
+  expect(screen.getAllByTestId("production-mix-source")[1]).toHaveClass(
+    "isHovered",
+  );
+  expect(screen.getAllByTestId("production-mix-segment")[1]).toHaveClass(
+    "isHovered",
+  );
+
+  rerender(
+    <ProductionMixBar
+      tick={{ supplyByFuel: { Wind: 0, Uranium: 0 } }}
+      fuelOrder={["Wind", "Uranium"]}
+    />,
+  );
+  expect(screen.getAllByTestId("production-mix-source")[1]).not.toHaveClass(
+    "isHovered",
+  );
+  expect(screen.queryAllByTestId("production-mix-segment")).toHaveLength(0);
+});
+
 it.each([null, { supplyByFuel: { Sun: 0 } }])(
   "keeps an empty track inspectable when production is absent: %s",
   async (tick) => {

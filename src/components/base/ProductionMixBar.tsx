@@ -25,6 +25,9 @@ export default function ProductionMixBar({
   React.useSyncExternalStore(subscribeThemeMode, getThemeVersion);
   const [open, setOpen] = React.useState(false);
   const [pinned, setPinned] = React.useState(false);
+  const [hoveredPosition, setHoveredPosition] = React.useState<number | null>(
+    null,
+  );
   const tooltipRef = React.useRef<HTMLDivElement>(null);
   const fuels = [
     ...new Set([
@@ -52,9 +55,18 @@ export default function ProductionMixBar({
     });
   }
   const total = sources.reduce((sum, source) => sum + source.watts, 0);
+  let end = 0;
+  const hoveredSource =
+    hoveredPosition === null
+      ? null
+      : sources.find((source) => {
+          end += source.watts;
+          return source.watts > 0 && hoveredPosition * total < end;
+        })?.name;
   const close = () => {
     setPinned(false);
     setOpen(false);
+    setHoveredPosition(null);
   };
   return (
     <ClickAwayListener onClickAway={close}>
@@ -68,7 +80,11 @@ export default function ProductionMixBar({
                   {total === 0 && <div>No production now</div>}
                   <div className="productionMixSources">
                     {sources.map((source) => (
-                      <div className="productionMixSource" key={source.name}>
+                      <div
+                        className={`productionMixSource${hoveredSource === source.name ? " isHovered" : ""}`}
+                        data-testid="production-mix-source"
+                        key={source.name}
+                      >
                         <span
                           className="productionMixSwatch"
                           data-testid="production-mix-swatch"
@@ -116,6 +132,12 @@ export default function ProductionMixBar({
             type="button"
             className="productionMixTarget"
             aria-label="Inspect current production mix"
+            onPointerMove={(event) => {
+              if (event.pointerType !== "mouse") return;
+              const bounds = event.currentTarget.getBoundingClientRect();
+              setHoveredPosition((event.clientX - bounds.left) / bounds.width);
+            }}
+            onPointerLeave={() => setHoveredPosition(null)}
             onClick={() => {
               setOpen(!pinned);
               setPinned(!pinned);
@@ -150,7 +172,7 @@ export default function ProductionMixBar({
                 .map((source) => (
                   <span
                     key={source.name}
-                    className="productionMixSegment"
+                    className={`productionMixSegment${hoveredSource === source.name ? " isHovered" : ""}`}
                     data-testid="production-mix-segment"
                     style={{
                       width: `${(source.watts / total) * 100}%`,

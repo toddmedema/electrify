@@ -174,7 +174,7 @@ test(
   },
 );
 
-test("CI's parallel CPU shards can be reproduced locally without native windows or excess workers", () => {
+test("CI's CPU shards can be reproduced locally without native windows or excess workers", () => {
   for (const index of [1, 2]) {
     const local = planForRun(index, true, { GITHUB_ACTIONS: "false" }, 20);
     assert.deepEqual(local.ui, []);

@@ -116,8 +116,8 @@ function planForRun(
     throw new Error(
       "This combined native-window harness is only for GitHub Actions; use --cpu-only for a windowless local reproduction or the ordinary local checks.",
     );
-  // Share at most four local workers across both concurrent suites. Keep CI's native
-  // plan intact while allowing its CPU contention and shard assignment to be reproduced.
+  // Cap the local CPU budget while preserving CI's worker split and shard assignment.
+  // execute() runs these suites serially, just as it does in CI.
   return cpuOnly
     ? { cpu: cpuSuites(index, inCI ? cores : Math.min(4, cores)), ui: [] }
     : commands(index, cores);

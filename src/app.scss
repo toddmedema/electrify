@@ -5214,13 +5214,24 @@ html[data-startup-visit="returning"] #appStartup {
   display: flex;
   width: 100%;
   height: 4px;
-  overflow: hidden;
   border-radius: var(--radius-pill);
   background: var(--border-subtle);
 }
 .productionMixSegment {
   height: 100%;
   flex: 0 0 auto;
+  &:first-child {
+    border-top-left-radius: inherit;
+    border-bottom-left-radius: inherit;
+  }
+  &:last-child {
+    border-top-right-radius: inherit;
+    border-bottom-right-radius: inherit;
+  }
+  &.isHovered {
+    height: calc(100% + 2px);
+    transform: translateY(-1px);
+  }
   + .productionMixSegment {
     box-shadow: inset 1px 0 var(--bg-primary);
   }
@@ -5256,6 +5267,9 @@ html[data-startup-visit="returning"] #appStartup {
   grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
+  &.isHovered {
+    font-weight: 700;
+  }
 }
 .productionMixSwatch {
   width: 8px;
