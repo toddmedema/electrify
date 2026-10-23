@@ -4,6 +4,7 @@ const {
   dialog,
   ipcMain,
   protocol,
+  powerMonitor,
   screen,
   session,
   shell,
@@ -94,6 +95,7 @@ let finalizingQuit = false;
 let quitRequested = false;
 let quitTimer;
 let rendererReady = false;
+let power = { phase: "awake", generation: 0 };
 let rendererCrashed = false;
 let quitWarningOpen = false;
 let resizeTimer;
@@ -140,6 +142,7 @@ function state() {
     ? screen.getDisplayMatching(window.getBounds())
     : screen.getPrimaryDisplay();
   return {
+    power: { ...power },
     display: {
       ...preferences,
       resolutions: resolutionsFor(display, preferences),
@@ -160,16 +163,32 @@ function publishGameFocus() {
       window.isFocused() &&
       !steam.overlayActive &&
       !steam.textInput?.active &&
+      !steam.dialogs?.active &&
       !quitRequested &&
-      rendererReady,
+      rendererReady &&
+      power.phase === "awake",
   );
   if (window && !window.isDestroyed())
     window.webContents.send(
       "desktop:focus-changed",
-      window.isFocused() && !steam.overlayActive && !steam.textInput?.active,
+      window.isFocused() &&
+        !steam.overlayActive &&
+        !steam.textInput?.active &&
+        !steam.dialogs?.active &&
+        !quitRequested &&
+        power.phase === "awake",
     );
 }
 steam.onOverlayChanged = publishGameFocus;
+
+function publishPower(phase) {
+  power = { phase, generation: power.generation + 1 };
+  // Gate native input before notifying the renderer, even if the OS keeps our window focused.
+  steam.setInputEnabled(false);
+  if (window && !window.isDestroyed())
+    window.webContents.send("desktop:power-changed", { ...power });
+  publishGameFocus();
+}
 
 function savePreferences() {
   atomicWrite(preferenceFile, JSON.stringify(preferences));
@@ -228,33 +247,35 @@ async function quitFailure() {
   quitWarningOpen = true;
   let response;
   try {
-    ({ response } = await dialog.showMessageBox(
-      window,
-      crashed
-        ? {
-            type: "warning",
-            title: "Restart or quit",
-            message: "The game stopped unexpectedly.",
-            detail:
-              "Your previous saves are safe. Restart to reload the game using the last saved state, or quit.",
-            buttons: ["Restart game", "Quit with previous save"],
-            defaultId: 0,
-            cancelId: 0,
-          }
-        : {
-            type: "warning",
-            title: "Save before quitting",
-            message: "Your latest game could not finish saving.",
-            detail:
-              "Your previous saves are safe. You can retry, return to the game, or quit using the last saved state.",
-            buttons: [
-              "Retry saving",
-              "Return to game",
-              "Quit with previous save",
-            ],
-            defaultId: 0,
-            cancelId: 1,
-          },
+    ({ response } = await steam.withNativeDialog(() =>
+      dialog.showMessageBox(
+        window,
+        crashed
+          ? {
+              type: "warning",
+              title: "Restart or quit",
+              message: "The game stopped unexpectedly.",
+              detail:
+                "Your previous saves are safe. Restart to reload the game using the last saved state, or quit.",
+              buttons: ["Restart game", "Quit with previous save"],
+              defaultId: 0,
+              cancelId: 0,
+            }
+          : {
+              type: "warning",
+              title: "Save before quitting",
+              message: "Your latest game could not finish saving.",
+              detail:
+                "Your previous saves are safe. You can retry, return to the game, or quit using the last saved state.",
+              buttons: [
+                "Retry saving",
+                "Return to game",
+                "Quit with previous save",
+              ],
+              defaultId: 0,
+              cancelId: 1,
+            },
+      ),
     ));
   } finally {
     quitWarningOpen = false;
@@ -275,7 +296,7 @@ function requestQuit() {
   if (!window || window.isDestroyed() || (!rendererReady && !rendererCrashed))
     return finishQuit();
   quitRequested = true;
-  steam.setInputEnabled(false);
+  publishGameFocus();
   displayChanges.pause();
   if (rendererCrashed) return quitFailure();
   window.webContents.send("desktop:before-quit");
@@ -298,6 +319,17 @@ handle("desktop:state", () => {
   publishGameFocus();
   void steam.flushScores();
   return state();
+});
+handle("desktop:resume-ready", (generation) => {
+  if (!Number.isSafeInteger(generation) || generation < 0)
+    throw new Error("Invalid power generation");
+  // An old checkpoint completing after another sleep must never re-enable held input.
+  if (power.phase !== "resuming" || generation !== power.generation) return;
+  power = { ...power, phase: "awake" };
+  window.webContents.send("desktop:power-changed", { ...power });
+  publishGameFocus();
+  publishState();
+  void steam.flushScores();
 });
 handle("desktop:display", applyDisplay);
 handle("desktop:quit", requestQuit);
@@ -327,7 +359,13 @@ handle("desktop:activity", (activity) => steam.setActivity(activity));
 handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
 handle("desktop:input-context", (context) => steam.setInputContext(context));
 handle("desktop:text-input", (input) => {
-  if (!window?.isFocused() || steam.overlayActive || quitRequested)
+  if (
+    !window?.isFocused() ||
+    steam.overlayActive ||
+    steam.dialogs?.active ||
+    quitRequested ||
+    power.phase !== "awake"
+  )
     return { status: "unavailable" };
   return steam.showTextInput(input);
 });
@@ -432,22 +470,24 @@ async function createWindow() {
       workshop ??= new SteamWorkshop(steam, config.appId);
       return workshop;
     },
-    chooseFile: async () => {
-      const result = await dialog.showOpenDialog(window, {
-        title: "Import data-only scenario mod",
-        properties: ["openFile"],
-        filters: [{ name: "Scenario package", extensions: ["json"] }],
-      });
-      return result.canceled ? undefined : result.filePaths[0];
-    },
-    chooseSave: async () => {
-      const result = await dialog.showSaveDialog(window, {
-        title: "Save scenario mod template",
-        defaultPath: "scenario.json",
-        filters: [{ name: "Scenario package", extensions: ["json"] }],
-      });
-      return result.canceled ? undefined : result.filePath;
-    },
+    chooseFile: () =>
+      steam.withNativeDialog(async () => {
+        const result = await dialog.showOpenDialog(window, {
+          title: "Import data-only scenario mod",
+          properties: ["openFile"],
+          filters: [{ name: "Scenario package", extensions: ["json"] }],
+        });
+        return result.canceled ? undefined : result.filePaths[0];
+      }),
+    chooseSave: () =>
+      steam.withNativeDialog(async () => {
+        const result = await dialog.showSaveDialog(window, {
+          title: "Save scenario mod template",
+          defaultPath: "scenario.json",
+          filters: [{ name: "Scenario package", extensions: ["json"] }],
+        });
+        return result.canceled ? undefined : result.filePath;
+      }),
     openUrl: openSteamPage,
   });
   // Upload stages from an earlier session; a failure is logged and never blocks launch.
@@ -684,7 +724,15 @@ else {
   });
   app
     .whenReady()
-    .then(createWindow)
+    .then(() => {
+      powerMonitor.on("suspend", () => {
+        if (power.phase !== "suspended") publishPower("suspended");
+      });
+      powerMonitor.on("resume", () => {
+        if (power.phase === "suspended") publishPower("resuming");
+      });
+      return createWindow();
+    })
     .catch((error) => {
       console.error("Electrify startup failed:", error);
       dialog.showErrorBox("Electrify could not start", error.message);

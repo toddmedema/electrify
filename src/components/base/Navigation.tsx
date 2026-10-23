@@ -11,6 +11,7 @@ import { getScenario } from "../../data/Scenarios";
 import ConceptIcon from "./ConceptIcon";
 import useDockLabels from "./useDockLabels";
 import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
+import { useControllerInput } from "../../desktop/InputPresentation";
 import { selectTutorialActions } from "../../reducers/Tutorial";
 
 export interface StateProps {
@@ -69,6 +70,7 @@ export default function Navigation({
   onToggle?: (tool: GameTool) => void;
 }) {
   const dispatch = useAppDispatch();
+  const controllerInput = useControllerInput();
   const cardName = useAppSelector(selectCardName);
   const readOnly = useAppSelector((state) => !!state.game.replayPlayback);
   const unreadEvents = useAppSelector(
@@ -112,7 +114,7 @@ export default function Navigation({
           <Tooltip
             key={tool.id}
             title={
-              fromTouch
+              fromTouch || controllerInput
                 ? tool.label
                 : `${tool.label} (${TOOL_SHORTCUTS[tool.id]})`
             }

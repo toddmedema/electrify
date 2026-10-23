@@ -208,3 +208,47 @@ describe("pause owners changing while the page is hidden", () => {
     },
   );
 });
+
+describe("system sleep requires an explicit resume", () => {
+  it.each([
+    {
+      name: "gameplay",
+      open: () => ({ type: "test/noop" }),
+      close: () => ({ type: "test/noop" }),
+    },
+    {
+      name: "dialog",
+      open: () =>
+        dialogOpen({ open: true, title: "Review", message: "Review purchase" }),
+      close: () => dialogClose(),
+    },
+    {
+      name: "manual",
+      open: () => manualHelpOpen("Interties"),
+      close: () => manualHelpClose(),
+    },
+    {
+      name: "catalog",
+      open: () => navigate("BUILD_STORAGE"),
+      close: () => navigateBack(),
+    },
+    {
+      name: "cloud prompt",
+      open: () => cloudSavePromptVisible(true),
+      close: () => cloudSavePromptVisible(false),
+    },
+    {
+      name: "policy",
+      open: () => openPolicyDecision("review"),
+      close: () => closePolicyDecision("review"),
+    },
+  ])("does not automatically resume $name after waking", ({ open, close }) => {
+    let state = gameReducer(running("FAST"), open());
+    state = gameReducer(state, pageHidden());
+    state = gameReducer(state, { type: "game/systemSuspend" });
+    state = gameReducer(state, pageVisible());
+    state = gameReducer(state, close());
+    expect(state.speed).toBe("PAUSED");
+    expect(gameReducer(state, setSpeed("NORMAL")).speed).toBe("NORMAL");
+  });
+});

@@ -15,7 +15,7 @@ import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
 import UnitsProvider from "./components/base/UnitsContext";
 import { navigate, navigateBack } from "./reducers/Card";
-import { pageHidden, pageVisible } from "./reducers/GameActions";
+import { pageHidden, pageVisible, systemSuspend } from "./reducers/GameActions";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
 import { layoutChanged, snackbarOpen } from "./reducers/UI";
 import { firebaseAppAuth, getDevicePlatform, getHistoryApi } from "./Globals";
@@ -44,6 +44,8 @@ import {
 } from "./Theme";
 import { ThemeChoiceType } from "./Types";
 import { InstallPromptProvider } from "./components/base/InstallAppButton";
+import type { DesktopPowerState } from "./Desktop";
+import { applyTextSize } from "./TextSize";
 import { getDesktop, isDesktopApp } from "./Desktop";
 
 const AchievementNotifications = lazy(
@@ -125,6 +127,10 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
   const choice: ThemeChoiceType = useAppSelector(
     (state) => state.settings.theme,
   );
+  const textSize = useAppSelector((state) => state.settings.textSize);
+  useLayoutEffect(() => {
+    applyTextSize(textSize);
+  }, [textSize]);
   // "System" is a standing instruction rather than a value, and the system can change its mind
   // while the game is open - at sunset, on a schedule, or because the player just flipped it
   const [systemDark, setSystemDark] = useState(prefersDarkMode);
@@ -312,8 +318,13 @@ export default function App() {
     window.addEventListener("popstate", onPopState);
 
     let desktopFocused = true;
+    let desktopPower: DesktopPowerState | undefined;
     const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden" || !desktopFocused) {
+      if (
+        document.visibilityState === "hidden" ||
+        !desktopFocused ||
+        (desktopPower && desktopPower.phase !== "awake")
+      ) {
         store.dispatch(pauseAudio());
         store.dispatch(pageHidden());
       } else if (document.visibilityState === "visible") {
@@ -348,13 +359,34 @@ export default function App() {
     let authLive = true;
     let steamProfileUid: string | undefined;
     let unsubscribeSteam: (() => void) | undefined;
+    let unsubscribeDesktopPower: (() => void) | undefined;
     let unsubscribeDesktopFocus: (() => void) | undefined;
     let stopDesktopServices: (() => void) | undefined;
     if (process.env.REACT_APP_DESKTOP === "true" && desktop) {
+      const updatePower = (power: DesktopPowerState) => {
+        if (
+          !authLive ||
+          (desktopPower && power.generation < desktopPower.generation)
+        )
+          return;
+        if (
+          desktopPower?.generation === power.generation &&
+          (desktopPower.phase === power.phase || desktopPower.phase === "awake")
+        )
+          return;
+        desktopPower = power;
+        if (power.phase !== "awake") {
+          store.dispatch(systemSuspend());
+          store.dispatch(pageHidden());
+        }
+        onVisibilityChange();
+      };
+      unsubscribeDesktopPower = desktop.onPowerStateChanged?.(updatePower);
       const updateSteam = (
         state: Awaited<ReturnType<NonNullable<typeof desktop>["getState"]>>,
       ) => {
         if (!authLive) return;
+        if (state.power) updatePower(state.power);
         if (state.steam.steamId) {
           const uid = `steam:${state.steam.steamId}`;
           store.dispatch(
@@ -460,6 +492,7 @@ export default function App() {
         authLive = false;
         unsubscribeSteam?.();
         unsubscribeDesktopFocus?.();
+        unsubscribeDesktopPower?.();
         stopDesktopServices?.();
       }
       unsubscribeAuth?.();

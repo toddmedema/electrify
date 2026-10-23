@@ -1,6 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { useState } from "react";
+import { Autocomplete, TextField } from "@mui/material";
 import type {
   DesktopBridge,
   DesktopInputFrame,
@@ -227,6 +228,63 @@ it("submits text to the focused autocomplete field that owns a portaled listbox"
   expect(field).toHaveValue("San Francisco");
   expect(changed).toHaveBeenCalledTimes(1);
   expect(field).toHaveFocus();
+});
+
+it("selects a highlighted city with Confirm after controller navigation instead of reopening the keyboard", async () => {
+  const picked = jest.fn();
+  render(
+    <main className="base_main">
+      <Autocomplete
+        options={["Toronto", "Vancouver"]}
+        openOnFocus
+        autoHighlight
+        onChange={(_event, value) => picked(value)}
+        renderInput={(params) => <TextField {...params} label="City" />}
+      />
+    </main>,
+  );
+  const f = bridge();
+  f.desktop.showTextInput = jest
+    .fn()
+    .mockResolvedValue({ status: "cancelled" });
+  stop = startDesktopInput(store, f.desktop);
+  await act(async () => Promise.resolve());
+  act(() => screen.getByRole("combobox").focus());
+  f.emit({ actions: ["down"] });
+  f.emit({ actions: ["confirm"] });
+  expect(picked).toHaveBeenCalledWith("Vancouver");
+  expect(f.desktop.showTextInput).not.toHaveBeenCalled();
+  expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+});
+
+it("opens text entry before accepting an auto-highlighted city and can confirm the submitted search", async () => {
+  const picked = jest.fn();
+  render(
+    <main className="base_main">
+      <Autocomplete
+        options={["Toronto", "Vancouver"]}
+        openOnFocus
+        autoHighlight
+        onChange={(_event, value) => picked(value)}
+        renderInput={(params) => <TextField {...params} label="City" />}
+      />
+    </main>,
+  );
+  const f = bridge();
+  f.desktop.showTextInput = jest.fn().mockResolvedValue({
+    status: "submitted",
+    text: "Vancouver",
+  });
+  stop = startDesktopInput(store, f.desktop);
+  await act(async () => Promise.resolve());
+  act(() => screen.getByRole("combobox").focus());
+  await act(async () => f.emit({ actions: ["confirm"] }));
+  expect(f.desktop.showTextInput).toHaveBeenCalledTimes(1);
+  expect(picked).not.toHaveBeenCalled();
+  expect(screen.getByRole("combobox")).toHaveValue("Vancouver");
+  f.emit({ actions: ["confirm"] });
+  expect(picked).toHaveBeenCalledWith("Vancouver");
+  expect(f.desktop.showTextInput).toHaveBeenCalledTimes(1);
 });
 
 it.each(["pause", "confirm"] as const)(

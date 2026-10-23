@@ -19,11 +19,11 @@ files are large, so broad rewrites create expensive review diffs.
   `firebase/firestore.rules`. It checks assets first, prints each gate's result as it finishes,
   and continues after gate failures.
 - Before pushing a pull request, run `npm run check:ci` once on the integrated code; there is no
-  need to run `check` immediately beforehand. Its fourteen gates add the CI checks that most
+  need to run `check` immediately beforehand. Its fifteen gates add the CI checks that most
   often fail pull requests: tick performance, the production web build and bundle-size
   ceilings, the headless production browser suites at 1280, 390 and 360 px, and the multiplayer
-  suite against the desktop renderer. Only the packaged Electron suite stays CI-only, because
-  it opens native windows.
+  and controller suites against the desktop renderer. Only the packaged Electron suite stays CI-only,
+  because it opens native windows.
 - After a failed check, fix the issue and rerun the failed gates with the printed command, such as
   `npm run check -- --steps lint,tests`. Keep the earlier passing results only while their inputs
   remain unchanged. A test-query lint fix does not require repeating successful simulations;

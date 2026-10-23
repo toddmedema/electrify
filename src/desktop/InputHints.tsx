@@ -1,6 +1,9 @@
 import { useSyncExternalStore } from "react";
 import type { DesktopInputAction } from "../Desktop";
-import { getInputPresentation, subscribeInputPresentation } from "./Input";
+import {
+  getInputPresentation,
+  subscribeInputPresentation,
+} from "./InputPresentation";
 import "./Input.scss";
 
 const menuHints: [DesktopInputAction, string][] = [

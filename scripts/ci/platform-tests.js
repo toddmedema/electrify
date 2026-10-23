@@ -81,6 +81,12 @@ function commands(index, cores = os.availableParallelism()) {
               script: "test:multiplayer",
               args: [],
             },
+            {
+              name: "Controller journeys",
+              script: "test:steam-input",
+              args: [],
+              env: { STEAM_INPUT_BUILD_DIR: "build" },
+            },
           ]
         : []),
       {
@@ -116,7 +122,8 @@ async function main(index) {
         process.execPath,
         [
           process.env.npm_execpath,
-          ...(step.group || ["test:e2e:ci", "typecheck"].includes(step.script)
+          ...(step.group ||
+          ["test:e2e:ci", "test:steam-input", "typecheck"].includes(step.script)
             ? ["--ignore-scripts"]
             : []),
           "run",
@@ -129,6 +136,7 @@ async function main(index) {
           windowsHide: true,
           env: {
             ...process.env,
+            ...step.env,
             ...(step.group
               ? { TEST_GROUP: step.group, TEST_SHARD: `${index}/2` }
               : {}),

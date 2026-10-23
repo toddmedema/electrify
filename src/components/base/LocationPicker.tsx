@@ -15,6 +15,7 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { CityType } from "../../data/Cities";
+import { useControllerInput } from "../../desktop/InputPresentation";
 import { WORLD_LAND_PATH } from "./WorldLand";
 import {
   clampViewport,
@@ -102,6 +103,7 @@ export default function LocationPicker({
   showHeading = true,
   onChange,
 }: Props): React.JSX.Element {
+  const controllerInput = useControllerInput();
   const coarsePointer = useMediaQuery("(pointer: coarse)");
   const markerSize = coarsePointer ? 44 : 40;
   const [viewport, setViewport] = React.useState<MapViewport>(WORLD_VIEW);
@@ -283,6 +285,17 @@ export default function LocationPicker({
     event: React.KeyboardEvent<HTMLButtonElement>,
     control: MapControl<CityType>,
   ) => {
+    if (event.key === "Escape") {
+      // All four directions belong to the map. Back must provide a way to the next form controls.
+      event.preventDefault();
+      event.stopPropagation();
+      mapRef.current
+        ?.querySelector<HTMLButtonElement>(
+          ".worldMapControls button:not(:disabled)",
+        )
+        ?.focus();
+      return;
+    }
     const directions: Partial<Record<string, MapDirection>> = {
       ArrowLeft: "left",
       ArrowRight: "right",
@@ -600,10 +613,9 @@ export default function LocationPicker({
         onWheel={wheelZoom}
       >
         <span id="location-map-instructions" className="visuallyHidden">
-          Use arrow keys to move between map locations. Press Enter or Space to
-          select a city or zoom into a cluster. When zoomed in, drag, swipe, or
-          pinch to explore the map. Scroll to zoom in or out. Press Home to show
-          the world.
+          {controllerInput
+            ? "Use directions to move between map locations. Select chooses a city or zooms into a cluster. Back moves to the map zoom controls so you can continue through custom setup."
+            : "Use arrow keys to move between map locations. Press Enter or Space to select a city or zoom into a cluster. Escape moves to the map zoom controls. When zoomed in, drag, swipe, or pinch to explore the map. Scroll to zoom in or out. Press Home to show the world."}
         </span>
         <svg
           className="worldMapLand"
