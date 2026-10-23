@@ -759,8 +759,8 @@ describe("summarizeWeatherHazardImpact", () => {
         effects: {},
       },
       {
-        key: "wildfire:LA:1",
-        definitionId: "recurring-wildfire",
+        key: "unrelated:1",
+        definitionId: "unrelated-event",
         startsMinute: 0,
         endsMinute: 1,
         attributes: {},

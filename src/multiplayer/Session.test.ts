@@ -336,7 +336,7 @@ test("a missing campaign does not create a lobby", async () => {
   f.session.dispose();
 });
 
-test("campaign resume retains legacy names through 200 characters and gives unnamed players an identity label", async () => {
+test("campaign resume retains bounded player names through 200 characters and gives unnamed players an identity label", async () => {
   const f = fixture(true);
   await f.session.initialize();
   const players = [

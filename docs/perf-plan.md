@@ -20,8 +20,7 @@ The initial revision corrected the first draft against the code. The changes tha
 - Weather is already memoized: `getWeather` reads a cached row array and extrapolates each day once.
   "Load weather up front" is not a lever.
 - `TICK_MS` lives in `src/Constants.tsx` and the tick loop in `src/reducers/Game.tsx`, both inside
-  the run-compatibility hash. Pacing changes affect the rules fingerprint. Compatible saves carry their run, challenge, replay
-  and score forward through `carryRunForward`; keep reducer changes together and prove parity.
+  the run-compatibility hash. Pacing changes affect the rules fingerprint. Saved runs require current rules; keep reducer changes together and prove parity.
 - Valgrind instruction counting is demoted to a timeboxed experiment. The repo already has a better
   pattern: `--benchmark-stories` gates on a ratio of two measurements in the same process, which
   cancels machine speed.
@@ -239,8 +238,7 @@ can overshoot that deadline, so it is a slicing budget rather than a guaranteed 
   changes behavior fails loudly.
 - **Manifest.** Perf work that touches `src/data`, `src/helpers`, `src/reducers`,
   `src/Constants.tsx`, or `src/Types.tsx` changes the generated (git-ignored) `RunCompatibility.json`
-  hash. Preserve the compatible-run carry-forward path and prove that simulation outputs stay
-  identical; do not commit the generated manifest.
+  hash. Prove that simulation outputs stay identical; do not commit the generated manifest.
 - **Determinism.** Seeded paths use only the `src/helpers/Math.tsx` seed helpers.
 - **No flaky ms gates.** CI gates only counts, bytes, hashes, and same-process ratios.
 - Visual regression is out of scope.
@@ -495,12 +493,12 @@ uses scenario 103 and a genuine 239-month reducer playthrough, 100 warmups and 5
 per sample. Both revisions use identical fixtures with the app bar in game. These are React render
 costs, not browser paint, compositor frame times or physical-device guarantees.
 
-| Median React render | Before | After | Reduction |
-| --- | ---: | ---: | ---: |
-| Closed dialog, fresh | 0.2383 ms | 0.0885 ms | 63% |
-| Closed dialog, 239 months | 0.3661 ms | 0.0370 ms | 90% |
-| Whole app bar, fresh | 0.7337 ms | 0.5390 ms | 27% |
-| Whole app bar, 239 months | 0.9826 ms | 0.6246 ms | 36% |
+| Median React render       |    Before |     After | Reduction |
+| ------------------------- | --------: | --------: | --------: |
+| Closed dialog, fresh      | 0.2383 ms | 0.0885 ms |       63% |
+| Closed dialog, 239 months | 0.3661 ms | 0.0370 ms |       90% |
+| Whole app bar, fresh      | 0.7337 ms | 0.5390 ms |       27% |
+| Whole app bar, 239 months | 0.9826 ms | 0.6246 ms |       36% |
 
 Reproduce with `npm run test:once -- --testMatch=**/src/testing/UiRenderBench.tsx --runInBand`.
 The unit suite gates eliminated hidden calculations rather than wall-clock timings.
@@ -512,12 +510,12 @@ and optimized helper exports directly, without spy wrappers or call recording. E
 improved; all 12 measured runs completed 23,040 ticks and produced identical selected-state hashes
 (history, fleet, timeline and commitment metadata, transmission, date and events).
 
-| Paired full-workload metric | Median reduction | Pair range |
-| --- | ---: | ---: |
-| Headless time per simulated year | 7.72% | 6.84–11.08% |
-| Redux/Immer time per simulated year | 7.61% | 3.80–22.84% |
-| Headless median month rollover | 9.15% | 9.12–9.85% |
-| Redux/Immer median month rollover | 8.92% | 7.09–9.31% |
+| Paired full-workload metric         | Median reduction |  Pair range |
+| ----------------------------------- | ---------------: | ----------: |
+| Headless time per simulated year    |            7.72% | 6.84–11.08% |
+| Redux/Immer time per simulated year |            7.61% | 3.80–22.84% |
+| Headless median month rollover      |            9.15% |  9.12–9.85% |
+| Redux/Immer median month rollover   |            8.92% |  7.09–9.31% |
 
 Reductions are medians of paired ratios, not ratios of independently selected medians. This
 temporary control used the standard Jest VM globals (Math, Number, Object, Array, JSON and BigInt),
@@ -531,13 +529,13 @@ are individual local observations; the later baseline refresh measured 201 ms pe
 year and 9.44 ms per month rollover on the same optimized code. That substantial absolute-time
 variation motivated an additional alternating same-process comparison before publishing claims.
 
-| Full simulation metric | Before | After | Reduction |
-| --- | ---: | ---: | ---: |
-| Headless time per simulated year | 106.07 ms | 98.16 ms | 7.5% |
-| Redux/Immer time per simulated year | 151.87 ms | 136.12 ms | 10.4% |
-| Headless median month rollover | 6.207 ms | 5.316 ms | 14.3% |
-| Redux/Immer median month rollover | 6.584 ms | 5.648 ms | 14.2% |
-| Redux/Immer median ordinary tick | 0.0391 ms | 0.0364 ms | 6.9% |
+| Full simulation metric              |    Before |     After | Reduction |
+| ----------------------------------- | --------: | --------: | --------: |
+| Headless time per simulated year    | 106.07 ms |  98.16 ms |      7.5% |
+| Redux/Immer time per simulated year | 151.87 ms | 136.12 ms |     10.4% |
+| Headless median month rollover      |  6.207 ms |  5.316 ms |     14.3% |
+| Redux/Immer median month rollover   |  6.584 ms |  5.648 ms |     14.2% |
+| Redux/Immer median ordinary tick    | 0.0391 ms | 0.0364 ms |      6.9% |
 
 The initial separate-process benchmark's synchronous forecast measurements also fell: shared twenty-year
 projection 472.49 to 423.07 ms, hydro outlook 130.12 to 56.76 ms, intertie outlook 65.71 to
@@ -614,11 +612,11 @@ full 240-month warmup, followed by three alternating pairs of the standard scena
 23,040 ticks and produced the same selected-state hash over history, fleet, timeline, transmission,
 date and events.
 
-| Paired simulation metric | Median reduction | Pair range |
-| --- | ---: | ---: |
-| Headless median ordinary tick | 33.58% | 31.78–44.44% |
-| Draft-wrapped time per simulated year | 3.94% | 2.42–9.98% |
-| Draft-wrapped median month rollover | 4.61% | 1.99–10.56% |
+| Paired simulation metric              | Median reduction |   Pair range |
+| ------------------------------------- | ---------------: | -----------: |
+| Headless median ordinary tick         |           33.58% | 31.78–44.44% |
+| Draft-wrapped time per simulated year |            3.94% |   2.42–9.98% |
+| Draft-wrapped median month rollover   |            4.61% |  1.99–10.56% |
 
 Headless whole-run timing was noisy: a 2.27% median reduction, ranging from a 1.48% regression to a
 24.28% improvement. Headless median rollover did not consistently improve. The consistent
@@ -633,11 +631,11 @@ alternating pairs at each width. The forecast was ready before measurement, and 
 required risk selection to run. The prior selector ignored the supplied status; the optimized
 selector reused it. Timed samples used real functions without call-recording spies.
 
-| Fresh post-forecast React render | Median reduction | Pair range |
-| --- | ---: | ---: |
-| 390 px app bar | 13.61% | 7.45–29.19% |
-| 390 px mission subtree | 15.71% | 8.67–18.00% |
-| 1440 px app bar | 3.44% | 0.83–11.62% |
+| Fresh post-forecast React render | Median reduction |  Pair range |
+| -------------------------------- | ---------------: | ----------: |
+| 390 px app bar                   |           13.61% | 7.45–29.19% |
+| 390 px mission subtree           |           15.71% | 8.67–18.00% |
+| 1440 px app bar                  |            3.44% | 0.83–11.62% |
 
 The phone app-bar sample medians span roughly 0.3–0.6 ms across both variants: the absolute
 saving is a fraction of a millisecond per render. Percentages are medians of paired reductions.
@@ -673,11 +671,11 @@ The host's idle callback cadence was about 60 Hz.
 The slowed phone samples still expose substantial chart and rollover stalls:
 
 | Phone journey, 4x CPU slowdown | Ordinary median before (ms) | After (ms) | Month median before (ms) | After (ms) |
-| --- | ---: | ---: | ---: | ---: |
-| Main panes | 66.6 | 16.7 | 66.6 | 33.2 |
-| Insights | 66.7 | 16.7 | 66.7 | 33.3 |
-| Hydro outlook | 150.0 | 50.1 | 200.1 | 83.3 |
-| Intertie outlook | 83.4 | 49.9 | 116.6 | 66.6 |
+| ------------------------------ | --------------------------: | ---------: | -----------------------: | ---------: |
+| Main panes                     |                        66.6 |       16.7 |                     66.6 |       33.2 |
+| Insights                       |                        66.7 |       16.7 |                     66.7 |       33.3 |
+| Hydro outlook                  |                       150.0 |       50.1 |                    200.1 |       83.3 |
+| Intertie outlook               |                        83.4 |       49.9 |                    116.6 |       66.6 |
 
 These single-build samples differ far more than the paired calculation gains explain; host load
 and scheduling can dominate them. They support no causal whole-frame improvement percentage.

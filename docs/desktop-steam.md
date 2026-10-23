@@ -201,10 +201,9 @@ savings and output after an actual combined-cycle conversion. It uses the simula
 representative-day weights and gross-source customer allocation. Evening ticks use the local
 simulation clock from 18:00 up to, but excluding, midnight. Charging, exports, cancelled
 retrofits, inherited storage and new combined-cycle purchases cannot count toward
-storage/retrofit achievements. Saves preserve these
-counters. Older saves receive empty telemetry when resumed: unknown past facility provenance
-and a partially observed month are not reconstructed or awarded. Browser imports validate and
-retain this optional telemetry, using the original save key for compatibility.
+storage/retrofit achievements. Saves preserve these counters under `game.desktopAchievements`.
+Browser imports validate the optional telemetry. Missing or invalid telemetry resets on resume;
+unknown past facility provenance and a partially observed month are not reconstructed or awarded.
 
 The renderer's shared `achievements` chunk installs simulation hooks before loading saves;
 `achievements-ui` holds the non-Steam gallery and notifications. The named `electron` chunk owns
@@ -421,7 +420,7 @@ approve the product.
 - The adapter creates leaderboards named
   `electrify-v1-s<scenarioId>-<lowercase-difficulty>-<digest>`, where `digest` is the first 24 hex
   characters of SHA256 of the generated run-compatibility ID. This keeps scores under different
-  simulation rules separate. Native calls with no compatibility ID use SHA256 of `legacy`.
+  simulation rules separate. Every native request must include the current compatibility ID.
   The boards use descending numeric scores and KeepBest. Confirm client writes and global reads
   are enabled in Steamworks so that both global and friends views work; set Community Names
   there if boards should appear in the Community Hub. Check with two accounts that own the
@@ -471,7 +470,7 @@ scenario, difficulty and custom settings read-only, and mark **Ready** for exact
 any change by the host clears it. **Start for everyone** launches that scenario for the lobby once
 a friend has joined and everyone is connected. Everyone
 selects a running speed to begin. Tutorials, challenge links, replays and Data Center setup are
-single-player only. See [co-op scenario selection](multiplayer-scenario-selection.md).
+single-player only. The host chooses a scenario in the normal selection screens; guests follow that selection.
 
 Every company plays the scenario as authored: its location, opening fleet, cash, customers,
 difficulty, seed, story events and term are identical, so trade comes from different decisions.
@@ -534,11 +533,9 @@ computer's persisted acknowledgement. The bundle includes all grids, canonical e
 commitment metadata and command receipts. Normal host exit joins the existing desktop quit save
 handshake. Local persistence does not wait for an absent player's acknowledgement. Manual resume
 uses one complete bundle, the original roster and a fresh epoch; pending old commands are dropped.
-Co-op checkpoint schema 3 records the solo save schema for its grids. Resume upgrades the entire
-bundle, including supported schema 2 checkpoints, and validates every grid and shared connection
-before publishing a current-rules baseline. Players in the same session must still run matching
-game code and data. Newer or unsupported bundles remain preserved; individual grids never migrate
-independently during play.
+Co-op checkpoint schema 3 records the solo save schema for its grids. Resume accepts only the
+current bundle and solo save schemas with matching game code and data, and validates every grid
+and shared connection before play. Unsupported checkpoints are rejected.
 
 When the host has multiplayer saves, the scenario list shows **Load multiplayer save** across the
 top. It lists each save with its players and save time, and its menu offers deletion with
@@ -549,9 +546,7 @@ connected player. A company handed to a new player is saved under that player's 
 New and resumed games start with every player
 paused, using the same speed controls as ordinary play.
 The account-specific `co-op-library.json` holds up to 32 campaigns and 64 MiB; a checkpoint is
-limited to 16 MiB. The old `co-op.json` is retained and imported as the last multiplayer save. An
-immutable `co-op-original-<digest>.json` preserves a checkpoint before a rules or schema upgrade;
-the rotating `.previous` file also protects interrupted writes.
+limited to 16 MiB. The rotating `.previous` file protects interrupted writes.
 
 Steam Cloud uses separate `electrify/co-op-device-<32-hex-device-id>.json` libraries. Different
 checkpoints are retained as separate Cloud copies, with deletion history to suppress a deleted

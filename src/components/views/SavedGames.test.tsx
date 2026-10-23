@@ -91,18 +91,6 @@ it("shows game date, difficulty and location above the saved date and time", () 
   );
 });
 
-it.each(["", " (23)"])(
-  "omits the location from legacy generated titles with suffix '%s'",
-  (suffix) => {
-    renderLibrary({
-      entries: [entry({ name: `Rise of Renewables — Ontario${suffix}` })],
-    });
-    expect(
-      screen.getByRole("heading", { name: `Rise of Renewables${suffix}` }),
-    ).toBeInTheDocument();
-  },
-);
-
 it("preserves player-authored titles and completed outcomes", () => {
   renderLibrary({
     entries: [

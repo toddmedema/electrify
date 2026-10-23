@@ -133,7 +133,7 @@ function layouts(platform = process.platform) {
 function boardName(selection) {
   const digest = crypto
     .createHash("sha256")
-    .update(selection.challengeId || "legacy")
+    .update(selection.challengeId)
     .digest("hex")
     .slice(0, 24);
   return `electrify-v1-s${selection.scenarioId}-${selection.difficulty.toLowerCase()}-${digest}`;

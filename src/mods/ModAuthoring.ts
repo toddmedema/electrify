@@ -335,14 +335,13 @@ function facts(
   scenario: ScenarioType,
   author: boolean,
   diagnostics: ModDiagnostic[] = [],
-  intent?: "inherit" | "replace" | "none",
 ): ModRuleFacts {
   const mod = scenario.mod;
   if (!mod || !validScenarioMod(mod, scenario))
     throw new Error("Only a validated mod snapshot can describe its rules.");
   const rules = mod.rules;
   const location = getScenarioLocation(scenario);
-  const mode = intent ?? mod.source.objectiveMode;
+  const mode = mod.source.objectiveMode;
   // A guest uses the host's validated snapshot without loading simulation data or forecasting.
   const peak = rules.startingPeakW > 0 ? rules.startingPeakW : undefined;
   const sections: ModFactSection[] = [
@@ -392,11 +391,9 @@ function facts(
       {
         label: "Objective intent",
         value:
-          mode === "none"
-            ? "No scenario goals. Reach the final month; ordinary game failures still apply."
-            : mode === "replace"
-              ? "Replace the base scenario's goals with the listed goals."
-              : "Use the default goals.",
+          mode === "replace"
+            ? "Replace the base scenario's goals with the listed goals."
+            : "Use the default goals.",
       },
       ...scenarioObjectiveDefinitions(scenario).map((objective) => ({
         label: objective.label,
@@ -410,7 +407,7 @@ function facts(
           ),
         ],
       })),
-      ...(scenarioObjectiveDefinitions(scenario).length === 0 && mode !== "none"
+      ...(scenarioObjectiveDefinitions(scenario).length === 0
         ? [
             {
               label: "Resolved goals",
@@ -700,16 +697,10 @@ function facts(
 export function modPlayerFacts(
   scenario: ScenarioType,
   options: {
-    objectiveIntent?: "inherit" | "replace" | "none";
     diagnostics?: ModDiagnostic[];
   } = {},
 ): ModRuleFacts {
-  return facts(
-    scenario,
-    false,
-    modPlayerDiagnostics(options.diagnostics),
-    options.objectiveIntent,
-  );
+  return facts(scenario, false, modPlayerDiagnostics(options.diagnostics));
 }
 
 /** Compiler diagnostics can name private events; only the explicit author tool exposes them. */

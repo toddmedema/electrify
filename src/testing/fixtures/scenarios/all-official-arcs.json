@@ -1,0 +1,67 @@
+{
+  "id": 999,
+  "name": "Custom Game",
+  "icon": "battery",
+  "summary": "Set your own location, era and rules",
+  "locationId": "Lusaka",
+  "ownership": "Public",
+  "startingYear": 2040,
+  "cash": 1600000000,
+  "startingCustomers": 100000,
+  "dollarsPerkWh": 0.088,
+  "durationMonths": 240,
+  "feePerKgCO2e": 0,
+  "facilities": [
+    {
+      "fuel": "Hydro",
+      "peakW": 435000000,
+      "hydroSiteId": "kariba-zmb",
+      "initialAgeYears": 20,
+      "initialReservoirFraction": 1
+    },
+    {
+      "name": "Natural Gas Peaker",
+      "fuel": "Natural Gas",
+      "peakW": 1000000000,
+      "initialAgeYears": 4
+    },
+    {
+      "fuel": "Uranium",
+      "peakW": 300000000,
+      "initialAgeYears": 20
+    },
+    {
+      "fuel": "Coal",
+      "peakW": 100000000,
+      "initialAgeYears": 35
+    }
+  ],
+  "location": {
+    "id": "Lusaka",
+    "name": "Lusaka, Zambia",
+    "country": "Zambia",
+    "region": "Africa",
+    "lat": -15.3875,
+    "long": 28.3228,
+    "timeZone": "Africa/Lusaka",
+    "watershedId": "Lusaka",
+    "watershedName": "Zambezi basin",
+    "resources": {
+      "hydro": true,
+      "geothermal": false
+    }
+  },
+  "eventScenarioIds": [
+    100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 113, 114, 115
+  ],
+  "loadAdditions": [
+    {
+      "id": "custom-106-manassas-data-centers",
+      "label": "Data Centers",
+      "startsYear": 2046,
+      "peakW": 78709169.61826053,
+      "loadFactor": 0.9,
+      "demandType": "Data Centers"
+    }
+  ]
+}

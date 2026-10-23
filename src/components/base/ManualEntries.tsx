@@ -1057,11 +1057,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           separately. Log in to submit your score and replay. Use the
           leaderboard's play buttons to see how others beat your score!
         </p>
-        <p>
-          Saves and replays need matching game rules. After a rules update,
-          older runs need their original game version. The saved file stays
-          unchanged.
-        </p>
         <p>Investor-owned points:</p>
         <table className="points">
           <tbody>

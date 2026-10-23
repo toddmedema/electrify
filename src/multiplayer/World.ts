@@ -63,7 +63,7 @@ import type {
 import { parseSave, serializeSave, validTransmissionLine } from "../SaveGame";
 import { intertiesEnabledForScenario } from "../data/AdjacentMarkets";
 import { accessContextForGame } from "../data/IntertieAccess";
-import { SAVE_SCHEMA_VERSION } from "../SaveUpgrade";
+import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 
 export const RULES = manifest.multiplayerCompatibilityId;
 export const EDGE_COST_PER_W = MULTIPLAYER_LINK_BUILD_COST_PER_W;
@@ -756,8 +756,7 @@ function validRoster(world: World) {
   if (
     !world ||
     world.schema !== 3 ||
-    typeof world.rules !== "string" ||
-    !world.rules ||
+    world.rules !== RULES ||
     typeof world.matchId !== "string" ||
     !world.matchId ||
     typeof world.epoch !== "string" ||
@@ -880,10 +879,7 @@ function validReceipts(world: World, ids: Set<string>) {
 function validGrid(world: World, initial: World, i: number) {
   const g = world.grids[i];
   const scenario = getScenario(g.scenarioId, g.customScenario)!;
-  const expectedConnections = initial.grids[i].transmission!.lines.filter(
-    (line) =>
-      !g.legacyWildfireIntertieAccess || isPeerCorridorId(line.corridorId),
-  );
+  const expectedConnections = initial.grids[i].transmission!.lines;
   const lineCount = expectedConnections.length;
   return (
     !!parseSave(
@@ -1057,7 +1053,8 @@ export function restoreWorld(
   epoch: string,
   seats?: Seat[],
 ): World {
-  const world = upgradeWorld(value);
+  savedMatchSpec(value);
+  const world = value as World;
   const ids = new Set(world?.seats?.map?.((s) => s?.id));
   if (
     !validRoster(world) ||
@@ -1086,7 +1083,6 @@ export function restoreWorld(
     throw new Error(INVALID_GRIDS);
   restoreCommitments(world, result);
   if (seats) reassignSeats(result, seats);
-  result.rules = RULES;
   result.epoch = epoch;
   // A restored renderer starts on the grid view, so prior menus cannot keep it stuck paused.
   result.activities = {};
@@ -1099,64 +1095,20 @@ export function restoreWorld(
   return result;
 }
 
-/** Upgrade a whole checkpoint as a copy; no grid reaches play until all pass validation. */
-function upgradeWorld(value: unknown): World {
-  savedMatchSpec(value);
-  if (!value || typeof value !== "object") throw new Error(INCOMPLETE_SAVE);
-  const raw = value as Omit<World, "schema" | "gameSchema"> & {
-    schema: number;
-    gameSchema?: number;
-  };
-  if (![2, 3].includes(raw.schema) || !Array.isArray(raw.grids))
-    throw new Error(INCOMPLETE_SAVE);
-  // Schema 2 predates per-grid versions; its grids used solo structure 2.
-  const gameSchema = raw.schema === 2 ? 2 : raw.gameSchema;
-  if (!Number.isInteger(gameSchema) || gameSchema! < 0)
-    throw new Error(INCOMPLETE_SAVE);
-  const world = cloneDeep(raw) as World;
-  world.schema = 3;
-  world.gameSchema = SAVE_SCHEMA_VERSION;
-  world.grids = world.grids.map((grid) => {
-    if (!grid || typeof grid !== "object") throw new Error(INVALID_GRIDS);
-    const scenario = getScenario(grid.scenarioId, grid.customScenario);
-    if (!scenario || !grid.transmission) throw new Error(INVALID_GRIDS);
-    const parsed = parseSave({
-      ...serializeSave({
-        ...grid,
-        multiplayer: undefined,
-        transmission: intertiesEnabledForScenario(scenario, grid.location)
-          ? { tradingPolicy: grid.transmission.tradingPolicy, lines: [] }
-          : undefined,
-      }),
-      schemaVersion: gameSchema,
-    });
-    if (!parsed) throw new Error(INVALID_GRIDS);
-    // Peer topology is checked against the complete roster after solo migrations.
-    return {
-      ...parsed.game,
-      // Schema 5 adds authored outside connections; older matches retain their peer-only topology.
-      ...(gameSchema! < 5 && grid.scenarioId === 111
-        ? { legacyWildfireIntertieAccess: true }
-        : {}),
-      multiplayer: grid.multiplayer,
-      transmission: grid.transmission,
-    };
-  });
-  return world;
-}
-
 /** Check the envelope before the worker attempts to load another version's scenario data. */
 export function savedMatchSpec(value: unknown): MatchSpec {
   const raw = value as {
     schema?: number;
     gameSchema?: number;
     spec?: MatchSpec;
+    rules?: string;
   } | null;
-  if ((raw?.schema ?? 0) > 3 || (raw?.gameSchema ?? 0) > SAVE_SCHEMA_VERSION)
-    throw new Error(
-      "This multiplayer save needs a newer game. Refresh to update. Your original save is preserved.",
-    );
-  if (!raw?.spec || ![2, 3].includes(raw.schema!))
+  if (
+    !raw?.spec ||
+    raw.schema !== 3 ||
+    raw.gameSchema !== SAVE_SCHEMA_VERSION ||
+    raw.rules !== RULES
+  )
     throw new Error(INCOMPLETE_SAVE);
   matchScenario(raw.spec);
   return raw.spec;

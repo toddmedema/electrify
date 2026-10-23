@@ -9,10 +9,9 @@ reloads and tabs. Explicit save interactions (including Save & Quit and Share) b
 that cadence. No game waits for Firebase to load or save locally. Signed-out players
 see the optional sign-in invitation only after their first successful Save & Quit.
 
-Backups upgrade silently before validation and restore, including backups with an
-older rules fingerprint; see [save upgrades](save-upgrades.md).
+Backups must pass current-format validation before restore; see [save formats](saves.md).
 
-Backups using a future, unsupported save schema stay untouched in the account, and
+Backups using a future save schema stay untouched in the account, and
 Saved games offers **Refresh to update**. They do not block healthy backups or cause the
 generic automatic-retry warning. The client remembers each incompatible save and cloud
 version for the signed-in account, so unchanged payloads are not downloaded again at

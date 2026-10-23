@@ -4,8 +4,7 @@ import { SaveRepository } from "./SaveRepository";
 import { parseSave, serializeSave } from "./SaveGame";
 import { fakeSaveGame, fakeSavedResult } from "./testing/SaveTestHelpers";
 import type { SaveLease } from "./Types";
-import legacyFile from "./testing/fixtures/saves/legacy-rules-save.json";
-import { SAVE_SCHEMA_VERSION } from "./SaveUpgrade";
+import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
 
 // jsdom omits Node's native structuredClone; IndexedDB still needs a real structured clone.
 if (typeof structuredClone === "undefined") {
@@ -107,35 +106,6 @@ describe("SaveRepository", () => {
     expect(requests).toEqual(["saves"]);
     await expect(create()).rejects.toMatchObject({ code: "conflict" });
     expect((await repository.read("first")).save.game.seed).toBe(31337);
-  });
-
-  it("reads and checkpoints a legacy device save while retaining its original until the next write", async () => {
-    await create();
-    await mutateStoredPayload((payload) => {
-      payload.save = legacyFile.save;
-    });
-    const original = await repository.readRaw("first");
-    const { record, lease: reserved } = await repository.prepareResume(
-      "first",
-      "tab-one",
-    );
-    expect(record.save.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
-    expect(record.save.game.customerRate).toBe(0.081);
-    expect(record.save.game.runIdentity?.compatibilityId).not.toBe(
-      legacyFile.save.game.runIdentity.compatibilityId,
-    );
-    expect(await repository.readRaw("first")).toEqual(original);
-    await repository.writeSnapshot(
-      reserved,
-      serializeSave(record.save.game),
-      "Rise of Renewables",
-    );
-    expect((await repository.readRaw("first")).payload).toMatchObject({
-      save: {
-        schemaVersion: SAVE_SCHEMA_VERSION,
-        game: { runIdentity: record.save.game.runIdentity },
-      },
-    });
   });
 
   it("keeps a device save from a newer app intact and explains it", async () => {

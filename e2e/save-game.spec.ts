@@ -265,25 +265,3 @@ test("the same tab can reload or navigate home and resume without waiting for le
   );
   expect(await readSaveRecords(page)).toHaveLength(1);
 });
-
-test("legacy local storage does not create saves and file import is replaced", async ({
-  page,
-}) => {
-  await page.addInitScript(() =>
-    localStorage.setItem("savedGame", '{"game":{"scenarioId":101}}'),
-  );
-  await page.goto("/");
-  await expect(
-    page.getByRole("button", { name: "Saved games", exact: true }),
-  ).toHaveCount(0);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByRole("button", { name: "Manage saves", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "No saved games yet" }),
-  ).toBeVisible();
-  await expect(page.getByLabel("Save game file")).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Import", exact: true }),
-  ).toHaveCount(0);
-  expect(await readSaveRecords(page)).toHaveLength(0);
-});

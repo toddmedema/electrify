@@ -213,33 +213,39 @@ test("landing and history preserve a save, and a challenge creates another", asy
   );
 });
 
-test("an invitation from an earlier deploy opens as the same challenge", async ({
-  page,
-}) => {
+test("an invitation from different rules is unavailable", async ({ page }) => {
   const value = invitation();
-  value.run.compatibilityId = "old-model";
+  value.run.compatibilityId = "different-rules";
   await page.goto(link(value));
   await expect(
-    page.getByRole("button", { name: "Start challenge", exact: true }),
+    page.getByRole("heading", { name: "Challenge unavailable" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Challenge unavailable" }),
+    page.getByRole("button", { name: "Start challenge", exact: true }),
   ).toHaveCount(0);
 });
 
-test("mismatched market bytes cannot initialize an equivalent challenge", async ({
-  page,
-}) => {
-  await page.route("**/data/EconomyRaw.csv", async (route) => {
-    const response = await route.fetch();
-    await route.fulfill({ response, body: `${await response.text()}\n` });
+test.describe("challenge data integrity", () => {
+  // Control the response consumed by fetch, including when this spec targets a production build.
+  test.use({ serviceWorkers: "block" });
+
+  test("mismatched market bytes cannot initialize an equivalent challenge", async ({
+    page,
+  }) => {
+    let alteredRequests = 0;
+    await page.route("**/data/EconomyRaw.csv", async (route) => {
+      alteredRequests += 1;
+      const response = await route.fetch();
+      await route.fulfill({ response, body: `${await response.text()}\n` });
+    });
+    await page.goto(link());
+    await page
+      .getByRole("button", { name: "Start challenge", exact: true })
+      .click();
+    await expect(
+      page.getByText(/Could not load the economic record/),
+    ).toBeVisible();
+    expect(alteredRequests).toBeGreaterThan(0);
+    expect(await savedGame(page)).toBeUndefined();
   });
-  await page.goto(link());
-  await page
-    .getByRole("button", { name: "Start challenge", exact: true })
-    .click();
-  await expect(
-    page.getByText(/Could not load the economic record/),
-  ).toBeVisible();
-  expect(await savedGame(page)).toBeUndefined();
 });

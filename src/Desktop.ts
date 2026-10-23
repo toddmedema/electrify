@@ -128,14 +128,14 @@ export interface DesktopBridge {
     scenarioId: number;
     difficulty?: DifficultyType;
     scope: "global" | "friends" | "player";
-    challengeId?: string;
+    challengeId: string;
   }): Promise<DesktopScore[]>;
   submitScore(score: {
     appVersion?: string;
     scenarioId: number;
     difficulty: DifficultyType;
     score: number;
-    challengeId?: string;
+    challengeId: string;
   }): Promise<void>;
   openFriends(): Promise<void>;
   submitAchievements?(intent: {
