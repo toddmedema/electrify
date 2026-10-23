@@ -108,7 +108,12 @@ for (const optionId of ["accelerate", "standard"] as const) {
         expect.objectContaining({
           key: "mod:bridge-the-maintenance-gap:overhaul-schedule",
           attributes: expect.objectContaining({
-            cost: optionId === "accelerate" ? 3000000 : 0,
+            cost:
+              optionId === "accelerate"
+                ? run.difficulty === "Employee"
+                  ? 3000000
+                  : 4000000
+                : 0,
             upfrontGrant: optionId === "standard" ? 2000000 : 0,
           }),
         }),

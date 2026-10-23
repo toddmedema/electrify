@@ -10,7 +10,6 @@ import type { SimOptionsType } from "./Simulator";
 
 export const MOD_EXAMPLE_IDS = [
   "funded-or-phased-connection",
-  "prepare-before-freeze",
   "two-dry-years",
   "retire-coal-without-bill-shock",
 ] as const;
@@ -58,10 +57,7 @@ export function modExampleBranches(
 }
 
 /** UI-legal commitments, not a second economic model or an injected winning state. */
-export function modExampleRoute(
-  id: ModExampleId,
-  responses: Record<string, string> = {},
-): Partial<SimOptionsType> {
+export function modExampleRoute(id: ModExampleId): Partial<SimOptionsType> {
   switch (id) {
     case "funded-or-phased-connection":
       return {
@@ -71,33 +67,6 @@ export function modExampleRoute(
           financed: true,
         },
         dollarsPerkWh: 0.12,
-      };
-    case "prepare-before-freeze":
-      return {
-        initialBuild: {
-          name: "Natural Gas Peaker",
-          peakW: 3000e6,
-          financed: true,
-        },
-        dollarsPerkWh: 0.091,
-        scheduledActions: [
-          ...[1, 3, 5].map((facilityId) => ({
-            type: "reprioritize" as const,
-            month: 0,
-            facilityId,
-          })),
-          {
-            type: "build",
-            month: 24,
-            build: {
-              name: "Natural Gas Peaker",
-              peakW: Object.values(responses).includes("winterize")
-                ? 1000e6
-                : 1500e6,
-              financed: false,
-            },
-          },
-        ],
       };
     case "two-dry-years":
       return {

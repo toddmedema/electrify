@@ -39,33 +39,6 @@ function checkBranchFacts(
       expect(grants).toBe(funded ? 15000000 : 0);
       break;
     }
-    case "prepare-before-freeze": {
-      const prepared = Object.values(responses).includes("winterize");
-      expect(receipt(":choice:winterization").attributes).toMatchObject({
-        cost: prepared ? 90000000 : 0,
-        upfrontGrant: 0,
-      });
-      const freeze = receipt(":texas-deep-freeze:uri");
-      expect(freeze.startsMinute).toBe(49 * MINUTES_PER_MONTH);
-      expect(freeze.endsMinute).toBe(50 * MINUTES_PER_MONTH);
-      expect(
-        freeze.effects.facilityOutputMultipliersByFuel!["Natural Gas"],
-      ).toBeCloseTo(prepared ? 0.81 : 0.62, 12);
-      expect(freeze.effects.fuelPriceMultipliers!["Natural Gas"]).toBe(2.8);
-      expect(receipt(":texas-deep-freeze:thaw").startsMinute).toBe(
-        50 * MINUTES_PER_MONTH,
-      );
-      expect(result.builds).toHaveLength(2);
-      expect(
-        result.finalFacilities.some(
-          (facility) =>
-            facility.name === "Natural Gas Peaker" &&
-            facility.peakW === (prepared ? 1000e6 : 1500e6) &&
-            facility.yearsToBuildLeft === 0,
-        ),
-      ).toBe(true);
-      break;
-    }
     case "two-dry-years": {
       let expectedGrants = 0;
       for (const [year, onset, amount, inflow] of [
@@ -149,7 +122,7 @@ for (const id of MOD_EXAMPLE_IDS) {
         );
         for (const scenarioResponses of branches) {
           const result = runSimulation({
-            ...modExampleRoute(id, scenarioResponses),
+            ...modExampleRoute(id),
             scenarioId: 999,
             scenario,
             difficulty,

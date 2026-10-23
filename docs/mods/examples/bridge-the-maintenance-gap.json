@@ -5,7 +5,7 @@
   "id": "bridge-the-maintenance-gap",
   "title": "Bridge the maintenance gap",
   "creator": "Electrify examples",
-  "version": "1",
+  "version": "2",
   "description": "Prepare the Manassas grid for an overhaul of its original gas peaker. Pay for a shorter outage or accept support for the longer schedule, then keep customers supplied without a bill shock.",
   "seed": 609,
   "baseScenarioId": 106,
@@ -108,9 +108,17 @@
         {
           "id": "accelerate",
           "label": "Accelerate the overhaul",
-          "description": "Pay 3,000,000 starting-year dollars to finish the original gas peaker overhaul in three months.",
+          "description": "Pay for accelerated work to finish the original gas peaker overhaul in three months.",
           "message": "Your company paid for the three-month overhaul.",
-          "costDollars": 3000000
+          "costDollars": {
+            "byDifficulty": {
+              "Intern": 1500000,
+              "Employee": 3000000,
+              "Manager": 4000000,
+              "VP": 5000000,
+              "CEO": 6000000
+            }
+          }
         },
         {
           "id": "standard",
