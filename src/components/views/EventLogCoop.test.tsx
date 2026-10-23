@@ -51,19 +51,16 @@ test("a retired company's real timeline retains its name outside the active cloc
         cash: 1e9,
         dollarsPerkWh: 0.2,
       },
-      objectives: {
-        mode: "replace",
-        items: [
-          {
-            id: "affordable",
-            label: "Keep bills affordable",
-            metric: "monthlyBilledRate",
-            fromMonth: 1,
-            throughMonth: 6,
-            maxDollarsPerKWh: 0.1,
-          },
-        ],
-      },
+      objectives: [
+        {
+          id: "affordable",
+          label: "Keep bills affordable",
+          metric: "monthlyBilledRate",
+          fromMonth: 1,
+          throughMonth: 6,
+          maxDollarsPerKWh: 0.1,
+        },
+      ],
     },
     undefined,
     "Employee",

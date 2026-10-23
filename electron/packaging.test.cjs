@@ -54,7 +54,7 @@ test("the packaged mod parser loads, validates and digests without checkout depe
     const pack = {
       schemaVersion: 1, gameApi: 1, id: "packaged-grid", title: "Packaged Grid",
       creator: "Creator", version: "1", description: "A grid planning challenge.",
-      seed: 42, baseScenarioId: 999, objectives: { mode: "none" },
+      seed: 42,
       events: [{
         id: "dry-year", title: "A dry year", message: "Water inflow has fallen.",
         startMonth: 1, durationMonths: 12, preview: "Water inflow will fall.",
@@ -106,7 +106,11 @@ test("the packaged mod parser loads, validates and digests without checkout depe
     const result = run();
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(result.stdout).id, "packaged-grid");
-    for (const dependency of ["ScenarioRulesSchema.js", "RuleIdentity.js"]) {
+    for (const dependency of [
+      "ScenarioRulesSchema.js",
+      "RuleIdentity.js",
+      "ScenarioText.js",
+    ]) {
       const filename = path.join(directory, "src", "helpers", dependency);
       const original = fs.readFileSync(filename);
       fs.unlinkSync(filename);

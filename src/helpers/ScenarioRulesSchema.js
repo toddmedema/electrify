@@ -1,3 +1,4 @@
+const { scenarioTextError, scenarioTextLength } = require("./ScenarioText");
 /* Shared declarative contract. Dependency-free so Electron can structurally validate packages. */
 const FACILITY_NAMES = [
   "Coal",
@@ -141,8 +142,14 @@ function ruleDiagnostics(value, path = "") {
       add("invalid-text", p, "must be non-empty text.");
       return;
     }
-    if (v.length > max)
-      add("text-limit", p, `must be at most ${max} characters.`);
+    const templateError = scenarioTextError(v, /^(events|choices)\[/.test(p));
+    if (templateError) add("date-template", p, templateError);
+    if (scenarioTextLength(v, /^(events|choices)\[/.test(p)) > max)
+      add(
+        "text-limit",
+        p,
+        `must be at most ${max} characters after date substitution.`,
+      );
     if (UNSAFE_TEXT.test(v) || UNSAFE_MARKUP.test(v))
       add(
         "unsafe-text",
@@ -458,12 +465,7 @@ function ruleDiagnostics(value, path = "") {
       magnitude(v.durationMonths, at(p, "durationMonths"), 1, 1200, true);
     if (v.visibility !== undefined)
       enumValue(v.visibility, at(p, "visibility"), ["forecast", "surprise"]);
-    text(
-      v.preview,
-      at(p, "preview"),
-      200,
-      !(v.effects || v.loads?.length) || v.visibility === "surprise",
-    );
+    text(v.preview, at(p, "preview"), 200, true);
     text(v.endMessage, at(p, "endMessage"), 500, true);
     if (v.effects !== undefined) {
       effects(v.effects, at(p, "effects"));
@@ -522,11 +524,11 @@ function ruleDiagnostics(value, path = "") {
         text(o.label, at(q, "label"), 100);
         text(o.description, at(q, "description"), 500);
         text(o.message, at(q, "message"), 500);
-        if ((o.costDollars === undefined) === (o.grantDollars === undefined))
+        if (o.costDollars !== undefined && o.grantDollars !== undefined)
           add(
             "option-money",
             q,
-            "must declare exactly one of costDollars or grantDollars, including zero for a free option.",
+            "must not declare both costDollars and grantDollars; omit both for a free option.",
           );
         for (const key of ["costDollars", "grantDollars"])
           if (o[key] !== undefined) magnitude(o[key], at(q, key), 0, 1e12);
@@ -622,7 +624,10 @@ function ruleDiagnostics(value, path = "") {
       const p = `${at(path, "officialArcs")}[${i}]`;
       if (object(arc, p, ["scenarioId", "includeChoices"])) {
         enumValue(arc.scenarioId, at(p, "scenarioId"), RULE_SCENARIO_IDS);
-        if (typeof arc.includeChoices !== "boolean")
+        if (
+          arc.includeChoices !== undefined &&
+          typeof arc.includeChoices !== "boolean"
+        )
           add(
             "invalid-value",
             at(p, "includeChoices"),

@@ -1241,7 +1241,7 @@ function communityScenario(
       baseScenarioId: 999,
       scenario: { startingYear: 2020, durationMonths: 6 },
       officialArcs: [],
-      objectives: { mode: "none" },
+      objectives: [],
       events: [
         {
           id: "hidden",

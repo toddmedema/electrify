@@ -1,3 +1,4 @@
+import { renderScenarioText } from "./ScenarioText";
 import type {
   CompiledRuleEvent,
   CompiledRuleLoad,
@@ -761,6 +762,21 @@ export function compileScenarioRules(
       : { supplementsBackground: definition.supplementsBackground }),
     ...(condition ? { requiresChoice: condition } : {}),
   });
+  const renderReport = (
+    report: RuleReport,
+    eventMonth?: number,
+  ): RuleReport => ({
+    ...normalizeReport(report),
+    ...(report.label
+      ? {
+          label: renderScenarioText(
+            report.label,
+            params.startingYear,
+            eventMonth,
+          ),
+        }
+      : {}),
+  });
   const compiledEvents = sorted(events).map((event): CompiledRuleEvent => {
     const first =
         typeof event.startMonth === "number"
@@ -851,8 +867,12 @@ export function compileScenarioRules(
     return {
       id: event.id,
       key,
-      title: event.title,
-      message: event.message,
+      title: renderScenarioText(event.title, params.startingYear, startMonth),
+      message: renderScenarioText(
+        event.message,
+        params.startingYear,
+        startMonth,
+      ),
       startMonth,
       possibleStartMonths: { from: first - 1, to: last - 1 },
       durationMonths,
@@ -860,8 +880,24 @@ export function compileScenarioRules(
         ? { durationUntilEnd: true as const }
         : {}),
       visibility: event.visibility ?? "forecast",
-      ...(event.preview ? { preview: event.preview } : {}),
-      ...(event.endMessage ? { endMessage: event.endMessage } : {}),
+      ...(event.preview
+        ? {
+            preview: renderScenarioText(
+              event.preview,
+              params.startingYear,
+              startMonth,
+            ),
+          }
+        : {}),
+      ...(event.endMessage
+        ? {
+            endMessage: renderScenarioText(
+              event.endMessage,
+              params.startingYear,
+              startMonth,
+            ),
+          }
+        : {}),
       ...(event.requiresChoice ? { requiresChoice: event.requiresChoice } : {}),
       effects,
       targets: sortedOperations(
@@ -885,9 +921,11 @@ export function compileScenarioRules(
           amount: ruleNumber(t.amountDollars, params.difficulty),
         })),
       ),
-      ...(event.report ? { report: normalizeReport(event.report) } : {}),
+      ...(event.report
+        ? { report: renderReport(event.report, startMonth) }
+        : {}),
       ...(event.endReport
-        ? { endReport: normalizeReport(event.endReport) }
+        ? { endReport: renderReport(event.endReport, startMonth) }
         : {}),
     };
   });
@@ -900,15 +938,15 @@ export function compileScenarioRules(
     durationMonths: params.durationMonths,
     startingPeakW: params.startingPeakW,
     startingAssetIds: [...params.startingAssetIds].sort(),
-    officialArcs: [...(definitions.officialArcs ?? [])].sort(
-      (a, b) => a.scenarioId - b.scenarioId,
-    ),
+    officialArcs: (definitions.officialArcs ?? [])
+      .map((arc) => ({ ...arc, includeChoices: arc.includeChoices ?? true }))
+      .sort((a, b) => a.scenarioId - b.scenarioId),
     events: compiledEvents,
     choices: sorted(choices).map((c) => ({
       id: c.id,
       key: keyOf(params.namespace, c.id),
-      title: c.title,
-      prompt: c.prompt,
+      title: renderScenarioText(c.title, params.startingYear, c.dueMonth - 1),
+      prompt: renderScenarioText(c.prompt, params.startingYear, c.dueMonth - 1),
       dueMonth: c.dueMonth - 1,
       ...(c.requiresChoice ? { requiresChoice: c.requiresChoice } : {}),
       freeOptionId: sorted(c.options).find(
@@ -918,9 +956,17 @@ export function compileScenarioRules(
       )!.id,
       options: sorted(c.options).map((o) => ({
         id: o.id,
-        label: o.label,
-        description: o.description,
-        message: o.message,
+        label: renderScenarioText(o.label, params.startingYear, c.dueMonth - 1),
+        description: renderScenarioText(
+          o.description,
+          params.startingYear,
+          c.dueMonth - 1,
+        ),
+        message: renderScenarioText(
+          o.message,
+          params.startingYear,
+          c.dueMonth - 1,
+        ),
         cost:
           o.costDollars === undefined
             ? 0
@@ -942,19 +988,20 @@ export function compileScenarioRules(
         ...(o.eventIds ? { eventIds: [...o.eventIds].sort() } : {}),
       })),
     })),
-    objectives: sorted(definitions.objectives).map((o) =>
-      normalizedObjective(
+    objectives: sorted(definitions.objectives).map((o) => ({
+      ...normalizedObjective(
         o,
         params.inheritedObjectiveIds?.includes(o.id) ?? false,
       ),
-    ),
+      label: renderScenarioText(o.label, params.startingYear),
+    })),
     loads: sorted(
       events.flatMap((e) =>
         (e.loads ?? []).map((l) => load(l, e.id, e.requiresChoice)),
       ),
     ),
-    debriefReports: sorted(definitions.debriefReports ?? []).map(
-      normalizeReport,
+    debriefReports: sorted(definitions.debriefReports ?? []).map((report) =>
+      renderReport(report),
     ),
   };
   const dependencyDiagnostics = scenarioRuleDependencyDiagnostics(result, {

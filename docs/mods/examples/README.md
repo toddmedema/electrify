@@ -6,9 +6,9 @@ edit the rules it demonstrates. Keep `$schema` pointed at
 The [authoring guide](../authoring.md) covers editing and publishing; the
 [format reference](../../mods.md) lists fields and limits.
 
-Every package uses `baseScenarioId` for its starting grid. Only **Funded or phased
-connection** imports an official event arc. The other examples use `officialArcs: []`
-and define their own rules in the JSON.
+Only **Funded or phased connection** uses a base scenario, imports official rules,
+and pins a seed. The other three packages declare their own locations, starting
+fleets, events and goals. Omitted fields use defaults.
 
 | Package                                                                 | API features to adapt                                                                                    |
 | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -42,7 +42,7 @@ stages. Each year has its own decision, so the player can change course.
 replacement plants cheaper and faster to build. `buildCost: 0.8` means 20% cheaper;
 `yearsToBuild: 0.5` halves construction time.
 
-Its goals combine coal retirement, billed-rate and debt limits, and reliable
+Player dates use `{{start+24 months}}` instead of “month 25.” Its goals combine coal retirement, billed-rate and debt limits, and reliable
 service. Adapt the incentives and deadlines together to create a transition with
 financial tradeoffs. `fuelMix` and `profitLoss` debriefs review the result.
 
@@ -53,7 +53,7 @@ peaker offline while leaving new generators available. A choice selects a short
 paid overhaul or a longer funded one. `costDollars.byDifficulty` sets a different
 price for each difficulty without duplicating the choice.
 
-An `affectedFacilities` report names the targeted plant. Use this pattern for
+Messages use `{{event+3 months}}` to show the actual return date. An `affectedFacilities` report names the targeted plant. Use this pattern for
 maintenance or plant-specific disruptions, keeping goal and report windows aligned
 with the outage.
 

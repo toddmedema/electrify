@@ -7,22 +7,18 @@
   "creator": "Electrify examples",
   "version": "1",
   "description": "Edit one bounded planning rule at a time, then validate and simulate it.",
-  "seed": 42,
-  "baseScenarioId": 999,
-  "officialArcs": [],
   "scenario": {
     "startingYear": 2020,
     "durationMonths": 6,
     "startingCustomers": 10000,
     "cash": 1000000000
   },
-  "objectives": { "mode": "none" },
   "events": [
     {
       "id": "planning-window",
       "title": "Planning window",
       "message": "Your grid faces new operating conditions.",
-      "preview": "Operating conditions will change for months 2–3.",
+      "preview": "Operating conditions will change from {{event}} to {{event+2 months}}.",
       "startMonth": 2,
       "durationMonths": 2,
       "effects": {

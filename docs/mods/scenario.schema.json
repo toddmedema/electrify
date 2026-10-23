@@ -51,23 +51,226 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 4294967295,
-      "description": "Deterministic run seed; integer 0–4294967295."
+      "description": "Optional fixed seed for reproducing weather and random event timing; defaults to 0; integer 0–4294967295."
     },
     "baseScenarioId": {
       "enum": [
         999, 100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114,
         115
       ],
-      "description": "Starting grid to inherit; 999 is Custom Game. Community runs remain unranked."
+      "description": "Optional built-in starting grid. Omit for a custom scenario."
     },
     "scenario": {
       "type": "object",
       "properties": {
+        "location": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "description": "Values for id."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+              "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+            },
+            "lat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90,
+              "description": "Latitude; number -90–90."
+            },
+            "long": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180,
+              "description": "Longitude; number -180–180."
+            },
+            "admin": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+              "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+            },
+            "timeZone": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+              "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+            },
+            "region": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+              "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+            },
+            "country": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+              "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+            },
+            "elevation": {
+              "type": "number",
+              "minimum": -500,
+              "maximum": 10000,
+              "description": "Metres above sea level; number -500–10000."
+            },
+            "watershedId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "description": "Values for watershedId."
+            },
+            "watershedName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+              "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+            },
+            "offshore": {
+              "type": "boolean",
+              "description": "Values for offshore."
+            },
+            "resources": {
+              "type": "object",
+              "properties": {
+                "hydro": {
+                  "type": "boolean",
+                  "description": "Values for hydro."
+                },
+                "geothermal": {
+                  "type": "boolean",
+                  "description": "Values for geothermal."
+                }
+              },
+              "required": [],
+              "additionalProperties": false,
+              "description": "Only listed fields are allowed."
+            }
+          },
+          "required": ["id", "name", "lat", "long"],
+          "additionalProperties": false,
+          "description": "Location; defaults to San Francisco without a base scenario."
+        },
+        "startingFleet": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+                "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
+              },
+              "name": {
+                "enum": [
+                  "Coal",
+                  "Nuclear",
+                  "Natural Gas Peaker",
+                  "Natural Gas CC",
+                  "Oil",
+                  "Biomass",
+                  "Wind",
+                  "Offshore Wind",
+                  "Airborne Wind",
+                  "Solar",
+                  "Hydro",
+                  "Geothermal",
+                  "Enhanced Geothermal",
+                  "Battery",
+                  "Pumped Hydro"
+                ],
+                "description": "Values for name."
+              },
+              "peakMW": {
+                "type": "number",
+                "minimum": 0.001,
+                "maximum": 100000,
+                "description": "Generator power in MW; number 0.001–100000."
+              },
+              "peakMWh": {
+                "type": "number",
+                "minimum": 0.001,
+                "maximum": 1000000,
+                "description": "Storage energy in MWh; number 0.001–1000000."
+              },
+              "ageYears": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 200,
+                "description": "Age at start; defaults to 0; number 0–200."
+              },
+              "hydroSiteId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+                "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 64 UTF-16 code units."
+              },
+              "reservoirFraction": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Starting reservoir share; number 0–1."
+              }
+            },
+            "required": ["name"],
+            "additionalProperties": false,
+            "description": "Only listed fields are allowed.",
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "name": {
+                      "enum": ["Battery", "Pumped Hydro"],
+                      "description": "Values for name."
+                    }
+                  }
+                },
+                "then": { "required": ["peakMWh"] },
+                "else": {
+                  "required": ["peakMW"],
+                  "not": { "required": ["peakMWh"] }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "name": {
+                      "not": { "const": "Hydro" },
+                      "description": "Values for name."
+                    }
+                  }
+                },
+                "then": {
+                  "not": {
+                    "anyOf": [
+                      { "required": ["hydroSiteId"] },
+                      { "required": ["reservoirFraction"] }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 100,
+          "description": "References must be unique and valid in this package."
+        },
         "cash": {
           "type": "number",
           "minimum": 0,
           "maximum": 1000000000000,
-          "description": "Cash in dollars of the resolved starting year; number 0–1000000000000."
+          "description": "Starting cash in dollars; number 0–1000000000000."
         },
         "startingYear": {
           "type": "integer",
@@ -91,7 +294,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 100,
-          "description": "Billed dollars/kWh of resolved starting year; number 0–100."
+          "description": "Billed dollars per kWh; number 0–100."
         },
         "durationMonths": {
           "type": "integer",
@@ -103,7 +306,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 100,
-          "description": "Initial dollars/kgCO₂e in starting-year dollars; timed fees use dollars/tonne; number 0–100."
+          "description": "Initial dollars/kgCO₂e; timed fees use dollars/tonne; number 0–100."
         },
         "ownership": {
           "enum": ["Investor", "Public"],
@@ -126,7 +329,7 @@
       },
       "required": [],
       "additionalProperties": false,
-      "description": "Allowed setup overrides only; location and starting fleet come from the bundled base."
+      "description": "Starting conditions. Omitted values use the custom-game defaults or the chosen base."
     },
     "facilities": {
       "type": "object",
@@ -560,10 +763,10 @@
           },
           "includeChoices": {
             "type": "boolean",
-            "description": "True prompts each company; false automatically selects the free option at its due month."
+            "description": "Defaults to true: ask each company. False selects the free option automatically."
           }
         },
-        "required": ["scenarioId", "includeChoices"],
+        "required": ["scenarioId"],
         "additionalProperties": false,
         "description": "Only listed fields are allowed."
       },
@@ -707,7 +910,7 @@
             "minLength": 1,
             "maxLength": 200,
             "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-            "description": "Future-tense preview required for announced mechanical events/loads. Up to 200 UTF-16 code units."
+            "description": "Optional preview; defaults to the event message. Up to 200 UTF-16 code units."
           },
           "endMessage": {
             "type": "string",
@@ -3444,7 +3647,7 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 1000000000000,
-                    "description": "Dollars per active month in the resolved starting year's price level; number 0–1000000000000."
+                    "description": "Dollars per active month; number 0–1000000000000."
                   },
                   {
                     "type": "object",
@@ -3456,31 +3659,31 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1000000000000,
-                            "description": "Dollars per active month in the resolved starting year's price level; number 0–1000000000000."
+                            "description": "Dollars per active month; number 0–1000000000000."
                           },
                           "Employee": {
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1000000000000,
-                            "description": "Dollars per active month in the resolved starting year's price level; number 0–1000000000000."
+                            "description": "Dollars per active month; number 0–1000000000000."
                           },
                           "Manager": {
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1000000000000,
-                            "description": "Dollars per active month in the resolved starting year's price level; number 0–1000000000000."
+                            "description": "Dollars per active month; number 0–1000000000000."
                           },
                           "VP": {
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1000000000000,
-                            "description": "Dollars per active month in the resolved starting year's price level; number 0–1000000000000."
+                            "description": "Dollars per active month; number 0–1000000000000."
                           },
                           "CEO": {
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1000000000000,
-                            "description": "Dollars per active month in the resolved starting year's price level; number 0–1000000000000."
+                            "description": "Dollars per active month; number 0–1000000000000."
                           }
                         },
                         "required": [
@@ -3499,7 +3702,7 @@
                     "description": "Only listed fields are allowed."
                   }
                 ],
-                "description": "Dollars per active month in the resolved starting year's price level; number 0–1000000000000. Use a number or a complete byDifficulty table."
+                "description": "Dollars per active month; number 0–1000000000000. Use a number or a complete byDifficulty table."
               },
               "carbonFeeDollarsPerTonneCO2e": {
                 "oneOf": [
@@ -3507,7 +3710,7 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 100000,
-                    "description": "Absolute dollars/tonne CO₂e in starting-year dollars; overlapping co-reachable overrides are rejected; number 0–100000."
+                    "description": "Absolute dollars/tonne CO₂e; overlapping co-reachable overrides are rejected; number 0–100000."
                   },
                   {
                     "type": "object",
@@ -3519,31 +3722,31 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 100000,
-                            "description": "Absolute dollars/tonne CO₂e in starting-year dollars; overlapping co-reachable overrides are rejected; number 0–100000."
+                            "description": "Absolute dollars/tonne CO₂e; overlapping co-reachable overrides are rejected; number 0–100000."
                           },
                           "Employee": {
                             "type": "number",
                             "minimum": 0,
                             "maximum": 100000,
-                            "description": "Absolute dollars/tonne CO₂e in starting-year dollars; overlapping co-reachable overrides are rejected; number 0–100000."
+                            "description": "Absolute dollars/tonne CO₂e; overlapping co-reachable overrides are rejected; number 0–100000."
                           },
                           "Manager": {
                             "type": "number",
                             "minimum": 0,
                             "maximum": 100000,
-                            "description": "Absolute dollars/tonne CO₂e in starting-year dollars; overlapping co-reachable overrides are rejected; number 0–100000."
+                            "description": "Absolute dollars/tonne CO₂e; overlapping co-reachable overrides are rejected; number 0–100000."
                           },
                           "VP": {
                             "type": "number",
                             "minimum": 0,
                             "maximum": 100000,
-                            "description": "Absolute dollars/tonne CO₂e in starting-year dollars; overlapping co-reachable overrides are rejected; number 0–100000."
+                            "description": "Absolute dollars/tonne CO₂e; overlapping co-reachable overrides are rejected; number 0–100000."
                           },
                           "CEO": {
                             "type": "number",
                             "minimum": 0,
                             "maximum": 100000,
-                            "description": "Absolute dollars/tonne CO₂e in starting-year dollars; overlapping co-reachable overrides are rejected; number 0–100000."
+                            "description": "Absolute dollars/tonne CO₂e; overlapping co-reachable overrides are rejected; number 0–100000."
                           }
                         },
                         "required": [
@@ -3562,7 +3765,7 @@
                     "description": "Only listed fields are allowed."
                   }
                 ],
-                "description": "Absolute dollars/tonne CO₂e in starting-year dollars; overlapping co-reachable overrides are rejected; number 0–100000. Use a number or a complete byDifficulty table."
+                "description": "Absolute dollars/tonne CO₂e; overlapping co-reachable overrides are rejected; number 0–100000. Use a number or a complete byDifficulty table."
               },
               "outputMultipliersBySelector": {
                 "type": "array",
@@ -4655,38 +4858,6 @@
           {
             "if": { "required": ["effects"] },
             "then": { "required": ["durationMonths"] }
-          },
-          {
-            "if": {
-              "allOf": [
-                {
-                  "anyOf": [
-                    { "required": ["effects"] },
-                    {
-                      "properties": {
-                        "loads": {
-                          "minItems": 1,
-                          "description": "Values for loads."
-                        }
-                      },
-                      "required": ["loads"]
-                    }
-                  ]
-                },
-                {
-                  "not": {
-                    "properties": {
-                      "visibility": {
-                        "const": "surprise",
-                        "description": "Must be \"surprise\"."
-                      }
-                    },
-                    "required": ["visibility"]
-                  }
-                }
-              ]
-            },
-            "then": { "required": ["preview"] }
           }
         ]
       },
@@ -4792,7 +4963,7 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000000000000,
-                      "description": "Immediate cost in starting-year dollars; zero is a free option; number 0–1000000000000."
+                      "description": "Immediate cost in dollars; zero is a free option; number 0–1000000000000."
                     },
                     {
                       "type": "object",
@@ -4804,31 +4975,31 @@
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1000000000000,
-                              "description": "Immediate cost in starting-year dollars; zero is a free option; number 0–1000000000000."
+                              "description": "Immediate cost in dollars; zero is a free option; number 0–1000000000000."
                             },
                             "Employee": {
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1000000000000,
-                              "description": "Immediate cost in starting-year dollars; zero is a free option; number 0–1000000000000."
+                              "description": "Immediate cost in dollars; zero is a free option; number 0–1000000000000."
                             },
                             "Manager": {
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1000000000000,
-                              "description": "Immediate cost in starting-year dollars; zero is a free option; number 0–1000000000000."
+                              "description": "Immediate cost in dollars; zero is a free option; number 0–1000000000000."
                             },
                             "VP": {
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1000000000000,
-                              "description": "Immediate cost in starting-year dollars; zero is a free option; number 0–1000000000000."
+                              "description": "Immediate cost in dollars; zero is a free option; number 0–1000000000000."
                             },
                             "CEO": {
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1000000000000,
-                              "description": "Immediate cost in starting-year dollars; zero is a free option; number 0–1000000000000."
+                              "description": "Immediate cost in dollars; zero is a free option; number 0–1000000000000."
                             }
                           },
                           "required": [
@@ -4847,7 +5018,7 @@
                       "description": "Only listed fields are allowed."
                     }
                   ],
-                  "description": "Immediate cost in starting-year dollars; zero is a free option; number 0–1000000000000. Use a number or a complete byDifficulty table."
+                  "description": "Immediate cost in dollars; zero is a free option; number 0–1000000000000. Use a number or a complete byDifficulty table."
                 },
                 "grantDollars": {
                   "oneOf": [
@@ -4855,7 +5026,7 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000000000000,
-                      "description": "Immediate grant in starting-year dollars; number 0–1000000000000."
+                      "description": "Immediate grant in dollars; number 0–1000000000000."
                     },
                     {
                       "type": "object",
@@ -4867,31 +5038,31 @@
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1000000000000,
-                              "description": "Immediate grant in starting-year dollars; number 0–1000000000000."
+                              "description": "Immediate grant in dollars; number 0–1000000000000."
                             },
                             "Employee": {
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1000000000000,
-                              "description": "Immediate grant in starting-year dollars; number 0–1000000000000."
+                              "description": "Immediate grant in dollars; number 0–1000000000000."
                             },
                             "Manager": {
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1000000000000,
-                              "description": "Immediate grant in starting-year dollars; number 0–1000000000000."
+                              "description": "Immediate grant in dollars; number 0–1000000000000."
                             },
                             "VP": {
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1000000000000,
-                              "description": "Immediate grant in starting-year dollars; number 0–1000000000000."
+                              "description": "Immediate grant in dollars; number 0–1000000000000."
                             },
                             "CEO": {
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1000000000000,
-                              "description": "Immediate grant in starting-year dollars; number 0–1000000000000."
+                              "description": "Immediate grant in dollars; number 0–1000000000000."
                             }
                           },
                           "required": [
@@ -4910,7 +5081,7 @@
                       "description": "Only listed fields are allowed."
                     }
                   ],
-                  "description": "Immediate grant in starting-year dollars; number 0–1000000000000. Use a number or a complete byDifficulty table."
+                  "description": "Immediate grant in dollars; number 0–1000000000000. Use a number or a complete byDifficulty table."
                 },
                 "replaceLoad": {
                   "type": "object",
@@ -5012,16 +5183,7 @@
               "required": ["id", "label", "description", "message"],
               "additionalProperties": false,
               "description": "Only listed fields are allowed.",
-              "oneOf": [
-                {
-                  "required": ["costDollars"],
-                  "not": { "required": ["grantDollars"] }
-                },
-                {
-                  "required": ["grantDollars"],
-                  "not": { "required": ["costDollars"] }
-                }
-              ]
+              "not": { "required": ["costDollars", "grantDollars"] }
             },
             "minItems": 2,
             "maxItems": 8,
@@ -5037,955 +5199,453 @@
       "description": "References must be unique and valid in this package."
     },
     "objectives": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "mode": {
-              "const": "inherit",
-              "description": "Keep base goals, relocated with the term."
-            },
-            "add": {
-              "type": "array",
-              "items": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "monthlyReliability",
-                        "description": "Delivered customer electricity divided by customer demand each completed month."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "minDemandServedShare": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "description": "Completed-month demand served share; every month; number 0–1."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "minDemandServedShare"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Delivered customer electricity divided by customer demand each completed month. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "customerRetention",
-                        "description": "Customers at the deadline divided by the run's recorded starting customers."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "deadlineMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "minRetainedShare": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "description": "Share of recorded starting customers at deadline; number 0–1."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "deadlineMonth",
-                      "minRetainedShare"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Customers at the deadline divided by the run's recorded starting customers. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "emissionsBudget",
-                        "description": "Total electricity and construction emissions over the window, including imports and exports."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "budgetTonnesCO2e": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1000000000000,
-                        "description": "Total tonnes CO₂e over the inclusive window; number 0–1000000000000."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "budgetTonnesCO2e"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Total electricity and construction emissions over the window, including imports and exports. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "emissionsPerDeliveredMWh",
-                        "description": "Total emissions, including imports, exports and construction, per delivered customer MWh over the window."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "maxKgCO2ePerMWh": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1000000,
-                        "description": "Total kg CO₂e per delivered customer MWh over the window; number 0–1000000."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "maxKgCO2ePerMWh"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Total emissions, including imports, exports and construction, per delivered customer MWh over the window. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "localFuelShare",
-                        "description": "Selected fuels' delivered electricity divided by all local fuel-delivered electricity over the window; imports and storage discharge have no fuel provenance."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "fuels": {
-                        "type": "array",
-                        "items": {
-                          "enum": [
-                            "Coal",
-                            "Uranium",
-                            "Natural Gas",
-                            "Oil",
-                            "Biomass",
-                            "Wind",
-                            "Offshore Wind",
-                            "Airborne Wind",
-                            "Sun",
-                            "Hydro",
-                            "Geothermal"
-                          ],
-                          "description": "Bundled generator fuel; imports and storage discharge have no fuel provenance."
-                        },
-                        "minItems": 1,
-                        "maxItems": 11,
-                        "description": "References must be unique and valid in this package.",
-                        "uniqueItems": true
-                      },
-                      "minShare": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "description": "Share of local fuel-delivered Wh; imports and storage excluded; number 0–1."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "fuels",
-                      "minShare"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Selected fuels' delivered electricity divided by all local fuel-delivered electricity over the window; imports and storage discharge have no fuel provenance. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "fuelRetirement",
-                        "description": "Own no asset of the specified fuel, including paused and unfinished assets, at the deadline and every later month close."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "deadlineMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "fuel": {
-                        "enum": [
-                          "Coal",
-                          "Uranium",
-                          "Natural Gas",
-                          "Oil",
-                          "Biomass",
-                          "Wind",
-                          "Offshore Wind",
-                          "Airborne Wind",
-                          "Sun",
-                          "Hydro",
-                          "Geothermal"
-                        ],
-                        "description": "Bundled generator fuel; imports and storage discharge have no fuel provenance."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "deadlineMonth",
-                      "fuel"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Own no asset of the specified fuel, including paused and unfinished assets, at the deadline and every later month close. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "monthlyBilledRate",
-                        "description": "Billed customer revenue per delivered kWh each month, excluding grants and exports, in starting-year dollars."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "maxDollarsPerKWh": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 100,
-                        "description": "Billed starting-year dollars per delivered kWh; excludes grants and exports; number 0–100."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "maxDollarsPerKWh"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Billed customer revenue per delivered kWh each month, excluding grants and exports, in starting-year dollars. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "monthEndDebt",
-                        "description": "Loan principal at each completed month close, in starting-year dollars; interest expenses are excluded."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "maxDebtDollars": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1000000000000,
-                        "description": "Month-end loan principal limit in starting-year dollars; excludes interest; number 0–1000000000000."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "maxDebtDollars"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Loan principal at each completed month close, in starting-year dollars; interest expenses are excluded. Requires completed-month observations."
-                  }
-                ],
-                "description": "Choose a goal metric and an inclusive window or deadline within the term. Goals cannot trigger rewards or actions."
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+                "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
               },
-              "minItems": 0,
-              "maxItems": 16,
-              "description": "References must be unique and valid in this package."
-            }
-          },
-          "required": ["mode"],
-          "additionalProperties": false,
-          "description": "Only listed fields are allowed."
-        },
-        {
-          "type": "object",
-          "properties": {
-            "mode": {
-              "const": "replace",
-              "description": "Replace base goals with items. Use --explain to get inherited goals as editable JSON."
-            },
-            "items": {
-              "type": "array",
-              "items": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "monthlyReliability",
-                        "description": "Delivered customer electricity divided by customer demand each completed month."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "minDemandServedShare": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "description": "Completed-month demand served share; every month; number 0–1."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "minDemandServedShare"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Delivered customer electricity divided by customer demand each completed month. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "customerRetention",
-                        "description": "Customers at the deadline divided by the run's recorded starting customers."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "deadlineMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "minRetainedShare": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "description": "Share of recorded starting customers at deadline; number 0–1."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "deadlineMonth",
-                      "minRetainedShare"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Customers at the deadline divided by the run's recorded starting customers. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "emissionsBudget",
-                        "description": "Total electricity and construction emissions over the window, including imports and exports."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "budgetTonnesCO2e": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1000000000000,
-                        "description": "Total tonnes CO₂e over the inclusive window; number 0–1000000000000."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "budgetTonnesCO2e"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Total electricity and construction emissions over the window, including imports and exports. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "emissionsPerDeliveredMWh",
-                        "description": "Total emissions, including imports, exports and construction, per delivered customer MWh over the window."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "maxKgCO2ePerMWh": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1000000,
-                        "description": "Total kg CO₂e per delivered customer MWh over the window; number 0–1000000."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "maxKgCO2ePerMWh"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Total emissions, including imports, exports and construction, per delivered customer MWh over the window. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "localFuelShare",
-                        "description": "Selected fuels' delivered electricity divided by all local fuel-delivered electricity over the window; imports and storage discharge have no fuel provenance."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "fuels": {
-                        "type": "array",
-                        "items": {
-                          "enum": [
-                            "Coal",
-                            "Uranium",
-                            "Natural Gas",
-                            "Oil",
-                            "Biomass",
-                            "Wind",
-                            "Offshore Wind",
-                            "Airborne Wind",
-                            "Sun",
-                            "Hydro",
-                            "Geothermal"
-                          ],
-                          "description": "Bundled generator fuel; imports and storage discharge have no fuel provenance."
-                        },
-                        "minItems": 1,
-                        "maxItems": 11,
-                        "description": "References must be unique and valid in this package.",
-                        "uniqueItems": true
-                      },
-                      "minShare": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "description": "Share of local fuel-delivered Wh; imports and storage excluded; number 0–1."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "fuels",
-                      "minShare"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Selected fuels' delivered electricity divided by all local fuel-delivered electricity over the window; imports and storage discharge have no fuel provenance. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "fuelRetirement",
-                        "description": "Own no asset of the specified fuel, including paused and unfinished assets, at the deadline and every later month close."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "deadlineMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "fuel": {
-                        "enum": [
-                          "Coal",
-                          "Uranium",
-                          "Natural Gas",
-                          "Oil",
-                          "Biomass",
-                          "Wind",
-                          "Offshore Wind",
-                          "Airborne Wind",
-                          "Sun",
-                          "Hydro",
-                          "Geothermal"
-                        ],
-                        "description": "Bundled generator fuel; imports and storage discharge have no fuel provenance."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "deadlineMonth",
-                      "fuel"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Own no asset of the specified fuel, including paused and unfinished assets, at the deadline and every later month close. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "monthlyBilledRate",
-                        "description": "Billed customer revenue per delivered kWh each month, excluding grants and exports, in starting-year dollars."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "maxDollarsPerKWh": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 100,
-                        "description": "Billed starting-year dollars per delivered kWh; excludes grants and exports; number 0–100."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "maxDollarsPerKWh"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Billed customer revenue per delivered kWh each month, excluding grants and exports, in starting-year dollars. Requires completed-month observations."
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-                        "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
-                      },
-                      "label": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100,
-                        "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
-                        "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
-                      },
-                      "metric": {
-                        "const": "monthEndDebt",
-                        "description": "Loan principal at each completed month close, in starting-year dollars; interest expenses are excluded."
-                      },
-                      "required": {
-                        "type": "boolean",
-                        "description": "Defaults to true. Set false for an optional goal that cannot end the run."
-                      },
-                      "fromMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "throughMonth": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1200,
-                        "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
-                      },
-                      "maxDebtDollars": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1000000000000,
-                        "description": "Month-end loan principal limit in starting-year dollars; excludes interest; number 0–1000000000000."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "metric",
-                      "fromMonth",
-                      "throughMonth",
-                      "maxDebtDollars"
-                    ],
-                    "additionalProperties": false,
-                    "description": "Loan principal at each completed month close, in starting-year dollars; interest expenses are excluded. Requires completed-month observations."
-                  }
-                ],
-                "description": "Choose a goal metric and an inclusive window or deadline within the term. Goals cannot trigger rewards or actions."
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+                "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
               },
-              "minItems": 0,
-              "maxItems": 16,
-              "description": "References must be unique and valid in this package."
-            }
+              "metric": {
+                "const": "monthlyReliability",
+                "description": "Delivered customer electricity divided by customer demand each completed month."
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Defaults to true. Set false for an optional goal that cannot end the run."
+              },
+              "fromMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "throughMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "minDemandServedShare": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Completed-month demand served share; every month; number 0–1."
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "metric",
+              "fromMonth",
+              "throughMonth",
+              "minDemandServedShare"
+            ],
+            "additionalProperties": false,
+            "description": "Delivered customer electricity divided by customer demand each completed month. Requires completed-month observations."
           },
-          "required": ["mode", "items"],
-          "additionalProperties": false,
-          "description": "Only listed fields are allowed."
-        },
-        {
-          "type": "object",
-          "properties": {
-            "mode": {
-              "const": "none",
-              "description": "No scenario goals. Reach the final month and avoid ordinary game failures."
-            }
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+                "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+                "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+              },
+              "metric": {
+                "const": "customerRetention",
+                "description": "Customers at the deadline divided by the run's recorded starting customers."
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Defaults to true. Set false for an optional goal that cannot end the run."
+              },
+              "deadlineMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "minRetainedShare": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Share of recorded starting customers at deadline; number 0–1."
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "metric",
+              "deadlineMonth",
+              "minRetainedShare"
+            ],
+            "additionalProperties": false,
+            "description": "Customers at the deadline divided by the run's recorded starting customers. Requires completed-month observations."
           },
-          "required": ["mode"],
-          "additionalProperties": false,
-          "description": "Only listed fields are allowed."
-        }
-      ],
-      "description": "Choose whether to keep, replace or remove base goals. Imported arcs do not add goals."
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+                "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+                "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+              },
+              "metric": {
+                "const": "emissionsBudget",
+                "description": "Total electricity and construction emissions over the window, including imports and exports."
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Defaults to true. Set false for an optional goal that cannot end the run."
+              },
+              "fromMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "throughMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "budgetTonnesCO2e": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000000,
+                "description": "Total tonnes CO₂e over the inclusive window; number 0–1000000000000."
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "metric",
+              "fromMonth",
+              "throughMonth",
+              "budgetTonnesCO2e"
+            ],
+            "additionalProperties": false,
+            "description": "Total electricity and construction emissions over the window, including imports and exports. Requires completed-month observations."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+                "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+                "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+              },
+              "metric": {
+                "const": "emissionsPerDeliveredMWh",
+                "description": "Total emissions, including imports, exports and construction, per delivered customer MWh over the window."
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Defaults to true. Set false for an optional goal that cannot end the run."
+              },
+              "fromMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "throughMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "maxKgCO2ePerMWh": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000,
+                "description": "Total kg CO₂e per delivered customer MWh over the window; number 0–1000000."
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "metric",
+              "fromMonth",
+              "throughMonth",
+              "maxKgCO2ePerMWh"
+            ],
+            "additionalProperties": false,
+            "description": "Total emissions, including imports, exports and construction, per delivered customer MWh over the window. Requires completed-month observations."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+                "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+                "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+              },
+              "metric": {
+                "const": "localFuelShare",
+                "description": "Selected fuels' delivered electricity divided by all local fuel-delivered electricity over the window; imports and storage discharge have no fuel provenance."
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Defaults to true. Set false for an optional goal that cannot end the run."
+              },
+              "fromMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "throughMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "fuels": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "Coal",
+                    "Uranium",
+                    "Natural Gas",
+                    "Oil",
+                    "Biomass",
+                    "Wind",
+                    "Offshore Wind",
+                    "Airborne Wind",
+                    "Sun",
+                    "Hydro",
+                    "Geothermal"
+                  ],
+                  "description": "Bundled generator fuel; imports and storage discharge have no fuel provenance."
+                },
+                "minItems": 1,
+                "maxItems": 11,
+                "description": "References must be unique and valid in this package.",
+                "uniqueItems": true
+              },
+              "minShare": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Share of local fuel-delivered Wh; imports and storage excluded; number 0–1."
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "metric",
+              "fromMonth",
+              "throughMonth",
+              "fuels",
+              "minShare"
+            ],
+            "additionalProperties": false,
+            "description": "Selected fuels' delivered electricity divided by all local fuel-delivered electricity over the window; imports and storage discharge have no fuel provenance. Requires completed-month observations."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+                "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+                "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+              },
+              "metric": {
+                "const": "fuelRetirement",
+                "description": "Own no asset of the specified fuel, including paused and unfinished assets, at the deadline and every later month close."
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Defaults to true. Set false for an optional goal that cannot end the run."
+              },
+              "deadlineMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "fuel": {
+                "enum": [
+                  "Coal",
+                  "Uranium",
+                  "Natural Gas",
+                  "Oil",
+                  "Biomass",
+                  "Wind",
+                  "Offshore Wind",
+                  "Airborne Wind",
+                  "Sun",
+                  "Hydro",
+                  "Geothermal"
+                ],
+                "description": "Bundled generator fuel; imports and storage discharge have no fuel provenance."
+              }
+            },
+            "required": ["id", "label", "metric", "deadlineMonth", "fuel"],
+            "additionalProperties": false,
+            "description": "Own no asset of the specified fuel, including paused and unfinished assets, at the deadline and every later month close. Requires completed-month observations."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+                "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+                "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+              },
+              "metric": {
+                "const": "monthlyBilledRate",
+                "description": "Billed customer revenue per delivered kWh each month, excluding grants and exports."
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Defaults to true. Set false for an optional goal that cannot end the run."
+              },
+              "fromMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "throughMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "maxDollarsPerKWh": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Billed dollars per delivered kWh; excludes grants and exports; number 0–100."
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "metric",
+              "fromMonth",
+              "throughMonth",
+              "maxDollarsPerKWh"
+            ],
+            "additionalProperties": false,
+            "description": "Billed customer revenue per delivered kWh each month, excluding grants and exports. Requires completed-month observations."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+                "description": "Stable author ID: 1–64 lowercase ASCII letters, digits or hyphens, starting and ending alphanumeric. Event, choice, objective, report and load IDs share one package namespace; options are scoped to their choice."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^(?![\\s\\S]*[\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069])(?![\\s\\S]*(?:<\\/?[a-zA-Z!][^>]*>|\\b[hH][tT][tT][pP][sS]?:\\/\\/|\\b[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:|\\b[dD][aA][tT][aA]:[^,\\s]*[,;]))[\\s\\S]*\\S[\\s\\S]*$",
+                "description": "Plain text; no HTML, URLs, control characters or expressions. Up to 100 UTF-16 code units."
+              },
+              "metric": {
+                "const": "monthEndDebt",
+                "description": "Outstanding loan principal each month, excluding interest."
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Defaults to true. Set false for an optional goal that cannot end the run."
+              },
+              "fromMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "throughMonth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200,
+                "description": "Playable month, starting at 1 and within the scenario term; integer 1–1200."
+              },
+              "maxDebtDollars": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000000,
+                "description": "Month-end loan principal limit in dollars; excludes interest; number 0–1000000000000."
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "metric",
+              "fromMonth",
+              "throughMonth",
+              "maxDebtDollars"
+            ],
+            "additionalProperties": false,
+            "description": "Outstanding loan principal each month, excluding interest. Requires completed-month observations."
+          }
+        ],
+        "description": "Choose a goal metric and an inclusive window or deadline within the term. Goals cannot trigger rewards or actions."
+      },
+      "minItems": 0,
+      "maxItems": 16,
+      "description": "Goals to meet. Omit to keep the base goals; a list replaces them, including an empty list for a survival-only run."
     },
     "debriefReports": {
       "type": "array",
@@ -6320,10 +5980,7 @@
     "title",
     "creator",
     "version",
-    "description",
-    "seed",
-    "baseScenarioId",
-    "objectives"
+    "description"
   ],
   "additionalProperties": false,
   "description": "Electrify scenario package, at most 256 KiB of UTF-8 JSON. Run mods:validate to check timing, references, combined effects, assets and byte limits."

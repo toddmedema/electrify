@@ -37,7 +37,7 @@ function createReachedGame() {
     description: "A target identity review.",
     seed: 42,
     baseScenarioId: 999,
-    objectives: { mode: "none" },
+    objectives: [],
     officialArcs: [],
     scenario: { durationMonths: 6, startingYear: 2020, cash: 1e9 },
     events: [
@@ -133,7 +133,7 @@ test("lawful construction before a same-opening conditional onset stays untarget
     description: "A target action ordering review.",
     seed: 42,
     baseScenarioId: 999,
-    objectives: { mode: "none" },
+    objectives: [],
     officialArcs: [],
     scenario: { durationMonths: 6, startingYear: 2020, cash: 1e9 },
     choices: [

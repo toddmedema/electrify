@@ -45,7 +45,7 @@ function setup(multiplier: number) {
       seed: 12345,
       baseScenarioId: 110,
       officialArcs: [],
-      objectives: { mode: "none" },
+      objectives: [],
       scenario: {
         durationMonths: 6,
         startingCustomers: 100000,

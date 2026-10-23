@@ -57,29 +57,24 @@ it("labels optional goals and explains their actual units without making them a 
     baseScenarioId: 999,
     officialArcs: [],
     scenario: { durationMonths: 6 },
-    objectives: {
-      mode: "replace",
-      items: [
-        {
-          id: "bills",
-          label: "Affordable practice",
-          metric: "monthlyBilledRate",
-          fromMonth: 1,
-          throughMonth: 2,
-          maxDollarsPerKWh: 0.123456789,
-          required: false,
-        },
-      ],
-    },
+    objectives: [
+      {
+        id: "bills",
+        label: "Affordable practice",
+        metric: "monthlyBilledRate",
+        fromMonth: 1,
+        throughMonth: 2,
+        maxDollarsPerKWh: 0.123456789,
+        required: false,
+      },
+    ],
   });
   render(<VictoryConditions scenario={scenario} difficulty="Manager" />);
   expect(screen.getByText("Optional: Affordable practice")).toBeInTheDocument();
   expect(
     screen.getByText(objectiveDefinition("monthlyBilledRate")),
   ).toBeInTheDocument();
-  expect(
-    screen.getByText(/Bills ≤\$0.123456789\/kWh in starting-year dollars/),
-  ).toBeInTheDocument();
+  expect(screen.getByText(/Bills ≤\$0.123456789\/kWh/)).toBeInTheDocument();
   expect(
     screen.getByText("Stretch goal; does not end or fail the run."),
   ).toBeInTheDocument();

@@ -41,7 +41,6 @@ const pack = (): ModPackage => ({
   description: "Grid metadata: plan a reliable grid.",
   seed: 42,
   baseScenarioId: 999,
-  objectives: { mode: "none" },
 });
 const event = (id = "dry-year"): RuleEvent => ({
   id,
@@ -374,7 +373,6 @@ test("objective intent explicitly inherits, adds, replaces or removes only scena
   const inherit = modScenario({
     ...pack(),
     baseScenarioId: 114,
-    objectives: { mode: "inherit" },
   });
   expect(inherit.mod!.rules.objectives.map((o) => o.id)).toContain(
     "base-114-reliability",
@@ -382,19 +380,17 @@ test("objective intent explicitly inherits, adds, replaces or removes only scena
   const add = modScenario({
     ...pack(),
     baseScenarioId: 114,
-    objectives: {
-      mode: "inherit",
-      add: [
-        {
-          id: "debt",
-          label: "Limit debt",
-          metric: "monthEndDebt",
-          fromMonth: 1,
-          throughMonth: 12,
-          maxDebtDollars: 1000,
-        },
-      ],
-    },
+    objectives: [
+      ...inheritedModObjectives(SCENARIOS.find((s) => s.id === 114)!),
+      {
+        id: "debt",
+        label: "Limit debt",
+        metric: "monthEndDebt",
+        fromMonth: 1,
+        throughMonth: 12,
+        maxDebtDollars: 1000,
+      },
+    ],
   });
   expect(add.mod!.rules.objectives).toHaveLength(
     inherit.mod!.rules.objectives.length + 1,
@@ -404,7 +400,7 @@ test("objective intent explicitly inherits, adds, replaces or removes only scena
     baseScenarioId: 114,
     officialArcs: [],
     scenario: { durationMonths: 6 },
-    objectives: { mode: "none" },
+    objectives: [],
   });
   expect(none.reliabilityObjective).toBeUndefined();
   expect(none.minimumCustomerRetention).toBeUndefined();
@@ -414,19 +410,16 @@ test("objective intent explicitly inherits, adds, replaces or removes only scena
     baseScenarioId: 114,
     officialArcs: [],
     scenario: { durationMonths: 6 },
-    objectives: {
-      mode: "replace",
-      items: [
-        {
-          id: "bills",
-          label: "Limit bills",
-          metric: "monthlyBilledRate",
-          fromMonth: 1,
-          throughMonth: 6,
-          maxDollarsPerKWh: 0.1,
-        },
-      ],
-    },
+    objectives: [
+      {
+        id: "bills",
+        label: "Limit bills",
+        metric: "monthlyBilledRate",
+        fromMonth: 1,
+        throughMonth: 6,
+        maxDollarsPerKWh: 0.1,
+      },
+    ],
   });
   expect(replace.mod!.rules.objectives.map((o) => o.id)).toEqual(["bills"]);
 });

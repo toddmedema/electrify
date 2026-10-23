@@ -67,7 +67,7 @@ const pack = (
   seed: 12345,
   baseScenarioId: arc,
   officialArcs: [{ scenarioId: arc, includeChoices }],
-  objectives: { mode: "none" },
+  objectives: [],
   scenario: { cash: 1e12 },
   ...override,
 });

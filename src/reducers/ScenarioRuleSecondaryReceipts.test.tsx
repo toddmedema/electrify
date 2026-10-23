@@ -45,7 +45,7 @@ const input: ModPackage = {
   description: "Real event endings and report observations.",
   seed: 42,
   baseScenarioId: 999,
-  objectives: { mode: "none" },
+  objectives: [],
   officialArcs: [],
   scenario: {
     durationMonths: 6,

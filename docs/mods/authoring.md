@@ -7,8 +7,8 @@ exported `scenario.schema.json` for offline editor validation and autocomplete.
 You can also copy a [complete scenario example](examples/README.md).
 
 Set your own `id`, `title`, `creator`, `version` and `description`. Keep
-`schemaVersion: 1` and `gameApi: 1`. Choose a `baseScenarioId` for the starting grid,
-then edit its setup, events, choices and goals using the [format reference](../mods.md).
+`schemaVersion: 1` and `gameApi: 1`. Set your starting conditions in `scenario`,
+then add events, choices and goals using the [format reference](../mods.md).
 
 ## Executable recipes
 
@@ -32,12 +32,12 @@ When adapting a recipe:
   multiply, including static and timed cost modifiers. See the
   [units and bounds](../mods.md#units-and-numeric-bounds).
 - A choice resolves before its due month runs. Every choice needs a free option;
-  each option declares exactly one `costDollars` or `grantDollars`.
+  omit payment fields for a free option, or use `costDollars` / `grantDollars`.
 - Use `requiresChoice` to enable an event for named options. Add `arc` when
   referring to an imported choice. Replace or cancel a load before it starts;
   `with: []` cancels it.
 - Match goal and report windows to the event. Monthly reliability goals must pass
-  in every month of their window. The [goal reference](../mods.md#goals-are-explicit)
+  in every month of their window. The [goal reference](../mods.md#goals)
   explains each metric.
 - Transmission caps affect an operating connection; they do not build a line or
   grant access to imports.
@@ -59,6 +59,20 @@ Import the file and open **Author report** to inspect the same details in the ga
 The report includes surprise events that player previews and Workshop Rules hide.
 Use the validator even if your editor accepts the file: it also checks references,
 timing, combined effects, starting assets and byte limits.
+
+## Keep player text brief
+
+Lead with the change or choice: “Hydro inflow is down to 50%.” Write “dollars,”
+not “starting-year dollars.” Use dates instead of asking players to count months:
+`{{start+12 months}}` refers to the scenario start; `{{event+3 months}}` refers to
+an event opening (or a choice's decision date). `{{event}}` gives that date itself.
+See [date substitutions](../mods.md#dates-in-player-text) for scope and examples.
+
+Omit fields that use defaults: `baseScenarioId`, `seed`, `officialArcs`,
+`objectives`, `visibility`, `includeChoices`, `preview`, and free-option payment
+fields. See the [format reference](../mods.md#package-contract) for their defaults.
+Use a plain `objectives` list only when changing the goals. An empty list clears
+base goals; omission keeps them.
 
 ## Try each branch
 

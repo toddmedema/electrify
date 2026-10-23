@@ -1,3 +1,5 @@
+import { inheritedModObjectives } from "../mods/ModScenario";
+import { getScenario } from "../data/Scenarios";
 import cloneDeep from "lodash.clonedeep";
 import type { RuleObjective } from "../data/ScenarioRules";
 import { GENERATORS } from "../data/Facilities";
@@ -46,7 +48,7 @@ const pack = (items: RuleObjective[] = []): ModPackage => ({
     startingCustomers: 10000,
     dollarsPerkWh: 0.2,
   },
-  objectives: { mode: "replace", items },
+  objectives: items,
 });
 const window = { fromMonth: 1, throughMonth: 6 };
 const goals: RuleObjective[] = [
@@ -220,7 +222,7 @@ test("a required billed-rate miss terminates at its first irrevocable completed 
 });
 
 test("none succeeds at the final month while ordinary insolvency still fails", () => {
-  const input = { ...pack(), objectives: { mode: "none" as const } };
+  const input = { ...pack(), objectives: [] };
   const result = runSimulation({
     scenarioId: 999,
     scenario: modScenario(input, undefined, "Employee"),
@@ -436,16 +438,19 @@ test("save validation rejects a consistent progress chain omitting a known retai
   ).toBeNull();
 });
 
-test("inherit/add/replace use common results without retaining replaced official requirements", () => {
+test("omitted and replaced goals use common results without retaining replaced official requirements", () => {
   const input = pack();
   input.baseScenarioId = 100;
   input.scenario = { ...input.scenario, durationMonths: 144 };
   const observe = (objectives: ModPackage["objectives"]) => {
-    const state = game({ ...input, objectives });
+    const runPack = { ...input };
+    if (objectives === undefined) delete runPack.objectives;
+    else runPack.objectives = objectives;
+    const state = game(runPack);
     runMonths(state, 1);
     return { state, results: gameObjectiveResults(state) };
   };
-  const inherited = observe({ mode: "inherit" });
+  const inherited = observe(undefined);
   expect(inherited.results).toEqual([
     expect.objectContaining({
       id: "base-100-retention",
@@ -461,7 +466,7 @@ test("inherit/add/replace use common results without retaining replaced official
     throughMonth: 1,
     maxDollarsPerKWh: 0,
   };
-  const added = observe({ mode: "inherit", add: [bills] });
+  const added = observe([...inheritedModObjectives(getScenario(100)!), bills]);
   expect(added.results).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
@@ -480,10 +485,7 @@ test("inherit/add/replace use common results without retaining replaced official
       false,
     )?.title,
   ).toBe("Mission objective missed");
-  const replaced = observe({
-    mode: "replace",
-    items: [{ ...bills, maxDollarsPerKWh: 1 }],
-  });
+  const replaced = observe([{ ...bills, maxDollarsPerKWh: 1 }]);
   expect(replaced.results).toEqual([
     expect.objectContaining({ id: "bill-limit", status: "completed" }),
   ]);

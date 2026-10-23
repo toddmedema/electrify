@@ -158,7 +158,7 @@ describe("canonical rule identities", () => {
       description: "A grid planning challenge.",
       seed: 42,
       baseScenarioId: 999,
-      objectives: { mode: "none" },
+      objectives: [],
     };
     expect(packageDigest({ ...pack, $schema: "./scenario.schema.json" })).toBe(
       packageDigest(pack),

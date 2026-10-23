@@ -29,11 +29,21 @@ test("only the arc-import example depends on official scenario rules", () => {
       )
       .map(({ pack }) => pack.id),
   ).toEqual(["funded-or-phased-connection"]);
+  expect(
+    examples
+      .filter(({ pack }) => pack.seed !== undefined)
+      .map(({ pack }) => pack.id),
+  ).toEqual(["funded-or-phased-connection"]);
   for (const { pack, rules } of examples.filter(
     ({ pack }) => pack.id !== "funded-or-phased-connection",
   )) {
-    expect(pack.officialArcs).toEqual([]);
-    expect(pack.objectives.mode).toBe("replace");
+    expect(pack.baseScenarioId).toBeUndefined();
+    expect(pack.scenario?.location).toBeDefined();
+    expect(
+      rules.startingAssetIds.some((id) => id.startsWith("scenario-")),
+    ).toBe(false);
+    expect(pack.scenario?.startingFleet?.length).toBeGreaterThan(0);
+    expect(Array.isArray(pack.objectives)).toBe(true);
     expect(rules.objectives.length).toBeGreaterThan(0);
   }
 });

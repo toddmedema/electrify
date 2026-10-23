@@ -87,14 +87,11 @@ export function maximumRulePackage(): ModPackage {
         costDollars: 0,
       })),
     })),
-    objectives: {
-      mode: "replace",
-      items: Array.from({ length: RULE_LIMITS.objectives }, (_, index) => ({
-        ...kinds[index % kinds.length],
-        id: `objective-${index}`,
-        label: `Benchmark objective ${index}`,
-        required: false,
-      })) as RuleObjective[],
-    },
+    objectives: Array.from({ length: RULE_LIMITS.objectives }, (_, index) => ({
+      ...kinds[index % kinds.length],
+      id: `objective-${index}`,
+      label: `Benchmark objective ${index}`,
+      required: false,
+    })) as RuleObjective[],
   };
 }

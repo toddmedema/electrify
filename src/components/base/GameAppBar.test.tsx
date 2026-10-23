@@ -85,7 +85,6 @@ describe("GameAppBar", () => {
       description: "A modded grid for testing its unranked label.",
       seed: 42,
       baseScenarioId: 999,
-      objectives: { mode: "inherit" },
     });
     const game = createGame({ scenarioId: 999, scenario });
     const { unmount } = renderAppBar();

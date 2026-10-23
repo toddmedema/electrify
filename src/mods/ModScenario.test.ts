@@ -30,7 +30,7 @@ const fixture = (): ModPackage => ({
   seed: 42,
   baseScenarioId: 999,
   description: "Plan a reliable community grid.",
-  objectives: { mode: "inherit" },
+
   facilities: {
     Solar: { buildCost: 0.5 },
     Battery: { annualOperatingCost: 2 },

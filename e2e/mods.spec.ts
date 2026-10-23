@@ -33,7 +33,7 @@ const pack = (patch: Partial<InstalledMod["pack"]>) => ({
   creator: "Community author",
   version: "1.0.0",
   description: "A community grid with its own planning decisions.",
-  objectives: { mode: "inherit" as const },
+
   seed: 42,
   baseScenarioId: 999,
   ...patch,
@@ -789,7 +789,7 @@ for (const theme of ["light", "dark"] as const) {
         id: "choice-grid",
         title: "Choice Grid",
         officialArcs: [],
-        objectives: { mode: "none" },
+        objectives: [],
         scenario: {
           durationMonths: 6,
           cash: 1000000000,
@@ -1033,28 +1033,25 @@ for (const theme of ["light", "dark"] as const) {
             startingCustomers: 10000,
             dollarsPerkWh: 0.2,
           },
-          objectives: {
-            mode: "replace",
-            items: [
-              {
-                id: "supply",
-                label: "Keep demand supplied",
-                metric: "monthlyReliability",
-                fromMonth: 1,
-                throughMonth: 2,
-                minDemandServedShare: 0,
-              },
-              {
-                id: "bills",
-                label: "Keep bills affordable",
-                metric: "monthlyBilledRate",
-                fromMonth: 1,
-                throughMonth: 2,
-                maxDollarsPerKWh: 0,
-                required: requiredBills,
-              },
-            ],
-          },
+          objectives: [
+            {
+              id: "supply",
+              label: "Keep demand supplied",
+              metric: "monthlyReliability",
+              fromMonth: 1,
+              throughMonth: 2,
+              minDemandServedShare: 0,
+            },
+            {
+              id: "bills",
+              label: "Keep bills affordable",
+              metric: "monthlyBilledRate",
+              fromMonth: 1,
+              throughMonth: 2,
+              maxDollarsPerKWh: 0,
+              required: requiredBills,
+            },
+          ],
         }),
       };
       await mockDesktop(page, false, theme, [entry]);
@@ -1074,10 +1071,10 @@ for (const theme of ["light", "dark"] as const) {
         rules.getByText("Keep bills affordable", { exact: true }),
       ).toBeVisible();
       await expect(rules).toContainText(
-        "Billed customer revenue per delivered kWh each month, excluding grants and exports, in starting-year dollars.",
+        "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
       );
       await expect(rules).toContainText(
-        "Bills ≤$0/kWh in starting-year dollars each month · Jan–Feb 2020",
+        "Bills ≤$0/kWh each month · Jan–Feb 2020",
       );
       await expect(
         rules.getByText("0/2 months completed", { exact: true }),
@@ -1145,7 +1142,7 @@ for (const theme of ["light", "dark"] as const) {
         `Keep bills affordable · ${requiredBills ? "Required" : "Optional"} · Failed`,
       );
       await expect(evidence).toContainText(
-        "Billed customer revenue per delivered kWh each month, excluding grants and exports, in starting-year dollars.",
+        "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
       );
       await expect(evidence).toContainText("Months 1–2");
       await expect(evidence).toContainText(
@@ -1545,19 +1542,16 @@ for (const theme of ["light", "dark"] as const) {
           cash: 1e9,
         },
         facilities: { Solar: { buildCost: 0.8 } },
-        objectives: {
-          mode: "replace",
-          items: [
-            {
-              id: "serve-demand",
-              label: "Keep your grid reliable",
-              metric: "monthlyReliability",
-              fromMonth: 1,
-              throughMonth: 6,
-              minDemandServedShare: 0.9,
-            },
-          ],
-        },
+        objectives: [
+          {
+            id: "serve-demand",
+            label: "Keep your grid reliable",
+            metric: "monthlyReliability",
+            fromMonth: 1,
+            throughMonth: 6,
+            minDemandServedShare: 0.9,
+          },
+        ],
         choices: [
           {
             id: "connection",
@@ -1891,7 +1885,7 @@ for (const theme of ["light", "dark"] as const) {
         name: "Inherited objectives: replace-ready JSON",
         exact: true,
       }),
-    ).toBeEnabled();
+    ).toHaveCount(0);
     await expect(
       report.getByRole("button", {
         name: "Difficulty validation",
@@ -1945,6 +1939,8 @@ for (const theme of ["light", "dark"] as const) {
         ),
       ),
     );
+    const startingYear = theme === "dark" ? 2030 : 2020;
+    maintenance.scenario = { ...maintenance.scenario, startingYear };
     await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
     await mockDesktop(page, false, theme, [
       {
@@ -1956,6 +1952,34 @@ for (const theme of ["light", "dark"] as const) {
     ]);
     await page.goto("/");
     await page.getByRole("button", { name: "Mods", exact: true }).click();
+    const play = page.getByRole("button", {
+      name: `Play ${maintenance.title}`,
+      exact: true,
+    });
+    await expect(play).toBeEnabled({ timeout: 60000 });
+    await play.click();
+    const details = page.getByRole("dialog", {
+      name: `Play ${maintenance.title}`,
+      exact: true,
+    });
+    const announced = details.getByRole("region", {
+      name: "Announced timeline",
+    });
+    await expect(announced).toContainText(
+      `The original gas peaker will be offline from January ${startingYear + 1} until April ${startingYear + 1}.`,
+    );
+    await expect(announced).toContainText(
+      `The original gas peaker will be offline from January ${startingYear + 1} until July ${startingYear + 1}.`,
+    );
+    await expect(details).not.toContainText("{{");
+    await expect(details).not.toContainText("starting-year dollars");
+    await scrollEvidenceIntoView(announced);
+    await screenshot(
+      page,
+      `mod-date-preview-${page.viewportSize()!.width}-${theme}.png`,
+    );
+    await details.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(details).toBeHidden();
     await page
       .getByRole("button", {
         name: `Author validation report for ${maintenance.title}`,
@@ -1976,8 +2000,8 @@ for (const theme of ["light", "dark"] as const) {
     await expect(targets.locator("dt")).toHaveCount(2);
     await expect(targets).toContainText("Months 13–15");
     await expect(targets).toContainText("Months 13–18");
-    await expect(targets).toContainText("Accelerate the overhaul");
-    await expect(targets).toContainText("Accept standard-schedule support");
+    await expect(targets).toContainText("Shorten the outage");
+    await expect(targets).toContainText("Take funding");
     await expect(targets).toContainText("0% output");
     await report
       .getByRole("button", { name: "Combined effects by month", exact: true })

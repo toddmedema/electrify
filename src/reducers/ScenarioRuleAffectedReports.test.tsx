@@ -17,7 +17,7 @@ const input: ModPackage = {
   seed: 42,
   baseScenarioId: 999,
   officialArcs: [],
-  objectives: { mode: "none" },
+  objectives: [],
   scenario: { durationMonths: 6, cash: 1e9 },
   debriefReports: [
     {

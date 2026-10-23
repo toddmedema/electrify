@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import type { ScenarioType } from "../../Types";
-import type { ModDiagnostic, ModPackage } from "../../mods/ModSchema";
+import type { ModDiagnostic } from "../../mods/ModSchema";
 import {
   modPlayerFacts,
   type ModFactSection,
@@ -191,7 +191,7 @@ export default function ModDetails({
   diagnostics,
 }: {
   scenario: ScenarioType;
-  objectiveIntent?: ModPackage["objectives"]["mode"];
+  objectiveIntent?: "inherit" | "replace" | "none";
   diagnostics?: ModDiagnostic[];
 }) {
   const facts = useMemo(

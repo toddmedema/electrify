@@ -27,7 +27,7 @@ const input: ModPackage = {
   seed: 12345,
   baseScenarioId: 111,
   officialArcs: [{ scenarioId: 111, includeChoices: true }],
-  objectives: { mode: "inherit" },
+
   scenario: { cash: 1e9 },
 };
 
@@ -123,7 +123,7 @@ test("all fourteen current arc snapshots validate through ordinary compilation",
         scenarioId,
         includeChoices: true,
       })),
-      objectives: { mode: "none" },
+      objectives: [],
       scenario: { startingYear: 2050, durationMonths: 240 },
     });
     expect(validScenarioMod(scenario.mod, scenario)).toBe(true);

@@ -207,18 +207,15 @@ test("public author commands emit clean JSON and execute explicit responses thro
     seed: 2468,
     baseScenarioId: 999,
     officialArcs: [],
-    objectives: {
-      mode: "replace",
-      items: [
-        {
-          id: "retire-coal",
-          label: "Retire coal",
-          metric: "fuelRetirement",
-          fuel: "Coal",
-          deadlineMonth: 6,
-        },
-      ],
-    },
+    objectives: [
+      {
+        id: "retire-coal",
+        label: "Retire coal",
+        metric: "fuelRetirement",
+        fuel: "Coal",
+        deadlineMonth: 6,
+      },
+    ],
     scenario: {
       durationMonths: 6,
       startingYear: 2020,

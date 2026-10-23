@@ -1,3 +1,7 @@
+const {
+  scenarioTextError,
+  scenarioTextLength,
+} = require("../helpers/ScenarioText");
 /* Package-only parsing; Electron main must never import the TypeScript catalog. */
 const {
   ruleDiagnostics,
@@ -46,6 +50,8 @@ const SCENARIO_OVERRIDE_KEYS = [
   "ownership",
   "endTitle",
   "endMessage",
+  "location",
+  "startingFleet",
 ];
 const COMPUTED_KEYS = [
   "runtimeVersion",
@@ -102,8 +108,20 @@ function modDiagnostics(p) {
       add("invalid-text", path, "must be non-empty text.");
       return;
     }
-    if (v.length > max)
-      add("text-limit", path, `must be at most ${max} characters.`);
+    const templateError =
+      v.includes("{{") &&
+      !["description", "scenario.endTitle", "scenario.endMessage"].includes(
+        path,
+      )
+        ? "date templates belong in descriptions and closing messages, not metadata."
+        : scenarioTextError(v);
+    if (templateError) add("date-template", path, templateError);
+    if (scenarioTextLength(v, false) > max)
+      add(
+        "text-limit",
+        path,
+        `must be at most ${max} characters after date substitution.`,
+      );
     if (UNSAFE_TEXT.test(v) || UNSAFE_MARKUP.test(v))
       add(
         "unsafe-text",
@@ -150,7 +168,7 @@ function modDiagnostics(p) {
   text(p.creator, "creator", 100);
   text(p.version, "version", 40);
   text(p.description, "description", 2000);
-  number(p.seed, "seed", 0, 4294967295, true);
+  if (p.seed !== undefined) number(p.seed, "seed", 0, 4294967295, true);
   if (
     p.$schema !== undefined &&
     (typeof p.$schema !== "string" ||
@@ -162,7 +180,11 @@ function modDiagnostics(p) {
       "$schema",
       "must be an editor schema string of at most 2048 safe characters.",
     );
-  if (p.baseScenarioId !== 999 && !MOD_SCENARIO_IDS.includes(p.baseScenarioId))
+  if (
+    p.baseScenarioId !== undefined &&
+    p.baseScenarioId !== 999 &&
+    !MOD_SCENARIO_IDS.includes(p.baseScenarioId)
+  )
     add(
       "unknown-base",
       "baseScenarioId",
@@ -198,6 +220,143 @@ function modDiagnostics(p) {
         text(p.scenario[key], `scenario.${key}`, 500);
   }
   if (
+    p.scenario?.location !== undefined &&
+    object(p.scenario.location, "scenario.location", [
+      "id",
+      "name",
+      "lat",
+      "long",
+      "admin",
+      "timeZone",
+      "region",
+      "country",
+      "elevation",
+      "watershedId",
+      "watershedName",
+      "offshore",
+      "resources",
+    ])
+  ) {
+    const l = p.scenario.location;
+    if (typeof l.id !== "string" || !/^[A-Za-z0-9_-]{1,32}$/.test(l.id))
+      add("invalid-id", "scenario.location.id", "must be a safe location ID.");
+    text(l.name, "scenario.location.name", 100);
+    number(l.lat, "scenario.location.lat", -90, 90);
+    number(l.long, "scenario.location.long", -180, 180);
+    for (const key of [
+      "admin",
+      "timeZone",
+      "region",
+      "country",
+      "watershedName",
+    ])
+      if (l[key] !== undefined) text(l[key], `scenario.location.${key}`, 100);
+    if (l.timeZone !== undefined) {
+      try {
+        new Intl.DateTimeFormat("en", { timeZone: l.timeZone });
+      } catch (_) {
+        add(
+          "invalid-zone",
+          "scenario.location.timeZone",
+          "must be an IANA time zone.",
+        );
+      }
+    }
+    if (l.elevation !== undefined)
+      number(l.elevation, "scenario.location.elevation", -500, 10000);
+    if (
+      l.watershedId !== undefined &&
+      (typeof l.watershedId !== "string" ||
+        !/^[A-Za-z0-9_-]{1,32}$/.test(l.watershedId))
+    )
+      add(
+        "invalid-id",
+        "scenario.location.watershedId",
+        "must be a safe location ID.",
+      );
+    if (l.offshore !== undefined && typeof l.offshore !== "boolean")
+      add(
+        "invalid-value",
+        "scenario.location.offshore",
+        "must be true or false.",
+      );
+    if (
+      l.resources !== undefined &&
+      object(l.resources, "scenario.location.resources", [
+        "hydro",
+        "geothermal",
+      ])
+    )
+      for (const [key, value] of Object.entries(l.resources))
+        if (typeof value !== "boolean")
+          add(
+            "invalid-value",
+            `scenario.location.resources.${key}`,
+            "must be true or false.",
+          );
+  }
+  if (p.scenario?.startingFleet !== undefined) {
+    const fleet = p.scenario.startingFleet;
+    if (!Array.isArray(fleet) || fleet.length > 100)
+      add(
+        "invalid-list",
+        "scenario.startingFleet",
+        "must be a list of at most 100 facilities.",
+      );
+    else {
+      const ids = new Set();
+      fleet.forEach((asset, i) => {
+        const path = `scenario.startingFleet[${i}]`;
+        if (
+          !object(asset, path, [
+            "id",
+            "name",
+            "peakMW",
+            "peakMWh",
+            "ageYears",
+            "hydroSiteId",
+            "reservoirFraction",
+          ])
+        )
+          return;
+        const id = asset.id ?? `starting-${i + 1}`;
+        if (typeof id !== "string" || !ID_PATTERN.test(id))
+          add("invalid-id", `${path}.id`, "must be a lowercase asset ID.");
+        if (ids.has(id)) add("duplicate-id", `${path}.id`, "must be unique.");
+        ids.add(id);
+        if (!FACILITY_NAMES.includes(asset.name))
+          add(
+            "invalid-value",
+            `${path}.name`,
+            "must name a buildable facility.",
+          );
+        const storage = ["Battery", "Pumped Hydro"].includes(asset.name);
+        if (asset.peakMW !== undefined || !storage)
+          number(asset.peakMW, `${path}.peakMW`, 0.001, 100000);
+        if (asset.peakMWh !== undefined || storage)
+          number(asset.peakMWh, `${path}.peakMWh`, 0.001, 1000000);
+        if (!storage && asset.peakMWh !== undefined)
+          add("invalid-value", `${path}.peakMWh`, "is only used for storage.");
+        if (asset.ageYears !== undefined)
+          number(asset.ageYears, `${path}.ageYears`, 0, 200);
+        if (asset.reservoirFraction !== undefined)
+          number(asset.reservoirFraction, `${path}.reservoirFraction`, 0, 1);
+        if (asset.hydroSiteId !== undefined)
+          text(asset.hydroSiteId, `${path}.hydroSiteId`, 64);
+        if (
+          asset.name !== "Hydro" &&
+          (asset.hydroSiteId !== undefined ||
+            asset.reservoirFraction !== undefined)
+        )
+          add(
+            "invalid-value",
+            path,
+            "only Hydro uses a site or reservoir level.",
+          );
+      });
+    }
+  }
+  if (
     p.facilities !== undefined &&
     object(p.facilities, "facilities", FACILITY_NAMES)
   )
@@ -209,37 +368,9 @@ function modDiagnostics(p) {
   if (p.programs !== undefined && object(p.programs, "programs", PROGRAM_KEYS))
     for (const [key, n] of Object.entries(p.programs))
       if (PROGRAM_KEYS.includes(key)) number(n, `programs.${key}`, 0.1, 10);
-  let objectives = [];
-  if (
-    object(p.objectives, "objectives", [
-      "mode",
-      ...(p.objectives?.mode === "inherit"
-        ? ["add"]
-        : p.objectives?.mode === "replace"
-          ? ["items"]
-          : []),
-    ])
-  ) {
-    if (!["inherit", "replace", "none"].includes(p.objectives.mode))
-      add(
-        "objective-intent",
-        "objectives.mode",
-        "must explicitly be inherit, replace or none.",
-      );
-    if (p.objectives.mode === "replace" || p.objectives.add !== undefined) {
-      objectives =
-        p.objectives.mode === "replace" ? p.objectives.items : p.objectives.add;
-      if (!Array.isArray(objectives)) {
-        add(
-          "invalid-list",
-          `objectives.${p.objectives.mode === "replace" ? "items" : "add"}`,
-          "must be a list.",
-        );
-        objectives = [];
-      }
-    }
-  }
-  const definitions = { objectives };
+  const definitions = {
+    objectives: p.objectives === undefined ? [] : p.objectives,
+  };
   for (const key of ["events", "choices", "debriefReports", "officialArcs"])
     if (p[key] !== undefined) definitions[key] = p[key];
   diagnostics.push(...ruleDiagnostics(definitions));

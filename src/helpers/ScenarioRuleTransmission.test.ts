@@ -49,7 +49,7 @@ const pack = (events = [event()]): ModPackage => ({
   seed: 42,
   baseScenarioId: 111,
   officialArcs: [],
-  objectives: { mode: "none" },
+  objectives: [],
   scenario: { durationMonths: 6, cash: 1e9 },
   events,
 });

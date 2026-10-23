@@ -1,3 +1,4 @@
+import { renderScenarioText } from "../helpers/ScenarioText";
 import {
   ModPackage,
   ModDiagnostic,
@@ -107,26 +108,49 @@ export function inheritedModObjectives(
 }
 function resolveModSetup(input: unknown) {
   const pack = validateMod(input);
+  const baseScenarioId = pack.baseScenarioId ?? CUSTOM_SCENARIO_ID;
+  const seed = pack.seed ?? 0;
   const base =
-    pack.baseScenarioId === 999
+    baseScenarioId === 999
       ? DEFAULT_CUSTOM_SCENARIO
-      : SCENARIOS.find(
-          (s) => s.id === pack.baseScenarioId && !s.tutorialSteps,
-        )!;
-  const overrides = pack.scenario ?? {},
-    startingYear = overrides.startingYear ?? base.startingYear;
+      : SCENARIOS.find((s) => s.id === baseScenarioId && !s.tutorialSteps)!;
+  const { startingFleet, ...overrides } = pack.scenario ?? {};
+  const startingYear = overrides.startingYear ?? base.startingYear;
   const arcs =
-    pack.officialArcs ??
-    (pack.baseScenarioId === 999
+    pack.officialArcs?.map((arc) => ({
+      ...arc,
+      includeChoices: arc.includeChoices ?? true,
+    })) ??
+    (baseScenarioId === 999
       ? []
-      : [{ scenarioId: pack.baseScenarioId, includeChoices: true }]);
+      : [{ scenarioId: baseScenarioId, includeChoices: true }]);
   const scenario: ScenarioType = {
     ...JSON.parse(JSON.stringify(base)),
     ...overrides,
     id: CUSTOM_SCENARIO_ID,
-    name: pack.title,
-    seed: pack.seed,
+    name: renderScenarioText(pack.title, startingYear),
+    seed,
     startingYear,
+    ...(overrides.location ? { locationId: overrides.location.id } : {}),
+    ...(startingFleet
+      ? {
+          facilities: startingFleet.map((asset, index) => ({
+            assetId: asset.id ?? `starting-${index + 1}`,
+            name: asset.name,
+            ...(asset.peakMW === undefined
+              ? {}
+              : { peakW: asset.peakMW * 1e6 }),
+            ...(asset.peakMWh === undefined
+              ? {}
+              : { peakWh: asset.peakMWh * 1e6 }),
+            initialAgeYears: asset.ageYears ?? 0,
+            ...(asset.hydroSiteId ? { hydroSiteId: asset.hydroSiteId } : {}),
+            ...(asset.reservoirFraction === undefined
+              ? {}
+              : { initialReservoirFraction: asset.reservoirFraction }),
+          })),
+        }
+      : {}),
     eventScenarioIds: arcs.map((a) => a.scenarioId).sort((a, b) => a - b),
     cash:
       overrides.cash ?? inEraMoney(base.cash, startingYear, base.startingYear),
@@ -134,10 +158,14 @@ function resolveModSetup(input: unknown) {
       overrides.feePerKgCO2e ??
       inEraMoney(base.feePerKgCO2e, startingYear, base.startingYear),
   };
+  if (scenario.endTitle)
+    scenario.endTitle = renderScenarioText(scenario.endTitle, startingYear);
+  if (scenario.endMessage)
+    scenario.endMessage = renderScenarioText(scenario.endMessage, startingYear);
   delete scenario.rules;
   if (base.startingInterties?.length) {
     scenario.startingIntertieAccess = frozenWildfireStartingIntertieAccess();
-    if (!validFrozenStartingIntertieScenario(scenario, pack.baseScenarioId))
+    if (!validFrozenStartingIntertieScenario(scenario, baseScenarioId))
       throw new Error(
         "The inherited northern intertie requires the original Los Angeles location and enabled interties.",
       );
@@ -154,7 +182,7 @@ function resolveModSetup(input: unknown) {
     durationMonths,
     dollarsPerkWh:
       overrides.dollarsPerkWh ??
-      (pack.baseScenarioId === 999
+      (baseScenarioId === 999
         ? prepared.dollarsPerkWh
         : inEraRate(base.dollarsPerkWh, startingYear, base.startingYear)),
     loadAdditions: [
@@ -171,7 +199,7 @@ function resolveModSetup(input: unknown) {
       ...(prepared.loadAdditions ?? []),
     ],
   };
-  if (pack.objectives.mode !== "inherit") {
+  if (pack.objectives !== undefined) {
     delete resolved.reliabilityObjective;
     delete resolved.minimumCustomerRetention;
   } else if (base.reliabilityObjective)
@@ -179,7 +207,16 @@ function resolveModSetup(input: unknown) {
       ...base.reliabilityObjective,
       year: base.reliabilityObjective.year + startingYear - base.startingYear,
     };
-  return { pack, base, arcs, startingYear, durationMonths, resolved };
+  return {
+    pack,
+    base,
+    baseScenarioId,
+    seed,
+    arcs,
+    startingYear,
+    durationMonths,
+    resolved,
+  };
 }
 
 /** Preparation uses precisely the same resolved baseline as compilation. */
@@ -193,13 +230,21 @@ function resolveMod(
   difficulty: DifficultyType,
   startingPeakW: number,
 ): ResolvedMod {
-  const { pack, base, arcs, startingYear, durationMonths, resolved } =
-    resolveModSetup(input);
+  const {
+    pack,
+    base,
+    baseScenarioId,
+    seed,
+    arcs,
+    startingYear,
+    durationMonths,
+    resolved,
+  } = resolveModSetup(input);
   const startingPeaks = Object.fromEntries(
     DIFFICULTY_IDS.map((atDifficulty) => [
       atDifficulty,
       startingPeakW ||
-        resolvedScenarioStartingPeak(resolved, atDifficulty, pack.seed) ||
+        resolvedScenarioStartingPeak(resolved, atDifficulty, seed) ||
         0,
     ]),
   ) as Record<DifficultyType, number>;
@@ -214,20 +259,12 @@ function resolveMod(
   if (cached)
     return detached({ ...cached, scenario: cached.scenarios[difficulty]! });
   const inherited =
-    pack.objectives.mode === "inherit"
+    pack.objectives === undefined
       ? inheritedModObjectives(base, startingYear)
       : [];
   const definitions: ScenarioRuleDefinitions = {
     officialArcs: arcs,
-    objectives:
-      pack.objectives.mode === "replace"
-        ? pack.objectives.items
-        : [
-            ...inherited,
-            ...(pack.objectives.mode === "inherit"
-              ? (pack.objectives.add ?? [])
-              : []),
-          ],
+    objectives: pack.objectives ?? inherited,
     ...(pack.events ? { events: pack.events } : {}),
     ...(pack.choices ? { choices: pack.choices } : {}),
     ...(pack.debriefReports ? { debriefReports: pack.debriefReports } : {}),
@@ -235,7 +272,7 @@ function resolveMod(
   const diagnostics: ModDiagnostic[] = [],
     params = {
       namespace: { kind: "mod" as const, id: pack.id },
-      seed: pack.seed,
+      seed,
       startingYear,
       durationMonths,
       startingPeakW,
@@ -324,18 +361,18 @@ function resolveMod(
     modRuntimeId: compatibilityManifest.modRuntimeId,
     source: {
       id: pack.id,
-      title: pack.title,
+      title: resolved.name,
       creator: pack.creator,
       version: pack.version,
-      description: pack.description,
-      objectiveMode: pack.objectives.mode,
+      description: renderScenarioText(pack.description, startingYear),
+      objectiveMode: pack.objectives === undefined ? "inherit" : "replace",
       ...(workshopId ? { workshopId } : {}),
     },
     parameters: {
-      baseScenarioId: pack.baseScenarioId,
+      baseScenarioId,
       startingYear,
       durationMonths,
-      seed: pack.seed,
+      seed,
       difficulty,
       startingCustomers: resolved.startingCustomers!,
       startingDemandScale: resolved.startingDemandScale ?? 1,
@@ -360,11 +397,7 @@ function resolveMod(
     };
   }
   diagnostics.push(
-    ...resolvedScenarioDiagnostics(
-      resolved,
-      pack.baseScenarioId,
-      DIFFICULTY_IDS,
-    ),
+    ...resolvedScenarioDiagnostics(resolved, baseScenarioId, DIFFICULTY_IDS),
   );
   if (utf8Bytes(JSON.stringify(resolved)).length > RULE_LIMITS.compiledBytes)
     diagnostics.push({

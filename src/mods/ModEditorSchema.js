@@ -270,17 +270,12 @@ const effects = () => {
       10,
       "Hydro inflow factor; zero is meaningful, and composed positive factors must stay 0.1–10",
     ],
-    [
-      "operatingExpenseDollarsPerMonth",
-      0,
-      1e12,
-      "Dollars per active month in the resolved starting year's price level",
-    ],
+    ["operatingExpenseDollarsPerMonth", 0, 1e12, "Dollars per active month"],
     [
       "carbonFeeDollarsPerTonneCO2e",
       0,
       100000,
-      "Absolute dollars/tonne CO₂e in starting-year dollars; overlapping co-reachable overrides are rejected",
+      "Absolute dollars/tonne CO₂e; overlapping co-reachable overrides are rejected",
     ],
   ])
     props[key] = magnitude(min, max, unit);
@@ -356,10 +351,7 @@ const event = () => ({
         ["forecast", "surprise"],
         "Forecast is default. Surprise events stay out of player previews and Workshop Rules; author reports include them.",
       ),
-      preview: text(
-        200,
-        "Future-tense preview required for announced mechanical events/loads.",
-      ),
+      preview: text(200, "Optional preview; defaults to the event message."),
       endMessage: text(500),
       requiresChoice: condition(),
       effects: effects(),
@@ -371,25 +363,6 @@ const event = () => ({
   ),
   allOf: [
     { if: { required: ["effects"] }, then: { required: ["durationMonths"] } },
-    {
-      if: {
-        allOf: [
-          {
-            anyOf: [
-              { required: ["effects"] },
-              { properties: { loads: { minItems: 1 } }, required: ["loads"] },
-            ],
-          },
-          {
-            not: {
-              properties: { visibility: { const: "surprise" } },
-              required: ["visibility"],
-            },
-          },
-        ],
-      },
-      then: { required: ["preview"] },
-    },
   ],
 });
 const option = () => ({
@@ -405,13 +378,9 @@ const option = () => ({
       costDollars: magnitude(
         0,
         1e12,
-        "Immediate cost in starting-year dollars; zero is a free option",
+        "Immediate cost in dollars; zero is a free option",
       ),
-      grantDollars: magnitude(
-        0,
-        1e12,
-        "Immediate grant in starting-year dollars",
-      ),
+      grantDollars: magnitude(0, 1e12, "Immediate grant in dollars"),
       replaceLoad: object(
         {
           arc: numeric(
@@ -430,10 +399,7 @@ const option = () => ({
     },
     ["id", "label", "description", "message"],
   ),
-  oneOf: [
-    { required: ["costDollars"], not: { required: ["grantDollars"] } },
-    { required: ["grantDollars"], not: { required: ["costDollars"] } },
-  ],
+  not: { required: ["costDollars", "grantDollars"] },
 });
 const objective = () => ({
   oneOf: Object.entries(OBJECTIVE_DEFINITIONS).map(([metric, definition]) => {
@@ -496,14 +462,14 @@ const objective = () => ({
         maxDollarsPerKWh: numeric(
           0,
           100,
-          "Billed starting-year dollars per delivered kWh; excludes grants and exports",
+          "Billed dollars per delivered kWh; excludes grants and exports",
         ),
       },
       monthEndDebt: {
         maxDebtDollars: numeric(
           0,
           1e12,
-          "Month-end loan principal limit in starting-year dollars; excludes interest",
+          "Month-end loan principal limit in dollars; excludes interest",
         ),
       },
     }[metric];
@@ -549,18 +515,78 @@ function createModEditorSchema() {
         2000,
         "Author description only. Publishing appends a generated Rules section; never paste that section here.",
       ),
-      seed: numeric(0, 4294967295, "Deterministic run seed", true),
+      seed: numeric(
+        0,
+        4294967295,
+        "Optional fixed seed for reproducing weather and random event timing; defaults to 0",
+        true,
+      ),
       baseScenarioId: enumeration(
         [999, ...RULE_SCENARIO_IDS],
-        "Starting grid to inherit; 999 is Custom Game. Community runs remain unranked.",
+        "Optional built-in starting grid. Omit for a custom scenario.",
       ),
       scenario: object(
         {
-          cash: numeric(
-            0,
-            1e12,
-            "Cash in dollars of the resolved starting year",
+          location: object(
+            {
+              id: { type: "string", pattern: "^[A-Za-z0-9_-]{1,32}$" },
+              name: text(100),
+              lat: numeric(-90, 90, "Latitude"),
+              long: numeric(-180, 180, "Longitude"),
+              admin: text(100),
+              timeZone: text(100),
+              region: text(100),
+              country: text(100),
+              elevation: numeric(-500, 10000, "Metres above sea level"),
+              watershedId: { type: "string", pattern: "^[A-Za-z0-9_-]{1,32}$" },
+              watershedName: text(100),
+              offshore: boolean(),
+              resources: object({ hydro: boolean(), geothermal: boolean() }),
+            },
+            ["id", "name", "lat", "long"],
+            "Location; defaults to San Francisco without a base scenario.",
           ),
+          startingFleet: list(
+            {
+              ...object(
+                {
+                  id: id(),
+                  name: enumeration(FACILITY_NAMES),
+                  peakMW: numeric(0.001, 100000, "Generator power in MW"),
+                  peakMWh: numeric(0.001, 1000000, "Storage energy in MWh"),
+                  ageYears: numeric(0, 200, "Age at start; defaults to 0"),
+                  hydroSiteId: text(64),
+                  reservoirFraction: numeric(0, 1, "Starting reservoir share"),
+                },
+                ["name"],
+              ),
+              allOf: [
+                {
+                  if: {
+                    properties: { name: { enum: ["Battery", "Pumped Hydro"] } },
+                  },
+                  then: { required: ["peakMWh"] },
+                  else: {
+                    required: ["peakMW"],
+                    not: { required: ["peakMWh"] },
+                  },
+                },
+                {
+                  if: { properties: { name: { not: { const: "Hydro" } } } },
+                  then: {
+                    not: {
+                      anyOf: [
+                        { required: ["hydroSiteId"] },
+                        { required: ["reservoirFraction"] },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+            100,
+          ),
+          cash: numeric(0, 1e12, "Starting cash in dollars"),
           startingYear: numeric(
             1980,
             2100,
@@ -573,16 +599,12 @@ function createModEditorSchema() {
             100,
             "Bundled demand calibration factor",
           ),
-          dollarsPerkWh: numeric(
-            0,
-            100,
-            "Billed dollars/kWh of resolved starting year",
-          ),
+          dollarsPerkWh: numeric(0, 100, "Billed dollars per kWh"),
           durationMonths: numeric(6, 1200, "Playable months", true),
           feePerKgCO2e: numeric(
             0,
             100,
-            "Initial dollars/kgCO₂e in starting-year dollars; timed fees use dollars/tonne",
+            "Initial dollars/kgCO₂e; timed fees use dollars/tonne",
           ),
           ownership: enumeration(
             ["Investor", "Public"],
@@ -592,7 +614,7 @@ function createModEditorSchema() {
           endMessage: text(500),
         },
         [],
-        "Allowed setup overrides only; location and starting fleet come from the bundled base.",
+        "Starting conditions. Omitted values use the custom-game defaults or the chosen base.",
       ),
       facilities: object(
         Object.fromEntries(
@@ -631,10 +653,10 @@ function createModEditorSchema() {
               "Importable bundled challenge arc; never grants official status or objectives.",
             ),
             includeChoices: boolean(
-              "True prompts each company; false automatically selects the free option at its due month.",
+              "Defaults to true: ask each company. False selects the free option automatically.",
             ),
           },
-          ["scenarioId", "includeChoices"],
+          ["scenarioId"],
         ),
         14,
       ),
@@ -654,41 +676,9 @@ function createModEditorSchema() {
         RULE_LIMITS.choices,
       ),
       objectives: {
-        oneOf: [
-          object(
-            {
-              mode: {
-                const: "inherit",
-                description: "Keep base goals, relocated with the term.",
-              },
-              add: objectives,
-            },
-            ["mode"],
-          ),
-          object(
-            {
-              mode: {
-                const: "replace",
-                description:
-                  "Replace base goals with items. Use --explain to get inherited goals as editable JSON.",
-              },
-              items: objectives,
-            },
-            ["mode", "items"],
-          ),
-          object(
-            {
-              mode: {
-                const: "none",
-                description:
-                  "No scenario goals. Reach the final month and avoid ordinary game failures.",
-              },
-            },
-            ["mode"],
-          ),
-        ],
+        ...objectives,
         description:
-          "Choose whether to keep, replace or remove base goals. Imported arcs do not add goals.",
+          "Goals to meet. Omit to keep the base goals; a list replaces them, including an empty list for a survival-only run.",
       },
       debriefReports: list(report(), RULE_LIMITS.debriefReports),
     },
@@ -700,9 +690,6 @@ function createModEditorSchema() {
       "creator",
       "version",
       "description",
-      "seed",
-      "baseScenarioId",
-      "objectives",
     ],
     "Electrify scenario package, at most 256 KiB of UTF-8 JSON. Run mods:validate to check timing, references, combined effects, assets and byte limits.",
   );

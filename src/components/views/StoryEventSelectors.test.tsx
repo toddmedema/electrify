@@ -46,7 +46,7 @@ test("mod-only upcoming events use previews and keep surprises hidden without im
     baseScenarioId: 999,
     seed: 42,
     officialArcs: [],
-    objectives: { mode: "none" },
+    objectives: [],
     events: [
       {
         id: "announced",
@@ -91,7 +91,7 @@ describe("active event groups", () => {
       description: "A scenario with an opening output warning.",
       baseScenarioId: 999,
       seed: 42,
-      objectives: { mode: "none" },
+      objectives: [],
       officialArcs: [],
       scenario: { startingYear: 2020, durationMonths: 6, cash: 1e9 },
       events: [

@@ -25,7 +25,7 @@ const scenario = (
     seed: 2468,
     baseScenarioId: 999,
     officialArcs: [],
-    objectives: { mode: "none" },
+    objectives: [],
     scenario: {
       startingYear: 2025,
       durationMonths: 6,

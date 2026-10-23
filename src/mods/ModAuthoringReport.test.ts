@@ -52,17 +52,15 @@ test("monthly author facts preserve alternative selector windows and choice cond
   )!.rows;
   expect(targets).toHaveLength(2);
   for (const [index, through, option] of [
-    [0, 15, "Accelerate the overhaul"],
-    [1, 18, "Accept standard-schedule support"],
+    [0, 15, "Shorten the outage"],
+    [1, 18, "Take funding"],
   ] as const) {
     expect(targets[index].value).toContain(`Months 13–${through}`);
     expect(targets[index].value).toContain(option);
     expect(targets[index].details).toEqual([
       expect.stringContaining("0% output"),
     ]);
-    expect(targets[index].details![0]).toContain(
-      "scenario-106-natural-gas-peaker",
-    );
+    expect(targets[index].details![0]).toContain("gas-peaker");
     expect(targets[index].details![0]).toContain("replacements are unaffected");
   }
   expect(report.sections.every((section) => section.rows.length)).toBe(true);

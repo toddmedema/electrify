@@ -33,7 +33,7 @@ function entry(id: string, share = true): InstalledMod {
     description: "A grid with a new campus.",
     seed: 42,
     baseScenarioId: 999,
-    objectives: { mode: "inherit" },
+
     ...(share
       ? {
           events: [

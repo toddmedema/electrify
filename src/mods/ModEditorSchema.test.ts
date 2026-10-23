@@ -148,12 +148,12 @@ test("text safety, complete difficulty values and objective scope unions have va
   const objectives = clone(
     recipes.find((recipe) => recipe.id === "objective-recipes")!,
   );
-  if (objectives.objectives.mode !== "replace")
+  if (!objectives.objectives)
     throw new Error("Objective fixture must replace goals");
   const wrongScope = clone(objectives) as unknown as {
-    objectives: { items: Record<string, unknown>[] };
+    objectives: Record<string, unknown>[];
   };
-  wrongScope.objectives.items[0].maxDebtDollars = 0;
+  wrongScope.objectives[0].maxDebtDollars = 0;
   expect(validate(wrongScope)).toBe(false);
   expect(
     modDiagnostics(wrongScope).some((d) => d.code === "unknown-field"),

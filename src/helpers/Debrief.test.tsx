@@ -27,7 +27,7 @@ it("interprets mod debriefs from completed facts and marks a missing-history nei
     seed: 42,
     officialArcs: [],
     scenario: { startingCustomers: 10000, cash: 1e9, durationMonths: 6 },
-    objectives: { mode: "none" },
+    objectives: [],
     events: [
       {
         id: "outage",

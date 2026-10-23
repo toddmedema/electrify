@@ -36,7 +36,7 @@ const pack = (startingYear = 2040): ModPackage => ({
   seed: 42,
   baseScenarioId: 101,
   officialArcs: [],
-  objectives: { mode: "none" },
+  objectives: [],
   scenario: {
     startingYear,
     durationMonths: 24,
@@ -68,9 +68,7 @@ const simulate = (
     scenario: modScenario(
       {
         ...input,
-        objectives: objective
-          ? { mode: "replace", items: [objective] }
-          : { mode: "none" },
+        objectives: objective ? [objective] : [],
       },
       undefined,
       "Employee",
@@ -103,7 +101,8 @@ test.each([2020, 2040])(
     expect(month.revenueExports).toBeGreaterThan(0);
     const deliveredKWh = month.supplyWh / 1000;
     const realRate =
-      startingDollarRevenue([month], startingYear, input.seed) / deliveredKWh;
+      startingDollarRevenue([month], startingYear, input.seed ?? 0) /
+      deliveredKWh;
     const nominalRate = customerSalesRevenue(month) / deliveredKWh;
     expect(nominalRate).toBeGreaterThan(realRate * 1.005);
     const objective = (maxDollarsPerKWh: number): RuleObjective => ({
@@ -131,8 +130,8 @@ test("month-end debt uses actual outstanding principal in monthly starting-year 
   const month = reference.months[17];
   expect(month.expensesInterest).toBeLessThan(reference.finalDebt / 10);
   const date = { year: month.year, monthNumber: month.month };
-  const monthlyIndex = getInflationIndex(date, 2040, input.seed);
-  const annualBillingIndex = getRateInflationIndex(date, 2040, input.seed);
+  const monthlyIndex = getInflationIndex(date, 2040, input.seed ?? 0);
+  const annualBillingIndex = getRateInflationIndex(date, 2040, input.seed ?? 0);
   expect(monthlyIndex).toBeGreaterThan(annualBillingIndex * 1.002);
   const realDebt = reference.finalDebt / monthlyIndex;
   const annuallyDeflatedDebt = reference.finalDebt / annualBillingIndex;
@@ -198,18 +197,15 @@ test("retention uses one completed-month clock in live termination and Mission S
   const threshold = (oldFrameLimit + boundaryLimit) / 2;
   expect(oldFrameLimit).toBeLessThan(threshold);
   expect(boundaryLimit).toBeGreaterThan(threshold);
-  input.objectives = {
-    mode: "replace",
-    items: [
-      {
-        id: "retain-community",
-        label: "Retain the community",
-        metric: "customerRetention",
-        deadlineMonth: 3,
-        minRetainedShare: threshold / 1000,
-      },
-    ],
-  };
+  input.objectives = [
+    {
+      id: "retain-community",
+      label: "Retain the community",
+      metric: "customerRetention",
+      deadlineMonth: 3,
+      minRetainedShare: threshold / 1000,
+    },
+  ];
   const scenario = modScenario(input, undefined, options.difficulty);
   const state = createGame({ ...options, scenario });
   state.date = getDateFromMinute(boundary, state.startingYear);

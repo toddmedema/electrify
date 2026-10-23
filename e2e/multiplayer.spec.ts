@@ -1904,19 +1904,16 @@ const cooperativeMod = (published: boolean): InstalledMod => ({
       cash: 1000000000,
       dollarsPerkWh: 0.2,
     },
-    objectives: {
-      mode: "replace",
-      items: [
-        {
-          id: "serve-customers",
-          label: "Keep your grid reliable",
-          metric: "monthlyReliability",
-          minDemandServedShare: 0.5,
-          fromMonth: 1,
-          throughMonth: 6,
-        },
-      ],
-    },
+    objectives: [
+      {
+        id: "serve-customers",
+        label: "Keep your grid reliable",
+        metric: "monthlyReliability",
+        minDemandServedShare: 0.5,
+        fromMonth: 1,
+        throughMonth: 6,
+      },
+    ],
     choices: [
       {
         id: "funding",

@@ -38,7 +38,7 @@ const pack = (): ModPackage => ({
   baseScenarioId: 114,
   scenario: { durationMonths: 6 },
   officialArcs: [],
-  objectives: { mode: "none" },
+  objectives: [],
 });
 function scenario(): ScenarioType {
   const input = pack();

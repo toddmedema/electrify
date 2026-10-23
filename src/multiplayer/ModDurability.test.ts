@@ -38,28 +38,25 @@ const packageData = (): ModPackage => ({
     cash: 1e9,
     dollarsPerkWh: 0.2,
   },
-  objectives: {
-    mode: "replace",
-    items: [
-      {
-        id: "reliable",
-        label: "Serve demand",
-        metric: "monthlyReliability",
-        fromMonth: 1,
-        throughMonth: 6,
-        minDemandServedShare: 1,
-      },
-      {
-        id: "free-bills",
-        label: "Offer free electricity",
-        metric: "monthlyBilledRate",
-        fromMonth: 1,
-        throughMonth: 6,
-        maxDollarsPerKWh: 0,
-        required: false,
-      },
-    ],
-  },
+  objectives: [
+    {
+      id: "reliable",
+      label: "Serve demand",
+      metric: "monthlyReliability",
+      fromMonth: 1,
+      throughMonth: 6,
+      minDemandServedShare: 1,
+    },
+    {
+      id: "free-bills",
+      label: "Offer free electricity",
+      metric: "monthlyBilledRate",
+      fromMonth: 1,
+      throughMonth: 6,
+      maxDollarsPerKWh: 0,
+      required: false,
+    },
+  ],
   events: [
     {
       id: "opening-funds",

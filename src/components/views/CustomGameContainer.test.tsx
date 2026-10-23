@@ -28,7 +28,7 @@ const modded = modScenario({
   description: "A community grid that must not seed custom setup.",
   seed: 42,
   baseScenarioId: 999,
-  objectives: { mode: "inherit" },
+
   facilities: { Solar: { buildCost: 0.5 } },
 });
 const state = (customScenario?: ScenarioType) =>

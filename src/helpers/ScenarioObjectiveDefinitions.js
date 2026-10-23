@@ -13,9 +13,8 @@ const OBJECTIVE_DEFINITIONS = {
   fuelRetirement:
     "Own no asset of the specified fuel, including paused and unfinished assets, at the deadline and every later month close.",
   monthlyBilledRate:
-    "Billed customer revenue per delivered kWh each month, excluding grants and exports, in starting-year dollars.",
-  monthEndDebt:
-    "Loan principal at each completed month close, in starting-year dollars; interest expenses are excluded.",
+    "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
+  monthEndDebt: "Outstanding loan principal each month, excluding interest.",
 };
 
 module.exports = { OBJECTIVE_DEFINITIONS };

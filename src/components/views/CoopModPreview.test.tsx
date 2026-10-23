@@ -36,28 +36,25 @@ const pack: ModPackage = {
   baseScenarioId: 999,
   officialArcs: [],
   scenario: { durationMonths: 6 },
-  objectives: {
-    mode: "replace",
-    items: [
-      {
-        id: "reliable",
-        label: "Serve your customers",
-        metric: "monthlyReliability",
-        fromMonth: 1,
-        throughMonth: 6,
-        minDemandServedShare: 0.99,
-      },
-      {
-        id: "bills",
-        label: "Keep bills affordable",
-        metric: "monthlyBilledRate",
-        fromMonth: 2,
-        throughMonth: 6,
-        maxDollarsPerKWh: 0.2,
-        required: false,
-      },
-    ],
-  },
+  objectives: [
+    {
+      id: "reliable",
+      label: "Serve your customers",
+      metric: "monthlyReliability",
+      fromMonth: 1,
+      throughMonth: 6,
+      minDemandServedShare: 0.99,
+    },
+    {
+      id: "bills",
+      label: "Keep bills affordable",
+      metric: "monthlyBilledRate",
+      fromMonth: 2,
+      throughMonth: 6,
+      maxDollarsPerKWh: 0.2,
+      required: false,
+    },
+  ],
   events: [
     {
       id: "announced",

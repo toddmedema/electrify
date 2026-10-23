@@ -1124,7 +1124,9 @@ function ModsLibrary(): React.JSX.Element {
             {playing && playingDetails?.scenario && (
               <ModDetails
                 scenario={playingDetails.scenario}
-                objectiveIntent={playing.pack.objectives.mode}
+                objectiveIntent={
+                  playing.pack.objectives === undefined ? "inherit" : "replace"
+                }
                 diagnostics={diagnosticsByEntry.get(playing.key)}
               />
             )}

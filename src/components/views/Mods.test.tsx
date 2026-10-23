@@ -39,7 +39,7 @@ const pack = (patch: Partial<ModPackage> = {}): ModPackage => ({
   creator: "Ada",
   version: "1.0.0",
   description: "A community grid with its own planning decisions.",
-  objectives: { mode: "inherit" },
+
   seed: 42,
   baseScenarioId: 999,
   ...patch,
@@ -406,10 +406,10 @@ test("the author can inspect every difficulty's complete resolved report", async
   expect(timeline).toHaveTextContent("Natural Gas fuel price: 80% of normal");
   expect(timeline).not.toHaveTextContent("120% of normal");
   expect(
-    within(dialog).getByRole("button", {
+    within(dialog).queryByRole("button", {
       name: "Inherited objectives: replace-ready JSON",
     }),
-  ).toBeEnabled();
+  ).toBeNull();
   await userEvent.click(within(dialog).getByText("Difficulty validation"));
   expect(
     within(dialog).getByLabelText("Difficulty validation"),

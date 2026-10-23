@@ -107,7 +107,7 @@ function checkConnectionComparison(id: ModExampleId, results: SimResultType[]) {
 
 for (const id of MOD_EXAMPLE_IDS) {
   for (const difficulty of ["Employee", "Manager"] as const) {
-    const defaultSeed = readModExample(id).seed;
+    const defaultSeed = readModExample(id).seed ?? 0;
     for (const seed of [defaultSeed, defaultSeed + 1]) {
       test(`${id} reaches every consequential branch on ${difficulty} seed ${seed}`, () => {
         const { scenario } = modExampleScenario(id, difficulty, seed);

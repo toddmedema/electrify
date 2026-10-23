@@ -23,7 +23,7 @@ const pack = (id: string): ModPackage => ({
   baseScenarioId: 999,
   officialArcs: [],
   scenario: { durationMonths: 12 },
-  objectives: { mode: "none" },
+  objectives: [],
   events: [
     {
       id: "conditions",

@@ -33,7 +33,7 @@ export function modExampleScenario(
   seed?: number,
 ) {
   const pack = readModExample(id);
-  pack.seed = seed ?? pack.seed;
+  if (seed !== undefined) pack.seed = seed;
   const location = getScenarioLocation(modResolvedSetup(pack));
   if (!location)
     throw new Error("The example must resolve a bundled location.");

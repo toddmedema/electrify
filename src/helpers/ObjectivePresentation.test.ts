@@ -147,7 +147,7 @@ it.each<[CompiledRuleObjective, number, string]>([
       maxDollarsPerKWh: 0.123456789,
     },
     0.123456789,
-    "$0.123456789/kWh in starting-year dollars",
+    "$0.123456789/kWh",
   ],
   [
     {
@@ -160,7 +160,7 @@ it.each<[CompiledRuleObjective, number, string]>([
       maxDebt: 123456789,
     },
     123456789,
-    "$123,456,789 principal in starting-year dollars",
+    "$123,456,789 principal",
   ],
 ])(
   "prints explicit units without approximating a %s target",

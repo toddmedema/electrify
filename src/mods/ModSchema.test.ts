@@ -33,6 +33,8 @@ const OVERRIDE_KEYS: Record<keyof ModScenarioOverrides, true> = {
   ownership: true,
   endTitle: true,
   endMessage: true,
+  location: true,
+  startingFleet: true,
 };
 const MODIFIER_KEYS: Record<keyof FacilityModifierType, true> = {
   buildCost: true,
@@ -136,7 +138,7 @@ test("independent structural failures retain stable diagnostic paths", () => {
     seed: 1,
     baseScenarioId: 999,
     description: "Plan the community grid.",
-    objectives: { mode: "inherit" },
+
     facilities: { Solar: { buildCost: 1e308, yearsToBuild: 0 } },
     programs: { solar: 11 },
     events: [{ id: "review", startMonth: 0, title: "", message: "Review." }],
@@ -194,7 +196,7 @@ test("bad multipliers and nonfinite results are rejected at the quote owner", ()
       description: "Plan the grid.",
       seed: 1,
       baseScenarioId: 999,
-      objectives: { mode: "none" },
+      objectives: [],
     },
     undefined,
     "Manager",

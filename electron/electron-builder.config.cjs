@@ -22,6 +22,7 @@ module.exports = {
     "src/mods/ModRecipes.js",
     "src/helpers/ScenarioObjectiveDefinitions.js",
     "src/helpers/ScenarioRulesSchema.js",
+    "src/helpers/ScenarioText.js",
     "src/helpers/RuleIdentity.js",
     "!electron/*.test.cjs",
     "!electron/electron-builder.config.cjs",

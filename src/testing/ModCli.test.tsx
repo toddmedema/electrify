@@ -19,7 +19,7 @@ const pack = (): ModPackage => ({
   seed: 2468,
   baseScenarioId: 999,
   officialArcs: [],
-  objectives: { mode: "none" },
+  objectives: [],
   scenario: {
     durationMonths: 6,
     startingYear: 2020,

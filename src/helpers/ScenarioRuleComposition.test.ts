@@ -224,7 +224,7 @@ const pack = (baseScenarioId: number): ModPackage => ({
   version: "1",
   seed: 42,
   baseScenarioId,
-  objectives: { mode: "none" },
+  objectives: [],
 });
 
 test("all fourteen imported arcs validate as complete detached snapshots in every difficulty", () => {

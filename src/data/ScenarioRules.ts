@@ -166,13 +166,9 @@ export type RuleObjective = ObjectiveBase &
       })
     | (ObjectiveWindow & { metric: "monthEndDebt"; maxDebtDollars: number })
   );
-export type RuleObjectiveIntent =
-  | { mode: "inherit"; add?: RuleObjective[] }
-  | { mode: "replace"; items: RuleObjective[] }
-  | { mode: "none" };
 export interface RuleArc {
   scenarioId: number;
-  includeChoices: boolean;
+  includeChoices?: boolean;
 }
 export interface ScenarioRuleDefinitions {
   events?: RuleEvent[];

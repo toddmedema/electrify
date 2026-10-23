@@ -10,5 +10,5 @@ Generated from the evaluator's shared metric definitions.
 | `emissionsPerDeliveredMWh` | Total emissions, including imports, exports and construction, per delivered customer MWh over the window.                                                     |
 | `localFuelShare`           | Selected fuels' delivered electricity divided by all local fuel-delivered electricity over the window; imports and storage discharge have no fuel provenance. |
 | `fuelRetirement`           | Own no asset of the specified fuel, including paused and unfinished assets, at the deadline and every later month close.                                      |
-| `monthlyBilledRate`        | Billed customer revenue per delivered kWh each month, excluding grants and exports, in starting-year dollars.                                                 |
-| `monthEndDebt`             | Loan principal at each completed month close, in starting-year dollars; interest expenses are excluded.                                                       |
+| `monthlyBilledRate`        | Billed customer revenue per delivered kWh each month, excluding grants and exports.                                                                           |
+| `monthEndDebt`             | Outstanding loan principal each month, excluding interest.                                                                                                    |

@@ -33,7 +33,7 @@ const pack = (): ModPackage => ({
   seed: 7,
   baseScenarioId: 111,
   officialArcs: [],
-  objectives: { mode: "none" },
+  objectives: [],
 });
 test("fresh base-111 community setup freezes the native40MW connection and access rather than the500MW regional route", () => {
   const scenario = modScenario(pack(), undefined, "Employee", 1e8);

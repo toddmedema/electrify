@@ -1,3 +1,4 @@
+const { renderScenarioText } = require("../helpers/ScenarioText");
 const {
   UNSAFE_TEXT,
   UNSAFE_MARKUP,
@@ -7,9 +8,21 @@ const { utf8Bytes } = require("../helpers/RuleIdentity");
 // https://partner.steamgames.com/doc/api/ISteamRemoteStorage#constants
 const MAX_WORKSHOP_DESCRIPTION_BYTES = 7999;
 function validatePublicationDescription(description, pack) {
+  // Main has no catalog import. A base's year is resolved in the renderer; accept only
+  // safe date expansions of the author's own text, never an edited description.
+  const years =
+    pack.scenario?.startingYear !== undefined
+      ? [pack.scenario.startingYear]
+      : pack.baseScenarioId !== undefined && pack.baseScenarioId !== 999
+        ? Array.from({ length: 121 }, (_, i) => 1980 + i)
+        : [2020];
   if (
     typeof description !== "string" ||
-    !description.startsWith(`${pack.description}\n\nRules\n`) ||
+    !years.some((year) =>
+      description.startsWith(
+        `${renderScenarioText(pack.description, year)}\n\nRules\n`,
+      ),
+    ) ||
     UNSAFE_TEXT.test(description.replace(/\n/g, "")) ||
     UNSAFE_MARKUP.test(description)
   )

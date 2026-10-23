@@ -6,43 +6,93 @@
   "title": "Two dry years",
   "creator": "Electrify examples",
   "version": "1",
-  "description": "Prepare the Lusaka grid for two dry years. Each company can pay for conservation or accept emergency fuel funding each year, while keeping supply reliable and emissions within budget.",
-  "seed": 42,
-  "baseScenarioId": 114,
+  "description": "Keep Lusaka supplied through two dry years. Fund conservation or accept fuel support.",
   "scenario": {
-    "durationMonths": 48
-  },
-  "officialArcs": [],
-  "objectives": {
-    "mode": "replace",
-    "items": [
+    "startingYear": 2012,
+    "durationMonths": 48,
+    "startingCustomers": 140000,
+    "startingDemandScale": 1.4,
+    "cash": 90000000,
+    "dollarsPerkWh": 0.05,
+    "ownership": "Public",
+    "location": {
+      "id": "Lusaka",
+      "name": "Lusaka, Zambia",
+      "country": "Zambia",
+      "region": "Africa",
+      "lat": -15.3875,
+      "long": 28.3228,
+      "timeZone": "Africa/Lusaka",
+      "watershedId": "Lusaka",
+      "watershedName": "Zambezi basin",
+      "resources": {
+        "hydro": true,
+        "geothermal": false
+      }
+    },
+    "startingFleet": [
       {
-        "id": "drought-reliability",
-        "label": "Supply customers through both dry years",
-        "metric": "monthlyReliability",
-        "fromMonth": 13,
-        "throughMonth": 36,
-        "minDemandServedShare": 0.98
+        "name": "Hydro",
+        "peakMW": 435.0,
+        "ageYears": 38,
+        "hydroSiteId": "kariba-zmb",
+        "reservoirFraction": 1
       },
       {
-        "id": "drought-emissions",
-        "label": "Keep the drought response below one million tonnes",
-        "metric": "emissionsBudget",
-        "fromMonth": 13,
-        "throughMonth": 48,
-        "budgetTonnesCO2e": 1000000
+        "name": "Oil",
+        "peakMW": 16.0,
+        "ageYears": 15
+      },
+      {
+        "name": "Solar",
+        "peakMW": 6.0,
+        "ageYears": 1
       }
-    ]
+    ],
+    "endTitle": "Two dry years",
+    "endMessage": "The drought is over. Review your service and emissions."
   },
+  "objectives": [
+    {
+      "id": "drought-reliability",
+      "label": "Keep Lusaka supplied",
+      "metric": "monthlyReliability",
+      "fromMonth": 13,
+      "throughMonth": 36,
+      "minDemandServedShare": 0.98
+    },
+    {
+      "id": "drought-emissions",
+      "label": "Limit drought emissions",
+      "metric": "emissionsBudget",
+      "fromMonth": 13,
+      "throughMonth": 48,
+      "budgetTonnesCO2e": 1000000
+    }
+  ],
   "events": [
+    {
+      "id": "mine-demand",
+      "title": "Copperbelt mines",
+      "message": "Copper mines draw 65 MW.",
+      "startMonth": 1,
+      "loads": [
+        {
+          "id": "copperbelt-mines",
+          "startMonth": 1,
+          "peakMW": 65.0,
+          "loadFactor": 0.95,
+          "demandType": "Mining"
+        }
+      ]
+    },
     {
       "id": "first-dry-year",
       "title": "First dry year",
       "message": "Hydro inflow is down to 50%.",
-      "preview": "Hydro inflow will fall to 50% for twelve months.",
+      "preview": "Hydro inflow will fall to 50% from {{event}} until {{event+12 months}}.",
       "startMonth": 13,
       "durationMonths": 12,
-      "visibility": "forecast",
       "effects": {
         "hydroInflowMultiplier": 0.5
       },
@@ -52,10 +102,9 @@
       "id": "second-dry-year",
       "title": "Second dry year",
       "message": "Hydro inflow is down to 25%.",
-      "preview": "Hydro inflow will fall to 25% for twelve months.",
+      "preview": "Hydro inflow will fall to 25% from {{event}} until {{event+12 months}}.",
       "startMonth": 25,
       "durationMonths": 12,
-      "visibility": "forecast",
       "effects": {
         "hydroInflowMultiplier": 0.25
       },
@@ -64,11 +113,10 @@
     {
       "id": "first-year-conservation",
       "title": "First-year conservation",
-      "message": "Your conservation programme reduces demand 10%.",
+      "message": "Conservation reduces demand 10%.",
       "preview": "Funded conservation will reduce demand 10% for twelve months.",
       "startMonth": 13,
       "durationMonths": 12,
-      "visibility": "forecast",
       "requiresChoice": {
         "choiceId": "first-year-response",
         "optionIds": ["conserve"]
@@ -77,16 +125,15 @@
         "demandMultiplier": 0.9,
         "operatingExpenseDollarsPerMonth": 125000
       },
-      "endMessage": "This conservation programme has ended."
+      "endMessage": "Conservation has ended."
     },
     {
       "id": "second-year-conservation",
       "title": "Second-year conservation",
-      "message": "Your conservation programme reduces demand 10%.",
+      "message": "Conservation reduces demand 10%.",
       "preview": "Funded conservation will reduce demand 10% for twelve months.",
       "startMonth": 25,
       "durationMonths": 12,
-      "visibility": "forecast",
       "requiresChoice": {
         "choiceId": "second-year-response",
         "optionIds": ["conserve"]
@@ -95,7 +142,7 @@
         "demandMultiplier": 0.9,
         "operatingExpenseDollarsPerMonth": 125000
       },
-      "endMessage": "This conservation programme has ended."
+      "endMessage": "Conservation has ended."
     }
   ],
   "choices": [
@@ -103,20 +150,20 @@
       "id": "first-year-response",
       "dueMonth": 12,
       "title": "Plan the first dry year",
-      "prompt": "Pay for a year of customer conservation or accept emergency fuel funding for your grid.",
+      "prompt": "Fund a year of conservation or accept fuel support.",
       "options": [
         {
           "id": "conserve",
           "label": "Fund conservation",
-          "description": "Pay 5,000,000 starting-year dollars and 125,000 per month to reduce customer demand 10% for twelve months.",
-          "message": "Your company funded one year of conservation.",
+          "description": "Reduce demand 10% for a year; costs $125,000 per month.",
+          "message": "You funded one year of conservation.",
           "costDollars": 5000000
         },
         {
           "id": "fuel-support",
           "label": "Accept fuel support",
-          "description": "Receive 5,000,000 starting-year dollars; demand remains unchanged.",
-          "message": "Your company accepted emergency fuel funding.",
+          "description": "Receive fuel funding; demand stays unchanged.",
+          "message": "You accepted emergency fuel funding.",
           "grantDollars": 5000000
         }
       ]
@@ -125,20 +172,20 @@
       "id": "second-year-response",
       "dueMonth": 25,
       "title": "Respond to the second dry year",
-      "prompt": "Pay for a year of customer conservation or accept emergency fuel funding for your grid.",
+      "prompt": "Fund a year of conservation or accept fuel support.",
       "options": [
         {
           "id": "conserve",
           "label": "Fund conservation",
-          "description": "Pay 3,000,000 starting-year dollars and 125,000 per month to reduce customer demand 10% for twelve months.",
-          "message": "Your company funded one year of conservation.",
+          "description": "Reduce demand 10% for a year; costs $125,000 per month.",
+          "message": "You funded one year of conservation.",
           "costDollars": 3000000
         },
         {
           "id": "fuel-support",
           "label": "Accept fuel support",
-          "description": "Receive 3,000,000 starting-year dollars; demand remains unchanged.",
-          "message": "Your company accepted emergency fuel funding.",
+          "description": "Receive fuel funding; demand stays unchanged.",
+          "message": "You accepted emergency fuel funding.",
           "grantDollars": 3000000
         }
       ]

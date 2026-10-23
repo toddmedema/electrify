@@ -335,7 +335,7 @@ function facts(
   scenario: ScenarioType,
   author: boolean,
   diagnostics: ModDiagnostic[] = [],
-  intent?: ModPackage["objectives"]["mode"],
+  intent?: "inherit" | "replace" | "none",
 ): ModRuleFacts {
   const mod = scenario.mod;
   if (!mod || !validScenarioMod(mod, scenario))
@@ -379,7 +379,7 @@ function facts(
         },
         {
           label: "Starting cash and billed rate",
-          value: `${money(scenario.cash)} · ${money(scenario.dollarsPerkWh)}/kWh · starting-year dollars`,
+          value: `${money(scenario.cash)} · ${money(scenario.dollarsPerkWh)}/kWh`,
         },
         { label: "Eligibility", value: "Modded · Unranked · No achievements" },
       ],
@@ -396,7 +396,7 @@ function facts(
             ? "No scenario goals. Reach the final month; ordinary game failures still apply."
             : mode === "replace"
               ? "Replace the base scenario's goals with the listed goals."
-              : "Inherit the base scenario's goals and include any added goals.",
+              : "Use the default goals.",
       },
       ...scenarioObjectiveDefinitions(scenario).map((objective) => ({
         label: objective.label,
@@ -454,7 +454,7 @@ function facts(
       })),
       {
         label: "Initial carbon fee",
-        value: `${money(scenario.feePerKgCO2e * 1000)}/tonne CO₂e · starting-year dollars`,
+        value: `${money(scenario.feePerKgCO2e * 1000)}/tonne CO₂e`,
       },
     ],
   });
@@ -468,7 +468,7 @@ function facts(
       key: event.key,
       row: {
         label: `${at(event.startMonth, scenario.startingYear)} · ${event.title}`,
-        value: author ? event.message : (event.preview ?? "Announced event"),
+        value: author ? event.message : (event.preview ?? event.message),
         details: [
           ...(author
             ? [
@@ -700,7 +700,7 @@ function facts(
 export function modPlayerFacts(
   scenario: ScenarioType,
   options: {
-    objectiveIntent?: ModPackage["objectives"]["mode"];
+    objectiveIntent?: "inherit" | "replace" | "none";
     diagnostics?: ModDiagnostic[];
   } = {},
 ): ModRuleFacts {
@@ -774,7 +774,10 @@ export function buildModAuthorReport(input: unknown): ModAuthorReport {
   } catch (_error) {
     /* Aggregated diagnostics already belong to the resolver. */
   }
-  const base = pack && getScenario(pack.baseScenarioId);
+  const base =
+    pack?.baseScenarioId === undefined
+      ? undefined
+      : getScenario(pack.baseScenarioId);
   const inheritedObjectives = base
     ? inheritedModObjectives(
         base,
@@ -805,7 +808,7 @@ export function buildModAuthorReport(input: unknown): ModAuthorReport {
             : "Unavailable because validation failed.",
         })),
       },
-    ],
+    ].filter((section) => section.rows.length),
     diagnostics,
     valid: !diagnostics.some((diagnostic) => diagnostic.severity === "error"),
     difficulties,
@@ -853,7 +856,7 @@ export function buildModPublication(input: unknown): {
   return {
     packageDigest: packageDigest(pack),
     description: validatePublicationDescription(
-      `${pack.description}\n\n${lines.join("\n")}`,
+      `${player.description}\n\n${lines.join("\n")}`,
       pack,
     ),
   };

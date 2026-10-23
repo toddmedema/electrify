@@ -18,19 +18,16 @@ const pack: ModPackage = {
   baseScenarioId: 999,
   officialArcs: [],
   scenario: { durationMonths: 6, startingYear: 2020 },
-  objectives: {
-    mode: "replace",
-    items: [
-      {
-        id: "serve-demand",
-        label: "Serve demand",
-        metric: "monthlyReliability",
-        fromMonth: 1,
-        throughMonth: 6,
-        minDemandServedShare: 0.99,
-      },
-    ],
-  },
+  objectives: [
+    {
+      id: "serve-demand",
+      label: "Serve demand",
+      metric: "monthlyReliability",
+      fromMonth: 1,
+      throughMonth: 6,
+      minDemandServedShare: 0.99,
+    },
+  ],
   facilities: { Solar: { buildCost: 0.8 } },
   events: [
     {

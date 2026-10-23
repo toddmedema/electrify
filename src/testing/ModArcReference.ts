@@ -45,7 +45,7 @@ export function modArcReferences(): ArcReference[] {
       seed: 12345,
       baseScenarioId: scenarioId,
       scenario: { durationMonths: 1200 },
-      objectives: { mode: "none" },
+      objectives: [],
       officialArcs: [{ scenarioId, includeChoices: true }],
     });
     const setup = modResolvedSetup(pack);

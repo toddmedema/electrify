@@ -7,22 +7,18 @@
   "creator": "Electrify examples",
   "version": "1",
   "description": "Edit one bounded planning rule at a time, then validate and simulate it.",
-  "seed": 42,
-  "baseScenarioId": 999,
-  "officialArcs": [],
   "scenario": {
     "startingYear": 2020,
     "durationMonths": 6,
     "startingCustomers": 10000,
     "cash": 1000000000
   },
-  "objectives": { "mode": "none" },
   "events": [
     {
       "id": "campus",
       "title": "Campus connection",
       "message": "A permanent campus connects to your grid.",
-      "preview": "A 0.1 MW campus will connect in month 3.",
+      "preview": "A 0.1 MW campus will connect in {{event}}.",
       "startMonth": 3,
       "loads": [
         {
@@ -38,7 +34,7 @@
       "id": "prepared-support",
       "title": "Connection support",
       "message": "Your grid receives the committed contribution.",
-      "preview": "Accepting funding will provide a contribution in month 2.",
+      "preview": "Accepting funding will provide a contribution in {{event}}.",
       "startMonth": 2,
       "durationMonths": "untilEnd",
       "requiresChoice": { "choiceId": "funding", "optionIds": ["accept"] },
@@ -57,10 +53,9 @@
         {
           "id": "accept",
           "label": "Accept funding",
-          "description": "Receive 100,000 starting-year dollars and connect a 0.1 MW load in month 3.",
+          "description": "Receive 100,000 dollars and connect a 0.1 MW load in {{start+2 months}}.",
           "message": "Your grid accepted the funding and connection.",
           "grantDollars": 100000,
-          "eventIds": ["prepared-support"],
           "replaceLoad": {
             "loadId": "campus-load",
             "with": [
@@ -79,7 +74,6 @@
           "label": "Keep the current grid",
           "description": "Forgo funding and cancel the future campus load.",
           "message": "Your grid declined funding and the future load.",
-          "costDollars": 0,
           "replaceLoad": { "loadId": "campus-load", "with": [] }
         }
       ]

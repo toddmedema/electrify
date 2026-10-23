@@ -30,7 +30,6 @@ const pack = (): ModPackage => ({
     cash: 1e9,
     dollarsPerkWh: 0.2,
   },
-  objectives: { mode: "none" },
   events: [
     {
       id: "announced-repair",
@@ -95,19 +94,16 @@ test("the author's report includes the same hidden rule that player facts exclud
 
 test("an edited no-goals claim cannot hide actual required objectives under a recomputed digest", () => {
   const input = pack();
-  input.objectives = {
-    mode: "replace",
-    items: [
-      {
-        id: "serve-demand",
-        label: "Serve demand",
-        metric: "monthlyReliability",
-        fromMonth: 1,
-        throughMonth: 6,
-        minDemandServedShare: 0.99,
-      },
-    ],
-  };
+  input.objectives = [
+    {
+      id: "serve-demand",
+      label: "Serve demand",
+      metric: "monthlyReliability",
+      fromMonth: 1,
+      throughMonth: 6,
+      minDemandServedShare: 0.99,
+    },
+  ];
   const valid = prepared(input);
   expect(validScenarioMod(valid.mod, valid)).toBe(true);
   const forged = cloneDeep(valid);
@@ -121,7 +117,7 @@ test("an edited replacement claim cannot relabel inherited goal definitions", ()
   const input = pack();
   input.baseScenarioId = 114;
   input.scenario = { cash: 1e9 };
-  input.objectives = { mode: "inherit" };
+  delete input.objectives;
   const valid = prepared(input);
   expect(valid.mod!.rules.objectives.some((goal) => goal.inherited)).toBe(true);
   expect(validScenarioMod(valid.mod, valid)).toBe(true);
@@ -131,35 +127,34 @@ test("an edited replacement claim cannot relabel inherited goal definitions", ()
   expect(validScenarioMod(forged.mod, forged)).toBe(false);
 });
 
-test("empty inheritance, replacement and no-goals intent stay distinguishable in public objectives", () => {
-  const objectiveRows = (["inherit", "replace", "none"] as const).map(
-    (mode) => {
-      const input = pack();
-      input.objectives = mode === "replace" ? { mode, items: [] } : { mode };
-      const scenario = prepared(input);
-      expect(scenario.mod!.rules.objectives).toEqual([]);
-      const section = modPlayerFacts(scenario).sections.find(
-        (candidate) => candidate.id === "objectives",
-      );
-      expect(section?.rows[0].label).toBe("Objective intent");
-      return section!.rows[0].value;
-    },
-  );
-  expect(new Set(objectiveRows).size).toBe(3);
+test("omitted goals inherit defaults and an explicit empty list clears them", () => {
+  const objectiveRows = (["inherit", "replace"] as const).map((mode) => {
+    const input = pack();
+    if (mode === "replace") input.objectives = [];
+    else delete input.objectives;
+    const scenario = prepared(input);
+    expect(scenario.mod!.rules.objectives).toEqual([]);
+    const section = modPlayerFacts(scenario).sections.find(
+      (candidate) => candidate.id === "objectives",
+    );
+    expect(section?.rows[0].label).toBe("Objective intent");
+    return section!.rows[0].value;
+  });
+  expect(new Set(objectiveRows).size).toBe(2);
 });
 
 test("reported inherited goals are valid replacement JSON with the same resolved measurements", () => {
   const input = pack();
   input.baseScenarioId = 114;
   input.scenario = { startingYear: 2040, cash: 1e9 };
-  input.objectives = { mode: "inherit" };
+  delete input.objectives;
   const inherited = prepared(input);
   const report = buildModAuthorReport(input);
   expect(report.valid).toBe(true);
   expect(report.inheritedObjectives.length).toBeGreaterThan(0);
   const replacement = prepared({
     ...input,
-    objectives: { mode: "replace", items: report.inheritedObjectives },
+    objectives: report.inheritedObjectives,
   });
   expect(validScenarioMod(replacement.mod, replacement)).toBe(true);
   expect(replacement.mod!.rules.objectives).toEqual(
@@ -220,18 +215,15 @@ test("each publication rebuilds changed public dates, effects and description wi
 
 test("a valid package warning does not block publication of its actual objectives", () => {
   const input = pack();
-  input.objectives = {
-    mode: "replace",
-    items: [
-      {
-        id: "retire-coal",
-        label: "Retire coal",
-        metric: "fuelRetirement",
-        fuel: "Coal",
-        deadlineMonth: 6,
-      },
-    ],
-  };
+  input.objectives = [
+    {
+      id: "retire-coal",
+      label: "Retire coal",
+      metric: "fuelRetirement",
+      fuel: "Coal",
+      deadlineMonth: 6,
+    },
+  ];
   prepared(input);
   const report = buildModAuthorReport(input);
   expect(report.valid).toBe(true);

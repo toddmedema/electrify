@@ -2,13 +2,14 @@ import type {
   RuleArc,
   RuleChoice,
   RuleEvent,
-  RuleObjectiveIntent,
+  RuleObjective,
   RuleReport,
 } from "../data/ScenarioRules";
 // Types for ModSchema.js. ModSchema.test.ts checks every key list below against these types and
 // the facility catalog, so the JavaScript validator and the TypeScript model cannot drift apart.
 import type {
   FacilityModifierType,
+  LocationType,
   ModFacilityNameType,
   ScenarioModType,
   ScenarioType,
@@ -28,7 +29,21 @@ export type ModScenarioOverrides = Partial<
     | "endTitle"
     | "endMessage"
   >
->;
+> & { location?: LocationType; startingFleet?: ModStartingFacility[] };
+export type ModStartingFacility = {
+  id?: string;
+  ageYears?: number;
+  hydroSiteId?: string;
+  reservoirFraction?: number;
+} & (
+  | {
+      name: Exclude<ModFacilityNameType, "Battery" | "Pumped Hydro">;
+      peakMW: number;
+      peakMWh?: never;
+    }
+  | { name: "Battery" | "Pumped Hydro"; peakMW?: number; peakMWh: number }
+);
+
 export type ModProgramId = keyof NonNullable<ScenarioModType["programs"]>;
 
 /** The authoring and sharing format. Runs keep only ScenarioModType, never this package. */
@@ -41,15 +56,15 @@ export interface ModPackage {
   version: string;
   description: string;
   $schema?: string;
-  seed: number;
-  baseScenarioId: number;
+  seed?: number;
+  baseScenarioId?: number;
   scenario?: ModScenarioOverrides;
   facilities?: Partial<Record<ModFacilityNameType, FacilityModifierType>>;
   programs?: Partial<Record<ModProgramId, number>>;
   officialArcs?: RuleArc[];
   events?: RuleEvent[];
   choices?: RuleChoice[];
-  objectives: RuleObjectiveIntent;
+  objectives?: RuleObjective[];
   debriefReports?: RuleReport[];
 }
 

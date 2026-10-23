@@ -78,7 +78,7 @@ test("a two-decision drought save resumes identically after an update, removal a
     scenarioId: 999,
     scenario,
     difficulty: "Employee",
-    seed: pack.seed,
+    seed: pack.seed ?? 0,
   });
   original = advance(original, 11);
   expect(pendingScenarioChoice(original)!.id).toBe(
@@ -93,7 +93,9 @@ test("a two-decision drought save resumes identically after an update, removal a
   const digest = original.customScenario!.mod!.runtimeDigest;
   const updated = cloneDeep(pack);
   updated.version = "2";
-  updated.events![0].effects!.hydroInflowMultiplier = 0.75;
+  updated.events!.find(
+    (event) => event.id === "first-dry-year",
+  )!.effects!.hydroInflowMultiplier = 0.75;
   const library = new Map([
     [pack.id, modScenario(updated, undefined, "Employee")],
   ]);

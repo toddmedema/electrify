@@ -938,6 +938,7 @@ export interface ScenarioModType {
     creator: string;
     version: string;
     description: string;
+    /** Frozen provenance; none remains readable for older saved runs. Packages use optional goal lists. */
     objectiveMode: "inherit" | "replace" | "none";
     workshopId?: string;
   };

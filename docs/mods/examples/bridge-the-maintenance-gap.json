@@ -6,45 +6,66 @@
   "title": "Bridge the maintenance gap",
   "creator": "Electrify examples",
   "version": "2",
-  "description": "Prepare the Manassas grid for an overhaul of its original gas peaker. Pay for a shorter outage or accept support for the longer schedule, then keep customers supplied without a bill shock.",
-  "seed": 609,
-  "baseScenarioId": 106,
+  "description": "Keep Manassas supplied while its gas peaker is overhauled. Pay for a shorter outage or accept funding for a longer one.",
   "scenario": {
+    "startingYear": 2020,
     "durationMonths": 24,
-    "endTitle": "Maintenance complete",
-    "endMessage": "The original gas peaker is back online. Review the cost of the overhaul and the service your customers received."
-  },
-  "officialArcs": [],
-  "objectives": {
-    "mode": "replace",
-    "items": [
+    "startingCustomers": 16500,
+    "startingDemandScale": 7.7,
+    "cash": 25000000,
+    "dollarsPerkWh": 0.1,
+    "ownership": "Public",
+    "location": {
+      "id": "Manassas",
+      "name": "Manassas, VA",
+      "admin": "VA",
+      "country": "United States",
+      "region": "North America",
+      "lat": 38.7509,
+      "long": -77.4753,
+      "timeZone": "America/New_York"
+    },
+    "startingFleet": [
       {
-        "id": "maintenance-service",
-        "label": "Keep the city supplied through maintenance",
-        "metric": "monthlyReliability",
-        "fromMonth": 13,
-        "throughMonth": 24,
-        "minDemandServedShare": 0.995
+        "name": "Natural Gas Peaker",
+        "id": "gas-peaker",
+        "peakMW": 75.0
       },
       {
-        "id": "maintenance-bills",
-        "label": "Keep billed electricity at or below 13 cents",
-        "metric": "monthlyBilledRate",
-        "fromMonth": 1,
-        "throughMonth": 24,
-        "maxDollarsPerKWh": 0.13
+        "name": "Oil",
+        "peakMW": 55.0,
+        "ageYears": 27
       }
-    ]
+    ],
+    "endTitle": "Maintenance complete",
+    "endMessage": "The overhaul is complete. Review your service and costs."
   },
+  "objectives": [
+    {
+      "id": "maintenance-service",
+      "label": "Keep Manassas supplied",
+      "metric": "monthlyReliability",
+      "fromMonth": 13,
+      "throughMonth": 24,
+      "minDemandServedShare": 0.995
+    },
+    {
+      "id": "maintenance-bills",
+      "label": "Keep bills affordable",
+      "metric": "monthlyBilledRate",
+      "fromMonth": 1,
+      "throughMonth": 24,
+      "maxDollarsPerKWh": 0.13
+    }
+  ],
   "events": [
     {
       "id": "accelerate-overhaul",
       "title": "Gas peaker overhaul",
-      "message": "The original gas peaker is offline for 3 months.",
-      "preview": "The original gas peaker will be offline for 3 months from month 13.",
+      "message": "The original gas peaker is offline until {{event+3 months}}.",
+      "preview": "The original gas peaker will be offline from {{event}} until {{event+3 months}}.",
       "startMonth": 13,
       "durationMonths": 3,
-      "visibility": "forecast",
       "requiresChoice": {
         "choiceId": "overhaul-schedule",
         "optionIds": ["accelerate"]
@@ -54,7 +75,7 @@
           {
             "target": {
               "selector": "startingAsset",
-              "assetId": "scenario-106-natural-gas-peaker"
+              "assetId": "gas-peaker"
             },
             "outputMultiplier": 0
           }
@@ -70,11 +91,10 @@
     {
       "id": "standard-overhaul",
       "title": "Gas peaker overhaul",
-      "message": "The original gas peaker is offline for 6 months.",
-      "preview": "The original gas peaker will be offline for 6 months from month 13.",
+      "message": "The original gas peaker is offline until {{event+6 months}}.",
+      "preview": "The original gas peaker will be offline from {{event}} until {{event+6 months}}.",
       "startMonth": 13,
       "durationMonths": 6,
-      "visibility": "forecast",
       "requiresChoice": {
         "choiceId": "overhaul-schedule",
         "optionIds": ["standard"]
@@ -84,7 +104,7 @@
           {
             "target": {
               "selector": "startingAsset",
-              "assetId": "scenario-106-natural-gas-peaker"
+              "assetId": "gas-peaker"
             },
             "outputMultiplier": 0
           }
@@ -102,14 +122,14 @@
     {
       "id": "overhaul-schedule",
       "dueMonth": 7,
-      "title": "Choose the overhaul schedule",
-      "prompt": "Pay for a three-month outage or accept a grant for a six-month outage. The original gas peaker stops generating in month 13; new plants remain available.",
+      "title": "Overhaul schedule",
+      "prompt": "The original gas peaker goes offline in {{start+12 months}}. Shorten the outage or take funding.",
       "options": [
         {
           "id": "accelerate",
-          "label": "Accelerate the overhaul",
-          "description": "Pay for accelerated work to finish the original gas peaker overhaul in three months.",
-          "message": "Your company paid for the three-month overhaul.",
+          "label": "Shorten the outage",
+          "description": "Finish the overhaul in three months.",
+          "message": "You paid for the three-month overhaul.",
           "costDollars": {
             "byDifficulty": {
               "Intern": 1500000,
@@ -122,9 +142,9 @@
         },
         {
           "id": "standard",
-          "label": "Accept standard-schedule support",
-          "description": "Receive 2,000,000 starting-year dollars; the original gas peaker overhaul takes six months.",
-          "message": "Your company accepted support for the six-month overhaul.",
+          "label": "Take funding",
+          "description": "The outage lasts six months.",
+          "message": "You accepted support for the six-month overhaul.",
           "grantDollars": 2000000
         }
       ]

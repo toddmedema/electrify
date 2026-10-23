@@ -42,7 +42,7 @@ function pack(objectives: RuleObjective[] = []): ModPackage {
       startingCustomers: 10000,
       dollarsPerkWh: 0.2,
     },
-    objectives: { mode: "replace", items: objectives },
+    objectives: objectives,
     choices: [
       {
         id: "funding",

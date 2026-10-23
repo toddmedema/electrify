@@ -110,7 +110,7 @@ export function modSimulationMatrix(
   pack: ModPackage,
   options: Pick<ModSimulationOptions, "seeds" | "difficulties">,
 ): { seed: number; difficulty: DifficultyType }[] {
-  const seeds = options.seeds ?? [pack.seed];
+  const seeds = options.seeds ?? [pack.seed ?? 0];
   const difficulties = options.difficulties ?? ["Employee"];
   if (
     !seeds.length ||
@@ -319,11 +319,7 @@ export function formatModAuthorReport(
     ...(explain && report.inheritedObjectives.length
       ? [
           "Inherited objectives (replace-ready JSON):",
-          JSON.stringify(
-            { mode: "replace", items: report.inheritedObjectives },
-            null,
-            2,
-          ),
+          JSON.stringify(report.inheritedObjectives, null, 2),
         ]
       : []),
   ].join("\n");

@@ -18,7 +18,7 @@ const fixture = (patch = {}) => ({
   creator: "Test Creator",
   version: "1",
   description: "A community scenario for the test grid.",
-  objectives: { mode: "inherit" },
+
   seed: 42,
   baseScenarioId: 999,
   ...patch,

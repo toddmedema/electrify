@@ -19,8 +19,7 @@ test("native compact snapshots restore exact frozen rules before strict World va
     ...choice,
     options: choice.options.slice(0, 2),
   }));
-  if (pack.objectives.mode === "replace")
-    pack.objectives.items = pack.objectives.items.slice(0, 2);
+  if (pack.objectives) pack.objectives = pack.objectives.slice(0, 2);
   loadSimData(getScenarioLocation(modResolvedSetup(pack))!);
   const scenario = modScenario(pack, undefined, "Employee");
   const world = createWorld(

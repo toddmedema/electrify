@@ -35,9 +35,9 @@ export function objectiveValueText(
     case "emissionsPerDeliveredMWh":
       return `${number(value, comparison)} kg CO₂e / delivered MWh`;
     case "monthlyBilledRate":
-      return `$${number(value, comparison)}/kWh in starting-year dollars`;
+      return `$${number(value, comparison)}/kWh`;
     case "monthEndDebt":
-      return `$${number(value, comparison)} principal in starting-year dollars`;
+      return `$${number(value, comparison)} principal`;
     case "fuelRetirement":
       return `${number(value)} owned ${objective.fuel} ${value === 1 ? "asset" : "assets"}`;
   }

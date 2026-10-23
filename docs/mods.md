@@ -27,12 +27,11 @@ features. The reference below describes the package format.
 ## Package contract
 
 The package is one UTF-8 JSON file, at most **256 KiB**. Scripts, expressions,
-archives, custom media and extra upload files are unsupported. Assets, technologies,
-locations and starting fleets come from the bundled catalog. The resolved package,
+archives, custom media and extra upload files are unsupported. Technologies come from the bundled catalog; locations and starting fleets can be authored. The resolved package,
 including imported content, must fit **512 KiB**.
 
 Required fields are `schemaVersion: 1`, `gameApi: 1`, `id`, `title`, `creator`,
-`version`, `description`, `seed`, `baseScenarioId` and `objectives`.
+`version` and `description`. Everything else is optional.
 
 - IDs use 1–64 lowercase ASCII letters, digits or hyphens, starting and ending with
   a letter or digit.
@@ -45,44 +44,100 @@ Required fields are `schemaVersion: 1`, `gameApi: 1`, `id`, `title`, `creator`,
   `events`, `choices` and `debriefReports`. Unknown fields are errors at any depth.
   Runtime versions and digests are computed; do not add them to the package.
 
-`baseScenarioId` selects one of the 14 challenges in the
-[arc reference](mods/arc-reference.md), or `999` for Custom Game. It supplies the
-fleet, location, resources, ownership and demand model. `scenario` may override
-only the setup fields listed below. Inherited assets must be available in the
-chosen era at every difficulty. Changing the era adjusts unset money and tariffs;
-explicit amounts use the chosen starting year's dollars.
+Omit `baseScenarioId` to build a scenario from custom-game defaults: San Francisco,
+2020, 20 years, one million customers, $200 million, $0.07/kWh and a 500 MW gas
+peaker. Set the fields you want to change under `scenario`.
 
-The River Runs Dry (`114`) includes its Kariba starting Hydro asset and national
-site inventory. This inventory is available only at the base's Lusaka location;
-authors cannot choose extra sites or an inventory key. Ordinary custom Lusaka
-uses its local inventory.
+Use `scenario.location` for your own location: `id`, `name`, `lat` and `long`, plus
+optional `timeZone`, `country`, `admin`, `region` and watershed/resource metadata.
+Set `scenario.startingFleet` to a list of plants, or `[]` to start with none:
+
+```json
+"startingFleet": [
+  { "id": "gas-peaker", "name": "Natural Gas Peaker", "peakMW": 75 },
+  { "name": "Battery", "peakMWh": 20 }
+]
+```
+
+Generators use `peakMW`; storage uses `peakMWh`. `ageYears` defaults to zero.
+Only give a plant an `id` when you need to target it with `startingAsset`; otherwise
+one is assigned. Hydro can also use `hydroSiteId` and `reservoirFraction`.
+The ordinary site inventory and technology availability checks still apply.
+
+To adapt a built-in challenge instead, set `baseScenarioId` to an ID from the
+[arc reference](mods/arc-reference.md). Its setup, goals and events become the
+defaults; use `officialArcs: []` to omit its events. Explicit `scenario` fields and
+`objectives` replace those defaults. Existing saved runs keep their frozen setup.
+
+`seed` is optional, with a default of `0`. It selects a repeatable weather and
+random-event sequence for balancing or reproducing a report. Most packages should
+omit it; the arc-import example shows a pinned sequence. Use the simulator's
+`--seeds` option to test other sequences without editing the file.
+
+All money is in dollars at the scenario's start. The game handles inflation;
+amounts need no repeated qualifier in player text.
+
+### Dates in player text
+
+Use `{{start+2 months}}` for two months after the scenario starts, and
+`{{event+7 months}}` for seven months after the current event opens. Offsets count
+elapsed months: a January 2020 start makes `{{start+12 months}}` January 2021.
+`{{start}}` and `{{event}}` show the anchors themselves; singular `month` also works.
+
+Use these in descriptions, event text/previews, choice text, goal/report labels,
+and closing messages. In a choice, `event` means its decision date. In an event's
+closing message it still means that event's opening date. Seeded events use their
+actual opening in that run. Scenario descriptions, goals, debrief labels and
+closing messages have only `start`; `event` is rejected outside events/choices.
+Offsets are whole months from 0 to 1,200. Unknown names or malformed tokens are
+validation errors; these substitutions cannot execute expressions or scripts.
+
+For example, an outage opening in January 2021 can say:
+
+```json
+"message": "The gas peaker is offline until {{event+3 months}}."
+```
+
+Players see “The gas peaker is offline until April 2021.” Dates remain correct
+when the start year or event schedule changes, including in saved/co-op games.
 
 The [editor schema](mods/scenario.schema.json) describes field shapes and limits.
 Run the validator before publishing: it also checks references, timing, combined
 effects, asset availability and byte limits.
 
-### Goals are explicit
+### Goals
 
-- `objectives: { "mode": "inherit" }` keeps the base goals; optional `add` appends goals.
-- `objectives: { "mode": "replace", "items": [...] }` uses only the listed goals.
-- `objectives: { "mode": "none" }` declares no scenario goals. The player must still
-  reach the final month and avoid ordinary game failures.
+Omit `objectives` to keep the normal/base goals. Supply a plain list to use your
+own goals; `[]` means survival only. No mode field is needed:
 
-**Author report** supplies inherited goals as JSON you can copy into `replace`.
-Keep inherited goal windows within the term, or replace the goals when shortening
-it. Required goals determine success or failure; optional goals report results
+```json
+"objectives": [
+  {
+    "id": "service",
+    "label": "Keep customers supplied",
+    "metric": "monthlyReliability",
+    "fromMonth": 1,
+    "throughMonth": 24,
+    "minDemandServedShare": 0.995
+  }
+]
+```
+
+The author report supplies inherited goals as editable JSON. Copy the goals you
+want to keep into your list, then add or change goals there. Keep their windows
+within the run. Required goals determine success; optional goals report results
 without ending the company.
 
-| Metric                     | Measurement and boundary                                                                                                                                          |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `monthlyReliability`       | Customer electricity delivered / customer demand in **every** completed month of the inclusive window; target `minDemandServedShare`.                             |
-| `customerRetention`        | Customers / recorded starting customers at `deadlineMonth`; target `minRetainedShare`. Earlier losses can be recovered before the deadline.                       |
-| `emissionsBudget`          | Cumulative electricity and construction tonnes CO₂e in the window, including imports and exports; target `budgetTonnesCO2e`.                                      |
-| `emissionsPerDeliveredMWh` | Total kg CO₂e / delivered customer MWh over the entire window; target `maxKgCO2ePerMWh`.                                                                          |
-| `localFuelShare`           | Selected fuels' delivered Wh / all local fuel-delivered Wh over the window; target `minShare`. Imports and storage have no fuel provenance.                       |
-| `fuelRetirement`           | Own no asset of `fuel`, including paused and unfinished assets, at the deadline and every later month close.                                                      |
-| `monthlyBilledRate`        | Actual billed customer revenue / delivered kWh, excluding grants and exports, deflated to starting-year dollars, each month; target `maxDollarsPerKWh`.           |
-| `monthEndDebt`             | Owned outstanding facility and transmission loan principal at each month close, deflated to starting-year dollars; target `maxDebtDollars`. Interest is excluded. |
+| Metric                     | Measurement and boundary                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `monthlyReliability`       | Customer electricity delivered / customer demand in **every** completed month of the inclusive window; target `minDemandServedShare`.               |
+| `customerRetention`        | Customers / recorded starting customers at `deadlineMonth`; target `minRetainedShare`. Earlier losses can be recovered before the deadline.         |
+| `emissionsBudget`          | Cumulative electricity and construction tonnes CO₂e in the window, including imports and exports; target `budgetTonnesCO2e`.                        |
+| `emissionsPerDeliveredMWh` | Total kg CO₂e / delivered customer MWh over the entire window; target `maxKgCO2ePerMWh`.                                                            |
+| `localFuelShare`           | Selected fuels' delivered Wh / all local fuel-delivered Wh over the window; target `minShare`. Imports and storage have no fuel provenance.         |
+| `fuelRetirement`           | Own no asset of `fuel`, including paused and unfinished assets, at the deadline and every later month close.                                        |
+| `monthlyBilledRate`        | Actual billed customer revenue / delivered kWh, excluding grants and exports, deflated to dollars, each month; target `maxDollarsPerKWh`.           |
+| `monthEndDebt`             | Owned outstanding facility and transmission loan principal at each month close, deflated to dollars; target `maxDebtDollars`. Interest is excluded. |
 
 All goals have `id`, `label`, `metric`, and optional `required` (default `true`).
 Retention and retirement use a deadline; other metrics use inclusive
@@ -99,9 +154,9 @@ See [objective definitions](mods/objective-definitions.md) for a compact summary
 | `scenario.durationMonths`                                                                                      | Playable months, integer 6–1,200.                                                                                                                      |
 | `scenario.startingCustomers`                                                                                   | Customer count, integer 1–100,000,000.                                                                                                                 |
 | `scenario.startingDemandScale`                                                                                 | Dimensionless demand calibration, 0.01–100.                                                                                                            |
-| `scenario.cash`                                                                                                | Starting-year dollars, 0–1e12.                                                                                                                         |
-| `scenario.dollarsPerkWh`                                                                                       | Starting-year dollars/customer kWh, 0–100.                                                                                                             |
-| `scenario.feePerKgCO2e`                                                                                        | Starting-year dollars/kg CO₂e, 0–100. This setup field uses kg; the timed fee field below uses tonnes.                                                 |
+| `scenario.cash`                                                                                                | Dollars, 0–1e12.                                                                                                                                       |
+| `scenario.dollarsPerkWh`                                                                                       | Dollars/customer kWh, 0–100.                                                                                                                           |
+| `scenario.feePerKgCO2e`                                                                                        | Dollars/kg CO₂e, 0–100. This setup field uses kg; the timed fee field below uses tonnes.                                                               |
 | Event `startMonth`, range `from`/`to`, choice `dueMonth`, load `startMonth`, report/goal windows and deadlines | One-based playable month, integer 1–1,200 and inside the resolved term. Windows include both endpoints.                                                |
 | Event `durationMonths`                                                                                         | Integer 1–1,200, a complete difficulty table, or `"untilEnd"`. The onset month counts; effect-only durations are required.                             |
 | `load.peakMW`                                                                                                  | Peak MW, 0.001–100,000.                                                                                                                                |
@@ -113,13 +168,13 @@ See [objective definitions](mods/objective-definitions.md) for a compact summary
 | `hydroInflowMultiplier`                                                                                        | Inflow factor, 0–10; composed positive values must be 0.1–10, while `0` permits no inflow.                                                             |
 | `transmissionCapacityLimitsMWByCorridor`                                                                       | Absolute capacity cap by corridor ID, 0–1,000,000 MW.                                                                                                  |
 | `temperatureOffsetC`                                                                                           | Additive °C, −30–30 per event.                                                                                                                         |
-| `operatingExpenseDollarsPerMonth`                                                                              | Starting-year dollars per active month, 0–1e12.                                                                                                        |
-| Event transaction `amountDollars`, option `costDollars`/`grantDollars`                                         | One-time starting-year dollars per company, 0–1e12.                                                                                                    |
-| `carbonFeeDollarsPerTonneCO2e`                                                                                 | Absolute starting-year dollars/tonne CO₂e, 0–100,000.                                                                                                  |
+| `operatingExpenseDollarsPerMonth`                                                                              | Dollars per active month, 0–1e12.                                                                                                                      |
+| Event transaction `amountDollars`, option `costDollars`/`grantDollars`                                         | One-time dollars per company, 0–1e12.                                                                                                                  |
+| `carbonFeeDollarsPerTonneCO2e`                                                                                 | Absolute dollars/tonne CO₂e, 0–100,000.                                                                                                                |
 | Selector `count` / `minAgeYears` / `targetCapacityShare`                                                       | Whole generator count 1–10 / age in years 0–200 / operating capacity share 0–1.                                                                        |
 | Goal `minDemandServedShare`, `minRetainedShare`, `minShare`; report `minDemandServedShare`                     | Dimensionless share, 0–1.                                                                                                                              |
 | `budgetTonnesCO2e` / `maxKgCO2ePerMWh`                                                                         | Tonnes CO₂e 0–1e12 / kg CO₂e per delivered MWh 0–1e6.                                                                                                  |
-| `maxDollarsPerKWh` / `maxDebtDollars`                                                                          | Starting-year dollars/kWh 0–100 / starting-year dollars 0–1e12.                                                                                        |
+| `maxDollarsPerKWh` / `maxDebtDollars`                                                                          | Dollars/kWh 0–100 / dollars 0–1e12.                                                                                                                    |
 
 For a baseline whose real starting peak is **500 MW**, `peakMW: 100` and
 `peakShareOfStartingPeak: 0.2` both resolve to **100 MW**. The absolute form stays
@@ -142,8 +197,8 @@ Event, choice, load, report and goal IDs share a package namespace. Option IDs
 are local to their choice. Use stable IDs rather than array positions.
 
 An event has `id`, `title`, `message`, one onset month or inclusive seeded range,
-and optional duration, preview, condition, effects, loads and reports. Mechanical
-forecast events require a short future-tense `preview` (at most 200 code units).
+and optional duration, preview, condition, effects, loads and reports. `preview` is optional and defaults to `message`; use a short future-tense preview
+when it helps players prepare (at most 200 code units).
 `visibility: "surprise"` hides its future schedule and mechanics from player
 previews and Workshop Rules; it remains visible to the author. Messages and end
 messages have at most 500 code units. At onset the live message states the actual
@@ -201,7 +256,7 @@ own cost or receives its own grant, and the game stays paused after answering.
 Paid options need enough current cash; a zero-cost option remains usable with
 negative cash.
 
-Each option has exactly one `costDollars` or `grantDollars`, including zero. At least
+An option may have `costDollars` or `grantDollars`; omit both for a free option. At least
 one zero-cost option must exist at every difficulty. Options may replace a named
 future load with up to four new loads; `with: []` cancels it. Replacement is valid
 only before the original load starts. Event loads are permanent additions: event expiry never disconnects them.
@@ -239,7 +294,7 @@ window ends earlier.
 
 ## Import official arcs
 
-`officialArcs` is an array of `{ "scenarioId": 106, "includeChoices": true }`.
+`officialArcs` is an array of `{ "scenarioId": 106 }`. Choices are included by default; set `includeChoices: false` to choose the free responses automatically.
 Omitting it imports the challenge base's own arc; base `999` defaults to none.
 `[]` explicitly imports none. The base and arc list are independent: removing an
 arc does not remove an inherited objective or an initial industrial load.

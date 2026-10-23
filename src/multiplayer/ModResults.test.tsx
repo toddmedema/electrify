@@ -96,9 +96,7 @@ test("co-op debriefs display each company's supplied objective verdicts without 
   const grace = screen.getByRole("region", { name: "Grace objective results" });
   const hedy = screen.getByRole("region", { name: "Hedy objective results" });
   expect(grace).toHaveTextContent("Keep bills affordable · Optional · Failed");
-  expect(grace).toHaveTextContent(
-    "$0.10000000000001/kWh in starting-year dollars",
-  );
+  expect(grace).toHaveTextContent("$0.10000000000001/kWh");
   expect(grace).toHaveTextContent(bills.definition);
   expect(grace).toHaveTextContent("Jan–Feb 2020");
   expect(grace).toHaveTextContent(bills.reason!);

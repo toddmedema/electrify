@@ -36,7 +36,7 @@ const pack = (events: RuleEvent[] = []): ModPackage => ({
   description: "A small grid for event boundaries.",
   seed: 42,
   baseScenarioId: 999,
-  objectives: { mode: "none" },
+  objectives: [],
   officialArcs: [],
   scenario: {
     durationMonths: 6,
