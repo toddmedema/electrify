@@ -1777,7 +1777,7 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expect(report).toContainText(
-      "Author tools show every rule, including hidden surprises.",
+      "Validation passed. Includes hidden events.",
     );
     const reportDefault = report.getByRole("button", {
       name: "Easy",
@@ -1927,5 +1927,82 @@ for (const theme of ["light", "dark"] as const) {
     await playAndCheckRun(page, "Connection Planning");
     const saved = (await readSavedGame(page))!;
     expect(saved.customScenario!.mod!.rules.startingPeakW).toBeGreaterThan(0);
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`author report keeps maintenance branches concise in ${theme}`, async ({
+    page,
+  }) => {
+    const maintenance = validateMod(
+      JSON.parse(
+        await fs.readFile(
+          path.resolve(
+            __dirname,
+            "../docs/mods/examples/bridge-the-maintenance-gap.json",
+          ),
+          "utf8",
+        ),
+      ),
+    );
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+    await mockDesktop(page, false, theme, [
+      {
+        key: `local:${maintenance.id}`,
+        source: "local",
+        enabled: true,
+        pack: maintenance,
+      },
+    ]);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Mods", exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: `Author validation report for ${maintenance.title}`,
+        exact: true,
+      })
+      .click();
+    const report = page.getByRole("dialog", {
+      name: `Author validation report: ${maintenance.title}`,
+      exact: true,
+    });
+    await expect(
+      report.getByRole("region", { name: "Scenario diagnostics" }),
+    ).toBeInViewport();
+    await report
+      .getByRole("button", { name: "Affected generators", exact: true })
+      .click();
+    const targets = report.getByRole("region", { name: "Affected generators" });
+    await expect(targets.locator("dt")).toHaveCount(2);
+    await expect(targets).toContainText("Months 13–15");
+    await expect(targets).toContainText("Months 13–18");
+    await expect(targets).toContainText("Accelerate the overhaul");
+    await expect(targets).toContainText("Accept standard-schedule support");
+    await expect(targets).toContainText("0% output");
+    await report
+      .getByRole("button", { name: "Combined effects by month", exact: true })
+      .click();
+    const monthly = report.getByRole("region", {
+      name: "Combined effects by month",
+    });
+    await expect(monthly.locator("dt")).toHaveCount(4);
+    await expect(monthly).toContainText("Months 13–15");
+    await expect(monthly).toContainText("Months 16–18");
+    await expect(monthly).toContainText(
+      "accelerate-overhaul, standard-overhaul",
+    );
+    await scrollEvidenceIntoView(monthly);
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await expect(
+      page.locator("iframe#webpack-dev-server-client-overlay"),
+    ).toHaveCount(0);
+    await screenshot(
+      page,
+      `mod-author-copy-${page.viewportSize()!.width}-${theme}.png`,
+    );
+    await report
+      .getByRole("button", { name: "Close report", exact: true })
+      .click();
+    await expect(report).toBeHidden();
   });
 }

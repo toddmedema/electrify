@@ -300,6 +300,7 @@ export function formatModAuthorReport(
   const facts = (sections: ModAuthorReport["sections"]) =>
     sections.flatMap((section) => [
       section.title,
+      ...(section.description ? [`  ${section.description}`] : []),
       ...section.rows.flatMap((row) => [
         `  ${row.label}: ${row.value}`,
         ...(row.details ?? []).map((detail) => `    ${detail}`),

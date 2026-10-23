@@ -1171,8 +1171,10 @@ function ModsLibrary(): React.JSX.Element {
             severity={authorReport?.valid ? "info" : "error"}
             sx={{ mb: 2 }}
           >
-            Author tools show every rule, including hidden surprises. Player
-            previews hide surprises.
+            {authorReport?.valid
+              ? "Validation passed."
+              : "Fix the validation errors below."}{" "}
+            Includes hidden events.
           </Alert>
           <Box
             className="difficultyPicker"
@@ -1199,8 +1201,8 @@ function ModsLibrary(): React.JSX.Element {
           </Box>
           {authorReport && !authorReport.difficulties[authorDifficulty] && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              Complete facts for this difficulty are unavailable because
-              validation failed. Review the diagnostics below.
+              This difficulty could not be compiled. Review the validation
+              issues.
             </Alert>
           )}
           {authorFacts && <ModFacts facts={authorFacts} author />}

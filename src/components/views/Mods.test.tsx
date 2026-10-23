@@ -303,7 +303,7 @@ test("an author explicitly opens the complete validation report without launchin
     name: "Author validation report: Community Grid",
   });
   expect(within(dialog).getByRole("alert")).toHaveTextContent(
-    "Author tools show every rule, including hidden surprises.",
+    "Validation passed. Includes hidden events.",
   );
   expect(
     within(dialog).getByRole("region", { name: "Scenario diagnostics" }),

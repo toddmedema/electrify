@@ -47,6 +47,7 @@ export interface ModFactRow {
 export interface ModFactSection {
   id: string;
   title: string;
+  description?: string;
   rows: ModFactRow[];
 }
 export interface ModRuleFacts {
@@ -64,6 +65,8 @@ export interface ModAuthorReport extends ModRuleFacts {
 const number = (value: number) =>
   value.toLocaleString("en-US", { maximumSignificantDigits: 12 });
 const money = (value: number) => `$${number(value)}`;
+const range = (min: number, max: number) =>
+  min === max ? number(min) : `${number(min)}–${number(max)}`;
 const sortedEvents = (rules: CompiledScenarioRules) =>
   [...rules.events, ...(rules.arcEvents ?? [])].sort(
     (a, b) =>
@@ -91,7 +94,7 @@ export function modSelectorDescription(selector: ResolvedRuleSelector): string {
     case "operatingAtLeastAge":
       return `All operating ${fuel}generators aged at least ${selector.minAgeYears} years at onset.`;
     case "startingAsset":
-      return `Original starting asset ${selector.assetId}; selling it never transfers this identity to a replacement.`;
+      return `Original starting asset ${selector.assetId}; replacements are unaffected.`;
   }
 }
 function conditionText(
@@ -102,24 +105,6 @@ function conditionText(
   const choice = resolveScenarioRuleChoice(condition, rules);
   return `If ${choice?.title ?? condition.choiceId}: ${condition.optionIds.map((id) => choice?.options.find((option) => option.id === id)?.label ?? id).join(" or ")}`;
 }
-const REPORT_FACTS: Record<RuleReport["kind"], string> = {
-  reliability:
-    "Completed customer supplyWh and demandWh; missing months are unavailable.",
-  affectedFacilities:
-    "Persisted original target identities and facility observations; sold assets are not retargeted.",
-  fuelMix:
-    "Completed deliveredWhByFuel and the declared denominator; storage and imports have no fuel provenance.",
-  firmCoverage:
-    "Recorded peak customer demand and owned dispatchable generator capacity.",
-  storageCoverage:
-    "Recorded peak customer demand and owned storage power and energy.",
-  profitLoss:
-    "Completed recorded revenues and expenses through the accounting owner.",
-  dataCenter:
-    "Recorded customer demand, supply, customers and the adapted connection response.",
-  deepFreeze:
-    "Recorded before, impact and recovery reliability and the adapted winterization response.",
-};
 const PLAYER_REPORTS: Record<
   RuleReport["kind"],
   { label: string; definition: string }
@@ -167,12 +152,12 @@ const PLAYER_REPORTS: Record<
 };
 function reportText(report: RuleReport, year: number, author: boolean): string {
   const wording = PLAYER_REPORTS[report.kind];
-  return `${author ? report.kind : (report.label ?? wording.label)}${"fromMonth" in report ? ` · ${window(report.fromMonth, report.throughMonth, year)}` : ""} · ${author ? REPORT_FACTS[report.kind] : wording.definition}${author && "eventId" in report ? ` Target event ID: ${report.eventId}.` : ""}`;
+  return `${report.label ?? wording.label}${author ? ` (${report.kind})` : ""}${"fromMonth" in report ? ` · ${window(report.fromMonth, report.throughMonth, year)}` : ""} · ${wording.definition}${author && "eventId" in report ? ` Event: ${report.eventId}.` : ""}`;
 }
-function eventEffects(event: CompiledRuleEvent): string[] {
+function eventEffects(event: CompiledRuleEvent, author = false): string[] {
   return [
     ...scenarioEffectsSummary(event.effects, true),
-    ...event.targets.map(
+    ...(author ? [] : event.targets).map(
       (target) =>
         `${modSelectorDescription(target.target)} Output multiplier ×${number(target.outputMultiplier)}.`,
     ),
@@ -204,7 +189,7 @@ function monthlyAdditiveRanges(
           { effects: { [field]: left } },
           { effects: { [field]: right } },
         ])[field] ?? 0;
-      const range = scenarioRuleChoiceEnvelope(
+      const bounds = scenarioRuleChoiceEnvelope(
         graph,
         month,
         entries.map((event) => {
@@ -231,14 +216,18 @@ function monthlyAdditiveRanges(
         },
       );
       return [
-        `${field}: ${number(range.min)}–${number(range.max)} ${field === "temperatureOffsetC" ? "°C" : "starting-year dollars/month"}`,
+        field === "temperatureOffsetC"
+          ? `Temperature: ${range(bounds.min, bounds.max)} °C`
+          : `Operating expense: $${range(bounds.min, bounds.max)}/month`,
       ];
     },
   );
 }
 
-// Keep small reports readable in place; larger repeated selector text uses short references.
-const INLINE_SELECTOR_TEXT_BUDGET = 64 * 1024;
+const eventReference = (event: CompiledRuleEvent) =>
+  event.source
+    ? `arc ${event.source.scenarioId}/${event.source.phaseId}`
+    : event.id;
 
 /** Complete declarations appear once; monthly references never guess onset-selected identities. */
 function selectorFacts(
@@ -248,8 +237,8 @@ function selectorFacts(
 ) {
   const declarations = events
     .filter((event) => event.targets.length)
-    .map((event, index) => {
-      const reference = `S${index + 1}`;
+    .map((event) => {
+      const reference = eventReference(event);
       const throughMonth = event.durationUntilEnd
         ? rules.durationMonths - 1
         : Math.min(
@@ -258,33 +247,25 @@ function selectorFacts(
           );
       const condition =
         conditionText(rules, event.requiresChoice) ?? "Unconditional.";
-      const activeWindow = `Possible active window: ${window(event.possibleStartMonths.from, throughMonth, rules.startingYear)}.`;
+      const activeWindow = window(
+        event.possibleStartMonths.from,
+        throughMonth,
+        rules.startingYear,
+      );
       const targets = event.targets.map(
         (target) =>
-          `Selector output limit from ${event.id}: ×${number(target.outputMultiplier)}. ${modSelectorDescription(target.target)}`,
+          `${number(target.outputMultiplier * 100)}% output · ${modSelectorDescription(target.target)}`,
       );
       return {
         event,
         reference,
-        inline: [...targets, condition, activeWindow].join(" "),
-        possibleMonths:
-          event.durationMonths > 0
-            ? Math.max(0, throughMonth - event.possibleStartMonths.from + 1)
-            : 0,
         row: {
-          label: `${reference} · ${event.key}`,
-          value: `${condition} ${activeWindow}`,
+          label: reference,
+          value: `${activeWindow} · ${condition}`,
           details: targets,
         },
       };
     });
-  // Estimate before expanding months, including room for timing text and separators.
-  const compact =
-    declarations.reduce(
-      (size, declaration) =>
-        size + (declaration.inline.length + 64) * declaration.possibleMonths,
-      0,
-    ) > INLINE_SELECTOR_TEXT_BUDGET;
   return {
     rows: declarations.map(({ row }) => row),
     atMonth(month: number): string[] {
@@ -299,15 +280,6 @@ function selectorFacts(
       );
       const guaranteed = ({ event }: (typeof declarations)[number]) =>
         scenarioRuleGuaranteedAt(event, month, rules.durationMonths);
-      if (!compact)
-        return possible.map(
-          (declaration) =>
-            `${declaration.inline} ${
-              guaranteed(declaration)
-                ? "Active this month when enabled."
-                : "May be active this month; start timing varies."
-            }`,
-        );
       const active = possible
         .filter(guaranteed)
         .map(({ reference }) => reference);
@@ -315,19 +287,48 @@ function selectorFacts(
         .filter((declaration) => !guaranteed(declaration))
         .map(({ reference }) => reference);
       return [
-        ...(active.length
-          ? [
-              `Selector output limits active when enabled: ${active.join(", ")}. See Target selector semantics for conditions and limits.`,
-            ]
-          : []),
+        ...(active.length ? [`Output limits: ${active.join(", ")}`] : []),
         ...(uncertain.length
-          ? [
-              `Possible selector output limits (start timing varies): ${uncertain.join(", ")}. See Target selector semantics for conditions and limits.`,
-            ]
+          ? [`Possible output limits: ${uncertain.join(", ")} (start varies)`]
           : []),
       ];
     },
   };
+}
+
+function factorLabel(path: string): string {
+  const [field, fuel, facility] = path.split(".");
+  switch (field) {
+    case "demandMultiplier":
+      return "Demand";
+    case "hydroRunoffMultiplier":
+      return "Hydro inflow";
+    case "fuelPriceMultipliers":
+      return `${fuel} fuel price`;
+    case "buildCostMultipliersByFuel":
+      return `${facility ?? fuel} construction cost`;
+    case "operatingCostMultipliersByFuel":
+      return `${facility ?? fuel} operating cost`;
+    case "facilityOutputMultipliersByFuel":
+      return `${fuel} output`;
+    default:
+      return path;
+  }
+}
+
+/** Identical consecutive months need one row, while every change retains its exact boundary. */
+function groupMonthlyFacts(rows: ModFactRow[], year: number): ModFactRow[] {
+  const grouped: ModFactRow[] = [];
+  let from = 0;
+  rows.forEach((row, month) => {
+    if (month && row.value === rows[month - 1].value) {
+      grouped[grouped.length - 1].label = window(from, month, year);
+    } else {
+      from = month;
+      grouped.push({ ...row });
+    }
+  });
+  return grouped;
 }
 
 function facts(
@@ -471,8 +472,7 @@ function facts(
         details: [
           ...(author
             ? [
-                `ID: ${event.id}${event.source ? ` · Arc ${event.source.scenarioId}/${event.source.phaseId}` : ""} · ${event.visibility}`,
-                `Resolved effects: ${JSON.stringify(event.effects)}`,
+                `ID: ${eventReference(event)} · ${event.visibility === "surprise" ? "Hidden from players" : "Announced"}`,
               ]
             : []),
           ...(event.possibleStartMonths.from === event.possibleStartMonths.to
@@ -488,14 +488,14 @@ function facts(
           ...(conditionText(rules, event.requiresChoice)
             ? [conditionText(rules, event.requiresChoice)!]
             : []),
-          ...eventEffects(event),
-          ...rules.loads
+          ...eventEffects(event, author),
+          ...(author ? [] : rules.loads)
             .filter((load) => load.eventId === event.id)
             .map(
               (load) =>
                 `Permanent ${load.demandType} load: ${number(load.peakW / 1e6)} MW from ${at(load.startMonth, scenario.startingYear)}; load factor ${number(load.loadFactor)}.`,
             ),
-          ...(event.source
+          ...(!author && event.source
             ? (scenario.loadAdditions ?? [])
                 .filter(
                   (load) =>
@@ -516,13 +516,13 @@ function facts(
                     `Permanent ${load.demandType} load: ${number(load.peakW / 1e6)} MW from ${load.startsYear}-${String(load.startsMonth ?? 1).padStart(2, "0")}; load factor ${number(load.loadFactor)}.`,
                 )
             : []),
-          ...[event.report, event.endReport, ...(event.reports ?? [])].flatMap(
-            (report) =>
-              report
-                ? [
-                    `Report: ${reportText(report, scenario.startingYear, author)}`,
-                  ]
-                : [],
+          ...(author
+            ? []
+            : [event.report, event.endReport, ...(event.reports ?? [])]
+          ).flatMap((report) =>
+            report
+              ? [`Report: ${reportText(report, scenario.startingYear, author)}`]
+              : [],
           ),
         ],
       },
@@ -547,7 +547,12 @@ function facts(
             : []),
           ...choice.options.map(
             (option) =>
-              `${option.label}${author ? ` [${option.id}]` : ""}: ${option.description} Cost ${money(option.cost)}; grant ${money(option.grant)} per company.${option.replaceLoad ? ` Replaces ${option.replaceLoad.arc === undefined ? "" : `arc ${option.replaceLoad.arc} / `}${option.replaceLoad.loadId} with ${option.replaceLoad.with.map((load) => `${number(load.peakW / 1e6)} MW from month ${load.startMonth + 1}`).join(", ")}.` : ""}`,
+              `${option.label}${author ? ` [${option.id}]` : ""}: ${author ? "" : `${option.description} `}${
+                [
+                  ...(option.cost ? [`Pay ${money(option.cost)}`] : []),
+                  ...(option.grant ? [`Receive ${money(option.grant)}`] : []),
+                ].join("; ") || "No payment"
+              } per company.${option.replaceLoad ? ` Replaces ${option.replaceLoad.arc === undefined ? "" : `arc ${option.replaceLoad.arc} / `}${option.replaceLoad.loadId} with ${option.replaceLoad.with.map((load) => `${number(load.peakW / 1e6)} MW from month ${load.startMonth + 1}`).join(", ")}.` : ""}`,
           ),
         ],
       },
@@ -566,36 +571,38 @@ function facts(
     const graph = createScenarioRuleChoiceGraph(rules);
     const selectors = selectorFacts(rules, graph, events);
     sections.push({
+      id: "selectors",
+      title: "Affected generators",
+      rows: selectors.rows,
+    });
+    sections.push({
       id: "monthly",
-      title: "Month-by-month openings and composed factors",
-      rows: scenarioRuleCompositionRanges(
-        rules,
-        modStaticCostFactors(mod.facilities),
-      ).map(({ month, factors }) => {
-        const additive = monthlyAdditiveRanges(rules, month, graph, events);
-        const monthlySelectors = selectors.atMonth(month);
-        return {
-          label: at(month, scenario.startingYear),
-          value:
-            factors.length || additive.length || monthlySelectors.length
-              ? [
-                  ...factors.map(
-                    (factor) =>
-                      `${factor.path}: ×${number(factor.min)}–${number(factor.max)}`,
-                  ),
-                  ...additive,
-                  ...monthlySelectors,
-                ].join("; ")
-              : "No static or timed multiplier changes.",
-          details: events
-            .filter(
-              (event) =>
-                month >= event.possibleStartMonths.from &&
-                month <= event.possibleStartMonths.to,
-            )
-            .map((event) => `Possible opening: ${event.id} (${event.title})`),
-        };
-      }),
+      title: "Combined effects by month",
+      description: `Ranges cover all seeds and choices.${selectors.rows.length ? " Output limits follow the conditions in Affected generators." : ""}`,
+      rows: groupMonthlyFacts(
+        scenarioRuleCompositionRanges(
+          rules,
+          modStaticCostFactors(mod.facilities),
+        ).map(({ month, factors }) => {
+          const additive = monthlyAdditiveRanges(rules, month, graph, events);
+          const monthlySelectors = selectors.atMonth(month);
+          return {
+            label: at(month, scenario.startingYear),
+            value:
+              factors.length || additive.length || monthlySelectors.length
+                ? [
+                    ...factors.map(
+                      (factor) =>
+                        `${factorLabel(factor.path)}: ×${range(factor.min, factor.max)}`,
+                    ),
+                    ...additive,
+                    ...monthlySelectors,
+                  ].join("\n")
+                : "No multiplier changes.",
+          };
+        }),
+        scenario.startingYear,
+      ),
     });
     const loads = [
       ...rules.loads,
@@ -609,11 +616,14 @@ function facts(
       rows: [
         ...loads.map((load) => ({
           label: load.id ?? load.eventId,
-          value: `${number(load.peakW / 1e6)} MW · from ${at(load.startMonth, scenario.startingYear)} · load factor ${number(load.loadFactor)}`,
+          value: `${number(load.peakW / 1e6)} MW ${load.demandType} · from ${at(load.startMonth, scenario.startingYear)} · load factor ${number(load.loadFactor * 100)}%`,
+          details: conditionText(rules, load.requiresChoice)
+            ? [conditionText(rules, load.requiresChoice)!]
+            : [],
         })),
         ...(scenario.loadAdditions ?? []).map((load) => ({
           label: load.id ?? "Bundled load",
-          value: `${number(load.peakW / 1e6)} MW · from ${load.startsYear}-${String(load.startsMonth ?? 1).padStart(2, "0")} · load factor ${number(load.loadFactor)}`,
+          value: `${number(load.peakW / 1e6)} MW ${load.demandType} · from ${load.startsYear}-${String(load.startsMonth ?? 1).padStart(2, "0")} · load factor ${number(load.loadFactor * 100)}%`,
         })),
       ],
     });
@@ -630,11 +640,6 @@ function facts(
             `Option ID: ${option.id}${node.choice.automatic && option.id === node.choice.freeOptionId ? " · automatic free response" : ""}`,
         ),
       })),
-    });
-    sections.push({
-      id: "selectors",
-      title: "Target selector semantics",
-      rows: selectors.rows,
     });
     sections.push({
       id: "carbon",
@@ -654,7 +659,7 @@ function facts(
     });
     sections.push({
       id: "reports",
-      title: "Report windows and recorded facts",
+      title: "Outcome reports",
       rows: [
         ...events.flatMap((event) => [
           event.report,
@@ -686,7 +691,9 @@ function facts(
   return {
     title: scenario.name,
     description: mod.source.description,
-    sections,
+    sections: author
+      ? sections.filter((section) => section.rows.length)
+      : sections,
     diagnostics,
   };
 }

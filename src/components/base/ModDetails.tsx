@@ -28,39 +28,76 @@ const sectionLabel = (section: ModFactSection, author = false) =>
 
 function FactRows({ section }: { section: ModFactSection }) {
   return (
-    <Box component="dl" sx={{ m: 0 }}>
-      {section.rows.map((row, index) => (
-        <Box
-          key={`${row.label}:${index}`}
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "minmax(120px, 1fr) 3fr" },
-            columnGap: 2,
-            rowGap: 0.5,
-            mt: index ? 1.5 : 0,
-            alignItems: "baseline",
-          }}
-        >
-          <Typography component="dt" variant="body2" sx={{ fontWeight: 600 }}>
-            {row.label}
-          </Typography>
-          <Box component="dd" sx={{ m: 0, minWidth: 0 }}>
-            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-              {row.value}
+    <>
+      {section.description && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          {section.description}
+        </Typography>
+      )}
+      <Box component="dl" sx={{ m: 0 }}>
+        {section.rows.map((row, index) => (
+          <Box
+            key={`${row.label}:${index}`}
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "minmax(120px, 1fr) 3fr" },
+              columnGap: 2,
+              rowGap: 0.5,
+              mt: index ? 1.5 : 0,
+              alignItems: "baseline",
+            }}
+          >
+            <Typography component="dt" variant="body2" sx={{ fontWeight: 600 }}>
+              {row.label}
             </Typography>
-            {row.details?.map((detail, detailIndex) => (
-              <Typography
-                key={detailIndex}
-                variant="body2"
-                color="text.secondary"
-                sx={{ mt: 0.5 }}
-              >
-                {detail}
+            <Box component="dd" sx={{ m: 0, minWidth: 0 }}>
+              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                {row.value}
               </Typography>
-            ))}
+              {row.details?.map((detail, detailIndex) => (
+                <Typography
+                  key={detailIndex}
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  {detail}
+                </Typography>
+              ))}
+            </Box>
           </Box>
-        </Box>
-      ))}
+        ))}
+      </Box>
+    </>
+  );
+}
+
+function Diagnostics({ facts }: { facts: ModRuleFacts }) {
+  return (
+    <Box component="section" aria-label="Scenario diagnostics">
+      <Typography
+        component="h3"
+        variant="subtitle1"
+        sx={{ fontWeight: 600, mb: 1 }}
+      >
+        Validation issues
+      </Typography>
+      {!facts.diagnostics.length ? (
+        <Typography variant="body2" color="text.secondary">
+          No validation issues.
+        </Typography>
+      ) : (
+        <Stack spacing={1}>
+          {facts.diagnostics.map((diagnostic, index) => (
+            <Alert
+              key={`${diagnostic.path}:${index}`}
+              severity={diagnostic.severity}
+            >
+              <strong>{diagnostic.path}</strong>: {diagnostic.message}
+            </Alert>
+          ))}
+        </Stack>
+      )}
     </Box>
   );
 }
@@ -79,12 +116,19 @@ export function ModFacts({
       spacing={2}
       sx={{ minWidth: 0, overflowWrap: "anywhere" }}
     >
-      <Box component="section" aria-label="Author description">
-        <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 600 }}>
-          Author description
-        </Typography>
-        <Typography variant="body2">{facts.description}</Typography>
-      </Box>
+      {author && <Diagnostics facts={facts} />}
+      {!author && (
+        <Box component="section" aria-label="Author description">
+          <Typography
+            component="h3"
+            variant="subtitle1"
+            sx={{ fontWeight: 600 }}
+          >
+            Author description
+          </Typography>
+          <Typography variant="body2">{facts.description}</Typography>
+        </Box>
+      )}
       {facts.sections.map((section) => {
         const expandable =
           author || !["setup", "objectives", "timeline"].includes(section.id);
@@ -135,31 +179,7 @@ export function ModFacts({
           </Box>
         );
       })}
-      <Box component="section" aria-label="Scenario diagnostics">
-        <Typography
-          component="h3"
-          variant="subtitle1"
-          sx={{ fontWeight: 600, mb: 1 }}
-        >
-          Diagnostics
-        </Typography>
-        {!facts.diagnostics.length ? (
-          <Typography variant="body2" color="text.secondary">
-            No validation issues.
-          </Typography>
-        ) : (
-          <Stack spacing={1}>
-            {facts.diagnostics.map((diagnostic, index) => (
-              <Alert
-                key={`${diagnostic.path}:${index}`}
-                severity={diagnostic.severity}
-              >
-                <strong>{diagnostic.path}</strong>: {diagnostic.message}
-              </Alert>
-            ))}
-          </Stack>
-        )}
-      </Box>
+      {!author && <Diagnostics facts={facts} />}
     </Stack>
   );
 }

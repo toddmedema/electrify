@@ -35,40 +35,37 @@ test("monthly author facts preserve alternative selector windows and choice cond
   const months = report.sections.find(
     (section) => section.id === "monthly",
   )!.rows;
-  for (const month of [12, 19])
-    expect(months[month - 1].value).not.toContain("Selector output limit");
-  for (const month of [13, 15]) {
-    expect(months[month - 1].value).toContain(
-      "Selector output limit from accelerate-overhaul: ×0",
+  expect(months).toHaveLength(4);
+  expect(months.map((row) => row.label)).toEqual([
+    "Months 1–12 · Jan 2020–Dec 2020",
+    "Months 13–15 · Jan 2021–Mar 2021",
+    "Months 16–18 · Apr 2021–Jun 2021",
+    "Months 19–24 · Jul 2021–Dec 2021",
+  ]);
+  expect(months[0].value).not.toContain("overhaul");
+  expect(months[1].value).toContain("accelerate-overhaul, standard-overhaul");
+  expect(months[2].value).toContain("standard-overhaul");
+  expect(months[2].value).not.toContain("accelerate-overhaul");
+  expect(months[3].value).not.toContain("overhaul");
+  const targets = report.sections.find(
+    (section) => section.id === "selectors",
+  )!.rows;
+  expect(targets).toHaveLength(2);
+  for (const [index, through, option] of [
+    [0, 15, "Accelerate the overhaul"],
+    [1, 18, "Accept standard-schedule support"],
+  ] as const) {
+    expect(targets[index].value).toContain(`Months 13–${through}`);
+    expect(targets[index].value).toContain(option);
+    expect(targets[index].details).toEqual([
+      expect.stringContaining("0% output"),
+    ]);
+    expect(targets[index].details![0]).toContain(
+      "scenario-106-natural-gas-peaker",
     );
-    expect(months[month - 1].value).toContain(
-      "Selector output limit from standard-overhaul: ×0",
-    );
-    expect(months[month - 1].value).toContain(
-      "If Choose the overhaul schedule: Accelerate the overhaul",
-    );
-    expect(months[month - 1].value).toContain(
-      "If Choose the overhaul schedule: Accept standard-schedule support",
-    );
-    expect(months[month - 1].value).toContain(
-      "Original starting asset scenario-106-natural-gas-peaker",
-    );
-    expect(months[month - 1].value).toContain(
-      "Possible active window: Months 13–15",
-    );
-    expect(months[month - 1].value).toContain(
-      "Possible active window: Months 13–18",
-    );
+    expect(targets[index].details![0]).toContain("replacements are unaffected");
   }
-  for (const month of [16, 18]) {
-    expect(months[month - 1].value).not.toContain("accelerate-overhaul");
-    expect(months[month - 1].value).toContain(
-      "Selector output limit from standard-overhaul: ×0",
-    );
-    expect(months[month - 1].value).toContain(
-      "If Choose the overhaul schedule: Accept standard-schedule support",
-    );
-  }
+  expect(report.sections.every((section) => section.rows.length)).toBe(true);
 });
 
 test("monthly selector facts describe seeded possible windows without inventing dynamic targets", () => {
@@ -93,22 +90,21 @@ test("monthly selector facts describe seeded possible windows without inventing 
   const months = report.sections.find(
     (section) => section.id === "monthly",
   )!.rows;
-  for (const month of [1, 5, 6])
-    expect(months[month - 1].value).not.toContain("Selector output limit");
-  for (const month of [2, 3, 4]) {
-    expect(months[month - 1].value).toContain(
-      "Selector output limit from seeded-overhaul: ×0.5",
-    );
-    expect(months[month - 1].value).toContain(
-      "Largest operating generator at onset",
-    );
-    expect(months[month - 1].value).toContain(
-      "Possible active window: Months 2–4",
-    );
-  }
-  expect(months[1].value).toContain("May be active this month");
-  expect(months[2].value).toContain("Active this month when enabled");
-  expect(months[3].value).toContain("May be active this month");
+  expect(months).toHaveLength(5);
+  expect(months[0].value).not.toContain("seeded-overhaul");
+  expect(months[4].label).toContain("Months 5–6");
+  expect(months[4].value).not.toContain("seeded-overhaul");
+  expect(months[1].value).toContain("Possible output limits: seeded-overhaul");
+  expect(months[2].value).toBe("Output limits: seeded-overhaul");
+  expect(months[3].value).toContain("Possible output limits: seeded-overhaul");
+  const target = report.sections.find((section) => section.id === "selectors")!
+    .rows[0];
+  expect(target.value).toContain("Months 2–4");
+  expect(target.details).toEqual([
+    expect.stringContaining(
+      "50% output · Largest operating generator at onset",
+    ),
+  ]);
 });
 
 test("large author reports retain complete selector declarations without repeating them every month", () => {
@@ -175,41 +171,36 @@ test("large author reports retain complete selector declarations without repeati
     )!.rows;
     expect(definitions).toHaveLength(10);
     for (let event = 0; event < 10; event++) {
-      expect(definitions[event].label).toContain(
-        `S${event + 1} · mod:effect-recipes:maintenance-${event}`,
-      );
+      expect(definitions[event].label).toContain(`maintenance-${event}`);
       expect(definitions[event].value).toContain(
         `If Choose maintenance: ${event % 2 ? "Funded" : "Standard"}`,
       );
-      expect(definitions[event].value).toContain(
-        "Possible active window: Months 1–120",
-      );
+      expect(definitions[event].value).toContain("Months 1–120");
       expect(definitions[event].details).toHaveLength(10);
       for (let target = 0; target < 10; target++)
         expect(definitions[event].details![target]).toContain(
-          `×${target / 10}. All operating Natural Gas generators aged at least ${target} years at onset.`,
+          `${target * 10}% output · All operating Natural Gas generators aged at least ${target} years at onset.`,
         );
     }
     const monthly = facts!.sections.find(({ id }) => id === "monthly")!.rows;
-    expect(monthly).toHaveLength(120);
-    for (const row of monthly.slice(2)) {
+    expect(monthly).toHaveLength(2);
+    expect(monthly[0].label).toContain("Months 1–2");
+    expect(monthly[1].label).toContain("Months 3–120");
+    for (const row of monthly.slice(1)) {
       expect(row.value).toContain(
-        "Selector output limits active when enabled: S1, S2, S3, S4, S5, S6, S7, S8, S9, S10",
-      );
-      expect(row.value).toContain(
-        "See Target selector semantics for conditions and limits",
+        "Output limits: maintenance-0, maintenance-1, maintenance-2, maintenance-3, maintenance-4, maintenance-5, maintenance-6, maintenance-7, maintenance-8, maintenance-9",
       );
       expect(row.value).not.toContain("at onset");
     }
-    for (const row of monthly.slice(0, 2)) {
+    for (const row of monthly.slice(0, 1)) {
       expect(row.value).toContain(
-        "Selector output limits active when enabled: S1, S2, S3, S4, S5, S6, S7, S8, S9.",
+        "Output limits: maintenance-0, maintenance-1, maintenance-2, maintenance-3, maintenance-4, maintenance-5, maintenance-6, maintenance-7, maintenance-8",
       );
       expect(row.value).toContain(
-        "Possible selector output limits (start timing varies): S10.",
+        "Possible output limits: maintenance-9 (start varies)",
       );
     }
-    expect(monthly[2].value).not.toContain("start timing varies");
+    expect(monthly[1].value).not.toContain("start varies");
   }
 });
 
@@ -231,17 +222,15 @@ test("the common author report has all difficulty values, actual peak and additi
       .rows.find((r) => r.label === "Starting peak demand")!.value;
     expect(peak).toMatch(/^[1-9][\d,.]* MW$/);
     const monthly = facts!.sections.find((s) => s.id === "monthly")!.rows;
-    expect(monthly).toHaveLength(6);
+    expect(monthly).toHaveLength(3);
     expect(monthly[0].value).toContain(
-      "buildCostMultipliersByFuel.Natural Gas.Natural Gas Peaker: ×2–2",
+      "Natural Gas Peaker construction cost: ×2",
     );
     expect(monthly[1].value).toContain(
-      "buildCostMultipliersByFuel.Natural Gas.Natural Gas Peaker: ×1.8–1.8",
+      "Natural Gas Peaker construction cost: ×1.8",
     );
-    expect(monthly[1].value).toContain("temperatureOffsetC: 1–1 °C");
-    expect(monthly[1].value).toContain(
-      "operatingExpensePerMonth: 1,000–1,000 starting-year dollars/month",
-    );
+    expect(monthly[1].value).toContain("Temperature: 1 °C");
+    expect(monthly[1].value).toContain("Operating expense: $1,000/month");
   }
 });
 
@@ -285,8 +274,8 @@ test("author report additive ranges retain mutually exclusive choice branches", 
   const report = buildModAuthorReport(pack);
   expect(report.valid).toBe(true);
   const monthly = report.sections.find((s) => s.id === "monthly")!.rows;
-  expect(monthly[1].value).toContain("temperatureOffsetC: -3–5 °C");
-  expect(monthly[0].value).not.toContain("temperatureOffsetC");
+  expect(monthly[1].value).toContain("Temperature: -3–5 °C");
+  expect(monthly[0].value).not.toContain("Temperature:");
 });
 
 test("player diagnostics cannot disclose a surprise through a real truncated-window warning", () => {
