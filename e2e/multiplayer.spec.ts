@@ -311,7 +311,9 @@ class SteamRoom {
     }
   }
   async publish() {
-    for (const id of this.pages.keys())
+    // A registered page may still be navigating before it joins. Its decoder cannot yet ACK.
+    // Capture this lobby's recipients before awaiting delivery so new pages cannot join the loop.
+    for (const id of this.members.map((member) => member.id))
       await this.event(id, { kind: "state", state: this.state(id) });
   }
   async request(id: string, input: NativeRequest): Promise<unknown> {
@@ -970,6 +972,40 @@ test("mock Steam publishes only to players with an initialized transport", async
   }
   expect(room.pages.size).toBe(1);
   await expect(room.publish()).resolves.toBeUndefined();
+  expect(room.transportErrors).toEqual([]);
+});
+
+test("mock Steam lobby publication skips registered players who have not joined", async ({
+  browser,
+}) => {
+  let transports = 0;
+  const room = new SteamRoom(async (page) => {
+    const transport = await createSteamTransport(page);
+    if (++transports === 2)
+      return {
+        ...transport,
+        send: async () => {
+          throw new Error("Unjoined renderer is navigating");
+        },
+      };
+    return transport;
+  });
+  const host = await room.player(browser, 0);
+  await hostGame(host);
+  await room.player(browser, 1, false, false);
+  await host.evaluate(() => {
+    window.addEventListener("mockSteamEvent", (event) => {
+      (window as SteamTestWindow).receivedMockSteamEvent = (
+        event as CustomEvent<NativeEvent>
+      ).detail;
+    });
+  });
+  await expect(room.publish()).resolves.toBeUndefined();
+  expect(
+    await host.evaluate(
+      () => (window as SteamTestWindow).receivedMockSteamEvent,
+    ),
+  ).toEqual({ kind: "state", state: room.state(room.host) });
   expect(room.transportErrors).toEqual([]);
 });
 

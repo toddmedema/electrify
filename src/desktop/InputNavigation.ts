@@ -1,6 +1,15 @@
 const controlSelector =
   "button,a[href],input,select,textarea,summary,[role=button],[tabindex]";
 const popupSelector = "[role=dialog],[role=menu],[role=listbox]";
+const keyCodes: Record<string, number> = {
+  Enter: 13,
+  Escape: 27,
+  " ": 32,
+  ArrowLeft: 37,
+  ArrowUp: 38,
+  ArrowRight: 39,
+  ArrowDown: 40,
+};
 
 function visible(element: HTMLElement): boolean {
   // Compact tools cover the fleet without unmounting it or changing pointer/keyboard access.
@@ -62,20 +71,19 @@ function actionTarget(scope: HTMLElement): HTMLElement {
 }
 
 function key(target: HTMLElement, value: string): KeyboardEvent {
-  const event = new KeyboardEvent("keydown", {
+  // The reorder library uses the legacy numeric key fields, as real keyboard events do.
+  const keyCode = keyCodes[value] ?? 0;
+  const options = {
     key: value,
-    code: value,
+    code: value === " " ? "Space" : value,
+    keyCode,
+    which: keyCode,
     bubbles: true,
     cancelable: true,
-  });
+  };
+  const event = new KeyboardEvent("keydown", options);
   target.dispatchEvent(event);
-  target.dispatchEvent(
-    new KeyboardEvent("keyup", {
-      key: value,
-      code: value,
-      bubbles: true,
-    }),
-  );
+  target.dispatchEvent(new KeyboardEvent("keyup", options));
   return event;
 }
 
@@ -180,6 +188,11 @@ export function confirmInput(): void {
   }
   if (!visible(target) || target.matches(":disabled,[aria-disabled=true]"))
     return;
+  // Confirm lifts/drops a reorder; arrows move it and Back cancels through its own sensor.
+  if (target.matches("[data-rfd-drag-handle-draggable-id]")) {
+    key(target, " ");
+    return;
+  }
   let clicked = false;
   const markClick = () => {
     clicked = true;

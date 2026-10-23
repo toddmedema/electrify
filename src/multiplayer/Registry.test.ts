@@ -7,7 +7,7 @@ import uiReducer, {
   dialogClose,
   setFacilityDragActive,
 } from "../reducers/UI";
-import { multiplayerSnapshot } from "../reducers/GameActions";
+import { multiplayerSnapshot, systemSuspend } from "../reducers/GameActions";
 import { multiplayerMiddleware, registerMultiplayerRuntime } from "./Registry";
 
 afterEach(() => {
@@ -98,4 +98,13 @@ test("ordinary economic actions reach the host, and renderer ticks never advance
   expect(runtime.command).toHaveBeenCalledTimes(commands);
   local.dispatch(setFacilityDragActive(false));
   expect(runtime.activity).toHaveBeenLastCalledWith(null);
+});
+
+test("system sleep submits a persistent shared pause instead of an automatic background pause", () => {
+  const { local, runtime } = fixture();
+  local.dispatch(systemSuspend());
+  expect(runtime.command).toHaveBeenLastCalledWith({
+    kind: "speed",
+    speed: "PAUSED",
+  });
 });

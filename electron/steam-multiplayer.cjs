@@ -753,6 +753,12 @@ class SteamMultiplayer {
     )
       throw new Error("Invalid save request");
     if (
+      payload.kind === "save-request" &&
+      payload.suspended !== undefined &&
+      typeof payload.suspended !== "boolean"
+    )
+      throw new Error("Invalid save request");
+    if (
       payload.kind === "browse" &&
       (!payload.browse ||
         Buffer.byteLength(JSON.stringify(payload.browse)) > MAX_BROWSE_BYTES)

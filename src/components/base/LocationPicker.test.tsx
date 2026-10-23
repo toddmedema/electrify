@@ -130,6 +130,26 @@ it("supports arrow navigation, Enter and Space activation, and Home", () => {
   expect(screen.getByText("Showing the whole world")).toBeInTheDocument();
 });
 
+it("leaves the map's directional navigation with Back without leaving custom setup", async () => {
+  const leaveSetup = jest.fn();
+  render(
+    <main onKeyDown={leaveSetup}>
+      <LocationPicker
+        locations={cities}
+        value={cities[0]}
+        onChange={jest.fn()}
+      />
+    </main>,
+  );
+  const marker = screen.getByRole("button", { name: /Select West City/ });
+  act(() => marker.focus());
+  await act(async () => {
+    expect(fireEvent.keyDown(marker, { key: "Escape" })).toBe(false);
+  });
+  expect(screen.getByRole("button", { name: "Zoom in" })).toHaveFocus();
+  expect(leaveSetup).not.toHaveBeenCalled();
+});
+
 it("zooms in and out with the scroll wheel", () => {
   render(
     <LocationPicker

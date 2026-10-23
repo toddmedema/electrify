@@ -3,6 +3,9 @@ import path from "node:path";
 import base from "./playwright.config";
 
 const port = process.env.E2E_PORT || "3197";
+const outputDir =
+  process.env.ELECTRIFY_E2E_OUTPUT_DIR ||
+  path.resolve(__dirname, "../test-results/steam-input");
 const productionBuild = process.env.STEAM_INPUT_BUILD_DIR;
 const productionRoot = productionBuild
   ? path.resolve(__dirname, "..", productionBuild)
@@ -18,25 +21,44 @@ export default defineConfig({
   ...base,
   testMatch: "steam-input.spec.ts",
   testIgnore: [],
-  outputDir: "../test-results/steam-input",
+  outputDir,
+  reporter: [
+    ["list"],
+    ["json", { outputFile: path.join(outputDir, "results.json") }],
+  ],
+  // Keep retries as diagnostics while rejecting a failed first attempt.
+  failOnFlakyTests: true,
   fullyParallel: false,
   workers: 1,
   timeout: 90000,
-  projects: base
-    .projects!.filter((project) =>
-      ["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
-        project.name!,
-      ),
-    )
-    .map((project) => ({
-      ...project,
+  projects: [
+    ...([800, 720] as const).flatMap((height) =>
+      (["light", "dark"] as const).map((colorScheme) => ({
+        name: `deck-${height}-${colorScheme}`,
+        use: {
+          browserName: "chromium" as const,
+          viewport: { width: 1280, height },
+          colorScheme,
+        },
+      })),
+    ),
+    {
+      name: "docked-light",
       use: {
-        ...project.use,
-        colorScheme: project.name!.startsWith("mobile-")
-          ? ("dark" as const)
-          : ("light" as const),
+        browserName: "chromium",
+        viewport: { width: 1920, height: 1080 },
+        colorScheme: "light",
       },
-    })),
+    },
+    ...base
+      .projects!.filter((project) =>
+        ["mobile-390px", "mobile-360px"].includes(project.name!),
+      )
+      .map((project) => ({
+        ...project,
+        use: { ...project.use, colorScheme: "dark" as const },
+      })),
+  ],
   use: { ...base.use, baseURL: `http://127.0.0.1:${port}` },
   webServer: {
     command: productionRoot ? "node scripts/ci/serve.js" : "npm start",

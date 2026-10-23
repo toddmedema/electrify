@@ -103,6 +103,32 @@ test("the host worker schedules every tick at the shared speed and reschedules s
       jest.advanceTimersByTime(Math.floor(TICK_MS[speed]));
       expect(ticks).toBe(before + (speed === "PAUSED" ? 0 : 1));
     }
+    await send({
+      kind: "command",
+      sender: "host",
+      envelope: {
+        matchId: "match",
+        epoch: "epoch",
+        sequence: 6,
+        command: { kind: "speed", speed: "NORMAL" },
+      },
+    });
+    await send({
+      kind: "checkpoint",
+      requestId: "sleep",
+      pause: true,
+      suspended: true,
+    });
+    expect(world.paused).toBe(true);
+    expect(world.reason).toMatch(/sleep/);
+    const beforeSleep = ticks;
+    jest.advanceTimersByTime(1000);
+    expect(ticks).toBe(beforeSleep);
+    expect(post).toHaveBeenCalledWith({
+      kind: "checkpoint",
+      world,
+      requestId: "sleep",
+    });
   } finally {
     jest.clearAllTimers();
     timeout.mockRestore();

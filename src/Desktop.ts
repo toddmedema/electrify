@@ -11,7 +11,12 @@ export interface DesktopDisplay {
   height: number;
   resolutions: { width: number; height: number }[];
 }
+export interface DesktopPowerState {
+  phase: "awake" | "suspended" | "resuming";
+  generation: number;
+}
 export interface DesktopState {
+  power?: DesktopPowerState;
   display: DesktopDisplay;
   steam: {
     available: boolean;
@@ -87,6 +92,10 @@ export interface DesktopBridge {
     input: import("./mods/Types").ModRequest,
   ): Promise<import("./mods/Types").ModLibrary>;
   setInputContext?(context: DesktopInputContext): Promise<DesktopInputFrame>;
+  onPowerStateChanged?(
+    callback: (power: DesktopPowerState) => void,
+  ): () => void;
+  readyAfterResume?(generation: number): Promise<void>;
   onInput?(callback: (frame: DesktopInputFrame) => void): () => void;
   showTextInput?(input: DesktopTextInput): Promise<DesktopTextInputResult>;
   multiplayerRequest?(

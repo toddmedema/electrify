@@ -3,6 +3,8 @@ import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { chartScale, eventMarkersPlugin } from "./UPlotHelpers";
 import { getThemeVersion, subscribeThemeMode } from "../../Theme";
+import { getTextScale, subscribeTextSize } from "../../TextSize";
+import { useControllerInput } from "../../desktop/InputPresentation";
 import { ChartAnnotationsContext } from "./ChartAnnotationsContext";
 import {
   ChartViewportContext,
@@ -75,6 +77,8 @@ function tooltipPlugin<S>(
   getLabel: () => ((idx: number, state: S) => string) | undefined,
   hoverOnly: boolean,
   interactiveTooltip: boolean,
+  keyboardSelected: () => boolean,
+  dismissDetails: () => void,
 ): uPlot.Plugin {
   let el: HTMLDivElement | null = null;
   let header: HTMLDivElement;
@@ -114,7 +118,7 @@ function tooltipPlugin<S>(
             });
           });
           dismiss = (event) => {
-            if (event.key === "Escape") u.setCursor({ left: -10, top: -10 });
+            if (event.key === "Escape") dismissDetails();
           };
           document.addEventListener("keydown", dismiss);
         }
@@ -124,7 +128,7 @@ function tooltipPlugin<S>(
           });
           u.over.addEventListener("mouseleave", () => {
             hovering = false;
-            if (el) {
+            if (el && !keyboardSelected()) {
               el.style.display = "none";
             }
           });
@@ -133,7 +137,12 @@ function tooltipPlugin<S>(
       setCursor: (u: uPlot) => {
         const label = getLabel();
         const idx = u.cursor.idx;
-        if (!el || !label || idx == null || !hovering) {
+        if (
+          !el ||
+          !label ||
+          idx == null ||
+          (!hovering && !keyboardSelected())
+        ) {
           if (el) {
             el.style.display = "none";
           }
@@ -176,6 +185,7 @@ export default function UPlotChart<S>(
   props: UPlotChartProps<S>,
 ): React.JSX.Element {
   const { ariaLabel, id, height, state, data, structureKey, syncKey } = props;
+  const controllerInput = useControllerInput();
   const annotations = React.useContext(ChartAnnotationsContext);
   const viewport = React.useContext(ChartViewportContext);
   const rootRef = React.useRef<HTMLDivElement>(null);
@@ -183,6 +193,12 @@ export default function UPlotChart<S>(
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
   const [width, setWidth] = React.useState(0);
   const [selectedPoint, setSelectedPoint] = React.useState<number | null>(null);
+  // The cursor consults this synchronously, including compatibility mouse events delivered
+  // between keydown and React's next render. React state also supplies the live description.
+  const selectedPointRef = React.useRef<number | null>(null);
+  const pointerPositionRef = React.useRef<{ x: number; y: number } | null>(
+    null,
+  );
   const instructionsId = React.useId();
   const measuredWidthRef = React.useRef(0);
   const heightRef = React.useRef(height);
@@ -259,6 +275,11 @@ export default function UPlotChart<S>(
     subscribeThemeMode,
     getThemeVersion,
     getThemeVersion,
+  );
+  const textScale = React.useSyncExternalStore(
+    subscribeTextSize,
+    getTextScale,
+    getTextScale,
   );
   const [fontReady, setFontReady] = React.useState(
     () => !document.fonts || document.fonts.check("14px Inter"),
@@ -360,12 +381,25 @@ export default function UPlotChart<S>(
         height: Math.max(1, Math.round((height || 300) * scale)),
         // Only x is synced: these charts plot watts against watt-hours against dollars, so
         // matching their y scales would line up numbers that have nothing to do with each other
-        cursor: syncKey
-          ? {
-              ...built.cursor,
-              sync: { key: syncKey, setSeries: false, scales: ["x", null] },
+        cursor: {
+          ...built.cursor,
+          // Keyboard selection owns the cursor until dismissal or new pointer input. In
+          // particular, a delayed touch compatibility mouseleave cannot clear half the state.
+          move: (plot, left, top) => {
+            const point = selectedPointRef.current;
+            const times = dataRef.current[0];
+            if (point !== null && times.length) {
+              return [
+                plot.valToPos(times[Math.min(point, times.length - 1)], "x"),
+                0,
+              ];
             }
-          : built.cursor,
+            return built.cursor?.move?.(plot, left, top) || [left, top];
+          },
+          ...(syncKey
+            ? { sync: { key: syncKey, setSeries: false, scales: ["x", null] } }
+            : {}),
+        },
         plugins: [
           ...(built.plugins || []),
           eventMarkersPlugin(
@@ -377,6 +411,8 @@ export default function UPlotChart<S>(
             () => tooltipRef.current,
             !!syncKey,
             !!props.interactiveTooltip,
+            () => selectedPointRef.current !== null,
+            closeDetails,
           ),
         ],
       },
@@ -392,7 +428,7 @@ export default function UPlotChart<S>(
     };
     // Data changes go through setData below; only size, shape and palette rebuild
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, structureKey, themeVersion, fontReady]);
+  }, [width, height, structureKey, themeVersion, textScale, fontReady]);
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {
@@ -408,7 +444,15 @@ export default function UPlotChart<S>(
         max: viewport.range[1],
       });
     }
-  }, [viewport, width, height, structureKey, themeVersion, fontReady]);
+  }, [
+    viewport,
+    width,
+    height,
+    structureKey,
+    themeVersion,
+    textScale,
+    fontReady,
+  ]);
 
   React.useLayoutEffect(() => {
     const plot = plotRef.current;
@@ -599,7 +643,15 @@ export default function UPlotChart<S>(
       if (frame !== undefined) cancelAnimationFrame(frame);
       if (wheelTimer) clearTimeout(wheelTimer);
     };
-  }, [width, height, structureKey, themeVersion, viewportEnabled, fontReady]);
+  }, [
+    width,
+    height,
+    structureKey,
+    themeVersion,
+    textScale,
+    viewportEnabled,
+    fontReady,
+  ]);
 
   React.useLayoutEffect(() => {
     plotRef.current?.redraw();
@@ -609,13 +661,18 @@ export default function UPlotChart<S>(
     const plot = plotRef.current;
     if (!plot || !data[0].length) return;
     const point = Math.max(0, Math.min(data[0].length - 1, index));
+    selectedPointRef.current = point;
     setSelectedPoint(point);
     plot.setCursor({ left: plot.valToPos(data[0][point], "x"), top: 0 });
   };
-  const closeDetails = () => {
+  function releaseKeyboardSelection() {
+    selectedPointRef.current = null;
     setSelectedPoint(null);
+  }
+  function closeDetails() {
+    releaseKeyboardSelection();
     plotRef.current?.setCursor({ left: -10, top: -10 });
-  };
+  }
   const detail =
     selectedPoint === null
       ? undefined
@@ -625,8 +682,9 @@ export default function UPlotChart<S>(
     <div className="accessibleChart">
       {props.interactiveTooltip && (
         <span id={instructionsId} className="srOnly">
-          Hover or press Enter to inspect a time. Use Left and Right arrows,
-          Home and End to read points. Escape closes the tooltip.
+          {controllerInput
+            ? "Select to inspect a time. Use Left and Right to read points. Back closes the tooltip."
+            : "Hover or press Enter to inspect a time. Use Left and Right arrows, Home and End to read points. Escape closes the tooltip."}
         </span>
       )}
       <div
@@ -637,6 +695,39 @@ export default function UPlotChart<S>(
         tabIndex={props.interactiveTooltip ? 0 : undefined}
         aria-describedby={props.interactiveTooltip ? instructionsId : undefined}
         onBlur={props.interactiveTooltip ? closeDetails : undefined}
+        onPointerDownCapture={
+          props.interactiveTooltip
+            ? (event) => {
+                pointerPositionRef.current = {
+                  x: event.clientX,
+                  y: event.clientY,
+                };
+                releaseKeyboardSelection();
+              }
+            : undefined
+        }
+        onPointerMoveCapture={
+          props.interactiveTooltip
+            ? (event) => {
+                const previous = pointerPositionRef.current;
+                pointerPositionRef.current = {
+                  x: event.clientX,
+                  y: event.clientY,
+                };
+                // movementX/Y may stay zero under mobile emulation. Compare actual coordinates,
+                // while ignoring a compatibility move at the touch's existing position.
+                if (
+                  selectedPointRef.current !== null &&
+                  event.pointerType === "mouse" &&
+                  (!previous ||
+                    previous.x !== event.clientX ||
+                    previous.y !== event.clientY)
+                ) {
+                  releaseKeyboardSelection();
+                }
+              }
+            : undefined
+        }
         onKeyDown={
           props.interactiveTooltip
             ? (event) => {
@@ -659,6 +750,14 @@ export default function UPlotChart<S>(
                 } else if (event.key in points) {
                   event.preventDefault();
                   selectPoint(points[event.key]);
+                  // Match pointer activation for the tutorial and other control owners. The
+                  // root click does not reach uPlot's inner pointer surface or move the cursor.
+                  if (
+                    event.key === "Enter" &&
+                    plotRef.current &&
+                    data[0].length
+                  )
+                    event.currentTarget.click();
                 }
               }
             : undefined

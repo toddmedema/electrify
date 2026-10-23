@@ -266,7 +266,8 @@ export class MultiplayerSession {
             to: event.sender,
             payload: { kind: "save-result", requestId, error },
           });
-        void this.save()
+        const suspended = event.payload.suspended === true;
+        void this.save(suspended, suspended)
           .then(
             () => respond(),
             (error) => respond(error.message),
@@ -957,7 +958,25 @@ export class MultiplayerSession {
       throw error;
     }
   }
-  async save(pause = false) {
+  async save(pause = false, keepOpen = false) {
+    if (keepOpen) {
+      // Unsent pre-sleep readiness cannot count as fresh consent after the safety checkpoint.
+      // Already sent envelopes keep their sequence/receipt identity and precede the checkpoint.
+      this.queued = this.queued.filter((queued) => {
+        const { command } = queued;
+        if (
+          command.kind !== "ready" &&
+          !(command.kind === "speed" && command.speed !== "PAUSED")
+        )
+          return true;
+        queued.reject(
+          new Error(
+            "The device went to sleep. Choose a speed again when ready.",
+          ),
+        );
+        return false;
+      });
+    }
     if (!this.worker) {
       if (!this.state.view) return;
       const requestId = crypto.randomUUID();
@@ -972,7 +991,11 @@ export class MultiplayerSession {
           void this.request({
             kind: "send",
             to: this.state.lobby.hostId!,
-            payload: { kind: "save-request", requestId },
+            payload: {
+              kind: "save-request",
+              requestId,
+              ...(keepOpen ? { suspended: true } : {}),
+            },
           }).catch(reject);
         });
       } finally {
@@ -981,7 +1004,7 @@ export class MultiplayerSession {
       }
       return;
     }
-    if (pause) this.closing = true;
+    if (pause && !keepOpen) this.closing = true;
     const requestId = crypto.randomUUID();
     let timeout: ReturnType<typeof setTimeout>;
     try {
@@ -991,10 +1014,15 @@ export class MultiplayerSession {
           () => reject(new Error("The host could not finish the save")),
           SAVE_TIMEOUT_MS,
         );
-        this.post({ kind: "checkpoint", requestId, pause });
+        this.post({
+          kind: "checkpoint",
+          requestId,
+          pause,
+          ...(keepOpen ? { suspended: true } : {}),
+        });
       });
     } catch (error) {
-      if (pause) this.closing = false;
+      if (pause && !keepOpen) this.closing = false;
       throw error;
     } finally {
       clearTimeout(timeout!);

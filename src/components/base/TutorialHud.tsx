@@ -2,6 +2,8 @@ import TouchAppOutlinedIcon from "@mui/icons-material/TouchAppOutlined";
 import { Button, Typography } from "@mui/material";
 import * as React from "react";
 import { TutorialStepType, isGatedStep } from "../../Types";
+import { useControllerInput } from "../../desktop/InputPresentation";
+import { tutorialInputText } from "./TutorialPrompt";
 
 export interface TutorialHudProps {
   desktop: boolean;
@@ -304,7 +306,13 @@ export default function TutorialHud({
   totalSteps,
   canGoBack,
 }: TutorialHudProps): React.JSX.Element {
-  const { action, content, target } = resolveStep(step, desktop);
+  const controllerInput = useControllerInput();
+  const {
+    action: resolvedAction,
+    content,
+    target,
+  } = resolveStep(step, desktop);
+  const action = tutorialInputText(resolvedAction, controllerInput);
   // Next is the step's main button only when it's the only way forward. A step that also
   // advances on an in-game deed keeps it as a quiet fallback, so the ringed control is the one
   // thing on screen asking to be tapped
@@ -497,7 +505,9 @@ export default function TutorialHud({
           {/* Keyed inside the live region so the region itself persists and keeps announcing */}
           <div key={stepIndex} className="tutorialHudStep">
             <p className="tutorialHudAction">
-              <TouchAppOutlinedIcon fontSize="small" aria-hidden />
+              {!controllerInput && (
+                <TouchAppOutlinedIcon fontSize="small" aria-hidden />
+              )}
               <span>{action}</span>
             </p>
             {content}

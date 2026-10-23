@@ -2,6 +2,9 @@ import { defineConfig } from "@playwright/test";
 import path from "node:path";
 
 const port = process.env.E2E_PORT || "3115";
+const outputDir =
+  process.env.ELECTRIFY_E2E_OUTPUT_DIR ||
+  path.resolve(__dirname, "../test-results/multiplayer");
 const productionBuild =
   process.env.MULTIPLAYER_BUILD_DIR ||
   (process.env.GITHUB_ACTIONS === "true" ? "build" : undefined);
@@ -21,18 +24,26 @@ if (productionRoot) {
   }
 }
 // Desktop-renderer specs that replace the native bridge with an in-memory one: Steam
-// multiplayer, Steam Input and mod management (Workshop and local packages). The name is
+// multiplayer and mod management (Workshop and local packages). The name is
 // historical. The real gameplay, input navigation, host worker and checkpoint protocol still run.
 // CI reuses its verified production desktop artifact; local dev remains available by default.
 export default defineConfig({
   testDir: ".",
-  testMatch: ["multiplayer.spec.ts", "steam-input.spec.ts", "mods.spec.ts"],
-  outputDir: "../test-results/multiplayer",
+  testMatch: ["multiplayer.spec.ts", "mods.spec.ts"],
+  outputDir,
   fullyParallel: false,
   workers: 1,
   timeout: 120000,
   expect: { timeout: 20000 },
-  reporter: "list",
+  reporter: [
+    ["list"],
+    [
+      "json",
+      {
+        outputFile: path.join(outputDir, "results.json"),
+      },
+    ],
+  ],
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     headless: true,

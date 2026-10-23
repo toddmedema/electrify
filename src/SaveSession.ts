@@ -484,13 +484,31 @@ export async function retryCurrentSave(): Promise<boolean> {
   }
 }
 
-/** Electron waits for the actual save commit before allowing a normal window close. */
+/** Commit the live checkpoint for desktop exit or sleep without releasing its writer lease. */
 export async function checkpointForDesktopExit(): Promise<void> {
   await transitionTail;
   const requested = active;
   if (requested) {
     requested.capture(getStore().getState().game);
     await requested.flush();
+  }
+}
+
+/** Refresh an existing writer after sleep without releasing or stealing another writer's lease. */
+export async function renewDesktopSaveWriter(): Promise<void> {
+  await transitionTail;
+  const requested = active;
+  if (!requested?.created || requested.terminal) return;
+  try {
+    await requested.settle();
+    if (active !== requested) return;
+    await repository.renew(requested.lease);
+  } catch (error) {
+    if (active === requested) {
+      requested.failure = error;
+      notifySession("failed", undefined, getSaveErrorMessage(error));
+    }
+    throw error;
   }
 }
 

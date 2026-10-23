@@ -110,6 +110,7 @@ import {
   openPolicyDecision,
   closePolicyDecision,
   pageHidden,
+  systemSuspend,
   pageVisible,
 } from "./GameActions";
 import type { AppDispatch } from "../Store";
@@ -2278,6 +2279,19 @@ export const gameSlice = createSlice({
         setForegroundSpeed(state, remembered);
         ensureTicking(state);
       }
+    });
+    builder.addCase(systemSuspend, (state) => {
+      state.speed = "PAUSED";
+      speedBeforeDialog = "PAUSED";
+      if (speedBeforeHidden !== undefined) speedBeforeHidden = "PAUSED";
+      if (speedBeforeBlockingCard !== undefined)
+        speedBeforeBlockingCard = "PAUSED";
+      if (speedBeforeManualHelp !== undefined) speedBeforeManualHelp = "PAUSED";
+      if (speedBeforeCloudSavePrompt !== undefined)
+        speedBeforeCloudSavePrompt = "PAUSED";
+      if (state.policyPause) state.policyPause.speed = "PAUSED";
+      if (state.scenarioChoicePause !== undefined)
+        state.scenarioChoicePause = "PAUSED";
     });
     builder.addCase(pageHidden, (state) => {
       if (state.inGame && speedBeforeHidden === undefined) {

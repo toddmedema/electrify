@@ -5,6 +5,10 @@ import { store } from "../../Store";
 import { delta, markEventsRead } from "../../reducers/Game";
 import { ActiveWorldEventType } from "../../Types";
 import Navigation from "./Navigation";
+import {
+  resetInputPresentation,
+  updateInputPresentation,
+} from "../../desktop/InputPresentation";
 
 function renderNavigation(onToggle = jest.fn()) {
   return render(
@@ -36,6 +40,7 @@ afterAll(() => {
   window.PointerEvent = originalPointerEvent;
 });
 afterEach(() => {
+  resetInputPresentation();
   document.elementFromPoint = originalElementFromPoint;
   jest.useRealTimers();
 });
@@ -213,6 +218,16 @@ describe("Navigation", () => {
     await act(async () => programs.focus());
     expect(screen.getByRole("tooltip", { name: "Programs (W)" })).toBeVisible();
     expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it("keeps dock help free of keyboard prompts while the controller is active", async () => {
+    renderNavigation();
+    const build = screen.getByRole("button", { name: "Build" });
+    act(() => updateInputPresentation({ active: true, connected: true }));
+    await act(async () => build.focus());
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build$/);
+    act(() => updateInputPresentation({ active: false }));
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(Q\)$/);
   });
 
   it("previews labels after holding the dock padding and scrubbing, without activating on release", () => {

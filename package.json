@@ -57,6 +57,7 @@
     "test:ci-core": "node scripts/ci/platform-tests.js 2 --cpu-only",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "test:e2e:ci": "playwright test --config e2e/ci.playwright.config.ts",
+    "test:e2e:production": "playwright test --config e2e/production.playwright.config.ts",
     "pretest:e2e:ci": "npm run compatibility:generate",
     "test:rules": "npx --yes firebase-tools@15.32.1 emulators:exec --only firestore --project demo-electrify-achievements \"node --test firebase/achievements.test.cjs\"",
     "sim": "node scripts/sim.js",
@@ -104,7 +105,9 @@
     "mods:validate": "node scripts/mods-validate.js",
     "premods:validate": "npm run compatibility:generate",
     "mods:schema": "node scripts/mods-schema.js",
-    "mods:recipes": "node scripts/mods-recipes.js"
+    "mods:recipes": "node scripts/mods-recipes.js",
+    "test:steam-input": "playwright test --config e2e/steam-input.playwright.config.ts",
+    "pretest:steam-input": "npm run compatibility:generate && npm run icons:generate"
   },
   "eslintConfig": {
     "extends": [

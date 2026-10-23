@@ -60,7 +60,7 @@ test("PR CI has exactly five jobs including all native targets and the required 
   assert.match(native, /workers: 1/);
   assert.match(native, /test-results\/desktop/);
   assert.match(
-    fs.readFileSync("e2e/ci.playwright.config.ts", "utf8"),
+    fs.readFileSync("e2e/production.playwright.config.ts", "utf8"),
     /test-results\/browser/,
   );
 });
@@ -102,6 +102,16 @@ test("platform plans retain all CPU shards, browser shards and full native suite
       index === 3,
       "Headless multiplayer renderer tests run once on the full-dependency Mac browser worker",
     );
+    assert.equal(
+      plan.ui.some(({ script }) => script === "test:steam-input"),
+      index === 3,
+      "Controller journeys run once against the production desktop renderer",
+    );
+    if (index === 3)
+      assert.deepEqual(
+        plan.ui.find(({ script }) => script === "test:steam-input").env,
+        { STEAM_INPUT_BUILD_DIR: "build" },
+      );
   }
   assert.deepEqual(
     cpuSuites(2, 4).map(({ script }) => script),

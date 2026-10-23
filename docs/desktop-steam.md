@@ -313,18 +313,21 @@ input remains available.
 Windowless browser coverage uses a replacement native bridge while retaining the production
 desktop renderer, real controls, reducers and save repository:
 
-```powershell
-$env:E2E_PORT = "3197" # Choose an unused task-specific port.
+```sh
+# Choose an unused task-specific port and keep it for this task's browser checks.
+export E2E_PORT=3217
 npm run desktop:build
-$env:STEAM_INPUT_BUILD_DIR = "build"
-npx playwright test --config e2e/steam-input.playwright.config.ts
-Remove-Item Env:STEAM_INPUT_BUILD_DIR
+STEAM_INPUT_BUILD_DIR=build npm run test:steam-input
 ```
 
-This covers a controller-only title → challenge → construction → pricing → chart → Save & Quit
-journey at desktop and phone widths, active-device hints and pause on disconnect. Native unit
-tests exercise action polling and lifecycle guards. These checks do not validate a physical
-controller, Steam's configuration delivery or Steam Deck gaming mode.
+`npm run check:ci` runs this production-renderer suite as its controller gate. The native CI
+matrix also runs it once on the full-dependency macOS browser worker. It is headless and uses
+semantic controller actions through a replacement native bridge, retaining the real controls,
+reducers, and save repository. Its matrix covers 1280×800 and 1280×720 in light and dark themes,
+a docked 1920×1080 view, and 390/360 px touch layouts. Coverage includes gameplay, construction,
+rate changes, charts, reordering, custom-city selection, text size, Workshop navigation, and
+multiplayer invite entry. These checks do not establish physical controller compatibility,
+Steam configuration delivery, or Deck Gaming Mode acceptance.
 
 Before release, launch a private Steam build with the real App ID and test:
 
@@ -342,6 +345,63 @@ Before release, launch a private Steam build with the real App ID and test:
   installed configurations and local saves must remain usable.
 - Enter a lobby code, rename a save and search the manual using the controller text editor.
   Check Unicode text, cancellation, returning focus and holding Confirm while closing the editor.
+
+### Handheld readability and system sleep
+
+Settings offers Standard (100%), Large (112.5%) and Larger (125%) text. This preference stays on
+the device. It scales interface typography, chart labels and controller hints together without
+changing the OS resolution or zooming the viewport. Controller navigation suppresses keyboard-only
+shortcut prompts; a physical keyboard restores them. Native mod import/template dialogs and the
+save-failure close warning temporarily request Steam's controller-to-mouse/keyboard navigation.
+Returning from a native dialog restores semantic controls and requires held buttons to be released.
+This integration still needs an actual SteamOS file-portal acceptance pass.
+
+Electron handles system suspend separately from losing focus. Sleep gates native input and
+pauses simulation/audio even when the window remains focused. Solo and shared-game checkpoints
+are best effort: the OS can freeze the process before a write completes. Periodic checkpoints
+remain the recovery boundary after a process kill or battery loss.
+
+Wake renews the existing save writer and attempts another checkpoint before releasing the input
+gate. Old wake acknowledgements cannot unlock a later sleep. The game stays paused until the
+player resumes it; closing a purchase, help, or other blocking screen cannot restore an earlier
+running speed. Multiplayer sleep also preserves the shared save and requires consent to continue.
+A wake checkpoint failure uses the existing visible save error and retry path.
+
+### Steam Deck release acceptance
+
+Use a private Steam branch with the real App ID and the intended Linux runtime. For each release,
+record the build/commit, SteamOS version, device model, runtime, controller configuration, and
+pass/fail evidence. Run on an LCD and OLED Deck when available; repeat dock/undock with an
+external controller and display. A browser viewport or Linux Xvfb run is not a substitute.
+
+- **Launch and defaults:** install and start in Gaming Mode without a keyboard, launch arguments,
+  compatibility overrides, or a community configuration. Verify the Linux executable and all
+  bundled assets, audio, overlay and text entry. Confirm the published default bindings arrive.
+- **Every player flow:** complete the tutorial path and a challenge; create a custom game and
+  choose a city; buy/resize/upgrade facilities; reorder plants and interties; change pricing and
+  programs; inspect charts; answer event/policy decisions; rename/load/delete a save; navigate
+  installed mods and Workshop; host, join, reconnect and resume co-op. No flow may require touch
+  or a physical keyboard. Check mod import/template dialogs with Steam's automatic native-dialog
+  navigation, including cancellation, save-failure recovery and a sleep while a chooser is open.
+  External authoring tools need their own usability check when advertised as supported.
+- **Prompts and focus:** verify Deck glyphs and a player-edited binding; inspect tooltips, manual
+  help, settings and charts for stray keyboard prompts. Test nested Back, modal focus restoration,
+  held Confirm across dialogs, and controller replacement/disconnection.
+- **Readability:** inspect default and Larger text at 1280×800 and 1280×720, both themes, at normal
+  handheld distance. Check charts, numeric controls, selected focus, tool panels and the controller
+  footer for clipping, overlap and unexpected page scrolling. Repeat docked and after undocking.
+- **Sleep and recovery:** sleep during FAST play, construction review, text entry and an active
+  save; wait beyond the save lease duration; wake while holding a button. Expect a paused game,
+  correct saved progress, usable focus and audio, and no catch-up or unintended purchase. Repeat
+  sleep/wake, go offline while asleep, and test a sleeping co-op host and guest with separate
+  Steam accounts. Confirm save failures are recoverable without discarding local progress.
+- **Offline and cross-device saves:** start with Steam Offline Mode, play/save/relaunch, and move
+  saves between Deck and PC after clean exits. Preserve conflicts and device display/text settings.
+  Dynamic Cloud Sync is not enabled by this implementation; seamless transfer while a game
+  remains suspended requires a separate integration and acceptance pass.
+- **Valve review:** submit the tested shipping build for Steam Deck compatibility review and
+  resolve reported issues before advertising Verified support. Automated checks cannot award
+  Valve's compatibility rating.
 
 ### Partner setup and release acceptance
 

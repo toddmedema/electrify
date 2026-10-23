@@ -2,7 +2,12 @@ import cloneDeep from "lodash.clonedeep";
 import { TICK_MINUTES } from "../Constants";
 import { createGame, createGameFromReplay } from "../testing/Simulator";
 import reducer, { generateNewTimeline, tickState, delta } from "./Game";
-import { chooseScenarioResponse } from "./GameActions";
+import {
+  chooseScenarioResponse,
+  pageHidden,
+  pageVisible,
+  systemSuspend,
+} from "./GameActions";
 import {
   getDateFromMinute,
   getTimeFromTimeline,
@@ -221,4 +226,17 @@ describe("scenario decision speed restoration", () => {
       expect(chosen.scenarioChoicePause).toBeUndefined();
     },
   );
+});
+
+test("a scenario answer after system sleep keeps the clock paused", () => {
+  const game = ready(106, 48 - TICK_MINUTES / MINUTES_PER_MONTH);
+  game.speed = "FAST";
+  tickState(game);
+  expect(game.scenarioChoicePause).toBe("FAST");
+  let state = reducer(game, pageHidden());
+  state = reducer(state, systemSuspend());
+  state = reducer(state, pageVisible());
+  state = reducer(state, choose(DATA_CENTER_DECISION_KEY, "phased"));
+  expect(state.speed).toBe("PAUSED");
+  expect(state.scenarioChoicePause).toBeUndefined();
 });
