@@ -60,7 +60,6 @@ export interface DispatchProps {
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
   onTextSizeChange: (change: TextSizeType) => void;
-  onManageSaves: () => void;
   onBack: () => void;
 }
 
@@ -467,39 +466,6 @@ export default function Settings(props: Props): React.JSX.Element {
                 </SettingRow>
               </>
             )}
-          </SettingsGroup>
-
-          <SettingsGroup id="saved-game-settings" title="Game data">
-            <SettingRow
-              label="Saved games"
-              description={
-                desktopApp
-                  ? "Games save automatically on this device. Steam Cloud backs them up when enabled and online."
-                  : "Resume, rename, share, or delete saves. Sign in for cloud backup and access on other devices."
-              }
-              stackOnMobile
-            >
-              <Stack
-                direction="row"
-                spacing={1}
-                useFlexGap
-                sx={{
-                  width: { xs: "100%", sm: "auto" },
-                  flexWrap: "wrap",
-                  "& .MuiButton-root": {
-                    flex: { xs: "1 1 120px", sm: "0 0 auto" },
-                  },
-                }}
-              >
-                <Button
-                  data-saves-trigger
-                  variant="outlined"
-                  onClick={props.onManageSaves}
-                >
-                  Manage saves
-                </Button>
-              </Stack>
-            </SettingRow>
           </SettingsGroup>
 
           {!desktopApp && canInstallApp && (

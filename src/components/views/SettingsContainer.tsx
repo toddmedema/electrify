@@ -1,6 +1,6 @@
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
-import { navigate, navigateBack } from "../../reducers/Card";
+import { navigateBack } from "../../reducers/Card";
 import { change as changeSettings } from "../../reducers/Settings";
 import { delta as userDelta, logout } from "../../reducers/User";
 import { login } from "../../Globals";
@@ -52,9 +52,6 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onTextSizeChange: (textSize: TextSizeType) => {
       dispatch(changeSettings({ textSize }));
-    },
-    onManageSaves: () => {
-      dispatch(navigate("SAVED_GAMES"));
     },
     // Mirrors Manual: Settings can now be reached mid-game too, so back has to return wherever
     // the player came from rather than always dropping them at the main menu

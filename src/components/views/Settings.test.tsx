@@ -37,7 +37,6 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
     onTextSizeChange: () => undefined,
-    onManageSaves: () => undefined,
     onBack: () => undefined,
     ...overrides,
   };
@@ -222,14 +221,10 @@ describe("Settings", () => {
     ).toBeNull();
   });
 
-  it("opens save management even when no game has been saved yet", async () => {
-    const onManageSaves = jest.fn();
-    renderSettings({ onManageSaves });
-    await userEvent.click(screen.getByRole("button", { name: "Manage saves" }));
-    expect(onManageSaves).toHaveBeenCalledTimes(1);
-    expect(
-      screen.getByText(/Sign in for cloud backup and access on other devices/),
-    ).toBeInTheDocument();
+  it("keeps save management out of Settings", () => {
+    renderSettings();
+    expect(screen.queryByRole("region", { name: "Game data" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Manage saves" })).toBeNull();
     expect(screen.getByText("Sign in with Google")).toBeInTheDocument();
     expect(screen.queryByText("Log out")).not.toBeInTheDocument();
   });

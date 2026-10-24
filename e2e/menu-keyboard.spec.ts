@@ -120,3 +120,36 @@ test("selection is visible in both themes without horizontal overflow", async ({
       animations: "disabled",
     });
 });
+
+test("touch hides button focus rings while text inputs and keyboard navigation keep theirs", async ({
+  page,
+}, info) => {
+  test.skip(!info.project.use.hasTouch, "Requires actual touch input");
+  await page.goto("/");
+  const start = page.getByRole("button", {
+    name: "Start playing",
+    exact: true,
+  });
+  await expect(start).toBeFocused();
+  await expect(start).toHaveCSS("outline-style", "none");
+  await page.getByRole("button", { name: "Settings", exact: true }).tap();
+  const system = page.getByRole("button", { name: "System", exact: true });
+  await expect(system).toBeFocused();
+  await expect(system).toHaveCSS("outline-style", "none");
+  await page.keyboard.press("Tab");
+  await expect(page.locator(":focus")).toHaveCSS("outline-style", "solid");
+  await expect(page.locator(":focus")).toHaveCSS("outline-width", "2px");
+  const focusedButton = page.locator("button:focus");
+  await expect(focusedButton).toHaveCount(1);
+  await focusedButton.tap();
+  await expect(focusedButton).toHaveCSS("outline-style", "none");
+  await page.goto("/?dataCenters=1");
+  const search = page.getByRole("combobox", {
+    name: "Select a city",
+    exact: true,
+  });
+  await search.tap();
+  await expect(search).toBeFocused();
+  await expect(search).toHaveCSS("outline-style", "solid");
+  await expect(search).toHaveCSS("outline-width", "2px");
+});

@@ -9,6 +9,7 @@ import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
 import * as React from "react";
+import { initialIntertieBuildTier } from "../../helpers/BuildSizing";
 import { useToolState } from "../base/GameToolMemory";
 import {
   DragDropContext,
@@ -599,7 +600,7 @@ export default function TransmissionPanel({
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
   const [tier, setTier] = useToolState(
     projectsOnly ? "interties.tier" : undefined,
-    1,
+    () => initialIntertieBuildTier(game),
   );
   const theme = useTheme();
   const [sort, setSort] = useToolState<IntertieSortKey>(

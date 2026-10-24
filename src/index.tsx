@@ -5,6 +5,7 @@ import { store } from "./Store";
 import App from "./App";
 import { registerServiceWorker } from "./ServiceWorkerRegistration";
 import "./app.scss";
+import { installFocusVisibility } from "./FocusVisibility";
 import { getDesktop, isDesktopApp } from "./Desktop";
 import {
   prepareDesktopStartup,
@@ -14,6 +15,7 @@ import {
 
 const container = document.getElementById("root")!;
 const root = createRoot(container);
+installFocusVisibility();
 
 function StartupHandoff(): null {
   React.useLayoutEffect(() => {

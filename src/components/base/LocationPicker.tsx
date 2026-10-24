@@ -115,6 +115,7 @@ export default function LocationPicker({
   const [findingNearest, setFindingNearest] = React.useState(false);
   const [nearestMessage, setNearestMessage] = React.useState("");
   const nearestRequest = React.useRef(0);
+  const searchSelection = React.useRef<CityType>();
   React.useEffect(
     () => () => {
       nearestRequest.current++;
@@ -535,10 +536,25 @@ export default function LocationPicker({
             isOptionEqualToValue={(a: CityType, b: CityType) => a.id === b.id}
             value={value ?? null}
             onChange={(_event, picked: CityType | null) => {
-              if (picked) select(picked, true);
+              if (!picked) return;
+              searchSelection.current = picked;
+              select(picked, true);
+            }}
+            onClose={(_event, reason) => {
+              const picked = searchSelection.current ?? value;
+              searchSelection.current = undefined;
+              // After MUI blurs the search, continue controller navigation at the chosen city
+              // even if it was already selected (which doesn't trigger onChange).
+              if (reason === "selectOption" && controllerInput && picked)
+                requestAnimationFrame(() =>
+                  controlRefs.current[`location-${picked.id}`]?.focus({
+                    preventScroll: true,
+                  }),
+                );
             }}
             disableClearable={!!value}
             autoHighlight
+            blurOnSelect
             openOnFocus
             renderInput={(params) => (
               <TextField {...params} label={searchLabel} size="small" />

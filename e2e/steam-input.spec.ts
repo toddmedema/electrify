@@ -561,6 +561,8 @@ test("controller chooses an autocomplete city and starts a custom game", async (
   await input(page, "confirm");
   await expect(search).toHaveValue("Paris, France");
   await expect(page.getByRole("listbox")).toHaveCount(0);
+  await expect(search).not.toBeFocused();
+  await expect(page.locator('.worldMapMarker[tabindex="0"]')).toBeFocused();
   await select(page, page.locator('.worldMapMarker[tabindex="0"]'));
   await input(page, "back");
   await expect(

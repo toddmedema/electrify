@@ -1578,13 +1578,19 @@ export default class Insights extends React.Component<Props, State> {
                   className="insightsWarning"
                   variant="body2"
                   role="note"
-                  aria-label={`Forecast shortfall for ${projection.shortfall.label}: about ${formatWattHours(projection.shortfall.wh)} of demand unmet, peak about ${formatWatts(projection.shortfall.peakW)}`}
+                  aria-label={`Forecast shortfall for ${projection.shortfall.label}: about ${formatWattHours(Number(projection.shortfall.wh.toPrecision(2)))} of demand unmet, about ${formatWatts(Number(projection.shortfall.peakW.toPrecision(2)))} peak`}
                 >
                   <WarningAmberIcon fontSize="small" aria-hidden="true" />
                   <span>
                     <strong>Shortfall, {projection.shortfall.label}:</strong> ~
-                    {formatWattHours(projection.shortfall.wh)} unmet · peak ~
-                    {formatWatts(projection.shortfall.peakW)}
+                    {formatWattHours(
+                      Number(projection.shortfall.wh.toPrecision(2)),
+                    )}{" "}
+                    unmet · ~
+                    {formatWatts(
+                      Number(projection.shortfall.peakW.toPrecision(2)),
+                    )}{" "}
+                    peak
                   </span>
                 </Typography>
               )}
