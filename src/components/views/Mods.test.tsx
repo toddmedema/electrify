@@ -7,6 +7,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { Dialog, TextField } from "@mui/material";
 import userEvent from "@testing-library/user-event";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
@@ -199,6 +200,20 @@ describe("returning from Mods", () => {
     const code = screen.getByRole("textbox", { name: "New invite code" });
     act(() => code.focus());
     act(() => jest.advanceTimersByTime(1000));
+    expect(code).toHaveFocus();
+  });
+
+  test("Back preserves the invite field when a real modal traps focus before the return delay", async () => {
+    await goBack();
+    act(() => jest.advanceTimersByTime(300));
+    render(
+      <Dialog open aria-label="Invitation">
+        <TextField label="New invite code" />
+      </Dialog>,
+    );
+    const code = screen.getByRole("textbox", { name: "New invite code" });
+    act(() => code.focus());
+    act(() => jest.advanceTimersByTime(50));
     expect(code).toHaveFocus();
   });
 

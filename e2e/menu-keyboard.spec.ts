@@ -1,9 +1,11 @@
 import path from "node:path";
 import { expect, test } from "./fixtures";
-import { verifyMenuKeyboard } from "./menu-keyboard";
+import { exitSettingsWithBodyArrow, verifyMenuKeyboard } from "./menu-keyboard";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
+    if (sessionStorage.getItem("menu-keyboard-seeded")) return;
+    sessionStorage.setItem("menu-keyboard-seeded", "true");
     localStorage.clear();
     localStorage.setItem("theme", "system");
     localStorage.setItem("audioEnabled", "false");
@@ -61,8 +63,9 @@ test("Space toggles Sound", async ({ page }) => {
 test("a background arrow during Settings exit preserves volume and restores focus", async ({
   page,
 }) => {
-  await page.clock.install({ time: 0 });
   await page.goto("/");
+  await page.clock.install();
+  await page.reload();
   const settings = page.getByRole("button", { name: "Settings", exact: true });
   await settings.click();
   await page.getByRole("switch", { name: "Sound", exact: true }).check();
@@ -73,18 +76,16 @@ test("a background arrow during Settings exit preserves volume and restores focu
   await effects.focus();
   await effects.press("Home");
   await expect(effects).toHaveAttribute("aria-valuenow", "0");
-  // Hold the return-focus timer until the body arrow arrives, even on a slow CI worker.
-  await page.clock.pauseAt(60_000);
-  await page.keyboard.press("Escape");
-  // Reproduce the native audit: the early arrow lands on body, not a menu control.
-  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
-  await expect(page.locator("body")).toBeFocused();
-  await page.keyboard.press("ArrowUp");
-  await page.clock.runFor(1_000);
+  await exitSettingsWithBodyArrow(page);
+  await page.clock.runFor(1000);
   await expect(settings).toBeFocused();
   expect(
     await page.evaluate(() => localStorage.getItem("soundEffectsVolume")),
   ).toBe("0");
+  await page.clock.resume();
+  await page.reload();
+  await settings.click();
+  await expect(effects).toHaveAttribute("aria-valuenow", "0");
 });
 
 test("Space activates game navigation while body Space pauses", async ({

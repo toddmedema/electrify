@@ -184,9 +184,8 @@ it("keeps as many tools open as fit beside a phone-width fleet", async () => {
 });
 
 it.each([
-  [1199, 1],
-  [1229, 1],
-  [1280, 2],
+  [1299, 1],
+  [1300, 2],
   [1512, 2],
   [1920, 3],
   [2560, 4],
@@ -239,17 +238,16 @@ it("reveals a remembered compact tool instead of toggling an unseen rail closed"
 });
 
 it("switches at layout boundaries without discarding the other open tool", async () => {
-  const { user, action } = setup(1230);
+  const { user, action } = setup(1300);
   await user.click(action("Events"));
   await user.click(action("Programs"));
   expect(screen.getAllByRole("region")).toHaveLength(2);
-  resize(1229);
+  resize(1299);
   expect(screen.getAllByRole("region")).toHaveLength(1);
   expect(screen.getByRole("heading", { name: "Programs" })).toBeVisible();
-  resize(1199);
   expect(screen.queryByRole("tablist", { name: "Decisions" })).toBeNull();
   expect(screen.getByRole("region", { name: "Programs" })).toBeVisible();
-  resize(1230);
+  resize(1300);
   expect(screen.getAllByRole("region")).toHaveLength(2);
   expect(screen.getByRole("region", { name: "Events" })).toBeVisible();
 });

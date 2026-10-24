@@ -95,8 +95,8 @@ test("platform plans retain all CPU shards, browser shards and full native suite
     assert(pack.args.includes("--skip-build"));
     assert.equal(
       plan.ui[0].script,
-      index === 3 ? "test:steam-input" : "desktop:pack:offline",
-      "controller regressions surface before packaging and the long browser/multiplayer suites",
+      index === 2 ? "test:steam-input" : "desktop:pack:offline",
+      "controller regressions surface before packaging and the other Windows UI phases",
     );
     const browser = plan.ui.find(({ script }) => script === "test:e2e:ci");
     assert.equal(!!browser, index === 2 || index === 3);
@@ -111,10 +111,10 @@ test("platform plans retain all CPU shards, browser shards and full native suite
     );
     assert.equal(
       plan.ui.some(({ script }) => script === "test:steam-input"),
-      index === 3,
-      "Controller journeys run once against the production desktop renderer",
+      index === 2,
+      "Controller journeys use the less-loaded Windows worker without adding jobs or overlapping heavy phases",
     );
-    if (index === 3)
+    if (index === 2)
       assert.deepEqual(
         plan.ui.find(({ script }) => script === "test:steam-input").env,
         { STEAM_INPUT_BUILD_DIR: "build" },

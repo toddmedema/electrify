@@ -54,7 +54,8 @@ function commands(index, cores = os.availableParallelism()) {
         : []),
     ],
     ui: [
-      ...(index === 3
+      // Windows has spare time; Mac already owns the long shared-clock suite.
+      ...(index === 2
         ? [
             {
               name: "Controller journeys",
