@@ -1,4 +1,5 @@
 import * as React from "react";
+import { flushSync } from "react-dom";
 import {
   Alert,
   Box,
@@ -422,11 +423,12 @@ function ModsLibrary(): React.JSX.Element {
   const onBack = () => {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
-    dispatch(navigateBack());
-    window.setTimeout(
-      () => document.querySelector<HTMLElement>("[data-mods-trigger]")?.focus(),
-      350,
-    );
+    // Restore the trigger as part of navigation, before the player can choose another action.
+    // A delayed callback can pull focus out of a dialog opened after returning to the menu.
+    flushSync(() => dispatch(navigateBack()));
+    const target = document.querySelector<HTMLElement>("[data-mods-trigger]");
+    if (target && !target.closest("[hidden],[inert],[aria-hidden=true]"))
+      target.focus();
   };
   const menuKeys = useMenuKeys(true, onBack);
 

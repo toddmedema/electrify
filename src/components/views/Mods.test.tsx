@@ -1,5 +1,13 @@
 import * as React from "react";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { Dialog, TextField } from "@mui/material";
 import userEvent from "@testing-library/user-event";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
@@ -107,6 +115,44 @@ afterEach(() => {
   delete window.electrifyDesktop;
   jest.clearAllMocks();
 });
+
+test.each(["idle", "menu", "dialog"] as const)(
+  "returning from Mods respects the %s destination when its transition settles",
+  async (destination) => {
+    jest.useFakeTimers();
+    const menu = document.createElement("main");
+    menu.innerHTML =
+      "<button data-mods-trigger>Mods</button><button>Play with friends</button>";
+    document.body.appendChild(menu);
+    try {
+      await act(async () => {
+        setup([]);
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Back" }));
+      let selected = screen.getByRole("button", { name: "Mods" });
+      expect(selected).toHaveFocus();
+      act(() => jest.advanceTimersByTime(300));
+      if (destination === "menu") {
+        selected = screen.getByRole("button", { name: "Play with friends" });
+        act(() => selected.focus());
+      } else if (destination === "dialog") {
+        render(
+          <Dialog open aria-label="Play with friends">
+            <TextField label="Invite code" />
+          </Dialog>,
+        );
+        selected = screen.getByRole("textbox", { name: "Invite code" });
+        act(() => selected.focus());
+      }
+      act(() => jest.advanceTimersByTime(50));
+      expect(selected).toHaveFocus();
+    } finally {
+      menu.remove();
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    }
+  },
+);
 
 test("modifiers read as player-facing changes with program names", () => {
   expect(
