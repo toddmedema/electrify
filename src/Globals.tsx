@@ -195,11 +195,11 @@ if (typeof window !== "undefined") {
  * From this width the game workspace opens tools in side columns beside the fleet, and the app
  * bar folds its status row into the top bar so the window gains one row of game.
  */
-export const SIDE_LAYOUT_MIN_WIDTH = 1200;
+export const SIDE_LAYOUT_MIN_WIDTH = 1300;
 export const SIDE_LAYOUT_MEDIA = `(min-width:${SIDE_LAYOUT_MIN_WIDTH}px)`;
 
 export function isBigScreen(): boolean {
-  return getViewportWidth() > 650;
+  return getViewportWidth() >= 700;
 }
 
 /**
@@ -207,7 +207,7 @@ export function isBigScreen(): boolean {
  * Keep in sync with $desktop_breakpoint in app.scss.
  */
 export function isDesktopScreen(): boolean {
-  return getViewportWidth() >= 1300;
+  return getViewportWidth() >= SIDE_LAYOUT_MIN_WIDTH;
 }
 
 /**

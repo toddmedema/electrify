@@ -1,6 +1,7 @@
 import path from "node:path";
 import { expect, test, type Locator } from "./fixtures";
 import { openBuild, openPane } from "./layout";
+import { chartScale } from "../src/components/base/UPlotHelpers";
 
 const expectRightInsets = async (insights: Locator) => {
   // Water uses this space for its reservoir axis; every other plot ends on the title guide.
@@ -242,9 +243,14 @@ for (const theme of ["light", "dark"] as const) {
         .uncheck();
       await expect(plots).toHaveCount(2);
       await aligned();
-      // The remaining MW axes fit the labels, rather than retaining Supply by Fuel's old 60-unit reserve.
+      // Compare design units: the old 60-unit reserve grows with the chart's scale.
+      const width = await plots
+        .first()
+        .evaluate(
+          (element) => element.closest(".uplot")!.getBoundingClientRect().width,
+        );
       await expect
-        .poll(async () => Math.max(...(await insets())))
+        .poll(async () => Math.max(...(await insets())) / chartScale(width))
         .toBeLessThan(60);
       await insights
         .getByRole("button", { name: "Done choosing layers" })

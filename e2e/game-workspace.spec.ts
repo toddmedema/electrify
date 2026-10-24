@@ -184,8 +184,8 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   page,
 }) => {
   // One tool at a time: switching tools hides the other instead of opening beside it.
-  if (page.viewportSize()!.width >= 1200)
-    await page.setViewportSize({ width: 1100, height: 800 });
+  if (page.viewportSize()!.width >= 1300)
+    await page.setViewportSize({ width: 1280, height: 800 });
   await startGame(page, "dark");
   const build = page.getByRole("region", { name: "Build", exact: true });
   await page.locator("#insightsNav").click();
@@ -814,14 +814,14 @@ test("wide screens keep several tools beside the fleet and remember them across 
   await expect(rate).toBeFocused();
   await expectSideRails(page);
 
-  // A single desktop rail reveals a remembered tool rather than closing an unseen one.
-  await page.setViewportSize({ width: 1200, height: 900 });
+  // A compact sheet reveals a remembered tool rather than closing an unseen one.
+  await page.setViewportSize({ width: 1280, height: 900 });
   await expect(page.locator(".gameStage")).toHaveAttribute(
     "data-layout",
-    "side",
+    "sheet",
   );
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
-  await expectSideRails(page);
+  await expectFloatingDock(page);
   await page.locator("#eventsNav").click();
   await expect(
     page.getByRole("region", { name: "Events", exact: true }),
@@ -863,11 +863,56 @@ test("wide screens keep several tools beside the fleet and remember them across 
   await expect(page.locator("#programsNav")).toBeFocused();
 });
 
+for (const theme of ["light", "dark"] as const) {
+  test(`desktop controls and side rails switch together at 1300px in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop-chromium");
+    await page.setViewportSize({ width: 1299, height: 800 });
+    await startGame(page, theme, 111);
+    await page.locator("#programsNav").click();
+    const rate = page.locator("#rateSlider input");
+    await rate.focus();
+    await rate.press("ArrowRight");
+    const value = await rate.inputValue();
+    const stage = page.locator(".gameStage");
+    const appbar = page.locator("#appbar");
+    const ultra = page.getByRole("button", {
+      name: "ultra speed",
+      exact: true,
+    });
+    for (const width of [1299, 1300, 1299]) {
+      await page.setViewportSize({ width, height: 800 });
+      const desktop = width === 1300;
+      await expect(stage).toHaveAttribute(
+        "data-layout",
+        desktop ? "side" : "sheet",
+      );
+      if (desktop) {
+        await expect(appbar).toHaveClass(/appbarSingleRow/);
+        await expect(ultra).toBeInViewport();
+        await expectSideRails(page);
+      } else {
+        await expect(appbar).not.toHaveClass(/appbarSingleRow/);
+        await expect(ultra).toHaveCount(0);
+      }
+      await expect(rate).toBeFocused();
+      await expect(rate).toHaveValue(value);
+      await expect(page.locator("#navfooter")).toBeInViewport();
+      expect(
+        await appbar.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+    }
+  });
+}
+
 test("short desktop rails keep their heading, scroll body, and floating dock reachable", async ({
   page,
 }, testInfo) => {
   test.skip(!!testInfo.project.use.hasTouch, "A short desktop viewport");
-  await page.setViewportSize({ width: 1280, height: 480 });
+  await page.setViewportSize({ width: 1300, height: 480 });
   await startGame(page, "dark");
   await page.locator("#insightsNav").click();
   const insights = page.getByRole("region", { name: "Insights", exact: true });
