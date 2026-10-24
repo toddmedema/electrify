@@ -49,6 +49,14 @@ individual attempts, including successful runs and retries. A changed source fin
 at completion invalidates that run; partial runs remain separate evidence. Native packaged Electron and
 Firestore rules checks are reported as outside the local runner's scope.
 
+Use `npm run check -- --report <report.json>` to produce a review summary with the
+tested source, runtime, full or partial scope, and whether the current snapshot still
+matches. It reads existing evidence without rerunning checks. Use `npm run ci:history`
+to group the latest 100 PR runs by recurring test and branch, including passed retries;
+pass a smaller count with `npm run ci:history -- 20`. Gate counts overlap, and unreadable
+logs are reported explicitly. `npm run ci:failures -- <pr>` remains the detailed
+reproduction guide for an individual failure.
+
 ## Explore further
 
 - [Simulation guide](src/testing/README.md): run scenarios and check game economics.

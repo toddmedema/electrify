@@ -1,9 +1,79 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { summarize, reproduce } = require("./failures");
+const { summarize, reproduce, summarizeHistory } = require("./failures");
 
 const line = (job, text) =>
   `${job}\tUNKNOWN STEP\t2026-10-17T18:53:11.6775880Z ${text}`;
+
+test("history groups recurring journeys across viewports, branches and shifted line numbers without double counting fan-in", () => {
+  const log = (project, lineNumber) =>
+    summarize(
+      [
+        line("macOS universal tests", "1 flaky"),
+        line(
+          "macOS universal tests",
+          `[${project}] › e2e/steam-input.spec.ts:${lineNumber}:5 › invite entry`,
+        ),
+        line("macOS universal tests", "Controller journeys: FAILED"),
+        line("check", "##[error]Process completed with exit code 1."),
+      ].join("\n"),
+    );
+  const first = log("deck-720-dark", 637);
+  first.set(
+    "another viewport",
+    log("mobile-390px", 637).get("macOS universal tests"),
+  );
+  const result = summarizeHistory([
+    {
+      databaseId: 1,
+      headBranch: "one",
+      conclusion: "failure",
+      url: "run/1",
+      summary: first,
+    },
+    {
+      databaseId: 2,
+      headBranch: "two",
+      conclusion: "failure",
+      url: "run/2",
+      summary: log("mobile-360px", 645),
+    },
+    { databaseId: 3, headBranch: "one", conclusion: "success" },
+    { databaseId: 4, headBranch: "three", conclusion: "cancelled" },
+  ]);
+  assert.deepEqual(result.totals, {
+    success: 1,
+    failure: 2,
+    cancelled: 1,
+    other: 0,
+  });
+  assert.deepEqual(result.gates, [["Controller journeys", 2]]);
+  assert.deepEqual(result.tests, [
+    {
+      test: "e2e/steam-input.spec.ts › invite entry",
+      runs: 2,
+      branches: 2,
+      flakyRuns: 2,
+      urls: ["run/1", "run/2"],
+    },
+  ]);
+});
+
+test("history retains unclassified build/setup failures instead of silently dropping them", () => {
+  const result = summarizeHistory([
+    {
+      databaseId: 5,
+      conclusion: "failure",
+      url: "run/build",
+      summary: summarize(
+        line("Shared production builds", "Error: missing Electron runtime"),
+      ),
+    },
+  ]);
+  assert.equal(result.totals.failure, 1);
+  assert.deepEqual(result.unclassified, ["run/build"]);
+  assert.deepEqual(result.tests, []);
+});
 
 test("native test timeouts retain the original failure before secondary teardown errors", () => {
   const job = "macOS universal tests";

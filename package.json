@@ -77,6 +77,7 @@
     "check": "node scripts/check.js",
     "check:ci": "node scripts/check.js --ci",
     "ci:failures": "node scripts/ci/failures.js",
+    "ci:history": "node scripts/ci/failures.js --history",
     "check:assets": "node scripts/check-assets.js",
     "fix": "npm run lint:fix && npm run format",
     "deploy": "./scripts/deploy.sh",
