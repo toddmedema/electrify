@@ -7,6 +7,8 @@ for (const theme of ["light", "dark"]) {
   test(`current production mix stays a thin bar with inspectable details in ${theme}`, async ({
     page,
   }, info) => {
+    if (info.project.name === "desktop-chromium")
+      await page.setViewportSize({ width: 1500, height: 800 });
     await page.addInitScript((mode) => {
       localStorage.clear();
       localStorage.setItem("theme", mode);
@@ -23,11 +25,24 @@ for (const theme of ["light", "dark"]) {
     const bar = pane.getByRole("button", {
       name: "Inspect current production mix",
     });
-    if (
-      (await page.locator(".gameStage").getAttribute("data-layout")) !== "side"
-    ) {
+    const sideLayout = page.viewportSize()!.width >= 1300;
+    await expect(page.locator(".gameStage")).toHaveAttribute(
+      "data-layout",
+      sideLayout ? "side" : "sheet",
+    );
+    if (!sideLayout) {
       await expect(bar).toHaveCount(0);
       await expect(pane.locator(".productionMix")).toHaveCount(0);
+      if (process.env.REVIEW_SCREENSHOT_DIR) {
+        await page.evaluate(() => document.fonts.ready);
+        await page.screenshot({
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            `mix-${info.project.name}-${theme}-hidden.png`,
+          ),
+          animations: "disabled",
+        });
+      }
       return;
     }
     await expect(bar).toBeVisible();
@@ -744,9 +759,15 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
   const mix = pane.getByRole("button", {
     name: "Inspect current production mix",
   });
-  if (
-    (await page.locator(".gameStage").getAttribute("data-layout")) !== "side"
-  ) {
+  // Keep the chart's narrow-layout checks above, then reach the complete divider on desktop.
+  if (info.project.name === "desktop-chromium")
+    await page.setViewportSize({ width: 1500, height: 800 });
+  const sideLayout = page.viewportSize()!.width >= 1300;
+  await expect(page.locator(".gameStage")).toHaveAttribute(
+    "data-layout",
+    sideLayout ? "side" : "sheet",
+  );
+  if (!sideLayout) {
     await expect(mix).toHaveCount(0);
   } else {
     await mix.click();
@@ -814,12 +835,12 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
 
 test("production divider follows side-panel capacity and clears its tooltip when resized smaller", async ({
   page,
-}) => {
+}, info) => {
   await page.addInitScript(() => {
     localStorage.clear();
     localStorage.setItem("audioEnabled", "false");
   });
-  await page.setViewportSize({ width: 1199, height: 800 });
+  await page.setViewportSize({ width: 1299, height: 800 });
   await page.goto("/?scenario=108");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const pane = page.locator(".facilities:visible");
@@ -835,7 +856,7 @@ test("production divider follows side-panel capacity and clears its tooltip when
     "sheet",
   );
   await expect(bar).toHaveCount(0);
-  for (const width of [1200, 1230, 1280]) {
+  for (const width of [1300, 1330, 1380]) {
     await page.setViewportSize({ width, height: 800 });
     await expect(page.locator(".gameStage")).toHaveAttribute(
       "data-layout",
@@ -844,7 +865,7 @@ test("production divider follows side-panel capacity and clears its tooltip when
     await expect(bar).toBeVisible();
     await expect(pane.locator(".productionMix")).toHaveCSS("height", "4px");
   }
-  await page.setViewportSize({ width: 1230, height: 800 });
+  await page.setViewportSize({ width: 1330, height: 800 });
   await openBuild(page);
   await page.locator("#insightsNav").click();
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
@@ -860,6 +881,15 @@ test("production divider follows side-panel capacity and clears its tooltip when
   expect(barBounds.y + barBounds.height).toBeLessThanOrEqual(
     firstRowBounds.y + 1,
   );
+  expect(barBounds.height).toBeGreaterThanOrEqual(
+    info.project.use.hasTouch ? 44 : 40,
+  );
+  if (info.project.use.hasTouch) {
+    await bar.tap();
+    await expect(page.getByRole("tooltip")).toContainText("Supply now");
+    await bar.tap();
+    await expect(page.getByRole("tooltip")).toBeHidden();
+  }
   await bar.focus();
   await bar.press("Enter");
   await expect(page.getByRole("tooltip")).toContainText("Supply now");
@@ -875,7 +905,7 @@ test("production divider follows side-panel capacity and clears its tooltip when
   await bar.focus();
   await bar.press("Enter");
   await expect(page.getByRole("tooltip")).toBeVisible();
-  await page.setViewportSize({ width: 1199, height: 800 });
+  await page.setViewportSize({ width: 1299, height: 800 });
   await expect(bar).toHaveCount(0);
   await expect(page.getByRole("tooltip")).toHaveCount(0);
   await expect(pane.locator(".productionMix")).toHaveCount(0);
