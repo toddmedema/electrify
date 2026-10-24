@@ -180,7 +180,7 @@ describe("GameAppBar", () => {
     window.matchMedia = (query: string) =>
       ({
         ...matchMedia(query),
-        matches: query.includes("min-width:1200px"),
+        matches: query.includes("min-width:1300px"),
       }) as MediaQueryList;
     try {
       const { container } = renderAppBar();
@@ -215,7 +215,7 @@ describe("GameAppBar", () => {
       ({
         ...matchMedia(query),
         get matches() {
-          return query.includes("min-width:1200px") && wide;
+          return query.includes("min-width:1300px") && wide;
         },
         addListener: (listener: () => void) => listeners.add(listener),
         removeListener: (listener: () => void) => listeners.delete(listener),
@@ -468,6 +468,27 @@ describe("GameAppBar", () => {
     expect(onQuit).toHaveBeenCalled();
     expect(target).toHaveFocus();
     target.remove();
+    jest.useRealTimers();
+  });
+
+  it("Save & Quit preserves a later menu selection", () => {
+    jest.useFakeTimers();
+    renderAppBar();
+    fireEvent.click(screen.getByRole("button", { name: "menu" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Save & Quit" }));
+    render(
+      <>
+        <button data-main-action>Continue</button>
+        <button>Saved games shortcut</button>
+      </>,
+    );
+    const library = screen.getByRole("button", {
+      name: "Saved games shortcut",
+    });
+    act(() => library.focus());
+    fireEvent.keyDown(library, { key: "Enter" });
+    act(() => jest.advanceTimersByTime(350));
+    expect(library).toHaveFocus();
     jest.useRealTimers();
   });
 

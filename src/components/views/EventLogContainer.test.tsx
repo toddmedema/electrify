@@ -40,8 +40,8 @@ describe("ongoing story events", () => {
     game.date = getDateFromMinute(12 * MINUTES_PER_MONTH, game.startingYear);
     game.worldEvents.active = [
       {
-        key: "story:111:california-wildfire-2025:firestorm",
-        definitionId: "california-wildfire-2025:firestorm",
+        key: "story:111:wildfire-intertie:outage",
+        definitionId: "wildfire-intertie:outage",
         startsMinute: 12 * MINUTES_PER_MONTH,
         endsMinute: 14 * MINUTES_PER_MONTH,
         attributes: {},
@@ -56,7 +56,7 @@ describe("ongoing story events", () => {
 
     expect(selectOngoing({ game } as AppStateType)).toEqual([
       expect.objectContaining({
-        key: "story:111:california-wildfire-2025:firestorm",
+        key: "story:111:wildfire-intertie:outage",
         title: "Wildfire emergency",
         label: "Through Feb 2023",
       }),

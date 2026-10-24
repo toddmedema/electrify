@@ -1,9 +1,11 @@
 import path from "node:path";
 import { expect, test } from "./fixtures";
-import { verifyMenuKeyboard } from "./menu-keyboard";
+import { exitSettingsWithBodyArrow, verifyMenuKeyboard } from "./menu-keyboard";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
+    if (sessionStorage.getItem("menu-keyboard-seeded")) return;
+    sessionStorage.setItem("menu-keyboard-seeded", "true");
     localStorage.clear();
     localStorage.setItem("theme", "system");
     localStorage.setItem("audioEnabled", "false");
@@ -56,6 +58,34 @@ test("Space toggles Sound", async ({ page }) => {
   await expect(sound).toBeChecked();
   await page.keyboard.press("Space");
   await expect(sound).not.toBeChecked();
+});
+
+test("a background arrow during Settings exit preserves volume and restores focus", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.clock.install();
+  await page.reload();
+  const settings = page.getByRole("button", { name: "Settings", exact: true });
+  await settings.click();
+  await page.getByRole("switch", { name: "Sound", exact: true }).check();
+  const effects = page.getByRole("slider", {
+    name: "Effects volume",
+    exact: true,
+  });
+  await effects.focus();
+  await effects.press("Home");
+  await expect(effects).toHaveAttribute("aria-valuenow", "0");
+  await exitSettingsWithBodyArrow(page);
+  await page.clock.runFor(1000);
+  await expect(settings).toBeFocused();
+  expect(
+    await page.evaluate(() => localStorage.getItem("soundEffectsVolume")),
+  ).toBe("0");
+  await page.clock.resume();
+  await page.reload();
+  await settings.click();
+  await expect(effects).toHaveAttribute("aria-valuenow", "0");
 });
 
 test("Space activates game navigation while body Space pauses", async ({
@@ -119,4 +149,37 @@ test("selection is visible in both themes without horizontal overflow", async ({
       path: path.join(shots, "settings-selection-phone.png"),
       animations: "disabled",
     });
+});
+
+test("touch hides button focus rings while text inputs and keyboard navigation keep theirs", async ({
+  page,
+}, info) => {
+  test.skip(!info.project.use.hasTouch, "Requires actual touch input");
+  await page.goto("/");
+  const start = page.getByRole("button", {
+    name: "Start playing",
+    exact: true,
+  });
+  await expect(start).toBeFocused();
+  await expect(start).toHaveCSS("outline-style", "none");
+  await page.getByRole("button", { name: "Settings", exact: true }).tap();
+  const system = page.getByRole("button", { name: "System", exact: true });
+  await expect(system).toBeFocused();
+  await expect(system).toHaveCSS("outline-style", "none");
+  await page.keyboard.press("Tab");
+  await expect(page.locator(":focus")).toHaveCSS("outline-style", "solid");
+  await expect(page.locator(":focus")).toHaveCSS("outline-width", "2px");
+  const focusedButton = page.locator("button:focus");
+  await expect(focusedButton).toHaveCount(1);
+  await focusedButton.tap();
+  await expect(focusedButton).toHaveCSS("outline-style", "none");
+  await page.goto("/?dataCenters=1");
+  const search = page.getByRole("combobox", {
+    name: "Select a city",
+    exact: true,
+  });
+  await search.tap();
+  await expect(search).toBeFocused();
+  await expect(search).toHaveCSS("outline-style", "solid");
+  await expect(search).toHaveCSS("outline-width", "2px");
 });

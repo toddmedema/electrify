@@ -83,7 +83,16 @@ export default function Lobby({
       }
       aria-labelledby="multiplayer-lobby-title"
       slotProps={{
-        transition: { onEntered: () => title.current?.focus() },
+        transition: {
+          onEntered: () => {
+            // Replace MUI's container autofocus, preserving navigation during the animation.
+            if (
+              document.activeElement ===
+              title.current?.closest('[role="dialog"]')
+            )
+              title.current?.focus();
+          },
+        },
       }}
     >
       <DialogTitle

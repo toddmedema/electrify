@@ -792,6 +792,32 @@ describe("Insights layers", () => {
     );
   });
 
+  it.each([
+    [962e6, 1.01e12, "~1TWh unmet · ~960MW peak"],
+    [9.96e6, 999e9, "~1TWh unmet · ~10MW peak"],
+    [12.6e6, 126e9, "~130GWh unmet · ~13MW peak"],
+  ])(
+    "rounds shortfall estimates to two significant digits (%s W, %s Wh)",
+    (peakW, wh, text) => {
+      const shortfall = jest
+        .spyOn(
+          Insights.prototype as unknown as {
+            rangeShortfall: () => ProjectionView["shortfall"];
+          },
+          "rangeShortfall",
+        )
+        .mockReturnValue({ peakW, wh, label: "2020–31" });
+      try {
+        renderInsights();
+        const note = screen.getByRole("note", { name: /^Forecast shortfall/ });
+        expect(note).toHaveTextContent(text);
+        expect(note).toHaveAccessibleName(/of demand unmet, about .* peak$/);
+      } finally {
+        shortfall.mockRestore();
+      }
+    },
+  );
+
   it("sizes the forecast shortfall to the displayed range", async () => {
     const game = createGame({ scenarioId: 100 });
     game.facilities = [];
@@ -799,7 +825,9 @@ describe("Insights layers", () => {
     const note = screen.getByRole("note", {
       name: /^Forecast shortfall for 2020–31:/,
     });
-    expect(note).toHaveTextContent(/^Shortfall, 2020–31:\s*~.+ unmet · peak ~/);
+    expect(note).toHaveTextContent(
+      /^Shortfall, 2020–31:\s*~.+ unmet · ~.+ peak$/,
+    );
     const wholeScenario = note.textContent;
 
     await user.click(labelledButton("Zoom in"));

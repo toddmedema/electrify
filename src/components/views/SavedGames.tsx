@@ -34,11 +34,11 @@ import { SaveMetadata, SavedRunResult, SaveStatus } from "../../Types";
 import ScreenPage from "../base/ScreenPage";
 import RenameSaveDialog from "../base/RenameSaveDialog";
 import SavedResultDialog from "../base/SavedResultDialog";
-import { saveTitle } from "../../helpers/SaveDisplay";
 import CloudSaveStatus from "../base/CloudSaveStatus";
 import CloudSyncIndicator from "../base/CloudSyncIndicator";
 import ShareSaveDialog from "../base/ShareSaveDialog";
 import { isDesktopApp } from "../../Desktop";
+import { restoreMenuFocus } from "../base/useMenuKeys";
 
 const STATUS_LABELS: Record<SaveStatus, string> = {
   inProgress: "In progress",
@@ -119,17 +119,10 @@ export default function SavedGames(): React.JSX.Element {
   };
   const onBack = () => {
     dispatch(navigateBack());
-    window.setTimeout(
-      () =>
-        document.querySelector<HTMLElement>("[data-saves-trigger]")?.focus(),
-      350,
-    );
+    restoreMenuFocus("[data-saves-trigger]");
   };
   const focusGameMenu = () => {
-    window.setTimeout(
-      () => document.querySelector<HTMLElement>(".gameMenuButton")?.focus(),
-      350,
-    );
+    restoreMenuFocus(".gameMenuButton");
   };
   const loadUnsavedGame = () => {
     dispatch(navigate("FACILITIES"));
@@ -308,7 +301,7 @@ export default function SavedGames(): React.JSX.Element {
             const current = save.id === saves.activeId && inGame;
             const resumable = isResumableStatus(save.status);
             const timestamp = new Date(save.savedAt).toLocaleString();
-            const title = saveTitle(save);
+            const title = save.name;
             const subtitle = `${save.date.month} ${save.date.year} - ${save.difficulty} - ${save.locationName}`;
             return (
               <Paper

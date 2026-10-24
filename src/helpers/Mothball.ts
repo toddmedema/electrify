@@ -8,7 +8,7 @@ import {
 import { MINUTES_PER_MONTH } from "./DateTime";
 
 /**
- * Thermal plants whose minimum stable output exceeds average useful load. This is a prompt to
+ * Thermal plants whose minimum output exceeds average useful load. This is a prompt to
  * inspect dispatch, not proof of losses: monthly averages cannot establish hourly economics.
  */
 export function generatorsAboveDemandFloor(

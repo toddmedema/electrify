@@ -7,6 +7,7 @@ import {
 import { validPolicyChange } from "./helpers/Policies";
 import cloneDeep from "lodash.clonedeep";
 import { APP_VERSION } from "./AppVersion";
+import manifest from "./data/RunCompatibility.json";
 import { isValidLocation, getScenarioLocation } from "./helpers/Locations";
 import { canonicalRuleJson } from "./helpers/RuleIdentity";
 import { isValidDifficulty } from "./helpers/Difficulty";
@@ -167,6 +168,7 @@ export function serializeReplay(
       .reverse(),
     result: cloneDeep(result),
     appVersion: APP_VERSION,
+    compatibilityId: manifest.compatibilityId,
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
     seed: game.seed,
@@ -202,8 +204,7 @@ function cents(dollars: number): number {
 
 /**
  * Compares the month playback just closed with the original run's. Playback re-simulates under
- * whichever build is watching, and a later change to the rules can make the same actions play out
- * differently. Returns true only at the first month that drifts, so it is reported once.
+ * the current rules. Returns true only at the first month that drifts, so it is reported once.
  */
 export function replayDiverged(
   playback: ReplayPlaybackType,
@@ -343,6 +344,7 @@ export function decodeReplay(raw: unknown): ReplayType | null {
   }
   const doc = raw as Partial<ReplayDocType>;
   if (
+    doc.compatibilityId !== manifest.compatibilityId ||
     !isFiniteNumber(doc.scenarioId) ||
     (doc.scenarioId === 999 && doc.customScenario === undefined) ||
     !isFiniteNumber(doc.seed) ||
@@ -363,10 +365,9 @@ export function decodeReplay(raw: unknown): ReplayType | null {
         doc.customScenario.mod.rules.difficulty !== doc.difficulty ||
         canonicalRuleJson(getScenarioLocation(doc.customScenario)) !==
           canonicalRuleJson(doc.location))) ||
-    (doc.monthlyCash !== undefined &&
-      (!Array.isArray(doc.monthlyCash) ||
-        doc.monthlyCash.length > MAX_REPLAY_MONTHS ||
-        !doc.monthlyCash.every(Number.isSafeInteger))) ||
+    !Array.isArray(doc.monthlyCash) ||
+    doc.monthlyCash.length > MAX_REPLAY_MONTHS ||
+    !doc.monthlyCash.every(Number.isSafeInteger) ||
     (doc.result !== undefined && !validReplayResult(doc.result))
   ) {
     return null;
@@ -377,6 +378,7 @@ export function decodeReplay(raw: unknown): ReplayType | null {
   }
   return {
     appVersion: doc.appVersion,
+    compatibilityId: doc.compatibilityId,
     scenarioId: doc.scenarioId,
     difficulty: doc.difficulty as ReplayType["difficulty"],
     seed: doc.seed,

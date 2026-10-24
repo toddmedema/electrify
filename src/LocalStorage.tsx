@@ -144,7 +144,7 @@ const CUSTOM_GAME_KEY = "customGame";
 // rather than back at the defaults. Unlike a save, this is only the setup, never a game in
 // progress - see SaveGame for the latter
 export function getCustomScenario(fallback: ScenarioType): ScenarioType {
-  // A mod run never becomes the remembered custom setup, even from an older build.
+  // A mod run never becomes the remembered custom setup.
   return withoutMod(getStorageJson<ScenarioType>(CUSTOM_GAME_KEY, fallback));
 }
 

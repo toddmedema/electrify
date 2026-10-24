@@ -25,7 +25,7 @@ describe("EventLog", () => {
       })),
       ongoing: [
         {
-          key: "story:111:california-wildfire-2025:firestorm",
+          key: "story:111:wildfire-intertie:outage",
           label: "Through Feb 2025",
           title: "Wildfire emergency",
           message: "Safety shutoffs remain active.",
@@ -183,7 +183,7 @@ describe("EventLog", () => {
         ]}
         ongoing={[
           {
-            key: "story:111:california-wildfire-2025:firestorm",
+            key: "story:111:wildfire-intertie:outage",
             label: "Through Feb 2025",
             title: "Wildfire emergency",
             message: "Safety shutoffs and restoration work remain active.",

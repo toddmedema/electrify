@@ -88,44 +88,6 @@ async function screenshot(
   });
 }
 
-test("a save from an earlier deploy upgrades silently and keeps its run", async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
-    localStorage.setItem("electrify-cloud-save-prompt-seen", "true");
-  });
-  await startGame(page);
-  const id = (await readSaveRecords(page))[0].metadata.id;
-  const original = await editSavedGame(
-    page,
-    (save) => {
-      delete save.schemaVersion;
-      save.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
-      return save.game;
-    },
-    id,
-  );
-  await page.reload();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.locator("#appbar:visible")).toBeVisible();
-  const upgraded = (await readSavedGame(page, id))!;
-  expect(upgraded.runIdentity?.compatibilityId).not.toBe(
-    original.runIdentity!.compatibilityId,
-  );
-  expect(upgraded.runIdentity?.seed).toBe(original.runIdentity!.seed);
-  expect(upgraded.date).toEqual(original.date);
-  expect(upgraded.facilities).toEqual(original.facilities);
-  expect(upgraded.monthlyHistory).toEqual(original.monthlyHistory);
-  await openSavedGames(page);
-  const row = page.locator(`[data-save-id="${id}"]`);
-  await expect(
-    row.getByRole("button", { name: "Load", exact: true }),
-  ).toBeEnabled();
-  await expect(row).not.toContainText(/updated|version/i);
-  await expect(page.getByText(/Some saves couldn't sync/)).toHaveCount(0);
-  expect((await readSaveRecords(page))[0].metadata.id).toBe(id);
-});
-
 for (const theme of ["light", "dark"]) {
   test(`cloud status sits beside the title and explains itself in ${theme}`, async ({
     page,
@@ -410,26 +372,28 @@ test("an invalid shared link is explained and closing keeps other URL parameters
   expect(await readSaveRecords(page)).toHaveLength(0);
 });
 
-test("Settings links to save management and explains cloud backup", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  const data = page.getByRole("region", { name: "Game data", exact: true });
-  await expect(data).toContainText("Resume, rename, share, or delete saves");
-  await expect(data).toContainText(
-    "Sign in for cloud backup and access on other devices",
+test("Settings leaves saved games in the main menu", async ({ page }, info) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("electrify-cloud-save-prompt-seen", "true"),
   );
-  expect(
-    await page
-      .locator(".scrollable:visible")
-      .evaluate((element) => element.scrollWidth - element.clientWidth),
-  ).toBeLessThanOrEqual(1);
-  await data.getByRole("button", { name: "Manage saves", exact: true }).click();
+  await startGame(page);
+  await page.goto("/");
+  const settings = page.getByRole("button", { name: "Settings", exact: true });
+  if (info.project.use.hasTouch) await settings.tap();
+  else await settings.click();
   await expect(
-    page.getByRole("heading", { name: "Saved games", exact: true }),
+    page.getByRole("heading", { name: "Settings", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "No saved games yet", exact: true }),
+    page.getByRole("region", { name: "Game data", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Manage saves", exact: true }),
+  ).toHaveCount(0);
+  await screenshot(page, info, `settings-${info.project.name}.png`);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.getByRole("button", { name: "Saved games", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Saved games", exact: true }),
   ).toBeVisible();
 });

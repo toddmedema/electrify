@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import uPlot from "uplot";
 import UPlotChart from "./UPlotChart";
 import { ChartViewportContext } from "./ChartViewportContext";
+import { ChartAxisAlignment } from "./ChartAxisAlignment";
 import { setThemeMode } from "../../Theme";
 import { applyTextSize } from "../../TextSize";
 import TutorialHud from "./TutorialHud";
@@ -30,6 +31,7 @@ describe("UPlotChart resizing", () => {
         setSize: jest.Mock;
         setScale: jest.Mock;
         destroy: jest.Mock;
+        redraw: jest.Mock;
       };
     }
   ).prototype;
@@ -101,6 +103,52 @@ describe("UPlotChart resizing", () => {
     expect(uPlotPrototype.destroy).toHaveBeenCalledTimes(1);
     expect(uPlot).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("img", { name: /Text size chart/ })).toBeVisible();
+  });
+
+  it("aligns measured left axes including titles and shrinks when the widest chart is removed", () => {
+    const chart = (name: string, size: number, label?: string) => (
+      <UPlotChart
+        key={name}
+        ariaLabel={name}
+        state={{}}
+        data={[
+          [0, 1],
+          [2, 3],
+        ]}
+        buildOptions={() => ({
+          width: 0,
+          height: 0,
+          series: [{}, {}],
+          axes: [{ side: 3, size: () => size, label, labelSize: 16 }],
+        })}
+      />
+    );
+    const narrow = chart("Narrow", 20, "Units");
+    const view = render(
+      <ChartAxisAlignment>
+        {chart("Wide", 60)}
+        {narrow}
+      </ChartAxisAlignment>,
+    );
+    const axes = (uPlot as unknown as jest.Mock).mock.calls.map(
+      ([options]: [uPlot.Options]) => options.axes![0],
+    );
+    const gutter = (axis: uPlot.Axis) => {
+      const size = axis.size;
+      return (
+        (typeof size === "function" ? size({} as uPlot, [], 0, 0) : size!) +
+        (axis.label ? axis.labelSize! : 0)
+      );
+    };
+    gutter(axes[0]);
+    gutter(axes[1]);
+    act(() => jest.advanceTimersByTime(20));
+    expect(gutter(axes[0])).toBe(60);
+    expect(gutter(axes[1])).toBe(60);
+    expect(uPlotPrototype.redraw).toHaveBeenCalled();
+    view.rerender(<ChartAxisAlignment>{narrow}</ChartAxisAlignment>);
+    act(() => jest.advanceTimersByTime(20));
+    expect(gutter(axes[1])).toBe(36);
   });
 
   function renderInteractiveChart() {

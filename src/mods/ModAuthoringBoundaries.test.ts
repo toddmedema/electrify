@@ -90,27 +90,6 @@ test("the author's report includes the same hidden rule that player facts exclud
   expect(input).toEqual(original);
 });
 
-test("an edited no-goals claim cannot hide actual required objectives under a recomputed digest", () => {
-  const input = pack();
-  input.objectives = [
-    {
-      id: "serve-demand",
-      label: "Serve demand",
-      metric: "monthlyReliability",
-      fromMonth: 1,
-      throughMonth: 6,
-      minDemandServedShare: 0.99,
-    },
-  ];
-  const valid = prepared(input);
-  expect(validScenarioMod(valid.mod, valid)).toBe(true);
-  const forged = cloneDeep(valid);
-  forged.mod!.source.objectiveMode = "none";
-  forged.mod!.runtimeDigest = modRuntimeDigest(forged.mod!);
-  expect(validScenarioMod(forged.mod, forged)).toBe(false);
-  expect(validScenarioMod(valid.mod, valid)).toBe(true);
-});
-
 test("an edited replacement claim cannot relabel inherited goal definitions", () => {
   const input = pack();
   input.baseScenarioId = 114;

@@ -123,6 +123,7 @@ test("world map location picker works with pointer, touch, search, and keyboard"
   await search.fill("San Francisco");
   await page.getByRole("option", { name: "San Francisco, CA" }).click();
   await expect(search).toHaveValue("San Francisco, CA");
+  await expect(search).not.toBeFocused();
 
   const tabbableMapControls = await map
     .locator(".worldMapMarker")
@@ -157,6 +158,7 @@ test("world map location picker works with pointer, touch, search, and keyboard"
   ).toHaveAttribute("aria-pressed", "true");
 
   const overflow = await page
+    .getByRole("main")
     .locator(".scrollable")
     .evaluate((element) =>
       Math.max(0, element.scrollWidth - element.clientWidth),

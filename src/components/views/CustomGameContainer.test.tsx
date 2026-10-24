@@ -57,7 +57,7 @@ test("starting or remembering a custom game strips any mod effects", () => {
   expect(started.name).toBe("Community Grid");
   expect(difficulty).toBe("Manager");
   expect(getCustomScenario(DEFAULT_CUSTOM_SCENARIO).mod).toBeUndefined();
-  // Even a stored mod from an older build is stripped on read.
+  // Stored mod snapshots are stripped from ordinary custom setup on read.
   localStorage.setItem("customGame", JSON.stringify(modded));
   expect(getCustomScenario(DEFAULT_CUSTOM_SCENARIO).mod).toBeUndefined();
 });

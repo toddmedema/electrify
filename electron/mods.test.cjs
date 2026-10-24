@@ -809,6 +809,25 @@ test("a corrupt library recovers its last completed transaction without deleting
   assert.equal(kept.length, 2);
 });
 
+test("only the current mod library envelope is accepted", async (t) => {
+  const store = new ModStore(temporary(t));
+  const file = path.join(temporary(t), "library.json");
+  for (const library of [
+    [],
+    { entries: [], published: {} },
+    { version: 1, entries: [], published: {} },
+    { version: 2, entries: [] },
+  ]) {
+    fs.writeFileSync(file, JSON.stringify(library));
+    await assert.rejects(store.readFile(file), /Invalid mod library/);
+  }
+  fs.writeFileSync(
+    file,
+    JSON.stringify({ version: 2, entries: [], published: {} }),
+  );
+  assert.deepEqual(await store.readFile(file), { entries: [], published: {} });
+});
+
 test("library entries are rebuilt from known fields and must be self-consistent", async (t) => {
   const store = new ModStore(temporary(t));
   const local = {
@@ -823,13 +842,20 @@ test("library entries are rebuilt from known fields and must be self-consistent"
     [local, local],
   ]) {
     fs.mkdirSync(store.directory, { recursive: true });
-    fs.writeFileSync(store.filename, JSON.stringify(bad));
+    fs.writeFileSync(
+      store.filename,
+      JSON.stringify({ version: 2, entries: bad, published: {} }),
+    );
     fs.rmSync(`${store.filename}.previous`, { force: true });
     assert.equal((await store.request({ kind: "list" })).unreadable, true);
   }
   fs.writeFileSync(
     store.filename,
-    JSON.stringify([{ ...local, extra: "dropped" }]),
+    JSON.stringify({
+      version: 2,
+      entries: [{ ...local, extra: "dropped" }],
+      published: {},
+    }),
   );
   assert.deepEqual(Object.keys((await entries(store))[0]).sort(), [
     "enabled",

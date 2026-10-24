@@ -10,7 +10,6 @@ import { validHydroClaims } from "./data/HydroSites";
 import {
   validRunIdentity,
   sameRunIdentity,
-  carryRunForward,
   expandAuthoredRunReference,
   normalizedInputs,
 } from "./helpers/RunIdentity";
@@ -24,7 +23,7 @@ import {
 } from "./helpers/Commitment";
 import { APP_VERSION } from "./AppVersion";
 import { decodeSave } from "./SaveEncoding";
-import { SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
+import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
 import {
   validWorldEvent,
   validTransmissionCapacityLimits,
@@ -324,12 +323,16 @@ export function serializeSave(game: GameType): SaveGameType {
  * malformed facility would otherwise crash the sim mid-tick.
  */
 export function parseSave(raw: unknown): SaveGameType | null {
-  raw = upgradeSave(decodeSave(raw));
+  raw = decodeSave(raw);
   if (typeof raw !== "object" || raw === null) {
     return null;
   }
   const save = raw as Partial<SaveGameType>;
-  if (typeof save.savedAt !== "string" || typeof save.appVersion !== "string") {
+  if (
+    save.schemaVersion !== SAVE_SCHEMA_VERSION ||
+    typeof save.savedAt !== "string" ||
+    typeof save.appVersion !== "string"
+  ) {
     return null;
   }
   const game = save.game as Partial<GameType> | undefined;
@@ -571,16 +574,6 @@ export function parseSave(raw: unknown): SaveGameType | null {
     typeof game.meaningfulDecisionGateWaived !== "boolean"
   )
     return null;
-  if (
-    game.wildfireForecastRefresh !== undefined &&
-    typeof game.wildfireForecastRefresh !== "boolean"
-  )
-    return null;
-  if (
-    game.legacyWildfireIntertieAccess !== undefined &&
-    typeof game.legacyWildfireIntertieAccess !== "boolean"
-  )
-    return null;
   const worldEvents = game.worldEvents as
     Partial<GameType["worldEvents"]> | undefined;
   if (
@@ -740,12 +733,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
     )
   )
     return null;
-  const normalized = carryRunForward({
+  const normalized = {
     ...game,
     policyPause: undefined,
     scenarioChoicePause: undefined,
     timeline: game.timeline.map((t) => ({ ...t })),
-  });
+  };
   // Achievement telemetry is optional: a save from a newer catalog (or a tampered one) still
   // loads, and resume starts observing it afresh rather than trusting the stored counters.
   if (

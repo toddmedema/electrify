@@ -55,7 +55,7 @@ beforeAll(() => loadSimData("SF"));
 
 test("player details separate author claims from engine facts and hide surprise rules", async () => {
   const scenario = modScenario(pack, undefined, "Employee");
-  render(<ModDetails scenario={scenario} objectiveIntent="replace" />);
+  render(<ModDetails scenario={scenario} />);
   expect(screen.getByLabelText("Author description")).toHaveTextContent(
     pack.description,
   );

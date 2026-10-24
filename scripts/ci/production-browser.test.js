@@ -130,7 +130,7 @@ test("controller journeys retain their own attempt report after leaving multipla
   );
   assert(
     report.config.projects.every(
-      ({ outputDir }) => path.normalize(outputDir) === directory,
+      ({ outputDir }) => path.resolve(outputDir) === directory,
     ),
   );
   assert.equal(report.config.failOnFlakyTests, true);

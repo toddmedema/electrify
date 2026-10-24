@@ -81,6 +81,11 @@ function commands(index, cores = os.availableParallelism()) {
               script: "test:multiplayer",
               args: [],
             },
+          ]
+        : []),
+      // Windows has spare time; Mac already owns the long shared-clock suite.
+      ...(index === 2
+        ? [
             {
               name: "Controller journeys",
               script: "test:steam-input",

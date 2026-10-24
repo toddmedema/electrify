@@ -3,7 +3,6 @@ import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
   AXIS_LABEL_SIZE,
-  FORECAST_AXIS_LEFT,
   FORECAST_AXIS_RIGHT,
   padRange,
   SPLINE,
@@ -62,7 +61,6 @@ function buildOptions(showXLabels: boolean) {
       yAxis(scale, {
         grid: true,
         label: "Water (mm)",
-        size: FORECAST_AXIS_LEFT - AXIS_LABEL_SIZE,
         values: (_u, splits) => splits.map((v) => String(Math.round(v))),
       }),
       yAxis(scale, {

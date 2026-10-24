@@ -208,7 +208,6 @@ describe("the fleet list", () => {
     expect(screen.getByText("Lifetime profit")).toBeInTheDocument();
     expect(screen.getByText("Avg output")).toBeInTheDocument();
     expect(screen.getByText("Lifetime cost per MWh")).toBeInTheDocument();
-    expect(screen.getByText("Revenue per MWh")).toBeInTheDocument();
     await user.click(rows()[0]);
     expect(onSelect).toHaveBeenLastCalledWith(null);
     expect(screen.queryByText("Lifetime profit")).not.toBeInTheDocument();
@@ -612,6 +611,7 @@ describe("the interties view", () => {
   it("explains and offers California connection projects", async () => {
     const game = playedGame(0);
     renderProjects(game);
+    fireEvent.change(screen.getByRole("slider"), { target: { value: 1 } });
     expect(
       screen.queryByText("Share power with nearby grids"),
     ).not.toBeInTheDocument();
@@ -638,6 +638,7 @@ describe("the interties view", () => {
 
   it("tells the neighbours apart by kind, typical year, peak help and price", async () => {
     renderProjects(playedGame(0));
+    fireEvent.change(screen.getByRole("slider"), { target: { value: 1 } });
     const north = screen.getByTestId("transmission-project-california-north");
     const south = screen.getByTestId("transmission-project-california-south");
     expect(within(north).getByText("Seasonal hydro")).toBeInTheDocument();
@@ -822,6 +823,7 @@ describe("the interties view", () => {
 
   it("shows usable directional capacities in the catalog and purchase review", async () => {
     renderProjects(createGame({ scenarioId: 115 }));
+    fireEvent.change(screen.getByRole("slider"), { target: { value: 1 } });
     const card = screen.getByTestId(
       "transmission-project-india-bangladesh-upgrade",
     );

@@ -108,6 +108,7 @@ import {
 } from "../../helpers/HistoryMetrics";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 import { ChartAnnotationsContext } from "../base/ChartAnnotationsContext";
+import { ChartAxisAlignment } from "../base/ChartAxisAlignment";
 import InsightEventRail from "../base/InsightEventRail";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
 import {
@@ -1578,13 +1579,19 @@ export default class Insights extends React.Component<Props, State> {
                   className="insightsWarning"
                   variant="body2"
                   role="note"
-                  aria-label={`Forecast shortfall for ${projection.shortfall.label}: about ${formatWattHours(projection.shortfall.wh)} of demand unmet, peak about ${formatWatts(projection.shortfall.peakW)}`}
+                  aria-label={`Forecast shortfall for ${projection.shortfall.label}: about ${formatWattHours(Number(projection.shortfall.wh.toPrecision(2)))} of demand unmet, about ${formatWatts(Number(projection.shortfall.peakW.toPrecision(2)))} peak`}
                 >
                   <WarningAmberIcon fontSize="small" aria-hidden="true" />
                   <span>
                     <strong>Shortfall, {projection.shortfall.label}:</strong> ~
-                    {formatWattHours(projection.shortfall.wh)} unmet · peak ~
-                    {formatWatts(projection.shortfall.peakW)}
+                    {formatWattHours(
+                      Number(projection.shortfall.wh.toPrecision(2)),
+                    )}{" "}
+                    unmet · ~
+                    {formatWatts(
+                      Number(projection.shortfall.peakW.toPrecision(2)),
+                    )}{" "}
+                    peak
                   </span>
                 </Typography>
               )}
@@ -2279,16 +2286,18 @@ export default class Insights extends React.Component<Props, State> {
           )}
           <ChartViewportContext.Provider value={viewportContext}>
             <ChartAnnotationsContext.Provider value={annotations}>
-              <div className="insightsTracks">
-                {visible.map((id, index) =>
-                  this.renderTrack(id, index, visible, viewportProjection),
-                )}
-                {!visible.length && (
-                  <Typography className="insightsEmpty" color="textSecondary">
-                    Choose Layers to customize this view.
-                  </Typography>
-                )}
-              </div>
+              <ChartAxisAlignment>
+                <div className="insightsTracks">
+                  {visible.map((id, index) =>
+                    this.renderTrack(id, index, visible, viewportProjection),
+                  )}
+                  {!visible.length && (
+                    <Typography className="insightsEmpty" color="textSecondary">
+                      Choose Layers to customize this view.
+                    </Typography>
+                  )}
+                </div>
+              </ChartAxisAlignment>
             </ChartAnnotationsContext.Provider>
           </ChartViewportContext.Provider>
         </div>

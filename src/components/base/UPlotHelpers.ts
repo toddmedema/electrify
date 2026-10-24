@@ -64,21 +64,6 @@ const LABEL_EDGE_PAD = 4;
 export const AXIS_LABEL_SIZE = 16;
 
 /**
- * The gutters the stacked forecast charts leave either side of their plots, in design units:
- * the left axis below, and the trailing pad or right axis after it.
- *
- * They read as one picture under one shared x axis, which only works if every plot starts and
- * ends at the same place: an axis sized to its own labels would put "1.2GWh" and "$12" on
- * different left edges, and the month labels under the bottom chart would then line up with
- * nothing above them.
- *
- * Wide enough for the widest label any of them draws, since a fixed size clips rather than
- * grows: the left is set by watt-hours ("800MWh" is as long as a niceSplits tick gets), and
- * includes the AXIS_LABEL_SIZE that the axes carrying a label spend on it.
- */
-export const FORECAST_AXIS_LEFT = 60;
-
-/**
  * The width of the one right axis a forecast chart carries -- water's reservoir scale, whose
  * labels are watt-hours. It includes the AXIS_LABEL_SIZE its "Reservoir" label spends, so the
  * axis itself gets the rest.
@@ -86,16 +71,10 @@ export const FORECAST_AXIS_LEFT = 60;
 export const FORECAST_AXIS_RIGHT = 48;
 
 /**
- * The trailing room a forecast plot leaves past its last x tick, in design units.
- *
- * Month labels are centred on their ticks, and a tick can sit exactly on the plot edge (the
- * default horizon ends mid-month, but any zoom or pan can land one there), so the plot needs
- * half a label of room beyond its edge or uPlot clips the trailing characters. Half of the
- * widest label a month axis draws -- a four-digit year at the largest chart scale -- is under
- * 24. Every forecast chart without a right axis uses this, so their plots all end at the same
- * place and none of them leaves a blank strip on the right.
+ * The trailing room past the plot in CSS pixels, matching the chart title's 16px inset.
+ * Keep this independent of chart scale so wide panes gain plot area rather than blank space.
  */
-export const FORECAST_RIGHT_PAD = 24;
+export const FORECAST_RIGHT_PAD = 16;
 
 /** Tick labels: the app's small caption, whatever the chart's width. */
 export const CHART_TICK_PX = 12;

@@ -407,7 +407,7 @@ test("the save envelope validates its mod selection before choosing scenario dat
   invalid.spec.difficulty = "CEO";
   expect(() => savedMatchSpec(invalid)).toThrow();
   expect(() => savedMatchSpec({ ...saved, schema: 4 })).toThrow(
-    /Refresh to update/,
+    /unsupported format/,
   );
   expect(savedMatchSpec(saved)).toEqual(saved.spec);
 });

@@ -619,8 +619,8 @@ export function validGameObjectiveProgress(game: GameType): boolean {
     retainedMonths.add(month);
     if (month >= context.completedMonths) continue;
     for (const objective of objectives) {
-      // These two facts are deliberately retained separately because older monthly rows do
-      // not contain historical ownership or principal. Never infer them from today's fleet.
+      // Monthly rows do not retain historical ownership or principal. These facts have
+      // their own recorded observations; never infer them from today's fleet.
       if (
         objective.metric === "monthEndDebt" ||
         objective.metric === "fuelRetirement"

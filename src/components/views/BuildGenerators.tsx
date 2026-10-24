@@ -76,7 +76,7 @@ import ManualLink from "../base/ManualLink";
 import { useUnits } from "../base/UnitsContext";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
-  mostRecentBuiltSize,
+  averageBuildSize,
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
@@ -554,7 +554,7 @@ export function GeneratorBuildItem(
                 />
                 {generator.minimumStableOutput !== undefined && (
                   <GeneratorDetailRow
-                    label="Minimum stable output"
+                    label="Minimum output"
                     value={
                       percent(generator.minimumStableOutput) +
                       " · " +
@@ -937,7 +937,11 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   const listRef = useToolScroll<HTMLUListElement>("generators.scroll");
   const [sliderTick, setSliderTick] = useToolState<number>(
     "generators.size",
-    () => wToSliderTick(mostRecentBuiltSize(game.facilities, false)),
+    () =>
+      Math.max(
+        0,
+        Math.min(34, wToSliderTick(averageBuildSize(game.facilities, false))),
+      ),
   );
   // Sizes between slider ticks, chosen per generator: hydro's site maximum or a technology's cap
   const [exactSizes, setExactSizes] = useToolState<Record<string, number>>(

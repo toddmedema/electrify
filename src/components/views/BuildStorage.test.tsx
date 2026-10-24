@@ -6,7 +6,7 @@ import {
   within,
 } from "@testing-library/react";
 import { createGame } from "../../testing/Simulator";
-import { GameType } from "../../Types";
+import { GameType, isStorage } from "../../Types";
 import BuildStorage from "./BuildStorage";
 
 jest.mock("../base/ManualLink", () => () => null);
@@ -121,4 +121,18 @@ it("offers an oversized storage project its max size", () => {
   expect(
     screen.queryByRole("button", { name: "Use max size" }),
   ).not.toBeInTheDocument();
+});
+
+it("opens at average storage energy capacity", () => {
+  const state = game();
+  const storage = createGame({ scenarioId: 2 }).facilities.find(isStorage)!;
+  state.facilities = [400e6, 800e6].map((peakWh, index) => ({
+    ...storage,
+    id: index + 1,
+    peakWh,
+  }));
+  render(
+    <BuildStorage game={state} onBack={jest.fn()} onBuildStorage={jest.fn()} />,
+  );
+  expect(screen.getByRole("slider")).toHaveAccessibleName(/600MWh/);
 });

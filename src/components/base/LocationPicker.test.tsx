@@ -1,8 +1,15 @@
 import * as React from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CityType } from "../../data/Cities";
 import LocationPicker from "./LocationPicker";
+import { updateInputPresentation } from "../../desktop/InputPresentation";
 
 const cities: CityType[] = [
   {
@@ -82,6 +89,19 @@ it("selects the same city from the map and searchable list", async () => {
   fireEvent.change(search, { target: { value: "West" } });
   await user.click(await screen.findByRole("option", { name: "West City" }));
   expect(onChange).toHaveBeenLastCalledWith(cities[0]);
+  expect(search).not.toHaveFocus();
+  expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+});
+
+it("releases the search field after choosing a city with the keyboard", async () => {
+  const user = userEvent.setup();
+  const onChange = jest.fn();
+  render(<LocationPicker locations={cities} onChange={onChange} />);
+  const search = screen.getByRole("combobox");
+  await user.type(search, "West");
+  await user.keyboard("{ArrowDown}{Enter}");
+  expect(onChange).toHaveBeenCalledWith(cities[0]);
+  expect(search).not.toHaveFocus();
 });
 
 it("keeps a marker click out of the pan gesture after zooming", async () => {
@@ -358,3 +378,35 @@ describe("finding the nearest city", () => {
     );
   });
 });
+
+it.each(cities)(
+  "continues controller navigation after selecting $name, including the current city",
+  async (city) => {
+    const user = userEvent.setup();
+    act(() => updateInputPresentation({ active: true }));
+    try {
+      render(
+        <LocationPicker
+          locations={cities}
+          value={cities[0]}
+          onChange={jest.fn()}
+        />,
+      );
+      const search = screen.getByRole("combobox");
+      await user.click(search);
+      await user.clear(search);
+      await user.type(search, city.name);
+      await user.click(screen.getByRole("option", { name: city.name }));
+      expect(search).not.toHaveFocus();
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", {
+            name: new RegExp(`Select ${city.name}`),
+          }),
+        ).toHaveFocus(),
+      );
+    } finally {
+      act(() => updateInputPresentation({ active: false }));
+    }
+  },
+);

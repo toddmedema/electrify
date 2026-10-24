@@ -50,7 +50,7 @@ describe("SaveFile", () => {
     it("downloads the named envelope and releases its temporary DOM resources", () => {
       downloadSave(fakeSaveFile());
       expect(clicked?.download).toBe(
-        "electrify-renewables-experiment-2035.json",
+        "electrify-renewables-experiment-2020.json",
       );
       expect(clicked?.href).toBe("blob:save");
       expect(clicked?.isConnected).toBe(false);

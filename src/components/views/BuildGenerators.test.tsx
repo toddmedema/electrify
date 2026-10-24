@@ -1,3 +1,4 @@
+import { GameToolMemoryContext } from "../base/GameToolMemory";
 import { getHydroAvailability, HYDRO_SITES } from "../../data/HydroSites";
 import { LOCATIONS } from "../../Constants";
 import * as React from "react";
@@ -869,4 +870,29 @@ describe("weather hardening in the purchase dialog", () => {
       within(screen.getByRole("dialog")).queryByRole("checkbox"),
     ).toBeNull();
   });
+});
+
+it("opens at the fleet average and remembers the player's chosen generator size", () => {
+  const game = createGame({ scenarioId: 100 });
+  game.facilities = [100e6, 200e6, 300e6].map((peakW, index) => ({
+    ...game.facilities[0],
+    id: index + 1,
+    peakW,
+  }));
+  const memory = new Map<string, unknown>();
+  const catalog = () => (
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        onBack={jest.fn()}
+        onBuildGenerator={jest.fn()}
+      />
+    </GameToolMemoryContext.Provider>
+  );
+  const view = render(catalog());
+  expect(screen.getByRole("slider")).toHaveAccessibleName(/200MW/);
+  fireEvent.keyDown(screen.getByRole("slider"), { key: "ArrowRight" });
+  view.unmount();
+  render(catalog());
+  expect(screen.getByRole("slider")).toHaveAccessibleName(/300MW/);
 });

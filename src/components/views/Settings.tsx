@@ -32,7 +32,7 @@ import { APP_VERSION } from "../../AppVersion";
 import { clearAppCache } from "../../helpers/Cache";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
-import { useMenuKeys } from "../base/useMenuKeys";
+import { restoreMenuFocus, useMenuKeys } from "../base/useMenuKeys";
 const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
@@ -60,7 +60,6 @@ export interface DispatchProps {
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
   onTextSizeChange: (change: TextSizeType) => void;
-  onManageSaves: () => void;
   onBack: () => void;
 }
 
@@ -205,9 +204,7 @@ export default function Settings(props: Props): React.JSX.Element {
     props.onBack();
     // Card transitions replace the button that opened Settings. Once the previous card is back,
     // return keyboard users to its stable replacement instead of leaving focus on <body>.
-    window.setTimeout(() => {
-      document.querySelector<HTMLElement>("[data-settings-trigger]")?.focus();
-    }, 350);
+    restoreMenuFocus("[data-settings-trigger]");
   };
   const menuKeys = useMenuKeys(true, onBack);
 
@@ -467,39 +464,6 @@ export default function Settings(props: Props): React.JSX.Element {
                 </SettingRow>
               </>
             )}
-          </SettingsGroup>
-
-          <SettingsGroup id="saved-game-settings" title="Game data">
-            <SettingRow
-              label="Saved games"
-              description={
-                desktopApp
-                  ? "Games save automatically on this device. Steam Cloud backs them up when enabled and online."
-                  : "Resume, rename, share, or delete saves. Sign in for cloud backup and access on other devices."
-              }
-              stackOnMobile
-            >
-              <Stack
-                direction="row"
-                spacing={1}
-                useFlexGap
-                sx={{
-                  width: { xs: "100%", sm: "auto" },
-                  flexWrap: "wrap",
-                  "& .MuiButton-root": {
-                    flex: { xs: "1 1 120px", sm: "0 0 auto" },
-                  },
-                }}
-              >
-                <Button
-                  data-saves-trigger
-                  variant="outlined"
-                  onClick={props.onManageSaves}
-                >
-                  Manage saves
-                </Button>
-              </Stack>
-            </SettingRow>
           </SettingsGroup>
 
           {!desktopApp && canInstallApp && (

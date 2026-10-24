@@ -1,6 +1,9 @@
-import { FacilityOperatingType, isStorage } from "../Types";
+import { FacilityOperatingType, GameType, isStorage } from "../Types";
 import { pow } from "./Pow";
 import { log10 } from "./Libm";
+import { MAX_INTERTIE_UPGRADES } from "../Constants";
+import { corridorsForGame } from "../data/IntertieAccess";
+import { intertieBuildQuote, intertieContextForGame } from "./Transmission";
 
 /** The size the catalog opens at when nothing of that kind has been built yet */
 export const DEFAULT_BUILD_SIZE = 500000000;
@@ -22,21 +25,47 @@ export function wToSliderTick(w: number): number {
   return frontNumber + exponent * 9 - 1;
 }
 
-/**
- * The size of the most recently built generator (peak W) or storage (peak Wh), so the catalog
- * opens where the player last left it.
- */
-export function mostRecentBuiltSize(
+/** Average installed capacity of this kind; the workspace remembers later slider choices. */
+export function averageBuildSize(
   facilities: readonly FacilityOperatingType[],
   storage: boolean,
 ): number {
-  let latest: FacilityOperatingType | undefined;
-  for (const facility of facilities) {
-    if (isStorage(facility) === storage && (!latest || facility.id > latest.id))
-      latest = facility;
-  }
-  if (!latest) return DEFAULT_BUILD_SIZE;
-  return (
-    (isStorage(latest) ? latest.peakWh : latest.peakW) || DEFAULT_BUILD_SIZE
+  const sizes = facilities
+    .filter((facility) => isStorage(facility) === storage)
+    .map((facility) => (isStorage(facility) ? facility.peakWh : facility.peakW))
+    .filter((size) => Number.isFinite(size) && size > 0);
+  if (sizes.length)
+    return sizes.reduce((sum, size) => sum + size, 0) / sizes.length;
+  // A first storage project holds four hours of an average generator's output, like a battery.
+  if (storage && facilities.some((facility) => !isStorage(facility)))
+    return averageBuildSize(facilities, false) * 4;
+  return DEFAULT_BUILD_SIZE;
+}
+
+/** Choose the available tier whose average project capacity is nearest the current grid. */
+export function initialIntertieBuildTier(game: GameType): number {
+  const lines = game.transmission?.lines ?? [];
+  const target = lines.length
+    ? lines.reduce((sum, line) => sum + line.capacityW, 0) / lines.length
+    : averageBuildSize(game.facilities, false);
+  const corridors = corridorsForGame(game).filter(
+    ({ id }) => !lines.some(({ corridorId }) => corridorId === id),
   );
+  const context = intertieContextForGame(game);
+  let bestTier = 1;
+  let bestDistance = Infinity;
+  for (let tier = 1; tier <= MAX_INTERTIE_UPGRADES + 1; tier++) {
+    const quotes = corridors
+      .map(({ id }) => intertieBuildQuote(id, game.date.year, tier, context))
+      .filter((quote) => quote !== undefined);
+    if (!quotes.length) continue;
+    const average =
+      quotes.reduce((sum, quote) => sum + quote.capacityW, 0) / quotes.length;
+    const distance = Math.abs(average - target);
+    if (distance < bestDistance) {
+      bestTier = tier;
+      bestDistance = distance;
+    }
+  }
+  return bestTier;
 }

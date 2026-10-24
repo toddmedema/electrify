@@ -1612,8 +1612,6 @@ export const gameSlice = createSlice({
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
       delete state.desktopAchievements;
-      delete state.legacyWildfireIntertieAccess;
-      delete state.scenarioRuleHistoryStartMinute;
       delete state.lowCashWarningMonth;
       delete state.objectiveProgress;
       delete state.tutorialIntertieStress;
@@ -2176,33 +2174,6 @@ export const gameSlice = createSlice({
       };
     });
     builder.addCase(loaded, (state) => {
-      if (state.wildfireForecastRefresh) {
-        const snapshot = current(state);
-        const recorded = snapshot.timeline.filter(
-          (tick) => tick.minute <= snapshot.date.minute,
-        );
-        const latest = recorded.at(-1);
-        const futureTicks = snapshot.timeline.length - recorded.length;
-        if (latest && futureTicks > 0) {
-          state.timeline = [
-            ...recorded,
-            ...generateNewTimeline(
-              {
-                ...snapshot,
-                date: getDateFromMinute(
-                  snapshot.date.minute + TICK_MINUTES,
-                  snapshot.startingYear,
-                ),
-                timeline: recorded,
-              },
-              latest.cash,
-              latest.customers,
-              futureTicks,
-            ),
-          ];
-        }
-        delete state.wildfireForecastRefresh;
-      }
       // Saves carry the commitment forecast, so this only runs for one that somehow lacks it.
       // Rebuild just that metadata after the data tables have loaded, and keep every recorded
       // value: a full reforecast re-dispatches the tick that already happened, rewriting its
@@ -4407,7 +4378,7 @@ function operatingCostEscalation(
   );
 }
 
-/** Variable cost of holding one generator at its minimum stable output for one game tick. */
+/** Variable cost of holding one generator at its minimum output for one game tick. */
 function minimumStableOperatingCost(
   state: GameType,
   generator: GeneratorOperatingType,

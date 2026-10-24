@@ -192,7 +192,6 @@ export function intertieForecastKey(game: GameType): string {
     game.loadAdditions,
     game.worldEvents,
     game.storyEffectsDisabled,
-    game.legacyWildfireIntertieAccess,
     game.policies,
     game.tutorialIntertieStress?.active,
     game.transmission?.tradingPolicy,

@@ -97,14 +97,12 @@ export default function HydroWaterSection(props: {
   const lowPoint = outlook?.[lowIndex];
   // The combined level would contradict this dam's own Reservoir stat above, so it's only
   // shown for a lone dam
-  const outlookLabel = [
+  const outlookLabels = [
     fleet ? undefined : `Now ${formatPercent(values[0])}`,
     lowIndex > 0 && lowPoint
       ? `Low ${MONTHS[lowPoint.monthNumber - 1]} ${formatPercent(lowPoint.fraction)}`
       : undefined,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  ].filter(Boolean);
   // A line pressed flat against the baseline says nothing a sentence can't say better
   const emptyAllYear = values.every((value) => value <= 0.02);
 
@@ -129,39 +127,45 @@ export default function HydroWaterSection(props: {
               : "—"
           }
         />
-      </dl>
-      {values.length > 2 && lowPoint && (
-        <figure className="facilityWaterOutlook">
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            component="figcaption"
-          >
-            {fleet ? "All your dams, next 12 months" : "Next 12 months"}
-            {/* A lone dam's status already says no refill is coming */}
-            {emptyAllYear && fleet && ": no refill expected"}
-          </Typography>
-          {!emptyAllYear && (
-            <div className="facilityTrend">
-              <Sparkline
-                values={values}
-                domain={[0, 1]}
-                width={144}
-                height={28}
-                fill
-                baseline
-                lowMarker
-                ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${formatPercent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${formatPercent(lowPoint.fraction)}.`}
-              />
-              {outlookLabel && (
-                <Typography variant="caption" color="textSecondary">
-                  {outlookLabel}
-                </Typography>
+        {values.length > 2 && lowPoint && (
+          <div className="facilityStat facilityWaterOutlook">
+            <Typography variant="caption" color="textSecondary" component="dt">
+              {fleet ? "All your dams, next 12 months" : "Next 12 months"}
+              {/* A lone dam's status already says no refill is coming */}
+              {emptyAllYear && fleet && ": no refill expected"}
+            </Typography>
+            <dd className="facilityTrend">
+              {!emptyAllYear && (
+                <>
+                  <Sparkline
+                    values={values}
+                    domain={[0, 1]}
+                    width={144}
+                    height={28}
+                    fill
+                    baseline
+                    lowMarker
+                    stretch
+                    ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${formatPercent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${formatPercent(lowPoint.fraction)}.`}
+                  />
+                  {outlookLabels.length > 0 && (
+                    <Typography
+                      variant="caption"
+                      color="textSecondary"
+                      component="div"
+                      className="facilityWaterOutlookLabels"
+                    >
+                      {outlookLabels.map((label) => (
+                        <span key={label}>{label}</span>
+                      ))}
+                    </Typography>
+                  )}
+                </>
               )}
-            </div>
-          )}
-        </figure>
-      )}
+            </dd>
+          </div>
+        )}
+      </dl>
     </section>
   );
 }

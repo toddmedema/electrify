@@ -219,6 +219,91 @@ test("the landing page opens a prepared current-year grid and supports browser h
   await expect(page).toHaveURL(/\/data-centers\.html$/);
 });
 
+for (const theme of ["light", "dark"] as const) {
+  test(`power controls and disclosures form a readable keyboard-accessible group in ${theme} mode`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript(
+      (mode) => localStorage.setItem("theme", mode),
+      theme,
+    );
+    await page.emulateMedia({ colorScheme: theme });
+    await page.goto("/?dataCenters=1");
+    await ready(page);
+
+    const section = page.getByRole("region", {
+      name: "How much extra power?",
+    });
+    const grid = section.locator(".dataCenterSetupGridSize");
+    const gridSummary = grid.locator("summary");
+    const assumptions = section.locator("details").filter({
+      has: page.locator("summary", { hasText: "Assumptions" }),
+    });
+    const assumptionsSummary = assumptions.locator("summary");
+    const gridBounds = (await gridSummary.boundingBox())!;
+    const assumptionsBounds = (await assumptionsSummary.boundingBox())!;
+    // These are consecutive rows in one settings group, with equal hit areas.
+    expect(
+      assumptionsBounds.y - (gridBounds.y + gridBounds.height),
+    ).toBeLessThanOrEqual(1);
+    expect(assumptionsBounds.height).toBeCloseTo(gridBounds.height, 0);
+    const minTarget = testInfo.project.name.startsWith("mobile") ? 44 : 40;
+    expect(gridBounds.height).toBeGreaterThanOrEqual(minTarget);
+
+    const slider = page.getByRole("slider", { name: "Power needed" });
+    await slider.focus();
+    const sliderOffset = () =>
+      slider.evaluate(
+        (el) =>
+          el.getBoundingClientRect().top -
+          el.closest("section")!.getBoundingClientRect().top,
+      );
+    const initialOffset = await sliderOffset();
+    await slider.press("Home");
+    await expect(slider).toHaveAttribute("aria-valuetext", "0MW");
+    expect(await sliderOffset()).toBeCloseTo(initialOffset, 0);
+    await slider.press("End");
+    await expect(slider).toHaveAttribute("aria-valuetext", "10GW");
+    expect(await sliderOffset()).toBeCloseTo(initialOffset, 0);
+    await expect(startButton(page)).toBeEnabled();
+
+    await gridSummary.focus();
+    await gridSummary.press("Enter");
+    const accounts = page.getByRole("textbox", {
+      name: "Homes and businesses served",
+    });
+    await expect(accounts).toBeVisible();
+    await accounts.fill("1234567");
+    await expect(startButton(page)).toBeEnabled();
+    await gridSummary.focus();
+    await gridSummary.press("Space");
+    await expect(accounts).not.toBeVisible();
+
+    await assumptionsSummary.focus();
+    await assumptionsSummary.press("Enter");
+    await expect(assumptions.locator("dt")).toHaveText([
+      "Demand",
+      "Power mix",
+      "Starting plants",
+    ]);
+    await expect(assumptions.getByRole("table")).toBeVisible();
+    expect(
+      await section.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    await assumptionsSummary.press("Space");
+    await expect(assumptions.getByRole("table")).not.toBeVisible();
+
+    await gridSummary.focus();
+    await gridSummary.press("Enter");
+    await accounts.fill("100000000");
+    await expect(gridSummary).toContainText("100,000,000 accounts");
+    // Check this last: calibrating the maximum grid can delay subsequent requests.
+    expect(
+      await gridSummary.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+  });
+}
+
 test("the header explore button opens setup and first-time tips preserve the chosen grid", async ({
   page,
 }, testInfo) => {
@@ -431,6 +516,7 @@ test("nearest location uses browser permission and keeps manual selection availa
   const city = page.getByRole("combobox", { name: "Select a city" });
   await city.fill("Pittsburgh");
   await page.getByRole("option", { name: /Pittsburgh/ }).click();
+  await expect(city).not.toBeFocused();
   await ready(page);
   await expect(city).toHaveValue(/Pittsburgh/);
 });
@@ -447,6 +533,7 @@ test("location changes prepare a populated grid and launching keeps its data-cen
   });
   await location.fill("Pittsburgh");
   await page.getByRole("option", { name: /Pittsburgh/ }).click();
+  await expect(location).not.toBeFocused();
   await ready(page);
   await page
     .getByRole("combobox", { name: "Start year", exact: true })

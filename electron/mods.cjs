@@ -119,14 +119,11 @@ class ModStore {
     const stat = await fs.promises.stat(filename);
     if (stat.size > MAX_PACKAGES * (MAX_MOD_BYTES + 1024) + 64 * 1024)
       throw new Error("Mod library exceeds its size limit.");
-    const data = JSON.parse(await fs.promises.readFile(filename, "utf8"));
-    // Version 1 libraries were a bare list of entries.
-    const library = Array.isArray(data)
-      ? { entries: data, published: {} }
-      : data;
+    const library = JSON.parse(await fs.promises.readFile(filename, "utf8"));
     if (
       !library ||
       typeof library !== "object" ||
+      library.version !== 2 ||
       !Array.isArray(library.entries) ||
       library.entries.length > MAX_PACKAGES
     )
@@ -135,7 +132,7 @@ class ModStore {
     if (new Set(entries.map((entry) => entry.key)).size !== entries.length)
       throw new Error("Invalid mod library.");
     const published = {};
-    const records = library.published ?? {};
+    const records = library.published;
     if (!records || typeof records !== "object" || Array.isArray(records))
       throw new Error("Invalid mod library.");
     for (const [id, record] of Object.entries(records)) {

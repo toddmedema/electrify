@@ -81,6 +81,11 @@ function preparedScenario(): ScenarioType {
     durationMonths: 192,
     facilities: [
       { fuel: "Sun", peakW: 200000000 },
+      {
+        fuel: "Hydro",
+        peakW: 100000000,
+        hydroSiteId: "robert-moses-niagara-us",
+      },
       { name: "Natural Gas CC", fuel: "Natural Gas", peakW: 2000000000 },
     ],
     eventScenarioIds: [106],
@@ -159,6 +164,9 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
     screen.getByRole("heading", { name: "How much extra power?" }),
   ).toBeVisible();
   expect(screen.getByRole("row", { name: "Solar 200MW" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("row", { name: "Hydro (Robert Moses Niagara) 100MW" }),
+  ).toBeInTheDocument();
   fireEvent.click(startButton());
   const configured: ScenarioType = onStart.mock.calls[0][0];
   expect(configured.loadAdditions?.[0].peakW).toBe(100000000);
@@ -262,7 +270,7 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   fireEvent.change(screen.getByRole("slider", { name: "Power needed" }), {
     target: { value: "19" },
   });
-  fireEvent.click(screen.getByText(/^Grid size: /));
+  fireEvent.click(screen.getByText("Grid size"));
   const accounts = screen.getByRole("textbox", {
     name: "Homes and businesses served",
   });

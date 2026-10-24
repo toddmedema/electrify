@@ -320,7 +320,7 @@ for (const theme of ["light", "dark"]) {
     await image.press("ArrowRight");
     await expect(time).not.toHaveText(firstTime!);
     await selectPoint(exporting);
-    await expect(details).toContainText("Interties exporting:");
+    await expect(details).toContainText("Interties:");
     await selectPoint(discharging);
     await expect(details).toContainText("Storage:");
     await image.press("End");
@@ -731,7 +731,7 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
     "Storage:",
     "Storage charging:",
     "Interties:",
-    "Interties exporting:",
+    "Interties:",
   ]) {
     await expect(details).toContainText(direction);
   }

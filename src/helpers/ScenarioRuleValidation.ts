@@ -25,10 +25,6 @@ import { ruleChoices } from "./ScenarioRuleDependencies";
 import { scenarioRuleExpectedLoads } from "./ScenarioRuleDecisions";
 import { validRuleReportReceipt } from "./ScenarioRuleReports";
 import type { ScenarioRuleTargetBinding } from "./ScenarioRuleTargets";
-import {
-  WILDFIRE_DECISION_KEY,
-  WILDFIRE_PREPARATION_COST,
-} from "../data/ScenarioChoiceRules";
 
 const bounded = (
   value: unknown,
@@ -384,16 +380,6 @@ function validSecondaryRuleReceipts(
 }
 
 export function validScenarioRuleState(game: GameType): boolean {
-  const historyBoundary = game.scenarioRuleHistoryStartMinute;
-  if (
-    historyBoundary !== undefined &&
-    (!Number.isSafeInteger(historyBoundary) ||
-      historyBoundary < 0 ||
-      historyBoundary > game.date.minute ||
-      ![101, 111].includes(game.scenarioId) ||
-      game.customScenario !== undefined)
-  )
-    return false;
   const rules = scenarioRules(
     getScenario(game.scenarioId, game.customScenario),
     game,
@@ -442,40 +428,9 @@ export function validScenarioRuleState(game: GameType): boolean {
   for (const [index, event] of occurrences.entries()) {
     if (
       event.attributes.ruleChoice !== true &&
-      !(
-        event.attributes.scenarioChoice === true &&
-        !event.key.startsWith("wildfire:")
-      )
+      event.attributes.scenarioChoice !== true
     )
       continue;
-    // The intertie redesign retires this native choice prospectively. Its already booked
-    // transaction remains history in saves carried forward from the original challenge.
-    if (
-      game.scenarioId === 111 &&
-      rules.namespace.kind === "official" &&
-      event.key === WILDFIRE_DECISION_KEY
-    ) {
-      const prepared = event.attributes.choice === "prepare";
-      if (
-        answered.has(event.key) ||
-        !["prepare", "standard"].includes(String(event.attributes.choice)) ||
-        event.definitionId !== event.key ||
-        event.startsMinute !== 35 * MINUTES_PER_MONTH ||
-        event.endsMinute !== event.startsMinute ||
-        event.startsMinute > game.date.minute ||
-        event.attributes.scenarioChoice !== true ||
-        event.attributes.cost !== (prepared ? WILDFIRE_PREPARATION_COST : 0) ||
-        event.attributes.upfrontGrant !== 0 ||
-        Object.keys(event.attributes).some(
-          (key) =>
-            !["choice", "cost", "upfrontGrant", "scenarioChoice"].includes(key),
-        ) ||
-        Object.keys(event.effects).length !== 0
-      )
-        return false;
-      answered.add(event.key);
-      continue;
-    }
     const choice = choices.find((choice) => choice.key === event.key);
     const option = choice?.options.find(
       (option) => option.id === event.attributes.choice,
@@ -682,22 +637,8 @@ export function validScenarioRuleState(game: GameType): boolean {
       return false;
   }
   for (const event of definitions) {
-    // A migrated native run has no journal for rules that did not exist when those
-    // months were played. This records coverage only; all current physical effects
-    // still resolve normally, and any receipt that is present was validated above.
-    const beforeJournal =
-      historyBoundary !== undefined &&
-      rules.namespace.kind === "official" &&
-      rules.namespace.scenarioId === game.scenarioId &&
-      event.source?.scenarioId === game.scenarioId &&
-      event.startMonth * MINUTES_PER_MONTH <= historyBoundary &&
-      !event.transactions.length &&
-      !event.targets.length &&
-      !event.requiresChoice &&
-      !rules.loads.some((load) => load.eventId === event.id);
     if (
       !game.storyEffectsDisabled &&
-      !beforeJournal &&
       event.startMonth <= game.date.monthsElapsed &&
       !(
         rules.namespace.kind === "official" &&

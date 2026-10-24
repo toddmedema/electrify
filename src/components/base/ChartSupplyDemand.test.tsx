@@ -62,7 +62,7 @@ it("balances charging, discharging, imports and exports without netting away sto
   expect(stack.bySource[3]).toEqual([30, 0]);
 });
 
-it("handles older records without optional flow fields and omits unused source keys", () => {
+it("handles records without optional flow fields and omits unused source keys", () => {
   const stack = supplyDemandStack(
     [
       { minute: 0, supplyW: 50, demandW: 40, supplyByFuel: { Coal: 50 } },
@@ -99,9 +99,7 @@ it("breaks supply into the four legend groups and keeps the full demand breakdow
   expect(formatProductionTooltip(1, state)).not.toContain("discharging");
   expect(formatProductionTooltip(1, state)).not.toContain("importing");
   expect(formatProductionTooltip(1, state)).toContain("Demand: 120W");
-  expect(formatProductionTooltip(1, state)).toContain(
-    "Interties exporting: 20W",
-  );
+  expect(formatProductionTooltip(1, state)).toContain("Interties: 20W");
   expect(formatProductionTooltip(1, state)).toContain("Total load: 140W");
   expect(formatProductionTooltip(1, state)).toContain("Blackout: 10W unmet");
 });
@@ -243,7 +241,7 @@ it("keeps simultaneous inward and outward flows distinct around the customer-dem
   expect(label).toContain("Storage: 20W");
   expect(label).toContain("Storage charging: 15W");
   expect(label).toContain("Interties: 10W");
-  expect(label).toContain("Interties exporting: 5W");
+  expect(label).toContain("Interties: 5W");
   expect(label).toContain("Blackout: 10W unmet");
 });
 

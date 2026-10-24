@@ -109,10 +109,10 @@ test("platform plans retain all CPU shards, browser shards and full native suite
     );
     assert.equal(
       plan.ui.some(({ script }) => script === "test:steam-input"),
-      index === 3,
-      "Controller journeys run once against the production desktop renderer",
+      index === 2,
+      "Controller journeys use the less-loaded Windows worker without adding jobs or overlapping heavy phases",
     );
-    if (index === 3)
+    if (index === 2)
       assert.deepEqual(
         plan.ui.find(({ script }) => script === "test:steam-input").env,
         { STEAM_INPUT_BUILD_DIR: "build" },

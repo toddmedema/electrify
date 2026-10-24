@@ -15,7 +15,12 @@ const {
 } = require("./runtime.cjs");
 
 test("score metadata survives validation and rejects invalid build versions", () => {
-  const score = { scenarioId: 101, difficulty: "CEO", score: 100 };
+  const score = {
+    scenarioId: 101,
+    difficulty: "CEO",
+    challengeId: "rules-a",
+    score: 100,
+  };
   const appVersion = "26sept26-1507";
   assert.equal(validateScore({ ...score, appVersion }).appVersion, appVersion);
   assert.equal(validateScore(score).appVersion, undefined);
@@ -196,6 +201,8 @@ test("Steam selections reject arbitrary names and scores outside signed integer 
     { ...board, scenarioId: -1 },
     { ...board, difficulty: "custom" },
     { ...board, challengeId: "../../secrets" },
+    { ...board, challengeId: undefined },
+    { ...board, challengeId: "" },
     { ...board, score: Infinity },
     { ...board, score: 2147483648 },
   ])

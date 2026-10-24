@@ -17,11 +17,9 @@ const validKey = (key) =>
 /** Each device owns its Cloud file. Differing checkpoints are offered as separate copies. */
 class CoopSaveStore {
   constructor(directory, steam, codec) {
-    this.directory = directory;
     this.steam = steam;
     this.codec = codec;
     this.filename = path.join(directory, "co-op-library.json");
-    this.legacy = path.join(directory, "co-op.json");
     this.deviceFile = path.join(directory, "co-op-device.json");
     let device;
     try {
@@ -71,7 +69,6 @@ class CoopSaveStore {
         throw new Error("Multiplayer save checksum failed");
       ids.add(slot.id);
     }
-    library.seen ??= [];
     if (
       library.deleted.length > 4096 ||
       library.deleted.some((key) => !validKey(key)) ||
@@ -83,11 +80,10 @@ class CoopSaveStore {
     return library;
   }
   worldJson(world) {
-    // Structural/simulation validation belongs to restoreWorld in the worker. Preserve newer formats.
+    // Structural/simulation validation belongs to restoreWorld in the worker.
     if (
       !world ||
-      !Number.isInteger(world.schema) ||
-      world.schema < 2 ||
+      world.schema !== 3 ||
       typeof world.matchId !== "string" ||
       !world.matchId ||
       world.matchId.length > 200 ||
@@ -134,17 +130,6 @@ class CoopSaveStore {
         }
       }
       library = { schema: 1, slots: [], deleted: [], seen: [] };
-      if (fs.existsSync(this.legacy)) {
-        try {
-          const world = this.codec.parse(fs.readFileSync(this.legacy, "utf8"));
-          const slot = this.add(library, world, "Last multiplayer save");
-          slot.id = hash(this.codec.stringify(world)).slice(0, 32);
-          slot.source = `${this.device}:${slot.id}`;
-        } catch {
-          this.warning =
-            "The old multiplayer save could not be read. Its file is preserved; other saves are available.";
-        }
-      }
     }
     return library;
   }
@@ -264,7 +249,7 @@ class CoopSaveStore {
   }
   async save(world) {
     const json = this.worldJson(world);
-    return this.transact(async (library) => {
+    return this.transact((library) => {
       let slot = library.slots.find(
         (s) => s.id === this.activeId && s.world.matchId === world.matchId,
       );
@@ -276,32 +261,6 @@ class CoopSaveStore {
         );
       if (!slot)
         slot = this.add(library, world, `Campaign ${library.slots.length + 1}`);
-      if (
-        slot.world.schema > world.schema ||
-        (slot.world.gameSchema ?? 0) > (world.gameSchema ?? 0)
-      )
-        throw new Error(
-          "This campaign needs a newer game. Your original save is preserved.",
-        );
-      if (
-        slot.world.rules !== world.rules ||
-        slot.world.schema !== world.schema ||
-        slot.world.gameSchema !== world.gameSchema
-      ) {
-        // Immutable pre-upgrade copy, independent of the rotating .previous backup.
-        const backup = path.join(
-          this.directory,
-          `co-op-original-${slot.digest}.json`,
-        );
-        await fs.promises
-          .writeFile(backup, this.codec.stringify(slot.world), {
-            flag: "wx",
-            mode: 0o600,
-          })
-          .catch((error) => {
-            if (error.code !== "EEXIST") throw error;
-          });
-      }
       slot.world = world;
       slot.digest = hash(json);
       slot.updatedAt = Date.now();
@@ -323,15 +282,6 @@ class CoopSaveStore {
     this.activeId = slot.id;
     return slot.world;
   }
-  rename(id, name) {
-    if (!validName(name))
-      throw new Error("Use a campaign name of 1–80 characters");
-    return this.transact((library) => {
-      const slot = library.slots.find((s) => s.id === id);
-      if (!slot) throw new Error("Multiplayer save no longer exists");
-      slot.name = name.trim();
-    });
-  }
   remove(id) {
     return this.transact((library) => {
       const slot = library.slots.find((s) => s.id === id);
@@ -340,24 +290,6 @@ class CoopSaveStore {
       library.slots = library.slots.filter((s) => s.id !== id);
       if (this.activeId === id) this.activeId = undefined;
     });
-  }
-  async importFile(filename) {
-    if ((await fs.promises.stat(filename)).size > MAX_WORLD_BYTES)
-      throw new Error("Multiplayer save is too large");
-    const json = await fs.promises.readFile(filename, "utf8");
-    const world = this.codec.parse(json);
-    this.worldJson(world);
-    return this.transact((library) => {
-      const digest = hash(this.codec.stringify(world));
-      if (library.slots.some((s) => s.digest === digest)) return;
-      this.add(library, world, "Imported campaign");
-    });
-  }
-  async exportFile(id, filename) {
-    await this.queue.catch(() => {});
-    const slot = this.read().slots.find((s) => s.id === id);
-    if (!slot) throw new Error("Multiplayer save no longer exists");
-    await atomicWriteAsync(filename, this.codec.stringify(slot.world));
   }
 }
 module.exports = { CoopSaveStore };
