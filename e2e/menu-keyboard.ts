@@ -1,5 +1,17 @@
 import { expect, Page } from "@playwright/test";
 
+/** The caller installs the clock before loading; keep return focus pending for a body key. */
+export async function exitSettingsWithBodyArrow(page: Page): Promise<void> {
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Start playing", exact: true }),
+  ).toBeFocused();
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await expect(page.locator("body")).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+}
+
 export async function openSettingsWithKeyboard(page: Page): Promise<void> {
   const start = page.getByRole("button", {
     name: "Start playing",
