@@ -28,6 +28,7 @@ import {
 import AudioContainer from "./base/AudioContainer";
 import GameWorkspace from "./base/GameWorkspace";
 import { GAME_TOOLS, GameTool } from "./base/Navigation";
+import { restoreMenuFocus } from "./base/useMenuKeys";
 import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import InstallAppButton from "./base/InstallAppButton";
@@ -341,13 +342,7 @@ const shortcutHandlers = {
       store.dispatch(navigateBack());
       // Escape may arrive before the gallery's entry focus settles.
       if (card.name === "ACHIEVEMENTS")
-        window.setTimeout(
-          () =>
-            document
-              .querySelector<HTMLElement>("[data-achievements-trigger]")
-              ?.focus(),
-          350,
-        );
+        restoreMenuFocus("[data-achievements-trigger]");
     }
   },
   ...Object.fromEntries(

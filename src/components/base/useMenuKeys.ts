@@ -1,7 +1,9 @@
 import { KeyboardEvent, useEffect, useRef } from "react";
+import { CARD_TRANSITION_ANIMATION_MS } from "../../Constants";
 
 const selector = "button,a[href],input,select,textarea,[role=button]";
 const popup = "[role=dialog],[role=menu],[role=listbox]";
+const unavailable = "[hidden],[inert],[aria-hidden=true]";
 function controls(root: Element): HTMLElement[] {
   return [
     root as HTMLElement,
@@ -11,13 +13,37 @@ function controls(root: Element): HTMLElement[] {
       element.matches(selector) &&
       element.tabIndex >= 0 &&
       !element.matches(":disabled,[aria-disabled=true]") &&
-      !element.closest("[hidden],[inert],[aria-hidden=true]") &&
+      !element.closest(unavailable) &&
       !!element.getClientRects().length &&
       getComputedStyle(element).visibility !== "hidden",
   );
 }
 const preferred = (items: HTMLElement[]) =>
   items.find((item) => item.matches("[aria-pressed=true]")) || items[0];
+
+/** Returning to a menu must not undo navigation begun during the card transition. */
+export function restoreMenuFocus(selector: string): void {
+  const cancel = () => {
+    window.clearTimeout(timer);
+    document.removeEventListener("keydown", cancel, true);
+    document.removeEventListener("pointerdown", cancel, true);
+  };
+  const timer = window.setTimeout(() => {
+    cancel();
+    const target = document.querySelector<HTMLElement>(selector);
+    if (
+      target &&
+      !target.closest(unavailable) &&
+      !Array.from(document.querySelectorAll(popup)).some(
+        (surface) => !surface.closest(unavailable),
+      )
+    )
+      target.focus();
+  }, CARD_TRANSITION_ANIMATION_MS + 50);
+  // Controller navigation emits the same keyboard events as physical keys.
+  document.addEventListener("keydown", cancel, true);
+  document.addEventListener("pointerdown", cancel, true);
+}
 
 /** Real focus is the selection, shared with pointer and native Tab navigation. */
 export function useMenuKeys(settings = false, onBack?: () => void) {
