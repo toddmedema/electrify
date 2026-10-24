@@ -215,7 +215,14 @@ $delta_bad: var(--delta-bad);
 // Constants
 // ===============================================
 
-$abswidthmax: 650px;
+// Viewport widths: 400 (narrow phone), 520 (compact controls), 600 (MUI sm),
+// 700 (foldables / legacy scale), 768 (tablet), 1024 (panes), 1300 (desktop).
+// Container queries below measure available component space, not the viewport.
+$narrow_phone_width: 400px;
+$compact_width: 520px;
+$phone_width: 600px;
+$tablet_width: 768px;
+$abswidthmax: 700px;
 $absheightmax: 1025px;
 $absmaxdimension: 1025px;
 // Wide enough to show Facilities/Finances/Forecasts side by side -- keep in sync with
@@ -227,7 +234,7 @@ $pane_breakpoint: 1024px;
 // Unfolded foldables (Galaxy Z Fold ~707x823, Pixel Fold ~841x701) are narrower than that but
 // nearly square, so each pane still gets a phone's width. The aspect ratio window leaves out
 // portrait tablets (3:4 and taller) and landscape phones. Keep in sync with isPaneLayout().
-$fold_pane_min_width: 700px;
+$fold_pane_min_width: $abswidthmax;
 $fold_pane_min_height: 600px;
 $pane_media: "screen and (min-width: #{$pane_breakpoint}), screen and (min-width: #{$fold_pane_min_width}) and (min-height: #{$fold_pane_min_height}) and (min-aspect-ratio: 4/5) and (max-aspect-ratio: 5/4)";
 $single_pane_media: "screen and (max-width: #{$fold_pane_min_width - 1px}), screen and (max-width: #{$pane_breakpoint - 1px}) and (max-height: #{$fold_pane_min_height - 1px}), screen and (max-width: #{$pane_breakpoint - 1px}) and (max-aspect-ratio: 799/1000), screen and (max-width: #{$pane_breakpoint - 1px}) and (min-aspect-ratio: 1251/1000)";
@@ -440,9 +447,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   .snackbarClose {
     display: none !important;
   }
-}
 
-@media screen and (max-width: ($desktop_breakpoint - 1px)) {
   .snackbar-above-nav {
     bottom: calc(56px + env(safe-area-inset-bottom) + 8px) !important;
   }
@@ -604,7 +609,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   width: 44px;
   height: 44px;
 }
-@media screen and (max-width: 599px) {
+@media screen and (max-width: ($phone_width - 1px)) {
   .achievementGallery {
     padding-top: 16px;
   }
@@ -760,7 +765,7 @@ $topbar_height: 56px;
   flex: 0 0 auto;
 }
 
-@media (max-width: 599px) {
+@media (max-width: ($phone_width - 1px)) {
   #topbar .constructionTitleBar.MuiToolbar-root {
     padding-left: max($space-1, env(safe-area-inset-left)) !important;
   }
@@ -815,7 +820,7 @@ $topbar_height: 56px;
   min-width: 156px !important;
 }
 
-@media screen and (min-width: 600px) {
+@media screen and (min-width: $phone_width) {
   .constructionControls {
     gap: $space-4;
     padding-left: max($space-4, env(safe-area-inset-left));
@@ -826,7 +831,7 @@ $topbar_height: 56px;
 // Four direct speed choices still fit beside the live status at phone width. The currency and
 // date already name their concepts in text, so their duplicate glyphs are omitted in the
 // component and the remaining chrome tightens just enough for a 360px viewport.
-@media screen and (max-width: 599px) {
+@media screen and (max-width: ($phone_width - 1px)) {
   #topbar .MuiToolbar-root {
     padding-left: max(4px, env(safe-area-inset-left)) !important;
     padding-right: max(4px, env(safe-area-inset-right)) !important;
@@ -876,7 +881,7 @@ $topbar_height: 56px;
 }
 
 // Stack cash and date on narrow phones so the year stays visible beside all four speed choices.
-@media screen and (max-width: 399px) {
+@media screen and (max-width: ($narrow_phone_width - 1px)) {
   #topbar .gameStatus {
     flex-direction: column;
     align-items: flex-start;
@@ -887,7 +892,7 @@ $topbar_height: 56px;
 
 // Tablets and desktops set cash and date at the larger h6 size, where the shared 4px size(small)
 // gap reads as one run. A fixed 12px step keeps them two distinct readouts.
-@media screen and (min-width: 600px) {
+@media screen and (min-width: $phone_width) {
   #topbar .gameStatus {
     gap: $space-3;
   }
@@ -1047,7 +1052,7 @@ $topbar_height: 56px;
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: $tablet_width) {
   // The months left end on the same 16px inset the row's first icon starts on
   .missionSummary {
     padding: 4px max(16px, env(safe-area-inset-right)) 4px 16px;
@@ -1055,7 +1060,7 @@ $topbar_height: 56px;
   }
 }
 
-@media (max-width: 599px) {
+@media (max-width: ($phone_width - 1px)) {
   .missionSummaryHeader,
   .missionSummaryCopy {
     gap: 8px;
@@ -1064,7 +1069,7 @@ $topbar_height: 56px;
 
 // Short windows and large text must scroll the operating header with the body instead of
 // squeezing the charts and controls beneath a growing fixed status stack.
-@media (max-width: 768px) and (max-height: 600px) {
+@media (max-width: $tablet_width) and (max-height: 600px) {
   #gameCard {
     overflow-y: auto;
     display: block;
@@ -1282,13 +1287,9 @@ $topbar_height: 56px;
   }
 }
 
+// Abbreviate the months and hour together before the wide bar gets crowded.
 @container appbar (max-width: 1365px) {
-  .missionSummaryMonthsTail {
-    display: none;
-  }
-}
-
-@container appbar (max-width: 1279px) {
+  .missionSummaryMonthsTail,
   .gameStatusHour {
     display: none;
   }
@@ -1416,7 +1417,7 @@ $pane_header_height: 48px;
   }
 }
 
-@media (max-width: 599px) {
+@media (max-width: ($phone_width - 1px)) {
   .build-list-item.buildOption.transmissionProject .buildOptionMetrics {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1465,7 +1466,7 @@ $pane_header_height: 48px;
   .sparkline {
     width: 100%;
     height: 80px;
-    @media (max-width: 599px) {
+    @media (max-width: ($phone_width - 1px)) {
       height: 64px;
     }
   }
@@ -2151,14 +2152,14 @@ $pane_header_height: 48px;
   }
 }
 
-@media (max-width: 620px) {
+@media (max-width: ($phone_width - 1px)) {
   .decisionImpactFacts,
   .generatorComparisonChoices {
     grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: $compact_width) {
   .build-list-item .MuiCardHeader-root {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
@@ -2454,7 +2455,7 @@ $pane_header_height: 48px;
   padding: 4px 0 12px;
 }
 
-@media (max-width: 760px) {
+@media (max-width: $tablet_width) {
   .scenarioDossierIcon {
     width: 88px;
     margin-bottom: 8px;
@@ -2671,7 +2672,7 @@ $pane_header_height: 48px;
   }
 }
 
-@media (max-width: 599px) {
+@media (max-width: ($phone_width - 1px)) {
   .victoryDialogActions {
     flex-direction: column;
     align-items: stretch;
@@ -2694,7 +2695,7 @@ $pane_header_height: 48px;
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: $compact_width) {
   .victoryDebrief {
     gap: 8px 12px;
   }
@@ -2878,7 +2879,7 @@ $pane_header_height: 48px;
     padding-right: env(safe-area-inset-right);
   }
 
-  @media screen and (max-width: 600px) {
+  @media screen and (max-width: ($phone_width - 1px)) {
     #menuCard #centeredMenu {
       padding-top: $space-4;
       padding-bottom: $space-4;
@@ -3305,7 +3306,7 @@ $pane_header_height: 48px;
     }
   }
 
-  @media (max-width: 520px) {
+  @media (max-width: $compact_width) {
     .tutorialSpotlight {
       .MuiCardHeader-root {
         display: grid;
@@ -3490,7 +3491,7 @@ $pane_header_height: 48px;
       overflow-wrap: anywhere;
       text-transform: none;
 
-      @media (max-width: 600px) {
+      @media (max-width: ($phone_width - 1px)) {
         width: 100%;
       }
 
@@ -4115,7 +4116,7 @@ $pane_header_height: 48px;
 // before Back/Next, where it reads like pager controls. It stays there on gated steps, which
 // have no Next button to carry it. The header keeps its place first in the DOM, so the region
 // name and the tab order are unchanged; only the visual order moves.
-@media screen and (max-width: 699.98px) {
+@media screen and (max-width: ($fold_pane_min_width - 0.02px)) {
   .tutorialHud {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
@@ -4177,7 +4178,7 @@ $pane_header_height: 48px;
 // span both text rows and keep a fixed line at the top as tall as the theme's 40px buttons, so
 // they line up with the action and Next never moves as the text grows; a step without a hint
 // leaves the second row empty.
-@media screen and (min-width: 700px) {
+@media screen and (min-width: $fold_pane_min_width) {
   .tutorialHud {
     display: grid;
     grid-template-areas:
@@ -5170,7 +5171,7 @@ html[data-startup-visit="returning"] #appStartup {
   display: grid;
   gap: 8px;
 }
-@media (max-width: 599px) {
+@media (max-width: ($phone_width - 1px)) {
   .transmissionLine > summary {
     gap: 8px;
     padding: 12px;
@@ -5233,7 +5234,7 @@ html[data-startup-visit="returning"] #appStartup {
     currentColor 5px 6px
   );
 }
-@media (max-width: 599px) {
+@media (max-width: ($phone_width - 1px)) {
   .facilities .facilitiesBody {
     display: block;
     overflow-y: auto;
@@ -5648,7 +5649,7 @@ html[data-startup-visit="returning"] #appStartup {
 }
 // On a phone the widest control (a long ownership choice) would size its column past the pane,
 // so the columns are fixed and each control wraps or shrinks to fit its own.
-@media screen and (max-width: 599px) {
+@media screen and (max-width: ($phone_width - 1px)) {
   .base_main .customSetupSettings #gameSetupTable {
     table-layout: fixed;
 
@@ -5954,7 +5955,7 @@ $programs_column: 800px;
 .customerProgramTradeoff {
   line-height: 1.5;
 }
-@media screen and (max-width: 599px) {
+@media screen and (max-width: ($phone_width - 1px)) {
   .customerProgramHeading h2 {
     font-size: 1.375rem;
   }
@@ -6008,7 +6009,7 @@ $programs_column: 800px;
   padding-top: 4px;
   padding-bottom: 4px;
 }
-@media (max-width: 599px) {
+@media (max-width: ($phone_width - 1px)) {
   .decisionImpactFact > div {
     grid-template-columns: 1fr;
   }
@@ -6150,7 +6151,7 @@ $programs_column: 800px;
     justify-content: center;
   }
 }
-@media (max-width: 599px) {
+@media (max-width: ($phone_width - 1px)) {
   .generatorDetails .generatorDetailLabel {
     // Leave enough room for complete cost/unit values beside the help target.
     width: 44%;
@@ -6910,7 +6911,7 @@ $programs_column: 800px;
 }
 
 .screenDataCenterSetup {
-  @media (min-width: 700px) {
+  @media (min-width: $fold_pane_min_width) {
     .locationPicker {
       grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
     }
@@ -7107,7 +7108,7 @@ $programs_column: 800px;
       justify-items: start;
     }
 
-    @media (max-width: 599px) {
+    @media (max-width: ($phone_width - 1px)) {
       > div {
         grid-template-columns: minmax(0, 1fr);
         gap: var(--space-2);
@@ -7175,7 +7176,7 @@ $programs_column: 800px;
     }
   }
 
-  @media (max-width: 480px) {
+  @media (max-width: $compact_width) {
     .dataCenterSetupContent {
       padding-top: var(--space-5);
     }
@@ -7189,7 +7190,7 @@ $programs_column: 800px;
     }
   }
 
-  @media (max-width: 699px) {
+  @media (max-width: ($fold_pane_min_width - 1px)) {
     > .scrollable {
       padding-bottom: calc(64px + max(16px, env(safe-area-inset-bottom)));
     }
@@ -7382,7 +7383,7 @@ $programs_column: 800px;
   border: 0 !important;
 }
 
-@media screen and (max-width: 699px) {
+@media screen and (max-width: ($fold_pane_min_width - 1px)) {
   .locationPicker {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -7530,7 +7531,7 @@ $programs_column: 800px;
   }
 }
 
-@media screen and (max-width: 599px) {
+@media screen and (max-width: ($phone_width - 1px)) {
   .coopBrowseBar .coopWideOnly {
     display: none;
   }
