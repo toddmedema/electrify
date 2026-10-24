@@ -4378,7 +4378,7 @@ function operatingCostEscalation(
   );
 }
 
-/** Variable cost of holding one generator at its minimum stable output for one game tick. */
+/** Variable cost of holding one generator at its minimum output for one game tick. */
 function minimumStableOperatingCost(
   state: GameType,
   generator: GeneratorOperatingType,

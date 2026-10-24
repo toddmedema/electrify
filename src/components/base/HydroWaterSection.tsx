@@ -114,54 +114,56 @@ export default function HydroWaterSection(props: {
       <Typography variant="body2" className="facilityWaterStatus">
         <strong className={status.tone}>{status.lead}</strong> {status.detail}
       </Typography>
-      <dl className="facilityStats">
-        <Stat
-          label="Reservoir"
-          value={formatWattHoursOfPeak(facility.reservoirWh || 0, capacityWh)}
-        />
-        <Stat
-          label="Inflow this month"
-          value={
-            now
-              ? formatWattHours(
-                  (facility.hydroWhPerMm || 0) * now.hydroRunoffMm,
-                )
-              : "—"
-          }
-        />
-      </dl>
-      {values.length > 2 && lowPoint && (
-        <figure className="facilityWaterOutlook">
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            component="figcaption"
-          >
-            {fleet ? "All your dams, next 12 months" : "Next 12 months"}
-            {/* A lone dam's status already says no refill is coming */}
-            {emptyAllYear && fleet && ": no refill expected"}
-          </Typography>
-          {!emptyAllYear && (
-            <div className="facilityTrend">
-              <Sparkline
-                values={values}
-                domain={[0, 1]}
-                width={144}
-                height={28}
-                fill
-                baseline
-                lowMarker
-                ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${formatPercent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${formatPercent(lowPoint.fraction)}.`}
-              />
-              {outlookLabel && (
-                <Typography variant="caption" color="textSecondary">
-                  {outlookLabel}
-                </Typography>
-              )}
-            </div>
-          )}
-        </figure>
-      )}
+      <div className="facilityWaterMetrics">
+        <dl className="facilityStats">
+          <Stat
+            label="Reservoir"
+            value={formatWattHoursOfPeak(facility.reservoirWh || 0, capacityWh)}
+          />
+          <Stat
+            label="Inflow this month"
+            value={
+              now
+                ? formatWattHours(
+                    (facility.hydroWhPerMm || 0) * now.hydroRunoffMm,
+                  )
+                : "—"
+            }
+          />
+        </dl>
+        {values.length > 2 && lowPoint && (
+          <figure className="facilityWaterOutlook">
+            <Typography
+              variant="caption"
+              color="textSecondary"
+              component="figcaption"
+            >
+              {fleet ? "All your dams, next 12 months" : "Next 12 months"}
+              {/* A lone dam's status already says no refill is coming */}
+              {emptyAllYear && fleet && ": no refill expected"}
+            </Typography>
+            {!emptyAllYear && (
+              <div className="facilityTrend">
+                <Sparkline
+                  values={values}
+                  domain={[0, 1]}
+                  width={144}
+                  height={28}
+                  fill
+                  baseline
+                  lowMarker
+                  ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${formatPercent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${formatPercent(lowPoint.fraction)}.`}
+                />
+                {outlookLabel && (
+                  <Typography variant="caption" color="textSecondary">
+                    {outlookLabel}
+                  </Typography>
+                )}
+              </div>
+            )}
+          </figure>
+        )}
+      </div>
     </section>
   );
 }

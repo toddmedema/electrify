@@ -356,7 +356,6 @@ export interface FacilityLifetimeType {
   profit: number;
   capacityFactor?: number; // 0 - 1
   costPerMWh?: number;
-  revenuePerMWh?: number;
 }
 
 export function facilityLifetime(
@@ -374,7 +373,6 @@ export function facilityLifetime(
     profit: revenue - expenses,
     capacityFactor: potentialWh > 0 ? wh / potentialWh : undefined,
     costPerMWh: mwh > 0 ? expenses / mwh : undefined,
-    revenuePerMWh: mwh > 0 ? revenue / mwh : undefined,
   };
 }
 

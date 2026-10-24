@@ -42,13 +42,12 @@ for (const colorScheme of ["light", "dark"] as const) {
           details.getByRole("heading", { name: "Economics" }),
         ).toBeVisible();
         const geometry = await details.evaluate((element) => {
-          const innerWidth = element.clientWidth - 32;
           const groups = Array.from(element.querySelectorAll(".facilityStats"));
           const sections = Array.from(
             element.querySelectorAll(".facilityDetailSection"),
           );
           return {
-            innerWidth,
+            widths: groups.map((group) => group.getBoundingClientRect().width),
             counts: groups.map((group) => group.children.length),
             aligned: groups.every((group) => {
               const cells = Array.from(
@@ -94,13 +93,54 @@ for (const colorScheme of ["light", "dark"] as const) {
               sections[0].getBoundingClientRect().top,
           };
         });
-        const expectedColumns = Math.max(
-          1,
-          Math.floor((geometry.innerWidth + 16) / (132 + 16)),
-        );
         expect(geometry.columns).toEqual(
-          geometry.counts.map((count) => Math.min(count, expectedColumns)),
+          geometry.counts.map((count, index) =>
+            Math.min(
+              count,
+              Math.max(
+                1,
+                Math.floor((geometry.widths[index] + 16) / (132 + 16)),
+              ),
+            ),
+          ),
         );
+        if (name === "Hydro") {
+          const water = details.getByRole("region", {
+            name: "Water",
+            exact: true,
+          });
+          const outlook = water.locator(".facilityWaterOutlook");
+          await expect(outlook).toBeVisible();
+          const statsBounds = (await water
+            .locator(".facilityStats")
+            .boundingBox())!;
+          const outlookBounds = (await outlook.boundingBox())!;
+          if (width >= 768) {
+            expect(outlookBounds.y).toBeCloseTo(statsBounds.y, 0);
+            expect(outlookBounds.x).toBeGreaterThan(
+              statsBounds.x + statsBounds.width,
+            );
+          } else if (width <= 390) {
+            expect(outlookBounds.y).toBeGreaterThan(
+              statsBounds.y + statsBounds.height,
+            );
+          }
+          if (
+            process.env.REVIEW_SCREENSHOT_DIR &&
+            ((width === 1440 && colorScheme === "light") ||
+              (width === 390 && colorScheme === "dark"))
+          ) {
+            await row.scrollIntoViewIfNeeded();
+            await page.mouse.move(0, 0);
+            await page.screenshot({
+              path: path.join(
+                process.env.REVIEW_SCREENSHOT_DIR,
+                `hydro-${width}-${colorScheme}.png`,
+              ),
+              animations: "disabled",
+            });
+          }
+        }
         expect(geometry.overflow).toBe(false);
         expect(geometry.aligned).toBe(true);
         expect(geometry.grouped).toBe(true);
@@ -166,7 +206,7 @@ test("reduced output stays inline beside capacity and fuel history shares the gr
       .evaluateAll((stats) =>
         stats.map((stat) => stat.getBoundingClientRect().top),
       );
-    expect(positions).toHaveLength(7);
+    expect(positions).toHaveLength(6);
     expect(new Set(positions).size).toBe(1);
     if (process.env.REVIEW_SCREENSHOT_DIR) {
       await row.scrollIntoViewIfNeeded();

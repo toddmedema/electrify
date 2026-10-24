@@ -453,7 +453,6 @@ describe("facilityLifetime", () => {
     expect(lifetime.profit).toBe(0);
     expect(lifetime.capacityFactor).toBeUndefined();
     expect(lifetime.costPerMWh).toBeUndefined();
-    expect(lifetime.revenuePerMWh).toBeUndefined();
   });
 
   it("reads the totals the simulation keeps on the facility", () => {
@@ -467,7 +466,6 @@ describe("facilityLifetime", () => {
     );
     expect(lifetime.capacityFactor).toBeCloseTo(0.25, 10);
     expect(lifetime.costPerMWh).toBeCloseTo(45, 10);
-    expect(lifetime.revenuePerMWh).toBeCloseTo(70, 10);
     expect(lifetime.profit).toBeCloseTo(2500, 10);
   });
 

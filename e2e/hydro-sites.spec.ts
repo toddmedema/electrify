@@ -97,7 +97,7 @@ for (const theme of ["light", "dark"] as const) {
       .locator(".facilityRow")
       .filter({ has: page.locator(".facilityName", { hasText: /^Hydro$/ }) });
     await plant.locator(".facilityDisclosure").click();
-    await expect(plant).toContainText("Hydro site:");
+    await expect(plant).toContainText("Site:");
     await plant
       .getByRole("button", { name: "Cancel construction of Hydro" })
       .click();
