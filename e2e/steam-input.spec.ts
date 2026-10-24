@@ -47,7 +47,8 @@ async function input(
     },
     { action, connection, glyphs },
   );
-  // Observe the real next render before sending another discrete button press.
+  // Yield for DOM commits; each journey also awaits the action's observable result.
+  // A frame alone does not establish dialog, native context, or text-entry readiness.
   await page.evaluate(
     () =>
       new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
@@ -62,6 +63,7 @@ async function select(
   limit = 100,
 ) {
   await expect(control).toBeVisible();
+  await expect(control).toBeEnabled();
   const popupSurfaces = () =>
     page
       .locator('[role="dialog"],[role="menu"],[role="listbox"]')
@@ -96,6 +98,8 @@ async function select(
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((glyphs) => {
     localStorage.clear();
+    // Keep game hazards independent of retries, wall time and worker scheduling.
+    Math.random = () => 0.25;
     localStorage.setItem("audioEnabled", "false");
     // A returning learner can choose a challenge from the real New Game catalog.
     localStorage.setItem(
@@ -465,16 +469,17 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at L
     page.getByRole("menuitem", { name: "Rename", exact: true }),
   );
   await input(page, "confirm");
-  await select(
-    page,
-    page.getByRole("textbox", { name: "Save name", exact: true }),
-  );
+  const saveName = page.getByRole("textbox", {
+    name: "Save name",
+    exact: true,
+  });
+  await select(page, saveName);
   await input(page, "confirm");
   await expect(page.locator("html")).toHaveAttribute(
     "data-mock-text-input",
     /Save name/,
   );
-  await submitText(page, "Deck renamed save");
+  await submitText(page, "Deck renamed save", saveName);
   await select(page, page.getByRole("button", { name: "Rename", exact: true }));
   await input(page, "confirm");
   await expect(
@@ -511,7 +516,7 @@ test("controller hints follow the active device without blocking keyboard naviga
   ).toBeVisible();
 });
 
-async function submitText(page: Page, text: string) {
+async function submitText(page: Page, text: string, field: Locator) {
   await page.evaluate((text) => {
     window.dispatchEvent(
       new CustomEvent("mockSteamTextResult", {
@@ -519,6 +524,9 @@ async function submitText(page: Page, text: string) {
       }),
     );
   }, text);
+  // Observe the real React edit and the controller's focus restoration before navigating.
+  await expect(field).toHaveValue(text);
+  await expect(field).toBeFocused();
 }
 
 async function chooseNewGame(page: Page) {
@@ -550,7 +558,7 @@ test("controller chooses an autocomplete city and starts a custom game", async (
     "data-mock-text-input",
     /Search playable cities/,
   );
-  await submitText(page, "Paris");
+  await submitText(page, "Paris", search);
   await expect(
     page.getByRole("option", { name: "Paris, France", exact: true }),
   ).toBeVisible();
@@ -638,7 +646,7 @@ test("controller changes text size, keeps settings reachable and persists it", a
 
 test("controller opens Workshop and enters a multiplayer invite with Steam text entry", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute(
     "data-mock-input-context",
@@ -678,6 +686,9 @@ test("controller opens Workshop and enters a multiplayer invite with Steam text 
     page.getByRole("button", { name: "Play with friends", exact: true }),
   );
   await input(page, "confirm");
+  await expect(
+    page.getByRole("dialog", { name: "Play with friends", exact: true }),
+  ).toBeVisible();
   const code = page.getByRole("textbox", { name: "Invite code", exact: true });
   await select(page, code);
   await input(page, "confirm");
@@ -685,8 +696,15 @@ test("controller opens Workshop and enters a multiplayer invite with Steam text 
     "data-mock-text-input",
     /Invite code/,
   );
-  await submitText(page, "10977524123456789");
-  await expect(code).toHaveValue("10977524123456789");
+  await submitText(page, "10977524123456789", code);
+  if (process.env.REVIEW_SCREENSHOT_DIR)
+    await page.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        `controller-invite-${testInfo.project.name}.png`,
+      ),
+      animations: "disabled",
+    });
   await select(page, page.getByRole("button", { name: "Join", exact: true }));
   await input(page, "confirm");
   await expect(page.locator("html")).toHaveAttribute(

@@ -89,8 +89,15 @@ test("platform plans retain all CPU shards, browser shards and full native suite
       script: "test:desktop",
       args: ["--headed"],
     });
-    assert.equal(plan.ui[0].script, "desktop:pack:offline");
-    assert(plan.ui[0].args.includes("--skip-build"));
+    const pack = plan.ui.find(
+      ({ script }) => script === "desktop:pack:offline",
+    );
+    assert(pack.args.includes("--skip-build"));
+    assert.equal(
+      plan.ui[0].script,
+      index === 2 ? "test:steam-input" : "desktop:pack:offline",
+      "controller regressions surface before packaging and the other Windows UI phases",
+    );
     const browser = plan.ui.find(({ script }) => script === "test:e2e:ci");
     assert.equal(!!browser, index === 2 || index === 3);
     if (browser) {

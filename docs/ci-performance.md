@@ -13,10 +13,11 @@ remains required on every PR.
    duplicate lint plugin is disabled.
 2. **Linux x64** runs unit/simulation shard 1, its complete native/packaged desktop suites,
    Firestore rules and CI tooling regression tests.
-3. **Windows x64** runs production browser shard 1 and its complete native/packaged suites.
-4. **macOS universal** packages one app containing both Intel and Apple Silicon slices on an
-   Apple Silicon runner, then runs browser shard 2, the complete native/packaged suites against
-   the arm64 slice, types, strict lint and formatting. CI does not launch the Intel slice.
+3. **Windows x64** runs the headless controller journeys against the shared desktop renderer
+   before packaging, then production browser shard 1 and its complete native/packaged suites.
+4. **macOS universal** runs types, strict lint and formatting, then packages one app containing
+   both Intel and Apple Silicon slices. It runs browser shard 2, multiplayer and the complete
+   packaged suite against the arm64 slice. CI does not launch the Intel slice.
 5. **check** runs unit/simulation shard 2 on another Linux runner, plus the CLI and isolated
    tick-ratio benchmark. It then requires all three native workers' latest results in this run
    to pass, merges raw coverage and enforces the unchanged `package.json` floors.
@@ -27,12 +28,12 @@ requires all three named native jobs, and fails on missing, failed, skipped, can
 workers. A partial rerun can reuse unchanged successes from this run, while a newer pending or
 failed job always supersedes its earlier success. Regression tests cover these conditions.
 
-Both Linux workers run unit and simulation suites concurrently, each bounded to half the cores.
-The native Linux worker overlaps those suites with packaging and its serial Electron UI tests.
-The two browser runners use a serial UI branch: package/verify, headless Chromium with two workers,
-then the full Electron suite. Every native target keeps one UI worker, preserving focus isolation. Separate
-browser, desktop and coverage output directories prevent Playwright cleanup from erasing a
-concurrent report. The combined native-window harness refuses to run locally.
+Every worker runs its CPU and UI phases sequentially, including covered Jest and simulations,
+each bounded to half the cores. A failed phase does not skip the remaining suites. Browser
+coverage keeps two Chromium workers; native Electron and controller journeys keep one UI worker.
+Controller failures surface before the Windows worker starts packaging or browser work.
+Separate browser, desktop and coverage directories retain each phase's reports. The combined
+native-window harness refuses to run locally.
 
 Linux workers and the static-check worker restore the full locked toolchain. Windows uses a
 lean native dependency closure preserving original locked runtime/tool records and native
@@ -53,12 +54,11 @@ automatically; private caches and discovery order never determine assignments. U
 when measured load drifts. Coverage validates every discovered unit suite actually passed exactly
 once and retains zero-hit files. Raw counters are merged; percentages are never averaged.
 
-Local `npm run check`, `test:ci` and `test:sim` still run complete suites. On a shared workstation,
-set `ELECTRIFY_CHECK_WORKERS=8` to bound workers without omitting tests. The local production
-browser gate uses up to six Chromium workers, bounded to half the cores; GitHub Actions keeps two.
-CI generates manifests
-before concurrent work and suppresses duplicate generation pre-hooks in those test branches.
-The CLI/ratio benchmark runs before concurrent work on its Linux runner.
+Local `npm run check`, `test:ci` and `test:sim` still run complete suites. The local check runner
+caps Jest at four workers by default. Local and hosted production browser gates both use two
+Chromium workers. CI generates manifests before its test phases and suppresses duplicate
+generation pre-hooks. The CLI/ratio benchmark runs before its Linux runner's unit and
+simulation suites.
 
 Jest 27 binds the sandbox's existing `Math`, `Number`, `Object`, `Array`, `JSON` and `BigInt`
 objects directly through `extraGlobals`, avoiding repeated VM global lookups in simulation loops.
@@ -68,6 +68,20 @@ An isolated local comparison of the three CEO seed tests took 92s before extendi
 `Math` binding and 67s after; measure whole-workflow time separately.
 The timing benchmark keeps its original Math-only sandbox through a separate CRA entry point,
 so its existing draft/plain ratio ceilings still compare the same execution environment.
+
+## Reliability evidence
+
+`npm run ci:history -- 100` groups recent failed PR runs by stable test file/title across
+viewports, shifted source lines and branches. It counts each run once per test or gate,
+separates passed retries, and links the contributing runs. It reports unreadable logs instead
+of treating them as passes. Counts describe the latest attempt of each run; a later successful
+rerun does not establish that its earlier failure was unrelated.
+
+`npm run check -- --report <report.json>` summarizes a retained local check with its tested
+commit, source fingerprint, runtime and full or partial scope. It explicitly reports whether
+the current source matches. This command reads evidence; it does not run checks or combine
+partial runs into a full pass. Native packaged tests remain CI-only and Firestore rules remain
+a separate local command.
 
 ## Downloadable QA builds
 
