@@ -41,7 +41,7 @@ function buildOptions(showXLabels: boolean) {
   return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0,
     height: 0,
-    padding: [5 * scale, FORECAST_RIGHT_PAD * scale, 0, 0],
+    padding: [5 * scale, FORECAST_RIGHT_PAD, 0, 0],
     cursor: {
       x: true,
       y: false,

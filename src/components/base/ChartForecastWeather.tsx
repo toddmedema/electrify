@@ -50,7 +50,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [5 * scale, FORECAST_RIGHT_PAD * scale, 0, 0],
+    padding: [5 * scale, FORECAST_RIGHT_PAD, 0, 0],
     cursor: {
       x: true,
       y: false,

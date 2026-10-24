@@ -71,16 +71,10 @@ export const AXIS_LABEL_SIZE = 16;
 export const FORECAST_AXIS_RIGHT = 48;
 
 /**
- * The trailing room a forecast plot leaves past its last x tick, in design units.
- *
- * Month labels are centred on their ticks, and a tick can sit exactly on the plot edge (the
- * default horizon ends mid-month, but any zoom or pan can land one there), so the plot needs
- * half a label of room beyond its edge or uPlot clips the trailing characters. Half of the
- * widest label a month axis draws -- a four-digit year at the largest chart scale -- is under
- * 24. Every forecast chart without a right axis uses this, so their plots all end at the same
- * place and none of them leaves a blank strip on the right.
+ * The trailing room past the plot in CSS pixels, matching the chart title's 16px inset.
+ * Keep this independent of chart scale so wide panes gain plot area rather than blank space.
  */
-export const FORECAST_RIGHT_PAD = 24;
+export const FORECAST_RIGHT_PAD = 16;
 
 /** Tick labels: the app's small caption, whatever the chart's width. */
 export const CHART_TICK_PX = 12;

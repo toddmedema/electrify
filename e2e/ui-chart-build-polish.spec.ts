@@ -2,6 +2,29 @@ import path from "node:path";
 import { expect, test, type Locator } from "./fixtures";
 import { openBuild, openPane } from "./layout";
 
+const expectRightInsets = async (insights: Locator) => {
+  // Water uses this space for its reservoir axis; every other plot ends on the title guide.
+  const tracks = insights.locator('.insightsTrack:not([data-layer="water"])');
+  await expect
+    .poll(() =>
+      tracks.evaluateAll((elements) =>
+        Math.max(
+          ...elements.flatMap((track) => {
+            const bounds = track.getBoundingClientRect();
+            const title = track.querySelector(".insightsTrackHeader h6")!;
+            const inset = title.getBoundingClientRect().left - bounds.left;
+            return Array.from(track.querySelectorAll(".u-over"), (plot) =>
+              Math.abs(
+                bounds.right - plot.getBoundingClientRect().right - inset,
+              ),
+            );
+          }),
+        ),
+      ),
+    )
+    .toBeLessThanOrEqual(1);
+};
+
 for (const theme of ["light", "dark"] as const) {
   test.describe(theme, () => {
     test.beforeEach(async ({ page }) => {
@@ -48,11 +71,26 @@ for (const theme of ["light", "dark"] as const) {
             type: "touchMove",
             touchPoints: [{ x: x + (dx * step) / 8, y: y + (dy * step) / 8 }],
           });
+          await page.evaluate(
+            () =>
+              new Promise<void>((resolve) =>
+                requestAnimationFrame(() => resolve()),
+              ),
+          );
         }
         await client.send("Input.dispatchTouchEvent", {
           type: "touchEnd",
           touchPoints: [],
         });
+        // A CDP acknowledgement can precede the compositor finishing the gesture.
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => resolve()),
+              ),
+            ),
+        );
       };
       const metrics = () => build.locator(".buildOptionMetrics").first();
       const selected = (name: string) =>
@@ -79,16 +117,14 @@ for (const theme of ["light", "dark"] as const) {
       await expect(slider).not.toHaveAttribute("aria-valuenow", previousValue!);
       await swipe(build.locator(".constructionCapacity"), -70);
       await selected("Generators");
-      await swipe(metrics(), 0, -100);
+      const scroller = build.locator(".scrollable").first();
+      const beforeScroll = await scroller.evaluate((el) => el.scrollTop);
+      await swipe(metrics(), 0, -180);
       await selected("Generators");
       await expect
-        .poll(() =>
-          build
-            .locator(".scrollable")
-            .first()
-            .evaluate((el) => el.scrollTop),
-        )
-        .toBeGreaterThan(0);
+        .poll(() => scroller.evaluate((el) => el.scrollTop))
+        .toBeGreaterThan(beforeScroll + 100);
+      await client.detach();
     });
 
     test(`pricing uses equal columns and the program catalog omits zero rollout in ${theme}`, async ({
@@ -165,6 +201,7 @@ for (const theme of ["light", "dark"] as const) {
           .toBeLessThanOrEqual(1);
       };
       await aligned();
+      await expectRightInsets(insights);
       const wide = Math.max(...(await insets()));
       await insights.getByRole("button", { name: /^Layers \(/ }).click();
       for (const label of [
@@ -182,6 +219,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       await expect(plots).toHaveCount(3);
       await aligned();
+      await expectRightInsets(insights);
       // Leave only the shorter percentage labels, so a removed MW axis is necessarily wider.
       await insights
         .getByRole("button", { name: "Remove Supply by Fuel", exact: true })
@@ -230,6 +268,28 @@ for (const theme of ["light", "dark"] as const) {
           animations: "disabled",
         });
       }
+    });
+
+    test(`Insights right gutters match the title inset with Larger text in ${theme}`, async ({
+      page,
+    }) => {
+      await page.addInitScript(() =>
+        localStorage.setItem("textSize", "larger"),
+      );
+      await page.goto("/?scenario=106");
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-text-size",
+        "larger",
+      );
+      await page
+        .getByRole("button", { name: "Start game", exact: true })
+        .click();
+      const insights = page.locator(".insights:visible");
+      await openPane(insights, page.locator("#insightsNav"));
+      await expect
+        .poll(() => insights.locator(".u-over").count())
+        .toBeGreaterThanOrEqual(7);
+      await expectRightInsets(insights);
     });
   });
 }
