@@ -1,7 +1,5 @@
 const crypto = require("node:crypto");
 const zlib = require("node:zlib");
-const path = require("node:path");
-const { atomicWriteAsync, readJson } = require("./storage.cjs");
 const { nativeLibraryPath } = require("./steam-native.cjs");
 const { CoopSaveStore } = require("./coop-storage.cjs");
 const { stringify, parse } = require("./coop-codec.cjs");
@@ -357,7 +355,6 @@ class SteamMultiplayer {
     this.api = api;
     this.koffi = koffi;
     this.emit = emit;
-    this.filename = path.join(directory, "co-op.json");
     this.saves = new CoopSaveStore(directory, service, { stringify, parse });
     this.matchmaking = api.matchmaking();
     this.sockets = api.sockets();
@@ -390,7 +387,6 @@ class SteamMultiplayer {
       }
     }, 33);
     this.timer.unref();
-    this.saveQueue = Promise.resolve();
   }
   state() {
     return {
@@ -633,7 +629,7 @@ class SteamMultiplayer {
   async persist(world) {
     if (
       !world ||
-      ![2, 3].includes(world.schema) ||
+      world.schema !== 3 ||
       !Array.isArray(world.seats) ||
       world.seats.length < 2 ||
       world.seats.length > 4 ||
@@ -644,26 +640,7 @@ class SteamMultiplayer {
     if (Buffer.byteLength(json) > MAX_BYTES)
       throw new Error("Multiplayer save is too large");
     const digest = crypto.createHash("sha256").update(json).digest("hex");
-    this.saveQueue = this.saveQueue
-      .catch(() => {})
-      .then(async () => {
-        // Retain the legacy checkpoint for older installations and disaster recovery.
-        // Never replace a future checkpoint with a save from an older game.
-        let previous;
-        try {
-          previous = readJson(this.filename, null);
-        } catch {
-          previous = { schema: Infinity };
-        }
-        await this.saves.save(world);
-        if (
-          !previous ||
-          (previous.schema <= world.schema &&
-            (previous.gameSchema ?? 0) <= (world.gameSchema ?? 0))
-        )
-          await atomicWriteAsync(this.filename, json);
-      });
-    await this.saveQueue;
+    await this.saves.save(world);
     this.savedAt = Date.now();
     this.publish();
     return digest;

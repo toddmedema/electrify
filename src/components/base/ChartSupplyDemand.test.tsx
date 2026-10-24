@@ -62,7 +62,7 @@ it("balances charging, discharging, imports and exports without netting away sto
   expect(stack.bySource[3]).toEqual([30, 0]);
 });
 
-it("handles older records without optional flow fields and omits unused source keys", () => {
+it("handles records without optional flow fields and omits unused source keys", () => {
   const stack = supplyDemandStack(
     [
       { minute: 0, supplyW: 50, demandW: 40, supplyByFuel: { Coal: 50 } },

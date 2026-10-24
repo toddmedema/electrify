@@ -134,7 +134,6 @@ test("tutorials, custom runs, simulation harness overrides and replays cannot ea
     { meaningfulDecisionGateWaived: true },
     { storyEffectsDisabled: true },
     { weatherHazardsDisabled: true },
-    { wildfireHazardDisabled: true },
   ]) {
     const state = Object.assign(game(), patch);
     hooks.finish(state, "bankrupt");
@@ -469,12 +468,12 @@ test.each([
     );
   },
 );
-test("a legacy partial month and an unreliable month cannot unlock monthly counter achievements", () => {
-  for (const legacy of [false, true]) {
+test("a partially observed month and an unreliable month cannot unlock monthly counter achievements", () => {
+  for (const reset of [false, true]) {
     const state = game();
     state.date.monthsElapsed = 1;
-    state.monthlyHistory = [month({ supplyWh: legacy ? 1e9 : 998e6 })];
-    if (legacy) state.desktopAchievements!.counterStartMonth = 1;
+    state.monthlyHistory = [month({ supplyWh: reset ? 1e9 : 998e6 })];
+    if (reset) state.desktopAchievements!.counterStartMonth = 1;
     state.desktopAchievements!.month = {
       nightServedWh: 100,
       nightStorageWh: 100,

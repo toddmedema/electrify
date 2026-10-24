@@ -35,7 +35,7 @@ export interface AchievementProgress {
   startingLineKeys: string[];
   commissionedIntertie: boolean;
   lastMinute: number;
-  /** A legacy save's partial month is excluded from new counter-based achievements. */
+  /** Exclude a partially observed month when missing or invalid telemetry is reset. */
   counterStartMonth: number;
   reliableMonths: number;
   recoveryMonths: number;

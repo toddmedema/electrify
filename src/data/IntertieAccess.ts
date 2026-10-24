@@ -13,7 +13,6 @@ import { log } from "../helpers/Libm";
 export interface IntertieAccessContext {
   peers?: NonNullable<GameType["multiplayer"]>["peers"];
   scenarioId?: number;
-  legacyWildfireIntertieAccess?: boolean;
   frozenStartingIntertieAccess?: FrozenStartingIntertieAccessType;
   locationId?: string;
 }
@@ -266,12 +265,11 @@ export const SCENARIO_INTERTIE_ACCESS: readonly ScenarioIntertieAccess[] = [
 ];
 export function accessContextForGame(
   game: Pick<GameType, "scenarioId" | "location" | "customScenario"> &
-    Partial<Pick<GameType, "multiplayer" | "legacyWildfireIntertieAccess">>,
+    Partial<Pick<GameType, "multiplayer">>,
 ): IntertieAccessContext {
   const custom = game.customScenario;
   return {
     peers: game.multiplayer?.peers,
-    legacyWildfireIntertieAccess: game.legacyWildfireIntertieAccess,
     scenarioId: game.customScenario ? undefined : game.scenarioId,
     locationId: game.location.id,
     ...(custom?.mod && validFrozenStartingIntertieScenario(custom)
@@ -279,26 +277,6 @@ export function accessContextForGame(
       : {}),
   };
 }
-const LEGACY_WILDFIRE_ACCESS: readonly ScenarioIntertieAccess[] = [
-  {
-    scenarioId: 111,
-    locationId: "LA",
-    corridorId: "california-north",
-    capacityW: 5e6,
-    availableSupplyW: 4e6,
-    importAccessWByTier: [4e6, 4.5e6, 5e6, 5.5e6],
-    availableDemandW: 5e6,
-  },
-  {
-    scenarioId: 111,
-    locationId: "LA",
-    corridorId: "california-south",
-    capacityW: 7.5e6,
-    availableSupplyW: 5e6,
-    importAccessWByTier: [5e6, 5.5e6, 6e6, 6.5e6],
-    availableDemandW: 7.5e6,
-  },
-];
 function allocation(corridorId: string, context?: IntertieAccessContext) {
   if (
     context?.frozenStartingIntertieAccess &&
@@ -307,10 +285,7 @@ function allocation(corridorId: string, context?: IntertieAccessContext) {
     return context.frozenStartingIntertieAccess.allocations.find(
       (row) => row.corridorId === corridorId,
     );
-  const allocations = context?.legacyWildfireIntertieAccess
-    ? LEGACY_WILDFIRE_ACCESS
-    : SCENARIO_INTERTIE_ACCESS;
-  return allocations.find(
+  return SCENARIO_INTERTIE_ACCESS.find(
     (row) =>
       row.scenarioId === context?.scenarioId &&
       row.locationId === context?.locationId &&
@@ -368,15 +343,14 @@ export function effectiveMarket(
 /** Corridors that can be ordered this year: their path exists and has not been cut off. */
 export function corridorsForGame(
   game: Pick<GameType, "scenarioId" | "location" | "customScenario"> &
-    Partial<Pick<GameType, "multiplayer" | "legacyWildfireIntertieAccess">> & {
+    Partial<Pick<GameType, "multiplayer">> & {
       date: Pick<GameType["date"], "year">;
     },
 ) {
   if (game.multiplayer) {
-    const starting = game.legacyWildfireIntertieAccess
-      ? []
-      : getScenario(game.scenarioId, game.customScenario)?.startingInterties ||
-        [];
+    const starting =
+      getScenario(game.scenarioId, game.customScenario)?.startingInterties ||
+      [];
     return [
       ...(game.multiplayer.peers?.map((p) => p.corridor) ?? []),
       ...corridorsForLocation(game.location)

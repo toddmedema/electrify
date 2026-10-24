@@ -1,8 +1,9 @@
+import manifest from "../data/RunCompatibility.json";
 import { TICK_MS } from "../Constants";
 import type { SpeedType } from "../Types";
 import type { World } from "../multiplayer/Types";
 import type { WorkerRequest } from "../multiplayer/WorkerProtocol";
-import { SAVE_SCHEMA_VERSION } from "../SaveUpgrade";
+import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 
 jest.mock("../data/Economy", () => ({
   initEconomy: (done: () => void) => done(),
@@ -240,6 +241,7 @@ test("a fresh worker loads the saved match's location before validating and rest
   const saved = {
     schema: 3,
     gameSchema: SAVE_SCHEMA_VERSION,
+    rules: manifest.multiplayerCompatibilityId,
     speed: "PAUSED",
     paused: true,
     spec,
@@ -313,7 +315,7 @@ test.each([
       expect(post).toHaveBeenCalledWith({
         kind: "error",
         message: expect.stringMatching(
-          /newer game.*original save is preserved/,
+          /unsupported format.*original save is preserved/,
         ),
       });
     } finally {

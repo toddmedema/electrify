@@ -30,9 +30,6 @@ export const WINTERIZATION_COST: Record<DifficultyType, number> = {
   CEO: 90000000,
 };
 
-// Advance inspection, staged equipment and crews; post-fire restoration is separate.
-export const WILDFIRE_PREPARATION_COST = 2000000;
-
 /** Months are authored one-based offsets, before the source's preparation lead. */
 export const SCENARIO_CHOICE_RULES: CatalogScenarioChoice[] = [
   {
@@ -123,6 +120,3 @@ export const DATA_CENTER_DECISION_KEY = catalogChoiceKey(
 export const DEEP_FREEZE_DECISION_KEY = catalogChoiceKey(
   SCENARIO_CHOICE_RULES.find((entry) => entry.scenarioId === 107)!,
 );
-/** Historical receipt identity only; current native 111 has no response. */
-export const WILDFIRE_DECISION_KEY =
-  "story:111:california-wildfire-2025:preparedness";

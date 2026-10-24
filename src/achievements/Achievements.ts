@@ -36,7 +36,6 @@ const eligible = (game: GameType) =>
   !game.customScenario &&
   !game.storyEffectsDisabled &&
   !game.weatherHazardsDisabled &&
-  !game.wildfireHazardDisabled &&
   !game.meaningfulDecisionGateWaived &&
   OFFICIAL_IDS.includes(game.scenarioId);
 export const reliable = (month: MonthlyHistoryType) =>

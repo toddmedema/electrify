@@ -1,3 +1,4 @@
+import manifest from "./data/RunCompatibility.json";
 import { DIFFICULTIES, LOCATIONS } from "./Constants";
 import {
   decodeReplay,
@@ -45,7 +46,9 @@ function aGame(minute: number, log?: ReplayActionType[]): GameType {
 
 function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
   return {
-    appVersion: "0.1.0",
+    appVersion: "fixture",
+    compatibilityId: manifest.compatibilityId,
+    monthlyCash: [],
     scenarioId: 101,
     difficulty: "Employee",
     seed: 12345,
@@ -293,8 +296,6 @@ describe("replay checkpoints", () => {
     expect(replayDiverged(playback, months(9, 2, 1))).toBe(true);
     expect(playback.diverged).toBe(true);
     expect(replayDiverged(playback, months(8, 9, 2, 1))).toBe(false);
-    // Replays recorded before checkpoints existed have nothing to compare
-    expect(replayDiverged({ actions: [], index: 0 }, months(5))).toBe(false);
   });
 
   it("round trips checkpoints and rejects malformed ones", () => {
@@ -499,4 +500,19 @@ describe("decodeReplay", () => {
     );
     expect(decodeReplay(doc)).toBeNull();
   });
+});
+
+it.each([undefined, "different-rules"])(
+  "rejects replay rules %p",
+  (compatibilityId) => {
+    const replay = encodeReplay(aReplay());
+    expect(decodeReplay({ ...replay, compatibilityId })).toBeNull();
+    expect(decodeReplay(replay)).not.toBeNull();
+  },
+);
+
+it("rejects a replay without recorded checkpoints", () => {
+  const replay = encodeReplay(aReplay());
+  expect(decodeReplay({ ...replay, monthlyCash: undefined })).toBeNull();
+  expect(decodeReplay(replay)).not.toBeNull();
 });

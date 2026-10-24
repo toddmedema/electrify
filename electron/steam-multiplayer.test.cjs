@@ -709,14 +709,14 @@ test("unchanged checkpoints skip only connected peers that confirmed their queue
   }
 });
 
-test("schema 2 checkpoints persist real files, including overlapping host saves and guest receipts", async () => {
+test("checkpoints persist real files, including overlapping host saves and guest receipts", async () => {
   const temporaryRoot = path.resolve(".tmp", "native-tests");
   fs.mkdirSync(temporaryRoot, { recursive: true });
   const directory = fs.mkdtempSync(path.join(temporaryRoot, "checkpoint-"));
   const { mp } = fixture(directory);
   const guest = { id: "76561198000000002", connected: true, queue: [] };
   const world = {
-    schema: 2,
+    schema: 3,
     matchId: "campaign-one",
     revision: 1,
     seats: [{ id: mp.service.identity.steamId }, { id: guest.id }],
@@ -731,7 +731,7 @@ test("schema 2 checkpoints persist real files, including overlapping host saves 
       mp.checkpoint(world),
       mp.checkpoint({ ...world, revision: 2 }),
     ]);
-    assert.equal(JSON.parse(fs.readFileSync(mp.filename, "utf8")).revision, 2);
+    assert.equal((await mp.saves.select()).revision, 2);
     assert.equal(guest.queue.length, 2);
     const messages = await Promise.all(
       guest.queue.map((message) => assemble(new Map(), chunk(message))),
@@ -761,41 +761,13 @@ test("schema 2 checkpoints persist real files, including overlapping host saves 
     mp.saves.filename = savedFilename;
     await mp.receive(guest.id, messages[1]);
     assert.equal(
-      fs.readFileSync(mp.filename, "utf8"),
+      stringify(await mp.saves.select()),
       stringify(messages[1].world),
     );
     assert.deepEqual(await assemble(new Map(), chunk(guest.queue[0])), {
       kind: "saved",
       digest: messages[1].digest,
     });
-  } finally {
-    mp.dispose();
-    fs.rmSync(directory, { recursive: true, force: true });
-  }
-});
-test("healthy named campaigns checkpoint while a corrupt or newer legacy file stays untouched", async () => {
-  const temporaryRoot = path.resolve(".tmp", "native-tests");
-  fs.mkdirSync(temporaryRoot, { recursive: true });
-  const directory = fs.mkdtempSync(
-    path.join(temporaryRoot, "legacy-protection-"),
-  );
-  const { mp } = fixture(directory);
-  const world = {
-    schema: 3,
-    gameSchema: 3,
-    matchId: "current",
-    seats: [{ id: mp.service.identity.steamId }, { id: "76561198000000002" }],
-  };
-  try {
-    await mp.persist(world);
-    const future = stringify({ ...world, gameSchema: 99 });
-    fs.writeFileSync(mp.filename, future);
-    await mp.persist({ ...world, matchId: "another" });
-    assert.equal(fs.readFileSync(mp.filename, "utf8"), future);
-    fs.writeFileSync(mp.filename, "damaged legacy JSON");
-    await mp.persist({ ...world, revision: 2 });
-    assert.equal(fs.readFileSync(mp.filename, "utf8"), "damaged legacy JSON");
-    assert.equal((await mp.saves.list()).slots.length, 2);
   } finally {
     mp.dispose();
     fs.rmSync(directory, { recursive: true, force: true });

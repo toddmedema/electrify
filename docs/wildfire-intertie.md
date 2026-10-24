@@ -48,7 +48,3 @@ The compact forecast worker transport retains the restriction. Negative or nonfi
 `WildfireIntertieBalance.sim.test.tsx` compares neglect, affected-route upgrades and viable
 preparation plans using the real reducer, across both difficulty endpoints and multiple
 seeds. Existing economy tests retain their one-action Intern and ten-decision CEO plans.
-
-Schema 5 removes retired active wildfire systems and legacy custom-event selections.
-Historical results, cash, fleet, recorded actions and challenge identity are preserved.
-Only forecast ticks after the saved instant are refreshed.

@@ -41,7 +41,6 @@ export * from "./OfficialScenarioTargetRules";
 export { LOAD_SHEDDING_BALANCE } from "./OfficialScenarioRules";
 export {
   DEEP_FREEZE_DECISION_KEY,
-  WILDFIRE_DECISION_KEY,
   WINTERIZATION_COST,
 } from "./ScenarioChoiceRules";
 export interface StoryContextType {

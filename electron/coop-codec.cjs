@@ -19,7 +19,7 @@ const plainJson = (value) => JSON.stringify(value, numberEncoding);
 function worldShape(value) {
   return (
     record(value) &&
-    [2, 3].includes(value.schema) &&
+    value.schema === 3 &&
     record(value.spec) &&
     Array.isArray(value.grids) &&
     value.grids.length >= 2 &&
@@ -28,8 +28,7 @@ function worldShape(value) {
 }
 function snapshotFor(world) {
   const snapshot = world.spec.customScenario;
-  return world.schema === 3 &&
-    world.spec.scenarioId === 999 &&
+  return world.spec.scenarioId === 999 &&
     record(snapshot) &&
     snapshot.id === 999 &&
     record(snapshot.mod) &&

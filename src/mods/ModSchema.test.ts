@@ -5,7 +5,6 @@ import {
   validateMod,
   ModValidationError,
   FACILITY_NAMES,
-  MOD_API_VERSION,
   MOD_SCENARIO_IDS,
   ModProgramId,
   ModScenarioOverrides,
@@ -91,39 +90,6 @@ test("mod base scenarios are every non-tutorial scenario", () => {
     SCENARIOS.filter((s) => !s.tutorialSteps)
       .map((s) => s.id)
       .sort(),
-  );
-});
-
-/**
- * Packages declare the game contract version they were written for. Ordinary releases must keep
- * every name a version 1 package may use; removing or renaming one breaks published mods, so it
- * needs a deliberate MOD_API_VERSION bump (and a new pinned catalog here) instead.
- */
-test("the version 1 mod contract keeps every name packages may rely on", () => {
-  expect(MOD_API_VERSION).toBe(1);
-  expect(FACILITY_NAMES).toEqual(
-    expect.arrayContaining([
-      "Coal",
-      "Nuclear",
-      "Natural Gas Peaker",
-      "Natural Gas CC",
-      "Oil",
-      "Biomass",
-      "Wind",
-      "Offshore Wind",
-      "Airborne Wind",
-      "Solar",
-      "Hydro",
-      "Geothermal",
-      "Enhanced Geothermal",
-      "Battery",
-      "Pumped Hydro",
-    ]),
-  );
-  expect(MOD_SCENARIO_IDS).toEqual(
-    expect.arrayContaining([
-      100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115,
-    ]),
   );
 });
 

@@ -1,3 +1,4 @@
+import manifest from "../data/RunCompatibility.json";
 import { configureStore } from "@reduxjs/toolkit";
 import userReducer, {
   delta,
@@ -55,7 +56,9 @@ function makeStore(user: UserType = {}) {
 
 function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
   return {
-    appVersion: "0.1.0",
+    appVersion: "fixture",
+    compatibilityId: manifest.compatibilityId,
+    monthlyCash: [],
     scenarioId: 101,
     difficulty: "Employee",
     seed: 12345,

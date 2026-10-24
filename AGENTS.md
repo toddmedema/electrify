@@ -145,12 +145,9 @@ untracked. Agents without a verified hook should format the files they changed b
 - `src/components/views/` contains screens; adjacent `*Container.tsx` files provide Redux wiring.
   Reusable UI and charts live in `src/components/base/`. `Compositor.tsx` selects the current
   screen from the card-navigation state.
-- Saves upgrade silently through the numbered migrations in `src/SaveUpgrade.ts`, which receive
-  decoded saves; a deploy that changes the rules fingerprint carries runs forward with their
-  challenge, replay and score (`carryRunForward`). Add a migration and regression fixture for
-  structural changes and validate the upgraded payload before use. Only tell players when their
-  app is too old, with a Refresh to update action. Keep untrusted-import validation and
-  deterministic replay behavior covered by tests.
+- Saves accept only the current structure in `src/SaveSchema.ts`; there are no prelaunch
+  migrations or historical simulation runtimes. Keep untrusted-import validation,
+  current-format round trips and deterministic replay behavior covered by tests.
 - `src/testing/Simulator.tsx` drives the real reducer, not a second model. Add economic invariants
   to `src/testing/Invariants.tsx`; do not duplicate game formulas in the simulator.
 - Background reading, loaded only when relevant: `docs/demand-model.md` (customer demand),

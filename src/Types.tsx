@@ -366,6 +366,7 @@ export interface MeaningfulDecisionType {
 }
 
 export interface ReplayType {
+  compatibilityId: string;
   appVersion: string; // For bug reports
   scenarioId: number;
   difficulty: DifficultyType;
@@ -378,9 +379,8 @@ export interface ReplayType {
   customScenario?: ScenarioType;
   actions: ReplayActionType[];
   meaningfulDecisionGateWaived?: boolean;
-  // Month-end cash of the original run in cents, oldest first, so playback can tell when a later
-  // build re-simulates it differently. Absent on replays recorded before checkpoints existed
-  monthlyCash?: number[];
+  // Month-end cash in cents, oldest first, used to detect playback divergence.
+  monthlyCash: number[];
   // What the original run actually scored, shown at the end even if playback drifts from it
   result?: ReplayResultType;
 }
@@ -938,8 +938,8 @@ export interface ScenarioModType {
     creator: string;
     version: string;
     description: string;
-    /** Frozen provenance; none remains readable for older saved runs. Packages use optional goal lists. */
-    objectiveMode: "inherit" | "replace" | "none";
+    /** Frozen provenance records whether the package inherited or supplied its goal list. */
+    objectiveMode: "inherit" | "replace";
     workshopId?: string;
   };
   parameters: {
@@ -1359,7 +1359,7 @@ export interface GameType {
       }[];
     };
   };
-  /** Shared achievement telemetry; retain the legacy save key for compatibility. */
+  /** Shared achievement telemetry. */
   desktopAchievements?: import("./achievements/SimulationHooks").AchievementProgress;
   runIdentity?: RunIdentity;
   challenge?: ChallengeInvitation;
@@ -1428,14 +1428,6 @@ export interface GameType {
   // Headless balance harness only: baseline matrix cells run the identical strategy with authored
   // effects disabled. Undefined means enabled and is what every browser save/replay uses.
   storyEffectsDisabled?: boolean;
-  // Legacy verification flag: keep earlier unranked runs ineligible for achievements.
-  wildfireHazardDisabled?: boolean;
-  /** One-time future forecast refresh after retiring legacy wildfire systems. */
-  wildfireForecastRefresh?: boolean;
-  /** Preserve pre-redesign transmission assets, loans and co-op topology in scenario-111 saves. */
-  legacyWildfireIntertieAccess?: boolean;
-  /** Earliest reliable native story journal boundary after a supported legacy save migration. */
-  scenarioRuleHistoryStartMinute?: number;
   // Headless balance harness only: run the identical strategy with hail and extreme-cold hazards
   // switched off. Undefined means enabled (the browser default).
   weatherHazardsDisabled?: boolean;
@@ -1554,8 +1546,7 @@ export type SaveId = string;
 export type SaveStatus = "inProgress" | "completed" | "bankrupt" | "fired";
 
 export interface SaveGameType {
-  /** Absent on legacy saves; upgraded before domain validation. */
-  schemaVersion?: number;
+  schemaVersion: number;
   savedAt: string;
   appVersion: string;
   game: GameType;

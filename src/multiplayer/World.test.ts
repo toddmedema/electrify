@@ -8,7 +8,6 @@ import {
   createWorld,
   pauseWorld,
   restoreWorld,
-  RULES,
   roomView,
   stepWorld,
 } from "./World";
@@ -18,7 +17,6 @@ import { parseSave, serializeSave } from "../SaveGame";
 import { COOP_TEST_SPEC, coopSeats } from "../testing/MultiplayerFixtures";
 import { DIFFICULTY_IDS } from "../Constants";
 import { validBrowseState } from "./Browse";
-import { emptyPolicies } from "../helpers/Policies";
 
 beforeAll(() => {
   loadSimData("SF");
@@ -450,10 +448,9 @@ test("resume restores the entire match and drops prior-session purchase IDs", ()
   expect(() =>
     restoreWorld({ ...world, grids: world.grids.slice(1) }, "new"),
   ).toThrow(/incomplete/);
-  expect(
-    restoreWorld({ ...checkpointWorld(world), rules: "other-build" }, "new")
-      .rules,
-  ).toBe(RULES);
+  expect(() =>
+    restoreWorld({ ...checkpointWorld(world), rules: "other-build" }, "new"),
+  ).toThrow(/unsupported format/);
   const before = world.grids[0].date.minute;
   world.seats.forEach((_seat, i) => {
     command(world, i, { kind: "ready" });
@@ -469,55 +466,16 @@ test("resume restores the entire match and drops prior-session purchase IDs", ()
   );
 });
 
-test("schema 2 match migration upgrades every grid, preserves progress and requires common readiness", () => {
-  const world = create(3);
-  const saved = checkpointWorld(world);
-  const legacy = {
-    ...saved,
-    schema: 2,
-    gameSchema: undefined,
-    rules: "previous-release",
-  };
-  for (const grid of legacy.grids) {
-    grid.policies = emptyPolicies();
-    const programs = grid.policies!.programs as Record<string, unknown>;
-    delete programs.thermal;
-    delete programs.evCharging;
-    delete programs.battery;
-  }
-  const original = JSON.stringify(legacy);
-  const restored = restoreWorld(legacy, "common-new-epoch");
-  expect(JSON.stringify(legacy)).toBe(original);
-  expect(restored.schema).toBe(3);
-  expect(restored.rules).toBe(RULES);
-  expect(restored.epoch).toBe("common-new-epoch");
-  expect(restored.ready).toEqual([]);
-  expect(restored.readyRequired).toBe(true);
-  expect(restored.grids.map((g) => g.policies!.programs.thermal.tier)).toEqual([
-    "Off",
-    "Off",
-    "Off",
-  ]);
-  expect(restored.grids.map((g) => g.facilities)).toEqual(
-    world.grids.map((g) => g.facilities),
-  );
-  expect(restored.edges).toEqual(world.edges);
-  command(restored, 0, { kind: "ready" });
-  command(restored, 1, { kind: "ready" });
-  expect(restored.speed).toBe("PAUSED");
-  command(restored, 2, { kind: "ready" });
-  expect(restored.speed).toBe("NORMAL");
-  const bad = { ...legacy, grids: legacy.grids.map((g) => ({ ...g })) };
-  bad.grids[2].customerMarketSize = -1;
-  expect(() => restoreWorld(bad, "rejected")).toThrow(/invalid grids/);
-});
-
 test("future and unsupported shared schemas are rejected without mutating the checkpoint", () => {
   const saved = checkpointWorld(create(2));
   for (const bad of [
     { ...saved, schema: 99 },
     { ...saved, gameSchema: 99 },
     { ...saved, schema: 1 },
+    { ...saved, schema: 2 },
+    { ...saved, gameSchema: 5 },
+    { ...saved, gameSchema: undefined },
+    { ...saved, rules: "previous-release" },
   ]) {
     const original = JSON.stringify(bad);
     expect(() => restoreWorld(bad, "new")).toThrow(/preserved/);

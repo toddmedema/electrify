@@ -271,24 +271,3 @@ test("an existing outside intertie upgrades without charging a peer or requiring
     ),
   ).not.toThrow();
 });
-
-test("older wildfire co-op checkpoints keep their original peer-only topology", () => {
-  loadSimData("LA");
-  const world = start({ scenarioId: 111, difficulty: "Manager" }, 2);
-  const checkpoint = JSON.parse(
-    JSON.stringify(checkpointWorld(world)),
-  ) as World;
-  checkpoint.gameSchema = 4;
-  checkpoint.grids.forEach((game) => {
-    game.transmission!.lines = game.transmission!.lines.filter((line) =>
-      line.corridorId.startsWith("peer:"),
-    );
-    game.transmission!.lines[0].id = 1;
-  });
-  const restored = restoreWorld(checkpoint, "older-topology");
-  restored.grids.forEach((game) => {
-    expect(game.legacyWildfireIntertieAccess).toBe(true);
-    expect(game.transmission!.lines).toHaveLength(1);
-    expect(game.transmission!.lines[0].corridorId).toBe("peer:0-1");
-  });
-});

@@ -28,6 +28,3 @@ change the simulation compatibility hash.
 Player names live in `users/{uid}.displayName`. Display names are not unique;
 Firebase Auth UIDs identify accounts. Scores retain a display-name copy for efficient
 leaderboard reads, with best-effort backfilling when a player renames themselves.
-
-Legacy `usernames` documents and `displayNameLower` profile fields are unused and may be
-deleted with admin tooling; deploying rules does not delete stored data.
