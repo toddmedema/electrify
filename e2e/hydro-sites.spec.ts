@@ -27,9 +27,6 @@ for (const theme of ["light", "dark"] as const) {
     await expect(hydro).toContainText("largest:");
     const slider = page.getByRole("slider");
     const before = await slider.getAttribute("aria-valuenow");
-    await hydro.getByRole("button", { name: "Use site maximum" }).click();
-    // The shortcut sizes the catalog to the largest open site, which is below the default
-    await expect(slider).not.toHaveAttribute("aria-valuenow", before!);
     const reviewBounds = (await hydro
       .getByRole("button", { name: "Review purchase of Hydro" })
       .boundingBox())!;
@@ -51,6 +48,12 @@ for (const theme of ["light", "dark"] as const) {
       testInfo.project.name.startsWith("mobile") ? 44 : 40,
     );
 
+    await hydro.getByRole("button", { name: "Use site maximum" }).click();
+    // The shortcut sizes the catalog to the largest open site, then hides at that size.
+    await expect(slider).not.toHaveAttribute("aria-valuenow", before!);
+    await expect(
+      hydro.getByRole("button", { name: "Use site maximum" }),
+    ).toHaveCount(0);
     await expect(hydro).toContainText("Site:");
     await expect(page.locator(".buildPrimer")).toContainText(
       "Each plant uses a whole site",
@@ -92,12 +95,15 @@ for (const theme of ["light", "dark"] as const) {
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildGenerator").click();
     await expect(hydro).toContainText(`${count - 1} sites left`);
-    await page.getByRole("button", { name: "close", exact: true }).click();
+    await openPane(
+      page.locator(".facilities"),
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
     const plant = page
       .locator(".facilityRow")
       .filter({ has: page.locator(".facilityName", { hasText: /^Hydro$/ }) });
     await plant.locator(".facilityDisclosure").click();
-    await expect(plant).toContainText("Hydro site:");
+    await expect(plant).toContainText("Site:");
     await plant
       .getByRole("button", { name: "Cancel construction of Hydro" })
       .click();

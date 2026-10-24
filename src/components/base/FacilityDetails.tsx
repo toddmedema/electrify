@@ -57,7 +57,7 @@ import Sparkline from "./Sparkline";
 
 /**
  * What a selected facility has actually been doing: how hard it has run, what a MWh out of it
- * costs against what it fetches, what it has made or lost, and - for anything that burns
+ * costs, what it has made or lost, and - for anything that burns
  * something - where the price of that something has been heading.
  *
  * All of it comes off totals the simulation already keeps (see LifetimeTotals) plus the fuel
@@ -357,7 +357,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
     <div className="facilityDetails">
       {facility.hydroSiteId && (
         <Typography variant="body2">
-          Hydro site:{" "}
+          Site:{" "}
           {HYDRO_SITES[facility.hydroSiteId]?.name || facility.hydroSiteId}
         </Typography>
       )}
@@ -408,7 +408,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             )}
             <Stat
               label="Age"
-              value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr${ageYears >= facility.lifespanYears ? " · beyond" : ""}`}
+              value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr`}
             />
             <Stat
               // Capacity factor is the generator's word for it; a battery isn't producing
@@ -435,7 +435,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             )}
             {minimumStableOutput !== undefined && (
               <Stat
-                label="Minimum stable output"
+                label="Minimum output"
                 value={`${formatPercent(minimumStableOutput)} · ${formatWatts(facility.peakW * minimumStableOutput)}`}
               />
             )}
@@ -484,14 +484,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 lifetime.costPerMWh === undefined
                   ? "—"
                   : formatPricePerMWh(lifetime.costPerMWh)
-              }
-            />
-            <Stat
-              label="Revenue per MWh"
-              value={
-                lifetime.revenuePerMWh === undefined
-                  ? "—"
-                  : formatPricePerMWh(lifetime.revenuePerMWh)
               }
             />
             <Stat

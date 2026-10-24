@@ -3501,7 +3501,9 @@ $pane_header_height: 48px;
   }
 
   .facilityWaterOutlook {
-    margin: 12px 0 0;
+    grid-column: span 2;
+    min-width: 0;
+    margin: 0;
 
     // Same neutral marks as the build cards' typical-year lines
     .sparklineLine,
@@ -3518,11 +3520,21 @@ $pane_header_height: 48px;
       fill: var(--spark-marker-fill);
     }
 
-    figcaption {
-      margin: 0 0 4px;
-      font-size: var(--font-size-caption-sm);
-      line-height: 16px;
+    .facilityTrend {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
     }
+
+    .sparkline {
+      width: 100%;
+    }
+  }
+
+  .facilityWaterOutlookLabels {
+    display: grid;
+    line-height: 16px;
+    white-space: nowrap;
   }
 
   // The one-sentence reason a dam is producing what it is. Only the verdict takes the warning
@@ -5448,6 +5460,17 @@ html[data-startup-visit="returning"] #appStartup {
   }
 }
 
+// Two 132 px cells, their 16 px gap and the row's 32 px padding need 312 px.
+@container facility-row (width < 312px) {
+  .base_main .facilityWaterOutlook {
+    grid-column: 1 / -1;
+
+    .facilityTrend {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}
+
 // A compact grip shares its generous drag target with the facility or intertie icon.
 .base_main .facilityDragHandle {
   position: relative; // over the row's output bar
@@ -7094,14 +7117,6 @@ $programs_column: 800px;
 
   .dataCenterSetupNote {
     color: var(--font-color-faded);
-  }
-
-  p.dataCenterSetupClosing {
-    margin: var(--space-4) 0 0;
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--border-subtle);
-    font-size: var(--font-size-body2);
-    line-height: 1.5;
   }
 
   // Names stay regular weight so the right-aligned, tabular capacities carry the eye

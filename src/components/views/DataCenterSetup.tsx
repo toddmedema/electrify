@@ -16,6 +16,7 @@ import {
   initDataCenterCustomers,
 } from "../../data/DataCenterCustomers";
 import { getDataCenterPowerMix } from "../../data/DataCenterPowerMix";
+import { HYDRO_SITES } from "../../data/HydroSites";
 import {
   configureDataCenterGrowth,
   MIN_DATA_CENTER_YEAR as MIN_YEAR,
@@ -510,9 +511,7 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                             <p>
                               Sized to serve existing demand with a 5% model
                               supply margin, before your new data centers
-                              arrive. Gas is split between steady and
-                              quick-start plants. Storage and unclassified
-                              sources are excluded.
+                              arrive.
                             </p>
                             <table className="dataCenterSetupPlants">
                               <thead>
@@ -534,6 +533,8 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                                               : facility.fuel === "Uranium"
                                                 ? "Nuclear"
                                                 : facility.fuel)}
+                                        {facility.hydroSiteId &&
+                                          ` (${HYDRO_SITES[facility.hydroSiteId]?.name || facility.hydroSiteId})`}
                                       </td>
                                       <td>
                                         {formatWatts(facility.peakW || 0)}
@@ -543,17 +544,9 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                                 )}
                               </tbody>
                             </table>
-                            <p className="dataCenterSetupNote">
-                              This is an opening-year allowance; growing
-                              background demand can require more infrastructure.
-                            </p>
                           </dd>
                         </div>
                       </dl>
-                      <p className="dataCenterSetupNote dataCenterSetupClosing">
-                        Results help you explore tradeoffs, rather than predict
-                        a specific project’s impact.
-                      </p>
                     </div>
                   </details>
                 )}

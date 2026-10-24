@@ -10,6 +10,7 @@ import {
   removeDesktopProfile,
 } from "./desktop-fixture";
 import { restoreFocusBeforeClosingProbe } from "./desktop-focus";
+import { exitSettingsWithBodyArrow } from "./menu-keyboard";
 import {
   auditFeedbackAudio,
   feedbackAudio,
@@ -604,6 +605,12 @@ test("zero Effects volume silences cached menu cues and persists independently o
 
 test("an arrow immediately after leaving Settings cannot change the exiting volume slider", async ({}, testInfo) => {
   const { page } = desktop;
+  await page.clock.install();
+  await page.reload();
+  await focusGame();
+  await expect(
+    page.getByRole("button", { name: "Start playing", exact: true }),
+  ).toBeFocused();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const effects = page.getByRole("slider", {
     name: "Effects volume",
@@ -635,9 +642,7 @@ test("an arrow immediately after leaving Settings cannot change the exiting volu
       true,
     );
   });
-  // Do not wait for the card animation or delayed trigger-focus restoration.
-  await page.keyboard.press("Escape");
-  await page.keyboard.press("ArrowUp");
+  await exitSettingsWithBodyArrow(page);
   const audit = await page.evaluate(() => ({
     events: (
       window as unknown as {
@@ -658,10 +663,13 @@ test("an arrow immediately after leaving Settings cannot change the exiting volu
   expect(audit.events.map((event) => event.key)).toEqual(["Escape", "ArrowUp"]);
   expect(audit.events[0].type).toBe("range");
   expect(audit.events[1].type).not.toBe("range");
+  expect(audit.events[1].tag).toBe("BODY");
   expect(audit.volume).toBe("0");
+  await page.clock.runFor(1000);
   await expect(
     page.getByRole("button", { name: "Settings", exact: true }),
   ).toBeFocused();
+  await page.clock.resume();
   await page.reload();
   await focusGame();
   await page.getByRole("button", { name: "Settings", exact: true }).click();

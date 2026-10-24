@@ -554,7 +554,7 @@ export function GeneratorBuildItem(
                 />
                 {generator.minimumStableOutput !== undefined && (
                   <GeneratorDetailRow
-                    label="Minimum stable output"
+                    label="Minimum output"
                     value={
                       percent(generator.minimumStableOutput) +
                       " · " +
