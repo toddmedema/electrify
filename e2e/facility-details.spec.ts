@@ -47,11 +47,37 @@ for (const colorScheme of ["light", "dark"] as const) {
             element.querySelectorAll(".facilityDetailSection"),
           );
           return {
-            widths: groups.map((group) => group.getBoundingClientRect().width),
-            counts: groups.map((group) => group.children.length),
+            sharedColumns: (() => {
+              const reference = groups[0]
+                .querySelector(".facilityStat")!
+                .getBoundingClientRect();
+              const gap = parseFloat(getComputedStyle(groups[0]).columnGap);
+              return groups.every(
+                (group) =>
+                  Math.abs(
+                    group.getBoundingClientRect().width -
+                      groups[0].getBoundingClientRect().width,
+                  ) < 1 &&
+                  Array.from(
+                    group.querySelectorAll(
+                      ".facilityStat:not(.facilityWaterOutlook)",
+                    ),
+                  ).every((cell) => {
+                    const bounds = cell.getBoundingClientRect();
+                    const column =
+                      (bounds.left - reference.left) / (reference.width + gap);
+                    return (
+                      Math.abs(bounds.width - reference.width) < 1 &&
+                      Math.abs(column - Math.round(column)) < 0.01
+                    );
+                  }),
+              );
+            })(),
             aligned: groups.every((group) => {
               const cells = Array.from(
-                group.querySelectorAll(".facilityStat"),
+                group.querySelectorAll(
+                  ".facilityStat:not(.facilityWaterOutlook)",
+                ),
               ).map((cell) => cell.getBoundingClientRect());
               const firstRow = cells.filter(
                 (cell) => Math.abs(cell.top - cells[0].top) < 1,
@@ -62,14 +88,6 @@ for (const colorScheme of ["light", "dark"] as const) {
                   Math.abs(cell.left - firstRow[index % firstRow.length].left) <
                     1,
               );
-            }),
-            columns: groups.map((group) => {
-              const cells = Array.from(group.children);
-              const firstTop = cells[0].getBoundingClientRect().top;
-              return cells.filter(
-                (cell) =>
-                  Math.abs(cell.getBoundingClientRect().top - firstTop) < 1,
-              ).length;
             }),
             overflow: Array.from(
               element.querySelectorAll<HTMLElement>(".facilityStat"),
@@ -93,17 +111,10 @@ for (const colorScheme of ["light", "dark"] as const) {
               sections[0].getBoundingClientRect().top,
           };
         });
-        expect(geometry.columns).toEqual(
-          geometry.counts.map((count, index) =>
-            Math.min(
-              count,
-              Math.max(
-                1,
-                Math.floor((geometry.widths[index] + 16) / (132 + 16)),
-              ),
-            ),
-          ),
-        );
+        expect(
+          geometry.sharedColumns,
+          "Operation, Water and Economics must use the same column widths and positions",
+        ).toBe(true);
         if (name === "Hydro") {
           const water = details.getByRole("region", {
             name: "Water",
@@ -111,25 +122,50 @@ for (const colorScheme of ["light", "dark"] as const) {
           });
           const outlook = water.locator(".facilityWaterOutlook");
           await expect(outlook).toBeVisible();
-          const statsBounds = (await water
-            .locator(".facilityStats")
+          const stats = water.locator(".facilityStats");
+          const statsBounds = (await stats.boundingBox())!;
+          const reservoirBounds = (await water
+            .locator(".facilityStat")
+            .nth(0)
             .boundingBox())!;
+          const inflowBounds = (await water
+            .locator(".facilityStat")
+            .nth(1)
+            .boundingBox())!;
+          const gap = await stats.evaluate((element) =>
+            parseFloat(getComputedStyle(element).columnGap),
+          );
           const outlookBounds = (await outlook.boundingBox())!;
-          if (width >= 768) {
-            expect(outlookBounds.y).toBeCloseTo(statsBounds.y, 0);
-            const inflowBounds = (await water
-              .locator(".facilityStat")
-              .nth(1)
-              .boundingBox())!;
+          expect(
+            outlookBounds.width,
+            "the forecast spans two standard cells",
+          ).toBeCloseTo(2 * reservoirBounds.width + gap, 0);
+          if (statsBounds.width >= 4 * reservoirBounds.width + 3 * gap - 1) {
+            expect(outlookBounds.y).toBeCloseTo(reservoirBounds.y, 0);
             expect(
               outlookBounds.x - (inflowBounds.x + inflowBounds.width),
-              "the forecast follows the inflow value without empty grid columns",
-            ).toBeCloseTo(16, 0);
-          } else if (width <= 390) {
+            ).toBeCloseTo(gap, 0);
+          } else {
             expect(outlookBounds.y).toBeGreaterThan(
-              statsBounds.y + statsBounds.height,
+              reservoirBounds.y + reservoirBounds.height,
             );
+            expect(outlookBounds.x).toBeCloseTo(reservoirBounds.x, 0);
           }
+          const labels = outlook.locator(".facilityWaterOutlookLabels > span");
+          await expect(labels).toHaveText([/^Now /, /^Low /]);
+          const nowBounds = (await labels.nth(0).boundingBox())!;
+          const lowBounds = (await labels.nth(1).boundingBox())!;
+          expect(lowBounds.y).toBeGreaterThanOrEqual(
+            nowBounds.y + nowBounds.height - 1,
+          );
+          expect(lowBounds.x).toBeCloseTo(nowBounds.x, 0);
+          expect(nowBounds.x).toBeCloseTo(
+            outlookBounds.x + reservoirBounds.width + gap,
+            0,
+          );
+          expect(
+            (await outlook.getByRole("img").boundingBox())!.width,
+          ).toBeCloseTo(reservoirBounds.width, 0);
           if (
             process.env.REVIEW_SCREENSHOT_DIR &&
             ((width === 1440 && colorScheme === "light") ||
