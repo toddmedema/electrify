@@ -94,10 +94,6 @@
 @media (max-width: 599px) {
   .programsPricing {
     .insightsRateMetrics {
-      grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.75fr) minmax(
-          0,
-          1.25fr
-        );
       gap: 8px;
     }
 

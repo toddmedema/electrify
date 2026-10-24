@@ -18,7 +18,6 @@ import ChartForecastSupplyByFuel from "./ChartForecastSupplyByFuel";
 import ChartForecastSupplyDemand from "./ChartForecastSupplyDemand";
 import ChartForecastWater from "./ChartForecastWater";
 import ChartForecastWeather from "./ChartForecastWeather";
-import { FORECAST_RIGHT_PAD } from "./UPlotHelpers";
 
 jest.mock("uplot", () => {
   const MockUPlot = jest.fn();
@@ -254,9 +253,22 @@ describe("insight forecast charts", () => {
         />
       ),
     ],
-  ])("%s reserves the shared right padding", (_name, makeChart) => {
-    const options = buildOptions(makeChart());
-    expect(options.padding?.[1]).toBe(FORECAST_RIGHT_PAD);
+  ])("%s keeps the title's 16px inset at every width", (_name, makeChart) => {
+    for (const width of [350, 700]) {
+      jest.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+        width,
+        height: 200,
+        top: 0,
+        right: width,
+        bottom: 200,
+        left: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => undefined,
+      });
+      const options = buildOptions(makeChart());
+      expect(options.padding?.[1]).toBe(16);
+    }
   });
 
   it("gives water its right axis instead of the shared padding", () => {

@@ -2,9 +2,7 @@ import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
-  AXIS_LABEL_SIZE,
   dashArray,
-  FORECAST_AXIS_LEFT,
   FORECAST_RIGHT_PAD,
   padRange,
   SPLINE,
@@ -41,7 +39,7 @@ function buildOptions(showXLabels: boolean) {
   return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [5 * scale, FORECAST_RIGHT_PAD * scale, 0, 0],
+    padding: [5 * scale, FORECAST_RIGHT_PAD, 0, 0],
     cursor: {
       x: true,
       y: false,
@@ -58,8 +56,6 @@ function buildOptions(showXLabels: boolean) {
       yAxis(scale, {
         grid: true,
         label: "Price per MMBtu",
-        // The label sits outside the axis, so it comes out of the shared gutter too
-        size: FORECAST_AXIS_LEFT - AXIS_LABEL_SIZE,
         values: (_u, splits) => splits.map((t) => formatMoneyConcise(t)),
       }),
     ],

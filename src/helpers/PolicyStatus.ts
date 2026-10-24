@@ -38,7 +38,9 @@ export function programStatus(
   if (isFlexibilityPolicy(id)) {
     if (!flexibilityAvailable(game, id) && program.adoption === 0)
       return "No eligible equipment yet";
-    return `${program.tier} · rollout ${formatPercent(program.adoption)}`;
+    return program.adoption > 0
+      ? `${program.tier} · rollout ${formatPercent(program.adoption)}`
+      : program.tier;
   }
   const buildout = id as BuildoutPolicyId;
   if (buildoutComplete(program.adoption))

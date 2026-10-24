@@ -79,7 +79,16 @@ export default function SavesDialog({
         onClose={busy ? undefined : onClose}
         aria-labelledby="multiplayer-saves-title"
         slotProps={{
-          transition: { onEntered: () => title.current?.focus() },
+          transition: {
+            onEntered: () => {
+              // Replace MUI's container autofocus, preserving navigation during the animation.
+              if (
+                document.activeElement ===
+                title.current?.closest('[role="dialog"]')
+              )
+                title.current?.focus();
+            },
+          },
         }}
       >
         <DialogTitle

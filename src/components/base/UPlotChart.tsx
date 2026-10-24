@@ -6,6 +6,7 @@ import { getThemeVersion, subscribeThemeMode } from "../../Theme";
 import { getTextScale, subscribeTextSize } from "../../TextSize";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { ChartAnnotationsContext } from "./ChartAnnotationsContext";
+import { ChartAxisAlignmentContext } from "./ChartAxisAlignment";
 import {
   ChartViewportContext,
   ChartViewportRange,
@@ -187,6 +188,7 @@ export default function UPlotChart<S>(
   const { ariaLabel, id, height, state, data, structureKey, syncKey } = props;
   const controllerInput = useControllerInput();
   const annotations = React.useContext(ChartAnnotationsContext);
+  const axisAlignment = React.useContext(ChartAxisAlignmentContext);
   const viewport = React.useContext(ChartViewportContext);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const plotRef = React.useRef<uPlot | null>(null);
@@ -374,6 +376,26 @@ export default function UPlotChart<S>(
     const getState = () => stateRef.current;
     const scale = chartScale(width);
     const built = buildRef.current({ getState, scale });
+    const alignedAxis = axisAlignment?.register(() =>
+      plotRef.current?.redraw(true, true),
+    );
+    if (alignedAxis) {
+      built.axes = built.axes?.map((axis) => {
+        if (axis.side !== 3) return axis;
+        const naturalSize = axis.size;
+        const labelSize = axis.label ? (axis.labelSize ?? 30) : 0;
+        return {
+          ...axis,
+          size: (plot, values, axisIndex, cycleNum) => {
+            const size =
+              typeof naturalSize === "function"
+                ? naturalSize(plot, values, axisIndex, cycleNum)
+                : (naturalSize ?? 50);
+            return alignedAxis.measure(size + labelSize) - labelSize;
+          },
+        };
+      });
+    }
     const plot = new uPlot(
       {
         ...built,
@@ -422,13 +444,22 @@ export default function UPlotChart<S>(
     plotRef.current = plot;
     drawnRef.current = dataRef.current;
     return () => {
+      alignedAxis?.destroy();
       plot.destroy();
       plotRef.current = null;
       drawnRef.current = null;
     };
     // Data changes go through setData below; only size, shape and palette rebuild
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, structureKey, themeVersion, textScale, fontReady]);
+  }, [
+    width,
+    height,
+    structureKey,
+    themeVersion,
+    textScale,
+    fontReady,
+    axisAlignment,
+  ]);
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {
