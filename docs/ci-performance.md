@@ -33,7 +33,7 @@ The two browser runners use a serial UI branch: package/verify, headless Chromiu
 then the full Electron suite. Every native target keeps one UI worker, preserving focus isolation. Separate
 browser, desktop and coverage output directories prevent Playwright cleanup from erasing a
 concurrent report. The combined harness refuses local native-window runs. To reproduce a CPU
-shard without native windows, run `node scripts/ci/platform-tests.js 1 --cpu-only` (or shard `2`);
+shard without native windows, run `npm run test:ci-platform -- 1 --cpu-only` (or shard `2`);
 this mode caps the local CPU budget at four cores.
 
 Linux workers and the static-check worker restore the full locked toolchain. Windows uses a
