@@ -6893,17 +6893,38 @@ $programs_column: 800px;
     }
   }
 
-  .dataCenterSetupPower {
+  .dataCenterSetupPowerHeader {
     display: flex;
-    align-items: center;
-    gap: 16px;
-    padding-right: 12px;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
 
     .dataCenterSetupPowerValue {
-      flex: 0 0 80px;
-      font-weight: 700;
+      color: var(--interactive-strong);
+      font-size: var(--font-size-display);
+      font-weight: var(--font-weight-emphasis);
       font-variant-numeric: tabular-nums;
+      line-height: 1.25;
     }
+  }
+  .dataCenterSetupPower {
+    // Leave room for the thumb's 42px hit area at both ends of the track.
+    padding-inline: var(--space-5);
+
+    .MuiSlider-root {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+    }
+  }
+  .dataCenterSetupPowerRange {
+    display: flex;
+    justify-content: space-between;
+    color: var(--font-color-faded);
+    font-size: var(--font-size-body2);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
   }
   .dataCenterSetupYears {
     display: grid;
@@ -6916,12 +6937,8 @@ $programs_column: 800px;
   }
   .dataCenterSetupControls {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-3);
     margin-bottom: var(--space-5);
-    .MuiSlider-root {
-      width: calc(100% - 24px);
-      margin: 0 12px;
-    }
   }
 
   .dataCenterSetupProgress {
@@ -6938,19 +6955,40 @@ $programs_column: 800px;
     gap: var(--space-5);
   }
 
+  .dataCenterSetupCaveat {
+    margin-bottom: var(--space-4);
+  }
+
+  .dataCenterSetupDisclosures {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+  }
+
   .dataCenterSetupAssumptions {
-    margin-top: var(--space-4);
-    border-top: 1px solid var(--border-subtle);
+    + .dataCenterSetupAssumptions {
+      border-top: 1px solid var(--border-subtle);
+    }
 
     > summary {
       display: flex;
       align-items: center;
-      gap: var(--space-2);
-      min-height: var(--control-size);
+      flex-wrap: wrap;
+      gap: var(--space-1) var(--space-3);
+      min-height: 56px;
+      box-sizing: border-box;
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-lg);
       cursor: pointer;
       list-style: none;
-      color: var(--interactive-strong);
+      color: var(--font-color-primary);
       font-weight: var(--font-weight-emphasis);
+      position: relative;
+      padding-right: calc(var(--space-4) + var(--space-5));
+    }
+
+    > summary:hover {
+      background: var(--bg-selected);
     }
 
     > summary::-webkit-details-marker {
@@ -6958,29 +6996,31 @@ $programs_column: 800px;
     }
 
     // A chevron that turns down when open, so the row reads as a disclosure rather than a link
-    > summary::before {
+    > summary::after {
       content: "";
-      flex: none;
+      position: absolute;
+      right: var(--space-4);
+      top: 24px;
       width: 7px;
       height: 7px;
-      margin: 0 var(--space-1);
+      color: var(--interactive-strong);
       border-right: 2px solid currentColor;
       border-bottom: 2px solid currentColor;
       transform: rotate(-45deg);
       transition: transform 150ms ease;
     }
 
-    &[open] > summary::before {
+    &[open] > summary::after {
       transform: rotate(45deg);
     }
 
     > summary:focus-visible {
       outline: 2px solid var(--focus-ring);
-      outline-offset: 2px;
+      outline-offset: -2px;
     }
 
     @media (prefers-reduced-motion: reduce) {
-      > summary::before {
+      > summary::after {
         transition: none;
       }
     }
@@ -6996,12 +7036,34 @@ $programs_column: 800px;
     }
   }
 
+  .dataCenterSetupAccountCount {
+    margin-left: auto;
+    color: var(--font-color-faded);
+    font-size: var(--font-size-body2);
+    font-weight: var(--font-weight-regular);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dataCenterSetupDisclosureBody {
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
+
+  .dataCenterSetupGridSizeBody {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 32rem;
+
+    .MuiFormHelperText-root {
+      margin-inline: 0;
+    }
+  }
+
   // Assumptions read as labelled facts: a short label column beside a capped measure, so each
   // group is scannable and long sentences stay near 70 characters.
   .dataCenterSetupFacts {
     display: grid;
-    gap: var(--space-4);
-    margin: var(--space-1) 0 0;
+    gap: var(--space-5);
+    margin: 0;
     font-size: var(--font-size-body2);
     line-height: 1.5;
 
@@ -7025,7 +7087,7 @@ $programs_column: 800px;
     @media (max-width: 599px) {
       > div {
         grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-1);
+        gap: var(--space-2);
       }
     }
   }
@@ -7034,8 +7096,8 @@ $programs_column: 800px;
     color: var(--font-color-faded);
   }
 
-  .dataCenterSetupClosing {
-    margin: var(--space-4) 0 var(--space-2);
+  p.dataCenterSetupClosing {
+    margin: var(--space-4) 0 0;
     padding-top: var(--space-3);
     border-top: 1px solid var(--border-subtle);
     font-size: var(--font-size-body2);
@@ -7087,19 +7149,6 @@ $programs_column: 800px;
     }
   }
 
-  .dataCenterSetupGridSize {
-    margin-top: 0;
-    border-top: 0;
-
-    > .MuiFormControl-root {
-      margin-top: var(--space-2);
-    }
-
-    > .MuiTypography-root {
-      margin-top: var(--space-2);
-    }
-  }
-
   .dataCenterSetupStart {
     padding-bottom: env(safe-area-inset-bottom);
     display: grid;
@@ -7114,6 +7163,14 @@ $programs_column: 800px;
   @media (max-width: 480px) {
     .dataCenterSetupContent {
       padding-top: var(--space-5);
+    }
+
+    .dataCenterSetupPowerHeader {
+      // A changing value must not move the track while the player is dragging it.
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: flex-start;
+      gap: var(--space-2);
     }
   }
 

@@ -301,37 +301,31 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
               aria-live="polite"
             >
               <div className="dataCenterSetupControls">
-                <Typography
-                  component="h2"
-                  variant="h6"
-                  id="data-center-demand-label"
-                >
-                  How much extra power?
-                </Typography>
-                {growthScenario && (
-                  <div className="dataCenterSetupPower">
+                <div className="dataCenterSetupPowerHeader">
+                  <Typography
+                    component="h2"
+                    variant="h6"
+                    id="data-center-demand-label"
+                  >
+                    How much extra power?
+                  </Typography>
+                  {growthScenario && (
                     <Typography
                       component="strong"
-                      color="primary"
                       className="dataCenterSetupPowerValue"
                     >
                       {formatDemandPower(demandW)}
                     </Typography>
+                  )}
+                </div>
+                {growthScenario && (
+                  <div className="dataCenterSetupPower">
                     <Slider
                       aria-label="Power needed"
                       value={demandTick}
                       min={ZERO_DEMAND_TICK}
                       max={MAX_DEMAND_TICK}
                       step={1}
-                      marks={[
-                        { value: ZERO_DEMAND_TICK, label: "0" },
-                        {
-                          value: MAX_DEMAND_TICK,
-                          label: formatDemandPower(
-                            demandAtTick(MAX_DEMAND_TICK),
-                          ),
-                        },
-                      ]}
                       getAriaValueText={(tick) =>
                         formatDemandPower(demandAtTick(tick))
                       }
@@ -343,202 +337,227 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                         setDemandTick(Array.isArray(value) ? value[0] : value)
                       }
                     />
+                    <div
+                      className="dataCenterSetupPowerRange"
+                      aria-hidden="true"
+                    >
+                      <span>0</span>
+                      <span>
+                        {formatDemandPower(demandAtTick(MAX_DEMAND_TICK))}
+                      </span>
+                    </div>
                   </div>
                 )}
+              </div>
+              {growthScenario?.facilities.some(
+                (facility) => facility.label === "Modeled balancing reserve",
+              ) && (
+                <Typography
+                  variant="body2"
+                  color="textSecondary"
+                  className="dataCenterSetupCaveat"
+                >
+                  Includes modeled gas backup where the game cannot reproduce
+                  the regional supply.
+                </Typography>
+              )}
+              <div className="dataCenterSetupDisclosures">
                 {customerProfile && (
                   <details className="dataCenterSetupAssumptions dataCenterSetupGridSize">
                     <summary>
-                      {accountsInput !== undefined
-                        ? "Your grid size"
-                        : "Grid size"}
-                      {validAccounts &&
-                        `: ${formatCount(startingCustomers!)} accounts`}
+                      <span>
+                        {accountsInput !== undefined
+                          ? "Your grid size"
+                          : "Grid size"}
+                      </span>
+                      {validAccounts && (
+                        <span className="dataCenterSetupAccountCount">
+                          {formatCount(startingCustomers!)} accounts
+                        </span>
+                      )}
                     </summary>
-                    <TextField
-                      label="Homes and businesses served"
-                      value={(
-                        accountsInput ?? String(startingCustomers ?? "")
-                      ).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-                      slotProps={{ htmlInput: { inputMode: "numeric" } }}
-                      error={!validAccounts}
-                      helperText={
-                        validAccounts
-                          ? "Customer accounts, not population. Adjust to match the area you want to explore."
-                          : "Enter a whole number from 1 to 100,000,000."
-                      }
-                      onChange={(event) => {
-                        const digits = event.target.value.replace(/,/g, "");
-                        if (/^\d*$/.test(digits)) setAccountsInput(digits);
-                      }}
-                    />
-                    <Typography variant="body2" color="textSecondary">
-                      {accountsInput !== undefined
-                        ? `Published reference: ${formatCount(customerProfile.customers)} accounts from `
-                        : customerProfile.basis === "reference-utility"
-                          ? "Example size based on "
-                          : "Based on "}
-                      <a
-                        href={customerProfile.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {customerProfile.serviceArea}
-                      </a>
-                      {customerProfile.sourceYear
-                        ? ` (${customerProfile.sourceYear})`
-                        : ""}
-                      .
-                    </Typography>
+                    <div className="dataCenterSetupDisclosureBody dataCenterSetupGridSizeBody">
+                      <TextField
+                        label="Homes and businesses served"
+                        value={(
+                          accountsInput ?? String(startingCustomers ?? "")
+                        ).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                        slotProps={{ htmlInput: { inputMode: "numeric" } }}
+                        error={!validAccounts}
+                        helperText={
+                          validAccounts
+                            ? "Customer accounts, not population. Adjust to match the area you want to explore."
+                            : "Enter a whole number from 1 to 100,000,000."
+                        }
+                        onChange={(event) => {
+                          const digits = event.target.value.replace(/,/g, "");
+                          if (/^\d*$/.test(digits)) setAccountsInput(digits);
+                        }}
+                      />
+                      <Typography variant="body2" color="textSecondary">
+                        {accountsInput !== undefined
+                          ? `Published reference: ${formatCount(customerProfile.customers)} accounts from `
+                          : customerProfile.basis === "reference-utility"
+                            ? "Example size based on "
+                            : "Based on "}
+                        <a
+                          href={customerProfile.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {customerProfile.serviceArea}
+                        </a>
+                        {customerProfile.sourceYear
+                          ? ` (${customerProfile.sourceYear})`
+                          : ""}
+                        .
+                      </Typography>
+                    </div>
                   </details>
                 )}
-              </div>
-              {growthScenario && (
-                <>
-                  {growthScenario.facilities.some(
-                    (facility) =>
-                      facility.label === "Modeled balancing reserve",
-                  ) && (
-                    <Typography variant="body2" color="textSecondary">
-                      Includes modeled gas backup where the game cannot
-                      reproduce the regional supply.
-                    </Typography>
-                  )}
+                {growthScenario && (
                   <details className="dataCenterSetupAssumptions">
                     <summary>Assumptions</summary>
-                    <dl className="dataCenterSetupFacts">
-                      <div>
-                        <dt>Demand</dt>
-                        <dd>
-                          <p>
-                            {customerProfile?.annualMWh ? (
-                              <>
-                                Background electricity use is sized to{" "}
-                                {(customerProfile.annualMWh / 1000000).toFixed(
-                                  2,
-                                )}{" "}
-                                TWh per year for {customerProfile.serviceArea},
-                                using{" "}
-                                <a
-                                  href={
-                                    customerProfile.energySourceUrl ||
-                                    customerProfile.sourceUrl
-                                  }
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  published {customerProfile.energySourceYear}{" "}
-                                  electricity sales
-                                </a>
-                                . Changing the account count scales this total.
-                              </>
-                            ) : (
-                              <>
-                                Annual electricity use has no verified local
-                                reference; demand per account uses the game’s
-                                regional assumptions.
-                              </>
-                            )}
-                          </p>
-                          <p className="dataCenterSetupNote">
-                            Published totals include existing data centers.
-                            Their share and future growth use regional model
-                            assumptions, rather than a measured local inventory.
-                            Starting years use the same published snapshot,
-                            shaped by local weather.
-                            {customerProfile?.observedPeakW &&
-                              " The demand curve also matches the territory’s reported annual peak."}
-                          </p>
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Power mix</dt>
-                        <dd>
-                          {powerMix && (
+                    <div className="dataCenterSetupDisclosureBody">
+                      <dl className="dataCenterSetupFacts">
+                        <div>
+                          <dt>Demand</dt>
+                          <dd>
                             <p>
-                              Based on{" "}
-                              <a
-                                href={powerMix.sourceUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                {powerMix.geography} capacity data (
-                                {powerMix.year})
-                              </a>
-                              {powerMix.geothermalSourceUrl && (
+                              {customerProfile?.annualMWh ? (
                                 <>
-                                  , supplemented by{" "}
+                                  Background electricity use is sized to{" "}
+                                  {(
+                                    customerProfile.annualMWh / 1000000
+                                  ).toFixed(2)}{" "}
+                                  TWh per year for {customerProfile.serviceArea}
+                                  , using{" "}
                                   <a
-                                    href={powerMix.geothermalSourceUrl}
+                                    href={
+                                      customerProfile.energySourceUrl ||
+                                      customerProfile.sourceUrl
+                                    }
                                     target="_blank"
                                     rel="noreferrer"
                                   >
-                                    IRENA geothermal capacity data
+                                    published {customerProfile.energySourceYear}{" "}
+                                    electricity sales
                                   </a>
+                                  . Changing the account count scales this
+                                  total.
+                                </>
+                              ) : (
+                                <>
+                                  Annual electricity use has no verified local
+                                  reference; demand per account uses the game’s
+                                  regional assumptions.
                                 </>
                               )}
-                              .
                             </p>
-                          )}
-                          <p className="dataCenterSetupNote">
-                            Uses the region’s mix of power-generating equipment,
-                            not its electricity output or your city’s actual
-                            power plants.
-                            {powerMix && startingYear > powerMix.year
-                              ? " Later starts use the latest available mix, not a prediction."
-                              : ""}
-                          </p>
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Starting plants</dt>
-                        <dd>
-                          <p>
-                            Sized to serve existing demand with a 5% model
-                            supply margin, before your new data centers arrive.
-                            Gas is split between steady and quick-start plants.
-                            Storage and unclassified sources are excluded.
-                          </p>
-                          <table className="dataCenterSetupPlants">
-                            <thead>
-                              <tr>
-                                <th scope="col">Source</th>
-                                <th scope="col">Capacity</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {growthScenario.facilities.map(
-                                (facility, index) => (
-                                  <tr key={`${facility.name}-${index}`}>
-                                    <td>
-                                      {facility.label
-                                        ? `${facility.label} (${facility.name})`
-                                        : facility.name ||
-                                          (facility.fuel === "Sun"
-                                            ? "Solar"
-                                            : facility.fuel === "Uranium"
-                                              ? "Nuclear"
-                                              : facility.fuel)}
-                                    </td>
-                                    <td>{formatWatts(facility.peakW || 0)}</td>
-                                  </tr>
-                                ),
-                              )}
-                            </tbody>
-                          </table>
-                          <p className="dataCenterSetupNote">
-                            This is an opening-year allowance; growing
-                            background demand can require more infrastructure.
-                          </p>
-                        </dd>
-                      </div>
-                    </dl>
-                    <p className="dataCenterSetupNote dataCenterSetupClosing">
-                      Results help you explore tradeoffs, rather than predict a
-                      specific project’s impact.
-                    </p>
+                            <p className="dataCenterSetupNote">
+                              Published totals include existing data centers.
+                              Their share and future growth use regional model
+                              assumptions, rather than a measured local
+                              inventory. Starting years use the same published
+                              snapshot, shaped by local weather.
+                              {customerProfile?.observedPeakW &&
+                                " The demand curve also matches the territory’s reported annual peak."}
+                            </p>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Power mix</dt>
+                          <dd>
+                            {powerMix && (
+                              <p>
+                                Based on{" "}
+                                <a
+                                  href={powerMix.sourceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {powerMix.geography} capacity data (
+                                  {powerMix.year})
+                                </a>
+                                {powerMix.geothermalSourceUrl && (
+                                  <>
+                                    , supplemented by{" "}
+                                    <a
+                                      href={powerMix.geothermalSourceUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      IRENA geothermal capacity data
+                                    </a>
+                                  </>
+                                )}
+                                .
+                              </p>
+                            )}
+                            <p className="dataCenterSetupNote">
+                              Uses the region’s mix of power-generating
+                              equipment, not its electricity output or your
+                              city’s actual power plants.
+                              {powerMix && startingYear > powerMix.year
+                                ? " Later starts use the latest available mix, not a prediction."
+                                : ""}
+                            </p>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Starting plants</dt>
+                          <dd>
+                            <p>
+                              Sized to serve existing demand with a 5% model
+                              supply margin, before your new data centers
+                              arrive. Gas is split between steady and
+                              quick-start plants. Storage and unclassified
+                              sources are excluded.
+                            </p>
+                            <table className="dataCenterSetupPlants">
+                              <thead>
+                                <tr>
+                                  <th scope="col">Source</th>
+                                  <th scope="col">Capacity</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {growthScenario.facilities.map(
+                                  (facility, index) => (
+                                    <tr key={`${facility.name}-${index}`}>
+                                      <td>
+                                        {facility.label
+                                          ? `${facility.label} (${facility.name})`
+                                          : facility.name ||
+                                            (facility.fuel === "Sun"
+                                              ? "Solar"
+                                              : facility.fuel === "Uranium"
+                                                ? "Nuclear"
+                                                : facility.fuel)}
+                                      </td>
+                                      <td>
+                                        {formatWatts(facility.peakW || 0)}
+                                      </td>
+                                    </tr>
+                                  ),
+                                )}
+                              </tbody>
+                            </table>
+                            <p className="dataCenterSetupNote">
+                              This is an opening-year allowance; growing
+                              background demand can require more infrastructure.
+                            </p>
+                          </dd>
+                        </div>
+                      </dl>
+                      <p className="dataCenterSetupNote dataCenterSetupClosing">
+                        Results help you explore tradeoffs, rather than predict
+                        a specific project’s impact.
+                      </p>
+                    </div>
                   </details>
-                </>
-              )}
+                )}
+              </div>
             </section>
           )}
           {scenario && (
