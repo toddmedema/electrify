@@ -61,6 +61,7 @@ test("Space toggles Sound", async ({ page }) => {
 test("a background arrow during Settings exit preserves volume and restores focus", async ({
   page,
 }) => {
+  await page.clock.install({ time: 0 });
   await page.goto("/");
   const settings = page.getByRole("button", { name: "Settings", exact: true });
   await settings.click();
@@ -72,11 +73,14 @@ test("a background arrow during Settings exit preserves volume and restores focu
   await effects.focus();
   await effects.press("Home");
   await expect(effects).toHaveAttribute("aria-valuenow", "0");
+  // Hold the return-focus timer until the body arrow arrives, even on a slow CI worker.
+  await page.clock.pauseAt(60_000);
   await page.keyboard.press("Escape");
   // Reproduce the native audit: the early arrow lands on body, not a menu control.
   await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
   await expect(page.locator("body")).toBeFocused();
   await page.keyboard.press("ArrowUp");
+  await page.clock.runFor(1_000);
   await expect(settings).toBeFocused();
   expect(
     await page.evaluate(() => localStorage.getItem("soundEffectsVolume")),
