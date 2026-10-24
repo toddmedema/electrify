@@ -68,7 +68,7 @@ test("first-load logo stays centered through its slower slide into the menu", as
     }
   }
   await expect(
-    page.getByRole("button", { name: "Start playing", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeEnabled();
   expect(
     await page.evaluate(() =>
@@ -131,7 +131,7 @@ test("later loads skip the entrance on reload and in a new tab", async ({
     releaseBundle();
     await expect(entrance).toHaveCount(0);
     await expect(
-      returningPage.getByRole("button", { name: "Start playing", exact: true }),
+      returningPage.getByRole("button", { name: "Play", exact: true }),
     ).toBeEnabled();
     await expect(returningPage.locator("html")).not.toHaveAttribute(
       "data-startup-transitions",
@@ -158,7 +158,7 @@ test("blocked visit storage still allows the menu to load", async ({
   });
   await page.goto("/");
   await expect(
-    page.getByRole("button", { name: "Start playing", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeEnabled();
   await expect(page.locator("#appStartup")).toHaveCount(0);
 });
@@ -177,7 +177,7 @@ test("a failed load does not consume the first visit", async ({ page }) => {
   await page.unroute("**/*achievements*.js");
   await page.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Start playing", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeEnabled();
   expect(
     await page.evaluate(() =>
@@ -230,7 +230,7 @@ for (const theme of ["light", "dark"]) {
     await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
     await expect(install).toBeHidden();
     await expect(
-      page.getByRole("button", { name: "Start playing", exact: true }),
+      page.getByRole("button", { name: "Play", exact: true }),
     ).toBeEnabled();
   });
 }
@@ -254,7 +254,7 @@ test("home actions and resources remain reachable at low height with and without
     const primary = page.getByRole("region", { name: "Primary actions" });
     await expect(
       primary.getByRole("button", {
-        name: hasSave ? "Continue" : "Start playing",
+        name: hasSave ? "Continue" : "Play",
         exact: true,
       }),
     ).toBeVisible();

@@ -19,9 +19,7 @@ for (const theme of ["light", "dark"]) {
       );
     }, theme);
     await page.goto("/");
-    await page
-      .getByRole("button", { name: "Start playing", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     await page
       .getByRole("button", { name: "Start Storage", exact: true })
       .click();

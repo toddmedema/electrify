@@ -270,9 +270,7 @@ test("gameplay sources and playheads survive card changes and all Back paths", a
 }) => {
   await page.goto("/");
   await expectMenuMusic(page);
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page
     .getByRole("button", { name: "All challenges", exact: true })
     .click();

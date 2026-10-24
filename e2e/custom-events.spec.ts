@@ -15,9 +15,7 @@ test("custom scenario events compose and persist without overflowing setup", asy
     );
   });
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.getByRole("button", { name: "View Custom Game details" }).click();
   await expect(
     page.getByRole("heading", { name: "Custom setup" }),
@@ -64,7 +62,10 @@ test("custom scenario events compose and persist without overflowing setup", asy
   await page.locator(".customSetupColumns").screenshot({
     path: testInfo.outputPath("custom-events.png"),
   });
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page
+    .locator(".customSetupActions")
+    .getByRole("button", { name: "Play", exact: true })
+    .click();
   await expect(page.locator("#appbar:visible").first()).toBeVisible({
     timeout: 30000,
   });

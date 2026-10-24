@@ -114,7 +114,7 @@ describe("MainMenu", () => {
     const user = userEvent.setup();
     render(<MainMenu {...props({ onStart })} />);
 
-    await user.click(screen.getByRole("button", { name: "Start playing" }));
+    await user.click(screen.getByRole("button", { name: "Play" }));
     expect(onStart).toHaveBeenCalled();
     expect(screen.queryByText("Continue")).not.toBeInTheDocument();
     expect(
@@ -156,7 +156,7 @@ describe("MainMenu", () => {
     expect(
       screen.getByRole("button", { name: "Saved games" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start playing" })).toHaveClass(
+    expect(screen.getByRole("button", { name: "Play" })).toHaveClass(
       "MuiButton-contained",
     );
     expect(

@@ -11,9 +11,7 @@ async function openCustomSetup(page: Page) {
     );
   });
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.getByRole("button", { name: "View Custom Game details" }).click();
   await expect(
     page.getByRole("heading", { name: "Custom setup" }),
@@ -528,7 +526,9 @@ test("location constraints keep Play valid only where the starting fleet is viab
 }) => {
   await openCustomSetup(page);
 
-  const play = page.getByRole("button", { name: "Play", exact: true });
+  const play = page
+    .locator(".customSetupActions")
+    .getByRole("button", { name: "Play", exact: true });
   await expect(play).toBeEnabled();
   await page.getByRole("combobox", { name: "Facility type" }).click();
   await page.getByRole("option", { name: "Geothermal" }).click();

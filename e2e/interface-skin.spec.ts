@@ -88,9 +88,7 @@ for (const theme of ["light", "dark"] as const) {
       );
     }, theme);
     await page.goto("/");
-    await page
-      .getByRole("button", { name: "Start playing", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     const action = page.locator(".tutorialSpotlightAction");
     await expect(action).toBeVisible();
     expect(await foregroundContrast(action)).toBeGreaterThanOrEqual(4.5);

@@ -1345,7 +1345,7 @@ for (const layout of [
     await page.goto("/");
     await page
       .getByRole("button", { name: "Start a new game", exact: true })
-      .or(page.getByRole("button", { name: "Start playing", exact: true }))
+      .or(page.getByRole("button", { name: "Play", exact: true }))
       .click();
     await page.getByLabel("Open community scenarios").click();
     const screenRoot = page.locator(".modsScreen");

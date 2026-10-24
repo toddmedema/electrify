@@ -13,11 +13,12 @@ test("chart-heavy controls remain responsive during pointer gestures", async ({
     );
   });
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
-  await page.getByRole("button", { name: "View Custom Game details" }).click();
   await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "View Custom Game details" }).click();
+  await page
+    .locator(".customSetupActions")
+    .getByRole("button", { name: "Play", exact: true })
+    .click();
 
   // A divider drag used to destroy and reconstruct every visible uPlot on every pointer step.
   // Count actual plot nodes added during a gesture so that regression is deterministic and does

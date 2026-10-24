@@ -2,7 +2,7 @@ import { expect, Page } from "@playwright/test";
 
 export async function openSettingsWithKeyboard(page: Page): Promise<void> {
   const start = page.getByRole("button", {
-    name: "Start playing",
+    name: "Play",
     exact: true,
   });
   await expect(start).toBeFocused();
@@ -89,7 +89,7 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   ).toBeFocused();
   await page.keyboard.press("Escape");
   const start = page.getByRole("button", {
-    name: "Start playing",
+    name: "Play",
     exact: true,
   });
   const settings = page.getByRole("button", { name: "Settings", exact: true });

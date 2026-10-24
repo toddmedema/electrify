@@ -135,9 +135,7 @@ test("history stays below priorities in a short pane without duplicate upcoming 
     );
   });
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.getByRole("button", { name: "View Custom Game details" }).click();
   await page
     .getByRole("combobox", { name: "Scenario events", exact: true })
@@ -150,7 +148,10 @@ test("history stays below priorities in a short pane without duplicate upcoming 
     await page.getByRole("option", { name, exact: true }).click();
   }
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page
+    .locator(".customSetupActions")
+    .getByRole("button", { name: "Play", exact: true })
+    .click();
   await page
     .locator("#navfooter")
     .getByRole("button", { name: "Events", exact: true })

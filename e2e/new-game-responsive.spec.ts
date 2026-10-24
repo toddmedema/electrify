@@ -69,9 +69,7 @@ test("game picker prioritizes one lesson and filters the challenge catalog", asy
     );
   });
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
 
   await expect(
     page.getByRole("heading", { name: "Choose a game" }),

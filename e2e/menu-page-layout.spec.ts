@@ -136,9 +136,7 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.locator(".app_container.menu-layout")).toBeVisible();
       const home = (await page.locator(".app_container").boundingBox())!;
       expect(home.width).toBeCloseTo(page.viewportSize()!.width, 0);
-      await page
-        .getByRole("button", { name: "Start playing", exact: true })
-        .click();
+      await page.getByRole("button", { name: "Play", exact: true }).click();
       await expectPageLayout(page, "Choose a game");
       if (
         screenshots &&
