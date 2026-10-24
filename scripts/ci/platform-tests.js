@@ -110,14 +110,26 @@ async function execute(plan, run) {
   return results;
 }
 
-async function main(index) {
-  if (process.env.GITHUB_ACTIONS !== "true")
+function planForRun(
+  index,
+  cpuOnly,
+  env = process.env,
+  cores = os.availableParallelism(),
+) {
+  const inCI = env.GITHUB_ACTIONS === "true";
+  if (!inCI && !cpuOnly)
     throw new Error(
-      "This combined native-window harness is only for GitHub Actions; use the ordinary local checks.",
+      "This combined native-window harness is only for GitHub Actions; use --cpu-only for a windowless local reproduction or the ordinary local checks.",
     );
-  const plan = process.argv.includes("--cpu-only")
-    ? { cpu: cpuSuites(index), ui: [] }
-    : commands(index);
+  // Cap the local CPU budget while preserving CI's worker split and shard assignment.
+  // execute() runs these suites serially, just as it does in CI.
+  return cpuOnly
+    ? { cpu: cpuSuites(index, inCI ? cores : Math.min(4, cores)), ui: [] }
+    : commands(index, cores);
+}
+
+async function main(index) {
+  const plan = planForRun(index, process.argv.includes("--cpu-only"));
   const run = (step) =>
     new Promise((resolve) => {
       console.error(`Starting ${step.name}`);
@@ -167,4 +179,4 @@ if (require.main === module)
     console.error(error);
     process.exitCode = 1;
   });
-module.exports = { commands, cpuSuites, execute };
+module.exports = { commands, cpuSuites, execute, planForRun };

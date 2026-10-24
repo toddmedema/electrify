@@ -9,6 +9,7 @@ import {
   ListItemAvatar,
   ListItemText,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
@@ -30,8 +31,10 @@ import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   activeScenario,
   currentGenerationW,
+  currentTick,
 } from "../../helpers/GameSelectors";
 import { chartPalette, facilityColor, withAlpha } from "../../Theme";
+import { SIDE_LAYOUT_MEDIA } from "../../Globals";
 import {
   FacilityOperatingType,
   isStorage,
@@ -49,6 +52,7 @@ import {
   formatFacilitySize,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
+import ProductionMixBar from "../base/ProductionMixBar";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import FlowBar from "../base/FlowBar";
 import FacilityDetails from "../base/FacilityDetails";
@@ -709,6 +713,8 @@ function FacilitySupplyChart({
   game: GameType;
   anchor: React.RefObject<HTMLDivElement>;
 }) {
+  const fuelOrder = getDispatchOrderedFuels(game.facilities);
+  const sideLayout = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
   return (
     <div
       ref={anchor}
@@ -719,12 +725,15 @@ function FacilitySupplyChart({
       <ChartSupplyDemand
         height={180}
         timeline={game.timeline}
-        fuelOrder={getDispatchOrderedFuels(game.facilities)}
+        fuelOrder={fuelOrder}
         currentMinute={game.date.minute}
         location={game.location}
         legend
         startingYear={game.startingYear}
       />
+      {sideLayout && (
+        <ProductionMixBar tick={currentTick(game)} fuelOrder={fuelOrder} />
+      )}
     </div>
   );
 }

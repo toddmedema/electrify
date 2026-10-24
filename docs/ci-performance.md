@@ -33,7 +33,10 @@ each bounded to half the cores. A failed phase does not skip the remaining suite
 coverage keeps two Chromium workers; native Electron and controller journeys keep one UI worker.
 Controller failures surface before the Windows worker starts packaging or browser work.
 Separate browser, desktop and coverage directories retain each phase's reports. The combined
-native-window harness refuses to run locally.
+harness refuses local native-window runs. To reproduce a CPU shard without native windows,
+run `npm run test:ci-platform -- 1 --cpu-only` (or shard `2`); this mode caps the local CPU budget
+at four cores. First run `npm run compatibility:generate` and `npm run icons:generate`, because
+the harness suppresses the test pre-hooks that normally create these local manifests.
 
 Linux workers and the static-check worker restore the full locked toolchain. Windows uses a
 lean native dependency closure preserving original locked runtime/tool records and native
