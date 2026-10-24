@@ -337,7 +337,16 @@ export function GameAppBar(props: Props) {
     setMenuAnchorEl(null);
     onQuit();
     window.setTimeout(() => {
-      document.querySelector<HTMLElement>("[data-main-action]")?.focus();
+      const target = document.querySelector<HTMLElement>("[data-main-action]");
+      const active = document.activeElement;
+      const inactive = "[hidden],[inert],[aria-hidden=true]";
+      // The player may already have selected another menu action while the game exits.
+      if (
+        target &&
+        !target.closest(inactive) &&
+        (!active || active === document.body || active.closest(inactive))
+      )
+        target.focus();
     }, 350);
   }, [onQuit]);
 

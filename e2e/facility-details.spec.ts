@@ -117,9 +117,14 @@ for (const colorScheme of ["light", "dark"] as const) {
           const outlookBounds = (await outlook.boundingBox())!;
           if (width >= 768) {
             expect(outlookBounds.y).toBeCloseTo(statsBounds.y, 0);
-            expect(outlookBounds.x).toBeGreaterThan(
-              statsBounds.x + statsBounds.width,
-            );
+            const inflowBounds = (await water
+              .locator(".facilityStat")
+              .nth(1)
+              .boundingBox())!;
+            expect(
+              outlookBounds.x - (inflowBounds.x + inflowBounds.width),
+              "the forecast follows the inflow value without empty grid columns",
+            ).toBeCloseTo(16, 0);
           } else if (width <= 390) {
             expect(outlookBounds.y).toBeGreaterThan(
               statsBounds.y + statsBounds.height,

@@ -471,6 +471,28 @@ describe("GameAppBar", () => {
     jest.useRealTimers();
   });
 
+  it("preserves the player's menu selection when delayed quit focus settles", () => {
+    jest.useFakeTimers();
+    const menu = document.createElement("main");
+    menu.className = "base_main";
+    menu.innerHTML =
+      "<button data-main-action>Continue</button><button>Saved games</button>";
+    document.body.appendChild(menu);
+    try {
+      renderAppBar();
+      fireEvent.click(screen.getByRole("button", { name: "menu" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Save & Quit" }));
+      act(() => jest.advanceTimersByTime(300));
+      const savedGames = screen.getByRole("button", { name: "Saved games" });
+      act(() => savedGames.focus());
+      act(() => jest.advanceTimersByTime(50));
+      expect(savedGames).toHaveFocus();
+    } finally {
+      menu.remove();
+      jest.useRealTimers();
+    }
+  });
+
   it.each([false, true])(
     "keeps the solo save library outside a multiplayer game (%s)",
     (multiplayer) => {
