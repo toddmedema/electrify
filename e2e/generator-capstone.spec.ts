@@ -17,9 +17,7 @@ test("generator capstone completes immediately after a different second purchase
     testInfo.project.name.startsWith("mobile") ? "dark" : "light",
   );
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page
     .getByRole("button", { name: "Start Generators", exact: true })
     .click();

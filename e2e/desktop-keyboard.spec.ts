@@ -23,7 +23,7 @@ test.beforeEach(async () => {
   });
   await desktop.page.reload();
   await expect(
-    desktop.page.getByRole("button", { name: "Start playing", exact: true }),
+    desktop.page.getByRole("button", { name: "Play", exact: true }),
   ).toBeFocused();
 });
 
@@ -79,7 +79,7 @@ test("desktop settings keep keyboard selection visible in dark mode", async () =
     });
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("button", { name: "Start playing", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeVisible();
   expect(desktop.errors).toEqual([]);
   expect(desktop.externalRequests).toEqual([]);
@@ -108,7 +108,7 @@ test("Escape closes the native resolution popup before leaving settings", async 
   await expect(resolution).toHaveValue(previous);
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("button", { name: "Start playing", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeVisible();
   expect(desktop.errors).toEqual([]);
   expect(desktop.externalRequests).toEqual([]);

@@ -11,6 +11,7 @@ import GameWorkspace, {
 } from "./GameWorkspace";
 
 jest.mock("./GameAppBar", () => () => <div>Game status</div>);
+jest.mock("./DataCenterGuide", () => () => null);
 jest.mock("../views/FacilitiesContainer", () => () => (
   <label>
     Facility notes

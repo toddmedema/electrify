@@ -3,6 +3,7 @@ import type { GameType } from "../src/Types";
 import path from "path";
 import { expectDialogToFit } from "./dialog-layout";
 import { readSavedGame, readSaveRecords } from "./save-fixture";
+import { openBuild } from "./layout";
 
 const setupHeading = (page: Page) =>
   page.getByRole("heading", {
@@ -304,7 +305,7 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("the header explore button opens setup and first-time tips preserve the chosen grid", async ({
+test("the first-time tour opens real tools and preserves the chosen grid", async ({
   page,
 }, testInfo) => {
   test.setTimeout(120000);
@@ -339,42 +340,85 @@ test("the header explore button opens setup and first-time tips preserve the cho
     await page.keyboard.press(key);
   await expect(intro).toBeVisible();
   expect(await savedGame(page)).toEqual(before);
-  await intro.getByRole("button", { name: "Show me the basics" }).click();
-  await expect(page.getByText("1 of 4", { exact: true })).toBeVisible();
+  await intro.getByRole("button", { name: "Start tour" }).click();
+  const tour = page.getByRole("region", { name: "Data center tour" });
+  const step = async (number: number) => {
+    await expect(
+      tour.getByText(`${number} of 8 · Paused`, { exact: true }),
+    ).toBeVisible();
+    await expectDialogToFit(tour);
+  };
+  await step(1);
+  await expect(tour).toContainText("100MW");
+  // Either the actual dock or the tour's labeled action can open the next tool.
+  const build = await openBuild(page);
+  await step(2);
+  await expect(
+    build.getByRole("tab", { name: "Generators", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
   if (reviewDir && testInfo.project.name === "desktop-chromium") {
-    await page.getByRole("heading", { name: "Keep the lights on" }).click();
     await page.screenshot({
       path: path.join(reviewDir, "data-center-guide-desktop.png"),
       animations: "disabled",
     });
   }
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page.getByRole("button", { name: "Back", exact: true }).click();
-  await expect(page.getByText("1 of 4", { exact: true })).toBeVisible();
-  for (let step = 0; step < 3; step++)
-    await page.getByRole("button", { name: "Next", exact: true }).click();
-  const final = page.getByRole("dialog", {
-    name: "Watch costs and emissions",
-  });
-  await expectDialogToFit(final);
-  await expect(final.getByText(/Choose 1× at the top/)).toBeVisible();
-  await expect(final).toContainText(
-    "You may need to raise rates to expand infrastructure without going bankrupt.",
-  );
+  await tour.getByRole("button", { name: "Back", exact: true }).click();
+  await step(1);
+  await expect(build).toBeHidden();
+  await tour.getByRole("button", { name: "Open Build", exact: true }).click();
+  await step(2);
+  await build.getByRole("tab", { name: "Storage", exact: true }).click();
+  await step(3);
+  await page.locator("#programsNav").click();
+  await step(4);
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
+  await expect(
+    programs.getByRole("slider", {
+      name: "The rate you charge for electricity generation",
+    }),
+  ).toBeVisible();
+  // Clicking a speed control during the tour must not advance the simulation.
+  await page.getByRole("button", { name: "slow speed", exact: true }).click();
+  await expect.poll(async () => (await savedGame(page))?.speed).toBe("PAUSED");
+  await tour.getByRole("button", { name: "Explore programs" }).click();
+  await step(5);
+  await programs.getByRole("button", { name: /Efficiency rebates/ }).click();
+  await expect(
+    programs.getByRole("region", { name: "Program details" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(tour).toBeVisible();
+  await expect(
+    programs.getByRole("region", { name: "Customer programs" }),
+  ).toBeVisible();
   if (reviewDir && testInfo.project.name === "mobile-390px") {
-    await page
-      .getByRole("heading", { name: "Watch costs and emissions" })
-      .click();
     await page.screenshot({
       path: path.join(reviewDir, "data-center-guide-mobile.png"),
       animations: "disabled",
     });
   }
-  await final
-    .getByRole("button", { name: "Ready to explore", exact: true })
-    .click();
-  await expect(final).toBeHidden();
-  expect(await savedGame(page)).toEqual(before);
+  await tour.getByRole("button", { name: "Open Insights" }).click();
+  await step(6);
+  await expect(
+    page.getByRole("combobox", { name: "Insight preset" }),
+  ).toBeVisible();
+  await tour.getByRole("button", { name: "Open Events" }).click();
+  await step(7);
+  await expect(
+    page.getByRole("region", { name: "Events", exact: true }),
+  ).toBeVisible();
+  await tour.getByRole("button", { name: "Open Scenario" }).click();
+  await step(8);
+  await expect(
+    page.getByRole("region", { name: "Scenario", exact: true }),
+  ).toBeVisible();
+  await tour.getByRole("button", { name: "Finish tour", exact: true }).click();
+  await expect(tour).toBeHidden();
+  const after = (await savedGame(page))!;
+  expect(after).toEqual({
+    ...before,
+    eventLogReadThroughId: after.eventLogReadThroughId,
+  });
   expect(
     await page.evaluate(() =>
       JSON.parse(localStorage.getItem("plays")!).plays.filter(

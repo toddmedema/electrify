@@ -18,15 +18,18 @@ import { setSpeed } from "../../reducers/Game";
 import uiReducer, { delta, dialogOpen, dialogClose } from "../../reducers/UI";
 import DataCenterGuide from "./DataCenterGuide";
 import { SpeedType } from "../../Types";
+import cardReducer, { navigate } from "../../reducers/Card";
 
 function mount({
   requested = true,
   inGame = true,
   replaying = false,
   blocked = false,
+  peakW = 100000000,
 } = {}) {
   const testStore = configureStore({
     reducer: {
+      card: cardReducer,
       ui: uiReducer,
       user: () => ({}),
       game: (
@@ -34,7 +37,19 @@ function mount({
           inGame: boolean;
           replayPlayback: boolean;
           speed: SpeedType;
-        } = { inGame, replayPlayback: replaying, speed: "NORMAL" },
+          customScenario: {
+            loadAdditions: { id: string; peakW: number; startsYear: number }[];
+          };
+        } = {
+          inGame,
+          replayPlayback: replaying,
+          speed: "NORMAL",
+          customScenario: {
+            loadAdditions: [
+              { id: "community-data-centers", peakW, startsYear: 2032 },
+            ],
+          },
+        },
         action: UnknownAction,
       ) => {
         if (setSpeed.match(action)) return { ...state, speed: action.payload };
@@ -44,6 +59,7 @@ function mount({
       },
     },
   });
+  testStore.dispatch(navigate("FACILITIES"));
   testStore.dispatch(delta({ dataCenterGuideRequested: requested }));
   if (blocked)
     testStore.dispatch(
@@ -60,6 +76,21 @@ function mount({
 }
 
 beforeEach(() => localStorage.clear());
+
+it.each([100000000, 0])(
+  "explains the chosen data-center demand (%s W)",
+  (peakW) => {
+    mount({ peakW });
+    fireEvent.click(screen.getByRole("button", { name: "Start tour" }));
+    expect(
+      screen.getByRole("region", { name: "Data center tour" }),
+    ).toHaveTextContent(
+      peakW
+        ? "New data centers add 100MW of demand in 2032."
+        : "This run has no added data-center demand.",
+    );
+  },
+);
 
 it("waits for a launched grid and any other dialog before recording the offer once", () => {
   const testStore = mount({ inGame: false, blocked: true });
@@ -104,27 +135,54 @@ it.each(["skip", "escape", "backdrop"])(
   },
 );
 
-it("supports back, next and completion without changing the game beyond pausing", async () => {
+it("opens the real tools, follows dock navigation and supports back without changing the grid", async () => {
   const testStore = mount();
   const before = testStore.getState().game;
-  fireEvent.click(screen.getByRole("button", { name: "Show me the basics" }));
-  expect(screen.getByText("1 of 4")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Next" }));
-  expect(screen.getByText("2 of 4")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Start tour" }));
+  expect(screen.getByText("1 of 8 · Paused")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Open Build" }));
+  expect(testStore.getState().card.name).toBe("BUILD_GENERATORS");
+  expect(screen.getByText("2 of 8 · Paused")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Back" }));
-  expect(screen.getByText("1 of 4")).toBeVisible();
-  for (let step = 0; step < 3; step++)
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
-  expect(screen.getByText(/Choose 1× at the top/)).toBeVisible();
-  expect(screen.getByText(/You may need to raise rates/)).toHaveTextContent(
-    "You may need to raise rates to expand infrastructure without going bankrupt.",
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Ready to explore" }));
+  expect(testStore.getState().card.name).toBe("FACILITIES");
+  act(() => {
+    testStore.dispatch(navigate("BUILD_GENERATORS"));
+  });
+  expect(screen.getByText("2 of 8 · Paused")).toBeVisible();
+  for (const name of [
+    "Open Storage",
+    "Open Programs",
+    "Explore programs",
+    "Open Insights",
+    "Open Events",
+    "Open Scenario",
+  ])
+    fireEvent.click(screen.getByRole("button", { name }));
+  expect(screen.getByText("8 of 8 · Paused")).toBeVisible();
+  expect(testStore.getState().card.name).toBe("SCENARIO");
+  fireEvent.click(screen.getByRole("button", { name: "Finish tour" }));
   await waitFor(() =>
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    expect(
+      screen.queryByRole("region", { name: "Data center tour" }),
+    ).not.toBeInTheDocument(),
   );
+  expect(testStore.getState().card.name).toBe("FACILITIES");
   expect(testStore.getState().game).toEqual(before);
   expect(getScenarioPlayCounts()[TUTORIALS[0].id]).toBe(1);
+});
+
+it("keeps time paused while exploring tools and exits the tour with Escape", async () => {
+  const testStore = mount();
+  fireEvent.click(screen.getByRole("button", { name: "Start tour" }));
+  act(() => {
+    testStore.dispatch(setSpeed("FAST"));
+  });
+  expect(testStore.getState().game.speed).toBe("PAUSED");
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(
+    screen.queryByRole("region", { name: "Data center tour" }),
+  ).not.toBeInTheDocument();
+  expect(testStore.getState().game.speed).toBe("PAUSED");
 });
 
 it("does not reoffer to someone who has played Mission 1", () => {

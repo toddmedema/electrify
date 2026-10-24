@@ -17,9 +17,7 @@ for (const theme of ["light", "dark"] as const) {
       );
     }, theme);
     await page.goto("/");
-    await page
-      .getByRole("button", { name: "Start playing", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     await page
       .getByRole("button", { name: "View Custom Game details" })
       .click();

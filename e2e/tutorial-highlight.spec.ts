@@ -18,9 +18,7 @@ test("keeps the tutorial ring visible on all sides of a full-bleed chart", async
     { theme: testInfo.project.name.startsWith("mobile-") ? "dark" : "light" },
   );
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   const hud = page.locator(".tutorialHud");
   await hud.waitFor({ timeout: 20_000 });
 
