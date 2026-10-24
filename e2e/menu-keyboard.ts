@@ -7,7 +7,18 @@ export async function exitSettingsWithBodyArrow(page: Page): Promise<void> {
   await expect(
     page.getByRole("button", { name: "Start playing", exact: true }),
   ).toBeFocused();
-  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  // Native state can finish loading and refocus the initial menu after a bare blur.
+  // Hold this fixture's background precondition only until the real arrow is dispatched.
+  await page.evaluate(() => {
+    const blur = () => (document.activeElement as HTMLElement)?.blur();
+    document.addEventListener("focusin", blur, true);
+    document.addEventListener(
+      "keydown",
+      () => document.removeEventListener("focusin", blur, true),
+      { capture: true, once: true },
+    );
+    blur();
+  });
   await expect(page.locator("body")).toBeFocused();
   await page.keyboard.press("ArrowUp");
 }
