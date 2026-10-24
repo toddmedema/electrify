@@ -13,12 +13,11 @@ remains required on every PR.
    duplicate lint plugin is disabled.
 2. **Linux x64** runs unit/simulation shard 1, its complete native/packaged desktop suites,
    Firestore rules and CI tooling regression tests.
-3. **Windows x64** runs production browser shard 1 and its complete native/packaged suites.
-4. **macOS universal** runs types, strict lint and formatting, then the headless controller
-   journeys against the shared desktop renderer before packaging or the long browser suites.
-   It packages one app containing both Intel and Apple Silicon slices, runs browser shard 2,
-   multiplayer and the complete packaged suite against the arm64 slice. CI does not launch
-   the Intel slice.
+3. **Windows x64** runs the headless controller journeys against the shared desktop renderer
+   before packaging, then production browser shard 1 and its complete native/packaged suites.
+4. **macOS universal** runs types, strict lint and formatting, then packages one app containing
+   both Intel and Apple Silicon slices. It runs browser shard 2, multiplayer and the complete
+   packaged suite against the arm64 slice. CI does not launch the Intel slice.
 5. **check** runs unit/simulation shard 2 on another Linux runner, plus the CLI and isolated
    tick-ratio benchmark. It then requires all three native workers' latest results in this run
    to pass, merges raw coverage and enforces the unchanged `package.json` floors.
@@ -32,7 +31,7 @@ failed job always supersedes its earlier success. Regression tests cover these c
 Every worker runs its CPU and UI phases sequentially, including covered Jest and simulations,
 each bounded to half the cores. A failed phase does not skip the remaining suites. Browser
 coverage keeps two Chromium workers; native Electron and controller journeys keep one UI worker.
-Controller failures surface before the Mac worker starts packaging, browser or multiplayer work.
+Controller failures surface before the Windows worker starts packaging or browser work.
 Separate browser, desktop and coverage directories retain each phase's reports. The combined
 native-window harness refuses to run locally.
 
