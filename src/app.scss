@@ -811,8 +811,8 @@ $topbar_height: 56px;
   margin-right: -8px !important;
 }
 
-.constructionSortSelect {
-  min-width: 156px !important;
+.constructionSortSelect .MuiSelect-iconOpen {
+  transform: none;
 }
 
 @media screen and (min-width: 600px) {
