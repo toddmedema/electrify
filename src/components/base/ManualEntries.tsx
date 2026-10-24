@@ -732,9 +732,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Fuel-burning and nuclear plants also have a{" "}
-          <strong>minimum stable output</strong>: the lowest power they can hold
-          while running. In Electrify, it's 15%–50% of rated power. When demand
-          is low, the game compares staying at minimum with shutting down and{" "}
+          <strong>minimum output</strong>: the lowest power they can hold while
+          running. In Electrify, it's 15%–50% of rated power. When demand is
+          low, the game compares staying at minimum with shutting down and{" "}
           <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>
             paying to restart
           </EntryLink>

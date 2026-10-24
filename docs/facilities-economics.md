@@ -90,7 +90,7 @@ The EIA AEO2025 reference designs also update:
   factor is 57%, the 2016-2025 average of 51.2-60.5% for U.S. combined cycles in Table 6.07.A.
   The quote assumes 100 starts a year, a gameplay assumption between coal's 20 and the peaker's
   daily start. Spin-up is 90 minutes, a blend of hot starts that reach full load in well under an
-  hour and warm or cold starts that take hours while the steam side heats; minimum stable output
+  hour and warm or cold starts that take hours while the steam side heats; minimum output
   is 45%. It is available from 1990, when the first F-class turbine entered combined-cycle
   service at Virginia Power's Chesterfield station. Per watt, EIA's reference combined cycle costs
   about as much as its reference peaker; the peaker's economic case is that it stays cheap when
@@ -242,19 +242,19 @@ Start tracking and start charges are deliberately separate capabilities:
 | Enhanced Geothermal | Yes           | None                                               | Same FOM treatment, without commercial start-cost observations                          |
 | Oil                 | No            | None                                               | Reciprocating-engine service follows use; starts do not change its maintenance schedule |
 
-Thermal generators also carry a minimum stable output. These technology-level values are
+Thermal generators also carry a minimum output. These technology-level values are
 representative production-cost inputs rather than limits for every individual unit:
 
-| Facility            | Minimum stable output | Basis                                                                                   |
-| ------------------- | --------------------: | --------------------------------------------------------------------------------------- |
-| Coal                |                   40% | GE Energy/HNEI ancillary-services study: 35-40% typical turndown level                  |
-| Nuclear             |                   50% | NREL production-cost modeling; individual IAEA load-following examples can reach 20-30% |
-| Natural Gas Peaker  |                   50% | Representative heavy-duty simple-cycle value within the published 15-70% range          |
-| Natural Gas CC      |                   45% | NREL: emissions limits often keep combined cycles from following load below 50%         |
-| Oil                 |                   50% | GE Energy/HNEI reciprocating-engine value                                               |
-| Biomass             |                   40% | GE Energy/HNEI ancillary-services study: 35-40%                                         |
-| Geothermal          |                   15% | GE Energy/HNEI ancillary-services study: 12-15%                                         |
-| Enhanced Geothermal |                   15% | Same thermally stable turndown assumption pending commercial fleet data                 |
+| Facility            | Minimum output | Basis                                                                                   |
+| ------------------- | -------------: | --------------------------------------------------------------------------------------- |
+| Coal                |            40% | GE Energy/HNEI ancillary-services study: 35-40% typical turndown level                  |
+| Nuclear             |            50% | NREL production-cost modeling; individual IAEA load-following examples can reach 20-30% |
+| Natural Gas Peaker  |            50% | Representative heavy-duty simple-cycle value within the published 15-70% range          |
+| Natural Gas CC      |            45% | NREL: emissions limits often keep combined cycles from following load below 50%         |
+| Oil                 |            50% | GE Energy/HNEI reciprocating-engine value                                               |
+| Biomass             |            40% | GE Energy/HNEI ancillary-services study: 35-40%                                         |
+| Geothermal          |            15% | GE Energy/HNEI ancillary-services study: 12-15%                                         |
+| Enhanced Geothermal |            15% | Same thermally stable turndown assumption pending commercial fleet data                 |
 
 The dispatcher first forecasts the unconstrained merit-order request for each facility. When an
 online plant is no longer requested, it scans that facility's upcoming requests and accumulates

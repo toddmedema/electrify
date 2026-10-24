@@ -1,5 +1,28 @@
 import { expect, Page } from "@playwright/test";
 
+/** The caller installs the clock before loading; keep return focus pending for a body key. */
+export async function exitSettingsWithBodyArrow(page: Page): Promise<void> {
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Start playing", exact: true }),
+  ).toBeFocused();
+  // Native state can finish loading and refocus the initial menu after a bare blur.
+  // Hold this fixture's background precondition only until the real arrow is dispatched.
+  await page.evaluate(() => {
+    const blur = () => (document.activeElement as HTMLElement)?.blur();
+    document.addEventListener("focusin", blur, true);
+    document.addEventListener(
+      "keydown",
+      () => document.removeEventListener("focusin", blur, true),
+      { capture: true, once: true },
+    );
+    blur();
+  });
+  await expect(page.locator("body")).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+}
+
 export async function openSettingsWithKeyboard(page: Page): Promise<void> {
   const start = page.getByRole("button", {
     name: "Play",

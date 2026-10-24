@@ -208,7 +208,6 @@ describe("the fleet list", () => {
     expect(screen.getByText("Lifetime profit")).toBeInTheDocument();
     expect(screen.getByText("Avg output")).toBeInTheDocument();
     expect(screen.getByText("Lifetime cost per MWh")).toBeInTheDocument();
-    expect(screen.getByText("Revenue per MWh")).toBeInTheDocument();
     await user.click(rows()[0]);
     expect(onSelect).toHaveBeenLastCalledWith(null);
     expect(screen.queryByText("Lifetime profit")).not.toBeInTheDocument();

@@ -657,7 +657,7 @@ a:hover {
   }
 }
 
-@media (max-width: 35rem) {
+@media (max-width: 37.5rem) {
   .topbar__inner {
     min-height: 4rem;
   }
