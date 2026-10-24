@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
 import path from "node:path";
 import { editSavedGame } from "./save-fixture";
-import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
+import { MINUTES_PER_MONTH } from "../src/helpers/DateTime";
 
 // Exercise pane width rather than assuming a viewport implies a column count.
 // Only one project runs this explicit matrix to avoid duplicating it per project.
@@ -171,8 +171,14 @@ test("reduced output stays inline beside capacity and fuel history shares the gr
   });
   await page.goto("/?scenario=108");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
+  // Let a real month complete so the save keeps its scenario receipts and fuel history.
+  const appbar = page.locator("#appbar:visible").first();
+  await appbar
+    .getByRole("button", { name: "normal speed", exact: true })
+    .click();
+  await expect(appbar).toContainText("Feb 2023");
+  await appbar.getByRole("button", { name: "pause", exact: true }).click();
   await editSavedGame(page, ({ game }) => {
-    game.date = getDateFromMinute(8 * MINUTES_PER_MONTH, game.startingYear);
     const gas = game.facilities.find(
       (facility) => facility.name === "Natural Gas CC",
     )!;
