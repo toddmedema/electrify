@@ -54,6 +54,16 @@ function commands(index, cores = os.availableParallelism()) {
         : []),
     ],
     ui: [
+      ...(index === 3
+        ? [
+            {
+              name: "Controller journeys",
+              script: "test:steam-input",
+              args: [],
+              env: { STEAM_INPUT_BUILD_DIR: "build" },
+            },
+          ]
+        : []),
       {
         name: "Package and verify native depot",
         script: "desktop:pack:offline",
@@ -80,12 +90,6 @@ function commands(index, cores = os.availableParallelism()) {
               name: "Shared-clock Steam renderer",
               script: "test:multiplayer",
               args: [],
-            },
-            {
-              name: "Controller journeys",
-              script: "test:steam-input",
-              args: [],
-              env: { STEAM_INPUT_BUILD_DIR: "build" },
             },
           ]
         : []),
