@@ -9,8 +9,60 @@ const {
   isFullCheck,
   workerCount,
   execute,
+  summarizeReport,
 } = require("../check");
 const { checkAssets } = require("../check-assets");
+
+test("review summaries distinguish full validation, partial retries and stale source evidence", () => {
+  const snapshot = {
+    commit: "abc123",
+    fingerprint: "checked-source",
+    dirty: false,
+  };
+  const report = {
+    schemaVersion: 1,
+    status: "passed",
+    source: { after: snapshot },
+    scope: {
+      full: true,
+      profile: "ci",
+      ciOnly: ["packaged-electron"],
+      separateChecks: ["firestore-rules"],
+    },
+    gates: steps.map(({ id }) => ({ id, status: "passed" })),
+    environment: {
+      node: "v24",
+      platform: "darwin",
+      arch: "arm64",
+      jestWorkers: 4,
+    },
+  };
+  const full = summarizeReport(report, snapshot);
+  assert.match(full, /full CI profile; 15\/15 gates passed/);
+  assert.match(full, /Current source: matches/);
+  assert.match(full, /packaged-electron \(CI only\)/);
+  assert.match(full, /firestore-rules \(separate checks\)/);
+  assert.match(
+    summarizeReport(report, { fingerprint: "later-edit" }),
+    /not verified by this report/,
+  );
+  const partial = summarizeReport(
+    { ...report, gates: report.gates.slice(0, 2) },
+    snapshot,
+  );
+  assert.match(partial, /partial\/quick check; 2\/2 gates passed/);
+  assert.doesNotMatch(partial, /full CI profile/);
+  const failed = summarizeReport(
+    {
+      ...report,
+      status: "failed",
+      gates: [{ id: "browser", status: "failed" }],
+    },
+    snapshot,
+  );
+  assert.match(failed, /Local validation: failed/);
+  assert.match(failed, /browser: failed/);
+});
 
 test("full checks retain every gate; partial checks reject unknown or injected names", () => {
   assert.deepEqual(
@@ -345,6 +397,15 @@ test("successful CLI gates retain their output and explicit validation scope", (
   );
   assert.match(output, /123/);
   assert.match(output, /456/);
+  const summary = spawnSync(
+    process.execPath,
+    [path.resolve("scripts/check.js"), "--report", match[1]],
+    { cwd: root, encoding: "utf8", windowsHide: true },
+  );
+  assert.equal(summary.status, 0, summary.stderr);
+  assert.match(summary.stdout, /partial\/quick check; 1\/1 gates passed/);
+  assert.match(summary.stdout, /Current source:/);
+  assert.doesNotMatch(summary.stderr, /Starting|Asset preflight/);
 });
 
 for (const file of ["source.txt", "untracked.txt"]) {

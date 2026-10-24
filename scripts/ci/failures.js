@@ -189,7 +189,131 @@ function findRun(argv) {
   return id;
 }
 
+// Collapse viewport/platform and source-line changes, but retain each journey's file/title.
+// Count a run once even when both native workers or several viewports hit the same defect.
+function summarizeHistory(runs) {
+  const totals = { success: 0, failure: 0, cancelled: 0, other: 0 };
+  const tests = new Map();
+  const gates = new Map();
+  const unclassified = [];
+  for (const run of runs) {
+    totals[Object.hasOwn(totals, run.conclusion) ? run.conclusion : "other"]++;
+    const seenGates = new Set();
+    let identifiedTest = false;
+    for (const found of run.summary?.values() || []) {
+      for (const gate of found.gates) seenGates.add(gate);
+      for (const [titles, flaky] of [
+        [found.tests, false],
+        [found.flaky, true],
+      ]) {
+        for (const title of titles) {
+          const key = title
+            .replace(/^\[[\w-]+\] › /, "")
+            .replace(/:\d+(?::\d+)?(?= › |$)/, "");
+          if (!/^(src|e2e)\//.test(key)) continue;
+          identifiedTest = true;
+          if (!tests.has(key))
+            tests.set(key, {
+              test: key,
+              runs: new Set(),
+              branches: new Set(),
+              flakyRuns: new Set(),
+              urls: new Set(),
+            });
+          const row = tests.get(key);
+          row.runs.add(run.databaseId);
+          row.branches.add(run.headBranch);
+          row.urls.add(run.url);
+          if (flaky) row.flakyRuns.add(run.databaseId);
+        }
+      }
+    }
+    for (const gate of seenGates) gates.set(gate, (gates.get(gate) || 0) + 1);
+    if (
+      run.conclusion === "failure" &&
+      run.summary &&
+      !seenGates.size &&
+      !identifiedTest
+    )
+      unclassified.push(run.url);
+  }
+  return {
+    totals,
+    unclassified,
+    gates: [...gates].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+    tests: [...tests.values()]
+      .map((row) => ({
+        ...row,
+        runs: row.runs.size,
+        branches: row.branches.size,
+        flakyRuns: row.flakyRuns.size,
+        urls: [...row.urls],
+      }))
+      .sort((a, b) => b.runs - a.runs || a.test.localeCompare(b.test)),
+  };
+}
+
+function history(limit = "100") {
+  if (!/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 100)
+    throw new Error("Usage: npm run ci:history -- [1-100]");
+  const runs = JSON.parse(
+    gh([
+      "run",
+      "list",
+      "--workflow",
+      workflow,
+      "--event",
+      "pull_request",
+      "--limit",
+      limit,
+      "--json",
+      "databaseId,headBranch,headSha,conclusion,url,createdAt",
+    ]),
+  );
+  const unreadable = [];
+  for (const run of runs) {
+    if (run.conclusion !== "failure") continue;
+    try {
+      run.summary = summarize(
+        gh(["run", "view", String(run.databaseId), "--log-failed"]),
+      );
+    } catch {
+      unreadable.push(run.url);
+    }
+  }
+  const result = summarizeHistory(runs);
+  print(
+    `Latest ${runs.length} PR workflow runs (latest attempt per run; gate counts overlap):`,
+  );
+  print(JSON.stringify(result.totals));
+  print("\nFailed gates:");
+  for (const [gate, count] of result.gates) print(`  ${count} runs: ${gate}`);
+  print(
+    "\nRecurring tests (failed runs / branches / runs with a passed retry):",
+  );
+  for (const row of result.tests) {
+    print(`  ${row.runs} / ${row.branches} / ${row.flakyRuns}: ${row.test}`);
+    for (const url of row.urls) print(`    ${url}`);
+  }
+  if (result.unclassified.length) {
+    print(
+      "\nFailed runs without a parsed test/gate (inspect their build/setup errors):",
+    );
+    result.unclassified.forEach((url) => print(`  ${url}`));
+  }
+  if (unreadable.length) {
+    print(`\nUnreadable failure logs (${unreadable.length}; not classified):`);
+    unreadable.forEach((url) => print(`  ${url}`));
+    process.exitCode = 1;
+  }
+}
+
 function main(argv = process.argv.slice(2)) {
+  if (argv[0] === "--history") {
+    if (argv.length > 2)
+      throw new Error("Usage: npm run ci:history -- [1-100]");
+    return history(argv[1]);
+  }
   const id = findRun(argv);
   const run = JSON.parse(
     gh([
@@ -273,4 +397,4 @@ if (require.main === module)
     console.error(error.message);
     process.exitCode = 1;
   }
-module.exports = { summarize, reproduce, parseLine };
+module.exports = { summarize, reproduce, parseLine, summarizeHistory };

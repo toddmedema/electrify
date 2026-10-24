@@ -1,5 +1,8 @@
 import { act, render, screen } from "@testing-library/react";
-import type { DesktopBridge } from "../Desktop";
+import type { DesktopBridge, DesktopInputFrame } from "../Desktop";
+import { store } from "../Store";
+import { startDesktopInput } from "../desktop/Input";
+import { restoreMenuFocus } from "../components/base/useMenuKeys";
 import type { LobbyState, SharedSaveLibrary } from "./Native";
 import { MultiplayerSession } from "./Session";
 import Lobby from "./Lobby";
@@ -11,6 +14,7 @@ afterEach(() => {
   sessions.splice(0).forEach((session) => session.dispose());
   jest.clearAllTimers();
   jest.useRealTimers();
+  jest.restoreAllMocks();
 });
 
 async function sessionFixture() {
@@ -55,11 +59,11 @@ async function sessionFixture() {
   const session = new MultiplayerSession(bridge, jest.fn());
   sessions.push(session);
   await session.initialize();
-  return session;
+  return { session, bridge };
 }
 
 async function showLobby() {
-  const session = await sessionFixture();
+  const { session, bridge } = await sessionFixture();
   render(
     <Lobby
       session={session}
@@ -70,11 +74,11 @@ async function showLobby() {
       onLeave={jest.fn()}
     />,
   );
-  return session;
+  return { session, bridge };
 }
 
 test("the lobby heading receives initial focus and focus on a new lobby mode", async () => {
-  const session = await showLobby();
+  const { session } = await showLobby();
   const title = screen.getByRole("heading", { name: "Play with friends" });
   expect(screen.getByRole("dialog")).toHaveFocus();
   await act(async () => jest.advanceTimersByTime(1000));
@@ -102,8 +106,50 @@ test.each(["Invite code", "Host a game"])(
   },
 );
 
+test("returning from Mods cannot interrupt controller invite entry when both transitions finish", async () => {
+  jest
+    .spyOn(HTMLElement.prototype, "getClientRects")
+    .mockReturnValue([{}] as unknown as DOMRectList);
+  render(<button data-mods-trigger>Mods</button>);
+  // Back schedules menu restoration before the player opens the real invitation dialog.
+  restoreMenuFocus("[data-mods-trigger]");
+  const { bridge } = await showLobby();
+  const frame: DesktopInputFrame = { connected: true, actions: [], glyphs: {} };
+  let input: (frame: DesktopInputFrame) => void = () => {};
+  const showTextInput = jest.fn().mockResolvedValue({ status: "cancelled" });
+  const stop = startDesktopInput(store, {
+    ...bridge,
+    setInputContext: async () => frame,
+    onInput: (callback) => {
+      input = callback;
+      return () => {};
+    },
+    onGameFocusChanged: () => () => {},
+    onBeforeQuit: () => () => {},
+    showTextInput,
+  });
+  try {
+    await act(async () => Promise.resolve());
+    // Dialog container → Back → Host a game → Invite code, through the real controller.
+    const down = () => input({ ...frame, actions: ["down"] });
+    for (let step = 0; step < 3; step++) act(down);
+    const code = screen.getByRole("textbox", { name: "Invite code" });
+    expect(code).toHaveFocus();
+    await act(async () => jest.advanceTimersByTime(1000));
+    expect(code).toHaveFocus();
+    await act(async () => input({ ...frame, actions: ["confirm"] }));
+    expect(showTextInput).toHaveBeenCalledTimes(1);
+    expect(showTextInput).toHaveBeenCalledWith(
+      expect.objectContaining({ description: "Invite code" }),
+    );
+    expect(code).toHaveFocus();
+  } finally {
+    stop();
+  }
+});
+
 async function showSaves() {
-  const session = await sessionFixture();
+  const { session } = await sessionFixture();
   render(<SavesDialog session={session} onClose={jest.fn()} />);
   await act(async () => {
     await Promise.resolve();
