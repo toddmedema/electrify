@@ -33,6 +33,7 @@ import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import InstallAppButton from "./base/InstallAppButton";
 import TutorialHud from "./base/TutorialHud";
+import DataCenterGuide from "./base/DataCenterGuide";
 import LowCashWarning from "./base/LowCashWarning";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
 import SaveTransitionDialog from "./base/SaveTransitionDialog";
@@ -684,6 +685,7 @@ export default class Compositor extends React.Component<Props, {}> {
               onExit={() => this.props.onTutorialEnd(tutorialSteps)}
             />
           )}
+        <DataCenterGuide />
         <LowCashWarning />
         <ManualHelpPopover
           entry={ui.manualHelpEntry}

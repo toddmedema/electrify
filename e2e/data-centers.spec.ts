@@ -341,16 +341,18 @@ test("the first-time tour opens real tools and preserves the chosen grid", async
   await expect(intro).toBeVisible();
   expect(await savedGame(page)).toEqual(before);
   await intro.getByRole("button", { name: "Start tour" }).click();
-  const tour = page.getByRole("region", { name: "Data center tour" });
+  const tour = page.locator("[data-data-center-guide] .tutorialHud");
   const step = async (number: number) => {
     await expect(
-      tour.getByText(`${number} of 8 · Paused`, { exact: true }),
+      tour.getByRole("heading", { name: `Step ${number} of 8`, exact: true }),
     ).toBeVisible();
     await expectDialogToFit(tour);
   };
   await step(1);
   await expect(tour).toContainText("100MW");
-  // Either the actual dock or the tour's labeled action can open the next tool.
+  // Reuse the standard HUD: its highlighted controls advance on their actual clicks.
+  await expect(page.locator("#buildNav")).toHaveClass(/tutorialTarget/);
+  await expect(page.locator(".tutorialTargetRing").first()).toBeVisible();
   const build = await openBuild(page);
   await step(2);
   await expect(
@@ -365,7 +367,7 @@ test("the first-time tour opens real tools and preserves the chosen grid", async
   await tour.getByRole("button", { name: "Back", exact: true }).click();
   await step(1);
   await expect(build).toBeHidden();
-  await tour.getByRole("button", { name: "Open Build", exact: true }).click();
+  await tour.getByRole("button", { name: "Next", exact: true }).click();
   await step(2);
   await build.getByRole("tab", { name: "Storage", exact: true }).click();
   await step(3);
@@ -380,9 +382,11 @@ test("the first-time tour opens real tools and preserves the chosen grid", async
   // Clicking a speed control during the tour must not advance the simulation.
   await page.getByRole("button", { name: "slow speed", exact: true }).click();
   await expect.poll(async () => (await savedGame(page))?.speed).toBe("PAUSED");
-  await tour.getByRole("button", { name: "Explore programs" }).click();
-  await step(5);
+  await expect(
+    programs.getByRole("button", { name: /Efficiency rebates/ }),
+  ).toHaveClass(/tutorialTarget/);
   await programs.getByRole("button", { name: /Efficiency rebates/ }).click();
+  await step(5);
   await expect(
     programs.getByRole("region", { name: "Program details" }),
   ).toBeVisible();
@@ -397,17 +401,17 @@ test("the first-time tour opens real tools and preserves the chosen grid", async
       animations: "disabled",
     });
   }
-  await tour.getByRole("button", { name: "Open Insights" }).click();
+  await page.locator("#insightsNav").click();
   await step(6);
   await expect(
     page.getByRole("combobox", { name: "Insight preset" }),
   ).toBeVisible();
-  await tour.getByRole("button", { name: "Open Events" }).click();
+  await page.locator("#eventsNav").click();
   await step(7);
   await expect(
     page.getByRole("region", { name: "Events", exact: true }),
   ).toBeVisible();
-  await tour.getByRole("button", { name: "Open Scenario" }).click();
+  await page.locator("#scenarioNav").click();
   await step(8);
   await expect(
     page.getByRole("region", { name: "Scenario", exact: true }),

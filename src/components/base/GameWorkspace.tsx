@@ -9,7 +9,6 @@ import { selectTutorialActions } from "../../reducers/Tutorial";
 import { CardNameType } from "../../Types";
 import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import GameAppBar from "./GameAppBar";
-import DataCenterGuide from "./DataCenterGuide";
 import Navigation, {
   GAME_TOOLS,
   GameTool,
@@ -181,7 +180,6 @@ export default function GameWorkspace() {
       <GameWorkspaceContext.Provider value={true}>
         <div className="gameWorkspace">
           <GameAppBar />
-          <DataCenterGuide />
           <div
             className="gameStage"
             data-layout={layout}

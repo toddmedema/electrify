@@ -10,6 +10,8 @@ export interface TutorialHudProps {
   onBack: () => void;
   onExit: () => void;
   onNext: () => void;
+  // A clicked control performs its own navigation; Next may need to open that destination.
+  onAutoAdvance?: () => void;
   step: TutorialStepType;
   stepIndex: number;
   totalSteps: number;
@@ -301,6 +303,7 @@ export default function TutorialHud({
   onBack,
   onExit,
   onNext,
+  onAutoAdvance,
   step,
   stepIndex,
   totalSteps,
@@ -318,6 +321,7 @@ export default function TutorialHud({
   // thing on screen asking to be tapped
   const nextIsPrimary = !step.continueOn && !step.continueOnClick;
   const progressText = `${stepIndex + 1} of ${totalSteps}`;
+  const advanceOnClick = onAutoAdvance ?? onNext;
 
   React.useEffect(() => {
     if (!step.continueOnClick || isGatedStep(step)) {
@@ -338,7 +342,7 @@ export default function TutorialHud({
       queueMicrotask(() => {
         if (active && !event.defaultPrevented) {
           active = false;
-          onNext();
+          advanceOnClick();
         }
       });
     };
@@ -347,7 +351,7 @@ export default function TutorialHud({
       active = false;
       document.removeEventListener("click", onClick, true);
     };
-  }, [step, onNext]);
+  }, [step, advanceOnClick]);
 
   React.useEffect(() => {
     if (!target || step.capstone) {
