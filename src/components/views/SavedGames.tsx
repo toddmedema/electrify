@@ -38,6 +38,7 @@ import CloudSaveStatus from "../base/CloudSaveStatus";
 import CloudSyncIndicator from "../base/CloudSyncIndicator";
 import ShareSaveDialog from "../base/ShareSaveDialog";
 import { isDesktopApp } from "../../Desktop";
+import { restoreMenuFocus } from "../base/useMenuKeys";
 
 const STATUS_LABELS: Record<SaveStatus, string> = {
   inProgress: "In progress",
@@ -118,17 +119,10 @@ export default function SavedGames(): React.JSX.Element {
   };
   const onBack = () => {
     dispatch(navigateBack());
-    window.setTimeout(
-      () =>
-        document.querySelector<HTMLElement>("[data-saves-trigger]")?.focus(),
-      350,
-    );
+    restoreMenuFocus("[data-saves-trigger]");
   };
   const focusGameMenu = () => {
-    window.setTimeout(
-      () => document.querySelector<HTMLElement>(".gameMenuButton")?.focus(),
-      350,
-    );
+    restoreMenuFocus(".gameMenuButton");
   };
   const loadUnsavedGame = () => {
     dispatch(navigate("FACILITIES"));

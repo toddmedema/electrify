@@ -1,7 +1,9 @@
 import { KeyboardEvent, useEffect, useRef } from "react";
+import { CARD_TRANSITION_ANIMATION_MS } from "../../Constants";
 
 const selector = "button,a[href],input,select,textarea,[role=button]";
 const popup = "[role=dialog],[role=menu],[role=listbox]";
+const unavailable = "[hidden],[inert],[aria-hidden=true]";
 function controls(root: Element): HTMLElement[] {
   return [
     root as HTMLElement,
@@ -11,13 +13,48 @@ function controls(root: Element): HTMLElement[] {
       element.matches(selector) &&
       element.tabIndex >= 0 &&
       !element.matches(":disabled,[aria-disabled=true]") &&
-      !element.closest("[hidden],[inert],[aria-hidden=true]") &&
+      !element.closest(unavailable) &&
       !!element.getClientRects().length &&
       getComputedStyle(element).visibility !== "hidden",
   );
 }
 const preferred = (items: HTMLElement[]) =>
   items.find((item) => item.matches("[aria-pressed=true]")) || items[0];
+
+/** Returning to a menu must not undo navigation begun during the card transition. */
+export function restoreMenuFocus(returnSelector: string): void {
+  const cancelOnInput = (event: Event) => {
+    const control =
+      event.target instanceof Element ? event.target.closest(selector) : null;
+    if (
+      control &&
+      !control.closest(unavailable) &&
+      !control.matches(":disabled,[aria-disabled=true]")
+    )
+      cancel();
+  };
+  const cancel = () => {
+    window.clearTimeout(timer);
+    document.removeEventListener("keydown", cancelOnInput, true);
+    document.removeEventListener("pointerdown", cancelOnInput, true);
+  };
+  const timer = window.setTimeout(() => {
+    cancel();
+    const target = document.querySelector<HTMLElement>(returnSelector);
+    if (
+      target &&
+      !target.closest(unavailable) &&
+      !Array.from(document.querySelectorAll(popup)).some(
+        (surface) => !surface.closest(unavailable),
+      )
+    )
+      target.focus();
+  }, CARD_TRANSITION_ANIMATION_MS + 50);
+  // Early keys can land on the body while the menu is still entering.
+  // Controller navigation emits the same keyboard events as physical keys.
+  document.addEventListener("keydown", cancelOnInput, true);
+  document.addEventListener("pointerdown", cancelOnInput, true);
+}
 
 /** Real focus is the selection, shared with pointer and native Tab navigation. */
 export function useMenuKeys(settings = false, onBack?: () => void) {

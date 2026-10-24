@@ -53,6 +53,7 @@ import {
 } from "../views/StoryEventSelectors";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
+import { restoreMenuFocus } from "./useMenuKeys";
 
 /**
  * The game's global state: cash, the date, how fast time is running, how far through the year it
@@ -336,9 +337,7 @@ export function GameAppBar(props: Props) {
   const handleQuit = React.useCallback(() => {
     setMenuAnchorEl(null);
     onQuit();
-    window.setTimeout(() => {
-      document.querySelector<HTMLElement>("[data-main-action]")?.focus();
-    }, 350);
+    restoreMenuFocus("[data-main-action]");
   }, [onQuit]);
 
   /**

@@ -50,7 +50,7 @@ import ModDetails, { ModFacts } from "../base/ModDetails";
 import type { DifficultyType } from "../../Types";
 import ScreenPage from "../base/ScreenPage";
 import DifficultyPicker from "../base/DifficultyPicker";
-import { useMenuKeys } from "../base/useMenuKeys";
+import { restoreMenuFocus, useMenuKeys } from "../base/useMenuKeys";
 import { startWithSaveGuard } from "./StartGame";
 
 const FACTOR_LABELS = {
@@ -423,10 +423,7 @@ function ModsLibrary(): React.JSX.Element {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
     dispatch(navigateBack());
-    window.setTimeout(
-      () => document.querySelector<HTMLElement>("[data-mods-trigger]")?.focus(),
-      350,
-    );
+    restoreMenuFocus("[data-mods-trigger]");
   };
   const menuKeys = useMenuKeys(true, onBack);
 

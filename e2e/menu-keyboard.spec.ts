@@ -58,6 +58,31 @@ test("Space toggles Sound", async ({ page }) => {
   await expect(sound).not.toBeChecked();
 });
 
+test("a background arrow during Settings exit preserves volume and restores focus", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const settings = page.getByRole("button", { name: "Settings", exact: true });
+  await settings.click();
+  await page.getByRole("switch", { name: "Sound", exact: true }).check();
+  const effects = page.getByRole("slider", {
+    name: "Effects volume",
+    exact: true,
+  });
+  await effects.focus();
+  await effects.press("Home");
+  await expect(effects).toHaveAttribute("aria-valuenow", "0");
+  await page.keyboard.press("Escape");
+  // Reproduce the native audit: the early arrow lands on body, not a menu control.
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await expect(page.locator("body")).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(settings).toBeFocused();
+  expect(
+    await page.evaluate(() => localStorage.getItem("soundEffectsVolume")),
+  ).toBe("0");
+});
+
 test("Space activates game navigation while body Space pauses", async ({
   page,
 }) => {
