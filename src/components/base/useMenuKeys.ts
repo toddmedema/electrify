@@ -22,15 +22,25 @@ const preferred = (items: HTMLElement[]) =>
   items.find((item) => item.matches("[aria-pressed=true]")) || items[0];
 
 /** Returning to a menu must not undo navigation begun during the card transition. */
-export function restoreMenuFocus(selector: string): void {
+export function restoreMenuFocus(returnSelector: string): void {
+  const cancelOnInput = (event: Event) => {
+    const control =
+      event.target instanceof Element ? event.target.closest(selector) : null;
+    if (
+      control &&
+      !control.closest(unavailable) &&
+      !control.matches(":disabled,[aria-disabled=true]")
+    )
+      cancel();
+  };
   const cancel = () => {
     window.clearTimeout(timer);
-    document.removeEventListener("keydown", cancel, true);
-    document.removeEventListener("pointerdown", cancel, true);
+    document.removeEventListener("keydown", cancelOnInput, true);
+    document.removeEventListener("pointerdown", cancelOnInput, true);
   };
   const timer = window.setTimeout(() => {
     cancel();
-    const target = document.querySelector<HTMLElement>(selector);
+    const target = document.querySelector<HTMLElement>(returnSelector);
     if (
       target &&
       !target.closest(unavailable) &&
@@ -40,9 +50,10 @@ export function restoreMenuFocus(selector: string): void {
     )
       target.focus();
   }, CARD_TRANSITION_ANIMATION_MS + 50);
+  // Early keys can land on the body while the menu is still entering.
   // Controller navigation emits the same keyboard events as physical keys.
-  document.addEventListener("keydown", cancel, true);
-  document.addEventListener("pointerdown", cancel, true);
+  document.addEventListener("keydown", cancelOnInput, true);
+  document.addEventListener("pointerdown", cancelOnInput, true);
 }
 
 /** Real focus is the selection, shared with pointer and native Tab navigation. */

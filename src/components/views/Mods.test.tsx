@@ -151,6 +151,21 @@ describe("returning from Mods", () => {
     expect(trigger).toHaveFocus();
   });
 
+  test("Back still restores focus after an arrow arrives before the menu", async () => {
+    const { trigger } = await goBack();
+    fireEvent.keyDown(document.body, { key: "ArrowUp" });
+    act(() => jest.advanceTimersByTime(1000));
+    expect(trigger).toHaveFocus();
+  });
+
+  test("input on an exiting screen cannot cancel Back focus restoration", async () => {
+    const { trigger, next } = await goBack();
+    next.setAttribute("inert", "");
+    fireEvent.keyDown(next, { key: "ArrowUp" });
+    act(() => jest.advanceTimersByTime(1000));
+    expect(trigger).toHaveFocus();
+  });
+
   test("Back restores focus when a closed menu remains mounted", async () => {
     const { trigger } = await goBack();
     render(

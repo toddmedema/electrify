@@ -471,6 +471,27 @@ describe("GameAppBar", () => {
     jest.useRealTimers();
   });
 
+  it("Save & Quit preserves a later menu selection", () => {
+    jest.useFakeTimers();
+    renderAppBar();
+    fireEvent.click(screen.getByRole("button", { name: "menu" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Save & Quit" }));
+    render(
+      <>
+        <button data-main-action>Continue</button>
+        <button>Saved games shortcut</button>
+      </>,
+    );
+    const library = screen.getByRole("button", {
+      name: "Saved games shortcut",
+    });
+    act(() => library.focus());
+    fireEvent.keyDown(library, { key: "Enter" });
+    act(() => jest.advanceTimersByTime(350));
+    expect(library).toHaveFocus();
+    jest.useRealTimers();
+  });
+
   it.each([false, true])(
     "keeps the solo save library outside a multiplayer game (%s)",
     (multiplayer) => {
