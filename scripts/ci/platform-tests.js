@@ -54,6 +54,17 @@ function commands(index, cores = os.availableParallelism()) {
         : []),
     ],
     ui: [
+      // Windows has spare time; Mac already owns the long shared-clock suite.
+      ...(index === 2
+        ? [
+            {
+              name: "Controller journeys",
+              script: "test:steam-input",
+              args: [],
+              env: { STEAM_INPUT_BUILD_DIR: "build" },
+            },
+          ]
+        : []),
       {
         name: "Package and verify native depot",
         script: "desktop:pack:offline",
@@ -80,17 +91,6 @@ function commands(index, cores = os.availableParallelism()) {
               name: "Shared-clock Steam renderer",
               script: "test:multiplayer",
               args: [],
-            },
-          ]
-        : []),
-      // Windows has spare time; Mac already owns the long shared-clock suite.
-      ...(index === 2
-        ? [
-            {
-              name: "Controller journeys",
-              script: "test:steam-input",
-              args: [],
-              env: { STEAM_INPUT_BUILD_DIR: "build" },
             },
           ]
         : []),

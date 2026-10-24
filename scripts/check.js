@@ -100,7 +100,7 @@ const steps = [
     reports: ["results.json"],
   },
 ];
-const usage = `Usage: npm run check -- [--ci] [--steps ${steps.map((step) => step.id).join(",")}]`;
+const usage = `Usage: npm run check -- [--ci] [--steps ${steps.map((step) => step.id).join(",")}]\n       npm run check -- --report <report.json>`;
 
 // The default check omits CI-only gates; --ci runs every gate, and --steps may name any gate.
 // Selecting a gate that tests a build also rebuilds it, because the two builds share build/.
@@ -184,6 +184,33 @@ function sourceSnapshot() {
     dirty: status.length > 0,
     fingerprint: hash.digest("hex"),
   };
+}
+
+// A retained pass describes its recorded scope, never a later checkout or a partial retry.
+function summarizeReport(report, current = sourceSnapshot()) {
+  if (report.schemaVersion !== 1 || !Array.isArray(report.gates))
+    throw new Error("Unsupported validation report");
+  const full =
+    report.scope?.full === true &&
+    report.scope.profile === "ci" &&
+    report.gates.length === steps.length &&
+    steps.every(({ id }) => report.gates.some((gate) => gate.id === id));
+  const passed = report.gates.filter(({ status }) => status === "passed");
+  const source = report.source?.after;
+  const same =
+    !!current?.fingerprint && current.fingerprint === source?.fingerprint;
+  return [
+    `Local validation: ${report.status} (${full ? "full CI profile" : "partial/quick check"}; ${passed.length}/${report.gates.length} gates passed).`,
+    `Tested commit: ${source?.commit ?? "unavailable"}${source?.dirty ? " with working-tree changes" : ""}.`,
+    `Source fingerprint: ${source?.fingerprint ?? "unavailable"}.`,
+    `Current source: ${same ? "matches the recorded snapshot" : "not verified by this report; the snapshot differs or is unavailable"}.`,
+    `Runtime: ${report.environment?.node}, ${report.environment?.platform}/${report.environment?.arch}; Jest workers: ${report.environment?.jestWorkers}.`,
+    `Passed gates: ${passed.map(({ id }) => id).join(", ") || "none"}.`,
+    ...report.gates
+      .filter(({ status }) => status !== "passed")
+      .map(({ id, status }) => `${id}: ${status}.`),
+    `Outside local scope: ${(report.scope?.ciOnly || []).join(", ") || "none"} (CI only); ${(report.scope?.separateChecks || []).join(", ") || "none"} (separate checks).`,
+  ].join("\n");
 }
 
 function run(step, workers, directory) {
@@ -290,6 +317,12 @@ async function execute(selected, runStep) {
 }
 
 async function main(argv = process.argv.slice(2)) {
+  if (argv.length === 2 && argv[0] === "--report") {
+    process.stdout.write(
+      `${summarizeReport(JSON.parse(fs.readFileSync(argv[1], "utf8")))}\n`,
+    );
+    return;
+  }
   if (argv.length === 1 && argv[0] === "--help") {
     console.error(usage);
     return;
@@ -404,4 +437,11 @@ if (require.main === module)
     console.error(error.message);
     process.exitCode = 1;
   });
-module.exports = { steps, selectSteps, isFullCheck, workerCount, execute };
+module.exports = {
+  steps,
+  selectSteps,
+  isFullCheck,
+  workerCount,
+  execute,
+  summarizeReport,
+};
