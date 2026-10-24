@@ -1,5 +1,4 @@
 import * as React from "react";
-import { flushSync } from "react-dom";
 import {
   Alert,
   Box,
@@ -51,7 +50,7 @@ import ModDetails, { ModFacts } from "../base/ModDetails";
 import type { DifficultyType } from "../../Types";
 import ScreenPage from "../base/ScreenPage";
 import DifficultyPicker from "../base/DifficultyPicker";
-import { useMenuKeys } from "../base/useMenuKeys";
+import { restoreMenuFocus, useMenuKeys } from "../base/useMenuKeys";
 import { startWithSaveGuard } from "./StartGame";
 
 const FACTOR_LABELS = {
@@ -423,12 +422,8 @@ function ModsLibrary(): React.JSX.Element {
   const onBack = () => {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
-    // Restore the trigger as part of navigation, before the player can choose another action.
-    // A delayed callback can pull focus out of a dialog opened after returning to the menu.
-    flushSync(() => dispatch(navigateBack()));
-    const target = document.querySelector<HTMLElement>("[data-mods-trigger]");
-    if (target && !target.closest("[hidden],[inert],[aria-hidden=true]"))
-      target.focus();
+    dispatch(navigateBack());
+    restoreMenuFocus("[data-mods-trigger]");
   };
   const menuKeys = useMenuKeys(true, onBack);
 

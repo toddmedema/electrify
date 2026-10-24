@@ -260,7 +260,7 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   fireEvent.change(screen.getByRole("slider", { name: "Power needed" }), {
     target: { value: "19" },
   });
-  fireEvent.click(screen.getByText(/^Grid size: /));
+  fireEvent.click(screen.getByText("Grid size"));
   const accounts = screen.getByRole("textbox", {
     name: "Homes and businesses served",
   });

@@ -53,6 +53,7 @@ import {
 } from "../views/StoryEventSelectors";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
+import { restoreMenuFocus } from "./useMenuKeys";
 
 /**
  * The game's global state: cash, the date, how fast time is running, how far through the year it
@@ -336,18 +337,7 @@ export function GameAppBar(props: Props) {
   const handleQuit = React.useCallback(() => {
     setMenuAnchorEl(null);
     onQuit();
-    window.setTimeout(() => {
-      const target = document.querySelector<HTMLElement>("[data-main-action]");
-      const active = document.activeElement;
-      const inactive = "[hidden],[inert],[aria-hidden=true]";
-      // The player may already have selected another menu action while the game exits.
-      if (
-        target &&
-        !target.closest(inactive) &&
-        (!active || active === document.body || active.closest(inactive))
-      )
-        target.focus();
-    }, 350);
+    restoreMenuFocus("[data-main-action]");
   }, [onQuit]);
 
   /**

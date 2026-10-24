@@ -116,43 +116,114 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
-test.each(["idle", "menu", "dialog"] as const)(
-  "returning from Mods respects the %s destination when its transition settles",
-  async (destination) => {
+describe("returning from Mods", () => {
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  async function goBack(inactiveTrigger = false) {
+    setup([]);
+    await screen.findByText("Install your first mod below");
+    render(
+      <>
+        <div aria-hidden={inactiveTrigger || undefined}>
+          <button data-mods-trigger>Mods shortcut</button>
+        </div>
+        <button>Play with friends</button>
+        <input aria-label="Invite code" />
+      </>,
+    );
     jest.useFakeTimers();
-    const menu = document.createElement("main");
-    menu.innerHTML =
-      "<button data-mods-trigger>Mods</button><button>Play with friends</button>";
-    document.body.appendChild(menu);
-    try {
-      await act(async () => {
-        setup([]);
-      });
-      fireEvent.click(screen.getByRole("button", { name: "Back" }));
-      let selected = screen.getByRole("button", { name: "Mods" });
-      expect(selected).toHaveFocus();
-      act(() => jest.advanceTimersByTime(300));
-      if (destination === "menu") {
-        selected = screen.getByRole("button", { name: "Play with friends" });
-        act(() => selected.focus());
-      } else if (destination === "dialog") {
-        render(
-          <Dialog open aria-label="Play with friends">
-            <TextField label="Invite code" />
-          </Dialog>,
-        );
-        selected = screen.getByRole("textbox", { name: "Invite code" });
-        act(() => selected.focus());
-      }
-      act(() => jest.advanceTimersByTime(50));
-      expect(selected).toHaveFocus();
-    } finally {
-      menu.remove();
-      jest.clearAllTimers();
-      jest.useRealTimers();
-    }
-  },
-);
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    return {
+      trigger: screen.getByRole("button", {
+        name: "Mods shortcut",
+        hidden: true,
+      }),
+      next: screen.getByRole("button", { name: "Play with friends" }),
+      code: screen.getByRole("textbox", { name: "Invite code" }),
+    };
+  }
+
+  test("Back restores the Mods trigger after the card transition", async () => {
+    const { trigger } = await goBack();
+    act(() => jest.advanceTimersByTime(1000));
+    expect(trigger).toHaveFocus();
+  });
+
+  test("Back still restores focus after an arrow arrives before the menu", async () => {
+    const { trigger } = await goBack();
+    fireEvent.keyDown(document.body, { key: "ArrowUp" });
+    act(() => jest.advanceTimersByTime(1000));
+    expect(trigger).toHaveFocus();
+  });
+
+  test("input on an exiting screen cannot cancel Back focus restoration", async () => {
+    const { trigger, next } = await goBack();
+    next.setAttribute("inert", "");
+    fireEvent.keyDown(next, { key: "ArrowUp" });
+    act(() => jest.advanceTimersByTime(1000));
+    expect(trigger).toHaveFocus();
+  });
+
+  test("Back restores focus when a closed menu remains mounted", async () => {
+    const { trigger } = await goBack();
+    render(
+      <div aria-hidden="true">
+        <div role="menu" aria-label="Closed game menu" />
+      </div>,
+    );
+    act(() => jest.advanceTimersByTime(1000));
+    expect(trigger).toHaveFocus();
+  });
+
+  test.each(["keyboard", "pointer"])(
+    "Back preserves focus after subsequent %s navigation",
+    async (method) => {
+      const { next, code } = await goBack();
+      if (method === "keyboard") fireEvent.keyDown(next, { key: "Enter" });
+      else fireEvent.pointerDown(next);
+      act(() => code.focus());
+      act(() => jest.advanceTimersByTime(1000));
+      expect(code).toHaveFocus();
+    },
+  );
+
+  test("Back preserves focus when a dialog opens without further input", async () => {
+    await goBack();
+    render(
+      <div role="dialog" aria-label="Invitation">
+        <input aria-label="New invite code" />
+      </div>,
+    );
+    const code = screen.getByRole("textbox", { name: "New invite code" });
+    act(() => code.focus());
+    act(() => jest.advanceTimersByTime(1000));
+    expect(code).toHaveFocus();
+  });
+
+  test("Back preserves the invite field when a real modal traps focus before the return delay", async () => {
+    await goBack();
+    act(() => jest.advanceTimersByTime(300));
+    render(
+      <Dialog open aria-label="Invitation">
+        <TextField label="New invite code" />
+      </Dialog>,
+    );
+    const code = screen.getByRole("textbox", { name: "New invite code" });
+    act(() => code.focus());
+    act(() => jest.advanceTimersByTime(50));
+    expect(code).toHaveFocus();
+  });
+
+  test("Back cannot focus a return trigger on an inactive screen", async () => {
+    const { code } = await goBack(true);
+    act(() => code.focus());
+    act(() => jest.advanceTimersByTime(1000));
+    expect(code).toHaveFocus();
+  });
+});
 
 test("modifiers read as player-facing changes with program names", () => {
   expect(

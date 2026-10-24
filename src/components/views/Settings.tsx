@@ -32,7 +32,7 @@ import { APP_VERSION } from "../../AppVersion";
 import { clearAppCache } from "../../helpers/Cache";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
-import { useMenuKeys } from "../base/useMenuKeys";
+import { restoreMenuFocus, useMenuKeys } from "../base/useMenuKeys";
 const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
@@ -204,9 +204,7 @@ export default function Settings(props: Props): React.JSX.Element {
     props.onBack();
     // Card transitions replace the button that opened Settings. Once the previous card is back,
     // return keyboard users to its stable replacement instead of leaving focus on <body>.
-    window.setTimeout(() => {
-      document.querySelector<HTMLElement>("[data-settings-trigger]")?.focus();
-    }, 350);
+    restoreMenuFocus("[data-settings-trigger]");
   };
   const menuKeys = useMenuKeys(true, onBack);
 
