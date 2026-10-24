@@ -36,8 +36,7 @@ export default function ConstructionBuildHeader(
   const [sortAnchorEl, setSortAnchorEl] = React.useState<HTMLElement | null>(
     null,
   );
-  // At 600px the label, useful slider track and 150px select all fit without truncation. Below
-  // that, preserving the slider's usable width is worth the compact icon-only sort control.
+  // Keep the compact icon-only sort control on phones to preserve usable slider width.
   const showSortSelect = useMediaQuery("(min-width:600px)");
   const currentSortLabel =
     props.sortOptions.find(([value]) => value === props.sort)?.[1] ||
@@ -56,7 +55,7 @@ export default function ConstructionBuildHeader(
           className="constructionCapacity"
           variant="body2"
         >
-          <span className="weak">{props.capacityLabel || "Capacity"}</span>
+          <span className="srOnly">{props.capacityLabel || "Capacity"} </span>
           <Typography component="strong">{props.capacity}</Typography>
         </Typography>
         <Slider
@@ -80,7 +79,8 @@ export default function ConstructionBuildHeader(
             <Select
               value={props.sort}
               onChange={(event) => updateSort(event.target.value)}
-              renderValue={() => `Sort: ${currentSortLabel}`}
+              renderValue={() => currentSortLabel}
+              IconComponent={SortIcon}
               inputProps={{
                 "aria-label": props.sortLabel || "Sort facilities",
               }}
