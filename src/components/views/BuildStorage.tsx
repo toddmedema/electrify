@@ -24,7 +24,7 @@ import { MANUAL_ENTRY } from "../base/ManualEntries";
 import ManualLink from "../base/ManualLink";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
-  mostRecentBuiltSize,
+  averageBuildSize,
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
@@ -274,7 +274,10 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const listRef = useToolScroll<HTMLUListElement>("storage.scroll");
   const [sliderTick, setSliderTick] = useToolState<number>("storage.size", () =>
-    wToSliderTick(mostRecentBuiltSize(game.facilities, true)),
+    Math.max(
+      4,
+      Math.min(37, wToSliderTick(averageBuildSize(game.facilities, true))),
+    ),
   );
   const [exactSizes, setExactSizes] = useToolState<Record<string, number>>(
     "storage.exactSizes",

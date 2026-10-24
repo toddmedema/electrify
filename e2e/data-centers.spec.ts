@@ -431,6 +431,7 @@ test("nearest location uses browser permission and keeps manual selection availa
   const city = page.getByRole("combobox", { name: "Select a city" });
   await city.fill("Pittsburgh");
   await page.getByRole("option", { name: /Pittsburgh/ }).click();
+  await expect(city).not.toBeFocused();
   await ready(page);
   await expect(city).toHaveValue(/Pittsburgh/);
 });
@@ -447,6 +448,7 @@ test("location changes prepare a populated grid and launching keeps its data-cen
   });
   await location.fill("Pittsburgh");
   await page.getByRole("option", { name: /Pittsburgh/ }).click();
+  await expect(location).not.toBeFocused();
   await ready(page);
   await page
     .getByRole("combobox", { name: "Start year", exact: true })

@@ -328,6 +328,14 @@ button,
   outline-offset: 2px;
 }
 
+// Programmatic focus after a tap should not leave button rings on a touch interface. Keyboard
+// navigation restores them immediately; controller navigation always keeps its own indicators.
+html[data-touch-input="true"]:not([data-controller-input="true"])
+  :is(button, [role="button"], [role="tab"], .MuiButtonBase-root):focus {
+  outline: none !important;
+  box-shadow: none;
+}
+
 @media (pointer: coarse) {
   // A Switch's thumb sits in its own button base sized to the track; stretching that base drops
   // the thumb below the track's centre, and the row around the switch already gives a big target
@@ -347,7 +355,8 @@ button,
 .keyboardMenu .MuiTouchRipple-ripplePulsate {
   display: none;
 }
-.keyboardMenu
+html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
+  .keyboardMenu
   .settingsGroup
   :is(.settingsRow, .settingsKeyboardRow):focus-within {
   background: var(--bg-raised);
