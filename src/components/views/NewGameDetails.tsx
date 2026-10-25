@@ -48,6 +48,7 @@ import {
 
 import { formatScore } from "../../helpers/Format";
 import { isDesktopApp } from "../../Desktop";
+import { SCORE_VERSION } from "../../helpers/Scoring";
 
 export interface StateProps {
   challenge?: ChallengeInvitation;
@@ -160,6 +161,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
       const querySnapshot = await getDocs(
         query(
           collection(getDb(), "scores"),
+          where("scoreVersion", "==", SCORE_VERSION),
+          where("outcome", "==", "completed"),
           where("scenarioId", "==", scenario.id),
           where("difficulty", "==", difficulty),
           orderBy("score", "desc"),
@@ -204,6 +207,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
       const querySnapshot = await getDocs(
         query(
           collection(getDb(), "scores"),
+          where("scoreVersion", "==", SCORE_VERSION),
+          where("outcome", "==", "completed"),
           where("scenarioId", "==", scenario.id),
           orderBy("score", "desc"),
           limit(50),
@@ -251,6 +256,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
       const querySnapshot = await getDocs(
         query(
           collection(getDb(), "scores"),
+          where("scoreVersion", "==", SCORE_VERSION),
+          where("outcome", "==", "completed"),
           where("scenarioId", "==", scenario.id),
           where("difficulty", "==", difficulty),
           where("uid", "==", uid),
@@ -613,7 +620,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                             ? desktopApp
                               ? "Steam scores are unavailable. You can still play and save offline."
                               : "Couldn't load the high scores right now."
-                            : "Finish this game to join the leaderboard"}
+                            : "Complete this mission to join the leaderboard"}
                         </Typography>
                       </TableCell>
                     </TableRow>

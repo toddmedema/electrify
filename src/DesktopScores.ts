@@ -1,8 +1,46 @@
 import { getDesktop } from "./Desktop";
 import { APP_VERSION } from "./AppVersion";
-import type { DifficultyType, ScoreType } from "./Types";
+import type { DifficultyType, ScoreType, VictoryType, UserType } from "./Types";
+import { competitiveBestKey, SCORE_VERSION } from "./helpers/Scoring";
+import type { SaveRepository } from "./SaveRepository";
+import { SCENARIOS } from "./data/Scenarios";
 import manifest from "./data/RunCompatibility.json";
 import { Timestamp } from "firebase/firestore";
+
+/** Restore only explicitly current completed official results after a Steam restart. */
+export async function readDesktopCompetitiveBests(
+  repository: Pick<SaveRepository, "list" | "read">,
+): Promise<NonNullable<UserType["bests"]>> {
+  const bests: NonNullable<UserType["bests"]> = {};
+  for (const entry of await repository.list()) {
+    try {
+      const { result, save } = await repository.read(entry.id);
+      if (
+        !result ||
+        result.scoreVersion !== SCORE_VERSION ||
+        result.outcome !== "completed" ||
+        entry.status !== "completed" ||
+        save.game.replayPlayback ||
+        !SCENARIOS.some(
+          (scenario) =>
+            scenario.id === result.scenarioId && !scenario.tutorialSteps,
+        )
+      )
+        continue;
+      const key = competitiveBestKey(result.scenarioId);
+      if (result.score > (bests[key]?.score ?? -Infinity))
+        bests[key] = {
+          scoreVersion: SCORE_VERSION,
+          score: result.score,
+          difficulty: result.difficulty,
+          date: Date.parse(entry.savedAt),
+        };
+    } catch {
+      /* A damaged historical save cannot prevent playing. */
+    }
+  }
+  return bests;
+}
 
 export async function desktopScores(
   scenarioId: number,
@@ -16,6 +54,7 @@ export async function desktopScores(
     difficulty,
     scope,
     challengeId: manifest.compatibilityId,
+    scoreVersion: SCORE_VERSION,
   });
   return entries.map((entry) => ({
     ...entry,
@@ -27,15 +66,18 @@ export async function desktopScores(
 // Submissions still in flight, so a rank lookup for a just-finished run can wait for its score.
 const submissions = new Set<Promise<void>>();
 export async function submitDesktopScore(submission: {
+  outcome: NonNullable<VictoryType["outcome"]>;
   scenarioId: number;
   difficulty: DifficultyType;
   score: number;
 }): Promise<void> {
+  if (submission.outcome !== "completed") return;
   const request = (async () => {
     await getDesktop()?.submitScore({
       ...submission,
       appVersion: APP_VERSION,
       challengeId: manifest.compatibilityId,
+      scoreVersion: SCORE_VERSION,
     });
   })();
   submissions.add(request);
@@ -65,6 +107,7 @@ export async function desktopGlobalRank(
       difficulty,
       scope: "player",
       challengeId: manifest.compatibilityId,
+      scoreVersion: SCORE_VERSION,
     });
     const entry = scores?.[0];
     if (entry && entry.score === target && entry.rank) return entry.rank;

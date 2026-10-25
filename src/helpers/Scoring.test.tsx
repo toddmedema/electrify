@@ -80,7 +80,7 @@ it("counts purchased emissions in the score just like the same local total", () 
     },
     summary.revenue,
   );
-  expect(imports.emissions).toBe(-2);
+  expect(imports.environmental).toBe(-2);
   expect(imports).toEqual(local);
 });
 
@@ -125,10 +125,10 @@ describe("inflation and the public rate target", () => {
       summary,
       startingDollarRevenue(history, 2020, 1),
     );
-    expect(real.rate).toBe(0);
+    expect(real.financial).toBe(0);
     // Judged on nominal revenue, the same run would lose points for inflation alone
     expect(
-      computeScoreBreakdown(scenario, summary, summary.revenue).rate,
+      computeScoreBreakdown(scenario, summary, summary.revenue).financial,
     ).toBeLessThan(-100);
   });
 
@@ -144,9 +144,9 @@ describe("inflation and the public rate target", () => {
       startingDollarRevenue(history, 2020, 1),
       6,
     );
-    expect(computeScoreBreakdown(scenario, summary, customerRevenue).rate).toBe(
-      0,
-    );
+    expect(
+      computeScoreBreakdown(scenario, summary, customerRevenue).financial,
+    ).toBe(0);
   });
 
   it("compares the coming year's rate to the target in today's dollars", () => {
@@ -233,60 +233,68 @@ describe("SCORE_RULES", () => {
     revenue: 1.2e9,
   };
 
-  it("scores an investor-owned run in the historical order and weights", () => {
+  it("groups investor contributions without the final-customer bonus", () => {
     const scenario = SCENARIOS.find((s) => s.ownership === "Investor")!;
     const breakdown = computeScoreBreakdown(scenario, summary, 0);
-    expect(Object.keys(breakdown)).toEqual([
-      "supply",
-      "netWorth",
-      "customers",
-      "emissions",
-      "blackouts",
-    ]);
     expect(breakdown).toEqual({
-      supply: 12,
-      netWorth: 100,
-      customers: 7,
-      emissions: -6,
-      blackouts: -8,
+      service: 4,
+      financial: 100,
+      environmental: -6,
+    });
+    expect(
+      computeScoreBreakdown(scenario, { ...summary, customers: 0 }, 0),
+    ).toEqual(breakdown);
+  });
+
+  it("groups public service and scores the lifetime rate", () => {
+    const scenario = {
+      ...SCENARIOS.find((s) => s.ownership === "Public")!,
+      dollarsPerkWh: 0.1,
+    };
+    const breakdown = computeScoreBreakdown(
+      scenario,
+      summary,
+      (summary.supplyWh / 1000) * 0.1,
+    );
+    expect(breakdown).toEqual({
+      service: 114,
+      financial: 0,
+      environmental: -15,
     });
   });
 
-  it("scores a public run on rates rather than net worth", () => {
-    const scenario = SCENARIOS.find((s) => s.ownership === "Public")!;
-    const breakdown = computeScoreBreakdown(scenario, summary, 0);
-    expect(Object.keys(breakdown)).toEqual([
-      "rate",
-      "supply",
-      "emissions",
-      "blackouts",
-    ]);
-    expect(breakdown.supply).toBe(124);
-    expect(breakdown.emissions).toBe(-15);
-    expect(breakdown.blackouts).toBe(-10);
+  it("rounds supplied energy and unmet demand separately before grouping service", () => {
+    const scenario = SCENARIOS.find((s) => s.ownership === "Investor")!;
+    expect(
+      computeScoreBreakdown(
+        scenario,
+        { ...summary, supplyWh: 0.6e12, demandWh: 0.65e12 },
+        0,
+      ).service,
+    ).toBe(1);
   });
 
-  it("writes rule text from the same weights", () => {
+  it("writes three category rules from the same weights", () => {
     const investor = scoreRuleText("Investor", 0.1, "1 Mt");
     expect(Object.keys(investor)).toEqual([
-      "netWorth",
-      "customers",
-      "supply",
-      "emissions",
-      "blackouts",
+      "service",
+      "financial",
+      "environmental",
     ]);
-    expect(investor.supply).toBe(
-      "Earn 1 point per terawatt-hour (TWh) of electricity supplied.",
+    expect(investor.service).toContain("Earn 1 point per terawatt-hour");
+    expect(investor.service).toContain(
+      "Lose 8 points per TWh of customer demand not served.",
     );
-    expect(investor.emissions).toBe(
+    expect(investor.environmental).toBe(
       "Lose 2 points per 1 Mt of greenhouse gas emissions.",
     );
+    expect(investor.financial).toContain("40 points per $1 billion");
     const publicText = scoreRuleText("Public", 0.12, "1 Mt");
-    expect(publicText.rate).toContain(
-      `Earn ± ${PUBLIC_RATE_POINTS_PER_CENT} points for each $0.01/kWh`,
+    expect(publicText.financial).toContain(
+      `${PUBLIC_RATE_POINTS_PER_CENT} points for each $0.01/kWh`,
     );
-    expect(publicText.rate).toContain("$0.12/kWh target");
-    expect(publicText.blackouts).toBe(
+    expect(publicText.financial).toContain("starting-year dollars");
+    expect(publicText.service).toContain(
       "Lose 10 points per TWh of customer demand not served.",
     );
   });

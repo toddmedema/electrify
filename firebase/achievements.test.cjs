@@ -122,3 +122,43 @@ test("updates can union new awards but cannot erase any earned evidence", async 
     }),
   );
 });
+
+test("current competitive scores require completion and the three numeric categories", async () => {
+  const db = environment.authenticatedContext("alice").firestore();
+  const score = {
+    uid: "alice",
+    scenarioId: 101,
+    difficulty: "CEO",
+    scoreVersion: 2,
+    outcome: "completed",
+    score: 95,
+    scoreBreakdown: { service: 80, financial: 20, environmental: -5 },
+  };
+  await assertSucceeds(setDoc(doc(db, "scores", "completed"), score));
+  for (const [index, patch] of [
+    { outcome: "bankrupt" },
+    { outcome: "fired" },
+    { outcome: null },
+    { scoreVersion: 3 },
+    { scoreVersion: "2" },
+    { score: "95" },
+    { scoreBreakdown: { service: 80, financial: 20 } },
+    { scoreBreakdown: { ...score.scoreBreakdown, customers: 3 } },
+    { scoreBreakdown: { ...score.scoreBreakdown, financial: "20" } },
+  ].entries())
+    await assertFails(
+      setDoc(doc(db, "scores", `invalid-${index}`), { ...score, ...patch }),
+    );
+  await assertFails(
+    setDoc(doc(db, "scores", "no-outcome"), {
+      uid: "alice",
+      scoreVersion: 2,
+      score: 95,
+      scoreBreakdown: score.scoreBreakdown,
+    }),
+  );
+  // Old clients keep their archived formula; the current board filters these rows out.
+  await assertSucceeds(
+    setDoc(doc(db, "scores", "legacy"), { uid: "alice", score: 100 }),
+  );
+});

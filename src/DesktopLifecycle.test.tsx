@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
 import App from "./App";
 import { DesktopBridge, DesktopPowerState } from "./Desktop";
@@ -7,6 +7,15 @@ import { delta as gameDelta } from "./reducers/Game";
 import { change } from "./reducers/Settings";
 import { pause, resume } from "./data/Audio";
 import { quit } from "./reducers/GameActions";
+import {
+  delta as userDelta,
+  reset,
+  restoreCompetitiveBests,
+} from "./reducers/User";
+import { competitiveBest } from "./helpers/Scoring";
+import { savedRunResult } from "./SaveModel";
+import { fakeSaveFile, fakeSavedResult } from "./testing/SaveTestHelpers";
+import { saveRepository } from "./SaveSession";
 
 jest.mock("./components/CompositorContainer", () => () => null);
 jest.mock("./components/base/CloudSavePrompt", () => () => null);
@@ -14,6 +23,7 @@ jest.mock("./components/base/SharedGameDialog", () => () => null);
 jest.mock("./components/base/ScenarioChoiceDialog", () => () => null);
 jest.mock("./CloudSaves", () => ({ startCloudSaves: () => () => {} }));
 jest.mock("./SaveSession", () => ({
+  saveRepository: { list: jest.fn(), read: jest.fn() },
   startSaveSessions: () => () => {},
   saveSessionMiddleware: () => (next: (action: unknown) => unknown) => next,
 }));
@@ -31,6 +41,83 @@ jest.mock("firebase/auth", () => ({
   ...jest.requireActual("firebase/auth"),
   getAuth: jest.fn(),
 }));
+
+it("restores only current completed official bests after a Steam restart and keeps newer scores", async () => {
+  const previousDesktop = process.env.REACT_APP_DESKTOP;
+  process.env.REACT_APP_DESKTOP = "true";
+  const result = (patch: Parameters<typeof fakeSavedResult>[0] = {}) =>
+    savedRunResult({
+      ...fakeSavedResult({
+        scoreVersion: 2,
+        breakdown: { service: 80, financial: 20, environmental: -5 },
+        ...patch,
+      }),
+      ranked: true,
+    });
+  const results = [
+    result({ score: 800 }),
+    result({ score: 600 }),
+    result({ score: 9000, outcome: "bankrupt" }),
+    result({ score: 9001, outcome: "fired" }),
+    result({ score: 9999, scoreVersion: undefined }),
+    result({ score: 10000, scoreVersion: 1 }),
+    result({ score: 10001, scenarioId: 999 }),
+    result({ score: 10002, scenarioId: 0 }),
+  ];
+  (saveRepository.list as jest.Mock).mockResolvedValue(
+    results.map((record, index) => ({
+      id: String(index),
+      status: record.outcome,
+      savedAt: "2026-10-24T00:00:00Z",
+    })),
+  );
+  (saveRepository.read as jest.Mock).mockImplementation(async (id: string) => ({
+    ...fakeSaveFile(),
+    result: results[Number(id)],
+  }));
+  const uid = "steam:76561198000000001";
+  window.electrifyDesktop = {
+    apiVersion: 1,
+    onGameFocusChanged: () => () => {},
+    onStateChanged: () => () => {},
+    onBeforeQuit: () => () => {},
+    getState: jest.fn().mockResolvedValue({ steam: { steamId: uid.slice(6) } }),
+    setActivity: jest.fn().mockResolvedValue(undefined),
+  } as unknown as DesktopBridge;
+  store.dispatch(reset());
+  const view = render(
+    <Provider store={store}>
+      <App />
+    </Provider>,
+  );
+  try {
+    await waitFor(() =>
+      expect(competitiveBest(store.getState().user.bests, 101)?.score).toBe(
+        800,
+      ),
+    );
+    expect(store.getState().user.bests?.["101"]).toBeUndefined();
+    expect(competitiveBest(store.getState().user.bests, 999)).toBeUndefined();
+    expect(competitiveBest(store.getState().user.bests, 0)).toBeUndefined();
+    const higher = { scoreVersion: 2, score: 900, difficulty: "CEO", date: 2 };
+    store.dispatch(userDelta({ bests: { "v2:101": higher } }));
+    store.dispatch(
+      restoreCompetitiveBests({
+        uid,
+        bests: { "v2:101": { ...higher, score: 800 } },
+      }),
+    );
+    expect(competitiveBest(store.getState().user.bests, 101)?.score).toBe(900);
+  } finally {
+    view.unmount();
+    delete window.electrifyDesktop;
+    if (previousDesktop === undefined) delete process.env.REACT_APP_DESKTOP;
+    else process.env.REACT_APP_DESKTOP = previousDesktop;
+    store.dispatch(reset());
+    (saveRepository.list as jest.Mock).mockReset();
+    (saveRepository.read as jest.Mock).mockReset();
+  }
+});
 
 it("keeps gameplay and audio paused through visibility/pageshow events until native focus returns", async () => {
   const focusListeners = new Set<(focused: boolean) => void>();

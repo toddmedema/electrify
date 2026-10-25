@@ -1,13 +1,34 @@
 import { getRateInflationIndex } from "../data/Economy";
 import {
   MonthlyHistoryType,
+  BestScoreType,
+  LegacyScoreCategoryType,
   ScenarioType,
   ScoreBreakdownType,
   ScoreCategoryType,
 } from "../Types";
 
-// What each scored category is called on the score screen, in lower case to sit mid-sentence
-export const SCORE_LABELS: Record<ScoreCategoryType, string> = {
+// Independent of build/run compatibility: a different formula must never inherit an old best.
+export const SCORE_VERSION = 2;
+export function competitiveBestKey(scenarioId: number): string {
+  return `v${SCORE_VERSION}:${scenarioId}`;
+}
+export function competitiveBest(
+  bests: Record<string, BestScoreType> | undefined,
+  scenarioId: number,
+): BestScoreType | undefined {
+  const best = bests?.[competitiveBestKey(scenarioId)];
+  return best?.scoreVersion === SCORE_VERSION ? best : undefined;
+}
+
+// Current category headings and original labels for recorded historical results.
+export const SCORE_LABELS: Record<
+  ScoreCategoryType | LegacyScoreCategoryType,
+  string
+> = {
+  service: "Service",
+  financial: "Financial performance",
+  environmental: "Environmental impact",
   supply: "electricity supplied",
   netWorth: "final net worth",
   customers: "final customers",
@@ -62,7 +83,7 @@ const BILLION = 1e9;
 
 function supplyRule(points: number): ScoreRuleType {
   return {
-    category: "supply",
+    category: "service",
     points,
     per: TWH,
     measure: ({ summary }) => summary.supplyWh,
@@ -73,7 +94,7 @@ function supplyRule(points: number): ScoreRuleType {
 
 function emissionsRule(points: number): ScoreRuleType {
   return {
-    category: "emissions",
+    category: "environmental",
     points,
     per: BILLION,
     measure: ({ summary }) => summary.kgco2e,
@@ -84,7 +105,7 @@ function emissionsRule(points: number): ScoreRuleType {
 
 function blackoutsRule(points: number): ScoreRuleType {
   return {
-    category: "blackouts",
+    category: "service",
     points,
     per: 1,
     measure: ({ blackoutsTWh }) => blackoutsTWh,
@@ -105,50 +126,39 @@ export const PUBLIC_RATE_POINTS_PER_CENT = 80;
 export const SCORE_RULES: Record<ScenarioType["ownership"], ScoreRuleType[]> = {
   Investor: [
     supplyRule(1),
+    blackoutsRule(-8),
     {
-      category: "netWorth",
+      category: "financial",
       points: 40,
       per: BILLION,
       measure: ({ summary }) => summary.netWorth,
       text: (_context, rule) =>
         `${earnOrLose(rule)} per $1 billion of net worth at the end.`,
     },
-    {
-      category: "customers",
-      points: 2,
-      per: 100000,
-      measure: ({ summary }) => summary.customers,
-      text: (_context, rule) =>
-        `${earnOrLose(rule)} per 100,000 customers at the end.`,
-    },
     emissionsRule(-2),
-    blackoutsRule(-8),
   ],
   Public: [
+    supplyRule(10),
+    blackoutsRule(-10),
     {
-      category: "rate",
+      category: "financial",
       points: PUBLIC_RATE_POINTS_PER_CENT,
       per: 0.01,
       measure: ({ targetRate, effectiveRate }) => targetRate - effectiveRate,
       score: ({ targetRate, effectiveRate }) =>
         publicRateScore(targetRate, effectiveRate),
       text: ({ dollarsPerkWh }, rule) =>
-        `Earn ± ${pointsText(rule.points)} for each $0.01/kWh your lifetime average rate is above/below the $${dollarsPerkWh}/kWh target.`,
+        `Earn ${pointsText(rule.points)} for each $0.01/kWh your lifetime average rate is below the $${dollarsPerkWh}/kWh target; lose the same above it. Rates are measured in starting-year dollars.`,
     },
-    supplyRule(10),
     emissionsRule(-5),
-    blackoutsRule(-10),
   ],
 };
 
 // The rules read as a list lead with what the player is chasing, which isn't the scoring order
 const RULE_TEXT_ORDER: ScoreCategoryType[] = [
-  "rate",
-  "netWorth",
-  "customers",
-  "supply",
-  "emissions",
-  "blackouts",
+  "service",
+  "financial",
+  "environmental",
 ];
 
 /** The point rule behind each score category, in the player's terms. */
@@ -159,10 +169,10 @@ export function scoreRuleText(
 ): ScoreBreakdownText {
   const text: ScoreBreakdownText = {};
   for (const category of RULE_TEXT_ORDER) {
-    const rule = SCORE_RULES[ownership].find((r) => r.category === category);
-    if (rule) {
-      text[category] = rule.text({ dollarsPerkWh, perEmissions }, rule);
-    }
+    text[category] = SCORE_RULES[ownership]
+      .filter((rule) => rule.category === category)
+      .map((rule) => rule.text({ dollarsPerkWh, perEmissions }, rule))
+      .join(" ");
   }
   return text;
 }
@@ -202,9 +212,11 @@ export function computeScoreBreakdown(
   };
   const breakdown: ScoreBreakdownType = {};
   for (const rule of SCORE_RULES[scenario.ownership]) {
-    breakdown[rule.category] = rule.score
+    // Round each original contribution before grouping it: grouping must not change totals.
+    const points = rule.score
       ? rule.score(inputs)
       : Math.round((rule.points * rule.measure(inputs)) / rule.per);
+    breakdown[rule.category] = (breakdown[rule.category] ?? 0) + points;
   }
   return breakdown;
 }

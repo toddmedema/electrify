@@ -58,7 +58,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
   // Identity rather than the object, so re-renders while the dialog is open don't refetch
   const scenarioId = victory?.scenarioId;
   const score = victory?.score;
-  const ranked = Boolean(victory?.ranked);
+  const ranked = Boolean(victory?.ranked && victory?.outcome === "completed");
   const difficulty = victory?.difficulty;
 
   React.useEffect(() => {
@@ -184,6 +184,16 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             color="textSecondary"
           >
             Modded run · not ranked and no achievements.
+          </Typography>
+        )}
+        {failed && !victory.modded && (
+          <Typography
+            className="victoryStanding"
+            variant="body2"
+            color="textSecondary"
+          >
+            Complete the mission to join the leaderboard and set a personal
+            best.
           </Typography>
         )}
         {ranked && loggedIn && (

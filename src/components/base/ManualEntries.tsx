@@ -1053,34 +1053,38 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           The tables below show how points add up, with reliability, costs and{" "}
-          <EntryLink to={MANUAL_ENTRY.EMISSIONS}>emissions</EntryLink> shown
-          separately. Log in to submit your score and replay. Use the
+          <EntryLink to={MANUAL_ENTRY.EMISSIONS}>emissions</EntryLink> shown in
+          three categories: Service, Financial performance, and Environmental
+          impact. Only completed missions earn leaderboard ranks and competitive
+          personal bests. Failed runs still show their points and actual
+          outcomes. Log in to submit a completed mission and replay. Use the
           leaderboard's play buttons to see how others beat your score!
+        </p>
+        <p>
+          Customer retention remains a mission requirement where listed; it adds
+          no points. Each contribution is rounded before the category totals are
+          added.
         </p>
         <p>Investor-owned points:</p>
         <table className="points">
           <tbody>
             <tr>
               <td>+4</td>
-              <td>per $100M of net worth at the end</td>
-            </tr>
-            <tr>
-              <td>+2</td>
-              <td>per 100k customers at the end</td>
+              <td>Financial performance: per $100M of net worth at the end</td>
             </tr>
             <tr>
               <td>+1</td>
-              <td>per TWh supplied</td>
+              <td>Service: per TWh supplied</td>
             </tr>
             <tr>
               <td>−2</td>
               <td>
-                per <EmissionsPerPoint /> of CO2e emitted
+                Environmental impact: per <EmissionsPerPoint /> of CO2e emitted
               </td>
             </tr>
             <tr>
               <td>−8</td>
-              <td>per TWh of demand not served during blackouts</td>
+              <td>Service: per TWh of demand not served during blackouts</td>
             </tr>
           </tbody>
         </table>
@@ -1090,24 +1094,24 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             <tr>
               <td>±80</td>
               <td>
-                per $0.01/kWh your{" "}
+                Financial performance: per $0.01/kWh your lifetime average{" "}
                 <EntryLink to={MANUAL_ENTRY.RATES}>rate</EntryLink> is
                 below/above the target rate (adjusted for inflation)
               </td>
             </tr>
             <tr>
               <td>+10</td>
-              <td>per TWh supplied</td>
+              <td>Service: per TWh supplied</td>
             </tr>
             <tr>
               <td>−5</td>
               <td>
-                per <EmissionsPerPoint /> of CO2e emitted
+                Environmental impact: per <EmissionsPerPoint /> of CO2e emitted
               </td>
             </tr>
             <tr>
               <td>−10</td>
-              <td>per TWh of demand not served during blackouts</td>
+              <td>Service: per TWh of demand not served during blackouts</td>
             </tr>
           </tbody>
         </table>

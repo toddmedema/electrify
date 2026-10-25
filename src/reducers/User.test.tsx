@@ -8,6 +8,7 @@ import userReducer, {
   loadProfile,
   logout,
   submitHighscore,
+  restoreCompetitiveBests,
 } from "./User";
 import { MAX_REPLAY_BYTES } from "../Replay";
 import { LOCATIONS } from "../Constants";
@@ -71,7 +72,8 @@ function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
 function aSubmission(replay?: ReplayType, score = 420) {
   return {
     score,
-    scoreBreakdown: { supply: 400, blackouts: 20 },
+    outcome: "completed" as const,
+    scoreBreakdown: { service: 400, financial: 20, environmental: 0 },
     scenarioId: 101,
     difficulty: "Employee" as const,
     replay,
@@ -100,6 +102,61 @@ beforeEach(() => {
 });
 
 describe("submitHighscore", () => {
+  it("merges delayed Steam hydration without replacing a newer personal best or legacy records", () => {
+    const legacy = { score: 9999, difficulty: "CEO", date: 1 };
+    const higher = { scoreVersion: 2, score: 900, difficulty: "CEO", date: 2 };
+    const store = makeStore({
+      ...SIGNED_IN,
+      bests: { "101": legacy, "v2:101": higher },
+    });
+    const restored = {
+      scoreVersion: 2,
+      score: 800,
+      difficulty: "Employee",
+      date: 1,
+    };
+    store.dispatch(
+      restoreCompetitiveBests({
+        uid: SIGNED_IN.uid!,
+        bests: { "v2:101": restored },
+      }),
+    );
+    expect(store.getState().user.bests).toEqual({
+      "101": legacy,
+      "v2:101": higher,
+    });
+    store.dispatch(
+      restoreCompetitiveBests({
+        uid: "another-account",
+        bests: { "v2:102": restored },
+      }),
+    );
+    expect(store.getState().user.bests?.["v2:102"]).toBeUndefined();
+  });
+  it.each(["bankrupt", "fired"] as const)(
+    "rejects a %s result before any score, replay or personal-best write",
+    async (outcome) => {
+      const store = makeStore(SIGNED_IN);
+      await store.dispatch(
+        submitHighscore({ ...aSubmission(aReplay()), outcome }),
+      );
+      expect(mockAddDoc).not.toHaveBeenCalled();
+      expect(mockSetDoc).not.toHaveBeenCalled();
+      expect(store.getState().user.bests).toBeUndefined();
+    },
+  );
+
+  it("starts a current competitive best without replacing the legacy record", async () => {
+    const legacy = { score: 9999, difficulty: "CEO", date: 1 };
+    const store = makeStore({ ...SIGNED_IN, bests: { "101": legacy } });
+    await store.dispatch(submitHighscore(aSubmission()));
+    expect(store.getState().user.bests?.["101"]).toEqual(legacy);
+    expect(store.getState().user.bests?.["v2:101"]?.score).toBe(420);
+    expect(writesTo("scores")[0][1]).toMatchObject({
+      scoreVersion: 2,
+      outcome: "completed",
+    });
+  });
   it("writes nothing for a player who isn't signed in", async () => {
     await makeStore().dispatch(submitHighscore(aSubmission(aReplay())));
     expect(mockAddDoc).not.toHaveBeenCalled();
@@ -192,26 +249,28 @@ describe("submitHighscore", () => {
     const store = makeStore(SIGNED_IN);
     await store.dispatch(submitHighscore(aSubmission(undefined, 640)));
 
-    expect(store.getState().user.bests?.["101"].score).toBe(640);
+    expect(store.getState().user.bests?.["v2:101"].score).toBe(640);
     // Mirrored onto the profile document too, so it survives a new browser
     const [ref, data] = mockSetDoc.mock.calls[0];
     expect(ref.path).toBe("users/player-1");
-    expect(data.bests["101"].score).toBe(640);
-    expect(data.bests["101"].appVersion).toBe("26sept26-1507");
+    expect(data.bests["v2:101"].score).toBe(640);
+    expect(data.bests["v2:101"].appVersion).toBe("26sept26-1507");
   });
 
   it("replaces the personal best only when the run beat it", async () => {
     const store = makeStore({
       ...SIGNED_IN,
-      bests: { "101": { score: 640, difficulty: "VP", date: 1 } },
+      bests: {
+        "v2:101": { scoreVersion: 2, score: 640, difficulty: "VP", date: 1 },
+      },
     });
 
     await store.dispatch(submitHighscore(aSubmission(undefined, 500)));
-    expect(store.getState().user.bests?.["101"].score).toBe(640);
+    expect(store.getState().user.bests?.["v2:101"].score).toBe(640);
     expect(mockSetDoc).not.toHaveBeenCalled();
 
     await store.dispatch(submitHighscore(aSubmission(undefined, 812)));
-    expect(store.getState().user.bests?.["101"]).toEqual(
+    expect(store.getState().user.bests?.["v2:101"]).toEqual(
       expect.objectContaining({ score: 812, difficulty: "Employee" }),
     );
   });
@@ -224,7 +283,7 @@ describe("submitHighscore", () => {
     });
     await store.dispatch(submitHighscore(aSubmission()));
     expect(store.getState().user.bests?.["102"].score).toBe(900);
-    expect(store.getState().user.bests?.["101"].score).toBe(420);
+    expect(store.getState().user.bests?.["v2:101"].score).toBe(420);
   });
 });
 
@@ -234,7 +293,9 @@ describe("loadProfile", () => {
       exists: () => true,
       data: () => ({
         displayName: "Ada",
-        bests: { "101": { score: 640, difficulty: "VP", date: 1 } },
+        bests: {
+          "v2:101": { scoreVersion: 2, score: 640, difficulty: "VP", date: 1 },
+        },
       }),
     });
     const store = makeStore(SIGNED_IN);
@@ -242,7 +303,7 @@ describe("loadProfile", () => {
 
     const user = store.getState().user;
     expect(user.displayName).toBe("Ada");
-    expect(user.bests?.["101"].score).toBe(640);
+    expect(user.bests?.["v2:101"].score).toBe(640);
     expect(user.profileLoaded).toBe(true);
     expect(user.needsDisplayName).toBe(false);
   });
@@ -369,7 +430,9 @@ describe("logout", () => {
     const store = makeStore({
       ...SIGNED_IN,
       displayName: "Ada",
-      bests: { "101": { score: 640, difficulty: "VP", date: 1 } },
+      bests: {
+        "v2:101": { scoreVersion: 2, score: 640, difficulty: "VP", date: 1 },
+      },
       profileLoaded: true,
     });
     await store.dispatch(logout());
@@ -396,6 +459,12 @@ describe("fetchGlobalRank", () => {
     // Strictly greater, so the player's own run never counts against them
     const { parts } = mockGetCount.mock.calls[0][0];
     expect(parts).toContainEqual({ field: "score", op: ">", value: 812 });
+    expect(parts).toContainEqual({ field: "scoreVersion", op: "==", value: 2 });
+    expect(parts).toContainEqual({
+      field: "outcome",
+      op: "==",
+      value: "completed",
+    });
   });
 });
 

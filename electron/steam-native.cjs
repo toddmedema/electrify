@@ -136,7 +136,7 @@ function boardName(selection) {
     .update(selection.challengeId)
     .digest("hex")
     .slice(0, 24);
-  return `electrify-v1-s${selection.scenarioId}-${selection.difficulty.toLowerCase()}-${digest}`;
+  return `electrify-v${selection.scoreVersion ?? 1}-s${selection.scenarioId}-${selection.difficulty.toLowerCase()}-${digest}`;
 }
 
 class SteamLeaderboards {

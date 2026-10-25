@@ -171,7 +171,7 @@ describe("ending a scenario from inside the reducer", () => {
     expect(() => jest.runOnlyPendingTimers()).not.toThrow();
   });
 
-  it("shows and submits a score after bankruptcy", () => {
+  it("shows a useful unranked breakdown after bankruptcy", () => {
     const submitHighscore = jest.spyOn(User, "submitHighscore");
     getStore().dispatch(quit());
     const scenario = SCENARIOS.find(
@@ -203,15 +203,18 @@ describe("ending a scenario from inside the reducer", () => {
       expect.objectContaining({
         scenarioId: scenario.id,
         outcome: "bankrupt",
-        ranked: true,
+        ranked: false,
       }),
     );
-    expect(submitHighscore).toHaveBeenCalledWith(
+    expect(victory?.breakdown).toEqual(
       expect.objectContaining({
-        scenarioId: scenario.id,
-        score: victory?.score,
+        service: expect.any(Number),
+        financial: expect.any(Number),
+        environmental: expect.any(Number),
       }),
     );
+    expect(victory?.debrief?.finalCustomers).toEqual(expect.any(Number));
+    expect(submitHighscore).not.toHaveBeenCalled();
   });
 
   it("shows a replay's recorded result even when this build plays it out differently", () => {
@@ -266,7 +269,7 @@ describe("ending a scenario from inside the reducer", () => {
     );
   });
 
-  it("shows and submits a score after the player is fired", () => {
+  it("shows a useful unranked breakdown after the player is fired", () => {
     const submitHighscore = jest.spyOn(User, "submitHighscore");
     getStore().dispatch(quit());
     const scenario = SCENARIOS.find(
@@ -326,15 +329,18 @@ describe("ending a scenario from inside the reducer", () => {
       expect.objectContaining({
         scenarioId: scenario.id,
         outcome: "fired",
-        ranked: true,
+        ranked: false,
       }),
     );
-    expect(submitHighscore).toHaveBeenCalledWith(
+    expect(victory?.breakdown).toEqual(
       expect.objectContaining({
-        scenarioId: scenario.id,
-        score: victory?.score,
+        service: expect.any(Number),
+        financial: expect.any(Number),
+        environmental: expect.any(Number),
       }),
     );
+    expect(victory?.debrief?.finalCustomers).toEqual(expect.any(Number));
+    expect(submitHighscore).not.toHaveBeenCalled();
   });
 });
 

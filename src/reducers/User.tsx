@@ -6,6 +6,7 @@ import {
   ScoreBreakdownType,
   ScoreType,
   UserType,
+  VictoryType,
 } from "../Types";
 import {
   addDoc,
@@ -29,6 +30,11 @@ import {
 import { encodeReplay, MAX_REPLAY_BYTES, replayByteLength } from "../Replay";
 import { isDesktopApp } from "../Desktop";
 import { APP_VERSION } from "../AppVersion";
+import {
+  competitiveBest,
+  competitiveBestKey,
+  SCORE_VERSION,
+} from "../helpers/Scoring";
 
 export const initialUser: UserType = {};
 
@@ -46,6 +52,7 @@ interface UserSliceStateType {
 const RENAME_BACKFILL_LIMIT = 100;
 
 export interface HighscoreSubmissionType {
+  outcome: NonNullable<VictoryType["outcome"]>;
   score: number;
   scoreBreakdown: ScoreBreakdownType; // For analytics purposes only
   scenarioId: number;
@@ -98,6 +105,8 @@ async function submitScore(
     : undefined;
   const scoreSubmission: ScoreType = {
     appVersion: APP_VERSION,
+    scoreVersion: SCORE_VERSION,
+    outcome: "completed",
     score: submission.score,
     scoreBreakdown: submission.scoreBreakdown, // For analytics purposes only
     scenarioId: submission.scenarioId,
@@ -124,7 +133,10 @@ async function saveBest(uid: string, scenarioId: number, best: BestScoreType) {
   try {
     await setDoc(
       doc(getDb(), "users", uid),
-      { bests: { [String(scenarioId)]: best }, updatedAt: serverTimestamp() },
+      {
+        bests: { [competitiveBestKey(scenarioId)]: best },
+        updatedAt: serverTimestamp(),
+      },
       { merge: true },
     );
   } catch (err) {
@@ -178,6 +190,8 @@ export async function fetchGlobalRank(
     query(
       collection(getDb(), "scores"),
       where("scenarioId", "==", scenarioId),
+      where("scoreVersion", "==", SCORE_VERSION),
+      where("outcome", "==", "completed"),
       where("score", ">", score),
     ),
   );
@@ -254,7 +268,7 @@ export const submitHighscore = createAsyncThunk<
   { state: UserSliceStateType }
 >("user/submitHighscore", async (submission, { getState }) => {
   const { uid, displayName, bests } = getState().user;
-  if (!uid) {
+  if (!uid || submission.outcome !== "completed") {
     return { uid, scenarioId: submission.scenarioId };
   }
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
@@ -262,12 +276,13 @@ export const submitHighscore = createAsyncThunk<
     await submitDesktopScore(submission);
   } else await submitScore(uid, displayName, submission);
 
-  const previous = (bests || {})[String(submission.scenarioId)];
+  const previous = competitiveBest(bests, submission.scenarioId);
   if (previous && previous.score >= submission.score) {
     return { uid, scenarioId: submission.scenarioId };
   }
   const best: BestScoreType = {
     appVersion: APP_VERSION,
+    scoreVersion: SCORE_VERSION,
     score: submission.score,
     difficulty: submission.difficulty,
     date: Date.now(),
@@ -281,6 +296,25 @@ export const userSlice = createSlice({
   name: "user",
   initialState: initialUser,
   reducers: {
+    restoreCompetitiveBests: (
+      state,
+      action: PayloadAction<{
+        uid: string;
+        bests: NonNullable<UserType["bests"]>;
+      }>,
+    ) => {
+      if (state.uid !== action.payload.uid) return;
+      for (const [key, best] of Object.entries(action.payload.bests)) {
+        if (
+          best.scoreVersion !== SCORE_VERSION ||
+          !key.startsWith(`v${SCORE_VERSION}:`)
+        )
+          continue;
+        if (best.score > (state.bests?.[key]?.score ?? -Infinity)) {
+          state.bests = { ...state.bests, [key]: best };
+        }
+      }
+    },
     delta: (state, action: PayloadAction<Partial<UserType>>) => {
       return state.uid !== action.payload.uid &&
         action.payload.uid !== undefined
@@ -356,18 +390,19 @@ export const userSlice = createSlice({
         if (
           action.payload.best &&
           action.payload.best.score >
-            (state.bests?.[String(action.payload.scenarioId)]?.score ??
+            (competitiveBest(state.bests, action.payload.scenarioId)?.score ??
               -Infinity)
         ) {
           state.bests = {
             ...state.bests,
-            [String(action.payload.scenarioId)]: action.payload.best,
+            [competitiveBestKey(action.payload.scenarioId)]:
+              action.payload.best,
           };
         }
       });
   },
 });
 
-export const { delta, reset } = userSlice.actions;
+export const { delta, reset, restoreCompetitiveBests } = userSlice.actions;
 
 export default userSlice.reducer;

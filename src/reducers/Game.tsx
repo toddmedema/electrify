@@ -166,6 +166,8 @@ import {
 import { arrayMove, newSeed } from "../helpers/Math";
 import {
   computeScoreBreakdown,
+  competitiveBest,
+  SCORE_VERSION,
   startingDollarRevenue,
   totalScore,
 } from "../helpers/Scoring";
@@ -3858,7 +3860,7 @@ export function* tickStatePhases(
         const finalScore = totalScore(score);
         const difficulty = state.difficulty;
         const { id: scoredScenarioId, name: scenarioName } = scenario;
-        const submitsScore = ranked;
+        const submitsScore = ranked && outcome === "completed";
         const runIdentity = state.runIdentity
           ? cloneDeep(state.runIdentity)
           : undefined;
@@ -3888,6 +3890,22 @@ export function* tickStatePhases(
           state.worldEvents.occurrences,
           gameObjectiveResults(state),
         );
+        debrief.scenarioMetrics = [
+          {
+            concept: "money",
+            label:
+              scenario.ownership === "Investor"
+                ? "final net worth"
+                : "lifetime rate (starting-year $/kWh)",
+            value:
+              scenario.ownership === "Investor"
+                ? formatMoneyConcise(summary.netWorth)
+                : summary.supplyWh > 0
+                  ? `$${(startingDollarRevenue(history, state.startingYear, state.seed) / (summary.supplyWh / 1000)).toFixed(3)}`
+                  : "No electricity supplied",
+          },
+          ...(debrief.scenarioMetrics ?? []),
+        ];
 
         if (!isReplay) {
           logEvent("scenario_end", {
@@ -3916,11 +3934,12 @@ export function* tickStatePhases(
               scenarioName,
               difficulty,
               score: finalScore,
+              scoreVersion: SCORE_VERSION,
               breakdown: score,
               endTitle,
               endMessage:
                 typeof endMessage === "string" ? endMessage : undefined,
-              ranked,
+              ranked: submitsScore,
               outcome,
               debrief,
             }),
@@ -3930,8 +3949,10 @@ export function* tickStatePhases(
         setTimeout(() => {
           // Read before the submit below, so "was 640" means the run before this one rather than
           // the one that just finished. getState() cannot be called while the reducer is running.
-          const previousBest =
-            getStore().getState().user.bests?.[String(scoredScenarioId)]?.score;
+          const previousBest = competitiveBest(
+            getStore().getState().user.bests,
+            scoredScenarioId,
+          )?.score;
           getStore().dispatch(
             victoryOpen({
               runIdentity,
@@ -3940,6 +3961,7 @@ export function* tickStatePhases(
               scenarioName,
               difficulty,
               score: recorded?.score ?? finalScore,
+              scoreVersion: recorded ? undefined : SCORE_VERSION,
               breakdown: recorded?.breakdown ?? score,
               endTitle: sameEnding ? endTitle : undefined,
               endMessage: !sameEnding
@@ -3947,7 +3969,7 @@ export function* tickStatePhases(
                 : typeof endMessage === "function"
                   ? endMessage()
                   : endMessage,
-              ranked,
+              ranked: submitsScore,
               modded,
               previousBest,
               outcome: recorded?.outcome ?? outcome,
@@ -3957,6 +3979,7 @@ export function* tickStatePhases(
           if (submitsScore) {
             getStore().dispatch(
               submitHighscore({
+                outcome,
                 score: finalScore,
                 scoreBreakdown: score, // For analytics purposes only
                 scenarioId: scoredScenarioId,

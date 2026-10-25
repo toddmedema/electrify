@@ -29,7 +29,7 @@ export interface ScoreProjectionType {
  * the line matches what the score screen would have said had the run ended there. The projection
  * extends the same formula rather than a second model: what accumulates (energy supplied, unmet
  * demand, emissions, customer revenue) keeps arriving at its recent monthly average, and what is a
- * level at the end (net worth, customers) keeps moving at its recent monthly rate. It is a
+ * level at the end (net worth) keeps moving at its recent monthly rate. It is a
  * straight-line guide to the trend, not a forecast of the decisions still to come.
  *
  * `history` is newest first, as the game stores it.
@@ -75,7 +75,6 @@ export function projectScore(
   const before = history[months] ?? window[months - 1];
   const steps = Math.max(1, history[months] ? months : months - 1);
   const netWorthSlope = (window[0].netWorth - before.netWorth) / steps;
-  const customersSlope = (window[0].customers - before.customers) / steps;
 
   const projected: number[] = [];
   const remaining = Math.max(0, scenario.durationMonths - history.length);
@@ -86,7 +85,6 @@ export function projectScore(
       demandWh: summary.demandWh + demandWh * ahead,
       kgco2e: summary.kgco2e + kgco2e * ahead,
       netWorth: summary.netWorth + netWorthSlope * ahead,
-      customers: Math.max(0, summary.customers + customersSlope * ahead),
     };
     projected.push(
       totalScore(

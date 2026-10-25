@@ -30,6 +30,7 @@ const victory: VictoryType = {
   score: 12400,
   breakdown: {},
   ranked: false,
+  outcome: "completed",
   runIdentity: identity,
 };
 const url = (raw: unknown) =>
@@ -201,6 +202,30 @@ it("compares signed local scores only for matching conditions", () => {
     }),
   ).toContain("9,007,199,254,740,993");
 });
+it.each(["bankrupt", "fired"] as const)(
+  "shares a %s result without creating or winning a challenge",
+  (outcome) => {
+    const failed = {
+      ...victory,
+      outcome,
+      score: invitation.target + 100,
+      challenge: invitation,
+    };
+    const shared = challengeShareContent(failed);
+    expect(shared.challenge).toBe(false);
+    expect(shared.content.url).not.toContain("challenge=");
+    expect(shared.content.text).toContain("I scored");
+    expect(challengeComparison(failed)).toBe(
+      "Complete the mission to compare your score with the shared score.",
+    );
+    expect(challengeComparison({ ...failed, outcome: "completed" })).toContain(
+      "beat the shared score",
+    );
+    expect(
+      challengeShareContent({ ...failed, outcome: "completed" }).challenge,
+    ).toBe(true);
+  },
+);
 it("stories report demand served, never infer blackout absence or uptime, and handle zero demand", () => {
   const debrief = {
     startingFleet: [],
@@ -217,7 +242,7 @@ it("stories report demand served, never infer blackout absence or uptime, and ha
   const story = challengeShareContent({
     ...victory,
     debrief,
-    outcome: "fired",
+    outcome: "completed",
   });
   expect(story.content.text).toContain("electricity demand");
   expect(story.content.text).not.toMatch(/blackout|uptime|emissions/);

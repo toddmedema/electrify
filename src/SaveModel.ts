@@ -118,6 +118,9 @@ function text(value: unknown, limit = 10000): value is string {
 const difficulties = new Set(["Intern", "Employee", "Manager", "VP", "CEO"]);
 const outcomes = new Set(["completed", "bankrupt", "fired"]);
 const categories = new Set([
+  "service",
+  "financial",
+  "environmental",
   "supply",
   "netWorth",
   "customers",
@@ -217,6 +220,9 @@ export function parseSavedRunResult(raw: unknown): SavedRunResult | null {
     !text(raw.scenarioName, 1000) ||
     !difficulties.has(raw.difficulty as string) ||
     !finite(raw.score) ||
+    (raw.scoreVersion !== undefined &&
+      (!Number.isSafeInteger(raw.scoreVersion) ||
+        (raw.scoreVersion as number) < 1)) ||
     !outcomes.has(raw.outcome as string) ||
     !validScoreBreakdown(raw.breakdown) ||
     (raw.endTitle !== undefined && !text(raw.endTitle)) ||
@@ -318,6 +324,9 @@ export function parseSavedRunResult(raw: unknown): SavedRunResult | null {
     scenarioName: raw.scenarioName as string,
     difficulty: raw.difficulty as SavedRunResult["difficulty"],
     score: raw.score as number,
+    ...(raw.scoreVersion === undefined
+      ? {}
+      : { scoreVersion: raw.scoreVersion as number }),
     breakdown: { ...raw.breakdown } as SavedRunResult["breakdown"],
     outcome: raw.outcome as SavedRunResult["outcome"],
     ...(raw.endTitle === undefined ? {} : { endTitle: raw.endTitle as string }),

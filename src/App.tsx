@@ -19,7 +19,12 @@ import { pageHidden, pageVisible, systemSuspend } from "./reducers/GameActions";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
 import { layoutChanged, snackbarOpen } from "./reducers/UI";
 import { firebaseAppAuth, getDevicePlatform, getHistoryApi } from "./Globals";
-import { delta, loadProfile, reset } from "./reducers/User";
+import {
+  delta,
+  loadProfile,
+  reset,
+  restoreCompetitiveBests,
+} from "./reducers/User";
 
 import {
   customEventFromSearch,
@@ -398,28 +403,11 @@ export default function App() {
           if (steamProfileUid !== uid) {
             steamProfileUid = uid;
             void (async () => {
-              const bests: NonNullable<import("./Types").UserType["bests"]> =
-                {};
-              for (const entry of await saveRepository.list()) {
-                try {
-                  const { result } = await saveRepository.read(entry.id);
-                  if (
-                    result &&
-                    result.score >
-                      (bests[String(result.scenarioId)]?.score ?? -Infinity)
-                  ) {
-                    bests[String(result.scenarioId)] = {
-                      score: result.score,
-                      difficulty: result.difficulty,
-                      date: Date.parse(entry.savedAt),
-                    };
-                  }
-                } catch {
-                  /* A damaged historical save cannot prevent playing. */
-                }
-              }
+              const { readDesktopCompetitiveBests } =
+                await import("./DesktopScores");
+              const bests = await readDesktopCompetitiveBests(saveRepository);
               if (authLive && store.getState().user.uid === uid)
-                store.dispatch(delta({ bests }));
+                store.dispatch(restoreCompetitiveBests({ uid, bests }));
             })().catch(() => undefined);
           }
         } else {

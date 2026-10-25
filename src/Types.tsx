@@ -292,17 +292,20 @@ export interface CardType {
   storyTarget?: StoryActionTargetType;
 }
 
-// Every category a run can be scored on. Which ones apply depends on ownership; the rules
-// themselves live in helpers/Scoring `SCORE_RULES`.
-export type ScoreCategoryType =
+export type ScoreCategoryType = "service" | "financial" | "environmental";
+// Old results remain readable without recalculating their recorded scores.
+export type LegacyScoreCategoryType =
   "supply" | "netWorth" | "customers" | "rate" | "emissions" | "blackouts";
 
-// The per-category points that sum to `score`. Investor and public-ownership scenarios are
-// scored on different categories (see helpers/Scoring), so the keys vary by scenario.
-export type ScoreBreakdownType = Partial<Record<ScoreCategoryType, number>>;
+// Per-category points that sum to `score`; legacy keys are presentation-only compatibility.
+export type ScoreBreakdownType = Partial<
+  Record<ScoreCategoryType | LegacyScoreCategoryType, number>
+>;
 
 export interface ScoreType {
   appVersion?: string; // Build that submitted the score; absent on older records.
+  scoreVersion?: number;
+  outcome?: "completed";
   scenarioId: number;
   score: number;
   scoreBreakdown: ScoreBreakdownType;
@@ -1512,6 +1515,7 @@ export interface SnackbarType {
  * the moment the scenario ends; the rank and the score write are enrichment that lands later.
  */
 export interface VictoryType {
+  scoreVersion?: number;
   runIdentity?: RunIdentity;
   challenge?: ChallengeInvitation;
   scenarioId: number;
@@ -1522,16 +1526,14 @@ export interface VictoryType {
   breakdown: ScoreBreakdownType;
   endTitle?: string;
   endMessage?: string;
-  // Whether the run counts for the leaderboard. A custom game (every one shares an id) or a
-  // replay of someone else's run gets the breakdown without a rank or a personal best
+  // Only a completed official live run can earn a rank or a competitive personal best.
   ranked: boolean;
   // A community mod run, which is never ranked and never earns achievements
   modded?: boolean;
   // The player's best on this scenario BEFORE this run, read at the moment the scenario ended so
   // that "was 640" reports the run before this one rather than the one just finished
   previousBest?: number;
-  // A failed run still earns and submits a score, but the score screen must not celebrate it as a
-  // completed mission or let the terminal game resume and submit the same run again
+  // Failed runs retain their breakdown and outcomes without competitive standings.
   outcome?: "completed" | "bankrupt" | "fired";
   debrief?: VictoryDebriefType;
 }
@@ -1560,6 +1562,7 @@ export type SavedRunResult = Pick<
   | "scenarioName"
   | "difficulty"
   | "score"
+  | "scoreVersion"
   | "breakdown"
   | "endTitle"
   | "endMessage"
@@ -1702,6 +1705,7 @@ export interface UIType {
 // can compare against it without a read
 export interface BestScoreType {
   appVersion?: string;
+  scoreVersion?: number;
   score: number;
   difficulty: string;
   // Epoch ms rather than a Timestamp: this one is read back into a plain Redux slice

@@ -1,3 +1,4 @@
+import { openPane } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { expect, test } from "./fixtures";
 
@@ -17,8 +18,8 @@ for (const theme of ["light", "dark"] as const) {
       .locator("#navfooter:visible")
       .getByRole("button", { name: "Scenario", exact: true })
       .first();
-    await details.click();
     const panel = page.getByRole("region", { name: "Scenario", exact: true });
+    await openPane(panel, details);
     await expect(panel).toBeVisible();
     await expect(panel).toContainText("Wildfire Emergency");
     await expect(
@@ -63,7 +64,13 @@ for (const theme of ["light", "dark"] as const) {
     await expect(score).not.toContainText(
       "Score appears after your first month.",
     );
-    await expect(score.getByText(/points per/).first()).toBeAttached();
+    await expect(score.locator("dt")).toHaveText([
+      "Service",
+      "Financial performance",
+      "Environmental impact",
+    ]);
+    await expect(score).not.toContainText("final customers");
+    await expect(score.getByText(/points? per/).first()).toBeAttached();
     await expect(
       panel.getByRole("region", { name: "Score outlook" }),
     ).toContainText("Projected final");

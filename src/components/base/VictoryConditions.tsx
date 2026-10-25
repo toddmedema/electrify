@@ -8,7 +8,7 @@ import {
 } from "../../helpers/ObjectivePresentation";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
-import { scoreRuleText } from "../../helpers/Scoring";
+import { scoreLabel, scoreRuleText } from "../../helpers/Scoring";
 import {
   blackoutFiringThreshold,
   formatRequiredShare,
@@ -82,8 +82,14 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   return (
     <div>
       {requiredObjectives}
+      <p>
+        Complete the mission to earn a leaderboard rank and a competitive
+        personal best. Failed runs still show their points and actual outcomes.
+      </p>
       {Object.entries(rules).map(([category, rule]) => (
-        <p key={category}>{rule}</p>
+        <p key={category}>
+          <strong>{scoreLabel(category)}:</strong> {rule}
+        </p>
       ))}
     </div>
   );

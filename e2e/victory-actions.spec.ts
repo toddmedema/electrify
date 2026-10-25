@@ -1,7 +1,73 @@
+import { openPane } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
 import path from "path";
 import { expect, test } from "./fixtures";
+import { getScenario } from "../src/data/Scenarios";
+import { resolveStoryAtDate } from "../src/data/WorldEvents";
+import { getDateFromMinute, summarizeTimeline } from "../src/helpers/DateTime";
+import {
+  initializeGameObjectiveProgress,
+  recordGameObjectiveMonth,
+} from "../src/helpers/ObjectiveRules";
+import { scenarioRules } from "../src/helpers/ScenarioRules";
+import {
+  buildStoryPeriodSnapshot,
+  buildStorySnapshot,
+} from "../src/helpers/Story";
+import { parseSave } from "../src/SaveGame";
+import type { GameType } from "../src/Types";
+
+/** Synthetic history still needs the same story receipts and objective evidence as real play. */
+function rebuildCompletionEvidence(game: GameType): void {
+  const finalDate = game.date;
+  const months = [...game.monthlyHistory].reverse();
+  const scenario = getScenario(game.scenarioId)!;
+  const rules = scenarioRules(scenario, game);
+  game.monthlyHistory = [];
+  game.worldEvents = { active: [], occurrences: [], checkedKeys: [] };
+  game.date = getDateFromMinute(0, game.startingYear);
+  initializeGameObjectiveProgress(game);
+  for (let month = 0; month <= months.length; month++) {
+    game.date = getDateFromMinute(month * 1440, game.startingYear);
+    const story = resolveStoryAtDate({
+      rules,
+      seed: game.seed,
+      scenarioId: game.scenarioId,
+      difficulty: game.difficulty,
+      date: game.date,
+      location: game.location,
+      snapshot: buildStorySnapshot(
+        game.monthlyHistory,
+        game.facilities,
+        game.date.minute,
+      ),
+      occurrences: game.worldEvents.occurrences,
+      monthlyHistory: game.monthlyHistory,
+      completedMonths: month,
+      startingRateDollarsPerKWh: scenario.dollarsPerkWh,
+      endingRateDollarsPerKWh: game.dollarsPerkWh,
+      periodSnapshots: Object.fromEntries(
+        [1, 2, 3, 4, 5, 6].map((period) => [
+          period,
+          buildStoryPeriodSnapshot(game.monthlyHistory, period),
+        ]),
+      ),
+    });
+    game.worldEvents.occurrences.push(...story.occurrences);
+    game.worldEvents.checkedKeys.push(
+      ...story.occurrences.map(({ key }) => key),
+    );
+    game.worldEvents.active = story.active;
+    if (month < months.length) {
+      const row = months[month];
+      game.monthlyHistory.unshift(row);
+      game.date = getDateFromMinute((month + 1) * 1440, game.startingYear);
+      recordGameObjectiveMonth(game, row);
+    }
+  }
+  game.date = finalDate;
+}
 
 for (const theme of ["light", "dark"]) {
   test(`victory actions remain usable and replay the scenario in ${theme}`, async ({
@@ -34,10 +100,19 @@ for (const theme of ["light", "dark"]) {
         year: save.game.startingYear + Math.floor((142 - index) / 12),
         month: ((142 - index) % 12) + 1,
       }));
-      const offset = 144 * 1440 - 15 - save.game.date.minute;
-      save.game.date.minute += offset;
-      save.game.date.monthsElapsed = 143;
+      // The forecast spans a whole month; align its first tick rather than the live cursor.
+      const offset = 143 * 1440 - save.game.timeline[0].minute;
+      save.game.date = getDateFromMinute(
+        144 * 1440 - 15,
+        save.game.startingYear,
+      );
       for (const tick of save.game.timeline) tick.minute += offset;
+      expect(
+        summarizeTimeline(save.game.timeline, save.game.startingYear),
+      ).toMatchObject({
+        year: save.game.startingYear + 11,
+        month: 12,
+      });
       // Every difficulty now requires at least one meaningful decision to win.
       save.game.meaningfulDecisions = [
         {
@@ -50,6 +125,8 @@ for (const theme of ["light", "dark"]) {
           after: "$0.11/kWh",
         },
       ];
+      rebuildCompletionEvidence(save.game);
+      expect(parseSave(save)).not.toBeNull();
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -60,6 +137,21 @@ for (const theme of ["light", "dark"]) {
       .click();
     const dialog = page.getByRole("dialog", { name: "Mission complete" });
     await expect(dialog).toBeVisible();
+    await expect(dialog.locator(".victoryScoreBreakdown")).toContainText(
+      "Service",
+    );
+    await expect(dialog.locator(".victoryScoreBreakdown")).toContainText(
+      "Financial performance",
+    );
+    await expect(dialog.locator(".victoryScoreBreakdown")).toContainText(
+      "Environmental impact",
+    );
+    await expect(dialog.locator(".victoryScoreBreakdown")).not.toContainText(
+      "final customers",
+    );
+    await expect(
+      dialog.getByRole("region", { name: "Mission results" }),
+    ).toContainText("final net worth");
     const popup = page.locator(".achievementToastPanel");
     await expect(popup).toBeVisible();
     await expect(popup).toContainText("Staying Power");
@@ -145,18 +237,15 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
     .getByRole("button", { name: "Scenario", exact: true })
     .first();
   const details = page.getByRole("region", { name: "Scenario", exact: true });
-  await requirements.click();
+  await openPane(details, requirements);
   await expect(details.getByText("Expert", { exact: true })).toBeVisible();
   await expect(details).toContainText("Rise of Renewables");
   await details.getByRole("button", { name: "Close Scenario" }).click();
 
   // Force insolvency at the next month boundary through a real saved game.
   await editSavedGame(page, (save) => {
-    const offset = 1440 - 15 - save.game.date.minute;
-    save.game.date.minute += offset;
     save.game.lowCashWarningMonth = save.game.date.monthsElapsed;
     for (const tick of save.game.timeline) {
-      tick.minute += offset;
       tick.cash = -1000000000;
     }
   });
@@ -164,11 +253,21 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page
     .locator("#appbar:visible")
-    .getByRole("button", { name: "normal speed", exact: true })
+    .getByRole("button", { name: "fast speed", exact: true })
     .first()
     .click();
   const failure = page.getByRole("dialog", { name: "Bankrupt!" });
   await expect(failure).toBeVisible();
+  await expect(failure).toContainText(
+    "Complete the mission to join the leaderboard and set a personal best.",
+  );
+  await expect(failure.locator(".victoryScoreBreakdown")).toContainText(
+    "Service",
+  );
+  await expect(failure).not.toContainText("New personal best");
+  await expect(
+    failure.getByRole("region", { name: "Mission results" }),
+  ).toContainText("customers");
   await failure.getByRole("button", { name: "Try again", exact: true }).click();
   await expect(failure).not.toBeVisible();
   await expect(page.locator("#appbar:visible").first()).toBeVisible();
@@ -177,7 +276,7 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
   expect(restarted.scenarioId).toBe(101);
   expect(restarted.difficulty).toBe("CEO");
   expect(restarted.date.monthsElapsed).toBe(0);
-  await requirements.click();
+  await openPane(details, requirements);
   await expect(details.getByText("Expert", { exact: true })).toBeVisible();
   if (process.env.REVIEW_SCREENSHOT_DIR) {
     await expect(details.locator("..")).toHaveCSS("opacity", "1");

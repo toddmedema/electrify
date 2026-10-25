@@ -56,15 +56,15 @@ describe("projectScore", () => {
     );
     expect(projection.actual[17]).toBe(current);
     // The first month is scored on its own: 1 TWh, $1B and 100k customers
-    expect(projection.actual[0]).toBe(1 + 40 + 2);
+    expect(projection.actual[0]).toBe(1 + 40);
   });
 
   it("extends a steady pace in a straight line to the end of the term", () => {
     const projection = projectScore(investor, steadyRun(18), 2020, 1)!;
     expect(projection.projected).toHaveLength(30);
-    // Every month adds 1 point of supply, 40 of net worth and 2 of customers
-    expect(projection.projected[0]).toBe(projection.actual[17] + 43);
-    expect(projection.final).toBe(48 * 43);
+    // Every month adds 1 point of service and 40 of net worth
+    expect(projection.projected[0]).toBe(projection.actual[17] + 41);
+    expect(projection.final).toBe(48 * 41);
   });
 
   it("settles on the current score once the term is over", () => {
@@ -76,13 +76,13 @@ describe("projectScore", () => {
   it("reads a pace from the months there are, and nothing from none", () => {
     expect(projectScore(investor, [], 2020, 1)).toBeNull();
     const early = projectScore(investor, steadyRun(3), 2020, 1)!;
-    expect(early.final).toBe(48 * 43);
+    expect(early.final).toBe(48 * 41);
     // A single month has no trend in its levels yet, only its flows
     const first = projectScore(investor, steadyRun(1), 2020, 1)!;
-    expect(first.final).toBe(48 + 40 + 2);
+    expect(first.final).toBe(48 + 40);
   });
 
-  it("never projects fewer than zero customers", () => {
+  it("ignores customer growth in score projections", () => {
     const shrinking = steadyRun(12).reverse();
     shrinking.forEach((month, elapsed) => {
       month.customers = 100000 * (12 - elapsed);
