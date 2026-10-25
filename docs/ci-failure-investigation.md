@@ -4,6 +4,60 @@ The recurring failures had different causes. A passing retry alone did not disti
 product race from broken test setup or a browser transport failure. The fixes below retain
 existing assertions, timeouts, retry acceptance, bundle ceilings and simulation baselines.
 
+## PR #626 follow-up: five whys for run 40153602931
+
+The [latest failed run](https://github.com/toddmedema/electrify/actions/runs/40153602931)
+failed the Windows production-browser gate. Linux, macOS and Windows packaged Electron
+passed. The aggregate `check` failed because Windows failed, not from a separate defect.
+
+### Browser launch regression: fixture settings contaminated the control
+
+1. **Why did Windows fail?** Both browser-environment projects found zero default
+   `--disable-features` switches instead of one, including on retries.
+2. **Why was the switch absent?** The control launch inherited `ignoreDefaultArgs`
+   from the Windows workaround, but replaced its `args` with only `--enable-automation`.
+   That combination removed the original switch without adding its replacement.
+3. **Why did a manual control launch inherit the workaround?** Playwright Test applies
+   the suite's `launchOptions` to manual `chromium.launch()` calls too. The locked
+   runtime shallow-merges those options, so overriding `args` does not reset
+   `ignoreDefaultArgs`. The Windows trace records that exact combination on the first launch.
+4. **Why did local verification miss it?** The suite config enables the workaround
+   only on Windows. Calling `browserLaunchOptions("win32")` for the treatment browser
+   on macOS exercised flag composition but did not reproduce control contamination.
+5. **Why was the regression incomplete?** It covered the adapter in isolation while
+   assuming the test runner did not supply ambient launch settings. The experiment's
+   control was not explicitly isolated from the behavior under test.
+
+The test now installs the Windows launch fixture on every host and explicitly resets
+both `args` and `ignoreDefaultArgs` for its control. Installing that fixture alone
+reproduced the exact zero-switch CI assertion on macOS before the reset; adding the
+reset passed at desktop and phone project settings. The single-switch and exact default
+feature-preservation assertions remain intact. The networking adapter is unchanged.
+
+### Chart geometry: a one-shot measurement raced a deferred rebuild
+
+1. **Why did the chart case fail once?** `plotBounds` was null, causing a property-access
+   error before the geometry assertions. A retry passed, but the gate rejects flaky tests.
+2. **Why could a resolved plot have no bounds?** Playwright resolves a locator and then
+   measures its element. An element detached between those operations has no bounding box.
+   The trace resolves `.u-over` immediately after the second tool panel opens; the
+   failure screenshot shows a rendered replacement chart.
+3. **Why can opening a panel replace the chart?** It changes the available width.
+   `UPlotChart` coalesces resize work and later rebuilds the plot after resize settles,
+   destroying the previous plot in its effect cleanup.
+4. **Why did the test measure before that work finished?** It waited for two visible
+   tool panels, which establishes panel presence but not completion of chart layout.
+5. **Why was the race unhandled?** The test used one-shot geometry reads with TypeScript
+   non-null assertions. Those assertions provide no runtime readiness check, unlike
+   Playwright's retrying locator assertions.
+
+The trace and component lifecycle support this rebuild-race diagnosis; the trace does
+not capture the exact JavaScript cleanup between the locator and geometry calls.
+The test now retries the complete geometry contract within the existing 12-second
+assertion budget, reacquiring all three bounds and checking they exist before asserting
+divider placement and minimum target height. Persistent missing charts or incorrect
+layout still fail. Tooltip, keyboard, touch and shrink assertions remain unchanged.
+
 ## Windows loopback allocation
 
 The controller failure in [run 40136399589](https://github.com/toddmedema/electrify/actions/runs/40136399589)

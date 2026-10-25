@@ -1,9 +1,18 @@
 const { browserLaunchOptions } = require("../scripts/ci/browser-launch");
 import { chromium, expect, test } from "@playwright/test";
 
-// This runs on every OS: Chromium's repeated-switch semantics are platform independent.
+// Exercise the Windows fixture on every host, including its inheritance by manual
+// chromium.launch() calls. Otherwise POSIX runs miss Windows-only option leakage.
+test.use({ launchOptions: browserLaunchOptions("win32") });
+
+// Chromium's repeated-switch semantics are platform independent.
 test("the Windows workaround preserves the browser's effective default features", async () => {
-  const defaults = await chromium.launch({ args: ["--enable-automation"] });
+  // Manual launches inherit the suite's launchOptions. Reset both halves of the
+  // workaround so the control browser actually retains Playwright's defaults.
+  const defaults = await chromium.launch({
+    ignoreDefaultArgs: [],
+    args: ["--enable-automation"],
+  });
   const options = browserLaunchOptions("win32");
   let mitigated: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
