@@ -8,8 +8,8 @@ import {
   forecastMonthAxis,
   yAxis,
 } from "./UPlotHelpers";
-import { TICK_MINUTES } from "../../Constants";
 import { TickPresentFutureType, UnitSystemType } from "../../Types";
+import { sampleTimeline } from "../../helpers/ForecastSampling";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { chartPalette } from "../../Theme";
 import {
@@ -96,12 +96,7 @@ export default class ChartForecastWeather extends React.PureComponent<
     const { domain, height, timeline, startingYear, multiyear, syncKey } =
       this.props;
     // Downsample the data to 6 per day to make it more vague / forecast-y
-    const data = timeline.filter(
-      (t: TickPresentFutureType) => t.minute % 240 < TICK_MINUTES,
-    );
-    // Make sure it gets the first + last entries for a full chart
-    data.unshift(timeline[0]);
-    data.push(timeline[timeline.length - 1]);
+    const data = sampleTimeline(timeline, 240);
 
     const minutes = new Array<number>(data.length);
     const temperature = new Array<number>(data.length);

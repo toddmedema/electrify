@@ -218,11 +218,7 @@ function buildProjection(
     domainMax,
   );
   blackouts.unshift({ minute: rangeMin, value: 0 });
-  const sampled = sampleForecastTimeline(
-    timeline,
-    240 * MAX_FORECAST_YEARS,
-    projectionStepMinutes,
-  );
+  const sampled = sampleForecastTimeline(timeline, 240 * MAX_FORECAST_YEARS);
 
   const currentMonth = summarizeTimeline(game.timeline, game.startingYear);
   const projectedMonths = summarizeTimelineByMonth(

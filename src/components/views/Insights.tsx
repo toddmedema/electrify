@@ -1990,17 +1990,12 @@ export default class Insights extends React.Component<Props, State> {
     const sampled = sampleForecastTimeline(
       viewportTimeline,
       viewportSampleInterval,
-      projection.projectionStepMinutes,
     );
     // Range bands must see every modeled hour so brief peaks and shortages survive aggregation.
     const supplyDemandTimeline =
       viewportRange[1] - viewportRange[0] > 24 * MINUTES_PER_MONTH
         ? viewportSupplyDemand
-        : sampleForecastTimeline(
-            viewportSupplyDemand,
-            viewportSampleInterval,
-            projection.projectionStepMinutes,
-          );
+        : sampleForecastTimeline(viewportSupplyDemand, viewportSampleInterval);
     let viewportDomainMin = Number.POSITIVE_INFINITY;
     let viewportDomainMax = Number.NEGATIVE_INFINITY;
     for (const tick of supplyDemandTimeline) {
