@@ -45,7 +45,7 @@ async function matchesIntegrity(response, integrity) {
   );
 }
 
-async function fetchAndCache(cache, url, durable = false) {
+async function fetchAndCache(cache, url, durable = false, retainWrite) {
   const integrity = typeof url === "string" ? "" : url.integrity || "";
   // Neither prefetches nor a different build may lend unchecked bytes to an SRI request.
   const key = `${absoluteUrl(url)}|${integrity}|${durable}`;
@@ -57,25 +57,30 @@ async function fetchAndCache(cache, url, durable = false) {
       }
       if (!(await matchesIntegrity(response, integrity)))
         throw new Error(`Integrity mismatch fetching ${absoluteUrl(url)}`);
-      try {
-        await cache.put(url, response.clone());
-      } catch {
-        if (durable) throw new Error(`Could not cache ${absoluteUrl(url)}`);
-        // A full or unavailable cache must not turn a successful network response into a failed
-        // game load. Prefetching is best-effort; the caller can still use the downloaded response.
-      }
-      return response;
+      const stored = (async () => {
+        try {
+          await cache.put(url, response.clone());
+        } catch {
+          if (durable) throw new Error(`Could not cache ${absoluteUrl(url)}`);
+          // Optional persistence must not turn a good download into a failed game load.
+        }
+      })();
+      return { response, stored };
     });
     inFlightFetches.set(key, pending);
+    // Coalesce until persistence finishes, including when the foreground already has its bytes.
+    pending
+      .then(({ stored }) => stored)
+      .catch(() => undefined)
+      .finally(() => {
+        if (inFlightFetches.get(key) === pending) inFlightFetches.delete(key);
+      });
   }
 
-  try {
-    return (await pending).clone();
-  } finally {
-    if (inFlightFetches.get(key) === pending) {
-      inFlightFetches.delete(key);
-    }
-  }
+  const { response, stored } = await pending;
+  if (retainWrite) retainWrite(stored);
+  else await stored; // Offline sync still requires durable completion before advancing its revision.
+  return response.clone();
 }
 
 /** Fill any holes for one scenario without refreshing data that is already available offline. */
@@ -229,15 +234,24 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.integrity || /\/data\/weather\/.*\.bin$/.test(url.pathname)) {
-    event.respondWith(
-      caches.match(request).then(async (cached) => {
-        if (cached && (await matchesIntegrity(cached, request.integrity))) {
-          return cached;
-        }
-        const cache = await caches.open(CACHE_VERSION);
-        return fetchAndCache(cache, request);
-      }),
+    let storage = Promise.resolve();
+    const verified = caches.match(request).then(async (cached) => {
+      if (cached && (await matchesIntegrity(cached, request.integrity)))
+        return cached;
+      const cache = await caches.open(CACHE_VERSION);
+      return fetchAndCache(cache, request, false, (write) => {
+        storage = write;
+      });
+    });
+    // Register the lifetime synchronously, but don't make play wait for disk persistence.
+    // Integrity verification remains on the response path; only the cache write is deferred.
+    event.waitUntil(
+      verified.then(
+        () => storage,
+        () => undefined,
+      ),
     );
+    event.respondWith(verified);
     return;
   }
 

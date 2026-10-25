@@ -45,6 +45,8 @@ export default defineConfig({
     ],
   ],
   use: {
+    launchOptions:
+      require("../scripts/ci/browser-launch").browserLaunchOptions(),
     baseURL: `http://127.0.0.1:${port}`,
     headless: true,
     viewport: { width: 1280, height: 900 },

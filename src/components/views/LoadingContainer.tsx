@@ -25,12 +25,13 @@ export function restoreTutorialAfterLoading(
   dispatch: Dispatch<UnknownAction>,
   tutorialSteps: TutorialStepType[],
   tutorialStep: number,
+  restorePane = true,
 ): void {
   const destination = tutorialSteps[tutorialStep]?.card;
-  // loaded() always mounts Facilities first. Reapply the selected objective's authored pane after
+  // When loading still owns navigation, loaded() mounts Facilities first. Restore the authored pane after
   // a capstone reset so Finances/Pricing retries do not strand their HUD on the fleet, and so
   // future capstones can safely start anywhere.
-  if (destination) {
+  if (destination && restorePane) {
     dispatch(navigate(destination));
   }
   dispatch(delta({ tutorialStep }));
@@ -43,7 +44,8 @@ export function restoreLoadedTutorial(
   tutorialSteps: TutorialStepType[],
 ): AppThunk {
   return (dispatch, getState) => {
-    const current = getState().game;
+    const state = getState();
+    const current = state.game;
     if (
       !current.inGame ||
       current.scenarioId !== requestedGame.scenarioId ||
@@ -55,6 +57,8 @@ export function restoreLoadedTutorial(
       dispatch,
       tutorialSteps,
       requestedGame.tutorialStep >= 0 ? requestedGame.tutorialStep : 0,
+      // Still initialize the objective, but never dismiss a screen opened since loaded().
+      state.card.name === "FACILITIES",
     );
   };
 }

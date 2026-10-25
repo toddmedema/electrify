@@ -21,6 +21,8 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
+    launchOptions:
+      require("../scripts/ci/browser-launch").browserLaunchOptions(),
     baseURL,
     headless: true,
     screenshot: "only-on-failure",

@@ -869,21 +869,30 @@ test("production divider follows side-panel capacity and clears its tooltip when
   await openBuild(page);
   await page.locator("#insightsNav").click();
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
-  const plotBounds = (await pane
-    .locator("#chartSupplyDemand .u-over")
-    .boundingBox())!;
-  const barBounds = (await bar.boundingBox())!;
-  const firstRowBounds = (await pane
-    .locator(".facilityDisclosure")
-    .first()
-    .boundingBox())!;
-  expect(barBounds.y).toBeGreaterThanOrEqual(plotBounds.y + plotBounds.height);
-  expect(barBounds.y + barBounds.height).toBeLessThanOrEqual(
-    firstRowBounds.y + 1,
-  );
-  expect(barBounds.height).toBeGreaterThanOrEqual(
-    info.project.use.hasTouch ? 44 : 40,
-  );
+  // Opening panels changes the chart width. Its deferred rebuild can detach the
+  // plot between locator resolution and measurement; retry the whole contract.
+  await expect(async () => {
+    const plotBounds = await pane
+      .locator("#chartSupplyDemand .u-over")
+      .boundingBox();
+    const barBounds = await bar.boundingBox();
+    const firstRowBounds = await pane
+      .locator(".facilityDisclosure")
+      .first()
+      .boundingBox();
+    expect(plotBounds).not.toBeNull();
+    expect(barBounds).not.toBeNull();
+    expect(firstRowBounds).not.toBeNull();
+    expect(barBounds!.y).toBeGreaterThanOrEqual(
+      plotBounds!.y + plotBounds!.height,
+    );
+    expect(barBounds!.y + barBounds!.height).toBeLessThanOrEqual(
+      firstRowBounds!.y + 1,
+    );
+    expect(barBounds!.height).toBeGreaterThanOrEqual(
+      info.project.use.hasTouch ? 44 : 40,
+    );
+  }).toPass({ timeout: 12000 });
   if (info.project.use.hasTouch) {
     await bar.tap();
     await expect(page.getByRole("tooltip")).toContainText("Supply now");

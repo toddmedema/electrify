@@ -1,3 +1,15 @@
+import cardReducer, {
+  initialCard,
+  navigate,
+  navigateBack,
+} from "../../reducers/Card";
+import {
+  loaded,
+  start,
+  resume,
+  startReplay,
+  launchRun,
+} from "../../reducers/GameActions";
 import { UnknownAction } from "@reduxjs/toolkit";
 import { TUTORIALS } from "../../data/Scenarios";
 import { store } from "../../Store";
@@ -45,9 +57,62 @@ it.each([
       TUTORIALS.find((tutorial) => tutorial.id === 0)!.tutorialSteps!,
     )(
       dispatch,
-      () => ({ ...state, game: { ...requested, ...current } }),
+      () => ({
+        ...state,
+        card: { ...state.card, name: "FACILITIES" },
+        game: { ...requested, ...current },
+      }),
       undefined,
     );
     expect(dispatch).toHaveBeenCalledTimes(current.expectedActions);
+  },
+);
+
+it("a delayed tutorial restoration cannot replace a screen the player opened", () => {
+  const state = store.getState();
+  const requested = {
+    ...state.game,
+    inGame: true,
+    scenarioId: 1,
+    tutorialStep: -1,
+  };
+  const dispatch = jest.fn();
+  restoreLoadedTutorial(
+    requested,
+    TUTORIALS.find((tutorial) => tutorial.id === 1)!.tutorialSteps!,
+  )(
+    dispatch,
+    () => ({
+      ...state,
+      game: requested,
+      card: { ...state.card, name: "ACHIEVEMENTS" },
+    }),
+    undefined,
+  );
+  expect(dispatch.mock.calls.map(([action]) => action)).toEqual([
+    { type: "game/delta", payload: { tutorialStep: 0 } },
+  ]);
+});
+
+it.each([start.type, resume.type, startReplay.type, launchRun.type])(
+  "%s finishes loading without taking navigation from the player's newer screen",
+  (type) => {
+    const loading = cardReducer(initialCard, { type });
+    expect(cardReducer(loading, loaded()).name).toBe("FACILITIES");
+    const gallery = cardReducer(loading, navigate("ACHIEVEMENTS"));
+    expect(cardReducer(gallery, navigateBack()).name).toBe("LOADING");
+    const completedGallery = cardReducer(gallery, loaded());
+    expect(completedGallery.name).toBe("ACHIEVEMENTS");
+    expect(completedGallery.ts).toBe(gallery.ts);
+    expect(cardReducer(completedGallery, navigateBack()).name).toBe(
+      "FACILITIES",
+    );
+    const manual = cardReducer(gallery, navigate("MANUAL"));
+    const finished = cardReducer(manual, loaded());
+    expect(finished.name).toBe("MANUAL");
+    expect(finished.ts).toBe(manual.ts);
+    const back = cardReducer(finished, navigateBack());
+    expect(back.name).toBe("ACHIEVEMENTS");
+    expect(cardReducer(back, navigateBack()).name).toBe("FACILITIES");
   },
 );
