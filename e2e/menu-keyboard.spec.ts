@@ -21,10 +21,10 @@ test("main menu and settings work entirely with arrows, Enter and Escape", async
   await verifyMenuKeyboard(page);
 });
 
-test("Space activates Start playing", async ({ page }) => {
+test("Space activates Play", async ({ page }) => {
   await page.goto("/");
   const start = page.getByRole("button", {
-    name: "Start playing",
+    name: "Play",
     exact: true,
   });
   await start.focus();
@@ -120,7 +120,7 @@ test("selection is visible in both themes without horizontal overflow", async ({
 }, testInfo) => {
   await page.goto("/");
   await expect(
-    page.getByRole("button", { name: "Start playing", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeFocused();
   const shots = process.env.REVIEW_SCREENSHOT_DIR;
   if (shots && testInfo.project.name === "desktop-chromium")
@@ -157,7 +157,7 @@ test("touch hides button focus rings while text inputs and keyboard navigation k
   test.skip(!info.project.use.hasTouch, "Requires actual touch input");
   await page.goto("/");
   const start = page.getByRole("button", {
-    name: "Start playing",
+    name: "Play",
     exact: true,
   });
   await expect(start).toBeFocused();

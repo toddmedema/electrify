@@ -11,9 +11,7 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
     testInfo.project.name.startsWith("mobile-") ? "dark" : "light",
   );
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
 
   await expect(
     page.getByRole("heading", { name: "Step 1 of 4" }),

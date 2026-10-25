@@ -3,9 +3,7 @@ import { expect, Page, test } from "./fixtures";
 async function reachStartTimeStep(page: Page) {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Tap 1× to start time")).toBeVisible();
@@ -27,7 +25,7 @@ test("tapping 1x carries a running clock into Mission 1's final step", async ({
 });
 
 // Regression test. The snackbar's swipe handler captured every press, so neither of its buttons
-// ever received a click, and leaving Mission 1 early never counted it - which sent Start playing
+// ever received a click, and leaving Mission 1 early never counted it - which sent Play
 // straight back into it
 test("closing a walkthrough offers a working way to the missions", async ({
   page,
@@ -66,9 +64,7 @@ test("closing a walkthrough offers a working way to the missions", async ({
   ).toBeVisible();
 
   await page.getByRole("button", { name: "back" }).click();
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Choose a game" }),
   ).toBeVisible();
@@ -97,9 +93,7 @@ for (const explicitlyExit of [false, true]) {
     await page
       .getByRole("menuitem", { name: "Main menu", exact: true })
       .click();
-    await page
-      .getByRole("button", { name: "Start playing", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     if (explicitlyExit) {
       await expect(
         page.getByRole("heading", { name: "Choose a game" }),

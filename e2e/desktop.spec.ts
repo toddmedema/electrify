@@ -203,7 +203,7 @@ test("a fresh offline install launches fullscreen with every bundled file and a 
     page.getByRole("heading", { name: "Electrify", exact: true }),
   ).toBeAttached();
   await expect(
-    page.getByRole("button", { name: "Start playing", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeVisible();
   expect(page.url()).toBe("electrify://app/index.html");
   expect((await displayState(app)).fullscreen).toBe(true);
@@ -408,9 +408,7 @@ test("a fresh offline install launches fullscreen with every bundled file and a 
 
 test("the first offline walkthrough leads to a mission that saves, resumes after relaunch, and quits from the game", async () => {
   let page = desktop.page;
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(page.getByText("Tap 1× to start time")).toBeVisible();

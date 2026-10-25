@@ -5,7 +5,7 @@ export async function exitSettingsWithBodyArrow(page: Page): Promise<void> {
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("button", { name: "Start playing", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeFocused();
   // Native state can finish loading and refocus the initial menu after a bare blur.
   // Hold this fixture's background precondition only until the real arrow is dispatched.
@@ -25,7 +25,7 @@ export async function exitSettingsWithBodyArrow(page: Page): Promise<void> {
 
 export async function openSettingsWithKeyboard(page: Page): Promise<void> {
   const start = page.getByRole("button", {
-    name: "Start playing",
+    name: "Play",
     exact: true,
   });
   await expect(start).toBeFocused();
@@ -112,7 +112,7 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   ).toBeFocused();
   await page.keyboard.press("Escape");
   const start = page.getByRole("button", {
-    name: "Start playing",
+    name: "Play",
     exact: true,
   });
   const settings = page.getByRole("button", { name: "Settings", exact: true });

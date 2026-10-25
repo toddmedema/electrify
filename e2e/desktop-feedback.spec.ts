@@ -171,7 +171,7 @@ test.beforeEach(async () => {
   await auditFeedbackAudio(desktop.page);
   await desktop.page.reload();
   await expect(
-    desktop.page.getByRole("button", { name: "Start playing", exact: true }),
+    desktop.page.getByRole("button", { name: "Play", exact: true }),
   ).toBeFocused();
   await focusGame();
 });
@@ -609,7 +609,7 @@ test("an arrow immediately after leaving Settings cannot change the exiting volu
   await page.reload();
   await focusGame();
   await expect(
-    page.getByRole("button", { name: "Start playing", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeFocused();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const effects = page.getByRole("slider", {

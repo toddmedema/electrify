@@ -145,9 +145,7 @@ test("reading help preserves the current tutorial objective", async ({
     );
   });
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page
     .getByRole("button", { name: "Start Finances", exact: true })
     .click();

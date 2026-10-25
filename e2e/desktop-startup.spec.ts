@@ -82,7 +82,7 @@ for (const { width, height, colorScheme, reducedMotion, returning } of [
       });
       await expect(entrance).toHaveCount(0);
       const start = page.getByRole("button", {
-        name: "Start playing",
+        name: "Play",
         exact: true,
       });
       await expect(start).toBeEnabled();
@@ -133,7 +133,7 @@ test("startup failure retains branding and keyboard recovery", async () => {
     await retry.press("Enter");
     await expect(page.locator("#appStartup")).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "Start playing", exact: true }),
+      page.getByRole("button", { name: "Play", exact: true }),
     ).toBeEnabled();
   } finally {
     await app.close();

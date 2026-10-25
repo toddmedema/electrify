@@ -98,6 +98,26 @@ describe("TutorialHud", () => {
     );
     expect(hudProps.onNext).toHaveBeenCalledTimes(1);
   });
+  it("lets a control handle its navigation while Next retains its fallback action", async () => {
+    const user = userEvent.setup();
+    const onAutoAdvance = jest.fn();
+    const hudProps = props({
+      step: objective({ continueOnClick: "#tool" }),
+      onAutoAdvance,
+    });
+    render(
+      <>
+        <button id="tool">Open tool</button>
+        <TutorialHud {...hudProps} />
+      </>,
+    );
+    await user.click(screen.getByRole("button", { name: "Open tool" }));
+    expect(onAutoAdvance).toHaveBeenCalledTimes(1);
+    expect(hudProps.onNext).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(hudProps.onNext).toHaveBeenCalledTimes(1);
+    expect(onAutoAdvance).toHaveBeenCalledTimes(1);
+  });
   it("continues on explicit UI controls, including keyboard activation, and cleans up", async () => {
     const user = userEvent.setup();
     const hudProps = props({ step: objective({ continueOnClick: "#tab" }) });

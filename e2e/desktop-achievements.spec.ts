@@ -27,9 +27,7 @@ test("a real tutorial completion journals First Spark offline and survives relau
   };
   try {
     const page = desktop.page;
-    await page
-      .getByRole("button", { name: "Start playing", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     await page
       .getByRole("button", { name: "Inspect Coal", exact: true })
       .click();

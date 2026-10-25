@@ -11,9 +11,7 @@ for (const theme of ["light", "dark"]) {
       localStorage.setItem("audioEnabled", "false");
     }, theme);
     await page.goto("/");
-    await page
-      .getByRole("button", { name: "Start playing", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     await page.locator('[data-fuel="Coal"] .facilityRowHeader').click();
     await expect(page.locator(".tutorialHud")).toContainText(
       "Tap the supply and demand chart",
@@ -47,9 +45,7 @@ for (const theme of ["light", "dark"]) {
       );
     }, theme);
     await page.goto("/");
-    await page
-      .getByRole("button", { name: "Start playing", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     await page
       .getByRole("button", { name: "Start Generators", exact: true })
       .click();

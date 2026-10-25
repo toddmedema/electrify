@@ -39,9 +39,7 @@ for (const [index, mission] of missions.entries()) {
       },
     );
     await page.goto("/");
-    await page
-      .getByRole("button", { name: "Start playing", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     if (index > 0)
       await page
         .getByRole("button", { name: `Start ${mission.name}`, exact: true })

@@ -305,7 +305,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at L
     "Menu",
   );
   await expect(
-    page.getByRole("button", { name: "Start playing", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeFocused();
   // A one-shot selection must survive a simultaneous held-direction repeat.
   await input(page, ["down", "confirm"]);
@@ -535,10 +535,7 @@ async function chooseNewGame(page: Page) {
     "data-mock-input-context",
     "Menu",
   );
-  await select(
-    page,
-    page.getByRole("button", { name: "Start playing", exact: true }),
-  );
+  await select(page, page.getByRole("button", { name: "Play", exact: true }));
   await input(page, "confirm");
   await expect(
     page.getByRole("heading", { name: "Choose a game", exact: true }),
@@ -576,7 +573,12 @@ test("controller chooses an autocomplete city and starts a custom game", async (
   await expect(
     page.getByRole("group", { name: "Map zoom controls" }).locator(":focus"),
   ).toHaveCount(1);
-  await select(page, page.getByRole("button", { name: "Play", exact: true }));
+  await select(
+    page,
+    page
+      .locator(".customSetupActions")
+      .getByRole("button", { name: "Play", exact: true }),
+  );
   await input(page, "confirm");
   await expect(page.locator("#appbar:visible")).toBeVisible();
   await expect.poll(async () => (await readSaveRecords(page)).length).toBe(1);

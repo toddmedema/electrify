@@ -28,9 +28,7 @@ async function startLesson(page: Page, name: string) {
     );
   }, name);
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page
     .getByRole("button", { name: `Start ${name}`, exact: true })
     .click();
