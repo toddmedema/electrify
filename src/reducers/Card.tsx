@@ -146,7 +146,7 @@ export const cardSlice = createSlice({
       }
     });
     builder.addCase(launchRun, (state) => {
-      state.history = [];
+      state.history = ["LOADING"];
       state.name = "LOADING";
       state.ts = Date.now();
     });
@@ -154,7 +154,9 @@ export const cardSlice = createSlice({
       state = {
         name: "LOADING",
         ts: Date.now(),
-        history: state.history, // Don't store loading screen in history
+        // Reserve a loading slot. Completion replaces it in place, preserving screens
+        // opened meanwhile and keeping Back safe while data is still pending.
+        history: ["LOADING", ...(state.history || [])],
       };
       return state;
     });
@@ -164,7 +166,7 @@ export const cardSlice = createSlice({
       return {
         name: "LOADING" as CardNameType,
         ts: Date.now(),
-        history: state.history,
+        history: ["LOADING", ...(state.history || [])],
       };
     });
     // Watching a replay goes the same way, since it re-runs the simulation from the seed
@@ -172,14 +174,23 @@ export const cardSlice = createSlice({
       return {
         name: "LOADING" as CardNameType,
         ts: Date.now(),
-        history: state.history,
+        history: ["LOADING", ...(state.history || [])],
       };
     });
     builder.addCase(loaded, (state) => {
+      const history = (state.history || []).map((card) =>
+        card === "LOADING" ? "FACILITIES" : card,
+      );
+      // Loading may finish after the player opens another screen (for example an
+      // achievement notification). Complete the game without taking navigation back.
+      if (state.name !== "LOADING") {
+        state.history = history;
+        return;
+      }
       state = {
         name: "FACILITIES",
         ts: Date.now(),
-        history: ["FACILITIES", ...(state.history || [])],
+        history,
       };
       return state;
     });

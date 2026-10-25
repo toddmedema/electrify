@@ -232,3 +232,20 @@ test("simulation and all desktop-renderer failures select their actual local gat
     ],
   );
 });
+
+test("transport evidence survives an unrelated downstream UI assertion", () => {
+  const failure =
+    "Network failure: GET /static/css/main.css (stylesheet): net::ERR_NO_BUFFER_SPACE";
+  const summary = summarize(
+    [
+      line("Windows x64 tests", failure),
+      line(
+        "Windows x64 tests",
+        "Error: expect(locator).toHaveCSS(expected) failed",
+      ),
+      line("Windows x64 tests", 'Expected: "solid"'),
+      line("Windows x64 tests", 'Received: "none"'),
+    ].join("\n"),
+  );
+  assert(summary.get("Windows x64 tests").errors.includes(failure));
+});

@@ -264,6 +264,47 @@ describe("simulation data integrity", () => {
     },
   );
 
+  it("serves verified mission data while its optional cache write is still pending", async () => {
+    const sw = dataWorker();
+    sw.fetch.mockResolvedValue(response(true, "fresh"));
+    let finishWrite!: () => void;
+    let started!: () => void;
+    const writing = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    sw.put.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishWrite = resolve;
+          started();
+        }),
+    );
+    const event = sw.request("cors", url, integrityFor("fresh"));
+    try {
+      await writing;
+      let ready = false;
+      const received = event.result.then(() => {
+        ready = true;
+      });
+      // Flush promise continuations while the storage operation remains explicitly held.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(ready).toBe(true);
+      expect(event.work).toHaveLength(1);
+      let persisted = false;
+      const lifetime = Promise.all(event.work).then(() => {
+        persisted = true;
+      });
+      await received;
+      expect(persisted).toBe(false);
+      finishWrite();
+      await lifetime;
+      expect(persisted).toBe(true);
+    } finally {
+      finishWrite?.();
+      await event.result;
+    }
+  });
+
   it("returns verified network data even if its cache write fails", async () => {
     const sw = dataWorker();
     sw.put.mockRejectedValue(new Error("quota"));

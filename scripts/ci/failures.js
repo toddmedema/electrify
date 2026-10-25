@@ -74,6 +74,7 @@ function summarize(log) {
     section = undefined;
     const gate = /^(.+): FAILED$/.exec(trimmed);
     if (gate) add(found.gates, gate[1]);
+    else if (/^Network failure: /.test(trimmed)) add(found.errors, trimmed);
     // Jest prints "FAIL <suite>"; the bundle and benchmark gates print "FAIL <metric> ...".
     else if (
       /^[·.]*FAIL (src\/\S+\.(test|spec)\.\w+)(?: \([\d.]+ s\))?$/.test(trimmed)

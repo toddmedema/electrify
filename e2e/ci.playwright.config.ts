@@ -2,6 +2,7 @@ import { defineConfig } from "@playwright/test";
 import production from "./production.playwright.config";
 
 const smoke = [
+  "browser-environment.spec.ts",
   "build-options.spec.ts",
   "escape-close.spec.ts",
   "game-workspace.spec.ts",
@@ -12,6 +13,7 @@ const smoke = [
   "main-menu.spec.ts",
   "music.spec.ts",
   "achievements.spec.ts",
+  "loading-navigation.spec.ts",
   "facilities-production-chart.spec.ts",
   "intertie-order.spec.ts",
   "operations-priorities.spec.ts",
