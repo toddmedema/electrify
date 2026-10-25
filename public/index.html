@@ -9,16 +9,6 @@
       (function () {
         // Scripts run: show the startup entrance below instead of the no-JS summary.
         document.documentElement.classList.add("js");
-        let returningVisit = false;
-        try {
-          returningVisit =
-            localStorage.getItem("electrify-startup-complete") === "true";
-        } catch (_) {
-          // Without storage, treat this as a first visit and keep loading normally.
-        }
-        document.documentElement.dataset.startupVisit = returningVisit
-          ? "returning"
-          : "first";
         let choice;
         try {
           choice = localStorage.getItem("theme");
@@ -57,19 +47,25 @@
       /* Lay out the startup entrance before the app stylesheet arrives. */
       #appStartup {
         position: fixed;
+        z-index: 2000;
         inset: 0;
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: safe center;
         align-items: center;
+        overflow: auto;
         text-align: center;
         color: #576574;
-        font-family: Inter, sans-serif;
+        background: var(--bg-primary, #ffffff);
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        line-height: 1.45;
       }
       html[data-theme="dark"] #appStartup {
         color: #9aa9ba;
+        background: var(--bg-primary, #0b1016);
       }
       #appStartup .appStartupLogo {
+        flex: 0 0 auto;
         box-sizing: border-box;
         width: 100%;
         padding: 32px 24px 0;
@@ -89,6 +85,22 @@
         inset: 0;
         width: 100%;
         height: 100%;
+      }
+      /* Reserve the same status space before and after the main stylesheet loads. */
+      #appStartup [data-startup-status] {
+        flex: 0 0 auto;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 24px;
+        font-size: var(--font-size-body1, 0.9375rem);
+      }
+      @media (max-height: 450px) {
+        #appStartup .homeLogo img {
+          max-height: 72px;
+          object-fit: contain;
+        }
       }
       .app-loading {
         max-width: 36rem;
@@ -255,9 +267,8 @@
       </main>
     </div>
 
-    <!-- Installed on web and desktop as soon as scripts run, and removed at the app's first
-         commit. Keep the logo geometry in step with MainMenu; both use the same homeLogo
-         styles and animation. -->
+    <!-- Installed on web and desktop as soon as scripts run; handed off after the app commits
+         and at least 500ms have elapsed. Keep logo geometry in step with MainMenu. -->
     <template id="appStartupTemplate">
       <div id="appStartup">
         <div class="appStartupLogo">
@@ -306,6 +317,8 @@
           entrance.querySelector("[data-startup-status]").textContent =
             "Loading Electrify…";
         document.body.append(entrance);
+        document.getElementById("appStartup").dataset.startedAt =
+          String(performance.now());
         template.remove();
       })();
     </script>

@@ -4602,10 +4602,6 @@ $homeSmokeCycle: 5.6s;
   @include staticHomeLogo;
 }
 
-html[data-startup-visit="returning"] #appStartup {
-  @include staticHomeLogo;
-}
-
 #appStartup {
   position: fixed;
   inset: 0;
