@@ -15,26 +15,39 @@ export async function expectSignInButtonsToFit(scope: Page | Locator) {
   await expect(apple).toHaveCount(1);
   await expect(google).toBeVisible();
   await expect(apple).toBeVisible();
-  const a = (await google.boundingBox())!;
-  const b = (await apple.boundingBox())!;
+  // A leaderboard response can move the entire row between protocol calls. Read both
+  // controls in one browser task so their geometry describes the same layout state.
+  const layout = await scope
+    .getByRole("group", { name: "Sign in", exact: true })
+    .evaluate((group) => ({
+      buttons: Array.from(group.querySelectorAll("button")).map((button) => {
+        const { x, y, width, height } = button.getBoundingClientRect();
+        return {
+          name: button.getAttribute("aria-label"),
+          x,
+          y,
+          width,
+          height,
+          overflow: button.scrollWidth - button.clientWidth,
+        };
+      }),
+      viewportWidth: window.innerWidth,
+      minimumHeight: matchMedia("(pointer: coarse)").matches ? 44 : 40,
+    }));
+  expect(layout.buttons.map((button) => button.name)).toEqual([
+    "Sign in with Google",
+    "Sign in with Apple",
+  ]);
+  const [a, b] = layout.buttons;
   expect(Math.abs(a.y - b.y)).toBeLessThanOrEqual(1);
   expect(Math.abs(a.height - b.height)).toBeLessThanOrEqual(1);
   expect(Math.abs(a.width - b.width)).toBeLessThanOrEqual(1);
   expect(b.x).toBeGreaterThanOrEqual(a.x + a.width);
-  const minimumHeight = await google
-    .page()
-    .evaluate(() => (matchMedia("(pointer: coarse)").matches ? 44 : 40));
-  expect(a.height).toBeGreaterThanOrEqual(minimumHeight);
-  const viewport = google.page().viewportSize()!;
+  expect(a.height).toBeGreaterThanOrEqual(layout.minimumHeight);
   expect(a.x).toBeGreaterThanOrEqual(0);
-  expect(b.x + b.width).toBeLessThanOrEqual(viewport.width + 1);
-  for (const button of [google, apple]) {
-    expect(
-      await button.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(1);
-  }
+  expect(b.x + b.width).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  for (const button of layout.buttons)
+    expect(button.overflow).toBeLessThanOrEqual(1);
 }
 
 /**

@@ -60,25 +60,31 @@ function entry(id: string, share = true): InstalledMod {
   return { key: `local:${id}`, source: "local", enabled: true, pack };
 }
 
-function setup(entries: InstalledMod[]) {
+async function setup(entries: InstalledMod[]) {
+  const libraryResponse = Promise.resolve({ entries });
   const state = {
     display: { fullscreen: false, width: 1, height: 1, resolutions: [] },
     steam: { available: true, online: false, cloudEnabled: false },
   };
   window.electrifyDesktop = {
     apiVersion: 1,
-    mods: jest.fn(async () => ({ entries })),
+    mods: jest.fn(() => libraryResponse),
     getState: async () => state,
     onStateChanged: () => () => {},
   } as unknown as DesktopBridge;
   const store = configureStore({
     reducer: { ui: uiReducer, game: () => ({ difficulty: "VP" }) },
   });
-  return render(
+  render(
     <Provider store={store}>
       <Mods />
     </Provider>,
   );
+  // Settle the mocked library response and React effects before querying launch controls.
+  // Explicitly deferred preparation promises still leave the loading state available.
+  await act(async () => {
+    await libraryResponse;
+  });
 }
 
 beforeEach(() => {
@@ -90,9 +96,9 @@ afterEach(() => {
 });
 
 it("prepares every mod's real baseline before exposing its launch details", async () => {
-  setup([entry("ordinary-grid", false)]);
+  await setup([entry("ordinary-grid", false)]);
   expect(
-    await screen.findByRole("button", { name: "Play ordinary-grid" }),
+    screen.getByRole("button", { name: "Play ordinary-grid" }),
   ).toBeEnabled();
   expect(mockPrepare).toHaveBeenCalledWith(entry("ordinary-grid", false).pack);
 });
@@ -105,7 +111,7 @@ it("shows preparation until the baseline is ready, then validates and enables pl
         finish = resolve;
       }),
   );
-  setup([entry("campus-grid")]);
+  await setup([entry("campus-grid")]);
   expect(await screen.findByText("Preparing scenario…")).toBeVisible();
   expect(screen.queryByRole("button", { name: "Play campus-grid" })).toBeNull();
   expect(mockValidation).not.toHaveBeenCalled();
@@ -127,7 +133,7 @@ it("shows a download failure and supports retry before play becomes available", 
           finish = resolve;
         }),
     );
-  setup([entry("retry-grid")]);
+  await setup([entry("retry-grid")]);
   expect(
     await screen.findByText("Could not load the weather: offline"),
   ).toBeVisible();
@@ -152,7 +158,7 @@ it("prepares share-based mods sequentially before validating each one", async ()
         finish.set(pack.id, resolve);
       }),
   );
-  setup([entry("first-location"), entry("second-location")]);
+  await setup([entry("first-location"), entry("second-location")]);
   await waitFor(() => expect(mockPrepare).toHaveBeenCalledTimes(1));
   expect(mockPrepare.mock.calls[0][0].id).toBe("first-location");
   await act(async () => finish.get("first-location")!());
@@ -225,7 +231,7 @@ it("also prepares a share-based replacement declared only in a choice", async ()
       ],
     },
   ];
-  setup([grid]);
+  await setup([grid]);
   expect(
     await screen.findByRole("button", { name: "Play choice-grid" }),
   ).toBeEnabled();
