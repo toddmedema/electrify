@@ -128,39 +128,6 @@
       </section>
 
       <div class="page-content comparison-content">
-        <section class="panel" aria-labelledby="compare-title">
-          <h2 id="compare-title">
-            Start with the same grid. Change one thing.
-          </h2>
-          <p>
-            Choose a city and Electrify prepares an example grid using regional
-            power sources, local weather, and published utility data where
-            available. Run it once with no added data-center demand, then again
-            with a new campus. Keep your other choices the same to see what that
-            extra demand changes.
-          </p>
-          <div class="comparison-columns">
-            <div>
-              <h3>Without the new campus</h3>
-              <p>
-                Set the added demand to 0 MW. This keeps the grid’s existing
-                demand, including the model’s estimate for data centers already
-                there. Homes and businesses can still use more power as the
-                years pass.
-              </p>
-            </div>
-            <div>
-              <h3>With the new campus</h3>
-              <p>
-                Try 100 MW of added demand. In this setup, the new campus draws
-                that power continuously from its opening year: 2,400 MWh every
-                day. The starting power plants stay the same, so you have to
-                decide how to meet the extra load.
-              </p>
-            </div>
-          </div>
-        </section>
-
         <section
           class="panel"
           id="worked-example"
@@ -198,36 +165,6 @@
               </tr>
             </thead>
             <tbody role="rowgroup">
-              <tr role="row">
-                <th scope="row" role="rowheader" id="energy-row">
-                  Electricity needed
-                </th>
-                <td role="cell" headers="energy-row baseline-column">
-                  <span class="comparison-table__label" aria-hidden="true"
-                    >No new campus</span
-                  >14.81 TWh
-                </td>
-                <td role="cell" headers="energy-row growth-column">
-                  <span class="comparison-table__label" aria-hidden="true"
-                    >100 MW campus</span
-                  >15.68 TWh
-                </td>
-              </tr>
-              <tr role="row">
-                <th scope="row" role="rowheader" id="peak-row">
-                  Highest demand
-                </th>
-                <td role="cell" headers="peak-row baseline-column">
-                  <span class="comparison-table__label" aria-hidden="true"
-                    >No new campus</span
-                  >2,816 MW
-                </td>
-                <td role="cell" headers="peak-row growth-column">
-                  <span class="comparison-table__label" aria-hidden="true"
-                    >100 MW campus</span
-                  >2,916 MW
-                </td>
-              </tr>
               <tr role="row">
                 <th scope="row" role="rowheader" id="margin-row">
                   Smallest spare supply
@@ -282,17 +219,14 @@
             a larger campus or a different power mix and the answer may change.
           </p>
           <p class="comparison-note">
-            These are game results recorded in October 2026, not forecasts for
-            Austin Energy. The starting account count and electricity use draw
-            on
+            These game results were recorded in October 2026 using
             <a href="https://austinenergy.com/about/company-profile/numbers"
-              >Austin Energy’s FY2025 figures</a
-            >. The plants, power output, costs, and emissions come from the
-            simulation. Figures are rounded. A TWh is one million MWh; CO₂e
-            expresses greenhouse gases as an equivalent amount of carbon
-            dioxide. “Spare supply” is the smallest gap between available supply
-            and demand during the simulation. Fuel and running costs exclude
-            construction and financing. Game updates may change the results.
+              >Austin Energy’s FY2025 account and electricity-use figures</a
+            >. The plants and their operation are simulated. “Spare supply” is
+            the smallest gap between supply and demand. Running costs exclude
+            construction and financing; CO₂e expresses greenhouse gases as
+            equivalent carbon dioxide. Figures are rounded and game updates may
+            change them.
           </p>
         </section>
 
@@ -300,93 +234,47 @@
           <h2 id="try-title">Try it yourself</h2>
           <ol>
             <li>
-              Open <a href="/?dataCenters=1">the data-center setup</a> and
-              select a city. Check <strong>Grid size</strong> and
-              <strong>Assumptions</strong> to see what the example is based on.
-              The starting plants are an illustrative fleet, not an inventory of
-              your utility’s assets.
+              Open <a href="/?dataCenters=1">the data-center setup</a>. Choose
+              Austin, set <strong>Start year</strong> to 2026 and
+              <strong>Data centers open</strong> to 2027, and keep
+              <strong>Grid size</strong> at 575,087 accounts.
             </li>
             <li>
-              To repeat the example above, choose Austin, set
-              <strong>Start year</strong> to 2026 and
-              <strong>Data centers open</strong> to 2027, and keep the grid at
-              575,087 accounts. Under <strong>How much extra power?</strong>,
-              move the slider to 0 MW and choose
-              <strong>Start exploring</strong>. Take the tour if this is your
-              first game.
+              Under <strong>How much extra power?</strong>, set 0 MW and choose
+              <strong>Start exploring</strong>. Leave plants, prices, and
+              customer programs unchanged. Watch
+              <strong>Insights</strong> through the end of 2027.
             </li>
             <li>
-              In <strong>Insights</strong>, watch supply and demand, cash, and
-              emissions. For the example above, leave the plants, prices, and
-              customer programs unchanged and run through the end of 2027. For
-              your own experiment, choose a date after the planned opening and
-              write down what you see.
-            </li>
-            <li>
-              Return to <a href="/?dataCenters=1">the setup</a>. Choose the same
-              city, grid size, and years, then set the added demand to 100 MW.
-              Choose <strong>Start exploring</strong> to begin a separate run.
-              Make the same decisions and compare at the same date. Any new
-              plants or price changes need to match in both runs.
-            </li>
-            <li>
-              Now try a different response: build generation, add storage, or
-              fund a customer program to reduce other demand. Watch both the
-              result and the time it takes to get there.
+              Return to the setup and repeat with 100 MW, keeping everything
+              else the same. Then try your own response: build generation, add
+              storage, or reduce other demand.
             </li>
           </ol>
-          <p>
-            An annual energy total is only part of the problem. Check the hours
-            when demand is highest or renewable output is low. A battery can
-            help cover a gap, but it needs enough energy stored to last.
+          <p class="comparison-note">
+            Zero added demand keeps existing customers, including existing data
+            centers. The new campus draws constant power, while the game uses
+            one representative day per month. This exercise cannot forecast a
+            real project’s reliability or local bills.
           </p>
         </section>
 
         <section class="panel" aria-labelledby="questions-title">
-          <h2 id="questions-title">
-            Three questions to take to your community
-          </h2>
-          <h3>Will enough power be ready when the campus opens?</h3>
-          <p>
-            In the game, a plant that is still under construction cannot help
-            with today’s shortage. Ask which generation and grid upgrades a
-            proposal needs, when they will be ready, and what happens if they
-            are delayed.
-          </p>
-          <h3>Who pays for the extra capacity?</h3>
-          <p>
-            Try different ways to supply the new demand and watch your costs.
-            Then ask how the real project’s connection costs, new
-            infrastructure, and ongoing electricity use would be paid for. The
-            game does not calculate your household’s future bill.
-          </p>
-          <h3>What supplies the power when wind and solar are low?</h3>
-          <p>
-            Compare the emissions of your choices as well as their cost. Ask
-            what would supply the campus on a still night, and how any promise
-            to use clean energy accounts for those hours.
-          </p>
-        </section>
-
-        <section class="panel" aria-labelledby="limits-title">
-          <h2 id="limits-title">Use the model to ask better questions</h2>
-          <p>
-            Electrify is a game about energy tradeoffs. It uses one
-            representative day per month and a simplified regional grid. It
-            cannot predict a specific project’s reliability, connection costs,
-            or effect on local bills. Real data centers also vary their
-            electricity use; the constant load here makes the comparison easier
-            to follow.
-          </p>
-          <p>
-            Want to explore further? Read
-            <a href="/power-grid-simulator.html">how the game works</a>, use the
-            <a href="/classroom.html">classroom activity</a>, or
-            <a href="/energy-simulators.html"
-              >compare energy and climate tools</a
-            >
-            for other kinds of questions.
-          </p>
+          <h2 id="questions-title">Take these questions to your community</h2>
+          <ul>
+            <li>
+              Which power plants and grid upgrades must be ready when the campus
+              opens?
+            </li>
+            <li>
+              Who will pay for the new infrastructure and ongoing electricity
+              use?
+            </li>
+            <li>
+              What supplies power on a still night, and how does a clean-energy
+              promise account for those hours?
+            </li>
+          </ul>
           <div class="panel__actions">
             <a class="button button--primary" href="/?dataCenters=1"
               >Explore the impact</a
