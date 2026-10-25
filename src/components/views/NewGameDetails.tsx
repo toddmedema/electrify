@@ -30,7 +30,8 @@ import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
 import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
 import { DIFFICULTY_LABELS, difficultyLabel } from "../../Constants";
 import DifficultyPicker from "../base/DifficultyPicker";
-import { getDb, login } from "../../Globals";
+import { getDb } from "../../Globals";
+import SignInButtons from "../base/SignInButtons";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
@@ -415,7 +416,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
     const endYear =
       scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
     const visibleScores = leaderboardExpanded ? allScores : scores?.slice(0, 3);
-    // Steam boards have no replays or Google sign-in.
+    // Steam boards have no replays or web sign-in.
     const desktopApp =
       process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
     const scoreColumnCount =
@@ -668,10 +669,16 @@ export default class NewGameDetails extends React.Component<Props, State> {
           )}
           {/* Below the board rather than in place of it: the board is the reason to log in */}
           {!challenge && !uid && !desktopApp && (
-            <div style={{ textAlign: "center", margin: "12px 0 24px" }}>
-              <Button variant="outlined" color="primary" onClick={login}>
-                Sign in with Google
-              </Button>
+            <div
+              style={{
+                textAlign: "center",
+                margin: "12px 0 24px",
+                display: "grid",
+                justifyItems: "center",
+                gap: 8,
+              }}
+            >
+              <SignInButtons />
               <Typography variant="body2" color="textSecondary">
                 To set a high score under your own name
               </Typography>

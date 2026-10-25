@@ -106,46 +106,56 @@ beforeEach(() => {
   mockLogin.mockResolvedValue(false);
 });
 
-it("prepares one snapshot and creates a frozen share link after sign-in", async () => {
-  const close = jest.fn();
-  const user = userEvent.setup();
-  render(<ShareSaveDialog id="local-save" onClose={close} />);
-  const sharing = screen.getByRole("dialog", { name: "Share a frozen copy" });
-  await waitFor(() =>
-    expect(
-      within(sharing).getByRole("button", { name: "Sign in and share" }),
-    ).toBeEnabled(),
-  );
-  expect(mockSnapshot).toHaveBeenCalledTimes(1);
-  expect(mockSnapshot).toHaveBeenCalledWith("local-save");
-  expect(mockCreate).not.toHaveBeenCalled();
-  mockLogin.mockImplementation(async () => {
-    mockAuth.currentUser = { uid: "account" };
-    return true;
-  });
-  await user.click(
-    within(sharing).getByRole("button", { name: "Sign in and share" }),
-  );
-  expect(mockCreate).toHaveBeenCalledWith("account", snapshot);
-  const link = await within(sharing).findByRole("textbox", {
-    name: "Share link",
-  });
-  expect(link).toHaveValue("https://electrifygame.com/?game=Abc123Xy90");
-  expect(link).toHaveAttribute("readonly");
-  const clipboard = jest
-    .spyOn(navigator.clipboard, "writeText")
-    .mockResolvedValue(undefined);
-  await user.click(within(sharing).getByRole("button", { name: "Copy link" }));
-  expect(clipboard).toHaveBeenCalledWith(
-    "https://electrifygame.com/?game=Abc123Xy90",
-  );
-  expect(await within(sharing).findByRole("status")).toHaveTextContent(
-    "Link copied",
-  );
-  await user.click(within(sharing).getByRole("button", { name: "Close" }));
-  expect(close).toHaveBeenCalledTimes(1);
-  expect(mockSnapshot).toHaveBeenCalledTimes(1);
-});
+it.each(["google", "apple"] as const)(
+  "prepares one snapshot and creates a frozen share link after %s sign-in",
+  async (provider) => {
+    const close = jest.fn();
+    const user = userEvent.setup();
+    render(<ShareSaveDialog id="local-save" onClose={close} />);
+    const sharing = screen.getByRole("dialog", { name: "Share a frozen copy" });
+    await waitFor(() =>
+      expect(
+        within(sharing).getByRole("button", {
+          name: `Sign in with ${provider === "google" ? "Google" : "Apple"}`,
+        }),
+      ).toBeEnabled(),
+    );
+    expect(mockSnapshot).toHaveBeenCalledTimes(1);
+    expect(mockSnapshot).toHaveBeenCalledWith("local-save");
+    expect(mockCreate).not.toHaveBeenCalled();
+    mockLogin.mockImplementation(async () => {
+      mockAuth.currentUser = { uid: "account" };
+      return true;
+    });
+    await user.click(
+      within(sharing).getByRole("button", {
+        name: `Sign in with ${provider === "google" ? "Google" : "Apple"}`,
+      }),
+    );
+    expect(mockLogin).toHaveBeenCalledWith(provider);
+    expect(mockCreate).toHaveBeenCalledWith("account", snapshot);
+    const link = await within(sharing).findByRole("textbox", {
+      name: "Share link",
+    });
+    expect(link).toHaveValue("https://electrifygame.com/?game=Abc123Xy90");
+    expect(link).toHaveAttribute("readonly");
+    const clipboard = jest
+      .spyOn(navigator.clipboard, "writeText")
+      .mockResolvedValue(undefined);
+    await user.click(
+      within(sharing).getByRole("button", { name: "Copy link" }),
+    );
+    expect(clipboard).toHaveBeenCalledWith(
+      "https://electrifygame.com/?game=Abc123Xy90",
+    );
+    expect(await within(sharing).findByRole("status")).toHaveTextContent(
+      "Link copied",
+    );
+    await user.click(within(sharing).getByRole("button", { name: "Close" }));
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(mockSnapshot).toHaveBeenCalledTimes(1);
+  },
+);
 
 it("retains the frozen snapshot when link creation fails and can retry", async () => {
   mockAuth.currentUser = { uid: "account" };
@@ -185,15 +195,48 @@ it("does not publish after a cancelled sign-in", async () => {
   render(<ShareSaveDialog id="local-save" onClose={jest.fn()} />);
   await waitFor(() =>
     expect(
-      screen.getByRole("button", { name: "Sign in and share" }),
+      screen.getByRole("button", { name: "Sign in with Google" }),
     ).toBeEnabled(),
   );
   await userEvent.click(
-    screen.getByRole("button", { name: "Sign in and share" }),
+    screen.getByRole("button", { name: "Sign in with Google" }),
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Sign-in didn't finish",
   );
+  expect(mockCreate).not.toHaveBeenCalled();
+});
+
+it("resets sign-in when switching saves and ignores the previous save's late sign-in", async () => {
+  let finish!: (ok: boolean) => void;
+  mockLogin.mockImplementationOnce(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const view = render(<ShareSaveDialog id="first" onClose={jest.fn()} />);
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Sign in with Apple" }),
+    ).toBeEnabled(),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Sign in with Apple" }),
+  );
+  expect(
+    screen.getByRole("button", { name: "Sign in with Google" }),
+  ).toBeDisabled();
+  view.rerender(<ShareSaveDialog id="second" onClose={jest.fn()} />);
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Sign in with Google" }),
+    ).toBeEnabled(),
+  );
+  await act(async () => {
+    mockAuth.currentUser = { uid: "account" };
+    finish(true);
+  });
   expect(mockCreate).not.toHaveBeenCalled();
 });
 
@@ -505,22 +548,28 @@ it("offers optional cloud sign-in only once after Save & Quit", async () => {
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
-it("keeps the cloud invitation available after a cancelled sign-in", async () => {
-  renderWithSaves(<CloudSavePrompt />, {
-    cloudState: "signedOut",
-    entries: [existingSave],
-    cloudPromptRequested: true,
-  });
-  await userEvent.click(
-    screen.getByRole("button", { name: "Sign in with Google" }),
-  );
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Sign-in didn't finish",
-  );
-  expect(
-    screen.getByRole("button", { name: "Continue without syncing" }),
-  ).toBeEnabled();
-});
+it.each(["google", "apple"] as const)(
+  "keeps the cloud invitation available after a cancelled %s sign-in",
+  async (provider) => {
+    renderWithSaves(<CloudSavePrompt />, {
+      cloudState: "signedOut",
+      entries: [existingSave],
+      cloudPromptRequested: true,
+    });
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: `Sign in with ${provider === "google" ? "Google" : "Apple"}`,
+      }),
+    );
+    expect(mockLogin).toHaveBeenCalledWith(provider);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Sign-in didn't finish",
+    );
+    expect(
+      screen.getByRole("button", { name: "Continue without syncing" }),
+    ).toBeEnabled();
+  },
+);
 
 it("does not interrupt shared links with the cloud invitation", () => {
   window.history.replaceState(null, "", "/?game=Abc123Xy90");

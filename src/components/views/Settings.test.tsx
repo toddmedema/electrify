@@ -28,7 +28,6 @@ function renderSettings(overrides: Partial<Props> = {}) {
       theme: "system",
     },
     loggedIn: false,
-    onLogin: () => undefined,
     onLogout: () => undefined,
     onChangeName: () => undefined,
     onAudioChange: () => undefined,

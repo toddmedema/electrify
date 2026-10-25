@@ -19,6 +19,7 @@ const smoke = [
   "operations-priorities.spec.ts",
 ];
 const layout = [
+  "sign-in.spec.ts",
   "ui-chart-build-polish.spec.ts",
   "multiline-text.spec.ts",
   "modal-layout.spec.ts",

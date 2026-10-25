@@ -56,6 +56,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "multiline-text.spec.ts",
       "ui-chart-build-polish.spec.ts",
       "modal-layout.spec.ts",
+      "sign-in.spec.ts",
       "wildfire-scenario.spec.ts",
       ...projects,
       "--project=mobile-360px",

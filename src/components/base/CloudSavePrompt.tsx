@@ -12,6 +12,7 @@ import { cloudSavePromptVisible } from "../../reducers/GameActions";
 import { getLocalStorage, login } from "../../Globals";
 import { setStorageKeyValue } from "../../LocalStorage";
 import { isDesktopApp } from "../../Desktop";
+import SignInButtons from "./SignInButtons";
 
 export const CLOUD_PROMPT_KEY = "electrify-cloud-save-prompt-seen";
 export default function CloudSavePrompt(): React.JSX.Element {
@@ -20,7 +21,6 @@ export default function CloudSavePrompt(): React.JSX.Element {
   const seen = useRef(false);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
   const visible =
     !(process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) &&
     open &&
@@ -67,35 +67,37 @@ export default function CloudSavePrompt(): React.JSX.Element {
       </DialogTitle>
       <DialogContent>
         <Typography id="cloud-prompt-description">
-          Sign in with Google to keep a private cloud backup and continue on
-          another device. Your games still save and load on this device, even
-          offline.
+          Sign in with Google or Apple to keep a private cloud backup and
+          continue on another device. Your games still save and load on this
+          device, even offline.
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
           You can also sign in later from Saved games.
         </Typography>
-        {error && (
-          <Typography color="error" role="alert" sx={{ mt: 2 }}>
-            Sign-in didn't finish. Please try again.
-          </Typography>
-        )}
       </DialogContent>
-      <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
+      <DialogActions
+        sx={{
+          flexDirection: "column",
+          gap: 1,
+          px: 3,
+          pb: 2,
+          "& > :not(style) ~ :not(style)": { ml: 0 },
+        }}
+      >
+        <SignInButtons
+          onSignIn={async (provider) => {
+            setBusy(true);
+            try {
+              const ok = await login(provider);
+              if (ok) setOpen(false);
+              return ok;
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
         <Button disabled={busy} onClick={dismiss}>
           Continue without syncing
-        </Button>
-        <Button
-          variant="contained"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            const ok = await login();
-            setBusy(false);
-            if (ok) setOpen(false);
-            else setError(true);
-          }}
-        >
-          {busy ? "Signing in…" : "Sign in with Google"}
         </Button>
       </DialogActions>
     </Dialog>

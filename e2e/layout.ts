@@ -1,5 +1,42 @@
 import { expect, Locator, Page } from "@playwright/test";
 
+/** Both providers must remain equal, usable columns at every supported width. */
+export async function expectSignInButtonsToFit(scope: Page | Locator) {
+  const google = scope.getByRole("button", {
+    name: "Sign in with Google",
+    exact: true,
+  });
+  const apple = scope.getByRole("button", {
+    name: "Sign in with Apple",
+    exact: true,
+  });
+  // Card transitions briefly mount the outgoing and incoming screens together.
+  await expect(google).toHaveCount(1);
+  await expect(apple).toHaveCount(1);
+  await expect(google).toBeVisible();
+  await expect(apple).toBeVisible();
+  const a = (await google.boundingBox())!;
+  const b = (await apple.boundingBox())!;
+  expect(Math.abs(a.y - b.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(a.height - b.height)).toBeLessThanOrEqual(1);
+  expect(Math.abs(a.width - b.width)).toBeLessThanOrEqual(1);
+  expect(b.x).toBeGreaterThanOrEqual(a.x + a.width);
+  const minimumHeight = await google
+    .page()
+    .evaluate(() => (matchMedia("(pointer: coarse)").matches ? 44 : 40));
+  expect(a.height).toBeGreaterThanOrEqual(minimumHeight);
+  const viewport = google.page().viewportSize()!;
+  expect(a.x).toBeGreaterThanOrEqual(0);
+  expect(b.x + b.width).toBeLessThanOrEqual(viewport.width + 1);
+  for (const button of [google, apple]) {
+    expect(
+      await button.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+  }
+}
+
 /**
  * Tools open deliberately from the dock at every width. Keep this compatibility helper for
  * existing walkthrough specs: a wide screen no longer opens Insights and Events automatically.
