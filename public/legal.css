@@ -780,6 +780,132 @@ a:hover {
   }
 }
 
+.comparison-content {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.comparison-page .hero h1 {
+  font-size: clamp(2.7rem, 5.5vw, 4.5rem);
+  line-height: 1.06;
+}
+
+.comparison-page .panel h3 {
+  margin: 1.5rem 0 0;
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+
+.comparison-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.comparison-columns > div > h3:first-child {
+  margin-top: 0;
+}
+
+.comparison-table {
+  width: 100%;
+  margin-top: 1.5rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.comparison-table thead {
+  background: var(--surface-soft);
+}
+
+.comparison-table th:first-child {
+  width: 20%;
+}
+
+.comparison-table td {
+  color: var(--text-muted);
+}
+
+.comparison-table__label {
+  display: none;
+}
+
+.comparison-page .comparison-note {
+  margin-top: 1.5rem;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 48rem) {
+  .comparison-columns {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .comparison-columns > div + div {
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .comparison-table,
+  .comparison-table tbody,
+  .comparison-table tr,
+  .comparison-table th,
+  .comparison-table td {
+    display: block;
+  }
+
+  .comparison-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .comparison-table th:first-child {
+    width: auto;
+  }
+
+  .comparison-table tbody th {
+    padding: 0.75rem 1rem;
+    border-bottom: 0;
+    background: var(--surface-soft);
+  }
+
+  .comparison-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 0;
+  }
+
+  .comparison-table tr + tr {
+    margin-top: 1rem;
+  }
+
+  .comparison-table__label {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+    font-weight: 750;
+  }
+}
+
+@media (max-width: 37.5rem) {
+  .comparison-page .topnav a[href="/about.html"] {
+    display: inline-flex;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
