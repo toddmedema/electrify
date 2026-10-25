@@ -4,7 +4,7 @@ import { readSavedGame } from "./save-fixture";
 // The bundle delays must control repeat visits even when production caching is available.
 test.use({ serviceWorkers: "block" });
 
-test("first-load logo stays centered through its slower slide into the menu", async ({
+test("loading hands off to a smooth logo rise and individually staggered controls", async ({
   page,
 }, testInfo) => {
   await page.emulateMedia({
@@ -15,7 +15,7 @@ test("first-load logo stays centered through its slower slide into the menu", as
     const animate = Element.prototype.animate;
     Element.prototype.animate = function (...args) {
       const animation = animate.apply(this, args);
-      if (this.matches("#menuCard .homeLogo")) {
+      if (this.closest("#menuCard")) {
         animation.pause();
         animation.currentTime = 0;
       }
@@ -31,164 +31,155 @@ test("first-load logo stays centered through its slower slide into the menu", as
   await page.goto("/", { waitUntil: "commit" });
   const loadingLogo = page.locator("#appStartup .homeLogo");
   await expect(loadingLogo.getByAltText("Electrify")).toBeVisible();
-  expect(
-    await page.evaluate(() =>
-      localStorage.getItem("electrify-startup-complete"),
-    ),
-  ).toBeNull();
   const before = (await loadingLogo.boundingBox())!;
-  expect(before.x + before.width / 2).toBeCloseTo(
-    page.viewportSize()!.width / 2,
-    0,
-  );
   releaseBundle();
   await expect(page.locator("#appStartup")).toHaveCount(0);
   const menuLogo = page.locator("#menuCard .homeLogo");
-  await expect(menuLogo).toBeVisible();
-  expect(
-    await menuLogo.evaluate(
-      (logo) => logo.getAnimations()[0].effect!.getTiming().duration,
-    ),
-  ).toBe(900);
-  for (const time of [0, 450, 900]) {
-    await menuLogo.evaluate((logo, currentTime) => {
-      for (const animation of logo.getAnimations())
-        animation.currentTime = currentTime;
+  const controls = page.locator("#menuCard button, #menuCard a[href]");
+  const duration = await menuLogo.evaluate((logo) =>
+    Number(logo.getAnimations()[0].effect!.getTiming().duration),
+  );
+  const advance = (time: number) =>
+    page.locator("#menuCard").evaluate((menu, currentTime) => {
+      for (const animation of menu.getAnimations({ subtree: true })) {
+        if (
+          animation instanceof Animation &&
+          !(animation instanceof CSSAnimation)
+        )
+          animation.currentTime = currentTime;
+      }
     }, time);
+  const start = (await menuLogo.boundingBox())!;
+  expect(start.y).toBeCloseTo(before.y, 0);
+  expect(start.width).toBeCloseTo(before.width, 0);
+  const delays = await controls.evaluateAll((elements) =>
+    elements.map((element) =>
+      Number(element.getAnimations()[0].effect!.getTiming().delay),
+    ),
+  );
+  expect(delays.length).toBeGreaterThan(5);
+  for (let index = 1; index < delays.length; index++)
+    expect(delays[index]).toBeGreaterThan(delays[index - 1]);
+  await expect(controls.first()).toHaveCSS("opacity", "0");
+  await advance(delays[1]);
+  expect(
+    Number(
+      await controls
+        .first()
+        .evaluate((element) => getComputedStyle(element).opacity),
+    ),
+  ).toBeGreaterThan(0);
+  await expect(controls.nth(1)).toHaveCSS("opacity", "0");
+  let previousY = start.y;
+  for (const time of [duration / 3, (duration * 2) / 3, duration]) {
+    await advance(time);
     const bounds = (await menuLogo.boundingBox())!;
-    expect(bounds.width).toBeCloseTo(before.width, 0);
+    expect(bounds.y).toBeLessThan(previousY);
+    previousY = bounds.y;
     expect(bounds.x + bounds.width / 2).toBeCloseTo(
       page.viewportSize()!.width / 2,
       0,
     );
-    if (process.env.PR_SCREENSHOTS && time === 900) {
-      await page.screenshot({
-        path: `.tmp/pr-startup-${testInfo.project.name}.png`,
-      });
-    }
+    const firstAction = (await controls.first().boundingBox())!;
+    expect(firstAction.y).toBeGreaterThan(bounds.y + bounds.height);
   }
+  for (const control of await controls.all())
+    await expect(control).toHaveCSS("opacity", "1");
+  if (process.env.PR_SCREENSHOTS)
+    await page.screenshot({
+      path: `.tmp/pr-startup-${testInfo.project.name}.png`,
+    });
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
-  ).toBeEnabled();
-  expect(
-    await page.evaluate(() =>
-      localStorage.getItem("electrify-startup-complete"),
-    ),
-  ).toBe("true");
+  ).toBeFocused();
 });
 
-test("later loads skip the entrance on reload and in a new tab", async ({
+test("warm reloads and new tabs keep the minimum loading time and animate again", async ({
   page,
   context,
 }) => {
   await context.addInitScript(() => {
+    new MutationObserver((records) => {
+      for (const record of records)
+        for (const removed of record.removedNodes) {
+          if (removed instanceof HTMLElement && removed.id === "appStartup")
+            document.documentElement.dataset.startupDuration = String(
+              performance.now() - Number(removed.dataset.startedAt),
+            );
+        }
+    }).observe(document, { childList: true, subtree: true });
     const animate = Element.prototype.animate;
     Element.prototype.animate = function (...args) {
-      if (this.matches("#menuCard .homeLogo, #centeredMenu")) {
-        const root = document.documentElement;
-        root.dataset.startupTransitions = String(
-          Number(root.dataset.startupTransitions ?? 0) + 1,
-        );
-      }
+      if (this.matches("#menuCard .homeLogo"))
+        document.documentElement.dataset.startupAnimated = "true";
       return animate.apply(this, args);
     };
   });
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/");
-  await expect(page.locator("#menuCard")).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-startup-transitions",
-    "2",
-  );
-
-  for (const returningPage of [page, await context.newPage()]) {
+  for (const returningPage of [page, page, await context.newPage()]) {
     await returningPage.emulateMedia({ reducedMotion: "no-preference" });
-    let releaseBundle!: () => void;
-    const bundleReady = new Promise<void>(
-      (resolve) => (releaseBundle = resolve),
-    );
-    await returningPage.route("**/*achievements*.js", async (route) => {
-      await bundleReady;
-      await route.continue();
-    });
-    // Hold initialization after the app stylesheet arrives so this exercises the real CSS.
-    const bundleRequested = returningPage.waitForRequest(
-      "**/*achievements*.js",
-    );
-    await returningPage.goto("/", { waitUntil: "commit" });
-    await bundleRequested;
-    await expect(returningPage.locator("html")).toHaveAttribute(
-      "data-startup-visit",
-      "returning",
-    );
-    const entrance = returningPage.locator("#appStartup");
-    await expect(entrance.getByRole("status")).toHaveText("Loading Electrify…");
+    await returningPage.goto("/");
+    await expect(returningPage.locator("#appStartup")).toHaveCount(0);
     expect(
-      await entrance.evaluate(
-        (element) => element.getAnimations({ subtree: true }).length,
+      Number(
+        await returningPage
+          .locator("html")
+          .getAttribute("data-startup-duration"),
       ),
-    ).toBe(0);
-    releaseBundle();
-    await expect(entrance).toHaveCount(0);
+    ).toBeGreaterThanOrEqual(500);
+    await expect(returningPage.locator("html")).toHaveAttribute(
+      "data-startup-animated",
+      "true",
+    );
     await expect(
       returningPage.getByRole("button", { name: "Play", exact: true }),
     ).toBeEnabled();
-    await expect(returningPage.locator("html")).not.toHaveAttribute(
-      "data-startup-transitions",
-    );
   }
 });
 
-test("blocked visit storage still allows the menu to load", async ({
+test("keyboard and pointer actions work during the entrance", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.addInitScript(() => {
-    const getItem = Storage.prototype.getItem;
-    const setItem = Storage.prototype.setItem;
-    Storage.prototype.getItem = function (key) {
-      if (key === "electrify-startup-complete")
-        throw new DOMException("Storage blocked", "SecurityError");
-      return getItem.call(this, key);
-    };
-    Storage.prototype.setItem = function (key, value) {
-      if (key === "electrify-startup-complete")
-        throw new DOMException("Storage blocked", "SecurityError");
-      setItem.call(this, key, value);
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (...args) {
+      const animation = animate.apply(this, args);
+      if (this.closest("#menuCard")) {
+        animation.pause();
+        animation.currentTime = 0;
+      }
+      return animation;
     };
   });
   await page.goto("/");
-  await expect(
-    page.getByRole("button", { name: "Play", exact: true }),
-  ).toBeEnabled();
   await expect(page.locator("#appStartup")).toHaveCount(0);
+  await page.keyboard.press("ArrowDown");
+  await expect(
+    page.getByRole("button", { name: "Manual", exact: true }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "Settings", exact: true }),
+  ).toHaveCSS("opacity", "1");
+  await page.reload();
+  await expect(page.locator("#appStartup")).toHaveCount(0);
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.locator(".facilities:visible")).toBeVisible();
 });
 
-test("a failed load does not consume the first visit", async ({ page }) => {
+test("a failed load can be retried", async ({ page }) => {
   await page.route("**/*achievements*.js", (route) => route.abort());
   await page.goto("/");
   await expect(page.getByRole("alert")).toContainText(
     "Electrify couldn't finish loading",
   );
-  expect(
-    await page.evaluate(() =>
-      localStorage.getItem("electrify-startup-complete"),
-    ),
-  ).toBeNull();
   await page.unroute("**/*achievements*.js");
   await page.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
   ).toBeEnabled();
-  expect(
-    await page.evaluate(() =>
-      localStorage.getItem("electrify-startup-complete"),
-    ),
-  ).toBe("true");
 });
 
-test("reduced motion skips the entrance on the first visit", async ({
-  page,
-}) => {
+test("reduced motion skips the logo movement and stagger", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const logo = page.locator("#menuCard .homeLogo");
@@ -200,8 +191,8 @@ test("reduced motion skips the entrance on the first visit", async ({
   ).toBe(0);
   expect(
     await page
-      .locator("#centeredMenu")
-      .evaluate((element) => element.getAnimations().length),
+      .locator("#menuCard")
+      .evaluate((element) => element.getAnimations({ subtree: true }).length),
   ).toBe(0);
 });
 
@@ -258,6 +249,7 @@ test("home actions and resources remain reachable at low height with and without
         exact: true,
       }),
     ).toBeVisible();
+    await expect(page.locator("#menuCard")).toHaveCSS("overflow-y", "auto");
     const logo = (await page.locator("#logo").boundingBox())!;
     const menu = (await page.locator("#centeredMenu").boundingBox())!;
     const footer = (await page.locator(".mainMenuFooter").boundingBox())!;

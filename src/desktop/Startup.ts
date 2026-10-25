@@ -35,24 +35,37 @@ export function failDesktopStartup(retry: () => void, quit: () => void): void {
   actions.querySelector("button")?.focus();
 }
 
-/**
- * Called at the app's first commit on web and desktop, with no timeout or animation
- * completion gate.
- */
+/** Keep even a cached startup visible for 500ms, measured from the early HTML entrance. */
 export function finishStartup(): void {
-  // Only a successful app commit counts; read the visit decision made before first paint.
-  try {
-    localStorage.setItem("electrify-startup-complete", "true");
-  } catch {
-    // Storage restrictions must never prevent the menu from becoming usable.
-  }
   const entrance = document.getElementById("appStartup");
-  if (!entrance) return;
-  if (document.documentElement.dataset.startupVisit === "returning") {
-    entrance.remove();
-    return;
+  // StrictMode commits twice; only one handoff may own the overlay and animations.
+  if (!entrance || entrance.dataset.handoffPending) return;
+  entrance.dataset.handoffPending = "true";
+  const root = document.getElementById("root");
+  const visibility = root?.style.visibility ?? "";
+  if (root) {
+    root.inert = true;
+    root.style.visibility = "hidden";
   }
-  const menu = document.querySelector("#menuCard");
+  const remaining = Math.max(
+    0,
+    Math.ceil(
+      500 - (performance.now() - Number(entrance.dataset.startedAt ?? 0)),
+    ),
+  );
+  const handoff = () => {
+    if (root) {
+      root.inert = false;
+      root.style.visibility = visibility;
+    }
+    if (entrance.isConnected) revealMenu(entrance);
+  };
+  if (remaining > 0) window.setTimeout(handoff, remaining);
+  else handoff();
+}
+
+function revealMenu(entrance: HTMLElement): void {
+  const menu = document.querySelector<HTMLElement>("#menuCard");
   const logo = menu?.querySelector(".homeLogo");
   const before = entrance.querySelector(".homeLogo")?.getBoundingClientRect();
   // Carry the pulse and smoke's clocks into the matching menu logo instead of restarting them.
@@ -73,23 +86,60 @@ export function finishStartup(): void {
   }
   entrance.remove();
   if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const controls = Array.from(
+      menu?.querySelectorAll<HTMLElement>("button, a[href]") ?? [],
+    ).filter((control) => control.getClientRects().length > 0);
+    const animations = controls.map((control, index) =>
+      control.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: 300,
+        delay: 180 + index * 80,
+        easing: "ease-out",
+        fill: "backwards",
+      }),
+    );
     const after = logo?.getBoundingClientRect();
     if (logo && before && after) {
-      logo.animate(
-        [
-          {
-            transform: `translateY(${before.y - after.y}px)`,
-          },
-          { transform: "none" },
-        ],
-        { duration: 900, easing: "ease-out" },
-      );
+      // Move the menu with the logo so fading controls always keep their final spacing.
+      for (const element of [logo, menu?.querySelector("#centeredMenu")]) {
+        if (element)
+          animations.push(
+            element.animate(
+              [
+                { transform: `translateY(${before.y - after.y}px)` },
+                { transform: "none" },
+              ],
+              {
+                duration: Math.max(900, 480 + (controls.length - 1) * 80),
+                easing: "cubic-bezier(0.25, 0.1, 0.25, 1)",
+              },
+            ),
+          );
+      }
     }
-    menu
-      ?.querySelector("#centeredMenu")
-      ?.animate([{ opacity: 0.65 }, { opacity: 1 }], {
-        duration: 720,
-        easing: "ease-out",
-      });
+    // Translated controls must not create a temporary scrollbar; restore normal scrolling
+    // when the entrance finishes, including on short screens that need it for the full menu.
+    const overflow = menu?.style.overflow ?? "";
+    if (menu) menu.style.overflow = "clip";
+    // Keyboard/controller or pointer input should reveal its target immediately.
+    const finish = () => animations.forEach((animation) => animation.finish());
+    const cleanup = () => {
+      if (menu) menu.style.overflow = overflow;
+      menu?.removeEventListener("keydown", finish, true);
+      menu?.removeEventListener("click", finish, true);
+    };
+    menu?.addEventListener("keydown", finish, { once: true, capture: true });
+    // Complete pointer activation before moving its target to the resting position.
+    menu?.addEventListener("click", finish, {
+      once: true,
+      capture: true,
+    });
+    void Promise.all(animations.map((animation) => animation.finished)).then(
+      cleanup,
+      cleanup,
+    );
   }
+  if (document.activeElement === document.body)
+    menu
+      ?.querySelector<HTMLElement>("[data-main-action]")
+      ?.focus({ preventScroll: true });
 }

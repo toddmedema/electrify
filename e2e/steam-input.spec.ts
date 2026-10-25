@@ -725,6 +725,9 @@ test("controller advances the first tutorial through inspection, chart and clock
     "data-mock-input-context",
     "Menu",
   );
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true }),
+  ).toBeFocused();
   await input(page, "confirm");
   const hud = page.locator(".tutorialHud");
   await expect(hud).toBeVisible();
