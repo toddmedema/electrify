@@ -64,7 +64,8 @@ async function focusGame() {
 
 const menuSources = async () =>
   (await feedbackAudio(desktop.page)).starts.filter((source) =>
-    source.url.includes("/audio/menu/"),
+    // The background soundtrack shares this directory, but is not an effects cue.
+    /\/audio\/menu\/(?:select|confirm|back)\.wav$/.test(source.url),
   );
 
 async function captureMenu() {
