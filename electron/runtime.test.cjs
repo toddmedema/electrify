@@ -211,6 +211,28 @@ test("Steam selections reject arbitrary names and scores outside signed integer 
     );
 });
 
+test("current Steam scoring accepts only completed missions and preserves legacy queue identity", () => {
+  const legacy = {
+    scenarioId: 101,
+    difficulty: "CEO",
+    challengeId: "rules-1-abc123",
+    score: 123,
+  };
+  assert.equal(validateScore(legacy).scoreVersion, undefined);
+  const current = { ...legacy, scoreVersion: 2, outcome: "completed" };
+  assert.deepEqual(validateScore(current), current);
+  for (const outcome of ["bankrupt", "fired", undefined, "unknown"])
+    assert.throws(
+      () => validateScore({ ...current, outcome }),
+      /Only completed missions/,
+    );
+  for (const scoreVersion of [0, 3, "2"])
+    assert.throws(
+      () => validateScore({ ...current, scoreVersion }),
+      /Invalid leaderboard/,
+    );
+});
+
 test("native save boundary bounds JSON while renderer owns domain validation", () => {
   const library = { version: 1, records: [{ id: "a", deleted: true }] };
   assert.deepEqual(parseLibrary(libraryJson(library)), library);

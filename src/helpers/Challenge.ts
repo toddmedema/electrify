@@ -82,7 +82,9 @@ export function challengeShareContent(
 ): { content: ShareContentType; challenge: boolean } {
   const reference = projectAuthoredRunReference(victory.runIdentity);
   const invitation: ChallengeInvitation | undefined =
-    reference && Number.isSafeInteger(victory.score)
+    victory.outcome === "completed" &&
+    reference &&
+    Number.isSafeInteger(victory.score)
       ? { run: reference, target: victory.score }
       : undefined;
   const url = invitation && challengeUrl(invitation, href);
@@ -106,6 +108,8 @@ export function challengeShareContent(
 export function challengeComparison(victory: VictoryType): string | undefined {
   const invitation = victory.challenge;
   if (!invitation) return;
+  if (victory.outcome !== "completed")
+    return "Complete the mission to compare your score with the shared score.";
   if (
     !sameRunIdentity(
       victory.runIdentity,

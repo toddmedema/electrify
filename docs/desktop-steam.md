@@ -418,7 +418,7 @@ approve the product.
   release. Each library is limited to 64 MiB. Separate device files retain conflicting progress
   rather than allowing a last-writer replacement to discard another computer's saves.
 - The adapter creates leaderboards named
-  `electrify-v1-s<scenarioId>-<lowercase-difficulty>-<digest>`, where `digest` is the first 24 hex
+  `electrify-v<scoreVersion>-s<scenarioId>-<lowercase-difficulty>-<digest>`, where `digest` is the first 24 hex
   characters of SHA256 of the generated run-compatibility ID. This keeps scores under different
   simulation rules separate. Every native request must include the current compatibility ID.
   The boards use descending numeric scores and KeepBest. Confirm client writes and global reads

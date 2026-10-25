@@ -110,6 +110,8 @@ function validateBoard(input) {
     !Number.isSafeInteger(input.scenarioId) ||
     input.scenarioId < 0 ||
     input.scenarioId > 100000 ||
+    (input.scoreVersion !== undefined &&
+      ![1, 2].includes(input.scoreVersion)) ||
     !difficulties.includes(input.difficulty) ||
     typeof input.challengeId !== "string" ||
     input.challengeId.length > 100 ||
@@ -120,11 +122,16 @@ function validateBoard(input) {
     scenarioId: input.scenarioId,
     difficulty: input.difficulty,
     challengeId: input.challengeId,
+    ...(input.scoreVersion !== undefined
+      ? { scoreVersion: input.scoreVersion }
+      : {}),
   };
 }
 
 function validateScore(input) {
   const board = validateBoard(input);
+  if (board.scoreVersion === 2 && input.outcome !== "completed")
+    throw new Error("Only completed missions can submit competitive scores");
   if (
     !Number.isFinite(input.score) ||
     input.score < -2147483648 ||
@@ -141,6 +148,7 @@ function validateScore(input) {
     ...board,
     score: Math.round(input.score),
     ...(input.appVersion ? { appVersion: input.appVersion } : {}),
+    ...(board.scoreVersion === 2 ? { outcome: "completed" } : {}),
   };
 }
 

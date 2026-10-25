@@ -40,6 +40,38 @@ function summary(
 }
 
 describe("SaveModel", () => {
+  it("round trips explicit score versions without inferring one for a legacy result", () => {
+    const legacy = fakeSavedResult();
+    expect(savedRunResult({ ...legacy, ranked: false })).not.toHaveProperty(
+      "scoreVersion",
+    );
+    const current = savedRunResult({
+      ...legacy,
+      ranked: true,
+      scoreVersion: 2,
+    });
+    expect(current.scoreVersion).toBe(2);
+    expect(parseSavedRunResult(JSON.parse(JSON.stringify(current)))).toEqual(
+      current,
+    );
+    for (const scoreVersion of ["2", 0, 1.5, Infinity])
+      expect(parseSavedRunResult({ ...current, scoreVersion })).toBeNull();
+  });
+  it("reads current and recorded legacy breakdowns without changing their totals", () => {
+    for (const breakdown of [
+      { service: 80, financial: 20, environmental: -5 },
+      {
+        supply: 100,
+        netWorth: 20,
+        customers: 3,
+        emissions: -5,
+        blackouts: -20,
+      },
+    ]) {
+      const result = { ...fakeSavedResult(), score: 987, breakdown };
+      expect(parseSavedRunResult(result)).toEqual(result);
+    }
+  });
   it("round trips a current encoded run without mutating the original", () => {
     const file = fakeSaveFile();
     file.save.game.runIdentity = captureRunIdentity(

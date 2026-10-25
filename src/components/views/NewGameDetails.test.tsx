@@ -71,7 +71,9 @@ describe("NewGameDetails leaderboard", () => {
     expect(mockPrefetchScenarioData).toHaveBeenCalledWith(
       expect.objectContaining({ id: "SF" }),
     );
-    await screen.findByText("Finish this game to join the leaderboard");
+    await screen.findByText("Complete this mission to join the leaderboard");
+    expect(mockWhere).toHaveBeenCalledWith("scoreVersion", "==", 2);
+    expect(mockWhere).toHaveBeenCalledWith("outcome", "==", "completed");
 
     expect(
       screen.getByRole("heading", { name: "Leaderboard — Easy" }),
@@ -137,7 +139,7 @@ describe("NewGameDetails leaderboard", () => {
     await act(async () => {
       finish({ docs: [] });
     });
-    await screen.findByText("Finish this game to join the leaderboard");
+    await screen.findByText("Complete this mission to join the leaderboard");
     expect(board).toHaveStyle({ minHeight: "360px" });
   });
 

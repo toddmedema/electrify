@@ -30,6 +30,7 @@ function aVictory(overrides: Partial<VictoryType> = {}): VictoryType {
     score: 812,
     breakdown: { supply: 800, emissions: 30, blackouts: -18 },
     ranked: true,
+    outcome: "completed",
     ...overrides,
   };
 }
@@ -233,6 +234,11 @@ describe("VictoryDialog", () => {
         screen.getByLabelText("Final score 812 points"),
       ).toBeInTheDocument();
       expect(screen.queryByText("Keep playing")).not.toBeInTheDocument();
+      expect(mockFetchGlobalRank).not.toHaveBeenCalled();
+      expect(screen.queryByText(/New personal best/)).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/Complete the mission to join the leaderboard/),
+      ).toBeInTheDocument();
       const retry = screen.getByRole("button", { name: "Try again" });
       expect(retry).toHaveClass("MuiButton-contained");
       expect(screen.getByRole("button", { name: "New game" })).toHaveClass(

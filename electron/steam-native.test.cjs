@@ -209,6 +209,7 @@ test("rule and difficulty changes cannot mingle incompatible leaderboard scores"
     boardName(input),
     boardName({ ...input, difficulty: "Intern" }),
   );
+  assert.notEqual(boardName(input), boardName({ ...input, scoreVersion: 2 }));
   assert(boardName(input).length < 128);
 });
 

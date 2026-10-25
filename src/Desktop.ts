@@ -125,12 +125,15 @@ export interface DesktopBridge {
     syncCloud?: boolean,
   ): Promise<{ cloudState: DesktopCloudState }>;
   getLeaderboard(request: {
+    scoreVersion?: number;
     scenarioId: number;
     difficulty?: DifficultyType;
     scope: "global" | "friends" | "player";
     challengeId: string;
   }): Promise<DesktopScore[]>;
   submitScore(score: {
+    scoreVersion?: number;
+    outcome?: "completed" | "bankrupt" | "fired";
     appVersion?: string;
     scenarioId: number;
     difficulty: DifficultyType;

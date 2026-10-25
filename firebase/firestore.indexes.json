@@ -35,6 +35,50 @@
         { "fieldPath": "uid", "order": "ASCENDING" },
         { "fieldPath": "score", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "scores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "scoreVersion", "order": "ASCENDING"},
+        {"fieldPath": "outcome", "order": "ASCENDING"},
+        {"fieldPath": "scenarioId", "order": "ASCENDING"},
+        {"fieldPath": "difficulty", "order": "ASCENDING"},
+        {"fieldPath": "score", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "scores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "scoreVersion", "order": "ASCENDING"},
+        {"fieldPath": "outcome", "order": "ASCENDING"},
+        {"fieldPath": "scenarioId", "order": "ASCENDING"},
+        {"fieldPath": "difficulty", "order": "ASCENDING"},
+        {"fieldPath": "uid", "order": "ASCENDING"},
+        {"fieldPath": "score", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "scores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "scoreVersion", "order": "ASCENDING"},
+        {"fieldPath": "outcome", "order": "ASCENDING"},
+        {"fieldPath": "scenarioId", "order": "ASCENDING"},
+        {"fieldPath": "score", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "scores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "scoreVersion", "order": "ASCENDING"},
+        {"fieldPath": "outcome", "order": "ASCENDING"},
+        {"fieldPath": "scenarioId", "order": "ASCENDING"},
+        {"fieldPath": "uid", "order": "ASCENDING"},
+        {"fieldPath": "score", "order": "DESCENDING"}
+      ]
     }
   ],
   "fieldOverrides": [

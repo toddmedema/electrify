@@ -47,3 +47,20 @@ rejects CRLF data so integrity metadata remains portable across build platforms.
 The manifest represents the data shipped with this build. Deployment must publish
 application code and its matching `public/data` together; it must not replace
 simulation data independently under an already-published build.
+
+Competitive scoring has its own `SCORE_VERSION` (currently 2), independent of run
+compatibility and app build metadata. Version 2 combines separately rounded supply
+and blackout points into Service, removes investor customer points, and ranks only
+completed missions. Firebase board, player-best and rank queries require both
+`scoreVersion: 2` and `outcome: completed`; profile bests use `v2:<scenarioId>` keys.
+Legacy score documents and profile bests remain stored, and recorded result
+breakdowns retain their original category names and totals. This does not add an
+old simulation runtime or make incompatible saves/replays playable.
+
+Deploy the added `firebase/firestore.indexes.json` indexes and wait for them to
+finish building before releasing the web client; deploy the matching Firestore
+rules before release as well. The rules reject failed or malformed version 2
+scores while allowing unversioned legacy clients to keep their historical records.
+Steam leaderboard names include the score version separately from the run hash;
+legacy queued scores retain version 1 board identity, while new version 2
+submissions require a completed outcome. No score migration or deletion is needed.

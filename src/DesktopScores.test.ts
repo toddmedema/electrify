@@ -40,6 +40,7 @@ it("waits for this run's submission before reading its Steam rank", async () => 
       }),
   );
   const submission = submitDesktopScore({
+    outcome: "completed",
     scenarioId: 101,
     difficulty: "CEO",
     score: 812,
@@ -76,3 +77,17 @@ it("reports no rank for a run that is not the player's Steam best", async () => 
   );
   expect(desktop.getLeaderboard).toHaveBeenCalledTimes(1);
 });
+
+it.each(["bankrupt", "fired"] as const)(
+  "never sends a %s score to Steam",
+  async (outcome) => {
+    const desktop = bridge(() => []);
+    await submitDesktopScore({
+      scenarioId: 101,
+      difficulty: "CEO",
+      score: 9999,
+      outcome,
+    });
+    expect(desktop.submitScore).not.toHaveBeenCalled();
+  },
+);

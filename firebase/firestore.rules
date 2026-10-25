@@ -260,7 +260,18 @@ service cloud.firestore {
     // up, since seeing named strangers above you is the reason to bother.
     match /scores/{scoreId} {
       allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      // Legacy clients retain their historical records; current competitive queries exclude them.
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid
+        && (!('scoreVersion' in request.resource.data)
+          || (request.resource.data.scoreVersion == 2
+            && request.resource.data.outcome == 'completed'
+            && request.resource.data.score is number
+            && request.resource.data.scoreBreakdown is map
+            && request.resource.data.scoreBreakdown.keys().hasAll(['service', 'financial', 'environmental'])
+            && request.resource.data.scoreBreakdown.keys().hasOnly(['service', 'financial', 'environmental'])
+            && request.resource.data.scoreBreakdown["service"] is number
+            && request.resource.data.scoreBreakdown["financial"] is number
+            && request.resource.data.scoreBreakdown["environmental"] is number));
       // Renaming backfills the denormalized name onto the player's own old scores, and that is
       // the only field a score may ever change.
       allow update: if isSignedIn()
