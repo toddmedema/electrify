@@ -50,3 +50,35 @@ GitHub Actions keeps its existing isolated jobs and full/trimmed dependency
 profiles. It bypasses local coordination and full-install preflight; its existing
 dependency checks remain. Native workers still suppress generators when adopting
 verified shared build artifacts. Packaged Electron window tests remain CI-only.
+
+## Resume verified validation
+
+After fixing a failed check, run `npm run check:ci -- --resume`. This still accounts
+for all fifteen gates. Failed or invalidated gates execute; unchanged passing
+gates can reuse retained evidence. Omit `--resume` to execute every selected gate
+fresh. Hosted CI always executes normally, even if `--resume` is supplied.
+
+The report marks each gate as `executed` or `reused`. Reused gates name their source
+report in `reusedFrom`; their logs and structured reports are copied and verified
+in the new run. A completed failed run can contribute its valid passes. Running
+or source-invalidated runs cannot. Missing or altered evidence forces execution.
+
+Keys include file contents and inventory, the command and environment, runtime and
+worker settings, dependency metadata, local CRA environment files, and generated
+inputs. Unknown files remain shared inputs. Known test-only changes can spare
+unrelated simulation and build work, but imported test helpers remain dependencies;
+uncertain imports fall back to the broader input set. A small set of existing
+tooling loaders has audited, content-pinned targets; editing those loaders revokes
+their exception. Staging or
+committing unchanged bytes does not invalidate evidence.
+
+Local integrated checks build web and desktop into separate directories under
+`.tmp/check-builds/`. Build inventories and contents are verified before reuse;
+missing or changed artifacts also invalidate dependent bundle/browser evidence.
+Reused artifacts retain their original build version and provenance. Standalone
+build commands and hosted CI keep their existing `build/` default.
+
+Compatibility/icon inputs are generated before the check snapshot. Edition-specific
+notices are prepared before each renderer gate. Changes to other ignored behavior
+inputs, including local environment files, invalidate a run just like tracked
+source changes. Cache reuse never authorizes a partial run to claim full coverage.

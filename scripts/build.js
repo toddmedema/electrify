@@ -4,6 +4,7 @@ const { verifyEditionBundle } = require("./verify-edition-bundle");
 require("./generate-notices").generateNotices();
 
 const version = buildVersion();
+const output = process.env.BUILD_PATH || "build";
 const result = spawnSync(
   process.execPath,
   [require.resolve("react-scripts/bin/react-scripts"), "build"],
@@ -14,5 +15,5 @@ const result = spawnSync(
 );
 if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status || 1);
-writeBuildVersion(version);
-verifyEditionBundle("build", "web");
+writeBuildVersion(version, output);
+verifyEditionBundle(output, "web");

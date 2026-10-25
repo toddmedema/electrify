@@ -5,6 +5,7 @@ const path = require("node:path");
 const { createHash } = require("node:crypto");
 const os = require("node:os");
 const { checkAssets } = require("./check-assets");
+const cache = require("./ci/validation-cache");
 
 const steps = [
   { id: "types", name: "Types", script: "typecheck", parallel: true },
@@ -100,11 +101,14 @@ const steps = [
     reports: ["results.json"],
   },
 ];
-const usage = `Usage: npm run check -- [--ci] [--steps ${steps.map((step) => step.id).join(",")}]\n       npm run check -- --report <report.json>`;
+const usage = `Usage: npm run check -- [--ci] [--resume] [--steps ${steps.map((step) => step.id).join(",")}]\n       npm run check -- --report <report.json>`;
 
 // The default check omits CI-only gates; --ci runs every gate, and --steps may name any gate.
-// Selecting a gate that tests a build also rebuilds it, because the two builds share build/.
+// Build prerequisites remain selected even on resume: they must execute or have verified evidence.
 function selectSteps(argv) {
+  if (argv.filter((arg) => arg === "--resume").length > 1)
+    throw new Error(usage);
+  argv = argv.filter((arg) => arg !== "--resume");
   const ci = argv[0] === "--ci";
   if (ci) argv = argv.slice(1);
   if (!argv.length) return ci ? steps : steps.filter((step) => !step.ci);
@@ -120,6 +124,130 @@ function selectSteps(argv) {
   return steps.filter(
     (step) => ids.includes(step.id) || needed.includes(step.id),
   );
+}
+
+function configuredStep(step, hosted = process.env.GITHUB_ACTIONS === "true") {
+  if (hosted) return step;
+  const web = ".tmp/check-builds/web";
+  const desktop = ".tmp/check-builds/desktop";
+  const overrides = {
+    build: { BUILD_PATH: web },
+    bundle: { BUILD_PATH: web },
+    browser: { E2E_BUILD_DIR: web },
+    "desktop-build": { BUILD_PATH: desktop },
+    multiplayer: { MULTIPLAYER_BUILD_DIR: desktop },
+    "steam-input": { STEAM_INPUT_BUILD_DIR: desktop },
+  };
+  return { ...step, env: { ...step.env, ...overrides[step.id] } };
+}
+
+function artifactDirectory(step) {
+  if (["build", "bundle", "desktop-build"].includes(step.id))
+    return step.env?.BUILD_PATH || "build";
+  if (step.id === "browser") return step.env?.E2E_BUILD_DIR || "build";
+  if (step.id === "multiplayer")
+    return step.env?.MULTIPLAYER_BUILD_DIR || "build";
+  if (step.id === "steam-input")
+    return step.env?.STEAM_INPUT_BUILD_DIR || "build";
+  return null;
+}
+
+function artifactDigest(step) {
+  const directory = artifactDirectory(step);
+  if (!directory) return undefined;
+  try {
+    return cache.digestDirectory(path.resolve(directory));
+  } catch {
+    return null;
+  } // Missing/corrupt artifacts can never authorize reuse.
+}
+
+function prepareRendererInputs(step) {
+  if (!artifactDirectory(step)) return;
+  const generator = path.resolve("scripts/generate-notices.js");
+  if (fs.existsSync(generator))
+    require("./generate-notices").generateNotices(
+      process.cwd(),
+      ["desktop-build", "multiplayer", "steam-input"].includes(step.id),
+    );
+}
+
+function commandArguments(step, workers) {
+  return [
+    "run",
+    "--silent",
+    step.script,
+    ...(step.jest
+      ? [
+          "--",
+          `--maxWorkers=${workers}`,
+          `--cacheDirectory=.tmp/jest-check-${step.id}`,
+        ]
+      : step.args || []),
+  ];
+}
+
+function gateEnvironment(step, directory) {
+  return {
+    CI: "true",
+    ...step.env,
+    ...(step.reports?.length
+      ? { ELECTRIFY_E2E_OUTPUT_DIR: path.join(directory, step.id) }
+      : {}),
+  };
+}
+
+function inputKey(step, workers, directory) {
+  return cache.gateKey(step, {
+    root: process.cwd(),
+    inputs: cache.sourceInputs(process.cwd()),
+    command: ["npm", ...commandArguments(step, workers)],
+    env: { ...process.env, ...gateEnvironment(step, directory) },
+    workers,
+    artifactDigest: ["build", "desktop-build"].includes(step.id)
+      ? undefined
+      : artifactDigest(step),
+  });
+}
+
+function behaviorFingerprint() {
+  // Edition notices are deliberately regenerated between web and desktop gates.
+  // Other ignored inputs, especially CRA's local env files, must stay unchanged.
+  const inputs = cache
+    .sourceInputs(process.cwd())
+    .filter(
+      ({ path: file }) =>
+        !["public/notices.json", "public/notices-chromium.html"].includes(file),
+    );
+  return createHash("sha256").update(JSON.stringify(inputs)).digest("hex");
+}
+
+function reuseGate(previous, step, directory) {
+  const origin = path.dirname(previous.reportPath);
+  for (const file of [previous.gate.log, ...(previous.gate.reports || [])]) {
+    const target = path.join(directory, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(origin, file), target);
+  }
+  if (
+    cache.evidenceDigest(directory, previous.gate) !==
+    previous.gate.evidenceDigest
+  )
+    throw new Error("Retained evidence changed while copying it");
+  return {
+    ...step,
+    ...previous.gate,
+    ok: true,
+    status: "passed",
+    execution: "reused",
+    originalSeconds: previous.gate.originalSeconds ?? previous.gate.seconds,
+    seconds: 0,
+    env: gateEnvironment(step, directory),
+    reusedFrom: {
+      report: path.relative(process.cwd(), previous.reportPath),
+      gate: step.id,
+    },
+  };
 }
 
 function isFullCheck(selected) {
@@ -206,6 +334,12 @@ function summarizeReport(report, current = sourceSnapshot()) {
     `Current source: ${same ? "matches the recorded snapshot" : "not verified by this report; the snapshot differs or is unavailable"}.`,
     `Runtime: ${report.environment?.node}, ${report.environment?.platform}/${report.environment?.arch}; Jest workers: ${report.environment?.jestWorkers}.`,
     `Passed gates: ${passed.map(({ id }) => id).join(", ") || "none"}.`,
+    `Reused gates: ${
+      passed
+        .filter(({ execution }) => execution === "reused")
+        .map(({ id }) => id)
+        .join(", ") || "none"
+    }; see each gate's reusedFrom for original evidence.`,
     ...report.gates
       .filter(({ status }) => status !== "passed")
       .map(({ id, status }) => `${id}: ${status}.`),
@@ -219,18 +353,7 @@ function run(step, workers, directory) {
     `Starting ${step.name}${step.jest ? ` (${workers} workers)` : ""}...`,
   );
   return new Promise((resolve) => {
-    const args = [
-      "run",
-      "--silent",
-      step.script,
-      ...(step.jest
-        ? [
-            "--",
-            `--maxWorkers=${workers}`,
-            `--cacheDirectory=.tmp/jest-check-${step.id}`,
-          ]
-        : step.args || []),
-    ];
+    const args = commandArguments(step, workers);
     const reportEnv = step.reports?.length
       ? { ELECTRIFY_E2E_OUTPUT_DIR: path.join(directory, step.id) }
       : {};
@@ -330,6 +453,10 @@ async function main(argv = process.argv.slice(2)) {
   const selected = selectSteps(argv);
   const workers = workerCount(process.env);
   if (selected.some((step) => step.assets)) checkAssets();
+  const sourceBefore = sourceSnapshot();
+  const reusable =
+    process.env.GITHUB_ACTIONS !== "true" && sourceBefore !== null;
+  const resume = reusable && argv.includes("--resume");
   const started = Date.now();
   const full = isFullCheck(selected);
   const available = full ? selected.length : steps.length;
@@ -344,7 +471,12 @@ async function main(argv = process.argv.slice(2)) {
     status: "running",
     startedAt: new Date(started).toISOString(),
     command: ["node", "scripts/check.js", ...argv],
-    source: { before: sourceSnapshot(), after: null, changedDuringRun: false },
+    source: {
+      before: sourceBefore,
+      after: null,
+      changedDuringRun: false,
+      behaviorBefore: reusable ? behaviorFingerprint() : null,
+    },
     environment: {
       node: process.version,
       platform: process.platform,
@@ -353,13 +485,16 @@ async function main(argv = process.argv.slice(2)) {
       jestWorkers: workers,
       githubActions: process.env.GITHUB_ACTIONS === "true",
       e2ePort: process.env.E2E_PORT || "3100",
-      webBuildDirectory: process.env.E2E_BUILD_DIR || "build",
+      webBuildDirectory:
+        configuredStep(steps.find(({ id }) => id === "build")).env
+          ?.BUILD_PATH || "build",
     },
     timing: {
       queueMs: Number(process.env.ELECTRIFY_COORDINATION_WAIT_MS || 0),
     },
     scope: {
       profile: selected.some((step) => step.ci) ? "ci" : "quick",
+      resume,
       full,
       selected: selected.map((step) => step.id),
       notSelected: steps
@@ -381,29 +516,83 @@ async function main(argv = process.argv.slice(2)) {
   saveReport();
   console.error(`Running ${selected.length}/${available} check gates.`);
   console.error(`Validation report: ${reportPath}`);
-  const results = await execute(selected, async (step) => {
-    const gate = report.gates.find((entry) => entry.id === step.id);
-    Object.assign(gate, {
-      status: "running",
-      startedAt: new Date().toISOString(),
-    });
-    saveReport();
-    const result = await run(step, workers, directory);
-    Object.assign(gate, result, { finishedAt: new Date().toISOString() });
-    saveReport();
-    return result;
-  });
+  const results = await execute(
+    selected.map((step) => configuredStep(step)),
+    async (step) => {
+      const gate = report.gates.find((entry) => entry.id === step.id);
+      const gateStartedAt = new Date().toISOString();
+      Object.assign(gate, {
+        status: "running",
+        startedAt: gateStartedAt,
+      });
+      saveReport();
+      let result;
+      try {
+        if (reusable) prepareRendererInputs(step);
+        const key = reusable ? inputKey(step, workers, directory) : undefined;
+        const artifact = reusable ? artifactDigest(step) : undefined;
+        const previous =
+          resume && (!artifactDirectory(step) || artifact)
+            ? cache.findReusable(parent, step, key, artifact)
+            : null;
+        if (previous) {
+          try {
+            result = reuseGate(previous, step, directory);
+            console.error(
+              `reuse ${step.name.padEnd(18)} ${path.relative(parent, previous.reportPath)}`,
+            );
+          } catch (error) {
+            console.error(
+              `Cannot reuse ${step.name}: ${error.message}; running it.`,
+            );
+          }
+        }
+        if (!result) {
+          result = {
+            ...(await run(step, workers, directory)),
+            execution: "executed",
+          };
+          if (reusable) {
+            const after = inputKey(step, workers, directory);
+            result.inputKey = key === after ? key : null;
+            result.artifactDigest = artifactDigest(step);
+            if (result.ok)
+              result.evidenceDigest = cache.evidenceDigest(directory, result);
+          }
+        }
+      } catch (error) {
+        console.error(`FAIL ${step.name}: ${error.message}`);
+        result = {
+          ...step,
+          ok: false,
+          status: "failed",
+          execution: "executed",
+          seconds: 0,
+          reason: error.message,
+        };
+      }
+      Object.assign(gate, result, {
+        startedAt: gateStartedAt,
+        finishedAt: new Date().toISOString(),
+      });
+      saveReport();
+      return result;
+    },
+  );
   // Dependency failures do not invoke run(), so record their skipped status explicitly.
   for (const result of results)
-    Object.assign(
-      report.gates.find((gate) => gate.id === result.id),
-      result,
-    );
+    if (result.status === "skipped")
+      Object.assign(
+        report.gates.find((gate) => gate.id === result.id),
+        result,
+      );
   const failed = results.filter((result) => !result.ok);
   report.source.after = sourceSnapshot();
+  report.source.behaviorAfter = reusable ? behaviorFingerprint() : null;
   report.source.changedDuringRun =
-    !!report.source.before &&
-    report.source.before.fingerprint !== report.source.after?.fingerprint;
+    (!!report.source.before &&
+      report.source.before.fingerprint !== report.source.after?.fingerprint) ||
+    report.source.behaviorBefore !== report.source.behaviorAfter;
   report.status = report.source.changedDuringRun
     ? "invalidated"
     : failed.length
@@ -411,6 +600,9 @@ async function main(argv = process.argv.slice(2)) {
       : "passed";
   report.finishedAt = new Date().toISOString();
   report.timing.executionMs = Date.now() - started;
+  report.timing.reusedGates = results.filter(
+    ({ execution }) => execution === "reused",
+  ).length;
   saveReport();
   if (report.source.changedDuringRun) {
     console.error(
@@ -426,6 +618,10 @@ async function main(argv = process.argv.slice(2)) {
       "Packaged Electron UI tests are CI-only and are not included in this check.",
     );
   if (failed.length) {
+    if (full && reusable)
+      console.error(
+        `Resume all required gates with verified reuse: npm run check${selected.some((step) => step.ci) ? ":ci" : ""} -- --resume`,
+      );
     console.error(
       "This retry covers only failed gates. Also rerun any passing gates whose inputs changed during the repair; use npm run check if unsure.",
     );
@@ -448,4 +644,5 @@ module.exports = {
   workerCount,
   execute,
   summarizeReport,
+  configuredStep,
 };
