@@ -8,6 +8,7 @@ for (const theme of ["light", "dark"] as const) {
     page,
   }, testInfo) => {
     test.setTimeout(120000);
+    await page.clock.install();
     await page.addInitScript((mode) => {
       localStorage.clear();
       localStorage.setItem("theme", mode);
@@ -46,6 +47,13 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "pause", exact: true })
       .and(page.locator('[aria-pressed="true"]'))
       .first();
+    // Advance the real animation-frame reducer within its one-second frame-gap
+    // bound. Stop at the outage or an unexpected pause, preserving the failure
+    // below instead of dismissing hazards or jumping directly to a saved date.
+    for (let second = 0; second < 90; second++) {
+      if ((await outage.isVisible()) || (await paused.isVisible())) break;
+      await page.clock.fastForward(1000);
+    }
     await expect(outage.or(paused).first()).toBeVisible({ timeout: 90000 });
     await expect(
       outage,
