@@ -1,9 +1,8 @@
 const os = require("node:os");
 const { spawn } = require("node:child_process");
 
-function cpuSuites(index, cores = os.availableParallelism()) {
-  if (![1, 2].includes(index)) throw new Error("Expected CPU shard 1 or 2");
-  const workers = Math.max(1, Math.ceil(cores / 2));
+function cpuSuites(cores = os.availableParallelism()) {
+  const workers = Math.max(1, Math.min(4, cores));
   return [
     {
       name: "Covered units",
@@ -15,9 +14,9 @@ function cpuSuites(index, cores = os.availableParallelism()) {
         `--maxWorkers=${workers}`,
         "--coverageThreshold={}",
         "--coverageReporters=json",
-        `--coverageDirectory=test-results/jest-unit-${index}`,
+        "--coverageDirectory=test-results/jest-unit-1",
         "--json",
-        `--outputFile=test-results/jest-unit-${index}/results.json`,
+        "--outputFile=test-results/jest-unit-1/results.json",
       ],
     },
     {
@@ -33,68 +32,51 @@ function cpuSuites(index, cores = os.availableParallelism()) {
   ];
 }
 
-function commands(index, cores = os.availableParallelism()) {
-  if (!Number.isInteger(index) || index < 1 || index > 3)
-    throw new Error("Expected a native platform index from 1 to 3");
+function commands(cores = os.availableParallelism()) {
   return {
     cpu: [
-      ...(index === 1
-        ? [
-            { name: "CI tooling", script: "test:ci-tools", args: [] },
-            { name: "Security rules", script: "test:rules", args: [] },
-            ...cpuSuites(1, cores),
-          ]
-        : []),
-      ...(index === 3
-        ? [
-            { name: "Types", script: "typecheck", args: [] },
-            { name: "Strict lint", script: "lint", args: [] },
-            { name: "Formatting", script: "format:check", args: [] },
-          ]
-        : []),
+      { name: "Types", script: "typecheck", args: [] },
+      { name: "Strict lint", script: "lint", args: [] },
+      { name: "Formatting", script: "format:check", args: [] },
+      { name: "Native desktop units", script: "test:desktop:native", args: [] },
+      { name: "CI tooling", script: "test:ci-tools", args: [] },
+      { name: "Security rules", script: "test:rules", args: [] },
+      { name: "Tick performance", script: "perf:bench", args: [] },
+      ...cpuSuites(cores),
+      {
+        name: "Every unit suite and coverage floor",
+        script: "test:ci-coverage",
+        args: [],
+      },
+      {
+        name: "Simulation CLI",
+        script: "sim",
+        args: ["--scenario", "101", "--months", "12"],
+      },
     ],
     ui: [
-      // Windows has spare time for controller journeys.
-      ...(index === 2
-        ? [
-            {
-              name: "Controller journeys",
-              script: "test:steam-input",
-              args: [],
-              env: { STEAM_INPUT_BUILD_DIR: "build" },
-            },
-          ]
-        : []),
       {
-        name: "Package and verify native depot",
+        // Build a separate Linux test package, so OS build jobs cannot block this worker.
+        name: "Package and verify test depot",
         script: "desktop:pack:offline",
-        args: [
-          "--skip-build",
-          "--platform",
-          process.platform,
-          "--arch",
-          process.platform === "darwin" ? "universal" : process.arch,
-        ],
+        args: ["--skip-build", "--platform", "linux", "--arch", "x64"],
       },
-      ...([2, 3].includes(index)
-        ? [
-            {
-              name: "Production browser",
-              script: "test:e2e:ci",
-              args: [`--shard=${index - 1}/2`, "--workers=2"],
-            },
-          ]
-        : []),
-      // Linux has headroom after its CPU shard; Mac owns the longer web shard.
-      ...(index === 1
-        ? [
-            {
-              name: "Shared-clock Steam renderer",
-              script: "test:multiplayer",
-              args: [],
-            },
-          ]
-        : []),
+      {
+        name: "Production browser",
+        script: "test:e2e:ci",
+        args: ["--workers=2"],
+      },
+      {
+        name: "Shared-clock Steam renderer",
+        script: "test:multiplayer",
+        args: [],
+      },
+      {
+        name: "Controller journeys",
+        script: "test:steam-input",
+        args: [],
+        env: { STEAM_INPUT_BUILD_DIR: "build" },
+      },
       {
         name: "Full packaged desktop",
         script: "test:desktop",
@@ -112,7 +94,6 @@ async function execute(plan, run) {
 }
 
 function planForRun(
-  index,
   cpuOnly,
   env = process.env,
   cores = os.availableParallelism(),
@@ -122,15 +103,14 @@ function planForRun(
     throw new Error(
       "This combined native-window harness is only for GitHub Actions; use --cpu-only for a windowless local reproduction or the ordinary local checks.",
     );
-  // Cap the local CPU budget while preserving CI's worker split and shard assignment.
-  // execute() runs these suites serially, just as it does in CI.
-  return cpuOnly
-    ? { cpu: cpuSuites(index, inCI ? cores : Math.min(4, cores)), ui: [] }
-    : commands(index, cores);
+  if (!cpuOnly && process.platform !== "linux")
+    throw new Error("The combined test worker requires Linux");
+  const plan = commands(cores);
+  return cpuOnly ? { ...plan, ui: [] } : plan;
 }
 
-async function main(index) {
-  const plan = planForRun(index, process.argv.includes("--cpu-only"));
+async function main() {
+  const plan = planForRun(process.argv.includes("--cpu-only"));
   const run = (step) =>
     new Promise((resolve) => {
       console.error(`Starting ${step.name}`);
@@ -156,7 +136,7 @@ async function main(index) {
             ...process.env,
             ...step.env,
             ...(step.group
-              ? { TEST_GROUP: step.group, TEST_SHARD: `${index}/2` }
+              ? { TEST_GROUP: step.group, TEST_SHARD: "1/1" }
               : {}),
           },
         },
@@ -176,7 +156,7 @@ async function main(index) {
 }
 
 if (require.main === module)
-  main(Number(process.argv[2])).catch((error) => {
+  main().catch((error) => {
     console.error(error);
     process.exitCode = 1;
   });

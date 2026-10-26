@@ -103,6 +103,20 @@ test("hosted trimmed installations preserve ignore-scripts and bypass only local
   assert(!fs.existsSync(path.join(root, "locks")));
 });
 
+test("the CI test wrapper invokes the renamed harness and forwards CPU-only mode", (t) => {
+  const { root, write, run } = fixture(t);
+  write(
+    "scripts/ci/test-suites.js",
+    "require('node:fs').writeFileSync('ci-args.json', JSON.stringify(process.argv.slice(2)))",
+  );
+  const result = run("ci-tests", ["--cpu-only"]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(root, "ci-args.json"))),
+    ["--cpu-only"],
+  );
+});
+
 test("bad dependency installations fail before generators or work execute", (t) => {
   const { root, write, run } = fixture(t);
   fs.rmSync(path.join(root, "node_modules/.package-lock.json"));

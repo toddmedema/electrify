@@ -25,7 +25,7 @@ const commands = {
   },
   sim: { entry: "scripts/sim.js", generators: generators.slice(0, 1) },
   bench: { entry: "scripts/perf/bench.js" },
-  platform: { entry: "scripts/ci/platform-tests.js" },
+  "ci-tests": { entry: "scripts/ci/test-suites.js" },
   types: {
     entry: "scripts/dev/typecheck.js",
     generators: generators.slice(0, 1),

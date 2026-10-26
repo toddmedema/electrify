@@ -1,67 +1,63 @@
 # PR testing performance
 
-CI has a hard cap of **six jobs per PR** and currently runs five, including the required
-`check`. A regression test expands the platform matrix and enforces this limit. Every existing unit test, long simulation,
-seed, browser viewport, native target, coverage threshold, security rule and performance gate
-remains required on every PR.
+CI uses **six jobs per PR**: shared renderer builds, three native package builds, one
+worker for all tests and static checks, and the required `check` gate. Unit, simulation,
+security-rule, browser, multiplayer/mod and controller suites retain their existing cases,
+viewports, seeds and coverage floors. Packaged Electron journeys now run once on Linux;
+Windows and macOS retain native packaging verification but no longer execute UI journeys.
 
-## Five-job layout
+## Six-job layout
 
 1. **Shared production builds** compiles/verifies the desktop renderer/catalogs and web build
    once each on Linux, checks bundle size, and uploads the artifacts. Separate input-validated
-   compiler caches keep editions apart. The broader strict lint gate remains required, so CRA's
-   duplicate lint plugin is disabled.
-2. **Linux x64** runs unit/simulation shard 1, its complete native/packaged desktop suites,
-   Firestore rules and CI tooling regression tests.
-3. **Windows x64** runs the headless controller journeys against the shared desktop renderer
-   before packaging, then production browser shard 1 and its complete native/packaged suites.
-4. **macOS universal** runs types, strict lint and formatting, then packages one app containing
-   both Intel and Apple Silicon slices. It runs browser shard 2, multiplayer and the complete
-   packaged suite against the arm64 slice. CI does not launch the Intel slice.
-5. **check** runs unit/simulation shard 2 on another Linux runner, plus the CLI and isolated
-   tick-ratio benchmark. It then requires all three native workers' latest results in this run
-   to pass, merges raw coverage and enforces the unchanged `package.json` floors.
+   compiler caches keep editions apart. The test worker owns strict lint, so CRA's duplicate
+   lint plugin is disabled.
+2. **Linux x64 build** packages and verifies the Linux depot.
+3. **Windows x64 build** packages and verifies the Windows depot.
+4. **macOS universal build** packages, signs and verifies one app containing both Intel and
+   Apple Silicon slices. Neither slice is launched in this job.
+5. **All tests and static checks** runs types, strict lint, formatting, native Node units, CI
+   tooling, Firestore rules, the isolated tick-ratio benchmark, every covered Jest unit and
+   long simulation, coverage validation, and the simulation CLI. It then packages its own
+   Linux test depot and runs the complete PR browser matrix, multiplayer/mod management,
+   controller journeys and the full packaged Electron suite under Xvfb.
+6. **check** waits for the shared renderer job, all three native builds and the test worker.
+   It passes only when every dependency succeeds. Failed, skipped, cancelled and timed-out
+   results cannot pass the required gate. Workflow tests execute the gate's shell command
+   against each of these outcomes.
 
-The required gate does useful CPU work before waiting for native results, avoiding another
-job. Its read-only GitHub API query is pinned to the current run/commit and excludes itself. It
-requires all three named native jobs, and fails on missing, failed, skipped, cancelled or timed-out
-workers. A partial rerun can reuse unchanged successes from this run, while a newer pending or
-failed job always supersedes its earlier success. Regression tests cover these conditions.
+The test worker and native package workers depend only on the shared renderer job. They run
+independently: a native package failure cannot prevent testing, and a test failure cannot
+prevent native packaging. Building a separate Linux test depot costs a few seconds and avoids
+waiting for the Linux package job or transferring its large app directory. The required gate
+uses GitHub Actions' dependency results directly, without polling the jobs API.
 
-Every worker runs its CPU and UI phases sequentially, including covered Jest and simulations,
-each bounded to half the cores. A failed phase does not skip the remaining suites. Browser
-coverage keeps two Chromium workers; native Electron and controller journeys keep one UI worker.
-Controller failures surface before the Windows worker starts packaging or browser work.
-Separate browser, desktop and coverage directories retain each phase's reports. The combined
-harness refuses local native-window runs. To reproduce a CPU shard without native windows,
-run `npm run test:ci-platform -- 1 --cpu-only` (or shard `2`); this mode caps the local CPU budget
-at four cores. First run `npm run compatibility:generate` and `npm run icons:generate`, because
-the harness suppresses the test pre-hooks that normally create these local manifests.
+All heavy test phases run sequentially so CPU work cannot make UI deadlines depend on load.
+Covered Jest and simulations use at most four workers, browser tests use two, and native
+Electron and controller journeys use one. A failed phase does not skip later suites. Unit and
+simulation discovery use a single `1/1` manifest; coverage validation still requires every
+discovered unit suite to have passed and retains zero-hit files before enforcing the unchanged
+`package.json` thresholds. Browser tests run the complete desktop/390 px smoke and
+desktop/390/360 px layout matrix without sharding.
 
-Linux workers and the static-check worker restore the full locked toolchain. Windows uses a
-lean native dependency closure preserving original locked runtime/tool records and native
-platform entries. Every target verifies shared renderer assets against its local checkout,
-packages/signs natively, verifies native binaries and finished signatures, and exercises every
-desktop case. Native CI keeps DOM/network traces, sources and failure screenshots without a
-continuous screenshot filmstrip during passing tests.
+The combined test harness refuses local native-window runs. For a windowless reproduction of
+its complete CPU plan, run `npm run test:ci-all -- --cpu-only` with Java 21 available for the
+Firestore emulator. First run `npm run compatibility:generate` and `npm run icons:generate`,
+because the harness suppresses redundant generation pre-hooks. Ordinary local validation
+continues to use `npm run check` and `npm run check:ci`; the latter leaves native packaged
+journeys to CI.
 
-Browser workers cache and install only locked Chromium headless shells. Linux installs the system
-libraries needed by Electron; Windows/Mac avoid repeated Windows Server media-feature setup.
-The browser case union is identical to the original desktop/390 px smoke and desktop/390/360 px
-layout matrix, now split across two workers.
+The test worker restores the full locked toolchain. All three native build workers use the
+lean locked dependency profile. Every target verifies shared renderer assets against its
+local checkout, packages natively and verifies native binaries; Mac also verifies both final
+architecture slices and the finished signature. Native build jobs do not install browsers,
+Java, Xvfb or a window manager.
 
-## Shard maintenance
-
-The Linux Jest workers use identical checked-in duration estimates. New files are included
-automatically; private caches and discovery order never determine assignments. Update estimates
-when measured load drifts. Coverage validates every discovered unit suite actually passed exactly
-once and retains zero-hit files. Raw counters are merged; percentages are never averaged.
-
-Local `npm run check`, `test:ci` and `test:sim` still run complete suites. The local check runner
-caps Jest at four workers by default. Local and hosted production browser gates both use two
-Chromium workers. CI generates manifests before its test phases and suppresses duplicate
-generation pre-hooks. The CLI/ratio benchmark runs before its Linux runner's unit and
-simulation suites.
+The test worker caches Chromium's locked headless shell and native packaging downloads. It
+uploads coverage, suite manifests, structured browser reports, traces and failure screenshots
+even if a test phase fails. Browser, multiplayer, controller and packaged-desktop reports keep
+separate directories. Native CI retains DOM/network traces and sources without a continuous
+screenshot filmstrip during passing tests.
 
 Jest 27 binds the sandbox's existing `Math`, `Number`, `Object`, `Array`, `JSON` and `BigInt`
 objects directly through `extraGlobals`, avoiding repeated VM global lookups in simulation loops.
@@ -90,13 +86,13 @@ a separate local command.
 
 Run **Test Code** manually with **Archive and upload all three verified offline desktop builds**
 enabled, or `gh workflow run workflow.yml --ref <branch> -f qa-artifacts=true`. This uses the same
-five jobs and full tests. PRs retain diagnostics but omit downloadable archives. Tar preserves
+six jobs and full tests. PRs retain diagnostics but omit downloadable archives. Tar preserves
 executable permissions; compressed archives upload without another compression pass.
 
 ## Timing
 
 The original successful runs inspected on October 14, 2026 took roughly 9–12 minutes.
 [The latest](https://github.com/toddmedema/electrify/actions/runs/38651304477) reached `check` in 9:28.
-The stretch target remains at least 2x faster within the hard six-job cap and unchanged test policy.
+Measure the independent build and test paths separately within the six-job cap; native UI execution is now Linux-only.
 Report measured end-to-end times, cache state and runner queueing in the PR. CPU suites stay on
 Linux because measurements on the other platforms produced substantially longer simulation runs.
