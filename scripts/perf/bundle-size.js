@@ -16,7 +16,7 @@ const path = require("path");
 const zlib = require("zlib");
 
 const root = path.resolve(__dirname, "../..");
-const buildDir = path.join(root, "build");
+const buildDir = path.resolve(root, process.env.BUILD_PATH || "build");
 const baselinesPath = path.join(__dirname, "bundle-baselines.json");
 const tolerance = 0.1;
 
