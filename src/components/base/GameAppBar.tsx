@@ -286,6 +286,7 @@ export function GameAppBar(props: Props) {
     null,
   );
   const online = useOnline();
+  const connectionDescriptionId = React.useId();
   // The Scenario tool opens by navigation (see evidenceCard); there is nothing in it to point at
   React.useEffect(() => {
     if (evidenceRequest?.target === "mission-details" && !facilityDragActive) {
@@ -377,13 +378,21 @@ export function GameAppBar(props: Props) {
           data-achievements-trigger
           className="gameMenuButton"
           onClick={handleMenuClick}
-          aria-label={online ? "menu" : "menu, offline"}
+          aria-label="menu"
+          aria-describedby={online ? undefined : connectionDescriptionId}
           edge="start"
           color="primary"
           size="large"
         >
           <MoreVertIcon />
-          {!online && <span className="offlineDot" aria-hidden="true" />}
+          {!online && (
+            <>
+              <span className="offlineDot" aria-hidden="true" />
+              <span id={connectionDescriptionId} className="srOnly">
+                Offline: saving to this device only
+              </span>
+            </>
+          )}
         </IconButton>
         <Menu
           id="gameCardMenu"
@@ -441,6 +450,7 @@ export function GameAppBar(props: Props) {
     [
       menuAnchorEl,
       online,
+      connectionDescriptionId,
       onManual,
       onSettings,
       props.onSavedGames,

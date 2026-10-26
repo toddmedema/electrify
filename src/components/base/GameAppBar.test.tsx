@@ -42,6 +42,27 @@ function renderAppBar(overrides: Partial<Props> = {}) {
 }
 
 describe("GameAppBar", () => {
+  it("keeps the menu action named consistently while announcing offline saving", () => {
+    const online = jest
+      .spyOn(window.navigator, "onLine", "get")
+      .mockReturnValue(false);
+    try {
+      renderAppBar();
+      const menu = screen.getByRole("button", { name: "menu", exact: true });
+      expect(menu).toHaveAccessibleDescription(
+        "Offline: saving to this device only",
+      );
+      fireEvent.click(menu);
+      expect(
+        screen.getByRole("menuitem", {
+          name: "Offline: saving to this device only",
+        }),
+      ).toHaveAttribute("aria-disabled", "true");
+    } finally {
+      online.mockRestore();
+    }
+  });
+
   it.each(["click", "{Enter}", " "])(
     "opens scenario info from the months remaining with %s",
     async (action) => {

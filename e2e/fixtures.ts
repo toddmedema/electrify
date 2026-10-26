@@ -29,12 +29,43 @@ export const test = base.extend<{
       context.on("requestfailed", record);
       await use();
       context.off("requestfailed", record);
-      if (info.status !== info.expectedStatus && failures.length) {
-        const evidence = [...new Set(failures)].join("\n");
-        console.error(evidence);
-        await info.attach("network-failures", {
-          body: evidence,
-          contentType: "text/plain",
+      if (info.status !== info.expectedStatus) {
+        if (failures.length) {
+          const evidence = [...new Set(failures)].join("\n");
+          console.error(evidence);
+          await info.attach("network-failures", {
+            body: evidence,
+            contentType: "text/plain",
+          });
+        }
+        const environment = await Promise.all(
+          context.pages().map(async (page) => {
+            try {
+              return await page.evaluate(() => ({
+                pathname: window.location.pathname,
+                online: navigator.onLine,
+                touchPoints: navigator.maxTouchPoints,
+                coarsePointer: matchMedia("(pointer: coarse)").matches,
+                coarsePointerAvailable: matchMedia("(any-pointer: coarse)")
+                  .matches,
+                hover: matchMedia("(hover: hover)").matches,
+                viewport: { width: innerWidth, height: innerHeight },
+              }));
+            } catch {
+              return { closed: true };
+            }
+          }),
+        );
+        await info.attach("browser-environment", {
+          body: JSON.stringify(
+            {
+              declaredHasTouch: !!info.project.use.hasTouch,
+              pages: environment,
+            },
+            null,
+            2,
+          ),
+          contentType: "application/json",
         });
       }
     },

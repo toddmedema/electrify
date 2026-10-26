@@ -64,6 +64,27 @@ async function select(
 ) {
   await expect(control).toBeVisible();
   await expect(control).toBeEnabled();
+  const group = control.locator("..");
+  if (
+    (await control.getAttribute("tabindex")) === "-1" &&
+    (await group.getAttribute("role")) === "group"
+  ) {
+    // Roving groups expose one vertical tab stop. Enter it before moving within
+    // the group, just as a player does with the D-pad.
+    const entry = group.locator('button[tabindex="0"]');
+    await expect(entry).toHaveCount(1);
+    await select(page, entry, "down", limit);
+    const forward = await control.evaluate(
+      (element) =>
+        !!(
+          document.activeElement!.compareDocumentPosition(element) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+        ),
+    );
+    const vertical =
+      (await group.getAttribute("aria-orientation")) === "vertical";
+    action = vertical ? (forward ? "down" : "up") : forward ? "right" : "left";
+  }
   const popupSurfaces = () =>
     page
       .locator('[role="dialog"],[role="menu"],[role="listbox"]')
