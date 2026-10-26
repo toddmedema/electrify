@@ -181,9 +181,23 @@ test("a failed load can be retried", async ({ page }) => {
 
 test("reduced motion skips the logo movement and stagger", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (...args) {
+      // Remember requests even if an entrance finishes before the assertions run.
+      if (this.closest("#menuCard"))
+        document.documentElement.dataset.menuAnimationRequested = "true";
+      return animate.apply(this, args);
+    };
+  });
   await page.goto("/");
+  // A visible logo can precede the startup handoff and its motion decision.
+  await expect(page.locator("#appStartup")).toHaveCount(0);
   const logo = page.locator("#menuCard .homeLogo");
   await expect(logo).toBeVisible();
+  expect(
+    await page.locator("html").getAttribute("data-menu-animation-requested"),
+  ).toBeNull();
   expect(
     await logo.evaluate(
       (element) => element.getAnimations({ subtree: true }).length,
