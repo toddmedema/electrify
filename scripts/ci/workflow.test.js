@@ -46,10 +46,29 @@ test("PR CI has exactly five jobs including all native targets and the required 
       name?.startsWith("Install ") && name.includes("headless browser"),
   );
   assert.equal(browserInstalls.length, 1);
-  assert(browserInstalls.every(({ run }) => run.includes("--only-shell")));
-  assert(
-    browserInstalls.find(({ name }) => name.includes("Windows")).run ===
-      "npx playwright install --only-shell chromium",
+  assert.equal(
+    browserInstalls[0].run,
+    "npx playwright install --only-shell chromium",
+  );
+  assert.equal(
+    browserInstalls[0].if,
+    undefined,
+    "Every platform now runs a headless renderer suite",
+  );
+  const browserCache = jobs.platform.steps.find(
+    ({ with: settings }) => settings?.path === ".tmp/playwright-browsers",
+  );
+  assert.equal(browserCache.if, undefined);
+  assert.match(
+    browserCache.with.key,
+    /runner\.os.*runner\.arch.*hashFiles\('package-lock\.json'\)/,
+  );
+  assert.equal(
+    jobs.platform.steps.find(
+      ({ with: settings }) => settings?.name === "desktop-renderer",
+    ).if,
+    undefined,
+    "Linux receives the same production desktop renderer used for multiplayer",
   );
   assert(
     jobs.check.steps.some(
@@ -111,8 +130,8 @@ test("platform plans retain all CPU shards, browser shards and full native suite
     }
     assert.equal(
       plan.ui.some(({ script }) => script === "test:multiplayer"),
-      index === 3,
-      "Headless multiplayer renderer tests run once on the full-dependency Mac browser worker",
+      index === 1,
+      "Headless multiplayer and mods tests run once on the full-dependency Linux worker",
     );
     assert.equal(
       plan.ui.some(({ script }) => script === "test:steam-input"),
