@@ -48,7 +48,7 @@ describe("GameAppBar", () => {
       .mockReturnValue(false);
     try {
       renderAppBar();
-      const menu = screen.getByRole("button", { name: "menu", exact: true });
+      const menu = screen.getByRole("button", { name: "menu" });
       expect(menu).toHaveAccessibleDescription(
         "Offline: saving to this device only",
       );
