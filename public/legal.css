@@ -956,6 +956,15 @@ a:hover {
     color: var(--text);
     font-weight: 750;
   }
+
+  .comparison-table--paired tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .comparison-table--paired tbody th {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 37.5rem) {

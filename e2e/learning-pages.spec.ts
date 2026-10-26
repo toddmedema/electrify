@@ -25,6 +25,24 @@ test.describe("learning pages without JavaScript", () => {
         if (pathname === "/data-centers.html")
           await expect(primary).toHaveAttribute("href", "/?dataCenters=1");
         else await expect(page.locator(".topnav a[href='/']")).toBeVisible();
+        if (pathname === "/data-centers.html") {
+          for (const row of await page
+            .getByRole("table")
+            .locator("tbody tr")
+            .all()) {
+            const cells = row.getByRole("cell");
+            await expect(cells).toHaveCount(2);
+            const baseline = (await cells.nth(0).boundingBox())!;
+            const campus = (await cells.nth(1).boundingBox())!;
+            expect(
+              Math.abs(baseline.y - campus.y),
+              "both comparison values stay on the same row",
+            ).toBeLessThanOrEqual(1);
+            expect(baseline.x + baseline.width).toBeLessThanOrEqual(
+              campus.x + 1,
+            );
+          }
+        }
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth),
         ).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
