@@ -161,6 +161,7 @@ export default function SavedGames(): React.JSX.Element {
             <TextField
               fullWidth
               size="small"
+              className="saveSearch"
               label="Search saves"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -317,7 +318,7 @@ export default function SavedGames(): React.JSX.Element {
                   sx={{
                     display: "grid",
                     gridTemplateColumns: "minmax(0, 1fr) auto",
-                    alignItems: "start",
+                    alignItems: "center",
                     columnGap: 1,
                   }}
                 >
@@ -331,6 +332,8 @@ export default function SavedGames(): React.JSX.Element {
                     </Typography>
                   </Box>
                   <IconButton
+                    edge="end"
+                    sx={{ my: -1 }}
                     aria-label={`Actions for ${title}`}
                     aria-haspopup="menu"
                     aria-expanded={menu?.save.id === save.id ? true : undefined}

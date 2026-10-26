@@ -69,6 +69,31 @@ for (const theme of ["light", "dark"]) {
       { exact: true },
     );
     await expect(subtitle).toBeVisible();
+    const titleBounds = (await originalRow.getByRole("heading").boundingBox())!;
+    const menuIcon = (await originalRow
+      .getByRole("button", { name: /^Actions for/ })
+      .locator("svg")
+      .boundingBox())!;
+    expect
+      .soft(
+        Math.abs(
+          titleBounds.y +
+            titleBounds.height / 2 -
+            menuIcon.y -
+            menuIcon.height / 2,
+        ),
+      )
+      .toBeLessThanOrEqual(1);
+    const subtitleBounds = (await subtitle.boundingBox())!;
+    expect
+      .soft(subtitleBounds.y - titleBounds.y - titleBounds.height)
+      .toBeLessThanOrEqual(5);
+    const loadBounds = (await originalRow
+      .getByRole("button", { name: "Load", exact: true })
+      .boundingBox())!;
+    expect
+      .soft(menuIcon.x + menuIcon.width)
+      .toBeGreaterThanOrEqual(loadBounds.x + loadBounds.width - 4);
     expect(
       await subtitle.evaluate((element) => {
         const style = getComputedStyle(element);
@@ -129,12 +154,49 @@ for (const theme of ["light", "dark"]) {
       await copySavedGame(page, original.metadata.id),
     ];
     await expect(page.locator("article.saveEntry")).toHaveCount(4);
-    await page
-      .getByRole("textbox", { name: "Search saves" })
-      .fill("Low carbon");
+    const search = page.getByRole("textbox", { name: "Search saves" });
+    const searchField = search.locator("..");
+    const searchLabel = page
+      .locator("label")
+      .filter({ hasText: "Search saves" });
+    const fieldBounds = (await searchField.boundingBox())!;
+    const labelBounds = (await searchLabel.boundingBox())!;
+    expect
+      .soft(
+        Math.abs(
+          labelBounds.y +
+            labelBounds.height / 2 -
+            fieldBounds.y -
+            fieldBounds.height / 2,
+        ),
+      )
+      .toBeLessThanOrEqual(1);
+    await search.fill("Low carbon");
     await expect(page.locator("article.saveEntry")).toHaveCount(1);
     await page.getByRole("textbox", { name: "Search saves" }).fill("");
     await expect(page.locator("article.saveEntry")).toHaveCount(4);
+    if (
+      process.env.REVIEW_SCREENSHOT_DIR &&
+      ((theme === "light" && info.project.name === "desktop-chromium") ||
+        (theme === "dark" && info.project.name === "mobile-390px"))
+    ) {
+      const dismissNotice = page
+        .getByRole("alert")
+        .getByRole("button", { name: "Close", exact: true });
+      if (await dismissNotice.count()) await dismissNotice.click();
+      await page
+        .getByRole("heading", { name: "Saved games", exact: true })
+        .click();
+      await expect(searchLabel).not.toHaveClass(/MuiInputLabel-shrink/);
+      await page.mouse.move(0, 0);
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `saves-${info.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
     for (const id of extraIds) {
       await page
         .locator(`[data-save-id="${id}"]`)
@@ -159,27 +221,6 @@ for (const theme of ["light", "dark"]) {
       expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(
         info.project.use.hasTouch ? 44 : 40,
       );
-    }
-    if (
-      process.env.REVIEW_SCREENSHOT_DIR &&
-      ((theme === "light" && info.project.name === "desktop-chromium") ||
-        (theme === "dark" && info.project.name === "mobile-390px"))
-    ) {
-      const dismissNotice = page
-        .getByRole("alert")
-        .getByRole("button", { name: "Close", exact: true });
-      if (await dismissNotice.count()) await dismissNotice.click();
-      await page
-        .getByRole("heading", { name: "Saved games", exact: true })
-        .click();
-      await page.mouse.move(0, 0);
-      await page.screenshot({
-        path: path.join(
-          process.env.REVIEW_SCREENSHOT_DIR,
-          `saves-${info.project.name}-${theme}.png`,
-        ),
-        animations: "disabled",
-      });
     }
     await copyRow.getByRole("button", { name: /^Actions for/ }).click();
     await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
