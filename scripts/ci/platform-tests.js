@@ -54,7 +54,7 @@ function commands(index, cores = os.availableParallelism()) {
         : []),
     ],
     ui: [
-      // Windows has spare time; Mac already owns the long shared-clock suite.
+      // Windows has spare time for controller journeys.
       ...(index === 2
         ? [
             {
@@ -85,7 +85,8 @@ function commands(index, cores = os.availableParallelism()) {
             },
           ]
         : []),
-      ...(index === 3
+      // Linux has headroom after its CPU shard; Mac owns the longer web shard.
+      ...(index === 1
         ? [
             {
               name: "Shared-clock Steam renderer",

@@ -31,10 +31,11 @@ files are large, so broad rewrites create expensive review diffs.
 - After a failed check, fix the issue and rerun the failed gates with the printed command, such as
   `npm run check -- --steps lint,tests`. Keep the earlier passing results only while their inputs
   remain unchanged. A test-query lint fix does not require repeating successful simulations;
-  changes to simulation inputs do. The runner does not track invalidation; rerun the full check
-  if unsure. A partial check is never evidence that all gates ran.
-  `npm run check:ci -- --steps browser` also works; selecting `browser` or `multiplayer`
-  rebuilds the renderer it tests because web and desktop builds share `build/`.
+  changes to simulation inputs do. `npm run check:ci -- --resume` accounts for all fifteen gates
+  and reruns failed or invalidated gates, verifying any reused source, environment, reports,
+  and build artifacts. Unknown inputs invalidate conservatively. Without `--resume`, checks run
+  fresh. A partial check is never evidence that all gates ran.
+  `npm run check:ci -- --steps browser --resume` also verifies its web-build prerequisite.
 - For prose-only Markdown changes, review the text and run `git diff --check`; app tests, builds
   and simulations are unnecessary. Changes to scripts, configuration or executable examples
   need the relevant checks. Do not run the full game suite just to save a proposal.
@@ -65,7 +66,8 @@ files are large, so broad rewrites create expensive review diffs.
 - `check:ci` runs only the smoke/layout specs listed in `e2e/ci.playwright.config.ts`.
   `test:e2e:ci -- <spec>` cannot select a spec outside that list. To test an arbitrary spec
   against production, use `test:e2e` with `E2E_BASE_URL` pointing to your hosted web build.
-  The final `check:ci` leaves a desktop build in `build/`; rebuild web before hosting it.
+  Local `check:ci` keeps web and desktop artifacts in `.tmp/check-builds/web` and
+  `.tmp/check-builds/desktop`. Standalone `build` and `desktop:build` still default to `build/`.
 - Local npm browser/check commands reserve and print an unused `E2E_PORT`. To keep a specific
   port across invocations, set it explicitly; an occupied or reserved port fails before tests.
   Leave other tasks' servers alone. An already-running dev server may serve another checkout.

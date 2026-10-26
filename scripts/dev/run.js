@@ -10,7 +10,7 @@ const generators = [
   "scripts/generate-icon-manifest.js",
 ];
 const commands = {
-  check: { entry: "scripts/check.js", port: true },
+  check: { entry: "scripts/check.js", port: true, generators },
   build: { entry: "scripts/build.js", generators },
   "desktop-build": { entry: "scripts/desktop-build.js" },
   start: { entry: "scripts/start.js", generators, port: true },

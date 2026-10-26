@@ -130,7 +130,6 @@ jobs:
           EXPECTED_ARCH: ${{ matrix.arch }}
         run: node -e 'if (process.platform !== process.env.EXPECTED_PLATFORM || process.arch !== process.env.EXPECTED_ARCH) throw new Error("The desktop build must run on its target platform and architecture")'
       - name: Cache the locked headless browser
-        if: matrix.index == 2 || matrix.index == 3
         uses: actions/cache@v6
         with:
           path: .tmp/playwright-browsers
@@ -138,8 +137,7 @@ jobs:
       - name: Install Linux graphical system dependencies
         if: matrix.platform == 'linux'
         run: npx playwright install-deps chromium
-      - name: Install Windows or Mac headless browser
-        if: matrix.index == 2 || matrix.index == 3
+      - name: Install locked headless browser
         run: npx playwright install --only-shell chromium
       - name: Install Linux native window dependencies
         if: matrix.platform == 'linux'
