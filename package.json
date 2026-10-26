@@ -83,7 +83,6 @@
     "deploy": "./scripts/deploy.sh",
     "compatibility:generate": "node scripts/run-compatibility.js",
     "icons:generate": "node scripts/generate-icon-manifest.js",
-    "notices:generate": "node scripts/generate-notices.js",
     "achievements:artwork": "node steamworks/achievement-artwork/export.cjs",
     "desktop:build": "node scripts/dev/run.js desktop-build",
     "desktop:start": "electron .",

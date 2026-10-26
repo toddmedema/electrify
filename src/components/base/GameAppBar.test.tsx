@@ -6,6 +6,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
+import userEvent from "@testing-library/user-event";
 import { createGame } from "../../testing/Simulator";
 import { modScenario } from "../../mods/ModScenario";
 import { TickPresentFutureType } from "../../Types";
@@ -41,6 +42,22 @@ function renderAppBar(overrides: Partial<Props> = {}) {
 }
 
 describe("GameAppBar", () => {
+  it.each(["click", "{Enter}", " "])(
+    "opens scenario info from the months remaining with %s",
+    async (action) => {
+      const onEvidence = jest.fn();
+      renderAppBar({ onEvidence });
+      const months = screen.getByRole("button", { name: /months left$/ });
+      if (action === "click") await userEvent.click(months);
+      else {
+        months.focus();
+        await userEvent.keyboard(action);
+      }
+      expect(onEvidence).toHaveBeenCalledTimes(1);
+      expect(onEvidence).toHaveBeenCalledWith("mission-details");
+    },
+  );
+
   it.each(["idle", "saving", "saved"] as const)(
     "keeps routine %s indicators off the game screen",
     (saveState) => {
@@ -207,53 +224,57 @@ describe("GameAppBar", () => {
     }
   });
 
-  it("keeps keyboard focus on a status control when the window crosses the single-row width", () => {
-    const matchMedia = window.matchMedia;
-    let wide = false;
-    const listeners = new Set<() => void>();
-    window.matchMedia = (query: string) =>
-      ({
-        ...matchMedia(query),
-        get matches() {
-          return query.includes("min-width:1300px") && wide;
-        },
-        addListener: (listener: () => void) => listeners.add(listener),
-        removeListener: (listener: () => void) => listeners.delete(listener),
-        addEventListener: (_: string, listener: () => void) =>
-          listeners.add(listener),
-        removeEventListener: (_: string, listener: () => void) =>
-          listeners.delete(listener),
-      }) as unknown as MediaQueryList;
-    const resize = (next: boolean) =>
-      act(() => {
-        wide = next;
-        listeners.forEach((listener) => listener());
-      });
-    try {
-      const { container } = renderAppBar({
-        activeEvents: [
-          {
-            key: "fire",
-            title: "Wildfire emergency",
-            importance: "CRITICAL",
-            count: 1,
-            throughLabel: "through Mar 2026",
+  it.each([/Wildfire emergency/, /months left$/])(
+    "keeps keyboard focus on %s when the window crosses the single-row width",
+    (name) => {
+      const matchMedia = window.matchMedia;
+      let wide = false;
+      const listeners = new Set<() => void>();
+      window.matchMedia = (query: string) =>
+        ({
+          ...matchMedia(query),
+          get matches() {
+            return query.includes("min-width:1300px") && wide;
           },
-        ],
-      });
-      const risk = () =>
-        screen.getByRole("button", { name: /Wildfire emergency/ });
-      risk().focus();
-      resize(true);
-      expect(container.querySelector("#topbar .gameStatusBar")).not.toBeNull();
-      expect(risk()).toHaveFocus();
-      resize(false);
-      expect(container.querySelector("#topbar .gameStatusBar")).toBeNull();
-      expect(risk()).toHaveFocus();
-    } finally {
-      window.matchMedia = matchMedia;
-    }
-  });
+          addListener: (listener: () => void) => listeners.add(listener),
+          removeListener: (listener: () => void) => listeners.delete(listener),
+          addEventListener: (_: string, listener: () => void) =>
+            listeners.add(listener),
+          removeEventListener: (_: string, listener: () => void) =>
+            listeners.delete(listener),
+        }) as unknown as MediaQueryList;
+      const resize = (next: boolean) =>
+        act(() => {
+          wide = next;
+          listeners.forEach((listener) => listener());
+        });
+      try {
+        const { container } = renderAppBar({
+          activeEvents: [
+            {
+              key: "fire",
+              title: "Wildfire emergency",
+              importance: "CRITICAL",
+              count: 1,
+              throughLabel: "through Mar 2026",
+            },
+          ],
+        });
+        const control = () => screen.getByRole("button", { name });
+        act(() => control().focus());
+        resize(true);
+        expect(
+          container.querySelector("#topbar .gameStatusBar"),
+        ).not.toBeNull();
+        expect(control()).toHaveFocus();
+        resize(false);
+        expect(container.querySelector("#topbar .gameStatusBar")).toBeNull();
+        expect(control()).toHaveFocus();
+      } finally {
+        window.matchMedia = matchMedia;
+      }
+    },
+  );
 
   it("keeps the status in its own row below the top bar on narrower windows", () => {
     const { container } = renderAppBar();

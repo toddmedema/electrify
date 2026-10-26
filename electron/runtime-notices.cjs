@@ -3,16 +3,6 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const RUNTIME_NOTICE_FILES = ["LICENSE", "LICENSES.chromium.html"];
-const NOTICE_ALIASES = {
-  "notices-chromium.html": "LICENSES.chromium.html",
-};
-
-function runtimeNoticeFilename(relative) {
-  return Object.hasOwn(NOTICE_ALIASES, relative)
-    ? NOTICE_ALIASES[relative]
-    : undefined;
-}
-
 /** Read the expectations captured from the actual target runtime at extraction. */
 function readRuntimeNoticeAssets(directory, electronVersion) {
   const manifest = JSON.parse(
@@ -44,31 +34,9 @@ function readRuntimeNoticeAssets(directory, electronVersion) {
     if (bytes.length !== expected.bytes || sha256 !== expected.sha256)
       throw new Error(`Packaged Electron notice mismatch: ${expected.name}`);
   }
-  return Object.entries(NOTICE_ALIASES).map(([alias, name]) => {
-    const { bytes, sha256 } = manifest.files.find((file) => file.name === name);
-    return { path: alias, bytes, sha256 };
-  });
-}
-
-/** Every served URL stays checked, including platform-specific native aliases. */
-function effectiveAssetManifest(sharedAssets, runtimeNotices, electronVersion) {
-  const nativeAssets = readRuntimeNoticeAssets(runtimeNotices, electronVersion);
-  for (const asset of nativeAssets)
-    if (
-      sharedAssets.filter((shared) => shared.path === asset.path).length !== 1
-    )
-      throw new Error(
-        `Shared renderer is missing native notice alias: ${asset.path}`,
-      );
-  return sharedAssets.map(
-    (asset) =>
-      nativeAssets.find((native) => native.path === asset.path) || asset,
-  );
 }
 
 module.exports = {
   RUNTIME_NOTICE_FILES,
-  runtimeNoticeFilename,
   readRuntimeNoticeAssets,
-  effectiveAssetManifest,
 };

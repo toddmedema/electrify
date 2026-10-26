@@ -8,8 +8,6 @@ const { builtinModules } = require("node:module");
 const generated = [
   "src/data/RunCompatibility.json",
   "public/icons.json",
-  "public/notices.json",
-  "public/notices-chromium.html",
   "node_modules/.package-lock.json",
 ];
 const renderer = new Set([
@@ -140,8 +138,6 @@ function sourceInputs(root = process.cwd()) {
 }
 
 function exempt(file, id) {
-  if (/^public\/notices(?:-chromium\.html|\.json)$/.test(file))
-    return !renderer.has(id);
   if (file.startsWith("e2e/")) return browserExempt.has(id);
   if (!file.startsWith("src/")) return false;
   if (/\.sim\.test\.[jt]sx?(?:\.snap)?$/.test(file))
@@ -302,12 +298,7 @@ function gateInputs(step, root, inputs) {
     const reference = graph.get(pending[index]);
     // Computed imports or unresolved local references cannot justify
     // excluding a test/helper. Hash everything until the dependency is explicit.
-    if (reference?.uncertain)
-      return inputs.filter(
-        ({ path: file }) =>
-          renderer.has(step.id) ||
-          !/^public\/notices(?:-chromium\.html|\.json)$/.test(file),
-      );
+    if (reference?.uncertain) return inputs;
     for (const target of reference?.links || [])
       if (!selected.has(target)) {
         selected.add(target);
