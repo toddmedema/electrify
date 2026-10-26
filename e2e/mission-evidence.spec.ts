@@ -40,7 +40,7 @@ async function range(page: Page) {
     ]);
 }
 for (const theme of ["light", "dark"]) {
-  test(`compact mission tracker preserves details focus during blackouts in ${theme}`, async ({
+  test(`compact mission tracker opens scenario info and stays usable during blackouts in ${theme}`, async ({
     page,
   }, info) => {
     test.skip(!reviewProjects.has(info.project.name));
@@ -89,16 +89,14 @@ for (const theme of ["light", "dark"]) {
       ).toBeLessThanOrEqual(1);
     }
     await settle(page);
-    const details = page.getByRole("button", {
-      name: "Scenario",
-      exact: true,
-    });
-    await details.click();
+    await page.getByRole("button", { name: "144 months left" }).click();
     const dialog = page.getByRole("region", { name: "Scenario", exact: true });
     await expect(dialog).toContainText("90%");
     await expect(dialog).toContainText("month-end");
     await page.keyboard.press("Escape");
-    await expect(details).toBeFocused();
+    await expect(
+      page.getByRole("button", { name: "Scenario", exact: true }),
+    ).toBeFocused();
     await page
       .getByRole("button", { name: "Inspect Coal", exact: true })
       .click();

@@ -78,7 +78,6 @@ missing or changed artifacts also invalidate dependent bundle/browser evidence.
 Reused artifacts retain their original build version and provenance. Standalone
 build commands and hosted CI keep their existing `build/` default.
 
-Compatibility/icon inputs are generated before the check snapshot. Edition-specific
-notices are prepared before each renderer gate. Changes to other ignored behavior
-inputs, including local environment files, invalidate a run just like tracked
+Compatibility/icon inputs are generated before the check snapshot. Changes to ignored
+behavior inputs, including local environment files, invalidate a run just like tracked
 source changes. Cache reuse never authorizes a partial run to claim full coverage.
