@@ -1,6 +1,16 @@
-import { Request, test as base } from "@playwright/test";
+import { Page, Request, test as base } from "@playwright/test";
 
 export * from "@playwright/test";
+
+const readBrowserEnvironment = () => ({
+  pathname: window.location.pathname,
+  online: navigator.onLine,
+  touchPoints: navigator.maxTouchPoints,
+  coarsePointer: matchMedia("(pointer: coarse)").matches,
+  coarsePointerAvailable: matchMedia("(any-pointer: coarse)").matches,
+  hover: matchMedia("(hover: hover)").matches,
+  viewport: { width: innerWidth, height: innerHeight },
+});
 
 export const test = base.extend<{
   showCloudSaveInvitation: boolean;
@@ -11,6 +21,20 @@ export const test = base.extend<{
   networkDiagnostics: [
     async ({ context, baseURL }, use, info) => {
       const failures: string[] = [];
+      const navigationStates: ReturnType<typeof readBrowserEnvironment>[] = [];
+      const pageListeners = new Map<Page, () => void>();
+      const recordPage = (page: Page) => {
+        const recordNavigation = () => {
+          void page.evaluate(readBrowserEnvironment).then(
+            (state) => navigationStates.push(state),
+            () => {},
+          );
+        };
+        page.on("domcontentloaded", recordNavigation);
+        pageListeners.set(page, recordNavigation);
+      };
+      context.on("page", recordPage);
+      context.pages().forEach(recordPage);
       const record = (request: Request) => {
         const url = new URL(request.url());
         const error = request.failure()?.errorText;
@@ -29,6 +53,10 @@ export const test = base.extend<{
       context.on("requestfailed", record);
       await use();
       context.off("requestfailed", record);
+      context.off("page", recordPage);
+      pageListeners.forEach((listener, page) =>
+        page.off("domcontentloaded", listener),
+      );
       if (info.status !== info.expectedStatus) {
         if (failures.length) {
           const evidence = [...new Set(failures)].join("\n");
@@ -41,16 +69,7 @@ export const test = base.extend<{
         const environment = await Promise.all(
           context.pages().map(async (page) => {
             try {
-              return await page.evaluate(() => ({
-                pathname: window.location.pathname,
-                online: navigator.onLine,
-                touchPoints: navigator.maxTouchPoints,
-                coarsePointer: matchMedia("(pointer: coarse)").matches,
-                coarsePointerAvailable: matchMedia("(any-pointer: coarse)")
-                  .matches,
-                hover: matchMedia("(hover: hover)").matches,
-                viewport: { width: innerWidth, height: innerHeight },
-              }));
+              return await page.evaluate(readBrowserEnvironment);
             } catch {
               return { closed: true };
             }
@@ -60,6 +79,7 @@ export const test = base.extend<{
           body: JSON.stringify(
             {
               declaredHasTouch: !!info.project.use.hasTouch,
+              navigationStates,
               pages: environment,
             },
             null,
