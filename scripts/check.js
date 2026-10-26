@@ -355,6 +355,9 @@ async function main(argv = process.argv.slice(2)) {
       e2ePort: process.env.E2E_PORT || "3100",
       webBuildDirectory: process.env.E2E_BUILD_DIR || "build",
     },
+    timing: {
+      queueMs: Number(process.env.ELECTRIFY_COORDINATION_WAIT_MS || 0),
+    },
     scope: {
       profile: selected.some((step) => step.ci) ? "ci" : "quick",
       full,
@@ -407,6 +410,7 @@ async function main(argv = process.argv.slice(2)) {
       ? "failed"
       : "passed";
   report.finishedAt = new Date().toISOString();
+  report.timing.executionMs = Date.now() - started;
   saveReport();
   if (report.source.changedDuringRun) {
     console.error(

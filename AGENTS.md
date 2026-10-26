@@ -8,6 +8,10 @@ files are large, so broad rewrites create expensive review diffs.
 
 - Use Node 24. Install exactly the lockfile with `npm ci` in a new checkout or when the lockfile
   changes; reuse that install across turns while it still matches the lockfile.
+- Reserve the checkout before editing with `npm run task -- claim` (Codex supplies the chat ID;
+  otherwise pass an ID or set `ELECTRIFY_TASK_ID`). If another task owns it, use an isolated
+  worktree. Release it with `npm run task -- release` when finished. See
+  [development coordination](docs/development-workflow.md) for recovery and command behavior.
 - In a fresh worktree, run `npm run check:assets` before tests, builds or browser QA. If it finds
   Git LFS pointers, try `git lfs checkout` for cached objects, then `git lfs pull` if needed.
   For missing files, stage intentional deletions or renames; otherwise restore the files.
@@ -36,9 +40,9 @@ files are large, so broad rewrites create expensive review diffs.
   need the relevant checks. Do not run the full game suite just to save a proposal.
 - Local checks default to at most four Jest workers to limit shared-machine contention, and keep
   heavy suites serial. The simulation CLI runs its single suite in process. Override the cap with
-  `ELECTRIFY_CHECK_WORKERS` only for a measured need. Avoid overlapping full checks, production
-  builds and broad browser suites on the same machine. When using subagents, give them focused
-  checks and let the integrating agent own the final full check.
+  `ELECTRIFY_CHECK_WORKERS` only for a measured need. The npm build/test/check commands queue
+  heavy work across local worktrees; do not pause a running test process to make room. When using
+  subagents, give them focused checks and let the integrating agent own the final full check.
 - `npm run fix` applies every mechanical fix: it runs `lint:fix` and `format`. Review its diff; it
   does not fix types or tests.
 - Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` starts Jest's
@@ -62,10 +66,9 @@ files are large, so broad rewrites create expensive review diffs.
   `test:e2e:ci -- <spec>` cannot select a spec outside that list. To test an arbitrary spec
   against production, use `test:e2e` with `E2E_BASE_URL` pointing to your hosted web build.
   The final `check:ci` leaves a desktop build in `build/`; rebuild web before hosting it.
-- Choose an unused task-specific `E2E_PORT` before starting browser checks; keep it set in
-  the same shell for iteration and the final check. In PowerShell: `$env:E2E_PORT = "3189"`;
-  in Bash: `export E2E_PORT=3189`. If occupied, choose another port; leave other tasks' servers
-  alone. An already-running dev server may serve another checkout.
+- Local npm browser/check commands reserve and print an unused `E2E_PORT`. To keep a specific
+  port across invocations, set it explicitly; an occupied or reserved port fails before tests.
+  Leave other tasks' servers alone. An already-running dev server may serve another checkout.
 - Keep local validation windowless: use `npm run check` and headless Chromium through
   `npm run test:e2e`. The Electron UI suite opens native windows and takes keyboard focus;
   leave it to CI unless the user explicitly requests a local native-window test. It requires
@@ -84,7 +87,7 @@ and behavioral tests over adding instructions here.
 
 `src/data/RunCompatibility.json` is a generated, git-ignored hash of every simulation input:
 everything under `src/data`, `src/helpers`, and `src/reducers` except tests, plus
-`src/Constants.tsx`, `src/Types.tsx`, `package-lock.json`, and `public/data`. The npm pre-hooks of
+`src/Constants.tsx`, `src/Types.tsx`, `package-lock.json`, and `public/data`. The npm entry points for
 `start`, `build`, `test*`, `sim`, and `typecheck` regenerate it automatically, so never commit or
 merge it. Run `npm run compatibility:generate` by hand only if your editor complains that the file
 is missing. See `docs/run-compatibility.md` for why the hash is intentionally broad.
