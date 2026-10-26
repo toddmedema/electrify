@@ -36,6 +36,52 @@ test("shards discover new files, cover every suite exactly once, and agree regar
   assert.deepEqual(parseShard("2/3"), { index: 2, count: 3 });
 });
 
+test("the single-worker Jest filter selects every discovered unit and simulation suite", (t) => {
+  const { spawnSync } = require("node:child_process");
+  const directory = temporary(t);
+  const all = [
+    "src/new.test.tsx",
+    "src/slow.test.tsx",
+    "src/game.sim.test.tsx",
+  ];
+  for (const group of ["unit", "simulation"]) {
+    const result = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `
+      const filter = require(${JSON.stringify(require.resolve("./jest-filter"))});
+      filter(${JSON.stringify(all)}.map(file => require('node:path').resolve(file)))
+        .then(result => process.stdout.write(JSON.stringify(result)));
+    `,
+      ],
+      {
+        cwd: directory,
+        encoding: "utf8",
+        env: { ...process.env, TEST_SHARD: "1/1", TEST_GROUP: group },
+      },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const selected = JSON.parse(result.stdout).filtered.map(({ test: file }) =>
+      path.relative(directory, file).split(path.sep).join("/"),
+    );
+    assert.deepEqual(selected.sort(), [...all].sort());
+    const manifest = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          directory,
+          "test-results",
+          `jest-${group}-1`,
+          "manifest.json",
+        ),
+        "utf8",
+      ),
+    );
+    assert.deepEqual(manifest.selected, [...all].sort());
+    assert.equal(manifest.count, 1);
+  }
+});
+
 test("the coverage gate rejects missing, overlapping, stale and mislabeled shard assignments", () => {
   const all = ["a", "b", "c"];
   const manifests = all.map((file, index) => ({

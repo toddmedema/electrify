@@ -13,8 +13,8 @@ concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
-# Hard cap: one build + three native workers + one required coverage gate = five jobs.
-# Every existing test and coverage threshold remains required on every PR.
+# Six jobs: shared renderers, three native builds, all tests, and the required gate.
+# Tests share renderer artifacts but never wait for an OS build.
 jobs:
   build:
     name: Shared production builds
@@ -58,63 +58,44 @@ jobs:
           if-no-files-found: error
 
   platform:
-    name: ${{ matrix.label }} tests
+    name: ${{ matrix.label }} build
     needs: build
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 15
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.tmp/electron-cache
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.tmp/electron-builder-cache
-      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tmp/playwright-browsers
-      E2E_BUILD_DIR: ${{ github.workspace }}/.tmp/web-renderer
-      ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/${{ matrix.executable }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - label: Linux x64
-            index: 1
             runner: ubuntu-22.04
             platform: linux
             arch: x64
             depot: linux-x64
             directory: linux-unpacked
-            executable: linux-unpacked/Electrify
           - label: Windows x64
-            index: 2
             runner: windows-latest
             platform: win32
             arch: x64
             depot: win32-x64
             directory: win-unpacked
-            executable: win-unpacked/Electrify.exe
           # One universal app serves Intel and Apple Silicon Macs. This Apple Silicon host
-          # packages both slices and tests the arm64 one.
+          # packages and verifies both slices.
           - label: macOS universal
-            index: 3
             runner: macos-15
             platform: darwin
             arch: arm64
             depot: darwin-universal
             directory: mac-universal
-            executable: mac-universal/Electrify.app/Contents/MacOS/Electrify
     steps:
       - uses: actions/checkout@v7
         with:
           lfs: true
       - uses: ./.github/actions/install
         with:
-          profile: ${{ matrix.index == 2 && 'desktop' || 'full' }}
-      - uses: ./.github/actions/jest-cache
-        if: matrix.index == 1
-        with:
-          group: unit
-          shard: ${{ matrix.index }}
-      - uses: ./.github/actions/jest-cache
-        if: matrix.index == 1
-        with:
-          group: simulation
-          shard: ${{ matrix.index }}
+          profile: desktop
       - name: Restore native packaging downloads
         id: native-cache
         uses: actions/cache/restore@v6
@@ -129,45 +110,11 @@ jobs:
           EXPECTED_PLATFORM: ${{ matrix.platform }}
           EXPECTED_ARCH: ${{ matrix.arch }}
         run: node -e 'if (process.platform !== process.env.EXPECTED_PLATFORM || process.arch !== process.env.EXPECTED_ARCH) throw new Error("The desktop build must run on its target platform and architecture")'
-      - name: Cache the locked headless browser
-        if: matrix.index == 2 || matrix.index == 3
-        uses: actions/cache@v6
-        with:
-          path: .tmp/playwright-browsers
-          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
-      - name: Install Linux graphical system dependencies
-        if: matrix.platform == 'linux'
-        run: npx playwright install-deps chromium
-      - name: Install Windows or Mac headless browser
-        if: matrix.index == 2 || matrix.index == 3
-        run: npx playwright install --only-shell chromium
-      - name: Install Linux native window dependencies
-        if: matrix.platform == 'linux'
-        run: sudo apt-get install --yes xvfb openbox
-      - name: Generate local manifests
-        run: npm run compatibility:generate && npm run icons:generate
-      - name: Java for the Firestore emulator
-        if: matrix.index == 1 && !cancelled()
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "21"
-      - name: Native desktop unit tests
-        run: npm run test:desktop:native
       - uses: actions/download-artifact@v8
         with:
           name: desktop-renderer
-      - uses: actions/download-artifact@v8
-        if: matrix.index == 2 || matrix.index == 3
-        with:
-          name: web-renderer
-          path: .tmp/web-renderer
-      - name: Unit, simulation, browser and full packaged desktop suites
-        if: matrix.platform != 'linux'
-        run: npm run test:ci-platform -- ${{ matrix.index }}
-      - name: Unit, simulation, browser and full packaged desktop suites (Linux)
-        if: matrix.platform == 'linux'
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:ci-platform -- ${{ matrix.index }}'
+      - name: Package and verify native depot
+        run: npm run desktop:pack:offline -- --skip-build --platform ${{ matrix.platform }} --arch ${{ matrix.platform == 'darwin' && 'universal' || matrix.arch }}
       - name: Save native packaging downloads
         if: "!cancelled() && steps.native-cache.outputs.cache-hit != 'true'"
         uses: actions/cache/save@v6
@@ -176,15 +123,6 @@ jobs:
             ${{ env.ELECTRON_CACHE }}
             ${{ env.ELECTRON_BUILDER_CACHE }}
           key: ${{ steps.native-cache.outputs.cache-primary-key }}
-      - name: Coverage and suite manifest
-        if: matrix.index == 1 && !cancelled()
-        uses: actions/upload-artifact@v7
-        with:
-          name: jest-unit-${{ matrix.index }}
-          path: test-results/jest-unit-${{ matrix.index }}/
-          retention-days: 2
-          compression-level: 1
-          if-no-files-found: error
       - name: Archive the complete verified QA depot (manual runs only)
         if: github.event_name == 'workflow_dispatch' && inputs.qa-artifacts
         shell: bash
@@ -198,35 +136,19 @@ jobs:
           retention-days: 14
           compression-level: 0
           if-no-files-found: error
-      - name: Preserve diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: diagnostics-${{ matrix.depot }}
-          path: |
-            test-results/browser/
-            test-results/multiplayer/
-            test-results/steam-input/
-            test-results/desktop/
-            test-results/desktop-results.json
-            test-results/jest-simulation-${{ matrix.index }}/manifest.json
-          retention-days: 7
-          if-no-files-found: ignore
-
-  check:
-    name: check
-    if: "!cancelled()"
-    needs: [build]
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    permissions:
-      contents: read
-      actions: read
+  tests:
+    name: All tests and static checks
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      ELECTRON_CACHE: ${{ github.workspace }}/.tmp/electron-cache
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.tmp/electron-builder-cache
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tmp/playwright-browsers
+      E2E_BUILD_DIR: ${{ github.workspace }}/.tmp/web-renderer
+      E2E_PORT: "3189"
+      ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/linux-unpacked/Electrify
     steps:
-      - name: Shared builds passed
-        env:
-          BUILD_RESULT: ${{ needs.build.result }}
-        run: test "$BUILD_RESULT" = success
       - uses: actions/checkout@v7
         with:
           lfs: true
@@ -234,41 +156,69 @@ jobs:
       - uses: ./.github/actions/jest-cache
         with:
           group: unit
-          shard: 2
+          shard: 1
       - uses: ./.github/actions/jest-cache
         with:
           group: simulation
-          shard: 2
+          shard: 1
+      - name: Cache native packaging downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.ELECTRON_CACHE }}
+            ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: desktop-tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+      - name: Cache the locked headless browser
+        uses: actions/cache@v6
+        with:
+          path: .tmp/playwright-browsers
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+      - name: Install graphical system dependencies and headless browser
+        run: npx playwright install --with-deps --only-shell chromium
+      - name: Install native window dependencies
+        run: sudo apt-get install --yes xvfb openbox
+      - name: Java for the Firestore emulator
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Generate local manifests
         run: npm run compatibility:generate && npm run icons:generate
-      - name: Simulation CLI
-        run: npm run sim -- --scenario 101 --months 12
-      - name: Isolated tick performance ratios
-        run: npm run perf:bench
-      - name: Unit and simulation shard 2
-        if: "!cancelled() && needs.build.result == 'success'"
-        run: npm run test:ci-core
-      - name: Coverage and suite manifest
-        if: "!cancelled() && needs.build.result == 'success'"
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-renderer
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-renderer
+          path: .tmp/web-renderer
+      - name: All test suites, types, lint and formatting
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:ci-all'
+      - name: Preserve test reports, coverage and diagnostics
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: jest-unit-2
-          path: test-results/jest-unit-2/
-          retention-days: 2
+          name: diagnostics-tests
+          path: |
+            coverage/
+            test-results/
+            firestore-debug.log
+          retention-days: 7
           compression-level: 1
-          if-no-files-found: error
-      # Execute useful CPU work before the fan-in, avoiding a seventh job.
-      # Use each job's latest result in this run, including unchanged jobs in a partial rerun.
-      - name: Require every native worker for this commit
-        if: "!cancelled() && needs.build.result == 'success'"
+          if-no-files-found: ignore
+
+  check:
+    name: check
+    if: always()
+    needs: [build, platform, tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every build and test worker
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci/wait-native.js
-      - uses: actions/download-artifact@v8
-        if: "!cancelled() && needs.build.result == 'success'"
-        with:
-          name: jest-unit-1
-          path: test-results/jest-unit-1
-      - name: Every suite exactly once, with the unchanged coverage floors
-        if: "!cancelled() && needs.build.result == 'success'"
-        run: node scripts/ci/coverage.js test-results 2
+          BUILD_RESULT: ${{ needs.build.result }}
+          PLATFORM_RESULT: ${{ needs.platform.result }}
+          TEST_RESULT: ${{ needs.tests.result }}
+        run: |
+          test "$BUILD_RESULT" = success
+          test "$PLATFORM_RESULT" = success
+          test "$TEST_RESULT" = success
