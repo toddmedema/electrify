@@ -1030,6 +1030,17 @@ $topbar_height: 56px;
 .missionSummaryMonths {
   flex: 0 0 auto;
   margin-left: auto;
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  min-height: 40px;
+  // Expand the hit area without increasing the status row's height.
+  margin-block: -12px;
 }
 .missionSummaryHeadline,
 .missionRiskText {
@@ -1047,7 +1058,8 @@ $topbar_height: 56px;
 }
 
 @media (pointer: coarse) {
-  .missionSummary .MuiButton-root {
+  .missionSummary .MuiButton-root,
+  .missionSummaryMonths {
     min-height: 44px;
   }
 }

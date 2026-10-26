@@ -1,7 +1,6 @@
 const { spawnSync } = require("node:child_process");
 const { buildVersion, writeBuildVersion } = require("./build-version");
 const { verifyEditionBundle } = require("./verify-edition-bundle");
-require("./generate-notices").generateNotices();
 
 const version = buildVersion();
 const output = process.env.BUILD_PATH || "build";

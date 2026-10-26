@@ -148,8 +148,8 @@ Bundled pages, simulation data, fonts, audio, images and worker chunks load from
 protocol. Desktop gameplay does not use Firebase login, Firebase Cloud backup, analytics or a
 web service worker. Native Steam calls run outside the renderer.
 
-**Settings → Credits and licenses** opens the bundled game, asset and dependency notices,
-including desktop privacy information. These remain available offline. The website's privacy
+**Settings → Credits and licenses** shows contributor credits, the game license summary,
+and desktop privacy information. These remain available offline. The website's privacy
 page also distinguishes Steam services from the browser edition's optional Firebase services.
 
 ## Steamworks configuration and acceptance

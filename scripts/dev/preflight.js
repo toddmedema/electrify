@@ -31,7 +31,7 @@ function electronRuntime(root, version, platform) {
   const marker = path.join(directory, "path.txt");
   const dist = path.join(directory, "dist");
   // Electron 44 downloads on demand. A fresh npm ci intentionally has neither
-  // marker nor dist; prepare-electron-runtime owns that download before building.
+  // marker nor dist; Electron downloads its runtime when needed.
   if (!fs.existsSync(marker) && !fs.existsSync(dist)) return "not-downloaded";
   const executable =
     platform === "darwin"

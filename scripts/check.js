@@ -162,16 +162,6 @@ function artifactDigest(step) {
   } // Missing/corrupt artifacts can never authorize reuse.
 }
 
-function prepareRendererInputs(step) {
-  if (!artifactDirectory(step)) return;
-  const generator = path.resolve("scripts/generate-notices.js");
-  if (fs.existsSync(generator))
-    require("./generate-notices").generateNotices(
-      process.cwd(),
-      ["desktop-build", "multiplayer", "steam-input"].includes(step.id),
-    );
-}
-
 function commandArguments(step, workers) {
   return [
     "run",
@@ -211,14 +201,7 @@ function inputKey(step, workers, directory) {
 }
 
 function behaviorFingerprint() {
-  // Edition notices are deliberately regenerated between web and desktop gates.
-  // Other ignored inputs, especially CRA's local env files, must stay unchanged.
-  const inputs = cache
-    .sourceInputs(process.cwd())
-    .filter(
-      ({ path: file }) =>
-        !["public/notices.json", "public/notices-chromium.html"].includes(file),
-    );
+  const inputs = cache.sourceInputs(process.cwd());
   return createHash("sha256").update(JSON.stringify(inputs)).digest("hex");
 }
 
@@ -528,7 +511,6 @@ async function main(argv = process.argv.slice(2)) {
       saveReport();
       let result;
       try {
-        if (reusable) prepareRendererInputs(step);
         const key = reusable ? inputKey(step, workers, directory) : undefined;
         const artifact = reusable ? artifactDigest(step) : undefined;
         const previous =

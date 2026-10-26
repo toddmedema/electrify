@@ -30,7 +30,7 @@ function fixture(t) {
   git("init", "--quiet");
   write(
     ".gitignore",
-    ".tmp/\nnode_modules/\n.env*\nbuild/\nsrc/data/RunCompatibility.json\npublic/icons.json\npublic/notices*\n",
+    ".tmp/\nnode_modules/\n.env*\nbuild/\nsrc/data/RunCompatibility.json\npublic/icons.json\n",
   );
   write("src/main.ts", "export const answer = 42;\n");
   write("src/main.test.ts", "export const expected = 42;\n");
@@ -164,16 +164,6 @@ test("simulation tests and e2e changes invalidate their owners without hiding se
     write(file, "changed");
     assert.notEqual(key("build"), previous, file);
   }
-});
-
-test("generated edition notices affect renderer gates, not unrelated validation", (t) => {
-  const { write, key } = fixture(t);
-  const tests = key("tests"),
-    build = key("build");
-  write("public/notices.json", { edition: "web" });
-  write("public/notices-chromium.html", "desktop notices");
-  assert.equal(key("tests"), tests);
-  assert.notEqual(key("build"), build);
 });
 
 test("a production import retains excluded test helpers and their transitive imports", (t) => {
