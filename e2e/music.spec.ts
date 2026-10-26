@@ -289,6 +289,12 @@ test("gameplay sources and playheads survive card changes and all Back paths", a
   }
   await page.keyboard.press("g");
   await expect(page.locator(".buildOption").first()).toBeVisible();
+  const closeBuild = page.getByRole("button", {
+    name: "Close Build",
+    exact: true,
+  });
+  await closeBuild.focus();
+  await expect(closeBuild).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.locator(".buildOption")).toHaveCount(0);
   playback = await expectContinuousMusic(page, playback);
