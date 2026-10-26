@@ -235,8 +235,25 @@ test("Build and Programs restore selections and scrolling without reopening hidd
     name: /^Efficiency rebates ·/,
   });
   await rebate.scrollIntoViewIfNeeded();
-  const listScroll = await body.evaluate((element) => element.scrollTop);
+  // A real click can scroll its target after the initial visibility check.
+  // Record the opening position during click capture, before React opens details.
+  const openingPosition = await body.evaluateHandle((element) => {
+    const position = { scrollTop: Number.NaN };
+    element.addEventListener(
+      "click",
+      () => {
+        position.scrollTop = element.scrollTop;
+      },
+      { capture: true, once: true },
+    );
+    return position;
+  });
   await rebate.click();
+  const listScroll = await openingPosition.evaluate(
+    (position) => position.scrollTop,
+  );
+  await openingPosition.dispose();
+  expect(Number.isFinite(listScroll)).toBe(true);
   await expect(
     programs.getByRole("button", { name: "Start next month", exact: true }),
   ).toBeEnabled({ timeout: 60_000 });

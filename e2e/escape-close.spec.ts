@@ -141,10 +141,15 @@ test("Escape dismisses nested build dialogs before closing the sheet", async ({
     .click();
   const help = page.getByRole("dialog", { name: "Manual help" });
   await expect(help).toBeVisible();
+  // Keep this keyboard journey separate from a hover preview when the backdrop disappears.
+  await page.mouse.move(0, 0);
   await page.keyboard.press("Escape");
   await expect(help).toHaveCount(0);
   // The hotkey guard remains active until the popover's exit transition unmounts it.
   await expect(page.locator('[data-manual-help="true"]')).toHaveCount(0);
+  await expect(
+    page.getByRole("dialog", { name: "Manual preview", exact: true }),
+  ).toHaveCount(0);
   await expect(catalog).toBeVisible();
 
   await page.keyboard.press("Escape");
