@@ -396,7 +396,6 @@ a:hover {
 }
 
 .panel--credits > p {
-  max-width: 70ch;
   margin-top: 1.5rem;
 }
 
@@ -616,6 +615,7 @@ a:hover {
 
 .site-footer nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
 }
 
@@ -785,6 +785,88 @@ a:hover {
   gap: 1.25rem;
 }
 
+.panel--resources {
+  grid-column: 1 / -1;
+}
+
+.learning-screenshot {
+  margin: 1.5rem 0 0;
+}
+
+.learning-screenshot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+.learning-screenshot figcaption {
+  margin-top: 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.worksheet-answer {
+  min-height: 5rem;
+  margin-top: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.student-worksheet li + li {
+  margin-top: 1.5rem;
+}
+
+@media print {
+  .classroom-page {
+    background: white;
+    color: black;
+    font-size: 11pt;
+    line-height: 1.4;
+    --text: black;
+    --text-muted: black;
+    --border: #777;
+  }
+
+  .classroom-page > :not(main),
+  .classroom-page .hero,
+  .classroom-page .comparison-content > :not(.student-worksheet) {
+    display: none;
+  }
+
+  .classroom-page .comparison-content {
+    display: block;
+    width: 100%;
+    padding: 0;
+  }
+
+  .classroom-page .student-worksheet {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: white;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .classroom-page .student-worksheet li {
+    break-inside: avoid;
+  }
+
+  .classroom-page .student-worksheet li + li {
+    margin-top: 1rem;
+  }
+
+  .classroom-page .worksheet-answer {
+    min-height: 4rem;
+  }
+
+  .classroom-page .student-worksheet a {
+    color: black;
+    text-decoration: none;
+  }
+}
+
 .comparison-page .hero h1 {
   font-size: clamp(2.7rem, 5.5vw, 4.5rem);
   line-height: 1.06;
@@ -794,6 +876,10 @@ a:hover {
   margin: 1.5rem 0 0;
   font-size: 1.125rem;
   line-height: 1.4;
+}
+
+.comparison-page :target {
+  scroll-margin-top: 6rem;
 }
 
 .comparison-columns {
