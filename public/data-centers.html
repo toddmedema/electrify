@@ -9,7 +9,7 @@
     <title>Data centers and your local grid — Electrify</title>
     <meta
       name="description"
-      content="See how data-center growth could change your local grid’s reliability, costs, and emissions. Then bring sharper questions to your utility and local officials."
+      content="Compare an example grid with and without new data-center demand. Try supplying the extra power, then bring better questions to your community."
     />
     <meta name="theme-color" content="#0084f8" />
     <link rel="icon" href="/favicon.ico" />
@@ -28,7 +28,7 @@
     />
     <meta
       property="og:description"
-      content="See how data-center growth could change your local grid’s reliability, costs, and emissions. Then bring sharper questions to your utility and local officials."
+      content="Compare an example grid with and without new data-center demand. Try supplying the extra power, then bring better questions to your community."
     />
     <meta
       property="og:image"
@@ -49,7 +49,7 @@
     />
     <meta
       name="twitter:description"
-      content="See how data-center growth could change your local grid’s reliability, costs, and emissions. Then bring sharper questions to your utility and local officials."
+      content="Compare an example grid with and without new data-center demand. Try supplying the extra power, then bring better questions to your community."
     />
     <meta
       name="twitter:image"
@@ -59,8 +59,25 @@
       name="twitter:image:alt"
       content="Electrify gameplay showing electricity supply, demand, and grid finances"
     />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "@id": "https://electrifygame.com/data-centers.html#webpage",
+        "url": "https://electrifygame.com/data-centers.html",
+        "name": "Data centers and your local grid — Electrify",
+        "description": "Compare an example grid with and without new data-center demand. Try supplying the extra power, then bring better questions to your community.",
+        "inLanguage": "en",
+        "isPartOf": {
+          "@type": "WebSite",
+          "@id": "https://electrifygame.com/#website",
+          "url": "https://electrifygame.com/",
+          "name": "Electrify"
+        }
+      }
+    </script>
   </head>
-  <body class="data-centers-page">
+  <body class="comparison-page">
     <a class="skip-link" href="#main-content">Skip to content</a>
     <header class="topbar">
       <div class="topbar__inner">
@@ -81,71 +98,188 @@
     </header>
 
     <main id="main-content">
-      <section class="hero" aria-labelledby="page-title">
+      <section class="hero hero--illustrated" aria-labelledby="page-title">
         <div class="hero__inner">
-          <h1 id="page-title">
-            A data center wants to plug into your grid. Now what?
-          </h1>
-          <p class="hero__lede">
-            Data centers use a lot of electricity. A big one can use as much as
-            a small city. Electrify is a free simulation where you run the grid
-            yourself, so you can see the tradeoffs firsthand and show up to your
-            next community meeting with sharper questions.
+          <div class="hero__copy">
+            <p class="eyebrow">Data centers and your community</p>
+            <h1 id="page-title">Can your grid keep up?</h1>
+            <p class="hero__lede">
+              A new data center needs power around the clock. Where will it come
+              from, what will it cost, and who has to plan for it? Run an
+              example grid in Electrify and see what it takes to supply that
+              extra electricity.
+            </p>
+            <div class="hero__actions">
+              <a class="button button--primary" href="/?dataCenters=1"
+                >Explore the impact</a
+              >
+              <a class="button" href="#worked-example">See an example</a>
+            </div>
+          </div>
+          <img
+            class="hero__art"
+            src="/images/about-hero-facility-tokens.svg"
+            alt=""
+            aria-hidden="true"
+            width="560"
+            height="360"
+          />
+        </div>
+      </section>
+
+      <div class="page-content comparison-content">
+        <section
+          class="panel"
+          id="worked-example"
+          aria-labelledby="example-title"
+        >
+          <h2 id="example-title">A worked example: adding 100 MW</h2>
+          <p>
+            We ran Electrify’s Austin example twice, starting in 2026 with
+            575,087 customer accounts. In one run, no new campus opened. In the
+            other, a 100 MW campus opened in 2027. We left the same plants,
+            electricity prices, and customer programs in place in both runs.
+            Here is what happened during 2027.
           </p>
-          <div class="hero__actions">
+          <!-- Reproduction: base 1f9ef3a4, DATA_CENTER_SEED 1062026, CEO difficulty.
+               calibrateDataCenterScenario(Austin, 2026, published customer profile),
+               configureDataCenterGrowth with 0 / 100e6 W, opening 2027.
+               runSimulation for 24 months, strategy none; sum the 12 2027 months.
+               Costs = expensesFuel + expensesOM; emissions = kgco2e / 1000.
+               Both runs completed with no invariant violations; their opening
+               facilities and first 12 months were equal. Recorded 2026-10-25. -->
+          <table
+            class="comparison-table"
+            role="table"
+            aria-labelledby="example-title"
+          >
+            <thead role="rowgroup">
+              <tr role="row">
+                <th scope="col" role="columnheader">Modeled result in 2027</th>
+                <th scope="col" role="columnheader" id="baseline-column">
+                  No new campus
+                </th>
+                <th scope="col" role="columnheader" id="growth-column">
+                  100 MW campus
+                </th>
+              </tr>
+            </thead>
+            <tbody role="rowgroup">
+              <tr role="row">
+                <th scope="row" role="rowheader" id="margin-row">
+                  Smallest spare supply
+                </th>
+                <td role="cell" headers="margin-row baseline-column">
+                  <span class="comparison-table__label" aria-hidden="true"
+                    >No new campus</span
+                  >682 MW
+                </td>
+                <td role="cell" headers="margin-row growth-column">
+                  <span class="comparison-table__label" aria-hidden="true"
+                    >100 MW campus</span
+                  >582 MW
+                </td>
+              </tr>
+              <tr role="row">
+                <th scope="row" role="rowheader" id="cost-row">
+                  Fuel and running costs
+                </th>
+                <td role="cell" headers="cost-row baseline-column">
+                  <span class="comparison-table__label" aria-hidden="true"
+                    >No new campus</span
+                  >$448.3 million
+                </td>
+                <td role="cell" headers="cost-row growth-column">
+                  <span class="comparison-table__label" aria-hidden="true"
+                    >100 MW campus</span
+                  >$459.3 million
+                </td>
+              </tr>
+              <tr role="row">
+                <th scope="row" role="rowheader" id="emissions-row">
+                  Emissions
+                </th>
+                <td role="cell" headers="emissions-row baseline-column">
+                  <span class="comparison-table__label" aria-hidden="true"
+                    >No new campus</span
+                  >6.145 million tonnes CO₂e
+                </td>
+                <td role="cell" headers="emissions-row growth-column">
+                  <span class="comparison-table__label" aria-hidden="true"
+                    >100 MW campus</span
+                  >6.313 million tonnes CO₂e
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            The grid supplied all its customers in both runs. The new campus
+            used some of its spare supply and added about $11 million in fuel
+            and running costs, along with 168,000 tonnes CO₂e in emissions. Try
+            a larger campus or a different power mix and the answer may change.
+          </p>
+          <p class="comparison-note">
+            These game results were recorded in October 2026 using
+            <a href="https://austinenergy.com/about/company-profile/numbers"
+              >Austin Energy’s FY2025 account and electricity-use figures</a
+            >. The plants and their operation are simulated. “Spare supply” is
+            the smallest gap between supply and demand. Running costs exclude
+            construction and financing; CO₂e expresses greenhouse gases as
+            equivalent carbon dioxide. Figures are rounded and game updates may
+            change them.
+          </p>
+        </section>
+
+        <section class="panel" aria-labelledby="try-title">
+          <h2 id="try-title">Try it yourself</h2>
+          <ol>
+            <li>
+              Open <a href="/?dataCenters=1">the data-center setup</a>. Choose
+              Austin, set <strong>Start year</strong> to 2026 and
+              <strong>Data centers open</strong> to 2027, and keep
+              <strong>Grid size</strong> at 575,087 accounts.
+            </li>
+            <li>
+              Under <strong>How much extra power?</strong>, set 0 MW and choose
+              <strong>Start exploring</strong>. Leave plants, prices, and
+              customer programs unchanged. Watch
+              <strong>Insights</strong> through the end of 2027.
+            </li>
+            <li>
+              Return to the setup and repeat with 100 MW, keeping everything
+              else the same. Then try your own response: build generation, add
+              storage, or reduce other demand.
+            </li>
+          </ol>
+          <p class="comparison-note">
+            Zero added demand keeps existing customers, including existing data
+            centers. The new campus draws constant power, while the game uses
+            one representative day per month. This exercise cannot forecast a
+            real project’s reliability or local bills.
+          </p>
+        </section>
+
+        <section class="panel" aria-labelledby="questions-title">
+          <h2 id="questions-title">Take these questions to your community</h2>
+          <ul>
+            <li>
+              Which power plants and grid upgrades must be ready when the campus
+              opens?
+            </li>
+            <li>
+              Who will pay for the new infrastructure and ongoing electricity
+              use?
+            </li>
+            <li>
+              What supplies power on a still night, and how does a clean-energy
+              promise account for those hours?
+            </li>
+          </ul>
+          <div class="panel__actions">
             <a class="button button--primary" href="/?dataCenters=1"
               >Explore the impact</a
             >
           </div>
-        </div>
-      </section>
-
-      <div class="page-content">
-        <section class="community-questions" aria-labelledby="questions-title">
-          <h2 id="questions-title">Three questions worth asking</h2>
-          <div class="community-questions__grid">
-            <div>
-              <h3>Will the lights stay on?</h3>
-              <p>
-                A huge new customer needs power every hour of every day,
-                including the worst ones. See when the extra demand causes
-                shortages, and what it takes to prevent them.
-              </p>
-            </div>
-            <div>
-              <h3>What will it cost?</h3>
-              <p>
-                Power plants aren’t free to build, and they aren’t free to run.
-                Try different mixes and watch what happens to the cost of
-                supplying electricity.
-              </p>
-            </div>
-            <div>
-              <h3>What happens to emissions?</h3>
-              <p>
-                Meeting new demand with gas looks very different from meeting it
-                with solar, wind, and batteries. Try a few options and compare.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section class="community-next-step" aria-labelledby="next-step-title">
-          <h2 id="next-step-title">Play it out. Then speak up.</h2>
-          <p>
-            Pick a location and you’ll start with a ready-made example grid. Run
-            it with and without data-center growth, then try different ways to
-            meet the extra demand.
-          </p>
-          <p>
-            Then take what you learned to your utility and local officials, and
-            ask how they’re planning for it.
-          </p>
-          <p class="community-model-note">
-            Electrify is a simulation. It shows what's possible, but it can't
-            predict a specific project's exact effects.
-            <a href="/about.html">About Electrify</a>
-          </p>
         </section>
       </div>
     </main>
