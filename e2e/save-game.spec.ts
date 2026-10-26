@@ -130,9 +130,25 @@ for (const theme of ["light", "dark"]) {
     const name = "Renewables experiment ⚡ — a longer name for this strategy";
     await rename.getByRole("textbox", { name: "Save name" }).fill(name);
     await rename.getByRole("textbox", { name: "Save name" }).press("Enter");
-    await expect(
-      originalRow.getByRole("heading", { name, exact: true }),
-    ).toBeVisible();
+    const renamedTitle = originalRow.getByRole("heading", {
+      name,
+      exact: true,
+    });
+    await expect(renamedTitle).toBeVisible();
+    const renamedTitleBounds = (await renamedTitle.boundingBox())!;
+    const renamedMenuIcon = (await originalRow
+      .getByRole("button", { name: /^Actions for/ })
+      .locator("svg")
+      .boundingBox())!;
+    if (info.project.use.isMobile) {
+      expect(renamedTitleBounds.height).toBeGreaterThan(titleBounds.height);
+    }
+    // Wrapping the title must leave the menu anchored beside its first line.
+    expect(
+      Math.abs(
+        renamedMenuIcon.y - renamedTitleBounds.y - (menuIcon.y - titleBounds.y),
+      ),
+    ).toBeLessThanOrEqual(1);
     await copySavedGame(page, original.metadata.id);
     await expect(page.locator("article.saveEntry")).toHaveCount(2);
     await expect(

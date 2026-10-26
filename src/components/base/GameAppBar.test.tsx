@@ -41,6 +41,17 @@ function renderAppBar(overrides: Partial<Props> = {}) {
   return render(<GameAppBar {...props} />);
 }
 
+const originalMatchMedia = window.matchMedia;
+beforeEach(() => {
+  window.matchMedia = (query: string) => ({
+    ...originalMatchMedia(query),
+    matches: query.includes("min-width:1300px") && mockDesktop,
+  });
+});
+afterEach(() => {
+  window.matchMedia = originalMatchMedia;
+});
+
 describe("GameAppBar", () => {
   it("keeps the menu action named consistently while announcing offline saving", () => {
     const online = jest
@@ -247,7 +258,7 @@ describe("GameAppBar", () => {
 
   it.each([/Wildfire emergency/, /months left$/])(
     "keeps keyboard focus on %s when the window crosses the single-row width",
-    (name) => {
+    async (name) => {
       const matchMedia = window.matchMedia;
       let wide = false;
       const listeners = new Set<() => void>();
@@ -265,7 +276,7 @@ describe("GameAppBar", () => {
             listeners.delete(listener),
         }) as unknown as MediaQueryList;
       const resize = (next: boolean) =>
-        act(() => {
+        act(async () => {
           wide = next;
           listeners.forEach((listener) => listener());
         });
@@ -282,13 +293,21 @@ describe("GameAppBar", () => {
           ],
         });
         const control = () => screen.getByRole("button", { name });
-        act(() => control().focus());
-        resize(true);
+        await act(async () => control().focus());
+        // Document geometry can still report the wide layout when the media query changes.
+        mockDesktop = true;
+        await resize(true);
+        expect(
+          screen.getByRole("button", { name: "ultra speed" }),
+        ).toBeVisible();
         expect(
           container.querySelector("#topbar .gameStatusBar"),
         ).not.toBeNull();
         expect(control()).toHaveFocus();
-        resize(false);
+        await resize(false);
+        expect(
+          screen.queryByRole("button", { name: "ultra speed" }),
+        ).toBeNull();
         expect(container.querySelector("#topbar .gameStatusBar")).toBeNull();
         expect(control()).toHaveFocus();
       } finally {

@@ -316,10 +316,8 @@ export default function SavedGames(): React.JSX.Element {
               >
                 <Box
                   sx={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) auto",
-                    alignItems: "center",
-                    columnGap: 1,
+                    position: "relative",
+                    pr: 5,
                   }}
                 >
                   <Box sx={{ minWidth: 0 }}>
@@ -333,7 +331,7 @@ export default function SavedGames(): React.JSX.Element {
                   </Box>
                   <IconButton
                     edge="end"
-                    sx={{ my: -1 }}
+                    sx={{ position: "absolute", top: -8, right: 0 }}
                     aria-label={`Actions for ${title}`}
                     aria-haspopup="menu"
                     aria-expanded={menu?.save.id === save.id ? true : undefined}

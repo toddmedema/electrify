@@ -200,8 +200,10 @@ function inputKey(step, workers, directory) {
   });
 }
 
-function behaviorFingerprint() {
-  const inputs = cache.sourceInputs(process.cwd());
+function behaviorFingerprint(root = process.cwd()) {
+  const inputs = cache
+    .sourceInputs(root)
+    .filter(({ digest }) => digest !== "missing");
   return createHash("sha256").update(JSON.stringify(inputs)).digest("hex");
 }
 
@@ -248,10 +250,11 @@ function workerCount(env, cores = os.availableParallelism()) {
   return value === undefined ? Math.min(4, cores) : Number(value);
 }
 
-// Include dirty and untracked inputs: a commit ID alone does not identify code checked
-// before committing. Ignored build products and generated manifests are deliberately excluded.
-function sourceSnapshot() {
+// Compare actual source bytes, including untracked and known ignored behavior inputs.
+// Git index/commit state is report provenance, not a change to the code being checked.
+function sourceSnapshot(cwd = process.cwd()) {
   const options = {
+    cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
     maxBuffer: 64 * 1024 * 1024,
@@ -271,29 +274,11 @@ function sourceSnapshot() {
   const commit = git("rev-parse", "HEAD").trim();
   const tree = git("rev-parse", "HEAD^{tree}").trim();
   const status = git("status", "--porcelain=v1", "--untracked-files=all");
-  const hash = createHash("sha256")
-    .update(commit)
-    .update(status)
-    .update(git("diff", "--binary", "HEAD"));
-  for (const file of git("ls-files", "--others", "--exclude-standard", "-z")
-    .split("\0")
-    .filter(Boolean)
-    .sort()) {
-    const target = path.join(root, file);
-    hash
-      .update(file)
-      .update("\0")
-      .update(
-        fs.lstatSync(target).isSymbolicLink()
-          ? fs.readlinkSync(target)
-          : fs.readFileSync(target),
-      );
-  }
   return {
     commit,
     tree,
     dirty: status.length > 0,
-    fingerprint: hash.digest("hex"),
+    fingerprint: behaviorFingerprint(root),
   };
 }
 
@@ -627,4 +612,5 @@ module.exports = {
   execute,
   summarizeReport,
   configuredStep,
+  sourceSnapshot,
 };

@@ -23,7 +23,6 @@ import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import {
   isBigScreen,
-  isDesktopScreen,
   isPaneLayout,
   openWindow,
   SIDE_LAYOUT_MEDIA,
@@ -348,7 +347,8 @@ export function GameAppBar(props: Props) {
    * built once per actual change and handed back as the same elements. React then skips them
    * entirely on the frames in between, which is where a good quarter of the frame budget went.
    */
-  const desktop = isDesktopScreen();
+  // Layout and speed availability must use the same media-query snapshot during resize.
+  const desktop = singleRow;
   const speedOptions = React.useMemo(
     () =>
       buildSpeedOptions({
