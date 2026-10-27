@@ -563,7 +563,11 @@ function createModEditorSchema() {
               allOf: [
                 {
                   if: {
-                    properties: { name: { enum: ["Battery", "Pumped Hydro"] } },
+                    properties: {
+                      name: {
+                        enum: ["Battery", "Iron-Air Battery", "Pumped Hydro"],
+                      },
+                    },
                   },
                   then: { required: ["peakMWh"] },
                   else: {

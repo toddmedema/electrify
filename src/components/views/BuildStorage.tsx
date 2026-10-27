@@ -40,6 +40,8 @@ function storageBuildSummary(storage: StorageShoppingType): string {
   switch (storage.name) {
     case "Battery":
       return "Fast response, four hours of power";
+    case "Iron-Air Battery":
+      return "100 hours of power; low charging efficiency";
     case "Pumped Hydro":
       return "Reservoir storage; slow to build";
     default:

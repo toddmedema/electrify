@@ -873,6 +873,9 @@ export function windAnnualOutputDegradation(commissioningYear: number): number {
   return commissioningYear < 2008 ? 0.005 : 0.002;
 }
 
+// Conservative commercial rollout after the announced 2029 Irish project; see economics docs.
+export const IRON_AIR_AVAILABLE_YEAR = 2030;
+
 export function STORAGE(state: GameType, peakWh: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = log10(peakWh) - 6;
@@ -918,6 +921,28 @@ export function STORAGE(state: GameType, peakWh: number) {
       yearsToBuild: batteryYearsToBuild(peakWh),
       // EIA reference total lead time is 18 months for 600MWh.
       spinMinutes: 1,
+    },
+    {
+      name: "Iron-Air Battery",
+      description:
+        "Supplies power for 100 hours using reversible rusting. Low storage cost, but loses more than half the charging energy",
+      available: year >= IRON_AIR_AVAILABLE_YEAR,
+      // Form's projected 2030 system costs, in 2022 dollars, normalized to 2023 dollars.
+      // $2,150/kW includes repowering; $17.50/kW-year is fixed O&M. No tax credit.
+      buildCost: (2150 / 100000) * (304.702 / 292.655) * peakWh,
+      peakW: peakWh / 100,
+      peakWh,
+      maxPeakWh: 10000000000,
+      // Provisional installed-system proxy, not a measured Form Energy LCA.
+      constructionKgco2ePerWh: 0.08,
+      lifespanYears: 20,
+      roundTripEfficiency: 0.425,
+      // About 7% per 30 days, within Form's published 1–10%/month range.
+      hourlyLoss: 0.0001,
+      annualOperatingCost: (17.5 / 100000) * (304.702 / 292.655) * peakWh,
+      // Two years and a 100 MW / 10 GWh project cap are planning assumptions.
+      yearsToBuild: 2,
+      spinMinutes: 10,
     },
     {
       name: "Pumped Hydro",

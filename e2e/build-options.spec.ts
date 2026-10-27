@@ -1,7 +1,8 @@
 import path from "path";
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openBuild, openPane } from "./layout";
+import { readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
   test(`build options remain compact and usable in ${theme}`, async ({
@@ -328,5 +329,89 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       battery.getByRole("button", { name: "Review purchase of Battery" }),
     ).toBeEnabled();
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`iron-air purchase from 2030 in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem(
+        "plays",
+        JSON.stringify({
+          plays: [
+            { scenarioId: 0, timesPlayed: 1, date: new Date().toString() },
+          ],
+        }),
+      );
+    }, theme);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page
+      .getByRole("button", { name: "View Custom Game details" })
+      .click();
+    const year = page.getByRole("combobox", { name: "Starting year" });
+    await year.click();
+    await page.getByRole("option", { name: "2030", exact: true }).click();
+    await page
+      .locator(".customSetupActions")
+      .getByRole("button", { name: "Play", exact: true })
+      .click();
+    await expect(page.locator("#appbar:visible").first()).toBeVisible();
+    const build = await openBuild(page);
+    await build.getByRole("tab", { name: "Storage", exact: true }).click();
+    // The default custom fleet opens at 2 GWh. Select a 1 GWh / 10 MW project.
+    const size = build.getByRole("slider");
+    await size.press("ArrowLeft");
+    await expect(size).toHaveAccessibleName("Capacity 1GWh");
+    const ironAir = page.locator(".buildOption").filter({
+      has: page.getByRole("button", {
+        name: /^(Show|Hide) Iron-Air Battery details$/,
+      }),
+    });
+    await expect(ironAir).toBeVisible();
+    await expect(ironAir.locator(".buildOptionMetrics")).toContainText(
+      "100 hr",
+    );
+    await expect(ironAir.locator(".buildOptionMetrics")).toContainText("10MW");
+    await page.screenshot({
+      path: testInfo.outputPath(`Storage-iron-air-${theme}.png`),
+      animations: "disabled",
+    });
+    await ironAir
+      .getByRole("button", {
+        name: "Show Iron-Air Battery details",
+        exact: true,
+      })
+      .click();
+    await expect(
+      ironAir.getByRole("row", { name: /Round-trip efficiency/ }),
+    ).toContainText("43%");
+    expect(
+      await ironAir.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    await ironAir
+      .getByRole("button", {
+        name: "Review purchase of Iron-Air Battery",
+        exact: true,
+      })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("Iron-Air Battery");
+    await dialog.getByRole("button", { name: "Pay cash", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect
+      .poll(async () =>
+        (await readSavedGame(page))?.facilities.some(
+          (facility) =>
+            facility.name === "Iron-Air Battery" &&
+            facility.peakWh === 1000000000,
+        ),
+      )
+      .toBe(true);
   });
 }

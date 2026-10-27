@@ -272,6 +272,7 @@ import {
 } from "../Constants";
 import {
   GENERATORS,
+  IRON_AIR_AVAILABLE_YEAR,
   STORAGE,
   windAnnualOutputDegradation,
 } from "../data/Facilities";
@@ -2408,6 +2409,12 @@ function applyBuildFacility(
 ): boolean {
   if (!validBuildFacility(payload)) return false;
   const requested = payload.facility;
+  // Future shopping quotes can arrive through replay/import as well as the live catalog.
+  if (
+    requested.name === "Iron-Air Battery" &&
+    (state.date.year < IRON_AIR_AVAILABLE_YEAR || !isStorage(requested))
+  )
+    return false;
   const hydro = isConventionalHydro(requested);
   const hydroSite = hydro
     ? getHydroAvailability(state, requested.peakW)

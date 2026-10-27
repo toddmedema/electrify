@@ -330,7 +330,11 @@ function modDiagnostics(p) {
             `${path}.name`,
             "must name a buildable facility.",
           );
-        const storage = ["Battery", "Pumped Hydro"].includes(asset.name);
+        const storage = [
+          "Battery",
+          "Iron-Air Battery",
+          "Pumped Hydro",
+        ].includes(asset.name);
         if (asset.peakMW !== undefined || !storage)
           number(asset.peakMW, `${path}.peakMW`, 0.001, 100000);
         if (asset.peakMWh !== undefined || storage)
