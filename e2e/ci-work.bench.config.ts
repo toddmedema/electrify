@@ -15,7 +15,10 @@ export default defineConfig({
       project.name!,
     ),
   ),
-  outputDir: path.resolve(__dirname, "../test-results/ci-work-bench"),
+  outputDir: path.resolve(
+    __dirname,
+    "../test-results/ci-work-bench/screenshots",
+  ),
   reporter: [
     ["list"],
     [
