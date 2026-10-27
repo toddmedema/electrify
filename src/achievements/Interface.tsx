@@ -198,21 +198,27 @@ export function AchievementGallery(): React.JSX.Element {
                   >
                     <div className="achievementArt">
                       <img src={`images/${entry.icon}.svg`} alt="" />
+                      <span
+                        className="achievementState"
+                        role="img"
+                        aria-label={unlocked ? "Unlocked" : "Locked"}
+                        title={unlocked ? "Unlocked" : "Locked"}
+                      >
+                        {unlocked ? (
+                          <CheckCircleOutlineIcon />
+                        ) : (
+                          <LockOutlinedIcon />
+                        )}
+                      </span>
                     </div>
                     <div className="achievementDescription">
-                      <div className="achievementRowHeading">
-                        <Typography variant="subtitle1" component="h3">
-                          {entry.name}
-                        </Typography>
-                        <span className="achievementState">
-                          {unlocked ? (
-                            <CheckCircleOutlineIcon fontSize="small" />
-                          ) : (
-                            <LockOutlinedIcon fontSize="small" />
-                          )}
-                          {unlocked ? "Unlocked" : "Locked"}
-                        </span>
-                      </div>
+                      <Typography
+                        className="achievementRowHeading"
+                        variant="subtitle1"
+                        component="h3"
+                      >
+                        {entry.name}
+                      </Typography>
                       <Typography color="text.secondary">
                         {entry.description}
                       </Typography>

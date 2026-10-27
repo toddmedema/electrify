@@ -2,6 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
 const { execFileSync, spawnSync } = require("node:child_process");
 const {
   steps,
@@ -10,6 +11,7 @@ const {
   workerCount,
   execute,
   summarizeReport,
+  sourceSnapshot,
 } = require("../check");
 const { checkAssets } = require("../check-assets");
 
@@ -539,4 +541,61 @@ test("browser gates retain attempt reports and reject missing output instead of 
     "the earlier invocation remains independently reviewable",
   );
   assert(fs.existsSync(path.join(passing.directory, gate.reports[0])));
+});
+
+test("source fingerprints follow file contents rather than staging or commit status", (t) => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "electrify-source-snapshot-"),
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const git = (...args) =>
+    execFileSync("git", args, { cwd: root, stdio: "pipe", windowsHide: true });
+  const write = (file, bytes) => fs.writeFileSync(path.join(root, file), bytes);
+  const fingerprint = () => sourceSnapshot(root).fingerprint;
+  const commit = () =>
+    git(
+      "-c",
+      "user.name=Snapshot test",
+      "-c",
+      "user.email=test@example.test",
+      "commit",
+      "--quiet",
+      "-m",
+      "snapshot",
+    );
+  git("init", "--quiet");
+  write(".gitignore", ".env*\n");
+  write("tracked.txt", "original");
+  git("add", ".");
+  commit();
+  write("tracked.txt", "edited");
+  write("added.txt", "new input");
+  const checked = fingerprint();
+  git("add", ".");
+  assert.equal(fingerprint(), checked);
+  commit();
+  assert.equal(fingerprint(), checked);
+  write("tracked.txt", "another edit");
+  assert.notEqual(fingerprint(), checked);
+  write("tracked.txt", "edited");
+  assert.equal(fingerprint(), checked);
+  fs.renameSync(path.join(root, "added.txt"), path.join(root, "renamed.txt"));
+  const renamed = fingerprint();
+  assert.notEqual(renamed, checked);
+  git("add", "-A");
+  assert.equal(fingerprint(), renamed);
+  commit();
+  assert.equal(fingerprint(), renamed);
+  fs.unlinkSync(path.join(root, "tracked.txt"));
+  const deleted = fingerprint();
+  assert.notEqual(deleted, renamed);
+  git("add", "-A");
+  assert.equal(fingerprint(), deleted);
+  commit();
+  assert.equal(fingerprint(), deleted);
+  write("untracked.txt", "untracked source");
+  const added = fingerprint();
+  assert.notEqual(added, deleted);
+  write(".env.local", "BEHAVIOR=changed");
+  assert.notEqual(fingerprint(), added);
 });

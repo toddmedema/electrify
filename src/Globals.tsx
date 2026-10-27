@@ -152,24 +152,16 @@ export function getDevicePlatform(): "web" {
 }
 
 /**
- * Reading scrollWidth / offsetWidth forces the browser to flush pending layout, and between the
- * compositor, the game card and the panes the answer is asked for the better part of a dozen
- * times per render -- which at FAST speed is a hundred renders a second, all for a number that
- * only moves when the window does. So it is measured once and kept until a resize says otherwise.
- * // https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
+ * Breakpoints follow the layout viewport, independent of overflowing page content. Cache the
+ * dimensions until resize rather than measuring document layout on every game tick.
  */
 let cachedViewportWidth: number | null = null;
 let cachedViewportHeight: number | null = null;
 
 function getViewportWidth(): number {
   if (cachedViewportWidth === null) {
-    cachedViewportWidth = Math.max(
-      document.body.scrollWidth,
-      document.documentElement.scrollWidth,
-      document.body.offsetWidth,
-      document.documentElement.offsetWidth,
-      document.documentElement.clientWidth,
-    );
+    cachedViewportWidth =
+      window.innerWidth || document.documentElement.clientWidth;
   }
   return cachedViewportWidth;
 }
