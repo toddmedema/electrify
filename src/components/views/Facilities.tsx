@@ -727,6 +727,7 @@ function FacilitySupplyChart({
         timeline={game.timeline}
         fuelOrder={fuelOrder}
         currentMinute={game.date.minute}
+        speed={game.speed}
         location={game.location}
         legend
         startingYear={game.startingYear}

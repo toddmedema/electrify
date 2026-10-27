@@ -1,6 +1,11 @@
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
+import { productionChartMotion } from "./ProductionChartMotion";
+import {
+  productionChartStrokes,
+  ProductionStroke,
+} from "./ProductionChartStrokes";
 import ChartLegend, { LegendItemType } from "./ChartLegend";
 import {
   anchoredForecastPaths,
@@ -25,7 +30,12 @@ import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
 import { WEATHER_DEPENDENT_FUELS } from "../../Constants";
 import { chartPalette, getThemeVersion, subscribeThemeMode } from "../../Theme";
-import { FuelNameType, LocationType, TickPresentFutureType } from "../../Types";
+import {
+  FuelNameType,
+  LocationType,
+  SpeedType,
+  TickPresentFutureType,
+} from "../../Types";
 
 type ChartData = Pick<
   TickPresentFutureType,
@@ -53,6 +63,7 @@ export interface Props {
   startingYear: number;
   /** Individual fuel details follow the dispatch order in the facility list. */
   fuelOrder?: FuelNameType[];
+  speed?: SpeedType;
 }
 
 // Everything the plot's callbacks read. Rebuilt every render and handed to UPlotChart, which
@@ -65,6 +76,8 @@ interface State {
   sunTicks: number[];
   blackoutSpans: Array<[number, number]>;
   currentMinute: number | null;
+  minute: number;
+  speed: SpeedType;
   sources: SupplySource[];
   bySource: number[][];
   supply: number[];
@@ -225,32 +238,51 @@ function sourceFill(
   };
 }
 
-function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+function buildOptions({
+  getState,
+  scale,
+  registerDataUpdate,
+}: BuildContext<State>): uPlot.Options {
   const { sources } = getState();
+  const motion = productionChartMotion(getState);
   const loadBaseStart = sources.length + 1;
   const fuelLineStart = loadBaseStart + 3;
   const chargingLineStart = fuelLineStart + sources.length * 2;
   const loadLineStart = chargingLineStart + 2;
   const demandLineStart = loadLineStart + 2;
+  const strokes: ProductionStroke[] = [];
+  const cache = productionChartStrokes(getState, strokes, motion.refresh);
+  registerDataUpdate?.(cache.updateData);
+  const linear = uPlot.paths.linear!();
   const linePair = (
     stroke: string,
     width: number,
     dash: number[],
     pastIndex: number,
-  ): uPlot.Series[] => [
-    { stroke, width, points: { show: false }, spanGaps: false },
-    {
-      stroke,
-      width,
-      dash,
-      paths: anchoredForecastPaths(pastIndex),
-      points: { show: false },
-      spanGaps: false,
-    },
-  ];
+  ): uPlot.Series[] => {
+    strokes.push({ pastIndex, color: stroke, width, dash });
+    return [
+      {
+        stroke,
+        width,
+        paths: cache.paths(linear),
+        points: { show: false },
+        spanGaps: false,
+      },
+      {
+        stroke,
+        width,
+        dash,
+        paths: cache.paths(anchoredForecastPaths(pastIndex)),
+        points: { show: false },
+        spanGaps: false,
+      },
+    ];
+  };
   return {
     width: 0, // set by UPlotChart
     height: 0,
+    pxAlign: 1,
     padding: [18 * scale, 5 * scale, 0, 0],
     cursor: {
       x: true,
@@ -339,14 +371,17 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     plugins: [
       bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.2),
       baselinePlugin(chartPalette().axis),
+      cache.plugin,
+      motion.plugin,
       verticalLinePlugin(
-        () => getState().currentMinute,
+        () => (motion.active() ? null : getState().currentMinute),
         chartPalette().axis,
         1,
       ),
       {
         hooks: {
           draw: (u) => {
+            if (motion.active()) return;
             const now = getState().currentMinute;
             if (now == null) return;
             const ratio = uPlot.pxRatio;
@@ -354,6 +389,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
             u.ctx.font = chartFont(ratio);
             u.ctx.fillStyle = tickLabelFill();
             u.ctx.textAlign = "center";
+            u.ctx.textBaseline = "alphabetic";
             const halfWidth = u.ctx.measureText("Now").width / 2;
             const x = Math.max(
               u.bbox.left + halfWidth,
@@ -577,6 +613,8 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
       currentMinute <= rangeMin || currentMinute >= rangeMax
         ? null
         : currentMinute,
+    minute: currentMinute,
+    speed: props.speed ?? "PAUSED",
     sources,
     bySource,
     supply,
