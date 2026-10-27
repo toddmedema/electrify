@@ -66,16 +66,38 @@ test("gallery lists all requirements, filters earned awards, restores keyboard f
     page.getByText("2 of 35 unlocked", { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".achievementRow")).toHaveCount(35);
-  await expect(page.locator(".achievementRow").first()).toContainText(
-    "Unlocked",
-  );
+  await expect(
+    page
+      .locator(".achievementRow")
+      .first()
+      .getByRole("img", { name: "Unlocked", exact: true }),
+  ).toBeVisible();
   await expect(page.locator(".achievementRow").nth(1)).toContainText(
     "Out of Juice",
   );
-  await expect(page.locator(".achievementRow").nth(1)).toContainText(
-    "Unlocked",
-  );
-  await expect(page.locator(".achievementRow").nth(2)).toContainText("Locked");
+  await expect(
+    page
+      .locator(".achievementRow")
+      .nth(1)
+      .getByRole("img", { name: "Unlocked", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator(".achievementRow")
+      .nth(2)
+      .getByRole("img", { name: "Locked", exact: true }),
+  ).toBeVisible();
+  for (const row of await page.locator(".achievementRow").all()) {
+    const art = (await row.locator(".achievementArt").boundingBox())!;
+    const badge = (await row.getByRole("img").boundingBox())!;
+    expect(
+      Math.abs(badge.x + badge.width - art.x - art.width),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(badge.y + badge.height - art.y - art.height),
+    ).toBeLessThanOrEqual(1);
+    await expect(row.getByRole("img")).toHaveText("");
+  }
   await expect(
     page.getByText("Saved on this device.", { exact: true }),
   ).toBeVisible();

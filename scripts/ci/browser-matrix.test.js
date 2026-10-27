@@ -47,6 +47,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "browser-environment.spec.ts",
       "loading-navigation.spec.ts",
       "facilities-production-chart.spec.ts",
+      "production-chart-motion.spec.ts",
       "intertie-order.spec.ts",
       "operations-priorities.spec.ts",
       ...projects,
