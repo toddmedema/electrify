@@ -53,6 +53,21 @@ afterEach(() => {
 });
 
 describe("GameAppBar", () => {
+  it("opens the feedback form directly from the game menu", () => {
+    const open = jest.spyOn(window, "open").mockImplementation(() => null);
+    try {
+      renderAppBar();
+      fireEvent.click(screen.getByRole("button", { name: "menu" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Send feedback" }));
+      expect(open).toHaveBeenCalledWith(
+        "https://forms.gle/nSpkVzcFcXMQMMgb9",
+        "_system",
+      );
+    } finally {
+      open.mockRestore();
+    }
+  });
+
   it("keeps the menu action named consistently while announcing offline saving", () => {
     const online = jest
       .spyOn(window.navigator, "onLine", "get")

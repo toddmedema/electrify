@@ -936,10 +936,6 @@ $topbar_height: 56px;
   position: relative;
 }
 
-#gameCardMenu .MuiMenuItem-root:not(.Mui-disabled) {
-  color: var(--font-color-primary);
-}
-
 .offlineDot {
   position: absolute;
   top: 8px;
@@ -1031,7 +1027,7 @@ $topbar_height: 56px;
   border: 0;
   padding: 0;
   background: none;
-  color: inherit;
+  color: var(--interactive-strong);
   font: inherit;
   text-align: inherit;
   cursor: pointer;
@@ -1413,8 +1409,7 @@ $pane_header_height: 48px;
 
 // Wrapped rows use the available card width, including their final row.
 .build-list-item.buildOption.transmissionProject {
-  .buildOptionMetrics,
-  .intertieDetailMetrics {
+  .buildOptionMetrics {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
@@ -1430,6 +1425,10 @@ $pane_header_height: 48px;
   .build-list-item.buildOption.transmissionProject .buildOptionMetrics {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    > .buildOptionMetric:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
   }
 }
 
@@ -6223,11 +6222,15 @@ $programs_column: 800px;
 }
 
 .constructionInterties {
-  padding: $space-4 $space-2;
+  padding: 0;
+
+  .transmissionProjects {
+    padding: $space-2;
+  }
 }
 
-// Shared geometry keeps generator properties aligned regardless of their help content.
-.generatorDetails {
+// Shared geometry aligns properties and manual help in every construction catalog.
+.buildDetails {
   table-layout: fixed;
   .MuiTableCell-root {
     height: 48px;
@@ -6236,15 +6239,15 @@ $programs_column: 800px;
     vertical-align: middle;
     border-color: var(--border-subtle);
   }
-  .generatorDetailLabel {
+  .buildDetailLabel {
     width: 54%;
     padding-left: 16px;
   }
-  .generatorDetailValue {
+  .buildDetailValue {
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
-  .generatorDetailHelp {
+  .buildDetailHelp {
     width: 48px;
     padding: 4px;
   }
@@ -6256,16 +6259,16 @@ $programs_column: 800px;
   }
 }
 @media (max-width: ($phone_width - 1px)) {
-  .generatorDetails .generatorDetailLabel {
+  .buildDetails .buildDetailLabel {
     // Leave enough room for complete cost/unit values beside the help target.
     width: 44%;
   }
 }
 @media (pointer: coarse) {
-  .generatorDetails .generatorDetailHelp {
+  .buildDetails .buildDetailHelp {
     width: 52px;
   }
-  .generatorDetails .MuiTableCell-root {
+  .buildDetails .MuiTableCell-root {
     height: 52px;
   }
 }
@@ -7710,4 +7713,13 @@ $programs_column: 800px;
   .coopSavesBar .MuiButton-root {
     min-height: 44px;
   }
+}
+
+// Native selects keep the trigger blue while their option list uses readable body text.
+select:not(:disabled) {
+  color: var(--interactive-strong);
+}
+option {
+  color: var(--font-color-primary);
+  background: var(--bg-primary);
 }

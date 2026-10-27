@@ -9,11 +9,6 @@ import {
   FormControlLabel,
   List,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableRow,
   Typography,
   useMediaQuery,
 } from "@mui/material";
@@ -66,13 +61,13 @@ import {
   expectedMonthlyOutputShape,
   ExpectedOutputShape,
 } from "../../helpers/ExpectedOutput";
-import { MANUAL_ENTRY, ManualEntryTitleType } from "../base/ManualEntries";
+import { MANUAL_ENTRY } from "../base/ManualEntries";
 import {
   formatLargeMassValueConcise,
   formatMass,
   largeMassUnit,
 } from "../../helpers/Units";
-import ManualLink from "../base/ManualLink";
+import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
 import { useUnits } from "../base/UnitsContext";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
@@ -179,26 +174,6 @@ function typicalCapacityFactor(
   shape?: ExpectedOutputShape,
 ): number {
   return shape?.kind === "water-inflow" ? shape.mean : generator.capacityFactor;
-}
-
-function GeneratorDetailRow(props: {
-  label: string;
-  value: React.ReactNode;
-  entry: ManualEntryTitleType;
-}): React.JSX.Element {
-  return (
-    <TableRow>
-      <TableCell component="th" scope="row" className="generatorDetailLabel">
-        {props.label}
-      </TableCell>
-      <TableCell align="right" className="generatorDetailValue">
-        {props.value}
-      </TableCell>
-      <TableCell className="generatorDetailHelp">
-        <ManualLink entry={props.entry} label={props.label.toLowerCase()} />
-      </TableCell>
-    </TableRow>
-  );
 }
 
 interface GeneratorBuildItemProps {
@@ -526,138 +501,119 @@ export function GeneratorBuildItem(
               </Stack>
             </Box>
           )}
-          <TableContainer>
-            <Table
-              size="small"
-              aria-label="generator properties"
-              className="generatorDetails"
-            >
-              <TableBody>
-                {props.secondaryMetric !== "lcWh" && (
-                  <GeneratorDetailRow
-                    label="Lifetime cost"
-                    value={
-                      formatMoneyConcise(generator.lcWh * 1000000) + "/MWh"
-                    }
-                    entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
-                  />
-                )}
-                <GeneratorDetailRow
-                  // Lifetime cost still assumes average water years; this is the year ahead
-                  label={
-                    waterShape
-                      ? "Capacity factor, this forecast"
-                      : "Expected capacity factor"
-                  }
-                  value={percent(capacityFactor)}
-                  entry={MANUAL_ENTRY.CAPACITY_FACTOR}
-                />
-                {generator.minimumStableOutput !== undefined && (
-                  <GeneratorDetailRow
-                    label="Minimum output"
-                    value={
-                      percent(generator.minimumStableOutput) +
-                      " · " +
-                      formatWatts(
-                        generator.peakW * generator.minimumStableOutput,
-                      )
-                    }
-                    entry={MANUAL_ENTRY.RAMP_RATE}
-                  />
-                )}
-                <GeneratorDetailRow
-                  label={hasVariableOM ? "Fixed O&M" : "Base O&M"}
+          <BuildDetails label="generator properties">
+            {props.secondaryMetric !== "lcWh" && (
+              <BuildDetailRow
+                label="Lifetime cost"
+                value={formatMoneyConcise(generator.lcWh * 1000000) + "/MWh"}
+                entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
+              />
+            )}
+            <BuildDetailRow
+              // Lifetime cost still assumes average water years; this is the year ahead
+              label={
+                waterShape
+                  ? "Capacity factor, this forecast"
+                  : "Expected capacity factor"
+              }
+              value={percent(capacityFactor)}
+              entry={MANUAL_ENTRY.CAPACITY_FACTOR}
+            />
+            {generator.minimumStableOutput !== undefined && (
+              <BuildDetailRow
+                label="Minimum output"
+                value={
+                  percent(generator.minimumStableOutput) +
+                  " · " +
+                  formatWatts(generator.peakW * generator.minimumStableOutput)
+                }
+                entry={MANUAL_ENTRY.RAMP_RATE}
+              />
+            )}
+            <BuildDetailRow
+              label={hasVariableOM ? "Fixed O&M" : "Base O&M"}
+              value={formatMoneyConcise(generator.annualOperatingCost) + "/yr"}
+              entry={MANUAL_ENTRY.OPERATING_COSTS}
+            />
+            {hasVariableOM && (
+              <>
+                <BuildDetailRow
+                  label="Variable O&M"
                   value={
-                    formatMoneyConcise(generator.annualOperatingCost) + "/yr"
+                    "$" +
+                    (generator.variableOperatingCostPerMWh || 0).toFixed(2) +
+                    "/MWh"
                   }
                   entry={MANUAL_ENTRY.OPERATING_COSTS}
                 />
-                {hasVariableOM && (
-                  <>
-                    <GeneratorDetailRow
-                      label="Variable O&M"
-                      value={
-                        "$" +
-                        (generator.variableOperatingCostPerMWh || 0).toFixed(
-                          2,
-                        ) +
-                        "/MWh"
-                      }
-                      entry={MANUAL_ENTRY.OPERATING_COSTS}
-                    />
-                    <GeneratorDetailRow
-                      label="Expected variable O&M"
-                      value={formatMoneyConcise(estimatedVariableOM) + "/yr"}
-                      entry={MANUAL_ENTRY.OPERATING_COSTS}
-                    />
-                  </>
-                )}
-                {generator.costPerStart !== undefined && (
-                  <GeneratorDetailRow
-                    label="Non-fuel start cost"
-                    value={
-                      formatMoneyConcise(generator.costPerStart) + "/start"
-                    }
-                    entry={MANUAL_ENTRY.OPERATING_COSTS}
-                  />
-                )}
-                {(hasVariableOM || generator.costPerStart !== undefined) && (
-                  <GeneratorDetailRow
-                    label="Estimated annual O&M"
-                    value={
-                      formatMoneyConcise(
-                        estimatedAnnualOperatingCost(generator),
-                      ) + "/yr"
-                    }
-                    entry={MANUAL_ENTRY.OPERATING_COSTS}
-                  />
-                )}
-                {fuelPrices[generator.fuel] && (
-                  <GeneratorDetailRow
-                    label="Fuel costs"
-                    value={
-                      formatMoneyConcise(
-                        generator.btuPerWh * (fuelPrices[generator.fuel] ?? 0),
-                      ) + "/MWh"
-                    }
-                    entry={MANUAL_ENTRY.FUEL_COSTS}
-                  />
-                )}
-                {generator.spinMinutes > 1 && (
-                  <GeneratorDetailRow
-                    label="Ramp up/down time"
-                    value={generator.spinMinutes + " min"}
-                    entry={MANUAL_ENTRY.RAMP_RATE}
-                  />
-                )}
-                <GeneratorDetailRow
-                  label="Accounting lifetime"
-                  value={generator.lifespanYears + " years"}
-                  entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
+                <BuildDetailRow
+                  label="Expected variable O&M"
+                  value={formatMoneyConcise(estimatedVariableOM) + "/yr"}
+                  entry={MANUAL_ENTRY.OPERATING_COSTS}
                 />
-                {sites && (
-                  <GeneratorDetailRow
-                    label="Sites left"
-                    value={`${sites.remaining} of ${sites.total}`}
-                    entry={MANUAL_ENTRY.PROJECT_SITES}
-                  />
-                )}
-                <GeneratorDetailRow
-                  label="Direct emissions"
-                  value={formatMass(kgCO2ePerMWh, units) + "/MWh"}
-                  entry={MANUAL_ENTRY.EMISSIONS}
-                />
-                <GeneratorDetailRow
-                  label="Construction emissions"
-                  value={`${formatLargeMassValueConcise(
-                    constructionKgco2eTotal,
-                    units,
-                  )} ${largeMassUnit(units)}`}
-                  entry={MANUAL_ENTRY.EMISSIONS}
-                />
-              </TableBody>
-            </Table>
-          </TableContainer>
+              </>
+            )}
+            {generator.costPerStart !== undefined && (
+              <BuildDetailRow
+                label="Non-fuel start cost"
+                value={formatMoneyConcise(generator.costPerStart) + "/start"}
+                entry={MANUAL_ENTRY.OPERATING_COSTS}
+              />
+            )}
+            {(hasVariableOM || generator.costPerStart !== undefined) && (
+              <BuildDetailRow
+                label="Estimated annual O&M"
+                value={
+                  formatMoneyConcise(estimatedAnnualOperatingCost(generator)) +
+                  "/yr"
+                }
+                entry={MANUAL_ENTRY.OPERATING_COSTS}
+              />
+            )}
+            {fuelPrices[generator.fuel] && (
+              <BuildDetailRow
+                label="Fuel costs"
+                value={
+                  formatMoneyConcise(
+                    generator.btuPerWh * (fuelPrices[generator.fuel] ?? 0),
+                  ) + "/MWh"
+                }
+                entry={MANUAL_ENTRY.FUEL_COSTS}
+              />
+            )}
+            {generator.spinMinutes > 1 && (
+              <BuildDetailRow
+                label="Ramp up/down time"
+                value={generator.spinMinutes + " min"}
+                entry={MANUAL_ENTRY.RAMP_RATE}
+              />
+            )}
+            <BuildDetailRow
+              label="Accounting lifetime"
+              value={generator.lifespanYears + " years"}
+              entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
+            />
+            {sites && (
+              <BuildDetailRow
+                label="Sites left"
+                value={`${sites.remaining} of ${sites.total}`}
+                entry={MANUAL_ENTRY.PROJECT_SITES}
+              />
+            )}
+            <BuildDetailRow
+              label="Direct emissions"
+              value={formatMass(kgCO2ePerMWh, units) + "/MWh"}
+              entry={MANUAL_ENTRY.EMISSIONS}
+            />
+            <BuildDetailRow
+              label="Construction emissions"
+              value={`${formatLargeMassValueConcise(
+                constructionKgco2eTotal,
+                units,
+              )} ${largeMassUnit(units)}`}
+              entry={MANUAL_ENTRY.EMISSIONS}
+            />
+          </BuildDetails>
         </>
       }
     >
@@ -838,12 +794,13 @@ function GeneratorComparison(props: {
   );
 }
 
-type GeneratorSortKey = "buildCost" | "yearsToBuild" | "lcWh";
+type GeneratorSortKey = "buildCost" | "yearsToBuild" | "lcWh" | "emissions";
 
 const sortOptions: ReadonlyArray<readonly [GeneratorSortKey, string]> = [
   ["buildCost", "Build Cost"],
   ["yearsToBuild", "Build Time"],
   ["lcWh", "Cost per MWh"],
+  ["emissions", "Emissions"],
 ];
 
 function valueLabelFormat(x: number) {
@@ -1002,11 +959,18 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     );
   // Technologies that burn the same fuel stay side by side, placed among the rest by their better
   // member, so the gas peaker and combined cycle read as one choice of how to burn gas
+  const sortValue = (generator: GeneratorShoppingType) =>
+    sort === "emissions"
+      ? generator.btuPerWh * (FUELS[generator.fuel]?.kgCO2ePerBtu ?? 0)
+      : generator[sort];
   const bestInFuel = new Map<string, number>();
   shownGenerators.forEach((generator) =>
     bestInFuel.set(
       generator.fuel,
-      Math.min(bestInFuel.get(generator.fuel) ?? Infinity, generator[sort]),
+      Math.min(
+        bestInFuel.get(generator.fuel) ?? Infinity,
+        sortValue(generator),
+      ),
     ),
   );
   const generators = shownGenerators.sort((a, b) => {
@@ -1018,6 +982,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     if (spentA !== spentB) {
       return spentA ? 1 : -1;
     }
+    if (sort === "emissions") return sortValue(a) - sortValue(b);
     if (props.focusFuel && a.fuel !== b.fuel) {
       if (a.fuel === props.focusFuel) {
         return -1;
@@ -1031,7 +996,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     if (a.fuel !== b.fuel && groupA !== groupB) {
       return groupA - groupB;
     }
-    return a[sort] - b[sort];
+    return sortValue(a) - sortValue(b);
   });
   const outputShapes = new Map(
     generators.map((generator) => [

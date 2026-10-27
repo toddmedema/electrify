@@ -1,3 +1,4 @@
+import path from "path";
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
@@ -47,7 +48,20 @@ for (const theme of ["light", "dark"] as const) {
       await expect(metrics).toContainText("Build cost");
       await expect(metrics).toContainText("Build time");
       if (kind === "Storage") {
-        await expect(metrics).toContainText("Round-trip efficiency");
+        await expect(metrics).not.toContainText("Energy capacity");
+        await expect(metrics).not.toContainText("Round-trip efficiency");
+        for (const description of await cards
+          .locator(".buildOptionDescription")
+          .all()) {
+          const layout = await description.evaluate((element) => ({
+            height:
+              element.getBoundingClientRect().height -
+              parseFloat(getComputedStyle(element).paddingTop) -
+              parseFloat(getComputedStyle(element).paddingBottom),
+            line: parseFloat(getComputedStyle(element).lineHeight),
+          }));
+          expect(layout.height).toBeLessThanOrEqual(layout.line + 1);
+        }
       } else {
         await expect(metrics).not.toContainText("Typical output");
         const sparklines = page.locator(".buildOptionSparkline svg");
@@ -152,7 +166,21 @@ for (const theme of ["light", "dark"] as const) {
       await expect(detailReview).toBeEnabled();
       await detailCard.getByRole("button", { name: /Show .* details/ }).click();
       await expect(detailCard.locator(".buildOptionDescription")).toBeVisible();
-      await expect(detailCard.getByRole("table")).toBeVisible();
+      const properties = detailCard.getByRole("table");
+      await expect(properties).toBeVisible();
+      for (const row of await properties.getByRole("row").all()) {
+        await expect(row.locator(":scope > *")).toHaveCount(3);
+        const help = row.getByRole("button");
+        if (await help.count()) {
+          const cells = await row.locator(":scope > *").all();
+          await expect(cells[2].getByRole("button")).toBeVisible();
+        }
+      }
+      if (kind === "Storage") {
+        await expect(
+          properties.getByRole("row", { name: /Round-trip efficiency/ }),
+        ).toBeVisible();
+      }
       await expect(
         detailCard.getByText("Construction emissions", { exact: true }),
       ).toBeVisible();
@@ -170,6 +198,20 @@ for (const theme of ["light", "dark"] as const) {
         path: testInfo.outputPath(`${kind}-details-${theme}.png`),
         animations: "disabled",
       });
+      if (
+        process.env.REVIEW_SCREENSHOT_DIR &&
+        ((theme === "light" && testInfo.project.name === "desktop-chromium") ||
+          (theme === "dark" && testInfo.project.name === "mobile-390px"))
+      ) {
+        await detailCard.scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            `${kind}-details-${theme}-${testInfo.project.name}.png`,
+          ),
+          animations: "disabled",
+        });
+      }
       await detailReview.click();
       await expect(page.getByRole("dialog")).toBeVisible();
       const dialog = page.getByRole("dialog");
@@ -239,8 +281,12 @@ for (const theme of ["light", "dark"] as const) {
     await expect(page.locator("main.base_main")).toHaveCount(1);
     await expect(battery.locator(".buildOptionMetrics")).toContainText("4 hr");
     await expect(battery.locator(".buildOptionMetrics")).toContainText("250MW");
-    await expect(battery.locator(".buildOptionMetrics")).toContainText("1GWh");
-    await expect(battery.locator(".buildOptionMetrics")).toContainText("85%");
+    await expect(battery.locator(".buildOptionMetrics")).not.toContainText(
+      "Energy capacity",
+    );
+    await expect(battery.locator(".buildOptionMetrics")).not.toContainText(
+      "85%",
+    );
     expect(
       await battery.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
@@ -248,6 +294,15 @@ for (const theme of ["light", "dark"] as const) {
       path: testInfo.outputPath(`Storage-modern-${theme}.png`),
     });
     await battery.getByRole("button", { name: "Show Battery details" }).click();
+    await expect(
+      battery.getByRole("row", { name: /Round-trip efficiency/ }),
+    ).toContainText("85%");
+    const efficiencyHelp = battery
+      .getByRole("row", { name: /Round-trip efficiency/ })
+      .getByRole("button");
+    await expect(efficiencyHelp).toHaveAccessibleName(
+      "What is round-trip efficiency?",
+    );
     await expect(battery).not.toContainText(
       "Full-power duration assumes a full charge",
     );

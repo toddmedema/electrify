@@ -1,3 +1,4 @@
+import { DISCORD_URL, FEEDBACK_URL } from "../../CommunityLinks";
 import * as React from "react";
 import {
   Box,
@@ -45,8 +46,6 @@ export interface DispatchProps {
 }
 
 export interface Props extends StateProps, DispatchProps {}
-
-const DISCORD_URL = "https://discord.gg/Chrjk36DC";
 
 // MUI ships no Discord glyph, so wrap the Simple Icons path in SvgIcon to inherit MUI sizing/color.
 const DiscordIcon = () => (
@@ -257,7 +256,9 @@ const MainMenu = (props: Props): React.JSX.Element => {
         </IconButton>
         <IconButton
           color="primary"
-          {...sitePage("/about.html#feedback")}
+          href={FEEDBACK_URL}
+          target="_blank"
+          rel="noopener noreferrer"
           aria-label="Send feedback"
           size="large"
         >

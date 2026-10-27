@@ -1,3 +1,4 @@
+import { FEEDBACK_URL } from "../../CommunityLinks";
 import * as React from "react";
 import {
   Accordion,
@@ -41,8 +42,6 @@ export interface DispatchProps {
 }
 
 export interface Props extends StateProps, DispatchProps {}
-
-const FEEDBACK_URL = "/about.html#feedback";
 
 // The pinned group header's height (.manual-group's line-height in app.scss). A grouped entry
 // scrolled into view must land below it, and its title pins at this offset while open. Keep

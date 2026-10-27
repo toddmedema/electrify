@@ -161,7 +161,7 @@ export default function MissionSummary({
           {shownRisk ? (
             <Button
               className={`missionRiskButton${warning ? "" : " missionRiskEvent"}`}
-              color="inherit"
+              color="primary"
               aria-label={`${shownRisk.shortLabel}. ${shownRisk.label}`}
               title={shownRisk.label}
               onClick={() =>

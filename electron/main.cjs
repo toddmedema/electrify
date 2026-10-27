@@ -423,6 +423,7 @@ function openExternal(url) {
       return;
     const allowed = [
       "electrifygame.com",
+      "forms.gle",
       "github.com",
       "store.steampowered.com",
       "steamcommunity.com",

@@ -136,3 +136,21 @@ it("opens at average storage energy capacity", () => {
   );
   expect(screen.getByRole("slider")).toHaveAccessibleName(/600MWh/);
 });
+
+it("keeps the storage summary visible and efficiency in expanded properties", () => {
+  render(
+    <BuildStorage
+      game={createGame({ scenarioId: 100 })}
+      onBack={jest.fn()}
+      onBuildStorage={jest.fn()}
+    />,
+  );
+  expect(screen.getByText("Fast response, four hours of power")).toBeVisible();
+  expect(screen.queryByText("Energy capacity")).not.toBeInTheDocument();
+  expect(screen.queryByText("Round-trip efficiency")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Show Battery details" }));
+  const table = screen.getByRole("table", { name: "storage properties" });
+  expect(
+    within(table).getByRole("row", { name: /Round-trip efficiency.*85%/ }),
+  ).toBeVisible();
+});

@@ -1914,7 +1914,7 @@ export default class Insights extends React.Component<Props, State> {
           <Button onClick={() => this.closePresetDialog()}>Cancel</Button>
           <Button
             variant="contained"
-            color={presetDialog === "delete" ? "error" : "primary"}
+            color="primary"
             onClick={() => {
               if (presetDialog === "saveAs") {
                 this.createCustomPreset();

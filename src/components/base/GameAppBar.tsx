@@ -1,3 +1,4 @@
+import { FEEDBACK_URL } from "../../CommunityLinks";
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import {
@@ -416,7 +417,7 @@ export function GameAppBar(props: Props) {
           {!inMultiplayer && (
             <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
           )}
-          <MenuItem onClick={() => openWindow("/about.html#feedback")}>
+          <MenuItem onClick={() => openWindow(FEEDBACK_URL)}>
             Send feedback
           </MenuItem>
           {/* Mid-tutorial, the thing a player who has seen enough wants is the next tutorial,

@@ -250,7 +250,7 @@ export default function SavedGames(): React.JSX.Element {
                     Export current game
                   </Button>
                   <Button
-                    color="error"
+                    color="primary"
                     onClick={() => {
                       setError("");
                       setDeleting({
@@ -459,7 +459,6 @@ export default function SavedGames(): React.JSX.Element {
             </MenuItem>
           )}
         <MenuItem
-          sx={{ color: "error.main" }}
           onClick={() => {
             setError("");
             setDeleting(menu?.save);
@@ -510,7 +509,7 @@ export default function SavedGames(): React.JSX.Element {
             Cancel
           </Button>
           <Button
-            color="error"
+            color="primary"
             variant="contained"
             disabled={busy}
             onClick={() => {

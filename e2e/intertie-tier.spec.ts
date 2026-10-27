@@ -1,3 +1,4 @@
+import { startIntertieBuildFixture } from "./intertie-build-fixture";
 import { expect, test } from "./fixtures";
 import path from "path";
 import { openPane, openBuild } from "./layout";
@@ -11,15 +12,30 @@ for (const theme of ["light", "dark"] as const) {
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);
-    await page.goto("/?scenario=111");
-    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await startIntertieBuildFixture(page);
     const facilities = page.locator(".facilities:visible");
     await openPane(
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
     await openBuild(page);
+    const controlGeometry = () =>
+      page.locator(".constructionControls").evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          height: (element as HTMLElement).offsetHeight,
+          padding: style.padding,
+          width: element.clientWidth,
+        };
+      });
+    const generatorGeometry = await controlGeometry();
+    await page.getByRole("tab", { name: "Storage", exact: true }).click();
+    expect(await controlGeometry()).toEqual(generatorGeometry);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
+    expect(await controlGeometry()).toEqual(generatorGeometry);
+    await expect(page.locator(".constructionCapacity strong")).toHaveText(
+      "Tier 1",
+    );
     const card = page.getByTestId("transmission-project-california-north");
     const importAccess = card
       .locator(".buildOptionMetric")
@@ -32,6 +48,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect(importAccess).toBeVisible();
     await expect(exportAccess).toBeVisible();
     const baseExportAccess = await exportRating.innerText();
+    await expect(card.locator(".buildOptionMetrics")).not.toContainText(
+      "Loan payment",
+    );
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
       .click();
@@ -47,10 +66,10 @@ for (const theme of ["light", "dark"] as const) {
         ? page.getByRole("combobox", { name: "Sort interties" })
         : page.getByRole("button", { name: /^Sort interties:/ });
     await expect(sortControl()).toBeVisible();
-    if (desktop) await expect(sortControl()).toContainText("Fastest");
+    if (desktop) await expect(sortControl()).toContainText("Build cost");
     else
       await expect(sortControl()).toHaveAccessibleName(
-        "Sort interties: Fastest",
+        "Sort interties: Build cost",
       );
     const sliderBox = (await slider.boundingBox())!;
     const sortBox = (await sortControl().boundingBox())!;
@@ -60,8 +79,20 @@ for (const theme of ["light", "dark"] as const) {
         sortBox.y + sortBox.height / 2 - sliderBox.y - sliderBox.height / 2,
       ),
     ).toBeLessThan(2);
-    for (const option of ["Cheapest", "Lowest emissions", "Fastest"]) {
+    for (const option of ["Build time", "Lowest emissions", "Build cost"]) {
       await sortControl().click();
+      const options = page.getByRole(desktop ? "option" : "menuitem");
+      await expect(options).toHaveText([
+        "Build cost",
+        "Build time",
+        "Lowest emissions",
+      ]);
+      for (const choice of await options.all()) {
+        await expect(choice).toHaveCSS(
+          "color",
+          theme === "light" ? "rgb(23, 35, 52)" : "rgb(230, 237, 245)",
+        );
+      }
       await page
         .getByRole(desktop ? "option" : "menuitem", {
           name: option,
@@ -98,6 +129,17 @@ for (const theme of ["light", "dark"] as const) {
     await expect(importRating).not.toHaveText(baseAccess);
     await expect(exportRating).toHaveText(baseExportAccess);
     const selectedAccess = await importRating.innerText();
+    const properties = card.getByRole("table", { name: "intertie properties" });
+    await expect(properties).toBeVisible();
+    await expect(
+      properties.getByRole("row", { name: /Construction emissions/ }),
+    ).toBeVisible();
+    for (const row of await properties.getByRole("row").all()) {
+      await expect(row.locator(":scope > *")).toHaveCount(3);
+      await expect(
+        row.locator(":scope > *").last().getByRole("button"),
+      ).toBeVisible();
+    }
     // Keep only the neighbor’s supply-risk summary.
     await expect(card.locator(".buildOptionDescription")).toHaveCount(1);
     expect(

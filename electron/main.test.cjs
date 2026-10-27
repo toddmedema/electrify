@@ -17,6 +17,7 @@ async function startup(
   const shown = Promise.withResolvers();
   const failed = Promise.withResolvers();
   const calls = [];
+  const externalUrls = [];
   const writes = [];
   const errors = [];
   const handlers = new Map();
@@ -46,7 +47,9 @@ async function startup(
       this.size = [1100, 800];
       this.webContents = Object.assign(new EventEmitter(), {
         mainFrame: { url: "electrify://app/index.html" },
-        setWindowOpenHandler() {},
+        setWindowOpenHandler(handler) {
+          this.openWindow = handler;
+        },
         send: (channel, value) => messages.push([channel, value]),
       });
       calls.push({ kind: "construct", visible: this.visible });
@@ -179,7 +182,12 @@ async function startup(
         protocol: { handle() {} },
       }),
     },
-    shell: {},
+    shell: {
+      openExternal: (url) => {
+        externalUrls.push(url);
+        return Promise.resolve();
+      },
+    },
   };
   const dependencies = {
     electron,
@@ -251,6 +259,7 @@ async function startup(
   return {
     game,
     calls,
+    externalUrls,
     powerMonitor,
     messages,
     inputEnabled,
@@ -454,4 +463,34 @@ test("the native save recovery warning translates controller input while quit re
   await settle();
   assert.deepEqual(f.launcherChanges, [true, false]);
   assert.equal(f.inputEnabled.at(-1), true);
+});
+
+test("feedback opens in the system browser while unapproved URLs stay blocked", async (t) => {
+  const f = await startup(t);
+  const feedback = "https://forms.gle/nSpkVzcFcXMQMMgb9";
+  const discord = "https://discord.gg/ethMFvvmup";
+  for (const url of [feedback, discord]) {
+    assert.equal(f.game.webContents.openWindow({ url }).action, "deny");
+  }
+  assert.deepEqual(f.externalUrls, [feedback, discord]);
+  for (const url of [
+    "http://forms.gle/nSpkVzcFcXMQMMgb9",
+    "https://forms.gle.example.com/nSpkVzcFcXMQMMgb9",
+    "https://name@forms.gle/nSpkVzcFcXMQMMgb9",
+  ]) {
+    assert.equal(f.game.webContents.openWindow({ url }).action, "deny");
+  }
+  assert.deepEqual(f.externalUrls, [feedback, discord]);
+  let prevented = false;
+  f.game.webContents.emit(
+    "will-navigate",
+    {
+      preventDefault: () => {
+        prevented = true;
+      },
+    },
+    feedback,
+  );
+  assert.equal(prevented, true);
+  assert.deepEqual(f.externalUrls, [feedback, discord, feedback]);
 });
