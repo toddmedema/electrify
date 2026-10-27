@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expectDialogToFit } from "./dialog-layout";
 import { expect, Locator, test } from "./fixtures";
 import { openBuild } from "./layout";
@@ -118,7 +119,7 @@ for (const theme of ["light", "dark"] as const) {
           expect(box.height).toBeGreaterThanOrEqual(44);
         }
       }
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: info.outputPath(`build-header-${theme}.png`),
         animations: "disabled",
       });
@@ -182,7 +183,7 @@ for (const theme of ["light", "dark"] as const) {
             );
             expect(lines).toBeGreaterThan(1);
           }
-          await page.screenshot({
+          await reviewScreenshot(page, {
             path: info.outputPath(`solar-purchase-${theme}.png`),
             animations: "disabled",
           });
@@ -214,7 +215,7 @@ for (const theme of ["light", "dark"] as const) {
       await gas
         .getByRole("rowheader", { name: "Non-fuel start cost", exact: true })
         .scrollIntoViewIfNeeded();
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: info.outputPath(`generator-details-${theme}.png`),
         animations: "disabled",
       });

@@ -3,7 +3,7 @@ description: Restore transforms and timings independently for each shard; save a
 inputs:
   group:
     required: true
-    description: unit or simulation
+    description: unit, simulation or world-advance
   shard:
     required: true
     description: Shard index

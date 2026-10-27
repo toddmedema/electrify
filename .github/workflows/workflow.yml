@@ -1,9 +1,16 @@
 name: Test Code
 run-name: Running tests on behalf of ${{ github.actor }} 🚀
 on:
+  # Default-branch runs populate trusted transform caches that every new PR can restore.
+  push:
+    branches: [master]
   pull_request:
   workflow_dispatch:
     inputs:
+      benchmark-work:
+        description: Measure helper startup, optional review captures and restored transforms
+        type: boolean
+        default: false
       qa-artifacts:
         description: Archive and upload all three verified offline desktop builds
         type: boolean
@@ -11,7 +18,8 @@ on:
 
 concurrency:
   group: test-${{ github.ref }}
-  cancel-in-progress: true
+  # Let a trusted seed finish even when another merge arrives; PR updates still cancel.
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 # Six jobs: shared renderers, three native builds, all tests, and the required gate.
 # Tests share renderer artifacts but never wait for an OS build.
@@ -161,6 +169,10 @@ jobs:
         with:
           group: simulation
           shard: 1
+      - uses: ./.github/actions/jest-cache
+        with:
+          group: world-advance
+          shard: 1
       - name: Cache native packaging downloads
         uses: actions/cache@v6
         with:
@@ -193,6 +205,12 @@ jobs:
           path: .tmp/web-renderer
       - name: All test suites, types, lint and formatting
         run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:ci-all'
+      - name: Measure work inside the existing test job (manual runs only)
+        if: github.event_name == 'workflow_dispatch' && inputs.benchmark-work
+        run: |
+          node scripts/ci/benchmark-world-advance.js "$(find test-results/multiplayer -path '*native-106*1280*/native-world.json' -print -quit)" 48 > test-results/benchmark-world-advance.json
+          node scripts/ci/benchmark-jest-cache.js > test-results/benchmark-jest-cache.json
+          npm run test:e2e -- --config=e2e/ci-work.bench.config.ts
       - name: Preserve test reports, coverage and diagnostics
         if: always()
         uses: actions/upload-artifact@v7

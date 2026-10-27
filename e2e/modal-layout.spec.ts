@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
@@ -44,7 +45,7 @@ for (const theme of ["light", "dark"]) {
         await insights.getByRole("button", { name: "Preset actions" }).click();
         await page.getByRole("menuitem", { name: action, exact: true }).click();
         await expectDialogToFit(dialog);
-        await page.screenshot({
+        await reviewScreenshot(page, {
           path: info.outputPath(action + ".png"),
           animations: "disabled",
         });
@@ -80,7 +81,7 @@ for (const theme of ["light", "dark"]) {
       await expect(dialog).toHaveCount(0);
       await row.locator(".facilityRetrofit button").click();
       await expectDialogToFit(dialog);
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: info.outputPath("retrofit.png"),
         animations: "disabled",
       });
@@ -146,7 +147,7 @@ for (const theme of ["light", "dark"]) {
       const name = "W".repeat(SAVE_NAME_LIMIT);
       await rename.getByRole("textbox", { name: "Save name" }).fill(name);
       await expectDialogToFit(rename);
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: info.outputPath("rename-save.png"),
         animations: "disabled",
       });
@@ -173,7 +174,7 @@ for (const theme of ["light", "dark"]) {
       await expect(
         deleting.getByRole("button", { name: "Cancel", exact: true }),
       ).toBeFocused();
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: info.outputPath("delete-save.png"),
         animations: "disabled",
       });
@@ -206,7 +207,7 @@ for (const theme of ["light", "dark"]) {
         .click();
       const dialog = page.getByRole("dialog");
       await expectDialogToFit(dialog);
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: info.outputPath("install.png"),
         animations: "disabled",
       });
@@ -232,7 +233,7 @@ for (const theme of ["light", "dark"]) {
         dialog.getByText("Nicholas Coronado", { exact: true }),
       ).toBeVisible();
       await expectDialogToFit(dialog);
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: info.outputPath("credits-and-licenses.png"),
         animations: "disabled",
       });

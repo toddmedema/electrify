@@ -91,6 +91,33 @@ test("PR CI isolates all tests from the three native builds in six jobs", () => 
   assert.match(reports.with.path, /coverage\//);
 });
 
+test("trusted master runs warm all three transform caches without adding jobs", () => {
+  const config = workflow();
+  assert.deepEqual(config.on.push.branches, ["master"]);
+  assert(Object.hasOwn(config.on, "pull_request"));
+  assert.equal(
+    config.concurrency["cancel-in-progress"],
+    `\${{ github.event_name != 'push' }}`,
+  );
+  assert.deepEqual(
+    config.jobs.tests.steps
+      .filter(({ uses }) => uses === "./.github/actions/jest-cache")
+      .map(({ with: options }) => options.group),
+    ["unit", "simulation", "world-advance"],
+  );
+  const action = parse(
+    fs.readFileSync(".github/actions/jest-cache/action.yml", "utf8"),
+  );
+  assert.equal(
+    action.runs.steps[0].with.path,
+    `.tmp/jest-\${{ inputs.group }}`,
+  );
+  assert.match(
+    action.runs.steps[0].with.key,
+    /hashFiles\('package-lock.json'\)/,
+  );
+});
+
 test("the required gate rejects every failed, skipped, cancelled or timed-out dependency", () => {
   const { jobs } = workflow();
   assert.equal(jobs.check.if, "always()");

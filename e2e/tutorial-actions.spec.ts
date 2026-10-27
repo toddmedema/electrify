@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
 
 const missions = [
@@ -82,7 +83,7 @@ for (const [index, mission] of missions.entries()) {
     if (mission.name === "Generators" || mission.name === "Finances") {
       await page.mouse.move(0, 0);
       await expect(page.getByRole("tooltip")).toBeHidden();
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: testInfo.outputPath(`${mission.name}-actions.png`),
       });
     }

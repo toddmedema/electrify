@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import path from "path";
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import { expect, test } from "./fixtures";
@@ -109,7 +110,7 @@ for (const theme of ["light", "dark"] as const) {
           expect(compare.y).toBeGreaterThan(reviewBox.y + reviewBox.height);
         }
       }
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: testInfo.outputPath(`${kind}-${theme}.png`),
       });
       if (kind === "Generator") {
@@ -200,7 +201,7 @@ for (const theme of ["light", "dark"] as const) {
       await expect(
         detailCard.getByText("Construction emissions", { exact: true }),
       ).toBeInViewport();
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: testInfo.outputPath(`${kind}-details-${theme}.png`),
         animations: "disabled",
       });
@@ -248,7 +249,7 @@ for (const theme of ["light", "dark"] as const) {
         page.getByRole("button", { name: "Pay cash", exact: true }),
       ).toBeVisible();
       if (kind === "Storage") {
-        await page.screenshot({
+        await reviewScreenshot(page, {
           path: testInfo.outputPath(`Storage-purchase-${theme}.png`),
           animations: "disabled",
         });
@@ -307,7 +308,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(
       await battery.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`Storage-modern-${theme}.png`),
     });
     await battery
@@ -342,7 +343,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(
       await battery.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`Storage-max-size-${theme}.png`),
     });
     await maxSize.click();
@@ -412,7 +413,7 @@ for (const theme of ["light", "dark"] as const) {
         .locator(".buildOptionMetric")
         .nth(4),
     ).toHaveText("Round-trip efficiency43%");
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`Storage-iron-air-${theme}.png`),
       animations: "disabled",
     });
