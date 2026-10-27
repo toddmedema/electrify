@@ -756,7 +756,7 @@ describe("the interties view", () => {
       game.transmission!.lines = [];
       renderProjects(game);
       const first = () => screen.getAllByTestId(/^transmission-project-/)[0];
-      expect(first()).toHaveAttribute("data-corridor-id", "california-north");
+      expect(first()).toHaveAttribute("data-corridor-id", "california-south");
       const select = async (label: string) => {
         await user.click(
           screen.getByRole("button", { name: /^Sort interties:/ }),
@@ -764,9 +764,11 @@ describe("the interties view", () => {
         await user.click(screen.getByRole("menuitem", { name: label }));
       };
       expect(
-        screen.getByRole("button", { name: "Sort interties: Fastest" }),
+        screen.getByRole("button", { name: "Sort interties: Build cost" }),
       ).toBeInTheDocument();
-      await select("Cheapest");
+      await select("Build time");
+      expect(first()).toHaveAttribute("data-corridor-id", "california-north");
+      await select("Build cost");
       expect(first()).toHaveAttribute("data-corridor-id", "california-south");
       fireEvent.change(screen.getByRole("slider"), { target: { value: 2 } });
       expect(first()).toHaveAttribute("data-corridor-id", "california-north");
@@ -774,7 +776,7 @@ describe("the interties view", () => {
       expect(first()).toHaveAttribute("data-corridor-id", "california-south");
       await select("Lowest emissions");
       expect(first()).toHaveAttribute("data-corridor-id", "california-north");
-      await select("Fastest");
+      await select("Build time");
       expect(first()).toHaveAttribute("data-corridor-id", "california-north");
     } finally {
       mock.mockRestore();

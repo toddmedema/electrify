@@ -890,7 +890,8 @@ export function STORAGE(state: GameType, peakWh: number) {
   let storage: StorageShoppingType[] = [
     {
       name: "Battery",
-      description: "Fast response, four hours of power",
+      description:
+        "Quick to build and nearly instant to respond, with limited stored energy",
       available: year > 2008, // Project Barbados, 2MW - https://en.wikipedia.org/wiki/List_of_energy_storage_projects
       buildCost: 10000 + batteryCostPerWh(year) * peakWh,
       // NREL's 2020 four-hour benchmark was $345/kWh (2020$); IRENA's global fully installed
@@ -920,7 +921,8 @@ export function STORAGE(state: GameType, peakWh: number) {
     },
     {
       name: "Pumped Hydro",
-      description: "Reservoir storage; slow to build",
+      description:
+        "Stores large amounts of energy by pumping water between two reservoirs. Needs a suitable site and years to build, but no river inflow",
       available: year > 1930 && (pumpedHydroLocations || 0) > 0, // New Milford plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
       buildCost: 2000000 + 0.3319 * peakWh,
       // NREL's 2024 ATB closed-loop sites span $2,205-$4,434/kW. At this facility's ten-hour

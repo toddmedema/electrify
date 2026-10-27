@@ -36,6 +36,17 @@ import { useUnits } from "../base/UnitsContext";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import { GameType, LocationType, StorageShoppingType } from "../../Types";
 
+function storageBuildSummary(storage: StorageShoppingType): string {
+  switch (storage.name) {
+    case "Battery":
+      return "Fast response, four hours of power";
+    case "Pumped Hydro":
+      return "Reservoir storage; slow to build";
+    default:
+      return storage.description;
+  }
+}
+
 interface StorageBuildItemProps {
   cash: number;
   interestRate: number;
@@ -102,7 +113,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           variant="body2"
           color="textSecondary"
         >
-          {storage.description}
+          {storageBuildSummary(storage)}
         </Typography>
       }
       warning={!buildable || shortfall ? buildSubtitle : undefined}

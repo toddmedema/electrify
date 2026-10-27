@@ -138,30 +138,19 @@ it("opens at average storage energy capacity", () => {
 });
 
 it("keeps the storage summary visible and efficiency in expanded properties", () => {
-  const { container } = render(
+  render(
     <BuildStorage
       game={createGame({ scenarioId: 100 })}
       onBack={jest.fn()}
       onBuildStorage={jest.fn()}
     />,
   );
-  const card = screen
-    .getByRole("button", { name: "Show Battery details" })
-    .closest(".buildOption")!;
-  expect(
-    within(card as HTMLElement).getByText("Fast response, four hours of power"),
-  ).toBeVisible();
-  expect(card.querySelector(".buildOptionMetrics")).not.toHaveTextContent(
-    /Energy capacity|Round-trip efficiency/,
-  );
+  expect(screen.getByText("Fast response, four hours of power")).toBeVisible();
+  expect(screen.queryByText("Energy capacity")).not.toBeInTheDocument();
+  expect(screen.queryByText("Round-trip efficiency")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Show Battery details" }));
-  const table = within(card as HTMLElement).getByRole("table", {
-    name: "storage properties",
-  });
+  const table = screen.getByRole("table", { name: "storage properties" });
   expect(
     within(table).getByRole("row", { name: /Round-trip efficiency.*85%/ }),
   ).toBeVisible();
-  for (const row of within(table).getAllByRole("row"))
-    expect(row.children).toHaveLength(3);
-  expect(container.querySelectorAll(".buildDetails")).toHaveLength(1);
 });

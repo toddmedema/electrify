@@ -901,7 +901,7 @@ it.each([undefined, "Natural Gas"] as const)(
   "sorts generators by lowest direct emissions with initial fuel focus %s",
   (focusFuel) => {
     const game = createGame({ scenarioId: 111, difficulty: "CEO" });
-    const { container } = render(
+    render(
       <BuildGenerators
         game={game}
         focusFuel={focusFuel}
@@ -913,10 +913,13 @@ it.each([undefined, "Natural Gas"] as const)(
     const choices = screen.getAllByRole("menuitem");
     expect(choices[choices.length - 1]).toHaveTextContent("Emissions");
     fireEvent.click(screen.getByRole("menuitem", { name: "Emissions" }));
-    const names = Array.from(
-      container.querySelectorAll(".buildOption .MuiCardHeader-title"),
-    ).map((element) => element.textContent);
-    const index = (name: string) => names.indexOf(name);
+    const choicesInOrder = screen.getAllByRole("button", {
+      name: /^Review purchase of /,
+    });
+    const index = (name: string) =>
+      choicesInOrder.indexOf(
+        screen.getByRole("button", { name: `Review purchase of ${name}` }),
+      );
     expect(index("Solar")).toBeLessThan(index("Natural Gas CC"));
     expect(index("Natural Gas CC")).toBeLessThan(index("Natural Gas Peaker"));
     expect(index("Natural Gas Peaker")).toBeLessThan(index("Coal"));
