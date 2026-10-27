@@ -982,6 +982,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     if (spentA !== spentB) {
       return spentA ? 1 : -1;
     }
+    if (sort === "emissions") return sortValue(a) - sortValue(b);
     if (props.focusFuel && a.fuel !== b.fuel) {
       if (a.fuel === props.focusFuel) {
         return -1;
@@ -990,7 +991,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         return 1;
       }
     }
-    if (sort === "emissions") return sortValue(a) - sortValue(b);
     const groupA = bestInFuel.get(a.fuel) as number;
     const groupB = bestInFuel.get(b.fuel) as number;
     if (a.fuel !== b.fuel && groupA !== groupB) {

@@ -897,25 +897,29 @@ it("opens at the fleet average and remembers the player's chosen generator size"
   expect(screen.getByRole("slider")).toHaveAccessibleName(/300MW/);
 });
 
-it("sorts generators by lowest direct emissions, including gas designs", () => {
-  const game = createGame({ scenarioId: 111, difficulty: "CEO" });
-  const { container } = render(
-    <BuildGenerators
-      game={game}
-      onBack={jest.fn()}
-      onBuildGenerator={jest.fn()}
-    />,
-  );
-  fireEvent.click(screen.getByRole("button", { name: /^Sort facilities:/ }));
-  const choices = screen.getAllByRole("menuitem");
-  expect(choices[choices.length - 1]).toHaveTextContent("Emissions");
-  fireEvent.click(screen.getByRole("menuitem", { name: "Emissions" }));
-  const names = Array.from(
-    container.querySelectorAll(".buildOption .MuiCardHeader-title"),
-  ).map((element) => element.textContent);
-  const index = (name: string) => names.indexOf(name);
-  expect(index("Solar")).toBeLessThan(index("Natural Gas CC"));
-  expect(index("Natural Gas CC")).toBeLessThan(index("Natural Gas Peaker"));
-  expect(index("Natural Gas Peaker")).toBeLessThan(index("Coal"));
-  expect(index("Coal")).toBeLessThan(index("Oil"));
-});
+it.each([undefined, "Natural Gas"] as const)(
+  "sorts generators by lowest direct emissions with initial fuel focus %s",
+  (focusFuel) => {
+    const game = createGame({ scenarioId: 111, difficulty: "CEO" });
+    const { container } = render(
+      <BuildGenerators
+        game={game}
+        focusFuel={focusFuel}
+        onBack={jest.fn()}
+        onBuildGenerator={jest.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Sort facilities:/ }));
+    const choices = screen.getAllByRole("menuitem");
+    expect(choices[choices.length - 1]).toHaveTextContent("Emissions");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Emissions" }));
+    const names = Array.from(
+      container.querySelectorAll(".buildOption .MuiCardHeader-title"),
+    ).map((element) => element.textContent);
+    const index = (name: string) => names.indexOf(name);
+    expect(index("Solar")).toBeLessThan(index("Natural Gas CC"));
+    expect(index("Natural Gas CC")).toBeLessThan(index("Natural Gas Peaker"));
+    expect(index("Natural Gas Peaker")).toBeLessThan(index("Coal"));
+    expect(index("Coal")).toBeLessThan(index("Oil"));
+  },
+);
