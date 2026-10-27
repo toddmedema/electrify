@@ -1,3 +1,4 @@
+import { startIntertieBuildFixture } from "./intertie-build-fixture";
 import { expect, test } from "./fixtures";
 import path from "path";
 import { openPane, openBuild } from "./layout";
@@ -11,8 +12,7 @@ for (const theme of ["light", "dark"] as const) {
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);
-    await page.goto("/?scenario=111");
-    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await startIntertieBuildFixture(page);
     const facilities = page.locator(".facilities:visible");
     await openPane(
       facilities,
@@ -23,9 +23,9 @@ for (const theme of ["light", "dark"] as const) {
       page.locator(".constructionControls").evaluate((element) => {
         const style = getComputedStyle(element);
         return {
-          height: element.getBoundingClientRect().height,
+          height: (element as HTMLElement).offsetHeight,
           padding: style.padding,
-          width: element.getBoundingClientRect().width,
+          width: element.clientWidth,
         };
       });
     const generatorGeometry = await controlGeometry();
