@@ -115,6 +115,42 @@ test("Space activates game navigation while body Space pauses", async ({
   await expect(paused).toHaveAttribute("aria-pressed", "true");
 });
 
+test("global shortcuts keep shifted fleet actions and manual typing separate", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=111");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect(page.locator(".facilities:visible")).toBeVisible();
+  await page.keyboard.press("0");
+  const paused = page
+    .getByRole("group", { name: "game speed", exact: true })
+    .getByRole("button", { name: "pause", exact: true });
+  await expect(paused).toHaveAttribute("aria-pressed", "true");
+  const first = page.locator(".facilityRow").first();
+  const name = await first.getAttribute("data-facility");
+  expect(name).toBeTruthy();
+  await page.keyboard.press("Shift+1");
+  await expect(page.getByText(`Paused ${name}`, { exact: true })).toBeVisible();
+  await expect(paused).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Shift+1");
+  await expect(
+    page.getByText(`Resumed ${name}`, { exact: true }),
+  ).toBeVisible();
+
+  await page.keyboard.press("Shift+/");
+  const search = page.getByRole("textbox", {
+    name: "Search the manual",
+    exact: true,
+  });
+  await expect(search).toBeVisible();
+  await search.pressSequentially("q?123");
+  await expect(search).toHaveValue("q?123");
+  await search.press("Escape");
+  await expect(search).toHaveCount(0);
+  await expect(page.locator(".facilities:visible")).toBeVisible();
+  await expect(paused).toHaveAttribute("aria-pressed", "true");
+});
+
 test("selection is visible in both themes without horizontal overflow", async ({
   page,
 }, testInfo) => {
