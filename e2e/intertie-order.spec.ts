@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
 
@@ -160,7 +161,7 @@ for (const theme of ["light", "dark"] as const) {
 
     await rows.first().scrollIntoViewIfNeeded();
     await page.mouse.move(0, 0);
-    await pane.screenshot({
+    await reviewScreenshot(pane, {
       path: testInfo.outputPath(`intertie-order-${theme}.png`),
       animations: "disabled",
     });

@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import path from "path";
 import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
@@ -368,10 +369,10 @@ for (const theme of ["light", "dark"]) {
     expect(
       await details.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
-    await details.screenshot({
+    await reviewScreenshot(details, {
       path: info.outputPath(`storage-details-${theme}.png`),
     });
-    await chart.screenshot({
+    await reviewScreenshot(chart, {
       path: info.outputPath(`keyboard-selection-${theme}.png`),
     });
     // An intentional pointer move takes over from keyboard selection. Screenshots may
@@ -451,7 +452,9 @@ for (const theme of ["light", "dark"]) {
     await expect(details).toBeHidden();
     await page.evaluate(() => document.fonts.ready);
     await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
-    await chart.screenshot({ path: info.outputPath(`storage-${theme}.png`) });
+    await reviewScreenshot(chart, {
+      path: info.outputPath(`storage-${theme}.png`),
+    });
     if (process.env.REVIEW_SCREENSHOT_DIR) {
       await chart.screenshot({
         path: path.join(
@@ -571,7 +574,7 @@ for (const theme of ["light", "dark"]) {
     await page.evaluate(() => document.fonts.ready);
     await expect(page.getByText("Starting your mission…")).toHaveCount(0);
     await expect(page.locator('[class*="-exit-active"]')).toHaveCount(0);
-    await chart.screenshot({
+    await reviewScreenshot(chart, {
       path: info.outputPath(`production-${theme}.png`),
     });
     if (process.env.REVIEW_SCREENSHOT_DIR) {
@@ -674,7 +677,7 @@ test("blackout periods remain visible when imports supplement fuel production", 
   await page.evaluate(() => document.fonts.ready);
   await expect(page.getByText("Starting your mission…")).toHaveCount(0);
   await expect(page.locator('[class*="-exit-active"]')).toHaveCount(0);
-  await chart.screenshot({
+  await reviewScreenshot(chart, {
     path: info.outputPath("production-blackout-dark.png"),
   });
   if (process.env.REVIEW_SCREENSHOT_DIR) {
@@ -753,7 +756,7 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
   await expect(details).toContainText("Blackout: 150MW unmet");
   await chart.getByRole("img").press("Escape");
   await page.evaluate(() => document.fonts.ready);
-  await chart.screenshot({
+  await reviewScreenshot(chart, {
     path: info.outputPath("concurrent-flow-fixture.png"),
   });
   const mix = pane.getByRole("button", {

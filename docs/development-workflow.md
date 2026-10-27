@@ -51,6 +51,22 @@ profiles. It bypasses local coordination and full-install preflight; its existin
 dependency checks remain. Native workers still suppress generators when adopting
 verified shared build artifacts. Packaged Electron window tests remain CI-only.
 
+The same combined test job also runs on `master` pushes to populate trusted Jest
+transform caches for new PRs. A running master seed finishes even if another merge
+arrives. Unit, simulation and multiplayer save-advance transforms have separate
+caches; cached transforms never replace test execution.
+
+Routine browser runs capture screenshots on failure. Set `REVIEW_SCREENSHOT_DIR`
+to collect optional review captures as well; test/viewport subdirectories prevent
+collisions. The layout and interaction assertions run in either mode.
+
+Multiplayer save advancement keeps one lazy CRA/Jest helper per Playwright worker.
+Every request reloads simulation data, restores its own UI-created save and runs
+the original advancement assertions. To compare it with the one-shot CLI on the
+same save, run `node scripts/ci/benchmark-world-advance.js <native-world.json>
+<month>`. The benchmark reserves the local validation slot, alternates three rounds
+of nine requests per mode, and requires identical output checkpoint hashes.
+
 ## Resume verified validation
 
 After fixing a failed check, run `npm run check:ci -- --resume`. This still accounts
@@ -81,3 +97,9 @@ build commands and hosted CI keep their existing `build/` default.
 Compatibility/icon inputs are generated before the check snapshot. Changes to ignored
 behavior inputs, including local environment files, invalidate a run just like tracked
 source changes. Cache reuse never authorizes a partial run to claim full coverage.
+
+For isolated runner measurements, manually dispatch Test Code with
+`benchmark-work=true`. It runs the ordinary combined test job first, then measures
+one-shot/persistent save advancement, four covered suites with cold/restored
+transforms, and optional review captures at all three CI viewport widths. Results
+are retained in `diagnostics-tests`; no additional job or required gate is added.

@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
 
 for (const layout of [
@@ -92,7 +93,7 @@ for (const layout of [
         timeout: 45000,
       });
       await page.getByRole("heading", { name: "Goals" }).click();
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: testInfo.outputPath(
           `operations-${layout.width}-${layout.theme}.png`,
         ),
@@ -106,7 +107,7 @@ for (const layout of [
       await expect(
         page.getByRole("button", { name: "Filter event history, All events" }),
       ).toBeVisible();
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: testInfo.outputPath("operations-phone-unchanged.png"),
       });
     }
@@ -172,7 +173,7 @@ test("history stays below priorities in a short pane without duplicate upcoming 
   await expect(
     page.getByRole("button", { name: "Filter event history, All events" }),
   ).toBeInViewport({ ratio: 1 });
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("history-short-pane.png"),
   });
 });

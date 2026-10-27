@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expect, Page, test } from "./fixtures";
 import path from "node:path";
 
@@ -59,7 +60,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("tooltip", { name: /^Blackout, .* short/ }),
     ).toBeVisible();
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`grid-blackout-${theme}.png`),
       animations: "disabled",
     });
@@ -398,7 +399,7 @@ for (const theme of ["light", "dark"] as const) {
       );
     }
     await expectFloatingDock(page);
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`workspace-facilities-${theme}.png`),
       animations: "disabled",
     });
@@ -458,7 +459,7 @@ for (const theme of ["light", "dark"] as const) {
         (element) => element.scrollWidth - element.clientWidth,
       ),
     ).toBeLessThanOrEqual(1);
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`workspace-insights-${theme}.png`),
       // Keep review images focused on the layout after keyboard assertions above.
       style:
@@ -567,7 +568,7 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
     ).toBeVisible();
     await expect(page.locator(".gameToolPanel")).toHaveCount(0);
   }
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-touch-labels.png"),
     animations: "disabled",
   });
@@ -656,7 +657,7 @@ test("Programs keeps points visible through monthly forecast refreshes", async (
   await expect(pricing).not.toHaveAttribute("data-score-blanked", "true");
   await settleSheets(page);
   await page.mouse.move(0, 0);
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("programs-points-estimate.png"),
     animations: "disabled",
   });
@@ -671,7 +672,7 @@ test("Programs keeps points visible through monthly forecast refreshes", async (
   if (testInfo.project.use.hasTouch) {
     await settleSheets(page);
     await page.mouse.move(0, 0);
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath("insights-scenario-range.png"),
       animations: "disabled",
     });
@@ -692,7 +693,7 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   const changed = Number(await rate.inputValue());
   expect(changed).toBeGreaterThan(original);
   await settleSheets(page);
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-programs-overview.png"),
     animations: "disabled",
   });
@@ -703,7 +704,7 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await expect(
     programs.getByRole("button", { name: "Start next month", exact: true }),
   ).toBeEnabled({ timeout: 60_000 });
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-programs-detail.png"),
     animations: "disabled",
   });
@@ -711,7 +712,7 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
     element.scrollTop = element.scrollHeight;
   });
   await expect(programs.getByText(/^Peak demand:/)).toBeInViewport();
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-programs-detail-impact.png"),
     animations: "disabled",
   });
@@ -808,7 +809,7 @@ test("wide screens keep several tools beside the fleet and remember them across 
   // Narrowing preserves the focused decision instead of hiding it for the newer tool.
   const rate = page.locator("#rateSlider input");
   const value = await rate.inputValue();
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-side-rails-desktop.png"),
     style:
       ".gameToolTitle:focus { outline: none !important; box-shadow: none !important; }",
@@ -962,7 +963,7 @@ test("short desktop rails keep their heading, scroll body, and floating dock rea
       .evaluate((element) => element.scrollTop),
   ).toBeGreaterThan(0);
   await expect(page.locator("#eventsNav")).toBeInViewport();
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-short-desktop.png"),
     animations: "disabled",
   });
@@ -1038,7 +1039,7 @@ for (const width of [360, 390]) {
         .evaluate((element) => element.scrollWidth - element.clientWidth),
     ).toBeLessThanOrEqual(1);
     await expect(page.locator("#eventsNav")).toBeInViewport();
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`workspace-floating-dock-${width}.png`),
       animations: "disabled",
     });

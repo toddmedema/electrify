@@ -1,4 +1,4 @@
-import { test, expect, Page, Browser } from "@playwright/test";
+import { expect, Page, Browser } from "@playwright/test";
 import { gzipSync } from "node:zlib";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -6,7 +6,7 @@ import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import type { GameType } from "../src/Types";
 import { wToSliderTick } from "../src/helpers/BuildSizing";
 import { openPane } from "./layout";
-import { advanceWorldSave } from "./advance-world";
+import { test } from "./advance-world";
 import type {
   LobbyState,
   NativeEvent,
@@ -2463,6 +2463,7 @@ for (const scenarioId of [106, 107] as const) {
   for (const width of [1280, 390, 360]) {
     test(`native ${scenarioId} companies choose independently and preserve rules on resume at ${width}px`, async ({
       browser,
+      advanceWorldSave,
     }) => {
       test.setTimeout(240000);
       const room = new SteamRoom(async (page) => {
