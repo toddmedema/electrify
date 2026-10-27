@@ -50,7 +50,12 @@ for (const theme of ["light", "dark"] as const) {
       await expect(metrics).toContainText("Build time");
       if (kind === "Storage") {
         await expect(metrics).not.toContainText("Energy capacity");
-        await expect(metrics).not.toContainText("Round-trip efficiency");
+        await expect(
+          metrics.locator(".buildOptionMetric").nth(3),
+        ).toContainText("At full power");
+        await expect(
+          metrics.locator(".buildOptionMetric").nth(4),
+        ).toContainText("Round-trip efficiency");
         for (const description of await cards
           .locator(".buildOptionDescription")
           .all()) {
@@ -180,7 +185,7 @@ for (const theme of ["light", "dark"] as const) {
       if (kind === "Storage") {
         await expect(
           properties.getByRole("row", { name: /Round-trip efficiency/ }),
-        ).toBeVisible();
+        ).toHaveCount(0);
       }
       await expect(
         detailCard.getByText("Construction emissions", { exact: true }),
@@ -276,7 +281,9 @@ for (const theme of ["light", "dark"] as const) {
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildStorage").click();
     const battery = page.locator(".buildOption").filter({
-      has: page.getByRole("button", { name: /Battery details/ }),
+      has: page.getByRole("button", {
+        name: /^(Show|Hide) Lithium Battery details$/,
+      }),
     });
     await expect(battery).toBeVisible();
     await expect(page.locator("main.base_main")).toHaveCount(1);
@@ -285,24 +292,35 @@ for (const theme of ["light", "dark"] as const) {
     await expect(battery.locator(".buildOptionMetrics")).not.toContainText(
       "Energy capacity",
     );
-    await expect(battery.locator(".buildOptionMetrics")).not.toContainText(
-      "85%",
-    );
+    await expect(
+      battery
+        .locator(".buildOptionMetrics")
+        .locator(".buildOptionMetric")
+        .nth(3),
+    ).toContainText("At full power");
+    await expect(
+      battery
+        .locator(".buildOptionMetrics")
+        .locator(".buildOptionMetric")
+        .nth(4),
+    ).toHaveText("Round-trip efficiency85%");
     expect(
       await battery.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
     await page.screenshot({
       path: testInfo.outputPath(`Storage-modern-${theme}.png`),
     });
-    await battery.getByRole("button", { name: "Show Battery details" }).click();
+    await battery
+      .getByRole("button", { name: "Show Lithium Battery details" })
+      .click();
     await expect(
       battery.getByRole("row", { name: /Round-trip efficiency/ }),
-    ).toContainText("85%");
-    const efficiencyHelp = battery
-      .getByRole("row", { name: /Round-trip efficiency/ })
+    ).toHaveCount(0);
+    const lossHelp = battery
+      .getByRole("row", { name: /Stored energy lost per hour/ })
       .getByRole("button");
-    await expect(efficiencyHelp).toHaveAccessibleName(
-      "What is round-trip efficiency?",
+    await expect(lossHelp).toHaveAccessibleName(
+      "What is stored energy lost per hour?",
     );
     await expect(battery).not.toContainText(
       "Full-power duration assumes a full charge",
@@ -310,7 +328,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       battery.getByRole("row", { name: /Stored energy lost per hour/ }),
     ).toContainText("0.01%");
-    await battery.getByRole("button", { name: "Hide Battery details" }).click();
+    await battery
+      .getByRole("button", { name: "Hide Lithium Battery details" })
+      .click();
     await page.getByRole("slider").focus();
     await page.getByRole("slider").press("End");
     const maxSize = battery.getByRole("button", { name: "Use max size" });
@@ -327,7 +347,9 @@ for (const theme of ["light", "dark"] as const) {
     });
     await maxSize.click();
     await expect(
-      battery.getByRole("button", { name: "Review purchase of Battery" }),
+      battery.getByRole("button", {
+        name: "Review purchase of Lithium Battery",
+      }),
     ).toBeEnabled();
   });
 }
@@ -378,6 +400,18 @@ for (const theme of ["light", "dark"] as const) {
       "100 hr",
     );
     await expect(ironAir.locator(".buildOptionMetrics")).toContainText("10MW");
+    await expect(
+      ironAir
+        .locator(".buildOptionMetrics")
+        .locator(".buildOptionMetric")
+        .nth(3),
+    ).toContainText("At full power");
+    await expect(
+      ironAir
+        .locator(".buildOptionMetrics")
+        .locator(".buildOptionMetric")
+        .nth(4),
+    ).toHaveText("Round-trip efficiency43%");
     await page.screenshot({
       path: testInfo.outputPath(`Storage-iron-air-${theme}.png`),
       animations: "disabled",
@@ -389,8 +423,11 @@ for (const theme of ["light", "dark"] as const) {
       })
       .click();
     await expect(
+      ironAir.getByRole("row", { name: /Operating costs/ }),
+    ).toBeVisible();
+    await expect(
       ironAir.getByRole("row", { name: /Round-trip efficiency/ }),
-    ).toContainText("43%");
+    ).toHaveCount(0);
     expect(
       await ironAir.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);

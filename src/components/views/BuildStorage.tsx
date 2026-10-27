@@ -60,6 +60,9 @@ interface StorageBuildItemProps {
 
 function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const { storage, cash } = props;
+  // The catalog key also identifies facilities in saves, replay actions and mods.
+  const displayName =
+    storage.name === "Battery" ? "Lithium Battery" : storage.name;
   const units = useUnits();
   const [open, setOpen] = React.useState(false);
   const { downpayment } = purchaseTerms(
@@ -93,10 +96,11 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
 
   return (
     <BuildOptionCard
-      name={storage.name}
+      className="storageBuildOption"
+      name={displayName}
       iconSrc={`/images/${storage.name.toLowerCase()}.svg`}
       review={{
-        ariaLabel: `Review purchase of ${storage.name}`,
+        ariaLabel: `Review purchase of ${displayName}`,
         disabled: !!shortfall || !buildable,
         onClick: openReview,
       }}
@@ -137,15 +141,14 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
             label="At full power"
             value={`${Number((storage.peakWh / storage.peakW).toFixed(1))} hr`}
           />
+          <BuildMetric
+            label="Round-trip efficiency"
+            value={`${Math.round(storage.roundTripEfficiency * 100)}%`}
+          />
         </>
       }
       details={
         <BuildDetails label="storage properties">
-          <BuildDetailRow
-            label="Round-trip efficiency"
-            value={`${Math.round(storage.roundTripEfficiency * 100)}%`}
-            entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
-          />
           <BuildDetailRow
             label="Operating costs"
             value={`${formatMoneyConcise(storage.annualOperatingCost)}/yr`}
@@ -187,7 +190,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
       <PurchaseReviewDialog
         open={open}
         onClose={() => setOpen(false)}
-        title={`Build ${formatWattHours(storage.peakWh)} ${storage.name}?`}
+        title={`Build ${formatWattHours(storage.peakWh)} ${displayName}?`}
         cash={cash}
         buildCost={storage.buildCost}
         interestRate={props.interestRate}

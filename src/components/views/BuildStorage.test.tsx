@@ -111,7 +111,7 @@ it("offers an oversized storage project its max size", () => {
   const slider = screen.getByRole("slider");
   fireEvent.keyDown(slider, { key: "End" });
   expect(
-    screen.getByRole("button", { name: "Review purchase of Battery" }),
+    screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),
   ).toBeDisabled();
   const useMaxSize = screen.getByRole("button", { name: "Use max size" });
 
@@ -137,20 +137,30 @@ it("opens at average storage energy capacity", () => {
   expect(screen.getByRole("slider")).toHaveAccessibleName(/600MWh/);
 });
 
-it("keeps the storage summary visible and efficiency in expanded properties", () => {
+it("shows lithium and iron-air efficiency before opening details", () => {
+  const state = createGame({ scenarioId: 100 });
+  state.date.year = 2030;
   render(
-    <BuildStorage
-      game={createGame({ scenarioId: 100 })}
-      onBack={jest.fn()}
-      onBuildStorage={jest.fn()}
-    />,
+    <BuildStorage game={state} onBack={jest.fn()} onBuildStorage={jest.fn()} />,
   );
   expect(screen.getByText("Fast response, four hours of power")).toBeVisible();
   expect(screen.queryByText("Energy capacity")).not.toBeInTheDocument();
-  expect(screen.queryByText("Round-trip efficiency")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Show Battery details" }));
+  expect(screen.getByText("85%")).toBeVisible();
+  expect(screen.getByText("43%")).toBeVisible();
+  for (const name of ["Lithium Battery", "Iron-Air Battery"]) {
+    expect(
+      screen.getByRole("button", { name: `Show ${name} details` }),
+    ).toHaveAttribute("aria-expanded", "false");
+  }
+  fireEvent.click(
+    screen.getByRole("button", { name: "Show Lithium Battery details" }),
+  );
   const table = screen.getByRole("table", { name: "storage properties" });
   expect(
-    within(table).getByRole("row", { name: /Round-trip efficiency.*85%/ }),
-  ).toBeVisible();
+    within(table).queryByRole("row", { name: /Round-trip efficiency/ }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),
+  );
+  expect(screen.getByRole("dialog")).toHaveAccessibleName(/Lithium Battery/);
 });
