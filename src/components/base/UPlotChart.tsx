@@ -34,6 +34,13 @@ export interface BuildContext<S> {
    * viewBox by this, so lengths and font sizes are multiplied by it to match.
    */
   scale: number;
+  /**
+   * Optional chart-specific updater: refresh changed pixels and keep visible cursor hooks
+   * current when retaining data. Other charts use the normal setData path.
+   */
+  registerDataUpdate?: (
+    update: (plot: uPlot, data: uPlot.AlignedData) => void,
+  ) => void;
 }
 
 export interface UPlotChartProps<S> {
@@ -193,6 +200,9 @@ export default function UPlotChart<S>(
   const rootRef = React.useRef<HTMLDivElement>(null);
   const plotRef = React.useRef<uPlot | null>(null);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
+  const dataUpdateRef = React.useRef<
+    ((plot: uPlot, data: uPlot.AlignedData) => void) | undefined
+  >();
   const [width, setWidth] = React.useState(0);
   const [selectedPoint, setSelectedPoint] = React.useState<number | null>(null);
   // The cursor consults this synchronously, including compatibility mouse events delivered
@@ -375,7 +385,14 @@ export default function UPlotChart<S>(
     }
     const getState = () => stateRef.current;
     const scale = chartScale(width);
-    const built = buildRef.current({ getState, scale });
+    dataUpdateRef.current = undefined;
+    const built = buildRef.current({
+      getState,
+      scale,
+      registerDataUpdate: (update) => {
+        dataUpdateRef.current = update;
+      },
+    });
     const alignedAxis = axisAlignment?.register(() =>
       plotRef.current?.redraw(true, true),
     );
@@ -448,6 +465,7 @@ export default function UPlotChart<S>(
       plot.destroy();
       plotRef.current = null;
       drawnRef.current = null;
+      dataUpdateRef.current = undefined;
     };
     // Data changes go through setData below; only size, shape and palette rebuild
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -463,7 +481,8 @@ export default function UPlotChart<S>(
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {
-      plotRef.current.setData(data);
+      if (dataUpdateRef.current) dataUpdateRef.current(plotRef.current, data);
+      else plotRef.current.setData(data);
       drawnRef.current = data;
     }
   });

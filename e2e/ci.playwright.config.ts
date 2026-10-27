@@ -15,6 +15,7 @@ const smoke = [
   "achievements.spec.ts",
   "loading-navigation.spec.ts",
   "facilities-production-chart.spec.ts",
+  "production-chart-motion.spec.ts",
   "intertie-order.spec.ts",
   "operations-priorities.spec.ts",
 ];
