@@ -203,7 +203,7 @@ for (const theme of ["light", "dark"] as const) {
         page.locator(".MuiCollapse-root:not(.MuiCollapse-entered)"),
       ).toHaveCount(0);
       await expectTextToFit(
-        page.locator(".generatorDetailLabel, .generatorDetailValue"),
+        page.locator(".buildDetailLabel, .buildDetailValue"),
       );
       const gas = page.locator(".buildOption").filter({
         has: page.getByRole("button", {

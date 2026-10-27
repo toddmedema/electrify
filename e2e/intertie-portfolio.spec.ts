@@ -29,7 +29,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(card).toContainText("$1.8M");
     const metrics = card.locator(".buildOptionMetrics");
     const cells = metrics.locator(":scope > .buildOptionMetric");
-    await expect(cells).toHaveCount(6);
+    await expect(cells).toHaveCount(5);
     const metricBoxes = await cells.evaluateAll((elements) =>
       elements.map((element) => {
         const cell = element.getBoundingClientRect();
@@ -50,7 +50,6 @@ for (const theme of ["light", "dark"] as const) {
     // Build is a narrow sheet or side panel at every width, so the metrics pair into rows.
     expect(metricBoxes[0].y).toBe(metricBoxes[1].y);
     expect(metricBoxes[2].y).toBe(metricBoxes[3].y);
-    expect(metricBoxes[4].y).toBe(metricBoxes[5].y);
     expect(metricBoxes[2].y).toBeGreaterThan(metricBoxes[0].y);
     expect(metricBoxes[4].y).toBeGreaterThan(metricBoxes[2].y);
     await expect(card).not.toContainText("Portfolio outlook");
@@ -65,8 +64,14 @@ for (const theme of ["light", "dark"] as const) {
       /MuiCollapse-entered/,
     );
     const chart = card.locator(".intertieAvailability");
-    const details = card.locator(".intertieDetailMetrics");
-    await expect(details.locator(".buildOptionMetric")).toHaveCount(3);
+    const details = card.getByRole("table", { name: "intertie properties" });
+    await expect(details.getByRole("row")).toHaveCount(3);
+    for (const row of await details.getByRole("row").all()) {
+      await expect(row.locator(":scope > *")).toHaveCount(3);
+      await expect(
+        row.locator(":scope > *").last().getByRole("button"),
+      ).toBeVisible();
+    }
     await expect(card).not.toContainText("Purchase cost change / year");
     await expect(card).not.toContainText("If open with your current fleet");
     const chartBox = (await chart.boundingBox())!;
@@ -79,7 +84,7 @@ for (const theme of ["light", "dark"] as const) {
       (await chart.locator("svg").boundingBox())!.height,
     ).toBeGreaterThanOrEqual(64);
     // Every wrapped metric row fills the card rather than reserving empty grid cells.
-    for (const strip of [card.locator(".buildOptionMetrics"), details]) {
+    for (const strip of [card.locator(".buildOptionMetrics")]) {
       const rowEnds = await strip
         .locator(":scope > .buildOptionMetric")
         .evaluateAll((cells) => {

@@ -1425,6 +1425,10 @@ $pane_header_height: 48px;
   .build-list-item.buildOption.transmissionProject .buildOptionMetrics {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    > .buildOptionMetric:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
   }
 }
 

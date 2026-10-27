@@ -75,7 +75,7 @@ for (const theme of ["light", "dark"]) {
     await page
       .getByRole("button", { name: "Show Natural Gas Peaker details" })
       .click();
-    const details = page.locator(".generatorDetails");
+    const details = page.locator(".buildDetails");
     await expect(details).toBeVisible();
     const rows = details.getByRole("row");
     for (const row of await rows.all()) {
