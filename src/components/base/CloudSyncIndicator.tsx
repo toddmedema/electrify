@@ -20,7 +20,6 @@ type IndicatorState = "synced" | "syncing" | "offline" | "failed";
 
 type Indicator = {
   icon: typeof SyncRoundedIcon;
-  color: string;
   label: string;
   spin?: boolean;
 };
@@ -30,23 +29,19 @@ type Indicator = {
 const INDICATORS: Record<IndicatorState, Indicator> = {
   synced: {
     icon: CheckCircleOutlineRoundedIcon,
-    color: "success.main",
     label: "Cloud backup up to date",
   },
   syncing: {
     icon: SyncRoundedIcon,
-    color: "var(--interactive-strong)",
     label: "Syncing cloud backup",
     spin: true,
   },
   offline: {
     icon: CloudOffRoundedIcon,
-    color: "var(--interactive-strong)",
     label: "Cloud backup offline",
   },
   failed: {
     icon: WarningRoundedIcon,
-    color: "var(--warning-icon)",
     label: "Cloud backup couldn't finish",
   },
 };
@@ -160,7 +155,7 @@ export default function CloudSyncIndicator(): React.JSX.Element | null {
         : state === "failed"
           ? cloudError || FAILED_FALLBACK
           : "Syncing cloud backup. Games load from this device.";
-  const { icon: Icon, color, label, spin } = INDICATORS[state];
+  const { icon: Icon, label, spin } = INDICATORS[state];
   const close = () => {
     cancel();
     setPinned(false);
@@ -225,7 +220,6 @@ export default function CloudSyncIndicator(): React.JSX.Element | null {
         }}
         size="large"
         className="cloudSyncIndicator"
-        sx={{ color }}
       >
         <Icon className={spin ? "cloudSyncSpin" : undefined} />
       </IconButton>

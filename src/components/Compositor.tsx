@@ -745,7 +745,7 @@ export default class Compositor extends React.Component<Props, {}> {
             )}
             {ui.dialog.action && (
               <Button
-                color={ui.dialog.destructive ? "error" : "primary"}
+                color="primary"
                 variant="contained"
                 onClick={ui.dialog.action}
               >

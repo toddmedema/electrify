@@ -170,7 +170,11 @@ describe("MainMenu", () => {
     const discord = screen.getByRole("link", {
       name: "Join the Electrify Discord",
     });
-    expect(discord).toHaveAttribute("href", "https://discord.gg/Chrjk36DC");
+    expect(discord).toHaveAttribute("href", "https://discord.gg/ethMFvvmup");
+    expect(screen.getByRole("link", { name: "Send feedback" })).toHaveAttribute(
+      "href",
+      "https://forms.gle/nSpkVzcFcXMQMMgb9",
+    );
     expect(
       screen.getAllByRole("link", {
         name: /Discord|feedback|About|Privacy/,

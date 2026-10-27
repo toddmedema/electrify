@@ -1,16 +1,7 @@
 import { GameToolCloseContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
-import {
-  Button,
-  List,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableRow,
-  Typography,
-} from "@mui/material";
+import { Button, List, Typography } from "@mui/material";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { facilityLoanMonths, purchaseTerms } from "../../helpers/Financials";
 import {
@@ -21,7 +12,7 @@ import {
 } from "../../helpers/Format";
 import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
-import ManualLink from "../base/ManualLink";
+import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
   averageBuildSize,
@@ -35,7 +26,6 @@ import {
   getBuildAvailability,
   getSiteInventory,
   siteCountLabel,
-  ViableLocationsRow,
 } from "../base/BuildAvailability";
 import BuildMetric from "../base/BuildMetric";
 import {
@@ -106,6 +96,15 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         )
       }
       context={buildable && sites ? siteCountLabel(sites) : undefined}
+      summary={
+        <Typography
+          className="buildOptionDescription"
+          variant="body2"
+          color="textSecondary"
+        >
+          {storage.description}
+        </Typography>
+      }
       warning={!buildable || shortfall ? buildSubtitle : undefined}
       metrics={
         <>
@@ -122,76 +121,54 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
             value={`${Math.round(storage.yearsToBuild * 12)} mo`}
           />
           <BuildMetric
-            label="Energy capacity"
-            value={formatWattHours(storage.peakWh)}
-          />
-          <BuildMetric
             label="At full power"
             value={`${Number((storage.peakWh / storage.peakW).toFixed(1))} hr`}
-          />
-          <BuildMetric
-            label="Round-trip efficiency"
-            value={`${Math.round(storage.roundTripEfficiency * 100)}%`}
           />
         </>
       }
       details={
-        <>
-          <Typography
-            className="buildOptionDescription"
-            variant="body2"
-            color="textSecondary"
-          >
-            {storage.description}
-          </Typography>
-          <TableContainer>
-            <Table size="small" aria-label="storage properties">
-              <TableBody>
-                <TableRow>
-                  <TableCell>Operating costs (/yr)</TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(storage.annualOperatingCost)}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>
-                    Ramp up/down time
-                    <ManualLink
-                      entry={MANUAL_ENTRY.RAMP_RATE}
-                      label="ramp rate"
-                    />
-                    <Typography variant="body2" color="textSecondary">
-                      To go from zero to full output
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">{storage.spinMinutes} min</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Lifespan</TableCell>
-                  <TableCell align="right">
-                    {storage.lifespanYears} years
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Stored energy lost per hour</TableCell>
-                  <TableCell align="right">
-                    {Number((storage.hourlyLoss * 100).toFixed(3))}%
-                  </TableCell>
-                </TableRow>
-                <ViableLocationsRow sites={sites} />
-                <TableRow>
-                  <TableCell>Construction emissions</TableCell>
-                  <TableCell align="right">
-                    {`${formatLargeMassValueConcise(
-                      (storage.constructionKgco2ePerWh || 0) * storage.peakWh,
-                      units,
-                    )} ${largeMassUnit(units)}`}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </>
+        <BuildDetails label="storage properties">
+          <BuildDetailRow
+            label="Round-trip efficiency"
+            value={`${Math.round(storage.roundTripEfficiency * 100)}%`}
+            entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
+          />
+          <BuildDetailRow
+            label="Operating costs"
+            value={`${formatMoneyConcise(storage.annualOperatingCost)}/yr`}
+            entry={MANUAL_ENTRY.OPERATING_COSTS}
+          />
+          <BuildDetailRow
+            label="Ramp up/down time"
+            value={`${storage.spinMinutes} min`}
+            entry={MANUAL_ENTRY.RAMP_RATE}
+          />
+          <BuildDetailRow
+            label="Accounting lifetime"
+            value={`${storage.lifespanYears} years`}
+            entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
+          />
+          <BuildDetailRow
+            label="Stored energy lost per hour"
+            value={`${Number((storage.hourlyLoss * 100).toFixed(3))}%`}
+            entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
+          />
+          {sites && (
+            <BuildDetailRow
+              label="Sites left"
+              value={`${sites.remaining} of ${sites.total}`}
+              entry={MANUAL_ENTRY.PROJECT_SITES}
+            />
+          )}
+          <BuildDetailRow
+            label="Construction emissions"
+            value={`${formatLargeMassValueConcise(
+              (storage.constructionKgco2ePerWh || 0) * storage.peakWh,
+              units,
+            )} ${largeMassUnit(units)}`}
+            entry={MANUAL_ENTRY.EMISSIONS}
+          />
+        </BuildDetails>
       }
     >
       <PurchaseReviewDialog

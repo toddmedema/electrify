@@ -437,7 +437,13 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiSelect: {
         defaultProps: { size: "small" },
         styleOverrides: {
-          select: { paddingTop: 8, paddingBottom: 8 },
+          select: {
+            paddingTop: 8,
+            paddingBottom: 8,
+            "&:not(.Mui-disabled)": {
+              color: mode === "light" ? primaryDarkColor : palette.interactive,
+            },
+          },
           standard: { paddingLeft: 8 },
           icon: {
             "&:not(.Mui-disabled)": {
@@ -450,9 +456,14 @@ export function createAppTheme(mode: ThemeModeType): Theme {
         styleOverrides: {
           root: {
             "&:not(.Mui-disabled)": {
-              color: mode === "light" ? primaryDarkColor : palette.interactive,
+              color: mode === "dark" ? "#e6edf5" : "#172334",
             },
           },
+        },
+      },
+      MuiAutocomplete: {
+        styleOverrides: {
+          option: { color: mode === "dark" ? "#e6edf5" : "#172334" },
         },
       },
       MuiAccordionSummary: {

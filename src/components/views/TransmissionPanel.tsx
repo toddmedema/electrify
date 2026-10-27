@@ -98,7 +98,8 @@ import {
   forecastCutoffIndex,
   IntertieForecastTick,
 } from "../base/OutlookForecast";
-import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
+import BuildMetric from "../base/BuildMetric";
+import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
 import FlowBar from "../base/FlowBar";
 import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
@@ -106,8 +107,8 @@ import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 
 type IntertieSortKey = "yearsToBuild" | "buildCost" | "emissions";
 const sortOptions: ReadonlyArray<readonly [IntertieSortKey, string]> = [
-  ["yearsToBuild", "Fastest"],
-  ["buildCost", "Cheapest"],
+  ["buildCost", "Build cost"],
+  ["yearsToBuild", "Build time"],
   ["emissions", "Lowest emissions"],
 ];
 
@@ -323,10 +324,6 @@ function IntertieBuildItem(props: {
             label="Total cost"
             value={formatMoneyConcise(corridor.buildCost)}
           />
-          <BuildMetric
-            label="Loan payment"
-            value={`${formatMoneyConcise(loan.monthlyPayment)}/mo`}
-          />
           {market && (
             <BuildMetric
               label="Emissions"
@@ -351,26 +348,40 @@ function IntertieBuildItem(props: {
               {INTERTIE_ARCHETYPES[market.archetype].summary}
             </Typography>
           )}
-          <Box className="intertieDetailMetrics">
+          <BuildDetails label="intertie properties">
             {outlook && (
               <>
-                <BuildMetric
+                <BuildDetailRow
                   label="At your peak"
                   value={`~${formatWatts(outlook.atPeak * outlook.importCapacityW)}`}
+                  entry={MANUAL_ENTRY.INTERTIES}
                 />
-                <BuildMetric
+                <BuildDetailRow
                   label="Typical import price"
-                  value={priceRange(outlook)}
-                  note={pricePeriodCaption(outlook) || undefined}
+                  value={
+                    <>
+                      {priceRange(outlook)}
+                      {pricePeriodCaption(outlook) && (
+                        <Typography
+                          variant="caption"
+                          color="textSecondary"
+                          component="div"
+                        >
+                          {pricePeriodCaption(outlook)}
+                        </Typography>
+                      )}
+                    </>
+                  }
+                  entry={MANUAL_ENTRY.INTERTIES}
                 />
               </>
             )}
-            <ConstructionEmissionsMetric
-              kgco2eTotal={props.constructionKgco2eTotal}
-              yearsToBuild={corridor.yearsToBuild}
-              units={units}
+            <BuildDetailRow
+              label="Construction emissions"
+              value={`${formatLargeMassValueConcise(props.constructionKgco2eTotal, units)} ${largeMassUnit(units)}`}
+              entry={MANUAL_ENTRY.EMISSIONS}
             />
-          </Box>
+          </BuildDetails>
         </>
       }
     />
@@ -605,7 +616,7 @@ export default function TransmissionPanel({
   const theme = useTheme();
   const [sort, setSort] = useToolState<IntertieSortKey>(
     projectsOnly ? "interties.sort" : undefined,
-    "yearsToBuild",
+    "buildCost",
   );
   const [reviewId, setReviewId] = React.useState<string | null>(null);
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
@@ -1217,8 +1228,8 @@ export default function TransmissionPanel({
       {projectsOnly && !!unbuiltCorridors.length && (
         <section aria-label="Connection projects">
           <ConstructionBuildHeader
-            capacityLabel="Tier"
-            capacity={String(tier)}
+            capacityLabel="Construction tier"
+            capacity={`Tier ${tier}`}
             sliderValue={tier}
             sliderMin={1}
             sliderMax={maxTier}

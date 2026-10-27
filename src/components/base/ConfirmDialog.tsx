@@ -11,7 +11,7 @@ export interface ConfirmDialogProps {
   onCancel: () => void;
   onConfirm: () => void;
   confirmDisabled?: boolean;
-  // Renders the confirm action in the error color, for choices that throw something away
+  // Focus Cancel first for choices that throw something away
   destructive?: boolean;
   // A dialog opened from inside a clickable row portals out of the DOM but not out of React's
   // event tree, so without this every click in it also lands on the row behind it
@@ -47,7 +47,7 @@ export default function ConfirmDialog({
           </Button>
           <Button
             onClick={onConfirm}
-            color={destructive ? "error" : "primary"}
+            color="primary"
             variant="contained"
             autoFocus={!destructive}
             disabled={confirmDisabled}
