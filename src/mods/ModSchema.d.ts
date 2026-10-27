@@ -37,11 +37,18 @@ export type ModStartingFacility = {
   reservoirFraction?: number;
 } & (
   | {
-      name: Exclude<ModFacilityNameType, "Battery" | "Pumped Hydro">;
+      name: Exclude<
+        ModFacilityNameType,
+        "Battery" | "Iron-Air Battery" | "Pumped Hydro"
+      >;
       peakMW: number;
       peakMWh?: never;
     }
-  | { name: "Battery" | "Pumped Hydro"; peakMW?: number; peakMWh: number }
+  | {
+      name: "Battery" | "Iron-Air Battery" | "Pumped Hydro";
+      peakMW?: number;
+      peakMWh: number;
+    }
 );
 
 export type ModProgramId = keyof NonNullable<ScenarioModType["programs"]>;

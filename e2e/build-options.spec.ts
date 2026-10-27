@@ -1,7 +1,8 @@
 import path from "path";
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openBuild, openPane } from "./layout";
+import { readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
   test(`build options remain compact and usable in ${theme}`, async ({
@@ -49,7 +50,12 @@ for (const theme of ["light", "dark"] as const) {
       await expect(metrics).toContainText("Build time");
       if (kind === "Storage") {
         await expect(metrics).not.toContainText("Energy capacity");
-        await expect(metrics).not.toContainText("Round-trip efficiency");
+        await expect(
+          metrics.locator(".buildOptionMetric").nth(3),
+        ).toContainText("At full power");
+        await expect(
+          metrics.locator(".buildOptionMetric").nth(4),
+        ).toContainText("Round-trip efficiency");
         for (const description of await cards
           .locator(".buildOptionDescription")
           .all()) {
@@ -179,7 +185,7 @@ for (const theme of ["light", "dark"] as const) {
       if (kind === "Storage") {
         await expect(
           properties.getByRole("row", { name: /Round-trip efficiency/ }),
-        ).toBeVisible();
+        ).toHaveCount(0);
       }
       await expect(
         detailCard.getByText("Construction emissions", { exact: true }),
@@ -275,7 +281,9 @@ for (const theme of ["light", "dark"] as const) {
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildStorage").click();
     const battery = page.locator(".buildOption").filter({
-      has: page.getByRole("button", { name: /Battery details/ }),
+      has: page.getByRole("button", {
+        name: /^(Show|Hide) Lithium Battery details$/,
+      }),
     });
     await expect(battery).toBeVisible();
     await expect(page.locator("main.base_main")).toHaveCount(1);
@@ -284,24 +292,35 @@ for (const theme of ["light", "dark"] as const) {
     await expect(battery.locator(".buildOptionMetrics")).not.toContainText(
       "Energy capacity",
     );
-    await expect(battery.locator(".buildOptionMetrics")).not.toContainText(
-      "85%",
-    );
+    await expect(
+      battery
+        .locator(".buildOptionMetrics")
+        .locator(".buildOptionMetric")
+        .nth(3),
+    ).toContainText("At full power");
+    await expect(
+      battery
+        .locator(".buildOptionMetrics")
+        .locator(".buildOptionMetric")
+        .nth(4),
+    ).toHaveText("Round-trip efficiency85%");
     expect(
       await battery.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
     await page.screenshot({
       path: testInfo.outputPath(`Storage-modern-${theme}.png`),
     });
-    await battery.getByRole("button", { name: "Show Battery details" }).click();
+    await battery
+      .getByRole("button", { name: "Show Lithium Battery details" })
+      .click();
     await expect(
       battery.getByRole("row", { name: /Round-trip efficiency/ }),
-    ).toContainText("85%");
-    const efficiencyHelp = battery
-      .getByRole("row", { name: /Round-trip efficiency/ })
+    ).toHaveCount(0);
+    const lossHelp = battery
+      .getByRole("row", { name: /Stored energy lost per hour/ })
       .getByRole("button");
-    await expect(efficiencyHelp).toHaveAccessibleName(
-      "What is round-trip efficiency?",
+    await expect(lossHelp).toHaveAccessibleName(
+      "What is stored energy lost per hour?",
     );
     await expect(battery).not.toContainText(
       "Full-power duration assumes a full charge",
@@ -309,7 +328,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       battery.getByRole("row", { name: /Stored energy lost per hour/ }),
     ).toContainText("0.01%");
-    await battery.getByRole("button", { name: "Hide Battery details" }).click();
+    await battery
+      .getByRole("button", { name: "Hide Lithium Battery details" })
+      .click();
     await page.getByRole("slider").focus();
     await page.getByRole("slider").press("End");
     const maxSize = battery.getByRole("button", { name: "Use max size" });
@@ -326,7 +347,108 @@ for (const theme of ["light", "dark"] as const) {
     });
     await maxSize.click();
     await expect(
-      battery.getByRole("button", { name: "Review purchase of Battery" }),
+      battery.getByRole("button", {
+        name: "Review purchase of Lithium Battery",
+      }),
     ).toBeEnabled();
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`iron-air purchase from 2030 in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem(
+        "plays",
+        JSON.stringify({
+          plays: [
+            { scenarioId: 0, timesPlayed: 1, date: new Date().toString() },
+          ],
+        }),
+      );
+    }, theme);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page
+      .getByRole("button", { name: "View Custom Game details" })
+      .click();
+    const year = page.getByRole("combobox", { name: "Starting year" });
+    await year.click();
+    await page.getByRole("option", { name: "2030", exact: true }).click();
+    await page
+      .locator(".customSetupActions")
+      .getByRole("button", { name: "Play", exact: true })
+      .click();
+    await expect(page.locator("#appbar:visible").first()).toBeVisible();
+    const build = await openBuild(page);
+    await build.getByRole("tab", { name: "Storage", exact: true }).click();
+    // The default custom fleet opens at 2 GWh. Select a 1 GWh / 10 MW project.
+    const size = build.getByRole("slider");
+    await size.press("ArrowLeft");
+    await expect(size).toHaveAccessibleName("Capacity 1GWh");
+    const ironAir = page.locator(".buildOption").filter({
+      has: page.getByRole("button", {
+        name: /^(Show|Hide) Iron-Air Battery details$/,
+      }),
+    });
+    await expect(ironAir).toBeVisible();
+    await expect(ironAir.locator(".buildOptionMetrics")).toContainText(
+      "100 hr",
+    );
+    await expect(ironAir.locator(".buildOptionMetrics")).toContainText("10MW");
+    await expect(
+      ironAir
+        .locator(".buildOptionMetrics")
+        .locator(".buildOptionMetric")
+        .nth(3),
+    ).toContainText("At full power");
+    await expect(
+      ironAir
+        .locator(".buildOptionMetrics")
+        .locator(".buildOptionMetric")
+        .nth(4),
+    ).toHaveText("Round-trip efficiency43%");
+    await page.screenshot({
+      path: testInfo.outputPath(`Storage-iron-air-${theme}.png`),
+      animations: "disabled",
+    });
+    await ironAir
+      .getByRole("button", {
+        name: "Show Iron-Air Battery details",
+        exact: true,
+      })
+      .click();
+    await expect(
+      ironAir.getByRole("row", { name: /Operating costs/ }),
+    ).toBeVisible();
+    await expect(
+      ironAir.getByRole("row", { name: /Round-trip efficiency/ }),
+    ).toHaveCount(0);
+    expect(
+      await ironAir.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    await ironAir
+      .getByRole("button", {
+        name: "Review purchase of Iron-Air Battery",
+        exact: true,
+      })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("Iron-Air Battery");
+    await dialog.getByRole("button", { name: "Pay cash", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect
+      .poll(async () =>
+        (await readSavedGame(page))?.facilities.some(
+          (facility) =>
+            facility.name === "Iron-Air Battery" &&
+            facility.peakWh === 1000000000,
+        ),
+      )
+      .toBe(true);
   });
 }

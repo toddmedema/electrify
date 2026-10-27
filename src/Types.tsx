@@ -918,6 +918,7 @@ export type ModFacilityNameType =
   | "Geothermal"
   | "Enhanced Geothermal"
   | "Battery"
+  | "Iron-Air Battery"
   | "Pumped Hydro";
 
 /** Multipliers on a facility's normal catalog calculation. */

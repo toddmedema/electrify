@@ -76,10 +76,11 @@ engineering estimates; the sources below do not directly validate their construc
 
 ## Storage, kgCO2e per watt-hour of capacity
 
-| Option       | Value | Ref year |     k | Floor |
-| ------------ | ----: | -------: | ----: | ----: |
-| Battery      | 0.080 |     2025 | 0.045 | 0.025 |
-| Pumped Hydro | 0.060 |     2025 |     0 |     — |
+| Option           | Value | Ref year |     k | Floor |
+| ---------------- | ----: | -------: | ----: | ----: |
+| Battery          | 0.080 |     2025 | 0.045 | 0.025 |
+| Iron-Air Battery | 0.080 |     2030 |     0 |     — |
+| Pumped Hydro     | 0.060 |     2025 |     0 |     — |
 
 The battery estimate is 80 kgCO2e/kWh of installed capacity, intended to include cells and the
 surrounding system. Peiseler et al. report a modeled global 90% interval of **54–69 kgCO2e/kWh
@@ -87,6 +88,14 @@ for LFP cells**, with a median of 62. Their boundary does not establish the inst
 80 kg figure: the additional allowance for housing, power electronics and installation is an
 engineering estimate. Their NMC811 cell interval is 59–115 kgCO2e/kWh; it should not be treated as
 a fixed chemistry multiplier. [Primary study, Figures 2–3](https://www.nature.com/articles/s41467-024-54634-y).
+
+Iron-air uses a **provisional 80 kgCO2e/kWh installed-system proxy**, held flat after its 2030
+rollout. No public Form Energy product LCA was found. This conservatively reuses the battery
+system allowance rather than treating abundant iron, water and air as zero-emission construction;
+it is not a measured chemistry comparison or a supplier claim. The
+[SEAI storage sustainability consultation draft, December 2025, p. 14](https://www.seai.ie/sites/default/files/2025-12/251218_TR_Appendix%20A_CONSULTATION%20DRAFT.pdf)
+mentions 60–80 kgCO2e/kWh for iron-air using weak secondary evidence, which is insufficient to
+justify a lower coefficient. Replace this proxy when a credible installed-system inventory exists.
 
 Pumped hydro's 60 kgCO2e/kWh is likewise an estimate, not a quoted result from Simon et al.
 Their functional unit is electricity delivered over the life of storage, which is different from

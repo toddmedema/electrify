@@ -73,6 +73,7 @@ for (const theme of ["light", "dark"] as const) {
       ["Generators", "Solar", "Pay cash"],
       ["Storage", "Battery", "Take loan"],
     ]) {
+      const purchaseName = name === "Battery" ? "Lithium Battery" : name;
       await openBuild(page);
       await page.getByRole("tab", { name: category, exact: true }).click();
       if (name === "Battery") {
@@ -82,7 +83,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       await page
         .getByRole("button", {
-          name: `Review purchase of ${name}`,
+          name: `Review purchase of ${purchaseName}`,
           exact: true,
         })
         .click();

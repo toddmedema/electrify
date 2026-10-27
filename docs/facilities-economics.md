@@ -120,6 +120,31 @@ duration used by both NREL and EIA. It has a 20-year / 7,300-cycle life, an 18-m
 time, and $10/kWh-year O&M including augmentation for degradation. Round-trip efficiency remains
 85%.
 
+Iron-Air Battery adds **100-hour multi-day storage from 2030**. Form Energy calls its chemistry
+reversible rusting: iron oxidizes during discharge and charging reverses the reaction. This is a
+conservative catalog rollout assumption, not a claim that commercial plants are operating today.
+Form's [March 2026 Irish project announcement](https://formenergy.com/form-energy-and-futurenergy-ireland-announce-agreement-to-deploy-first-iron-air-battery-storage-project-in-ireland/)
+expects a 10 MW / 1,000 MWh installation online in 2029. Great River Energy's
+[April 2026 resource plan](https://greatriverenergy.com/wp-content/uploads/2026/05/2026-2040-GRE-IRP-FINAL-4-24-2026.pdf)
+still anticipates commercial operation of its smaller 1.5 MW / 150 MWh pilot at the end of 2026,
+followed by seasonal testing; a factory opening or delivered pilot does not establish deployment.
+
+The [Form Energy New York modeling white paper, August 2023, Table B1](https://formenergy.com/wp-content/uploads/2023/09/Form-Modeling-Multi-Day-Energy-Storage-in-NY-whitepaper-8.8.23.pdf)
+provides **projected 2030** costs and performance: $2,150/kW capital, $17.50/kW-year fixed O&M,
+100 hours and 42.5% round-trip efficiency. Multiplying its 2022 dollars by CPI-U
+304.702 / 292.655 yields $2,238.50/kW ($22.385/kWh) and $18.22/kW-year ($0.1822/kWh-year)
+in the game's 2023 dollars. Capital includes the discounted cost of repowering and precedes tax
+credits. Capacity stays constant under the same abstraction as existing batteries, without adding
+a second augmentation charge. These are supplier modeling assumptions, not an installed-price quote.
+
+A [supplier technical presentation](https://www.era.ac.uk/wp-content/uploads/2024/02/6-Form-Energy_MDES_EDIT.pdf)
+supports a 20-year life, under-ten-minute ramp and 1–10% monthly self-discharge. The game uses
+10 minutes and 0.01% hourly loss (about 7% over 30 days). A flat two-year construction time and
+100 MW / 10 GWh project cap are explicit planning assumptions; announced larger projects are not
+completed-system evidence. Costs and performance stay flat after rollout instead of assuming
+unsupported future learning. No hydro site or geological resource is required. Construction
+emissions use the provisional proxy documented in `construction-emissions.md`.
+
 Pumped hydro remains a ten-hour, 80%-efficient device. Its cost is updated to $3,319/kW (the
 midpoint of NREL's $2,205-$4,434/kW closed-loop site range), equivalent to $332/kWh at ten hours.
 Fixed O&M becomes $19/kW-year. NREL projects no cost or efficiency improvement for this mature

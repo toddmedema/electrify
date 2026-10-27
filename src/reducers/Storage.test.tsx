@@ -4,6 +4,7 @@ import {
   GAME_TO_REAL_YEARS,
   FUELS,
 } from "../Constants";
+import { STORAGE } from "../data/Facilities";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { createGame } from "../testing/Simulator";
 import {
@@ -66,6 +67,28 @@ function fixture() {
 }
 
 describe("storage dispatch energy accounting", () => {
+  it("charges iron-air at its actual efficiency and returns only stored energy", () => {
+    const { game, generator, battery, run } = fixture();
+    game.date.year = 2030;
+    const quote = STORAGE(game, 10000).find(
+      (facility) => facility.name === "Iron-Air Battery",
+    )!;
+    const store = battery(2, { ...quote, yearsToBuildLeft: 0 });
+    // A 100 Wh/h grid connection takes 50 W of surplus, stores 21.25 W, and loses 28.75 W.
+    const charged = run([generator(1, 150), store]);
+    expect(store.currentW).toBeCloseTo(-21.25);
+    expect(store.currentWh).toBeCloseTo(21.25 / TICKS_PER_HOUR);
+    expect(charged.storageLossWh).toBeCloseTo(28.75 / TICKS_PER_HOUR);
+    const heldWh = store.currentWh!;
+    game.facilities = [store];
+    tickState(game);
+    const discharged = getTimeFromTimeline(game.date.minute, game.timeline)!;
+    expect(discharged.supplyW).toBeGreaterThan(0);
+    expect(discharged.supplyW).toBeLessThanOrEqual(heldWh * TICKS_PER_HOUR);
+    expect(store.currentWh).toBeCloseTo(0);
+    expect(discharged.storageLossWh).toBeGreaterThan(0);
+  });
+
   it("caps grid charging at surplus and counts conversion losses once", () => {
     const { generator, battery, run } = fixture();
     const gen = generator(1, 150),
