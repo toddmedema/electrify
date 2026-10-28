@@ -1,4 +1,4 @@
-import { GameToolCloseContext } from "../base/GameWorkspaceContext";
+import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
 import { Button, List, Typography } from "@mui/material";
@@ -262,7 +262,7 @@ export interface DispatchProps {
 export type Props = StateProps & DispatchProps;
 
 export default function StorageBuildDialog(props: Props): React.JSX.Element {
-  const closeTool = React.useContext(GameToolCloseContext);
+  const completeBuild = React.useContext(GameBuildCompleteContext);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const listRef = useToolScroll<HTMLUListElement>("storage.scroll");
@@ -325,7 +325,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
             location={game.location}
             onBuild={(financed: boolean) => {
               props.onBuildStorage(g, financed);
-              (closeTool ?? onBack)();
+              (completeBuild ?? onBack)();
             }}
           />
         ))}

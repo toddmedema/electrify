@@ -187,7 +187,7 @@ test("selection is visible in both themes without horizontal overflow", async ({
     });
 });
 
-test("touch hides button focus rings while text inputs and keyboard navigation keep theirs", async ({
+test("touch hides button focus rings while inputs and keyboard navigation retain focus indicators", async ({
   page,
 }, info) => {
   test.skip(!info.project.use.hasTouch, "Requires actual touch input");
@@ -216,6 +216,9 @@ test("touch hides button focus rings while text inputs and keyboard navigation k
   });
   await search.tap();
   await expect(search).toBeFocused();
-  await expect(search).toHaveCSS("outline-style", "solid");
-  await expect(search).toHaveCSS("outline-width", "2px");
+  await expect(search).toHaveCSS("outline-style", "none");
+  await expect(search.locator("..").locator("fieldset")).toHaveCSS(
+    "border-width",
+    "2px",
+  );
 });

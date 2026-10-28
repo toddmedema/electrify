@@ -18,7 +18,10 @@ import CatalogTitleBar from "../base/CatalogTitleBar";
 import BuildGeneratorsContainer from "./BuildGeneratorsContainer";
 import BuildStorageContainer from "./BuildStorageContainer";
 import TransmissionPanel from "./TransmissionPanel";
-import { GameToolCloseContext } from "../base/GameWorkspaceContext";
+import {
+  GameToolCloseContext,
+  GameBuildCompleteContext,
+} from "../base/GameWorkspaceContext";
 
 const categories = [
   ["BUILD_GENERATORS", "Generators", "Generator"],
@@ -35,6 +38,7 @@ export default function BuildFacilities({
 }): React.JSX.Element {
   const dispatch = useAppDispatch();
   const closeTool = React.useContext(GameToolCloseContext);
+  const completeBuild = React.useContext(GameBuildCompleteContext);
   const game = useAppSelector((state) => state.game);
   const card = useAppSelector((state) => state.card.name);
   const introductoryChoices = game.scenarioId === 1 && game.tutorialStep === 1;
@@ -184,7 +188,7 @@ export default function BuildFacilities({
                       `Intertie approved — power can flow in ${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}.`,
                     ),
                   );
-                close();
+                (completeBuild ?? close)();
               }}
             />
           </div>

@@ -4,6 +4,7 @@ import { openPane } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { SAVE_NAME_LIMIT } from "../src/SaveModel";
 import { readSavedGame, readSaveRecords } from "./save-fixture";
+import path from "node:path";
 
 for (const theme of ["light", "dark"]) {
   test.describe(theme, () => {
@@ -35,13 +36,36 @@ for (const theme of ["light", "dark"]) {
       const dialog = page.getByRole("dialog");
       await expectDialogToFit(dialog);
       const field = dialog.getByRole("textbox", { name: "Preset name" });
+      const border = dialog.locator(".MuiOutlinedInput-notchedOutline");
+      const blue = await field.evaluate(() =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--interactive-blue")
+          .trim(),
+      );
+      await field.fill("Grid watch");
+      await expect(field).toBeFocused();
+      await expect(field).toHaveCSS("outline-style", "none");
+      // Compare computed colors so hex and rgb token spellings are equivalent.
+      const blueRgb = await field.evaluate((input, color) => {
+        const probe = document.createElement("span");
+        probe.style.color = color;
+        input.parentElement!.appendChild(probe);
+        const result = getComputedStyle(probe).color;
+        probe.remove();
+        return result;
+      }, blue);
+      await expect(border).toHaveCSS("border-color", blueRgb);
+      await field.press("Tab");
+      await field.hover();
+      await expect(field).toHaveCSS("outline-style", "none");
+      await expect(border).toHaveCSS("border-color", blueRgb);
       const length = Number(await field.getAttribute("maxlength"));
       await field.fill("W".repeat(length));
       await dialog
         .getByRole("button", { name: "Save preset", exact: true })
         .click();
       await expect(dialog).toHaveCount(0);
-      for (const action of ["Rename preset…", "Delete custom preset"]) {
+      for (const action of ["Rename preset", "Delete custom preset"]) {
         await insights.getByRole("button", { name: "Preset actions" }).click();
         await page.getByRole("menuitem", { name: action, exact: true }).click();
         await expectDialogToFit(dialog);
@@ -54,6 +78,88 @@ for (const theme of ["light", "dark"]) {
           .click();
         await expect(dialog).toHaveCount(0);
       }
+    });
+
+    test("preset menus keep edits with the named preset and only show useful groups", async ({
+      page,
+    }, info) => {
+      await page.goto("/?scenario=100");
+      await page
+        .getByRole("button", { name: "Start game", exact: true })
+        .click();
+      const insights = page.locator(".insights:visible");
+      await openPane(
+        insights,
+        page.getByRole("button", { name: "Insights", exact: true }),
+      );
+      const preset = insights.getByRole("combobox", { name: "Insight preset" });
+      await preset.click();
+      await expect(
+        page.getByText("Default presets", { exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("option", { name: "Unsaved view" }),
+      ).toHaveCount(0);
+      await page.keyboard.press("Escape");
+
+      await insights.getByRole("button", { name: "Preset actions" }).click();
+      await page
+        .getByRole("menuitem", { name: "Save as new preset", exact: true })
+        .click();
+      const dialog = page.getByRole("dialog");
+      await dialog
+        .getByRole("textbox", { name: "Preset name" })
+        .fill("Grid watch");
+      const shots = process.env.REVIEW_SCREENSHOT_DIR;
+      if (shots && theme === "dark" && info.project.name === "desktop-chromium")
+        await page.screenshot({
+          path: path.join(shots, "preset-input-desktop-dark.png"),
+          animations: "disabled",
+        });
+      await dialog
+        .getByRole("button", { name: "Save preset", exact: true })
+        .click();
+      await insights.getByRole("button", { name: /^Layers/ }).click();
+      await insights
+        .getByRole("checkbox", { name: "Revenue", exact: true })
+        .click();
+      await insights
+        .getByRole("button", { name: "Done choosing layers", exact: true })
+        .click();
+      await expect(preset).toContainText("Grid watch");
+      await expect(
+        preset.getByRole("status", { name: "Unsaved changes" }),
+      ).toBeVisible();
+      await preset.click();
+      await expect(
+        page.getByText("Default presets", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByText("Your presets", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("option", { name: "Grid watch", exact: true }),
+      ).toHaveAttribute("aria-selected", "true");
+      await expect(
+        page.getByRole("option", { name: "Unsaved view" }),
+      ).toHaveCount(0);
+      if (shots && theme === "dark" && info.project.name === "desktop-chromium")
+        await page.screenshot({
+          path: path.join(shots, "preset-menu-desktop-dark.png"),
+          animations: "disabled",
+        });
+      await page.keyboard.press("Escape");
+      await insights.getByRole("button", { name: "Preset actions" }).click();
+      const rename = page.getByRole("menuitem", {
+        name: "Rename preset",
+        exact: true,
+      });
+      await expect(rename.locator("svg")).toBeVisible();
+      if (shots && theme === "light" && info.project.name === "mobile-390px")
+        await page.screenshot({
+          path: path.join(shots, "preset-actions-mobile-light.png"),
+          animations: "disabled",
+        });
     });
 
     test("facility sale and resilience confirmations fit", async ({

@@ -370,6 +370,16 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at L
   );
   await input(page, "confirm");
   await expect(purchase).toHaveCount(0);
+  if (
+    (await page.locator(".gameStage").getAttribute("data-layout")) === "side"
+  ) {
+    await expect(build).toBeVisible();
+    await select(
+      page,
+      build.getByRole("button", { name: "Close Build", exact: true }),
+    );
+    await input(page, "confirm");
+  }
   await expect(build).toHaveCount(0);
 
   // Confirm lifts a reorder handle; directions must move the row rather than leave it.

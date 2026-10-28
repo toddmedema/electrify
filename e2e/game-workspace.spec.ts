@@ -1,6 +1,7 @@
 import { reviewScreenshot } from "./review-screenshot";
 import { expect, Page, test } from "./fixtures";
 import path from "node:path";
+import { openBuild } from "./layout";
 
 test.setTimeout(90_000);
 
@@ -31,6 +32,57 @@ async function settleSheets(page: Page) {
         panel.getAnimations().map((animation) => animation.finished),
       ),
     );
+  });
+}
+
+for (const side of [false, true]) {
+  test(`purchases ${side ? "keep Build open in a side panel" : "close Build in an overlay"}`, async ({
+    page,
+  }, info) => {
+    test.skip(
+      side && !!info.project.use.hasTouch,
+      "Side-panel coverage uses the desktop project",
+    );
+    const width = side
+      ? 1300
+      : info.project.use.hasTouch
+        ? page.viewportSize()!.width
+        : 1299;
+    await page.setViewportSize({ width, height: page.viewportSize()!.height });
+    await startGame(page, "dark", 100);
+    for (const [category, purchase] of [
+      ["Generators", "Solar"],
+      ["Storage", "Pumped Hydro"],
+      ["Interties", "Pacific Northwest intertie"],
+    ]) {
+      const build = await openBuild(page);
+      await build.getByRole("tab", { name: category, exact: true }).click();
+      const before = await page
+        .locator(".facilityRow, .transmissionLine")
+        .count();
+      await build
+        .getByRole("button", {
+          name: `Review purchase of ${purchase}`,
+          exact: true,
+        })
+        .click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Take loan", exact: true })
+        .click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(page.locator(".facilityRow, .transmissionLine")).toHaveCount(
+        before + 1,
+      );
+      if (side) {
+        await expect(build).toBeVisible();
+        await build
+          .getByRole("button", { name: "Close Build", exact: true })
+          .click();
+      } else {
+        await expect(build).toHaveCount(0);
+      }
+    }
   });
 }
 

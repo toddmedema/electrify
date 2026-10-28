@@ -335,6 +335,13 @@ button,
   outline-offset: 2px;
 }
 
+// Material inputs already draw their focus indicator on their border or underline. An outline
+// on the inner input adds a second, square border inside the rounded control.
+:is(.MuiOutlinedInput-root, .MuiInput-root, .MuiFilledInput-root)
+  .MuiInputBase-input:focus {
+  outline: none !important;
+}
+
 // Programmatic focus after a tap should not leave button rings on a touch interface. Keyboard
 // navigation restores them immediately; controller navigation always keeps its own indicators.
 html[data-touch-input="true"]:not([data-controller-input="true"])
@@ -1656,6 +1663,7 @@ $pane_header_height: 48px;
 
 .insightsPresetSaveMenuItem,
 .insightsPresetSaveAsMenuItem,
+.insightsPresetRenameMenuItem,
 .insightsPresetResetMenuItem {
   > svg {
     margin-right: 12px;
