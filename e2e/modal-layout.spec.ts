@@ -31,7 +31,7 @@ for (const theme of ["light", "dark"]) {
       );
       await insights.getByRole("button", { name: "Preset actions" }).click();
       await page
-        .getByRole("menuitem", { name: "Save as new preset", exact: true })
+        .getByRole("menuitem", { name: "Save as new", exact: true })
         .click();
       const dialog = page.getByRole("dialog");
       await expectDialogToFit(dialog);
@@ -65,7 +65,7 @@ for (const theme of ["light", "dark"]) {
         .getByRole("button", { name: "Save preset", exact: true })
         .click();
       await expect(dialog).toHaveCount(0);
-      for (const action of ["Rename preset", "Delete custom preset"]) {
+      for (const action of ["Rename", "Delete custom"]) {
         await insights.getByRole("button", { name: "Preset actions" }).click();
         await page.getByRole("menuitem", { name: action, exact: true }).click();
         await expectDialogToFit(dialog);
@@ -104,7 +104,7 @@ for (const theme of ["light", "dark"]) {
 
       await insights.getByRole("button", { name: "Preset actions" }).click();
       await page
-        .getByRole("menuitem", { name: "Save as new preset", exact: true })
+        .getByRole("menuitem", { name: "Save as new", exact: true })
         .click();
       const dialog = page.getByRole("dialog");
       await dialog
@@ -151,7 +151,7 @@ for (const theme of ["light", "dark"]) {
       await page.keyboard.press("Escape");
       await insights.getByRole("button", { name: "Preset actions" }).click();
       const rename = page.getByRole("menuitem", {
-        name: "Rename preset",
+        name: "Rename",
         exact: true,
       });
       await expect(rename.locator("svg")).toBeVisible();

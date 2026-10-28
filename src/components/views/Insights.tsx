@@ -2218,8 +2218,8 @@ export default class Insights extends React.Component<Props, State> {
               >
                 <SaveIcon fontSize="small" />
                 {this.state.preset === "custom"
-                  ? "Save as new preset"
-                  : "Save preset changes"}
+                  ? "Save as new"
+                  : "Save changes"}
               </MenuItem>
               {this.state.preset !== "custom" && (
                 <MenuItem
@@ -2228,7 +2228,7 @@ export default class Insights extends React.Component<Props, State> {
                   onClick={() => this.openPresetDialog("saveAs")}
                 >
                   <AddIcon fontSize="small" />
-                  Save as new preset
+                  Save as new
                 </MenuItem>
               )}
               {selectedCustom && (
@@ -2237,7 +2237,7 @@ export default class Insights extends React.Component<Props, State> {
                   onClick={() => this.openPresetDialog("rename")}
                 >
                   <EditOutlinedIcon fontSize="small" />
-                  Rename preset
+                  Rename
                 </MenuItem>
               )}
               {selectedCustom && (
@@ -2246,7 +2246,7 @@ export default class Insights extends React.Component<Props, State> {
                   onClick={() => this.openPresetDialog("delete")}
                 >
                   <DeleteOutlineIcon fontSize="small" />
-                  Delete custom preset
+                  Delete custom
                 </MenuItem>
               )}
               {selectedDefault &&

@@ -1053,9 +1053,7 @@ describe("Insights layers", () => {
     );
 
     await user.click(labelledButton("Preset actions"));
-    await user.click(
-      screen.getByRole("menuitem", { name: "Save preset changes" }),
-    );
+    await user.click(screen.getByRole("menuitem", { name: "Save changes" }));
 
     const library = JSON.parse(
       localStorage.getItem("insightsPresetLibrary") || "{}",
@@ -1101,7 +1099,7 @@ describe("Insights layers", () => {
     expect(screen.queryByText("Revenue", { selector: "h6" })).toBeNull();
     await user.click(labelledButton("Preset actions"));
     expect(
-      screen.getByRole("menuitem", { name: "Save preset changes" }),
+      screen.getByRole("menuitem", { name: "Save changes" }),
     ).toHaveAttribute("aria-disabled", "true");
   });
 
@@ -1126,9 +1124,7 @@ describe("Insights layers", () => {
   it("creates and updates a named preset", async () => {
     renderInsights();
     await user.click(labelledButton("Preset actions"));
-    await user.click(
-      screen.getByRole("menuitem", { name: "Save as new preset" }),
-    );
+    await user.click(screen.getByRole("menuitem", { name: "Save as new" }));
     await user.type(
       screen.getByRole("textbox", { name: "Preset name" }),
       "Peak watch",
@@ -1151,9 +1147,7 @@ describe("Insights layers", () => {
     expect(screen.queryByRole("option", { name: "Unsaved view" })).toBeNull();
     await user.keyboard("{Escape}");
     await user.click(labelledButton("Preset actions"));
-    await user.click(
-      screen.getByRole("menuitem", { name: "Save preset changes" }),
-    );
+    await user.click(screen.getByRole("menuitem", { name: "Save changes" }));
     const library = JSON.parse(
       localStorage.getItem("insightsPresetLibrary") || "{}",
     );
@@ -1168,7 +1162,7 @@ describe("Insights layers", () => {
     const view = renderInsights();
 
     await user.click(labelledButton("Preset actions"));
-    await user.click(screen.getByRole("menuitem", { name: /Rename preset/ }));
+    await user.click(screen.getByRole("menuitem", { name: /Rename/ }));
     const name = screen.getByRole("textbox", { name: "Preset name" });
     await user.clear(name);
     await user.type(name, "Morning peak");
@@ -1183,9 +1177,7 @@ describe("Insights layers", () => {
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("Morning peak");
     await user.click(labelledButton("Preset actions"));
-    await user.click(
-      screen.getByRole("menuitem", { name: /Delete custom preset/ }),
-    );
+    await user.click(screen.getByRole("menuitem", { name: /Delete custom/ }));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),
@@ -1215,7 +1207,7 @@ describe("Insights layers", () => {
 
     await user.click(labelledButton("Preset actions"));
     expect(
-      screen.getByRole("menuitem", { name: "Save as new preset" }),
+      screen.getByRole("menuitem", { name: "Save as new" }),
     ).toHaveAttribute("aria-disabled", "true");
   });
 

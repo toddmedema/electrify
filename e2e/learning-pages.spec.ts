@@ -104,7 +104,13 @@ test.describe("learning pages without JavaScript", () => {
 
 test("the player page opens the playable game", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
-  await page.goto("/power-grid-simulator.html");
+  // Following the game link must work even while third-party analytics is still loading.
+  await page.route("https://www.googletagmanager.com/**", async () => {
+    await page.waitForEvent("close");
+  });
+  await page.goto("/power-grid-simulator.html", {
+    waitUntil: "domcontentloaded",
+  });
   await page.locator(".hero .button--primary").click();
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),

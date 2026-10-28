@@ -521,7 +521,7 @@ test("insights header controls stay aligned in one compact row", async ({
     ).toHaveCount(0);
     await page.getByRole("button", { name: "Preset actions" }).click();
     await expect(
-      page.getByRole("menuitem", { name: "Save preset changes" }),
+      page.getByRole("menuitem", { name: "Save changes" }),
     ).toBeVisible();
     expect(
       await presetName.evaluate(
