@@ -2,7 +2,7 @@ import { openPane } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
 import path from "path";
-import { expect, test } from "./fixtures";
+import { expect, test, Page } from "./fixtures";
 import { getScenario } from "../src/data/Scenarios";
 import { resolveStoryAtDate } from "../src/data/WorldEvents";
 import { getDateFromMinute, summarizeTimeline } from "../src/helpers/DateTime";
@@ -17,6 +17,73 @@ import {
 } from "../src/helpers/Story";
 import { parseSave } from "../src/SaveGame";
 import type { GameType } from "../src/Types";
+
+/** Exercise populated standings through the real native-score adapter, without a native window. */
+async function installLeaderboardFixture(page: Page) {
+  await page.addInitScript(() => {
+    const display = {
+      fullscreen: false,
+      width: 1280,
+      height: 800,
+      resolutions: [],
+    };
+    const steamId = "76561198000000001";
+    let submitted:
+      | {
+          scenarioId: number;
+          difficulty: GameType["difficulty"];
+          score: number;
+        }
+      | undefined;
+    const noop = () => () => {};
+    window.electrifyDesktop = {
+      apiVersion: 1,
+      getState: async () => ({
+        display,
+        steam: {
+          available: true,
+          online: true,
+          cloudEnabled: false,
+          steamId,
+          displayName: "Grid planner",
+        },
+      }),
+      setDisplay: async () => display,
+      onStateChanged: noop,
+      onGameFocusChanged: noop,
+      onBeforeQuit: noop,
+      readyToQuit: () => {},
+      quit: async () => {},
+      openFriends: async () => {},
+      readSaveLibrary: async () => ({
+        local: null,
+        cloud: null,
+        cloudState: "disabled",
+      }),
+      writeSaveLibrary: async () => ({ cloudState: "disabled" }),
+      submitScore: async ({ scenarioId, difficulty, score }) => {
+        submitted = { scenarioId, difficulty, score: Math.round(score) };
+      },
+      getLeaderboard: async (selection) =>
+        selection.scope === "player"
+          ? submitted
+            ? [{ ...submitted, steamId, displayName: "Grid planner", rank: 4 }]
+            : []
+          : [
+              "Lakeside Municipal Electricity Cooperative",
+              "Northern Wind",
+              "Solar operator",
+            ].map((displayName, i) => ({
+              steamId: `7656119800000000${i + 2}`,
+              displayName,
+              score: 1000 - i * 100,
+              rank: i + 1,
+              scenarioId: selection.scenarioId,
+              difficulty: selection.difficulty || "VP",
+            })),
+    };
+  });
+}
 
 /** Synthetic history still needs the same story receipts and objective evidence as real play. */
 function rebuildCompletionEvidence(game: GameType): void {
@@ -69,16 +136,29 @@ function rebuildCompletionEvidence(game: GameType): void {
   game.date = finalDate;
 }
 
-for (const theme of ["light", "dark"]) {
-  test(`victory actions remain usable and replay the scenario in ${theme}`, async ({
+for (const { theme, native } of [
+  { theme: "light", native: false },
+  { theme: "dark", native: false },
+  { theme: "dark", native: true },
+] as const) {
+  test(`victory actions remain usable and replay the scenario in ${theme}${native ? " with native leaderboard" : ""}`, async ({
     page,
   }, info) => {
     await page.addInitScript((mode) => {
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);
+    if (native) await installLeaderboardFixture(page);
     await page.goto("/?scenario=101");
     await page.getByRole("button", { name: "Hard", exact: true }).click();
+    // Web production omits the native adapter; its public-board path remains covered too.
+    const nativeBoard =
+      (await page.getByRole("group", { name: "Steam leaderboard" }).count()) >
+      0;
+    test.skip(
+      native && !nativeBoard,
+      "Native standings require the desktop-enabled renderer",
+    );
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await page
       .getByRole("button", { name: "fast speed", exact: true })
@@ -137,6 +217,10 @@ for (const theme of ["light", "dark"]) {
       .click();
     const dialog = page.getByRole("dialog", { name: "Mission complete" });
     await expect(dialog).toBeVisible();
+    const leaderboard = dialog.getByRole("region", {
+      name: "Leaderboard · Hard",
+    });
+    await expect(leaderboard).toBeAttached();
     await expect(dialog.locator(".victoryScoreBreakdown")).toContainText(
       "Service",
     );
@@ -153,21 +237,38 @@ for (const theme of ["light", "dark"]) {
       dialog.getByRole("region", { name: "Mission results" }),
     ).toContainText("final net worth");
     const popup = page.locator(".achievementToastPanel");
-    await expect(popup).toBeVisible();
-    await expect(popup).toContainText("Staying Power");
-    await expect
-      .poll(() =>
-        popup.evaluate((el) => {
-          const bounds = el.getBoundingClientRect();
-          return el.contains(
-            document.elementFromPoint(bounds.right - 24, bounds.top + 24),
-          );
-        }),
-      )
-      .toBe(true);
+    if (!nativeBoard) {
+      await expect(popup).toBeVisible();
+      await expect(popup).toContainText("Staying Power");
+      await expect
+        .poll(() =>
+          popup.evaluate((el) => {
+            const bounds = el.getBoundingClientRect();
+            return el.contains(
+              document.elementFromPoint(bounds.right - 24, bounds.top + 24),
+            );
+          }),
+        )
+        .toBe(true);
+    }
     // Dismiss queued awards so the remaining result-action checks can use the whole dialog.
     while (await popup.isVisible()) {
       await popup.getByRole("button", { name: /^Dismiss/ }).click();
+    }
+    await leaderboard.scrollIntoViewIfNeeded();
+    await expect(leaderboard).toBeVisible();
+    if (nativeBoard) {
+      await expect(leaderboard.getByRole("row")).toHaveCount(4);
+      await expect(
+        leaderboard.getByRole("cell", {
+          name: "Lakeside Municipal Electricity Cooperative",
+        }),
+      ).toBeVisible();
+      expect(
+        await leaderboard.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
     }
     await expect(dialog.locator("..")).toHaveCSS("opacity", "1");
     await expectDialogToFit(dialog);
@@ -194,10 +295,10 @@ for (const theme of ["light", "dark"]) {
     }
     if (process.env.REVIEW_SCREENSHOT_DIR) {
       await page.mouse.move(0, 0);
-      await page.screenshot({
+      await dialog.screenshot({
         path: path.join(
           process.env.REVIEW_SCREENSHOT_DIR,
-          `victory-${info.project.name}-${theme}.png`,
+          `victory-${info.project.name}-${theme}${native ? "-native" : ""}.png`,
         ),
       });
     }
@@ -265,6 +366,7 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
     "Service",
   );
   await expect(failure).not.toContainText("New personal best");
+  await expect(failure.locator(".resultLeaderboard")).toHaveCount(0);
   await expect(
     failure.getByRole("region", { name: "Mission results" }),
   ).toContainText("customers");

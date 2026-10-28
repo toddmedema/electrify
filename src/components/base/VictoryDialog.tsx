@@ -22,6 +22,9 @@ import { canShare, shareText } from "../../helpers/Share";
 import { formatScore } from "../../helpers/Format";
 import { ResultScore, resultTitle, RunDebrief } from "./RunResult";
 import { isDesktopApp } from "../../Desktop";
+import { SCENARIOS } from "../../data/Scenarios";
+import ResultLeaderboard from "./ResultLeaderboard";
+import { SCORE_VERSION } from "../../helpers/Scoring";
 
 export interface StateProps {
   victory: VictoryType | null;
@@ -176,7 +179,6 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             </Typography>
           </Typography>
         )}
-        {victory.debrief && <RunDebrief debrief={victory.debrief} />}
         {victory.modded && (
           <Typography
             className="victoryStanding"
@@ -208,7 +210,13 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               <span>Personal best {formatScore(previousBest as number)}</span>
             )}
             {!rankFailed && rank !== undefined && (
-              <span> · #{formatScore(rank)} globally</span>
+              <span>
+                {" "}
+                · #{formatScore(rank)}{" "}
+                {process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()
+                  ? "globally"
+                  : "across all levels"}
+              </span>
             )}
           </Typography>
         )}
@@ -227,6 +235,20 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               to join the leaderboard
             </Typography>
           )}
+        {victory.outcome === "completed" &&
+          victory.scoreVersion === SCORE_VERSION &&
+          !victory.modded &&
+          SCENARIOS.some(
+            (scenario) =>
+              scenario.id === victory.scenarioId && !scenario.tutorialSteps,
+          ) && (
+            <ResultLeaderboard
+              key={`${victory.scenarioId}:${victory.difficulty}:${victory.score}`}
+              scenarioId={victory.scenarioId}
+              difficulty={victory.difficulty}
+            />
+          )}
+        {victory.debrief && <RunDebrief debrief={victory.debrief} />}
       </DialogContent>
       <DialogActions
         className="victoryDialogActions"

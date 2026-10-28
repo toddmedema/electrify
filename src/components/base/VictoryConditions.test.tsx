@@ -1,9 +1,31 @@
 import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import VictoryConditions from "./VictoryConditions";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../../data/Scenarios";
 import { modScenario } from "../../mods/ModScenario";
 import { objectiveDefinition } from "../../helpers/ScenarioObjectives";
+
+it("separates requirements from points and keeps measurement help secondary", () => {
+  render(
+    <VictoryConditions
+      scenario={SCENARIOS.find((scenario) => scenario.id === 100)!}
+      difficulty="Manager"
+    />,
+  );
+  const requirements = screen.getByRole("region", { name: "Requirements" });
+  const scoring = screen.getByRole("region", { name: "Scoring" });
+  expect(within(requirements).getByText(/bankruptcy/i)).toBeInTheDocument();
+  expect(within(requirements).queryByText(/Earn .*points/)).toBeNull();
+  expect(within(scoring).getByText(/Service/)).toBeInTheDocument();
+  expect(
+    within(scoring).getByText(/Financial performance/),
+  ).toBeInTheDocument();
+  expect(within(scoring).getByText(/Environmental impact/)).toBeInTheDocument();
+  expect(screen.getByText("How objectives are measured")).toBeVisible();
+  expect(
+    screen.getByText(objectiveDefinition("customerRetention")),
+  ).not.toBeVisible();
+});
 
 it.each(["Public", "Investor"] as const)(
   "shows canonical required retention and reliability objectives for %s ownership",
@@ -70,13 +92,19 @@ it("labels optional goals and explains their actual units without making them a 
     ],
   });
   render(<VictoryConditions scenario={scenario} difficulty="Manager" />);
-  expect(screen.getByText("Optional: Affordable practice")).toBeInTheDocument();
+  const optional = screen.getByRole("region", { name: "Optional goals" });
+  expect(within(optional).getByText("Affordable practice")).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("region", { name: "Requirements" })).queryByText(
+      "Affordable practice",
+    ),
+  ).toBeNull();
   expect(
     screen.getByText(objectiveDefinition("monthlyBilledRate")),
   ).toBeInTheDocument();
   expect(screen.getByText(/Bills ≤\$0.123456789\/kWh/)).toBeInTheDocument();
   expect(
-    screen.getByText("Stretch goal; does not end or fail the run."),
+    screen.getByText("Stretch goals; not required to win."),
   ).toBeInTheDocument();
 });
 
@@ -93,8 +121,8 @@ it("keeps internal decision tracking out of player victory conditions", () => {
   expect(
     screen.queryByTestId("meaningful-decision-history"),
   ).not.toBeInTheDocument();
-  expect(screen.getByText(/In all scenarios, you fail/)).toHaveTextContent(
-    "In all scenarios, you fail if you go bankrupt or serve less than 90% of demand in three consecutive months.",
+  expect(screen.getByText(/Serve at least/)).toHaveTextContent(
+    "Serve at least 90% of demand. Three consecutive months below this end the run.",
   );
 });
 
@@ -105,7 +133,7 @@ it("explains the stricter Expert blackout limit", () => {
       difficulty="CEO"
     />,
   );
-  expect(screen.getByText(/In all scenarios, you fail/)).toHaveTextContent(
-    "serve less than 95% of demand in three consecutive months",
+  expect(screen.getByText(/Serve at least/)).toHaveTextContent(
+    "Serve at least 95% of demand. Three consecutive months below this end the run.",
   );
 });

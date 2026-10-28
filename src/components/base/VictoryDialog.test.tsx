@@ -7,6 +7,14 @@ import VictoryDialog, { Props } from "./VictoryDialog";
 import { VictoryType } from "../../Types";
 
 const mockFetchGlobalRank = jest.fn();
+jest.mock("./ResultLeaderboard", () => ({
+  __esModule: true,
+  default: (props: { scenarioId: number; difficulty: string }) => (
+    <section aria-label="Result leaderboard">
+      {props.scenarioId} · {props.difficulty}
+    </section>
+  ),
+}));
 jest.mock("../../reducers/User", () => ({
   fetchGlobalRank: (...args: unknown[]) => mockFetchGlobalRank(...args),
 }));
@@ -28,6 +36,7 @@ function aVictory(overrides: Partial<VictoryType> = {}): VictoryType {
     scenarioName: "Deregulation",
     difficulty: "CEO",
     score: 812,
+    scoreVersion: 2,
     breakdown: { supply: 800, emissions: 30, blackouts: -18 },
     ranked: true,
     outcome: "completed",
@@ -58,6 +67,26 @@ beforeEach(() => {
 });
 
 describe("VictoryDialog", () => {
+  it("shows the played scenario and difficulty's board to guests after completion", () => {
+    renderDialog({ loggedIn: false, victory: aVictory({ ranked: false }) });
+    expect(
+      screen.getByRole("region", { name: "Result leaderboard" }),
+    ).toHaveTextContent("101 · CEO");
+  });
+
+  it.each([
+    { outcome: "fired" as const },
+    { outcome: "bankrupt" as const },
+    { modded: true },
+    { scenarioId: 999 },
+    { scoreVersion: 1 },
+    { scoreVersion: undefined },
+  ])("does not offer a competitive board for %j", (overrides) => {
+    renderDialog({ victory: aVictory(overrides) });
+    expect(
+      screen.queryByRole("region", { name: "Result leaderboard" }),
+    ).toBeNull();
+  });
   it("says a modded run is unranked instead of showing standings", () => {
     renderDialog({ victory: aVictory({ ranked: false, modded: true }) });
     expect(
@@ -149,7 +178,7 @@ describe("VictoryDialog", () => {
   it("fills in the global rank once it resolves", async () => {
     mockFetchGlobalRank.mockResolvedValue(4);
     renderDialog();
-    expect(await screen.findByText(/#4 globally/)).toBeInTheDocument();
+    expect(await screen.findByText(/#4 across all levels/)).toBeInTheDocument();
     expect(mockFetchGlobalRank).toHaveBeenCalledWith(101, 812, "CEO");
   });
 
@@ -161,7 +190,7 @@ describe("VictoryDialog", () => {
     renderDialog();
 
     await waitFor(() =>
-      expect(screen.queryByText(/globally/)).not.toBeInTheDocument(),
+      expect(screen.queryByText(/across all levels/)).not.toBeInTheDocument(),
     );
     expect(screen.getByText(/800 electricity supplied/)).toBeInTheDocument();
     warn.mockRestore();
