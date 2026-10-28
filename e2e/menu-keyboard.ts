@@ -2,6 +2,9 @@ import { expect, Page } from "@playwright/test";
 
 /** The caller installs the clock before loading; keep return focus pending for a body key. */
 export async function exitSettingsWithBodyArrow(page: Page): Promise<void> {
+  // The returning menu focuses hovered buttons. Keep this keyboard-only fixture's pointer
+  // outside it, so a stationary pointer cannot override the initial Play focus on remount.
+  await page.mouse.move(0, 0);
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
   await page.keyboard.press("Escape");
   await expect(
