@@ -21,7 +21,7 @@ concurrency:
   # Let a trusted seed finish even when another merge arrives; PR updates still cancel.
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
-# Six jobs: shared renderers, three native builds, all tests, and the required gate.
+# Eight jobs: shared renderers, three native builds, three test workers, and the required gate.
 # Tests share renderer artifacts but never wait for an OS build.
 jobs:
   build:
@@ -144,18 +144,10 @@ jobs:
           retention-days: 14
           compression-level: 0
           if-no-files-found: error
-  tests:
-    name: All tests and static checks
-    needs: build
+  cpu:
+    name: CPU tests and static checks
     runs-on: ubuntu-22.04
     timeout-minutes: 60
-    env:
-      ELECTRON_CACHE: ${{ github.workspace }}/.tmp/electron-cache
-      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.tmp/electron-builder-cache
-      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tmp/playwright-browsers
-      E2E_BUILD_DIR: ${{ github.workspace }}/.tmp/web-renderer
-      E2E_PORT: "3189"
-      ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/linux-unpacked/Electrify
     steps:
       - uses: actions/checkout@v7
         with:
@@ -169,6 +161,89 @@ jobs:
         with:
           group: simulation
           shard: 1
+      - name: Java for the Firestore emulator
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Generate local manifests
+        run: npm run compatibility:generate && npm run icons:generate
+      - name: All CPU suites, types, lint and formatting
+        run: npm run test:ci-all -- --group=cpu
+      - name: Measure restored transforms (manual runs only)
+        if: github.event_name == 'workflow_dispatch' && inputs.benchmark-work
+        run: node scripts/ci/benchmark-jest-cache.js > test-results/benchmark-jest-cache.json
+      - name: Preserve CPU reports and coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diagnostics-cpu
+          path: |
+            coverage/
+            test-results/
+            firestore-debug.log
+          retention-days: 7
+          compression-level: 1
+          if-no-files-found: ignore
+
+  browser:
+    name: Production browser tests
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tmp/playwright-browsers
+      E2E_BUILD_DIR: ${{ github.workspace }}/.tmp/web-renderer
+      E2E_PORT: "3189"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+      - uses: ./.github/actions/install
+      - name: Cache the locked headless browser
+        uses: actions/cache@v6
+        with:
+          path: .tmp/playwright-browsers
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+      - name: Install graphical system dependencies and headless browser
+        run: npx playwright install --with-deps --only-shell chromium
+      - name: Generate local manifests
+        run: npm run compatibility:generate && npm run icons:generate
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-renderer
+          path: .tmp/web-renderer
+      - name: Complete production browser matrix
+        run: npm run test:ci-all -- --group=browser
+      - name: Measure optional review captures (manual runs only)
+        if: github.event_name == 'workflow_dispatch' && inputs.benchmark-work
+        run: npm run test:e2e -- --config=e2e/ci-work.bench.config.ts
+      - name: Preserve browser reports and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diagnostics-browser
+          path: test-results/
+          retention-days: 7
+          compression-level: 1
+          if-no-files-found: ignore
+
+  desktop:
+    name: Desktop integration tests
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      ELECTRON_CACHE: ${{ github.workspace }}/.tmp/electron-cache
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.tmp/electron-builder-cache
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tmp/playwright-browsers
+      E2E_PORT: "3189"
+      ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/linux-unpacked/Electrify
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+      - uses: ./.github/actions/install
       - uses: ./.github/actions/jest-cache
         with:
           group: world-advance
@@ -189,37 +264,22 @@ jobs:
         run: npx playwright install --with-deps --only-shell chromium
       - name: Install native window dependencies
         run: sudo apt-get install --yes xvfb openbox
-      - name: Java for the Firestore emulator
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "21"
       - name: Generate local manifests
         run: npm run compatibility:generate && npm run icons:generate
       - uses: actions/download-artifact@v8
         with:
           name: desktop-renderer
-      - uses: actions/download-artifact@v8
-        with:
-          name: web-renderer
-          path: .tmp/web-renderer
-      - name: All test suites, types, lint and formatting
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:ci-all'
-      - name: Measure work inside the existing test job (manual runs only)
+      - name: Multiplayer, controller and full packaged desktop suites
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:ci-all -- --group=desktop'
+      - name: Measure helper startup (manual runs only)
         if: github.event_name == 'workflow_dispatch' && inputs.benchmark-work
-        run: |
-          node scripts/ci/benchmark-world-advance.js "$(find test-results/multiplayer -path '*native-106*1280*/native-world.json' -print -quit)" 48 > test-results/benchmark-world-advance.json
-          node scripts/ci/benchmark-jest-cache.js > test-results/benchmark-jest-cache.json
-          npm run test:e2e -- --config=e2e/ci-work.bench.config.ts
-      - name: Preserve test reports, coverage and diagnostics
+        run: node scripts/ci/benchmark-world-advance.js "$(find test-results/multiplayer -path '*native-106*1280*/native-world.json' -print -quit)" 48 > test-results/benchmark-world-advance.json
+      - name: Preserve desktop reports and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: diagnostics-tests
-          path: |
-            coverage/
-            test-results/
-            firestore-debug.log
+          name: diagnostics-desktop
+          path: test-results/
           retention-days: 7
           compression-level: 1
           if-no-files-found: ignore
@@ -227,7 +287,7 @@ jobs:
   check:
     name: check
     if: always()
-    needs: [build, platform, tests]
+    needs: [build, platform, cpu, browser, desktop]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -235,8 +295,12 @@ jobs:
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           PLATFORM_RESULT: ${{ needs.platform.result }}
-          TEST_RESULT: ${{ needs.tests.result }}
+          CPU_RESULT: ${{ needs.cpu.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+          DESKTOP_RESULT: ${{ needs.desktop.result }}
         run: |
           test "$BUILD_RESULT" = success
           test "$PLATFORM_RESULT" = success
-          test "$TEST_RESULT" = success
+          test "$CPU_RESULT" = success
+          test "$BROWSER_RESULT" = success
+          test "$DESKTOP_RESULT" = success
