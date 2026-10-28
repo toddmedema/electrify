@@ -317,3 +317,48 @@ test("gameplay sources and playheads survive card changes and all Back paths", a
     playback = await expectContinuousMusic(page, playback);
   }
 });
+
+test("a suspended audio clock does not restart gameplay early", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.goto("/?scenario=111");
+  await expectMenuMusic(page);
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect(page.locator(".gameMenuButton")).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => window.electrifyMusicStarts))
+    .toHaveLength(4);
+  await expect
+    .poll(async () => (await playbackSnapshot(page)).active[0].position)
+    .toBeGreaterThan(0.1);
+  await page.evaluate(async () => {
+    const contexts = new Set(
+      window.electrifyMusicPlayback.map((entry) => entry.source.context),
+    );
+    await Promise.all(
+      [...contexts].map((context) => (context as AudioContext).suspend()),
+    );
+  });
+  const before = await playbackSnapshot(page);
+  expect(before.active).toHaveLength(3);
+  expect(before.active.map((entry) => entry.state)).toEqual([
+    "suspended",
+    "suspended",
+    "suspended",
+  ]);
+  // Advance the loop timer while the real audio clock stays at the saved playhead.
+  await page.clock.fastForward(392119);
+  const after = await playbackSnapshot(page);
+  expect(after.starts).toEqual(before.starts);
+  expect(after.active).toEqual(before.active);
+  await page.evaluate(async () => {
+    const contexts = new Set(
+      window.electrifyMusicPlayback.map((entry) => entry.source.context),
+    );
+    await Promise.all(
+      [...contexts].map((context) => (context as AudioContext).resume()),
+    );
+  });
+  await expectContinuousMusic(page, before);
+});
