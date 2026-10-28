@@ -362,6 +362,25 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
 .keyboardMenu .MuiTouchRipple-ripplePulsate {
   display: none;
 }
+// The home menu's text buttons are plain until one is active. The active button carries the
+// primary fill as its focus indicator, so it drops the separate ring from .keyboardMenu :focus.
+// Hovering a control moves real focus to it (MainMenu.focusHomeButton), so :focus alone tracks
+// the pointer as well as keyboard and controller navigation.
+#centeredMenu
+  :is(.mainActions, .resourceActions, .discoveryActions)
+  .MuiButton-root {
+  &:hover {
+    background-color: transparent; // keep the inactive state borderless and unfilled
+  }
+
+  &:focus {
+    background-color: var(--interactive-strong);
+    color: var(--interactive-contrast);
+    // The fill is the focus indicator here, so drop both the global :focus-visible ring
+    // (which is !important) and the .keyboardMenu :focus ring for these controls.
+    outline: none !important;
+  }
+}
 html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   .keyboardMenu
   .settingsGroup

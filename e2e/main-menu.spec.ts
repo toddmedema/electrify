@@ -166,6 +166,20 @@ test("keyboard and pointer actions work during the entrance", async ({
   await expect(page.locator(".facilities:visible")).toBeVisible();
 });
 
+test("hovering a home control makes it the active button, and keyboard continues from there", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" }); // skip the entrance stagger
+  await page.goto("/");
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  const manual = page.getByRole("button", { name: "Manual", exact: true });
+  await expect(play).toBeFocused(); // the first control starts active
+  await manual.hover();
+  await expect(manual).toBeFocused(); // the pointer moved the active button to Manual
+  await page.keyboard.press("ArrowUp");
+  await expect(play).toBeFocused(); // keyboard continues from the hovered control
+});
+
 test("a failed load can be retried", async ({ page }) => {
   await page.route("**/*achievements*.js", (route) => route.abort());
   await page.goto("/");
