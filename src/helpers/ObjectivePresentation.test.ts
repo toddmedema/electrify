@@ -169,3 +169,8 @@ it.each<[CompiledRuleObjective, number, string]>([
     expect(objectiveValueText(objective, value, value)).toBe(expected);
   },
 );
+
+it("clears zero signs without hiding a genuinely negative objective measurement", () => {
+  expect(objectiveValueText(reliability, -0)).toBe("0%");
+  expect(objectiveValueText(reliability, -0.00001)).not.toBe("0%");
+});

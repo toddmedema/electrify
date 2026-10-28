@@ -271,10 +271,8 @@ export const SCENARIOS: ScenarioType[] = [
         target: '[aria-label^="Sort facilities"]',
         phase: "GENERATOR_CHOICES",
         continueOnClick: '[role="option"], #sort-menu [role="menuitem"]',
-        action: "Choose how to sort generators",
-        content: (
-          <TutorialPrompt text="Open Sort to compare plants by cost, build time or other features, then choose an order." />
-        ),
+        action: "Sort generators",
+        content: <TutorialPrompt text="Sort by cost, build time, etc" />,
       },
       {
         card: { name: "BUILD_GENERATORS", dontRemember: true },

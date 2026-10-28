@@ -1,3 +1,4 @@
+import { formatFixed } from "./Format";
 import type {
   CompiledRuleEvent,
   CompiledScenarioRules,
@@ -19,7 +20,7 @@ type Occurrence = ActiveWorldEventType & StoryPhaseDescriptionType;
 const share = (part: number, whole: number) =>
   whole > 0 ? Math.max(0, Math.min(1, part / whole)) : 0;
 const percent = (value: number) =>
-  `${(value * 100).toFixed(value >= 0.1 ? 0 : 1)}%`;
+  `${formatFixed(value * 100, value >= 0.1 ? 0 : 1)}%`;
 export const officialPresentation = (event: CompiledRuleEvent) =>
   event.source
     ? officialScenarioRuleDefinition(event.source.scenarioId)?.presentation[

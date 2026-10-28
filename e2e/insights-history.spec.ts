@@ -93,6 +93,23 @@ for (const theme of ["light", "dark"]) {
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
       localStorage.setItem("insightsLayers", JSON.stringify(["customers"]));
+      const labels: string[] = [];
+      (
+        window as Window & { customerAxisLabels?: string[] }
+      ).customerAxisLabels = labels;
+      const draw = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (
+        this: CanvasRenderingContext2D,
+        text: string,
+        x: number,
+        y: number,
+        maxWidth?: number,
+      ) {
+        if (this.canvas.closest("#chartInsightsCustomersPlot"))
+          labels.push(text);
+        if (maxWidth === undefined) draw.call(this, text, x, y);
+        else draw.call(this, text, x, y, maxWidth);
+      };
     }, theme);
     await page.goto("/?scenario=106");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
@@ -102,6 +119,25 @@ for (const theme of ["light", "dark"]) {
     await chart.locator(".u-over").hover({ position: { x: 1, y: 20 } });
     await expect(chart.locator(".chartTooltip")).toBeVisible();
     await expect(chart.locator(".chartTooltip")).toContainText("16.5K");
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as Window & { customerAxisLabels?: string[] })
+              .customerAxisLabels || [],
+        ),
+      )
+      .toContain("0");
+    const axisLabels = await page.evaluate(
+      () =>
+        (window as Window & { customerAxisLabels?: string[] })
+          .customerAxisLabels || [],
+    );
+    expect(
+      axisLabels.filter((label) =>
+        /^[-−]0(?:[.,]0+)*(?:[A-Za-z%°]+)?$/.test(label),
+      ),
+    ).toEqual([]);
     await reviewScreenshot(page, {
       path: testInfo.outputPath(`customer-precision-${theme}.png`),
       animations: "disabled",

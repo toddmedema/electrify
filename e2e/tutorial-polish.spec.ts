@@ -52,9 +52,7 @@ for (const theme of ["light", "dark"]) {
       .getByRole("button", { name: "Start Generators", exact: true })
       .click();
     await page.locator(".button-buildFacility").click();
-    await expect(page.locator(".tutorialHud")).toContainText(
-      "Choose how to sort generators",
-    );
+    await expect(page.locator(".tutorialHud")).toContainText("Sort generators");
     await reviewScreenshot(page, {
       path: testInfo.outputPath(`sort-${theme}.png`),
       animations: "disabled",

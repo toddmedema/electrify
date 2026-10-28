@@ -1,3 +1,4 @@
+import { formatNumber } from "./Format";
 import { ChallengeInvitation, VictoryType } from "../Types";
 import {
   expandAuthoredRunReference,
@@ -100,7 +101,7 @@ export function challengeShareContent(
     challenge: true,
     content: {
       title: `Challenge a friend: ${scenario.name}`,
-      text: `${story} in ${scenario.name} on ${DIFFICULTY_LABELS[victory.difficulty]}. My score: ${victory.score.toLocaleString("en-US")}. Can you beat it?`,
+      text: `${story} in ${scenario.name} on ${DIFFICULTY_LABELS[victory.difficulty]}. My score: ${formatNumber(victory.score)}. Can you beat it?`,
       url,
     },
   };

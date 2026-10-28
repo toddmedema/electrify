@@ -59,6 +59,7 @@ import { facilityLifetime } from "../../helpers/Financials";
 import {
   formatMoneyConcise,
   formatCustomerCount,
+  formatPercent,
   formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
@@ -1541,7 +1542,7 @@ export default class Insights extends React.Component<Props, State> {
                   title={
                     key === "inflationRate" ? "Inflation" : "Interest rate"
                   }
-                  format={(value) => (value * 100).toFixed(2) + "%"}
+                  format={(value) => formatPercent(value, 2)}
                   startingYear={game.startingYear}
                   domain={projection.domain.x}
                   syncKey={SYNC_KEY}

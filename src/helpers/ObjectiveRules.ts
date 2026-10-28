@@ -1,3 +1,4 @@
+import { formatCount, formatNumber } from "./Format";
 import {
   DifficultyType,
   GameType,
@@ -394,7 +395,7 @@ function inheritedResultReasons(
       );
       return {
         ...result,
-        reason: `Customer attrition left you with ${Math.round(customers).toLocaleString("en-US")} customers. Even the fastest possible growth reaches only ${Math.round(bestCase).toLocaleString("en-US")} by the end of the term, short of the ${Math.ceil(progress.retentionBaseline * result.target).toLocaleString("en-US")} this mission requires.`,
+        reason: `Customer attrition left you with ${formatCount(customers)} customers. Even the fastest possible growth reaches only ${formatCount(bestCase)} by the end of the term, short of the ${formatNumber(Math.ceil(progress.retentionBaseline * result.target))} this mission requires.`,
       };
     }
     return result;

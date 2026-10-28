@@ -72,7 +72,7 @@ for (const mission of [
         await storageTab.click();
       }
       if (mission === "Generators") {
-        await expect(hud).toContainText("Choose how to sort generators");
+        await expect(hud).toContainText("Sort generators");
         await sortBuildCatalog(page);
       }
       await expect(hud).toContainText(
