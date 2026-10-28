@@ -35,6 +35,7 @@ import FitScreenIcon from "@mui/icons-material/FitScreen";
 import SaveIcon from "@mui/icons-material/Save";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
@@ -1855,7 +1856,7 @@ export default class Insights extends React.Component<Props, State> {
             : `Restore “${selected}”?`;
     const description =
       presetDialog === "saveAs"
-        ? `Save the current ${this.state.layers.length} charts and their order as a reusable preset.`
+        ? null
         : presetDialog === "rename"
           ? "Give this preset a short, recognizable name."
           : presetDialog === "delete"
@@ -1870,13 +1871,17 @@ export default class Insights extends React.Component<Props, State> {
         fullWidth
         maxWidth="xs"
         aria-labelledby="insight-preset-dialog-title"
-        aria-describedby="insight-preset-dialog-description"
+        aria-describedby={
+          description ? "insight-preset-dialog-description" : undefined
+        }
       >
         <DialogTitle id="insight-preset-dialog-title">{title}</DialogTitle>
         <DialogContent>
-          <DialogContentText id="insight-preset-dialog-description">
-            {description}
-          </DialogContentText>
+          {description && (
+            <DialogContentText id="insight-preset-dialog-description">
+              {description}
+            </DialogContentText>
+          )}
           {naming ? (
             <TextField
               autoFocus
@@ -2121,17 +2126,16 @@ export default class Insights extends React.Component<Props, State> {
                     </span>
                   )}
                 >
-                  <ListSubheader>Default presets</ListSubheader>
+                  {!!this.state.presetLibrary.custom.length && (
+                    <ListSubheader>Default presets</ListSubheader>
+                  )}
                   {Object.entries(INSIGHT_PRESETS).map(([id, preset]) => (
                     <MenuItem key={id} value={id} data-insight-preset={id}>
                       {preset.label}
                     </MenuItem>
                   ))}
                   {!!this.state.presetLibrary.custom.length && (
-                    <ListSubheader>
-                      Your presets ({this.state.presetLibrary.custom.length}/
-                      {MAX_CUSTOM_INSIGHT_PRESETS})
-                    </ListSubheader>
+                    <ListSubheader>Your presets</ListSubheader>
                   )}
                   {this.state.presetLibrary.custom.map((preset) => (
                     <MenuItem
@@ -2144,9 +2148,11 @@ export default class Insights extends React.Component<Props, State> {
                       </span>
                     </MenuItem>
                   ))}
-                  <MenuItem value="custom" disabled>
-                    Unsaved view
-                  </MenuItem>
+                  {this.state.preset === "custom" && (
+                    <MenuItem value="custom" disabled>
+                      Unsaved view
+                    </MenuItem>
+                  )}
                 </Select>
                 <Tooltip title="Rename, save a copy, restore, or delete">
                   <IconButton
@@ -2212,8 +2218,8 @@ export default class Insights extends React.Component<Props, State> {
               >
                 <SaveIcon fontSize="small" />
                 {this.state.preset === "custom"
-                  ? "Save as new preset"
-                  : "Save preset changes"}
+                  ? "Save as new"
+                  : "Save changes"}
               </MenuItem>
               {this.state.preset !== "custom" && (
                 <MenuItem
@@ -2222,12 +2228,16 @@ export default class Insights extends React.Component<Props, State> {
                   onClick={() => this.openPresetDialog("saveAs")}
                 >
                   <AddIcon fontSize="small" />
-                  Save as new preset
+                  Save as new
                 </MenuItem>
               )}
               {selectedCustom && (
-                <MenuItem onClick={() => this.openPresetDialog("rename")}>
-                  Rename preset…
+                <MenuItem
+                  className="insightsPresetRenameMenuItem"
+                  onClick={() => this.openPresetDialog("rename")}
+                >
+                  <EditOutlinedIcon fontSize="small" />
+                  Rename
                 </MenuItem>
               )}
               {selectedCustom && (
@@ -2236,7 +2246,7 @@ export default class Insights extends React.Component<Props, State> {
                   onClick={() => this.openPresetDialog("delete")}
                 >
                   <DeleteOutlineIcon fontSize="small" />
-                  Delete custom preset
+                  Delete custom
                 </MenuItem>
               )}
               {selectedDefault &&

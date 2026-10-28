@@ -1,4 +1,4 @@
-import { GameToolCloseContext } from "../base/GameWorkspaceContext";
+import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
 import {
@@ -874,7 +874,7 @@ export interface DispatchProps {
 export type Props = StateProps & DispatchProps;
 
 export default function BuildGenerators(props: Props): React.JSX.Element {
-  const closeTool = React.useContext(GameToolCloseContext);
+  const completeBuild = React.useContext(GameBuildCompleteContext);
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -1128,7 +1128,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                       : withResilienceOptions(g, game, selection),
                     financed,
                   );
-                  (closeTool ?? onBack)();
+                  (completeBuild ?? onBack)();
                 }}
               />
             </React.Fragment>

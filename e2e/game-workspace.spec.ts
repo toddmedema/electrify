@@ -35,6 +35,57 @@ async function settleSheets(page: Page) {
   });
 }
 
+for (const side of [false, true]) {
+  test(`purchases ${side ? "keep Build open in a side panel" : "close Build in an overlay"}`, async ({
+    page,
+  }, info) => {
+    test.skip(
+      side && !!info.project.use.hasTouch,
+      "Side-panel coverage uses the desktop project",
+    );
+    const width = side
+      ? 1300
+      : info.project.use.hasTouch
+        ? page.viewportSize()!.width
+        : 1299;
+    await page.setViewportSize({ width, height: page.viewportSize()!.height });
+    await startGame(page, "dark", 100);
+    for (const [category, purchase] of [
+      ["Generators", "Solar"],
+      ["Storage", "Pumped Hydro"],
+      ["Interties", "Pacific Northwest intertie"],
+    ]) {
+      const build = await openBuild(page);
+      await build.getByRole("tab", { name: category, exact: true }).click();
+      const before = await page
+        .locator(".facilityRow, .transmissionLine")
+        .count();
+      await build
+        .getByRole("button", {
+          name: `Review purchase of ${purchase}`,
+          exact: true,
+        })
+        .click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Take loan", exact: true })
+        .click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(page.locator(".facilityRow, .transmissionLine")).toHaveCount(
+        before + 1,
+      );
+      if (side) {
+        await expect(build).toBeVisible();
+        await build
+          .getByRole("button", { name: "Close Build", exact: true })
+          .click();
+      } else {
+        await expect(build).toHaveCount(0);
+      }
+    }
+  });
+}
+
 for (const theme of ["light", "dark"] as const) {
   test(`main game content stays centered at 1800px while tools use spare width in ${theme}`, async ({
     page,

@@ -31,6 +31,9 @@ for (const theme of ["light", "dark"] as const) {
         .borderBottomWidth;
     });
     expect(parseFloat(inputBorder)).toBeGreaterThan(0);
+    await seed.focus();
+    await expect(seed).toHaveCSS("outline-style", "none");
+    await expect(seed.locator("..")).toHaveClass(/Mui-focused/);
     const facilitySelectors = page.locator(
       ".customFacilityPicker [role=combobox]",
     );

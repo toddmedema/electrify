@@ -193,6 +193,21 @@ test("survival is chronological completed evidence and ignores current partial h
   ).toBe("unknown");
 });
 
+test.each([
+  [2_678_123_456, "$2.68B"],
+  [2_600_000_000, "$2.60B"],
+  [268_123_456, "$268M"],
+  [-2_678_123, "$-2.68M"],
+])("solvency cash %s uses the header's rounded amount %s", (cash, amount) => {
+  const game = createNextState(fixture(), (g) => {
+    g.timeline[0].cash = cash;
+  });
+  expect(requirement(game, "cash")).toMatchObject({
+    current: `${amount} now`,
+    compact: `Cash ≥ $0 (${amount})`,
+  });
+});
+
 test("Expert survival text and verdict use the 95% firing threshold", () => {
   const game = createNextState(fixture(29), (g) => {
     g.difficulty = "CEO";

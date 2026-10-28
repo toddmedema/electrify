@@ -16,7 +16,7 @@ import {
 } from "./ObjectiveRules";
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
 import { TICK_MINUTES } from "../Constants";
-import { formatMoneyConcise, formatCount } from "./Format";
+import { formatMoneyStable } from "./Format";
 import { selectProjection } from "./Projection";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import {
@@ -121,8 +121,10 @@ export function getMissionStatus(game: GameType) {
   requirements.push({
     id: "cash",
     label: "Keep the utility solvent",
-    compact: `Cash ≥ $0 (${now ? formatMoneyConcise(now.cash) : "unavailable"})`,
-    current: now ? `$${formatCount(now.cash)} now` : "Current cash unavailable",
+    compact: `Cash ≥ $0 (${now ? formatMoneyStable(now.cash) : "unavailable"})`,
+    current: now
+      ? `${formatMoneyStable(now.cash)} now`
+      : "Current cash unavailable",
     target: "Cash ≥$0 at every month-end",
     timing:
       "Checked at month end; negative cash now is a warning, not a final outcome",

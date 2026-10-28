@@ -482,6 +482,14 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           },
         },
       },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            "&:hover:not(.Mui-disabled):not(.Mui-error) .MuiOutlinedInput-notchedOutline":
+              { borderColor: palette.interactive },
+          },
+        },
+      },
       MuiCheckbox: {
         styleOverrides: {
           root: {
