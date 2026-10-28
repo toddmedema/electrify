@@ -606,6 +606,32 @@ describe("Insights layers", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("adds monthly lowest spare capacity to Reliability and lets players toggle the layer", async () => {
+    renderInsights();
+    await choosePreset("Reliability");
+    const track = screen.getByRole("region", {
+      name: "Lowest spare capacity evidence",
+    });
+    expect(
+      within(track).getByRole("img", { name: /Monthly lowest spare capacity/ }),
+    ).toBeInTheDocument();
+    const headings = screen.getAllByRole("heading", { level: 6 });
+    expect(headings[1]).toHaveTextContent("Supply & Demand");
+    expect(headings[2]).toHaveTextContent("Lowest spare capacity");
+    await user.click(labelledButton(/Layers/));
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: "Lowest spare capacity",
+      }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Lowest spare capacity evidence" }),
+    ).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("insightsLayers")!)).not.toContain(
+      "spareCapacity",
+    );
+  });
+
   // Regression test. Construction progress was part of the projection's cache key, so every
   // tick of a build re-simulated the long-range forecast from a start that had moved on by one
   // tick, and its hourly samples (wind most visibly) jittered from frame to frame

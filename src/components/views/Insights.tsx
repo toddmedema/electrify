@@ -130,10 +130,12 @@ import PowerExchangeSummary, {
 } from "../base/PowerExchangeSummary";
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
 import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
+import ChartMonthlySpareCapacity from "../base/ChartMonthlySpareCapacity";
 import { ToolScrollMemory } from "../base/GameToolMemory";
 
 export type InsightLayerId =
   | "supplyDemand"
+  | "spareCapacity"
   | "powerExchange"
   | "demandByType"
   | "supplyByFuel"
@@ -162,6 +164,7 @@ export interface InsightLayerDefinition {
 
 export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
+  { id: "spareCapacity", label: "Lowest spare capacity", group: "Grid" },
   {
     id: "powerExchange",
     label: "Power exchange",
@@ -238,6 +241,7 @@ export const INSIGHT_PRESETS: Record<
     label: "Reliability",
     layers: [
       "supplyDemand",
+      "spareCapacity",
       "powerExchange",
       "supplyByFuel",
       "storage",
@@ -1548,6 +1552,38 @@ export default class Insights extends React.Component<Props, State> {
                   syncKey={SYNC_KEY}
                 />
               ))}
+            </>
+          );
+          break;
+        case "spareCapacity":
+          body = (
+            <>
+              <ChartLegend
+                items={[
+                  { name: "Recorded", color: chartPalette().supply },
+                  {
+                    name: "Projected",
+                    color: chartPalette().supply,
+                    dash: "4,4",
+                  },
+                ]}
+              />
+              <ChartMonthlySpareCapacity
+                height={140}
+                past={projection.financePast}
+                projected={projection.financeProjected}
+                startingYear={game.startingYear}
+                domain={projection.domain}
+                syncKey={SYNC_KEY}
+              />
+              <Typography
+                variant="caption"
+                component="p"
+                sx={{ mx: 2, my: 1, color: "text.secondary" }}
+              >
+                Lowest reserve in each month. Below zero means a reserve
+                deficit.
+              </Typography>
             </>
           );
           break;
