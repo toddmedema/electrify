@@ -3953,6 +3953,9 @@ $pane_header_height: 48px;
     height: 40px;
 
     .facilityActivity {
+      // The triangle's open upper-right corner keeps the lower exchange arrow visible.
+      top: -2px;
+      bottom: auto;
       color: $font_color_primary;
     }
   }
@@ -6808,10 +6811,16 @@ $programs_column: 800px;
 [data-theme] .MuiAvatar-root:has(> .MuiAvatar-img[src$="/transmission.svg"]),
 img[src$="/transmission.svg"] {
   border-radius: 0;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
-[data-theme="dark"] img[src$="/transmission.svg"]:not(.MuiAvatar-img) {
+[data-theme="dark"]
+  :is(
+    .MuiAvatar-root:has(> .MuiAvatar-img[src$="/transmission.svg"]),
+    img[src$="/transmission.svg"]:not(.MuiAvatar-img)
+  ) {
   box-sizing: border-box;
-  padding: 2px;
+  // Inset the steep sides and base evenly; square padding leaves a heavy base stripe.
+  padding: 4px 3px 2px;
   background: var(--font-color-primary);
 }
 

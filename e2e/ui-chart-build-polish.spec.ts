@@ -432,25 +432,26 @@ for (const theme of ["light", "dark"] as const) {
             "clip-path",
             "polygon(50% 0px, 100% 50%, 50% 100%, 0px 50%)",
           );
+        else {
+          await expect(icon).toHaveCSS(
+            "clip-path",
+            "polygon(50% 0px, 100% 100%, 0px 100%)",
+          );
+          await icon
+            .locator("img")
+            .evaluate((element) => (element as HTMLImageElement).decode());
+        }
       }
       expect(
         await card.evaluate(
           (element) => element.scrollWidth - element.clientWidth,
         ),
       ).toBeLessThanOrEqual(1);
-      if (
-        process.env.REVIEW_SCREENSHOT_DIR &&
-        ((category === "Interties" &&
-          theme === "light" &&
-          info.project.name === "desktop-chromium") ||
-          (category === "Storage" &&
-            theme === "dark" &&
-            info.project.name === "mobile-390px"))
-      ) {
+      if (process.env.REVIEW_SCREENSHOT_DIR && category === "Interties") {
         await page.screenshot({
           path: path.join(
             process.env.REVIEW_SCREENSHOT_DIR,
-            `${category}-${theme}.png`,
+            `interties-${theme}-${info.project.name}.png`,
           ),
           animations: "disabled",
         });
@@ -506,16 +507,71 @@ for (const theme of ["light", "dark"] as const) {
       "border-radius",
       "0px",
     );
-    if (
-      process.env.REVIEW_SCREENSHOT_DIR &&
-      theme === "dark" &&
-      info.project.name === "desktop-chromium"
-    ) {
+    await expect(page.locator(".transmissionListIcon").first()).toHaveCSS(
+      "clip-path",
+      "polygon(50% 0px, 100% 100%, 0px 100%)",
+    );
+    await page
+      .locator(".transmissionListIcon")
+      .first()
+      .evaluate((element) => (element as HTMLImageElement).decode());
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.mouse.move(0, 0);
       await expect(page.locator(".snackbarContent")).toBeHidden();
       await page.screenshot({
         path: path.join(
           process.env.REVIEW_SCREENSHOT_DIR,
-          "facility-focus-dark.png",
+          `facilities-${theme}-${info.project.name}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+  });
+
+  test(`operating intertie badges leave the exchange arrow clear in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=111");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await openPane(
+      page.locator(".facilities:visible"),
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    const line = page.locator(".transmissionLine").first();
+    const icon = line.locator(".transmissionIcon");
+    const badge = icon.locator(".facilityActivity");
+    await expect(badge).toBeVisible();
+    await line
+      .locator(".transmissionListIcon")
+      .evaluate((element) => (element as HTMLImageElement).decode());
+    await line.scrollIntoViewIfNeeded();
+    const iconBounds = (await icon.boundingBox())!;
+    const badgeBounds = (await badge.boundingBox())!;
+    // The exchange arrow occupies the triangle's lower half. Nest the flow badge in
+    // the open upper-right corner, clear of both arrowheads.
+    expect(badgeBounds.y + badgeBounds.height).toBeLessThanOrEqual(
+      iconBounds.y + iconBounds.height / 2,
+    );
+    expect(badgeBounds.x).toBeGreaterThanOrEqual(
+      iconBounds.x + iconBounds.width / 2,
+    );
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `operating-${theme}-${info.project.name}.png`,
+        ),
+        animations: "disabled",
+      });
+      await line.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `operating-row-${theme}-${info.project.name}.png`,
         ),
         animations: "disabled",
       });
