@@ -538,11 +538,11 @@ describe("weather resilience defaults", () => {
       });
       expect(g.resilienceExtraBuildCost).toBeUndefined();
     });
-    // The package is a small, exact share of the otherwise identical scaled price.
+    // Both gas cycles have the same capacity-based targeted protection price.
     const [iceGas] = icelandGas;
     const extra = iceGas.resilienceExtraBuildCost as number;
-    const base = iceGas.buildCost - extra;
-    expect(extra).toBe(Math.round(base * 0.02));
+    expect(extra).toBe(icelandGas[1].resilienceExtraBuildCost);
+    expect(extra).toBeGreaterThan(0);
   });
 
   it("offers solar hail resistance unselected by default", () => {

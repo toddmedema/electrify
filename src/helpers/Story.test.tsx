@@ -23,6 +23,31 @@ function month(index: number): MonthlyHistoryType {
 describe("storyOutputMultiplier", () => {
   const coal = { id: 3, fuel: "Coal" as const };
 
+  it("halves only cold loss on protected assets, including projected completion, without softening other outages", () => {
+    const effects = {
+      winterizationOutputMultipliersByFuel: { Coal: 0.73 },
+      facilityOutputMultipliersById: { "3": 0.5 },
+    };
+    expect(storyOutputMultiplier(coal, effects)).toBe(0.365);
+    expect(
+      storyOutputMultiplier(
+        { ...coal, resilience: { coldWeatherPackage: true } },
+        effects,
+      ),
+    ).toBeCloseTo(0.4325);
+    const pending = {
+      ...coal,
+      upgradeInProgress: {
+        upgrade: "coldWeatherPackage" as const,
+        cost: 100,
+        startsMinute: 0,
+        completesMinute: 100,
+      },
+    };
+    expect(storyOutputMultiplier(pending, effects, 99)).toBe(0.365);
+    expect(storyOutputMultiplier(pending, effects, 100)).toBeCloseTo(0.4325);
+  });
+
   it("multiplies the fuel and facility derates", () => {
     expect(
       storyOutputMultiplier(coal, {

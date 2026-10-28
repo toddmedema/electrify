@@ -25,6 +25,9 @@ const FACILITY_UPGRADES: readonly FacilityUpgradeType[] = [
 const RESILIENCE_FIELDS_BY_FUEL: Readonly<Record<string, readonly string[]>> = {
   Sun: ["hailResistant", "solarTrackers", "trackerHailDamageFactor"],
   "Natural Gas": ["coldWeatherPackage", "designMinTempC"],
+  Coal: ["coldWeatherPackage"],
+  Uranium: ["coldWeatherPackage"],
+  Wind: ["coldWeatherPackage"],
 };
 
 /**

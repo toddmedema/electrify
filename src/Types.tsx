@@ -1138,7 +1138,7 @@ export interface FacilityResilienceType {
   // "Sun" with trackers: the share of hail damage a tracked array still takes, fixed at build by
   // the stow angle the trackers of that year could reach.
   trackerHailDamageFactor?: number; // (0, 1]
-  coldWeatherPackage?: boolean; // "Natural Gas" fuel only, either cycle
+  coldWeatherPackage?: boolean; // Gas, coal, nuclear, and onshore wind
   // "Natural Gas" fuel only: the coldest representative-day minimum the plant runs through without a
   // derate, resolved at build or retrofit from the location so it cannot drift afterwards.
   designMinTempC?: number; // [-60, 0]
@@ -1192,6 +1192,8 @@ export interface WorldEventEffectsType {
   /** Fixed company-wide operating expense charged once per active story month. */
   operatingExpensePerMonth?: number;
   facilityOutputMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
+  /** Cold-only losses; installed winterization halves their loss on each facility. */
+  winterizationOutputMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
   facilityOutputMultipliersById?: Record<string, number>;
 }
 

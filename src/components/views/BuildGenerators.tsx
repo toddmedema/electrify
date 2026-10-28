@@ -322,12 +322,15 @@ export function GeneratorBuildItem(
           STANDARD_GAS_DESIGN_MIN_TEMP_C;
         const lines: { text: string; warning?: boolean }[] = [
           {
-            text: coldPackageEffect(
-              props.withResilience({ [option.upgrade]: true }).resilience
-                ?.designMinTempC ?? standardMinTempC,
-              standardMinTempC,
-              units,
-            ),
+            text:
+              generator.fuel !== "Natural Gas"
+                ? "Permanently halves this plant’s output losses in the deep freeze."
+                : coldPackageEffect(
+                    props.withResilience({ [option.upgrade]: true }).resilience
+                      ?.designMinTempC ?? standardMinTempC,
+                    standardMinTempC,
+                    units,
+                  ),
           },
         ];
         if (option.defaultSelected) {

@@ -33,6 +33,7 @@ export function scenarioEffectsSummary(
     ["construction cost", effects.buildCostMultipliersByFuel],
     ["operating cost", effects.operatingCostMultipliersByFuel],
     ["output", effects.facilityOutputMultipliersByFuel],
+    ["unprotected cold output", effects.winterizationOutputMultipliersByFuel],
   ] as const) {
     Object.entries(values || {}).forEach(([fuel, value]) =>
       changes.push(`${fuel} ${label}: ${rounded(value! * 100)}% of normal`),

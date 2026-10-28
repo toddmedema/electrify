@@ -674,7 +674,7 @@ describe("weather hardening in the purchase dialog", () => {
     });
     expect(option).toBeChecked();
     expect(option).toHaveAccessibleDescription(
-      "Rated to \u221230°C instead of \u22128°C; halves losses below that. Recommended here: winters often drop below \u22128°C.",
+      "Rated to \u221230°C instead of \u22128°C; halves remaining cold losses and deep-freeze losses. Recommended here: winters often drop below \u22128°C.",
     );
     const impact = within(dialog).getByRole("region", {
       name: "Expected impact",
@@ -692,6 +692,33 @@ describe("weather hardening in the purchase dialog", () => {
     });
     expect(quote.resilienceExtraBuildCost).toBeUndefined();
   });
+
+  it.each(["Natural Gas Peaker", "Coal", "Nuclear", "Wind"])(
+    "offers permanent winterization when buying %s in Deep Freeze",
+    (name) => {
+      const game = createGame({ scenarioId: 107 });
+      game.timeline[0].cash = 1e12;
+      const onBuild = jest.fn();
+      render(
+        <BuildGenerators
+          game={game}
+          onBack={jest.fn()}
+          onBuildGenerator={onBuild}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: `Review purchase of ${name}` }),
+      );
+      const dialog = screen.getByRole("dialog");
+      const option = within(dialog).getByRole("checkbox", {
+        name: /^Cold-weather package/,
+      });
+      expect(option).not.toBeChecked();
+      fireEvent.click(option);
+      fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
+      expect(onBuild.mock.calls[0][0].resilience.coldWeatherPackage).toBe(true);
+    },
+  );
 
   it("offers no cold-weather package where winters never get cold enough", () => {
     const game = createGame({ scenarioId: 100 });
