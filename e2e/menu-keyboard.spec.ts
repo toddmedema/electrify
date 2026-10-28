@@ -67,8 +67,18 @@ test("a background arrow during Settings exit preserves volume and restores focu
   await page.clock.install();
   await page.reload();
   const settings = page.getByRole("button", { name: "Settings", exact: true });
+  const manualBounds = await page
+    .getByRole("button", { name: "Manual", exact: true })
+    .boundingBox();
+  expect(manualBounds).not.toBeNull();
   await settings.click();
   await page.getByRole("switch", { name: "Sound", exact: true }).check();
+  // Returning reveals Manual beneath a stationary pointer. Hover may select it
+  // before the delayed Settings focus restoration; Play need not own focus.
+  await page.mouse.move(
+    manualBounds!.x + manualBounds!.width / 2,
+    manualBounds!.y + manualBounds!.height / 2,
+  );
   const effects = page.getByRole("slider", {
     name: "Effects volume",
     exact: true,
