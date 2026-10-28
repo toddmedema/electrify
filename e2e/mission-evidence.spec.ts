@@ -298,14 +298,27 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
+  // The pause confirmation can cover Resume on phones, and MUI keeps it open on hover.
+  // Release the pointer and wait for it to clear before acting on the row beneath it.
+  await page.mouse.move(0, 0);
+  await expect(page.locator(".snackbarContent")).toBeHidden();
   await page.getByRole("button", { name: "Resume Coal", exact: true }).click();
   // A shortfall later in the sampled day replaces the reassuring reserve reading.
-  await expect(page.locator(".gridHealth:visible")).toContainText(
-    "Blackout ahead",
-  );
-  await expect(page.locator(".gridHealth:visible")).toHaveClass(
-    /statusWarning/,
-  );
+  const grid = page.locator(".gridHealth:visible");
+  await expect(grid).toHaveClass(/gridHealth-blackout-ahead/);
+  if (info.project.name === "mobile-390px") {
+    const warning = grid.getByRole("button", {
+      name: /^Current grid status: Blackout ahead, .+ short at /,
+    });
+    await expect(warning).toBeVisible();
+    await warning.tap();
+    await expect(
+      page.getByRole("tooltip", { name: /^Blackout ahead, .+ short at / }),
+    ).toBeVisible();
+  } else {
+    await expect(grid).toContainText("Blackout ahead");
+    await expect(grid).toHaveClass(/statusWarning/);
+  }
   await expect(page.locator(".missionRiskButton:visible")).not.toContainText(
     /shortfall/i,
   );

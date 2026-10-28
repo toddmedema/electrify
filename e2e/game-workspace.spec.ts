@@ -79,6 +79,33 @@ for (const theme of ["light", "dark"] as const) {
       path: testInfo.outputPath(`centered-fleet-tools-${theme}.png`),
       animations: "disabled",
     });
+    // Three and four rails still leave a capped, centered fleet on a 4K display.
+    await page.setViewportSize({ width: 3840, height: 1100 });
+    await page.locator("#programsNav").click();
+    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
+    await expectCenteredFleet(960, 3360);
+    await expectSideRails(page);
+    await expect(insights.locator("#chartForecastSupplyDemand")).toBeVisible({
+      timeout: 60_000,
+    });
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`centered-fleet-three-panels-${theme}.png`),
+      animations: "disabled",
+    });
+    await page.locator("#eventsNav").click();
+    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(4);
+    await expectCenteredFleet(960, 2880);
+    await expectSideRails(page);
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`centered-fleet-four-panels-${theme}.png`),
+      animations: "disabled",
+    });
+    await page
+      .getByRole("button", { name: "Close Programs", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Close Events", exact: true })
+      .click();
     // Only shrink once the open tools leave less than 1800px for the main content.
     await page.setViewportSize({ width: 2240, height: 1100 });
     await expectCenteredFleet(480, 1760);
