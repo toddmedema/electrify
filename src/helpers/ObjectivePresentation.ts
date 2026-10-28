@@ -1,3 +1,4 @@
+import { formatNumber } from "./Format";
 import type { CompiledRuleObjective } from "../data/ScenarioRules";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import { MONTHS } from "../Constants";
@@ -14,7 +15,7 @@ const number = (
   // Keep a measured value on its actual side of a nearby target. A rounded-up 100%
   // beside a failed reliability verdict would contradict the recorded result.
   const precise = comparison === undefined || rounded === compared;
-  return (precise ? value : rounded).toLocaleString("en-US", {
+  return formatNumber(precise ? value : rounded, {
     maximumSignificantDigits: precise ? 21 : 6,
     ...(percent ? { style: "percent" } : {}),
   });

@@ -217,21 +217,18 @@ describe("TutorialHud", () => {
     expect(hudProps.onExit).toHaveBeenCalledTimes(1);
   });
 
-  it("always shows help and has no redundant Next for gates", () => {
+  it("has no redundant Next for gates", () => {
     render(
       <TutorialHud
         {...props({
           step: objective({
             advanceOn: () => false,
-            hint: "Look at the reserve readout.",
           }),
         })}
       />,
     );
 
-    expect(screen.getByRole("note")).toHaveTextContent(
-      "Look at the reserve readout.",
-    );
+    expect(screen.queryByRole("note")).toBeNull();
     expect(screen.queryByRole("button", { name: /hint/i })).toBeNull();
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
     expect(screen.queryByText("Complete objective")).toBeNull();

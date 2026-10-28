@@ -290,6 +290,7 @@ import {
   CUSTOM_SCENARIO_ID,
   getNextTutorial,
   getScenario,
+  getTutorialStep,
   SCENARIOS,
   TUTORIALS,
 } from "../data/Scenarios";
@@ -2014,7 +2015,7 @@ export const gameSlice = createSlice({
       if (
         state.tutorialIntertieStress?.active &&
         !state.replayPlayback &&
-        state.tutorialStep < 18 &&
+        getTutorialStep(state)?.phase !== "INTERTIE_STRESS_SUPPLY" &&
         action.payload !== "PAUSED"
       )
         return;
@@ -2075,7 +2076,7 @@ export const gameSlice = createSlice({
       if (
         state.scenarioId !== 112 ||
         state.customScenario ||
-        state.tutorialStep !== 15 ||
+        getTutorialStep(state)?.phase !== "INTERTIE_STRESS_PREPARE" ||
         state.tutorialIntertieStress
       )
         return;
@@ -3656,7 +3657,7 @@ export function* tickStatePhases(
   if (
     state.tutorialIntertieStress?.active &&
     !state.replayPlayback &&
-    state.tutorialStep < 18
+    getTutorialStep(state)?.phase !== "INTERTIE_STRESS_SUPPLY"
   ) {
     state.speed = "PAUSED";
     return;

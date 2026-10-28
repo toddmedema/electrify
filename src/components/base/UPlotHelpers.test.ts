@@ -9,6 +9,7 @@ import {
   chartScale,
   xAxis,
   yAxis,
+  niceSplits,
 } from "./UPlotHelpers";
 import { applyTextSize } from "../../TextSize";
 
@@ -257,4 +258,15 @@ describe("spansBelow", () => {
     expect(spans[0][0]).toBeCloseTo(0.25);
     expect(spans[0][1]).toBe(1);
   });
+});
+
+it("uses positive zero for axis ticks crossing a small negative lower bound", () => {
+  const ticks = niceSplits(-1, 16500);
+  expect(ticks).toEqual([0, 5000, 10000, 15000]);
+  expect(ticks.some((value) => Object.is(value, -0))).toBe(false);
+  expect(niceSplits(-10000, 10000)).toContain(-5000);
+});
+
+it("does not retain negative zero in a degenerate axis", () => {
+  expect(niceSplits(-0, -0)).toEqual([0]);
 });

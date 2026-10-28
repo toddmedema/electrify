@@ -456,15 +456,15 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             ? "draining"
             : facility.hydroLastSpillWh
               ? "spilling"
-              : "steady";
+              : "";
       const low =
         Math.round(capacityFraction! * 100) < RESERVOIR_WARNING_FRACTION * 100;
-      detail = (
+      detail = waterStatus ? (
         <span className={low ? "facilityStatusLow" : undefined}>
           {waterStatus}
           {low && <span className="srOnly"> low</span>}
         </span>
-      );
+      ) : null;
     }
   }
   // Output communicates normal operation; keep explicit labels for other states.

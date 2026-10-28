@@ -517,12 +517,6 @@ export default function TutorialHud({
             {content}
           </div>
         </div>
-
-        {step.hint && (
-          <div className="tutorialHudHint" role="note">
-            <strong>Hint:</strong> {step.hint}
-          </div>
-        )}
       </div>
 
       <div className="tutorialHudFooter">

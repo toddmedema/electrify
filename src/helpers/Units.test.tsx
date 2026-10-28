@@ -52,3 +52,8 @@ describe("Units", () => {
     expect(formatPricePerLargeMass(0, "imperial")).toBe("$0/ton");
   });
 });
+
+it("does not show negative zero for a per-ton price rounded to zero", () => {
+  expect(formatPricePerLargeMass(-0.00001, "metric")).toBe("$0/tonne");
+  expect(formatPricePerLargeMass(-0.001, "metric")).toBe("$-1/tonne");
+});

@@ -1,4 +1,6 @@
 import { expect, test } from "./fixtures";
+import { sortBuildCatalog } from "./layout";
+import { reviewScreenshot } from "./review-screenshot";
 
 for (const theme of ["light", "dark"]) {
   test(`tutorial explanation uses the available width in ${theme}`, async ({
@@ -50,6 +52,12 @@ for (const theme of ["light", "dark"]) {
       .getByRole("button", { name: "Start Generators", exact: true })
       .click();
     await page.locator(".button-buildFacility").click();
+    await expect(page.locator(".tutorialHud")).toContainText("Sort generators");
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`sort-${theme}.png`),
+      animations: "disabled",
+    });
+    await sortBuildCatalog(page);
     await expect(page.locator(".tutorialHud")).toContainText("Compare cost");
     await expect(
       page.getByRole("tablist", { name: "Build categories" }),

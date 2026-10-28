@@ -43,6 +43,8 @@ interface ChartMockProps {
   currentMinute?: number;
   title?: string;
   hideTitle?: boolean;
+  format?: (value: number) => number | string;
+  formatAxis?: (value: number) => number | string;
   id?: string;
   syncKey?: string;
   timeline?: unknown[];
@@ -191,12 +193,16 @@ jest.mock("../base/ChartFinances", () => ({
     domain,
     title,
     hideTitle,
+    format,
+    formatAxis,
   }: ChartMockProps) => (
     <div
       role="img"
       id={id}
       data-testid={id}
       data-visible-title={hideTitle ? "" : title}
+      data-inspected-value={format?.(123456)}
+      data-axis-value={(formatAxis || format)?.(123456)}
       data-sync-key={syncKey}
       data-points={timeline?.length}
       data-domain={domainValue(domain)}
@@ -1013,9 +1019,24 @@ describe("Insights layers", () => {
     expect(screen.getAllByRole("heading", { level: 6 })[1]).toHaveTextContent(
       "Power exchange",
     );
+    const exchange = screen.getByRole("region", {
+      name: "Power exchange evidence",
+    });
+    expect(
+      within(exchange).getByRole("button", { name: "What is Interties?" }),
+    ).toBeVisible();
+    expect(within(exchange).queryByText("How interties work")).toBeNull();
     expect(localStorage.getItem("insightsLayers")).toBe(
       JSON.stringify(["cash", "supplyDemand"]),
     );
+  });
+
+  it("gives the customer chart two significant digits on axes and three on inspection", () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["customers"]));
+    renderInsights();
+    const chart = screen.getByTestId("chartInsightsCustomersPlot");
+    expect(chart).toHaveAttribute("data-axis-value", "120K");
+    expect(chart).toHaveAttribute("data-inspected-value", "123K");
   });
 
   it("applies presets and gives every chart the shared cursor key", async () => {

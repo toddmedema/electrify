@@ -2,7 +2,7 @@ import { Box, Typography } from "@mui/material";
 import { GameType } from "../../Types";
 import { summarizeTimeline } from "../../helpers/DateTime";
 import { compareEconomicFutures } from "../../helpers/EconomicFutures";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise, formatFixed } from "../../helpers/Format";
 
 export default function EconomicFutureComparison({ game }: { game: GameType }) {
   const rows = compareEconomicFutures({
@@ -29,11 +29,11 @@ export default function EconomicFutureComparison({ game }: { game: GameType }) {
           </Typography>
           <Typography variant="body2">
             Fuel: {formatMoneyConcise(row.annualFuelExpense)}/year with{" "}
-            {(row.annualFuelGrowth * 100).toFixed(0)}% annual price growth
+            {formatFixed(row.annualFuelGrowth * 100, 0)}% annual price growth
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Prime borrowing rate: {(row.primeRate * 100).toFixed(1)}% ·
-            Inflation: {(row.inflationRate * 100).toFixed(1)}%
+            Prime borrowing rate: {formatFixed(row.primeRate * 100, 1)}% ·
+            Inflation: {formatFixed(row.inflationRate * 100, 1)}%
           </Typography>
         </Box>
       ))}

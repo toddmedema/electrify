@@ -55,8 +55,10 @@ for (const theme of ["light", "dark"]) {
     const image = chart.getByRole("img");
     await image.focus();
     await image.press("Home");
-    for (const label of ["Sunrise:", "Solar noon:", "Sunset:"])
-      await expect(chart.locator(".chartTooltip")).toContainText(label);
+    await expect(chart.locator(".chartTooltip")).toContainText("Total supply:");
+    await expect(chart.locator(".chartTooltip")).not.toContainText(
+      /sunrise|solar noon|sunset/i,
+    );
     await image.press("Escape");
     await page.mouse.move(0, 0);
     // Clear the keyboard focus ring for the review image.
@@ -261,6 +263,7 @@ for (const theme of ["light", "dark"]) {
       await page.mouse.move(hoverBounds.x + x, hoverBounds.y + y);
       const tooltip = chart.locator(".chartTooltip");
       await expect(tooltip).toBeVisible();
+      await expect(tooltip).not.toContainText(/sunrise|solar noon|sunset/i);
       const hoverTime = tooltip.locator(":scope > div").first();
       if (previousHoverTime)
         await expect(hoverTime).not.toHaveText(previousHoverTime);

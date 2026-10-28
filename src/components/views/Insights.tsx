@@ -58,6 +58,8 @@ import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { facilityLifetime } from "../../helpers/Financials";
 import {
   formatMoneyConcise,
+  formatCustomerCount,
+  formatPercent,
   formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
@@ -88,6 +90,8 @@ import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
 } from "../base/ChartForecastDemandByType";
 import ChartFinances from "../base/ChartFinances";
+import ManualLink from "../base/ManualLink";
+import { MANUAL_ENTRY } from "../base/ManualEntries";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
@@ -1497,7 +1501,12 @@ export default class Insights extends React.Component<Props, State> {
               game.startingYear,
             )}
             title={finance.label}
-            format={finance.format}
+            format={id === "customers" ? formatCustomerCount : finance.format}
+            formatAxis={
+              id === "customers"
+                ? (value) => formatCustomerCount(value, 2)
+                : undefined
+            }
             // Cash clips at zero and says so; profit keeps its axis and names its losses
             domainMin={finance.key === "cash" ? 0 : undefined}
             negativeNote={
@@ -1533,7 +1542,7 @@ export default class Insights extends React.Component<Props, State> {
                   title={
                     key === "inflationRate" ? "Inflation" : "Interest rate"
                   }
-                  format={(value) => (value * 100).toFixed(2) + "%"}
+                  format={(value) => formatPercent(value, 2)}
                   startingYear={game.startingYear}
                   domain={projection.domain.x}
                   syncKey={SYNC_KEY}
@@ -1783,7 +1792,12 @@ export default class Insights extends React.Component<Props, State> {
         aria-label={`${definition.label} evidence`}
       >
         <Toolbar className="insightsTrackHeader">
-          <Typography variant="h6">{definition.label}</Typography>
+          <Typography variant="h6">
+            {definition.label}
+            {id === "powerExchange" && (
+              <ManualLink entry={MANUAL_ENTRY.INTERTIES} />
+            )}
+          </Typography>
           {this.state.layersOpen && (
             <span className="insightsTrackActions">
               <IconButton

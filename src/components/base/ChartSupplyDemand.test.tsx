@@ -6,7 +6,6 @@ import ChartSupplyDemand, {
   Props,
 } from "./ChartSupplyDemand";
 import { LOCATIONS } from "../../Constants";
-import * as DateTime from "../../helpers/DateTime";
 
 const timeline: Props["timeline"] = [
   {
@@ -89,7 +88,6 @@ it("breaks supply into the four legend groups and keeps the full demand breakdow
     timeline,
     ...stack,
     startingYear: 2020,
-    location: LOCATIONS.SF,
   };
   expect(formatProductionTooltip(0, state)).toContain("Interties: 30W");
   expect(formatProductionTooltip(0, state)).toContain("Storage: 0W");
@@ -243,7 +241,6 @@ it("keeps simultaneous inward and outward flows distinct around the customer-dem
       },
     ],
     startingYear: 2020,
-    location: LOCATIONS.SF,
   });
   expect(label).toContain("Storage: 20W");
   expect(label).toContain("Storage charging: 15W");
@@ -277,20 +274,13 @@ it("ends blackout shading when storage exactly meets the customer deficit", () =
   );
 });
 
-it("keeps solar noon available on inspection without confusing it with clock noon", () => {
-  const sun = jest.spyOn(DateTime, "getSunriseSunset").mockReturnValue({
-    sunrise: 360,
-    sunset: 1140,
-    daylight: "normal",
-  });
+it("keeps daylight times out of the supply and demand tooltip", () => {
   const state = {
     timeline,
     ...supplyDemandStack(timeline, []),
     startingYear: 2020,
-    location: LOCATIONS.SF,
   };
-  expect(formatProductionTooltip(0, state)).toContain("Solar noon: 12:30 PM");
-  sun.mockReturnValue({ sunrise: 0, sunset: 1440, daylight: "polar-day" });
-  expect(formatProductionTooltip(0, state)).not.toContain("Solar noon");
-  sun.mockRestore();
+  const tooltip = formatProductionTooltip(0, state);
+  expect(tooltip).toContain("Total supply:");
+  expect(tooltip).not.toMatch(/sunrise|solar noon|sunset/i);
 });

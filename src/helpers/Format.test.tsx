@@ -10,6 +10,10 @@ import {
   formatWattsOfPeak,
   formatPercent,
   formatCount,
+  formatCustomerCount,
+  withoutNegativeZero,
+  formatFixed,
+  formatNumber,
   formatPricePerMWh,
   formatFacilitySize,
   formatBuildMonths,
@@ -180,4 +184,65 @@ describe("money formatting of values that are not numbers", () => {
 test("energy uses the same magnitude thresholds as power", () => {
   expect(formatWattHours(500e6)).toBe("500MWh");
   expect(formatWattHours(1e9)).toBe("1GWh");
+});
+
+describe("formatCustomerCount", () => {
+  it.each([
+    [1234, "1.2K", "1.23K"],
+    [123456, "120K", "123K"],
+    [1234567, "1.2M", "1.23M"],
+    [9876543, "9.9M", "9.88M"],
+    [0, "0", "0"],
+  ])(
+    "keeps two digits on axes and three on inspection for %s customers",
+    (value, axis, tooltip) => {
+      expect(formatCustomerCount(Number(value), 2)).toBe(axis);
+      expect(formatCustomerCount(Number(value))).toBe(tooltip);
+    },
+  );
+});
+
+describe("zero signs in UI numbers", () => {
+  it("displays negative zero as zero in compact customer counts", () => {
+    expect(formatCustomerCount(-0, 2)).toBe("0");
+    expect(formatCustomerCount(-0)).toBe("0");
+  });
+
+  it("does not put a minus before counts or percentages rounded to zero", () => {
+    expect(formatCount(-0.1)).toBe("0");
+    expect(formatPercent(-0.00001, 1)).toBe("0.0%");
+    expect(formatPercent(-0.01, 1)).toBe("-1.0%");
+    expect(formatCustomerCount(-0.00123)).toBe("-0.00123");
+  });
+});
+
+describe("displayed negative zero", () => {
+  it.each([
+    ["-0", "0"],
+    ["−0.00%", "0.00%"],
+    ["$-0.00", "$0.00"],
+    ["-$0.00", "$0.00"],
+    ["-0,000.00 kWh", "0,000.00 kWh"],
+    ["-0.001", "-0.001"],
+    ["-0.01%", "-0.01%"],
+    ["-$0.01", "-$0.01"],
+    ["-1,000", "-1,000"],
+  ])("formats %s as %s", (input, output) => {
+    expect(withoutNegativeZero(input)).toBe(output);
+  });
+
+  it("keeps fixed decimals while clearing only zero signs", () => {
+    expect(formatFixed(-0.004, 2)).toBe("0.00");
+    expect(formatFixed(-0.005, 2)).toBe("-0.01");
+    expect(formatFixed(-0.4, 0)).toBe("0");
+    expect(formatFixed(-0.5, 0)).toBe("-1");
+    expect(formatNumber(-0)).toBe("0");
+    expect(formatNumber(-0.00001)).toBe("0");
+    expect(formatNumber(-0.00001, { maximumSignificantDigits: 3 })).toBe(
+      "-0.00001",
+    );
+    expect(formatMoneyConcise(-0.001)).toBe("$0");
+    expect(formatWatts(-0.001)).toBe("0W");
+    expect(formatScore(-0.001)).toBe("0");
+  });
 });

@@ -84,7 +84,7 @@ import {
   siteCountLabel,
 } from "../base/BuildAvailability";
 import HydroPrimer, { useHydroPrimer } from "../base/HydroPrimer";
-import { getScenario } from "../../data/Scenarios";
+import { getScenario, getTutorialStep } from "../../data/Scenarios";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import Sparkline from "../base/Sparkline";
@@ -953,8 +953,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     )
     .filter(
       (generator) =>
-        game.scenarioId !== 1 ||
-        game.tutorialStep !== 1 ||
+        getTutorialStep(game)?.phase !== "GENERATOR_CHOICES" ||
         ["Natural Gas", "Sun", "Wind"].includes(generator.fuel),
     );
   // Technologies that burn the same fuel stay side by side, placed among the rest by their better

@@ -521,7 +521,7 @@ it("pins up to three current-grid choices into a comparison tray", () => {
 
 it("keeps expanded details with their generator when tutorial choices expand", () => {
   const game = createGame({ scenarioId: 1 });
-  game.tutorialStep = 1;
+  game.tutorialStep = 2;
   const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
   const { rerender } = render(<BuildGenerators game={game} {...callbacks} />);
   expect(
@@ -529,7 +529,7 @@ it("keeps expanded details with their generator when tutorial choices expand", (
   ).toHaveLength(4);
   fireEvent.click(screen.getByRole("button", { name: "Show Wind details" }));
   rerender(
-    <BuildGenerators game={{ ...game, tutorialStep: 2 }} {...callbacks} />,
+    <BuildGenerators game={{ ...game, tutorialStep: 3 }} {...callbacks} />,
   );
   expect(
     screen.getByRole("button", { name: "Hide Wind details" }),

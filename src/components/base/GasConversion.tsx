@@ -7,7 +7,11 @@ import {
 } from "../../Types";
 import { gasConversionQuote } from "../../helpers/GasConversion";
 import { currentCash } from "../../helpers/GameSelectors";
-import { formatMoneyConcise, formatPercent } from "../../helpers/Format";
+import {
+  formatMoneyConcise,
+  formatPercent,
+  formatNumber,
+} from "../../helpers/Format";
 import ConfirmDialog from "./ConfirmDialog";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import DecisionImpactPreview from "./DecisionImpactPreview";
@@ -86,7 +90,7 @@ export default function GasConversion(props: {
               {
                 concept: "fuel",
                 label: "Fuel use",
-                value: `${((facility.btuPerWh ?? 0) * 1000).toLocaleString("en-US")} → ${((quote.target.btuPerWh ?? 0) * 1000).toLocaleString("en-US")} Btu/kWh`,
+                value: `${formatNumber((facility.btuPerWh ?? 0) * 1000)} → ${formatNumber((quote.target.btuPerWh ?? 0) * 1000)} Btu/kWh`,
               },
               {
                 concept: "time",
