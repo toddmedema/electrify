@@ -17,7 +17,7 @@ export const DIFFICULTIES = {
     blackoutPenalty: 2,
     peakSharingImportLoss: 0.25,
     description:
-      "Most forgiving: much lower game costs, very fast building, and smaller gameplay penalties from outages.",
+      "Most forgiving: much lower costs, very fast building, and smaller penalties from outages.",
   },
   Employee: {
     buildCost: 0.7,
@@ -26,7 +26,7 @@ export const DIFFICULTIES = {
     blackoutPenalty: 4,
     peakSharingImportLoss: 0.3,
     description:
-      "Forgiving: lower game costs, faster building, and smaller gameplay penalties from outages.",
+      "Forgiving: lower costs, faster building, and smaller penalties from outages.",
   },
   Manager: {
     buildCost: 0.8,
@@ -35,7 +35,7 @@ export const DIFFICULTIES = {
     blackoutPenalty: 6,
     peakSharingImportLoss: 0.375,
     description:
-      "Balanced: some help with game costs, building time, and outage penalties.",
+      "Balanced: some help with costs, building time, and outage penalties.",
   },
   VP: {
     buildCost: 0.9,
@@ -43,7 +43,7 @@ export const DIFFICULTIES = {
     buildTime: 0.7,
     blackoutPenalty: 8,
     peakSharingImportLoss: 0.45,
-    description: "Demanding: a little help with game costs and building time.",
+    description: "Demanding: a little help with costs and building time.",
   },
   CEO: {
     buildCost: 1,
@@ -52,7 +52,7 @@ export const DIFFICULTIES = {
     blackoutPenalty: 10,
     peakSharingImportLoss: 0.5,
     description:
-      "Full challenge: unadjusted game costs, building times, and outage penalties.",
+      "Full challenge: unadjusted costs, building times, and outage penalties.",
   },
 } satisfies Record<DifficultyType, DifficultyMultipliersType>;
 

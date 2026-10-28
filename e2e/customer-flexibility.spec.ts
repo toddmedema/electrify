@@ -31,7 +31,7 @@ for (const theme of ["light", "dark"]) {
         .getByRole("button", { name: new RegExp(`^${name} ·`) })
         .click();
       await expect(
-        dialog.getByText("Installation budget", { exact: true }),
+        dialog.getByText("Installation cost", { exact: true }),
       ).toBeVisible();
       await expect(
         dialog.getByText(/at full rollout · while on/),

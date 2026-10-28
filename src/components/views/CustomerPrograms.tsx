@@ -222,7 +222,7 @@ function FlexibilitySummary({
       : undefined;
   const facts: ProgramFact[] = [
     {
-      label: "Installation budget",
+      label: "Installation cost",
       value: `${formatMoneyConcise(buildoutComplete(program.adoption) ? 0 : flexibilityCapitalCost(game, id, month) / flexibilityMonths(id))}/mo`,
       detail: `${flexibilityMonths(id)} months of funding`,
     },
@@ -350,11 +350,11 @@ function BuildoutSummary({
       ]
     : [
         {
-          label: "Monthly budget",
+          label: "Monthly cost",
           value: `${formatMoneyConcise(policyBudget(game, id, "On", effective))}/mo`,
           detail: `Current profit: ${formatMoneyConcise(profit)}/mo`,
         },
-        { label: "Total budget", value: formatMoneyConcise(total) },
+        { label: "Total cost", value: formatMoneyConcise(total) },
         {
           label: "Duration",
           value: `${months} months`,
