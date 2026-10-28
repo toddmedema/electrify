@@ -89,18 +89,26 @@ function removeOwner(directory, token) {
 async function acquireLease(name, options = {}) {
   const root = options.root || coordinationRoot();
   fs.mkdirSync(root, { recursive: true });
-  const directory = path.join(root, name);
+  const slots = options.slots ?? 1;
+  if (!Number.isSafeInteger(slots) || slots < 1)
+    throw new Error("Reservation slots must be a positive integer");
+  // Keep the original name for slot one so older checkouts still coordinate with us.
+  const directories = Array.from({ length: slots }, (_, index) =>
+    path.join(root, index === 0 ? name : `${name}-${index + 1}`),
+  );
   const inherited = options.inherited;
   if (inherited) {
-    const owner = readOwner(directory);
-    if (owner?.token === inherited && ownerAlive(owner))
-      return {
-        token: inherited,
-        groupId: owner.groupId,
-        inherited: true,
-        waitMs: 0,
-        release() {},
-      };
+    for (const directory of directories) {
+      const owner = readOwner(directory);
+      if (owner?.token === inherited && ownerAlive(owner))
+        return {
+          token: inherited,
+          groupId: owner.groupId,
+          inherited: true,
+          waitMs: 0,
+          release() {},
+        };
+    }
   }
   const token = randomUUID();
   const prepared = path.join(root, `${name}-${token}`);
@@ -117,45 +125,56 @@ async function acquireLease(name, options = {}) {
   try {
     for (;;) {
       options.signal?.throwIfAborted();
-      try {
-        // The complete metadata becomes visible atomically with ownership.
-        fs.renameSync(prepared, directory);
-        return {
-          token,
-          inherited: false,
-          waitMs: Date.now() - started,
-          setChild(pid, groupId) {
-            owner.childPid = pid;
-            if (groupId !== undefined) owner.groupId = groupId;
-            const file = path.join(directory, `${token}.json`);
-            const temporary = path.join(root, `${token}.update`);
-            fs.writeFileSync(temporary, JSON.stringify(owner));
-            fs.renameSync(temporary, file);
-          },
-          release() {
-            removeOwner(directory, token);
-          },
-        };
-      } catch (error) {
-        if (!["EEXIST", "ENOTEMPTY", "EPERM"].includes(error.code)) throw error;
-      }
-      const current = readOwner(directory);
-      if (!current) {
+      let occupied;
+      let recovered = false;
+      for (const directory of directories) {
         try {
-          fs.rmdirSync(directory);
+          // The complete metadata becomes visible atomically with ownership.
+          fs.renameSync(prepared, directory);
+          return {
+            token,
+            inherited: false,
+            waitMs: Date.now() - started,
+            setChild(pid, groupId) {
+              owner.childPid = pid;
+              if (groupId !== undefined) owner.groupId = groupId;
+              const file = path.join(directory, `${token}.json`);
+              const temporary = path.join(root, `${token}.update`);
+              fs.writeFileSync(temporary, JSON.stringify(owner));
+              fs.renameSync(temporary, file);
+            },
+            release() {
+              removeOwner(directory, token);
+            },
+          };
         } catch (error) {
-          if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error.code))
+          if (!["EEXIST", "ENOTEMPTY", "EPERM"].includes(error.code))
             throw error;
         }
-      } else if (!ownerAlive(current)) {
-        removeOwner(directory, current.token);
-      } else {
+        const current = readOwner(directory);
+        if (!current) {
+          recovered = true;
+          try {
+            fs.rmdirSync(directory);
+          } catch (error) {
+            if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error.code))
+              throw error;
+          }
+        } else if (!ownerAlive(current)) {
+          removeOwner(directory, current.token);
+          recovered = true;
+        } else {
+          occupied = current;
+        }
+      }
+      if (recovered) continue;
+      if (occupied) {
         if (options.wait === false)
           throw new Error(
-            `Reservation ${name} is held by PID ${current.pid} in ${current.cwd}`,
+            `Reservation ${name} is held by PID ${occupied.pid} in ${occupied.cwd}`,
           );
         if (!announced) {
-          options.onWait?.(current);
+          options.onWait?.(occupied);
           announced = true;
         }
       }

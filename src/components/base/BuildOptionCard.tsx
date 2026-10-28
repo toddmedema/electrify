@@ -111,7 +111,12 @@ export default function BuildOptionCard(
           ...(props.titleComponent && {
             title: { component: props.titleComponent },
           }),
-          ...(warningInHeader && { subheader: { component: "div" } }),
+          ...(warningInHeader && {
+            subheader: {
+              component: "div",
+              className: "buildOptionHeaderWarning",
+            },
+          }),
         }}
         title={name}
         subheader={
@@ -125,7 +130,11 @@ export default function BuildOptionCard(
       {metrics !== undefined && (
         <>
           {!contextInHeader && context && (
-            <Typography className="buildOptionContext" variant="body2">
+            <Typography
+              className="buildOptionContext"
+              variant="body2"
+              color="textSecondary"
+            >
               {context}
             </Typography>
           )}

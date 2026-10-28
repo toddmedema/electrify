@@ -4,6 +4,7 @@ import production from "./production.playwright.config";
 const smoke = [
   "browser-environment.spec.ts",
   "build-options.spec.ts",
+  "contextual-learning.spec.ts",
   "escape-close.spec.ts",
   "game-workspace.spec.ts",
   "mission-evidence.spec.ts",
