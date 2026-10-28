@@ -174,6 +174,45 @@ describe("UPlotChart resizing", () => {
     expect(screen.getByText("Output 1.4", { exact: true })).toBeVisible();
   });
 
+  it("keeps solar context visible after the supply and load breakdown", () => {
+    render(
+      <UPlotChart
+        ariaLabel="Daylight chart"
+        state={{}}
+        data={[
+          [0, 1],
+          [10, 10],
+        ]}
+        buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+        interactiveTooltip
+        tooltip={() =>
+          "12 AM\nTotal supply: 10W\nWind: 10W\n\nTotal load: 9W\nDemand: 9W\n\nSunrise: 6:05 AM\nSunset: 6:07 PM"
+        }
+      />,
+    );
+    const plot = currentPlot();
+    const built = (uPlot as unknown as jest.Mock).mock.calls.at(
+      -1,
+    )[0] as uPlot.Options;
+    const tooltip = built.plugins!.at(-1)!;
+    screen.getByRole("img", { name: /Daylight chart/ }).appendChild(plot.over);
+    const init = tooltip.hooks!.init;
+    if (typeof init === "function")
+      init(plot, built, [
+        [0, 1],
+        [10, 10],
+      ]);
+    plot.cursor = { idx: 0, left: 0, top: 0 };
+    const cursor = tooltip.hooks!.setCursor;
+    if (typeof cursor === "function") cursor(plot);
+    expect(screen.getByText("Total supply: 10W")).toBeVisible();
+    expect(screen.getByText("Total load: 9W")).toBeVisible();
+    expect(screen.getByText(/Sunrise: 6:05 AM/)).toHaveTextContent(
+      "Sunset: 6:07 PM",
+    );
+    expect(screen.getByText(/Sunrise: 6:05 AM/)).toBeVisible();
+  });
+
   it("rebuilds a mounted canvas when text size changes without a window resize", () => {
     render(
       <UPlotChart
