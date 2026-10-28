@@ -5,7 +5,7 @@ import { openPane, openBuild } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"]) {
-  test(`current production mix stays a thin bar with inspectable details in ${theme}`, async ({
+  test(`current production mix stays a compact rail with inspectable details in ${theme}`, async ({
     page,
   }, info) => {
     if (info.project.name === "desktop-chromium")
@@ -48,6 +48,8 @@ for (const theme of ["light", "dark"]) {
     }
     await expect(bar).toBeVisible();
     await expect(bar).toHaveText("");
+    await expect(bar.locator(".productionMixChevron")).toBeVisible();
+    await expect(bar).toHaveAttribute("aria-expanded", "false");
     const chartBounds = (await pane
       .locator("#chartSupplyDemand")
       .boundingBox())!;
@@ -59,10 +61,10 @@ for (const theme of ["light", "dark"]) {
       .locator("#chartSupplyDemand .u-over")
       .boundingBox())!;
     expect(
-      Math.abs(trackBounds.y - (chartBounds.y + chartBounds.height)),
+      Math.abs(trackBounds.y - (chartBounds.y + chartBounds.height + 4)),
     ).toBeLessThanOrEqual(1);
     expect((await pane.locator(".productionMix").boundingBox())!.height).toBe(
-      4,
+      16,
     );
     expect(barBounds.y).toBeGreaterThanOrEqual(
       plotBounds.y + plotBounds.height,
@@ -79,7 +81,7 @@ for (const theme of ["light", "dark"]) {
     );
     expect(
       (await bar.locator(".productionMixTrack").boundingBox())!.height,
-    ).toBe(4);
+    ).toBe(8);
     await expect(page.getByRole("tooltip")).toHaveCount(0);
     await page.evaluate(() => document.fonts.ready);
     if (process.env.REVIEW_SCREENSHOT_DIR) {
@@ -95,6 +97,7 @@ for (const theme of ["light", "dark"]) {
     else await bar.hover();
     const tooltip = page.getByRole("tooltip");
     await expect(tooltip).toContainText("Supply now");
+    await expect(bar).toHaveAttribute("aria-expanded", "true");
     await expect(tooltip).toContainText("Total supply");
     await expect(tooltip.locator(".productionMixSource")).not.toHaveCount(0);
     const tipBounds = (await tooltip.boundingBox())!;
@@ -167,7 +170,7 @@ for (const theme of ["light", "dark"]) {
       for (const [index, segment] of (await segments.all()).entries()) {
         const resting = (await segment.boundingBox())!;
         await page.mouse.move(resting.x + resting.width / 2, target.y + 10);
-        await expect(segment).toHaveCSS("height", "6px");
+        await expect(segment).toHaveCSS("height", "10px");
         const highlighted = (await segment.boundingBox())!;
         expect(highlighted.y).toBe(track.y - 1);
         expect(highlighted.y + highlighted.height).toBe(
@@ -189,7 +192,7 @@ for (const theme of ["light", "dark"]) {
         await expect(
           bar.locator(".productionMixSegment.isHovered"),
         ).toHaveCount(1);
-        await expect(segments.nth(1 - index)).toHaveCSS("height", "4px");
+        await expect(segments.nth(1 - index)).toHaveCSS("height", "8px");
       }
       if (process.env.REVIEW_SCREENSHOT_DIR) {
         await page.screenshot({
@@ -200,6 +203,10 @@ for (const theme of ["light", "dark"]) {
           animations: "disabled",
         });
       }
+      await bar.locator(".productionMixChevron").hover();
+      await expect(bar.locator(".productionMixSegment.isHovered")).toHaveCount(
+        0,
+      );
       await page.mouse.move(0, 0);
       await expect(bar.locator(".productionMixSegment.isHovered")).toHaveCount(
         0,
@@ -208,7 +215,7 @@ for (const theme of ["light", "dark"]) {
         tooltip.locator(".productionMixSource.isHovered"),
       ).toHaveCount(0);
       for (const segment of await segments.all()) {
-        await expect(segment).toHaveCSS("height", "4px");
+        await expect(segment).toHaveCSS("height", "8px");
       }
     }
 
@@ -791,7 +798,7 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
       const segments = mix.locator(".productionMixSegment");
       for (const index of [0, 6, 11, 12]) {
         await segments.nth(index).hover();
-        await expect(segments.nth(index)).toHaveCSS("height", "6px");
+        await expect(segments.nth(index)).toHaveCSS("height", "10px");
         await expect(
           mixDetails.locator(".productionMixSource").nth(index),
         ).toHaveCSS("font-weight", "700");
@@ -866,7 +873,7 @@ test("production divider follows side-panel capacity and clears its tooltip when
       "side",
     );
     await expect(bar).toBeVisible();
-    await expect(pane.locator(".productionMix")).toHaveCSS("height", "4px");
+    await expect(pane.locator(".productionMix")).toHaveCSS("height", "16px");
   }
   await page.setViewportSize({ width: 1330, height: 800 });
   await openBuild(page);

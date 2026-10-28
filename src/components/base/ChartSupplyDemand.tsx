@@ -74,6 +74,7 @@ interface State {
   range: [number, number];
   hourTicks: number[];
   sunTicks: number[];
+  location: LocationType;
   blackoutSpans: Array<[number, number]>;
   currentMinute: number | null;
   minute: number;
@@ -88,7 +89,7 @@ interface State {
 
 // Words rather than emoji: platform emoji are full-colour art that clash with the flat icon
 // set and change shape from one OS to the next
-const SUN_LABELS = ["Sunrise", "Noon", "Sunset"];
+const SUN_LABELS = ["Sunrise", "Sunset"];
 
 // Fuel boundaries stay lighter than the demand the player has to meet. Solid records and
 // dashed forecasts meet at now; fills stay subtle so blackout shading remains visible.
@@ -306,12 +307,17 @@ function buildOptions({
         scale: "x",
         side: 2,
         stroke: tickLabelFill(),
-        font: chartFont(),
+        font: chartFont(1, 11),
         grid: { show: false },
-        ticks: { show: false },
+        ticks: {
+          show: true,
+          stroke: chartPalette().tick,
+          width: 1,
+          size: 3 * scale,
+        },
         border: { show: false },
         size: 18 * scale,
-        gap: 0,
+        gap: 3 * scale,
         splits: () => getState().sunTicks,
         values: () => SUN_LABELS,
       },
@@ -407,6 +413,14 @@ function buildOptions({
   };
 }
 
+function formatClockTime(minuteOfDay: number): string {
+  const hour = Math.floor(minuteOfDay / 60);
+  const minute = Math.floor(minuteOfDay % 60)
+    .toString()
+    .padStart(2, "0");
+  return `${hour % 12 || 12}:${minute} ${hour < 12 ? "AM" : "PM"}`;
+}
+
 export function formatProductionTooltip(
   idx: number,
   state: Pick<
@@ -417,15 +431,13 @@ export function formatProductionTooltip(
     | "supply"
     | "totalDemand"
     | "startingYear"
+    | "location"
   >,
 ): string {
   const d = state.timeline[idx];
   const date = getDateFromMinute(d.minute, state.startingYear);
-  const hour = Math.floor(date.minuteOfDay / 60);
-  const minute = Math.floor(date.minuteOfDay % 60)
-    .toString()
-    .padStart(2, "0");
-  const time = `${hour % 12 || 12}:${minute} ${hour < 12 ? "AM" : "PM"}`;
+  const time = formatClockTime(date.minuteOfDay);
+  const sun = getSunriseSunset(date, state.location);
   const loads: Array<[string, number | undefined]> = [
     ["Storage charging", d.storageChargeW],
     ["Interties", d.exportedW],
@@ -444,6 +456,9 @@ export function formatProductionTooltip(
       .map(([label, value]) => `${label}: ${formatWatts(value!)}`),
     ...(d.demandW > d.supplyW
       ? [`Blackout: ${formatWatts(d.demandW - d.supplyW)} unmet`]
+      : []),
+    ...(sun.daylight === "normal"
+      ? ["", `Solar noon: ${formatClockTime((sun.sunrise + sun.sunset) / 2)}`]
       : []),
   ].join("\n");
 }
@@ -507,7 +522,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           location,
         ).sunset;
     }
-    sunTicks = [sunrise, sunrise + (sunset - sunrise) / 2, sunset];
+    sunTicks = [sunrise, sunset];
   }
 
   // "Demand peaks in the early evening" only lands if you can read the clock off the axis
@@ -608,6 +623,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     range: [rangeMin, rangeMax],
     hourTicks,
     sunTicks,
+    location,
     blackoutSpans: spansFromEdges(blackouts),
     currentMinute:
       currentMinute <= rangeMin || currentMinute >= rangeMax

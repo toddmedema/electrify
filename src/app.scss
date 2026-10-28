@@ -5222,7 +5222,7 @@ $homeSmokeCycle: 5.6s;
 }
 .productionMix {
   position: relative;
-  height: 4px;
+  height: 16px;
   flex: 0 0 auto;
 }
 .productionMixTarget {
@@ -5233,6 +5233,7 @@ $homeSmokeCycle: 5.6s;
   z-index: 1;
   display: flex;
   align-items: flex-end;
+  gap: 8px;
   min-height: 40px;
   padding: 0;
   border: 0;
@@ -5240,11 +5241,25 @@ $homeSmokeCycle: 5.6s;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   border-radius: var(--radius-sm);
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+  &[aria-expanded="true"] .productionMixChevron {
+    transform: rotate(-90deg);
+  }
+}
+.productionMixChevron {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--font-color-faded);
 }
 .productionMixTrack {
   display: flex;
-  width: 100%;
-  height: 4px;
+  flex: 1;
+  min-width: 0;
+  height: 8px;
+  margin-bottom: 4px;
   border-radius: var(--radius-pill);
   background: var(--border-subtle);
 }

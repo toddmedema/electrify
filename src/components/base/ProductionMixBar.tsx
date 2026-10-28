@@ -1,5 +1,6 @@
 import * as React from "react";
 import { ClickAwayListener, Tooltip } from "@mui/material";
+import { ChevronRightGlyph } from "./Glyphs";
 import { formatWatts } from "../../helpers/Format";
 import {
   chartPalette,
@@ -28,6 +29,7 @@ export default function ProductionMixBar({
   const [hoveredPosition, setHoveredPosition] = React.useState<number | null>(
     null,
   );
+  const trackRef = React.useRef<HTMLSpanElement>(null);
   const tooltipRef = React.useRef<HTMLDivElement>(null);
   const fuels = [
     ...new Set([
@@ -132,10 +134,14 @@ export default function ProductionMixBar({
             type="button"
             className="productionMixTarget"
             aria-label="Inspect current production mix"
+            aria-expanded={open}
             onPointerMove={(event) => {
               if (event.pointerType !== "mouse") return;
-              const bounds = event.currentTarget.getBoundingClientRect();
-              setHoveredPosition((event.clientX - bounds.left) / bounds.width);
+              const bounds = trackRef.current!.getBoundingClientRect();
+              const position = (event.clientX - bounds.left) / bounds.width;
+              setHoveredPosition(
+                position >= 0 && position < 1 ? position : null,
+              );
             }}
             onPointerLeave={() => setHoveredPosition(null)}
             onClick={() => {
@@ -166,7 +172,12 @@ export default function ProductionMixBar({
               }
             }}
           >
-            <span className="productionMixTrack" aria-hidden="true">
+            <span
+              className="productionMixTrack"
+              data-testid="production-mix-track"
+              ref={trackRef}
+              aria-hidden="true"
+            >
               {sources
                 .filter((source) => source.watts > 0)
                 .map((source) => (
@@ -181,6 +192,7 @@ export default function ProductionMixBar({
                   />
                 ))}
             </span>
+            <ChevronRightGlyph className="productionMixChevron" aria-hidden />
           </button>
         </Tooltip>
       </div>

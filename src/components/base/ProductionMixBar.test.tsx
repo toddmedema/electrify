@@ -75,20 +75,33 @@ it("keeps the highlighted source under a stationary mouse as live production cha
     x: 0,
     y: 0,
     left: 0,
-    right: 100,
+    right: 144,
     top: 0,
     bottom: 40,
-    width: 100,
+    width: 144,
     height: 40,
     toJSON: () => ({}),
   });
+  jest
+    .spyOn(screen.getByTestId("production-mix-track"), "getBoundingClientRect")
+    .mockReturnValue({
+      x: 20,
+      y: 0,
+      left: 20,
+      right: 120,
+      top: 0,
+      bottom: 40,
+      width: 100,
+      height: 40,
+      toJSON: () => ({}),
+    });
   fireEvent.click(button);
   await screen.findByRole("tooltip");
   // jsdom has no PointerEvent; preserve the mouse type and coordinates React reads.
   fireEvent(
     button,
     Object.assign(
-      new MouseEvent("pointermove", { bubbles: true, clientX: 40 }),
+      new MouseEvent("pointermove", { bubbles: true, clientX: 60 }),
       { pointerType: "mouse" },
     ),
   );
@@ -114,6 +127,18 @@ it("keeps the highlighted source under a stationary mouse as live production cha
   expect(screen.getAllByTestId("production-mix-segment")[1]).toHaveClass(
     "isHovered",
   );
+
+  // The disclosure cue is outside the proportional rail, so it must not select a fuel.
+  fireEvent(
+    button,
+    Object.assign(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 130 }),
+      { pointerType: "mouse" },
+    ),
+  );
+  screen.getAllByTestId("production-mix-source").forEach((source) => {
+    expect(source).not.toHaveClass("isHovered");
+  });
 
   rerender(
     <ProductionMixBar

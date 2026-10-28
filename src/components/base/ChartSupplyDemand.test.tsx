@@ -6,6 +6,7 @@ import ChartSupplyDemand, {
   Props,
 } from "./ChartSupplyDemand";
 import { LOCATIONS } from "../../Constants";
+import * as DateTime from "../../helpers/DateTime";
 
 const timeline: Props["timeline"] = [
   {
@@ -84,7 +85,12 @@ it("handles records without optional flow fields and omits unused source keys", 
 
 it("breaks supply into the four legend groups and keeps the full demand breakdown", () => {
   const stack = supplyDemandStack(timeline, ["Sun", "Coal"]);
-  const state = { timeline, ...stack, startingYear: 2020 };
+  const state = {
+    timeline,
+    ...stack,
+    startingYear: 2020,
+    location: LOCATIONS.SF,
+  };
   expect(formatProductionTooltip(0, state)).toContain("Interties: 30W");
   expect(formatProductionTooltip(0, state)).toContain("Storage: 0W");
   expect(formatProductionTooltip(0, state)).toContain("Storage charging: 10W");
@@ -237,6 +243,7 @@ it("keeps simultaneous inward and outward flows distinct around the customer-dem
       },
     ],
     startingYear: 2020,
+    location: LOCATIONS.SF,
   });
   expect(label).toContain("Storage: 20W");
   expect(label).toContain("Storage charging: 15W");
@@ -268,4 +275,22 @@ it("ends blackout shading when storage exactly meets the customer deficit", () =
   expect(screen.getByRole("img")).toHaveAccessibleName(
     /2 blackout periods shaded/,
   );
+});
+
+it("keeps solar noon available on inspection without confusing it with clock noon", () => {
+  const sun = jest.spyOn(DateTime, "getSunriseSunset").mockReturnValue({
+    sunrise: 360,
+    sunset: 1140,
+    daylight: "normal",
+  });
+  const state = {
+    timeline,
+    ...supplyDemandStack(timeline, []),
+    startingYear: 2020,
+    location: LOCATIONS.SF,
+  };
+  expect(formatProductionTooltip(0, state)).toContain("Solar noon: 12:30 PM");
+  sun.mockReturnValue({ sunrise: 0, sunset: 1440, daylight: "polar-day" });
+  expect(formatProductionTooltip(0, state)).not.toContain("Solar noon");
+  sun.mockRestore();
 });
