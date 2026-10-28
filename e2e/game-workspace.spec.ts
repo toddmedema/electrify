@@ -1,7 +1,7 @@
 import { reviewScreenshot } from "./review-screenshot";
+import { openBuild } from "./layout";
 import { expect, Page, test } from "./fixtures";
 import path from "node:path";
-import { openBuild } from "./layout";
 
 test.setTimeout(90_000);
 
@@ -87,6 +87,127 @@ for (const side of [false, true]) {
 }
 
 for (const theme of ["light", "dark"] as const) {
+  test(`main game content stays centered at 1800px while tools use spare width in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop-chromium");
+    await page.setViewportSize({ width: 3200, height: 1100 });
+    await startGame(page, theme, 111);
+    const fleet = page.locator(".gameFleet");
+    const build = page.getByRole("region", { name: "Build", exact: true });
+    const insights = page.getByRole("region", {
+      name: "Insights",
+      exact: true,
+    });
+    const expectCenteredFleet = async (left: number, right: number) => {
+      const box = (await fleet.boundingBox())!;
+      expect(box.width).toBe(Math.min(1800, right - left));
+      expect(
+        Math.abs(box.x + box.width / 2 - (left + right) / 2),
+      ).toBeLessThanOrEqual(1);
+      expect((await page.locator("#appbar").boundingBox())!.width).toBe(
+        page.viewportSize()!.width,
+      );
+      expect(
+        (await page.locator(".gameStage .facilities").boundingBox())!.width,
+      ).toBe(box.width);
+      expect(
+        (await page.locator(".unifiedFacilitiesList").boundingBox())!.width,
+      ).toBeLessThanOrEqual(box.width);
+    };
+    await expectCenteredFleet(0, 3200);
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`centered-fleet-${theme}.png`),
+      animations: "disabled",
+    });
+    await openBuild(page);
+    await expectCenteredFleet(480, 3200);
+    await page.locator("#insightsNav").click();
+    await expect(insights).toBeVisible();
+    await expectCenteredFleet(480, 2720);
+    await expectSideRails(page);
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`centered-fleet-tools-${theme}.png`),
+      animations: "disabled",
+    });
+    // Three and four rails still leave a capped, centered fleet on a 4K display.
+    await page.setViewportSize({ width: 3840, height: 1100 });
+    await page.locator("#programsNav").click();
+    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
+    await expectCenteredFleet(960, 3360);
+    await expectSideRails(page);
+    await expect(insights.locator("#chartForecastSupplyDemand")).toBeVisible({
+      timeout: 60_000,
+    });
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`centered-fleet-three-panels-${theme}.png`),
+      animations: "disabled",
+    });
+    await page.locator("#eventsNav").click();
+    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(4);
+    await expectCenteredFleet(960, 2880);
+    await expectSideRails(page);
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`centered-fleet-four-panels-${theme}.png`),
+      animations: "disabled",
+    });
+    await page
+      .getByRole("button", { name: "Close Programs", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Close Events", exact: true })
+      .click();
+    // Only shrink once the open tools leave less than 1800px for the main content.
+    await page.setViewportSize({ width: 2240, height: 1100 });
+    await expectCenteredFleet(480, 1760);
+    await expectSideRails(page);
+    await build
+      .getByRole("button", { name: "Close Build", exact: true })
+      .click();
+    await expectCenteredFleet(0, 1760);
+    await insights
+      .getByRole("button", { name: "Close Insights", exact: true })
+      .click();
+    await expectCenteredFleet(0, 2240);
+  });
+
+  test(`mission header uses regular event text and matching button hover in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await startGame(page, theme, 111);
+    const event = page.locator(".missionRiskEvent");
+    await expect(event).toBeVisible();
+    await expect(event.locator(".missionRiskText")).toHaveCSS(
+      "font-weight",
+      "400",
+    );
+    const months = page.getByRole("button", { name: /^\d+ months? left$/ });
+    if (!testInfo.project.use.hasTouch) {
+      const background = await months.evaluate(
+        (element) => getComputedStyle(element).backgroundColor,
+      );
+      await event.hover();
+      await expect(event).not.toHaveCSS("background-color", background);
+      const hover = await event.evaluate(async (element) => {
+        await Promise.all(
+          element.getAnimations().map((animation) => animation.finished),
+        );
+        return getComputedStyle(element).backgroundColor;
+      });
+      await months.hover();
+      await expect(months).toHaveCSS("background-color", hover);
+    }
+    await page.mouse.move(0, 0);
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`mission-header-${theme}.png`),
+      animations: "disabled",
+    });
+    await months.click();
+    await expect(
+      page.getByRole("region", { name: "Scenario", exact: true }),
+    ).toBeVisible();
+  });
+
   test(`mobile grid status keeps the header height during a blackout in ${theme}`, async ({
     page,
   }, testInfo) => {

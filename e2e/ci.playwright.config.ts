@@ -6,6 +6,7 @@ const smoke = [
   "build-options.spec.ts",
   "escape-close.spec.ts",
   "game-workspace.spec.ts",
+  "mission-evidence.spec.ts",
   "tutorial-exit.spec.ts",
   "tutorial-actions.spec.ts",
   "cloud-saves.spec.ts",

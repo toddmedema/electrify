@@ -1,4 +1,4 @@
-// The fleet fills the stage. Desktop tools occupy their own tracks; compact tools rise above it.
+// The fleet is centered within the stage. Desktop tools occupy their own tracks; compact tools rise above it.
 .gameWorkspace {
   --game-dock-bottom: max(12px, env(safe-area-inset-bottom));
   --game-dock-clearance: calc(72px + var(--game-dock-bottom));
@@ -24,6 +24,10 @@
   position: relative;
   grid-column: 1;
   grid-row: 1;
+  // Tool tracks consume spare stage width before narrowing the chart and facility list.
+  width: 100%;
+  max-width: 1800px;
+  justify-self: center;
   min-width: 0;
   min-height: 0;
 

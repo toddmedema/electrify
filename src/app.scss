@@ -1001,6 +1001,9 @@ $topbar_height: 56px;
     padding-inline: 8px;
     white-space: nowrap;
   }
+  .missionRiskEvent .statusLabel {
+    font-weight: 400;
+  }
   // The icon signals the action without making the entire status line look like a link.
   .missionRiskEvent .conceptIcon {
     color: $interactive_blue;
@@ -1027,18 +1030,13 @@ $topbar_height: 56px;
   flex: 1 1 auto;
   white-space: nowrap;
 }
-.missionSummaryMonths {
+.missionSummaryMonths.MuiButton-root {
   flex: 0 0 auto;
   margin-left: auto;
-  appearance: none;
-  border: 0;
-  padding: 0;
-  background: none;
-  color: var(--interactive-strong);
+  min-width: 0;
+  padding: 0 8px;
+  margin-inline-end: -8px;
   font: inherit;
-  text-align: inherit;
-  cursor: pointer;
-  min-height: 40px;
   // Expand the hit area without increasing the status row's height.
   margin-block: -12px;
 }
@@ -1295,6 +1293,7 @@ $topbar_height: 56px;
   // The first status icon sits 20px past the divider (the bar's gap plus the readout's own
   // inset); the months left end the same 20px before the speed controls
   .gameStatusBar .missionSummaryMonths {
+    margin-inline-end: 0;
     padding-inline-end: $space-1;
   }
 }
