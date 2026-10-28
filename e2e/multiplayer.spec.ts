@@ -1761,6 +1761,18 @@ for (const count of [2, 4]) {
       await pages[0]
         .getByRole("button", { name: "pause", exact: true })
         .click();
+      // Delay the guest's acknowledgment so its next click reverses an in-flight choice,
+      // even though its last host snapshot still shows SLOW selected.
+      if (count === 2) {
+        await expect(clock(buyer)).toHaveAttribute(
+          "data-active-speed",
+          "PAUSED",
+        );
+        await expect(
+          clock(buyer).getByRole("button", { name: "slow speed", exact: true }),
+        ).toHaveAttribute("aria-pressed", "true");
+        room.heldViews.add(buyerId);
+      }
       await pages[1]
         .getByRole("button", { name: "normal speed", exact: true })
         .click();
@@ -1776,6 +1788,7 @@ for (const count of [2, 4]) {
         await pages[1]
           .getByRole("button", { name: "slow speed", exact: true })
           .click();
+      if (count === 2) room.heldViews.delete(buyerId);
       for (const page of pages)
         await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
       // Normal settings navigation is another local pause that freezes every player.

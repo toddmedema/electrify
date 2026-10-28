@@ -16,9 +16,10 @@ before/after source fingerprint continues to reject validation of changing sourc
 ## Heavy work and ports
 
 The existing npm check, build, Jest, browser, simulation, benchmark, and typecheck
-commands acquire one machine-wide reservation before their generators or tests
-start. A competing invocation waits without suspending the current test. Nested
-commands inherit validated ownership, so `check:ci` can invoke builds and tests
+commands acquire one of three machine-wide reservations before their generators or
+tests start. When all three slots are occupied, a competing invocation waits without
+suspending the current test. Nested commands inherit validated ownership, so
+`check:ci` can invoke builds and tests
 without waiting on itself. Direct Node invocations are for tooling tests and
 diagnostics; use the npm commands for development validation.
 

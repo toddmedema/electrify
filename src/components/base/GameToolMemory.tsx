@@ -87,9 +87,13 @@ export function useRememberedScroll(
       element.addEventListener(type, takeOver, { passive: true }),
     );
     element.addEventListener("scroll", remember);
+    // Clicking can scroll a target into view before its asynchronous scroll event arrives.
+    // Capture the position before the target's handler changes this element's contents/key.
+    element.addEventListener("click", remember, true);
     return () => {
       intents.forEach((type) => element.removeEventListener(type, takeOver));
       element.removeEventListener("scroll", remember);
+      element.removeEventListener("click", remember, true);
     };
   });
 }

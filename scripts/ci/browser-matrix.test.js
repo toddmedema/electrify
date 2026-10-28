@@ -37,6 +37,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
     ...list([
       "--config=e2e/playwright.config.ts",
       "build-options.spec.ts",
+      "contextual-learning.spec.ts",
       "escape-close.spec.ts",
       "game-workspace.spec.ts",
       "mission-evidence.spec.ts",

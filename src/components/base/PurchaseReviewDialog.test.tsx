@@ -41,6 +41,9 @@ describe("PurchaseReviewDialog", () => {
     );
     expect(screen.getByText(/Includes refinancing/)).toBeInTheDocument();
     expect(screen.getByText("Online in")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "What is interest rate?" }),
+    ).toBeVisible();
   });
 
   it("gates each option on what it costs now", () => {

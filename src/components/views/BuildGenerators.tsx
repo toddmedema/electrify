@@ -797,8 +797,8 @@ function GeneratorComparison(props: {
 type GeneratorSortKey = "buildCost" | "yearsToBuild" | "lcWh" | "emissions";
 
 const sortOptions: ReadonlyArray<readonly [GeneratorSortKey, string]> = [
-  ["buildCost", "Build Cost"],
-  ["yearsToBuild", "Build Time"],
+  ["buildCost", "Build cost"],
+  ["yearsToBuild", "Build time"],
   ["lcWh", "Cost per MWh"],
   ["emissions", "Emissions"],
 ];
