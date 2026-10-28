@@ -5,7 +5,7 @@ export default function MultiplayerButton() {
     <Button
       data-main-action
       size="large"
-      variant="outlined"
+      color="primary"
       onClick={showMultiplayerLobby}
     >
       Play with friends

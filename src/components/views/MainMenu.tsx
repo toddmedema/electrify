@@ -54,6 +54,18 @@ const DiscordIcon = () => (
   </SvgIcon>
 );
 
+// The home menu's text buttons are plain until one is active. The active button carries the
+// primary fill (its focus indicator) and follows both pointer and keyboard/controller focus,
+// so hovering a control moves real focus to it; Enter/Space/A then activate that button.
+const HOME_MENU_BUTTONS =
+  ".mainActions button, .resourceActions button, .discoveryActions button";
+function focusHomeButton(event: React.PointerEvent) {
+  const target = event.target as HTMLElement;
+  const button = target.closest<HTMLElement>(HOME_MENU_BUTTONS);
+  if (button && button !== document.activeElement)
+    button.focus({ preventScroll: true });
+}
+
 const MainMenu = (props: Props): React.JSX.Element => {
   const menuKeys = useMenuKeys();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
@@ -125,6 +137,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
         id="centeredMenu"
         className="keyboardMenu"
         {...menuKeys}
+        onPointerOver={focusHomeButton}
         sx={{ px: 3 }}
       >
         <Stack
@@ -138,7 +151,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
             <Button
               data-main-action
               size="large"
-              variant="contained"
               color="primary"
               onClick={props.onContinue}
             >
@@ -148,7 +160,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
           <Button
             data-main-action
             size="large"
-            variant={props.hasSavedGame ? "outlined" : "contained"}
             color="primary"
             onClick={props.onStart}
           >
@@ -158,7 +169,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
             <Button
               data-saves-trigger
               size="large"
-              variant="outlined"
               color="primary"
               onClick={props.onSavedGames}
             >
@@ -187,7 +197,12 @@ const MainMenu = (props: Props): React.JSX.Element => {
             Manual
           </Button>
           {desktopApp && getDesktop()?.mods && (
-            <Button data-mods-trigger variant="text" onClick={props.onMods}>
+            <Button
+              data-mods-trigger
+              variant="text"
+              color="primary"
+              onClick={props.onMods}
+            >
               Mods
             </Button>
           )}
@@ -203,13 +218,18 @@ const MainMenu = (props: Props): React.JSX.Element => {
             <Button
               data-achievements-trigger
               variant="text"
+              color="primary"
               onClick={props.onAchievements}
             >
               Achievements
             </Button>
           )}
           {desktopApp && (
-            <Button variant="text" onClick={() => void getDesktop()?.quit()}>
+            <Button
+              variant="text"
+              color="primary"
+              onClick={() => void getDesktop()?.quit()}
+            >
               Quit
             </Button>
           )}
