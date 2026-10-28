@@ -5245,7 +5245,7 @@ $homeSmokeCycle: 5.6s;
     outline-offset: -2px;
   }
   &[aria-expanded="true"] .productionMixChevron {
-    transform: rotate(-90deg);
+    transform: rotate(180deg);
   }
 }
 .productionMixChevron {

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { ClickAwayListener, Tooltip } from "@mui/material";
-import { ChevronRightGlyph } from "./Glyphs";
+import { ChevronDownGlyph } from "./Glyphs";
 import { formatWatts } from "../../helpers/Format";
 import {
   chartPalette,
@@ -192,7 +192,7 @@ export default function ProductionMixBar({
                   />
                 ))}
             </span>
-            <ChevronRightGlyph className="productionMixChevron" aria-hidden />
+            <ChevronDownGlyph className="productionMixChevron" aria-hidden />
           </button>
         </Tooltip>
       </div>
