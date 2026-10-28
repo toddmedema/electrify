@@ -85,7 +85,7 @@ test("multiplayer adds only other players' icons along the bottom of the standar
     "12×: nobody",
   );
   fireEvent.click(screen.getByRole("button", { name: "ultra speed" }));
-  expect(onSpeedChange).not.toHaveBeenCalled();
+  expect(onSpeedChange).toHaveBeenCalledWith("ULTRA");
   fireEvent.click(screen.getByRole("button", { name: "normal speed" }));
   expect(onSpeedChange).toHaveBeenCalledWith("NORMAL");
 });
@@ -218,11 +218,11 @@ test("unready players can reselect a running speed to resume without an extra co
     }),
   );
   fireEvent.click(screen.getByRole("button", { name: "ultra speed" }));
-  expect(onSpeedChange).not.toHaveBeenCalled();
+  expect(onSpeedChange).toHaveBeenCalledWith("ULTRA");
   expect(screen.getAllByRole("button")).toHaveLength(5);
 });
 
-test("reselecting pause never signals readiness", () => {
+test("reselecting pause sends only a pause, even when readiness is required", () => {
   const onSpeedChange = jest.fn();
   render(
     buildSpeedOptions({
@@ -237,5 +237,21 @@ test("reselecting pause never signals readiness", () => {
     }),
   );
   fireEvent.click(screen.getByRole("button", { name: "pause" }));
-  expect(onSpeedChange).not.toHaveBeenCalled();
+  expect(onSpeedChange.mock.calls).toEqual([["PAUSED"]]);
+});
+
+test("a multiplayer speed reversal is sent before the host acknowledges the first choice", () => {
+  const onSpeedChange = jest.fn();
+  render(
+    buildSpeedOptions({
+      speed: "SLOW",
+      onSpeedChange,
+      desktop: true,
+      multiplayer,
+    }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "normal speed" }));
+  // The controls still reflect the host's previous snapshot while NORMAL is in flight.
+  fireEvent.click(screen.getByRole("button", { name: "slow speed" }));
+  expect(onSpeedChange.mock.calls).toEqual([["NORMAL"], ["SLOW"]]);
 });

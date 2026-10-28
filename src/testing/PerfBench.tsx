@@ -30,8 +30,6 @@ import { createGame } from "./Simulator";
 
 jest.setTimeout(600000);
 
-const WARMUP_MONTHS = 24;
-
 /**
  * The plan's workload was scenario 103 with an 800 MWh battery at month 0, but batteries only
  * become buildable after 2008 and The Shale Boom starts in 2006, and an 800 MWh battery bankrupts
@@ -152,6 +150,12 @@ function play(
     tickState(draft);
   };
 
+  // Each path starts with only its own live game. Garbage from the preceding playthrough
+  // must not be charged to the next path; collections created during this run remain timed.
+  if (!global.gc)
+    throw new Error("Run the benchmark through npm run perf:bench");
+  global.gc();
+
   while (state.date.monthsElapsed < months) {
     if (pendingScenarioChoice(state)) {
       state = adopt(answerPendingChoice(state));
@@ -195,9 +199,13 @@ function play(
   };
 }
 
-function runOnce(months: number): RunType {
-  const plain = play(months, false);
-  const immer = play(months, true);
+function runOnce(months: number, immerFirst = false): RunType {
+  // Reverse the order between pairs instead of consistently charging later process effects
+  // (JIT, temperature and memory pressure) to the draft path.
+  const first = play(months, immerFirst);
+  const second = play(months, !immerFirst);
+  const plain = immerFirst ? second : first;
+  const immer = immerFirst ? first : second;
   if (plain.samples.length !== immer.samples.length) {
     throw new Error(
       `Plain and Immer paths diverged: ${plain.samples.length} vs ${immer.samples.length} ticks`,
@@ -317,12 +325,13 @@ it("perf bench", () => {
   const months = Number(process.env.PERF_MONTHS) || WORKLOAD.months;
   const quiet = process.env.PERF_QUIET === "1";
 
-  // Discarded. Two simulated years are enough to warm the JIT, including rollovers, and a full
-  // extra run would add half a minute on the Immer path alone
-  runOnce(Math.min(months, WARMUP_MONTHS));
+  // Warm the complete measured workload on both paths, including the battery built at month
+  // 36 and the growing history. A 24-month prefix left those shapes/allocations cold and made
+  // the draft/plain ratio depend on JIT and GC timing during the first measured pair.
+  runOnce(months);
   const measured: RunType[] = [];
   for (let i = 0; i < runs; i++) {
-    measured.push(runOnce(months));
+    measured.push(runOnce(months, i % 2 === 1));
   }
   const pick = (key: keyof RunType) =>
     median(measured.map((run) => run[key] as number));
@@ -406,7 +415,7 @@ it("perf bench", () => {
   write("");
   write(
     `  Scenario ${WORKLOAD.scenarioId}, seed ${WORKLOAD.seed}, ${months} months ` +
-      `(${result.ticks} ticks), ${runs} warmed runs + a 24-month warmup`,
+      `(${result.ticks} ticks), ${runs} warmed runs + a ${months}-month warmup`,
   );
   if (result.endedEarly) {
     write(`  WARNING: workload ended early (${result.endedEarly})`);

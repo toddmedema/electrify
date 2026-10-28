@@ -25,6 +25,9 @@ function interpolates(
   );
 }
 async function start(page: Page, theme: string, textSize = "standard") {
+  // Drive the real chart/tick timers on one clock. Shared-runner scheduling must not turn
+  // a 100 ms midpoint into a >150 ms gap or move ticks outside the observation window.
+  await page.clock.install();
   await page.addInitScript(
     ({ mode, size }) => {
       localStorage.clear();
@@ -42,6 +45,8 @@ async function start(page: Page, theme: string, textSize = "standard") {
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
   await page.locator("#chartSupplyDemand .u-wrap > canvas").waitFor();
+  await page.evaluate(() => document.fonts.ready);
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 200);
   await page.evaluate(() => {
     const probe = {
       samples: [] as Array<{ x: number; at: number }>,
@@ -77,7 +82,7 @@ async function sample(page: Page) {
     window.__productionMotion!.samples = [];
     window.__productionMotion!.canvasDraws = 0;
   });
-  await page.waitForTimeout(600);
+  await page.clock.runFor(600);
   return page.evaluate(() => window.__productionMotion!);
 }
 
@@ -99,7 +104,7 @@ test("1x smoothly advances Now with stationary curves, then snaps for inspection
   const bounds = await canvas.boundingBox();
   await appbar.getByRole("button", { name: "slow speed", exact: true }).click();
   // The label stays clamped near the day's edges, then moves with the guide.
-  await page.waitForTimeout(1200);
+  await page.clock.runFor(1200);
   const motion = await sample(page);
   expect(interpolates(motion.samples)).toBe(true);
   expect(motion.canvasDraws).toBeGreaterThan(0);
@@ -140,7 +145,7 @@ test("reduced motion can change during 1x play without leaving interpolation act
     .first()
     .getByRole("button", { name: "slow speed", exact: true })
     .click();
-  await page.waitForTimeout(1200);
+  await page.clock.runFor(1200);
   expect((await sample(page)).samples.length).toBeLessThanOrEqual(5);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   expect(interpolates((await sample(page)).samples)).toBe(true);
@@ -162,7 +167,7 @@ test.describe("larger chart text at high pixel density", () => {
       .first()
       .getByRole("button", { name: "slow speed", exact: true })
       .click();
-    await page.waitForTimeout(2000);
+    await page.clock.runFor(2000);
     const marker = page.locator("#chartSupplyDemand [data-production-now]");
     await expect(marker).toBeVisible();
     const label = await marker.locator("span").boundingBox();

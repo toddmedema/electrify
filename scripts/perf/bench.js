@@ -9,7 +9,7 @@
  * and exits non-zero when either is exceeded. Milliseconds are reported, never gated: a ratio
  * measured in one process cancels machine speed, an absolute time does not.
  *
- *   --runs <n>   warmed runs to take the median of (default 3; a discarded 24-month warmup precedes them)
+ *   --runs <n>   warmed runs to take the median of (default 3; one full discarded warmup precedes them)
  *   --months <n> shorten the workload while iterating locally (gating is skipped)
  *   --json       print only the machine-readable result on stdout
  *   --mods       maximum community rules,1200-month histories and four-company save/worker sizes
@@ -118,6 +118,7 @@ function main() {
   const child = spawnSync(
     process.execPath,
     [
+      "--expose-gc",
       require.resolve("./jest-baseline"),
       "--watchAll=false",
       "--testMatch",

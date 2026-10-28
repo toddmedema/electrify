@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openBuild, openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`contextual learning preserves a storage decision in ${theme}`, async ({
@@ -19,8 +19,8 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await page.locator(".button-buildFacility").click();
-    await page.locator(".button-buildStorage").click();
+    const build = await openBuild(page);
+    await build.getByRole("tab", { name: "Storage", exact: true }).click();
     const capacity = page.getByRole("slider", { name: /^Capacity/ });
     await capacity.focus();
     await capacity.press("ArrowLeft");
@@ -44,7 +44,7 @@ for (const theme of ["light", "dark"] as const) {
       .locator('.buildOption button[aria-label^="Review purchase of"]:enabled')
       .first()
       .click();
-    const purchase = page.getByRole("dialog");
+    const purchase = page.getByRole("dialog", { name: /^Build / });
     const help = purchase.getByRole("button", {
       name: "What is interest rate?",
       exact: true,
@@ -117,7 +117,9 @@ for (const theme of ["light", "dark"] as const) {
       ).toBeVisible();
     }
 
-    await page.getByRole("button", { name: "close", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Close Build", exact: true })
+      .click();
     // The outgoing catalog retains its speed controls during the closing transition.
     await expect(page.getByRole("group", { name: "game speed" })).toHaveCount(
       1,
@@ -157,8 +159,8 @@ test("reading help preserves the current tutorial objective", async ({
     facilities,
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
-  await facilities.locator(".button-buildFacility").click();
-  await page.locator(".button-buildGenerator").click();
+  const build = await openBuild(page);
+  await build.getByRole("tab", { name: "Generators", exact: true }).click();
   await page
     .locator('.buildOption button[aria-label^="Review purchase of"]:enabled')
     .first()

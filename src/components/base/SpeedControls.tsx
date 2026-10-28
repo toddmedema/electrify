@@ -110,7 +110,9 @@ function speedOptions(
         value={speed}
         onChange={(_event, next: SpeedType | null) => {
           if (next) onSpeedChange(next);
-          else if (resume && speed !== "PAUSED") onSpeedChange(speed);
+          // A host snapshot can still show an earlier selection while a different choice
+          // is in flight. Send reselections too, so a quick reversal is never dropped.
+          else if (multiplayer) onSpeedChange(speed);
         }}
         aria-label={multiplayer ? "your game speed" : "game speed"}
         aria-describedby={descriptionId}

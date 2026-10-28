@@ -126,6 +126,12 @@ ends the run early. It reports, as a median of warmed runs:
 - the Immer overhead ratio between the two;
 - total ms per simulated year.
 
+Both paths first warm the full workload, including construction and long histories. Measured
+pairs alternate which path goes first. Each playthrough collects garbage before timing starts,
+so it pays for its own allocations rather than leftovers from the preceding path; collections
+during its ticks remain timed. The entry point enables GC explicitly and the bench rejects a
+runner that cannot establish that starting condition.
+
 Wall-clock numbers are reported, not gated. Two ratios are gated, because a ratio measured in one
 process cancels machine speed (the `--benchmark-stories` pattern): the overall draft/plain tick
 ratio and the paired draft/plain median rollover ratio from B7. Their ceilings sit in `scripts/perf/bench-baselines.json` with a
