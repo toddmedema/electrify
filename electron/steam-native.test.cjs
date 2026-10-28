@@ -289,3 +289,32 @@ test("shutdown after download resolves prevents reading native entry and persona
     /shutting down/,
   );
 });
+
+test("global rank probes read the requested range and reject invalid ranges", async () => {
+  const { api, calls, dispatcher } = mockNative("win32");
+  const boards = new SteamLeaderboards(api, dispatcher, "win32");
+  const selection = {
+    scenarioId: 101,
+    difficulty: "CEO",
+    challengeId: "rules-a",
+    scope: "global",
+  };
+  await boards.read({ ...selection, startRank: 147, endRank: 147 });
+  assert.deepEqual(
+    calls.find((entry) => entry[0] === "download"),
+    ["download", "stats", 999n, 0, 147, 147],
+  );
+  for (const range of [
+    { startRank: 0, endRank: 1 },
+    { startRank: 2, endRank: 1 },
+    { startRank: 1.5, endRank: 2 },
+    { startRank: 1, endRank: 101 },
+    { startRank: 1, endRank: 2147483648 },
+    { startRank: 1 },
+    { startRank: 1, endRank: 1, scope: "friends" },
+  ])
+    await assert.rejects(
+      boards.read({ ...selection, ...range }),
+      /Invalid leaderboard range/,
+    );
+});

@@ -1078,7 +1078,8 @@ for (const theme of ["light", "dark"] as const) {
       const desktop = width >= 1300;
       const profit = appbar.getByLabel(/^Monthly profit forecast/);
       await expect(profit).toBeVisible();
-      await expect(profit).toContainText("Monthly profit");
+      await expect(profit).toHaveText(/^[+−-]?\$[\d.,]+[KMBT]?\/mo$/);
+      expect(await profit.evaluate((el) => el.getClientRects().length)).toBe(1);
       const [cashBox, profitBox, dateBox] = await Promise.all([
         appbar.locator(".gameStatusValue").first().boundingBox(),
         profit.boundingBox(),

@@ -580,11 +580,8 @@ export function GameAppBar(props: Props) {
                   }
                   aria-label={`Monthly profit forecast ${formatMoneyStable(monthlyProfit)}`}
                 >
-                  <span className="gameMonthlyProfitLabel">Monthly profit</span>
-                  <span>
-                    {monthlyProfit > 0 ? "+" : ""}
-                    {formatMoneyStable(monthlyProfit)}
-                  </span>
+                  {monthlyProfit > 0 ? "+" : ""}
+                  {formatMoneyStable(monthlyProfit)}/mo
                 </Typography>
               </Tooltip>
             )}

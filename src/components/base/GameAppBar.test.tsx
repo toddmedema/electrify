@@ -93,7 +93,7 @@ describe("GameAppBar", () => {
           `Monthly profit forecast ${formatMoneyStable(expected)}`,
         );
         expect(profit).toHaveTextContent(
-          `${expected > 0 ? "+" : ""}${formatMoneyStable(expected)}`,
+          `${expected > 0 ? "+" : ""}${formatMoneyStable(expected)}/mo`,
         );
         const palette = createAppTheme("light").palette;
         expect(profit).toHaveStyle({

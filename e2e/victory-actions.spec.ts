@@ -19,8 +19,8 @@ import { parseSave } from "../src/SaveGame";
 import type { GameType } from "../src/Types";
 
 /** Exercise populated standings through the real native-score adapter, without a native window. */
-async function installLeaderboardFixture(page: Page) {
-  await page.addInitScript(() => {
+async function installLeaderboardFixture(page: Page, currentRank: number) {
+  await page.addInitScript((rank) => {
     const display = {
       fullscreen: false,
       width: 1280,
@@ -45,7 +45,7 @@ async function installLeaderboardFixture(page: Page) {
           online: true,
           cloudEnabled: false,
           steamId,
-          displayName: "Grid planner",
+          displayName: "Daniel McEntee",
         },
       }),
       setDisplay: async () => display,
@@ -67,7 +67,14 @@ async function installLeaderboardFixture(page: Page) {
       getLeaderboard: async (selection) =>
         selection.scope === "player"
           ? submitted
-            ? [{ ...submitted, steamId, displayName: "Grid planner", rank: 4 }]
+            ? [
+                {
+                  ...submitted,
+                  steamId,
+                  displayName: "Daniel McEntee",
+                  rank,
+                },
+              ]
             : []
           : [
               "Lakeside Municipal Electricity Cooperative",
@@ -82,7 +89,7 @@ async function installLeaderboardFixture(page: Page) {
               difficulty: selection.difficulty || "VP",
             })),
     };
-  });
+  }, currentRank);
 }
 
 /** Synthetic history still needs the same story receipts and objective evidence as real play. */
@@ -136,10 +143,11 @@ function rebuildCompletionEvidence(game: GameType): void {
   game.date = finalDate;
 }
 
-for (const { theme, native } of [
-  { theme: "light", native: false },
-  { theme: "dark", native: false },
-  { theme: "dark", native: true },
+for (const { theme, native, currentRank } of [
+  { theme: "light", native: false, currentRank: 47 },
+  { theme: "dark", native: false, currentRank: 47 },
+  { theme: "dark", native: true, currentRank: 47 },
+  { theme: "light", native: true, currentRank: 12345 },
 ] as const) {
   test(`victory actions remain usable and replay the scenario in ${theme}${native ? " with native leaderboard" : ""}`, async ({
     page,
@@ -148,7 +156,7 @@ for (const { theme, native } of [
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);
-    if (native) await installLeaderboardFixture(page);
+    if (native) await installLeaderboardFixture(page, currentRank);
     await page.goto("/?scenario=101");
     await page.getByRole("button", { name: "Hard", exact: true }).click();
     // Web production omits the native adapter; its public-board path remains covered too.
@@ -259,11 +267,33 @@ for (const { theme, native } of [
     await expect(leaderboard).toBeVisible();
     if (nativeBoard) {
       await expect(leaderboard.getByRole("row")).toHaveCount(4);
+      await expect(leaderboard.getByRole("columnheader")).toHaveCount(0);
+      await expect(
+        leaderboard.getByRole("row", { name: "This run" }),
+      ).toContainText(`${currentRank.toLocaleString("en-US")}Daniel McEntee`);
+      await expect(
+        leaderboard
+          .getByRole("row", { name: "This run" })
+          .getByRole("cell")
+          .last(),
+      ).toHaveText(
+        (await dialog
+          .getByLabel(/^Final score/)
+          .locator("strong")
+          .textContent()) || "",
+      );
       await expect(
         leaderboard.getByRole("cell", {
           name: "Lakeside Municipal Electricity Cooperative",
         }),
       ).toBeVisible();
+      const rankCell = leaderboard
+        .getByRole("row", { name: "This run" })
+        .getByRole("cell")
+        .first();
+      expect(
+        await rankCell.evaluate((el) => getComputedStyle(el).whiteSpace),
+      ).toBe("nowrap");
       expect(
         await leaderboard.evaluate(
           (element) => element.scrollWidth - element.clientWidth,
@@ -277,8 +307,16 @@ for (const { theme, native } of [
       exact: true,
     });
     const replay = dialog.getByRole("button", { name: "Replay", exact: true });
-    const newBox = (await newGame.boundingBox())!;
-    const replayBox = (await replay.boundingBox())!;
+    await expect(newGame).toBeVisible();
+    // Read the pair together: late standings can reposition the centered dialog.
+    const [replayBox, newBox] = await dialog
+      .locator(".victoryNextActions button")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const { x, y, width } = button.getBoundingClientRect();
+          return { x, y, width };
+        }),
+      );
     expect(replayBox.y).toBe(newBox.y);
     expect(newBox.x).toBeGreaterThan(replayBox.x + replayBox.width);
     expect(

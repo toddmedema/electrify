@@ -29,6 +29,8 @@ import { SCORE_VERSION } from "../../helpers/Scoring";
 export interface StateProps {
   victory: VictoryType | null;
   loggedIn: boolean;
+  uid?: string;
+  displayName?: string;
 }
 
 export interface DispatchProps {
@@ -246,6 +248,9 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               key={`${victory.scenarioId}:${victory.difficulty}:${victory.score}`}
               scenarioId={victory.scenarioId}
               difficulty={victory.difficulty}
+              currentScore={victory.score}
+              uid={props.uid}
+              displayName={props.displayName}
             />
           )}
         {victory.debrief && <RunDebrief debrief={victory.debrief} />}

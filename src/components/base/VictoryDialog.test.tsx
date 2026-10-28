@@ -9,9 +9,15 @@ import { VictoryType } from "../../Types";
 const mockFetchGlobalRank = jest.fn();
 jest.mock("./ResultLeaderboard", () => ({
   __esModule: true,
-  default: (props: { scenarioId: number; difficulty: string }) => (
+  default: (props: {
+    scenarioId: number;
+    difficulty: string;
+    currentScore: number;
+    displayName?: string;
+  }) => (
     <section aria-label="Result leaderboard">
-      {props.scenarioId} · {props.difficulty}
+      {props.scenarioId} · {props.difficulty} · {props.displayName} ·{" "}
+      {props.currentScore}
     </section>
   ),
 }));
@@ -223,7 +229,7 @@ describe("VictoryDialog", () => {
     renderDialog({ victory: aVictory({ ranked: false }) });
     expect(mockFetchGlobalRank).not.toHaveBeenCalled();
     expect(screen.queryByText(/personal best/)).not.toBeInTheDocument();
-    expect(screen.getByText(/812/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Final score 812 points")).toBeInTheDocument();
   });
 
   it("keeps the ways out of a finished run", async () => {
@@ -324,4 +330,11 @@ it("previews a guest challenge, preserves native cancellation and announces succ
   await waitFor(() =>
     expect(onShared).toHaveBeenCalledWith(expect.anything(), "clipboard"),
   );
+});
+
+it("passes the completed run and current player's name to the leaderboard", () => {
+  renderDialog({ displayName: "Daniel McEntee", uid: "me" });
+  expect(
+    screen.getByRole("region", { name: "Result leaderboard" }),
+  ).toHaveTextContent("Daniel McEntee · 812");
 });

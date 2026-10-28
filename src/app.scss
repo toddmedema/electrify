@@ -2553,33 +2553,32 @@ $pane_header_height: 48px;
 
   table {
     width: 100%;
-    table-layout: fixed;
+    table-layout: auto;
     border-collapse: collapse;
     font-size: var(--font-size-body2);
   }
 
-  th,
   td {
     padding: 4px 8px;
     text-align: left;
     overflow-wrap: anywhere;
   }
 
-  th {
-    color: $font_color_faded;
-    font-weight: 400;
-    font-size: var(--font-size-caption);
+  .currentRun {
+    font-weight: 600;
+    background: var(--bg-selected);
   }
 
-  th:first-child,
   td:first-child {
-    width: 24px;
+    width: 1%;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
     padding-left: 0;
   }
 
-  th:last-child,
   td:last-child {
-    width: 80px;
+    width: 1%;
+    white-space: nowrap;
     padding-right: 0;
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -2587,18 +2586,11 @@ $pane_header_height: 48px;
 }
 
 #topbar .gameMonthlyProfit {
-  display: flex;
-  flex-direction: column;
   flex: 0 0 auto;
   font-size: var(--font-size-body2);
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.gameMonthlyProfitLabel {
-  color: $font_color_faded;
-  font-size: var(--font-size-caption-sm);
 }
 
 @media (max-width: $tablet_width) {
