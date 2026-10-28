@@ -173,7 +173,7 @@ test("hovering a home control makes it the active button, and keyboard continues
   await page.goto("/");
   const play = page.getByRole("button", { name: "Play", exact: true });
   const manual = page.getByRole("button", { name: "Manual", exact: true });
-  await expect(play).toBeFocused(); // the first control starts active
+  await expect(page.locator("#appStartup")).toHaveCount(0); // the menu is revealed
   await manual.hover();
   await expect(manual).toBeFocused(); // the pointer moved the active button to Manual
   await page.keyboard.press("ArrowUp");
