@@ -5,7 +5,7 @@ import { openPane, openBuild } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"]) {
-  test(`current production mix stays a compact rail with inspectable details in ${theme}`, async ({
+  test(`day and night follow the plot's time axis in ${theme}`, async ({
     page,
   }, info) => {
     if (info.project.name === "desktop-chromium")
@@ -22,221 +22,69 @@ for (const theme of ["light", "dark"]) {
       pane,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    const chart = pane.locator("#chartSupplyDemand");
+    const ribbon = chart.locator(".dayNightRibbon");
+    await expect(ribbon).toBeVisible();
+    await expect(ribbon).toHaveAttribute("aria-hidden", "true");
+    await expect(ribbon.locator('[data-phase="day"] svg')).toHaveCount(1);
+    await expect(ribbon.locator('[data-phase="night"] svg')).toHaveCount(2);
+    await expect(chart.getByRole("button")).toHaveCount(0);
+    await expect(chart.getByRole("img")).toHaveAccessibleName(
+      /Day\/night ribbon: Night .*Daylight/,
+    );
+
+    const aligned = async () => {
+      const plot = (await chart.locator(".u-over").boundingBox())!;
+      const band = (await ribbon.boundingBox())!;
+      const bounds = (await chart.boundingBox())!;
+      expect(Math.abs(band.x - plot.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(band.width - plot.width)).toBeLessThanOrEqual(1);
+      expect(band.y).toBeGreaterThan(plot.y + plot.height + 12);
+      expect(band.y + band.height).toBeLessThanOrEqual(
+        bounds.y + bounds.height,
+      );
+      const segments = await ribbon.locator("[data-phase]").all();
+      const first = (await segments[0].boundingBox())!;
+      const last = (await segments[segments.length - 1].boundingBox())!;
+      expect(Math.abs(first.x - band.x)).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(last.x + last.width - band.x - band.width),
+      ).toBeLessThanOrEqual(1);
+    };
+    await expect(aligned).toPass();
+    const image = chart.getByRole("img");
+    await image.focus();
+    await image.press("Home");
+    for (const label of ["Sunrise:", "Solar noon:", "Sunset:"])
+      await expect(chart.locator(".chartTooltip")).toContainText(label);
+    await image.press("Escape");
     await page.mouse.move(0, 0);
-    const bar = pane.getByRole("button", {
-      name: "Inspect current production mix",
-    });
-    const sideLayout = page.viewportSize()!.width >= 1300;
-    await expect(page.locator(".gameStage")).toHaveAttribute(
-      "data-layout",
-      sideLayout ? "side" : "sheet",
-    );
-    if (!sideLayout) {
-      await expect(bar).toHaveCount(0);
-      await expect(pane.locator(".productionMix")).toHaveCount(0);
-      if (process.env.REVIEW_SCREENSHOT_DIR) {
-        await page.evaluate(() => document.fonts.ready);
-        await page.screenshot({
-          path: path.join(
-            process.env.REVIEW_SCREENSHOT_DIR,
-            `mix-${info.project.name}-${theme}-hidden.png`,
-          ),
-          animations: "disabled",
-        });
-      }
-      return;
-    }
-    await expect(bar).toBeVisible();
-    await expect(bar).toHaveText("");
-    await expect(bar.locator(".productionMixChevron")).toBeVisible();
-    await expect(bar).toHaveAttribute("aria-expanded", "false");
-    const chartBounds = (await pane
-      .locator("#chartSupplyDemand")
-      .boundingBox())!;
-    const barBounds = (await bar.boundingBox())!;
-    const trackBounds = (await bar
-      .locator(".productionMixTrack")
-      .boundingBox())!;
-    const plotBounds = (await pane
-      .locator("#chartSupplyDemand .u-over")
-      .boundingBox())!;
-    expect(
-      Math.abs(trackBounds.y - (chartBounds.y + chartBounds.height + 4)),
-    ).toBeLessThanOrEqual(1);
-    expect((await pane.locator(".productionMix").boundingBox())!.height).toBe(
-      16,
-    );
-    expect(barBounds.y).toBeGreaterThanOrEqual(
-      plotBounds.y + plotBounds.height,
-    );
-    const fleetBounds = (await pane
-      .locator(".facilityDisclosure")
-      .first()
-      .boundingBox())!;
-    expect(barBounds.y + barBounds.height).toBeLessThanOrEqual(
-      fleetBounds.y + 1,
-    );
-    expect(barBounds.height).toBeGreaterThanOrEqual(
-      info.project.use.hasTouch ? 44 : 40,
-    );
-    expect(
-      (await bar.locator(".productionMixTrack").boundingBox())!.height,
-    ).toBe(8);
-    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    // Clear the keyboard focus ring for the review image.
+    await page.getByRole("heading", { level: 6 }).first().click();
     await page.evaluate(() => document.fonts.ready);
     if (process.env.REVIEW_SCREENSHOT_DIR) {
       await page.screenshot({
         path: path.join(
           process.env.REVIEW_SCREENSHOT_DIR,
-          `mix-${info.project.name}-${theme}-rest.png`,
+          `day-night-${info.project.name}-${theme}.png`,
         ),
         animations: "disabled",
       });
     }
-    if (info.project.use.hasTouch) await bar.tap();
-    else await bar.hover();
-    const tooltip = page.getByRole("tooltip");
-    await expect(tooltip).toContainText("Supply now");
-    await expect(bar).toHaveAttribute("aria-expanded", "true");
-    await expect(tooltip).toContainText("Total supply");
-    await expect(tooltip.locator(".productionMixSource")).not.toHaveCount(0);
-    const tipBounds = (await tooltip.boundingBox())!;
-    const viewport = page.viewportSize()!;
-    expect(tipBounds.x).toBeGreaterThanOrEqual(0);
-    expect(tipBounds.y).toBeGreaterThanOrEqual(0);
-    expect(tipBounds.x + tipBounds.width).toBeLessThanOrEqual(viewport.width);
-    expect(tipBounds.y + tipBounds.height).toBeLessThanOrEqual(viewport.height);
-    if (process.env.REVIEW_SCREENSHOT_DIR) {
-      await page.screenshot({
-        path: path.join(
-          process.env.REVIEW_SCREENSHOT_DIR,
-          `mix-${info.project.name}-${theme}-open.png`,
-        ),
-        animations: "disabled",
-      });
-    }
-    if (!info.project.use.hasTouch) {
-      await tooltip.hover();
-      await expect(tooltip).toBeVisible();
-    }
-    if (info.project.use.hasTouch) {
-      await bar.tap();
-      await expect(tooltip).toBeHidden();
-      await bar.tap();
-      await expect(tooltip).toBeVisible();
-    }
-    await page.getByRole("heading", { level: 6 }).first().click();
-    await expect(tooltip).toBeHidden();
-    await bar.focus();
-    await bar.press("Enter");
-    await expect(tooltip).toBeVisible();
-    await bar.press("Escape");
-    await expect(tooltip).toBeHidden();
-
-    // A saved reading distinct from its forecast proves this is the current mix.
-    await editSavedGame(page, (save) => {
-      save.game.timeline.forEach((tick) => {
-        tick.supplyByFuel =
-          tick.minute === save.game.date.minute
-            ? { Wind: 25e6, Uranium: 75e6, Sun: 0 }
-            : { Coal: 900e6 };
-        tick.storageDischargeW = 0;
-        tick.importedW = 0;
-      });
-    });
-    await page.reload();
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
-    await bar.click();
-    await expect(tooltip).toContainText("25MW");
-    await expect(tooltip).toContainText("75MW");
-    await expect(tooltip).toContainText("100MW");
-    await expect(tooltip).not.toContainText("900MW");
-    const segments = bar.locator(".productionMixSegment");
-    await expect(segments).toHaveCount(2);
-    const shares = await segments.evaluateAll((elements) =>
-      elements.map((el) => (el as HTMLElement).style.width).sort(),
-    );
-    expect(shares).toEqual(["25%", "75%"]);
-
-    if (!info.project.use.hasTouch) {
-      await page.mouse.move(0, 0);
-      const track = (await bar.locator(".productionMixTrack").boundingBox())!;
-      const target = (await bar.boundingBox())!;
-      const rows = tooltip.locator(".productionMixSource");
-      for (const [index, segment] of (await segments.all()).entries()) {
-        const resting = (await segment.boundingBox())!;
-        await page.mouse.move(resting.x + resting.width / 2, target.y + 10);
-        await expect(segment).toHaveCSS("height", "10px");
-        const highlighted = (await segment.boundingBox())!;
-        expect(highlighted.y).toBe(track.y - 1);
-        expect(highlighted.y + highlighted.height).toBe(
-          track.y + track.height + 1,
+    if (info.project.name === "desktop-chromium") {
+      for (const width of [1299, 1330, 1500]) {
+        await page.setViewportSize({ width, height: 800 });
+        await openPane(
+          pane,
+          page.getByRole("button", { name: "Facilities", exact: true }),
         );
-        expect(highlighted.x).toBe(resting.x);
-        expect(highlighted.width).toBe(resting.width);
-        // The fixture has only Wind and Nuclear output, even when zero-output
-        // sources appear between them in the tooltip's dispatch order.
-        const name =
-          (await segment.evaluate((el) => (el as HTMLElement).style.width)) ===
-          "25%"
-            ? "Wind"
-            : "Nuclear";
-        for (const row of await rows.all()) {
-          const selected = await row.getByText(name, { exact: true }).count();
-          await expect(row).toHaveCSS("font-weight", selected ? "700" : "400");
-        }
-        await expect(
-          bar.locator(".productionMixSegment.isHovered"),
-        ).toHaveCount(1);
-        await expect(segments.nth(1 - index)).toHaveCSS("height", "8px");
+        await expect(aligned).toPass();
       }
-      if (process.env.REVIEW_SCREENSHOT_DIR) {
-        await page.screenshot({
-          path: path.join(
-            process.env.REVIEW_SCREENSHOT_DIR,
-            `mix-${info.project.name}-${theme}-fuel-hover.png`,
-          ),
-          animations: "disabled",
-        });
-      }
-      await bar.locator(".productionMixChevron").hover();
-      await expect(bar.locator(".productionMixSegment.isHovered")).toHaveCount(
-        0,
-      );
-      await page.mouse.move(0, 0);
-      await expect(bar.locator(".productionMixSegment.isHovered")).toHaveCount(
-        0,
-      );
-      await expect(
-        tooltip.locator(".productionMixSource.isHovered"),
-      ).toHaveCount(0);
-      for (const segment of await segments.all()) {
-        await expect(segment).toHaveCSS("height", "8px");
-      }
+      await openBuild(page);
+      await page.locator("#insightsNav").click();
+      await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
+      await expect(aligned).toPass();
     }
-
-    // The same inspectable target remains when the entire fleet is idle.
-    await editSavedGame(page, (save) => {
-      save.game.timeline.forEach((tick) => {
-        tick.supplyByFuel = { Sun: 0 };
-        tick.storageDischargeW = 0;
-        tick.importedW = 0;
-      });
-    });
-    await page.reload();
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
-    await bar.click();
-    await expect(tooltip).toBeVisible();
-    await expect(tooltip).toContainText("No production now");
-    await expect(segments).toHaveCount(0);
   });
 }
 
@@ -766,166 +614,4 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
   await reviewScreenshot(chart, {
     path: info.outputPath("concurrent-flow-fixture.png"),
   });
-  const mix = pane.getByRole("button", {
-    name: "Inspect current production mix",
-  });
-  // Keep the chart's narrow-layout checks above, then reach the complete divider on desktop.
-  if (info.project.name === "desktop-chromium")
-    await page.setViewportSize({ width: 1500, height: 800 });
-  const sideLayout = page.viewportSize()!.width >= 1300;
-  await expect(page.locator(".gameStage")).toHaveAttribute(
-    "data-layout",
-    sideLayout ? "side" : "sheet",
-  );
-  if (!sideLayout) {
-    await expect(mix).toHaveCount(0);
-  } else {
-    await mix.click();
-    const mixDetails = page.getByRole("tooltip");
-    await expect(mixDetails).toBeVisible();
-    await expect(mixDetails.locator(".productionMixSource")).toHaveCount(13);
-    await expect(mixDetails).toContainText("Storage discharge");
-    await expect(mixDetails).toContainText("Imports");
-    const mixBounds = (await mixDetails.boundingBox())!;
-    expect(mixBounds.y).toBeGreaterThanOrEqual(0);
-    expect(mixBounds.y + mixBounds.height).toBeLessThanOrEqual(
-      page.viewportSize()!.height,
-    );
-    expect(
-      await mixDetails.evaluate((el) => el.scrollWidth - el.clientWidth),
-    ).toBeLessThanOrEqual(1);
-    if (!info.project.use.hasTouch) {
-      const segments = mix.locator(".productionMixSegment");
-      for (const index of [0, 6, 11, 12]) {
-        await segments.nth(index).hover();
-        await expect(segments.nth(index)).toHaveCSS("height", "10px");
-        await expect(
-          mixDetails.locator(".productionMixSource").nth(index),
-        ).toHaveCSS("font-weight", "700");
-        await expect(
-          mix.locator(".productionMixSegment.isHovered"),
-        ).toHaveCount(1);
-        await expect(
-          mixDetails.locator(".productionMixSource.isHovered"),
-        ).toHaveCount(1);
-      }
-      await page.mouse.move(0, 0);
-    }
-    await mix.press("End");
-    expect(
-      await mixDetails
-        .locator(".productionMixTooltip")
-        .evaluate((el) => el.scrollTop),
-    ).toBeGreaterThan(0);
-    await expect(mixDetails.getByText("Total supply")).toBeVisible();
-    await mix.press("Home");
-    expect(
-      await mixDetails
-        .locator(".productionMixTooltip")
-        .evaluate((el) => el.scrollTop),
-    ).toBe(0);
-    await mix.press("ArrowDown");
-    expect(
-      await mixDetails
-        .locator(".productionMixTooltip")
-        .evaluate((el) => el.scrollTop),
-    ).toBeGreaterThan(0);
-    await page.keyboard.press("Escape");
-    await expect(mixDetails).toBeHidden();
-  }
-  if (process.env.REVIEW_SCREENSHOT_DIR) {
-    await chart.screenshot({
-      path: path.join(
-        process.env.REVIEW_SCREENSHOT_DIR,
-        `review-fixture-concurrent-${info.project.name}.png`,
-      ),
-    });
-  }
-});
-
-test("production divider follows side-panel capacity and clears its tooltip when resized smaller", async ({
-  page,
-}, info) => {
-  await page.addInitScript(() => {
-    localStorage.clear();
-    localStorage.setItem("audioEnabled", "false");
-  });
-  await page.setViewportSize({ width: 1299, height: 800 });
-  await page.goto("/?scenario=108");
-  await page.getByRole("button", { name: "Start game", exact: true }).click();
-  const pane = page.locator(".facilities:visible");
-  await openPane(
-    pane,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
-  const bar = pane.getByRole("button", {
-    name: "Inspect current production mix",
-  });
-  await expect(page.locator(".gameStage")).toHaveAttribute(
-    "data-layout",
-    "sheet",
-  );
-  await expect(bar).toHaveCount(0);
-  for (const width of [1300, 1330, 1380]) {
-    await page.setViewportSize({ width, height: 800 });
-    await expect(page.locator(".gameStage")).toHaveAttribute(
-      "data-layout",
-      "side",
-    );
-    await expect(bar).toBeVisible();
-    await expect(pane.locator(".productionMix")).toHaveCSS("height", "16px");
-  }
-  await page.setViewportSize({ width: 1330, height: 800 });
-  await openBuild(page);
-  await page.locator("#insightsNav").click();
-  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
-  // Opening panels changes the chart width. Its deferred rebuild can detach the
-  // plot between locator resolution and measurement; retry the whole contract.
-  await expect(async () => {
-    const plotBounds = await pane
-      .locator("#chartSupplyDemand .u-over")
-      .boundingBox();
-    const barBounds = await bar.boundingBox();
-    const firstRowBounds = await pane
-      .locator(".facilityDisclosure")
-      .first()
-      .boundingBox();
-    expect(plotBounds).not.toBeNull();
-    expect(barBounds).not.toBeNull();
-    expect(firstRowBounds).not.toBeNull();
-    expect(barBounds!.y).toBeGreaterThanOrEqual(
-      plotBounds!.y + plotBounds!.height,
-    );
-    expect(barBounds!.y + barBounds!.height).toBeLessThanOrEqual(
-      firstRowBounds!.y + 1,
-    );
-    expect(barBounds!.height).toBeGreaterThanOrEqual(
-      info.project.use.hasTouch ? 44 : 40,
-    );
-  }).toPass({ timeout: 12000 });
-  if (info.project.use.hasTouch) {
-    await bar.tap();
-    await expect(page.getByRole("tooltip")).toContainText("Supply now");
-    await bar.tap();
-    await expect(page.getByRole("tooltip")).toBeHidden();
-  }
-  await bar.focus();
-  await bar.press("Enter");
-  await expect(page.getByRole("tooltip")).toContainText("Supply now");
-  await bar.press("Escape");
-  await expect(page.getByRole("tooltip")).toBeHidden();
-  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
-  // Plot inspection must still work above the compact target.
-  await pane
-    .locator("#chartSupplyDemand .u-over")
-    .hover({ position: { x: 50, y: 10 } });
-  await expect(pane.locator("#chartSupplyDemand .chartTooltip")).toBeVisible();
-  await page.mouse.move(0, 0);
-  await bar.focus();
-  await bar.press("Enter");
-  await expect(page.getByRole("tooltip")).toBeVisible();
-  await page.setViewportSize({ width: 1299, height: 800 });
-  await expect(bar).toHaveCount(0);
-  await expect(page.getByRole("tooltip")).toHaveCount(0);
-  await expect(pane.locator(".productionMix")).toHaveCount(0);
 });

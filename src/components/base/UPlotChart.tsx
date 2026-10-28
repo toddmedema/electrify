@@ -90,6 +90,7 @@ function tooltipPlugin<S>(
 ): uPlot.Plugin {
   let el: HTMLDivElement | null = null;
   let header: HTMLDivElement;
+  let context: HTMLDivElement;
   let columns: Array<{ total: HTMLElement; rows: HTMLDivElement }>;
   let dismiss: (event: KeyboardEvent) => void;
   // A synced chart moves its cursor when a neighbour is hovered, which is the point -- but it
@@ -114,7 +115,9 @@ function tooltipPlugin<S>(
             values.appendChild(column);
             return { total, rows };
           });
-          el.append(header, values);
+          context = document.createElement("div");
+          context.className = "chartTooltipContext";
+          el.append(header, values, context);
           // uPlot ignores moves whose target isn't the plot itself. This breakdown takes pointer
           // events so it can scroll, so a fast pointer landing on it would otherwise strand the
           // cursor and leave the tooltip behind; hand those moves back to the plot instead.
@@ -165,6 +168,8 @@ function tooltipPlugin<S>(
             columns[i].total.textContent = rows[0];
             columns[i].rows.textContent = rows.slice(1).join("\n");
           });
+          context.textContent = groups.slice(2).join("\n\n");
+          context.hidden = !context.textContent;
           el.style.maxWidth = `${u.over.clientWidth}px`;
         } else {
           el.textContent = text;
