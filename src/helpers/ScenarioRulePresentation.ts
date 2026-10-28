@@ -57,14 +57,6 @@ export function presentOfficialRuleOccurrence(
     snapshot?.facilities.filter((facility) =>
       selectedIds.includes(facility.id),
     ) ?? [];
-  const protection = Number(core.attributes.ruleProtectionFactor ?? 0);
-  const priorChoice = (choice: string, option: string) =>
-    context?.occurrences?.some(
-      (occurrence) =>
-        occurrence.key ===
-          `story:${event.source!.scenarioId}:${event.source!.arcId}:${choice}` &&
-        occurrence.attributes.choice === option,
-    ) ?? false;
   const delivered = (fuels: FuelNameType[]) =>
     fuels.reduce(
       (sum, fuel) => sum + (snapshot!.deliveredWhByFuel12m[fuel] ?? 0),
@@ -132,14 +124,11 @@ export function presentOfficialRuleOccurrence(
       effects.facilityOutputMultipliersById ??= {};
       break;
     case "deepFreezeOnset":
-      if (protection > 0)
-        message += " Your funded winterization halves output losses.";
+      message += " Winterized plants take half the output loss.";
       break;
     case "deepFreezeThaw": {
       const period = context!.periodSnapshots?.[1];
-      const preparation = priorChoice("winterization", "winterize")
-        ? "Winterization halved output losses. "
-        : "";
+      const preparation = "";
       message =
         period === undefined
           ? "The freeze ends next month. Plant output and gas prices return to normal."

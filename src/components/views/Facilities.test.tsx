@@ -502,12 +502,20 @@ describe("weather hazards in the fleet", () => {
       startsMinute: state.date.minute - MINUTES_PER_MONTH / 2,
       completesMinute: state.date.minute + MINUTES_PER_MONTH / 2,
     };
+    gas.currentW = gas.peakW / 2;
     const { onCancelRetrofit } = renderFacilities(state, gas.id);
     const gasRow = rows().find((row) =>
       row.getAttribute("aria-label")?.startsWith(`Inspect ${gas.name}`),
     )!;
-    expect(gasRow).toHaveTextContent("Upgrading 50%");
-    expect(gasRow).toHaveTextContent("cold-weather package, 16 days left");
+    expect(gasRow).toHaveTextContent(
+      "Winterizing 50% · 90% capacity available",
+    );
+    expect(
+      screen.getByRole("img", {
+        name: `${gas.name} installing winterization, 90% capacity available`,
+      }),
+    ).toBeInTheDocument();
+    expect(gasRow).toHaveTextContent("16 days left");
     // The only plant out of service, so the only progress bar on the pane. The bar is
     // aria-hidden (the percentage is in the text), so there is no role to query it by.
     // eslint-disable-next-line testing-library/no-node-access
