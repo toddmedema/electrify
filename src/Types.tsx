@@ -798,13 +798,16 @@ export interface TutorialStepType {
   // the objective always opens on a deed instead of a paragraph to read
   action: string;
   content: React.JSX.Element;
+  // Runtime restrictions follow authored phases rather than positions in the walkthrough.
+  phase?:
+    | "GENERATOR_CHOICES"
+    | "INTERTIE_STRESS_PREPARE"
+    | "INTERTIE_STRESS_INSPECT"
+    | "INTERTIE_STRESS_SUPPLY";
   // Game chrome this step doesn't need yet. The first mission starts almost bare and reveals
   // controls as they're taught, so a new player isn't choosing between a dozen buttons before
   // they've made their first move. Presentation only: the gates never depend on it
   hideUi?: TutorialUiIdType[];
-  // Extra help, always shown beneath the step's sentence. Kept outside content so authored
-  // steps state the task first and the help second, in a consistent style.
-  hint?: React.ReactNode;
   // Present = the step is action-gated ("play, don't tell"): the HUD shows a "complete
   // objective" status instead of a Next button, and the walkthrough advances the moment this
   // returns true. Evaluated after every dispatch - including every tick - so keep it to

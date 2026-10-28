@@ -202,3 +202,14 @@ export function formatBuildMonths(
 export function formatScore(score: number): string {
   return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
 }
+
+/** Compact customer counts, with separate precision for chart axes and inspection. */
+export function formatCustomerCount(
+  value: number,
+  significantDigits = 3,
+): string {
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumSignificantDigits: significantDigits,
+  }).format(value);
+}

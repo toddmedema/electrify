@@ -1,8 +1,9 @@
 import path from "path";
 import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
+import { reviewScreenshot } from "./review-screenshot";
 
-test("public pricing shows the rate score and an absolute customer objective", async ({
+test("public pricing shows the rate score and the customer retention objective", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -73,7 +74,7 @@ test("public pricing shows the rate score and an absolute customer objective", a
     .click();
   await expect(
     page.getByRole("region", { name: "Scenario", exact: true }),
-  ).toContainText("14,850 customers");
+  ).toContainText("Retain ≥90% of starting customers");
   if (reviewDir && testInfo.project.name === "desktop-chromium") {
     await page.waitForTimeout(400);
     await page.screenshot({
@@ -82,3 +83,28 @@ test("public pricing shows the rate score and an absolute customer objective", a
     });
   }
 });
+
+for (const theme of ["light", "dark"]) {
+  test(`customer inspection preserves three significant digits in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem("insightsLayers", JSON.stringify(["customers"]));
+    }, theme);
+    await page.goto("/?scenario=106");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await page.locator("#insightsNav").click();
+    const chart = page.locator("#chartInsightsCustomersPlot");
+    await expect(chart).toBeVisible();
+    await chart.locator(".u-over").hover({ position: { x: 1, y: 20 } });
+    await expect(chart.locator(".chartTooltip")).toBeVisible();
+    await expect(chart.locator(".chartTooltip")).toContainText("16.5K");
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`customer-precision-${theme}.png`),
+      animations: "disabled",
+    });
+  });
+}

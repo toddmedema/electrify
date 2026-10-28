@@ -125,7 +125,7 @@ describe("the fleet list", () => {
   it.each([
     [2000, 0, 0, false, "filling"],
     [500, 0, 0, false, "draining"],
-    [1000, 0, 0, false, "steady"],
+    [1000, 0, 0, false, ""],
     [2000, 1000, 0, false, "spilling"],
     [500, 0, 1000, true, "draining"],
     [500, 0, 0, true, "filling"],
@@ -142,10 +142,18 @@ describe("the fleet list", () => {
       hydro.hydroLastBypassWh = Number(bypass);
       hydro.paused = Boolean(paused);
       renderFacilities(hydroGame, null);
-      expect(rows()[0]).toHaveTextContent(String(label));
+      expect(rows()[0]).toHaveTextContent(label || hydro.name);
+      expect(rows()[0]).not.toHaveTextContent("steady");
+      expect(
+        within(rows()[0]).queryAllByText("·", { exact: true }),
+      ).toHaveLength(label ? 1 : 0);
       expect(rows()[0]).not.toHaveTextContent("50%");
       await user.click(rows()[0]);
-      expect(rows()[0]).toHaveTextContent(String(label));
+      expect(rows()[0]).toHaveTextContent(label || hydro.name);
+      expect(rows()[0]).not.toHaveTextContent("steady");
+      expect(
+        within(rows()[0]).queryAllByText("·", { exact: true }),
+      ).toHaveLength(label ? 1 : 0);
     },
   );
 

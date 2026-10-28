@@ -1,5 +1,11 @@
 import { expect, test } from "./fixtures";
-import { isPaneLayout, waitForPaneOrNav, waitForSettled } from "./layout";
+import { reviewScreenshot } from "./review-screenshot";
+import {
+  isPaneLayout,
+  sortBuildCatalog,
+  waitForPaneOrNav,
+  waitForSettled,
+} from "./layout";
 
 for (const mission of [
   "Generators",
@@ -9,6 +15,12 @@ for (const mission of [
   "Forecasting",
 ]) {
   test(`${mission} advances from game controls`, async ({ page }, testInfo) => {
+    if (
+      mission === "Finances" &&
+      testInfo.project.name === "desktop-chromium"
+    ) {
+      await page.setViewportSize({ width: 1440, height: 900 });
+    }
     await page.addInitScript(
       ({ lesson, theme }) => {
         localStorage.clear();
@@ -58,6 +70,10 @@ for (const mission of [
         await expect(hud).toContainText("Tap Storage");
         await expect(storageTab).toHaveClass(/tutorialTarget/);
         await storageTab.click();
+      }
+      if (mission === "Generators") {
+        await expect(hud).toContainText("Choose how to sort generators");
+        await sortBuildCatalog(page);
       }
       await expect(hud).toContainText(
         mission === "Generators" ? "Review a generator" : "Review a storage",
@@ -130,12 +146,34 @@ for (const mission of [
         );
         await page.locator("#insightsLayersButton").click();
         await expect(hud).toContainText("Tap Programs");
+        await expect(
+          page.getByRole("region", { name: "Insights", exact: true }),
+        ).toBeVisible();
         await expect(page.locator("#programsNav")).toHaveClass(
           /tutorialTarget/,
         );
         await page.locator("#programsNav").click();
         await expect(hud).toContainText("Raise the electricity rate");
+        if (
+          (await page.locator(".gameStage").getAttribute("data-layout")) ===
+          "side"
+        ) {
+          await expect(
+            page.getByRole("region", { name: "Insights", exact: true }),
+          ).toBeVisible();
+          await expect(page.locator("#chartFinances")).toBeVisible();
+          await page.locator("#insightsLayersButton").click();
+          await expect(page.locator("#insightsLayersButton")).toHaveAttribute(
+            "aria-expanded",
+            "false",
+          );
+        }
         await expect(page.locator("#rateSlider")).toHaveClass(/tutorialTarget/);
+        await page.mouse.move(0, 0);
+        await reviewScreenshot(page, {
+          path: testInfo.outputPath("programs-and-insights.png"),
+          animations: "disabled",
+        });
         const rate = page.locator("#rateSlider input");
         await rate.focus();
         await rate.press("ArrowRight");

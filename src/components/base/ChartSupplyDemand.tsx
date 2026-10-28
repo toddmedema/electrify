@@ -11,7 +11,6 @@ import {
   describeDayNight,
   DayNightSegment,
   dayNightRibbonPlugin,
-  daylightDescription,
   formatClockTime,
 } from "./DayNightRibbon";
 import { getTextScale } from "../../TextSize";
@@ -33,7 +32,6 @@ import {
   formatMinuteOfDayChartAxis,
   getDateFromMinute,
   getHourTicks,
-  getSunriseSunset,
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
@@ -410,13 +408,11 @@ export function formatProductionTooltip(
     | "supply"
     | "totalDemand"
     | "startingYear"
-    | "location"
   >,
 ): string {
   const d = state.timeline[idx];
   const date = getDateFromMinute(d.minute, state.startingYear);
   const time = formatClockTime(date.minuteOfDay);
-  const sun = getSunriseSunset(date, state.location);
   const loads: Array<[string, number | undefined]> = [
     ["Storage charging", d.storageChargeW],
     ["Interties", d.exportedW],
@@ -436,8 +432,6 @@ export function formatProductionTooltip(
     ...(d.demandW > d.supplyW
       ? [`Blackout: ${formatWatts(d.demandW - d.supplyW)} unmet`]
       : []),
-    "",
-    daylightDescription(sun),
   ].join("\n");
 }
 

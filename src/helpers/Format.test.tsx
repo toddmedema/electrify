@@ -10,6 +10,7 @@ import {
   formatWattsOfPeak,
   formatPercent,
   formatCount,
+  formatCustomerCount,
   formatPricePerMWh,
   formatFacilitySize,
   formatBuildMonths,
@@ -180,4 +181,20 @@ describe("money formatting of values that are not numbers", () => {
 test("energy uses the same magnitude thresholds as power", () => {
   expect(formatWattHours(500e6)).toBe("500MWh");
   expect(formatWattHours(1e9)).toBe("1GWh");
+});
+
+describe("formatCustomerCount", () => {
+  it.each([
+    [1234, "1.2K", "1.23K"],
+    [123456, "120K", "123K"],
+    [1234567, "1.2M", "1.23M"],
+    [9876543, "9.9M", "9.88M"],
+    [0, "0", "0"],
+  ])(
+    "keeps two digits on axes and three on inspection for %s customers",
+    (value, axis, tooltip) => {
+      expect(formatCustomerCount(Number(value), 2)).toBe(axis);
+      expect(formatCustomerCount(Number(value))).toBe(tooltip);
+    },
+  );
 });

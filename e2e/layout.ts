@@ -108,3 +108,21 @@ export async function openSavedGames(page: Page) {
     page.getByRole("heading", { name: "Saved games", exact: true }),
   ).toBeVisible();
 }
+
+/** Choose a build sort order through the desktop select or compact sort menu. */
+export async function sortBuildCatalog(
+  page: Page,
+  order = "Build Time",
+): Promise<void> {
+  const select = page.getByRole("combobox", {
+    name: "Sort facilities",
+    exact: true,
+  });
+  if (await select.isVisible()) {
+    await select.click();
+    await page.getByRole("option", { name: order, exact: true }).click();
+  } else {
+    await page.getByRole("button", { name: /^Sort facilities:/ }).click();
+    await page.getByRole("menuitem", { name: order, exact: true }).click();
+  }
+}

@@ -4094,22 +4094,8 @@ $pane_header_height: 48px;
   line-height: 20px;
 }
 
-.tutorialHudHint {
-  margin-top: 4px;
-  color: $font_color_faded;
-  font-size: var(--font-size-caption);
-  line-height: 18px;
-
-  strong {
-    color: $font_color_primary;
-    font-weight: 600;
-  }
-}
-
-// Hang the explanation and hint off the action's text (20px icon + 8px gap) so every line starts
-// at one left edge.
-.tutorialHud .tutorialPrompt,
-.tutorialHudHint {
+// Hang the explanation off the action's text (20px icon + 8px gap).
+.tutorialHud .tutorialPrompt {
   padding-left: 28px;
 }
 
@@ -4164,10 +4150,6 @@ $pane_header_height: 48px;
     min-height: 0;
     overflow: auto;
   }
-  // A full-width flex basis plus the hanging indent would otherwise run past the right edge
-  .tutorialHudHint {
-    box-sizing: border-box;
-  }
   // A plain div with no role, so flattening it into the HUD's row loses no semantics
   .tutorialHudFooter {
     display: contents;
@@ -4208,15 +4190,12 @@ $pane_header_height: 48px;
 }
 
 // Wider screens put the step name, the text and the buttons side by side. The header and footer
-// span both text rows and keep a fixed line at the top as tall as the theme's 40px buttons, so
-// they line up with the action and Next never moves as the text grows; a step without a hint
-// leaves the second row empty.
+// keep a fixed line at the top as tall as the theme's 40px buttons, so they line up with the
+// action and Next never moves as the explanation grows.
 @media screen and (min-width: $fold_pane_min_width) {
   .tutorialHud {
     display: grid;
-    grid-template-areas:
-      "header content footer"
-      "header hint footer";
+    grid-template-areas: "header content footer";
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: start;
     column-gap: 24px;
@@ -4241,10 +4220,6 @@ $pane_header_height: 48px;
     padding-top: 12px;
   }
 
-  .tutorialHudHint {
-    grid-area: hint;
-  }
-
   .tutorialHudFooter {
     grid-area: footer;
   }
@@ -4252,15 +4227,12 @@ $pane_header_height: 48px;
   // The phone's arrangement at every width: Exit quiet on the left, the step count beside the
   // primary action on the right, so the controls never swap sides as the window changes.
   .tutorialHud {
-    grid-template-areas:
-      "exit content step back next"
-      "exit hint step back next";
+    grid-template-areas: "exit content step back next";
     grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     column-gap: $space-2;
   }
 
-  .tutorialHudContent,
-  .tutorialHudHint {
+  .tutorialHudContent {
     margin-left: $space-4;
     margin-right: $space-4;
   }

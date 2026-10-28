@@ -506,12 +506,16 @@ describe("transmission actions", () => {
       ).toBe(true);
       // Acknowledgement starts a real dispatch restriction, but inspection cannot run the clock.
       expect(state.tutorialIntertieStress).toBeUndefined();
-      state.tutorialStep = 15;
+      state.tutorialStep = steps.findIndex(
+        (step) => step.phase === "INTERTIE_STRESS_PREPARE",
+      );
       state = cloneDeep(gameReducer(state, beginIntertieStress()));
       expect(state.tutorialIntertieStress?.active).toBe(true);
       const stressMinute = state.date.minute;
       expect(state.timeline.some((t) => t.demandW > t.supplyW)).toBe(true);
-      state.tutorialStep = 16;
+      state.tutorialStep = steps.findIndex(
+        (step) => step.phase === "INTERTIE_STRESS_INSPECT",
+      );
       state = cloneDeep(gameReducer(state, setSpeed("FAST")));
       tickState(state);
       expect(state.speed).toBe("PAUSED");
@@ -524,8 +528,10 @@ describe("transmission actions", () => {
       bad.tutorialIntertieStress!.suppliedTicks = Infinity;
       expect(parseSave(serializeSave(bad))).toBeNull();
       state = cloneDeep(gameReducer(state, togglePauseFacility(gas.id)));
-      state.tutorialStep = 18;
-      const finalCapstone = steps[18].capstone!;
+      state.tutorialStep = steps.findIndex(
+        (step) => step.phase === "INTERTIE_STRESS_SUPPLY",
+      );
+      const finalCapstone = steps[state.tutorialStep].capstone!;
       expect(finalCapstone.success(appState())).toBe(false);
       for (let i = 0; i < TICKS_PER_MONTH - 1; i++) tickState(state);
       expect(finalCapstone.success(appState())).toBe(false);
