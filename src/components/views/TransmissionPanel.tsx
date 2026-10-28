@@ -28,6 +28,7 @@ import {
   Chip,
   FormControl,
   InputLabel,
+  List,
   MenuItem,
   Select,
   Typography,
@@ -1241,7 +1242,7 @@ export default function TransmissionPanel({
             sortLabel="Sort interties"
             onSortChange={(value) => setSort(value as IntertieSortKey)}
           />
-          <div className="transmissionProjects">
+          <List dense className="cardList transmissionProjects">
             {projects.map(({ quote: corridor }) => {
               const capacities = intertieDirectionalCapacities(
                 corridor.id,
@@ -1265,7 +1266,7 @@ export default function TransmissionPanel({
                 />
               );
             })}
-          </div>
+          </List>
         </section>
       )}
       {projectsOnly && !!upcomingCorridors.length && (

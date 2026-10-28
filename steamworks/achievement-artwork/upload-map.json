@@ -13,7 +13,7 @@
     "name": "Grid Graduate",
     "description": "Complete all seven tutorial missions.",
     "source": "public/images/transmission.svg",
-    "sourceSha256": "7a1c9d555a18c69d3d9e1cd8c62ec9240679e4e48031219496a733626e7be6a3",
+    "sourceSha256": "c02f0864e32b86fb85b93fec4813f4ab1e456e8268fd601ee1693954dac1b2c4",
     "achieved": "uploads/GRID_GRADUATE_ACHIEVED.png",
     "unachieved": "uploads/GRID_GRADUATE_UNACHIEVED.png"
   },
@@ -40,7 +40,7 @@
     "name": "Lights On",
     "description": "Serve at least 99.9% of demand for 12 consecutive completed months.",
     "source": "public/images/transmission.svg",
-    "sourceSha256": "7a1c9d555a18c69d3d9e1cd8c62ec9240679e4e48031219496a733626e7be6a3",
+    "sourceSha256": "c02f0864e32b86fb85b93fec4813f4ab1e456e8268fd601ee1693954dac1b2c4",
     "achieved": "uploads/LIGHTS_ON_ACHIEVED.png",
     "unachieved": "uploads/LIGHTS_ON_UNACHIEVED.png"
   },
@@ -130,7 +130,7 @@
     "name": "Grid Connected",
     "description": "Commission a player-built intertie and import at least 10% of demand over a reliable month.",
     "source": "public/images/transmission.svg",
-    "sourceSha256": "7a1c9d555a18c69d3d9e1cd8c62ec9240679e4e48031219496a733626e7be6a3",
+    "sourceSha256": "c02f0864e32b86fb85b93fec4813f4ab1e456e8268fd601ee1693954dac1b2c4",
     "achieved": "uploads/GRID_CONNECTED_ACHIEVED.png",
     "unachieved": "uploads/GRID_CONNECTED_UNACHIEVED.png"
   },
@@ -139,7 +139,7 @@
     "name": "Good Neighbor",
     "description": "Export at least 10% of customer demand over a reliable month.",
     "source": "public/images/transmission.svg",
-    "sourceSha256": "7a1c9d555a18c69d3d9e1cd8c62ec9240679e4e48031219496a733626e7be6a3",
+    "sourceSha256": "c02f0864e32b86fb85b93fec4813f4ab1e456e8268fd601ee1693954dac1b2c4",
     "achieved": "uploads/GOOD_NEIGHBOR_ACHIEVED.png",
     "unachieved": "uploads/GOOD_NEIGHBOR_UNACHIEVED.png"
   },

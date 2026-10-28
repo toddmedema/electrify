@@ -91,6 +91,7 @@ async function runCommand(command, args = [], options = {}) {
     if (local) {
       claimTask(root);
       lease = await acquireLease("heavy", {
+        slots: 3,
         root: options.coordinationRoot,
         inherited: env.ELECTRIFY_DEVELOPMENT_LEASE,
         signal: abort.signal,

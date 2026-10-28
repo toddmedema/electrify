@@ -28,10 +28,10 @@ for (const theme of ["light", "dark"] as const) {
     const sort = page.getByRole("combobox", { name: "Sort facilities" });
     if (await sort.isVisible()) {
       await sort.click();
-      await page.getByRole("option", { name: "Build Time" }).click();
+      await page.getByRole("option", { name: "Build time" }).click();
     } else {
       await page.getByRole("button", { name: /^Sort facilities:/ }).click();
-      await page.getByRole("menuitem", { name: "Build Time" }).click();
+      await page.getByRole("menuitem", { name: "Build time" }).click();
     }
     const first = page.locator(".buildOption").first();
     const metrics = await first.locator(".buildOptionMetrics").innerText();
@@ -110,10 +110,10 @@ for (const theme of ["light", "dark"] as const) {
       useInnerText: true,
     });
     if (await sort.isVisible()) {
-      await expect(sort).toContainText("Build Time");
+      await expect(sort).toContainText("Build time");
     } else {
       await expect(
-        page.getByRole("button", { name: "Sort facilities: Build Time" }),
+        page.getByRole("button", { name: "Sort facilities: Build time" }),
       ).toBeVisible();
     }
 
