@@ -112,7 +112,7 @@ export async function openSavedGames(page: Page) {
 /** Choose a build sort order through the desktop select or compact sort menu. */
 export async function sortBuildCatalog(
   page: Page,
-  order = "Build Time",
+  order = "Build time",
 ): Promise<void> {
   const select = page.getByRole("combobox", {
     name: "Sort facilities",
