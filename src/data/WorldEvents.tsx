@@ -35,14 +35,10 @@ import {
   HURRICANE_BALANCE,
   END_OF_ERA_BALANCE,
 } from "./OfficialScenarioTargetRules";
-import { WINTERIZATION_COST } from "./ScenarioChoiceRules";
 export * from "./OfficialScenarioEffectRules";
 export * from "./OfficialScenarioTargetRules";
 export { LOAD_SHEDDING_BALANCE } from "./OfficialScenarioRules";
-export {
-  DEEP_FREEZE_DECISION_KEY,
-  WINTERIZATION_COST,
-} from "./ScenarioChoiceRules";
+export { DEEP_FREEZE_DECISION_KEY } from "./ScenarioChoiceRules";
 export interface StoryContextType {
   rules?: CompiledScenarioRules;
   monthlyHistory?: MonthlyHistoryType[];
@@ -89,9 +85,6 @@ const DIFFICULTY_ORDER: DifficultyType[] = [
   "VP",
   "CEO",
 ];
-
-export const winterizationCost = (difficulty: DifficultyType) =>
-  WINTERIZATION_COST[difficulty];
 
 export function validateStoryDifficultyMonotonicity(): string[] {
   const problems: string[] = [];
@@ -395,6 +388,12 @@ export function combineStoryEffects(
           combined.transmissionCapacityLimitsWByCorridor?.[id] ?? Infinity,
           limitW,
         );
+    const winterizationOutput = multiplyEffects(
+      combined.winterizationOutputMultipliersByFuel,
+      effects.winterizationOutputMultipliersByFuel,
+    );
+    if (winterizationOutput !== undefined)
+      combined.winterizationOutputMultipliersByFuel = winterizationOutput;
     const facilityOutputMultipliersById = multiplyEffects(
       combined.facilityOutputMultipliersById,
       effects.facilityOutputMultipliersById,

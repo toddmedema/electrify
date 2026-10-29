@@ -293,7 +293,7 @@ the result before resuming. Saves retain unanswered prompts and replay actions r
 
 Accepted choices are story occurrences with the definition ID as their key and
 `attributes.choice` as the option ID. Future `WorldEvents` phase descriptions and previews can
-read these through `context.occurrences` (see winterization) to branch narrative and effects.
+read these through `context.occurrences` to branch narrative and effects. Winterization is permanent facility state; its bulk scenario response starts ordinary retrofits and does not itself grant protection.
 The forecast cache includes occurrence attributes, so an answer refreshes future effects.
 Costs are charged once and retained as operating expenses through reforecasting.
 

@@ -11,12 +11,12 @@ import {
   ruleConditionMet,
   officialRuleOccurrence,
   ruleEvents,
-  scenarioRuleProtectionFactor,
   scenarioRuleTargetOperations,
   scenarioRuleCapacityReportMonths,
   ruleObservationKey,
   interpretScenarioRuleReport,
 } from "./ScenarioRuleRuntime";
+import { winterizationEffects } from "./Winterization";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { canonicalRuleJson } from "./RuleIdentity";
 import { ID_PATTERN } from "./ScenarioRulesSchema";
@@ -207,23 +207,10 @@ function validOfficialOccurrence(
     if (canonicalRuleJson(attrs[key]) !== canonicalRuleJson(value))
       return false;
   }
-  const effects = { ...definition.effects };
-  const protection = scenarioRuleProtectionFactor(
-    definition,
-    rules,
-    game.worldEvents.occurrences.filter(
-      (receipt) => receipt.startsMinute <= event.startsMinute,
-    ),
-  );
-  if (
-    definition.protection?.kind === "deepFreezeWinterization" &&
-    protection > 0
-  )
-    effects.facilityOutputMultipliersByFuel = Object.fromEntries(
-      Object.entries(effects.facilityOutputMultipliersByFuel ?? {}).map(
-        ([fuel, value]) => [fuel, 1 - (1 - value) * (1 - protection)],
-      ),
-    );
+  const effects =
+    definition.protection?.kind === "deepFreezeWinterization"
+      ? winterizationEffects(definition.effects)
+      : { ...definition.effects };
   if (definition.targets.length) {
     const ids = attrs.selectedFacilityIds;
     if (
@@ -543,15 +530,7 @@ export function validScenarioRuleState(game: GameType): boolean {
       (!definition.protection && event.attributes.ruleProtectionFactor !== 0)
     )
       return false;
-    if (
-      event.attributes.ruleProtectionFactor !==
-      scenarioRuleProtectionFactor(
-        definition,
-        rules,
-        occurrences.slice(0, occurrences.indexOf(event)),
-      )
-    )
-      return false;
+    if (event.attributes.ruleProtectionFactor !== 0) return false;
     const grant = definition.transactions
       .filter((t) => t.kind === "grant")
       .reduce((sum, t) => sum + t.amount, 0);

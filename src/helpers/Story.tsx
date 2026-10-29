@@ -8,6 +8,7 @@ import {
 } from "../Types";
 import { WEATHER_DEPENDENT_FUELS } from "../Constants";
 import { summarizeHistory } from "./DateTime";
+import { hasWinterization } from "./Winterization";
 import { facilityAgeYears } from "./Financials";
 
 /**
@@ -17,15 +18,25 @@ import { facilityAgeYears } from "./Financials";
  * disagree about what a plant can produce.
  */
 export function storyOutputMultiplier(
-  facility: Pick<FacilityOperatingType, "id" | "fuel">,
+  facility: Pick<FacilityOperatingType, "id" | "fuel"> &
+    Partial<Pick<FacilityOperatingType, "resilience" | "upgradeInProgress">>,
   effects: WorldEventEffectsType,
+  minute = -Infinity,
 ): number {
   const fuel = facility.fuel;
   const byFuel = fuel
     ? (effects.facilityOutputMultipliersByFuel?.[fuel] ?? 1)
     : 1;
+  const cold = fuel
+    ? (effects.winterizationOutputMultipliersByFuel?.[fuel] ?? 1)
+    : 1;
+  const coldOutput = hasWinterization(facility, minute)
+    ? 1 - (1 - cold) * 0.5
+    : cold;
   return (
-    byFuel * (effects.facilityOutputMultipliersById?.[String(facility.id)] ?? 1)
+    byFuel *
+    coldOutput *
+    (effects.facilityOutputMultipliersById?.[String(facility.id)] ?? 1)
   );
 }
 

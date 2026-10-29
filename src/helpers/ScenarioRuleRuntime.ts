@@ -23,6 +23,7 @@ import {
   survivingScenarioRuleTargets,
   ScenarioRuleTargetBinding,
 } from "./ScenarioRuleTargets";
+import { winterizationEffects } from "./Winterization";
 import { canonicalRuleJson } from "./RuleIdentity";
 import {
   resolveScenarioRuleChoice,
@@ -44,27 +45,6 @@ export const ruleEvents = (rules: CompiledScenarioRules): CompiledRuleEvent[] =>
   );
 export const ruleLoadKey = (rules: CompiledScenarioRules, id: string) =>
   `${rules.namespace.kind === "mod" ? `mod:${rules.namespace.id}` : `story:${rules.namespace.scenarioId}:${rules.namespace.arcId}`}:load:${id}`;
-
-/** Protection is fixed by the paid winterization response recorded before activation. */
-export function scenarioRuleProtectionFactor(
-  event: CompiledRuleEvent,
-  rules: CompiledScenarioRules,
-  occurrences: readonly ActiveWorldEventType[],
-): number {
-  if (!event.protection) return 0;
-  const source = event.source;
-  return occurrences.some(
-    (occurrence) =>
-      occurrence.startsMinute <= event.startMonth * MINUTES_PER_MONTH &&
-      occurrence.attributes.choice === "winterize" &&
-      (occurrence.key ===
-        `story:${source?.scenarioId}:${source?.arcId}:winterization` ||
-        occurrence.key ===
-          `mod:${rules.namespace.kind === "mod" ? rules.namespace.id : ""}:arc:${source?.scenarioId}:choice:winterization`),
-  )
-    ? 0.5
-    : 0;
-}
 
 /** Choice answers, activations and receipts share the existing persisted occurrence owner. */
 export function ruleConditionMet(
@@ -147,7 +127,9 @@ export function ruleEffectsForOccurrence(
       context.rules.namespace.kind !== "official" ||
       !definition?.targets.length
     )
-      return event.effects;
+      return definition?.protection?.kind === "deepFreezeWinterization"
+        ? winterizationEffects(event.effects)
+        : event.effects;
     const effects = { ...event.effects };
     const originalAsset =
       definition.targets.length === 1 &&
@@ -172,16 +154,10 @@ export function ruleEffectsForOccurrence(
   }
   if (!definition) return {};
   const effects: WorldEventEffectsType = { ...definition.effects };
-  const protection = Number(event.attributes.ruleProtectionFactor ?? 0);
-  if (
-    definition.protection?.kind === "deepFreezeWinterization" &&
-    protection > 0
-  )
-    effects.facilityOutputMultipliersByFuel = Object.fromEntries(
-      Object.entries(effects.facilityOutputMultipliersByFuel ?? {}).map(
-        ([fuel, multiplier]) => [fuel, 1 - (1 - multiplier) * (1 - protection)],
-      ),
-    );
+  if (definition.protection?.kind === "deepFreezeWinterization") {
+    Object.assign(effects, winterizationEffects(effects));
+    delete effects.facilityOutputMultipliersByFuel;
+  }
   const byId: Record<string, number> = {};
   const operations = scenarioRuleTargetOperations(definition);
   const facilities = context.snapshot.facilities.map((f) => ({
@@ -322,11 +298,6 @@ function resolveEvent(
   const charge = event.transactions
     .filter((t) => t.kind === "charge")
     .reduce((sum, t) => sum + t.amount, 0);
-  const protection = scenarioRuleProtectionFactor(
-    event,
-    context.rules!,
-    context.occurrences ?? [],
-  );
   const reportContext = {
     ...context,
     occurrences: [
@@ -399,7 +370,7 @@ function resolveEvent(
         t.targets.map((f) => f.name),
       ),
       noMatch,
-      ruleProtectionFactor: protection,
+      ruleProtectionFactor: 0,
       cost: charge,
       upfrontGrant: grant,
       ...Object.assign({}, ...reports.map((report) => report.attributes)),

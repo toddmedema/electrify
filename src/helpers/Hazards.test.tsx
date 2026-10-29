@@ -114,7 +114,12 @@ function optionFor(q: GeneratorShoppingType, game: GameType, upgrade: string) {
 }
 
 function quote(fuel: string, buildCost = 50_000_000): GeneratorShoppingType {
-  return { name: fuel, fuel, buildCost } as unknown as GeneratorShoppingType;
+  return {
+    name: fuel,
+    fuel,
+    buildCost,
+    peakW: 100e6,
+  } as unknown as GeneratorShoppingType;
 }
 
 /** The first storm key, for a fleet, whose sampled hits include every listed facility. */
@@ -364,11 +369,11 @@ describe("replacementValue", () => {
 describe("retrofitCost", () => {
   it("prices retrofits at half as much again as building them in", () => {
     const game = gameAt(DENVER);
-    // 1.5 x the 3% and 2% build shares of a $100M replacement value
+    // Hail uses replacement value; targeted winterization follows capacity.
     expect(retrofitCost(facility(1, "Sun"), game, "hailResistant")).toBe(4.5e6);
     expect(
       retrofitCost(facility(1, "Natural Gas"), game, "coldWeatherPackage"),
-    ).toBe(3e6);
+    ).toBe(300000);
   });
 
   it("is not offered while a retrofit is being installed, or for trackers", () => {
@@ -404,7 +409,7 @@ describe("retrofitCost", () => {
     expect(
       retrofitCost(
         facility(1, "Natural Gas"),
-        gameAt(DENVER, [], { scenarioId: 107 }),
+        gameAt(DENVER, [], { scenarioId: 1 }),
         "coldWeatherPackage",
       ),
     ).toBeUndefined();
@@ -510,8 +515,8 @@ describe("resilience build options", () => {
       coldWeatherPackage: true,
       designMinTempC: -30,
     });
-    expect(cold.buildCost).toBeCloseTo(51_000_000, 6);
-    expect(cold.resilienceExtraBuildCost).toBeCloseTo(1_000_000, 6);
+    expect(cold.buildCost).toBeCloseTo(50_200_000, 6);
+    expect(cold.resilienceExtraBuildCost).toBeCloseTo(200_000, 6);
     const mild = applyDefaultResilience(
       quote("Natural Gas"),
       gameAt(NASHVILLE),
@@ -588,14 +593,14 @@ describe("resilience build options", () => {
     );
     // Gas still records its standard rating so a later retrofit has a baseline.
     const texas = gameAt(DALLAS, [], { scenarioId: 107 });
-    expect(resilienceBuildOptions(quote("Natural Gas"), texas)).toEqual([]);
+    expect(resilienceBuildOptions(quote("Natural Gas"), texas)).toHaveLength(1);
     expect(
       withResilienceOptions(quote("Natural Gas"), texas, {
         coldWeatherPackage: true,
       }),
     ).toMatchObject({
-      buildCost: 50_000_000,
-      resilience: { coldWeatherPackage: false, designMinTempC: -8 },
+      buildCost: 50_200_000,
+      resilience: { coldWeatherPackage: true, designMinTempC: -25 },
     });
   });
 });
@@ -706,7 +711,7 @@ describe("facilityResilienceSummary", () => {
     });
   });
 
-  it("reports a gas plant's rating and hides where cold is authored", () => {
+  it("reports installed protection even where no new upgrade is offered", () => {
     const gas = facility(1, "Natural Gas", {
       resilience: { coldWeatherPackage: true, designMinTempC: -30 },
     });
@@ -721,7 +726,7 @@ describe("facilityResilienceSummary", () => {
     ).toBeUndefined();
     expect(
       facilityResilienceSummary(gameAt(DALLAS, [], { scenarioId: 103 }), gas),
-    ).toBeUndefined();
+    ).toMatchObject({ installed: true });
     expect(
       facilityResilienceSummary(gameAt(DENVER), facility(2, "Wind")),
     ).toBeUndefined();
