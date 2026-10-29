@@ -69,9 +69,27 @@ describe("TutorialHud", () => {
   ] as [string, Partial<TutorialStepType>, boolean][])(
     "reserves the continuation instruction for manual steps (%s)",
     (_name, overrides, manual) => {
-      render(<TutorialHud {...props({ step: objective(overrides) })} />);
+      render(
+        <TutorialHud
+          {...props({ desktop: true, step: objective(overrides) })}
+        />,
+      );
       const instruction = screen.queryByText(/when you’re ready\./);
       expect(instruction !== null).toBe(manual);
+    },
+  );
+
+  it.each(["Next", "Start final challenge"])(
+    "hides the %s instruction in sheet mode while retaining its button",
+    (nextLabel) => {
+      render(<TutorialHud {...props({ step: objective({ nextLabel }) })} />);
+      expect(screen.queryByText(/when you’re ready\./)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: nextLabel })).toHaveClass(
+        "MuiButton-contained",
+      );
+      expect(
+        screen.getByRole("button", { name: nextLabel }),
+      ).toHaveAccessibleDescription("");
     },
   );
 
@@ -120,6 +138,7 @@ describe("TutorialHud", () => {
   it("names a deliberate challenge transition without advancing from unrelated controls", async () => {
     const user = userEvent.setup();
     const hudProps = props({
+      desktop: true,
       step: objective({ nextLabel: "Start final challenge" }),
     });
     render(
@@ -234,7 +253,7 @@ describe("TutorialHud", () => {
 
   it("exposes the current step, progress and ordinary navigation", async () => {
     const user = userEvent.setup();
-    const hudProps = props({ canGoBack: true, stepIndex: 1 });
+    const hudProps = props({ desktop: true, canGoBack: true, stepIndex: 1 });
     const { rerender } = render(<TutorialHud {...hudProps} />);
 
     expect(

@@ -249,8 +249,25 @@ for (const mission of [
       expect((await progress.boundingBox())!.width).toBe(initialBox!.width);
       // Seek the animation timeline to prove both glows repeat without waiting eight seconds.
       const next = hud.getByRole("button", { name: "Next", exact: true });
+      if (testInfo.project.name === "desktop-chromium") {
+        // The hint follows side-panel mode, including live resizes at its exact boundary.
+        for (const width of [1299, 1300, 1299, 1300]) {
+          await page.setViewportSize({ width, height: 800 });
+          await expect(page.locator(".gameStage")).toHaveAttribute(
+            "data-layout",
+            width === 1300 ? "side" : "sheet",
+          );
+          await expect(hud.locator(".tutorialHudContinue")).toHaveCount(
+            width === 1300 ? 1 : 0,
+          );
+          await expect(next).toBeVisible();
+        }
+      }
+      const sideLayout =
+        (await page.locator(".gameStage").getAttribute("data-layout")) ===
+        "side";
       await expect(next).toHaveAccessibleDescription(
-        "Select Next when you’re ready.",
+        sideLayout ? "Select Next when you’re ready." : "",
       );
       const cue = next.locator(".tutorialHudNextPulse");
       await expect(cue).toHaveCSS("animation-delay", "0s, 4s");
@@ -275,7 +292,9 @@ for (const mission of [
       expect(reminders[4]).toBe(reminders[1]);
       await page.emulateMedia({ reducedMotion: "reduce" });
       await expect(cue).toHaveCSS("animation-name", "none");
-      await expect(hud.locator(".tutorialHudContinue")).toBeVisible();
+      await expect(hud.locator(".tutorialHudContinue")).toHaveCount(
+        sideLayout ? 1 : 0,
+      );
       await expect(next).toHaveClass(/MuiButton-contained/);
       await page.emulateMedia({ reducedMotion: "no-preference" });
       await page.mouse.move(0, 0);
@@ -306,8 +325,21 @@ for (const mission of [
         name: "Start final challenge",
         exact: true,
       });
+      if (testInfo.project.name === "desktop-chromium") {
+        await page.setViewportSize({ width: 1300, height: 800 });
+        await expect(page.locator(".gameStage")).toHaveAttribute(
+          "data-layout",
+          "side",
+        );
+      }
+      const sideLayout =
+        (await page.locator(".gameStage").getAttribute("data-layout")) ===
+        "side";
       await expect(start).toHaveAccessibleDescription(
-        "Select Start final challenge when you’re ready.",
+        sideLayout ? "Select Start final challenge when you’re ready." : "",
+      );
+      await expect(hud.locator(".tutorialHudContinue")).toHaveCount(
+        sideLayout ? 1 : 0,
       );
       await expect(start.locator(".tutorialHudNextPulse")).toBeVisible();
       await page.mouse.move(0, 0);

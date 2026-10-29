@@ -322,6 +322,7 @@ export default function TutorialHud({
   // thing on screen asking to be tapped
   const requiresNext =
     !isGatedStep(step) && !step.continueOn && !step.continueOnClick;
+  const showContinueHint = requiresNext && desktop;
   const nextLabel = step.nextLabel || "Next";
   const progressText = `${stepIndex + 1} of ${totalSteps}`;
   const advanceOnClick = onAutoAdvance ?? onNext;
@@ -523,7 +524,7 @@ export default function TutorialHud({
               <span>{action}</span>
             </p>
             {content}
-            {requiresNext && (
+            {showContinueHint && (
               <p
                 id="tutorial-continue-instruction"
                 className="tutorialHudContinue"
@@ -557,7 +558,7 @@ export default function TutorialHud({
             size="small"
             variant={requiresNext ? "contained" : "text"}
             aria-describedby={
-              requiresNext ? "tutorial-continue-instruction" : undefined
+              showContinueHint ? "tutorial-continue-instruction" : undefined
             }
             endIcon={requiresNext ? <ArrowForwardIcon /> : undefined}
             onClick={onNext}
