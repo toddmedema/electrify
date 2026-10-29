@@ -264,7 +264,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
       screen.queryByRole("button", { name: "View demand" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("How it works")).not.toBeInTheDocument();
-    expect(fact("Monthly budget")).toMatch(/\/moCurrent profit: .*\/mo/);
+    expect(fact("Monthly cost")).toMatch(/\/moCurrent profit: .*\/mo/);
     expect(screen.queryByText(/^Facility comparable/) !== null).toBe(
       id === "solar",
     );
@@ -611,7 +611,7 @@ test("solar facts compare a same-size facility and distinguish annual energy fro
   expect(fact("Duration")).toBe("48 monthsFinishes Jan 2024");
   expect(fact("If started now")).toBeUndefined();
   expect(fact("While active")).toBeUndefined();
-  expect(fact("Monthly budget")).toMatch(
+  expect(fact("Monthly cost")).toMatch(
     /\$[\d.]+[kKMB]?\/moCurrent profit: \$[\d.]+[kKMB]?\/mo/,
   );
   fireEvent.click(screen.getByText("Compare utility solar"));

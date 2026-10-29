@@ -1,6 +1,6 @@
 import * as React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import DifficultyPicker from "./DifficultyPicker";
+import DifficultyPicker, { DIFFICULTY_DESCRIPTIONS } from "./DifficultyPicker";
 import {
   DIFFICULTIES,
   DIFFICULTY_IDS,
@@ -31,7 +31,7 @@ describe("DifficultyPicker", () => {
       />,
     );
     expect(
-      screen.getByText(DIFFICULTIES.Manager.description),
+      screen.getByText(DIFFICULTY_DESCRIPTIONS.Manager),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByText(DIFFICULTY_LABELS.Manager));
     expect(onChange).not.toHaveBeenCalled();

@@ -8,12 +8,20 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import {
-  DIFFICULTIES,
-  DIFFICULTY_IDS,
-  DIFFICULTY_LABELS,
-} from "../../Constants";
+import { DIFFICULTY_IDS, DIFFICULTY_LABELS } from "../../Constants";
 import { DifficultyType } from "../../Types";
+
+// Interface copy stays out of Constants.tsx so editing it never changes the run compatibility ID
+export const DIFFICULTY_DESCRIPTIONS: Record<DifficultyType, string> = {
+  Intern:
+    "Most forgiving: much lower costs, very fast building, and smaller penalties from outages.",
+  Employee:
+    "Forgiving: lower costs, faster building, and smaller penalties from outages.",
+  Manager:
+    "Balanced: some help with costs, building time, and outage penalties.",
+  VP: "Demanding: a little help with costs and building time.",
+  CEO: "Full challenge: unadjusted costs, building times, and outage penalties.",
+};
 
 export interface DifficultyPickerProps {
   value: DifficultyType;
@@ -55,7 +63,7 @@ export default function DifficultyPicker({
       >
         {DIFFICULTY_IDS.map((d) => (
           <MenuItem value={d} key={d}>
-            <Tooltip title={DIFFICULTIES[d].description} placement="right">
+            <Tooltip title={DIFFICULTY_DESCRIPTIONS[d]} placement="right">
               <span>{DIFFICULTY_LABELS[d]}</span>
             </Tooltip>
           </MenuItem>
@@ -83,7 +91,7 @@ export default function DifficultyPicker({
             value={d}
             key={d}
             disabled={readOnly}
-            title={DIFFICULTIES[d].description}
+            title={DIFFICULTY_DESCRIPTIONS[d]}
             aria-label={DIFFICULTY_LABELS[d]}
           >
             {DIFFICULTY_LABELS[d]}
@@ -107,7 +115,7 @@ export default function DifficultyPicker({
                 visibility: difficulty === value ? "visible" : "hidden",
               }}
             >
-              {DIFFICULTIES[difficulty].description}
+              {DIFFICULTY_DESCRIPTIONS[difficulty]}
             </span>
           ))}
         </Typography>
