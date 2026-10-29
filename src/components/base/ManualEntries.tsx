@@ -1198,10 +1198,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           When building, you can add hail-resistant panels to solar (less
           damage) or a cold-weather package to gas (rated to{" "}
           <ColdPackageRating />, colder in cold climates). Either can be added
-          later from the facility&apos;s details for 50% more, and the plant
-          goes offline for a month while it&apos;s installed. You can cancel
+          later from the facility&apos;s details for 50% more. Hail retrofits
+          take the plant offline for a month; winterization keeps 90% of
+          capacity available during a month of staged work. You can cancel
           before then for a full refund. The cold-weather package is only
-          offered where winters get cold enough to matter.
+          offered where winters get cold enough to matter. In Deep Freeze, gas,
+          coal, nuclear and wind plants can be winterized permanently; the bulk
+          offer covers only eligible plants still needing protection. New builds
+          need their own package.
         </p>
         <p>
           Solar trackers, available from 2014, turn panels to follow the sun for

@@ -60,8 +60,8 @@ test("Space toggles Sound", async ({ page }) => {
   await expect(sound).not.toBeChecked();
 });
 
-for (const pointerOverSettings of [false, true]) {
-  test(`a background arrow during Settings exit preserves volume and restores focus${pointerOverSettings ? " with the pointer over Settings" : ""}`, async ({
+for (const pointerTarget of [null, "Settings", "Manual"] as const) {
+  test(`a background arrow during Settings exit preserves volume and restores focus${pointerTarget ? ` with the pointer over ${pointerTarget}` : ""}`, async ({
     page,
   }) => {
     await page.goto("/");
@@ -71,7 +71,12 @@ for (const pointerOverSettings of [false, true]) {
       name: "Settings",
       exact: true,
     });
-    const menuBounds = await settings.boundingBox();
+    const menuBounds = pointerTarget
+      ? await page
+          .getByRole("button", { name: pointerTarget, exact: true })
+          .boundingBox()
+      : null;
+    if (pointerTarget) expect(menuBounds).not.toBeNull();
     await settings.click();
     await page.getByRole("switch", { name: "Sound", exact: true }).check();
     const effects = page.getByRole("slider", {
@@ -81,7 +86,9 @@ for (const pointerOverSettings of [false, true]) {
     await effects.focus();
     await effects.press("Home");
     await expect(effects).toHaveAttribute("aria-valuenow", "0");
-    if (pointerOverSettings) {
+    // Returning may reveal a menu control beneath a stationary pointer. Hover can
+    // select it before the delayed Settings focus restoration.
+    if (pointerTarget) {
       await page.mouse.move(
         menuBounds!.x + menuBounds!.width / 2,
         menuBounds!.y + menuBounds!.height / 2,

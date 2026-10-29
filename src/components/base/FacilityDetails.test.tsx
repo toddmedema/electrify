@@ -249,7 +249,7 @@ describe("weather resilience details", () => {
     };
     showDetails(game, gas);
     expect(section()).toHaveTextContent(
-      "Installing cold-weather packageOffline until done · 25% installed",
+      "Installing cold-weather package90% capacity available · 25% installed",
     );
     expect(
       screen.queryByRole("button", { name: /^Add cold-weather package/ }),
@@ -307,7 +307,7 @@ describe("weather resilience details", () => {
       }),
     );
     expect(screen.getByRole("dialog")).toHaveTextContent(
-      "Rated to \u221222°F instead of 18°F; halves losses below that.",
+      "Rated to \u221222°F instead of 18°F; halves remaining cold losses and deep-freeze losses.",
     );
   });
 

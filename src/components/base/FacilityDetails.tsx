@@ -175,9 +175,10 @@ function WeatherResilienceSection(props: {
   const canOffer = !props.readOnly && !!onRetrofit && cost !== undefined;
   const designMinTempC =
     facility.resilience?.designMinTempC ?? STANDARD_GAS_DESIGN_MIN_TEMP_C;
-  const detail = hail
-    ? summary.detail
-    : `Rated to ${formatDesignTemperature(designMinTempC, units)}`;
+  const detail =
+    hail || facility.fuel !== "Natural Gas"
+      ? summary.detail
+      : `Rated to ${formatDesignTemperature(designMinTempC, units)}`;
   const actionLabel = resilienceActionLabel(summary.upgrade);
   const retrofitted = canOffer
     ? retrofittedResilience(facility, game, summary.upgrade)
@@ -235,7 +236,7 @@ function WeatherResilienceSection(props: {
               <>
                 Installing {resilienceName(installing.upgrade)}
                 <span className="facilityStatNote">
-                  {`Offline until done · ${Math.round(upgradeProgress(installing, game.date.minute) * 100)}% installed`}
+                  {`${installing.upgrade === "coldWeatherPackage" ? "90% capacity available" : "Offline until done"} · ${Math.round(upgradeProgress(installing, game.date.minute) * 100)}% installed`}
                 </span>
               </>
             }
@@ -271,14 +272,18 @@ function WeatherResilienceSection(props: {
           <DialogContentText>
             {hail
               ? "Less damage from future hail."
-              : coldPackageEffect(
-                  retrofitted?.designMinTempC ?? designMinTempC,
-                  designMinTempC,
-                  units,
-                )}
+              : facility.fuel !== "Natural Gas"
+                ? "Permanently halves this plant’s output losses in the deep freeze."
+                : coldPackageEffect(
+                    retrofitted?.designMinTempC ?? designMinTempC,
+                    designMinTempC,
+                    units,
+                  )}
           </DialogContentText>
           <DialogContentText>
-            {facility.name} goes offline for a month while it&apos;s installed.
+            {summary.upgrade === "coldWeatherPackage"
+              ? "Staged installation keeps 90% of capacity available for a month."
+              : `${facility.name} goes offline for a month while it's installed.`}{" "}
             Adding it now costs{" "}
             {Math.round((RETROFIT_COST_MULTIPLIER - 1) * 100)}% more than
             building it in. Cancel before it&apos;s done for a full refund.
@@ -324,7 +329,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
     ),
   );
   const maxOutputFactor =
-    outputFactor * storyOutputMultiplier(facility, activeEffects);
+    outputFactor * storyOutputMultiplier(facility, activeEffects, date.minute);
   const maxOutputPercent =
     maxOutputFactor < 1 && Math.round(maxOutputFactor * 100) === 100
       ? "<100%"

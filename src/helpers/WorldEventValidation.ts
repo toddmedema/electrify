@@ -102,6 +102,7 @@ export function validWorldEvent(value: unknown): boolean {
     "buildCostMultipliersByFuel",
     "operatingCostMultipliersByFuel",
     "facilityOutputMultipliersByFuel",
+    "winterizationOutputMultipliersByFuel",
     "facilityOutputMultipliersById",
     "transmissionCapacityLimitsWByCorridor",
   ];

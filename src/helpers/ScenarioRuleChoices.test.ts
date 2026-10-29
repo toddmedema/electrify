@@ -92,15 +92,15 @@ test("compatible official choices keep their exact costs, grants, messages and l
       "standard",
       0,
       0,
-      "Construction budget kept. February 2021 output losses apply in full.",
+      "Construction budget kept. Existing winterization stays with its plants.",
       undefined,
     ],
     [
       107,
       "winterize",
-      90e6,
       0,
-      "Winterization halves February 2021 output losses. Demand and gas prices still surge.",
+      0,
+      "Winterization installation started. Demand and gas prices still surge during the freeze.",
       undefined,
     ],
   ]);
@@ -181,7 +181,7 @@ test("connection budgets and both permanent loads scale with the receiving grid 
   expect(officialArcLoadScale(original, receiving)).toBe(2);
 });
 
-test("freeze protection prices scale once, preserving the exact free and consequential responses", () => {
+test("freeze bulk pricing is deferred to the receiving fleet, preserving the skip response", () => {
   const original = source(107);
   const receiving = {
     ...original,
@@ -193,14 +193,14 @@ test("freeze protection prices scale once, preserving the exact free and consequ
     { receivingScenario: receiving, startingYear: receiving.startingYear },
     [{ scenarioId: 107, includeChoices: true }],
   );
-  const paid = choice.options.find((option) => option.cost > 0)!;
-  expect(paid.cost).toBe(officialArcMoneyAmount(90000000, original, receiving));
+  expect(
+    choice.options.find((option) => option.id === "winterize"),
+  ).toMatchObject({ cost: 0, grant: 0 });
+  expect(choice.source?.scenarioId).toBe(107);
   expect(choice.freeOptionId).toBe("standard");
   expect(
     choice.options.find((option) => option.id === "standard"),
   ).toMatchObject({ cost: 0, grant: 0, meaningful: false });
-  expect(paid.message).toContain("February 2031");
-  expect(paid.message).not.toContain("2021");
 });
 
 test("includeChoices false compiles an automatic free response without dropping the choice or its consequences", () => {

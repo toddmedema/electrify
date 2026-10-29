@@ -71,6 +71,7 @@ import {
   pendingScenarioChoice,
   pendingScenarioRuleChoice,
   scenarioChoicesForGame,
+  isBulkWinterizationChoice,
   validScenarioResponse,
 } from "../helpers/ScenarioChoices";
 import { getViableLocationCount } from "../data/FacilitySites";
@@ -231,6 +232,8 @@ import {
   resolveColdImpact,
   RETROFIT_DOWNTIME_MINUTES,
   retrofitCost,
+  bulkWinterizationQuote,
+  retrofitOutputMultiplier,
   retrofittedResilience,
   sampleHailImpacts,
   trackerOutputMultiplier,
@@ -2852,7 +2855,11 @@ function recordRetrofitTransaction(
  * paid up front. The plant is offline for RETROFIT_DOWNTIME_MINUTES, after which the upgrade takes
  * effect; see completeRetrofits.
  */
-function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
+function applyRetrofitFacility(
+  state: GameType,
+  payload: unknown,
+  bulk = false,
+): boolean {
   if (!validRetrofitFacility(payload)) return false;
   const facility = state.facilities.find(({ id }) => id === payload.facilityId);
   if (!facility || facility.yearsToBuildLeft > 0) return false;
@@ -2882,7 +2889,7 @@ function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
   logGameEvent(
     state,
     "BUILD",
-    `Installing ${label} on ${facility.name} for ${formatMoneyConcise(cost)}. Offline for ${conversion ? "six months" : "a month"}.`,
+    `Installing ${label} on ${facility.name} for ${formatMoneyConcise(cost)}. ${payload.upgrade === "coldWeatherPackage" ? "Staged work keeps 90% of capacity available for a month." : `Offline for ${conversion ? "six months" : "a month"}.`}`,
     {
       importance: "NOTABLE",
       actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -2894,14 +2901,15 @@ function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
     : payload.upgrade === "hailResistant"
       ? "hail-resistant"
       : "cold-weather-package";
-  recordMeaningfulDecision(state, {
-    lever: `resilience:${facility.id}:${lever}`,
-    label: `Add ${label} to ${facility.name}`,
-    kind: "asset",
-    before: "standard",
-    after: lever,
-  });
-  state.timeline = reforecastSupply(state, true);
+  if (!bulk)
+    recordMeaningfulDecision(state, {
+      lever: `resilience:${facility.id}:${lever}`,
+      label: `Add ${label} to ${facility.name}`,
+      kind: "asset",
+      before: "standard",
+      after: lever,
+    });
+  if (!bulk) state.timeline = reforecastSupply(state, true);
   return true;
 }
 
@@ -3045,14 +3053,19 @@ function applyCompiledScenarioResponse(
     getScenario(state.scenarioId, state.customScenario),
     state,
   );
+  const bulk =
+    isBulkWinterizationChoice(decision) && option.id === "winterize"
+      ? bulkWinterizationQuote(state)
+      : undefined;
+  const cost = bulk?.cost ?? option.cost;
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   if (
     !now ||
     state.date.minute !== decision.dueMonth * MINUTES_PER_MONTH ||
     state.worldEvents.occurrences.some((event) => event.key === decision.key) ||
-    !Number.isFinite(option.cost) ||
-    option.cost < 0 ||
-    (option.cost > 0 && now.cash < option.cost) ||
+    !Number.isFinite(cost) ||
+    cost < 0 ||
+    (cost > 0 && now.cash < cost) ||
     !Number.isFinite(option.grant) ||
     option.grant < 0
   )
@@ -3066,7 +3079,15 @@ function applyCompiledScenarioResponse(
     ? storyEffectsAt(state.date, state)
     : undefined;
   const previousLoadIds = new Set(state.loadAdditions.map((load) => load.id));
-  bookScenarioTransaction(now, option.cost, option.grant);
+  // Each asset owns its payment/refund; the choice receipt must not book it again.
+  bookScenarioTransaction(now, bulk ? 0 : cost, option.grant);
+  for (const item of bulk?.facilities ?? []) {
+    applyRetrofitFacility(
+      state,
+      { facilityId: item.facilityId, upgrade: "coldWeatherPackage" },
+      true,
+    );
+  }
   state.loadAdditions = loads;
   const message = decision.automatic
     ? `Resolved automatically: ${option.label}. ${option.message}`
@@ -3078,7 +3099,13 @@ function applyCompiledScenarioResponse(
     endsMinute: state.date.minute,
     attributes: {
       choice: option.id,
-      cost: option.cost,
+      cost: bulk ? 0 : cost,
+      ...(bulk
+        ? {
+            retrofitCost: cost,
+            retrofitFacilityIds: bulk.facilities.map((item) => item.facilityId),
+          }
+        : {}),
       upfrontGrant: option.grant,
       scenarioChoice: true,
       ...(rules.namespace.kind === "mod" || !decision.source
@@ -4417,7 +4444,7 @@ function minimumStableOperatingCost(
   stepMinutes = TICK_MINUTES,
 ): number {
   // An installation outage cannot incur the variable cost of staying online.
-  if (isUpgradingAt(generator, tick.minute)) return 0;
+  if (retrofitOutputMultiplier(generator, tick.minute) === 0) return 0;
   const ticksPerHour = 60 / stepMinutes;
   const minimumW = generator.peakW * (generator.minimumStableOutput || 0);
   const generatedWh = (minimumW / ticksPerHour) * GAME_TO_REAL_YEARS;
@@ -4749,9 +4776,10 @@ function* supplyFacilitiesFinancesPhases(
         generator?.committed ??
         previousW > 0);
     // A retrofit holds the plant offline until it completes.
-    const availablePeakW = isUpgradingAt(g, now.minute)
-      ? 0
-      : g.peakW * storyOutputMultiplier(g, tickStoryEffects);
+    const availablePeakW =
+      g.peakW *
+      retrofitOutputMultiplier(g, now.minute) *
+      storyOutputMultiplier(g, tickStoryEffects, now.minute);
     let dispatchPeakW = availablePeakW;
     const outputFactor = facilityOutputFactor(g, now.minute);
     let mandatedW = 0;
