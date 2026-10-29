@@ -51,6 +51,17 @@ function renderSettings(overrides: Partial<Props> = {}) {
   );
 }
 
+// Fake timers and nodes added outside React must not leak into later tests when one fails.
+const attached: Element[] = [];
+function attach(...nodes: Element[]) {
+  document.body.append(...nodes);
+  attached.push(...nodes);
+}
+afterEach(() => {
+  jest.useRealTimers();
+  attached.splice(0).forEach((node) => node.remove());
+});
+
 describe("Settings", () => {
   afterEach(() => {
     act(() => updateInputPresentation({ active: false }));
@@ -284,7 +295,7 @@ describe("Settings", () => {
     jest.useFakeTimers();
     const trigger = document.createElement("button");
     trigger.dataset.settingsTrigger = "";
-    document.body.appendChild(trigger);
+    attach(trigger);
     const onBack = jest.fn();
     renderSettings({ onBack });
 
@@ -293,8 +304,6 @@ describe("Settings", () => {
 
     expect(onBack).toHaveBeenCalled();
     expect(trigger).toHaveFocus();
-    trigger.remove();
-    jest.useRealTimers();
   });
 
   it("blurs the exiting input before calling back so rapid arrows cannot change it", () => {

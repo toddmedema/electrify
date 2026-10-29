@@ -51,6 +51,16 @@ beforeEach(() => {
 afterEach(() => {
   window.matchMedia = originalMatchMedia;
 });
+// Fake timers and nodes added outside React must not leak into later tests when one fails.
+const attached: Element[] = [];
+function attach(...nodes: Element[]) {
+  document.body.append(...nodes);
+  attached.push(...nodes);
+}
+afterEach(() => {
+  jest.useRealTimers();
+  attached.splice(0).forEach((node) => node.remove());
+});
 
 describe("GameAppBar", () => {
   it("opens the feedback form directly from the game menu", () => {
@@ -533,7 +543,7 @@ describe("GameAppBar", () => {
     jest.useFakeTimers();
     const target = document.createElement("button");
     target.dataset.mainAction = "";
-    document.body.appendChild(target);
+    attach(target);
     const onQuit = jest.fn();
     renderAppBar({ onQuit });
 
@@ -543,8 +553,6 @@ describe("GameAppBar", () => {
 
     expect(onQuit).toHaveBeenCalled();
     expect(target).toHaveFocus();
-    target.remove();
-    jest.useRealTimers();
   });
 
   it("Save & Quit preserves a later menu selection", () => {
@@ -565,7 +573,6 @@ describe("GameAppBar", () => {
     fireEvent.keyDown(library, { key: "Enter" });
     act(() => jest.advanceTimersByTime(350));
     expect(library).toHaveFocus();
-    jest.useRealTimers();
   });
 
   it.each([false, true])(

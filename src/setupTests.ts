@@ -1,6 +1,13 @@
 // jest-dom adds custom jest matchers for asserting on DOM nodes.
 // https://github.com/testing-library/jest-dom
 import "@testing-library/jest-dom";
+
+// Every test starts on real timers, so one that fails before restoring fake timers cannot stall
+// the real-timer waits of the tests after it. This runs before each file's own beforeEach, so
+// suites that install fake timers there still get them.
+beforeEach(() => {
+  jest.useRealTimers();
+});
 jest.mock("./helpers/PolicyPreviewClient", () => ({
   createPolicyPreviewWorker: () => ({
     onmessage: null,

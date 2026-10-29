@@ -63,6 +63,21 @@ test("PR CI runs three independent test groups and three native builds in eight 
     ),
   );
 
+  // Every job that installs the default profile shares one node_modules cache key.
+  for (const [name, job] of Object.entries(jobs)) {
+    if (
+      job.steps.some(
+        ({ uses, with: options }) =>
+          uses === "./.github/actions/install" && !options?.profile,
+      )
+    )
+      assert.equal(job["runs-on"], "ubuntu-22.04", name);
+  }
+  assert.deepEqual(workflow().permissions, { contents: "read" });
+  for (const { uses, ...step } of jobs.build.steps)
+    if (uses === "actions/upload-artifact@v7")
+      assert.equal(step["continue-on-error"], undefined);
+
   for (const group of ["cpu", "browser", "desktop"]) {
     const job = jobs[group];
     assert.equal(job["runs-on"], "ubuntu-22.04");
@@ -91,6 +106,7 @@ test("PR CI runs three independent test groups and three native builds in eight 
       ({ uses }) => uses === "actions/upload-artifact@v7",
     );
     assert.equal(reports.if, "always()");
+    assert.equal(reports["continue-on-error"], true);
     assert.equal(reports.with.name, `diagnostics-${group}`);
     assert.match(reports.with.path, /test-results\//);
   }
