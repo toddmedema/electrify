@@ -52,16 +52,15 @@ function monthlyWeather(
   seed: number,
   cumulativeMegatons: number,
   seriesId?: string,
+  weatherAt?: (date: DateType) => RawWeatherType,
 ) {
   let temperatureC = 0;
   let sampledDayPrecipMm = 0;
   for (let hour = 0; hour < HOURS_PER_DAY; hour++) {
-    const reading = getWeather(
-      shiftedMonth(date, 0, hour),
-      seed,
-      cumulativeMegatons,
-      seriesId,
-    );
+    const at = shiftedMonth(date, 0, hour);
+    const reading = weatherAt
+      ? weatherAt(at)
+      : getWeather(at, seed, cumulativeMegatons, seriesId);
     temperatureC += reading.TEMP_C;
     sampledDayPrecipMm += reading.PRECIP_MM;
   }
@@ -82,6 +81,7 @@ export function getHydroConditions(
   seed: number,
   cumulativeMegatons = 0,
   seriesId?: string,
+  weatherAt?: (date: DateType) => RawWeatherType,
 ): HydroConditionsType {
   let snowpackMm = 0;
   let current: HydroConditionsType = {
@@ -97,6 +97,7 @@ export function getHydroConditions(
       seed,
       cumulativeMegatons,
       seriesId,
+      weatherAt,
     );
     const snowMm = weather.precipitationMm * snowFraction(weather.temperatureC);
     const rainMm = weather.precipitationMm - snowMm;

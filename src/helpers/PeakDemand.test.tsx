@@ -2,6 +2,7 @@ import cloneDeep from "lodash.clonedeep";
 import { createGame, runSimulation } from "../testing/Simulator";
 import gameReducer, {
   delta,
+  generateForecastTimeline,
   generateNewTimeline,
   tickState,
 } from "../reducers/Game";
@@ -162,12 +163,12 @@ test("Off removes all operating participation next month without changing instal
   expect(game.policies!.programs.efficiency.adoption).toBe(0.3);
 });
 
-test("scheduled preview uses real demand/billing; even partial and zero supply bill only delivered energy", () => {
+test("scheduled preview uses estimated demand/billing; even partial and zero supply bill only delivered energy", () => {
   const change = { id: "timeOfUse", tier: "On", month: 1 } as const;
   const preview = previewPolicy(baseline, change, 1);
   let game = cloneDeep(gameReducer(baseline, schedulePolicy(change)));
   const now = game.timeline[0];
-  const forecast = generateNewTimeline(
+  const forecast = generateForecastTimeline(
     game,
     now.cash,
     now.customers,

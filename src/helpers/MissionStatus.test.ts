@@ -495,7 +495,7 @@ test("immutable tick reads reuse cached projections without simulation mutations
   let game = createGame({ scenarioId: 103 });
   // Warm the shared projection cache before checking per-tick reuse and rollover rebuilds.
   selectProjection(game, game.timeline[0]);
-  const rebuilds = jest.spyOn(GameModule, "generateNewTimeline");
+  const rebuilds = jest.spyOn(GameModule, "generateForecastTimeline");
   let changed = 0;
   let steadyTicks = 0;
   let rebuildCount = 0;
@@ -553,7 +553,7 @@ test.each([
             };
     });
     const generate = jest
-      .spyOn(GameModule, "generateNewTimeline")
+      .spyOn(GameModule, "generateForecastTimeline")
       .mockImplementation((_game, _cash, _customers, ticks = 0, step = 60) =>
         Array.from({ length: ticks }, (_, i) =>
           Object.assign({}, game.timeline[0], {

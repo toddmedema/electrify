@@ -7,7 +7,7 @@ import {
 } from "./DateTime";
 import { forecastShortfalls } from "./ForecastShortfalls";
 import { sampleForecastTimeline } from "./ForecastSampling";
-import { generateNewTimeline } from "../reducers/Game";
+import { generateForecastTimeline } from "../reducers/Game";
 import { GameType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
 
 /**
@@ -176,7 +176,7 @@ function buildProjection(
 
   // Cash risk and charts share one simulation, never longer than 20 years.
   const cashMonths = cashRunwayHorizon(game);
-  const timeline = generateNewTimeline(
+  const timeline = generateForecastTimeline(
     game,
     now.cash,
     now.customers,

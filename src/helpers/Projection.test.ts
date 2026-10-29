@@ -21,9 +21,9 @@ import { cashRunwayMonths } from "./MissionStatus";
 let generate: jest.SpyInstance;
 let generatedForecast: ProjectionView["forecast"];
 beforeEach(() => {
-  const realGenerate = GameModule.generateNewTimeline;
+  const realGenerate = GameModule.generateForecastTimeline;
   generate = jest
-    .spyOn(GameModule, "generateNewTimeline")
+    .spyOn(GameModule, "generateForecastTimeline")
     .mockImplementation((...args) => {
       const timeline = realGenerate(...args);
       // Detach before buildProjection can transform anything: an in-place mutation
@@ -188,4 +188,23 @@ it("refreshes projections when an intertie upgrade starts and completes", () => 
   const after = selectProjection(completed, completed.timeline[0]);
   expect(after).not.toBe(during);
   expectGeneratedForecast(completed, after);
+});
+
+it("forecasts weather and its demand effects instead of revealing the future record", () => {
+  const game = createGame({ scenarioId: 103, seed: 7 });
+  const before = JSON.stringify(game);
+  const projection = selectProjection(game, game.timeline[0]);
+  const predicted = projection.forecast.find(
+    (tick) => tick.minute === 12 * 60,
+  )!;
+  const actual = game.timeline.find(
+    (tick) => tick.minute === predicted.minute,
+  )!;
+  expect(predicted.temperatureC).not.toBe(actual.temperatureC);
+  expect(predicted.windKph).not.toBe(actual.windKph);
+  expect(predicted.solarIrradianceWM2).not.toBe(actual.solarIrradianceWM2);
+  expect(predicted.demandByType.Residential).not.toBe(
+    actual.demandByType.Residential,
+  );
+  expect(JSON.stringify(game)).toBe(before);
 });
