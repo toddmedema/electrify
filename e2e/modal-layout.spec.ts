@@ -301,23 +301,52 @@ for (const theme of ["light", "dark"]) {
     });
 
     test("iPhone install instructions fit", async ({ page }, info) => {
-      await page.addInitScript(() =>
+      let releaseAuth!: () => void;
+      const authPending = new Promise<void>((resolve) => {
+        releaseAuth = resolve;
+      });
+      await page.route("https://apis.google.com/js/api.js*", async (route) => {
+        await authPending;
+        await route.abort();
+      });
+      await page.addInitScript(() => {
         Object.defineProperty(navigator, "userAgent", {
           get: () =>
             "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1",
-        }),
-      );
-      await page.goto("/");
-      await page
-        .getByRole("button", { name: "Install app", exact: true })
-        .click();
-      const dialog = page.getByRole("dialog");
-      await expectDialogToFit(dialog);
-      await reviewScreenshot(page, {
-        path: info.outputPath("install.png"),
-        animations: "disabled",
+        });
+        // Put Safari's background auth script in the initial load-event window.
+        document.addEventListener(
+          "DOMContentLoaded",
+          () => {
+            const script = document.createElement("script");
+            script.async = true;
+            script.src = "https://apis.google.com/js/api.js";
+            document.head.append(script);
+          },
+          { once: true },
+        );
       });
-      await dialog.getByRole("button", { name: "Got it", exact: true }).click();
+      try {
+        await page.goto("/", { waitUntil: "domcontentloaded" });
+        await page
+          .getByRole("button", { name: "Install app", exact: true })
+          .click();
+        const dialog = page.getByRole("dialog");
+        await expectDialogToFit(dialog);
+        expect(await page.evaluate(() => document.readyState)).toBe(
+          "interactive",
+        );
+        await reviewScreenshot(page, {
+          path: info.outputPath("install.png"),
+          animations: "disabled",
+        });
+        await dialog
+          .getByRole("button", { name: "Got it", exact: true })
+          .click();
+      } finally {
+        releaseAuth();
+        await page.unrouteAll({ behavior: "wait" });
+      }
     });
 
     test("credits fit and return focus to Settings", async ({ page }, info) => {
