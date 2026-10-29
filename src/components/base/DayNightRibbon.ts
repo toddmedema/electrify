@@ -60,6 +60,34 @@ export function dayNightSegments(
   return segments;
 }
 
+/** A two-hour visual blend centered on each solar boundary. Exact intervals remain
+ * available to the accessible description; nearby short phases shorten the blend. */
+export function dayNightGradient(
+  segments: DayNightSegment[],
+  range: [number, number],
+): string {
+  const color = (day: boolean) => `var(--${day ? "daylight" : "night"}-fill)`;
+  if (!segments.length || range[1] <= range[0]) return "none";
+  if (segments.length === 1) return color(segments[0].day);
+  const stop = (day: boolean, minute: number) =>
+    `${color(day)} ${((minute - range[0]) / (range[1] - range[0])) * 100}%`;
+  const stops = [stop(segments[0].day, segments[0].start)];
+  for (let i = 1; i < segments.length; i++) {
+    const previous = segments[i - 1];
+    const next = segments[i];
+    const blend = Math.min(
+      60,
+      (previous.end - previous.start) / 2,
+      (next.end - next.start) / 2,
+    );
+    stops.push(stop(previous.day, next.start - blend));
+    stops.push(stop(next.day, next.start + blend));
+  }
+  const last = segments[segments.length - 1];
+  stops.push(stop(last.day, last.end));
+  return `linear-gradient(to right, ${stops.join(", ")})`;
+}
+
 export function formatClockTime(minuteOfDay: number): string {
   const hour = Math.floor(minuteOfDay / 60);
   const minute = Math.floor(minuteOfDay % 60)
@@ -114,7 +142,12 @@ function phaseIcon(day: boolean): SVGSVGElement {
 /** Non-interactive footer inside the plot's reserved bottom padding. Its geometry follows
  * uPlot's actual bounds on every resize, rather than the surrounding panel's width. */
 export function dayNightRibbonPlugin(
-  getState: () => { range: [number, number]; dayNight: DayNightSegment[] },
+  getState: () => {
+    range: [number, number];
+    dayNight: DayNightSegment[];
+    startingYear: number;
+    location: LocationType;
+  },
 ): uPlot.Plugin {
   let ribbon: HTMLDivElement;
   let previousKey = "";
@@ -130,7 +163,7 @@ export function dayNightRibbonPlugin(
         u.ctx.canvas.parentElement!.appendChild(ribbon);
       },
       draw: (u) => {
-        const { range, dayNight } = getState();
+        const { range, dayNight, startingYear, location } = getState();
         const width = u.bbox.width / uPlot.pxRatio;
         const left = u.bbox.left / uPlot.pxRatio;
         const key = JSON.stringify([left, width, range, dayNight]);
@@ -138,6 +171,15 @@ export function dayNightRibbonPlugin(
         previousKey = key;
         ribbon.style.left = `${left}px`;
         ribbon.style.width = `${width}px`;
+        // Include offscreen dawn/dusk so a rolling window never clips a blend at its edge.
+        ribbon.style.background = dayNightGradient(
+          dayNightSegments(
+            [range[0] - 120, range[1] + 120],
+            startingYear,
+            location,
+          ),
+          range,
+        );
         ribbon.replaceChildren(
           ...dayNight.map((segment) => {
             const span = document.createElement("span");

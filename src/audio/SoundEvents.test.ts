@@ -41,7 +41,7 @@ describe("soundEffectsForUpdate", () => {
     ]);
   });
 
-  it("does not replay a restored run's saved event history", () => {
+  it("does not repeat a restored run's saved event history", () => {
     expect(
       soundEffectsForUpdate(
         snapshot({ inGame: false }),

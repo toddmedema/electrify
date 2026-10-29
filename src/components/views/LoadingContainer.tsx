@@ -105,16 +105,11 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       // resume() has already restored the whole slice by the time a saved game reaches this
       // screen, so all that's left is re-reading the CSVs it couldn't carry
       const resumed = isResumedGame(game);
-      // A replay is closer to a new game than a resumed one: nothing of the run is restored, it
-      // is simulated again from the seed startReplay put on the slice
-      const replaying = !!game.replayPlayback;
-      if (!replaying) {
-        logEvent("scenario_start", {
-          id: game.scenarioId,
-          difficulty: game.difficulty,
-          resumed,
-        });
-      }
+      logEvent("scenario_start", {
+        id: game.scenarioId,
+        difficulty: game.difficulty,
+        resumed,
+      });
       const scenario = activeScenario(game);
       if (!scenario) {
         reportError("Mission not found. Choose another from the mission list.");
@@ -122,12 +117,9 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         loadListeners = [];
         return;
       }
-      // A resumed game keeps the location it was saved with, so the weather CSV that gets loaded
-      // is the one its forecasts were built from. A replay is the same story: startReplay put
-      // the location the run was recorded in on the slice, which is the only thing that keeps a
-      // replay from being re-simulated somewhere else
+      // Resume and challenge runs keep the location their forecasts were built from.
       const location =
-        resumed || replaying || game.runIdentity
+        resumed || game.runIdentity
           ? game.location
           : getScenarioLocation(scenario);
       if (!location) {
@@ -162,10 +154,8 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
               customers:
                 scenario.startingCustomers || getStartingCustomers(location),
               location,
-              // A replay has to run on the seed it was recorded with. Otherwise only the custom
-              // game screen sets one; every authored scenario leaves it undefined and draws a
-              // fresh seed
-              seed: replaying || game.runIdentity ? game.seed : scenario.seed,
+              // Challenge runs keep their seed; ordinary missions draw a fresh seed.
+              seed: game.runIdentity ? game.seed : scenario.seed,
             }),
           );
         }
@@ -174,7 +164,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         dispatch(loaded());
 
         // Tutorials are never autosaved, so a resumed game shouldn't restart a walkthrough
-        if (scenario.tutorialSteps && !resumed && !replaying) {
+        if (scenario.tutorialSteps && !resumed) {
           // A capstone retry comes through the same clean scenario-start path with its authored
           // step already selected. Preserve it; a normal tutorial still arrives with -1 and
           // starts at the first objective after the card transition has mounted its controls.

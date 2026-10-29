@@ -277,6 +277,16 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: { name: "BUILD_GENERATORS", dontRemember: true },
         hideUi: EARLY_MISSION_HIDDEN,
+        target: ".constructionCapacitySlider",
+        phase: "GENERATOR_CHOICES",
+        action: "Choose a plant size",
+        content: (
+          <TutorialPrompt text="Use the size slider to change both cost and build time. Smaller plants cost less and can be built faster." />
+        ),
+      },
+      {
+        card: { name: "BUILD_GENERATORS", dontRemember: true },
+        hideUi: EARLY_MISSION_HIDDEN,
         target: '[aria-label^="Review purchase of"]',
         phase: "GENERATOR_CHOICES",
         continueOn: (s: AppStateType) => s.game.facilities.length >= 2,
@@ -429,18 +439,10 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
         target: '[aria-label="Reorder Coal"]',
+        nextLabel: "Start final challenge",
         action: "Check generation comes before storage",
         content: (
-          <TutorialPrompt text="Spare power charges storage only when generation comes first. Charging storage loses some energy." />
-        ),
-      },
-      {
-        card: "FACILITIES",
-        hideUi: EARLY_MISSION_HIDDEN,
-        nextLabel: "Start final challenge",
-        action: "Try storage through the evening peak",
-        content: (
-          <TutorialPrompt text="Restart with a smaller coal plant and the original storage. Your practice purchase is cleared." />
+          <TutorialPrompt text="Spare power charges storage only when generation comes first. Charging loses some energy. The challenge clears your practice purchase and restarts with a smaller coal plant." />
         ),
       },
       {
@@ -629,7 +631,7 @@ export const SCENARIOS: ScenarioType[] = [
         advanceOn: (s: AppStateType) => s.game.dollarsPerkWh < 0.07,
         action: "Drag the rate slider below the market price",
         content: (
-          <TutorialPrompt text="A rate below the market price wins more customers." />
+          <TutorialPrompt text="Investor utilities gain customers by pricing below market. Public utilities’ customers don’t switch over price; rates below their target earn score, and rates above it lose score." />
         ),
       },
       {
@@ -807,9 +809,9 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "INSIGHTS",
         nextLabel: "Start final challenge",
-        action: "Prevent the shortage you can see ahead",
+        action: "Restart for the final challenge",
         content: (
-          <TutorialPrompt text="Start again before the blackout, then build enough generation to cover summer demand." />
+          <TutorialPrompt text="The next step resets time and your grid to the start of this tutorial. Then you’ll build generation to prevent the summer blackout." />
         ),
       },
       {
@@ -1322,10 +1324,9 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "boom",
       fantasy: "Prepare a small city's grid for a surge in demand.",
-      objective:
-        "Build dependable generation and storage before the data centers connect in 2026.",
+      objective: "Keep customers supplied as data centers connect in 2026.",
       threat:
-        "Data centers need power around the clock. If you wait until they arrive to build, you'll be too late.",
+        "Data centers need power around the clock. New plants take years to build.",
     },
     ownership: "Public",
     startingYear: 2020,
@@ -1395,8 +1396,7 @@ export const SCENARIOS: ScenarioType[] = [
       fantasy: "Keep Austin powered through a brutal winter storm.",
       objective:
         "Strengthen the grid and keep every customer supplied during the February 2021 freeze.",
-      threat:
-        "Heating demand surges as equipment freezes. Winterize plants when building or upgrading; a January 2020 bulk offer covers remaining plants.",
+      threat: "Heating demand surges as equipment freezes.",
     },
     ownership: "Public",
     seed: 268107,
@@ -1557,8 +1557,7 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "legacy",
       fantasy: "Keep the lights on when your largest generator shuts down.",
-      objective:
-        "Have enough generation and storage ready to cover the main reactor's shutdown.",
+      objective: "Keep customers supplied after your main reactor shuts down.",
       threat:
         "The shutdown date is hidden. The reactor stays offline for the rest of the mission.",
     },
@@ -1625,8 +1624,7 @@ export const SCENARIOS: ScenarioType[] = [
         "Keep Los Angeles supplied when wildfire cuts your northern intertie.",
       objective:
         "Supply at least 99.5% of demand during the January and February 2025 intertie outage.",
-      threat:
-        "Your existing northern intertie will lose 90% of its capacity. Prepare local generation, storage, or an independent connection.",
+      threat: "Your existing northern intertie will lose 90% of its capacity.",
     },
     ownership: "Public",
     startingYear: 2022,

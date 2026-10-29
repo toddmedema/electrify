@@ -27,10 +27,83 @@ import {
 } from "../../helpers/Hazards";
 import { DOWNPAYMENT_PERCENT, TICKS_PER_YEAR } from "../../Constants";
 import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
+import { purchaseTerms } from "../../helpers/Financials";
 import { computeOutlook } from "../base/OutlookForecast";
 import type { EvidenceRequestType } from "../../Types";
 
 jest.mock("../base/ManualLink", () => () => null);
+
+it.each([false, true])(
+  "resizes an unaffordable generator to the largest affordable slider size (live cash: %s)",
+  (live) => {
+    const game = createGame({ scenarioId: 100 });
+    const quote = (size: number) =>
+      GENERATORS(game, size, [], []).find((item) => item.name === "Solar")!;
+    const cash = purchaseTerms(
+      quote(70e6).buildCost,
+      true,
+      game.interestRate,
+    ).downpayment;
+    const cashAt = (amount: number) => ({
+      ...game,
+      timeline: game.timeline.map((tick) => ({ ...tick, cash: amount })),
+    });
+    const store = configureStore({
+      reducer: {
+        game: (
+          state = cashAt(live ? 0 : cash),
+          action: { type: string; payload?: typeof game },
+        ) => (action.type === "replace" ? action.payload! : state),
+      },
+    });
+    const onBuildGenerator = jest.fn();
+    const catalog = (
+      <BuildGenerators
+        game={store.getState().game}
+        onBuildGenerator={onBuildGenerator}
+        onBack={jest.fn()}
+      />
+    );
+    render(live ? <Provider store={store}>{catalog}</Provider> : catalog);
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "18" } });
+    const review = screen.getByRole("button", {
+      name: "Review purchase of Solar",
+    });
+    expect(review).toBeDisabled();
+    const card = screen.getByText(
+      (_text, element) =>
+        element?.getAttribute("data-build-option") === "Solar",
+    );
+    const useMax = () =>
+      within(card).queryByRole("button", { name: "Use max size" });
+    expect(Boolean(useMax())).toBe(!live);
+    const updateCash = (amount: number) =>
+      act(() => {
+        store.dispatch({ type: "replace", payload: cashAt(amount) });
+      });
+    const smallerCash = purchaseTerms(
+      quote(60e6).buildCost,
+      true,
+      game.interestRate,
+    ).downpayment;
+    updateCash(smallerCash);
+    expect(useMax()).toBeInTheDocument();
+    updateCash(0);
+    expect(Boolean(useMax())).toBe(!live);
+    updateCash(smallerCash);
+    // Both sizes remain below the Review threshold, so the click must read current cash.
+    updateCash(cash);
+    fireEvent.click(
+      within(card).getByRole("button", {
+        name: "Use max size",
+      }),
+    );
+    expect(review).toBeEnabled();
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Take loan" }));
+    expect(onBuildGenerator.mock.calls[0][0].peakW).toBe(70e6);
+  },
+);
 
 it("focuses requested evidence after background quotes arrive", () => {
   const game = createGame({ scenarioId: 103, seed: 12345 });
@@ -669,7 +742,7 @@ it("pins up to three current-grid choices into a comparison tray", () => {
 
 it("keeps expanded details with their generator when tutorial choices expand", () => {
   const game = createGame({ scenarioId: 1 });
-  game.tutorialStep = 2;
+  game.tutorialStep = 3;
   const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
   const { rerender } = render(<BuildGenerators game={game} {...callbacks} />);
   expect(
@@ -677,7 +750,7 @@ it("keeps expanded details with their generator when tutorial choices expand", (
   ).toHaveLength(4);
   fireEvent.click(screen.getByRole("button", { name: "Show Wind details" }));
   rerender(
-    <BuildGenerators game={{ ...game, tutorialStep: 3 }} {...callbacks} />,
+    <BuildGenerators game={{ ...game, tutorialStep: 4 }} {...callbacks} />,
   );
   expect(
     screen.getByRole("button", { name: "Hide Wind details" }),
@@ -687,7 +760,30 @@ it("keeps expanded details with their generator when tutorial choices expand", (
   ).toHaveLength(1);
   expect(
     screen.getAllByRole("button", { name: /^Review purchase of/ }).length,
-  ).toBeGreaterThan(3);
+  ).toBeGreaterThan(4);
+});
+
+it("remembers dismissal of Hydro help when reopening the build screen", () => {
+  localStorage.removeItem("hydroPrimerSeen");
+  const game = createGame({ scenarioId: 103 });
+  const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
+  const view = render(<BuildGenerators game={game} {...callbacks} />);
+  fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
+  const help = screen.getByRole("region", { name: "About Hydro" });
+  expect(help).toHaveTextContent("Each plant uses a whole site");
+  fireEvent.click(
+    within(help).getByRole("button", { name: "Dismiss About Hydro" }),
+  );
+  expect(screen.queryByRole("region", { name: "About Hydro" })).toBeNull();
+  expect(localStorage.getItem("hydroPrimerSeen")).toBe("true");
+  expect(
+    screen.getByRole("button", { name: "Review purchase of Hydro" }),
+  ).toBeInTheDocument();
+  view.unmount();
+  render(<BuildGenerators game={game} {...callbacks} />);
+  fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
+  expect(screen.queryByRole("region", { name: "About Hydro" })).toBeNull();
+  localStorage.removeItem("hydroPrimerSeen");
 });
 
 it("quotes a Hydro site maximum and updates the shared slider", () => {

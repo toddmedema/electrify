@@ -22,7 +22,7 @@ function cacheKey(
 
 /**
  * Uses the production first-year forecast, including its ordinary customer drift. Callers that
- * load data synchronously (headless/replay) retain their existing loadSimData-before-entry contract.
+ * load data synchronously (headless simulation) retain their existing loadSimData-before-entry contract.
  */
 export function resolvedScenarioStartingPeak(
   scenario: ScenarioType,

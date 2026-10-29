@@ -342,11 +342,18 @@ handle("desktop:leaderboard", async (input) => {
         ...(await steam.getLeaderboard({
           ...validateBoard({ ...input, difficulty }),
           scope: input.scope,
+          startRank: input.startRank,
+          endRank: input.endRank,
         })),
       );
     return rows.sort((left, right) => right.score - left.score);
   }
-  return steam.getLeaderboard({ ...validateBoard(input), scope: input.scope });
+  return steam.getLeaderboard({
+    ...validateBoard(input),
+    scope: input.scope,
+    startRank: input.startRank,
+    endRank: input.endRank,
+  });
 });
 handle("desktop:score", (input) => steam.submitScore(validateScore(input)));
 handle("desktop:friends", () => {

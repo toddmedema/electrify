@@ -228,7 +228,7 @@ describe("a custom game", () => {
     expect(Number.isFinite(now.kgco2e)).toBe(true);
   });
 
-  it("runs on the seed the player pinned, and replays identically from it", () => {
+  it("runs on the seed the player pinned, and produces identical results from it", () => {
     const first = createGame({
       scenarioId: CUSTOM_SCENARIO_ID,
       scenario: CUSTOM,

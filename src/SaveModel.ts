@@ -1,6 +1,5 @@
 import type {
   GameType,
-  ReplayResultType,
   ScoreBreakdownType,
   SaveFileType,
   SaveGameType,
@@ -134,17 +133,6 @@ function validScoreBreakdown(raw: unknown): raw is ScoreBreakdownType {
     Object.entries(raw).every(
       ([key, value]) => categories.has(key) && finite(value),
     )
-  );
-}
-
-/** The original result a replay carries; presentation data, never a score submission. */
-export function validReplayResult(raw: unknown): raw is ReplayResultType {
-  return (
-    object(raw) &&
-    Object.keys(raw).sort().join() === "breakdown,outcome,score" &&
-    finite(raw.score) &&
-    outcomes.has(raw.outcome as string) &&
-    validScoreBreakdown(raw.breakdown)
   );
 }
 
@@ -395,11 +383,6 @@ export function validateSaveFileEnvelope(
       "That file isn't a valid Electrify save game.",
     );
   }
-  if (save.game.replayPlayback)
-    throw new SaveRepositoryError(
-      "invalid",
-      "Replay playback cannot be imported as a saved game.",
-    );
   return {
     name,
     status: raw.status as SaveStatus,

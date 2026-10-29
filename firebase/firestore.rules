@@ -11,8 +11,7 @@ rules_version = '2';
 //
 // Accepted limitation, unchanged from before: scores are client-authoritative. Rules cannot
 // re-run a simulation, so nothing here proves a score was actually earned. If cheating on the
-// board becomes a real problem, the fix is a Cloud Function that recomputes the score from the
-// seed and the replay's action log.
+// board becomes a real problem, scoring must move to a trusted server.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -262,6 +261,10 @@ service cloud.firestore {
       allow read: if true;
       // Legacy clients retain their historical records; current competitive queries exclude them.
       allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'appVersion', 'scoreVersion', 'outcome', 'scenarioId', 'score',
+          'scoreBreakdown', 'difficulty', 'date', 'uid', 'displayName'
+        ])
         && (!('scoreVersion' in request.resource.data)
           || (request.resource.data.scoreVersion == 2
             && request.resource.data.outcome == 'completed'
@@ -278,14 +281,6 @@ service cloud.firestore {
         && resource.data.uid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName']);
       allow delete: if false;
-    }
-
-    // The run behind a score. Immutable once written, so a replay always matches the score that
-    // points at it.
-    match /replays/{replayId} {
-      allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if false;
     }
   }
 }

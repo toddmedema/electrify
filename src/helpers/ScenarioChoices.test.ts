@@ -134,7 +134,6 @@ test("generic reducer accepts another scenario's authored option without wildfir
       )?.attributes.choice,
     ).toBe("adopt");
     expect(pendingScenarioChoice(chosen)).toBeUndefined();
-    expect(chosen.replayLog?.at(-1)?.type).toBe("chooseScenarioResponse");
   } finally {
     SCENARIOS[scenarioIndex] = originalScenario;
     SCENARIO_CHOICES.pop();

@@ -6,20 +6,25 @@ import { signature } from "./DeferredProjection";
 
 const noSubscription = () => () => undefined;
 
+/** Read exact cash when an action is chosen without redrawing quotes on every tick. */
+export function useBuildCashReader(fallback: number): () => number {
+  const context = React.useContext(ReactReduxContext);
+  return () => {
+    const game = context
+      ? (context.store.getState() as Partial<AppStateType>).game
+      : undefined;
+    return game ? (currentTick(game)?.cash ?? fallback) : fallback;
+  };
+}
+
 function useCashValue<T>(
   fallback: number,
   select: (cash: number) => T,
   live = true,
 ): T {
   const context = React.useContext(ReactReduxContext);
-  const read = () => {
-    const game =
-      context && live
-        ? (context.store.getState() as Partial<AppStateType>).game
-        : undefined;
-    const cash = game ? (currentTick(game)?.cash ?? fallback) : fallback;
-    return select(cash);
-  };
+  const readCash = useBuildCashReader(fallback);
+  const read = () => select(live ? readCash() : fallback);
   return React.useSyncExternalStore(
     live ? (context?.store.subscribe ?? noSubscription) : noSubscription,
     read,
@@ -32,7 +37,7 @@ export function useBuildCash(fallback: number, live = true): number {
   return useCashValue(fallback, (cash) => cash, live);
 }
 
-/** A card only redraws when its Review button crosses the affordability threshold. */
+/** Cards redraw only when cash crosses a quoted affordability threshold. */
 export function useBuildAffordability(
   fallback: number,
   downpayment: number,
@@ -55,7 +60,6 @@ export function sameBuildQuote<Props extends { game: GameType }>(
         before.inGame === after.inGame &&
         before.tutorialStep === after.tutorialStep &&
         before.interestRate === after.interestRate &&
-        before.replayPlayback === after.replayPlayback &&
         (before.runIdentity ?? before.location) ===
           (after.runIdentity ?? after.location) &&
         before.date.minute <= after.date.minute &&

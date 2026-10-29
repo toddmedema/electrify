@@ -5,7 +5,6 @@ const TEXT = {
   loading: "Loading the grid",
   playing: "Managing the grid",
   paused: "Grid paused",
-  replay: "Watching a replay",
   victory: "Scenario completed",
   ended: "Run ended",
   custom: "Custom grid",
@@ -22,7 +21,7 @@ function presenceTokens(scenarios) {
     "#Status_loading": TEXT.loading,
     "#Scenario_custom": TEXT.custom,
   };
-  for (const phase of ["playing", "paused", "replay", "victory", "ended"]) {
+  for (const phase of ["playing", "paused", "victory", "ended"]) {
     tokens[`#Status_${phase}`] = `{#Scenario_%scenario%} · ${TEXT[phase]}`;
     tokens[`#Status_${phase}Progress`] =
       `{#Scenario_%scenario%} · ${TEXT.year.replace("{year}", "%year%").replace("{total}", "%total%")}${phase === "playing" ? "" : ` · ${TEXT[phase]}`}`;

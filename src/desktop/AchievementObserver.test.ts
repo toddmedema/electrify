@@ -63,15 +63,12 @@ test("failed disk IPC retries the same intent and stopped observers release thei
   jest.advanceTimersByTime(10000);
   expect(f.submit).toHaveBeenCalledTimes(2);
 });
-test("restored intent is retried once, while replay, custom and transitioning state never submits", () => {
+test("restored intent is retried once, while custom and transitioning state never submits", () => {
   const f = fixture();
   f.state.game.desktopAchievements!.earned = ["LIGHTS_ON"];
   f.state.saves.transitioning = true;
   f.notify();
   f.state.saves.transitioning = false;
-  f.state.game.replayPlayback = {} as RootState["game"]["replayPlayback"];
-  f.notify();
-  f.state.game.replayPlayback = undefined;
   f.state.game.customScenario = {} as RootState["game"]["customScenario"];
   f.notify();
   expect(f.submit).not.toHaveBeenCalled();

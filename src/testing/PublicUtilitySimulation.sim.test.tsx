@@ -2,7 +2,6 @@ import { LOCATIONS } from "../Constants";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { EMPTY_HISTORY } from "../helpers/DateTime";
 import { scenarioObjectiveFailure } from "../reducers/Game";
-import { serializeReplay } from "../Replay";
 import { parseSave } from "../SaveGame";
 import { DifficultyType, ScenarioType } from "../Types";
 import {
@@ -10,7 +9,7 @@ import {
   runMonths,
   runSimulationOnce,
 } from "./SimulationTestHelpers";
-import { createGame, createGameFromReplay, runSimulation } from "./Simulator";
+import { createGame, runSimulation } from "./Simulator";
 import { roundTrip } from "./SaveForgery";
 
 jest.setTimeout(120000);
@@ -45,13 +44,9 @@ describe("researched public-utility scenarios", () => {
     const restored = parseSave(roundTrip(state))!.game;
     expect(restored.startingDemandScale).toBe(manassas.startingDemandScale);
     expect(restored.loadAdditions).toEqual(manassas.loadAdditions);
-    const replayed = createGameFromReplay(serializeReplay(state)!);
-    expect(replayed.startingDemandScale).toBe(manassas.startingDemandScale);
-    expect(replayed.loadAdditions).toEqual(manassas.loadAdditions);
-    expect(replayed.timeline).toEqual(state.timeline);
   });
 
-  it("records only completed Manassas months across new game, save and replay", () => {
+  it("records only completed Manassas months across new game and save", () => {
     const fresh = createGame({ scenarioId: 106 });
     expect(fresh.monthlyHistory).toEqual([]);
     runMonths(fresh, 1);
@@ -65,10 +60,6 @@ describe("researched public-utility scenarios", () => {
     const restored = parseSave(roundTrip(boundary))!.game;
     runMonths(restored, 2);
     expect(restored.monthlyHistory).toEqual(uninterrupted.monthlyHistory);
-
-    const replayed = createGameFromReplay(serializeReplay(boundary)!);
-    runMonths(replayed, 73);
-    expect(replayed.monthlyHistory).toEqual(uninterrupted.monthlyHistory);
 
     // The Employee run "completes Data Center Boom" below also asserts on, played once for both
     const full = runSimulationOnce({
@@ -144,7 +135,7 @@ describe("researched public-utility scenarios", () => {
     expect(peakDemandW).toBeLessThanOrEqual(2_654_000_000 * 1.1);
   });
 
-  it("reproduces Uri once across forecast, save and replay, then expires every effect", () => {
+  it("reproduces Uri once across forecast and save, then expires every effect", () => {
     const event = createGame({ scenarioId: 107 });
     const control = createGame({
       scenarioId: 107,
@@ -185,12 +176,6 @@ describe("researched public-utility scenarios", () => {
     expect(restored.startingDemandScale).toBe(event.startingDemandScale);
     expect(restored.loadAdditions).toEqual(event.loadAdditions);
     expect(restored.worldEvents).toEqual(event.worldEvents);
-
-    const replay = serializeReplay(event)!;
-    const replayed = createGameFromReplay(replay);
-    runMonths(replayed, 49);
-    expect(replayed.timeline).toEqual(event.timeline);
-    expect(replayed.worldEvents).toEqual(event.worldEvents);
 
     runMonths(event, 1);
     runMonths(control, 1);
@@ -329,7 +314,6 @@ describe("researched public-utility scenarios", () => {
       });
       expectNoViolations(result);
       expect(result.outcome).toBe("completed");
-      expect(result.actionCount).toBeGreaterThan(0);
     },
   );
 

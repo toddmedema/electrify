@@ -37,8 +37,7 @@ export interface DesktopScore {
 }
 export type DesktopCloudState = "disabled" | "offline" | "ready" | "failed";
 export interface DesktopActivity {
-  phase:
-    "loading" | "menu" | "playing" | "paused" | "replay" | "victory" | "ended";
+  phase: "loading" | "menu" | "playing" | "paused" | "victory" | "ended";
   scenarioId?: number;
   year?: number;
   totalYears?: number;
@@ -129,6 +128,8 @@ export interface DesktopBridge {
     scenarioId: number;
     difficulty?: DifficultyType;
     scope: "global" | "friends" | "player";
+    startRank?: number;
+    endRank?: number;
     challengeId: string;
   }): Promise<DesktopScore[]>;
   submitScore(score: {

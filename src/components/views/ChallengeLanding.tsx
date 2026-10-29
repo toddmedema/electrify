@@ -87,8 +87,6 @@ export default function ChallengeLanding() {
       onContinue={saved || game.inGame ? continueGame : undefined}
       onBack={leave}
       onDelta={() => undefined}
-      onWatchReplay={() => undefined}
-      onReplayError={() => undefined}
       onStart={() =>
         startWithSaveGuard(store.dispatch, () => {
           const identity = expandAuthoredRunReference(invitation.run);

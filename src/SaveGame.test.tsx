@@ -672,9 +672,8 @@ describe("SaveGame", () => {
     ).toBeNull();
   });
 
-  // The location is checked in full rather than just for being an object, the same way a replay's
-  // is: its id becomes the path of the weather file the loading screen fetches, and the rest of it
-  // drives the sun model
+  // Check the full location: its id becomes the weather-file path, and the remaining
+  // fields drive the sun model.
   it("ignores a save whose location isn't one", () => {
     const save = serializeSave(game);
     const withLocation = (location: unknown) =>

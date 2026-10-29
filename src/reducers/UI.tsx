@@ -7,14 +7,7 @@ import {
   EvidenceTargetType,
   EvidenceRequestType,
 } from "../Types";
-import {
-  launchRun,
-  quit,
-  start,
-  resume,
-  startReplay,
-  loaded,
-} from "./GameActions";
+import { launchRun, quit, start, resume, loaded } from "./GameActions";
 import { navigate, navigateBack } from "./Card";
 
 // Re-evaluate layout-dependent tutorial gates even while the simulation is paused.
@@ -144,9 +137,7 @@ export const uiSlice = createSlice({
     });
     builder.addMatcher(
       (action) =>
-        [start.type, resume.type, startReplay.type, launchRun.type].includes(
-          action.type,
-        ),
+        [start.type, resume.type, launchRun.type].includes(action.type),
       (state) => {
         delete state.dataCenterGuideRequested;
       },
@@ -156,7 +147,6 @@ export const uiSlice = createSlice({
         [
           start.type,
           resume.type,
-          startReplay.type,
           launchRun.type,
           loaded.type,
           "game/initGame",

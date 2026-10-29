@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Button, Typography } from "@mui/material";
+import { IconButton, Typography } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import { getStorageBoolean, setStorageKeyValue } from "../../LocalStorage";
 
 const SEEN_KEY = "hydroPrimerSeen";
@@ -26,15 +27,23 @@ export default function HydroPrimer(props: {
   const titleId = React.useId();
   return (
     <section className="buildPrimer" aria-labelledby={titleId}>
-      <Typography id={titleId} variant="subtitle2" component="h2">
-        About Hydro
-      </Typography>
-      <Typography variant="body2">
-        Each plant uses a whole site. Reservoirs refill from rain and snowmelt.
-      </Typography>
-      <Button size="small" onClick={props.onDismiss}>
-        Got it
-      </Button>
+      <div className="buildPrimerCopy">
+        <Typography id={titleId} variant="subtitle2" component="h2">
+          About Hydro
+        </Typography>
+        <Typography variant="body2">
+          Each plant uses a whole site. Reservoirs refill from rain and
+          snowmelt.
+        </Typography>
+      </div>
+      <IconButton
+        className="buildPrimerDismiss"
+        size="small"
+        aria-label="Dismiss About Hydro"
+        onClick={props.onDismiss}
+      >
+        <CloseIcon fontSize="small" />
+      </IconButton>
     </section>
   );
 }

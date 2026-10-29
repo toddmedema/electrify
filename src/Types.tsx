@@ -317,40 +317,6 @@ export interface ScoreType {
   // rendering a board is one query rather than one plus a profile read per row. Absent on scores
   // set before display names existed, and those fall back to Anonymous
   displayName?: string;
-  // Id of the document in the `replays` collection holding the run that set this score, when one
-  // was small enough to keep. A reference rather than the replay itself, so that opening a
-  // leaderboard downloads fifty scores instead of fifty replays
-  replayId?: string;
-}
-
-// The player actions a replay has to reproduce. Everything else about a run -- weather, fuel
-// prices, demand -- falls out of the seed, so this is the whole of what the player contributed.
-export type ReplayActionNameType =
-  | "beginIntertieStress"
-  | "chooseScenarioResponse"
-  | "schedulePolicy"
-  | "cancelPolicy"
-  | "buildFacility"
-  | "sellFacility"
-  | "togglePauseFacility"
-  | "reprioritizeFacility"
-  | "buildTransmissionLine"
-  | "upgradeTransmissionLine"
-  | "cancelTransmissionLine"
-  | "togglePauseTransmissionLine"
-  | "reprioritizeTransmissionLine"
-  | "setTradingPolicy"
-  | "retrofitFacility"
-  | "cancelRetrofit"
-  | "delta";
-
-export interface ReplayActionType {
-  // Game minute the action was taken at, which is always a tick boundary
-  minute: number;
-  type: ReplayActionNameType;
-  // The reducer's own payload, verbatim. Untyped here because it differs per action and comes
-  // back off the network as untrusted JSON; decodeReplay is what makes it safe to apply
-  payload: unknown;
 }
 
 export type MeaningfulDecisionKindType =
@@ -365,49 +331,6 @@ export interface MeaningfulDecisionType {
   kind: MeaningfulDecisionKindType;
   before: string;
   after: string;
-}
-
-export interface ReplayType {
-  compatibilityId: string;
-  appVersion: string; // For bug reports
-  scenarioId: number;
-  difficulty: DifficultyType;
-  seed: number;
-  // Where the run was played. A scenario id no longer pins this down -- a custom game carries its
-  // own location, and an authored one could be given a location that isn't in LOCATIONS -- so
-  // without it a replay would silently be re-simulated against a different city's weather
-  location: LocationType;
-  /** Internal deterministic playback carries a mod's exact detached launch snapshot. */
-  customScenario?: ScenarioType;
-  actions: ReplayActionType[];
-  meaningfulDecisionGateWaived?: boolean;
-  // Month-end cash in cents, oldest first, used to detect playback divergence.
-  monthlyCash: number[];
-  // What the original run actually scored, shown at the end even if playback drifts from it
-  result?: ReplayResultType;
-}
-
-export type ReplayResultType = Pick<VictoryType, "score" | "breakdown"> & {
-  outcome: NonNullable<VictoryType["outcome"]>;
-};
-
-/**
- * A replay on its way to or from Firestore. `actions` is a JSON string rather than a real array
- * so that the nested payloads can't run into Firestore's rules about what may sit inside one, and
- * so that the size measured against the 1 MiB document limit is the size actually stored.
- */
-export interface ReplayDocType extends Omit<ReplayType, "actions"> {
-  actions: string;
-}
-
-// Where a replay has got to while it's being watched
-export interface ReplayPlaybackType {
-  actions: ReplayActionType[];
-  index: number; // Next action to apply
-  monthlyCash?: number[];
-  result?: ReplayResultType;
-  // Set at the first month that no longer matches the original run
-  diverged?: boolean;
 }
 
 export interface LocalStoragePlayedType {
@@ -784,7 +707,7 @@ export interface TutorialStepType {
   // the card holding the target instead of leaving the objective pointing at absent UI
   card?: CardNameType | NavigateActionType;
   // A one-way side effect of leaving this step forwards, such as starting the clock. It
-  // isn't replayed when stepping backwards, since nothing would undo it - navigation
+  // isn't repeated when stepping backwards, since nothing would undo it - navigation
   // belongs in `card`, which works in both directions
   onNext?: () => Action;
   // Name an explicit transition when continuing starts a fresh challenge.
@@ -1160,7 +1083,7 @@ export interface WeatherHazardProfileType {
   source: string;
 }
 
-/** The replayed payload for adding a resilience upgrade to a standing facility. */
+/** The action payload for adding a resilience upgrade to a standing facility. */
 export interface RetrofitFacilityAction {
   facilityId: number;
   upgrade: FacilityUpgradeType;
@@ -1232,7 +1155,7 @@ export interface StoryPeriodSnapshotType {
 
 /** One deterministic, time-bounded occurrence created by the world-event engine. */
 export interface ActiveWorldEventType {
-  // Definition id plus location/date, stable across a replay of the same run
+  // Definition id plus location/date, stable for the same seeded run
   key: string;
   definitionId: string;
   startsMinute: number;
@@ -1252,7 +1175,7 @@ export interface ActiveWorldEventType {
 
 export interface WorldEventStateType {
   active: ActiveWorldEventType[];
-  // Resolved live occurrences survive expiry so recovery copy, saves, replays, matrix reports,
+  // Resolved live occurrences survive expiry so recovery copy, saves, matrix reports,
   // and debrief selection can refer to the exact onset-time attributes and facility IDs.
   occurrences: ActiveWorldEventType[];
   // A bounded record of month/definition checks prevents a save resumed in the same month from
@@ -1434,7 +1357,7 @@ export interface GameType {
   fuelCostSnapshot?: Partial<Record<FuelNameType, number>>;
   worldEvents: WorldEventStateType;
   // Headless balance harness only: baseline matrix cells run the identical strategy with authored
-  // effects disabled. Undefined means enabled and is what every browser save/replay uses.
+  // effects disabled. Undefined means enabled and is what every browser save uses.
   storyEffectsDisabled?: boolean;
   // Headless balance harness only: run the identical strategy with hail and extreme-cold hazards
   // switched off. Undefined means enabled (the browser default).
@@ -1443,19 +1366,10 @@ export interface GameType {
   facilities: FacilityOperatingType[];
   // Absent in scenarios without intertie access. Enabled scenarios carry an explicit empty state.
   transmission?: TransmissionStateType;
-  // Reducer-validated progress for the visible CEO objective. Replays rebuild it by applying the
-  // same accepted state changes; saves persist and validate it so progress survives a reload.
+  // Reducer-validated progress for the visible CEO objective; saves persist and validate it.
   meaningfulDecisions: MeaningfulDecisionType[];
   // Headless balance harness can waive the decision gate to isolate economic outcomes.
   meaningfulDecisionGateWaived?: boolean;
-  // Every simulation-affecting thing the player has done this run, for the replay attached to a
-  // high score. Undefined means the run isn't being recorded: before a game starts, while one is
-  // being watched, or once a run has grown past MAX_REPLAY_ACTIONS. Persisted with the rest of the
-  // slice, so a replay survives a reload.
-  replayLog?: ReplayActionType[];
-  // Set only while watching a replay. Doubles as the "this is a replay" flag: player controls are
-  // hidden, nothing is autosaved, and no score is submitted while it's here
-  replayPlayback?: ReplayPlaybackType;
 }
 
 // Which units the player reads. Only ever affects display: everything the game stores and
@@ -1776,7 +1690,7 @@ export interface RunIdentity {
   seed: number;
   difficulty: DifficultyType;
   compatibilityId: string;
-  origin: "authored" | "custom" | "tutorial" | "replay";
+  origin: "authored" | "custom" | "tutorial";
   inputs: {
     scenario: string;
     location: LocationType;

@@ -16,7 +16,6 @@ it("keeps a pending data center guide through loading and clears it between runs
     "game/quit",
     "game/start",
     "game/resume",
-    "game/startReplay",
     "game/launchRun",
   ]) {
     expect(
@@ -39,7 +38,6 @@ it("consumes only the matching purchase and clears arrivals between runs", () =>
     "game/quit",
     "game/start",
     "game/resume",
-    "game/startReplay",
     "game/loaded",
     "game/initGame",
   ]) {

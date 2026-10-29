@@ -14,13 +14,12 @@ export async function readDesktopCompetitiveBests(
   const bests: NonNullable<UserType["bests"]> = {};
   for (const entry of await repository.list()) {
     try {
-      const { result, save } = await repository.read(entry.id);
+      const { result } = await repository.read(entry.id);
       if (
         !result ||
         result.scoreVersion !== SCORE_VERSION ||
         result.outcome !== "completed" ||
         entry.status !== "completed" ||
-        save.game.replayPlayback ||
         !SCENARIOS.some(
           (scenario) =>
             scenario.id === result.scenarioId && !scenario.tutorialSteps,
@@ -117,4 +116,53 @@ export async function desktopGlobalRank(
       await new Promise((resolve) => setTimeout(resolve, RANK_RETRY_MS));
   }
   throw new Error("Steam rank is unavailable.");
+}
+
+/** Rank this run even if Steam retained a higher personal best. */
+export async function desktopScoreRank(
+  scenarioId: number,
+  difficulty: DifficultyType,
+  score: number,
+): Promise<number> {
+  await Promise.allSettled([...submissions]);
+  const desktop = getDesktop();
+  if (!desktop) throw new Error("Steam rank is unavailable.");
+  const selection = {
+    scenarioId,
+    difficulty,
+    challengeId: manifest.compatibilityId,
+    scoreVersion: SCORE_VERSION,
+  };
+  const target = Math.round(score);
+  const own = (
+    await desktop.getLeaderboard({ ...selection, scope: "player" })
+  )[0];
+  if (own?.score === target) return own.rank;
+  // Probe ranks exponentially, then find the first score no greater than this run.
+  // This also handles runs below the first hundred and scores not yet uploaded.
+  const at = async (rank: number) =>
+    (
+      await desktop.getLeaderboard({
+        ...selection,
+        scope: "global",
+        startRank: rank,
+        endRank: rank,
+      })
+    )[0];
+  let low = 1;
+  let high = 1;
+  for (;;) {
+    const entry = await at(high);
+    if (!entry || entry.score <= target) break;
+    low = high + 1;
+    high = Math.min(high * 2, 2147483647);
+    if (low > high) throw new Error("Steam rank is unavailable.");
+  }
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    const entry = await at(middle);
+    if (entry && entry.score > target) low = middle + 1;
+    else high = middle;
+  }
+  return low;
 }

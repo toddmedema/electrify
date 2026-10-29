@@ -55,9 +55,9 @@ for (const theme of ["light", "dark"] as const) {
       hydro.getByRole("button", { name: "Use site maximum" }),
     ).toHaveCount(0);
     await expect(hydro).toContainText("Site:");
-    await expect(page.locator(".buildPrimer")).toContainText(
-      "Each plant uses a whole site",
-    );
+    await expect(
+      hydro.getByRole("region", { name: "About Hydro" }),
+    ).toContainText("Each plant uses a whole site");
     expect(
       await hydro.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
@@ -67,6 +67,17 @@ for (const theme of ["light", "dark"] as const) {
       path: testInfo.outputPath(`hydro-${theme}.png`),
       animations: "disabled",
     });
+    const dismiss = hydro.getByRole("button", { name: "Dismiss About Hydro" });
+    const dismissBounds = (await dismiss.boundingBox())!;
+    const minimumTarget = testInfo.project.use.hasTouch ? 44 : 40;
+    expect(dismissBounds.width).toBeGreaterThanOrEqual(minimumTarget);
+    expect(dismissBounds.height).toBeGreaterThanOrEqual(minimumTarget);
+    await dismiss.focus();
+    await page.keyboard.press("Enter");
+    await expect(hydro.locator("[tabindex='-1']")).toBeFocused();
+    await expect(page.getByRole("region", { name: "About Hydro" })).toHaveCount(
+      0,
+    );
     const review = hydro.getByRole("button", {
       name: "Review purchase of Hydro",
     });
@@ -95,6 +106,9 @@ for (const theme of ["light", "dark"] as const) {
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildGenerator").click();
     await expect(hydro).toContainText(`${count - 1} sites left`);
+    await expect(page.getByRole("region", { name: "About Hydro" })).toHaveCount(
+      0,
+    );
     await openPane(
       page.locator(".facilities"),
       page.getByRole("button", { name: "Facilities", exact: true }),

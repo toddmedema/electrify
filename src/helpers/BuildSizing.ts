@@ -4,6 +4,7 @@ import { log10 } from "./Libm";
 import { MAX_INTERTIE_UPGRADES } from "../Constants";
 import { corridorsForGame } from "../data/IntertieAccess";
 import { intertieBuildQuote, intertieContextForGame } from "./Transmission";
+import { purchaseTerms } from "./Financials";
 
 /** The size the catalog opens at when nothing of that kind has been built yet */
 export const DEFAULT_BUILD_SIZE = 500000000;
@@ -23,6 +24,43 @@ export function wToSliderTick(w: number): number {
   const exponent = Math.floor(log10(w)) - 6;
   const frontNumber = +w.toString().charAt(0);
   return frontNumber + exponent * 9 - 1;
+}
+
+/** Slider sizes plus the exact technology/site limit used by the catalog's resize shortcut. */
+export function buildSizeOptions(
+  minTick: number,
+  maxTick: number,
+  limit: number,
+): number[] {
+  const sizes = Array.from({ length: maxTick - minTick + 1 }, (_, index) =>
+    sliderTickToW(minTick + index),
+  ).filter((size) => size <= limit);
+  if (
+    sizes.length &&
+    limit < sliderTickToW(maxTick) &&
+    sizes[sizes.length - 1] !== limit
+  )
+    sizes.push(limit);
+  return sizes;
+}
+
+/** Find the largest offered size whose loan downpayment fits the player's cash. Quotes own costs. */
+export function largestAffordableBuildSize(
+  sizes: readonly number[],
+  cash: number,
+  buildCost: (size: number) => number,
+): number | undefined {
+  let low = 0;
+  let high = sizes.length - 1;
+  let affordable: number | undefined;
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    if (purchaseTerms(buildCost(sizes[middle]), true, 0).downpayment <= cash) {
+      affordable = sizes[middle];
+      low = middle + 1;
+    } else high = middle - 1;
+  }
+  return affordable;
 }
 
 /** Average installed capacity of this kind; the workspace remembers later slider choices. */

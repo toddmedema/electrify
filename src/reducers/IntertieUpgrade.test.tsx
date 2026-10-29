@@ -11,8 +11,7 @@ import {
   TICKS_PER_MONTH,
 } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
-import { createGame, createGameFromReplay } from "../testing/Simulator";
-import { serializeReplay, encodeReplay, decodeReplay } from "../Replay";
+import { createGame } from "../testing/Simulator";
 import gameReducer, {
   buildTransmissionLine,
   cancelTransmissionLine,
@@ -27,7 +26,6 @@ import {
   intertieUpgradeQuote,
   intertieBuildQuote,
 } from "../helpers/Transmission";
-import { TRANSMISSION_CORRIDORS } from "../data/AdjacentMarkets";
 import { parseSave, serializeSave } from "../SaveGame";
 
 const CORRIDOR = "california-north";
@@ -265,33 +263,6 @@ describe("intertie upgrades", () => {
     expect(after.transmission!.lines[0].upgrade).toBeUndefined();
   });
 
-  it("replays an upgrade to the same capacity it reached live", () => {
-    let state = createGame({ scenarioId: 112, seed: 249007 });
-    const corridorId = state.transmission
-      ? TRANSMISSION_CORRIDORS.find(({ id }) => id.startsWith("california"))!.id
-      : CORRIDOR;
-    state = cloneDeep(
-      gameReducer(state, buildTransmissionLine({ corridorId, financed: true })),
-    );
-    runMonths(state, 14);
-    state = cloneDeep(
-      gameReducer(
-        state,
-        upgradeTransmissionLine({ corridorId, financed: true }),
-      ),
-    );
-    runMonths(state, 14);
-
-    const replay = serializeReplay(state)!;
-    expect(
-      replay.actions.some(({ type }) => type === "upgradeTransmissionLine"),
-    ).toBe(true);
-    const replayed = createGameFromReplay(replay);
-    for (let i = 0; i < 28 * TICKS_PER_MONTH; i++) tickState(replayed);
-    expect(replayed.transmission).toEqual(state.transmission);
-    expect(replayed.monthlyHistory).toEqual(state.monthlyHistory);
-  });
-
   it("survives a save round trip once widened", () => {
     let state = openIntertie();
     state = cloneDeep(
@@ -487,7 +458,7 @@ describe("building intertie tiers directly", () => {
     ).toBe(before);
   });
 
-  it("round trips a directly built tier through saves and deterministic replays", () => {
+  it("round trips a directly built tier through saves and rejects an impossible tier", () => {
     const before = createGame({ scenarioId: 112, seed: 249007 });
     const state = cloneDeep(
       gameReducer(
@@ -502,18 +473,16 @@ describe("building intertie tiers directly", () => {
     expect(state.transmission!.lines).toHaveLength(1);
     const saved = parseSave(serializeSave(state));
     expect(saved?.game.transmission).toEqual(state.transmission);
-    runMonths(state, 2);
-    const replay = serializeReplay(state)!;
-    expect(decodeReplay(encodeReplay(replay))).not.toBeNull();
-    const replayed = createGameFromReplay(replay);
-    runMonths(replayed, 2);
-    expect(replayed.transmission).toEqual(state.transmission);
-    expect(replayed.monthlyHistory).toEqual(state.monthlyHistory);
-    const action = replay.actions.find(
-      ({ type }) => type === "buildTransmissionLine",
-    )!;
-    action.payload = { corridorId: CORRIDOR, financed: true, tier: 99 };
-    expect(decodeReplay(encodeReplay(replay))).toBeNull();
+    expect(
+      gameReducer(
+        before,
+        buildTransmissionLine({
+          corridorId: CORRIDOR,
+          financed: true,
+          tier: 99,
+        }),
+      ),
+    ).toBe(before);
   });
 
   it("retains the existing physical capacity ceiling", () => {
@@ -541,6 +510,8 @@ describe("intertie operating controls", () => {
       );
       const line = built.transmission!.lines[0];
       expect(line).toBeDefined();
+      const malformed = "bad" as unknown as number;
+      expect(gameReducer(built, cancelTransmissionLine(malformed))).toBe(built);
       const cancelled = gameReducer(built, cancelTransmissionLine(line.id));
       expect(cancelled.transmission!.lines).toHaveLength(0);
       expect(
@@ -551,13 +522,6 @@ describe("intertie operating controls", () => {
           (d) => d.lever === `intertie:${line.id}`,
         ),
       ).toBe(false);
-      const replay = serializeReplay(cancelled)!;
-      expect(decodeReplay(encodeReplay(replay))).not.toBeNull();
-      const replayed = createGameFromReplay(replay);
-      tickState(replayed);
-      expect(replayed.transmission!.lines).toHaveLength(0);
-      replay.actions[replay.actions.length - 1].payload = "bad";
-      expect(decodeReplay(encodeReplay(replay))).toBeNull();
     },
   );
   it("pauses dispatch, preserves loan payments and resumes", () => {
@@ -586,26 +550,4 @@ describe("intertie operating controls", () => {
       resumed,
     );
   });
-});
-
-it("replays an intertie pause and resume deterministically", () => {
-  let state = createGame({ scenarioId: 112, seed: 249007 });
-  state = cloneDeep(
-    gameReducer(
-      state,
-      buildTransmissionLine({ corridorId: CORRIDOR, financed: true }),
-    ),
-  );
-  runMonths(state, 14);
-  const id = state.transmission!.lines[0].id;
-  state = cloneDeep(gameReducer(state, togglePauseTransmissionLine(id)));
-  runMonths(state, 1);
-  state = cloneDeep(gameReducer(state, togglePauseTransmissionLine(id)));
-  runMonths(state, 1);
-  const replay = serializeReplay(state)!;
-  expect(decodeReplay(encodeReplay(replay))).not.toBeNull();
-  const replayed = createGameFromReplay(replay);
-  runMonths(replayed, 16);
-  expect(replayed.transmission).toEqual(state.transmission);
-  expect(replayed.monthlyHistory).toEqual(state.monthlyHistory);
 });

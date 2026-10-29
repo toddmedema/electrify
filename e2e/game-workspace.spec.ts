@@ -2,6 +2,7 @@ import { reviewScreenshot } from "./review-screenshot";
 import { openBuild } from "./layout";
 import { expect, Page, test } from "./fixtures";
 import path from "node:path";
+import { editSavedGame } from "./save-fixture";
 
 test.setTimeout(90_000);
 
@@ -884,7 +885,9 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await programs.locator(".customerProgramsBody").evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
-  await expect(programs.getByText(/^Peak demand:/)).toBeInViewport();
+  await expect(
+    programs.getByRole("img", { name: /^Estimated demand:/ }),
+  ).toBeInViewport();
   await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-programs-detail-impact.png"),
     animations: "disabled",
@@ -1072,9 +1075,20 @@ for (const theme of ["light", "dark"] as const) {
       name: "ultra speed",
       exact: true,
     });
-    for (const width of [1299, 1300, 1299]) {
+    for (const width of [1299, 1300, 1440, 1299]) {
       await page.setViewportSize({ width, height: 800 });
-      const desktop = width === 1300;
+      const desktop = width >= 1300;
+      const profit = appbar.getByLabel(/^Monthly profit forecast/);
+      await expect(profit).toBeVisible();
+      await expect(profit).toHaveText(/^[+−-]?\$[\d.,]+[KMBT]?\/mo$/);
+      expect(await profit.evaluate((el) => el.getClientRects().length)).toBe(1);
+      const [cashBox, profitBox, dateBox] = await Promise.all([
+        appbar.locator(".gameStatusValue").first().boundingBox(),
+        profit.boundingBox(),
+        appbar.locator(".gameStatusValue.weak").boundingBox(),
+      ]);
+      expect(profitBox!.x).toBeGreaterThan(cashBox!.x + cashBox!.width);
+      expect(dateBox!.x).toBeGreaterThan(profitBox!.x + profitBox!.width);
       await expect(stage).toHaveAttribute(
         "data-layout",
         desktop ? "side" : "sheet",
@@ -1095,6 +1109,78 @@ for (const theme of ["light", "dark"] as const) {
           (element) => element.scrollWidth - element.clientWidth,
         ),
       ).toBeLessThanOrEqual(1);
+    }
+    await page.locator("#programsNav").click();
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.mouse.move(0, 0);
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `monthly-profit-${theme}.png`,
+        ),
+      });
+      await appbar.locator(".gameStatus").screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `monthly-profit-detail-${theme}.png`,
+        ),
+      });
+    }
+    for (const width of [1024, 1023, 390, 360]) {
+      await page.setViewportSize({ width, height: 800 });
+      const profit = appbar.getByLabel(/^Monthly profit forecast/);
+      if (width >= 1024) await expect(profit).toBeVisible();
+      else await expect(profit).toHaveCount(0);
+      expect(
+        await appbar.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+    }
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`desktop profit and warning controls fit with a large negative balance in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "desktop-chromium");
+    await page.setViewportSize({ width: 1300, height: 800 });
+    await startGame(page, theme, 111);
+    await editSavedGame(page, (save) => {
+      save.game.lowCashWarningMonth = save.game.date.monthsElapsed;
+      for (const tick of save.game.timeline) {
+        tick.cash = -999999999999;
+        tick.revenue = 0;
+        tick.expensesFuel = 99999999;
+        tick.supplyW = tick.demandW * 0.9;
+      }
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const appbar = page.locator("#appbar");
+    for (const width of [1300, 1440]) {
+      await page.setViewportSize({ width, height: 800 });
+      await expect(appbar.getByLabel(/^Monthly profit forecast/)).toBeVisible();
+      await expect(
+        appbar.getByRole("button", { name: "ultra speed", exact: true }),
+      ).toBeInViewport();
+      expect(
+        await appbar.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+      if (process.env.REVIEW_SCREENSHOT_DIR && width === 1300) {
+        await page.mouse.move(0, 0);
+        await page.screenshot({
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            `monthly-profit-warning-${theme}.png`,
+          ),
+          animations: "disabled",
+        });
+      }
     }
   });
 }
@@ -1205,7 +1291,9 @@ for (const width of [360, 390]) {
     await programs.locator(".customerProgramsBody").evaluate((element) => {
       element.scrollTop = element.scrollHeight;
     });
-    await expect(programs.getByText(/^Peak demand:/)).toBeInViewport();
+    await expect(
+      programs.getByRole("img", { name: /^Estimated demand:/ }),
+    ).toBeInViewport();
     expect(
       await page
         .locator(".gameWorkspace")

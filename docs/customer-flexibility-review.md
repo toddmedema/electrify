@@ -67,7 +67,7 @@ rebate program.
 
 **Independent approval: all three plans and implementations are acceptable.** No unresolved
 implementation defect was identified in the reviewed core code. The additional regressions were
-reviewed: completed-rollout pending saves for all three offers, actual dispatch and costs replayed
+reviewed: completed-rollout pending saves for all three offers, actual dispatch and costs reproduced
 exactly over three months, and rooftop self-consumption plus battery input bounded by production.
 After the funded-only correction, the implementation author's focused run passed all 50 tests
 in the battery helper, integration and save upgrade suites. The added checks connect subsidy to

@@ -5,7 +5,11 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
+import { getTimeFromTimeline, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { TICK_MINUTES } from "../../Constants";
+import { formatMoneyStable } from "../../helpers/Format";
+import { ThemeProvider } from "@mui/material/styles";
+import { createAppTheme } from "../../Theme";
 import userEvent from "@testing-library/user-event";
 import { createGame } from "../../testing/Simulator";
 import { modScenario } from "../../mods/ModScenario";
@@ -38,14 +42,21 @@ function renderAppBar(overrides: Partial<Props> = {}) {
     onSpeedChange: () => undefined,
     ...overrides,
   };
-  return render(<GameAppBar {...props} />);
+  return render(
+    <ThemeProvider theme={createAppTheme("light")}>
+      <GameAppBar {...props} />
+    </ThemeProvider>,
+  );
 }
 
 const originalMatchMedia = window.matchMedia;
 beforeEach(() => {
   window.matchMedia = (query: string) => ({
     ...originalMatchMedia(query),
-    matches: query.includes("min-width:1300px") && mockDesktop,
+    matches:
+      (query.includes("min-width:1300px") ||
+        query.includes("min-width:1024px")) &&
+      mockDesktop,
   });
 });
 afterEach(() => {
@@ -63,6 +74,56 @@ afterEach(() => {
 });
 
 describe("GameAppBar", () => {
+  it.each([1, -1, 0])(
+    "shows the current month profit forecast beside cash on desktop (%s)",
+    (sign) => {
+      mockDesktop = true;
+      try {
+        const game = createGame({ scenarioId: 101 });
+        game.inGame = true;
+        const tick = {
+          ...game.timeline[0],
+          revenue: sign > 0 ? 200000 : 0,
+          expensesFuel: sign < 0 ? 100000 : 0,
+          expensesOM: 0,
+          expensesCarbonFee: 0,
+          expensesInterest: sign === 0 ? 0 : 10000,
+          expensesPolicy: 0,
+          expensesImports: sign === 0 ? 0 : 5000,
+        };
+        game.timeline = [
+          { ...tick, minute: 0 },
+          { ...tick, minute: TICK_MINUTES },
+          { ...tick, minute: MINUTES_PER_MONTH, revenue: 1000000000 },
+        ];
+        // Two current-month samples include interest and imports; the next month is excluded.
+        const expected = sign > 0 ? 370000 : sign < 0 ? -230000 : 0;
+        renderAppBar({ game });
+        const profit = screen.getByLabelText(
+          `Monthly profit forecast ${formatMoneyStable(expected)}`,
+        );
+        expect(profit).toHaveTextContent(
+          `${expected > 0 ? "+" : ""}${formatMoneyStable(expected)}/mo`,
+        );
+        const palette = createAppTheme("light").palette;
+        expect(profit).toHaveStyle({
+          color:
+            sign < 0
+              ? palette.error.main
+              : sign > 0
+                ? palette.success.main
+                : palette.text.secondary,
+        });
+      } finally {
+        mockDesktop = false;
+      }
+    },
+  );
+
+  it("keeps the profit forecast out of the phone top bar", () => {
+    renderAppBar();
+    expect(screen.queryByLabelText(/^Monthly profit forecast/)).toBeNull();
+  });
   it("opens the feedback form directly from the game menu", () => {
     const open = jest.spyOn(window, "open").mockImplementation(() => null);
     try {
@@ -107,7 +168,7 @@ describe("GameAppBar", () => {
       const months = screen.getByRole("button", { name: /months left$/ });
       if (action === "click") await userEvent.click(months);
       else {
-        months.focus();
+        act(() => months.focus());
         await userEvent.keyboard(action);
       }
       expect(onEvidence).toHaveBeenCalledTimes(1);

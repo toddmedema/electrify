@@ -47,7 +47,7 @@ function retryLines(
   tier?: number,
 ): ScheduledSimActionType[] {
   // Retry each month until affordable. Already-built lines are harmless rejected duplicate
-  // orders, not additional meaningful decisions. Only accepted actions appear in replay.
+  // orders, not additional meaningful decisions. Only accepted changes affect the decision count.
   return Array.from({ length: scenario.durationMonths }, (_, month) =>
     corridorIds.map((corridorId): ScheduledSimActionType => ({
       month,

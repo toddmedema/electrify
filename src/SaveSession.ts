@@ -35,14 +35,7 @@ import {
   saveUnavailable,
 } from "./SaveLibrary";
 import { requestCloudSave, withRunSaveEffects } from "./SaveEffects";
-import {
-  launchRun,
-  loaded,
-  quit,
-  resume,
-  start,
-  startReplay,
-} from "./reducers/GameActions";
+import { launchRun, loaded, quit, resume, start } from "./reducers/GameActions";
 import { navigate } from "./reducers/Card";
 import {
   dialogClose,
@@ -416,7 +409,7 @@ export async function importSavedGame(file: SaveFileType): Promise<string> {
     file.save.game.scenarioId,
     file.save.game.customScenario,
   );
-  if (!scenario || scenario.tutorialSteps || file.save.game.replayPlayback)
+  if (!scenario || scenario.tutorialSteps)
     throw new Error("Only playable games can be imported.");
   const record = await repository.create({
     ...file,
@@ -938,7 +931,6 @@ function snapshotChanged(): void {
   if (
     !active ||
     !game.inGame ||
-    game.replayPlayback ||
     active.generation !== generation ||
     active.suspended ||
     active.terminal
@@ -961,13 +953,7 @@ function snapshotChanged(): void {
 function afterLoaded(): void {
   const game = getStore().getState().game;
   const scenario = getScenario(game.scenarioId, game.customScenario);
-  if (
-    game.multiplayer ||
-    game.replayPlayback ||
-    !scenario ||
-    scenario.tutorialSteps
-  )
-    return;
+  if (game.multiplayer || !scenario || scenario.tutorialSteps) return;
   if (!active) {
     const name = suggestedSaveName(
       scenario.name,
@@ -1034,7 +1020,6 @@ export const saveSessionMiddleware: Middleware = () => (next) => (action) => {
     start.match(action) ||
     launchRun.match(action) ||
     resume.match(action) ||
-    startReplay.match(action) ||
     quit.match(action);
   if (replaces) {
     generation++;

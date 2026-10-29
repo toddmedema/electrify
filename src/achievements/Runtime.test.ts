@@ -62,7 +62,7 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-test("live awards toast once while loaded, replay and custom evidence never count", () => {
+test("live awards toast once while loaded and custom evidence never count", () => {
   const f = fixture();
   const stop = startAchievementServices(f.observer, f.journal);
   f.publish({ inGame: true });
@@ -71,14 +71,8 @@ test("live awards toast once while loaded, replay and custom evidence never coun
   f.publish();
   expect(f.journal.getSnapshot().notifications).toEqual(["OUT_OF_JUICE"]);
   f.journal.clearNotifications();
-  f.publish({
-    replayPlayback: { actions: [], index: 0 },
-    desktopAchievements: { ...progress, earned: ["LIGHTS_ON"] },
-  });
-  expect(f.journal.getSnapshot().progress.earned).toEqual(["OUT_OF_JUICE"]);
   // A resumed save or shared link carries someone's earlier evidence, including a finished run.
   f.publish({
-    replayPlayback: undefined,
     inGame: false,
     desktopAchievements: {
       ...progress,

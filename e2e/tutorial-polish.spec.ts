@@ -58,6 +58,18 @@ for (const theme of ["light", "dark"]) {
       animations: "disabled",
     });
     await sortBuildCatalog(page);
+    await expect(page.locator(".tutorialHud")).toContainText(
+      "Choose a plant size",
+    );
+    await expect(page.locator(".constructionCapacitySlider")).toBeInViewport();
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`size-${theme}.png`),
+      animations: "disabled",
+    });
+    await page
+      .locator(".tutorialHud")
+      .getByRole("button", { name: "Next", exact: true })
+      .click();
     await expect(page.locator(".tutorialHud")).toContainText("Compare cost");
     await expect(
       page.getByRole("tablist", { name: "Build categories" }),

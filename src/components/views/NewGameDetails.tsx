@@ -2,8 +2,6 @@ import { activeScenario } from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
   collection,
-  doc,
-  getDoc,
   getDocs,
   query,
   where,
@@ -25,7 +23,6 @@ import {
 import ScreenPage from "../base/ScreenPage";
 import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
-import CircularProgress from "@mui/material/CircularProgress";
 import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
 import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
 import { DIFFICULTY_LABELS, difficultyLabel } from "../../Constants";
@@ -34,14 +31,12 @@ import { getDb, login } from "../../Globals";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
-import { decodeReplay } from "../../Replay";
 import CoopBrowseBar, { CoopStartButton } from "../base/CoopBrowseBar";
 import {
   ChallengeInvitation,
   CoopSelectionType,
   GameType,
   LocationType,
-  ReplayType,
   ScenarioType,
   ScoreType,
 } from "../../Types";
@@ -63,8 +58,6 @@ export interface DispatchProps {
   onBack: () => void;
   onDelta: (delta: Partial<GameType>) => void;
   onStart: (scenarioId: number) => void;
-  onWatchReplay: (replay: ReplayType) => void;
-  onReplayError: (message: string) => void;
 }
 
 interface State {
@@ -77,8 +70,6 @@ interface State {
   scenario: ScenarioType | null;
   location: LocationType | null;
   victoryDialogOpen?: boolean;
-  // The replay currently being fetched, so its row can show a spinner instead of the play button
-  loadingReplayId?: string;
   leaderboardExpanded?: boolean;
   leaderboardMinHeight?: number;
   steamScope?: "global" | "friends";
@@ -275,59 +266,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
     }
   }
 
-  /**
-   * Fetches a replay and hands it to the game. Replays live in their own collection rather than
-   * on the score, so opening a leaderboard costs fifty small documents and watching one costs a
-   * single extra read -- the alternative downloads every replay to show a table of numbers.
-   */
-  private async watchReplay(replayId: string) {
-    if (this.state.loadingReplayId) {
-      return;
-    }
-    this.setState({ loadingReplayId: replayId });
-    try {
-      const snapshot = await getDoc(doc(getDb(), "replays", replayId));
-      const data = snapshot.exists() ? snapshot.data() : undefined;
-      const replay = data ? decodeReplay(data) : null;
-      if (replay) {
-        this.props.onWatchReplay(replay);
-      } else {
-        this.props.onReplayError("Sorry, that replay couldn't be loaded.");
-      }
-    } catch (err) {
-      console.warn("Couldn't load the replay: ", err);
-      this.props.onReplayError("Sorry, that replay couldn't be loaded.");
-    } finally {
-      this.setState({ loadingReplayId: undefined });
-    }
-  }
-
-  private renderReplayCell(score: ScoreType) {
-    if (!score.replayId) {
-      return <TableCell className="replay" />;
-    }
-    const replayId = score.replayId;
-    if (this.state.loadingReplayId === replayId) {
-      return (
-        <TableCell className="replay">
-          <CircularProgress size={20} />
-        </TableCell>
-      );
-    }
-    return (
-      <TableCell className="replay">
-        <IconButton
-          onClick={() => this.watchReplay(replayId)}
-          aria-label="Watch replay"
-          color="primary"
-          size="small"
-        >
-          <PlayCircleIcon />
-        </IconButton>
-      </TableCell>
-    );
-  }
-
   public componentDidMount() {
     if (this.state.location) {
       void prefetchScenarioData(this.state.location);
@@ -415,11 +353,10 @@ export default class NewGameDetails extends React.Component<Props, State> {
     const endYear =
       scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
     const visibleScores = leaderboardExpanded ? allScores : scores?.slice(0, 3);
-    // Steam boards have no replays or Google sign-in.
+    // Steam boards use the signed-in Steam account.
     const desktopApp =
       process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
-    const scoreColumnCount =
-      (leaderboardExpanded ? 5 : 4) - (desktopApp ? 1 : 0);
+    const scoreColumnCount = leaderboardExpanded ? 4 : 3;
     const visibleBoardFailed = leaderboardExpanded
       ? allScoresFailed
       : boardFailed;
@@ -582,9 +519,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
                     <TableCell>Name</TableCell>
                     <TableCell>Score</TableCell>
                     {leaderboardExpanded && <TableCell>Level</TableCell>}
-                    {!desktopApp && (
-                      <TableCell className="replay">Replay</TableCell>
-                    )}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -600,7 +534,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
                           {difficultyLabel(myTopScore.difficulty)}
                         </TableCell>
                       )}
-                      {!desktopApp && this.renderReplayCell(myTopScore)}
                     </TableRow>
                   )}
                   {!visibleScores && (
@@ -651,7 +584,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
                               {difficultyLabel(score.difficulty)}
                             </TableCell>
                           )}
-                          {!desktopApp && this.renderReplayCell(score)}
                         </TableRow>
                       );
                     })}

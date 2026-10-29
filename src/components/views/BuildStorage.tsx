@@ -1,6 +1,10 @@
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
-import { sameBuildQuote, useBuildAffordability } from "../base/useBuildCash";
+import {
+  sameBuildQuote,
+  useBuildAffordability,
+  useBuildCashReader,
+} from "../base/useBuildCash";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
 import { Button, List, Typography } from "@mui/material";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
@@ -17,6 +21,8 @@ import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
   averageBuildSize,
+  buildSizeOptions,
+  largestAffordableBuildSize,
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
@@ -36,6 +42,7 @@ import {
 } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+import useBuildRowReveal from "../base/useBuildRowReveal";
 import { GameType, LocationType, StorageShoppingType } from "../../Types";
 
 function storageBuildSummary(storage: StorageShoppingType): string {
@@ -56,13 +63,14 @@ interface StorageBuildItemProps {
   interestRate: number;
   location?: LocationType;
   storage: StorageShoppingType;
+  minimumBuildCost: number;
   onUseMaxSize: (peakWh: number) => void;
   onBuild: (financed: boolean) => void;
 }
 
 function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const { storage, cash } = props;
-  // The catalog key also identifies facilities in saves, replay actions and mods.
+  // The catalog key also identifies facilities in saves and mods.
   const displayName =
     storage.name === "Battery" ? "Lithium Battery" : storage.name;
   const units = useUnits();
@@ -73,6 +81,11 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     props.interestRate,
   );
   const affordable = useBuildAffordability(cash, downpayment);
+  const minimumAffordable = useBuildAffordability(
+    cash,
+    purchaseTerms(props.minimumBuildCost ?? Infinity, true, props.interestRate)
+      .downpayment,
+  );
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
   const maxSizeWh = floorToTwoSignificantDigits(storage.maxPeakWh);
   const { buildable, secondaryText, offerMaxSize } = getBuildAvailability({
@@ -93,6 +106,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     <BuildCashWarning cash={cash} downpayment={downpayment} />
   ) : undefined;
   const buildSubtitle = (buildable && shortfall) || secondaryText;
+  const offerAffordableSize = buildable && !!shortfall && minimumAffordable;
 
   const openReview = (e: React.SyntheticEvent) => {
     setOpen(true);
@@ -110,8 +124,8 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         onClick: openReview,
       }}
       sizeAction={
-        offerMaxSize &&
-        storage.peakWh !== maxSizeWh && (
+        (offerMaxSize || offerAffordableSize) &&
+        (offerAffordableSize || storage.peakWh !== maxSizeWh) && (
           <Button size="small" onClick={() => props.onUseMaxSize(maxSizeWh)}>
             Use max size
           </Button>
@@ -270,7 +284,9 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const readCash = useBuildCashReader(now?.cash ?? 0);
   const listRef = useToolScroll<HTMLUListElement>("storage.scroll");
+  const revealResizedRow = useBuildRowReveal(listRef);
   const [sliderTick, setSliderTick] = useToolState<number>("storage.size", () =>
     Math.max(
       4,
@@ -291,6 +307,7 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
   }
 
   const cash = now.cash;
+  const minimumStorage = STORAGE(game, sliderTickToW(4));
   const storage = STORAGE(game, sliderTickToW(sliderTick))
     .map((candidate) =>
       exactSizes[candidate.name] !== undefined
@@ -317,14 +334,29 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
         onSortChange={(value) => setSort(value as StorageSortKey)}
       />
       <List ref={listRef} dense className="scrollable cardList">
-        {storage.map((g: StorageShoppingType, i: number) => (
+        {storage.map((g: StorageShoppingType) => (
           <StorageBuildItem
             storage={g}
-            key={i}
+            key={g.name}
             cash={cash}
+            minimumBuildCost={
+              minimumStorage.find((item) => item.name === g.name)!.buildCost
+            }
             onUseMaxSize={(peakWh) => {
-              setSliderTick(Math.max(0, wToSliderTick(peakWh)));
-              setExactSizes((sizes) => ({ ...sizes, [g.name]: peakWh }));
+              const size =
+                largestAffordableBuildSize(
+                  buildSizeOptions(4, 37, peakWh),
+                  readCash(),
+                  (capacity) =>
+                    STORAGE(game, capacity).find(
+                      (item) => item.name === g.name,
+                    )!.buildCost,
+                ) ?? peakWh;
+              revealResizedRow(
+                g.name === "Battery" ? "Lithium Battery" : g.name,
+              );
+              setSliderTick(Math.max(4, wToSliderTick(size)));
+              setExactSizes((sizes) => ({ ...sizes, [g.name]: size }));
             }}
             interestRate={game.interestRate}
             location={game.location}

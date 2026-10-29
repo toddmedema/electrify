@@ -31,6 +31,7 @@ import {
 } from "../../helpers/Hazards";
 import { formatMoneyConcise } from "../../helpers/Format";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
+import { purchaseTerms } from "../../helpers/Financials";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
@@ -609,21 +610,81 @@ describe("weather hazards in the fleet", () => {
     });
     expect(onSelect).not.toHaveBeenCalled();
   });
-
-  it("shows a replay's hardening without offering to buy any", () => {
-    const state = {
-      ...gameWithSolar(),
-      replayPlayback: { actions: [], index: 0 },
-    } as GameType;
-    state.facilities[2].resilience = { hailResistant: true };
-    renderFacilities(state, 3);
-    const details = screen.getByRole("region", { name: "Upgrades" });
-    expect(details).not.toHaveTextContent("Standard panels");
-    expect(within(details).queryByRole("button")).toBeNull();
-  });
 });
 
 describe("the interties view", () => {
+  it("reveals the resized intertie after its new cost moves it to a different row", () => {
+    const original = transmission.intertieBuildQuote;
+    const quotes = jest
+      .spyOn(transmission, "intertieBuildQuote")
+      .mockImplementation((...args) => {
+        const quote = original(...args);
+        if (!quote) return quote;
+        const north = quote.id === "california-north";
+        return {
+          ...quote,
+          buildCost: args[2] === 1 ? (north ? 2e6 : 1e6) : north ? 10e6 : 20e6,
+        };
+      });
+    const scroll = jest.fn(function (this: HTMLElement) {
+      // The effect must run after sorting has committed, on the same named card.
+      expect(screen.getAllByTestId(/^transmission-project-/)[1]).toBe(this);
+    });
+    const priorScroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scroll;
+    try {
+      const game = createGame({ scenarioId: 100 });
+      game.transmission!.lines = [];
+      game.timeline = game.timeline.map((tick) => ({ ...tick, cash: 400000 }));
+      renderProjects(game);
+      fireEvent.change(screen.getByRole("slider"), { target: { value: 2 } });
+      const north = screen.getByTestId("transmission-project-california-north");
+      expect(screen.getAllByTestId(/^transmission-project-/)[0]).toBe(north);
+      fireEvent.click(
+        within(north).getByRole("button", { name: "Use max size" }),
+      );
+      expect(screen.getAllByTestId(/^transmission-project-/)[1]).toBe(north);
+      expect(scroll).toHaveBeenCalledTimes(1);
+      expect(scroll.mock.instances[0]).toBe(north);
+    } finally {
+      quotes.mockRestore();
+      HTMLElement.prototype.scrollIntoView = priorScroll;
+    }
+  });
+  it("uses the largest affordable tier and hides the shortcut when even tier one is too expensive", () => {
+    const game = createGame({ scenarioId: 100 });
+    game.transmission!.lines = [];
+    const context = transmission.intertieContextForGame(game);
+    const quote = transmission.intertieBuildQuote(
+      "california-north",
+      game.date.year,
+      2,
+      context,
+    )!;
+    const cash = purchaseTerms(
+      quote.buildCost,
+      true,
+      game.interestRate,
+    ).downpayment;
+    game.timeline = game.timeline.map((tick) => ({ ...tick, cash }));
+    renderProjects(game);
+    const north = screen.getByTestId("transmission-project-california-north");
+    const review = within(north).getByRole("button", {
+      name: /Review purchase/,
+    });
+    fireEvent.change(screen.getByRole("slider"), { target: { value: 3 } });
+    expect(review).toBeDisabled();
+    fireEvent.click(
+      within(north).getByRole("button", { name: "Use max size" }),
+    );
+    expect(screen.getByRole("slider")).toHaveAttribute("aria-valuenow", "2");
+    expect(review).toBeEnabled();
+    cleanup();
+    game.timeline = game.timeline.map((tick) => ({ ...tick, cash: 0 }));
+    renderProjects(game);
+    fireEvent.change(screen.getByRole("slider"), { target: { value: 3 } });
+    expect(screen.queryByRole("button", { name: "Use max size" })).toBeNull();
+  });
   it("explains and offers California connection projects", async () => {
     const game = playedGame(0);
     renderProjects(game);
@@ -992,22 +1053,6 @@ describe("unified connections", () => {
     expect(building).toHaveTextContent("Emissions");
     expect(building).not.toHaveTextContent("Import available now");
     expect(building).toHaveTextContent("Typical price");
-  });
-
-  it("permits inspecting replay connections but disables trading and building", async () => {
-    const game = connectedGame();
-    game.replayPlayback = {
-      actions: [],
-      index: 0,
-    } as GameType["replayPlayback"];
-    renderFacilities(game, null);
-    expect(screen.queryByRole("button", { name: "Build" })).toBeNull();
-    expect(screen.getByText("No power flowing")).toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "Trading rule" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Reorder / })).toBeNull();
-    expect(
-      screen.getByText("Trading rule: Buy for shortages, sell extra"),
-    ).toBeInTheDocument();
   });
 });
 

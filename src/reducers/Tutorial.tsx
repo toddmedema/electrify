@@ -83,7 +83,7 @@ export function recordTutorialExited(game: GameType): void {
     game.scenarioId,
     game.customScenario,
   )?.tutorialSteps;
-  if (!steps || game.replayPlayback || game.tutorialStep >= steps.length) {
+  if (!steps || game.tutorialStep >= steps.length) {
     return;
   }
   recordScenarioPlayed(game.scenarioId);
@@ -104,7 +104,7 @@ export function changeTutorialStep(
   const steps = tutorialSteps || [];
 
   // Only leaving a step forwards runs its one-way side effects - Back has no way to undo
-  // them, and replaying the previous step's would fire an effect nobody triggered
+  // them, and repeating the previous step's would fire an effect nobody triggered
   const leaving = toStep > fromStep ? steps[fromStep] : undefined;
   if (leaving && leaving.onNext) {
     dispatch(leaving.onNext());

@@ -9,7 +9,11 @@ import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
 import * as React from "react";
-import { initialIntertieBuildTier } from "../../helpers/BuildSizing";
+import {
+  initialIntertieBuildTier,
+  largestAffordableBuildSize,
+} from "../../helpers/BuildSizing";
+import useBuildRowReveal from "../base/useBuildRowReveal";
 import { useToolState } from "../base/GameToolMemory";
 import {
   DragDropContext,
@@ -244,15 +248,15 @@ function IntertieBuildItem(props: {
   cash: number | undefined;
   interestRate: number;
   outlook?: IntertieOutlook;
-  readOnly: boolean;
   units: UnitSystemType;
   onReview: () => void;
+  onUseMaxSize?: () => void;
   importCapacityW: number;
   exportCapacityW: number;
   constructionKgco2eTotal: number;
   year: number;
 }): React.JSX.Element {
-  const { cash, corridor, outlook, readOnly, units } = props;
+  const { cash, corridor, outlook, units } = props;
   const market = adjacentMarketForCorridor(corridor.id);
   const name = market?.name || corridor.name;
   const loan = purchaseTerms(corridor.buildCost, true, props.interestRate);
@@ -275,16 +279,19 @@ function IntertieBuildItem(props: {
       // what the dialog's own "Build..." title is, so the list stays navigable without jumping
       // back up a level underneath it.
       titleComponent="h6"
-      review={
-        readOnly
-          ? undefined
-          : {
-              id: `review-intertie-${corridor.id}`,
-              ariaLabel: `Review purchase of ${name} intertie`,
-              disabled: !buildable,
-              onClick: props.onReview,
-            }
+      sizeAction={
+        props.onUseMaxSize && (
+          <Button size="small" onClick={props.onUseMaxSize}>
+            Use max size
+          </Button>
+        )
       }
+      review={{
+        id: `review-intertie-${corridor.id}`,
+        ariaLabel: `Review purchase of ${name} intertie`,
+        disabled: !buildable,
+        onClick: props.onReview,
+      }}
       context={
         <>
           <span className="nowrap">
@@ -303,7 +310,7 @@ function IntertieBuildItem(props: {
         </>
       }
       warning={
-        !readOnly && !buildable
+        !buildable
           ? financingShortfallText(cash || 0, loan.downpayment)
           : undefined
       }
@@ -401,20 +408,10 @@ function IntertieUpgradeControl(props: {
   year: number;
   interestRate: number;
   units: UnitSystemType;
-  readOnly?: boolean;
   onUpgrade: (corridorId: string, financed: boolean) => void;
   context: IntertieAccessContext;
 }): React.JSX.Element | null {
-  const {
-    line,
-    cash,
-    year,
-    interestRate,
-    units,
-    readOnly,
-    onUpgrade,
-    context,
-  } = props;
+  const { line, cash, year, interestRate, units, onUpgrade, context } = props;
   const [reviewing, setReviewing] = React.useState(false);
   if (line.upgrade) {
     const years = line.upgrade.yearsToBuildLeft;
@@ -444,7 +441,6 @@ function IntertieUpgradeControl(props: {
       </Typography>
     );
   }
-  if (readOnly) return null;
   const { downpayment } = purchaseTerms(quote.buildCost, true, interestRate);
   const shortfall = financingShortfallText(cash ?? 0, downpayment);
   const months = Math.max(1, Math.round(quote.yearsToBuild * 12));
@@ -563,15 +559,6 @@ function TradingControls({
 }: Pick<TransmissionPanelProps, "game" | "onPolicy">) {
   const state = game.transmission;
   if (!state?.lines.length) return null;
-  if (game.replayPlayback) {
-    return (
-      <div className="tradingControls">
-        <Typography variant="body2">
-          Trading rule: {POLICY_LABELS[state.tradingPolicy]}
-        </Typography>
-      </div>
-    );
-  }
   return (
     <div className="tradingControls">
       <FormControl fullWidth size="small" className="tradingPolicy">
@@ -607,6 +594,8 @@ export default function TransmissionPanel({
   projectsOnly = false,
 }: TransmissionPanelProps) {
   const units = useUnits();
+  const projectsRef = React.useRef<HTMLUListElement>(null);
+  const revealResizedRow = useBuildRowReveal(projectsRef);
   const [cancelLine, setCancelLine] =
     React.useState<TransmissionLineOperatingType | null>(null);
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
@@ -623,15 +612,12 @@ export default function TransmissionPanel({
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
   const availableCorridors = corridorsForGame(game);
   const now = currentTick(game);
-  const readOnly = !!game.replayPlayback;
-  const reorderDisabled =
-    readOnly ||
-    !!(
-      game.inGame &&
-      activeScenario(game)?.tutorialSteps?.[
-        game.tutorialStep
-      ]?.hideUi?.includes("facilityActions")
-    );
+  const reorderDisabled = !!(
+    game.inGame &&
+    activeScenario(game)?.tutorialSteps?.[game.tutorialStep]?.hideUi?.includes(
+      "facilityActions",
+    )
+  );
   const intertieContext = intertieContextForGame(game);
   const forecast = useIntertieForecast(
     game,
@@ -1156,54 +1142,52 @@ export default function TransmissionPanel({
                                       year={game.date.year}
                                       interestRate={game.interestRate}
                                       units={units}
-                                      readOnly={readOnly}
                                       onUpgrade={onUpgrade}
                                     />
                                   </>
                                 )}
-                                {!readOnly &&
-                                  ((building && onCancel) ||
-                                    (!building && onPause)) && (
-                                    <div className="facilityActions">
-                                      {building && onCancel && (
-                                        <Button
-                                          className="facilityCancelConstruction"
-                                          variant="outlined"
-                                          startIcon={<CancelIcon />}
-                                          aria-label={`Cancel construction of ${line.name}`}
-                                          onClick={() => setCancelLine(line)}
-                                        >
-                                          <span className="facilityActionLabel">
-                                            Cancel construction
-                                          </span>
-                                        </Button>
-                                      )}
-                                      {!building && onPause && (
-                                        <Button
-                                          variant="outlined"
-                                          startIcon={
-                                            <ConceptIcon
-                                              concept={
-                                                line.paused ? "play" : "pause"
-                                              }
-                                            />
-                                          }
-                                          aria-label={`${line.paused ? "Resume" : "Pause"} ${line.name}`}
-                                          onClick={() =>
-                                            onPause(
-                                              line.id,
-                                              line.name,
-                                              !!line.paused,
-                                            )
-                                          }
-                                        >
-                                          <span className="facilityActionLabel">
-                                            {line.paused ? "Resume" : "Pause"}
-                                          </span>
-                                        </Button>
-                                      )}
-                                    </div>
-                                  )}
+                                {((building && onCancel) ||
+                                  (!building && onPause)) && (
+                                  <div className="facilityActions">
+                                    {building && onCancel && (
+                                      <Button
+                                        className="facilityCancelConstruction"
+                                        variant="outlined"
+                                        startIcon={<CancelIcon />}
+                                        aria-label={`Cancel construction of ${line.name}`}
+                                        onClick={() => setCancelLine(line)}
+                                      >
+                                        <span className="facilityActionLabel">
+                                          Cancel construction
+                                        </span>
+                                      </Button>
+                                    )}
+                                    {!building && onPause && (
+                                      <Button
+                                        variant="outlined"
+                                        startIcon={
+                                          <ConceptIcon
+                                            concept={
+                                              line.paused ? "play" : "pause"
+                                            }
+                                          />
+                                        }
+                                        aria-label={`${line.paused ? "Resume" : "Pause"} ${line.name}`}
+                                        onClick={() =>
+                                          onPause(
+                                            line.id,
+                                            line.name,
+                                            !!line.paused,
+                                          )
+                                        }
+                                      >
+                                        <span className="facilityActionLabel">
+                                          {line.paused ? "Resume" : "Pause"}
+                                        </span>
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1234,7 +1218,7 @@ export default function TransmissionPanel({
             sliderValue={tier}
             sliderMin={1}
             sliderMax={maxTier}
-            sliderDisabled={readOnly || maxTier === 1}
+            sliderDisabled={maxTier === 1}
             sliderValueText={(value) => `Tier ${value}`}
             onSliderChange={setTier}
             sort={sort}
@@ -1242,8 +1226,24 @@ export default function TransmissionPanel({
             sortLabel="Sort interties"
             onSortChange={(value) => setSort(value as IntertieSortKey)}
           />
-          <List dense className="cardList transmissionProjects">
+          <List
+            ref={projectsRef}
+            dense
+            className="cardList transmissionProjects"
+          >
             {projects.map(({ quote: corridor }) => {
+              const affordableTier =
+                now &&
+                purchaseTerms(corridor.buildCost, true, game.interestRate)
+                  .downpayment > now.cash
+                  ? largestAffordableBuildSize(
+                      Array.from({ length: tier - 1 }, (_, index) => index + 1),
+                      now.cash,
+                      (candidate) =>
+                        buildQuote(corridor.id, candidate)?.buildCost ??
+                        Infinity,
+                    )
+                  : undefined;
               const capacities = intertieDirectionalCapacities(
                 corridor.id,
                 intertieContext,
@@ -1260,9 +1260,19 @@ export default function TransmissionPanel({
                   cash={now?.cash}
                   interestRate={game.interestRate}
                   outlook={outlookFor(corridor.id, corridor.capacityW)}
-                  readOnly={readOnly}
                   units={units}
                   onReview={() => setReviewId(corridor.id)}
+                  onUseMaxSize={
+                    affordableTier === undefined
+                      ? undefined
+                      : () => {
+                          revealResizedRow(
+                            adjacentMarketForCorridor(corridor.id)?.name ||
+                              corridor.name,
+                          );
+                          setTier(affordableTier);
+                        }
+                  }
                 />
               );
             })}
@@ -1298,8 +1308,8 @@ export default function TransmissionPanel({
           cash={now?.cash ?? 0}
           buildCost={review.buildCost}
           interestRate={game.interestRate}
-          cashDisabled={readOnly || !now}
-          loanDisabled={readOnly || !now}
+          cashDisabled={!now}
+          loanDisabled={!now}
           leadingFacts={[
             {
               concept: "supply",

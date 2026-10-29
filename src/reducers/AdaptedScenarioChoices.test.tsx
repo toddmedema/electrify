@@ -23,12 +23,7 @@ import { runFailure } from "../helpers/ObjectiveRules";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
 import { parseSave } from "../SaveGame";
-import { decodeReplay, encodeReplay, serializeReplay } from "../Replay";
-import {
-  createGame,
-  createGameFromReplay,
-  runSimulation,
-} from "../testing/Simulator";
+import { createGame, runSimulation } from "../testing/Simulator";
 import type { DifficultyType, GameType } from "../Types";
 import reducer, { delta, generateNewTimeline, tickState } from "./Game";
 import { chooseScenarioResponse } from "./GameActions";
@@ -521,21 +516,6 @@ test.each(catalog)(
     expect(result.violations).toEqual([]);
     expect(result.months).toEqual([...live.monthlyHistory].reverse());
     expect(result.storyOccurrences).toEqual(live.worldEvents.occurrences);
-    const captured = serializeReplay(live)!;
-    expect(
-      captured.actions.some(
-        (action) => action.type === "chooseScenarioResponse",
-      ),
-    ).toBe(true);
-    const playback = createGameFromReplay(
-      decodeReplay(encodeReplay(captured))!,
-    );
-    advance(playback, dueMonth + 1);
-    expect(playback.monthlyHistory).toEqual(live.monthlyHistory);
-    expect(playback.worldEvents.occurrences).toEqual(
-      live.worldEvents.occurrences,
-    );
-    expect(playback.loadAdditions).toEqual(live.loadAdditions);
   },
 );
 

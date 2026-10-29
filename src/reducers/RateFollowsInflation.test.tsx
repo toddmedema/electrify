@@ -135,13 +135,8 @@ describe("public utility rate following inflation", () => {
     );
     const resumed = gameReducer(manual, delta({ rateFollowsInflation: true }));
     expect(resumed.rateFollowsInflation).toBe(true);
-    // No snap to the target: 12 cents stays in force, and both deltas merge into one replay
-    // entry at the same minute.
+    // No snap to the target: 12 cents stays in force.
     expect(resumed.dollarsPerkWh).toBe(0.12);
-    expect(resumed.replayLog?.at(-1)?.payload).toEqual({
-      dollarsPerkWh: 0.12,
-      rateFollowsInflation: true,
-    });
     // The January step then carries the hand-set rate forward with inflation.
     const live = cloneDeep(resumed);
     runMonths(live, 13);
