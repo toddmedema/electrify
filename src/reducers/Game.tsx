@@ -148,6 +148,7 @@ import {
   getInflationIndex,
   getInflationRate,
   getPrimeRate,
+  getRateInflationIndex,
   hasEconomy,
 } from "../data/Economy";
 import {
@@ -156,7 +157,6 @@ import {
   getMarketRate,
   nextCustomerCount,
   publicRateCap,
-  publicTargetRate,
   updateCustomerRate,
 } from "../helpers/Customers";
 import {
@@ -1690,8 +1690,7 @@ export const gameSlice = createSlice({
       state.dollarsPerkWh = startingRate;
       state.customerRate = startingRate;
       // A tutorial checkpoint's rate is part of its lesson, so it stays where it was authored.
-      state.rateFollowsTarget =
-        !checkpoint && followedTargetRate(state) !== undefined;
+      state.rateFollowsInflation = !checkpoint && canFollowInflation(state);
       state.customerMarketSize = startingCustomers * CUSTOMER_MARKET_MULTIPLIER;
       initializeGameObjectiveProgress(state);
       state.startingDemandScale = scenario.startingDemandScale ?? 1;
@@ -3157,55 +3156,68 @@ function applyPolicyEdit(
 }
 
 /**
- * The rate a public utility following its target charges now, or undefined where there is no
- * target to follow: investor-owned and multiplayer companies, and tutorials.
+ * Whether this run's rate can follow inflation at all: solo public utilities only. Investor-owned
+ * and multiplayer companies, and tutorials, set their own rates.
  */
-function followedTargetRate(
-  state: GameType,
-  date: DateType = state.date,
-): number | undefined {
+function canFollowInflation(state: GameType): boolean {
   const scenario = getScenario(state.scenarioId, state.customScenario);
-  if (
-    !scenario ||
-    scenario.ownership !== "Public" ||
-    scenario.tutorialSteps ||
-    state.multiplayer
-  )
-    return undefined;
-  return publicTargetRate(
-    scenario.dollarsPerkWh,
-    date,
-    state.startingYear,
-    state.seed,
-  );
-}
-
-/** Current-month edits stay in force; future months apply the same target as live rollover. */
-function customerBaseRateAt(state: GameType, date: DateType): number {
   return (
-    (state.rateFollowsTarget && date.monthsElapsed > state.date.monthsElapsed
-      ? followedTargetRate(state, date)
-      : undefined) ?? state.dollarsPerkWh
+    !!scenario &&
+    scenario.ownership === "Public" &&
+    !scenario.tutorialSteps &&
+    !state.multiplayer
   );
 }
 
 /**
- * Turning following on sets the rate to the target; setting a rate by hand turns it off.
- * Deltas that also pick the scenario are setup, which initGame settles.
+ * Whether the rate moves with inflation: the saved setting, honoured only where following is
+ * allowed, so an edited save cannot inflate an investor's or a multiplayer company's rate.
+ */
+function followsInflation(state: GameType): boolean {
+  return !!state.rateFollowsInflation && canFollowInflation(state);
+}
+
+/**
+ * The rate a following public utility charges at `date`: the current rate carried forward by
+ * whatever inflation has passed since now, mirroring the live rollover's January step.
+ */
+function inflationAdjustedRateAt(state: GameType, date: DateType): number {
+  const base = getRateInflationIndex(
+    state.date,
+    state.startingYear,
+    state.seed,
+  );
+  return (
+    (state.dollarsPerkWh *
+      getRateInflationIndex(date, state.startingYear, state.seed)) /
+    base
+  );
+}
+
+/** Current-month edits stay in force; future months carry the rate forward with inflation. */
+function customerBaseRateAt(state: GameType, date: DateType): number {
+  return date.monthsElapsed > state.date.monthsElapsed &&
+    followsInflation(state)
+    ? inflationAdjustedRateAt(state, date)
+    : state.dollarsPerkWh;
+}
+
+/**
+ * Turning following on starts adjusting the current rate with inflation; setting a rate by hand
+ * turns it off. Deltas that also pick the scenario are setup, which initGame settles.
  */
 function normalizeRateDelta(state: GameType, payload: Partial<GameType>) {
   const setup = "scenarioId" in payload || "customScenario" in payload;
-  if (payload.rateFollowsTarget === true && !setup) {
-    const target = followedTargetRate(state);
-    if (target === undefined) delete payload.rateFollowsTarget;
-    else payload.dollarsPerkWh = target;
+  if (payload.rateFollowsInflation === true && !setup) {
+    // No snap to the target: the rate keeps its current level and starts moving with inflation.
+    if (!canFollowInflation(state)) delete payload.rateFollowsInflation;
   } else if (
     typeof payload.dollarsPerkWh === "number" &&
-    payload.rateFollowsTarget === undefined &&
-    state.rateFollowsTarget &&
+    payload.rateFollowsInflation === undefined &&
+    state.rateFollowsInflation &&
     !setup
   ) {
-    payload.rateFollowsTarget = false;
+    payload.rateFollowsInflation = false;
   }
   if (typeof payload.dollarsPerkWh === "number") {
     payload.dollarsPerkWh = capRateForScenario(state, payload);
@@ -3554,9 +3566,25 @@ export function* tickStatePhases(
           `${POLICIES[id].name}: ${policyChoiceLabel(id, state.policies!.programs[id])} starts this month.`,
         ),
       );
-      if (state.rateFollowsTarget) {
-        const target = followedTargetRate(state);
-        if (target !== undefined) state.dollarsPerkWh = target;
+      if (followsInflation(state)) {
+        // The retail index steps once a year, in January; carry the rate across that step.
+        const previousDate = getDateFromMinute(
+          state.date.minute - TICK_MINUTES,
+          state.startingYear,
+        );
+        const previousIndex = getRateInflationIndex(
+          previousDate,
+          state.startingYear,
+          state.seed,
+        );
+        const index = getRateInflationIndex(
+          state.date,
+          state.startingYear,
+          state.seed,
+        );
+        if (index !== previousIndex) {
+          state.dollarsPerkWh = (state.dollarsPerkWh * index) / previousIndex;
+        }
       }
       state.timeline = generateNewTimeline(
         state,
@@ -5401,11 +5429,14 @@ function* supplyFacilitiesFinancesPhases(
   return now;
 }
 
+type ForecastObserver = (state: GameType, tick: TickPresentFutureType) => void;
+
 function supplyForecastPass(
   state: GameType,
   simulated?: boolean,
   withoutMinimumStableOutput = false,
   stepMinutes = TICK_MINUTES,
+  observe?: ForecastObserver,
 ): TickPresentFutureType[] {
   // updateSupplyFacilitiesFinances ramps generators, charges batteries and pays down loans by
   // mutating the facilities in place, so forecasting has to run against a copy of them. A shallow
@@ -5510,6 +5541,7 @@ function supplyForecastPass(
         });
       }
     }
+    observe?.(newState, t);
     prev = t;
     return t;
   });
@@ -5522,7 +5554,7 @@ export function forecastMonthClosingCashAtCustomerRate(
 ): number {
   const forecast = cloneDeep(state);
   forecast.dollarsPerkWh = dollarsPerkWh;
-  forecast.rateFollowsTarget = false;
+  forecast.rateFollowsInflation = false;
   forecast.timeline = reforecastSupply(forecast, true);
   const closesMinute = (state.date.monthsElapsed + 1) * MINUTES_PER_MONTH;
   for (
@@ -5547,6 +5579,7 @@ function reforecastSupply(
   state: GameType,
   simulated?: boolean,
   stepMinutes = TICK_MINUTES,
+  observe?: ForecastObserver,
 ): TickPresentFutureType[] {
   // First record the merit-order request each generator would receive without minimum-load
   // constraints. The optimized pass then scans those per-facility requests to compare the cost
@@ -5595,6 +5628,7 @@ function reforecastSupply(
     simulated,
     false,
     stepMinutes,
+    observe,
   );
 }
 
@@ -5605,8 +5639,17 @@ export function generateNewTimeline(
   customers: number,
   ticks = TICKS_PER_DAY,
   stepMinutes = TICK_MINUTES,
+  observe?: ForecastObserver,
 ): TickPresentFutureType[] {
-  return generateTimeline(state, cash, customers, ticks, stepMinutes, false);
+  return generateTimeline(
+    state,
+    cash,
+    customers,
+    ticks,
+    stepMinutes,
+    false,
+    observe,
+  );
 }
 
 /** Player-facing projections run the same demand/dispatch engine on estimated weather. */
@@ -5616,8 +5659,17 @@ export function generateForecastTimeline(
   customers: number,
   ticks = TICKS_PER_DAY,
   stepMinutes = TICK_MINUTES,
+  observe?: ForecastObserver,
 ): TickPresentFutureType[] {
-  return generateTimeline(state, cash, customers, ticks, stepMinutes, true);
+  return generateTimeline(
+    state,
+    cash,
+    customers,
+    ticks,
+    stepMinutes,
+    true,
+    observe,
+  );
 }
 
 function generateTimeline(
@@ -5627,6 +5679,7 @@ function generateTimeline(
   ticks: number,
   stepMinutes: number,
   forecastWeather: boolean,
+  observe?: ForecastObserver,
 ): TickPresentFutureType[] {
   // Forecasts only read the live state. Snapshot a draft once so the horizon does not repeatedly
   // traverse Immer proxies for location, events, history and other shared inputs. `current`, not
@@ -5768,7 +5821,7 @@ function generateTimeline(
     state.timeline[0].customerBatteryWhStart = batteryCarry;
     state.timeline[0].customerBatteryWh = batteryCarry;
   }
-  state.timeline = reforecastSupply(state, true, stepMinutes);
+  state.timeline = reforecastSupply(state, true, stepMinutes, observe);
   return state.timeline;
 }
 

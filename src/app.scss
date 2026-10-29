@@ -6488,8 +6488,7 @@ $programs_column: 800px;
   }
 }
 
-// Two lines per requirement: the rule, then its progress and any meaningful status.
-// Missing-history warnings can wrap so the evidence is never clipped.
+// Victory conditions pair each goal with its target; long date windows can wrap.
 .missionRequirements {
   margin: 0;
 
@@ -6503,31 +6502,17 @@ $programs_column: 800px;
   }
 }
 
-.missionRequirementStatus {
-  flex: 0 0 auto;
-  padding: 1px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  background: var(--bg-raised);
+.scenarioOutcome {
+  margin: $space-2 0 0;
+  overflow-wrap: anywhere;
   color: $font_color_faded;
-  font-size: var(--font-size-caption-sm);
-  line-height: 1.25;
-  font-weight: 600;
-  white-space: nowrap;
 
-  // The word carries the state on its own; the colour is a second, faster read of it
-  &[data-status="failed"] {
-    border-color: var(--delta-bad);
-    color: var(--delta-bad);
-  }
-
-  &[data-status="completed"] {
-    border-color: var(--delta-good);
+  &[data-status="win"] {
     color: var(--delta-good);
   }
 }
 
-// The Scenario tool: the scenario at a glance, then its score, then what it takes to win
+// The Scenario tool: the scenario at a glance, its score and loss outlook, then conditions
 .scenarioDetailsBody {
   display: flex;
   flex-direction: column;

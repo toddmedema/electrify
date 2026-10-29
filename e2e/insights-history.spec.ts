@@ -7,7 +7,9 @@ test("public pricing shows the rate score and the customer retention objective",
   page,
 }, testInfo) => {
   test.skip(
-    !["desktop-chromium", "mobile-390px"].includes(testInfo.project.name),
+    !["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
+      testInfo.project.name,
+    ),
   );
   await page.emulateMedia({
     colorScheme:
@@ -31,6 +33,18 @@ test("public pricing shows the rate score and the customer retention objective",
   // A public utility's pricing feedback shows its rate score and target.
   await expect(pricing).toContainText(/rate score/i);
   await expect(pricing).not.toContainText(/market/i);
+  // The "Follow inflation" switch must fit beside the heading at every supported width:
+  // visible, with its label on a single line.
+  await expect(
+    pricing.getByRole("switch", { name: "Follow inflation" }),
+  ).toBeVisible();
+  const labelBox = await pricing
+    .getByText("Follow inflation", { exact: true })
+    .boundingBox();
+  expect(
+    labelBox!.height,
+    "the switch label stays on one line",
+  ).toBeLessThanOrEqual(24);
   await page
     .locator("#appbar:visible")
     .getByRole("button", { name: "fast speed" })

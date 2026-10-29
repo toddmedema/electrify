@@ -48,6 +48,7 @@ function expectGeneratedForecast(
     game.timeline[0].customers,
     projection.forecast.length,
     projection.projectionStepMinutes,
+    undefined,
   );
   expect(projection.forecast).toEqual(generatedForecast);
 }
@@ -67,7 +68,7 @@ it("adopts worker results with the original history identity without recalculati
 it("does not count ordinary within-month cash burn twice", () => {
   const game = createGame({ scenarioId: 111, seed: 7 });
   game.dollarsPerkWh = 0;
-  game.rateFollowsTarget = false;
+  game.rateFollowsInflation = false;
   game.timeline = generateNewTimeline(
     game,
     5_000_000,
@@ -144,6 +145,7 @@ it("caps a 100-year custom game at 20 years of cash and chart simulation", () =>
     game.timeline[0].customers,
     20 * 12 * 24,
     60,
+    undefined,
   );
   expect(projection.cashProjected).toHaveLength(240);
   expect(projection.financeProjected).toHaveLength(240);

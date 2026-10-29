@@ -1310,10 +1310,10 @@ export interface GameType {
   feePerKgCO2e: number;
   dollarsPerkWh: number;
   /**
-   * A public utility's rate tracks its inflating target each month until the player sets one.
-   * Absent in saves from before the option existed, which keep the rate they chose.
+   * A public utility's rate follows inflation, stepping up each January until the player sets
+   * one by hand. Absent in saves from before the option existed, which keep the rate they chose.
    */
-  rateFollowsTarget?: boolean;
+  rateFollowsInflation?: boolean;
   // Customer price competition starts from the scenario's rate and half of this addressable pool.
   /** The last month offered a cash warning; persisted so reloading cannot repeat it. */
   lowCashWarningMonth?: number;

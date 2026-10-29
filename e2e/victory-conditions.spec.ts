@@ -99,7 +99,7 @@ for (const theme of ["light", "dark"] as const) {
       );
       expect(rows.length).toBeGreaterThan(0);
       for (const descriptions of rows) {
-        expect(descriptions.length).toBeGreaterThan(0);
+        expect(descriptions).toHaveLength(1);
         expect(descriptions.join("").trim()).not.toBe("");
       }
       if (scenario.id === 100) {
@@ -114,27 +114,13 @@ for (const theme of ["light", "dark"] as const) {
           descriptions.includes(target),
         );
         expect(requirement).toBeDefined();
-        expect(requirement?.join(" ")).toContain("Not started");
-        expect(requirement?.join(" ")).toMatch(/0\/\d+ months completed/);
+        expect(requirement).toEqual([target]);
       }
-      // Keep targets and progress compact; explanatory descriptions can wrap.
-      // At 360px, long date windows may reflow, but must remain fully readable.
-      if (testInfo.project.use.viewport!.width >= 390) {
-        const wrapped = await dialog
-          .locator(
-            ".missionRequirements dd:has(> .missionRequirementStatus), .missionRequirements dd:has(+ dd > .missionRequirementStatus)",
-          )
-          .evaluateAll((rows) =>
-            rows
-              .filter(
-                (row) =>
-                  row.getBoundingClientRect().height >
-                  parseFloat(getComputedStyle(row).lineHeight) + 1,
-              )
-              .map((row) => row.textContent),
-          );
-        expect(wrapped).toEqual([]);
-      }
+      await expect(
+        dialog.getByRole("region", { name: "Victory conditions" }),
+      ).not.toContainText(
+        /Not started|Recorded:|months completed|Delivered customer electricity divided/,
+      );
       const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
       if (
         reviewDir &&

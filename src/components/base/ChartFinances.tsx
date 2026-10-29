@@ -61,6 +61,9 @@ export interface Props {
    * dashes would blur into a dotted line. For a chart whose projection is the point of it.
    */
   projectedNote?: string;
+  /** Warning periods on this chart's x scale, independent of the score/value's sign. */
+  warningSpans?: Array<[number, number]>;
+  warningNote?: string;
 }
 
 interface State {
@@ -80,6 +83,8 @@ interface State {
   projectedSpans: Array<[number, number]>;
   negativeNote?: string;
   projectedNote?: string;
+  warningSpans: Array<[number, number]>;
+  warningNote?: string;
 }
 
 /**
@@ -185,6 +190,7 @@ function buildOptions({
         // Forecast trouble is a warning about the future, not a fact about the record
         0.15,
       ),
+      bandsPlugin(() => getState().warningSpans, chartPalette().blackout, 0.3),
     ],
   };
 }
@@ -197,7 +203,14 @@ function tooltip(idx: number, state: State): string {
     state.negativeNote && d.value < 0 ? `\n${state.negativeNote}` : "";
   const projected =
     state.projectedNote && d.projected ? `\n${state.projectedNote}` : "";
-  return `${monthName} ${d.year}\n${state.format(d.value)}${note}${projected}`;
+  const warning =
+    state.warningNote &&
+    state.warningSpans.some(
+      ([from, to]) => state.months[idx] >= from && state.months[idx] <= to,
+    )
+      ? `\n${state.warningNote}`
+      : "";
+  return `${monthName} ${d.year}\n${state.format(d.value)}${note}${projected}${warning}`;
 }
 
 const ChartFinances = (props: Props): React.JSX.Element => {
@@ -254,11 +267,13 @@ const ChartFinances = (props: Props): React.JSX.Element => {
       : [],
     negativeNote: props.negativeNote,
     projectedNote: props.projectedNote,
+    warningSpans: props.warningSpans ?? [],
+    warningNote: props.warningNote,
   };
 
   return (
     <UPlotChart<State>
-      ariaLabel={`Chart of ${props.title} over time`}
+      ariaLabel={`Chart of ${props.title} over time${props.warningSpans?.length ? `. ${props.warningNote ?? "Warning"} periods shaded` : ""}`}
       formatSummaryValue={(value) => String(state.format(value))}
       id={props.id || "chartFinances"}
       height={props.height}
