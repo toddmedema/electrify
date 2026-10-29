@@ -10,6 +10,7 @@ import {
   ListItemText,
   Typography,
 } from "@mui/material";
+import CheckIcon from "@mui/icons-material/Check";
 import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
@@ -24,8 +25,11 @@ import {
   DraggingStyle,
   Droppable,
   DropResult,
+  DragStart,
   NotDraggingStyle,
 } from "@hello-pangea/dnd";
+import FacilityContextMenu, { FacilityMenuTarget } from "./FacilityContextMenu";
+import { facilityGroupMoves } from "./FacilitySelection";
 import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   activeScenario,
@@ -79,9 +83,12 @@ interface FacilityListItemProps {
   spotInList: number;
   game: GameType;
   selected: boolean;
+  bulkSelected: boolean;
+  selectionCount: number;
+  onRowClick: (id: number, event: React.MouseEvent) => void;
+  onContextMenu: (id: number, event: React.MouseEvent) => void;
   storyOutputMultiplier: number;
   hazardStatus?: FacilityHazardStatusType;
-  onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onTogglePause: DispatchProps["onTogglePause"];
   onPause: DispatchProps["onPause"];
   onSell: DispatchProps["onSell"];
@@ -309,7 +316,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     game,
     onTogglePause,
     onPause,
-    onSelect,
     selected,
     storyOutputMultiplier,
     hazardStatus,
@@ -523,7 +529,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`facilityRow${selected ? " selected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
+          className={`facilityRow${selected ? " selected" : ""}${props.bulkSelected ? " bulkSelected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
+          onContextMenu={(event) => props.onContextMenu(facility.id, event)}
           data-fuel={fuel}
           data-facility={facility.name}
           style={getDraggableStyle(provided.draggableProps.style)}
@@ -546,9 +553,20 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 className="facilityDragHandle"
                 aria-label={"Reorder " + facility.name}
                 title="Drag to reorder"
+                onClick={(event) => {
+                  if (event.shiftKey || event.ctrlKey || event.metaKey)
+                    props.onRowClick(facility.id, event);
+                }}
               >
                 <DragIndicatorIcon aria-hidden />
                 {icon}
+                {snapshot.isDragging &&
+                  props.bulkSelected &&
+                  props.selectionCount > 1 && (
+                    <span className="facilityDragCount">
+                      {props.selectionCount} facilities
+                    </span>
+                  )}
               </button>
             )}
             <button
@@ -562,7 +580,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 (storage ? `, ${status}` : "")
               }
               aria-expanded={selected}
-              onClick={() => onSelect(selected ? null : facility.id)}
+              aria-pressed={props.bulkSelected}
+              onClick={(event) => props.onRowClick(facility.id, event)}
             >
               <ListItem className="facility" component="span">
                 {reorderDisabled && icon}
@@ -627,6 +646,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     </span>
                   )}
                 </span>
+                {props.bulkSelected && (
+                  <CheckIcon className="facilitySelectionCheck" aria-hidden />
+                )}
                 <ChevronDownGlyph className="facilityChevron" aria-hidden />
               </ListItem>
             </button>
@@ -769,7 +791,112 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default class Facilities extends React.Component<Props> {
+interface SelectionState {
+  ids: number[];
+  anchor: number | null;
+  menu: FacilityMenuTarget | null;
+  groupDragging: boolean;
+}
+
+export default class Facilities extends React.Component<Props, SelectionState> {
+  public state: SelectionState = {
+    ids: [],
+    anchor: null,
+    menu: null,
+    groupDragging: false,
+  };
+  private draggedIds: number[] = [];
+
+  private mouseEnabled = () =>
+    window.matchMedia("(any-pointer: fine)").matches &&
+    !(
+      this.props.game.inGame &&
+      activeScenario(this.props.game)?.tutorialSteps?.[
+        this.props.game.tutorialStep
+      ]?.hideUi?.includes("facilityActions")
+    );
+
+  private onRowClick = (id: number, event: React.MouseEvent) => {
+    if (!this.mouseEnabled()) {
+      this.props.onSelect(this.props.selectedFacilityId === id ? null : id);
+      return;
+    }
+    const ids = this.props.game.facilities.map((f) => f.id);
+    const current = this.state.ids.filter((selected) => ids.includes(selected));
+    if (event.shiftKey) {
+      const candidate = this.state.anchor ?? this.props.selectedFacilityId;
+      const anchor =
+        candidate !== null && ids.includes(candidate) ? candidate : id;
+      const from = ids.indexOf(anchor);
+      const to = ids.indexOf(id);
+      const range = ids.slice(Math.min(from, to), Math.max(from, to) + 1);
+      this.setState({
+        ids:
+          event.ctrlKey || event.metaKey
+            ? [...new Set([...current, ...range])]
+            : range,
+        anchor,
+      });
+      this.props.onSelect(null);
+    } else if (event.ctrlKey || event.metaKey) {
+      this.setState({
+        ids: current.includes(id)
+          ? current.filter((selected) => selected !== id)
+          : [...current, id],
+        anchor: id,
+      });
+      this.props.onSelect(null);
+    } else {
+      this.setState({ ids: [id], anchor: id });
+      this.props.onSelect(this.props.selectedFacilityId === id ? null : id);
+    }
+  };
+
+  private onContextMenu = (id: number, event: React.MouseEvent) => {
+    if (!this.mouseEnabled()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    // macOS emits contextmenu with button 0 for Ctrl-click, with no click afterward.
+    if (event.ctrlKey && event.button === 0) {
+      this.onRowClick(id, event);
+      return;
+    }
+    const button = event.currentTarget.querySelector<HTMLButtonElement>(
+      ".facilityDisclosure",
+    );
+    button?.focus();
+    const bounds = button?.getBoundingClientRect();
+    const ids = this.state.ids.includes(id) ? this.state.ids : [id];
+    this.setState({
+      ids,
+      anchor: this.state.ids.includes(id) ? this.state.anchor : id,
+      menu: {
+        ids,
+        top: event.clientY || bounds?.top || 0,
+        left: event.clientX || bounds?.left || 0,
+      },
+    });
+  };
+
+  private closeMenu = () => this.setState({ menu: null });
+
+  private onSelectionKeyDown = (event: React.KeyboardEvent) => {
+    if (
+      event.key === "Escape" &&
+      !event.defaultPrevented &&
+      !this.dragging &&
+      this.state.ids.length
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.clearSelection();
+    }
+  };
+
+  private clearSelection = () => {
+    this.setState({ ids: [], anchor: null, menu: null });
+    this.props.onSelect(null);
+  };
   constructor(props: Props) {
     super(props);
     this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
@@ -842,7 +969,11 @@ export default class Facilities extends React.Component<Props> {
 
   // Keep 1x presentation unchanged, but cap FAST's 100 simulation ticks/sec to 25 visual
   // refreshes/sec. Intermediate simulation ticks still run; the pane simply presents the newest.
-  public shouldComponentUpdate(nextProps: Props) {
+  public shouldComponentUpdate(
+    nextProps: Props,
+    nextState: Readonly<SelectionState>,
+  ) {
+    if (nextState !== this.state) return true;
     if (this.dragging) {
       return false;
     }
@@ -890,7 +1021,15 @@ export default class Facilities extends React.Component<Props> {
     this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
   }
 
-  public onBeforeDragStart() {
+  public onBeforeDragStart(start?: DragStart) {
+    const id = start?.draggableId.startsWith("f")
+      ? Number(start.draggableId.slice(1))
+      : undefined;
+    this.draggedIds =
+      id !== undefined && this.mouseEnabled() && this.state.ids.includes(id)
+        ? [...this.state.ids]
+        : [];
+    this.setState({ groupDragging: this.draggedIds.length > 1 });
     this.dragging = true;
     this.speedBeforeDrag = this.props.game.speed;
     this.props.onFacilityDragStart(this.speedBeforeDrag);
@@ -898,6 +1037,7 @@ export default class Facilities extends React.Component<Props> {
 
   public onDragEnd(result: DropResult) {
     this.dragging = false;
+    this.setState({ groupDragging: false });
     if (result.source.droppableId === "interties") {
       this.props.onFacilityDragEnd(
         result.source.index,
@@ -907,9 +1047,21 @@ export default class Facilities extends React.Component<Props> {
       );
       return;
     }
+    const bulk = this.draggedIds.length > 1;
+    if (bulk && result.destination) {
+      for (const move of facilityGroupMoves(
+        this.props.game.facilities.map((f) => f.id),
+        this.draggedIds,
+        result.source.index,
+        result.destination.index,
+      )) {
+        this.props.onReprioritize(move.spotInList, move.delta);
+      }
+    }
+    this.draggedIds = [];
     this.props.onFacilityDragEnd(
       result.source.index,
-      result.destination?.index ?? null,
+      bulk ? null : (result.destination?.index ?? null),
       this.speedBeforeDrag,
     );
   }
@@ -920,12 +1072,14 @@ export default class Facilities extends React.Component<Props> {
       onSell,
       onTogglePause,
       onPause,
-      onSelect,
       onTransmissionBuild,
       onTransmissionUpgrade,
       onTradingPolicy,
       selectedFacilityId,
     } = this.props;
+    const selection = game.facilities.filter((f) =>
+      this.state.ids.includes(f.id),
+    );
     const facilitiesCount = game.facilities.length;
     const intertiesAvailable = !!(
       game.transmission &&
@@ -945,7 +1099,39 @@ export default class Facilities extends React.Component<Props> {
         <>
           <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
             <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
-            <List dense className="scrollable unifiedFacilitiesList">
+            {!(
+              game.inGame &&
+              activeScenario(game)?.tutorialSteps?.[
+                game.tutorialStep
+              ]?.hideUi?.includes("facilityActions")
+            ) && (
+              <div
+                className="facilitySelectionBar"
+                onKeyDown={this.onSelectionKeyDown}
+              >
+                {selection.length > 1 ? (
+                  <>
+                    <span role="status">
+                      {selection.length} facilities selected
+                    </span>
+                    <Button size="small" onClick={this.clearSelection}>
+                      Clear selection
+                    </Button>
+                  </>
+                ) : (
+                  <span>
+                    Shift-click a range · Ctrl/⌘-click to add · Right-click for
+                    actions
+                  </span>
+                )}
+              </div>
+            )}
+            <List
+              dense
+              className="scrollable unifiedFacilitiesList"
+              data-group-dragging={this.state.groupDragging || undefined}
+              onKeyDown={this.onSelectionKeyDown}
+            >
               {intertiesAvailable && !!game.transmission?.lines.length && (
                 <Typography
                   id="dispatch-order"
@@ -978,7 +1164,10 @@ export default class Facilities extends React.Component<Props> {
                             onPause={onPause}
                             onRetrofit={this.props.onRetrofit}
                             onCancelRetrofit={this.props.onCancelRetrofit}
-                            onSelect={onSelect}
+                            onRowClick={this.onRowClick}
+                            onContextMenu={this.onContextMenu}
+                            bulkSelected={selection.some((f) => f.id === g.id)}
+                            selectionCount={selection.length}
                             selected={selectedFacilityId === g.id}
                             storyOutputMultiplier={storyOutputMultiplier(
                               g,
@@ -1017,6 +1206,16 @@ export default class Facilities extends React.Component<Props> {
               )}
             </List>
           </div>
+          <FacilityContextMenu
+            game={game}
+            target={this.state.menu}
+            onClose={this.closeMenu}
+            onSell={onSell}
+            onPause={onPause}
+            onTogglePause={onTogglePause}
+            onRetrofit={this.props.onRetrofit}
+            onCancelRetrofit={this.props.onCancelRetrofit}
+          />
         </>
       </GameCard>
     );
