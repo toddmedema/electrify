@@ -60,8 +60,13 @@ test("Space toggles Sound", async ({ page }) => {
   await expect(sound).not.toBeChecked();
 });
 
-for (const pointerTarget of [null, "Settings", "Manual"] as const) {
-  test(`a background arrow during Settings exit preserves volume and restores focus${pointerTarget ? ` with the pointer over ${pointerTarget}` : ""}`, async ({
+for (const { pointerTarget, deferPlayFocus } of [
+  { pointerTarget: null, deferPlayFocus: false },
+  { pointerTarget: "Settings", deferPlayFocus: false },
+  { pointerTarget: "Manual", deferPlayFocus: false },
+  { pointerTarget: null, deferPlayFocus: true },
+] as const) {
+  test(`a background arrow during Settings exit preserves volume and restores focus${pointerTarget ? ` with the pointer over ${pointerTarget}` : ""}${deferPlayFocus ? " with deferred Play focus" : ""}`, async ({
     page,
   }) => {
     await page.goto("/");
@@ -86,6 +91,27 @@ for (const pointerTarget of [null, "Settings", "Manual"] as const) {
     await effects.focus();
     await effects.press("Home");
     await expect(effects).toHaveAttribute("aria-valuenow", "0");
+    if (deferPlayFocus) {
+      await page.evaluate(() => {
+        // Native startup updates can prevent the entering menu's initial focus from settling.
+        // Keep that state until the real background arrow, then allow normal return focus.
+        const defer = (event: FocusEvent) => {
+          const target = event.target;
+          if (
+            target instanceof HTMLElement &&
+            target.matches("[data-main-action]")
+          )
+            target.blur();
+        };
+        const release = (event: KeyboardEvent) => {
+          if (event.key !== "ArrowUp") return;
+          document.removeEventListener("focusin", defer, true);
+          document.removeEventListener("keydown", release, true);
+        };
+        document.addEventListener("focusin", defer, true);
+        document.addEventListener("keydown", release, true);
+      });
+    }
     // Returning may reveal a menu control beneath a stationary pointer. Hover can
     // select it before the delayed Settings focus restoration.
     if (pointerTarget) {
