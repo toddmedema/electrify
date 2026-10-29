@@ -14,13 +14,18 @@ function renderDetails(game = createGame({ scenarioId: 103 })) {
   );
 }
 
-it("waits for a completed month before scoring", () => {
+it("shows the score forecast immediately and waits for a completed month for the breakdown", () => {
   renderDetails();
   expect(screen.getByText("The Shale Boom")).toBeInTheDocument();
   expect(
-    screen.getByText("Score appears after your first month."),
+    screen.getByText("Breakdown appears after your first month."),
   ).toBeInTheDocument();
-  expect(screen.queryByRole("region", { name: "Score outlook" })).toBeNull();
+  expect(
+    screen.getByRole("region", { name: "Score outlook" }),
+  ).toHaveTextContent("Score now0");
+  expect(
+    screen.getByRole("img", { name: /Chart of score over time/ }),
+  ).toBeInTheDocument();
   // The tool's top bar already counts down the term
   expect(screen.queryByText(/months remaining/)).toBeNull();
 });
@@ -46,7 +51,7 @@ it("shows the score so far beside where the current pace ends it", () => {
   ).toHaveTextContent(/electricity supplied/i);
 });
 
-it("puts the projected loss and its causes ahead of score and shows every condition's forecast", () => {
+it("keeps one concise loss line under the score chart and removes redundant goal forecasts", () => {
   const game = createGame({ scenarioId: 111 });
   jest.spyOn(MissionProjection, "projectMission").mockReturnValue({
     status: "loss",
@@ -78,20 +83,25 @@ it("puts the projected loss and its causes ahead of score and shows every condit
     ],
   });
   renderDetails(game);
-  const outlook = screen.getByRole("region", { name: "Projected loss" });
-  expect(outlook).toHaveTextContent("92%");
-  expect(outlook).toHaveTextContent("Jun 2024 month-end");
-  expect(within(outlook).getAllByRole("listitem")[0]).toHaveTextContent(
-    "Keep the utility solvent",
+  const outlook = screen.getByRole("region", { name: "Score outlook" });
+  const status = within(outlook).getByRole("status", {
+    name: "Scenario forecast",
+  });
+  expect(status).toHaveTextContent(
+    "! Projected loss: Cash below $0 at Jan 2022. Demand served <99.5% at Jan 2025.",
   );
+  expect(
+    screen.getByRole("img", { name: /Projected loss periods shaded/ }),
+  ).toBeInTheDocument();
+  expect(screen.getAllByText(/! Projected loss:/)).toHaveLength(1);
   const conditions = screen.getByRole("region", { name: "Victory conditions" });
-  expect(conditions).toHaveTextContent("Projected miss");
-  expect(conditions).toHaveTextContent("Projected to meet");
+  expect(conditions).not.toHaveTextContent(
+    /Projected miss|Projected to meet|Projected loss/,
+  );
   expect(conditions).toHaveTextContent("Recorded:");
   expect(
-    outlook.compareDocumentPosition(
-      screen.getByRole("region", { name: "Score breakdown" }),
-    ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    outlook.compareDocumentPosition(conditions) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
 });
 
@@ -108,8 +118,8 @@ it("clears a stale win while an edited plan is being forecast", () => {
     .mockImplementation(() => undefined);
   const view = renderDetails(game);
   expect(
-    screen.getByRole("region", { name: "Projected win" }),
-  ).toBeInTheDocument();
+    screen.getByRole("status", { name: "Scenario forecast" }),
+  ).toHaveTextContent("Projected win.");
   const originalWorker = global.Worker;
   Object.defineProperty(global, "Worker", {
     configurable: true,
@@ -123,10 +133,10 @@ it("clears a stale win while an edited plan is being forecast", () => {
         scenario={activeScenario(game)!}
       />,
     );
-    expect(screen.queryByRole("region", { name: "Projected win" })).toBeNull();
     expect(
-      screen.getByRole("region", { name: "Updating forecast…" }),
-    ).toBeInTheDocument();
+      screen.getByRole("status", { name: "Scenario forecast" }),
+    ).toHaveTextContent("Updating forecast…");
+    expect(screen.queryByText("Projected win.")).toBeNull();
   } finally {
     Object.defineProperty(global, "Worker", {
       configurable: true,

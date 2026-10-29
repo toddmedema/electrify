@@ -7,6 +7,7 @@ import { getScenarioLocation } from "../../helpers/Locations";
 import {
   deriveExpandedSummary,
   summarizeHistory,
+  MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import {
   computeScoreBreakdown,
@@ -20,13 +21,15 @@ import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
 import { formatScore } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
 import type { MissionRequirement } from "../../helpers/MissionStatus";
-import {
-  projectScore,
-  ScoreProjectionType,
-} from "../../helpers/ScoreProjection";
+import { ScoreProjectionType } from "../../helpers/ScoreProjection";
 import { useAppSelector } from "../../Store";
 import { GameCard } from "./GameCard";
 import ChartFinances from "./ChartFinances";
+import type { ProjectionView } from "../../helpers/Projection";
+import {
+  scenarioLossSummary,
+  scenarioScoreProjection,
+} from "./ScenarioOutlook";
 import {
   projectMission,
   MissionProjection,
@@ -38,7 +41,7 @@ import {
   subscribeProjection,
 } from "./DeferredProjection";
 
-function useMissionProjection(game: GameType): MissionProjection | undefined {
+function useScenarioForecast(game: GameType): ProjectionView | undefined {
   const [, refresh] = React.useReducer((count: number) => count + 1, 0);
   React.useEffect(() => subscribeProjection(refresh), []);
   const now = currentTick(game);
@@ -50,81 +53,7 @@ function useMissionProjection(game: GameType): MissionProjection | undefined {
   }, [game, now, ended, ready]);
   if (!now || ended || (!ready && typeof Worker !== "undefined"))
     return undefined;
-  return projectMission(game, readProjection(game, now));
-}
-
-const FORECAST_LABELS = {
-  "on-track": "Projected to meet",
-  "at-risk": "Projected miss",
-  unavailable: "Forecast unavailable",
-  completed: "Met",
-  failed: "Failed",
-};
-
-function MissionOutlook({
-  outlook,
-}: {
-  outlook: MissionProjection | undefined;
-}): React.JSX.Element {
-  const risks = outlook?.requirements
-    .filter(
-      (row) =>
-        row.required && (row.status === "at-risk" || row.status === "failed"),
-    )
-    .sort(
-      (a, b) =>
-        Number(b.status === "failed") - Number(a.status === "failed") ||
-        (a.failureMonth ?? Infinity) - (b.failureMonth ?? Infinity),
-    );
-  return (
-    <Box
-      component="section"
-      aria-labelledby="scenario-result-title"
-      className="scenarioMissionOutlook"
-      data-status={outlook?.status ?? "loading"}
-    >
-      <Typography
-        id="scenario-result-title"
-        variant="h6"
-        component="h3"
-        sx={{ fontWeight: 600 }}
-      >
-        {!outlook
-          ? "Updating forecast…"
-          : outlook.status === "loss"
-            ? "Projected loss"
-            : outlook.status === "win"
-              ? "Projected win"
-              : "Forecast incomplete"}
-      </Typography>
-      {risks && risks.length > 0 ? (
-        <Box
-          component="ul"
-          sx={{ m: 0, pl: 2, typography: "body2", "& li + li": { mt: 1 } }}
-        >
-          {risks.map((risk) => (
-            <li key={risk.id}>
-              <strong>{risk.label}:</strong> {risk.detail}
-            </li>
-          ))}
-        </Box>
-      ) : (
-        <Typography variant="body2">
-          {!outlook
-            ? "Checking every goal and survival condition."
-            : outlook.status === "win"
-              ? "All required goals and survival conditions are projected to be met."
-              : "Some goals cannot be forecast through their full required window."}
-        </Typography>
-      )}
-      {outlook && (
-        <Typography variant="body2" color="text.secondary">
-          With current plans, through {outlook.through}. Hourly estimates update
-          when you make changes.
-        </Typography>
-      )}
-    </Box>
-  );
+  return readProjection(game, now);
 }
 
 const STATUS_LABELS: Record<MissionRequirement["status"], string> = {
@@ -152,13 +81,28 @@ function statusLabel(requirement: MissionRequirement): string {
 function ScoreOutlook({
   projection,
   history,
+  game,
+  outlook,
 }: {
-  projection: ScoreProjectionType;
+  projection: ScoreProjectionType | null;
   history: GameType["monthlyHistory"];
+  game: GameType;
+  outlook: MissionProjection | undefined;
 }): React.JSX.Element {
   const timeline = React.useMemo(() => {
+    if (!projection)
+      return [
+        {
+          month: game.startingYear * 12,
+          year: game.startingYear - 1,
+          value: 0,
+          projected: false,
+        },
+      ];
     const last = history[0];
-    const first = last.year * 12 + last.month - projection.actual.length + 1;
+    const first = last
+      ? last.year * 12 + last.month - projection.actual.length + 1
+      : game.startingYear * 12;
     const point = (index: number, value: number, projected: boolean) => {
       const month = first + index;
       return { month, year: Math.floor((month - 1) / 12), value, projected };
@@ -169,10 +113,23 @@ function ScoreOutlook({
         point(projection.actual.length + i, value, true),
       ),
     ];
-  }, [projection, history]);
-  const current = projection.actual[projection.actual.length - 1];
-  const change = projection.final - current;
-  const ended = projection.projected.length === 0;
+  }, [projection, history, game.startingYear]);
+  const current = projection?.actual.at(-1) ?? 0;
+  const change = projection ? projection.final - current : 0;
+  const duration = activeScenario(game)!.durationMonths;
+  const ended = game.date.monthsElapsed >= duration;
+  const loss = scenarioLossSummary(game, outlook);
+  const warningSpans = React.useMemo<Array<[number, number]>>(
+    () =>
+      loss.firstMonth === undefined
+        ? []
+        : [[loss.firstMonth * MINUTES_PER_MONTH, duration * MINUTES_PER_MONTH]],
+    [loss.firstMonth, duration],
+  );
+  const domain = React.useMemo<[number, number]>(
+    () => [0, (duration - 1) * MINUTES_PER_MONTH],
+    [duration],
+  );
   // The chart's height scales with its width, so a phone needs more to keep its axis readable
   const phone = useMediaQuery("(max-width: 599px)");
   return (
@@ -198,7 +155,7 @@ function ScoreOutlook({
           <div>
             <dt>Projected final</dt>
             <dd>
-              {formatScore(projection.final)}
+              {projection ? formatScore(projection.final) : "—"}
               {change !== 0 && (
                 <span
                   className="scenarioOutlookChange"
@@ -221,13 +178,29 @@ function ScoreOutlook({
         title="score"
         format={formatScore}
         projectedNote="Projected"
+        startingYear={game.startingYear}
+        domain={domain}
+        warningSpans={warningSpans}
+        warningNote="Projected loss"
       />
+      {!ended && (
+        <Typography
+          component="p"
+          variant="body2"
+          role="status"
+          aria-label="Scenario forecast"
+          className="scenarioOutcome"
+          data-status={outlook?.status ?? "loading"}
+        >
+          {loss.text}
+        </Typography>
+      )}
     </Box>
   );
 }
 
 /**
- * The scenario's outcome and goals lead; score remains separate from winning the term.
+ * The score chart leads, with loss periods and their causes directly beneath it.
  */
 export default function ScenarioDetails(): React.JSX.Element | null {
   const game = useAppSelector((state) => state.game);
@@ -259,7 +232,10 @@ export function ScenarioDetailsContent({
   const units = useUnits();
   const location = getScenarioLocation(scenario);
   const mission = getMissionStatus(game);
-  const missionProjection = useMissionProjection(game);
+  const forecast = useScenarioForecast(game);
+  const missionProjection = forecast
+    ? projectMission(game, forecast)
+    : undefined;
   const history = game.monthlyHistory;
   // Both read only the completed months, which change once a month rather than every tick
   const breakdown = React.useMemo(
@@ -274,8 +250,17 @@ export function ScenarioDetailsContent({
     [scenario, history, game.startingYear, game.seed],
   );
   const projection = React.useMemo(
-    () => projectScore(scenario, history, game.startingYear, game.seed),
-    [scenario, history, game.startingYear, game.seed],
+    () =>
+      scenarioScoreProjection(
+        {
+          monthlyHistory: history,
+          startingYear: game.startingYear,
+          seed: game.seed,
+        },
+        scenario,
+        forecast,
+      ),
+    [history, game.startingYear, game.seed, scenario, forecast],
   );
   const rules = scoreRuleText(
     scenario.ownership,
@@ -302,6 +287,12 @@ export function ScenarioDetailsContent({
       >
         {scenario.name}
       </Typography>
+      <ScoreOutlook
+        projection={projection}
+        history={history}
+        game={game}
+        outlook={missionProjection}
+      />
       <Box component="dl" className="scenarioFacts">
         {facts.map(({ label, value }) => (
           <div key={label}>
@@ -310,116 +301,6 @@ export function ScenarioDetailsContent({
           </div>
         ))}
       </Box>
-      {!mission.finalNote && <MissionOutlook outlook={missionProjection} />}
-      <Box component="section" aria-labelledby="scenario-rules-title">
-        <Typography
-          id="scenario-rules-title"
-          variant="h6"
-          component="h3"
-          sx={{ fontWeight: 600 }}
-        >
-          Victory conditions
-        </Typography>
-        {scenario.id === 3 && <CustomerGrowthChallenge />}
-        {mission.finalNote && (
-          <Typography variant="body2">{mission.finalNote}</Typography>
-        )}
-        <Box component="dl" className="missionRequirements">
-          {[...mission.requirements]
-            .sort(
-              (a, b) =>
-                Number(a.required === false) - Number(b.required === false),
-            )
-            .map((requirement) => {
-              const forecast = missionProjection?.requirements.find(
-                (row) => row.id === requirement.id,
-              );
-              const showForecast =
-                requirement.status !== "completed" &&
-                requirement.status !== "failed" &&
-                !mission.finalNote;
-              return (
-                <React.Fragment key={requirement.id}>
-                  <Typography
-                    component="dt"
-                    variant="body2"
-                    sx={{ mt: 2, fontWeight: 600, overflowWrap: "anywhere" }}
-                  >
-                    <span>
-                      {requirement.definition
-                        ? requirement.label
-                        : requirement.target}
-                    </span>
-                    {requirement.required === false && (
-                      <Typography
-                        component="span"
-                        variant="body2"
-                        sx={{ ml: 1, color: "text.secondary" }}
-                      >
-                        Optional
-                      </Typography>
-                    )}
-                  </Typography>
-                  {requirement.definition && (
-                    <Typography
-                      component="dd"
-                      variant="body2"
-                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
-                    >
-                      {requirement.definition}
-                    </Typography>
-                  )}
-                  {requirement.definition && (
-                    <Typography component="dd" variant="body2">
-                      {requirement.target}
-                    </Typography>
-                  )}
-                  <Typography component="dd" variant="body2">
-                    {(requirement.status !== "unknown" ||
-                      requirement.definition) &&
-                      requirement.status !== "in-progress" && (
-                        <span
-                          className="missionRequirementStatus"
-                          data-status={requirement.status}
-                        >
-                          {statusLabel(requirement)}
-                        </span>
-                      )}{" "}
-                    <span>
-                      {requirement.definition || requirement.id === "survival"
-                        ? "Recorded: "
-                        : ""}
-                      {requirement.current}
-                    </span>
-                  </Typography>
-                  {showForecast && (
-                    <Typography component="dd" variant="body2">
-                      <span
-                        className="missionRequirementStatus"
-                        data-status={forecast?.status ?? "loading"}
-                      >
-                        {forecast
-                          ? FORECAST_LABELS[forecast.status]
-                          : "Updating forecast…"}
-                      </span>
-                      {forecast && <span>{forecast.detail}</span>}
-                    </Typography>
-                  )}
-                  {requirement.reason && (
-                    <Typography
-                      component="dd"
-                      variant="body2"
-                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
-                    >
-                      {requirement.reason}
-                    </Typography>
-                  )}
-                </React.Fragment>
-              );
-            })}
-        </Box>
-      </Box>
-      {projection && <ScoreOutlook projection={projection} history={history} />}
       <Box
         component="section"
         aria-labelledby="scenario-score-title"
@@ -494,9 +375,97 @@ export function ScenarioDetailsContent({
           </Box>
         ) : (
           <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
-            Score appears after your first month.
+            Breakdown appears after your first month.
           </Typography>
         )}
+      </Box>
+      <Box component="section" aria-labelledby="scenario-rules-title">
+        <Typography
+          id="scenario-rules-title"
+          variant="h6"
+          component="h3"
+          sx={{ fontWeight: 600 }}
+        >
+          Victory conditions
+        </Typography>
+        {scenario.id === 3 && <CustomerGrowthChallenge />}
+        {mission.finalNote && (
+          <Typography variant="body2">{mission.finalNote}</Typography>
+        )}
+        <Box component="dl" className="missionRequirements">
+          {[...mission.requirements]
+            .sort(
+              (a, b) =>
+                Number(a.required === false) - Number(b.required === false),
+            )
+            .map((requirement) => {
+              return (
+                <React.Fragment key={requirement.id}>
+                  <Typography
+                    component="dt"
+                    variant="body2"
+                    sx={{ mt: 2, fontWeight: 600, overflowWrap: "anywhere" }}
+                  >
+                    <span>
+                      {requirement.definition
+                        ? requirement.label
+                        : requirement.target}
+                    </span>
+                    {requirement.required === false && (
+                      <Typography
+                        component="span"
+                        variant="body2"
+                        sx={{ ml: 1, color: "text.secondary" }}
+                      >
+                        Optional
+                      </Typography>
+                    )}
+                  </Typography>
+                  {requirement.definition && (
+                    <Typography
+                      component="dd"
+                      variant="body2"
+                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                    >
+                      {requirement.definition}
+                    </Typography>
+                  )}
+                  {requirement.definition && (
+                    <Typography component="dd" variant="body2">
+                      {requirement.target}
+                    </Typography>
+                  )}
+                  <Typography component="dd" variant="body2">
+                    {(requirement.status !== "unknown" ||
+                      requirement.definition) &&
+                      requirement.status !== "in-progress" && (
+                        <span
+                          className="missionRequirementStatus"
+                          data-status={requirement.status}
+                        >
+                          {statusLabel(requirement)}
+                        </span>
+                      )}{" "}
+                    <span>
+                      {requirement.definition || requirement.id === "survival"
+                        ? "Recorded: "
+                        : ""}
+                      {requirement.current}
+                    </span>
+                  </Typography>
+                  {requirement.reason && (
+                    <Typography
+                      component="dd"
+                      variant="body2"
+                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                    >
+                      {requirement.reason}
+                    </Typography>
+                  )}
+                </React.Fragment>
+              );
+            })}
+        </Box>
       </Box>
     </div>
   );

@@ -6451,32 +6451,20 @@ $programs_column: 800px;
   }
 }
 
-// Put the decision-driving outcome ahead of score; text carries every state as well as colour.
-.scenarioMissionOutlook {
-  display: grid;
-  min-width: 0;
+.scenarioOutcome {
+  margin: $space-2 0 0;
   overflow-wrap: anywhere;
-  gap: $space-2;
-  padding: $space-3 $space-4;
-  border-left: 4px solid var(--border-subtle);
-  background: var(--bg-raised);
+  color: $font_color_faded;
 
   &[data-status="loss"] {
-    border-color: var(--delta-bad);
-    h3 {
-      color: var(--delta-bad);
-    }
+    color: var(--delta-bad);
   }
-
   &[data-status="win"] {
-    border-color: var(--delta-good);
-    h3 {
-      color: var(--delta-good);
-    }
+    color: var(--delta-good);
   }
 }
 
-// The Scenario tool: the scenario at a glance, its victory outlook, then score
+// The Scenario tool: the scenario at a glance, its score and loss outlook, then conditions
 .scenarioDetailsBody {
   display: flex;
   flex-direction: column;
