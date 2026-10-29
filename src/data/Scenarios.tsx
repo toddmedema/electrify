@@ -1322,10 +1322,9 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "boom",
       fantasy: "Prepare a small city's grid for a surge in demand.",
-      objective:
-        "Build dependable generation and storage before the data centers connect in 2026.",
+      objective: "Keep customers supplied as data centers connect in 2026.",
       threat:
-        "Data centers need power around the clock. If you wait until they arrive to build, you'll be too late.",
+        "Data centers need power around the clock. New plants take years to build.",
     },
     ownership: "Public",
     startingYear: 2020,
@@ -1395,8 +1394,7 @@ export const SCENARIOS: ScenarioType[] = [
       fantasy: "Keep Austin powered through a brutal winter storm.",
       objective:
         "Strengthen the grid and keep every customer supplied during the February 2021 freeze.",
-      threat:
-        "Heating demand surges as equipment freezes. Winterize plants when building or upgrading; a January 2020 bulk offer covers remaining plants.",
+      threat: "Heating demand surges as equipment freezes.",
     },
     ownership: "Public",
     seed: 268107,
@@ -1557,8 +1555,7 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "legacy",
       fantasy: "Keep the lights on when your largest generator shuts down.",
-      objective:
-        "Have enough generation and storage ready to cover the main reactor's shutdown.",
+      objective: "Keep customers supplied after your main reactor shuts down.",
       threat:
         "The shutdown date is hidden. The reactor stays offline for the rest of the mission.",
     },
@@ -1625,8 +1622,7 @@ export const SCENARIOS: ScenarioType[] = [
         "Keep Los Angeles supplied when wildfire cuts your northern intertie.",
       objective:
         "Supply at least 99.5% of demand during the January and February 2025 intertie outage.",
-      threat:
-        "Your existing northern intertie will lose 90% of its capacity. Prepare local generation, storage, or an independent connection.",
+      threat: "Your existing northern intertie will lose 90% of its capacity.",
     },
     ownership: "Public",
     startingYear: 2022,
