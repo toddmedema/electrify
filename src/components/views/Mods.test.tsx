@@ -22,6 +22,7 @@ import type { InstalledMod, ModLibrary, ModRequest } from "../../mods/Types";
 import type { DesktopBridge } from "../../Desktop";
 import { launchCustomScenario } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
+import { prepareModStartingPeak } from "../../mods/ModScenario";
 import { loadSimData } from "../../testing/SimData";
 
 Object.assign(global, { TextEncoder });
@@ -114,6 +115,14 @@ afterEach(() => {
   delete window.electrifyDesktop;
   jest.clearAllMocks();
 });
+
+async function openAuthorReport() {
+  const trigger = await screen.findByRole("button", {
+    name: "Author validation report for Community Grid",
+  });
+  await waitFor(() => expect(trigger).toBeEnabled());
+  await userEvent.click(trigger);
+}
 
 describe("returning from Mods", () => {
   afterEach(() => {
@@ -410,11 +419,7 @@ test("the launch details separate author claims from computed rules before start
 
 test("an author explicitly opens the complete validation report without launching", async () => {
   setup([local()]);
-  await userEvent.click(
-    await screen.findByRole("button", {
-      name: "Author validation report for Community Grid",
-    }),
-  );
+  await openAuthorReport();
   const dialog = screen.getByRole("dialog", {
     name: "Author validation report: Community Grid",
   });
@@ -429,6 +434,28 @@ test("an author explicitly opens the complete validation report without launchin
     within(dialog).getByRole("button", { name: "Close report" }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+test("the author report stays unavailable until scenario preparation completes", async () => {
+  let finishPreparation!: () => void;
+  const preparation = new Promise<void>((resolve) => {
+    finishPreparation = resolve;
+  });
+  jest.mocked(prepareModStartingPeak).mockReturnValueOnce(preparation);
+  setup([local()]);
+  const trigger = await screen.findByRole("button", {
+    name: "Author validation report for Community Grid",
+  });
+  expect(trigger).toBeDisabled();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  await act(async () => finishPreparation());
+  await openAuthorReport();
+  expect(
+    screen.getByRole("dialog", {
+      name: "Author validation report: Community Grid",
+    }),
+  ).toBeVisible();
+  expect(launchCustomScenario).not.toHaveBeenCalled();
 });
 
 const difficultyEventMod = () =>
@@ -471,9 +498,7 @@ const difficultyEventMod = () =>
 async function openDifficultyReport() {
   await loadSimData("SF");
   setup([difficultyEventMod()]);
-  await userEvent.click(
-    await screen.findByLabelText("Author validation report for Community Grid"),
-  );
+  await openAuthorReport();
   const dialog = screen.getByRole("dialog", {
     name: "Author validation report: Community Grid",
   });
@@ -573,9 +598,7 @@ test("private event warnings remain available only in the explicit author report
     within(dialog).getByText("Cancel", { selector: "button" }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  await userEvent.click(
-    screen.getByLabelText("Author validation report for Community Grid"),
-  );
+  await openAuthorReport();
   expect(screen.getByLabelText("Scenario diagnostics")).toHaveTextContent(
     "Surprise transformer failure may continue beyond the term",
   );
