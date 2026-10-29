@@ -26,6 +26,8 @@ test("generator capstone completes immediately after a different second purchase
   await page.locator(".button-buildFacility").click();
   await expect(hud).toContainText("Sort generators");
   await sortBuildCatalog(page);
+  await expect(hud).toContainText("Choose a plant size");
+  await hud.getByRole("button", { name: "Next", exact: true }).click();
   await expect(hud).toContainText("Review a generator purchase");
   await page
     .getByRole("button", {
