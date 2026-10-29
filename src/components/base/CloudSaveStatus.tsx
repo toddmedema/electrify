@@ -1,7 +1,7 @@
 import { Alert, AlertTitle, Button, Stack, Typography } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { sessionChanged } from "../../SaveLibrary";
-import { login } from "../../Globals";
+import SignInButtons from "./SignInButtons";
 import { refreshToUpdate } from "../../helpers/Cache";
 import { isDesktopApp } from "../../Desktop";
 
@@ -41,13 +41,7 @@ export default function CloudSaveStatus(): React.JSX.Element | null {
           Saves stay on this device. Sign in for cloud backup and access on
           other devices.
         </Typography>
-        <Button
-          variant="outlined"
-          onClick={() => void login()}
-          sx={{ flexShrink: 0 }}
-        >
-          Sign in with Google
-        </Button>
+        <SignInButtons />
       </Stack>
     );
   if (!incompatibleCloudSaves.length && !cloudConflicts) return null;

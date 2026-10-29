@@ -22,6 +22,7 @@ import { canShare, shareText } from "../../helpers/Share";
 import { formatScore } from "../../helpers/Format";
 import { ResultScore, resultTitle, RunDebrief } from "./RunResult";
 import { isDesktopApp } from "../../Desktop";
+import SignInButtons from "./SignInButtons";
 import { SCENARIOS } from "../../data/Scenarios";
 import ResultLeaderboard from "./ResultLeaderboard";
 import { SCORE_VERSION } from "../../helpers/Scoring";
@@ -37,7 +38,6 @@ export interface DispatchProps {
   onClose: () => void;
   onQuit: () => void;
   onRetry: (victory: VictoryType) => void;
-  onLogin: () => void;
   // Reported once the player has actually shared, with how it went out
   onShared: (victory: VictoryType, method: string) => void;
   onShareFailed: () => void;
@@ -54,7 +54,7 @@ export interface Props extends StateProps, DispatchProps {}
  * appears when (and if) it can -- a Firestore hiccup must not cost the player their score screen.
  */
 export default function VictoryDialog(props: Props): React.JSX.Element {
-  const { victory, loggedIn, onClose, onQuit, onLogin } = props;
+  const { victory, loggedIn, onClose, onQuit } = props;
   const [preview, setPreview] = React.useState(false);
   const [sharing, setSharing] = React.useState(false);
   const [rank, setRank] = React.useState<number | undefined>(undefined);
@@ -231,10 +231,10 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               color="textSecondary"
               component="div"
             >
-              <Button color="primary" onClick={onLogin} size="small">
-                Log in
-              </Button>
-              to join the leaderboard
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                Sign in to join the leaderboard
+              </Typography>
+              <SignInButtons />
             </Typography>
           )}
         {victory.outcome === "completed" &&

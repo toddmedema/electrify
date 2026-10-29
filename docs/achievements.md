@@ -63,7 +63,7 @@ CSV and the marked Firestore rules from the shared catalog. Keep generated rules
 
 The main menu and game overflow menu expose Achievements when Steam is unavailable. The gallery
 shows all requirements, earned/locked text and count filters, plus accurate device/account sync
-status and the existing Google sign-in flow. Opening the gallery pauses gameplay like other
+status and the shared Google and Apple sign-in flow. Opening the gallery pauses gameplay like other
 standalone screens. Keyboard entry focuses Back; Escape returns to the opener.
 
 Live local unlocks queue one popup 16 px from the bottom right. It rises above the phone tab bar

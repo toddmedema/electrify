@@ -1,5 +1,5 @@
 import path from "path";
-import { openSavedGames } from "./layout";
+import { expectSignInButtonsToFit, openSavedGames } from "./layout";
 import { expect, Page, test, TestInfo } from "./fixtures";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
@@ -261,6 +261,7 @@ for (const theme of ["light", "dark"]) {
       .getByRole("menuitem", { name: "Save & Quit", exact: true })
       .click();
     await expect(invitation).toBeVisible();
+    await expectSignInButtonsToFit(invitation);
     await expect(invitation).toContainText("even offline");
     await expect(invitation).toContainText("sign in later from Saved games");
     await checkDialogLayout(page, "Back up your saves to the cloud", info);
@@ -297,6 +298,7 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.getByRole("button", { name: "Sign in with Google", exact: true }),
     ).toBeVisible();
+    await expectSignInButtonsToFit(page);
     await expect(page.getByLabel("Save game file")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Import", exact: true }),
@@ -340,8 +342,9 @@ for (const theme of ["light", "dark"]) {
       "expires after a year without being opened",
     );
     await expect(sharing).toContainText("No account is needed to open it");
+    await expectSignInButtonsToFit(sharing);
     await expect(
-      sharing.getByRole("button", { name: "Sign in and share", exact: true }),
+      sharing.getByRole("button", { name: "Sign in with Google", exact: true }),
     ).toBeEnabled();
     await checkDialogLayout(page, "Share a frozen copy", info);
     if (theme === "dark" && info.project.name === "mobile-390px") {

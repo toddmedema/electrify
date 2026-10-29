@@ -57,7 +57,6 @@ function renderDialog(overrides: Partial<Props> = {}) {
     onClose: () => undefined,
     onQuit: () => undefined,
     onRetry: () => undefined,
-    onLogin: () => undefined,
     onShared: () => undefined,
     onShareFailed: () => undefined,
     ...overrides,
@@ -221,6 +220,12 @@ describe("VictoryDialog", () => {
     renderDialog({ loggedIn: false });
     expect(screen.queryByText(/personal best/)).not.toBeInTheDocument();
     expect(screen.getByText(/join the leaderboard/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sign in with Google" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Sign in with Apple" }),
+    ).toBeVisible();
   });
 
   // Custom games share a scenario id, so their scores are not comparable on the board.

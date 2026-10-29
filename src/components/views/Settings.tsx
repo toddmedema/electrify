@@ -27,6 +27,7 @@ import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts, { SHORTCUTS } from "../base/KeyboardShortcuts";
 import ScreenPage from "../base/ScreenPage";
+import SignInButtons from "../base/SignInButtons";
 import InstallAppButton, { useCanInstallApp } from "../base/InstallAppButton";
 import { APP_VERSION } from "../../AppVersion";
 import { clearAppCache } from "../../helpers/Cache";
@@ -51,7 +52,6 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onLogin: () => void;
   onLogout: () => void;
   onChangeName: () => void;
   onAudioChange: (change: boolean) => void;
@@ -456,9 +456,7 @@ export default function Settings(props: Props): React.JSX.Element {
                         </Button>
                       </>
                     ) : (
-                      <Button variant="outlined" onClick={props.onLogin}>
-                        Sign in with Google
-                      </Button>
+                      <SignInButtons />
                     )}
                   </Stack>
                 </SettingRow>

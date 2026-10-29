@@ -16,7 +16,8 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ScreenPage from "../components/base/ScreenPage";
 import { useAppDispatch, useAppSelector } from "../Store";
 import { navigate, navigateBack } from "../reducers/Card";
-import { firebaseAppAuth, login } from "../Globals";
+import { firebaseAppAuth } from "../Globals";
+import SignInButtons from "../components/base/SignInButtons";
 import { catalog } from "./Progress";
 import { achievementJournal } from "./Journal";
 import { useAchievements } from "./useAchievements";
@@ -34,8 +35,6 @@ export function AchievementGallery(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const online = useOnline();
   const [filter, setFilter] = React.useState<Filter>("all");
-  const [signingIn, setSigningIn] = React.useState(false);
-  const [signInError, setSignInError] = React.useState(false);
   const onBack = () => {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
@@ -92,17 +91,6 @@ export function AchievementGallery(): React.JSX.Element {
                 : state.sync === "failed"
                   ? "Saved on this device. Account sync couldn't finish."
                   : "Saved on this device. Syncing to your account…";
-  const signIn = async () => {
-    setSigningIn(true);
-    setSignInError(false);
-    try {
-      if (!(await login())) setSignInError(true);
-    } catch {
-      setSignInError(true);
-    } finally {
-      setSigningIn(false);
-    }
-  };
   return (
     <ScreenPage
       title="Achievements"
@@ -133,20 +121,9 @@ export function AchievementGallery(): React.JSX.Element {
                     : "Sign in when you're online to keep achievements across devices."}
                 </Typography>
               )}
-              {signInError && (
-                <Typography color="error" role="alert">
-                  Sign-in couldn't finish. Please try again.
-                </Typography>
-              )}
             </div>
             {!state.uid && firebaseAppAuth && (
-              <Button
-                variant="outlined"
-                disabled={signingIn || !online}
-                onClick={() => void signIn()}
-              >
-                {signingIn ? "Signing in…" : "Sign in with Google"}
-              </Button>
+              <SignInButtons disabled={!online} />
             )}
             {account && state.sync === "failed" && online && (
               <Button variant="outlined" onClick={retryAchievementSync}>

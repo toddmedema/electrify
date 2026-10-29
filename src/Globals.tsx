@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithPopup,
   signOut,
 } from "firebase/auth";
@@ -30,12 +31,16 @@ const firebaseApp =
       });
 // Desktop accounts come from Steam; even constructing Firebase Auth starts web transport.
 export const firebaseAppAuth = firebaseApp ? getAuth(firebaseApp) : undefined;
-const provider = new GoogleAuthProvider();
+export type SignInProvider = "google" | "apple";
 
-export function login(): Promise<boolean> {
+export function login(provider: SignInProvider = "google"): Promise<boolean> {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp())
     return Promise.resolve(false);
-  return signInWithPopup(firebaseAppAuth!, provider)
+  const authProvider =
+    provider === "apple"
+      ? new OAuthProvider("apple.com")
+      : new GoogleAuthProvider();
+  return signInWithPopup(firebaseAppAuth!, authProvider)
     .then(() => {
       // The signed in user reaches the app through firebaseAppAuth.onAuthStateChanged
       // (see App.tsx); nothing is needed here. Do not log the credential -- it carries an
