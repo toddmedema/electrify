@@ -47,6 +47,7 @@ const operationalEnv = new Set([
   "ELECTRIFY_E2E_OUTPUT_DIR",
   "ELECTRIFY_TASK_ID",
   "CODEX_THREAD_ID",
+  "CODEX_TOOL_CALL_ID",
 ]);
 // These reviewed loaders target installed packages or a test VM dependency map,
 // never excluded src/e2e tests. Pin the complete file, not only the require call:

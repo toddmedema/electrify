@@ -7,10 +7,27 @@ import {
   initialIntertieBuildTier,
   sliderTickToW,
   wToSliderTick,
+  buildSizeOptions,
+  largestAffordableBuildSize,
 } from "./BuildSizing";
 import { FacilityOperatingType } from "../Types";
+import { purchaseTerms } from "./Financials";
 
 describe("size slider", () => {
+  it("includes exact caps and respects the minimum size", () => {
+    expect(buildSizeOptions(0, 34, 4.5e6)).toEqual([1e6, 2e6, 3e6, 4e6, 4.5e6]);
+    expect(buildSizeOptions(4, 37, 4e6)).toEqual([]);
+  });
+
+  it("handles downpayment boundaries, fixed costs and unaffordable minimums", () => {
+    const sizes = buildSizeOptions(0, 4, 5e6);
+    const quote = (size: number) => 2e6 + size;
+    const cash = purchaseTerms(quote(3e6), true, 0).downpayment;
+    expect(largestAffordableBuildSize(sizes, cash, quote)).toBe(3e6);
+    expect(largestAffordableBuildSize(sizes, cash - 1, quote)).toBe(2e6);
+    expect(largestAffordableBuildSize(sizes, 0, quote)).toBeUndefined();
+    expect(largestAffordableBuildSize([], cash, quote)).toBeUndefined();
+  });
   it("steps the leading digit and then the magnitude", () => {
     expect(sliderTickToW(0)).toBe(1e6);
     expect(sliderTickToW(8)).toBe(9e6);

@@ -42,7 +42,11 @@ import {
 } from "../../Types";
 import { useOutlookWorker } from "../base/useOutlookWorker";
 import { signature } from "../base/DeferredProjection";
-import { sameBuildQuote, useBuildAffordability } from "../base/useBuildCash";
+import {
+  sameBuildQuote,
+  useBuildAffordability,
+  useBuildCashReader,
+} from "../base/useBuildCash";
 import {
   resilienceBuildOptions,
   ResilienceBuildOptionType,
@@ -72,6 +76,8 @@ import { useUnits } from "../base/UnitsContext";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
   averageBuildSize,
+  buildSizeOptions,
+  largestAffordableBuildSize,
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
@@ -88,6 +94,7 @@ import HydroPrimer, { useHydroPrimer } from "../base/HydroPrimer";
 import { getScenario, getTutorialStep } from "../../data/Scenarios";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+import useBuildRowReveal from "../base/useBuildRowReveal";
 import Sparkline from "../base/Sparkline";
 
 function percent(fraction: number): string {
@@ -185,6 +192,7 @@ interface GeneratorBuildItemProps {
   date: DateType;
   interestRate: number;
   generator: GeneratorShoppingType;
+  minimumBuildCost?: number;
   location: LocationType;
   seed: number;
   secondaryMetric?: string;
@@ -235,6 +243,11 @@ export function GeneratorBuildItem(
     props.interestRate,
   );
   const affordable = useBuildAffordability(cash, downpayment);
+  const minimumAffordable = useBuildAffordability(
+    cash,
+    purchaseTerms(props.minimumBuildCost ?? Infinity, true, props.interestRate)
+      .downpayment,
+  );
   const includedOptions = resilienceOptions.filter((option) => option.selected);
   const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
   const maxSizeW = floorToTwoSignificantDigits(generator.maxPeakW);
@@ -260,6 +273,13 @@ export function GeneratorBuildItem(
   ) : undefined;
   const canBuild = buildable && !shortfall;
   const buildSubtitle = (buildable && shortfall) || secondaryText;
+  const offerAffordableSize =
+    !!shortfall &&
+    (buildable ||
+      offerMaxSize ||
+      props.hydroAvailability?.status === "too-large") &&
+    props.minimumBuildCost !== undefined &&
+    minimumAffordable;
   const hasVariableOM = generator.variableOperatingCostPerMWh !== undefined;
   const estimatedVariableOM = estimatedAnnualVariableOperatingCost(generator);
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
@@ -385,15 +405,17 @@ export function GeneratorBuildItem(
         Use site maximum
       </Button>
     );
-  const useMaxSizeAction = offerMaxSize &&
-    generator.peakW !== maxSizeW &&
+  const useMaxSizeAction = (offerMaxSize || offerAffordableSize) &&
+    (offerAffordableSize || generator.peakW !== maxSizeW) &&
     props.onUseMaxSize && (
       <Button size="small" onClick={() => props.onUseMaxSize?.(maxSizeW)}>
         Use max size
       </Button>
     );
   // A resize shortcut sits under Review, so the context line moves up beside it
-  const sizeAction = useSiteMaximumAction || useMaxSizeAction;
+  const sizeAction = offerAffordableSize
+    ? useMaxSizeAction
+    : useSiteMaximumAction || useMaxSizeAction;
   const context = (
     <>
       {role}
@@ -842,7 +864,9 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const readCash = useBuildCashReader(now?.cash ?? 0);
   const listRef = useToolScroll<HTMLUListElement>("generators.scroll");
+  const revealResizedRow = useBuildRowReveal(listRef);
   const [sliderTick, setSliderTick] = useToolState<number>(
     "generators.size",
     () =>
@@ -913,6 +937,14 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const hydroAvailability = getHydroAvailability(
     game,
     exactSizes.Hydro ?? sliderTickToW(sliderTick),
+  );
+  const minimumGenerators = GENERATORS(
+    game,
+    sliderTickToW(0),
+    windSpeeds,
+    solarIrradiances,
+    offshoreWindSpeeds,
+    airborneWindSpeeds,
   );
   const shownGenerators = GENERATORS(
     game,
@@ -1079,18 +1111,51 @@ function BuildGenerators(props: Props): React.JSX.Element {
                   g.name === "Hydro" ? hydroAvailability : undefined
                 }
                 onUseSiteMaximum={(peakW) => {
+                  revealResizedRow(g.name);
                   setSliderTick(wToSliderTick(peakW));
                   setExactSizes((sizes) => ({ ...sizes, Hydro: peakW }));
                 }}
                 onUseMaxSize={(peakW) => {
-                  setSliderTick(Math.max(0, wToSliderTick(peakW)));
-                  setExactSizes((sizes) => ({ ...sizes, [g.name]: peakW }));
+                  const limit =
+                    g.name === "Hydro"
+                      ? Math.min(
+                          peakW,
+                          hydroAvailability.largest?.maxPeakW ?? peakW,
+                        )
+                      : peakW;
+                  const size =
+                    largestAffordableBuildSize(
+                      buildSizeOptions(0, 34, limit),
+                      readCash(),
+                      (capacity) => {
+                        const candidate = GENERATORS(
+                          game,
+                          capacity,
+                          windSpeeds,
+                          solarIrradiances,
+                          offshoreWindSpeeds,
+                          airborneWindSpeeds,
+                        ).find((item) => item.name === g.name)!;
+                        return withResilienceOptions(candidate, game, {})
+                          .buildCost;
+                      },
+                    ) ?? limit;
+                  revealResizedRow(g.name);
+                  setSliderTick(Math.max(0, wToSliderTick(size)));
+                  setExactSizes((sizes) => ({ ...sizes, [g.name]: size }));
                 }}
                 date={game.date}
                 seed={game.seed}
                 location={game.location}
                 interestRate={game.interestRate}
                 generator={g}
+                minimumBuildCost={
+                  withResilienceOptions(
+                    minimumGenerators.find((item) => item.name === g.name)!,
+                    game,
+                    {},
+                  ).buildCost
+                }
                 cash={cash}
                 secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
                 advantages={advantages.slice(0, 2)}
