@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { sortBuildCatalog } from "./layout";
 
 test("generator capstone completes immediately after a different second purchase", async ({
   page,
@@ -23,6 +24,11 @@ test("generator capstone completes immediately after a different second purchase
     .click();
   const hud = page.locator(".tutorialHud");
   await page.locator(".button-buildFacility").click();
+  await expect(hud).toContainText("Sort generators");
+  await sortBuildCatalog(page);
+  await expect(hud).toContainText("Choose a plant size");
+  await hud.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(hud).toContainText("Review a generator purchase");
   await page
     .getByRole("button", {
       name: "Review purchase of Natural Gas Peaker",
@@ -33,7 +39,7 @@ test("generator capstone completes immediately after a different second purchase
   await expect(hud).toContainText("Construction started");
   await hud.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
-  await expect(hud).toContainText("Watch the year bar advance");
+  await expect(hud).toContainText("Read the year progress bar");
   await hud.getByRole("button", { name: "Next", exact: true }).click();
   await expect(hud).toContainText(
     "Order a second generator of a different type",

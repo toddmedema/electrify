@@ -331,7 +331,7 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
         target: "#yearProgressBar",
-        action: "Watch the year bar advance",
+        action: "Read the year progress bar",
         content: (
           <TutorialPrompt text="This bar tracks the year. Each simulated day represents one month." />
         ),

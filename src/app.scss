@@ -76,6 +76,11 @@
   // The bright head of the glint that circles the tutorial ring
   --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 64%, white);
   --tutorial-glow: color-mix(in srgb, var(--interactive-blue) 60%, transparent);
+  --tutorial-sweep-fill: color-mix(
+    in srgb,
+    var(--interactive-blue) 12%,
+    transparent
+  );
   // The interaction blue: focus is an interaction, and purple or amber would read as a new
   // state (amber already means warning)
   --focus-ring: var(--interactive-blue);
@@ -142,6 +147,11 @@
   --interactive-tint: rgba(98, 155, 225, 0.24);
   --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 34%, white);
   --tutorial-glow: color-mix(in srgb, var(--interactive-blue) 45%, transparent);
+  --tutorial-sweep-fill: color-mix(
+    in srgb,
+    var(--interactive-blue) 16%,
+    transparent
+  );
   --blackout-red: #ef5350; /* red400 */
   --blackout-tint: rgba(239, 83, 80, 0.16);
   --blackout-glow: rgba(244, 67, 54, 0.75);
@@ -4180,6 +4190,41 @@ $pane_header_height: 48px;
   padding-left: 28px;
 }
 
+// A separate clipped layer keeps the sweep behind the HUD without changing its scrolling.
+.tutorialHudSweep {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: 50%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--tutorial-sweep-fill),
+      transparent
+    );
+    animation: tutorialBarSweep 8s ease-out infinite;
+  }
+}
+
+// Travel toward Next for 1.6 seconds, then leave the bar quiet until the next pass.
+@keyframes tutorialBarSweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  20%,
+  100% {
+    transform: translateX(200%);
+  }
+}
+
 .tutorialHudFooter {
   display: flex;
   align-items: center;
@@ -4190,25 +4235,41 @@ $pane_header_height: 48px;
   flex: 1 1 auto;
 }
 
-// A brief reminder after six seconds, repeated while the player stays on this step.
+// Narrow layouts draw attention to Next on entry, then repeat a double glow every four seconds.
 .tutorialHudNextPulse {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  animation: tutorialNextPulse 6s ease-in-out 6s infinite;
+  animation:
+    tutorialNextIntro 600ms ease-out,
+    tutorialNextPulse 4s ease-in-out 4s infinite;
+}
+
+@keyframes tutorialNextIntro {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--tutorial-glow);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 4px var(--tutorial-glow);
+  }
 }
 
 @keyframes tutorialNextPulse {
   0%,
   16%,
+  32%,
   100% {
     transform: scale(1);
     box-shadow: 0 0 0 0 var(--tutorial-glow);
   }
-  8% {
-    transform: scale(1.04);
-    box-shadow: 0 0 0 4px var(--tutorial-glow);
+  8%,
+  24% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 6px var(--tutorial-glow);
   }
 }
 
@@ -4472,6 +4533,14 @@ $pane_header_height: 48px;
   }
 }
 
+// Reading targets stay still while the HUD or Next button points out how to continue.
+.tutorialTargetRing-static {
+  &::before,
+  &::after {
+    display: none;
+  }
+}
+
 .tutorialTargetRingPulse {
   animation: tutorialTargetPulse 10s ease-in-out infinite;
 }
@@ -4509,6 +4578,15 @@ $pane_header_height: 48px;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .tutorialHudSweep {
+    background: var(--tutorial-sweep-fill);
+
+    &::before {
+      display: none;
+      animation: none;
+    }
+  }
+
   .tutorialTargetRingPulse,
   .tutorialTargetRingIntro,
   .tutorialHudNextPulse {
