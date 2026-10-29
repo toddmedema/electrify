@@ -1235,7 +1235,7 @@ $topbar_height: 56px;
 }
 
 // Wide windows fold the status row into the top bar (GameAppBar renders it inside the toolbar):
-// cash and date, a hairline, the grid readout, then the mission, with the speed controls pinned
+// cash, profit and date, a hairline, the grid readout, then the mission, with the speed controls pinned
 // right. The bar never wraps. Only the mission's text gives up width, then the months label
 // abbreviates and the hour goes, so the grid state and its figure always stay whole.
 #appbar.appbarSingleRow {
@@ -2482,6 +2482,111 @@ $pane_header_height: 48px;
 .leaderboardToggle {
   text-align: center;
   padding: 4px 0 12px;
+}
+
+.victoryConditions {
+  overflow-wrap: anywhere;
+
+  > section + section {
+    margin-top: 16px;
+  }
+
+  ul {
+    padding-left: 20px;
+    margin: 8px 0 0;
+    font-size: var(--font-size-body2);
+  }
+
+  li + li {
+    margin-top: 8px;
+  }
+
+  .victoryObjectiveList {
+    margin-top: 12px;
+  }
+
+  dl {
+    margin: 12px 0 0;
+    font-size: var(--font-size-body2);
+  }
+
+  dl > div + div {
+    margin-top: 12px;
+  }
+
+  dt {
+    font-weight: 600;
+  }
+
+  dd {
+    margin: 0;
+    color: $font_color_faded;
+  }
+}
+
+.victoryScoring {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.victoryMeasurementHelp {
+  margin-top: 16px;
+
+  summary {
+    display: list-item;
+    align-content: center;
+    min-height: var(--control-size);
+    color: $interactive_blue;
+    cursor: pointer;
+    font-size: var(--font-size-body2);
+  }
+}
+
+.resultLeaderboard {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+
+  table {
+    width: 100%;
+    table-layout: auto;
+    border-collapse: collapse;
+    font-size: var(--font-size-body2);
+  }
+
+  td {
+    padding: 4px 8px;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .currentRun {
+    font-weight: 600;
+    background: var(--bg-selected);
+  }
+
+  td:first-child {
+    width: 1%;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    padding-left: 0;
+  }
+
+  td:last-child {
+    width: 1%;
+    white-space: nowrap;
+    padding-right: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+#topbar .gameMonthlyProfit {
+  flex: 0 0 auto;
+  font-size: var(--font-size-body2);
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 @media (max-width: $tablet_width) {

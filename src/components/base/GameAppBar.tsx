@@ -15,9 +15,12 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import FlashOnIcon from "@mui/icons-material/FlashOn";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import {
+  deriveExpandedSummary,
   formatHour,
   getDateFromMinute,
   getTimeFromTimeline,
+  MINUTES_PER_MONTH,
+  summarizeTimeline,
 } from "../../helpers/DateTime";
 import { projectedShortfall } from "../../helpers/MissionStatus";
 import {
@@ -60,8 +63,8 @@ import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus } from "./useMenuKeys";
 
 /**
- * The game's global state: cash, the date, how fast time is running, how far through the year it
- * is, and whether the lights are currently out.
+ * The game's global state: cash, monthly profit on wide screens, the date, speed, year progress,
+ * and whether the lights are currently out.
  *
  * This used to live inside whichever pane happened to be showing, which on desktop meant all of
  * it was reported from the top-left corner of column one. None of it belongs to a single pane,
@@ -70,8 +73,8 @@ import { restoreMenuFocus } from "./useMenuKeys";
  *
  * Narrower windows stack it in two rows: cash, date and speed above, then the grid readout and
  * the mission. Once the workspace has room for side columns those rows fold into one bar, in the
- * order a player checks them: cash and date, the grid, the mission (the only part that gives up
- * width), then the speed controls pinned right where they always are.
+ * order a player checks them: cash, profit and date, the grid, the mission (the only part that
+ * gives up width), then the speed controls pinned right where they always are.
  */
 
 export interface StateProps {
@@ -301,6 +304,22 @@ export function GameAppBar(props: Props) {
   const bigScreen = isBigScreen();
   // Tracks resizes even while paused, when the bar otherwise has no reason to re-render.
   const singleRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
+  const showProfit = useMediaQuery("(min-width:1024px)", { noSsr: true });
+  const monthlyProfit = React.useMemo(
+    () =>
+      showProfit
+        ? deriveExpandedSummary(
+            summarizeTimeline(
+              game.timeline,
+              game.startingYear,
+              (tick) =>
+                Math.floor(tick.minute / MINUTES_PER_MONTH) ===
+                date.monthsElapsed,
+            ),
+          ).profit
+        : 0,
+    [showProfit, game.timeline, game.startingYear, date.monthsElapsed],
+  );
   // Crossing the breakpoint moves the status row to another parent, which remounts its
   // controls; a player tabbed onto one keeps their place rather than dropping to the page.
   const layoutSeen = React.useRef(singleRow);
@@ -551,6 +570,25 @@ export function GameAppBar(props: Props) {
             <span className="gameStatusValue">
               {formatMoneyStable(now.cash)}
             </span>
+            {showProfit && (
+              <Tooltip title="Current month forecast: revenue minus operating expenses, including interest and imports.">
+                <Typography
+                  component="span"
+                  className="gameMonthlyProfit"
+                  color={
+                    monthlyProfit < 0
+                      ? "error"
+                      : monthlyProfit > 0
+                        ? "success"
+                        : "textSecondary"
+                  }
+                  aria-label={`Monthly profit forecast ${formatMoneyStable(monthlyProfit)}`}
+                >
+                  {monthlyProfit > 0 ? "+" : ""}
+                  {formatMoneyStable(monthlyProfit)}/mo
+                </Typography>
+              </Tooltip>
+            )}
             <span className="weak gameStatusValue">
               {/* One inline run, so the flex gap doesn't open before the comma. */}
               <span>
