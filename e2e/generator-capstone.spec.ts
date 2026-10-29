@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { sortBuildCatalog } from "./layout";
 
 test("generator capstone completes immediately after a different second purchase", async ({
   page,
@@ -23,6 +24,9 @@ test("generator capstone completes immediately after a different second purchase
     .click();
   const hud = page.locator(".tutorialHud");
   await page.locator(".button-buildFacility").click();
+  await expect(hud).toContainText("Sort generators");
+  await sortBuildCatalog(page);
+  await expect(hud).toContainText("Review a generator purchase");
   await page
     .getByRole("button", {
       name: "Review purchase of Natural Gas Peaker",
