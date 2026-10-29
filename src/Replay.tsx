@@ -67,7 +67,7 @@ const MAX_REPLAY_MONTHS = 2400;
 // -- either doesn't affect the sim or is already in the replay header.
 export const RECORDED_DELTA_KEYS = [
   "dollarsPerkWh",
-  "rateFollowsTarget",
+  "rateFollowsInflation",
 ] as const;
 
 export type RecordedDeltaType = Partial<
@@ -105,8 +105,8 @@ export function recordedDelta(
   const recorded: RecordedDeltaType = {};
   if (typeof rate === "number" && Number.isFinite(rate) && rate >= 0)
     recorded.dollarsPerkWh = rate;
-  if (typeof payload.rateFollowsTarget === "boolean")
-    recorded.rateFollowsTarget = payload.rateFollowsTarget;
+  if (typeof payload.rateFollowsInflation === "boolean")
+    recorded.rateFollowsInflation = payload.rateFollowsInflation;
   return Object.keys(recorded).length ? recorded : null;
 }
 

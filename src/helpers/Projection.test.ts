@@ -67,7 +67,7 @@ it("adopts worker results with the original history identity without recalculati
 it("does not count ordinary within-month cash burn twice", () => {
   const game = createGame({ scenarioId: 111, seed: 7 });
   game.dollarsPerkWh = 0;
-  game.rateFollowsTarget = false;
+  game.rateFollowsInflation = false;
   game.timeline = generateNewTimeline(
     game,
     5_000_000,

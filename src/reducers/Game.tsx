@@ -148,6 +148,7 @@ import {
   getInflationIndex,
   getInflationRate,
   getPrimeRate,
+  getRateInflationIndex,
   hasEconomy,
 } from "../data/Economy";
 import {
@@ -156,7 +157,6 @@ import {
   getMarketRate,
   nextCustomerCount,
   publicRateCap,
-  publicTargetRate,
   updateCustomerRate,
 } from "../helpers/Customers";
 import {
@@ -1596,7 +1596,7 @@ export const gameSlice = createSlice({
       normalizeRateDelta(state, payload);
       const recorded = recordedDelta(payload);
       const rateBefore = state.dollarsPerkWh;
-      const followedBefore = !!state.rateFollowsTarget;
+      const followedBefore = !!state.rateFollowsInflation;
       Object.assign(state, payload);
       const rateChanged =
         recorded?.dollarsPerkWh !== undefined &&
@@ -1612,7 +1612,7 @@ export const gameSlice = createSlice({
       }
       if (
         recorded &&
-        (rateChanged || !!state.rateFollowsTarget !== followedBefore)
+        (rateChanged || !!state.rateFollowsInflation !== followedBefore)
       ) {
         recordReplayAction(state, "delta", recorded);
       }
@@ -1708,8 +1708,7 @@ export const gameSlice = createSlice({
       state.dollarsPerkWh = startingRate;
       state.customerRate = startingRate;
       // A tutorial checkpoint's rate is part of its lesson, so it stays where it was authored.
-      state.rateFollowsTarget =
-        !checkpoint && followedTargetRate(state) !== undefined;
+      state.rateFollowsInflation = !checkpoint && canFollowInflation(state);
       state.customerMarketSize = startingCustomers * CUSTOMER_MARKET_MULTIPLIER;
       initializeGameObjectiveProgress(state);
       state.startingDemandScale = scenario.startingDemandScale ?? 1;
@@ -3374,55 +3373,60 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
 }
 
 /**
- * The rate a public utility following its target charges now, or undefined where there is no
- * target to follow: investor-owned and multiplayer companies, and tutorials.
+ * Whether this run's rate can follow inflation at all: solo public utilities only. Investor-owned
+ * and multiplayer companies, and tutorials, set their own rates.
  */
-function followedTargetRate(
-  state: GameType,
-  date: DateType = state.date,
-): number | undefined {
+function canFollowInflation(state: GameType): boolean {
   const scenario = getScenario(state.scenarioId, state.customScenario);
-  if (
-    !scenario ||
-    scenario.ownership !== "Public" ||
-    scenario.tutorialSteps ||
-    state.multiplayer
-  )
-    return undefined;
-  return publicTargetRate(
-    scenario.dollarsPerkWh,
-    date,
-    state.startingYear,
-    state.seed,
-  );
-}
-
-/** Current-month edits stay in force; future months apply the same target as live rollover. */
-function customerBaseRateAt(state: GameType, date: DateType): number {
   return (
-    (state.rateFollowsTarget && date.monthsElapsed > state.date.monthsElapsed
-      ? followedTargetRate(state, date)
-      : undefined) ?? state.dollarsPerkWh
+    !!scenario &&
+    scenario.ownership === "Public" &&
+    !scenario.tutorialSteps &&
+    !state.multiplayer
   );
 }
 
 /**
- * Turning following on sets the rate to the target; setting a rate by hand turns it off.
- * Deltas that also pick the scenario are setup, which initGame settles.
+ * The rate a following public utility charges at `date`: the current rate carried forward by
+ * whatever inflation has passed since now, mirroring the live rollover's January step.
+ */
+function inflationAdjustedRateAt(state: GameType, date: DateType): number {
+  const base = getRateInflationIndex(
+    state.date,
+    state.startingYear,
+    state.seed,
+  );
+  return (
+    (state.dollarsPerkWh *
+      getRateInflationIndex(date, state.startingYear, state.seed)) /
+    base
+  );
+}
+
+/** Current-month edits stay in force; future months carry the rate forward with inflation. */
+function customerBaseRateAt(state: GameType, date: DateType): number {
+  return state.rateFollowsInflation &&
+    date.monthsElapsed > state.date.monthsElapsed
+    ? inflationAdjustedRateAt(state, date)
+    : state.dollarsPerkWh;
+}
+
+/**
+ * Turning following on starts adjusting the current rate with inflation; setting a rate by hand
+ * turns it off. Deltas that also pick the scenario are setup, which initGame settles.
  */
 function normalizeRateDelta(state: GameType, payload: Partial<GameType>) {
   const setup = "scenarioId" in payload || "customScenario" in payload;
-  if (payload.rateFollowsTarget === true && !setup) {
-    const target = followedTargetRate(state);
-    if (target === undefined) delete payload.rateFollowsTarget;
-    else payload.dollarsPerkWh = target;
+  if (payload.rateFollowsInflation === true && !setup) {
+    // No snap to the target: the rate keeps its current level and starts moving with inflation.
+    if (!canFollowInflation(state)) delete payload.rateFollowsInflation;
   } else if (
     typeof payload.dollarsPerkWh === "number" &&
-    payload.rateFollowsTarget === undefined &&
-    state.rateFollowsTarget &&
+    payload.rateFollowsInflation === undefined &&
+    state.rateFollowsInflation &&
     !setup
   ) {
-    payload.rateFollowsTarget = false;
+    payload.rateFollowsInflation = false;
   }
   if (typeof payload.dollarsPerkWh === "number") {
     payload.dollarsPerkWh = capRateForScenario(state, payload);
@@ -3799,9 +3803,25 @@ export function* tickStatePhases(
           `${POLICIES[id].name}: ${policyChoiceLabel(id, state.policies!.programs[id])} starts this month.`,
         ),
       );
-      if (state.rateFollowsTarget) {
-        const target = followedTargetRate(state);
-        if (target !== undefined) state.dollarsPerkWh = target;
+      if (state.rateFollowsInflation) {
+        // The retail index steps once a year, in January; carry the rate across that step.
+        const previousDate = getDateFromMinute(
+          state.date.minute - TICK_MINUTES,
+          state.startingYear,
+        );
+        const previousIndex = getRateInflationIndex(
+          previousDate,
+          state.startingYear,
+          state.seed,
+        );
+        const index = getRateInflationIndex(
+          state.date,
+          state.startingYear,
+          state.seed,
+        );
+        if (index !== previousIndex) {
+          state.dollarsPerkWh = (state.dollarsPerkWh * index) / previousIndex;
+        }
       }
       state.timeline = generateNewTimeline(
         state,
@@ -5781,7 +5801,7 @@ export function forecastMonthClosingCashAtCustomerRate(
 ): number {
   const forecast = cloneDeep(state);
   forecast.dollarsPerkWh = dollarsPerkWh;
-  forecast.rateFollowsTarget = false;
+  forecast.rateFollowsInflation = false;
   forecast.timeline = reforecastSupply(forecast, true);
   const closesMinute = (state.date.monthsElapsed + 1) * MINUTES_PER_MONTH;
   for (

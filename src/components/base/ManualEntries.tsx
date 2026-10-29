@@ -792,11 +792,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>
             operating costs
           </EntryLink>{" "}
-          in the game. Your{" "}
-          <EntryLink to={MANUAL_ENTRY.RATES}>electricity rate</EntryLink>{" "}
-          doesn't rise on its own; you set it in Insights. A public utility's
-          target rate and an investor's market rate both rise with inflation.
-          Future economic conditions are estimates.
+          in the game. You set your{" "}
+          <EntryLink to={MANUAL_ENTRY.RATES}>electricity rate</EntryLink> in
+          Insights; a public utility can let it follow inflation instead of
+          holding steady. A public utility's target rate and an investor's
+          market rate both rise with inflation. Future economic conditions are
+          estimates.
         </p>
       </div>
     ),
@@ -830,7 +831,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           utility. Your <EntryLink to={MANUAL_ENTRY.SCORE}>score</EntryLink>{" "}
           rewards affordable power: a lifetime average rate below the scenario's
           target earns points; above it loses points. You still need enough
-          revenue to cover costs. Set your rate in Insights.
+          revenue to cover costs. Set your rate in Insights, or let it follow
+          inflation, which is the default.
         </p>
       </div>
     ),

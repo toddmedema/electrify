@@ -82,11 +82,11 @@ describe("SaveGame", () => {
 
   it.each(["false", 0, 1, null, {}])(
     "rejects an invalid saved rate-follow setting %p",
-    (rateFollowsTarget) => {
+    (rateFollowsInflation) => {
       expect(
         parseSave({
           ...serializeSave(game),
-          game: { ...game, rateFollowsTarget },
+          game: { ...game, rateFollowsInflation },
         }),
       ).toBeNull();
     },
@@ -94,13 +94,13 @@ describe("SaveGame", () => {
 
   it.each([true, false, undefined])(
     "accepts a saved rate-follow setting %p",
-    (rateFollowsTarget) => {
+    (rateFollowsInflation) => {
       expect(
         parseSave({
           ...serializeSave(game),
-          game: { ...game, rateFollowsTarget },
-        })?.game.rateFollowsTarget,
-      ).toBe(rateFollowsTarget);
+          game: { ...game, rateFollowsInflation },
+        })?.game.rateFollowsInflation,
+      ).toBe(rateFollowsInflation);
     },
   );
 
