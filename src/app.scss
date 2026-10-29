@@ -4094,6 +4094,19 @@ $pane_header_height: 48px;
 
 @include styling();
 
+// The completion dialog's "Up next" preview: the mission name as a label with its summary
+// below, so the player knows what the next tutorial covers before committing to it.
+.tutorialNextPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+
+  span {
+    color: $font_color_faded;
+  }
+}
+
 // A tutorial step is game chrome, not a modal. It occupies its own row above the active card,
 // so its instructions never cover the control they name and the whole grid remains interactive.
 .tutorialHud {
