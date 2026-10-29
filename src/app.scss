@@ -5991,9 +5991,6 @@ $programs_column: 800px;
   gap: $space-3;
   padding-top: $space-2;
 }
-.customerProgramTradeoff {
-  line-height: 1.5;
-}
 @media screen and (max-width: ($phone_width - 1px)) {
   .customerProgramHeading h2 {
     font-size: 1.375rem;

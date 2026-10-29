@@ -29,48 +29,36 @@ export const POLICIES = {
   thermal: {
     name: "Smart heating and hot water",
     description:
-      "Move eligible heating and hot-water use out of your peak window. Deferred use returns over the next three hours.",
-    tradeoff:
-      "Comfort limits constrain peak relief. Switching off stops installations and control, but deferred use still returns.",
+      "Shift heating and hot-water use out of your peak window. Comfort limits apply and deferred use returns over three hours.",
   },
   evCharging: {
     name: "Managed EV charging",
     description:
-      "Move some EV charging out of your peak window and into the next six hours.",
-    tradeoff:
-      "Drivers can override controls. Delayed charging can create a later peak.",
+      "Shift EV charging out of your peak window into the next six hours. Driver overrides and delayed charging can limit peak relief.",
   },
   battery: {
     name: "Home battery virtual power plant",
     description:
-      "Store surplus electricity in household batteries for your peak window.",
-    tradeoff:
-      "Batteries start empty, lose energy and age. A household reserve limits how much they can supply.",
+      "Store surplus electricity in home batteries for your peak window. Batteries lose energy and age while keeping a household reserve.",
   },
   timeOfUse: {
     name: "Time-of-use tariff",
     description:
-      "Half of homes shift 20% of peak-window use into the next three hours.",
-    tradeoff:
-      "Participants pay 30% more during the peak window and 10% less for the next three hours. Higher bills can drive customers away; shifted demand can create a later peak.",
+      "Half of homes shift 20% of peak-window use into the next three hours. Higher peak prices can drive customers away.",
     cap: 0.2,
     costPerCustomer: 0,
   },
   curtailment: {
     name: "Peak curtailment contracts",
     description:
-      "Half of demand from factories, mines and data centers drops 20% during your peak window.",
-    tradeoff:
-      "Participants receive a 10% bill credit all day, even without shortages.",
+      "Half of demand from factories, mines and data centers drops 20% during your peak window. Participants get a 10% bill credit all day.",
     cap: 0.2,
     costPerCustomer: 0,
   },
   efficiency: {
     name: "Efficiency rebates",
     description:
-      "Reduce home and business demand, especially heating and cooling.",
-    tradeoff:
-      "Upgrades reduce sales as well as generation needs. Savings fade between each upgrade’s tenth and twentieth years.",
+      "Reduce home and business demand especially heating and cooling. Savings start to fade after ten years.",
     // At full adoption: lighting and appliance upgrades cut all home and business use, while
     // insulation, sealing and efficient heat pumps cut the weather-driven part of it much more.
     // DOE's Weatherization Assistance Program evaluations report heating and cooling savings of
@@ -87,9 +75,7 @@ export const POLICIES = {
   solar: {
     name: "Rooftop solar rebates",
     description:
-      "Reduce daytime demand with rooftop panels. Home batteries can store surplus for later.",
-    tradeoff:
-      "Panels keep producing without further spending, but do not cover evening peaks alone. Surplus beyond enrolled battery charging is discarded.",
+      "Reduce daytime demand with rooftop panels. Panels keep producing without further spending but do not cover evening peaks alone.",
     // Watts per starting customer, scaled with scenario demand, at full adoption. The California
     // Solar Initiative, among the largest rebate programs, funded about 1.9 GW across roughly 12
     // million utility customers - about 160 W each.

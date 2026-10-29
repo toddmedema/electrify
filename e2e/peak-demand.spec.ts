@@ -30,7 +30,7 @@ for (const theme of ["light", "dark"]) {
       await window.selectOption(offer === "Time-of-use tariff" ? "22" : "9");
       await expect(dialog).toContainText(
         offer === "Time-of-use tariff"
-          ? "02:00–05:00"
+          ? "Use shifts to 02:00-05:00"
           : "Half of demand from factories, mines and data centers drops 20%",
       );
       // The workspace header has no contextual help. Its foreground game menu
@@ -48,7 +48,9 @@ for (const theme of ["light", "dark"]) {
         exact: true,
       });
       await expect(apply).toBeEnabled({ timeout: 30000 });
-      await expect(dialog).toContainText("Peak demand:");
+      await expect(
+        dialog.getByRole("img", { name: /^Estimated demand:/ }),
+      ).toBeVisible();
       expect(
         await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
       ).toBeLessThanOrEqual(1);
@@ -65,7 +67,9 @@ for (const theme of ["light", "dark"]) {
           `${offer === "Time-of-use tariff" ? "tariff" : "contract"}-${theme}.png`,
         ),
       });
-      await dialog.getByText(/^Peak demand:/).scrollIntoViewIfNeeded();
+      await dialog
+        .getByRole("img", { name: /^Estimated demand:/ })
+        .scrollIntoViewIfNeeded();
       await page.screenshot({
         path: testInfo.outputPath(
           `${offer === "Time-of-use tariff" ? "tariff" : "contract"}-preview-${theme}.png`,
