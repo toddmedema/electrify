@@ -12,7 +12,13 @@ import {
   MINUTES_PER_MONTH,
 } from "../helpers/DateTime";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
-import { buildStorySnapshot } from "../helpers/Story";
+import { GENERATORS } from "../data/Facilities";
+import {
+  bulkWinterizationQuote,
+  resilienceBuildOptions,
+  withResilienceOptions,
+} from "../helpers/Hazards";
+import { buildStorySnapshot, storyOutputMultiplier } from "../helpers/Story";
 import { runFailure } from "../helpers/ObjectiveRules";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
@@ -145,6 +151,23 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
+test("imported freeze offers permanent construction packages for every affected fuel", () => {
+  const game = start(pack(107));
+  const quotes = GENERATORS(game, 100e6, [], []);
+  for (const fuel of ["Natural Gas", "Coal", "Uranium", "Wind"] as const) {
+    const quote = quotes.find((item) => item.fuel === fuel)!;
+    expect(
+      resilienceBuildOptions(quote, game).some(
+        (option) => option.upgrade === "coldWeatherPackage",
+      ),
+    ).toBe(true);
+    expect(
+      withResilienceOptions(quote, game, { coldWeatherPackage: true })
+        .resilience?.coldWeatherPackage,
+    ).toBe(true);
+  }
+});
+
 test.each(
   catalog.flatMap((entry) =>
     DIFFICULTY_IDS.flatMap((difficulty) =>
@@ -162,17 +185,31 @@ test.each(
     expect(before.speed).toBe("PAUSED");
     const pending = restore(before);
     expect(pendingScenarioChoice(pending)?.id).toBe(key(arc, id));
+    const cost =
+      arc === 107 && option.id === "winterize"
+        ? bulkWinterizationQuote(before).cost
+        : option.cost;
     const after = reducer(before, respond(key(arc, id), option.id));
     const resumedAnswer = reducer(pending, respond(key(arc, id), option.id));
-    expect(now(after).cash - now(before).cash).toBe(option.grant - option.cost);
+    expect(now(after).cash - now(before).cash).toBe(option.grant - cost);
     expect(now(after).revenue - now(before).revenue).toBe(option.grant);
     expect(now(after).revenueGrants - now(before).revenueGrants).toBe(
       option.grant,
     );
-    expect(now(after).expensesOM - now(before).expensesOM).toBeCloseTo(
-      option.cost,
-      6,
+    // Installation changes dispatch O&M too; assets own the exact retrofit payments.
+    const payments = after.worldEvents.occurrences.filter(
+      (event) =>
+        event.attributes.retrofit === true &&
+        event.startsMinute === before.date.minute,
     );
+    const payment =
+      arc === 107 && option.id === "winterize"
+        ? payments.reduce(
+            (sum, event) => sum + Number(event.attributes.cost),
+            0,
+          )
+        : now(after).expensesOM - now(before).expensesOM;
+    expect(payment).toBeCloseTo(cost, 6);
     expect(after.speed).toBe("PAUSED");
     expect(pendingScenarioChoice(after)).toBeUndefined();
     expect(
@@ -181,7 +218,7 @@ test.each(
       startsMinute: dueMonth * MINUTES_PER_MONTH,
       attributes: {
         choice: option.id,
-        cost: option.cost,
+        cost: arc === 107 ? 0 : cost,
         upfrontGrant: option.grant,
         ruleChoice: true,
       },
@@ -330,11 +367,10 @@ test.each([
     dueMonth: 36,
     onsetMonth: 49,
     customers: 157567,
-    scaledCost: 30000000,
   },
 ])(
   "$lane arc $arc relocates its full paid budget and keeps preparation ahead of the shock",
-  ({ arc, id, option, dueMonth, onsetMonth, customers, scaledCost }) => {
+  ({ arc, id, option, dueMonth, onsetMonth, customers }) => {
     const before = start(
       pack(arc, true, {
         scenario: {
@@ -346,12 +382,13 @@ test.each([
     );
     advance(before, dueMonth);
     expect(pendingScenarioChoice(before)?.id).toBe(key(arc, id));
-    const expected = inEraMoney(scaledCost, 2040, source(arc).startingYear);
+    const expected = bulkWinterizationQuote(before).cost;
+    expect(expected).toBeGreaterThan(82e6);
     const after = reducer(before, respond(key(arc, id), option));
     expect(now(before).cash - now(after).cash).toBe(expected);
     expect(
       after.worldEvents.occurrences.find((event) => event.key === key(arc, id))
-        ?.attributes.cost,
+        ?.attributes.retrofitCost,
     ).toBe(expected);
     const onset = after.customScenario!.mod!.rules.arcEvents!.find(
       (event) => event.protection,
@@ -362,7 +399,7 @@ test.each([
     expect(
       activated.worldEvents.occurrences.find((event) => event.key === onset.key)
         ?.attributes.ruleProtectionFactor,
-    ).toBe(0.5);
+    ).toBe(0);
     expect(restore(activated).date).toEqual(activated.date);
   },
 );
@@ -395,7 +432,7 @@ test.each([{ arc: 107, lane: "current" }])(
       (event) => event.key === onset.key,
     )!;
     const visibleConditions = [
-      `Natural Gas output: ${Math.round(visible.effects.facilityOutputMultipliersByFuel!["Natural Gas"]! * 100)}% of normal`,
+      `Natural Gas unprotected cold output: ${Math.round(visible.effects.winterizationOutputMultipliersByFuel!["Natural Gas"]! * 100)}% of normal`,
     ];
     visibleConditions.forEach((condition) =>
       expect(visible.message).toContain(condition),
@@ -404,11 +441,19 @@ test.each([{ arc: 107, lane: "current" }])(
     expect(protectedEvent.effects[unchangedField]).toBe(
       standard.effects[unchangedField],
     );
-    const affectedLosses = (
-      ["Natural Gas", "Coal", "Uranium", "Wind"] as const
-    ).map((fuel) => [
-      1 - standard.effects.facilityOutputMultipliersByFuel![fuel]!,
-      1 - protectedEvent.effects.facilityOutputMultipliersByFuel![fuel]!,
+    const affectedLosses = after.facilities.map((facility) => [
+      1 -
+        storyOutputMultiplier(
+          before.facilities.find((item) => item.id === facility.id)!,
+          standard.effects,
+          onset.startMonth * MINUTES_PER_MONTH,
+        ),
+      1 -
+        storyOutputMultiplier(
+          facility,
+          protectedEvent.effects,
+          onset.startMonth * MINUTES_PER_MONTH,
+        ),
     ]);
     expect(affectedLosses.length).toBeGreaterThan(1);
     affectedLosses.forEach(([originalLoss, preparedLoss]) =>
@@ -443,7 +488,7 @@ test.each([{ arc: 107, lane: "current" }])(
     const recorded = activated.worldEvents.occurrences.find(
       (event) => event.key === onset.key,
     )!;
-    expect(recorded.attributes.ruleProtectionFactor).toBe(0.5);
+    expect(recorded.attributes.ruleProtectionFactor).toBe(0);
     expect(restore(activated).worldEvents.occurrences).toEqual(
       activated.worldEvents.occurrences,
     );

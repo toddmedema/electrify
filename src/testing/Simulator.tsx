@@ -25,6 +25,7 @@ import gameReducer, {
   start,
   startReplay,
   sellFacility,
+  retrofitFacility,
   tickState,
   togglePauseFacility,
 } from "../reducers/Game";
@@ -73,6 +74,12 @@ export type InitialBuildType = InitialBuildBaseType &
 export type ScheduledSimActionType =
   | { month: number; type: "rate"; dollarsPerkWh: number }
   | { month: number; type: "build"; build: InitialBuildType }
+  | {
+      month: number;
+      type: "retrofit";
+      facilityId: number;
+      upgrade: "coldWeatherPackage";
+    }
   | { month: number; type: "sell"; facilityId: number }
   | { month: number; type: "toggle"; facilityId: number }
   | { month: number; type: "reprioritize"; facilityId: number }
@@ -544,6 +551,17 @@ export function runSimulation(options: SimOptionsType): SimResultType {
               });
             break;
           }
+          case "retrofit":
+            state = cloneDeep(
+              gameReducer(
+                state,
+                retrofitFacility({
+                  facilityId: action.facilityId,
+                  upgrade: action.upgrade,
+                }),
+              ),
+            );
+            break;
           case "sell":
             state = cloneDeep(
               gameReducer(state, sellFacility(action.facilityId)),

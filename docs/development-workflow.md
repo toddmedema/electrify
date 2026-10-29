@@ -100,7 +100,9 @@ behavior inputs, including local environment files, invalidate a run just like t
 source changes. Cache reuse never authorizes a partial run to claim full coverage.
 
 For isolated runner measurements, manually dispatch Test Code with
-`benchmark-work=true`. It runs the ordinary combined test job first, then measures
-one-shot/persistent save advancement, four covered suites with cold/restored
-transforms, and optional review captures at all three CI viewport widths. Results
-are retained in `diagnostics-tests`; no additional job or required gate is added.
+`benchmark-work=true`. Each of the three test workers runs its ordinary suites first, then
+measures its own workload: CPU checks compare four covered suites with cold/restored transforms,
+desktop integration measures one-shot/persistent save advancement, and the browser worker
+captures optional review images at all three CI viewport widths. Results are retained in
+`diagnostics-cpu`, `diagnostics-desktop` and `diagnostics-browser`; no additional job or
+required gate is added.

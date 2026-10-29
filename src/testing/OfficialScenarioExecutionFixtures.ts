@@ -14,6 +14,7 @@ import gameReducer, {
   hasChronicBlackouts,
   reprioritizeFacility,
   sellFacility,
+  retrofitFacility,
   setTradingPolicy,
   tickState,
   togglePauseFacility,
@@ -94,6 +95,14 @@ function applyScheduled(
         buildFacility({
           facility: officialQuote(game, action.build),
           financed: action.build.financed,
+        }),
+      );
+    case "retrofit":
+      return officialCommand(
+        game,
+        retrofitFacility({
+          facilityId: action.facilityId,
+          upgrade: action.upgrade,
         }),
       );
     case "sell":

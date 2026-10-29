@@ -4,9 +4,12 @@ import { expect, Page } from "@playwright/test";
 export async function exitSettingsWithBodyArrow(page: Page): Promise<void> {
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
   await page.keyboard.press("Escape");
+  // Hover can focus a control revealed beneath the pointer. Wait for the menu,
+  // not a particular selection, while the exit and return-focus timers are paused.
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
-  ).toBeFocused();
+  ).toBeVisible();
+  await expect(page.locator("main[inert] #gameCard")).toHaveCount(1);
   // Native state can finish loading and refocus the initial menu after a bare blur.
   // Hold this fixture's background precondition only until the real arrow is dispatched.
   await page.evaluate(() => {
