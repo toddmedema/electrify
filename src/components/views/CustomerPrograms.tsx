@@ -212,14 +212,14 @@ function FlexibilitySummary({
       : undefined;
   const facts: ProgramFact[] = [
     {
-      label: "Installation budget",
+      label: "Installation cost",
       value: `${formatMoneyConcise(buildoutComplete(program.adoption) ? 0 : flexibilityCapitalCost(game, id, month) / flexibilityMonths(id))}/mo`,
       detail: `${flexibilityMonths(id)} months to full rollout`,
     },
     {
       label: "Participation payments",
       value: `${formatMoneyConcise(flexibilityMonthlyCost(game, id, game.date.monthsElapsed))}/mo`,
-      detail: `${formatMoneyConcise(flexibilityMonthlyCost(fullRollout, id, month))}/mo at full rollout · while on`,
+      detail: `${formatMoneyConcise(flexibilityMonthlyCost(fullRollout, id, month))}/mo at full rollout while on`,
     },
   ];
   const equipment: ProgramFact[] = [
@@ -332,10 +332,10 @@ function BuildoutSummary({
       ]
     : [
         {
-          label: "Monthly budget",
+          label: "Monthly cost",
           value: `${formatMoneyConcise(policyBudget(game, id, "On", effective))}/mo`,
         },
-        { label: "Total budget", value: formatMoneyConcise(total) },
+        { label: "Total cost", value: formatMoneyConcise(total) },
         {
           label: "Duration",
           value: `${months} months`,

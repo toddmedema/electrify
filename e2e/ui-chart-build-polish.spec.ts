@@ -1,6 +1,6 @@
 import path from "node:path";
 import { expect, test, type Locator } from "./fixtures";
-import { openBuild, openPane } from "./layout";
+import { openBuild, openPane, sortBuildCatalog } from "./layout";
 import { chartScale } from "../src/components/base/UPlotHelpers";
 
 const expectRightInsets = async (insights: Locator) => {
@@ -385,24 +385,7 @@ for (const theme of ["light", "dark"] as const) {
           .click();
       if (category !== "Interties") {
         for (const label of ["Build time", "Build cost"]) {
-          const sort = build.getByRole("combobox", { name: "Sort facilities" });
-          if (await sort.isVisible()) {
-            await sort.click();
-            await page
-              .getByRole("option", { name: label, exact: true })
-              .click();
-            await expect(sort).toContainText(label);
-          } else {
-            await build
-              .getByRole("button", { name: /^Sort facilities:/ })
-              .click();
-            await page
-              .getByRole("menuitem", { name: label, exact: true })
-              .click();
-            await expect(
-              build.getByRole("button", { name: `Sort facilities: ${label}` }),
-            ).toBeVisible();
-          }
+          await sortBuildCatalog(page, label);
         }
       }
       const card =

@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -8,8 +9,53 @@ import {
 import { createGame } from "../../testing/Simulator";
 import { GameType, isStorage } from "../../Types";
 import BuildStorage from "./BuildStorage";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
 
 jest.mock("../base/ManualLink", () => () => null);
+
+it("keeps storage affordability and its open review current independently of the quote", () => {
+  const initial = {
+    ...createGame({ scenarioId: 100, seed: 12345 }),
+    speed: "FAST" as const,
+  };
+  const cashAt = (cash: number) => ({
+    ...initial,
+    timeline: initial.timeline.map((tick) => ({ ...tick, cash })),
+  });
+  const store = configureStore({
+    reducer: {
+      game: (
+        state = cashAt(0),
+        action: { type: string; payload?: typeof initial },
+      ) => (action.type === "replace" ? action.payload! : state),
+    },
+  });
+  render(
+    <Provider store={store}>
+      <BuildStorage
+        game={store.getState().game}
+        onBack={jest.fn()}
+        onBuildStorage={jest.fn()}
+      />
+    </Provider>,
+  );
+  const review = screen.getByRole("button", {
+    name: "Review purchase of Pumped Hydro",
+  });
+  expect(review).toBeDisabled();
+  act(() => {
+    store.dispatch({ type: "replace", payload: cashAt(1e12) });
+  });
+  expect(review).toBeEnabled();
+  fireEvent.click(review);
+  expect(screen.getByRole("button", { name: "Pay cash" })).toBeEnabled();
+  act(() => {
+    store.dispatch({ type: "replace", payload: cashAt(0) });
+  });
+  expect(screen.getByRole("button", { name: "Pay cash" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Take loan" })).toBeDisabled();
+});
 
 function game(): GameType {
   const state = createGame({ scenarioId: 103 });

@@ -270,7 +270,7 @@ test.each<PolicyId>(POLICY_IDS)(
     ).toBeVisible();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(fact("Monthly budget")).toEqual(
+    expect(fact("Monthly cost")).toEqual(
       id === "solar" || id === "efficiency"
         ? expect.stringMatching(/^\$[\d.]+[kKMB]?\/mo$/)
         : undefined,
@@ -610,7 +610,7 @@ test("solar facts compare a same-size facility and distinguish annual energy fro
   expect(fact("Duration")).toBe("48 monthsFinishes Jan 2024");
   expect(fact("If started now")).toBeUndefined();
   expect(fact("While active")).toBeUndefined();
-  expect(fact("Monthly budget")).toMatch(/^\$[\d.]+[kKMB]?\/mo$/);
+  expect(fact("Monthly cost")).toMatch(/^\$[\d.]+[kKMB]?\/mo$/);
   fireEvent.click(screen.getByText("Compare utility solar"));
   const impact = fact("At completion")!;
   const comparable = screen
