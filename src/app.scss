@@ -6410,7 +6410,7 @@ $programs_column: 800px;
   }
 }
 
-// Two lines per requirement: the rule, then its progress and any meaningful status.
+// Keep the rule, recorded progress, and forward outlook distinct within each requirement.
 // Missing-history warnings can wrap so the evidence is never clipped.
 .missionRequirements {
   margin: 0;
@@ -6438,18 +6438,45 @@ $programs_column: 800px;
   white-space: nowrap;
 
   // The word carries the state on its own; the colour is a second, faster read of it
-  &[data-status="failed"] {
+  &[data-status="failed"],
+  &[data-status="at-risk"] {
     border-color: var(--delta-bad);
     color: var(--delta-bad);
   }
 
-  &[data-status="completed"] {
+  &[data-status="completed"],
+  &[data-status="on-track"] {
     border-color: var(--delta-good);
     color: var(--delta-good);
   }
 }
 
-// The Scenario tool: the scenario at a glance, then its score, then what it takes to win
+// Put the decision-driving outcome ahead of score; text carries every state as well as colour.
+.scenarioMissionOutlook {
+  display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  gap: $space-2;
+  padding: $space-3 $space-4;
+  border-left: 4px solid var(--border-subtle);
+  background: var(--bg-raised);
+
+  &[data-status="loss"] {
+    border-color: var(--delta-bad);
+    h3 {
+      color: var(--delta-bad);
+    }
+  }
+
+  &[data-status="win"] {
+    border-color: var(--delta-good);
+    h3 {
+      color: var(--delta-good);
+    }
+  }
+}
+
+// The Scenario tool: the scenario at a glance, its victory outlook, then score
 .scenarioDetailsBody {
   display: flex;
   flex-direction: column;

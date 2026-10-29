@@ -9,6 +9,9 @@ import { forecastShortfalls } from "./ForecastShortfalls";
 import { sampleForecastTimeline } from "./ForecastSampling";
 import { generateNewTimeline } from "../reducers/Game";
 import { GameType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
+import type { ObjectiveMonthFacts } from "../data/ScenarioObjectives";
+import { scenarioObjectiveDefinitions } from "./ObjectiveRules";
+import { getTotalDebt } from "./Financials";
 
 /**
  * The one long-range projection a game has.
@@ -42,6 +45,11 @@ export function forecastViewportBounds(game: GameType): [number, number] {
 }
 
 export interface ProjectionView {
+  /** Private forecast fleet/loan facts for objectives that monthly chart rows cannot measure. */
+  objectiveAssets?: Pick<
+    ObjectiveMonthFacts,
+    "month" | "debtPrincipal" | "ownedFuels"
+  >[];
   timeline: TickPresentFutureType[];
   sampled: TickPresentFutureType[];
   supplyDemandTimeline: TickPresentFutureType[];
@@ -176,12 +184,43 @@ function buildProjection(
 
   // Cash risk and charts share one simulation, never longer than 20 years.
   const cashMonths = cashRunwayHorizon(game);
+  const needsAssets = scenarioObjectiveDefinitions(
+    getScenario(game.scenarioId, game.customScenario),
+    game,
+  ).some(
+    ({ metric }) => metric === "monthEndDebt" || metric === "fuelRetirement",
+  );
+  const objectiveAssets: NonNullable<ProjectionView["objectiveAssets"]> = [];
   const timeline = generateNewTimeline(
     game,
     now.cash,
     now.customers,
     ticks,
     projectionStepMinutes,
+    needsAssets
+      ? (state, tick) => {
+          const month = Math.floor(tick.minute / MINUTES_PER_MONTH);
+          if (
+            Math.floor(
+              (tick.minute + projectionStepMinutes) / MINUTES_PER_MONTH,
+            ) === month
+          )
+            return;
+          const ownedFuels: ObjectiveMonthFacts["ownedFuels"] = {};
+          for (const facility of state.facilities) {
+            if (facility.fuel)
+              ownedFuels[facility.fuel] = (ownedFuels[facility.fuel] ?? 0) + 1;
+          }
+          objectiveAssets.push({
+            month,
+            ownedFuels,
+            debtPrincipal: getTotalDebt([
+              ...state.facilities,
+              ...(state.transmission?.lines ?? []),
+            ]),
+          });
+        }
+      : undefined,
   );
   const historicalSupplyDemand = [...game.monthlyHistory]
     .reverse()
@@ -226,6 +265,7 @@ function buildProjection(
     game.startingYear,
   ).slice(1);
   return {
+    ...(needsAssets ? { objectiveAssets } : {}),
     timeline: [...historicalCharts, ...timeline],
     sampled: [...historicalCharts, ...sampled],
     supplyDemandTimeline: [...historicalSupplyDemand, ...timeline],

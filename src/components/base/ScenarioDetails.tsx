@@ -1,4 +1,4 @@
-import { activeScenario } from "../../helpers/GameSelectors";
+import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { Box, Typography, useMediaQuery } from "@mui/material";
 import { GameType, ScenarioType, ScoreCategoryType } from "../../Types";
@@ -27,6 +27,105 @@ import {
 import { useAppSelector } from "../../Store";
 import { GameCard } from "./GameCard";
 import ChartFinances from "./ChartFinances";
+import {
+  projectMission,
+  MissionProjection,
+} from "../../helpers/MissionProjection";
+import {
+  projectionReady,
+  readProjection,
+  requestProjection,
+  subscribeProjection,
+} from "./DeferredProjection";
+
+function useMissionProjection(game: GameType): MissionProjection | undefined {
+  const [, refresh] = React.useReducer((count: number) => count + 1, 0);
+  React.useEffect(() => subscribeProjection(refresh), []);
+  const now = currentTick(game);
+  const ended =
+    game.date.monthsElapsed >= (activeScenario(game)?.durationMonths ?? 0);
+  const ready = projectionReady(game);
+  React.useEffect(() => {
+    if (now && !ended && !ready) requestProjection(game, now);
+  }, [game, now, ended, ready]);
+  if (!now || ended || (!ready && typeof Worker !== "undefined"))
+    return undefined;
+  return projectMission(game, readProjection(game, now));
+}
+
+const FORECAST_LABELS = {
+  "on-track": "Projected to meet",
+  "at-risk": "Projected miss",
+  unavailable: "Forecast unavailable",
+  completed: "Met",
+  failed: "Failed",
+};
+
+function MissionOutlook({
+  outlook,
+}: {
+  outlook: MissionProjection | undefined;
+}): React.JSX.Element {
+  const risks = outlook?.requirements
+    .filter(
+      (row) =>
+        row.required && (row.status === "at-risk" || row.status === "failed"),
+    )
+    .sort(
+      (a, b) =>
+        Number(b.status === "failed") - Number(a.status === "failed") ||
+        (a.failureMonth ?? Infinity) - (b.failureMonth ?? Infinity),
+    );
+  return (
+    <Box
+      component="section"
+      aria-labelledby="scenario-result-title"
+      className="scenarioMissionOutlook"
+      data-status={outlook?.status ?? "loading"}
+    >
+      <Typography
+        id="scenario-result-title"
+        variant="h6"
+        component="h3"
+        sx={{ fontWeight: 600 }}
+      >
+        {!outlook
+          ? "Updating forecast…"
+          : outlook.status === "loss"
+            ? "Projected loss"
+            : outlook.status === "win"
+              ? "Projected win"
+              : "Forecast incomplete"}
+      </Typography>
+      {risks && risks.length > 0 ? (
+        <Box
+          component="ul"
+          sx={{ m: 0, pl: 2, typography: "body2", "& li + li": { mt: 1 } }}
+        >
+          {risks.map((risk) => (
+            <li key={risk.id}>
+              <strong>{risk.label}:</strong> {risk.detail}
+            </li>
+          ))}
+        </Box>
+      ) : (
+        <Typography variant="body2">
+          {!outlook
+            ? "Checking every goal and survival condition."
+            : outlook.status === "win"
+              ? "All required goals and survival conditions are projected to be met."
+              : "Some goals cannot be forecast through their full required window."}
+        </Typography>
+      )}
+      {outlook && (
+        <Typography variant="body2" color="text.secondary">
+          With current plans, through {outlook.through}. Hourly estimates update
+          when you make changes.
+        </Typography>
+      )}
+    </Box>
+  );
+}
 
 const STATUS_LABELS: Record<MissionRequirement["status"], string> = {
   pending: "Not started",
@@ -128,8 +227,7 @@ function ScoreOutlook({
 }
 
 /**
- * The scenario's goals and score, in the game's tool panel like Insights and Events: the outlook
- * leads, its breakdown follows directly, then what the term requires to win.
+ * The scenario's outcome and goals lead; score remains separate from winning the term.
  */
 export default function ScenarioDetails(): React.JSX.Element | null {
   const game = useAppSelector((state) => state.game);
@@ -161,6 +259,7 @@ export function ScenarioDetailsContent({
   const units = useUnits();
   const location = getScenarioLocation(scenario);
   const mission = getMissionStatus(game);
+  const missionProjection = useMissionProjection(game);
   const history = game.monthlyHistory;
   // Both read only the completed months, which change once a month rather than every tick
   const breakdown = React.useMemo(
@@ -210,6 +309,115 @@ export function ScenarioDetailsContent({
             <dd>{value}</dd>
           </div>
         ))}
+      </Box>
+      {!mission.finalNote && <MissionOutlook outlook={missionProjection} />}
+      <Box component="section" aria-labelledby="scenario-rules-title">
+        <Typography
+          id="scenario-rules-title"
+          variant="h6"
+          component="h3"
+          sx={{ fontWeight: 600 }}
+        >
+          Victory conditions
+        </Typography>
+        {scenario.id === 3 && <CustomerGrowthChallenge />}
+        {mission.finalNote && (
+          <Typography variant="body2">{mission.finalNote}</Typography>
+        )}
+        <Box component="dl" className="missionRequirements">
+          {[...mission.requirements]
+            .sort(
+              (a, b) =>
+                Number(a.required === false) - Number(b.required === false),
+            )
+            .map((requirement) => {
+              const forecast = missionProjection?.requirements.find(
+                (row) => row.id === requirement.id,
+              );
+              const showForecast =
+                requirement.status !== "completed" &&
+                requirement.status !== "failed" &&
+                !mission.finalNote;
+              return (
+                <React.Fragment key={requirement.id}>
+                  <Typography
+                    component="dt"
+                    variant="body2"
+                    sx={{ mt: 2, fontWeight: 600, overflowWrap: "anywhere" }}
+                  >
+                    <span>
+                      {requirement.definition
+                        ? requirement.label
+                        : requirement.target}
+                    </span>
+                    {requirement.required === false && (
+                      <Typography
+                        component="span"
+                        variant="body2"
+                        sx={{ ml: 1, color: "text.secondary" }}
+                      >
+                        Optional
+                      </Typography>
+                    )}
+                  </Typography>
+                  {requirement.definition && (
+                    <Typography
+                      component="dd"
+                      variant="body2"
+                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                    >
+                      {requirement.definition}
+                    </Typography>
+                  )}
+                  {requirement.definition && (
+                    <Typography component="dd" variant="body2">
+                      {requirement.target}
+                    </Typography>
+                  )}
+                  <Typography component="dd" variant="body2">
+                    {(requirement.status !== "unknown" ||
+                      requirement.definition) &&
+                      requirement.status !== "in-progress" && (
+                        <span
+                          className="missionRequirementStatus"
+                          data-status={requirement.status}
+                        >
+                          {statusLabel(requirement)}
+                        </span>
+                      )}{" "}
+                    <span>
+                      {requirement.definition || requirement.id === "survival"
+                        ? "Recorded: "
+                        : ""}
+                      {requirement.current}
+                    </span>
+                  </Typography>
+                  {showForecast && (
+                    <Typography component="dd" variant="body2">
+                      <span
+                        className="missionRequirementStatus"
+                        data-status={forecast?.status ?? "loading"}
+                      >
+                        {forecast
+                          ? FORECAST_LABELS[forecast.status]
+                          : "Updating forecast…"}
+                      </span>
+                      {forecast && <span>{forecast.detail}</span>}
+                    </Typography>
+                  )}
+                  {requirement.reason && (
+                    <Typography
+                      component="dd"
+                      variant="body2"
+                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                    >
+                      {requirement.reason}
+                    </Typography>
+                  )}
+                </React.Fragment>
+              );
+            })}
+        </Box>
       </Box>
       {projection && <ScoreOutlook projection={projection} history={history} />}
       <Box
@@ -289,81 +497,6 @@ export function ScenarioDetailsContent({
             Score appears after your first month.
           </Typography>
         )}
-      </Box>
-      <Box component="section" aria-labelledby="scenario-rules-title">
-        <Typography
-          id="scenario-rules-title"
-          variant="h6"
-          component="h3"
-          sx={{ fontWeight: 600 }}
-        >
-          Victory conditions
-        </Typography>
-        {scenario.id === 3 && <CustomerGrowthChallenge />}
-        {mission.finalNote && (
-          <Typography variant="body2">{mission.finalNote}</Typography>
-        )}
-        <Box component="dl" className="missionRequirements">
-          {mission.requirements.map((requirement) => (
-            <React.Fragment key={requirement.id}>
-              <Typography
-                component="dt"
-                variant="body2"
-                sx={{ mt: 2, fontWeight: 600, overflowWrap: "anywhere" }}
-              >
-                <span>
-                  {requirement.definition
-                    ? requirement.label
-                    : requirement.target}
-                </span>
-                {requirement.required === false && (
-                  <Typography
-                    component="span"
-                    variant="body2"
-                    sx={{ ml: 1, color: "text.secondary" }}
-                  >
-                    Optional
-                  </Typography>
-                )}
-              </Typography>
-              {requirement.definition && (
-                <Typography
-                  component="dd"
-                  variant="body2"
-                  sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
-                >
-                  {requirement.definition}
-                </Typography>
-              )}
-              {requirement.definition && (
-                <Typography component="dd" variant="body2">
-                  {requirement.target}
-                </Typography>
-              )}
-              <Typography component="dd" variant="body2">
-                {(requirement.status !== "unknown" || requirement.definition) &&
-                  requirement.status !== "in-progress" && (
-                    <span
-                      className="missionRequirementStatus"
-                      data-status={requirement.status}
-                    >
-                      {statusLabel(requirement)}
-                    </span>
-                  )}{" "}
-                <span>{requirement.current}</span>
-              </Typography>
-              {requirement.reason && (
-                <Typography
-                  component="dd"
-                  variant="body2"
-                  sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
-                >
-                  {requirement.reason}
-                </Typography>
-              )}
-            </React.Fragment>
-          ))}
-        </Box>
       </Box>
     </div>
   );

@@ -479,21 +479,31 @@ const resultCache = new WeakMap<
   ObjectiveProgress,
   { completedMonths: number; rulesDigest: string; results: ObjectiveResult[] }
 >();
+/** Shared recorded evidence; forecast callers extend a copy without changing the live run. */
+export function gameObjectiveProgress(
+  game: GameType,
+): ObjectiveProgress | undefined {
+  const scenario = getScenario(game.scenarioId, game.customScenario);
+  if (!scenario) return undefined;
+  return (
+    game.objectiveProgress ??
+    historyProgress(
+      scenarioObjectiveDefinitions(scenario, game),
+      game.monthlyHistory,
+      objectiveContextForGame(game, scenario),
+      retentionBaseline(scenario, game.customerMarketSize) ??
+        game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
+    )
+  );
+}
+
 export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!scenario) return [];
   const objectives = scenarioObjectiveDefinitions(scenario, game);
   if (!objectives.length) return [];
   const context = objectiveContextForGame(game, scenario);
-  const progress =
-    game.objectiveProgress ??
-    historyProgress(
-      objectives,
-      game.monthlyHistory,
-      context,
-      retentionBaseline(scenario, game.customerMarketSize) ??
-        game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
-    );
+  const progress = gameObjectiveProgress(game)!;
   const cached = resultCache.get(progress);
   if (
     cached?.completedMonths === context.completedMonths &&

@@ -1067,7 +1067,7 @@ for (const [theme, requiredBills] of [
       "Bills ≤$0/kWh each month · Jan–Feb 2020",
     );
     await expect(
-      rules.getByText("0/2 months completed", { exact: true }),
+      rules.getByText("Recorded: 0/2 months completed", { exact: true }),
     ).toHaveCount(2);
     await expect(rules.getByText("Optional", { exact: true })).toHaveCount(
       requiredBills ? 0 : 1,

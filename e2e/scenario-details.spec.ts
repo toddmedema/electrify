@@ -1,6 +1,7 @@
 import { openPane } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { expect, test } from "./fixtures";
+import { editSavedGame, readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
   test(`scenario tool reflows and dismisses in ${theme} mode`, async ({
@@ -22,6 +23,28 @@ for (const theme of ["light", "dark"] as const) {
     await openPane(panel, details);
     await expect(panel).toBeVisible();
     await expect(panel).toContainText("Wildfire Emergency");
+    await expect(panel.locator(".scenarioMissionOutlook")).toHaveAttribute(
+      "data-status",
+      /^(win|loss|unknown)$/,
+    );
+    const requirements = panel.getByRole("region", {
+      name: "Victory conditions",
+    });
+    await expect(
+      requirements
+        .getByText(/Projected to meet|Projected miss|Forecast unavailable/)
+        .first(),
+    ).toBeAttached();
+    await expect(requirements.locator('[data-status="loading"]')).toHaveCount(
+      0,
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`scenario-outlook-${theme}.png`),
+    });
+    await requirements.locator("dt").first().scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: testInfo.outputPath(`scenario-goals-${theme}.png`),
+    });
     await expect(
       panel.locator(
         '.missionRequirementStatus[data-status="unknown"], .missionRequirementStatus[data-status="in-progress"]',
@@ -84,3 +107,36 @@ for (const theme of ["light", "dark"] as const) {
     await expect(panel).not.toBeVisible();
   });
 }
+
+test("scenario outlook flags insolvency with the first projected month-end", async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem("audioEnabled", "false");
+  });
+  await page.goto("/?scenario=111");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
+  await editSavedGame(page, (save) => {
+    save.game.lowCashWarningMonth = save.game.date.monthsElapsed;
+    for (const tick of save.game.timeline) tick.cash = -1e12;
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Scenario", exact: true });
+  await openPane(
+    panel,
+    page
+      .locator("#navfooter:visible")
+      .getByRole("button", { name: "Scenario", exact: true })
+      .first(),
+  );
+  const outlook = panel.getByRole("region", { name: "Projected loss" });
+  await expect(outlook).toContainText("Keep the utility solvent");
+  await expect(outlook).toContainText(/Cash below \$0 at \w+ \d{4} month-end/);
+  await expectDialogToFit(panel);
+  await page.screenshot({
+    path: testInfo.outputPath("scenario-outlook-bankruptcy.png"),
+  });
+});
