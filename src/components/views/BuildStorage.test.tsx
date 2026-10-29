@@ -8,8 +8,44 @@ import {
 import { createGame } from "../../testing/Simulator";
 import { GameType, isStorage } from "../../Types";
 import BuildStorage from "./BuildStorage";
+import { STORAGE } from "../../data/Facilities";
+import { purchaseTerms } from "../../helpers/Financials";
 
 jest.mock("../base/ManualLink", () => () => null);
+
+it("resizes an unaffordable battery to the largest affordable slider size", () => {
+  const state = game();
+  state.date.year = 2020;
+  const quote = (size: number) =>
+    STORAGE(state, size).find((item) => item.name === "Battery")!;
+  const cash = purchaseTerms(
+    quote(70e6).buildCost,
+    true,
+    state.interestRate,
+  ).downpayment;
+  state.timeline = state.timeline.map((tick) => ({ ...tick, cash }));
+  const onBuildStorage = jest.fn();
+  render(
+    <BuildStorage
+      game={state}
+      onBuildStorage={onBuildStorage}
+      onBack={jest.fn()}
+    />,
+  );
+  const review = screen.getByRole("button", {
+    name: "Review purchase of Lithium Battery",
+  });
+  expect(review).toBeDisabled();
+  const card = screen.getByText(
+    (_text, element) =>
+      element?.getAttribute("data-build-option") === "Lithium Battery",
+  );
+  fireEvent.click(within(card).getByRole("button", { name: "Use max size" }));
+  expect(review).toBeEnabled();
+  fireEvent.click(review);
+  fireEvent.click(screen.getByRole("button", { name: "Take loan" }));
+  expect(onBuildStorage.mock.calls[0][0].peakWh).toBe(70e6);
+});
 
 function game(): GameType {
   const state = createGame({ scenarioId: 103 });
@@ -113,13 +149,19 @@ it("offers an oversized storage project its max size", () => {
   expect(
     screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),
   ).toBeDisabled();
-  const useMaxSize = screen.getByRole("button", { name: "Use max size" });
+  const battery = screen.getByText(
+    (_text, element) =>
+      element?.getAttribute("data-build-option") === "Lithium Battery",
+  );
+  const useMaxSize = within(battery).getByRole("button", {
+    name: "Use max size",
+  });
 
   const before = slider.getAttribute("aria-valuenow");
   fireEvent.click(useMaxSize);
   expect(slider).not.toHaveAttribute("aria-valuenow", before!);
   expect(
-    screen.queryByRole("button", { name: "Use max size" }),
+    within(battery).queryByRole("button", { name: "Use max size" }),
   ).not.toBeInTheDocument();
 });
 

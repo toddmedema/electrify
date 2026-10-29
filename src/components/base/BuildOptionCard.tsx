@@ -102,6 +102,7 @@ export default function BuildOptionCard(
         .filter(Boolean)
         .join(" ")}
       {...props.cardProps}
+      data-build-option={name}
     >
       <CardHeader
         className={sizeAction ? "stackedActionsHeader" : undefined}

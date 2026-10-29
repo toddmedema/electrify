@@ -9,7 +9,11 @@ import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
 import * as React from "react";
-import { initialIntertieBuildTier } from "../../helpers/BuildSizing";
+import {
+  initialIntertieBuildTier,
+  largestAffordableBuildSize,
+} from "../../helpers/BuildSizing";
+import useBuildRowReveal from "../base/useBuildRowReveal";
 import { useToolState } from "../base/GameToolMemory";
 import {
   DragDropContext,
@@ -247,6 +251,7 @@ function IntertieBuildItem(props: {
   readOnly: boolean;
   units: UnitSystemType;
   onReview: () => void;
+  onUseMaxSize?: () => void;
   importCapacityW: number;
   exportCapacityW: number;
   constructionKgco2eTotal: number;
@@ -275,6 +280,14 @@ function IntertieBuildItem(props: {
       // what the dialog's own "Build..." title is, so the list stays navigable without jumping
       // back up a level underneath it.
       titleComponent="h6"
+      sizeAction={
+        !readOnly &&
+        props.onUseMaxSize && (
+          <Button size="small" onClick={props.onUseMaxSize}>
+            Use max size
+          </Button>
+        )
+      }
       review={
         readOnly
           ? undefined
@@ -607,6 +620,8 @@ export default function TransmissionPanel({
   projectsOnly = false,
 }: TransmissionPanelProps) {
   const units = useUnits();
+  const projectsRef = React.useRef<HTMLUListElement>(null);
+  const revealResizedRow = useBuildRowReveal(projectsRef);
   const [cancelLine, setCancelLine] =
     React.useState<TransmissionLineOperatingType | null>(null);
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
@@ -1242,8 +1257,25 @@ export default function TransmissionPanel({
             sortLabel="Sort interties"
             onSortChange={(value) => setSort(value as IntertieSortKey)}
           />
-          <List dense className="cardList transmissionProjects">
+          <List
+            ref={projectsRef}
+            dense
+            className="cardList transmissionProjects"
+          >
             {projects.map(({ quote: corridor }) => {
+              const affordableTier =
+                !readOnly &&
+                now &&
+                purchaseTerms(corridor.buildCost, true, game.interestRate)
+                  .downpayment > now.cash
+                  ? largestAffordableBuildSize(
+                      Array.from({ length: tier - 1 }, (_, index) => index + 1),
+                      now.cash,
+                      (candidate) =>
+                        buildQuote(corridor.id, candidate)?.buildCost ??
+                        Infinity,
+                    )
+                  : undefined;
               const capacities = intertieDirectionalCapacities(
                 corridor.id,
                 intertieContext,
@@ -1263,6 +1295,17 @@ export default function TransmissionPanel({
                   readOnly={readOnly}
                   units={units}
                   onReview={() => setReviewId(corridor.id)}
+                  onUseMaxSize={
+                    affordableTier === undefined
+                      ? undefined
+                      : () => {
+                          revealResizedRow(
+                            adjacentMarketForCorridor(corridor.id)?.name ||
+                              corridor.name,
+                          );
+                          setTier(affordableTier);
+                        }
+                  }
                 />
               );
             })}

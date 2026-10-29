@@ -23,8 +23,45 @@ import {
 } from "../../helpers/Hazards";
 import { DOWNPAYMENT_PERCENT, TICKS_PER_YEAR } from "../../Constants";
 import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
+import { purchaseTerms } from "../../helpers/Financials";
 
 jest.mock("../base/ManualLink", () => () => null);
+
+it("resizes an unaffordable generator to the largest affordable slider size", () => {
+  const game = createGame({ scenarioId: 100 });
+  const quote = (size: number) =>
+    GENERATORS(game, size, [], []).find((item) => item.name === "Solar")!;
+  const cash = purchaseTerms(
+    quote(70e6).buildCost,
+    true,
+    game.interestRate,
+  ).downpayment;
+  game.timeline = game.timeline.map((tick) => ({ ...tick, cash }));
+  const onBuildGenerator = jest.fn();
+  render(
+    <BuildGenerators
+      game={game}
+      onBuildGenerator={onBuildGenerator}
+      onBack={jest.fn()}
+    />,
+  );
+  const review = screen.getByRole("button", {
+    name: "Review purchase of Solar",
+  });
+  expect(review).toBeDisabled();
+  const card = screen.getByText(
+    (_text, element) => element?.getAttribute("data-build-option") === "Solar",
+  );
+  fireEvent.click(
+    within(card).getByRole("button", {
+      name: "Use max size",
+    }),
+  );
+  expect(review).toBeEnabled();
+  fireEvent.click(review);
+  fireEvent.click(screen.getByRole("button", { name: "Take loan" }));
+  expect(onBuildGenerator.mock.calls[0][0].peakW).toBe(70e6);
+});
 
 describe("the three-year build forecast", () => {
   const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
@@ -521,7 +558,7 @@ it("pins up to three current-grid choices into a comparison tray", () => {
 
 it("keeps expanded details with their generator when tutorial choices expand", () => {
   const game = createGame({ scenarioId: 1 });
-  game.tutorialStep = 2;
+  game.tutorialStep = 3;
   const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
   const { rerender } = render(<BuildGenerators game={game} {...callbacks} />);
   expect(
@@ -529,7 +566,7 @@ it("keeps expanded details with their generator when tutorial choices expand", (
   ).toHaveLength(4);
   fireEvent.click(screen.getByRole("button", { name: "Show Wind details" }));
   rerender(
-    <BuildGenerators game={{ ...game, tutorialStep: 3 }} {...callbacks} />,
+    <BuildGenerators game={{ ...game, tutorialStep: 4 }} {...callbacks} />,
   );
   expect(
     screen.getByRole("button", { name: "Hide Wind details" }),
@@ -539,7 +576,7 @@ it("keeps expanded details with their generator when tutorial choices expand", (
   ).toHaveLength(1);
   expect(
     screen.getAllByRole("button", { name: /^Review purchase of/ }).length,
-  ).toBeGreaterThan(3);
+  ).toBeGreaterThan(4);
 });
 
 it("quotes a Hydro site maximum and updates the shared slider", () => {

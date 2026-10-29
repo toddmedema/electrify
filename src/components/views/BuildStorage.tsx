@@ -16,6 +16,8 @@ import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
   averageBuildSize,
+  buildSizeOptions,
+  largestAffordableBuildSize,
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
@@ -34,6 +36,7 @@ import {
 } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+import useBuildRowReveal from "../base/useBuildRowReveal";
 import { GameType, LocationType, StorageShoppingType } from "../../Types";
 
 function storageBuildSummary(storage: StorageShoppingType): string {
@@ -54,6 +57,7 @@ interface StorageBuildItemProps {
   interestRate: number;
   location?: LocationType;
   storage: StorageShoppingType;
+  minimumBuildCost: number;
   onUseMaxSize: (peakWh: number) => void;
   onBuild: (financed: boolean) => void;
 }
@@ -88,6 +92,11 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   );
   const shortfall = financingShortfallText(cash, downpayment);
   const buildSubtitle = (buildable && shortfall) || secondaryText;
+  const offerAffordableSize =
+    buildable &&
+    !!shortfall &&
+    purchaseTerms(props.minimumBuildCost, true, props.interestRate)
+      .downpayment <= cash;
 
   const openReview = (e: React.SyntheticEvent) => {
     setOpen(true);
@@ -105,8 +114,8 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         onClick: openReview,
       }}
       sizeAction={
-        offerMaxSize &&
-        storage.peakWh !== maxSizeWh && (
+        (offerMaxSize || offerAffordableSize) &&
+        (offerAffordableSize || storage.peakWh !== maxSizeWh) && (
           <Button size="small" onClick={() => props.onUseMaxSize(maxSizeWh)}>
             Use max size
           </Button>
@@ -266,6 +275,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const listRef = useToolScroll<HTMLUListElement>("storage.scroll");
+  const revealResizedRow = useBuildRowReveal(listRef);
   const [sliderTick, setSliderTick] = useToolState<number>("storage.size", () =>
     Math.max(
       4,
@@ -286,6 +296,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
   }
 
   const cash = now.cash;
+  const minimumStorage = STORAGE(game, sliderTickToW(4));
   const storage = STORAGE(game, sliderTickToW(sliderTick))
     .map((candidate) =>
       exactSizes[candidate.name] !== undefined
@@ -312,14 +323,29 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
         onSortChange={(value) => setSort(value as StorageSortKey)}
       />
       <List ref={listRef} dense className="scrollable cardList">
-        {storage.map((g: StorageShoppingType, i: number) => (
+        {storage.map((g: StorageShoppingType) => (
           <StorageBuildItem
             storage={g}
-            key={i}
+            key={g.name}
             cash={cash}
+            minimumBuildCost={
+              minimumStorage.find((item) => item.name === g.name)!.buildCost
+            }
             onUseMaxSize={(peakWh) => {
-              setSliderTick(Math.max(0, wToSliderTick(peakWh)));
-              setExactSizes((sizes) => ({ ...sizes, [g.name]: peakWh }));
+              const size =
+                largestAffordableBuildSize(
+                  buildSizeOptions(4, 37, peakWh),
+                  cash,
+                  (capacity) =>
+                    STORAGE(game, capacity).find(
+                      (item) => item.name === g.name,
+                    )!.buildCost,
+                ) ?? peakWh;
+              revealResizedRow(
+                g.name === "Battery" ? "Lithium Battery" : g.name,
+              );
+              setSliderTick(Math.max(4, wToSliderTick(size)));
+              setExactSizes((sizes) => ({ ...sizes, [g.name]: size }));
             }}
             interestRate={game.interestRate}
             location={game.location}
