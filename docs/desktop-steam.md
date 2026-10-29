@@ -97,6 +97,14 @@ for player distribution.
 
 ## Prepare a Steam build
 
+While waiting for Steamworks account verification or Electrify's App ID, use
+`npm run desktop:pack:offline` and open the packaged `Electrify.app` directly on macOS.
+This exercises the game without Steam services. If testing with App ID `480`, remember that
+it identifies [Valve's Spacewar sample](https://partner.steamgames.com/doc/sdk/api/example),
+which has its own library entry and compatibility metadata. Launching Spacewar from the Steam
+library does not launch Electrify. Its compatibility warning does not establish whether the
+packaged Electrify app can run on the Mac.
+
 Use the App ID allocated to Electrify in your Steamworks account. Do not ship Spacewar's test
 App ID or a development `steam_appid.txt` file.
 
@@ -113,6 +121,30 @@ platform and does not choose depots by CPU architecture, so the single universal
 both Intel and Apple Silicon Macs. Set Windows to `Electrify.exe`, Linux to `Electrify`, and
 macOS to `Electrify.app`. Publish the Steamworks changes and assign the build to a private
 testing branch. This repository does not publish a Steam depot or configure your partner account.
+
+### macOS compatibility metadata
+
+Steam's "Your current macOS version is unable to run 32-bit games" warning can appear even
+when the installed app is universal. Steam uses published partner metadata to identify
+64-bit Mac support; packaging or uploading a new depot does not set that metadata.
+
+In Electrify's **Edit Steamworks Settings → Application → General → Supported Operating
+Systems**, enable **macOS** and **64 Bit Binaries Included** (or **64 Bit (Intel) Binaries
+Included**, depending on the label). Enable **Apple Silicon Binaries Included** when offered:
+the universal app contains both `x86_64` and `arm64`. Save and publish the Steamworks changes.
+See [Valve's macOS platform guidance](https://partner.steamgames.com/doc/store/application/platforms).
+
+Keep the macOS launch option pointed at `Electrify.app` and the universal Mac depot included
+in the testing account's package and selected branch. After Steam receives the published
+settings, confirm that the library warning has disappeared and launch the installed build
+on an Apple Silicon Mac. Check an Intel Mac before release as well. A warning disappearing
+confirms the compatibility metadata; launching the installed game verifies the depot.
+
+Rebuilding the app alone cannot clear this warning. The packaging verifier already requires
+both 64-bit executable slices and their native Steam dependencies. If launch still fails
+after the metadata correction, investigate that failure separately.
+
+### macOS signing and notarization
 
 macOS Steam releases require Developer ID signing and Apple notarization. Supply your signing
 certificate through electron-builder's `CSC_LINK` and `CSC_KEY_PASSWORD` configuration (or an
