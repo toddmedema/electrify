@@ -11,6 +11,17 @@ import {
 
 afterEach(() => resetInputPresentation());
 
+// Fake timers and nodes added outside React must not leak into later tests when one fails.
+const attached: Element[] = [];
+function attach(...nodes: Element[]) {
+  document.body.append(...nodes);
+  attached.push(...nodes);
+}
+afterEach(() => {
+  jest.useRealTimers();
+  attached.splice(0).forEach((node) => node.remove());
+});
+
 function objective(
   overrides: Partial<TutorialStepType> = {},
 ): TutorialStepType {
@@ -238,7 +249,7 @@ describe("TutorialHud", () => {
     jest.useFakeTimers();
     const target = document.createElement("button");
     target.id = "tutorial-target";
-    document.body.appendChild(target);
+    attach(target);
 
     const hudProps = props();
     const { rerender, unmount } = render(<TutorialHud {...hudProps} />);
@@ -275,8 +286,6 @@ describe("TutorialHud", () => {
     ).toBeInTheDocument();
 
     unmount();
-    target.remove();
-    jest.useRealTimers();
   });
 
   // jsdom lays nothing out, so these tests stub the target's box. The viewport is 1024x768 and
@@ -326,7 +335,7 @@ describe("TutorialHud", () => {
       scroller.appendChild(target);
       return target;
     });
-    document.body.appendChild(scroller);
+    attach(scroller);
     const { unmount } = render(
       <TutorialHud
         {...props({ step: objective({ target: ".purchase-choice" }) })}
@@ -347,8 +356,6 @@ describe("TutorialHud", () => {
     act(() => jest.advanceTimersByTime(1000));
     expect(scroller.scrollTop).toBe(0);
     unmount();
-    scroller.remove();
-    jest.useRealTimers();
   });
 
   it.each([
@@ -383,22 +390,15 @@ describe("TutorialHud", () => {
       dock.id = "navfooter";
       dock.className = "gameActionDock";
       stubRect(dock, overlaps ? 200 : 600, 600, overlaps ? 300 : 700, 680);
-      document.body.append(scroller, dock);
-      const { unmount } = render(<TutorialHud {...props()} />);
-      try {
-        act(() => jest.advanceTimersByTime(500));
-        expect(scroller.scrollTop).toBe(overlaps && inStage ? 50 : 0);
-        const ring = screen.getByTestId("tutorial-target-ring");
-        expect(
-          Number.parseFloat(ring.style.top) +
-            Number.parseFloat(ring.style.height),
-        ).toBe(overlaps && inStage ? 600 : 650);
-      } finally {
-        unmount();
-        scroller.remove();
-        dock.remove();
-        jest.useRealTimers();
-      }
+      attach(scroller, dock);
+      render(<TutorialHud {...props()} />);
+      act(() => jest.advanceTimersByTime(500));
+      expect(scroller.scrollTop).toBe(overlaps && inStage ? 50 : 0);
+      const ring = screen.getByTestId("tutorial-target-ring");
+      expect(
+        Number.parseFloat(ring.style.top) +
+          Number.parseFloat(ring.style.height),
+      ).toBe(overlaps && inStage ? 600 : 650);
     },
   );
 
@@ -406,7 +406,7 @@ describe("TutorialHud", () => {
     const target = document.createElement("div");
     target.id = "tutorial-target";
     stubRect(target, 200, 150, 400, 250);
-    document.body.appendChild(target);
+    attach(target);
 
     const { unmount } = render(<TutorialHud {...props()} />);
     const ring = screen.getByTestId("tutorial-target-ring");
@@ -418,7 +418,6 @@ describe("TutorialHud", () => {
     expect(ring.style.height).toBe("110px");
 
     unmount();
-    target.remove();
   });
 
   it("keeps every side of the ring visible when the control runs edge to edge", () => {
@@ -427,7 +426,7 @@ describe("TutorialHud", () => {
     // Flush with the viewport's left and right, like the facilities chart on a phone or in a
     // pane. An outline lost its sides here; the ring must not.
     stubRect(target, 0, 150, 1024, 250);
-    document.body.appendChild(target);
+    attach(target);
 
     const { unmount } = render(<TutorialHud {...props()} />);
     const ring = screen.getByTestId("tutorial-target-ring");
@@ -440,7 +439,6 @@ describe("TutorialHud", () => {
     expect(ring.style.width).toBe("1024px");
 
     unmount();
-    target.remove();
   });
 
   it("tracks moving targets on every animation frame and stops after unmount", () => {
@@ -455,7 +453,7 @@ describe("TutorialHud", () => {
     const target = document.createElement("div");
     target.id = "tutorial-target";
     stubRect(target, 200, 150, 400, 250);
-    document.body.appendChild(target);
+    attach(target);
 
     const { unmount } = render(<TutorialHud {...props()} />);
     const ring = screen.getByTestId("tutorial-target-ring");
@@ -475,7 +473,6 @@ describe("TutorialHud", () => {
     unmount();
     expect(cancelFrame).toHaveBeenCalledWith(1);
     expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
-    target.remove();
     requestFrame.mockRestore();
     cancelFrame.mockRestore();
   });
@@ -485,7 +482,7 @@ describe("TutorialHud", () => {
     const target = document.createElement("div");
     target.id = "tutorial-target";
     stubRect(target, 200, 150, 400, 250);
-    document.body.appendChild(target);
+    attach(target);
     const { unmount } = render(<TutorialHud {...props()} />);
     const ring = screen.getByTestId("tutorial-target-ring");
     target.className = "facilityRowHeader ready";
@@ -503,8 +500,6 @@ describe("TutorialHud", () => {
     expect(screen.getByTestId("tutorial-target-ring")).toBe(ring);
     unmount();
     expect(target).not.toHaveClass("tutorialTarget", "tutorialTargetReminder");
-    target.remove();
-    jest.useRealTimers();
   });
 
   it("keeps the gap even on every side when one side has only a little room", () => {
@@ -512,7 +507,7 @@ describe("TutorialHud", () => {
     target.id = "tutorial-target";
     // 4px from the viewport's right edge, like the speed buttons on a phone.
     stubRect(target, 800, 20, 1020, 60);
-    document.body.appendChild(target);
+    attach(target);
 
     const { unmount } = render(<TutorialHud {...props()} />);
     const ring = screen.getByTestId("tutorial-target-ring");
@@ -522,7 +517,6 @@ describe("TutorialHud", () => {
     expect(ring.style.height).toBe("48px");
 
     unmount();
-    target.remove();
   });
 
   it("keeps the gap for a control flush with a pane that clips but does not scroll", () => {
@@ -534,7 +528,7 @@ describe("TutorialHud", () => {
     target.id = "tutorial-target";
     stubRect(target, 320, 100, 410, 140);
     pane.appendChild(target);
-    document.body.appendChild(pane);
+    attach(pane);
 
     const { unmount } = render(<TutorialHud {...props()} />);
     const ring = screen.getByTestId("tutorial-target-ring");
@@ -542,17 +536,15 @@ describe("TutorialHud", () => {
     expect(ring.style.height).toBe("50px");
 
     unmount();
-    pane.remove();
   });
 
   it("draws one ring around targets that touch edge to edge", () => {
-    const rows = [150, 220].map((top) => {
+    for (const top of [150, 220]) {
       const row = document.createElement("div");
       row.className = "tutorial-row";
       stubRect(row, 200, top, 600, top + 70);
-      document.body.appendChild(row);
-      return row;
-    });
+      attach(row);
+    }
 
     const { unmount } = render(
       <TutorialHud
@@ -567,14 +559,13 @@ describe("TutorialHud", () => {
     expect(visible[0].style.height).toBe("150px");
 
     unmount();
-    rows.forEach((row) => row.remove());
   });
 
   it("hides the ring while its target has no box", () => {
     const target = document.createElement("div");
     target.id = "tutorial-target";
     stubRect(target, 0, 0, 0, 0);
-    document.body.appendChild(target);
+    attach(target);
 
     const { unmount } = render(<TutorialHud {...props()} />);
     const ring = screen.getByTestId("tutorial-target-ring");
@@ -582,7 +573,6 @@ describe("TutorialHud", () => {
     expect(ring.style.display).toBe("none");
 
     unmount();
-    target.remove();
   });
   it("follows a target that mounts late or is replaced during the step", () => {
     jest.useFakeTimers();
@@ -593,7 +583,7 @@ describe("TutorialHud", () => {
     const first = document.createElement("div");
     first.id = "tutorial-target";
     stubRect(first, 200, 150, 400, 250);
-    document.body.appendChild(first);
+    attach(first);
     act(() => jest.advanceTimersByTime(100));
     expect(first).toHaveClass("tutorialTarget");
     expect(screen.getAllByTestId("tutorial-target-ring")).toHaveLength(1);
@@ -604,7 +594,7 @@ describe("TutorialHud", () => {
     const second = document.createElement("div");
     second.id = "tutorial-target";
     stubRect(second, 0, 150, 1024, 250);
-    document.body.appendChild(second);
+    attach(second);
     act(() => jest.advanceTimersByTime(100));
     expect(second).toHaveClass("tutorialTarget", "tutorialTargetReminder");
     expect(first).not.toHaveClass("tutorialTarget");
@@ -616,8 +606,6 @@ describe("TutorialHud", () => {
     unmount();
     expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
     expect(second).not.toHaveClass("tutorialTarget");
-    second.remove();
-    jest.useRealTimers();
   });
 
   it("stops the ring above a sticky bar lying across the control", () => {
@@ -632,7 +620,7 @@ describe("TutorialHud", () => {
     footer.style.bottom = "0px";
     stubRect(footer, 0, 700, 1024, 768);
     scroller.append(target, footer);
-    document.body.appendChild(scroller);
+    attach(scroller);
 
     const { unmount } = render(<TutorialHud {...props()} />);
     const ring = screen.getByTestId("tutorial-target-ring");
@@ -642,6 +630,5 @@ describe("TutorialHud", () => {
     expect(ring.style.height).toBe("100px");
 
     unmount();
-    scroller.remove();
   });
 });

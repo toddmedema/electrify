@@ -26,7 +26,8 @@ concurrency:
 jobs:
   build:
     name: Shared production builds
-    runs-on: ubuntu-latest
+    # Same image as the test workers, which restore the node_modules cache this job can save.
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     env:
       DISABLE_ESLINT_PLUGIN: "true"
@@ -175,6 +176,8 @@ jobs:
         run: node scripts/ci/benchmark-jest-cache.js > test-results/benchmark-jest-cache.json
       - name: Preserve CPU reports and coverage
         if: always()
+        # A failed diagnostics upload must not turn passing tests red.
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: diagnostics-cpu
@@ -220,6 +223,8 @@ jobs:
         run: npm run test:e2e -- --config=e2e/ci-work.bench.config.ts
       - name: Preserve browser reports and diagnostics
         if: always()
+        # A failed diagnostics upload must not turn passing tests red.
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: diagnostics-browser
@@ -276,6 +281,8 @@ jobs:
         run: node scripts/ci/benchmark-world-advance.js "$(find test-results/multiplayer -path '*native-106*1280*/native-world.json' -print -quit)" 48 > test-results/benchmark-world-advance.json
       - name: Preserve desktop reports and diagnostics
         if: always()
+        # A failed diagnostics upload must not turn passing tests red.
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: diagnostics-desktop

@@ -8,6 +8,7 @@ declare global {
       samples: Array<{ x: number; at: number }>;
       canvasDraws: number;
     };
+    __reducedMotionChange?: Promise<void>;
   }
 }
 function interpolates(
@@ -76,6 +77,22 @@ async function start(page: Page, theme: string, textSize = "standard") {
   });
   await page.mouse.move(0, 0);
   return pane;
+}
+async function setReducedMotion(
+  page: Page,
+  reducedMotion: "reduce" | "no-preference",
+) {
+  // The chart snaps from its own matchMedia change listener. This one is registered later, so
+  // it resolves after the chart has reacted, before the next sample starts.
+  await page.evaluate(() => {
+    window.__reducedMotionChange = new Promise((resolve) =>
+      window
+        .matchMedia("(prefers-reduced-motion: reduce)")
+        .addEventListener("change", () => resolve(), { once: true }),
+    );
+  });
+  await page.emulateMedia({ reducedMotion });
+  await page.evaluate(() => window.__reducedMotionChange);
 }
 async function sample(page: Page) {
   await page.evaluate(() => {
@@ -147,9 +164,9 @@ test("reduced motion can change during 1x play without leaving interpolation act
     .click();
   await page.clock.runFor(1200);
   expect((await sample(page)).samples.length).toBeLessThanOrEqual(5);
-  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await setReducedMotion(page, "no-preference");
   expect(interpolates((await sample(page)).samples)).toBe(true);
-  await page.emulateMedia({ reducedMotion: "reduce" });
+  await setReducedMotion(page, "reduce");
   expect((await sample(page)).samples.length).toBeLessThanOrEqual(5);
 });
 
