@@ -1,5 +1,6 @@
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
+import { sameBuildQuote, useBuildAffordability } from "../base/useBuildCash";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
 import { Button, List, Typography } from "@mui/material";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
@@ -19,8 +20,9 @@ import {
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
-import PurchaseReviewDialog, {
-  financingShortfallText,
+import {
+  LivePurchaseReviewDialog as PurchaseReviewDialog,
+  BuildCashWarning,
 } from "../base/PurchaseReviewDialog";
 import {
   getBuildAvailability,
@@ -70,6 +72,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     true,
     props.interestRate,
   );
+  const affordable = useBuildAffordability(cash, downpayment);
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
   const maxSizeWh = floorToTwoSignificantDigits(storage.maxPeakWh);
   const { buildable, secondaryText, offerMaxSize } = getBuildAvailability({
@@ -86,7 +89,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     props.location,
     storage.viableLocationsRemaining,
   );
-  const shortfall = financingShortfallText(cash, downpayment);
+  const shortfall = !affordable ? (
+    <BuildCashWarning cash={cash} downpayment={downpayment} />
+  ) : undefined;
   const buildSubtitle = (buildable && shortfall) || secondaryText;
 
   const openReview = (e: React.SyntheticEvent) => {
@@ -261,7 +266,7 @@ export interface DispatchProps {
 
 export type Props = StateProps & DispatchProps;
 
-export default function StorageBuildDialog(props: Props): React.JSX.Element {
+function StorageBuildDialog(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
@@ -333,3 +338,5 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
     </div>
   );
 }
+
+export default React.memo(StorageBuildDialog, sameBuildQuote);

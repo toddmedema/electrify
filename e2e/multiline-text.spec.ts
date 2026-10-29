@@ -199,6 +199,8 @@ for (const theme of ["light", "dark"] as const) {
       page,
     }, info) => {
       const details = page.getByRole("button", { name: /^Show .* details$/ });
+      // The Build shell appears before its worker-backed quotes and disclosures.
+      await expect(details.first()).toBeVisible();
       while (await details.count()) await details.first().click();
       await expect(
         page.locator(".MuiCollapse-root:not(.MuiCollapse-entered)"),
