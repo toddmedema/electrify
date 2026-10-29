@@ -105,7 +105,7 @@ export interface RateControlsProps {
 export default function RateControls({ game, onDelta }: RateControlsProps) {
   const now = currentTick(game);
   // Announce only the change a drag makes, not a state the panel opened in.
-  const followSetting = !!game.rateFollowsTarget;
+  const followSetting = !!game.rateFollowsInflation;
   const wasFollowing = React.useRef(followSetting);
   const [announcedStop, setAnnouncedStop] = React.useState(false);
   React.useEffect(() => {
@@ -196,9 +196,10 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     game.startingYear,
     game.seed,
   );
-  // Tutorials and multiplayer matches set their own rates, so only a solo public run can follow.
+  // Tutorials and multiplayer matches set their own rates, so only a solo public run can
+  // follow inflation.
   const canFollow = !investor && !scenario.tutorialSteps && !game.multiplayer;
-  const following = canFollow && !!game.rateFollowsTarget;
+  const following = canFollow && !!game.rateFollowsInflation;
   const max = publicRateCap(
     scenario.dollarsPerkWh,
     game.date,
@@ -270,7 +271,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
   );
   const rateSummary = investor
     ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-    : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; ${following ? "following the target each month; " : ""}${hasEstimate ? `estimated rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
+    : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; ${following ? "adjusting with inflation each January; " : ""}${hasEstimate ? `estimated rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
   const rateScoreClass = `insightsRateScore ${
     rateScore(game.dollarsPerkWh) > 0
       ? "good"
@@ -326,14 +327,14 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
           <FormControlLabel
             className="programsRateFollow"
             labelPlacement="start"
-            label="Follow target"
+            label="Follow inflation"
             control={
               <Switch
                 color="primary"
                 checked={following}
-                slotProps={{ input: { "aria-label": "Follow target rate" } }}
+                slotProps={{ input: { "aria-label": "Follow inflation" } }}
                 onChange={(event) =>
-                  onDelta({ rateFollowsTarget: event.target.checked })
+                  onDelta({ rateFollowsInflation: event.target.checked })
                 }
               />
             }
@@ -346,7 +347,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
       {canFollow && (
         <span className="srOnly" role="status" aria-live="polite">
           {!following && announcedStop
-            ? "Rate no longer follows the target."
+            ? "Rate no longer follows inflation."
             : ""}
         </span>
       )}

@@ -275,28 +275,28 @@ it("labels the public slider axis in cents with a short cap", () => {
   ]);
 });
 
-it("offers a public utility a switch to follow its target, off once a rate is chosen", () => {
+it("offers a public utility a switch to follow inflation, off once a rate is chosen", () => {
   const game = createGame({ scenarioId: 107 });
   const onDelta = jest.fn();
   const view = render(<RateControls game={game} onDelta={onDelta} />);
-  const follow = screen.getByRole("switch", { name: "Follow target rate" });
+  const follow = screen.getByRole("switch", { name: "Follow inflation" });
   expect(follow).toBeChecked();
   fireEvent.click(follow);
-  expect(onDelta).toHaveBeenCalledWith({ rateFollowsTarget: false });
+  expect(onDelta).toHaveBeenCalledWith({ rateFollowsInflation: false });
   view.rerender(
     <RateControls
-      game={{ ...game, rateFollowsTarget: false }}
+      game={{ ...game, rateFollowsInflation: false }}
       onDelta={onDelta}
     />,
   );
   expect(screen.getByRole("status")).toHaveTextContent(
-    "Rate no longer follows the target.",
+    "Rate no longer follows inflation.",
   );
-  fireEvent.click(screen.getByRole("switch", { name: "Follow target rate" }));
-  expect(onDelta).toHaveBeenLastCalledWith({ rateFollowsTarget: true });
+  fireEvent.click(screen.getByRole("switch", { name: "Follow inflation" }));
+  expect(onDelta).toHaveBeenLastCalledWith({ rateFollowsInflation: true });
 });
 
-it("doesn't offer an investor-owned utility a target to follow", () => {
+it("doesn't offer an investor-owned utility inflation to follow", () => {
   renderRates(100);
   expect(screen.queryByRole("switch")).not.toBeInTheDocument();
 });

@@ -158,7 +158,7 @@ export function projectionSignature(game: GameType): string {
     game.date.monthsElapsed,
     game.monthlyHistory.length,
     game.dollarsPerkWh,
-    !!game.rateFollowsTarget,
+    !!game.rateFollowsInflation,
     game.feePerKgCO2e,
     facilitySignature(game),
     policySignature(game),
