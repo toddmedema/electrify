@@ -78,6 +78,12 @@ for (const mission of [
       await expect(hud).toContainText(
         mission === "Generators" ? "Review a generator" : "Review a storage",
       );
+      // These steps advance from the review control; Next remains an optional fallback.
+      await expect(hud.locator(".tutorialHudContinue")).toHaveCount(0);
+      await expect(hud.locator(".tutorialHudNextPulse")).toHaveCount(0);
+      await expect(
+        hud.getByRole("button", { name: "Next", exact: true }),
+      ).not.toHaveClass(/MuiButton-contained/);
       await page
         .getByRole("button", { name: /Review purchase of/ })
         .first()
@@ -229,14 +235,25 @@ for (const mission of [
       });
       await expect(fastSpeed).toHaveClass(/tutorialTarget/);
       await fastSpeed.click();
-      await expect(hud).toContainText("Watch the year bar advance");
+      await expect(hud).toContainText("Read the year progress bar");
       await expect(progress).toHaveClass(/tutorialTarget/);
-      await expect(page.locator(".tutorialTargetRing")).toBeVisible();
+      const ring = page.locator(".tutorialTargetRing");
+      await expect(ring).toBeVisible();
+      await expect(ring).toHaveCSS("animation-name", "none");
+      expect(
+        await ring.evaluate(
+          (element) => getComputedStyle(element, "::before").display,
+        ),
+      ).toBe("none");
       await expect(progress).not.toHaveAttribute("aria-valuenow", "0");
       expect((await progress.boundingBox())!.width).toBe(initialBox!.width);
-      // Seek the browser's animation timeline to check the reminders without waiting 12s.
+      // Seek the animation timeline to prove both glows repeat without waiting eight seconds.
       const next = hud.getByRole("button", { name: "Next", exact: true });
+      await expect(next).toHaveAccessibleDescription(
+        "Select Next when you’re ready.",
+      );
       const cue = next.locator(".tutorialHudNextPulse");
+      await expect(cue).toHaveCSS("animation-delay", "0s, 4s");
       const reminders = await cue.evaluate((element) => {
         const animation = element
           .getAnimations()
@@ -246,7 +263,7 @@ for (const mission of [
               candidate.animationName === "tutorialNextPulse",
           )!;
         animation.pause();
-        return [5999, 6480, 7200, 12480].map((time) => {
+        return [4000, 4320, 4640, 4960, 8320].map((time) => {
           animation.currentTime = time;
           const transform = getComputedStyle(element).transform;
           return transform === "none" ? 1 : new DOMMatrixReadOnly(transform).a;
@@ -255,15 +272,58 @@ for (const mission of [
       expect(reminders[0]).toBe(reminders[2]);
       expect(reminders[1]).not.toBe(reminders[0]);
       expect(reminders[3]).toBe(reminders[1]);
+      expect(reminders[4]).toBe(reminders[1]);
       await page.emulateMedia({ reducedMotion: "reduce" });
       await expect(cue).toHaveCSS("animation-name", "none");
+      await expect(hud.locator(".tutorialHudContinue")).toBeVisible();
+      await expect(next).toHaveClass(/MuiButton-contained/);
       await page.emulateMedia({ reducedMotion: "no-preference" });
-      await page.screenshot({ path: testInfo.outputPath("year-progress.png") });
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole("tooltip")).toBeHidden();
+      if (process.env.REVIEW_SCREENSHOT_DIR) {
+        await expect(page.locator(".MuiSnackbar-root")).toBeHidden();
+      }
+      await reviewScreenshot(page, {
+        path: testInfo.outputPath("manual-next.png"),
+        animations: "disabled",
+      });
       await hud.getByRole("button", { name: "Next" }).click();
       await expect(hud).toContainText(
         "Order a second generator of a different type",
       );
       await expect(progress).not.toHaveClass(/tutorialTarget/);
+      await expect(hud.locator(".tutorialHudContinue")).toHaveCount(0);
+      await expect(hud.locator(".tutorialHudNextPulse")).toHaveCount(0);
+      await expect(
+        hud.getByRole("button", { name: "Next", exact: true }),
+      ).toHaveCount(0);
+    }
+    if (mission === "Storage") {
+      await hud.getByRole("button", { name: "Next", exact: true }).click();
+      await expect(hud).toContainText("Check generation comes before storage");
+      await hud.getByRole("button", { name: "Next", exact: true }).click();
+      const start = hud.getByRole("button", {
+        name: "Start final challenge",
+        exact: true,
+      });
+      await expect(start).toHaveAccessibleDescription(
+        "Select Start final challenge when you’re ready.",
+      );
+      await expect(start.locator(".tutorialHudNextPulse")).toBeVisible();
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole("tooltip")).toBeHidden();
+      if (process.env.REVIEW_SCREENSHOT_DIR) {
+        await expect(page.locator(".MuiSnackbar-root")).toBeHidden();
+      }
+      await reviewScreenshot(page, {
+        path: testInfo.outputPath("manual-challenge.png"),
+        animations: "disabled",
+      });
+      await start.click();
+      await expect(hud).toContainText(
+        "Supply the evening peak with stored energy",
+      );
+      await expect(hud.locator(".tutorialHudContinue")).toHaveCount(0);
     }
   });
 }

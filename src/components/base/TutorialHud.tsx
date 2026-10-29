@@ -1,3 +1,4 @@
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import TouchAppOutlinedIcon from "@mui/icons-material/TouchAppOutlined";
 import { Button, Typography } from "@mui/material";
 import * as React from "react";
@@ -319,7 +320,9 @@ export default function TutorialHud({
   // Next is the step's main button only when it's the only way forward. A step that also
   // advances on an in-game deed keeps it as a quiet fallback, so the ringed control is the one
   // thing on screen asking to be tapped
-  const nextIsPrimary = !step.continueOn && !step.continueOnClick;
+  const requiresNext =
+    !isGatedStep(step) && !step.continueOn && !step.continueOnClick;
+  const nextLabel = step.nextLabel || "Next";
   const progressText = `${stepIndex + 1} of ${totalSteps}`;
   const advanceOnClick = onAutoAdvance ?? onNext;
 
@@ -402,7 +405,9 @@ export default function TutorialHud({
         ring.className = "tutorialTargetRing";
         ring.setAttribute("aria-hidden", "true");
         ring.setAttribute("data-testid", "tutorial-target-ring");
-        if (reminding) {
+        if (requiresNext) {
+          ring.classList.add("tutorialTargetRing-static");
+        } else if (reminding) {
           ring.classList.add("tutorialTargetRingPulse");
         } else {
           // One pulse the moment the step starts draws the eye to where the action is
@@ -467,14 +472,17 @@ export default function TutorialHud({
       frame = window.requestAnimationFrame(tick);
     }
 
-    const reminder = window.setTimeout(() => {
-      reminding = true;
-      rings.forEach((ring, element) => {
-        element.classList.add("tutorialTargetReminder");
-        ring.classList.remove("tutorialTargetRingIntro");
-        ring.classList.add("tutorialTargetRingPulse");
-      });
-    }, 10_000);
+    // A manual step's ring identifies what to read; only Next asks for action.
+    const reminder = requiresNext
+      ? undefined
+      : window.setTimeout(() => {
+          reminding = true;
+          rings.forEach((ring, element) => {
+            element.classList.add("tutorialTargetReminder");
+            ring.classList.remove("tutorialTargetRingIntro");
+            ring.classList.add("tutorialTargetRingPulse");
+          });
+        }, 10_000);
 
     return () => {
       window.clearTimeout(reminder);
@@ -484,7 +492,7 @@ export default function TutorialHud({
       }
       rings.forEach((ring, element) => release(element, ring));
     };
-  }, [step, target]);
+  }, [step, target, requiresNext]);
 
   return (
     <section
@@ -515,6 +523,14 @@ export default function TutorialHud({
               <span>{action}</span>
             </p>
             {content}
+            {requiresNext && (
+              <p
+                id="tutorial-continue-instruction"
+                className="tutorialHudContinue"
+              >
+                Select <strong>{nextLabel}</strong> when you’re ready.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -539,16 +555,22 @@ export default function TutorialHud({
             className="tutorialHudNav"
             color="primary"
             size="small"
-            variant={nextIsPrimary ? "contained" : "text"}
+            variant={requiresNext ? "contained" : "text"}
+            aria-describedby={
+              requiresNext ? "tutorial-continue-instruction" : undefined
+            }
+            endIcon={requiresNext ? <ArrowForwardIcon /> : undefined}
             onClick={onNext}
           >
             {/* Restart the cue each step while the button keeps keyboard focus. */}
-            <span
-              key={stepIndex}
-              className="tutorialHudNextPulse"
-              aria-hidden
-            />
-            {step.nextLabel || "Next"}
+            {requiresNext && (
+              <span
+                key={stepIndex}
+                className="tutorialHudNextPulse"
+                aria-hidden
+              />
+            )}
+            {nextLabel}
           </Button>
         )}
       </div>

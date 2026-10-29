@@ -49,6 +49,32 @@ function props(overrides: Partial<TutorialHudProps> = {}): TutorialHudProps {
 }
 
 describe("TutorialHud", () => {
+  it.each([
+    ["manual", {}, true],
+    ["optional state advance", { continueOn: () => false }, false],
+    ["optional control advance", { continueOnClick: "#tool" }, false],
+    ["required state action", { advanceOn: () => false }, false],
+    ["required dispatched action", { advanceOnAction: "game/setSpeed" }, false],
+    [
+      "capstone",
+      {
+        capstone: {
+          success: () => false,
+          successMessage: "Complete.",
+          failureMessage: "Try again.",
+        },
+      },
+      false,
+    ],
+  ] as [string, Partial<TutorialStepType>, boolean][])(
+    "reserves the continuation instruction for manual steps (%s)",
+    (_name, overrides, manual) => {
+      render(<TutorialHud {...props({ step: objective(overrides) })} />);
+      const instruction = screen.queryByText(/when you’re ready\./);
+      expect(instruction !== null).toBe(manual);
+    },
+  );
+
   it("uses controller wording in the objective and its teaching prompt", () => {
     act(() => updateInputPresentation({ active: true, connected: true }));
     render(
@@ -101,6 +127,11 @@ describe("TutorialHud", () => {
         <button>1×</button>
         <TutorialHud {...hudProps} />
       </>,
+    );
+    expect(
+      screen.getByRole("button", { name: "Start final challenge" }),
+    ).toHaveAccessibleDescription(
+      "Select Start final challenge when you’re ready.",
     );
     await user.click(screen.getByRole("button", { name: "1×" }));
     expect(hudProps.onNext).not.toHaveBeenCalled();
@@ -218,6 +249,9 @@ describe("TutorialHud", () => {
     expect(screen.getByRole("button", { name: "Next" })).toHaveClass(
       "MuiButton-contained",
     );
+    expect(
+      screen.getByRole("button", { name: "Next" }),
+    ).toHaveAccessibleDescription("Select Next when you’re ready.");
     await user.click(screen.getByRole("button", { name: "Back" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
     rerender(<TutorialHud {...hudProps} stepIndex={2} />);
@@ -251,7 +285,7 @@ describe("TutorialHud", () => {
     target.id = "tutorial-target";
     attach(target);
 
-    const hudProps = props();
+    const hudProps = props({ step: objective({ advanceOn: () => false }) });
     const { rerender, unmount } = render(<TutorialHud {...hudProps} />);
     expect(target).toHaveClass("tutorialTarget");
     expect(target).not.toHaveClass("tutorialTargetReminder");
@@ -285,6 +319,22 @@ describe("TutorialHud", () => {
       screen.getByRole("region", { name: /Your turn/ }),
     ).toBeInTheDocument();
 
+    unmount();
+  });
+
+  it("keeps a manual step’s reading target static while Next asks for action", () => {
+    jest.useFakeTimers();
+    const target = document.createElement("div");
+    target.id = "tutorial-target";
+    attach(target);
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    expect(target).toHaveClass("tutorialTarget");
+    expect(ring).toHaveClass("tutorialTargetRing-static");
+    expect(ring).not.toHaveClass("tutorialTargetRingIntro");
+    act(() => jest.advanceTimersByTime(10_000));
+    expect(target).not.toHaveClass("tutorialTargetReminder");
+    expect(ring).not.toHaveClass("tutorialTargetRingPulse");
     unmount();
   });
 
@@ -483,7 +533,11 @@ describe("TutorialHud", () => {
     target.id = "tutorial-target";
     stubRect(target, 200, 150, 400, 250);
     attach(target);
-    const { unmount } = render(<TutorialHud {...props()} />);
+    const { unmount } = render(
+      <TutorialHud
+        {...props({ step: objective({ advanceOn: () => false }) })}
+      />,
+    );
     const ring = screen.getByTestId("tutorial-target-ring");
     target.className = "facilityRowHeader ready";
     act(() => jest.advanceTimersByTime(20));
@@ -576,7 +630,11 @@ describe("TutorialHud", () => {
   });
   it("follows a target that mounts late or is replaced during the step", () => {
     jest.useFakeTimers();
-    const { unmount } = render(<TutorialHud {...props()} />);
+    const { unmount } = render(
+      <TutorialHud
+        {...props({ step: objective({ advanceOn: () => false }) })}
+      />,
+    );
     expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
 
     // The control mounts after the step starts, like a list that is still loading.

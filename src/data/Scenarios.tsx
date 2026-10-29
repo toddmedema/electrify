@@ -321,7 +321,7 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
         target: "#yearProgressBar",
-        action: "Watch the year bar advance",
+        action: "Read the year progress bar",
         content: (
           <TutorialPrompt text="This bar tracks the year. Each simulated day represents one month." />
         ),
@@ -438,7 +438,7 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
         nextLabel: "Start final challenge",
-        action: "Try storage through the evening peak",
+        action: "Prepare for the evening peak challenge",
         content: (
           <TutorialPrompt text="Restart with a smaller coal plant and the original storage. Your practice purchase is cleared." />
         ),
@@ -807,7 +807,7 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "INSIGHTS",
         nextLabel: "Start final challenge",
-        action: "Prevent the shortage you can see ahead",
+        action: "Prepare for the forecast shortage challenge",
         content: (
           <TutorialPrompt text="Start again before the blackout, then build enough generation to cover summer demand." />
         ),

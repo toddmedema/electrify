@@ -4098,6 +4098,14 @@ $pane_header_height: 48px;
   padding-left: 28px;
 }
 
+.tutorialHudContinue {
+  margin: 8px 0 0;
+  padding-left: 28px;
+  color: var(--interactive-strong);
+  font-size: var(--font-size-body1);
+  line-height: 20px;
+}
+
 .tutorialHudFooter {
   display: flex;
   align-items: center;
@@ -4108,25 +4116,41 @@ $pane_header_height: 48px;
   flex: 1 1 auto;
 }
 
-// A brief reminder after six seconds, repeated while the player stays on this step.
+// Manual steps draw attention to Next on entry, then repeat a double glow every four seconds.
 .tutorialHudNextPulse {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  animation: tutorialNextPulse 6s ease-in-out 6s infinite;
+  animation:
+    tutorialNextIntro 600ms ease-out,
+    tutorialNextPulse 4s ease-in-out 4s infinite;
+}
+
+@keyframes tutorialNextIntro {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--tutorial-glow);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 4px var(--tutorial-glow);
+  }
 }
 
 @keyframes tutorialNextPulse {
   0%,
   16%,
+  32%,
   100% {
     transform: scale(1);
     box-shadow: 0 0 0 0 var(--tutorial-glow);
   }
-  8% {
-    transform: scale(1.04);
-    box-shadow: 0 0 0 4px var(--tutorial-glow);
+  8%,
+  24% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 6px var(--tutorial-glow);
   }
 }
 
@@ -4387,6 +4411,14 @@ $pane_header_height: 48px;
 @keyframes tutorialGlint {
   to {
     --tutorial-glint-angle: 360deg;
+  }
+}
+
+// Reading targets keep their outline, leaving the manual Next button as the animated cue.
+.tutorialTargetRing-static {
+  &::before,
+  &::after {
+    display: none;
   }
 }
 
