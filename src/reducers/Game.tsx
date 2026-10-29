@@ -288,7 +288,7 @@ import {
 } from "../helpers/Commitment";
 import { getViableLocationsRemaining } from "../data/FacilitySites";
 import { logEvent } from "../Globals";
-import { getPlayedScenarioIds, recordScenarioPlayed } from "../LocalStorage";
+import { recordScenarioPlayed } from "../LocalStorage";
 import {
   CUSTOM_SCENARIO_ID,
   getNextTutorial,
@@ -3529,10 +3529,12 @@ export function tutorialCompleteDialog({
   message?: string;
   nextTutorial?: ScenarioType;
 }) {
-  const played = getPlayedScenarioIds();
-  const completed = TUTORIALS.filter(
-    (t: ScenarioType) => played.indexOf(t.id) !== -1,
-  ).length;
+  // The sequence position already lives in the mission name ("Mission 2: Generators"); fold the
+  // total into it so the handoff says where the player is without a separate progress line.
+  const nextName = nextTutorial?.name.replace(
+    /^(Mission \d+):/,
+    `$1 of ${TUTORIALS.length}:`,
+  );
   return dialogOpen({
     title: `🎉 ${title}`,
     message: (
@@ -3544,12 +3546,9 @@ export function tutorialCompleteDialog({
             <br />
           </span>
         )}
-        <strong>
-          {completed} of {TUTORIALS.length} missions complete
-        </strong>
         {nextTutorial && (
           <div className="tutorialNextPreview">
-            <strong>Up next: {nextTutorial.name}</strong>
+            <strong>Up next: {nextName}</strong>
             <span>{nextTutorial.summary}</span>
           </div>
         )}
