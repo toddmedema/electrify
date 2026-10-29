@@ -7788,3 +7788,168 @@ option {
   color: var(--font-color-primary);
   background: var(--bg-primary);
 }
+
+// Chart inspection uses the full viewport while retaining the shared chart surface.
+.insightsExpandChart.MuiIconButton-root {
+  min-width: var(--control-size);
+  min-height: var(--control-size);
+  margin-left: 4px;
+  color: var(--interactive-strong);
+  flex-shrink: 0;
+}
+.fuelPriceFilter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 16px 8px;
+  font-size: var(--font-size-body2);
+  container-type: inline-size;
+  container-name: fuel-prices;
+  .fuelPriceFilterLabel {
+    margin-right: 4px;
+    color: var(--font-color-faded);
+  }
+  .fuelPriceFilterOptions {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    min-width: 0;
+    gap: 4px;
+  }
+  .MuiButton-root {
+    gap: 8px;
+    padding: 4px 8px;
+    min-height: var(--control-size);
+    border: 1px solid transparent;
+    color: var(--font-color-primary);
+    &[aria-pressed="true"] {
+      border-color: var(--interactive-strong);
+      background: var(--bg-selected);
+      font-weight: 700;
+    }
+    svg {
+      width: 40px;
+      height: 6px;
+      flex-shrink: 0;
+    }
+  }
+}
+.insightsChartDialog {
+  .MuiDialog-paper.MuiDialog-paperFullScreen {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  .MuiDialog-paper {
+    background: var(--chart-surface);
+  }
+  .expandedChartTitle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    > span {
+      min-width: 0;
+    }
+    .MuiIconButton-root {
+      flex-shrink: 0;
+    }
+  }
+  .insightsViewportToolbar {
+    flex-shrink: 0;
+    max-width: none;
+  }
+  .insightsViewportButtons {
+    .insightsViewportButton,
+    .MuiIconButton-root {
+      width: var(--control-size);
+      height: var(--control-size);
+      flex-basis: var(--control-size);
+    }
+  }
+  .expandedChartContent {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0 16px;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .expandedChartBody {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    > * {
+      flex-shrink: 0;
+    }
+  }
+  .fuelPriceFilter .MuiButton-root {
+    font-size: var(--font-size-body1);
+  }
+  .chartLegend,
+  .chartTooltip {
+    font-size: var(--font-size-body1);
+  }
+  .chartLegend {
+    padding: 8px 16px;
+  }
+  .chartLegendSwatch-line {
+    width: 32px;
+  }
+}
+
+// Three named controls per row keep the fuel key to two rows on phones and narrow panes.
+// The sample sits above its name so the dash pattern stays long enough to recognize.
+@container fuel-prices (max-width: 568px) {
+  .fuelPriceFilterLabel {
+    display: none;
+  }
+  .fuelPriceFilter .fuelPriceFilterOptions {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr));
+    .MuiButton-root {
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
+      padding: 4px;
+      font-size: var(--font-size-body2);
+      line-height: 1.25;
+      white-space: normal;
+      svg {
+        width: 32px;
+      }
+    }
+  }
+}
+
+@media (max-width: 600px) {
+  .insightsChartDialog .insightsViewportToolbar {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 8px 16px;
+    .insightsViewportDate {
+      flex: 1 0 100%;
+      white-space: normal;
+    }
+  }
+}
+
+.insights .MuiToolbar-root.insightsTrackHeader {
+  flex-flow: row nowrap !important;
+  > h6 {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

@@ -795,7 +795,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#chartForecastFuelPrices",
         action: "Compare future fuel prices",
         content: (
-          <TutorialPrompt text="Compare possible fuel costs in five years. These examples do not change your game." />
+          <TutorialPrompt text="Compare each fuel’s predicted prices before choosing what to build." />
         ),
       },
       {

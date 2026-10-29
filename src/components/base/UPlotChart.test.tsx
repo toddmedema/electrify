@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
+import { ChartPresentationContext } from "./ChartPresentationContext";
 import { ChartViewportContext } from "./ChartViewportContext";
 import { ChartAxisAlignment } from "./ChartAxisAlignment";
 import { setThemeMode } from "../../Theme";
@@ -20,6 +21,7 @@ jest.mock("uplot", () => {
 
 jest.mock("./UPlotHelpers", () => ({
   chartScale: (width: number) => Math.min(width / 350, 1.4),
+  expandedChartOptions: (options: uPlot.Options) => options,
   eventMarkersPlugin: () => ({ hooks: {} }),
 }));
 
@@ -626,7 +628,7 @@ describe("UPlotChart resizing", () => {
     expect(pinched[1] - pinched[0]).toBeLessThan(50);
   });
 
-  it.each(["theme", "structure", "height"])(
+  it.each(["theme", "structure", "height", "presentation"])(
     "restores the viewport and gestures after a %s rebuild",
     (change) => {
       const onRangeChange = jest.fn();
@@ -640,19 +642,27 @@ describe("UPlotChart resizing", () => {
       };
       const ui = (changed = false) => (
         <ChartViewportContext.Provider value={viewport}>
-          <UPlotChart
-            ariaLabel="Rebuilt chart"
-            state={{}}
-            data={[
-              [0, 100],
-              [2, 3],
-            ]}
-            height={changed && change === "height" ? 400 : 300}
-            structureKey={
-              changed && change === "structure" ? "changed" : "initial"
+          <ChartPresentationContext.Provider
+            value={
+              change === "presentation"
+                ? { height: changed ? 500 : 400, fontScale: 4 / 3 }
+                : null
             }
-            buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
-          />
+          >
+            <UPlotChart
+              ariaLabel="Rebuilt chart"
+              state={{}}
+              data={[
+                [0, 100],
+                [2, 3],
+              ]}
+              height={changed && change === "height" ? 400 : 300}
+              structureKey={
+                changed && change === "structure" ? "changed" : "initial"
+              }
+              buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+            />
+          </ChartPresentationContext.Provider>
         </ChartViewportContext.Provider>
       );
       const view = render(ui());

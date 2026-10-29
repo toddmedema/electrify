@@ -31,6 +31,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FitScreenIcon from "@mui/icons-material/FitScreen";
 import SaveIcon from "@mui/icons-material/Save";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -39,11 +40,11 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
-import { PRICED_FUELS } from "../../Constants";
 import {
   DerivedHistoryKeysType,
   GameType,
   MonthlyHistoryType,
+  PricedFuelNameType,
   TickPresentFutureType,
   UnitSystemType,
 } from "../../Types";
@@ -83,7 +84,6 @@ import {
   chartPalette,
   demandTypeColors,
   fuelColors,
-  fuelDashArrays,
   waterDashArrays,
 } from "../../Theme";
 import ChartForecastDemandByType, {
@@ -92,6 +92,8 @@ import ChartForecastDemandByType, {
 import ChartFinances from "../base/ChartFinances";
 import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
+import FuelPriceFilter from "../base/FuelPriceFilter";
+import { ExpandedChartPresentation } from "../base/ChartPresentationContext";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
@@ -103,7 +105,6 @@ import ChartForecastWater from "../base/ChartForecastWater";
 import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
-import EconomicFutureComparison from "../base/EconomicFutureComparison";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { UnitsContext } from "../base/UnitsContext";
 import {
@@ -310,6 +311,9 @@ type SavedViewport = { viewport: [number, number]; month: number };
 
 interface State {
   compact: boolean;
+  expandedLayer?: InsightLayerId;
+  expandedPlaceholderHeight: number;
+  selectedPriceFuel?: PricedFuelNameType;
   temporaryLayer?: InsightLayerId;
   layers: InsightLayerId[];
   preset: InsightPresetId;
@@ -669,6 +673,7 @@ export default class Insights extends React.Component<Props, State> {
     const savedLayers = presetDefinition(preset, presetLibrary)?.layers;
     this.state = {
       compact: false,
+      expandedPlaceholderHeight: 0,
       temporaryLayer: props.focusLayer,
       layers,
       preset,
@@ -1363,6 +1368,7 @@ export default class Insights extends React.Component<Props, State> {
     bounds: ChartViewportRange,
     range: ChartViewportRange,
     minSpan: number,
+    hintId = "insightsViewportHint",
   ) {
     const full = rangesEqual(bounds, range);
     const scenarioRange = clampChartViewport(
@@ -1397,7 +1403,7 @@ export default class Insights extends React.Component<Props, State> {
       <section
         className="insightsViewportToolbar"
         aria-label="Chart time navigation"
-        aria-describedby="insightsViewportHint"
+        aria-describedby={hintId}
       >
         <Typography
           className="insightsViewportDate"
@@ -1450,7 +1456,7 @@ export default class Insights extends React.Component<Props, State> {
               ),
           )}
         </div>
-        <span id="insightsViewportHint" className="srOnly">
+        <span id={hintId} className="srOnly">
           Pinch or use the zoom controls to zoom. Swipe, drag, or use the pan
           controls to move through time.
         </span>
@@ -1461,22 +1467,13 @@ export default class Insights extends React.Component<Props, State> {
     );
   }
 
-  private renderTrack(
+  private renderTrackBody(
     id: InsightLayerId,
-    index: number,
-    visible: InsightLayerId[],
     projection: ProjectionView,
+    expanded = false,
   ) {
     const { game, selectedFacilityId } = this.props;
-    const definition = INSIGHT_LAYERS.find((layer) => layer.id === id)!;
-    const configured = this.state.layers.includes(id);
-    const previousConfigured = visible
-      .slice(0, index)
-      .reverse()
-      .find((layer) => this.state.layers.includes(layer));
-    const nextConfigured = visible
-      .slice(index + 1)
-      .find((layer) => this.state.layers.includes(layer));
+    const syncKey = expanded ? "insights-expanded" : SYNC_KEY;
     const multiyear =
       projection.domain.x[1] - projection.domain.x[0] > 12 * MINUTES_PER_MONTH;
     const fuels = forecastFuels(
@@ -1526,7 +1523,7 @@ export default class Insights extends React.Component<Props, State> {
             }
             startingYear={game.startingYear}
             domain={projection.domain.x}
-            syncKey={SYNC_KEY}
+            syncKey={syncKey}
           />
         </>
       );
@@ -1553,7 +1550,7 @@ export default class Insights extends React.Component<Props, State> {
                   format={(value) => formatPercent(value, 2)}
                   startingYear={game.startingYear}
                   domain={projection.domain.x}
-                  syncKey={SYNC_KEY}
+                  syncKey={syncKey}
                 />
               ))}
             </>
@@ -1578,7 +1575,7 @@ export default class Insights extends React.Component<Props, State> {
                 projected={projection.financeProjected}
                 startingYear={game.startingYear}
                 domain={projection.domain}
-                syncKey={SYNC_KEY}
+                syncKey={syncKey}
               />
               <Typography
                 variant="caption"
@@ -1609,7 +1606,7 @@ export default class Insights extends React.Component<Props, State> {
                   domain={projection.domain}
                   startingYear={game.startingYear}
                   currentMinute={projection.forecast[0]?.minute}
-                  syncKey={SYNC_KEY}
+                  syncKey={syncKey}
                 />
               ) : (
                 <ChartForecastSupplyDemand
@@ -1621,7 +1618,7 @@ export default class Insights extends React.Component<Props, State> {
                   multiyear={multiyear}
                   // Cached simulated hours never become recorded observations as the clock advances.
                   currentMinute={projection.forecast[0]?.minute}
-                  syncKey={SYNC_KEY}
+                  syncKey={syncKey}
                 />
               )}
               {projection.shortfall && (
@@ -1682,7 +1679,7 @@ export default class Insights extends React.Component<Props, State> {
                 typeLabels={demandTypeLabels}
                 startingYear={game.startingYear}
                 multiyear={multiyear}
-                syncKey={SYNC_KEY}
+                syncKey={syncKey}
               />
             </>
           );
@@ -1708,7 +1705,7 @@ export default class Insights extends React.Component<Props, State> {
                 startingYear={game.startingYear}
                 multiyear={multiyear}
                 fuels={fuels}
-                syncKey={SYNC_KEY}
+                syncKey={syncKey}
                 highlightFuel={highlightFuel}
                 currentMinute={projection.forecast[0]?.minute}
               />
@@ -1723,29 +1720,28 @@ export default class Insights extends React.Component<Props, State> {
               domain={{ x: projection.domain.x }}
               startingYear={game.startingYear}
               multiyear={multiyear}
-              syncKey={SYNC_KEY}
+              syncKey={syncKey}
             />
           );
           break;
         case "fuelPrices":
           body = (
             <>
-              <ChartLegend
-                items={PRICED_FUELS.map((fuel) => ({
-                  name: fuel,
-                  color: fuelColors()[fuel],
-                  dash: fuelDashArrays[fuel],
-                }))}
+              <FuelPriceFilter
+                selectedFuel={this.state.selectedPriceFuel}
+                onChange={(selectedPriceFuel) =>
+                  this.setState({ selectedPriceFuel })
+                }
               />
               <ChartForecastFuelPrices
+                selectedFuel={this.state.selectedPriceFuel}
                 height={140}
                 timeline={projection.sampled}
                 domain={{ x: projection.domain.x }}
                 startingYear={game.startingYear}
                 multiyear={multiyear}
-                syncKey={SYNC_KEY}
+                syncKey={syncKey}
               />
-              <EconomicFutureComparison game={game} />
             </>
           );
           break;
@@ -1758,7 +1754,7 @@ export default class Insights extends React.Component<Props, State> {
               domain={{ x: projection.domain.x }}
               startingYear={game.startingYear}
               multiyear={multiyear}
-              syncKey={SYNC_KEY}
+              syncKey={syncKey}
             />
           );
           break;
@@ -1790,7 +1786,7 @@ export default class Insights extends React.Component<Props, State> {
                 domain={{ x: projection.domain.x }}
                 startingYear={game.startingYear}
                 multiyear={multiyear}
-                syncKey={SYNC_KEY}
+                syncKey={syncKey}
               />
             </>
           );
@@ -1803,7 +1799,7 @@ export default class Insights extends React.Component<Props, State> {
               domain={{ x: projection.domain.x }}
               startingYear={game.startingYear}
               multiyear={multiyear}
-              syncKey={SYNC_KEY}
+              syncKey={syncKey}
             />
           );
           break;
@@ -1823,6 +1819,26 @@ export default class Insights extends React.Component<Props, State> {
       body = <div id="chartInsightsCustomers">{body}</div>;
     }
 
+    return body;
+  }
+
+  private renderTrack(
+    id: InsightLayerId,
+    index: number,
+    visible: InsightLayerId[],
+    projection: ProjectionView,
+  ) {
+    const { game } = this.props;
+    const definition = INSIGHT_LAYERS.find((layer) => layer.id === id)!;
+    const configured = this.state.layers.includes(id);
+    const previousConfigured = visible
+      .slice(0, index)
+      .reverse()
+      .find((layer) => this.state.layers.includes(layer));
+    const nextConfigured = visible
+      .slice(index + 1)
+      .find((layer) => this.state.layers.includes(layer));
+
     return (
       <section
         className="insightsTrack"
@@ -1838,6 +1854,27 @@ export default class Insights extends React.Component<Props, State> {
               <ManualLink entry={MANUAL_ENTRY.INTERTIES} />
             )}
           </Typography>
+          {id !== "powerExchange" && id !== "financeDetails" && (
+            <Tooltip title={`Expand ${definition.label} chart`}>
+              <IconButton
+                className="insightsExpandChart"
+                size="small"
+                aria-label={`Expand ${definition.label} chart`}
+                onClick={(event) =>
+                  this.setState({
+                    expandedLayer: id,
+                    expandedPlaceholderHeight:
+                      event.currentTarget
+                        .closest(".insightsTrack")
+                        ?.querySelector(".insightsTrackBody")
+                        ?.getBoundingClientRect().height || 0,
+                  })
+                }
+              >
+                <FullscreenIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
           {this.state.layersOpen && (
             <span className="insightsTrackActions">
               <IconButton
@@ -1886,7 +1923,17 @@ export default class Insights extends React.Component<Props, State> {
               Temporary evidence · not saved with preset
             </div>
           )}
-        {body}
+        <div
+          className="insightsTrackBody"
+          style={
+            this.state.expandedLayer === id
+              ? { height: this.state.expandedPlaceholderHeight }
+              : undefined
+          }
+        >
+          {this.state.expandedLayer !== id &&
+            this.renderTrackBody(id, projection)}
+        </div>
       </section>
     );
   }
@@ -2357,6 +2404,61 @@ export default class Insights extends React.Component<Props, State> {
                   )}
                 </div>
               </ChartAxisAlignment>
+              {this.state.expandedLayer &&
+                visible.includes(this.state.expandedLayer) && (
+                  <Dialog
+                    fullScreen
+                    open
+                    className="insightsChartDialog"
+                    aria-labelledby="expanded-chart-title"
+                    onClose={() => this.setState({ expandedLayer: undefined })}
+                  >
+                    <DialogTitle
+                      id="expanded-chart-heading"
+                      className="expandedChartTitle"
+                    >
+                      <span id="expanded-chart-title">
+                        {
+                          INSIGHT_LAYERS.find(
+                            (layer) => layer.id === this.state.expandedLayer,
+                          )!.label
+                        }
+                      </span>
+                      <IconButton
+                        autoFocus
+                        aria-label={`Close ${INSIGHT_LAYERS.find((layer) => layer.id === this.state.expandedLayer)!.label} chart`}
+                        onClick={() =>
+                          this.setState({ expandedLayer: undefined })
+                        }
+                      >
+                        <CloseIcon />
+                      </IconButton>
+                    </DialogTitle>
+                    {this.renderViewportControls(
+                      viewportBounds,
+                      viewportRange,
+                      minViewportSpan,
+                      "expandedViewportHint",
+                    )}
+                    <DialogContent className="expandedChartContent">
+                      <ExpandedChartPresentation
+                        plots={
+                          this.state.expandedLayer === "inflationInterest"
+                            ? 2
+                            : 1
+                        }
+                      >
+                        <ChartAxisAlignment>
+                          {this.renderTrackBody(
+                            this.state.expandedLayer,
+                            viewportProjection,
+                            true,
+                          )}
+                        </ChartAxisAlignment>
+                      </ExpandedChartPresentation>
+                    </DialogContent>
+                  </Dialog>
+                )}
             </ChartAnnotationsContext.Provider>
           </ChartViewportContext.Provider>
         </div>

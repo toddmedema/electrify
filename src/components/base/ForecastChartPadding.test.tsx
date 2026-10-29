@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import uPlot from "uplot";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { setThemeMode } from "../../Theme";
@@ -9,6 +9,7 @@ import {
   GeneratorShoppingType,
   TickPresentFutureType,
 } from "../../Types";
+import { ChartPresentationContext } from "./ChartPresentationContext";
 import ChartFinances from "./ChartFinances";
 import ChartForecastDemandByType from "./ChartForecastDemandByType";
 import ChartForecastFuelPrices from "./ChartForecastFuelPrices";
@@ -118,6 +119,7 @@ describe("insight forecast charts", () => {
       { name: "Solar", fuel: "Sun", available: true } as GeneratorShoppingType,
     ]);
     setThemeMode("light");
+    jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     // 350 is the design width, so chartScale is exactly one and every length in the options
     // comes out in design units
     jest.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
@@ -149,6 +151,120 @@ describe("insight forecast charts", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it("renders larger canvas fonts, measured gutters, height and strokes only in expanded presentation", () => {
+    const chart = (
+      <ChartForecastWater
+        timeline={timeline}
+        domain={domain}
+        startingYear={STARTING_YEAR}
+        multiyear={false}
+        height={140}
+      />
+    );
+    const view = render(chart);
+    const compact = (uPlot as unknown as jest.Mock).mock.calls.at(
+      -1,
+    )[0] as uPlot.Options;
+    expect(compact.axes![1].font).toMatch(/^12px /);
+    view.rerender(
+      <ChartPresentationContext.Provider
+        value={{ height: 500, fontScale: 4 / 3 }}
+      >
+        {chart}
+      </ChartPresentationContext.Provider>,
+    );
+    const expanded = (uPlot as unknown as jest.Mock).mock.calls.at(
+      -1,
+    )[0] as uPlot.Options;
+    expect(expanded.height).toBe(500);
+    expect(expanded.axes![1].font).toMatch(/^16px /);
+    expect(expanded.axes![2].labelFont).toMatch(/^16px /);
+    const size = expanded.axes![2].size as uPlot.Axis.Size;
+    const reserve =
+      typeof size === "function"
+        ? size({} as uPlot, ["100000000GWh"], 2, 0)
+        : size;
+    expect(reserve).toBeGreaterThan(100);
+    expect(expanded.series[1].width).toBeGreaterThan(
+      compact.series[1].width as number,
+    );
+    expect(expanded.series[3].dash).toEqual(compact.series[3].dash);
+  });
+
+  it("thins enlarged date ticks to fit the actual plot width, retaining both endpoints", () => {
+    render(
+      <ChartPresentationContext.Provider
+        value={{ height: 500, fontScale: 4 / 3 }}
+      >
+        <ChartForecastWater
+          timeline={timeline}
+          domain={{ x: [0, 24 * MINUTES_PER_MONTH] }}
+          startingYear={2024}
+          multiyear
+        />
+      </ChartPresentationContext.Provider>,
+    );
+    const options = (uPlot as unknown as jest.Mock).mock.calls.at(
+      -1,
+    )[0] as uPlot.Options;
+    const splits = options.axes![0].splits as Exclude<
+      uPlot.Axis.Splits,
+      number[]
+    >;
+    const ticks = (width: number) =>
+      splits(
+        { width, bbox: { width } } as uPlot,
+        0,
+        0,
+        24 * MINUTES_PER_MONTH,
+        0,
+        0,
+      );
+    for (const width of [180, 220, 260]) {
+      const narrow = ticks(width);
+      expect(narrow.length).toBeLessThanOrEqual(4);
+      expect(narrow[0]).toBe(0);
+      expect(narrow.at(-1)).toBe(24 * MINUTES_PER_MONTH);
+      for (let index = 1; index < narrow.length; index++) {
+        const gap =
+          ((narrow[index] - narrow[index - 1]) / (24 * MINUTES_PER_MONTH)) *
+          width;
+        expect(gap).toBeGreaterThanOrEqual(48);
+      }
+    }
+    expect(ticks(1000)).toHaveLength(7);
+  });
+
+  it("isolates fuel data, inspected values and accessible series then restores all fuels", () => {
+    const props = {
+      timeline,
+      domain,
+      startingYear: STARTING_YEAR,
+      multiyear: false,
+    };
+    const view = render(<ChartForecastFuelPrices {...props} />);
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      /Biomass.*Coal.*Natural Gas.*Oil.*Uranium/,
+    );
+    view.rerender(<ChartForecastFuelPrices {...props} selectedFuel="Coal" />);
+    const plot = screen.getByRole("img");
+    expect(plot).toHaveAccessibleName(/Coal/);
+    expect(plot).not.toHaveAccessibleName(/Biomass|Natural Gas|Oil|Uranium/);
+    const args = (uPlot as unknown as jest.Mock).mock.calls.at(-1);
+    expect(args[1]).toEqual([
+      timeline.map((tick) => tick.minute),
+      timeline.map((tick) => tick.Coal),
+    ]);
+    expect(args[0].series).toHaveLength(2);
+    view.rerender(<ChartForecastFuelPrices {...props} />);
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      /Biomass.*Coal.*Natural Gas.*Oil.*Uranium/,
+    );
+    expect(
+      (uPlot as unknown as jest.Mock).mock.calls.at(-1)[0].series,
+    ).toHaveLength(6);
   });
 
   // The stacked charts read as one picture under a shared x axis, which only works if every

@@ -124,6 +124,137 @@ function textWidth(text: string, font: string, sizePx: number): number {
   return measureCtx.measureText(text).width;
 }
 
+/** Enlarge rendered options and measure the final font, without changing compact charts. */
+export function expandedChartOptions(
+  options: uPlot.Options,
+  fontScale: number,
+): uPlot.Options {
+  const enlargeFont = (font: string | undefined) =>
+    (font || chartFont()).replace(
+      /(\d+)px/,
+      (_match, size) => `${Math.round(Number(size) * fontScale)}px`,
+    );
+  const padding: uPlot.Padding = options.padding
+    ? [...options.padding]
+    : [null, null, null, null];
+  const xAxisIndex =
+    options.axes?.findIndex((axis) => axis.scale === "x") ?? -1;
+  if (xAxisIndex >= 0 && !options.axes?.some((axis) => axis.side === 1)) {
+    const axis = options.axes![xAxisIndex];
+    const originalRight = padding[1];
+    padding[1] = (plot, side, sides, cycle) => {
+      const reserve =
+        typeof originalRight === "function"
+          ? originalRight(plot, side, sides, cycle)
+          : (originalRight ?? 0);
+      const range = plot.scales.x;
+      const splits =
+        typeof axis.splits === "function"
+          ? axis.splits(plot, xAxisIndex, range.min ?? 0, range.max ?? 0, 0, 0)
+          : (axis.splits ?? []);
+      const labels =
+        typeof axis.values === "function"
+          ? axis.values(plot, splits, xAxisIndex, 0, 0)
+          : [];
+      const finalLabel = labels[labels.length - 1];
+      if (finalLabel == null) return reserve;
+      const font = enlargeFont(axis.font);
+      // Endpoint dates are centered on the plot edge; enlarged labels need room beyond it.
+      return Math.ceil(
+        Math.max(
+          reserve,
+          textWidth(String(finalLabel), font, Number.parseFloat(font)) / 2 +
+            4 * getTextScale(),
+        ),
+      );
+    };
+  }
+  return {
+    ...options,
+    padding,
+    axes: options.axes?.map((axis) => {
+      const font = enlargeFont(axis.font);
+      const originalSize = axis.size;
+      const vertical = axis.side === 1 || axis.side === 3 || axis.scale === "y";
+      return {
+        ...axis,
+        font,
+        labelFont: enlargeFont(axis.labelFont),
+        splits:
+          vertical || !axis.splits
+            ? axis.splits
+            : (plot, axisIndex, min, max, increment, space) => {
+                const splits =
+                  typeof axis.splits === "function"
+                    ? axis.splits(plot, axisIndex, min, max, increment, space)
+                    : axis.splits!;
+                if (splits.length < 3 || typeof axis.values !== "function")
+                  return splits;
+                const labels = axis.values(
+                  plot,
+                  splits,
+                  axisIndex,
+                  space,
+                  increment,
+                );
+                const widths = labels.map((label) =>
+                  label == null
+                    ? 0
+                    : textWidth(String(label), font, Number.parseFloat(font)),
+                );
+                const ratio = uPlot.pxRatio || 1;
+                const plotWidth =
+                  (plot.bbox?.width ?? plot.width * ratio) / ratio;
+                const position = (index: number) =>
+                  ((splits[index] - min) / Math.max(1, max - min)) * plotWidth;
+                const fits = (left: number, right: number) =>
+                  position(right) - position(left) >=
+                  (widths[left] + widths[right]) / 2 + 12 * getTextScale();
+                const last = splits.length - 1;
+                const kept = [0];
+                // Reserve the last date before accepting an interior label. Index rounding alone
+                // can leave neighboring ticks too close at intermediate pane widths.
+                for (let index = 1; index < last; index++) {
+                  if (fits(kept[kept.length - 1], index) && fits(index, last))
+                    kept.push(index);
+                }
+                if (fits(kept[kept.length - 1], last)) kept.push(last);
+                return kept.map((index) => splits[index]);
+              },
+        labelSize: axis.label
+          ? (axis.labelSize ?? 16) * fontScale
+          : axis.labelSize,
+        size: (plot, values, axisIndex, cycle) => {
+          const natural =
+            typeof originalSize === "function"
+              ? originalSize(plot, values, axisIndex, cycle)
+              : (originalSize ?? (vertical ? 50 : 25));
+          if (!vertical) return natural * fontScale;
+          // Includes fixed right axes: their old reserve may be narrower than the final label.
+          const sizePx = Number.parseFloat(font);
+          const widest = Math.max(
+            0,
+            ...(values || []).map((value) =>
+              value == null ? 0 : textWidth(String(value), font, sizePx),
+            ),
+          );
+          return Math.ceil(Math.max(natural, widest + 20 * getTextScale()));
+        },
+      };
+    }),
+    series: options.series.map((series, index) =>
+      index === 0
+        ? series
+        : {
+            ...series,
+            // Filled areas and invisible boundaries should not acquire artificial outlines.
+            width:
+              series.width === 0 ? 0 : Math.max(2.5, (series.width ?? 1) * 1.5),
+          },
+    ),
+  };
+}
+
 interface AxisOptions {
   /** Which tick values to draw; omitted lets uPlot choose */
   splits?: uPlot.Axis.Splits;
@@ -531,6 +662,7 @@ export function baselinePlugin(stroke: string): uPlot.Plugin {
 export function eventMarkersPlugin(
   getMarkers: () => ChartEventMarker[],
   getActiveKey: () => string | undefined,
+  fontScale = 1,
 ): uPlot.Plugin {
   return {
     hooks: {
@@ -564,7 +696,7 @@ export function eventMarkersPlugin(
           u.ctx.lineTo(x, u.bbox.top + u.bbox.height);
           u.ctx.stroke();
 
-          const radius = 8 * scale;
+          const radius = 8 * scale * fontScale;
           const badgeY = u.bbox.top + radius + 2 * scale;
           u.ctx.globalAlpha = 1;
           u.ctx.setLineDash([]);
@@ -577,7 +709,7 @@ export function eventMarkersPlugin(
           u.ctx.stroke();
           u.ctx.fillStyle = palette.interactive;
           // The badge geometry already contains the selected text scale.
-          u.ctx.font = chartFont(1, (10 * scale) / getTextScale());
+          u.ctx.font = chartFont(1, (10 * scale * fontScale) / getTextScale());
           u.ctx.textAlign = "center";
           u.ctx.textBaseline = "middle";
           u.ctx.fillText(String(marker.number), x, badgeY);
@@ -597,6 +729,7 @@ export function eventMarkersPlugin(
 export function titlePlugin(
   getTitle: () => string,
   designY: number,
+  fontScale = 1,
 ): uPlot.Plugin {
   return {
     hooks: {
@@ -607,7 +740,7 @@ export function titlePlugin(
         }
         const scale = canvasScale(u);
         u.ctx.save();
-        u.ctx.font = chartFont(uPlot.pxRatio, 14);
+        u.ctx.font = chartFont(uPlot.pxRatio, 14 * fontScale);
         u.ctx.fillStyle = chartPalette().legendText;
         u.ctx.textAlign = "center";
         u.ctx.textBaseline = "middle";

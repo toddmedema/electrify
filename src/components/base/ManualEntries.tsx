@@ -640,11 +640,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           <strong>Fuel Prices:</strong> Historical prices and future estimates.
-          Prices can jump, so check before building fuel-burning plants.{" "}
-          <strong>Compare possible costs in five years</strong> applies 0.5%,
-          2.5% or 4.5% yearly growth to this month's fuel bill times 12. It
-          assumes the same facilities and fuel use. These examples don't
-          estimate how likely each cost is or change your loans or settings.
+          Prices can jump, so check before building fuel-burning plants.
         </p>
         <p>
           <strong>Temperature</strong> and{" "}

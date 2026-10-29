@@ -43,15 +43,6 @@ const EARLIEST_DATA_YEAR = 1975;
 // with it closely enough to quote a retail rate in the right ballpark.
 export const LATEST_DATA_YEAR = 2019;
 
-/** Provenance of the underlying national series; regional prices are estimates in every year. */
-export function getFuelPriceProvenance(
-  date: Pick<DateType, "year" | "monthNumber">,
-): "historical" | "modeled" {
-  return recordedMonths.has(absoluteMonth(date.year, date.monthNumber))
-    ? "historical"
-    : "modeled";
-}
-
 // Fixed so that each fuel always draws from the same slot of the fuel stream, whatever order
 // the CSV's columns happen to arrive in. New fuels belong at the end so adding one cannot shift
 // the established simulations for every fuel before it.
@@ -176,7 +167,6 @@ type RawFuelPricesType = {
 // and the run stops being a function of its seed.
 // year -> month (1-12) -> price per MBTU by fuel
 const fuelPrices: Record<number, Record<number, FuelPricesType>> = {};
-const recordedMonths = new Set<number>();
 
 /**
  * Whether any prices have been loaded yet. The game screens all run after the loading screen has
@@ -202,7 +192,6 @@ function absoluteMonth(year: number, month: number): number {
 // Emptied in place rather than reassigned so that the closure in projectYear keeps referring to
 // a const, which no-loop-func requires
 function resetFuelPrices() {
-  recordedMonths.clear();
   Object.keys(fuelPrices).forEach((year: string) => {
     delete fuelPrices[+year];
   });
@@ -370,7 +359,6 @@ function collectFuelPriceRow(data: RawFuelPricesType) {
     return;
   }
   fuelPrices[+data.year] = fuelPrices[+data.year] || {};
-  recordedMonths.add(absoluteMonth(+data.year, +data.month));
   // Frozen because getFuelPricesPerMBTU hands the cached object straight to its callers rather
   // than copying it per tick, and a caller that wrote to one would be rewriting the record
   fuelPrices[+data.year][+data.month] = Object.freeze({
