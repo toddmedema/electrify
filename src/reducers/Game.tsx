@@ -5412,11 +5412,14 @@ function* supplyFacilitiesFinancesPhases(
   return now;
 }
 
+type ForecastObserver = (state: GameType, tick: TickPresentFutureType) => void;
+
 function supplyForecastPass(
   state: GameType,
   simulated?: boolean,
   withoutMinimumStableOutput = false,
   stepMinutes = TICK_MINUTES,
+  observe?: ForecastObserver,
 ): TickPresentFutureType[] {
   // updateSupplyFacilitiesFinances ramps generators, charges batteries and pays down loans by
   // mutating the facilities in place, so forecasting has to run against a copy of them. A shallow
@@ -5521,6 +5524,7 @@ function supplyForecastPass(
         });
       }
     }
+    observe?.(newState, t);
     prev = t;
     return t;
   });
@@ -5558,6 +5562,7 @@ function reforecastSupply(
   state: GameType,
   simulated?: boolean,
   stepMinutes = TICK_MINUTES,
+  observe?: ForecastObserver,
 ): TickPresentFutureType[] {
   // First record the merit-order request each generator would receive without minimum-load
   // constraints. The optimized pass then scans those per-facility requests to compare the cost
@@ -5606,6 +5611,7 @@ function reforecastSupply(
     simulated,
     false,
     stepMinutes,
+    observe,
   );
 }
 
@@ -5615,6 +5621,7 @@ export function generateNewTimeline(
   customers: number,
   ticks = TICKS_PER_DAY,
   stepMinutes = TICK_MINUTES,
+  observe?: ForecastObserver,
 ): TickPresentFutureType[] {
   // Forecasts only read the live state. Snapshot a draft once so the horizon does not repeatedly
   // traverse Immer proxies for location, events, history and other shared inputs. `current`, not
@@ -5756,7 +5763,7 @@ export function generateNewTimeline(
     state.timeline[0].customerBatteryWhStart = batteryCarry;
     state.timeline[0].customerBatteryWh = batteryCarry;
   }
-  state.timeline = reforecastSupply(state, true, stepMinutes);
+  state.timeline = reforecastSupply(state, true, stepMinutes, observe);
   return state.timeline;
 }
 

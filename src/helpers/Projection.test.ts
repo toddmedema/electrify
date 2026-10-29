@@ -48,6 +48,7 @@ function expectGeneratedForecast(
     game.timeline[0].customers,
     projection.forecast.length,
     projection.projectionStepMinutes,
+    undefined,
   );
   expect(projection.forecast).toEqual(generatedForecast);
 }
@@ -144,6 +145,7 @@ it("caps a 100-year custom game at 20 years of cash and chart simulation", () =>
     game.timeline[0].customers,
     20 * 12 * 24,
     60,
+    undefined,
   );
   expect(projection.cashProjected).toHaveLength(240);
   expect(projection.financeProjected).toHaveLength(240);
