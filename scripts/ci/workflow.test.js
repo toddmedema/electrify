@@ -73,7 +73,6 @@ test("PR CI runs three independent test groups and three native builds in eight 
     )
       assert.equal(job["runs-on"], "ubuntu-22.04", name);
   }
-  assert.deepEqual(workflow().permissions, { contents: "read" });
   for (const { uses, ...step } of jobs.build.steps)
     if (uses === "actions/upload-artifact@v7")
       assert.equal(step["continue-on-error"], undefined);

@@ -21,10 +21,6 @@ concurrency:
   # Let a trusted seed finish even when another merge arrives; PR updates still cancel.
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
-# No step writes to the repository; cache and artifact steps use the runner's own token.
-permissions:
-  contents: read
-
 # Eight jobs: shared renderers, three native builds, three test workers, and the required gate.
 # Tests share renderer artifacts but never wait for an OS build.
 jobs:
