@@ -191,7 +191,6 @@ export interface DifficultyMultipliersType {
   buildTime: number;
   blackoutPenalty: number; // for each % of demand unfulfilled, how much the regional growth rate is reduced
   peakSharingImportLoss: number; // share of a peak-sharing neighbour's imports lost at full local heat/cold stress
-  description: string; // shown in a tooltip on the difficulty picker
 }
 
 export type CardNameType =
