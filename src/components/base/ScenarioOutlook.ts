@@ -109,7 +109,7 @@ export function scenarioLossSummary(
     risk.failureMonth === undefined ? [] : [risk.failureMonth],
   );
   return {
-    text: `! Projected loss: ${descriptions.join(" ")}`,
+    text: descriptions.join(" "),
     firstMonth: months.length ? Math.min(...months) : game.date.monthsElapsed,
   };
 }

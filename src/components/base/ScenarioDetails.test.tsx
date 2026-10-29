@@ -88,17 +88,26 @@ it("keeps one concise loss line under the score chart and removes redundant goal
     name: "Scenario forecast",
   });
   expect(status).toHaveTextContent(
-    "! Projected loss: Cash below $0 at Jan 2022. Demand served <99.5% at Jan 2025.",
+    "Projected loss: Cash below $0 at Jan 2022. Demand served <99.5% at Jan 2025.",
   );
   expect(
     screen.getByRole("img", { name: /Projected loss periods shaded/ }),
   ).toBeInTheDocument();
-  expect(screen.getAllByText(/! Projected loss:/)).toHaveLength(1);
+  expect(screen.getAllByText(/Projected loss:/)).toHaveLength(1);
+  expect(status).toContainHTML("<strong>Projected loss:</strong>");
+  expect(status).toHaveClass("insightsWarning");
+  expect(within(status).getByTestId("WarningAmberIcon")).toBeInTheDocument();
   const conditions = screen.getByRole("region", { name: "Victory conditions" });
   expect(conditions).not.toHaveTextContent(
     /Projected miss|Projected to meet|Projected loss/,
   );
-  expect(conditions).toHaveTextContent("Recorded:");
+  expect(conditions).not.toHaveTextContent(
+    /Not started|Recorded:|months completed|Delivered customer electricity divided/,
+  );
+  expect(conditions).toHaveTextContent(
+    "Keep the lights on through the wildfire emergency",
+  );
+  expect(conditions).toHaveTextContent("≥99.5% of demand monthly");
   expect(
     outlook.compareDocumentPosition(conditions) &
       Node.DOCUMENT_POSITION_FOLLOWING,

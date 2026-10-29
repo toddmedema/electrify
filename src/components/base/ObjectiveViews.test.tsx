@@ -49,11 +49,10 @@ it("shows the owning verdict and Optional meaning in Mission Status without subs
   const rules = screen.getByRole("region", { name: "Victory conditions" });
   expect(within(rules).getByText("Keep bills affordable")).toBeInTheDocument();
   expect(within(rules).getByText("Optional")).toBeInTheDocument();
-  expect(within(rules).getByText(bills.definition)).toBeInTheDocument();
-  expect(within(rules).getByText(bills.reason!)).toBeInTheDocument();
-  expect(
-    within(rules).getByText(/Highest \$0.10000000000001\/kWh/),
-  ).toBeInTheDocument();
+  expect(rules).toHaveTextContent("Bills ≤$0.1/kWh each month");
+  expect(within(rules).queryByText(bills.definition)).not.toBeInTheDocument();
+  expect(within(rules).queryByText(bills.reason!)).not.toBeInTheDocument();
+  expect(rules).not.toHaveTextContent(/Highest|months completed|Recorded:/);
 });
 
 it("renders stored objective debrief facts and unavailability without re-evaluating the finished game", () => {

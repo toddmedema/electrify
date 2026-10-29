@@ -2638,6 +2638,10 @@ for (const scenarioId of [106, 107] as const) {
         scenarioId === 106
           ? "Retain the community"
           : "Keep the lights on through the freeze";
+      const target =
+        scenarioId === 106
+          ? "Retain ≥90% of starting customers · Dec 2035"
+          : "≥99.5% of demand monthly · Feb 2021";
       const scenarioPanel = (page: Page) =>
         page.getByRole("region", { name: "Scenario", exact: true });
       const showGoal = async (page: Page) => {
@@ -2648,6 +2652,13 @@ for (const scenarioId of [106, 107] as const) {
         );
         await expect(panel).toContainText(goal);
         await expect(panel).not.toContainText("Modded");
+        const conditions = panel.getByRole("region", {
+          name: "Victory conditions",
+        });
+        await expect(conditions).toContainText(target);
+        await expect(conditions).not.toContainText(
+          /months completed|Not started|Recorded:/,
+        );
         return panel;
       };
       await hostGame(host);
@@ -2699,9 +2710,7 @@ for (const scenarioId of [106, 107] as const) {
           scenarioId === 106 ? 50e6 : 2e9,
           scenarioId === 106 ? 0.12 : 0.1,
         );
-        await expect(await showGoal(page)).toContainText(
-          "0/1 months completed",
-        );
+        await showGoal(page);
         await page.keyboard.press("Escape");
       }
       const dueMonth = scenarioId === 106 ? 48 : 36;
@@ -2905,29 +2914,22 @@ for (const scenarioId of [106, 107] as const) {
         });
         if (await keepWatching.isVisible()) await keepWatching.click();
         for (const page of pages) {
-          const panel = await showGoal(page);
-          await expect(panel).toContainText("1/1 months completed");
-          await expect(panel.getByText("Met", { exact: true })).toBeVisible();
+          await showGoal(page);
           await page.keyboard.press("Escape");
         }
         if (width === 390) {
           const panel = await showGoal(guest);
           const title = panel.getByText(goal, { exact: true });
-          const observed = panel.getByText(/1\/1 months completed/);
+          const goalTarget = panel.getByText(target, { exact: true });
           await title.scrollIntoViewIfNeeded();
-          await observed.scrollIntoViewIfNeeded();
+          await goalTarget.scrollIntoViewIfNeeded();
           await expect(title).toBeInViewport();
-          await expect(observed).toBeInViewport();
-          await expect(
-            panel.getByText("Met", { exact: true }),
-          ).toBeInViewport();
+          await expect(goalTarget).toBeInViewport();
           await capture("native-107-390-goal-dark.png", guest);
           await guest.keyboard.press("Escape");
         }
       } else {
-        await expect(await showGoal(guest)).toContainText(
-          "0/1 months completed",
-        );
+        await showGoal(guest);
         await guest.keyboard.press("Escape");
       }
       await saveAndQuit(guest);

@@ -6410,8 +6410,7 @@ $programs_column: 800px;
   }
 }
 
-// Keep the rule, recorded progress, and forward outlook distinct within each requirement.
-// Missing-history warnings can wrap so the evidence is never clipped.
+// Victory conditions pair each goal with its target; long date windows can wrap.
 .missionRequirements {
   margin: 0;
 
@@ -6425,40 +6424,11 @@ $programs_column: 800px;
   }
 }
 
-.missionRequirementStatus {
-  flex: 0 0 auto;
-  padding: 1px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  background: var(--bg-raised);
-  color: $font_color_faded;
-  font-size: var(--font-size-caption-sm);
-  line-height: 1.25;
-  font-weight: 600;
-  white-space: nowrap;
-
-  // The word carries the state on its own; the colour is a second, faster read of it
-  &[data-status="failed"],
-  &[data-status="at-risk"] {
-    border-color: var(--delta-bad);
-    color: var(--delta-bad);
-  }
-
-  &[data-status="completed"],
-  &[data-status="on-track"] {
-    border-color: var(--delta-good);
-    color: var(--delta-good);
-  }
-}
-
 .scenarioOutcome {
   margin: $space-2 0 0;
   overflow-wrap: anywhere;
   color: $font_color_faded;
 
-  &[data-status="loss"] {
-    color: var(--delta-bad);
-  }
   &[data-status="win"] {
     color: var(--delta-good);
   }

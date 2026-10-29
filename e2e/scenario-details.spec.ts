@@ -30,8 +30,13 @@ for (const theme of ["light", "dark"] as const) {
       name: "Victory conditions",
     });
     await expect(requirements).not.toContainText(
-      /Projected miss|Projected to meet|Projected loss/,
+      /Projected miss|Projected to meet|Projected loss|Not started|Recorded:|months completed|Delivered customer electricity divided/,
     );
+    await expect(
+      requirements.getByText("≥99.5% of demand monthly · Jan–Feb 2025", {
+        exact: true,
+      }),
+    ).toBeAttached();
     const outlook = panel.getByRole("region", { name: "Score outlook" });
     await expect(
       outlook.getByRole("img", { name: /Chart of score/ }),
@@ -42,11 +47,6 @@ for (const theme of ["light", "dark"] as const) {
     await page.screenshot({
       path: testInfo.outputPath(`scenario-score-${theme}.png`),
     });
-    await expect(
-      panel.locator(
-        '.missionRequirementStatus[data-status="unknown"], .missionRequirementStatus[data-status="in-progress"]',
-      ),
-    ).toHaveCount(0);
     await expect(panel).not.toContainText("(partial month)");
     await expect(panel).toBeInViewport({ ratio: 1 });
     await expectDialogToFit(panel);
@@ -133,8 +133,10 @@ test("scenario outlook flags insolvency with the first projected month-end", asy
   );
   const outlook = panel.getByRole("region", { name: "Score outlook" });
   const failure = outlook.getByRole("status", { name: "Scenario forecast" });
+  await expect(failure.locator("strong")).toHaveText("Projected loss:");
+  await expect(failure.locator("svg")).toBeVisible();
   await expect(failure).toContainText(
-    /! Projected loss: Cash below \$0 at \w+ \d{4}\./,
+    /Projected loss: Cash below \$0 at \w+ \d{4}\./,
   );
   await expect(
     outlook.getByRole("img", { name: /Projected loss periods shaded/ }),

@@ -495,7 +495,10 @@ for (const [theme, winning] of [
       );
       await expect(
         scenario.getByRole("region", { name: "Victory conditions" }),
-      ).toContainText("1/36 months completed");
+      ).toContainText("≥99.5% of demand monthly · Jan 2026–Dec 2028");
+      await expect(
+        scenario.getByRole("region", { name: "Victory conditions" }),
+      ).not.toContainText(/months completed|Not started/);
       expect(
         (await readSavedGame(page))!.objectiveProgress?.completedMonths,
       ).toBe(73);
@@ -1060,15 +1063,15 @@ for (const [theme, requiredBills] of [
     await expect(
       rules.getByText("Keep bills affordable", { exact: true }),
     ).toBeVisible();
-    await expect(rules).toContainText(
+    await expect(rules).not.toContainText(
       "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
     );
     await expect(rules).toContainText(
       "Bills ≤$0/kWh each month · Jan–Feb 2020",
     );
-    await expect(
-      rules.getByText("Recorded: 0/2 months completed", { exact: true }),
-    ).toHaveCount(2);
+    await expect(rules).not.toContainText(
+      /Recorded:|months completed|Not started/,
+    );
     await expect(rules.getByText("Optional", { exact: true })).toHaveCount(
       requiredBills ? 0 : 1,
     );
@@ -1085,9 +1088,11 @@ for (const [theme, requiredBills] of [
       await expect(appbar).toContainText("Feb 2020", { timeout: 30000 });
       await appbar.getByRole("button", { name: "pause", exact: true }).click();
       await openPane(panel, scenarioButton);
-      await expect(rules).toContainText("1/2 months completed");
+      await expect(rules).not.toContainText(
+        /months completed|At least one completed month/,
+      );
       await expect(rules).toContainText(
-        "At least one completed month billed more than the starting-year rate ceiling.",
+        "Bills ≤$0/kWh each month · Jan–Feb 2020",
       );
       await expect(rules.getByText("Optional", { exact: true })).toBeVisible();
       await expect(
@@ -1102,10 +1107,9 @@ for (const [theme, requiredBills] of [
       await scrollEvidenceIntoView(goal);
       await expect(goal).toBeInViewport({ ratio: 1 });
       await expect(
-        rules.getByText(
-          "At least one completed month billed more than the starting-year rate ceiling.",
-          { exact: true },
-        ),
+        rules.getByText("Bills ≤$0/kWh each month · Jan–Feb 2020", {
+          exact: true,
+        }),
       ).toBeInViewport({ ratio: 1 });
       await screenshot(
         page,

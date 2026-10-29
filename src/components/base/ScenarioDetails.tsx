@@ -1,6 +1,7 @@
 import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { Box, Typography, useMediaQuery } from "@mui/material";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { GameType, ScenarioType, ScoreCategoryType } from "../../Types";
 import { DIFFICULTY_LABELS } from "../../Constants";
 import { getScenarioLocation } from "../../helpers/Locations";
@@ -20,7 +21,6 @@ import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
 import { formatScore } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
-import type { MissionRequirement } from "../../helpers/MissionStatus";
 import { ScoreProjectionType } from "../../helpers/ScoreProjection";
 import { useAppSelector } from "../../Store";
 import { GameCard } from "./GameCard";
@@ -54,23 +54,6 @@ function useScenarioForecast(game: GameType): ProjectionView | undefined {
   if (!now || ended || (!ready && typeof Worker !== "undefined"))
     return undefined;
   return readProjection(game, now);
-}
-
-const STATUS_LABELS: Record<MissionRequirement["status"], string> = {
-  pending: "Not started",
-  "in-progress": "In progress",
-  completed: "Met",
-  failed: "Failed",
-  unknown: "Unknown",
-  waived: "Waived",
-};
-
-function statusLabel(requirement: MissionRequirement): string {
-  if (requirement.definition && requirement.status === "unknown")
-    return "Unavailable";
-  return requirement.id === "retention" && requirement.status === "failed"
-    ? "Out of reach"
-    : STATUS_LABELS[requirement.status];
 }
 
 /**
@@ -189,10 +172,21 @@ function ScoreOutlook({
           variant="body2"
           role="status"
           aria-label="Scenario forecast"
-          className="scenarioOutcome"
+          className={
+            outlook?.status === "loss" ? "insightsWarning" : "scenarioOutcome"
+          }
           data-status={outlook?.status ?? "loading"}
         >
-          {loss.text}
+          {outlook?.status === "loss" ? (
+            <>
+              <WarningAmberIcon fontSize="small" aria-hidden="true" />
+              <span>
+                <strong>Projected loss:</strong> {loss.text}
+              </span>
+            </>
+          ) : (
+            loss.text
+          )}
         </Typography>
       )}
     </Box>
@@ -389,82 +383,39 @@ export function ScenarioDetailsContent({
           Victory conditions
         </Typography>
         {scenario.id === 3 && <CustomerGrowthChallenge />}
-        {mission.finalNote && (
-          <Typography variant="body2">{mission.finalNote}</Typography>
-        )}
         <Box component="dl" className="missionRequirements">
           {[...mission.requirements]
             .sort(
               (a, b) =>
                 Number(a.required === false) - Number(b.required === false),
             )
-            .map((requirement) => {
-              return (
-                <React.Fragment key={requirement.id}>
-                  <Typography
-                    component="dt"
-                    variant="body2"
-                    sx={{ mt: 2, fontWeight: 600, overflowWrap: "anywhere" }}
-                  >
-                    <span>
-                      {requirement.definition
-                        ? requirement.label
-                        : requirement.target}
-                    </span>
-                    {requirement.required === false && (
-                      <Typography
-                        component="span"
-                        variant="body2"
-                        sx={{ ml: 1, color: "text.secondary" }}
-                      >
-                        Optional
-                      </Typography>
-                    )}
-                  </Typography>
-                  {requirement.definition && (
+            .map((requirement) => (
+              <React.Fragment key={requirement.id}>
+                <Typography
+                  component="dt"
+                  variant="body2"
+                  sx={{ mt: 2, fontWeight: 600, overflowWrap: "anywhere" }}
+                >
+                  <span>{requirement.label}</span>
+                  {requirement.required === false && (
                     <Typography
-                      component="dd"
+                      component="span"
                       variant="body2"
-                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                      sx={{ ml: 1, color: "text.secondary" }}
                     >
-                      {requirement.definition}
+                      Optional
                     </Typography>
                   )}
-                  {requirement.definition && (
-                    <Typography component="dd" variant="body2">
-                      {requirement.target}
-                    </Typography>
-                  )}
-                  <Typography component="dd" variant="body2">
-                    {(requirement.status !== "unknown" ||
-                      requirement.definition) &&
-                      requirement.status !== "in-progress" && (
-                        <span
-                          className="missionRequirementStatus"
-                          data-status={requirement.status}
-                        >
-                          {statusLabel(requirement)}
-                        </span>
-                      )}{" "}
-                    <span>
-                      {requirement.definition || requirement.id === "survival"
-                        ? "Recorded: "
-                        : ""}
-                      {requirement.current}
-                    </span>
-                  </Typography>
-                  {requirement.reason && (
-                    <Typography
-                      component="dd"
-                      variant="body2"
-                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
-                    >
-                      {requirement.reason}
-                    </Typography>
-                  )}
-                </React.Fragment>
-              );
-            })}
+                </Typography>
+                <Typography
+                  component="dd"
+                  variant="body2"
+                  sx={{ overflowWrap: "anywhere" }}
+                >
+                  {requirement.target}
+                </Typography>
+              </React.Fragment>
+            ))}
         </Box>
       </Box>
     </div>
