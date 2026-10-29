@@ -63,7 +63,7 @@ describe("simulation invariants", () => {
 
 describe("simulation determinism", () => {
   // The seed only feeds the extrapolation past the end of the recorded data (weather runs
-  // 1980-2019, fuel prices similar). Inside that window the game replays real history, so two
+  // 1980-2019, fuel prices similar). Inside that window the game follows real history, so two
   // seeds legitimately agree; past it they have to diverge or the seed is being ignored.
   it("produces different runs for different seeds once past the recorded data", () => {
     // Carbon Fee starts in 2020, so every tick is extrapolated
@@ -72,7 +72,7 @@ describe("simulation determinism", () => {
     expect(second.months).not.toEqual(first.months);
   });
 
-  it("replays recorded history identically whatever the seed", () => {
+  it("uses recorded history identically whatever the seed", () => {
     // Rise of Renewables starts in 2002 and only runs 12 years, well inside the data
     const first = runSimulation({ scenarioId: 101, months: 24, seed: 1 });
     const second = runSimulation({ scenarioId: 101, months: 24, seed: 2 });

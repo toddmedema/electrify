@@ -14,13 +14,12 @@ export async function readDesktopCompetitiveBests(
   const bests: NonNullable<UserType["bests"]> = {};
   for (const entry of await repository.list()) {
     try {
-      const { result, save } = await repository.read(entry.id);
+      const { result } = await repository.read(entry.id);
       if (
         !result ||
         result.scoreVersion !== SCORE_VERSION ||
         result.outcome !== "completed" ||
         entry.status !== "completed" ||
-        save.game.replayPlayback ||
         !SCENARIOS.some(
           (scenario) =>
             scenario.id === result.scenarioId && !scenario.tutorialSteps,

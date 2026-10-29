@@ -14,8 +14,7 @@ import {
   summarizeTimeline,
   summarizeHistory,
 } from "../helpers/DateTime";
-import { serializeReplay } from "../Replay";
-import { createGame, createGameFromReplay } from "../testing/Simulator";
+import { createGame } from "../testing/Simulator";
 import gameReducer, {
   buildTransmissionLine,
   generateNewTimeline,
@@ -322,30 +321,6 @@ describe("transmission actions", () => {
     expect(state.transmission).toEqual(before);
   });
 
-  it("replays intertie builds and trading policy changes", () => {
-    let game = createGame({ scenarioId: 100, seed: 61 });
-    game = gameReducer(
-      game,
-      buildTransmissionLine({
-        corridorId: "california-north",
-        financed: true,
-      }),
-    );
-    game = gameReducer(game, setTradingPolicy("RELIABILITY_FIRST"));
-
-    const replayed = createGameFromReplay(serializeReplay(game)!);
-
-    expect(replayed.transmission).toMatchObject({
-      tradingPolicy: "RELIABILITY_FIRST",
-      lines: [
-        expect.objectContaining({
-          corridorId: "california-north",
-          financed: true,
-        }),
-      ],
-    });
-  });
-
   it("runs Mission 7 from financed build through imports and a later safe export", () => {
     jest.useFakeTimers();
     try {
@@ -520,7 +495,7 @@ describe("transmission actions", () => {
       tickState(state);
       expect(state.speed).toBe("PAUSED");
       expect(state.date.minute).toBe(stressMinute);
-      // The exercise is persistent, finite, validated, and replayed as a deliberate decision.
+      // The exercise is persistent, finite, validated, and counted as a deliberate decision.
       expect(
         parseSave(serializeSave(state))?.game.tutorialIntertieStress,
       ).toEqual(state.tutorialIntertieStress);
@@ -549,22 +524,6 @@ describe("transmission actions", () => {
           restored,
         ),
       ).toBeGreaterThan(150e6);
-      expect(
-        state.replayLog?.some((a) => a.type === "beginIntertieStress"),
-      ).toBe(true);
-      let replayed = createGameFromReplay(serializeReplay(state)!);
-      while (replayed.date.minute < stressMinute + 15) tickState(replayed);
-      expect(replayed.tutorialIntertieStress?.active).toBe(true);
-      replayed = cloneDeep(gameReducer(replayed, setSpeed("PAUSED")));
-      replayed = cloneDeep(gameReducer(replayed, setSpeed("FAST")));
-      expect(replayed.speed).toBe("FAST");
-      while (replayed.date.minute < state.date.minute) tickState(replayed);
-      expect(replayed.tutorialIntertieStress).toEqual(
-        state.tutorialIntertieStress,
-      );
-      expect(
-        getTimeFromTimeline(replayed.date.minute, replayed.timeline)?.supplyW,
-      ).toBeCloseTo(restored.supplyW, 0);
     } finally {
       jest.clearAllTimers();
       jest.useRealTimers();

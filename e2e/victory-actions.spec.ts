@@ -149,7 +149,7 @@ for (const { theme, native, currentRank } of [
   { theme: "dark", native: true, currentRank: 47 },
   { theme: "light", native: true, currentRank: 12345 },
 ] as const) {
-  test(`victory actions remain usable and replay the scenario in ${theme}${native ? " with native leaderboard" : ""}`, async ({
+  test(`victory actions remain usable and restart the scenario in ${theme}${native ? " with native leaderboard" : ""}`, async ({
     page,
   }, info) => {
     await page.addInitScript((mode) => {
@@ -306,10 +306,13 @@ for (const { theme, native, currentRank } of [
       name: "New game",
       exact: true,
     });
-    const replay = dialog.getByRole("button", { name: "Replay", exact: true });
+    const playAgain = dialog.getByRole("button", {
+      name: "Play again",
+      exact: true,
+    });
     await expect(newGame).toBeVisible();
     // Read the pair together: late standings can reposition the centered dialog.
-    const [replayBox, newBox] = await dialog
+    const [playAgainBox, newBox] = await dialog
       .locator(".victoryNextActions button")
       .evaluateAll((buttons) =>
         buttons.map((button) => {
@@ -317,8 +320,8 @@ for (const { theme, native, currentRank } of [
           return { x, y, width };
         }),
       );
-    expect(replayBox.y).toBe(newBox.y);
-    expect(newBox.x).toBeGreaterThan(replayBox.x + replayBox.width);
+    expect(playAgainBox.y).toBe(newBox.y);
+    expect(newBox.x).toBeGreaterThan(playAgainBox.x + playAgainBox.width);
     expect(
       await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
@@ -349,7 +352,7 @@ for (const { theme, native, currentRank } of [
     await expectDialogToFit(preview);
     await preview.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(preview).toHaveCount(0);
-    await replay.click();
+    await playAgain.click();
     await expect(dialog).not.toBeVisible();
     await expect(page.locator("#appbar:visible").first()).toBeVisible();
     await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));

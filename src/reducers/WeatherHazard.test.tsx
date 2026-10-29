@@ -8,10 +8,9 @@ import gameReducer, {
   tickState,
   togglePauseFacility,
 } from "./Game";
-import { createGame, createGameFromReplay } from "../testing/Simulator";
+import { createGame } from "../testing/Simulator";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { parseSave, serializeSave } from "../SaveGame";
-import { decodeReplay, encodeReplay, serializeReplay } from "../Replay";
 import {
   COLD_DEFINITION_ID,
   facilityHazardStatus,
@@ -348,7 +347,6 @@ describe("retrofits", () => {
       startsMinute: next.date.minute,
       completesMinute: next.date.minute + MINUTES_PER_MONTH,
     });
-    expect(next.replayLog?.at(-1)?.type).toBe("retrofitFacility");
     // A repeat is not offered and changes nothing.
     // Immer freezes an unchanged base, so each probe works on its own copy.
     const repeated = dispatch(
@@ -358,7 +356,6 @@ describe("retrofits", () => {
     expect(
       getTimeFromTimeline(repeated.date.minute, repeated.timeline)!.cash,
     ).toBe(at.cash);
-    expect(repeated.replayLog).toEqual(next.replayLog);
     // Wrong technology, unknown facility and malformed payloads are rejected.
     const gas = next.facilities.find((f) => f.fuel === "Natural Gas")!;
     [
@@ -370,7 +367,8 @@ describe("retrofits", () => {
         cloneDeep(next),
         retrofitFacility(payload as Parameters<typeof retrofitFacility>[0]),
       );
-      expect(rejected.replayLog).toEqual(next.replayLog);
+      expect(rejected.facilities).toEqual(next.facilities);
+      expect(rejected.timeline).toEqual(next.timeline);
     });
     // The next tick does not charge it again.
     const control = cloneDeep(next);
@@ -450,7 +448,6 @@ describe("retrofits", () => {
     const plant = cancelled.facilities.find((f) => f.id === gas.id)!;
     expect(plant.upgradeInProgress).toBeUndefined();
     expect(plant.resilience?.coldWeatherPackage).toBeFalsy();
-    expect(cancelled.replayLog?.at(-1)?.type).toBe("cancelRetrofit");
     expect(
       cancelled.eventLog.some((e) => e.message.startsWith("Cancelled")),
     ).toBe(true);
@@ -463,7 +460,6 @@ describe("retrofits", () => {
     );
     // A second cancel, or one for a plant that isn't upgrading, changes nothing
     const again = dispatch(cloneDeep(cancelled), cancelRetrofit(gas.id));
-    expect(again.replayLog).toEqual(cancelled.replayLog);
     expect(cashNow(again)).toBe(cashNow(cancelled));
     // The refunded plant runs like one that was never upgraded
     for (let i = 0; i < 8; i++) {
@@ -515,49 +511,6 @@ describe("retrofits", () => {
     expect(
       next.facilities.find((f) => f.id === solar.id)!.resilience?.hailResistant,
     ).toBeFalsy();
-  });
-
-  it("replays a retrofit identically", () => {
-    // Replays rebuild an authored scenario by id; 105 starts with a solar farm.
-    const authored = SCENARIOS.find((s) => s.id === 105)!;
-    const scenario = {
-      ...authored,
-      locationId: "Denver",
-      location: getSimLocation("Denver"),
-    };
-    let played = createGame({ scenarioId: 105, scenario, seed: 4242 });
-    tickToMonth(played, 2);
-    const solar = played.facilities.find((f) => f.fuel === "Sun")!;
-    // Try it, cancel for a refund, then commit to it
-    played = dispatch(
-      played,
-      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
-    );
-    tickToMinute(played, played.date.minute + 4 * 60);
-    played = dispatch(played, cancelRetrofit(solar.id));
-    tickToMinute(played, played.date.minute + 60);
-    played = dispatch(
-      played,
-      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
-    );
-    tickToMonth(played, 5);
-    expect(
-      played.facilities.find((f) => f.id === solar.id)!.resilience
-        ?.hailResistant,
-    ).toBe(true);
-    const replay = decodeReplay(
-      JSON.parse(JSON.stringify(encodeReplay(serializeReplay(played)!))),
-    )!;
-    expect(replay.actions.map((a) => a.type)).toEqual(
-      expect.arrayContaining(["retrofitFacility", "cancelRetrofit"]),
-    );
-    const watched = createGameFromReplay(replay);
-    tickToMonth(watched, 5);
-    expect(watched.facilities).toEqual(played.facilities);
-    expect(watched.monthlyHistory).toEqual(played.monthlyHistory);
-    expect(watched.worldEvents.occurrences).toEqual(
-      played.worldEvents.occurrences,
-    );
   });
 });
 

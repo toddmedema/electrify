@@ -318,8 +318,7 @@ thermals or battery constraints. This host cannot establish the M5's 8.33 ms fra
 
 - Live reducer batches create one plain working state from the untouched Immer draft, isolate
   each settled timeline frame and mutable fleet fields, and adopt once. Month inputs are copied
-  only at rollover. Unchanged history/events retain their references; replay actions retain the
-  original draft path. Reusing resolved story effects removes repeated price/fee lookups.
+  only at rollover. Unchanged history/events retain their references. Reusing resolved story effects removes repeated price/fee lookups.
 - The initial shared projection and month-keyed hydro/intertie outlooks run in persistent workers.
   Results are scoped to the exact run and request; stale/imported results are rejected, rapid
   requests coalesce, data loads remain retryable, and failures retain the after-paint fallback.
@@ -334,7 +333,7 @@ thermals or battery constraints. This host cannot establish the M5's 8.33 ms fra
 
 Full-state parity covers every scenario and standard CEO balance playbooks through the real draft
 wrapper. Focused tests cover real multi-step presentation batches across normal/month/January
-boundaries, pause and replay, exact worker transport, cancellation, failures and visible forecast
+boundaries, pause, exact worker transport, cancellation, failures and visible forecast
 publication. Golden outputs did not change. No simulation constants, economics, authored data or
 seeded outcomes changed.
 
@@ -627,7 +626,7 @@ date and events.
 Headless whole-run timing was noisy: a 2.27% median reduction, ranging from a 1.48% regression to a
 24.28% improvement. Headless median rollover did not consistently improve. The consistent
 whole-run gain is in the draft-wrapped per-tick lab workload, including snapshot/adopt work;
-non-replay draft inputs enter a plain working state inside `tickStatePhases`. Normal foreground
+draft inputs enter a plain working state inside `tickStatePhases`. Normal foreground
 play batches snapshot/adopt once per frame, so this is not a direct foreground-throughput or
 whole-frame measurement. Plain ordinary-tick medians were 0.0236–0.0297 ms before and
 0.0161–0.0182 ms after. That core-tick gain is a small part of total cost; rollovers dominate here.

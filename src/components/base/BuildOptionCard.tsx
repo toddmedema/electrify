@@ -23,7 +23,7 @@ export interface BuildOptionCardProps {
   cardProps?: Record<`data-${string}`, string>;
   /** Heading semantics for the title (interties are navigable by heading) */
   titleComponent?: "h6";
-  /** Omitted to leave the card without a Review button (replay playback) */
+  /** Omitted to leave the card without a Review button */
   review?: {
     ariaLabel: string;
     disabled: boolean;

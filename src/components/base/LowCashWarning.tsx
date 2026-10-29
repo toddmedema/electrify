@@ -16,7 +16,6 @@ export const offerLowCashWarning = (): AppThunk => (dispatch, getState) => {
   const cash = currentTick(game)?.cash;
   if (
     !game.inGame ||
-    game.replayPlayback ||
     cash === undefined ||
     cash >= LOW_CASH_THRESHOLD ||
     game.lowCashWarningMonth === game.date.monthsElapsed ||

@@ -276,6 +276,6 @@ The separate balance report records the final empirical results. Required
 repository checks, production build, and browser checks of both palettes and
 desktop/mobile choices cover mechanics and presentation. Passing this matrix
 establishes tested paths to victory and defeat, not a proof for every possible
-strategy or seed. The PR already changes save/replay versions relative to its
+strategy or seed. The PR already changes save versions relative to its
 base, so these additional unmerged price revisions stay within that compatibility
 boundary.

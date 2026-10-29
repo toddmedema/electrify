@@ -35,7 +35,6 @@ export default function DataCenterGuide() {
       (item) => item.id === "community-data-centers",
     ),
   );
-  const replaying = useAppSelector((state) => !!state.game.replayPlayback);
   const blocked = useAppSelector(
     (state) =>
       !!(
@@ -137,13 +136,13 @@ export default function DataCenterGuide() {
     if (!inGame) setOpen(false);
     if (!requested || !inGame || !ready || blocked) return;
     dispatch(uiDelta({ dataCenterGuideRequested: false }));
-    if (replaying || getPlayedScenarioIds().includes(TUTORIALS[0].id)) return;
+    if (getPlayedScenarioIds().includes(TUTORIALS[0].id)) return;
     // Count the offer itself, including ignoring it or reloading, exactly once.
     recordScenarioPlayed(TUTORIALS[0].id);
     dispatch(setSpeed("PAUSED"));
     setStep(-1);
     setOpen(true);
-  }, [requested, inGame, ready, replaying, blocked, dispatch]);
+  }, [requested, inGame, ready, blocked, dispatch]);
 
   React.useLayoutEffect(() => {
     if (open && inGame && speed !== "PAUSED") dispatch(setSpeed("PAUSED"));

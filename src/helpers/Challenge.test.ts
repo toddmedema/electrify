@@ -79,8 +79,8 @@ it.each([
 ])("rejects incompatible reference %p", (patch) =>
   expect(expandAuthoredRunReference({ ...run, ...patch })).toBeUndefined(),
 );
-it("rejects overrides, waived gates, changed inputs, and custom/replay/tutorial origins", () => {
-  for (const origin of ["custom", "tutorial", "replay"] as const)
+it("rejects overrides, waived gates, changed inputs, and custom/tutorial origins", () => {
+  for (const origin of ["custom", "tutorial"] as const)
     expect(
       projectAuthoredRunReference({ ...identity, origin }),
     ).toBeUndefined();
@@ -104,7 +104,7 @@ it("rejects overrides, waived gates, changed inputs, and custom/replay/tutorial 
   expect(
     projectAuthoredRunReference({ ...fixedIdentity, seed: fixed.seed! + 1 }),
   ).toBeUndefined();
-  expect(sameRunIdentity(identity, { ...identity, origin: "replay" })).toBe(
+  expect(sameRunIdentity(identity, { ...identity, origin: "tutorial" })).toBe(
     true,
   );
   expect(sameRunIdentity(identity, undefined)).toBe(false);

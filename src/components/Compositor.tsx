@@ -122,16 +122,11 @@ export const keyMap = {
 /**
  * Whether the keys that act on the game should do anything right now.
  *
- * The hotkeys are global, so they fire over the main menu and the manual too -- and a replay is
- * somebody else's run, which the viewer does not get to reorder.
+ * Global hotkeys also fire over menus and the manual, where game actions are unavailable.
  */
 function canPlay(): boolean {
   const state = store.getState();
-  return (
-    state.game.inGame &&
-    !state.game.replayPlayback &&
-    isNavCard(state.card.name)
-  );
+  return state.game.inGame && isNavCard(state.card.name);
 }
 
 // Pausing from the keyboard offers the same undo the row's pause button does: the fleet is a
@@ -180,8 +175,7 @@ function reprioritizeSelected(delta: number) {
 }
 
 // A tool key does exactly what its action bar button does -- open the tool, or close it when it
-// is already showing -- so it presses that button. One missing or hidden (Build in a replay, or
-// a tutorial that hasn't introduced the bar yet) has no key either.
+// is already showing -- so it presses that button. A tool hidden by a tutorial has no key either.
 function toggleTool(tool: GameTool) {
   const { card, game } = store.getState();
   if (!game.inGame || !isGameCard(card.name)) {

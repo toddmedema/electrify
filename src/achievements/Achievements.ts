@@ -32,7 +32,6 @@ const emptyMonth = (): AchievementMonth => ({
   efficiencyWh: 0,
 });
 const eligible = (game: GameType) =>
-  !game.replayPlayback &&
   !game.customScenario &&
   !game.storyEffectsDisabled &&
   !game.weatherHazardsDisabled &&
@@ -51,7 +50,7 @@ function award(progress: AchievementProgress, id: string): void {
 }
 
 function initialize(game: GameType): void {
-  if (game.replayPlayback || game.customScenario) return;
+  if (game.customScenario) return;
   game.desktopAchievements = {
     version: 1,
     startedWithCoal:
@@ -249,7 +248,6 @@ export const achievementHooks: SimulationHooks = {
   tutorial(game) {
     const scenario = SCENARIOS.find(({ id }) => id === game.scenarioId);
     if (
-      game.replayPlayback ||
       game.customScenario ||
       !TUTORIAL_IDS.includes(game.scenarioId) ||
       !scenario?.tutorialSteps ||

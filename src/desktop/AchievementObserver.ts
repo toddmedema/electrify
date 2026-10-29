@@ -14,7 +14,6 @@ export function startAchievements(
     if (
       stopped ||
       saves.transitioning ||
-      game.replayPlayback ||
       game.customScenario ||
       !progress ||
       !desktop.submitAchievements

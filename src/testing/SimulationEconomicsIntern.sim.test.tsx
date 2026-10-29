@@ -1,6 +1,5 @@
 import { INTERN_ONE_BUILD_PLAYS } from "./BalancePlaybooks";
 import {
-  baselineChoiceActions,
   baselineMeaningfulChoices,
   ECONOMICS_SCENARIOS,
   expectNoViolations,
@@ -17,9 +16,6 @@ describe("simulation economics", () => {
         difficulty: "Intern",
       });
       expectNoViolations(passive);
-      expect(passive.actionCount).toBe(
-        baselineChoiceActions(passive, scenario.id),
-      );
       expect(passive.meaningfulDecisionCount).toBe(
         baselineMeaningfulChoices(scenario.id, passive),
       );
@@ -32,9 +28,6 @@ describe("simulation economics", () => {
         ...INTERN_ONE_BUILD_PLAYS[scenario.id],
       });
       expectNoViolations(active);
-      expect(active.actionCount).toBe(
-        1 + baselineChoiceActions(active, scenario.id),
-      );
       expect(active.meaningfulDecisionCount).toBe(
         1 + baselineMeaningfulChoices(scenario.id, active),
       );

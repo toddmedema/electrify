@@ -1,7 +1,6 @@
 import { MeaningfulDecisionKindType } from "../Types";
 import { STANDARD_BALANCE_PLAYS } from "./BalancePlaybooks";
 import {
-  baselineChoiceActions,
   baselineMeaningfulChoices,
   ECONOMICS_SCENARIOS,
   expectNoViolations,
@@ -44,9 +43,6 @@ describe("simulation economics on CEO", () => {
         difficulty: "CEO",
       });
       expectNoViolations(passive);
-      expect(passive.actionCount).toBe(
-        baselineChoiceActions(passive, scenario.id),
-      );
       expect(passive.meaningfulDecisionCount).toBe(
         baselineMeaningfulChoices(scenario.id, passive),
       );

@@ -442,7 +442,6 @@ export class SaveRepository {
       result === undefined ? undefined : parseSavedRunResult(result);
     if (
       !validSave ||
-      validSave.game.replayPlayback ||
       validResult === null ||
       !validateStatusResult(status, validResult, validSave.game)
     ) {
@@ -472,7 +471,6 @@ export class SaveRepository {
         : parseSavedRunResult(payload.result);
     if (
       !save ||
-      save.game.replayPlayback ||
       result === null ||
       !validateStatusResult(metadata.status, result, save.game) ||
       metadata.scenarioId !== save.game.scenarioId ||
@@ -820,7 +818,7 @@ export class SaveRepository {
   ): Promise<SaveMetadata> {
     // Encode before opening the transaction: expensive work cannot extend its active lifetime.
     const validSave = this.parseSave(save);
-    if (!validSave || validSave.game.replayPlayback)
+    if (!validSave)
       throw new SaveRepositoryError("invalid", "This game could not be saved.");
     const wire = encodeSave(validSave);
     const metadata = await this.transaction<SaveMetadata>(

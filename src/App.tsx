@@ -236,7 +236,7 @@ export default function App() {
 
     // A direct challenge link needs a real catalog entry behind it, so both the visible Back
     // button and the browser Back button stay in the app instead of returning to the referring
-    // site. The ref makes this safe under StrictMode's development effect replay.
+    // site. The ref makes this safe under StrictMode's repeated development effects.
     if (!scenarioRouteInitialized.current) {
       scenarioRouteInitialized.current = true;
       const challenge = parseChallengeUrl(window.location.href);

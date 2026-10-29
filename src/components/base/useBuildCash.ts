@@ -60,7 +60,6 @@ export function sameBuildQuote<Props extends { game: GameType }>(
         before.inGame === after.inGame &&
         before.tutorialStep === after.tutorialStep &&
         before.interestRate === after.interestRate &&
-        before.replayPlayback === after.replayPlayback &&
         (before.runIdentity ?? before.location) ===
           (after.runIdentity ?? after.location) &&
         before.date.minute <= after.date.minute &&

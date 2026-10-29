@@ -303,16 +303,9 @@ import {
   loaded,
   quit,
   resume,
-  startReplay,
   multiplayerSnapshot,
 } from "./GameActions";
 import { currentRunSaveEffects, RunSaveEffects } from "../SaveEffects";
-import {
-  recordReplayAction,
-  recordedDelta,
-  replayDiverged,
-  serializeReplay,
-} from "../Replay";
 import {
   ActiveWorldEventType,
   ConstructionEmissions,
@@ -337,7 +330,6 @@ import {
   SpeedType,
   TickPresentFutureType,
   FuelProductionType,
-  ReplayActionType,
   FacilityUpgradeType,
   RetrofitFacilityAction,
   TradingPolicyType,
@@ -503,9 +495,8 @@ function logGameEvent(
   if (log.length > MAX_EVENTS) {
     log.length = MAX_EVENTS;
   }
-  // An important event creates a decision point. Replays remain passive records, and an already
-  // paused player stays deliberately paused rather than acquiring a speed to restore later.
-  if (options.pause && !state.replayPlayback) {
+  // An important event creates a decision point and pauses the clock.
+  if (options.pause) {
     state.speed = "PAUSED";
   }
   return true;
@@ -1541,9 +1532,8 @@ export const gameSlice = createSlice({
       const simulationStepMs = TICK_MS[state.speed];
       // Catch-up ticks share one private state. Snapshotting the modified draft again for every
       // step recursively copied the whole forecast and fleet, magnifying a dropped frame into
-      // a more expensive next frame. Replays retain Immer because their actions can edit any root.
+      // a more expensive next frame.
       const snapshot =
-        !state.replayPlayback &&
         accumulatedTickMs + simulationStepMs * TICK_SNAP >= simulationStepMs
           ? current(state)
           : undefined;
@@ -1566,9 +1556,7 @@ export const gameSlice = createSlice({
       scheduleTick(state.speed);
     },
     delta: (state, action: PayloadAction<Partial<GameType>>) => {
-      // Assigned onto the draft rather than spread into a new object, which is equivalent for a
-      // partial merge and is what lets the recorder below append to the draft's own log. Immer
-      // rejects a reducer that both mutates its draft and returns a replacement for it
+      // Mutate the draft for a partial merge; Immer rejects mutating and replacing it together.
       const {
         policies: _policies,
         policyPause: _policyPause,
@@ -1594,27 +1582,21 @@ export const gameSlice = createSlice({
         state.runIdentity = undefined;
       }
       normalizeRateDelta(state, payload);
-      const recorded = recordedDelta(payload);
       const rateBefore = state.dollarsPerkWh;
-      const followedBefore = !!state.rateFollowsTarget;
       Object.assign(state, payload);
       const rateChanged =
-        recorded?.dollarsPerkWh !== undefined &&
-        recorded.dollarsPerkWh !== rateBefore;
+        typeof payload.dollarsPerkWh === "number" &&
+        Number.isFinite(payload.dollarsPerkWh) &&
+        payload.dollarsPerkWh >= 0 &&
+        payload.dollarsPerkWh !== rateBefore;
       if (rateChanged) {
         recordMeaningfulDecision(state, {
           lever: "rate",
           label: "Set the customer electricity rate",
           kind: "rate",
           before: String(rateBefore),
-          after: String(recorded.dollarsPerkWh),
+          after: String(payload.dollarsPerkWh),
         });
-      }
-      if (
-        recorded &&
-        (rateChanged || !!state.rateFollowsTarget !== followedBefore)
-      ) {
-        recordReplayAction(state, "delta", recorded);
       }
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
@@ -1635,9 +1617,6 @@ export const gameSlice = createSlice({
       state.meaningfulDecisions = [];
       state.transmission = undefined;
       state.timeline = [];
-      // A game being watched is not a game being recorded; anything else starts an empty log,
-      // which is also what tells serializeReplay the run was recorded from its very first minute
-      state.replayLog = state.replayPlayback ? undefined : [];
       state.seed = a.seed !== undefined ? a.seed : newSeed();
       const scenario =
         getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
@@ -1673,13 +1652,11 @@ export const gameSlice = createSlice({
           customers: a.customers,
           meaningfulDecisionGateWaived: !!state.meaningfulDecisionGateWaived,
         },
-        state.replayPlayback
-          ? "replay"
-          : scenario.tutorialSteps
-            ? "tutorial"
-            : state.customScenario
-              ? "custom"
-              : "authored",
+        scenario.tutorialSteps
+          ? "tutorial"
+          : state.customScenario
+            ? "custom"
+            : "authored",
       );
       state.runIdentity =
         !state.storyEffectsDisabled &&
@@ -1917,107 +1894,61 @@ export const gameSlice = createSlice({
       // Establish the comparison before time moves. A fleet that was already dearer on day one
       // has not crossed anything; the first monthly ordering change is the event.
       state.fuelCostSnapshot = currentFuelCosts(state);
-      // Anything the player did before the clock first moved -- setting a rate on the way in.
-      // tickState picks up everything after this
-      applyPendingReplayActions(state);
     },
     buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {
-      if (applyBuildFacility(state, action.payload)) {
-        recordReplayAction(state, "buildFacility", action.payload);
-      }
+      applyBuildFacility(state, action.payload);
     },
     buildTransmissionLine: (
       state,
       action: PayloadAction<BuildTransmissionLineAction>,
     ) => {
-      if (applyBuildTransmissionLine(state, action.payload)) {
-        recordReplayAction(state, "buildTransmissionLine", action.payload);
-      }
+      applyBuildTransmissionLine(state, action.payload);
     },
     cancelTransmissionLine: (state, action: PayloadAction<number>) => {
-      if (
-        !state.replayPlayback &&
-        applyCancelTransmissionLine(state, action.payload)
-      )
-        recordReplayAction(state, "cancelTransmissionLine", action.payload);
+      applyCancelTransmissionLine(state, action.payload);
     },
     togglePauseTransmissionLine: (state, action: PayloadAction<number>) => {
-      if (
-        !state.replayPlayback &&
-        applyTogglePauseTransmissionLine(state, action.payload)
-      )
-        recordReplayAction(
-          state,
-          "togglePauseTransmissionLine",
-          action.payload,
-        );
+      applyTogglePauseTransmissionLine(state, action.payload);
     },
     reprioritizeTransmissionLine: (
       state,
       action: PayloadAction<ReprioritizeAction>,
     ) => {
-      if (
-        !state.replayPlayback &&
-        applyReprioritizeTransmissionLine(state, action.payload)
-      ) {
-        recordReplayAction(
-          state,
-          "reprioritizeTransmissionLine",
-          action.payload,
-        );
-      }
+      applyReprioritizeTransmissionLine(state, action.payload);
     },
     upgradeTransmissionLine: (
       state,
       action: PayloadAction<UpgradeTransmissionLineAction>,
     ) => {
-      if (applyUpgradeTransmissionLine(state, action.payload)) {
-        recordReplayAction(state, "upgradeTransmissionLine", action.payload);
-      }
+      applyUpgradeTransmissionLine(state, action.payload);
     },
     setTradingPolicy: (state, action: PayloadAction<TradingPolicyType>) => {
-      if (applyTradingPolicy(state, action.payload)) {
-        recordReplayAction(state, "setTradingPolicy", action.payload);
-      }
+      applyTradingPolicy(state, action.payload);
     },
     sellFacility: (state, action: PayloadAction<number>) => {
-      if (applySellFacility(state, action.payload)) {
-        recordReplayAction(state, "sellFacility", action.payload);
-      }
+      applySellFacility(state, action.payload);
     },
     togglePauseFacility: (state, action: PayloadAction<number>) => {
-      if (applyTogglePauseFacility(state, action.payload)) {
-        recordReplayAction(state, "togglePauseFacility", action.payload);
-      }
+      applyTogglePauseFacility(state, action.payload);
     },
     reprioritizeFacility: (
       state,
       action: PayloadAction<ReprioritizeAction>,
     ) => {
-      if (applyReprioritizeFacility(state, action.payload)) {
-        recordReplayAction(state, "reprioritizeFacility", action.payload);
-      }
+      applyReprioritizeFacility(state, action.payload);
     },
     retrofitFacility: (
       state,
       action: PayloadAction<RetrofitFacilityAction>,
     ) => {
-      if (
-        !state.replayPlayback &&
-        applyRetrofitFacility(state, action.payload)
-      ) {
-        recordReplayAction(state, "retrofitFacility", action.payload);
-      }
+      applyRetrofitFacility(state, action.payload);
     },
     cancelRetrofit: (state, action: PayloadAction<number>) => {
-      if (!state.replayPlayback && applyCancelRetrofit(state, action.payload)) {
-        recordReplayAction(state, "cancelRetrofit", action.payload);
-      }
+      applyCancelRetrofit(state, action.payload);
     },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
       if (
         state.tutorialIntertieStress?.active &&
-        !state.replayPlayback &&
         getTutorialStep(state)?.phase !== "INTERTIE_STRESS_SUPPLY" &&
         action.payload !== "PAUSED"
       )
@@ -2091,7 +2022,6 @@ export const gameSlice = createSlice({
         completed: false,
       };
       state.timeline = reforecastSupply(state, true);
-      recordReplayAction(state, "beginIntertieStress", null);
     });
     builder.addCase(launchRun, (_state, action) => {
       const { identity, challenge } = action.payload;
@@ -2141,44 +2071,11 @@ export const gameSlice = createSlice({
       // Never resume mid-tick; loaded() flips inGame once the CSVs are back
       restored.speed = "PAUSED";
       restored.inGame = false;
-      // Nothing ever autosaves a replay, so anything here came out of a hand-edited save
-      restored.replayPlayback = undefined;
       if (!restored.desktopAchievements)
         desktopSimulationHooks()?.initialize(restored);
       // tickLoopRunning is deliberately left alone: any loop still alive clears the flag and stops
       // on its next tick, since tick() bails while !inGame or PAUSED
       return restored;
-    });
-    /**
-     * Sets a replay up to be watched. Nothing is simulated here: this only puts the scenario, the
-     * location, the difficulty and the seed in place, then hands over to the loading screen, which
-     * reloads the data files and calls initGame the same way it does for a new game.
-     */
-    builder.addCase(startReplay, (_state, action) => {
-      const replay = action.payload;
-      speedBeforeBlockingCard = undefined;
-      speedBeforeManualHelp = undefined;
-      speedBeforeCloudSavePrompt = undefined;
-      speedBeforeHidden = undefined;
-      speedBeforeDialog = "PAUSED";
-      dialogBlocksSpeed = false;
-      return {
-        ...cloneDeep(initialGame),
-        scenarioId: replay.scenarioId,
-        difficulty: replay.difficulty,
-        seed: replay.seed,
-        // The loading screen reads this back rather than looking the scenario's location up,
-        // which is what makes the replay run against the weather the original player saw
-        location: cloneDeep(replay.location),
-        customScenario: cloneDeep(replay.customScenario),
-        meaningfulDecisionGateWaived: !!replay.meaningfulDecisionGateWaived,
-        replayPlayback: {
-          actions: cloneDeep(replay.actions),
-          index: 0,
-          monthlyCash: cloneDeep(replay.monthlyCash),
-          result: cloneDeep(replay.result),
-        },
-      };
     });
     builder.addCase(loaded, (state) => {
       // Saves carry the commitment forecast, so this only runs for one that somehow lacks it.
@@ -2297,11 +2194,7 @@ export const gameSlice = createSlice({
     });
     builder.addCase(chooseScenarioResponse, (state, action) => {
       const blocking = !!pendingScenarioChoice(state);
-      if (
-        !state.replayPlayback &&
-        applyScenarioResponse(state, action.payload)
-      ) {
-        recordReplayAction(state, "chooseScenarioResponse", action.payload);
+      if (applyScenarioResponse(state, action.payload)) {
         if (blocking) {
           delete state.scenarioChoicePause;
           setForegroundSpeed(state, "PAUSED");
@@ -2309,15 +2202,10 @@ export const gameSlice = createSlice({
       }
     });
     builder.addCase(schedulePolicy, (state, action) => {
-      if (
-        !state.replayPlayback &&
-        applyPolicyEdit(state, action.payload, false)
-      )
-        recordReplayAction(state, "schedulePolicy", action.payload);
+      applyPolicyEdit(state, action.payload, false);
     });
     builder.addCase(cancelPolicy, (state, action) => {
-      if (!state.replayPlayback && applyPolicyEdit(state, action.payload, true))
-        recordReplayAction(state, "cancelPolicy", action.payload);
+      applyPolicyEdit(state, action.payload, true);
     });
     builder.addCase(openPolicyDecision, (state, action) => {
       if (!state.policyPause) {
@@ -2371,19 +2259,12 @@ export const {
 } = gameSlice.actions;
 
 // Re-exported so that everything still imports the game's actions from one place
-export { start, loaded, quit, resume, startReplay };
+export { start, loaded, quit, resume };
 
 export default gameSlice.reducer;
 
 // ====== HELPERS ======
 
-/**
- * The simulation-affecting player actions, as plain functions of (state, payload).
- *
- * Both the reducers above and replay playback go through these, which is what makes a replay
- * reproduce the original run rather than an approximation of it: there is one implementation of
- * "the player built a plant", not two that have to be kept in step.
- */
 function refreshInterestRate(
   state: GameType,
   cash: number,
@@ -2413,7 +2294,7 @@ function applyBuildFacility(
 ): boolean {
   if (!validBuildFacility(payload)) return false;
   const requested = payload.facility;
-  // Future shopping quotes can arrive through replay/import as well as the live catalog.
+  // Validate future shopping quotes as carefully as current catalog entries.
   if (
     requested.name === "Iron-Air Battery" &&
     (state.date.year < IRON_AIR_AVAILABLE_YEAR || !isStorage(requested))
@@ -2434,7 +2315,7 @@ function applyBuildFacility(
     !!payload.financed,
     state.interestRate,
   );
-  // The dialog's quote can be stale by the time an action lands (or a replay/import can be
+  // The dialog's quote can be stale by the time an action lands (or an import can be
   // malformed). Never let a purchase drive cash below zero merely because the UI once enabled it.
   if (!now || now.cash < amountDue) {
     return false;
@@ -2445,7 +2326,7 @@ function applyBuildFacility(
     built.name,
   );
   // Recheck current state instead of trusting the shopping-card snapshot in the action. It keeps
-  // a stale dialog or replay action from claiming one more site after the last one was used.
+  // a stale dialog action from claiming one more site after the last one was used.
   if (
     !hydro &&
     viableLocationsRemaining !== undefined &&
@@ -2850,8 +2731,8 @@ function recordRetrofitTransaction(
 }
 
 /**
- * Starts installing a weather-resilience upgrade on a standing facility, for live play and
- * replay. The price is recomputed here from current state rather than trusted from the dialog and
+ * Starts installing a weather-resilience upgrade on a standing facility.
+ * The price is recomputed here from current state rather than trusted from the dialog and
  * paid up front. The plant is offline for RETROFIT_DOWNTIME_MINUTES, after which the upgrade takes
  * effect; see completeRetrofits.
  */
@@ -2977,7 +2858,7 @@ function bookScenarioTransaction(
   now.expensesOM += cost;
 }
 
-/** Accepts one authored choice for live play, replay and headless simulation. */
+/** Accepts one authored choice for live play and headless simulation. */
 function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   if (!validScenarioResponse(payload)) return false;
   const compiled = pendingScenarioRuleChoice(state);
@@ -3179,7 +3060,7 @@ function applyCompiledScenarioResponse(
   return true;
 }
 
-/** Automatic arc branches use the same atomic transition, without adding a player replay action. */
+/** Automatic arc branches use the same atomic transition, without a player decision. */
 function resolveAutomaticScenarioChoices(state: GameType): void {
   let choice = pendingScenarioRuleChoice(state, true);
   while (choice) {
@@ -3270,109 +3151,6 @@ function applyPolicyEdit(
   return true;
 }
 
-function applyReplayAction(state: GameType, entry: ReplayActionType) {
-  const payload = entry.payload;
-  switch (entry.type) {
-    case "beginIntertieStress":
-      if (
-        state.scenarioId === 112 &&
-        !state.customScenario &&
-        !state.tutorialIntertieStress
-      ) {
-        state.tutorialIntertieStress = {
-          active: true,
-          startsMinute: state.date.minute,
-          suppliedTicks: 0,
-          completed: false,
-        };
-        state.timeline = reforecastSupply(state, true);
-      }
-      break;
-    case "chooseScenarioResponse":
-      applyScenarioResponse(state, payload);
-      break;
-    case "retrofitFacility":
-      applyRetrofitFacility(state, payload);
-      break;
-    case "cancelRetrofit":
-      applyCancelRetrofit(state, payload);
-      break;
-    case "schedulePolicy":
-    case "cancelPolicy":
-      applyPolicyEdit(state, payload, entry.type === "cancelPolicy");
-      break;
-    case "buildFacility": {
-      if (validBuildFacility(payload)) applyBuildFacility(state, payload);
-      break;
-    }
-    case "buildTransmissionLine": {
-      const build = payload as Partial<BuildTransmissionLineAction>;
-      applyBuildTransmissionLine(state, build);
-      break;
-    }
-    case "cancelTransmissionLine":
-      if (typeof payload === "number")
-        applyCancelTransmissionLine(state, payload);
-      break;
-    case "togglePauseTransmissionLine":
-      if (typeof payload === "number")
-        applyTogglePauseTransmissionLine(state, payload);
-      break;
-    case "upgradeTransmissionLine": {
-      const upgrade = payload as Partial<UpgradeTransmissionLineAction>;
-      applyUpgradeTransmissionLine(state, upgrade);
-      break;
-    }
-    case "setTradingPolicy":
-      applyTradingPolicy(state, payload);
-      break;
-    case "sellFacility":
-      if (typeof payload === "number") {
-        applySellFacility(state, payload);
-      }
-      break;
-    case "togglePauseFacility":
-      if (typeof payload === "number") {
-        applyTogglePauseFacility(state, payload);
-      }
-      break;
-    case "reprioritizeTransmissionLine": {
-      applyReprioritizeTransmissionLine(state, payload as ReprioritizeAction);
-      break;
-    }
-    case "reprioritizeFacility": {
-      const move = payload as Partial<ReprioritizeAction>;
-      if (Number.isFinite(move?.spotInList) && Number.isFinite(move?.delta)) {
-        applyReprioritizeFacility(state, move as ReprioritizeAction);
-      }
-      break;
-    }
-    case "delta": {
-      const requested = { ...((payload || {}) as Partial<GameType>) };
-      normalizeRateDelta(state, requested);
-      const recorded = recordedDelta(requested);
-      if (!recorded) break;
-      const before = state.dollarsPerkWh;
-      Object.assign(state, recorded);
-      if (
-        recorded.dollarsPerkWh !== undefined &&
-        recorded.dollarsPerkWh !== before
-      ) {
-        recordMeaningfulDecision(state, {
-          lever: "rate",
-          label: "Set the customer electricity rate",
-          kind: "rate",
-          before: String(before),
-          after: String(recorded.dollarsPerkWh),
-        });
-      }
-      break;
-    }
-    default:
-      break;
-  }
-}
-
 /**
  * The rate a public utility following its target charges now, or undefined where there is no
  * target to follow: investor-owned and multiplayer companies, and tutorials.
@@ -3458,25 +3236,6 @@ function capRateForScenario(
       state.seed,
     ),
   );
-}
-
-/**
- * Applies every recorded action the clock has reached. Called from inside the tick rather than
- * from a store subscriber because at FAST speed one dispatch of `tick` runs several ticks, and a
- * subscriber would only see the last of them -- every action in between would land late.
- */
-function applyPendingReplayActions(state: GameType) {
-  const playback = state.replayPlayback;
-  if (!playback) {
-    return;
-  }
-  while (
-    playback.index < playback.actions.length &&
-    playback.actions[playback.index].minute <= state.date.minute
-  ) {
-    applyReplayAction(state, playback.actions[playback.index]);
-    playback.index++;
-  }
 }
 
 /**
@@ -3569,10 +3328,8 @@ export function tutorialCompleteDialog({
 }
 
 /**
- * Give a live tick private mutable outputs while keeping its large read-only inputs plain. Only
- * the frame being settled is written; copying a whole month's forecast would throw away the
- * benefit and invalidate every chart row. Replay actions can write any frame or root, so they
- * keep the normal Immer path instead.
+ * Give a live tick private mutable outputs while keeping large read-only inputs plain.
+ * Only the frame being settled is written, preserving untouched chart rows.
  */
 function tickWorkingState(state: GameType): GameType {
   return {
@@ -3674,7 +3431,7 @@ export function* tickStatePhases(
   state: GameType,
   saveEffects?: RunSaveEffects,
 ): Generator<PeerPlan, void, PeerSettlement | undefined> {
-  if (isDraft(state) && !state.replayPlayback) {
+  if (isDraft(state)) {
     const snapshot = current(state);
     const working = tickWorkingState(snapshot);
     tickWorkingStateStep(working, saveEffects);
@@ -3683,7 +3440,6 @@ export function* tickStatePhases(
   }
   if (
     state.tutorialIntertieStress?.active &&
-    !state.replayPlayback &&
     getTutorialStep(state)?.phase !== "INTERTIE_STRESS_SUPPLY"
   ) {
     state.speed = "PAUSED";
@@ -3691,7 +3447,6 @@ export function* tickStatePhases(
   }
   const speedBeforeTick = foregroundSpeed(state);
   const stressWasActive = !!state.tutorialIntertieStress?.active;
-  applyPendingReplayActions(state);
   if (pendingScenarioChoice(state)) {
     state.scenarioChoicePause ??= speedBeforeTick;
     setForegroundSpeed(state, "PAUSED");
@@ -3777,16 +3532,11 @@ export function* tickStatePhases(
       // Record final history for the month, then generate the new timeline
       history.unshift(summarizeTimeline(state.timeline, state.startingYear));
       recordGameObjectiveMonth(state, history[0]);
-      if (state.replayPlayback && replayDiverged(state.replayPlayback, history))
-        logEvent("replay_diverged", {
-          scenarioId: state.scenarioId,
-          month: history.length,
-        });
       // Reprice the company's credit off the year that just closed, before the forecast is built
       // against it. Operating results reprice monthly; new borrowing reprices immediately.
       refreshInterestRate(state, cash, now.netWorth);
       const storyPriceFuels = updateWorldEvents(state);
-      // The recurring regional hazard resolves on its own path, after the authored story, so a
+      // Resolve recurring regional hazards after the authored story effects.
       updateWeatherHazards(state).forEach((fuel) => storyPriceFuels.add(fuel));
       const activatedPrograms = advancePolicies(
         state,
@@ -3856,11 +3606,6 @@ export function* tickStatePhases(
       // state is an Immer draft, and it's revoked the moment this reducer returns - so anything
       // the timeouts below need has to be read out here rather than from inside their callbacks
       const scenarioId = state.scenarioId;
-      // A replay reaches every one of these the same way the original run did, and must set off
-      // none of their side effects: it is not a played game, it has no score of its own to
-      // submit, and the save it would clear belongs to whoever is watching. Its end screen still
-      // shows, since a replay ending with "Bankrupt!" is the point of watching it
-      const isReplay = !!state.replayPlayback;
       const scenario =
         getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
       const isTutorial = Boolean(scenario.tutorialSteps);
@@ -3869,10 +3614,9 @@ export function* tickStatePhases(
       );
       // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
       // and rules the player gave themselves - would be scored against each other as if they
-      // were the same scenario. Replays likewise belong to the original player, not the viewer.
-      // Mods always run as the custom scenario, so this is also their single exclusion point
-      // from scores, official replays and completion records.
-      const ranked = scenario.id !== CUSTOM_SCENARIO_ID && !isReplay;
+      // were the same scenario. Mods always run as the custom scenario, so this also excludes
+      // them from scores and completion records.
+      const ranked = scenario.id !== CUSTOM_SCENARIO_ID;
       const modded = !!state.customScenario?.mod;
 
       /**
@@ -3902,19 +3646,6 @@ export function* tickStatePhases(
         const challenge = state.challenge
           ? cloneDeep(state.challenge)
           : undefined;
-        const replay = submitsScore
-          ? serializeReplay(state, {
-              score: finalScore,
-              breakdown: score,
-              outcome,
-            })
-          : undefined;
-        // Watching a run shows what it actually scored, even where a later build plays it out
-        // differently. Its re-simulated ending is shown only if it ends the same way.
-        const recorded = isReplay
-          ? cloneDeep(state.replayPlayback?.result)
-          : undefined;
-        const sameEnding = !recorded || recorded.outcome === outcome;
         const debrief = buildVictoryDebrief(
           scenario,
           summary,
@@ -3942,27 +3673,25 @@ export function* tickStatePhases(
           ...(debrief.scenarioMetrics ?? []),
         ];
 
-        if (!isReplay) {
-          logEvent("scenario_end", {
-            id: scoredScenarioId,
-            type:
-              outcome === "completed"
-                ? "win"
-                : outcome === "fired"
-                  ? "blackouts"
-                  : "bankrupt",
-            difficulty,
-            score: finalScore,
+        logEvent("scenario_end", {
+          id: scoredScenarioId,
+          type:
+            outcome === "completed"
+              ? "win"
+              : outcome === "fired"
+                ? "blackouts"
+                : "bankrupt",
+          difficulty,
+          score: finalScore,
+        });
+        if (challenge)
+          logEvent("challenge_complete", {
+            scenarioId: scoredScenarioId,
+            outcome,
           });
-          if (challenge)
-            logEvent("challenge_complete", {
-              scenarioId: scoredScenarioId,
-              outcome,
-            });
-        }
         // Bind the outcome before the reducer returns. The middleware persists the final
         // Redux snapshot afterwards; no delayed callback can target a different live save.
-        if (!isReplay && saveEffects) {
+        if (saveEffects) {
           saveEffects.outcome(
             cloneDeep({
               scenarioId: scoredScenarioId,
@@ -3995,19 +3724,16 @@ export function* tickStatePhases(
               scenarioId: scoredScenarioId,
               scenarioName,
               difficulty,
-              score: recorded?.score ?? finalScore,
-              scoreVersion: recorded ? undefined : SCORE_VERSION,
-              breakdown: recorded?.breakdown ?? score,
-              endTitle: sameEnding ? endTitle : undefined,
-              endMessage: !sameEnding
-                ? undefined
-                : typeof endMessage === "function"
-                  ? endMessage()
-                  : endMessage,
+              score: finalScore,
+              scoreVersion: SCORE_VERSION,
+              breakdown: score,
+              endTitle,
+              endMessage:
+                typeof endMessage === "function" ? endMessage() : endMessage,
               ranked: submitsScore,
               modded,
               previousBest,
-              outcome: recorded?.outcome ?? outcome,
+              outcome,
               debrief,
             }),
           );
@@ -4019,7 +3745,6 @@ export function* tickStatePhases(
                 scoreBreakdown: score, // For analytics purposes only
                 scenarioId: scoredScenarioId,
                 difficulty,
-                replay,
               }),
             );
           }
@@ -4050,13 +3775,11 @@ export function* tickStatePhases(
         // Tutorials are intentionally unscored even when completed, so retain their guided
         // failure dialog rather than putting one tutorial attempt on the global leaderboard.
         if (isTutorial) {
-          if (!isReplay) {
-            logEvent("scenario_end", {
-              id: scenarioId,
-              type: failure.outcome === "fired" ? "blackouts" : "bankrupt",
-              difficulty: state.difficulty,
-            });
-          }
+          logEvent("scenario_end", {
+            id: scenarioId,
+            type: failure.outcome === "fired" ? "blackouts" : "bankrupt",
+            difficulty: state.difficulty,
+          });
           setTimeout(() => {
             getStore().dispatch(
               dialogOpen({
@@ -4109,14 +3832,12 @@ export function* tickStatePhases(
             const { id: scoredScenarioId, endTitle, endMessage } = scenario;
             const difficulty = state.difficulty;
             const nextTutorial = getNextTutorial(scoredScenarioId);
-            if (!isReplay) {
-              logEvent("scenario_end", {
-                id: scoredScenarioId,
-                type: "win",
-                difficulty,
-                score: finalScore,
-              });
-            }
+            logEvent("scenario_end", {
+              id: scoredScenarioId,
+              type: "win",
+              difficulty,
+              score: finalScore,
+            });
             setTimeout(() => {
               return getStore().dispatch(
                 tutorialCompleteDialog({
@@ -4143,7 +3864,6 @@ export function* tickStatePhases(
     state.timeline = reforecastSupply(state, true);
 
   // After the tick, the way a player's click lands after the tick that brought the clock to it
-  applyPendingReplayActions(state);
   if (pendingScenarioChoice(state)) {
     state.scenarioChoicePause ??= speedBeforeTick;
     setForegroundSpeed(state, "PAUSED");

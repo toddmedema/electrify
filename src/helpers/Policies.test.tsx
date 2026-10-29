@@ -11,7 +11,7 @@ import {
   programCustomers,
 } from "./Policies";
 import { POLICIES, residentialSolarCostPerW } from "../data/Policies";
-import { createGame, createGameFromReplay } from "../testing/Simulator";
+import { createGame } from "../testing/Simulator";
 import gameReducer, {
   generateNewTimeline,
   tickState,
@@ -32,7 +32,6 @@ import {
 import { previewPolicy } from "./PolicyPreview";
 import { pendingScenarioChoice } from "./ScenarioChoices";
 import { parseSave, serializeSave } from "../SaveGame";
-import { decodeReplay, serializeReplay } from "../Replay";
 import { TICK_MINUTES, TICKS_PER_MONTH, TICKS_PER_YEAR } from "../Constants";
 import { GameType } from "../Types";
 
@@ -85,18 +84,17 @@ test("forecast resolution cannot multiply monthly spending or mutate live adopti
   expect(game.policies).toEqual(snapshot);
 });
 
-test("schedule, replace, cancel and reject stale/no-op edits without recording them", () => {
+test("schedule, replace, cancel and reject stale/no-op edits without changing the scheduled policy", () => {
   let game = createGame({ scenarioId: 106, seed: 4 });
   game = gameReducer(game, schedulePolicy(change));
   expect(game.policies!.programs.efficiency.pending).toEqual({
     tier: "On",
     month: 1,
   });
-  const log = game.replayLog!.length;
-  expect(gameReducer(game, schedulePolicy(change)).replayLog).toHaveLength(log);
-  expect(
-    gameReducer(game, schedulePolicy({ ...change, month: 2 })).replayLog,
-  ).toHaveLength(log);
+  expect(gameReducer(game, schedulePolicy(change))).toEqual(game);
+  expect(gameReducer(game, schedulePolicy({ ...change, month: 2 }))).toEqual(
+    game,
+  );
   // Scheduling the current tier replaces the pending start with no change.
   game = gameReducer(game, schedulePolicy({ ...change, tier: "Off" }));
   expect(game.policies!.programs.efficiency.pending).toBeUndefined();
@@ -113,11 +111,9 @@ test("schedule, replace, cancel and reject stale/no-op edits without recording t
     gameReducer(tutorial, schedulePolicy(change)).policies,
   ).toBeUndefined();
   const ended = { ...game, date: { ...game.date, monthsElapsed: 191 } };
-  expect(
-    gameReducer(ended, schedulePolicy({ ...change, month: 192 })).replayLog,
-  ).toEqual(game.replayLog);
-  const replay = { ...game, replayPlayback: { actions: [], index: 0 } };
-  expect(gameReducer(replay, schedulePolicy(change))).toEqual(replay);
+  expect(gameReducer(ended, schedulePolicy({ ...change, month: 192 }))).toEqual(
+    ended,
+  );
 });
 
 test("adoption and actual spending are bounded, idempotent, and stop at saturation", () => {
@@ -169,18 +165,17 @@ test("a build-out finishes after exactly its funded months, then costs nothing a
   advancePolicies(game, BUILDOUT + 1);
   expect(program.spending).toBe(0);
   expect(program.spent).toBeCloseTo(total);
-  // Pausing a finished project has no effect, so the reducer refuses to record it.
+  // Pausing a finished project has no effect, so the reducer leaves it unchanged.
   const fresh = createGame({ scenarioId: 106, seed: 4 });
   fresh.policies = emptyPolicies(fresh.date.monthsElapsed);
   Object.assign(fresh.policies.programs.solar, cloneDeep(program));
-  const log = fresh.replayLog!.length;
   expect(
-    gameReducer(fresh, schedulePolicy({ id: "solar", tier: "Off", month: 1 }))
-      .replayLog,
-  ).toHaveLength(log);
-  expect(gameReducer(fresh, schedulePolicy(change)).replayLog).toHaveLength(
-    log + 1,
-  );
+    gameReducer(fresh, schedulePolicy({ id: "solar", tier: "Off", month: 1 })),
+  ).toEqual(fresh);
+  expect(
+    gameReducer(fresh, schedulePolicy(change)).policies?.programs.efficiency
+      .pending,
+  ).toEqual({ tier: "On", month: 1 });
 });
 
 test("solar affects only eligible daylight load after efficiency; neutral demand is exact", () => {
@@ -254,7 +249,7 @@ test("preview is isolated, matches the real forecast and monthly costs reach cas
   ).toBe(true);
 });
 
-test("Off preserves installed upgrades through save/load and actions replay deterministically", () => {
+test("Off preserves installed upgrades through save/load and continues normally", () => {
   let game = cloneDeep(
     gameReducer(
       createGame({ scenarioId: 106, seed: 4 }),
@@ -273,18 +268,11 @@ test("Off preserves installed upgrades through save/load and actions replay dete
     JSON.parse(JSON.stringify(serializeSave(game))),
   )!.game;
   expect(restored.policies).toEqual(game.policies);
-  const replay = createGameFromReplay(serializeReplay(game)!);
-  month(replay);
-  month(replay);
-  expect(replay.policies).toEqual(game.policies);
-  expect(replay.timeline.map((t) => t.cash)).toEqual(
-    game.timeline.map((t) => t.cash),
-  );
   month(restored);
   expect(restored.policies!.programs.efficiency.adoption).toBe(stock);
 });
 
-test("neutral saves round-trip; malformed stocks and policy actions are rejected", () => {
+test("neutral saves round-trip and malformed stocks are rejected", () => {
   const game = createGame({ scenarioId: 106 });
   const restored = parseSave(serializeSave(game))!;
   // A game that never touched a program has no policy record, and resuming it must not add one
@@ -294,19 +282,6 @@ test("neutral saves round-trip; malformed stocks and policy actions are rejected
   expect(parseSave(bad)).not.toBeNull();
   bad.game.policies!.programs.solar.adoption = 2;
   expect(parseSave(bad)).toBeNull();
-  const replay = serializeReplay(game)!;
-  expect(
-    decodeReplay({
-      ...replay,
-      actions: [
-        {
-          type: "schedulePolicy",
-          minute: 0,
-          payload: { ...change, tier: "Huge" },
-        },
-      ],
-    }),
-  ).toBeNull();
 });
 
 test("a paused and resumed build-out completes through the reducer and its completion survives a save", () => {

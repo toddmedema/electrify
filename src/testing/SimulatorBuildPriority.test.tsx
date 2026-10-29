@@ -3,7 +3,7 @@ import type { InitialBuildType } from "./Simulator";
 
 const oil: InitialBuildType = { name: "Oil", peakW: 50e6, financed: true };
 
-test("reserve purchases go behind the inherited fleet through recorded dispatch actions", () => {
+test("reserve purchases go behind the inherited fleet through dispatch actions", () => {
   const normal = createGame({ scenarioId: 106, initialBuild: oil });
   const explicitDefault = createGame({
     scenarioId: 106,
@@ -16,12 +16,6 @@ test("reserve purchases go behind the inherited fleet through recorded dispatch 
   expect(normal.facilities.map(({ id }) => id)).toEqual([3, 1, 2]);
   expect(explicitDefault).toEqual(normal);
   expect(reserve.facilities.map(({ id }) => id)).toEqual([1, 2, 3]);
-  expect(
-    reserve.replayLog?.filter(({ type }) => type === "reprioritizeFacility"),
-  ).toEqual([
-    expect.objectContaining({ payload: { spotInList: 0, delta: 1 } }),
-    expect.objectContaining({ payload: { spotInList: 1, delta: 1 } }),
-  ]);
   expect(reserve.facilities.find(({ id }) => id === 3)).toMatchObject({
     loanAmountLeft: expect.any(Number),
     yearsToBuildLeft: expect.any(Number),
@@ -46,7 +40,6 @@ test("a rejected reserve cash purchase never reorders an existing asset", () => 
     },
   });
   expect(rejected.facilities).toEqual(before.facilities);
-  expect(rejected.replayLog).toEqual(before.replayLog);
 });
 
 test("the public simulation API rejects an unknown build priority", () => {

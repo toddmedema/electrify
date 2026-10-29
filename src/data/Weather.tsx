@@ -353,7 +353,7 @@ export function initWeather(
   const ids = [...new Set([localId, watershedId].filter(Boolean))] as string[];
   if (ids.some((id) => !isValidLocationId(id))) {
     // A location id is now any string rather than a checked union, and it arrives here from a
-    // saved game or a replay document on its way into a URL
+    // saved game on its way into a URL
     return done(
       `"${ids.join(", ")}" is not a location id weather can be loaded for`,
     );

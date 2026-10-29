@@ -20,8 +20,6 @@ const mockWhere = jest.fn((field: string, op: string, value: unknown) => ({
 
 jest.mock("firebase/firestore", () => ({
   collection: jest.fn(() => "scores"),
-  doc: jest.fn(),
-  getDoc: jest.fn(),
   getDocs: (...args: unknown[]) => mockGetDocs(...args),
   query: jest.fn((...args: unknown[]) => args),
   where: (...args: [string, string, unknown]) => mockWhere(...args),
@@ -50,8 +48,6 @@ function props(overrides: Partial<Props> = {}): Props {
     onBack: jest.fn(),
     onDelta: jest.fn(),
     onStart: jest.fn(),
-    onWatchReplay: jest.fn(),
-    onReplayError: jest.fn(),
     ...overrides,
   };
 }
@@ -156,6 +152,10 @@ describe("NewGameDetails leaderboard", () => {
     expect(cells[1]).toHaveTextContent("Your best");
     expect(cells[2]).toHaveTextContent("432");
     expect(cells[1]).not.toHaveTextContent("432");
+    expect(cells).toHaveLength(3);
+    expect(
+      screen.getAllByRole("columnheader").map((cell) => cell.textContent),
+    ).toEqual(["Leaderboard — Easy", "#", "Name", "Score"]);
   });
 
   it("shows all difficulties and their labels only on the expanded board", async () => {
@@ -252,7 +252,7 @@ describe("NewGameDetails leaderboard", () => {
     expect(screen.queryByText("Stale global player")).not.toBeInTheDocument();
     expect(mockGetDocs).not.toHaveBeenCalled();
     expect(
-      screen.queryByRole("columnheader", { name: "Replay" }),
-    ).not.toBeInTheDocument();
+      screen.getAllByRole("columnheader").map((cell) => cell.textContent),
+    ).toEqual(["Leaderboard — All levels", "#", "Name", "Score", "Level"]);
   });
 });
