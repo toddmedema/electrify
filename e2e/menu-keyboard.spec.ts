@@ -60,43 +60,52 @@ test("Space toggles Sound", async ({ page }) => {
   await expect(sound).not.toBeChecked();
 });
 
-test("a background arrow during Settings exit preserves volume and restores focus", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await page.clock.install();
-  await page.reload();
-  const settings = page.getByRole("button", { name: "Settings", exact: true });
-  const manualBounds = await page
-    .getByRole("button", { name: "Manual", exact: true })
-    .boundingBox();
-  expect(manualBounds).not.toBeNull();
-  await settings.click();
-  await page.getByRole("switch", { name: "Sound", exact: true }).check();
-  // Returning reveals Manual beneath a stationary pointer. Hover may select it
-  // before the delayed Settings focus restoration; Play need not own focus.
-  await page.mouse.move(
-    manualBounds!.x + manualBounds!.width / 2,
-    manualBounds!.y + manualBounds!.height / 2,
-  );
-  const effects = page.getByRole("slider", {
-    name: "Effects volume",
-    exact: true,
+for (const pointerTarget of [null, "Settings", "Manual"] as const) {
+  test(`a background arrow during Settings exit preserves volume and restores focus${pointerTarget ? ` with the pointer over ${pointerTarget}` : ""}`, async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.clock.install();
+    await page.reload();
+    const settings = page.getByRole("button", {
+      name: "Settings",
+      exact: true,
+    });
+    const menuBounds = pointerTarget
+      ? await page
+          .getByRole("button", { name: pointerTarget, exact: true })
+          .boundingBox()
+      : null;
+    if (pointerTarget) expect(menuBounds).not.toBeNull();
+    await settings.click();
+    await page.getByRole("switch", { name: "Sound", exact: true }).check();
+    const effects = page.getByRole("slider", {
+      name: "Effects volume",
+      exact: true,
+    });
+    await effects.focus();
+    await effects.press("Home");
+    await expect(effects).toHaveAttribute("aria-valuenow", "0");
+    // Returning may reveal a menu control beneath a stationary pointer. Hover can
+    // select it before the delayed Settings focus restoration.
+    if (pointerTarget) {
+      await page.mouse.move(
+        menuBounds!.x + menuBounds!.width / 2,
+        menuBounds!.y + menuBounds!.height / 2,
+      );
+    }
+    await exitSettingsWithBodyArrow(page);
+    await page.clock.runFor(1000);
+    await expect(settings).toBeFocused();
+    expect(
+      await page.evaluate(() => localStorage.getItem("soundEffectsVolume")),
+    ).toBe("0");
+    await page.clock.resume();
+    await page.reload();
+    await settings.click();
+    await expect(effects).toHaveAttribute("aria-valuenow", "0");
   });
-  await effects.focus();
-  await effects.press("Home");
-  await expect(effects).toHaveAttribute("aria-valuenow", "0");
-  await exitSettingsWithBodyArrow(page);
-  await page.clock.runFor(1000);
-  await expect(settings).toBeFocused();
-  expect(
-    await page.evaluate(() => localStorage.getItem("soundEffectsVolume")),
-  ).toBe("0");
-  await page.clock.resume();
-  await page.reload();
-  await settings.click();
-  await expect(effects).toHaveAttribute("aria-valuenow", "0");
-});
+}
 
 test("Space activates game navigation while body Space pauses", async ({
   page,
