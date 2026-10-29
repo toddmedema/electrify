@@ -2,8 +2,112 @@ import { reviewScreenshot } from "./review-screenshot";
 import path from "path";
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import { expect, test } from "./fixtures";
-import { openBuild, openPane } from "./layout";
-import { readSavedGame } from "./save-fixture";
+import { openBuild, openPane, sortBuildCatalog } from "./layout";
+import { editSavedGame, readSavedGame } from "./save-fixture";
+import { purchaseTerms } from "../src/helpers/Financials";
+import {
+  intertieBuildQuote,
+  intertieContextForGame,
+} from "../src/helpers/Transmission";
+
+for (const theme of ["light", "dark"] as const) {
+  for (const [category, name] of [
+    ["Generators", "Solar"],
+    ["Storage", "Pumped Hydro"],
+    ["Interties", "Pacific Northwest"],
+  ]) {
+    test(`${category} max affordable size stays visible after sorting in ${theme}`, async ({
+      page,
+    }, info) => {
+      await page.addInitScript((mode) => {
+        localStorage.setItem("theme", mode);
+        localStorage.setItem("audioEnabled", "false");
+      }, theme);
+      await page.goto("/?scenario=100");
+      await page
+        .getByRole("button", { name: "Start game", exact: true })
+        .click();
+      await expect
+        .poll(async () => (await readSavedGame(page))?.scenarioId)
+        .toBe(100);
+      await editSavedGame(page, (save) => {
+        const quote = intertieBuildQuote(
+          "california-north",
+          save.game.date.year,
+          1,
+          intertieContextForGame(save.game),
+        )!;
+        const cash =
+          category === "Interties"
+            ? purchaseTerms(quote.buildCost, true, save.game.interestRate)
+                .downpayment
+            : 20e6;
+        save.game.timeline.forEach((tick) => {
+          tick.cash = cash;
+        });
+      });
+      await page.reload();
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await openBuild(page);
+      await page.getByRole("tab", { name: category, exact: true }).click();
+      if (category !== "Interties") await sortBuildCatalog(page, "Build cost");
+      const slider = page.getByRole("slider");
+      await slider.focus();
+      // Use a buildable but unaffordable size for plants; interties have only a few tiers.
+      await slider.press(category === "Interties" ? "End" : "Home");
+      if (category !== "Interties") {
+        await slider.press("ArrowRight");
+        for (let index = 0; index < 22; index++)
+          await slider.press("ArrowRight");
+      }
+      const card = page.locator(".buildOption").filter({
+        has: page.getByRole("button", {
+          name: `Review purchase of ${name}${category === "Interties" ? " intertie" : ""}`,
+          exact: true,
+        }),
+      });
+      const review = card.getByRole("button", { name: /Review purchase/ });
+      await expect(review).toBeDisabled();
+      const before = await slider.getAttribute("aria-valuenow");
+      if (
+        process.env.REVIEW_SCREENSHOT_DIR &&
+        theme === "dark" &&
+        category === "Generators"
+      ) {
+        await card.scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            `affordable-${info.project.name}.png`,
+          ),
+          animations: "disabled",
+        });
+      }
+      await card
+        .getByRole("button", { name: "Use max size", exact: true })
+        .click();
+      await expect(slider).not.toHaveAttribute("aria-valuenow", before!);
+      await expect(review).toBeEnabled();
+      await expect(card.locator(".MuiCardHeader-root")).toBeInViewport({
+        ratio: 1,
+      });
+      // A trial click checks that the resized row is also clear of fixed bars and overlays.
+      await review.click({ trial: true });
+      await review.click();
+      const loan = page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Take loan", exact: true });
+      await expect(loan).toBeEnabled();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "close", exact: true })
+        .click();
+      await slider.focus();
+      await slider.press("ArrowRight");
+      await expect(review).toBeDisabled();
+    });
+  }
+}
 
 for (const theme of ["light", "dark"] as const) {
   test(`build options remain compact and usable in ${theme}`, async ({
@@ -162,6 +266,9 @@ for (const theme of ["light", "dark"] as const) {
         await detailCard
           .getByRole("button", { name: "Use site maximum" })
           .click();
+        await expect(detailCard.locator(".MuiCardHeader-root")).toBeInViewport({
+          ratio: 1,
+        });
         await expect(detailCard).not.toContainText("Plant:");
         await expect(page.getByRole("slider")).toHaveAttribute(
           "aria-valuenow",
@@ -347,6 +454,9 @@ for (const theme of ["light", "dark"] as const) {
       path: testInfo.outputPath(`Storage-max-size-${theme}.png`),
     });
     await maxSize.click();
+    await expect(battery.locator(".MuiCardHeader-root")).toBeInViewport({
+      ratio: 1,
+    });
     await expect(
       battery.getByRole("button", {
         name: "Review purchase of Lithium Battery",
