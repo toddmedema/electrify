@@ -131,7 +131,11 @@ import PowerExchangeSummary, {
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
 import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
 import ChartMonthlySpareCapacity from "../base/ChartMonthlySpareCapacity";
+import { getTutorialStep } from "../../data/Scenarios";
 import { ToolScrollMemory } from "../base/GameToolMemory";
+
+// Matched by target rather than step number, which shifts whenever a tutorial step is edited.
+const TUTORIAL_POWER_EXCHANGE_TARGET = '[data-layer="powerExchange"]';
 
 export type InsightLayerId =
   | "supplyDemand"
@@ -894,15 +898,15 @@ export default class Insights extends React.Component<Props, State> {
 
   private scrollTutorialPowerExchangeIntoView() {
     if (
-      this.props.game.scenarioId !== 112 ||
-      this.props.game.tutorialStep !== 7 ||
+      getTutorialStep(this.props.game)?.target !==
+        TUTORIAL_POWER_EXCHANGE_TARGET ||
       window.innerWidth > 768
     ) {
       return;
     }
     window.setTimeout(() => {
       document
-        .querySelector<HTMLElement>('[data-layer="powerExchange"]')
+        .querySelector<HTMLElement>(TUTORIAL_POWER_EXCHANGE_TARGET)
         ?.scrollIntoView?.({ block: "nearest" });
     }, 0);
   }

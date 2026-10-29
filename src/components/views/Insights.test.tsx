@@ -1057,6 +1057,46 @@ describe("Insights layers", () => {
     );
   });
 
+  it("scrolls the power exchange into view on the phone step that points to it", () => {
+    jest.useFakeTimers();
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 112 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    game.tutorialStep = getScenario(112)!.tutorialSteps!.findIndex(
+      (step) => step.target === '[data-layer="powerExchange"]',
+    );
+    expect(game.tutorialStep).toBeGreaterThan(0);
+    const width = window.innerWidth;
+    const scrolled: Element[] = [];
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this);
+    };
+    try {
+      renderInsights(112, game);
+      act(() => jest.runOnlyPendingTimers());
+      expect(scrolled).toHaveLength(1);
+      expect(scrolled[0]).toHaveAttribute("data-layer", "powerExchange");
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+      Object.defineProperty(window, "innerWidth", {
+        configurable: true,
+        value: width,
+      });
+    }
+  });
+
   it("gives the customer chart two significant digits on axes and three on inspection", () => {
     localStorage.setItem("insightsLayers", JSON.stringify(["customers"]));
     renderInsights();
