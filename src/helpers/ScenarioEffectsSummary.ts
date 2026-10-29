@@ -1,3 +1,4 @@
+import { formatNumber } from "./Format";
 import type { WorldEventEffectsType } from "../Types";
 
 /** Mechanical conditions share one formatter across native and community rules. */
@@ -26,13 +27,14 @@ export function scenarioEffectsSummary(
     );
   if (effects.operatingExpensePerMonth)
     changes.push(
-      `${exact ? "Operating expense" : "Restoration"}: $${rounded(effects.operatingExpensePerMonth).toLocaleString("en-US", exact ? { maximumSignificantDigits: 12 } : undefined)}/month`,
+      `${exact ? "Operating expense" : "Restoration"}: $${formatNumber(rounded(effects.operatingExpensePerMonth), exact ? { maximumSignificantDigits: 12 } : undefined)}/month`,
     );
   for (const [label, values] of [
     ["fuel price", effects.fuelPriceMultipliers],
     ["construction cost", effects.buildCostMultipliersByFuel],
     ["operating cost", effects.operatingCostMultipliersByFuel],
     ["output", effects.facilityOutputMultipliersByFuel],
+    ["unprotected cold output", effects.winterizationOutputMultipliersByFuel],
   ] as const) {
     Object.entries(values || {}).forEach(([fuel, value]) =>
       changes.push(`${fuel} ${label}: ${rounded(value! * 100)}% of normal`),

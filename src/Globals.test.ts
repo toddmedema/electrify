@@ -177,3 +177,40 @@ describe("logEvent", () => {
     expect(mockFirebaseLogEvent).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("viewport breakpoints", () => {
+  it("ignores overflowing content while resizing across the desktop breakpoint", () => {
+    const originalWidth = window.innerWidth;
+    const bodyWidth = jest
+      .spyOn(document.body, "scrollWidth", "get")
+      .mockReturnValue(1400);
+    const documentWidth = jest
+      .spyOn(document.documentElement, "scrollWidth", "get")
+      .mockReturnValue(1400);
+    const { isDesktopScreen } =
+      require("./Globals") as typeof import("./Globals");
+    try {
+      for (const [width, desktop] of [
+        [1300, true],
+        [1299, false],
+        [1300, true],
+        [1299, false],
+      ] as const) {
+        Object.defineProperty(window, "innerWidth", {
+          configurable: true,
+          value: width,
+        });
+        window.dispatchEvent(new Event("resize"));
+        expect(isDesktopScreen()).toBe(desktop);
+      }
+    } finally {
+      bodyWidth.mockRestore();
+      documentWidth.mockRestore();
+      Object.defineProperty(window, "innerWidth", {
+        configurable: true,
+        value: originalWidth,
+      });
+      window.dispatchEvent(new Event("resize"));
+    }
+  });
+});

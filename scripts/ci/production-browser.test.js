@@ -59,60 +59,78 @@ test("production reproduction and CI use the same server and acceptance policy",
   assert(JSON.parse(result.stdout).suites.length > 0);
 });
 
-test("a failed first attempt cannot become a green production gate on retry", (t) => {
-  const parent = path.resolve(".tmp", "production-policy-tests");
-  fs.mkdirSync(parent, { recursive: true });
-  const directory = fs.mkdtempSync(path.join(parent, "run-"));
-  t.after(() => {
-    assert(directory.startsWith(parent + path.sep));
-    fs.rmSync(directory, { recursive: true, force: true });
-  });
-  const config = path.join(directory, "playwright.config.ts");
-  const reportFile = path.join(directory, "attempts.json");
-  fs.writeFileSync(
-    config,
-    `
-    import production from ${JSON.stringify(path.resolve("e2e/production.playwright.config").replaceAll("\\", "/"))};
-    export default { ...production, testDir: '.', testMatch: 'policy.spec.ts',
+for (const name of ["production", "multiplayer"]) {
+  test(`a failed first attempt cannot become a green ${name} gate on retry`, (t) => {
+    const parent = path.resolve(".tmp", "production-policy-tests");
+    fs.mkdirSync(parent, { recursive: true });
+    const directory = fs.mkdtempSync(path.join(parent, "run-"));
+    t.after(() => {
+      assert(directory.startsWith(parent + path.sep));
+      fs.rmSync(directory, { recursive: true, force: true });
+    });
+    const config = path.join(directory, "playwright.config.ts");
+    const reportFile = path.join(directory, "attempts.json");
+    fs.writeFileSync(
+      config,
+      `
+    import policy from ${JSON.stringify(path.resolve(`e2e/${name}.playwright.config`).replaceAll("\\", "/"))};
+    export default { ...policy, testDir: '.', testMatch: 'policy.spec.ts',
       projects: [{ name: 'policy' }], workers: 1, webServer: undefined,
-      reporter: Array.isArray(production.reporter) ? production.reporter.map(([name, options]) =>
-        name === 'json' ? [name, { outputFile: ${JSON.stringify(reportFile)} }] : [name, options]) : production.reporter,
+      reporter: Array.isArray(policy.reporter) ? policy.reporter.map(([name, options]) =>
+        name === 'json' ? [name, { outputFile: ${JSON.stringify(reportFile)} }] : [name, options]) : policy.reporter,
       outputDir: ${JSON.stringify(path.join(directory, "results"))} };
   `,
-  );
-  // These use the runner without requesting a browser: the regression is its exit status.
-  fs.writeFileSync(
-    path.join(directory, "policy.spec.ts"),
-    `
+    );
+    // These use the runner without requesting a browser: the regression is its exit status.
+    fs.writeFileSync(
+      path.join(directory, "policy.spec.ts"),
+      `
     import { test, expect } from '@playwright/test';
-    test('stable', () => expect(true).toBe(true));
+    test('stable', ({}, info) => {
+      expect(info.project.use.trace).toBe('on-first-retry');
+      expect(info.project.use.screenshot).toBe('only-on-failure');
+    });
     test('flaky', ({}, info) => expect(info.retry).toBeGreaterThan(0));
   `,
-  );
-  const stable = playwright([`--config=${config}`, "--grep=stable"], {}, true);
-  assert.equal(stable.status, 0, stable.stderr || stable.stdout);
-  assert(
-    fs.existsSync(reportFile),
-    "successful production runs must retain a structured report",
-  );
-  assert.equal(
-    JSON.parse(fs.readFileSync(reportFile, "utf8")).stats.expected,
-    1,
-  );
-  const flaky = playwright([`--config=${config}`, "--grep=flaky"], {}, true);
-  const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
-  assert.equal(report.stats.flaky, 1);
-  assert.equal(report.stats.unexpected, 0, "the retry really passed");
-  assert.equal(flaky.status, 1, "a passed retry must still fail the gate");
-  const attempts = report.suites[0].specs[0].tests[0].results;
-  assert.deepEqual(
-    attempts.map(({ status, retry }) => ({ status, retry })),
-    [
-      { status: "failed", retry: 0 },
-      { status: "passed", retry: 1 },
-    ],
-  );
-});
+    );
+    const environment = {
+      CI: "true",
+      GITHUB_ACTIONS: "false",
+      MULTIPLAYER_BUILD_DIR: "",
+    };
+    const stable = playwright(
+      [`--config=${config}`, "--grep=stable"],
+      environment,
+      true,
+    );
+    assert.equal(stable.status, 0, stable.stderr || stable.stdout);
+    assert(
+      fs.existsSync(reportFile),
+      "successful production runs must retain a structured report",
+    );
+    assert.equal(
+      JSON.parse(fs.readFileSync(reportFile, "utf8")).stats.expected,
+      1,
+    );
+    const flaky = playwright(
+      [`--config=${config}`, "--grep=flaky"],
+      environment,
+      true,
+    );
+    const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
+    assert.equal(report.stats.flaky, 1);
+    assert.equal(report.stats.unexpected, 0, "the retry really passed");
+    assert.equal(flaky.status, 1, "a passed retry must still fail the gate");
+    const attempts = report.suites[0].specs[0].tests[0].results;
+    assert.deepEqual(
+      attempts.map(({ status, retry }) => ({ status, retry })),
+      [
+        { status: "failed", retry: 0 },
+        { status: "passed", retry: 1 },
+      ],
+    );
+  });
+}
 
 test("controller journeys retain their own attempt report after leaving multiplayer", (t) => {
   const parent = path.resolve(".tmp", "controller-policy-tests");

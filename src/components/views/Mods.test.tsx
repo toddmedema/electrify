@@ -22,7 +22,7 @@ import type { InstalledMod, ModLibrary, ModRequest } from "../../mods/Types";
 import type { DesktopBridge } from "../../Desktop";
 import { launchCustomScenario } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
-import { buildModAuthorReport } from "../../mods/ModAuthoring";
+import { prepareModStartingPeak } from "../../mods/ModScenario";
 import { loadSimData } from "../../testing/SimData";
 
 Object.assign(global, { TextEncoder });
@@ -115,6 +115,14 @@ afterEach(() => {
   delete window.electrifyDesktop;
   jest.clearAllMocks();
 });
+
+async function openAuthorReport() {
+  const trigger = await screen.findByRole("button", {
+    name: "Author validation report for Community Grid",
+  });
+  await waitFor(() => expect(trigger).toBeEnabled());
+  await userEvent.click(trigger);
+}
 
 describe("returning from Mods", () => {
   afterEach(() => {
@@ -411,11 +419,7 @@ test("the launch details separate author claims from computed rules before start
 
 test("an author explicitly opens the complete validation report without launching", async () => {
   setup([local()]);
-  await userEvent.click(
-    await screen.findByRole("button", {
-      name: "Author validation report for Community Grid",
-    }),
-  );
+  await openAuthorReport();
   const dialog = screen.getByRole("dialog", {
     name: "Author validation report: Community Grid",
   });
@@ -432,9 +436,30 @@ test("an author explicitly opens the complete validation report without launchin
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 });
 
-test("the author can inspect every difficulty's complete resolved report", async () => {
-  await loadSimData("SF");
-  const entry = local({
+test("the author report stays unavailable until scenario preparation completes", async () => {
+  let finishPreparation!: () => void;
+  const preparation = new Promise<void>((resolve) => {
+    finishPreparation = resolve;
+  });
+  jest.mocked(prepareModStartingPeak).mockReturnValueOnce(preparation);
+  setup([local()]);
+  const trigger = await screen.findByRole("button", {
+    name: "Author validation report for Community Grid",
+  });
+  expect(trigger).toBeDisabled();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  await act(async () => finishPreparation());
+  await openAuthorReport();
+  expect(
+    screen.getByRole("dialog", {
+      name: "Author validation report: Community Grid",
+    }),
+  ).toBeVisible();
+  expect(launchCustomScenario).not.toHaveBeenCalled();
+});
+
+const difficultyEventMod = () =>
+  local({
     officialArcs: [],
     scenario: {
       durationMonths: 6,
@@ -467,52 +492,39 @@ test("the author can inspect every difficulty's complete resolved report", async
       },
     ],
   });
-  const expected = buildModAuthorReport(entry.pack);
-  expect(
-    expected.diagnostics.filter(
-      (diagnostic) => diagnostic.severity === "error",
-    ),
-  ).toEqual([]);
-  const expertSetup = expected.difficulties.CEO!.sections.find(
-    (section) => section.id === "setup",
-  )!;
-  const expertPeak = expertSetup.rows.find(
-    (row) => row.label === "Starting peak demand",
-  )!.value;
-  expect(expertPeak).toMatch(/^[1-9].* MW$/);
-  const expertTimeline = expected.difficulties.CEO!.sections.find(
-    (section) => section.id === "timeline",
-  )!;
-  expect(expertTimeline.rows).not.toEqual(
-    expected.difficulties.Employee!.sections.find(
-      (section) => section.id === "timeline",
-    )!.rows,
-  );
-  setup([entry]);
-  await userEvent.click(
-    await screen.findByLabelText("Author validation report for Community Grid"),
-  );
+
+// The full report resolves every difficulty, so each test keeps to one
+// journey to stay well inside Jest's timeout on loaded, instrumented CI runs.
+async function openDifficultyReport() {
+  await loadSimData("SF");
+  setup([difficultyEventMod()]);
+  await openAuthorReport();
   const dialog = screen.getByRole("dialog", {
     name: "Author validation report: Community Grid",
   });
   // Direct labels/text avoid repeating JSDOM's style-heavy accessible-name scan
-  // across every accordion; keep the full report interactions and visibility checks.
+  // across every accordion.
   expect(
     within(dialog).getByText("Easy", { selector: "button" }),
   ).toHaveAttribute("aria-pressed", "true");
   await userEvent.click(
     within(dialog).getByText("Expert", { selector: "button" }),
   );
+  return dialog;
+}
+
+test("the author report resolves setup and timeline for the inspected difficulty", async () => {
+  const dialog = await openDifficultyReport();
   await userEvent.click(within(dialog).getByText("Resolved setup"));
-  expect(within(dialog).getByLabelText("Resolved setup")).toBeVisible();
-  expect(within(dialog).getByLabelText("Resolved setup")).toHaveTextContent(
-    expertPeak,
+  const resolvedSetup = within(dialog).getByLabelText("Resolved setup");
+  expect(resolvedSetup).toBeVisible();
+  expect(resolvedSetup).toHaveTextContent(
+    /Starting peak demand\s*[1-9][\d,.]* MW/,
   );
-  expect(within(dialog).getByLabelText("Resolved setup")).toHaveTextContent(
-    expertSetup.rows.find((row) => row.label === "Difficulty")!.value,
-  );
-  await userEvent.click(within(dialog).getByText(expertTimeline.title));
-  const timeline = within(dialog).getByLabelText(expertTimeline.title);
+  expect(resolvedSetup).toHaveTextContent("Expert (CEO)");
+  const timelineTitle = "Complete event and decision timeline";
+  await userEvent.click(within(dialog).getByText(timelineTitle));
+  const timeline = within(dialog).getByLabelText(timelineTitle);
   expect(timeline).toBeVisible();
   expect(timeline).toHaveTextContent("Active for 5 months");
   expect(timeline).toHaveTextContent("Natural Gas fuel price: 120% of normal");
@@ -523,10 +535,14 @@ test("the author can inspect every difficulty's complete resolved report", async
   expect(timeline).toHaveTextContent("Natural Gas fuel price: 80% of normal");
   expect(timeline).not.toHaveTextContent("120% of normal");
   expect(
-    within(dialog).queryByRole("button", {
-      name: "Inherited objectives: replace-ready JSON",
-    }),
+    within(dialog).queryByText("Inherited objectives: replace-ready JSON"),
   ).toBeNull();
+  expect(launchCustomScenario).not.toHaveBeenCalled();
+});
+
+test("inspecting a report difficulty leaves the Play difficulty unchanged", async () => {
+  const dialog = await openDifficultyReport();
+  expect(within(dialog).getByText(/^Validation passed\./)).toBeVisible();
   await userEvent.click(within(dialog).getByText("Difficulty validation"));
   expect(
     within(dialog).getByLabelText("Difficulty validation"),
@@ -534,19 +550,15 @@ test("the author can inspect every difficulty's complete resolved report", async
   expect(
     within(dialog).getByLabelText("Scenario diagnostics"),
   ).toHaveTextContent("scenario.durationMonths");
-  expect(launchCustomScenario).not.toHaveBeenCalled();
   await userEvent.click(
     within(dialog).getByText("Close report", { selector: "button" }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  await userEvent.click(
-    screen.getByRole("button", { name: "Play Community Grid" }),
-  );
-  const playDialog = screen.getByRole("dialog", {
-    name: "Play Community Grid",
-  });
+  await userEvent.click(screen.getByLabelText("Play Community Grid"));
   expect(
-    within(playDialog).getByRole("button", { name: "Hard" }),
+    within(screen.getByRole("dialog")).getByText("Hard", {
+      selector: "button",
+    }),
   ).toHaveAttribute("aria-pressed", "true");
   expect(launchCustomScenario).not.toHaveBeenCalled();
 });
@@ -586,9 +598,7 @@ test("private event warnings remain available only in the explicit author report
     within(dialog).getByText("Cancel", { selector: "button" }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  await userEvent.click(
-    screen.getByLabelText("Author validation report for Community Grid"),
-  );
+  await openAuthorReport();
   expect(screen.getByLabelText("Scenario diagnostics")).toHaveTextContent(
     "Surprise transformer failure may continue beyond the term",
   );

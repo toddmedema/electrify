@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import uPlot from "uplot";
-import UPlotChart from "./UPlotChart";
+import UPlotChart, { BuildContext } from "./UPlotChart";
 import { ChartViewportContext } from "./ChartViewportContext";
 import { ChartAxisAlignment } from "./ChartAxisAlignment";
 import { setThemeMode } from "../../Theme";
@@ -84,6 +84,158 @@ describe("UPlotChart resizing", () => {
     act(() => applyTextSize("standard"));
     jest.restoreAllMocks();
     jest.useRealTimers();
+  });
+
+  it("never announces negative zero in a chart summary", () => {
+    const props = {
+      ariaLabel: "Zero chart",
+      state: {},
+      data: [
+        [0, 1],
+        [-0, -0.001],
+      ] as uPlot.AlignedData,
+      buildOptions: () => ({ width: 0, height: 0, series: [{}, {}] }),
+    };
+    const view = render(<UPlotChart {...props} />);
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      /latest -0\.001, range -0\.001 to 0/,
+    );
+    view.rerender(
+      <UPlotChart
+        {...props}
+        formatSummaryValue={(value) => value.toFixed(1)}
+      />,
+    );
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      /latest 0\.0, range 0\.0 to 0\.0/,
+    );
+  });
+
+  it("feeds a chart-owned updater fresh data while accessible values remain current, and restores default updates after rebuild", () => {
+    const update = jest.fn();
+    const custom = ({
+      registerDataUpdate,
+    }: BuildContext<object>): uPlot.Options => {
+      registerDataUpdate?.(update);
+      return { width: 0, height: 0, series: [{}, {}] };
+    };
+    const data = (value: number): uPlot.AlignedData => [
+      [0, 1],
+      [value, value],
+    ];
+    const ui = (values: uPlot.AlignedData, owned = true) => (
+      <UPlotChart
+        ariaLabel="Live reading"
+        state={{}}
+        data={values}
+        structureKey={owned ? "owned" : "default"}
+        buildOptions={
+          owned ? custom : () => ({ width: 0, height: 0, series: [{}, {}] })
+        }
+      />
+    );
+    const view = render(ui(data(1)));
+    const next = data(1.4);
+    view.rerender(ui(next));
+    expect(update).toHaveBeenCalledWith(currentPlot(), next);
+    expect(currentPlot().setData).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("img", { name: /Live reading.*latest 1\.4/ }),
+    ).toBeVisible();
+    view.rerender(ui(data(3), false));
+    const latest = data(4);
+    view.rerender(ui(latest, false));
+    expect(currentPlot().setData).toHaveBeenCalledWith(latest);
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes the visible tooltip through setCursor after a retained numeric edit without pointer movement", () => {
+    const options = ({
+      registerDataUpdate,
+    }: BuildContext<{ value: number }>): uPlot.Options => {
+      registerDataUpdate?.((plot) => {
+        plot.setCursor({ left: plot.cursor.left!, top: plot.cursor.top! });
+      });
+      return { width: 0, height: 0, series: [{}, {}] };
+    };
+    const ui = (value: number) => (
+      <UPlotChart
+        ariaLabel="Inspected output"
+        state={{ value }}
+        data={[
+          [0, 1],
+          [value, value],
+        ]}
+        buildOptions={options}
+        tooltip={(_index, state) => `Output ${state.value}`}
+      />
+    );
+    const view = render(ui(1));
+    const plot = currentPlot();
+    const built = (uPlot as unknown as jest.Mock).mock.calls.at(
+      -1,
+    )[0] as uPlot.Options;
+    const tooltip = built.plugins!.at(-1)!;
+    const init = tooltip.hooks!.init;
+    screen
+      .getByRole("img", { name: /Inspected output/ })
+      .appendChild(plot.over);
+    if (typeof init === "function")
+      init(plot, built, [
+        [0, 1],
+        [1, 1],
+      ]);
+    plot.cursor = { idx: 0, left: 0, top: 0 };
+    plot.setCursor = jest.fn((position: { left: number; top: number }) => {
+      plot.cursor = { ...position, idx: 0 };
+      const cursor = tooltip.hooks!.setCursor;
+      if (typeof cursor === "function") cursor(plot);
+    });
+    plot.setCursor({ left: 0, top: 0 });
+    expect(screen.getByText("Output 1", { exact: true })).toBeVisible();
+    view.rerender(ui(1.4));
+    expect(plot.setData).not.toHaveBeenCalled();
+    expect(plot.cursor).toEqual({ idx: 0, left: 0, top: 0 });
+    expect(screen.getByText("Output 1.4", { exact: true })).toBeVisible();
+  });
+
+  it("keeps solar context visible after the supply and load breakdown", () => {
+    render(
+      <UPlotChart
+        ariaLabel="Daylight chart"
+        state={{}}
+        data={[
+          [0, 1],
+          [10, 10],
+        ]}
+        buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+        interactiveTooltip
+        tooltip={() =>
+          "12 AM\nTotal supply: 10W\nWind: 10W\n\nTotal load: 9W\nDemand: 9W\n\nSunrise: 6:05 AM\nSunset: 6:07 PM"
+        }
+      />,
+    );
+    const plot = currentPlot();
+    const built = (uPlot as unknown as jest.Mock).mock.calls.at(
+      -1,
+    )[0] as uPlot.Options;
+    const tooltip = built.plugins!.at(-1)!;
+    screen.getByRole("img", { name: /Daylight chart/ }).appendChild(plot.over);
+    const init = tooltip.hooks!.init;
+    if (typeof init === "function")
+      init(plot, built, [
+        [0, 1],
+        [10, 10],
+      ]);
+    plot.cursor = { idx: 0, left: 0, top: 0 };
+    const cursor = tooltip.hooks!.setCursor;
+    if (typeof cursor === "function") cursor(plot);
+    expect(screen.getByText("Total supply: 10W")).toBeVisible();
+    expect(screen.getByText("Total load: 9W")).toBeVisible();
+    expect(screen.getByText(/Sunrise: 6:05 AM/)).toHaveTextContent(
+      "Sunset: 6:07 PM",
+    );
+    expect(screen.getByText(/Sunrise: 6:05 AM/)).toBeVisible();
   });
 
   it("rebuilds a mounted canvas when text size changes without a window resize", () => {

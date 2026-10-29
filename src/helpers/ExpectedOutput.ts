@@ -18,6 +18,18 @@ type OutputTechnology = Pick<
   "name" | "fuel" | "peakW" | "hydroWhPerMm"
 >;
 
+/** The weather readings needed by output charts, including authored technology overrides. */
+export type OutputWeatherTick = Pick<
+  TickPresentFutureType,
+  | "minute"
+  | "windKph"
+  | "windOffshoreKph"
+  | "windAirborneKph"
+  | "solarIrradianceWM2"
+  | "hydroRunoffMm"
+  | "renewableCapacityFactors"
+>;
+
 export interface RenewableCapacityFactorPoint {
   minute: number;
   factors: Record<string, number>;
@@ -41,7 +53,7 @@ const WEATHER_FUELS = new Set([
 
 export function technologyCapacityFactor(
   technology: OutputTechnology,
-  ticks: TickPresentFutureType[],
+  ticks: OutputWeatherTick[],
 ): number {
   if (
     ticks.every(
@@ -90,10 +102,10 @@ export function technologyCapacityFactor(
 }
 
 function groupTicks(
-  timeline: TickPresentFutureType[],
+  timeline: OutputWeatherTick[],
   keyOf: (month: number) => number,
-): Map<number, TickPresentFutureType[]> {
-  const groups = new Map<number, TickPresentFutureType[]>();
+): Map<number, OutputWeatherTick[]> {
+  const groups = new Map<number, OutputWeatherTick[]>();
   timeline.forEach((tick) => {
     const key = keyOf(Math.floor(tick.minute / MINUTES_PER_MONTH));
     const ticks = groups.get(key) || [];
@@ -104,7 +116,7 @@ function groupTicks(
 }
 
 export function monthlyRenewableCapacityFactors(
-  timeline: TickPresentFutureType[],
+  timeline: OutputWeatherTick[],
   technologies: OutputTechnology[],
 ): RenewableCapacityFactorPoint[] {
   return Array.from(groupTicks(timeline, (month) => month).values()).map(
@@ -136,7 +148,7 @@ export function expectedOutputKind(fuel: string): ExpectedOutputKind {
  */
 export function expectedMonthlyOutputShape(
   technology: OutputTechnology,
-  timeline: TickPresentFutureType[],
+  timeline: OutputWeatherTick[],
 ): ExpectedOutputShape | undefined {
   const kind = expectedOutputKind(technology.fuel);
   if (kind === "on-demand") {

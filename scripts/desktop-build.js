@@ -7,6 +7,7 @@ const { buildVersion, writeBuildVersion } = require("./build-version");
 
 function desktopBuild() {
   const version = buildVersion();
+  const output = process.env.BUILD_PATH || "build";
   if (Number(process.versions.node.split(".")[0]) !== 24)
     throw new Error("Use Node 24 to build Electrify");
   for (const script of [
@@ -14,14 +15,11 @@ function desktopBuild() {
     "scripts/generate-icon-manifest.js",
     "scripts/generate-steam-localization.js",
     "scripts/generate-achievements.js",
-    "scripts/generate-notices.js",
     "node_modules/react-scripts/bin/react-scripts.js",
   ]) {
     const arguments_ = script.includes("react-scripts")
       ? [script, "build"]
-      : script === "scripts/generate-notices.js"
-        ? [script, "--desktop"]
-        : [script];
+      : [script];
     const result = spawnSync(process.execPath, arguments_, {
       stdio: "inherit",
       env: {
@@ -35,11 +33,11 @@ function desktopBuild() {
     if (result.error || result.status !== 0)
       throw result.error || new Error(`Desktop build failed: ${script}`);
   }
-  verifyEditionBundle("build", "desktop");
-  writeBuildVersion(version);
-  const assets = verifyBuild("build", "public");
+  verifyEditionBundle(output, "desktop");
+  writeBuildVersion(version, output);
+  const assets = verifyBuild(output, "public");
   fs.writeFileSync(
-    path.join("build", "desktop-assets.json"),
+    path.join(output, "desktop-assets.json"),
     JSON.stringify(assets, null, 2) + "\n",
   );
   console.error(

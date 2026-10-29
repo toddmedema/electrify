@@ -4,8 +4,10 @@ import production from "./production.playwright.config";
 const smoke = [
   "browser-environment.spec.ts",
   "build-options.spec.ts",
+  "contextual-learning.spec.ts",
   "escape-close.spec.ts",
   "game-workspace.spec.ts",
+  "mission-evidence.spec.ts",
   "tutorial-exit.spec.ts",
   "tutorial-actions.spec.ts",
   "cloud-saves.spec.ts",
@@ -15,11 +17,13 @@ const smoke = [
   "achievements.spec.ts",
   "loading-navigation.spec.ts",
   "facilities-production-chart.spec.ts",
+  "production-chart-motion.spec.ts",
   "intertie-order.spec.ts",
   "operations-priorities.spec.ts",
 ];
 const layout = [
   "sign-in.spec.ts",
+  "learning-pages.spec.ts",
   "ui-chart-build-polish.spec.ts",
   "multiline-text.spec.ts",
   "modal-layout.spec.ts",

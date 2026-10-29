@@ -50,6 +50,17 @@ function renderSettings(overrides: Partial<Props> = {}) {
   );
 }
 
+// Fake timers and nodes added outside React must not leak into later tests when one fails.
+const attached: Element[] = [];
+function attach(...nodes: Element[]) {
+  document.body.append(...nodes);
+  attached.push(...nodes);
+}
+afterEach(() => {
+  jest.useRealTimers();
+  attached.splice(0).forEach((node) => node.remove());
+});
+
 describe("Settings", () => {
   afterEach(() => {
     act(() => updateInputPresentation({ active: false }));
@@ -262,50 +273,28 @@ describe("Settings", () => {
     expect(mockedClearAppCache).toHaveBeenCalledTimes(1);
   });
 
-  it("opens bundled credits and restores the Settings footer after closing", async () => {
-    const originalFetch = global.fetch;
-    global.fetch = jest.fn(
-      async () =>
-        ({
-          ok: true,
-          json: async () => ({
-            notices: [
-              {
-                title: "Game redistribution license",
-                text: "MIT with Commons Clause",
-              },
-            ],
-            chromium: false,
-          }),
-        }) as Response,
+  it("opens credits and restores the Settings footer after closing", async () => {
+    renderSettings();
+    const button = screen.getByRole("button", {
+      name: "Credits and licenses",
+    });
+    await userEvent.click(button);
+    const dialog = await screen.findByRole("dialog", {
+      name: "Credits and licenses",
+    });
+    expect(within(dialog).getByText("Todd Medema")).toBeInTheDocument();
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Close" }),
     );
-    try {
-      renderSettings();
-      const button = screen.getByRole("button", {
-        name: "Credits and licenses",
-      });
-      await userEvent.click(button);
-      const dialog = await screen.findByRole("dialog", {
-        name: "Credits and licenses",
-      });
-      expect(
-        await within(dialog).findByText("Game redistribution license"),
-      ).toBeInTheDocument();
-      await userEvent.click(
-        within(dialog).getByRole("button", { name: "Close" }),
-      );
-      expect(screen.queryByRole("dialog")).toBeNull();
-      expect(button).toHaveFocus();
-    } finally {
-      global.fetch = originalFetch;
-    }
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(button).toHaveFocus();
   });
 
   it("returns focus to the control that opened Settings", () => {
     jest.useFakeTimers();
     const trigger = document.createElement("button");
     trigger.dataset.settingsTrigger = "";
-    document.body.appendChild(trigger);
+    attach(trigger);
     const onBack = jest.fn();
     renderSettings({ onBack });
 
@@ -314,8 +303,6 @@ describe("Settings", () => {
 
     expect(onBack).toHaveBeenCalled();
     expect(trigger).toHaveFocus();
-    trigger.remove();
-    jest.useRealTimers();
   });
 
   it("blurs the exiting input before calling back so rapid arrows cannot change it", () => {

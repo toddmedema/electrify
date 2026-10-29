@@ -33,3 +33,9 @@ describe("the customer forecast", () => {
     expect(formatCustomerChange(9900, 0)).toEqual("+9.9k");
   });
 });
+
+it("does not display negative zero in customer changes or inflation", () => {
+  expect(formatCustomerChange(-0.001, 1000000)).toBe("0 (0.0%)");
+  expect(formatCustomerChange(-1, 1000000)).toBe("-1 (0.0%)");
+  expect(historyMetrics("metric").inflationRate.format(-0.00001)).toBe("0.0%");
+});

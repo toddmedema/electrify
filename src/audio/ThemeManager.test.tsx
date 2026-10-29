@@ -36,8 +36,13 @@ function fakeContext(tickPerSource: number = 0) {
     cancelAndHoldAtTime: jest.Mock;
     linearRampToValueAtTime: jest.Mock;
   }> = [];
+  const events = new EventTarget();
   const context = {
     currentTime: 0,
+    state: "running" as AudioContextState,
+    addEventListener: events.addEventListener.bind(events),
+    removeEventListener: events.removeEventListener.bind(events),
+    dispatchEvent: events.dispatchEvent.bind(events),
     destination: {},
     createGain: () => {
       const gain = {
@@ -231,11 +236,111 @@ describe("menu and gameplay music", () => {
       expect(source.start).toHaveBeenCalledWith(80, 0);
     }
     const beforeWrap = sources.length;
+    context.currentTime = 80 + BASIC_DURATION_SECONDS - 0.001;
     jest.advanceTimersByTime(BASIC.durationMs - 1);
     expect(sources).toHaveLength(beforeWrap);
+    context.currentTime = 80 + BASIC_DURATION_SECONDS;
     jest.advanceTimersByTime(1);
     expect(sources).toHaveLength(beforeWrap + BASIC.tracks.length);
   });
+});
+
+describe("gameplay loop clock", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it("waits for the audio playhead when the loop timer fires early", () => {
+    const { context, sources } = playingBasicTheme();
+    context.currentTime = 20;
+    jest.advanceTimersByTime(BASIC.durationMs);
+    expect(sources).toHaveLength(BASIC.tracks.length);
+
+    context.currentTime = BASIC_DURATION_SECONDS - 0.001;
+    jest.advanceTimersByTime(BASIC.durationMs - 20000 - 1);
+    expect(sources).toHaveLength(BASIC.tracks.length);
+    context.currentTime = BASIC_DURATION_SECONDS;
+    jest.advanceTimersByTime(1);
+    expect(sources).toHaveLength(BASIC.tracks.length * 2);
+    for (const source of sources.slice(BASIC.tracks.length)) {
+      expect(source.start).toHaveBeenCalledWith(BASIC_DURATION_SECONDS, 0);
+    }
+
+    context.currentTime = BASIC_DURATION_SECONDS * 2;
+    jest.advanceTimersByTime(BASIC.durationMs);
+    expect(sources).toHaveLength(BASIC.tracks.length * 3);
+    for (const source of sources.slice(0, BASIC.tracks.length)) {
+      expect(source.stop).not.toHaveBeenCalled();
+    }
+  });
+
+  it("waits without polling when audio is suspended just before the loop boundary", () => {
+    const { context, sources } = playingBasicTheme();
+    context.currentTime = BASIC_DURATION_SECONDS - 0.001;
+    context.state = "suspended";
+    jest.advanceTimersByTime(BASIC.durationMs);
+    expect(sources).toHaveLength(BASIC.tracks.length);
+    expect(jest.getTimerCount()).toBe(0);
+    jest.advanceTimersByTime(BASIC.durationMs * 2);
+    expect(sources).toHaveLength(BASIC.tracks.length);
+
+    context.state = "running";
+    context.dispatchEvent(new Event("statechange"));
+    expect(jest.getTimerCount()).toBe(1);
+    context.currentTime = BASIC_DURATION_SECONDS;
+    jest.advanceTimersByTime(2);
+    expect(sources).toHaveLength(BASIC.tracks.length * 2);
+    expect(jest.getTimerCount()).toBe(1);
+  });
+
+  it("keeps one loop deadline when paused and resumed while the context is suspended", () => {
+    const { themeManager, context, sources } = playingBasicTheme();
+    context.currentTime = 20;
+    context.state = "suspended";
+    jest.advanceTimersByTime(BASIC.durationMs);
+    expect(sources).toHaveLength(BASIC.tracks.length);
+    themeManager.pause();
+    themeManager.resume();
+    expect(sources).toHaveLength(BASIC.tracks.length * 2);
+
+    context.state = "running";
+    context.dispatchEvent(new Event("statechange"));
+    expect(jest.getTimerCount()).toBe(1);
+    context.currentTime = BASIC_DURATION_SECONDS;
+    jest.advanceTimersByTime(BASIC.durationMs - 20000);
+    expect(sources).toHaveLength(BASIC.tracks.length * 3);
+    expect(jest.getTimerCount()).toBe(1);
+  });
+
+  it.each(["pause", "menu", "stop"])(
+    "cancels a suspended loop when playback changes to %s",
+    (change) => {
+      const { themeManager, context, sources } = musicHarness();
+      themeManager.setIntensity(2);
+      context.currentTime = 20;
+      context.state = "suspended";
+      jest.advanceTimersByTime(BASIC.durationMs);
+      expect(sources).toHaveLength(BASIC.tracks.length);
+
+      if (change === "pause") themeManager.pause();
+      else themeManager.setIntensity(change === "menu" ? 1 : 0);
+      const starts = sources.length;
+      context.state = "running";
+      context.dispatchEvent(new Event("statechange"));
+      jest.advanceTimersByTime(BASIC.durationMs * 2);
+      expect(sources).toHaveLength(starts);
+      expect(jest.getTimerCount()).toBe(0);
+
+      context.currentTime = 90;
+      themeManager.resume();
+      const resumed = sources.slice(starts);
+      expect(resumed).toHaveLength(
+        change === "pause" ? BASIC.tracks.length : 0,
+      );
+      for (const source of resumed) {
+        expect(source.start).toHaveBeenCalledWith(90, 20);
+      }
+    },
+  );
 });
 
 describe("dynamic gameplay music", () => {
@@ -424,11 +529,13 @@ describe("ThemeManager pause / resume", () => {
     themeManager.resume();
     const beforeWrap = sources.length;
 
+    context.currentTime = BASIC_DURATION_SECONDS - 0.001;
     jest.advanceTimersByTime(BASIC.durationMs - 40000 - 1);
     expect(sources).toHaveLength(beforeWrap);
 
     // Arming the loop with the full duration instead would push this 40 seconds later, and drift
     // further on every pause / resume
+    context.currentTime = BASIC_DURATION_SECONDS;
     jest.advanceTimersByTime(1);
     expect(sources).toHaveLength(beforeWrap + BASIC.tracks.length);
   });

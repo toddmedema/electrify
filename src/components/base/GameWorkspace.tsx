@@ -23,6 +23,7 @@ import ScenarioDetails from "./ScenarioDetails";
 import {
   GameWorkspaceContext,
   GameToolCloseContext,
+  GameBuildCompleteContext,
 } from "./GameWorkspaceContext";
 import "./GameWorkspace.scss";
 
@@ -264,12 +265,20 @@ export default function GameWorkspace() {
                           value={() => close(tool)}
                         >
                           {tool === "BUILD_GENERATORS" && (
-                            <BuildFacilities
-                              embedded
-                              category={
-                                card.startsWith("BUILD_") ? card : buildCategory
-                              }
-                            />
+                            <GameBuildCompleteContext.Provider
+                              value={() => {
+                                if (layout === "sheet") close(tool);
+                              }}
+                            >
+                              <BuildFacilities
+                                embedded
+                                category={
+                                  card.startsWith("BUILD_")
+                                    ? card
+                                    : buildCategory
+                                }
+                              />
+                            </GameBuildCompleteContext.Provider>
                           )}
                           {tool === "PROGRAMS" && (
                             <Programs

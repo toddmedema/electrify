@@ -84,7 +84,11 @@ it("handles records without optional flow fields and omits unused source keys", 
 
 it("breaks supply into the four legend groups and keeps the full demand breakdown", () => {
   const stack = supplyDemandStack(timeline, ["Sun", "Coal"]);
-  const state = { timeline, ...stack, startingYear: 2020 };
+  const state = {
+    timeline,
+    ...stack,
+    startingYear: 2020,
+  };
   expect(formatProductionTooltip(0, state)).toContain("Interties: 30W");
   expect(formatProductionTooltip(0, state)).toContain("Storage: 0W");
   expect(formatProductionTooltip(0, state)).toContain("Storage charging: 10W");
@@ -268,4 +272,15 @@ it("ends blackout shading when storage exactly meets the customer deficit", () =
   expect(screen.getByRole("img")).toHaveAccessibleName(
     /2 blackout periods shaded/,
   );
+});
+
+it("keeps daylight times out of the supply and demand tooltip", () => {
+  const state = {
+    timeline,
+    ...supplyDemandStack(timeline, []),
+    startingYear: 2020,
+  };
+  const tooltip = formatProductionTooltip(0, state);
+  expect(tooltip).toContain("Total supply:");
+  expect(tooltip).not.toMatch(/sunrise|solar noon|sunset/i);
 });

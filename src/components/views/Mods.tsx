@@ -1215,7 +1215,7 @@ function ModsLibrary(): React.JSX.Element {
           </Button>
           <Button
             disabled={!!pending}
-            color="error"
+            color="primary"
             variant="contained"
             onClick={confirmRemove}
           >

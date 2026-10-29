@@ -1,4 +1,5 @@
 import { DIFFICULTY_IDS, MONTHS, difficultyLabel } from "../Constants";
+import { formatNumber } from "../helpers/Format";
 import { getScenario } from "../data/Scenarios";
 import { POLICIES } from "../data/Policies";
 import { combineStoryEffects } from "../data/WorldEvents";
@@ -63,7 +64,7 @@ export interface ModAuthorReport extends ModRuleFacts {
   inheritedObjectives: RuleObjective[];
 }
 const number = (value: number) =>
-  value.toLocaleString("en-US", { maximumSignificantDigits: 12 });
+  formatNumber(value, { maximumSignificantDigits: 12 });
 const money = (value: number) => `$${number(value)}`;
 const range = (min: number, max: number) =>
   min === max ? number(min) : `${number(min)}–${number(max)}`;

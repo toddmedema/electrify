@@ -7,7 +7,13 @@ import * as React from "react";
 import CustomerGrowthChallenge from "../components/base/CustomerGrowthChallenge";
 
 import TutorialPrompt from "../components/base/TutorialPrompt";
-import { AppStateType, ScenarioType, TutorialUiIdType } from "../Types";
+import {
+  AppStateType,
+  GameType,
+  ScenarioType,
+  TutorialStepType,
+  TutorialUiIdType,
+} from "../Types";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 
 // Every screen size opens these tools from the game dock. Teaching the same action on desktop
@@ -262,7 +268,17 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: { name: "BUILD_GENERATORS", dontRemember: true },
         hideUi: EARLY_MISSION_HIDDEN,
+        target: '[aria-label^="Sort facilities"]',
+        phase: "GENERATOR_CHOICES",
+        continueOnClick: '[role="option"], #sort-menu [role="menuitem"]',
+        action: "Sort generators",
+        content: <TutorialPrompt text="Sort by cost, build time, etc" />,
+      },
+      {
+        card: { name: "BUILD_GENERATORS", dontRemember: true },
+        hideUi: EARLY_MISSION_HIDDEN,
         target: '[aria-label^="Review purchase of"]',
+        phase: "GENERATOR_CHOICES",
         continueOn: (s: AppStateType) => s.game.facilities.length >= 2,
         continueOnClick: '[aria-label^="Review purchase of"]',
         action: "Review a generator purchase",
@@ -432,9 +448,8 @@ export const SCENARIOS: ScenarioType[] = [
         hideUi: EARLY_MISSION_HIDDEN,
         action: "Supply the evening peak with stored energy",
         content: (
-          <TutorialPrompt text="Charge from spare generation, then keep supply above demand through the evening." />
+          <TutorialPrompt text="Put Coal above storage to charge from spare generation, then supply the evening peak within two simulated days." />
         ),
-        hint: "Put Coal above storage, then run time. Finish within two simulated days.",
         capstone: {
           checkpoint: {
             facilities: [
@@ -520,7 +535,7 @@ export const SCENARIOS: ScenarioType[] = [
         ),
       },
       {
-        card: "FACILITIES",
+        card: "INSIGHTS",
         target: "#programsNav",
         revealActions: ["PROGRAMS"],
         advanceOn: (s: AppStateType) => s.card.name === "PROGRAMS",
@@ -551,9 +566,8 @@ export const SCENARIOS: ScenarioType[] = [
         card: "PROGRAMS",
         action: "Set a rate that turns next month’s loss into profit",
         content: (
-          <TutorialPrompt text="Revenue must cover fuel, upkeep and loan payments while supply meets demand." />
+          <TutorialPrompt text="Raise the rate in Programs, then check that revenue covers expenses in Insights before the month ends. Keep supply above demand." />
         ),
-        hint: "Raise the rate in Programs and compare revenue with expenses in Insights before the month ends.",
         capstone: {
           preserveProgress: true,
           checkpoint: { dollarsPerkWh: 0.03 },
@@ -639,7 +653,6 @@ export const SCENARIOS: ScenarioType[] = [
         card: "INSIGHTS",
         action: "Grow customers 5% while staying profitable",
         content: <CustomerGrowthChallenge />,
-        hint: "A modest discount below market attracts customers. Check finances too: pricing too low can grow sales at a loss.",
         capstone: {
           preserveProgress: true,
           success: pricingCapstoneSucceeded,
@@ -803,9 +816,8 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         action: "Finish new generation before the summer shortage",
         content: (
-          <TutorialPrompt text="Keep the grid supplied through month seven with new generation ready for the predicted summer shortage." />
+          <TutorialPrompt text="Check the supply-and-demand forecast, then build enough generation before the summer shortage. Keep the grid supplied through month seven." />
         ),
-        hint: "Check the supply-and-demand forecast. Choose a generator with enough capacity that can finish before the shortage.",
         capstone: {
           success: forecastingCapstoneSucceeded,
           failure: (s: AppStateType) =>
@@ -911,9 +923,8 @@ export const SCENARIOS: ScenarioType[] = [
           s.game.speed === "PAUSED",
         action: "Pause when the line shows a power reading",
         content: (
-          <TutorialPrompt text="The line can’t trade until construction finishes." />
+          <TutorialPrompt text="Wait until Building becomes a power reading such as 0/500MW, then pause. The line can now trade." />
         ),
-        hint: "Once the line is live, Building gives way to a power reading such as 0/500MW. Pause then.",
       },
       {
         card: "FACILITIES",
@@ -930,7 +941,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#dispatch-order",
         action: "Find the dispatch order",
         content: (
-          <TutorialPrompt text="Plants and interties share one list. Plants run in dispatch order; interties trade automatically." />
+          <TutorialPrompt text="Plants run in dispatch order; interties trade automatically." />
         ),
       },
       {
@@ -977,9 +988,8 @@ export const SCENARIOS: ScenarioType[] = [
           s.game.speed === "PAUSED",
         action: "Pause after an importing month",
         content: (
-          <TutorialPrompt text="The line can cover only up to its available capacity." />
+          <TutorialPrompt text="Let a full importing month finish so it appears in Insights, then pause. Imports are limited by available capacity." />
         ),
-        hint: "Let a full importing month finish so it appears in Insights, then pause.",
       },
       {
         card: "INSIGHTS",
@@ -990,20 +1000,11 @@ export const SCENARIOS: ScenarioType[] = [
         ),
       },
       {
-        card: "INSIGHTS",
-        target: ".powerExchangeSummary",
-        action: "Compare available capacity with 500 MW",
-        content: (
-          <TutorialPrompt text="Hot, sunny weather can reduce how much the line carries." />
-        ),
-      },
-      {
         card: "FACILITIES",
         action: "Supply your grid while selling surplus solar power",
         content: (
-          <TutorialPrompt text="Use the trading rule to safely sell spare solar power over the next month." />
+          <TutorialPrompt text="Choose “Buy for shortages, sell extra” and keep Solar on. Exports use surplus after local demand and storage charging." />
         ),
-        hint: "Exports use surplus after charging and local demand. If flow stays at 0, make sure Solar is on.",
         capstone: {
           preserveProgress: true,
           success: intertiesCapstoneSucceeded,
@@ -1016,17 +1017,18 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "FACILITIES",
         action: "Prepare for a regional shortage",
+        phase: "INTERTIE_STRESS_PREPARE",
         nextLabel: "Inspect shortage safely",
         onNext: () => beginIntertieStress(),
         content: (
-          <TutorialPrompt text="Your neighbor will have only 150 MW to spare before seasonal limits. The clock stays paused while you inspect the shortage and restore backup." />
+          <TutorialPrompt text="Your neighbor will have only 150 MW to spare before seasonal limits. Continue to inspect safely with time paused, then restore your existing gas backup." />
         ),
-        hint: "This practice starts only when you continue. Your existing gas plant can cover the gap; no new construction is needed.",
       },
       {
         card: "FACILITIES",
         target: ".transmissionLine",
         action: "Inspect the neighbor supply limit",
+        phase: "INTERTIE_STRESS_INSPECT",
         content: (
           <TutorialPrompt text="The wire is still rated at 500 MW, but a wider wire cannot create power in the neighboring grid. Open the intertie to compare its line rating with available imports." />
         ),
@@ -1035,6 +1037,7 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         target: '[data-facility="Natural Gas Peaker"] .facilityDisclosure',
         action: "Restore your gas backup",
+        phase: "INTERTIE_STRESS_INSPECT",
         advanceOn: (s: AppStateType) =>
           s.game.facilities.some(
             (f) => f.name === "Natural Gas Peaker" && !f.paused,
@@ -1046,10 +1049,10 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "FACILITIES",
         action: "Supply a full month with limited imports",
+        phase: "INTERTIE_STRESS_SUPPLY",
         content: (
-          <TutorialPrompt text="Run time to prove your local fleet and limited imports can serve the grid together." />
+          <TutorialPrompt text="Run one continuously supplied month with your local fleet and limited imports. The clock then pauses and normal neighboring supply returns." />
         ),
-        hint: "The clock pauses after one continuously supplied month. Normal neighboring supply then returns.",
         capstone: {
           preserveProgress: true,
           success: (s: AppStateType) =>
@@ -1319,10 +1322,9 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "boom",
       fantasy: "Prepare a small city's grid for a surge in demand.",
-      objective:
-        "Build dependable generation and storage before the data centers connect in 2026.",
+      objective: "Keep customers supplied as data centers connect in 2026.",
       threat:
-        "Data centers need power around the clock. If you wait until they arrive to build, you'll be too late.",
+        "Data centers need power around the clock. New plants take years to build.",
     },
     ownership: "Public",
     startingYear: 2020,
@@ -1392,8 +1394,7 @@ export const SCENARIOS: ScenarioType[] = [
       fantasy: "Keep Austin powered through a brutal winter storm.",
       objective:
         "Strengthen the grid and keep every customer supplied during the February 2021 freeze.",
-      threat:
-        "Heating demand surges as equipment freezes. In January 2020, fund winterization or keep cash for construction.",
+      threat: "Heating demand surges as equipment freezes.",
     },
     ownership: "Public",
     seed: 268107,
@@ -1554,8 +1555,7 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "legacy",
       fantasy: "Keep the lights on when your largest generator shuts down.",
-      objective:
-        "Have enough generation and storage ready to cover the main reactor's shutdown.",
+      objective: "Keep customers supplied after your main reactor shuts down.",
       threat:
         "The shutdown date is hidden. The reactor stays offline for the rest of the mission.",
     },
@@ -1622,8 +1622,7 @@ export const SCENARIOS: ScenarioType[] = [
         "Keep Los Angeles supplied when wildfire cuts your northern intertie.",
       objective:
         "Supply at least 99.5% of demand during the January and February 2025 intertie outage.",
-      threat:
-        "Your existing northern intertie will lose 90% of its capacity. Prepare local generation, storage, or an independent connection.",
+      threat: "Your existing northern intertie will lose 90% of its capacity.",
     },
     ownership: "Public",
     startingYear: 2022,
@@ -1979,6 +1978,15 @@ export function getScenario(
     return custom;
   }
   return SCENARIOS.find((s: ScenarioType) => s.id === scenarioId);
+}
+
+/** Resolve the authored behavior of the current step without coupling callers to its index. */
+export function getTutorialStep(
+  game: Pick<GameType, "scenarioId" | "customScenario" | "tutorialStep">,
+): TutorialStepType | undefined {
+  return getScenario(game.scenarioId, game.customScenario)?.tutorialSteps?.[
+    game.tutorialStep
+  ];
 }
 
 /**

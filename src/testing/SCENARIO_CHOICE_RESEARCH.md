@@ -1,5 +1,11 @@
 # Scenario choice cost research
 
+**Permanent winterization (October 2026):** Deep Freeze now offers the ordinary permanent
+facility upgrade in bulk, charging only for eligible assets still needing protection.
+The fixed $90M fee and choice-wide protection described below are historical. Current
+prices, technology scope, installation impact, and measured outcomes are documented in
+[the winterization design and research](../../docs/winterization.md).
+
 **Wildfire redesign:** the wildfire preparedness, restoration-cost and passive-grid comparisons
 below are historical. Scenario 111 now starts with a pivotal Northern intertie that loses 90%
 of its capacity; see [the current mission design](../../docs/wildfire-intertie.md).
@@ -171,7 +177,7 @@ nuclear**. Against that scope, $250M would be only 35% low. Therefore the correc
 claim is that $250M is excessive for the **targeted loss-reduction package being
 offered**, not that every possible winterization project must cost under $150M.
 
-**Implementation:** charge $90M at every difficulty for plant protection and
+**Historical implementation:** charge $90M at every difficulty for plant protection and
 supplier coordination ahead of February 2021. Keep the demand spike, gas-price
 spike, and residual output losses. Preparation can be economically attractive;
 that is consistent with its purpose. Do not inflate its price solely to equalize

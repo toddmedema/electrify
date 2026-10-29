@@ -9,7 +9,6 @@ import {
   ListItemAvatar,
   ListItemText,
   Typography,
-  useMediaQuery,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
@@ -31,10 +30,8 @@ import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   activeScenario,
   currentGenerationW,
-  currentTick,
 } from "../../helpers/GameSelectors";
 import { chartPalette, facilityColor, withAlpha } from "../../Theme";
-import { SIDE_LAYOUT_MEDIA } from "../../Globals";
 import {
   FacilityOperatingType,
   isStorage,
@@ -52,7 +49,6 @@ import {
   formatFacilitySize,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
-import ProductionMixBar from "../base/ProductionMixBar";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import FlowBar from "../base/FlowBar";
 import FacilityDetails from "../base/FacilityDetails";
@@ -65,6 +61,7 @@ import {
   FacilityHazardStatusType,
   HAIL_DEFINITION_ID,
   isUpgradingAt,
+  retrofitOutputMultiplier,
   upgradeDaysLeft,
   upgradeInProgress,
   upgradeProgress,
@@ -341,8 +338,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     ? undefined
     : upgradeInProgress(facility);
   const upgrading = !!installing && isUpgradingAt(facility, game.date.minute);
-  // Building and upgrading both hold the plant out of service behind a progress bar
-  const offlineForWork = underConstruction || upgrading;
+  const partialUpgrade =
+    upgrading && retrofitOutputMultiplier(facility, game.date.minute) > 0;
+  const offlineForWork = underConstruction || (upgrading && !partialUpgrade);
+  const activityLabel = partialUpgrade
+    ? "installing winterization, 90% capacity available"
+    : undefined;
   const storage = isStorage(facility) ? facility : undefined;
   const wasBuilding = React.useRef(underConstruction);
   const [arriving, setArriving] = React.useState(arrivalRequested);
@@ -428,11 +429,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     detail = `${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
   } else if (upgrading) {
     const daysLeft = upgradeDaysLeft(installing!, game.date.minute);
-    reading = `Upgrading ${Math.round(builtFraction * 100)}%`;
+    reading = partialUpgrade
+      ? formatWattsOfPeak(facility.currentW, facility.peakW)
+      : `Upgrading ${Math.round(builtFraction * 100)}%`;
     detail = (
       <>
         <span className="facilityStatusLong">
-          {resilienceName(installing!.upgrade)}, {dayCount(daysLeft)} left
+          {partialUpgrade
+            ? `Winterizing ${Math.round(builtFraction * 100)}% · 90% capacity available`
+            : resilienceName(installing!.upgrade)}
+          , {dayCount(daysLeft)} left
         </span>
         <span className="facilityStatusShort">{daysLeft}d left</span>
       </>
@@ -460,20 +466,20 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             ? "draining"
             : facility.hydroLastSpillWh
               ? "spilling"
-              : "steady";
+              : "";
       const low =
         Math.round(capacityFraction! * 100) < RESERVOIR_WARNING_FRACTION * 100;
-      detail = (
+      detail = waterStatus ? (
         <span className={low ? "facilityStatusLow" : undefined}>
           {waterStatus}
           {low && <span className="srOnly"> low</span>}
         </span>
-      );
+      ) : null;
     }
   }
   // Output communicates normal operation; keep explicit labels for other states.
   const status =
-    offlineForWork || activity === "RUNNING"
+    offlineForWork || partialUpgrade || activity === "RUNNING"
       ? reading
       : `${reading} · ${ACTIVITY_LABELS[activity]}`;
 
@@ -507,7 +513,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         <div
           className="facilityActivity"
           role="img"
-          aria-label={`${facility.name} ${ACTIVITY_LABELS[activity]}`}
+          aria-label={`${facility.name} ${activityLabel ?? ACTIVITY_LABELS[activity]}`}
         >
           {activityIcon(activity, accentColor)}
         </div>
@@ -614,7 +620,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     }
                   />
                   {/* The percentage is already in the text; this only makes it glanceable */}
-                  {offlineForWork && (
+                  {(underConstruction || upgrading) && (
                     <span
                       className="constructionProgress"
                       data-paused={game.speed === "PAUSED"}
@@ -714,7 +720,6 @@ function FacilitySupplyChart({
   anchor: React.RefObject<HTMLDivElement>;
 }) {
   const fuelOrder = getDispatchOrderedFuels(game.facilities);
-  const sideLayout = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
   return (
     <div
       ref={anchor}
@@ -727,13 +732,11 @@ function FacilitySupplyChart({
         timeline={game.timeline}
         fuelOrder={fuelOrder}
         currentMinute={game.date.minute}
+        speed={game.speed}
         location={game.location}
         legend
         startingYear={game.startingYear}
       />
-      {sideLayout && (
-        <ProductionMixBar tick={currentTick(game)} fuelOrder={fuelOrder} />
-      )}
     </div>
   );
 }

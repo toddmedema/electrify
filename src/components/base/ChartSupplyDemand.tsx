@@ -1,6 +1,19 @@
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
+import { productionChartMotion } from "./ProductionChartMotion";
+import {
+  productionChartStrokes,
+  ProductionStroke,
+} from "./ProductionChartStrokes";
+import {
+  dayNightSegments,
+  describeDayNight,
+  DayNightSegment,
+  dayNightRibbonPlugin,
+  formatClockTime,
+} from "./DayNightRibbon";
+import { getTextScale } from "../../TextSize";
 import ChartLegend, { LegendItemType } from "./ChartLegend";
 import {
   anchoredForecastPaths,
@@ -19,13 +32,17 @@ import {
   formatMinuteOfDayChartAxis,
   getDateFromMinute,
   getHourTicks,
-  getSunriseSunset,
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
 import { WEATHER_DEPENDENT_FUELS } from "../../Constants";
 import { chartPalette, getThemeVersion, subscribeThemeMode } from "../../Theme";
-import { FuelNameType, LocationType, TickPresentFutureType } from "../../Types";
+import {
+  FuelNameType,
+  LocationType,
+  SpeedType,
+  TickPresentFutureType,
+} from "../../Types";
 
 type ChartData = Pick<
   TickPresentFutureType,
@@ -53,6 +70,7 @@ export interface Props {
   startingYear: number;
   /** Individual fuel details follow the dispatch order in the facility list. */
   fuelOrder?: FuelNameType[];
+  speed?: SpeedType;
 }
 
 // Everything the plot's callbacks read. Rebuilt every render and handed to UPlotChart, which
@@ -62,9 +80,12 @@ interface State {
   domain: [number, number];
   range: [number, number];
   hourTicks: number[];
-  sunTicks: number[];
+  dayNight: DayNightSegment[];
+  location: LocationType;
   blackoutSpans: Array<[number, number]>;
   currentMinute: number | null;
+  minute: number;
+  speed: SpeedType;
   sources: SupplySource[];
   bySource: number[][];
   supply: number[];
@@ -72,10 +93,6 @@ interface State {
   loadStack: number[][];
   startingYear: number;
 }
-
-// Words rather than emoji: platform emoji are full-colour art that clash with the flat icon
-// set and change shape from one OS to the next
-const SUN_LABELS = ["Sunrise", "Noon", "Sunset"];
 
 // Fuel boundaries stay lighter than the demand the player has to meet. Solid records and
 // dashed forecasts meet at now; fills stay subtle so blackout shading remains visible.
@@ -225,33 +242,52 @@ function sourceFill(
   };
 }
 
-function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+function buildOptions({
+  getState,
+  scale,
+  registerDataUpdate,
+}: BuildContext<State>): uPlot.Options {
   const { sources } = getState();
+  const motion = productionChartMotion(getState);
   const loadBaseStart = sources.length + 1;
   const fuelLineStart = loadBaseStart + 3;
   const chargingLineStart = fuelLineStart + sources.length * 2;
   const loadLineStart = chargingLineStart + 2;
   const demandLineStart = loadLineStart + 2;
+  const strokes: ProductionStroke[] = [];
+  const cache = productionChartStrokes(getState, strokes, motion.refresh);
+  registerDataUpdate?.(cache.updateData);
+  const linear = uPlot.paths.linear!();
   const linePair = (
     stroke: string,
     width: number,
     dash: number[],
     pastIndex: number,
-  ): uPlot.Series[] => [
-    { stroke, width, points: { show: false }, spanGaps: false },
-    {
-      stroke,
-      width,
-      dash,
-      paths: anchoredForecastPaths(pastIndex),
-      points: { show: false },
-      spanGaps: false,
-    },
-  ];
+  ): uPlot.Series[] => {
+    strokes.push({ pastIndex, color: stroke, width, dash });
+    return [
+      {
+        stroke,
+        width,
+        paths: cache.paths(linear),
+        points: { show: false },
+        spanGaps: false,
+      },
+      {
+        stroke,
+        width,
+        dash,
+        paths: cache.paths(anchoredForecastPaths(pastIndex)),
+        points: { show: false },
+        spanGaps: false,
+      },
+    ];
+  };
   return {
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [18 * scale, 5 * scale, 0, 0],
+    pxAlign: 1,
+    padding: [18 * scale, 5 * scale, 24 * getTextScale(), 0],
     cursor: {
       x: true,
       y: false,
@@ -269,20 +305,6 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         splits: () => getState().hourTicks,
         values: (_u, splits) => splits.map(formatMinuteOfDayChartAxis),
       }),
-      {
-        // Sunrise and sunset ride a second axis so the hours stay evenly spaced and readable
-        scale: "x",
-        side: 2,
-        stroke: tickLabelFill(),
-        font: chartFont(),
-        grid: { show: false },
-        ticks: { show: false },
-        border: { show: false },
-        size: 18 * scale,
-        gap: 0,
-        splits: () => getState().sunTicks,
-        values: () => SUN_LABELS,
-      },
       yAxis(scale, {
         values: (_u, splits) => splits.map((t) => formatWattsAxis(t, splits)),
       }),
@@ -337,16 +359,20 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       { series: [loadBaseStart + 2, loadBaseStart + 1] },
     ],
     plugins: [
+      dayNightRibbonPlugin(getState),
       bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.2),
       baselinePlugin(chartPalette().axis),
+      cache.plugin,
+      motion.plugin,
       verticalLinePlugin(
-        () => getState().currentMinute,
+        () => (motion.active() ? null : getState().currentMinute),
         chartPalette().axis,
         1,
       ),
       {
         hooks: {
           draw: (u) => {
+            if (motion.active()) return;
             const now = getState().currentMinute;
             if (now == null) return;
             const ratio = uPlot.pxRatio;
@@ -354,6 +380,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
             u.ctx.font = chartFont(ratio);
             u.ctx.fillStyle = tickLabelFill();
             u.ctx.textAlign = "center";
+            u.ctx.textBaseline = "alphabetic";
             const halfWidth = u.ctx.measureText("Now").width / 2;
             const x = Math.max(
               u.bbox.left + halfWidth,
@@ -385,11 +412,7 @@ export function formatProductionTooltip(
 ): string {
   const d = state.timeline[idx];
   const date = getDateFromMinute(d.minute, state.startingYear);
-  const hour = Math.floor(date.minuteOfDay / 60);
-  const minute = Math.floor(date.minuteOfDay % 60)
-    .toString()
-    .padStart(2, "0");
-  const time = `${hour % 12 || 12}:${minute} ${hour < 12 ? "AM" : "PM"}`;
+  const time = formatClockTime(date.minuteOfDay);
   const loads: Array<[string, number | undefined]> = [
     ["Storage charging", d.storageChargeW],
     ["Interties", d.exportedW],
@@ -444,35 +467,11 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     domainMax = Math.max(domainMax, supply[i], totalDemand[i]);
   });
 
-  // Get sunrise and sunset, sliding forward if it's actually in the next day
-  const date = getDateFromMinute(rangeMin, startingYear);
-  const midnight = Math.floor(rangeMin / 1440) * 1440;
-
-  const sun = getSunriseSunset(date, location);
-  let sunTicks: number[] = [];
-  if (sun.daylight === "normal") {
-    let sunrise = midnight + sun.sunrise;
-    let sunset = midnight + sun.sunset;
-    if (sunrise < rangeMin) {
-      sunrise =
-        midnight +
-        1440 +
-        getSunriseSunset(
-          getDateFromMinute(rangeMin + 1440, startingYear),
-          location,
-        ).sunrise;
-    }
-    if (sunset < rangeMin) {
-      sunset =
-        midnight +
-        1440 +
-        getSunriseSunset(
-          getDateFromMinute(rangeMin + 1440, startingYear),
-          location,
-        ).sunset;
-    }
-    sunTicks = [sunrise, sunrise + (sunset - sunrise) / 2, sunset];
-  }
+  const dayNight = dayNightSegments(
+    [rangeMin, rangeMax],
+    startingYear,
+    location,
+  );
 
   // "Demand peaks in the early evening" only lands if you can read the clock off the axis
   const hourTicks = getHourTicks(rangeMin, rangeMax);
@@ -571,12 +570,15 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     domain: [0, padRange(0, domainMax)[1]],
     range: [rangeMin, rangeMax],
     hourTicks,
-    sunTicks,
+    dayNight,
+    location,
     blackoutSpans: spansFromEdges(blackouts),
     currentMinute:
       currentMinute <= rangeMin || currentMinute >= rangeMax
         ? null
         : currentMinute,
+    minute: currentMinute,
+    speed: props.speed ?? "PAUSED",
     sources,
     bySource,
     supply,
@@ -605,7 +607,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         />
       )}
       <UPlotChart<State>
-        ariaLabel={`Chart of electricity supply and demand over the day. Generation is grouped as Variable and Dispatchable. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
+        ariaLabel={`Chart of electricity supply and demand over the day. Day/night ribbon: ${describeDayNight(dayNight)}. Generation is grouped as Variable and Dispatchable. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
         interactiveTooltip
         formatSummaryValue={formatWatts}
         height={height}

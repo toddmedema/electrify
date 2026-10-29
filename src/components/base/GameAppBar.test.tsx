@@ -6,6 +6,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
+import userEvent from "@testing-library/user-event";
 import { createGame } from "../../testing/Simulator";
 import { modScenario } from "../../mods/ModScenario";
 import { TickPresentFutureType } from "../../Types";
@@ -40,7 +41,80 @@ function renderAppBar(overrides: Partial<Props> = {}) {
   return render(<GameAppBar {...props} />);
 }
 
+const originalMatchMedia = window.matchMedia;
+beforeEach(() => {
+  window.matchMedia = (query: string) => ({
+    ...originalMatchMedia(query),
+    matches: query.includes("min-width:1300px") && mockDesktop,
+  });
+});
+afterEach(() => {
+  window.matchMedia = originalMatchMedia;
+});
+// Fake timers and nodes added outside React must not leak into later tests when one fails.
+const attached: Element[] = [];
+function attach(...nodes: Element[]) {
+  document.body.append(...nodes);
+  attached.push(...nodes);
+}
+afterEach(() => {
+  jest.useRealTimers();
+  attached.splice(0).forEach((node) => node.remove());
+});
+
 describe("GameAppBar", () => {
+  it("opens the feedback form directly from the game menu", () => {
+    const open = jest.spyOn(window, "open").mockImplementation(() => null);
+    try {
+      renderAppBar();
+      fireEvent.click(screen.getByRole("button", { name: "menu" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Send feedback" }));
+      expect(open).toHaveBeenCalledWith(
+        "https://forms.gle/nSpkVzcFcXMQMMgb9",
+        "_system",
+      );
+    } finally {
+      open.mockRestore();
+    }
+  });
+
+  it("keeps the menu action named consistently while announcing offline saving", () => {
+    const online = jest
+      .spyOn(window.navigator, "onLine", "get")
+      .mockReturnValue(false);
+    try {
+      renderAppBar();
+      const menu = screen.getByRole("button", { name: "menu" });
+      expect(menu).toHaveAccessibleDescription(
+        "Offline: saving to this device only",
+      );
+      fireEvent.click(menu);
+      expect(
+        screen.getByRole("menuitem", {
+          name: "Offline: saving to this device only",
+        }),
+      ).toHaveAttribute("aria-disabled", "true");
+    } finally {
+      online.mockRestore();
+    }
+  });
+
+  it.each(["click", "{Enter}", " "])(
+    "opens scenario info from the months remaining with %s",
+    async (action) => {
+      const onEvidence = jest.fn();
+      renderAppBar({ onEvidence });
+      const months = screen.getByRole("button", { name: /months left$/ });
+      if (action === "click") await userEvent.click(months);
+      else {
+        months.focus();
+        await userEvent.keyboard(action);
+      }
+      expect(onEvidence).toHaveBeenCalledTimes(1);
+      expect(onEvidence).toHaveBeenCalledWith("mission-details");
+    },
+  );
+
   it.each(["idle", "saving", "saved"] as const)(
     "keeps routine %s indicators off the game screen",
     (saveState) => {
@@ -207,53 +281,65 @@ describe("GameAppBar", () => {
     }
   });
 
-  it("keeps keyboard focus on a status control when the window crosses the single-row width", () => {
-    const matchMedia = window.matchMedia;
-    let wide = false;
-    const listeners = new Set<() => void>();
-    window.matchMedia = (query: string) =>
-      ({
-        ...matchMedia(query),
-        get matches() {
-          return query.includes("min-width:1300px") && wide;
-        },
-        addListener: (listener: () => void) => listeners.add(listener),
-        removeListener: (listener: () => void) => listeners.delete(listener),
-        addEventListener: (_: string, listener: () => void) =>
-          listeners.add(listener),
-        removeEventListener: (_: string, listener: () => void) =>
-          listeners.delete(listener),
-      }) as unknown as MediaQueryList;
-    const resize = (next: boolean) =>
-      act(() => {
-        wide = next;
-        listeners.forEach((listener) => listener());
-      });
-    try {
-      const { container } = renderAppBar({
-        activeEvents: [
-          {
-            key: "fire",
-            title: "Wildfire emergency",
-            importance: "CRITICAL",
-            count: 1,
-            throughLabel: "through Mar 2026",
+  it.each([/Wildfire emergency/, /months left$/])(
+    "keeps keyboard focus on %s when the window crosses the single-row width",
+    async (name) => {
+      const matchMedia = window.matchMedia;
+      let wide = false;
+      const listeners = new Set<() => void>();
+      window.matchMedia = (query: string) =>
+        ({
+          ...matchMedia(query),
+          get matches() {
+            return query.includes("min-width:1300px") && wide;
           },
-        ],
-      });
-      const risk = () =>
-        screen.getByRole("button", { name: /Wildfire emergency/ });
-      risk().focus();
-      resize(true);
-      expect(container.querySelector("#topbar .gameStatusBar")).not.toBeNull();
-      expect(risk()).toHaveFocus();
-      resize(false);
-      expect(container.querySelector("#topbar .gameStatusBar")).toBeNull();
-      expect(risk()).toHaveFocus();
-    } finally {
-      window.matchMedia = matchMedia;
-    }
-  });
+          addListener: (listener: () => void) => listeners.add(listener),
+          removeListener: (listener: () => void) => listeners.delete(listener),
+          addEventListener: (_: string, listener: () => void) =>
+            listeners.add(listener),
+          removeEventListener: (_: string, listener: () => void) =>
+            listeners.delete(listener),
+        }) as unknown as MediaQueryList;
+      const resize = (next: boolean) =>
+        act(async () => {
+          wide = next;
+          listeners.forEach((listener) => listener());
+        });
+      try {
+        const { container } = renderAppBar({
+          activeEvents: [
+            {
+              key: "fire",
+              title: "Wildfire emergency",
+              importance: "CRITICAL",
+              count: 1,
+              throughLabel: "through Mar 2026",
+            },
+          ],
+        });
+        const control = () => screen.getByRole("button", { name });
+        await act(async () => control().focus());
+        // Document geometry can still report the wide layout when the media query changes.
+        mockDesktop = true;
+        await resize(true);
+        expect(
+          screen.getByRole("button", { name: "ultra speed" }),
+        ).toBeVisible();
+        expect(
+          container.querySelector("#topbar .gameStatusBar"),
+        ).not.toBeNull();
+        expect(control()).toHaveFocus();
+        await resize(false);
+        expect(
+          screen.queryByRole("button", { name: "ultra speed" }),
+        ).toBeNull();
+        expect(container.querySelector("#topbar .gameStatusBar")).toBeNull();
+        expect(control()).toHaveFocus();
+      } finally {
+        window.matchMedia = matchMedia;
+      }
+    },
+  );
 
   it("keeps the status in its own row below the top bar on narrower windows", () => {
     const { container } = renderAppBar();
@@ -457,7 +543,7 @@ describe("GameAppBar", () => {
     jest.useFakeTimers();
     const target = document.createElement("button");
     target.dataset.mainAction = "";
-    document.body.appendChild(target);
+    attach(target);
     const onQuit = jest.fn();
     renderAppBar({ onQuit });
 
@@ -467,8 +553,6 @@ describe("GameAppBar", () => {
 
     expect(onQuit).toHaveBeenCalled();
     expect(target).toHaveFocus();
-    target.remove();
-    jest.useRealTimers();
   });
 
   it("Save & Quit preserves a later menu selection", () => {
@@ -489,7 +573,6 @@ describe("GameAppBar", () => {
     fireEvent.keyDown(library, { key: "Enter" });
     act(() => jest.advanceTimersByTime(350));
     expect(library).toHaveFocus();
-    jest.useRealTimers();
   });
 
   it.each([false, true])(

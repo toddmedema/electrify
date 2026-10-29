@@ -16,5 +16,6 @@ export const FACILITY_FUELS = {
   Geothermal: "Geothermal",
   "Enhanced Geothermal": "Geothermal",
   Battery: undefined,
+  "Iron-Air Battery": undefined,
   "Pumped Hydro": undefined,
 } as const satisfies Record<ModFacilityNameType, FuelNameType | undefined>;

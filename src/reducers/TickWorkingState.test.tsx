@@ -1,6 +1,7 @@
 import { createNextState, freeze } from "@reduxjs/toolkit";
 import cloneDeep from "lodash.clonedeep";
 import { TICK_MINUTES, TICK_MS, TICKS_PER_MONTH } from "../Constants";
+import { getScenario } from "../data/Scenarios";
 import {
   copyCommitmentMetadata,
   serializeCommitmentMetadata,
@@ -205,7 +206,9 @@ describe("live tick working state", () => {
 
   it("isolates completion of the tutorial intertie exercise and its forecast", () => {
     const state = createGame({ scenarioId: 112, seed: 61 });
-    state.tutorialStep = 18;
+    state.tutorialStep = getScenario(112)!.tutorialSteps!.findIndex(
+      (step) => step.phase === "INTERTIE_STRESS_SUPPLY",
+    );
     state.tutorialIntertieStress = {
       active: true,
       startsMinute: 0,

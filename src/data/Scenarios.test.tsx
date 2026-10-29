@@ -113,7 +113,6 @@ describe("tutorial mission metadata", () => {
       expect(capstones).toHaveLength(tutorial.id === 112 ? 2 : 1);
       capstones.forEach((step) => {
         expect(step.target).toBeUndefined();
-        expect(!!step.hint).toBe(tutorial.id !== 0 && tutorial.id !== 1);
       });
     });
   });
@@ -133,7 +132,7 @@ describe("tutorial mission metadata", () => {
         peakW: 500000000,
       }),
     ]);
-    expect(interties.tutorialSteps).toHaveLength(19);
+    expect(interties.tutorialSteps).toHaveLength(18);
   });
 
   it("keeps interties out of earlier tutorials without disabling ordinary California games", () => {

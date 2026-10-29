@@ -162,7 +162,7 @@ describe("Manual", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Let us know" })).toHaveAttribute(
       "href",
-      "/about.html#feedback",
+      "https://forms.gle/nSpkVzcFcXMQMMgb9",
     );
   });
 

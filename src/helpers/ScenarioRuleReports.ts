@@ -10,7 +10,12 @@ import {
   MINUTES_PER_MONTH,
   summarizeHistory,
 } from "./DateTime";
-import { formatMoneyConcise, formatWatts, formatWattHours } from "./Format";
+import {
+  formatMoneyConcise,
+  formatWatts,
+  formatWattHours,
+  formatFixed,
+} from "./Format";
 import { customerSalesRevenue } from "./Scoring";
 import { MONTH_NAMES } from "../Constants";
 
@@ -316,7 +321,7 @@ function billedRate(month: MonthlyHistoryType): number | undefined {
 }
 
 function rateText(rate: number): string {
-  return `$${rate.toFixed(3).replace(/0+$/, "").replace(/\.$/, "")}/kWh`;
+  return `$${formatFixed(rate, 3).replace(/0+$/, "").replace(/\.$/, "")}/kWh`;
 }
 
 function dataCenterMetrics(
@@ -644,7 +649,7 @@ export function interpretRuleReport(
     const storageHoursAtPeak = snapshot.storagePeakWh / peakDemandW;
     return observed(
       report,
-      `Storage power covers ${percent(storageCoverage)} of recorded peak demand, with ${storageHoursAtPeak.toFixed(1)} hours of energy at that demand.`,
+      `Storage power covers ${percent(storageCoverage)} of recorded peak demand, with ${formatFixed(storageHoursAtPeak, 1)} hours of energy at that demand.`,
       [
         metric(
           "storageCoverage",

@@ -25,10 +25,12 @@ jest.mock("../views/Programs", () => () => (
 jest.mock("../views/BuildFacilities", () => {
   const { useContext } = jest.requireActual("react");
   const { useDispatch } = jest.requireActual("react-redux");
-  const { GameToolCloseContext } = jest.requireActual("./GameWorkspaceContext");
+  const { GameBuildCompleteContext } = jest.requireActual(
+    "./GameWorkspaceContext",
+  );
   return function MockBuildFacilities({ category }: { category: string }) {
     const dispatch = useDispatch();
-    const close = useContext(GameToolCloseContext);
+    const complete = useContext(GameBuildCompleteContext);
     return (
       <>
         <div role="tablist" aria-label="Build categories">
@@ -48,7 +50,7 @@ jest.mock("../views/BuildFacilities", () => {
             </button>
           ))}
         </div>
-        <button onClick={close}>Finish purchase</button>
+        <button onClick={complete}>Finish purchase</button>
       </>
     );
   };
@@ -272,13 +274,26 @@ it("retains Build tab focus and restores its category after closing another tool
   );
 });
 
-it("finishes a purchase without closing the opposite desktop rail", async () => {
+it("keeps Build and the opposite desktop rail open after a purchase", async () => {
   const { store, user, action } = setup(2240);
   await user.click(action("Insights"));
   await user.click(action("Build"));
   await user.click(screen.getByRole("button", { name: "Finish purchase" }));
-  expect(screen.queryByRole("region", { name: "Build" })).toBeNull();
+  expect(screen.getByRole("region", { name: "Build" })).toBeVisible();
   expect(screen.getByRole("region", { name: "Insights" })).toBeVisible();
-  expect(store.getState().card.name).toBe("INSIGHTS");
-  expect(action("Build")).toHaveFocus();
+  expect(store.getState().card.name).toBe("BUILD_GENERATORS");
 });
+
+it.each([390, SIDE_LAYOUT_MIN_WIDTH - 1, SIDE_LAYOUT_MIN_WIDTH])(
+  "only closes Build after a purchase when %ipx uses an overlay",
+  async (width) => {
+    const { user, action } = setup(width);
+    await user.click(action("Build"));
+    await user.click(screen.getByRole("button", { name: "Finish purchase" }));
+    const staysOpen = width >= SIDE_LAYOUT_MIN_WIDTH;
+    expect(screen.queryAllByRole("region", { name: "Build" })).toHaveLength(
+      Number(staysOpen),
+    );
+    expect(action("Build")).toHaveAttribute("aria-expanded", String(staysOpen));
+  },
+);

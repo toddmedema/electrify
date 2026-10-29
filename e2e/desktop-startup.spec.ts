@@ -76,7 +76,7 @@ for (const { width, height, colorScheme, reducedMotion, returning } of [
           animations.forEach((animation) => animation.pause());
           return animations.length;
         });
-      expect(animations > 0).toBe(!returning && reducedMotion !== "reduce");
+      expect(animations > 0).toBe(reducedMotion !== "reduce");
       await app.evaluate(({ ipcMain }) => {
         ipcMain.emit("test:release-startup");
       });

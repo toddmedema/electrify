@@ -1,3 +1,4 @@
+import { formatFixed } from "./Format";
 import type {
   CompiledRuleEvent,
   CompiledScenarioRules,
@@ -19,7 +20,7 @@ type Occurrence = ActiveWorldEventType & StoryPhaseDescriptionType;
 const share = (part: number, whole: number) =>
   whole > 0 ? Math.max(0, Math.min(1, part / whole)) : 0;
 const percent = (value: number) =>
-  `${(value * 100).toFixed(value >= 0.1 ? 0 : 1)}%`;
+  `${formatFixed(value * 100, value >= 0.1 ? 0 : 1)}%`;
 export const officialPresentation = (event: CompiledRuleEvent) =>
   event.source
     ? officialScenarioRuleDefinition(event.source.scenarioId)?.presentation[
@@ -56,14 +57,6 @@ export function presentOfficialRuleOccurrence(
     snapshot?.facilities.filter((facility) =>
       selectedIds.includes(facility.id),
     ) ?? [];
-  const protection = Number(core.attributes.ruleProtectionFactor ?? 0);
-  const priorChoice = (choice: string, option: string) =>
-    context?.occurrences?.some(
-      (occurrence) =>
-        occurrence.key ===
-          `story:${event.source!.scenarioId}:${event.source!.arcId}:${choice}` &&
-        occurrence.attributes.choice === option,
-    ) ?? false;
   const delivered = (fuels: FuelNameType[]) =>
     fuels.reduce(
       (sum, fuel) => sum + (snapshot!.deliveredWhByFuel12m[fuel] ?? 0),
@@ -131,14 +124,11 @@ export function presentOfficialRuleOccurrence(
       effects.facilityOutputMultipliersById ??= {};
       break;
     case "deepFreezeOnset":
-      if (protection > 0)
-        message += " Your funded winterization halves output losses.";
+      message += " Winterized plants take half the output loss.";
       break;
     case "deepFreezeThaw": {
       const period = context!.periodSnapshots?.[1];
-      const preparation = priorChoice("winterization", "winterize")
-        ? "Winterization halved output losses. "
-        : "";
+      const preparation = "";
       message =
         period === undefined
           ? "The freeze ends next month. Plant output and gas prices return to normal."

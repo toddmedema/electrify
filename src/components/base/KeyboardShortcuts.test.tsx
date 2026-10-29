@@ -3,13 +3,13 @@ import { GAME_TOOLS } from "./Navigation";
 import { keyMap } from "../Compositor";
 
 /**
- * The two halves of the keyboard contract: the keys react-hotkeys actually listens for, and the
+ * The two halves of the keyboard contract: the keys the global listener responds to, and the
  * table the Manual and Settings print. They live in different files and drifted before -- a key
  * the game answers to but never mentions is only a little worse than one it advertises and
  * ignores, and this is the cheapest way to have neither.
  */
 
-// Every key any binding listens for, in react-hotkeys' own spelling
+// Every key any binding listens for, in the shortcut table's spelling
 const bound = new Set(
   Object.values(keyMap)
     .flatMap((keys: string | string[]) => (Array.isArray(keys) ? keys : [keys]))

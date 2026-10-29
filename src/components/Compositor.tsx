@@ -11,7 +11,6 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import * as React from "react";
-import { GlobalHotKeys, configure } from "react-hotkeys";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 import { CARD_TRANSITION_ANIMATION_MS, NAV_CARDS } from "../Constants";
 import {
@@ -30,6 +29,7 @@ import GameWorkspace from "./base/GameWorkspace";
 import { GAME_TOOLS, GameTool } from "./base/Navigation";
 import { restoreMenuFocus } from "./base/useMenuKeys";
 import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
+import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import InstallAppButton from "./base/InstallAppButton";
 import TutorialHud from "./base/TutorialHud";
@@ -90,73 +90,9 @@ const FACILITY_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 // the fleet has had shortcuts of its own
 const facilitySlotKey = (slot: number) => `shift+${slot}`;
 
-// react-hotkeys' default ignoreEventsCondition treats every <input> as a text field and drops
-// the keydown entirely -- but the capacity sliders on the build screens and the rate slider in
-// Finances are MUI Sliders, which render as a bare <input type="range">. Just
-// clicking one leaves it focused, and from then on every shortcut silently did nothing until
-// the player happened to click something else -- the "some element is pulling focus" bug.
-// These types don't take character input, so there's nothing for a shortcut key to clobber.
-// Escape is exempted outright too, so it can always back out of a screen even if focus never
-// left an actual text field.
-const NON_TEXT_INPUT_TYPES = new Set([
-  "range",
-  "checkbox",
-  "radio",
-  "button",
-  "color",
-  "submit",
-  "reset",
-  "image",
-  "file",
-]);
-configure({
-  ignoreEventsCondition: (event: KeyboardEvent) => {
-    if (event.defaultPrevented) return true;
-    if (
-      event.key === " " &&
-      event.target instanceof Element &&
-      event.target.closest(
-        'button, input, select, textarea, summary, [role="button"], [role="checkbox"], [role="radio"], [role="switch"]',
-      )
-    )
-      return true;
-    if (document.querySelector(".MuiModal-root:not(.MuiModal-hidden)"))
-      return true;
-    if (document.querySelector('[data-data-center-guide="true"]')) return true;
-    if (document.querySelector('[data-scenario-choice="true"]')) return true;
-    if (document.querySelector('[data-manual-help="true"]')) return true;
-    if (
-      event.target instanceof Element &&
-      event.target.closest('[data-program-decision="true"]')
-    )
-      return true;
-    if (event.key === "Escape") {
-      return false;
-    }
-    const target = event.target as HTMLElement | null;
-    const tagName = target?.tagName?.toLowerCase();
-    if (!tagName) {
-      return false;
-    }
-    if (
-      tagName === "input" &&
-      NON_TEXT_INPUT_TYPES.has((target as HTMLInputElement).type)
-    ) {
-      return false;
-    }
-    return (
-      tagName === "input" ||
-      tagName === "select" ||
-      tagName === "textarea" ||
-      !!target?.isContentEditable
-    );
-  },
-});
-
 // Keep in sync with SHORTCUTS in base/KeyboardShortcuts, which is what the Manual and Settings
 // both list -- exported so a test can hold the two against each other rather than a comment
-// asking politely. react-hotkeys ignores key events from inputs, so `?` still types into a
-// text field
+// asking politely. Text fields keep their character input, including `?`.
 export const keyMap = {
   PAUSED: ["`", "space", "0"],
   SLOW: "1",
@@ -275,8 +211,7 @@ function canBuild(): boolean {
 
 const shortcutHandlers = {
   // Space is one of this handler's own keys, and the browser's default action for it is to
-  // scroll the page -- which fires alongside the pause because react-hotkeys doesn't call
-  // preventDefault for you. Only this binding needs it: the other two (`` ` `` and `0`) have no
+  // scroll the page. Only this binding needs preventDefault: the other two (`` ` `` and `0`) have no
   // native behaviour of their own
   PAUSED: (e?: KeyboardEvent) => {
     e?.preventDefault();
@@ -385,6 +320,7 @@ export function isGameCard(name: CardNameType) {
 }
 
 export default class Compositor extends React.Component<Props, {}> {
+  private removeShortcuts?: () => void;
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
   private snackbarContentRef = React.createRef<HTMLDivElement>();
   private dialogCancelRef = React.createRef<HTMLButtonElement>();
@@ -415,6 +351,7 @@ export default class Compositor extends React.Component<Props, {}> {
   };
 
   public componentDidMount() {
+    this.removeShortcuts = listenForShortcuts(keyMap, shortcutHandlers);
     window.addEventListener("resize", this.handleResize);
   }
 
@@ -440,6 +377,7 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public componentWillUnmount() {
+    this.removeShortcuts?.();
     window.removeEventListener("resize", this.handleResize);
     clearTimeout(this.resizeTimeout);
     clearTimeout(this.snackbarDismissTimeout);
@@ -619,7 +557,6 @@ export default class Compositor extends React.Component<Props, {}> {
         className={`app_container${singlePanel ? " single-panel" : ""}${menuLayout ? " menu-layout" : ""}`}
         data-tutorial-hide={hiddenUi?.length ? hiddenUi.join(" ") : undefined}
       >
-        <GlobalHotKeys keyMap={keyMap} handlers={shortcutHandlers} />
         <TransitionGroup
           className="cardTransitions"
           childFactory={(child) =>
@@ -745,7 +682,7 @@ export default class Compositor extends React.Component<Props, {}> {
             )}
             {ui.dialog.action && (
               <Button
-                color={ui.dialog.destructive ? "error" : "primary"}
+                color="primary"
                 variant="contained"
                 onClick={ui.dialog.action}
               >

@@ -154,7 +154,7 @@ interface AxisOptions {
 export function niceSplits(min: number, max: number, target = 4): number[] {
   const raw = (max - min) / target;
   if (!(raw > 0)) {
-    return [min];
+    return [min === 0 ? 0 : min];
   }
   const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
   const normalized = raw / magnitude;
@@ -163,7 +163,7 @@ export function niceSplits(min: number, max: number, target = 4): number[] {
     magnitude;
   const splits = [];
   for (let v = Math.ceil(min / step) * step; v <= max; v += step) {
-    splits.push(v);
+    splits.push(v === 0 ? 0 : v);
   }
   return splits;
 }

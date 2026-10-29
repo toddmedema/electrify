@@ -1,5 +1,6 @@
 import { DifficultyType, GameType, ScenarioChoiceType } from "../Types";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
+import { bulkWinterizationQuote } from "./Hazards";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
 import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
@@ -106,7 +107,7 @@ export function pendingScenarioRuleChoice(
 ): CompiledRuleChoice | undefined {
   const { choices, rules } = scenarioChoicesForGame(game);
   if (game.storyEffectsDisabled) return undefined;
-  return choices.find(
+  const choice = choices.find(
     (choice) =>
       !!choice.automatic === automatic &&
       game.date.monthsElapsed >= choice.dueMonth &&
@@ -118,6 +119,47 @@ export function pendingScenarioRuleChoice(
             rules,
             game.worldEvents.occurrences,
           ))),
+  );
+  if (!choice || !isBulkWinterizationChoice(choice)) return choice;
+  const quote = bulkWinterizationQuote(game);
+  const count = quote.facilities.length;
+  return {
+    ...choice,
+    prompt: count
+      ? `${count} unprotected ${count === 1 ? "plant remains" : "plants remain"}. Retrofit them now, or manage upgrades individually. Already protected plants and work in progress are excluded.`
+      : "Every eligible plant is already winterized or being upgraded. New construction needs its own cold-weather package.",
+    options: [...choice.options]
+      .sort((a, b) =>
+        a.id === "winterize" ? -1 : b.id === "winterize" ? 1 : 0,
+      )
+      .map((option) =>
+        option.id === "winterize"
+          ? {
+              ...option,
+              cost: quote.cost,
+              label: count ? "Retrofit remaining plants" : "Already prepared",
+              description: count
+                ? "Permanent winterization halves each plant’s freeze output loss. Staged installation keeps 90% of capacity available for one month. Future builds are not included."
+                : "No work or payment needed. Existing protection stays with each plant.",
+              message: count
+                ? `Winterization started on ${count} ${count === 1 ? "plant" : "plants"}. Installation takes a month with 90% of capacity available.`
+                : "Existing winterization retained; no additional work needed.",
+              ...(count ? {} : { meaningful: false as const }),
+            }
+          : {
+              ...option,
+              description:
+                "Keep cash and arrange individual upgrades or more capacity. Existing winterization still protects its plants.",
+            },
+      ),
+  };
+}
+
+/** Trusted detached source, including imported official arcs. */
+export function isBulkWinterizationChoice(choice: CompiledRuleChoice): boolean {
+  return (
+    choice.source?.scenarioId === 107 &&
+    choice.source.choiceId === "winterization"
   );
 }
 

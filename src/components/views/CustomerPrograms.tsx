@@ -12,7 +12,6 @@ import {
   Button,
   Dialog,
   LinearProgress,
-  Skeleton,
   TextField,
   Typography,
 } from "@mui/material";
@@ -51,11 +50,6 @@ import {
 import { electricVehicleEligibility } from "../../data/ElectricVehicles";
 import { customerBatteryFleet } from "../../helpers/CustomerBatteries";
 import { GENERATORS } from "../../data/Facilities";
-import {
-  deriveExpandedSummary,
-  MINUTES_PER_MONTH,
-  summarizeTimeline,
-} from "../../helpers/DateTime";
 import {
   BuildoutPolicyId,
   buildoutComplete,
@@ -99,10 +93,6 @@ import {
   policyWindowLabel,
   suggestedPolicyStartHour,
 } from "../../helpers/PolicyWindow";
-// The estimate's closing note wraps to two lines at dialog width. Reserving both whether or not
-// it appears keeps the dialog from changing height when an estimate arrives.
-const NOTE_SLOT = { minHeight: "2lh" };
-
 const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
   efficiency: EnergySavingsLeafIcon,
   solar: SolarPowerIcon,
@@ -222,14 +212,14 @@ function FlexibilitySummary({
       : undefined;
   const facts: ProgramFact[] = [
     {
-      label: "Installation budget",
+      label: "Installation cost",
       value: `${formatMoneyConcise(buildoutComplete(program.adoption) ? 0 : flexibilityCapitalCost(game, id, month) / flexibilityMonths(id))}/mo`,
-      detail: `${flexibilityMonths(id)} months of funding`,
+      detail: `${flexibilityMonths(id)} months to full rollout`,
     },
     {
       label: "Participation payments",
       value: `${formatMoneyConcise(flexibilityMonthlyCost(game, id, game.date.monthsElapsed))}/mo`,
-      detail: `${formatMoneyConcise(flexibilityMonthlyCost(fullRollout, id, month))}/mo at full rollout · while on`,
+      detail: `${formatMoneyConcise(flexibilityMonthlyCost(fullRollout, id, month))}/mo at full rollout while on`,
     },
   ];
   const equipment: ProgramFact[] = [
@@ -318,14 +308,6 @@ function BuildoutSummary({
       cost: `${formatMoneyConcise(facility.buildCost)} upfront + ${formatMoneyConcise(facility.annualOperatingCost / 12)}/mo`,
     };
   }, [snapshot, id]);
-  const profit = deriveExpandedSummary(
-    summarizeTimeline(
-      game.timeline,
-      game.startingYear,
-      (tick) =>
-        Math.floor(tick.minute / MINUTES_PER_MONTH) === game.date.monthsElapsed,
-    ),
-  ).profit;
   const impact = solar?.impact ?? buildoutImpact(game, id);
   const months = buildoutMonths(id);
   const complete = buildoutComplete(program.adoption);
@@ -350,11 +332,10 @@ function BuildoutSummary({
       ]
     : [
         {
-          label: "Monthly budget",
+          label: "Monthly cost",
           value: `${formatMoneyConcise(policyBudget(game, id, "On", effective))}/mo`,
-          detail: `Current profit: ${formatMoneyConcise(profit)}/mo`,
         },
-        { label: "Total budget", value: formatMoneyConcise(total) },
+        { label: "Total cost", value: formatMoneyConcise(total) },
         {
           label: "Duration",
           value: `${months} months`,
@@ -572,7 +553,6 @@ function PolicyProgramDetail({
   buildout,
   complete,
   cancelling,
-  operating,
   effective,
   end,
   month,
@@ -588,7 +568,6 @@ function PolicyProgramDetail({
   buildout: BuildoutPolicyId | undefined;
   complete: boolean;
   cancelling: boolean;
-  operating: boolean;
   effective: number;
   end: number;
   month: number;
@@ -598,8 +577,6 @@ function PolicyProgramDetail({
   result: PolicyPreviewResult | undefined;
   error: string | undefined;
 }) {
-  const peakBefore = result ? Math.max(...result.current) : 0;
-  const peakAfter = result ? Math.max(...result.changed) : 0;
   return (
     <>
       <Typography>
@@ -607,15 +584,6 @@ function PolicyProgramDetail({
           ? `Installed ${selected === "solar" ? "rooftop panels keep generating" : "upgrades keep saving energy"} with no further cost.`
           : POLICIES[selected].description}
       </Typography>
-      {!complete && (
-        <Typography
-          variant="body2"
-          className="customerProgramTradeoff"
-          color="text.secondary"
-        >
-          {POLICIES[selected].tradeoff}
-        </Typography>
-      )}
       {current.pending && (
         // A standing notice, not an interruption: it is already true when the card opens.
         <Alert severity="info" role="status">
@@ -659,7 +627,7 @@ function PolicyProgramDetail({
                 }}
                 helperText={
                   selected === "timeOfUse"
-                    ? `Use moves to ${policyWindowLabel((startHour + 4) % 24, 3)} afterward.`
+                    ? `Use shifts to ${policyWindowLabel((startHour + 4) % 24, 3).replace("–", "-")}`
                     : undefined
                 }
               >
@@ -684,67 +652,18 @@ function PolicyProgramDetail({
           </Typography>
           {error ? (
             <Alert severity="error">{error}</Alert>
-          ) : !result ? (
-            // Mirrors the loaded layout line for line so the dialog keeps its height
-            // when the estimate arrives instead of jumping under the player's pointer
-            <>
-              <Typography variant="body2">
-                Current plan ━ · With this change ┄
-              </Typography>
-              <PolicyDemandChartPlaceholder />
-              <Box aria-hidden>
-                {Array.from({ length: operating ? 1 : 2 }, (_, i) => (
-                  <Typography key={i}>
-                    <Skeleton width={i % 2 ? "60%" : "80%"} />
-                  </Typography>
-                ))}
-                <Typography variant="body2" sx={NOTE_SLOT}>
-                  &nbsp;
-                </Typography>
-              </Box>
-            </>
           ) : (
             <>
               <Typography variant="body2">
                 Current plan ━ · With this change ┄
               </Typography>
-              <PolicyDemandChart
-                current={result.current}
-                changed={result.changed}
-              />
-              <Box role="status">
-                <Typography>
-                  Peak demand: {formatWatts(peakBefore)} →{" "}
-                  {formatWatts(peakAfter)}
-                </Typography>
-                {!operating && (
-                  <Typography>
-                    Electricity supplied:{" "}
-                    {formatWattHours(result.before.supplyWh)} →{" "}
-                    {formatWattHours(result.after.supplyWh)}
-                  </Typography>
-                )}
-
-                {formatWatts(peakBefore) === formatWatts(peakAfter) ||
-                Math.abs(peakAfter - peakBefore) < peakBefore * 0.001 ? (
-                  <Typography variant="body2" sx={NOTE_SLOT}>
-                    Little change in peak demand.{" "}
-                    {operating
-                      ? "Only eligible loads respond. Try a different daily window to target your peak."
-                      : selected === "solar"
-                        ? "Daylight savings may leave the evening peak unchanged."
-                        : "Efficiency savings are largest for heating and cooling, so mild weather may leave the peak unchanged."}
-                  </Typography>
-                ) : (
-                  <Typography variant="body2" sx={NOTE_SLOT} aria-hidden>
-                    &nbsp;
-                  </Typography>
-                )}
-              </Box>
-              {result.after.cash < 0 && (
-                <Alert severity="warning">
-                  Projected cash is negative. Existing debt rules still apply.
-                </Alert>
+              {result ? (
+                <PolicyDemandChart
+                  current={result.current}
+                  changed={result.changed}
+                />
+              ) : (
+                <PolicyDemandChartPlaceholder />
               )}
             </>
           )}
@@ -994,7 +913,6 @@ export function ProgramsScreen({
               buildout={buildout}
               complete={complete}
               cancelling={cancelling}
-              operating={operating}
               effective={effective}
               end={end}
               month={month}

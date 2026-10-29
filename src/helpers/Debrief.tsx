@@ -9,7 +9,12 @@ import {
   ActiveWorldEventType,
   ConceptNameType,
 } from "../Types";
-import { formatWatts, formatWattHours, formatMoneyConcise } from "./Format";
+import {
+  formatWatts,
+  formatWattHours,
+  formatMoneyConcise,
+  formatFixed,
+} from "./Format";
 import { scenarioRules } from "./ScenarioRules";
 import { interpretScenarioRuleReport } from "./ScenarioRuleRuntime";
 import type { RuleReportMetric } from "./ScenarioRuleReports";
@@ -179,7 +184,7 @@ function reportMetricValue(metric: RuleReportMetric): string {
   if (typeof metric.value === "string") return metric.value;
   switch (metric.unit) {
     case "share":
-      return `${(metric.value * 100).toFixed(1)}%`;
+      return `${formatFixed(metric.value * 100, 1)}%`;
     case "Wh":
       return formatWattHours(metric.value);
     case "W":
@@ -187,7 +192,7 @@ function reportMetricValue(metric: RuleReportMetric): string {
     case "dollars":
       return formatMoneyConcise(metric.value);
     case "hours":
-      return `${metric.value.toFixed(1)} hours`;
+      return `${formatFixed(metric.value, 1)} hours`;
     default:
       return String(metric.value);
   }

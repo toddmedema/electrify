@@ -180,6 +180,41 @@ export default function EventLog(props: Props): React.JSX.Element {
         tabIndex={-1}
         aria-label="Announced events and event history evidence"
       >
+        {ongoing.length > 0 && (
+          <section
+            className="eventLogSection ongoingEvents"
+            aria-labelledby="ongoingEventsTitle"
+          >
+            <header className="eventLogSectionHeader">
+              <Typography id="ongoingEventsTitle" variant="subtitle2">
+                Ongoing events
+              </Typography>
+            </header>
+            {props.game?.multiplayer && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 1, overflowWrap: "anywhere" }}
+              >
+                Events for {companyName}.
+              </Typography>
+            )}
+            <ul className="eventLogList">
+              {ongoing.map((event) => (
+                <StoryEventCard
+                  className="ongoing"
+                  event={event}
+                  key={event.key}
+                  onActivate={
+                    event.actionTarget
+                      ? () => onSelect(event.actionTarget)
+                      : undefined
+                  }
+                />
+              ))}
+            </ul>
+          </section>
+        )}
         {operations && props.game && props.onEvidence && (
           <OperationsPriorities
             key={`${props.game.scenarioId}:${props.game.seed}:${props.game.startingYear}`}
@@ -193,41 +228,6 @@ export default function EventLog(props: Props): React.JSX.Element {
           ref={historyAnchor}
           tabIndex={operations ? -1 : undefined}
         >
-          {ongoing.length > 0 && (
-            <section
-              className="eventLogSection ongoingEvents"
-              aria-labelledby="ongoingEventsTitle"
-            >
-              <header className="eventLogSectionHeader">
-                <Typography id="ongoingEventsTitle" variant="subtitle2">
-                  Ongoing events
-                </Typography>
-              </header>
-              {props.game?.multiplayer && (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 1, overflowWrap: "anywhere" }}
-                >
-                  Events for {companyName}.
-                </Typography>
-              )}
-              <ul className="eventLogList">
-                {ongoing.map((event) => (
-                  <StoryEventCard
-                    className="ongoing"
-                    event={event}
-                    key={event.key}
-                    onActivate={
-                      event.actionTarget
-                        ? () => onSelect(event.actionTarget)
-                        : undefined
-                    }
-                  />
-                ))}
-              </ul>
-            </section>
-          )}
           {!operations && upcoming.length > 0 && (
             <section
               className="eventLogSection upcomingEvents"

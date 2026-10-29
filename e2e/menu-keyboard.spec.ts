@@ -60,33 +60,78 @@ test("Space toggles Sound", async ({ page }) => {
   await expect(sound).not.toBeChecked();
 });
 
-test("a background arrow during Settings exit preserves volume and restores focus", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await page.clock.install();
-  await page.reload();
-  const settings = page.getByRole("button", { name: "Settings", exact: true });
-  await settings.click();
-  await page.getByRole("switch", { name: "Sound", exact: true }).check();
-  const effects = page.getByRole("slider", {
-    name: "Effects volume",
-    exact: true,
+for (const { pointerTarget, deferPlayFocus } of [
+  { pointerTarget: null, deferPlayFocus: false },
+  { pointerTarget: "Settings", deferPlayFocus: false },
+  { pointerTarget: "Manual", deferPlayFocus: false },
+  { pointerTarget: null, deferPlayFocus: true },
+] as const) {
+  test(`a background arrow during Settings exit preserves volume and restores focus${pointerTarget ? ` with the pointer over ${pointerTarget}` : ""}${deferPlayFocus ? " with deferred Play focus" : ""}`, async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.clock.install();
+    await page.reload();
+    const settings = page.getByRole("button", {
+      name: "Settings",
+      exact: true,
+    });
+    const menuBounds = pointerTarget
+      ? await page
+          .getByRole("button", { name: pointerTarget, exact: true })
+          .boundingBox()
+      : null;
+    if (pointerTarget) expect(menuBounds).not.toBeNull();
+    await settings.click();
+    await page.getByRole("switch", { name: "Sound", exact: true }).check();
+    const effects = page.getByRole("slider", {
+      name: "Effects volume",
+      exact: true,
+    });
+    await effects.focus();
+    await effects.press("Home");
+    await expect(effects).toHaveAttribute("aria-valuenow", "0");
+    if (deferPlayFocus) {
+      await page.evaluate(() => {
+        // Native startup updates can prevent the entering menu's initial focus from settling.
+        // Keep that state until the real background arrow, then allow normal return focus.
+        const defer = (event: FocusEvent) => {
+          const target = event.target;
+          if (
+            target instanceof HTMLElement &&
+            target.matches("[data-main-action]")
+          )
+            target.blur();
+        };
+        const release = (event: KeyboardEvent) => {
+          if (event.key !== "ArrowUp") return;
+          document.removeEventListener("focusin", defer, true);
+          document.removeEventListener("keydown", release, true);
+        };
+        document.addEventListener("focusin", defer, true);
+        document.addEventListener("keydown", release, true);
+      });
+    }
+    // Returning may reveal a menu control beneath a stationary pointer. Hover can
+    // select it before the delayed Settings focus restoration.
+    if (pointerTarget) {
+      await page.mouse.move(
+        menuBounds!.x + menuBounds!.width / 2,
+        menuBounds!.y + menuBounds!.height / 2,
+      );
+    }
+    await exitSettingsWithBodyArrow(page);
+    await page.clock.runFor(1000);
+    await expect(settings).toBeFocused();
+    expect(
+      await page.evaluate(() => localStorage.getItem("soundEffectsVolume")),
+    ).toBe("0");
+    await page.clock.resume();
+    await page.reload();
+    await settings.click();
+    await expect(effects).toHaveAttribute("aria-valuenow", "0");
   });
-  await effects.focus();
-  await effects.press("Home");
-  await expect(effects).toHaveAttribute("aria-valuenow", "0");
-  await exitSettingsWithBodyArrow(page);
-  await page.clock.runFor(1000);
-  await expect(settings).toBeFocused();
-  expect(
-    await page.evaluate(() => localStorage.getItem("soundEffectsVolume")),
-  ).toBe("0");
-  await page.clock.resume();
-  await page.reload();
-  await settings.click();
-  await expect(effects).toHaveAttribute("aria-valuenow", "0");
-});
+}
 
 test("Space activates game navigation while body Space pauses", async ({
   page,
@@ -112,6 +157,42 @@ test("Space activates game navigation while body Space pauses", async ({
   await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
   await expect(page.locator("body")).toBeFocused();
   await page.keyboard.press("Space");
+  await expect(paused).toHaveAttribute("aria-pressed", "true");
+});
+
+test("global shortcuts keep shifted fleet actions and manual typing separate", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=111");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect(page.locator(".facilities:visible")).toBeVisible();
+  await page.keyboard.press("0");
+  const paused = page
+    .getByRole("group", { name: "game speed", exact: true })
+    .getByRole("button", { name: "pause", exact: true });
+  await expect(paused).toHaveAttribute("aria-pressed", "true");
+  const first = page.locator(".facilityRow").first();
+  const name = await first.getAttribute("data-facility");
+  expect(name).toBeTruthy();
+  await page.keyboard.press("Shift+1");
+  await expect(page.getByText(`Paused ${name}`, { exact: true })).toBeVisible();
+  await expect(paused).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Shift+1");
+  await expect(
+    page.getByText(`Resumed ${name}`, { exact: true }),
+  ).toBeVisible();
+
+  await page.keyboard.press("Shift+/");
+  const search = page.getByRole("textbox", {
+    name: "Search the manual",
+    exact: true,
+  });
+  await expect(search).toBeVisible();
+  await search.pressSequentially("q?123");
+  await expect(search).toHaveValue("q?123");
+  await search.press("Escape");
+  await expect(search).toHaveCount(0);
+  await expect(page.locator(".facilities:visible")).toBeVisible();
   await expect(paused).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -151,7 +232,7 @@ test("selection is visible in both themes without horizontal overflow", async ({
     });
 });
 
-test("touch hides button focus rings while text inputs and keyboard navigation keep theirs", async ({
+test("touch hides button focus rings while inputs and keyboard navigation retain focus indicators", async ({
   page,
 }, info) => {
   test.skip(!info.project.use.hasTouch, "Requires actual touch input");
@@ -180,6 +261,9 @@ test("touch hides button focus rings while text inputs and keyboard navigation k
   });
   await search.tap();
   await expect(search).toBeFocused();
-  await expect(search).toHaveCSS("outline-style", "solid");
-  await expect(search).toHaveCSS("outline-width", "2px");
+  await expect(search).toHaveCSS("outline-style", "none");
+  await expect(search.locator("..").locator("fieldset")).toHaveCSS(
+    "border-width",
+    "2px",
+  );
 });

@@ -273,13 +273,12 @@ test("a fresh offline install launches fullscreen with every bundled file and a 
     ]),
   );
 
-  // Compare every shipping URL with its production build or validated target
-  // runtime expectation. The shared renderer may have been built on another OS.
+  // Compare every shipping URL with its production build.
   // This catches missing or changed assets even when a short game does not use them.
   const build = path.join(workspace, "build");
   const files = await walk(build);
   expect(files.length).toBeGreaterThan(200);
-  const sharedAssets = await Promise.all(
+  const assets = await Promise.all(
     files.map(async (file) => {
       const bytes = await fs.readFile(file);
       expect(bytes.subarray(0, 64).toString("utf8"), file).not.toMatch(
@@ -292,22 +291,6 @@ test("a fresh offline install launches fullscreen with every bundled file and a 
       };
     }),
   );
-  const assets: typeof sharedAssets = await app.evaluate(({ app }, shared) => {
-    const nativeRequire = process
-      .getBuiltinModule("module")
-      .createRequire(`${app.getAppPath()}/package.json`);
-    const { effectiveAssetManifest } = nativeRequire(
-      `${app.getAppPath()}/electron/runtime-notices.cjs`,
-    );
-    return effectiveAssetManifest(
-      shared,
-      process
-        .getBuiltinModule("path")
-        .join(process.resourcesPath, "runtime-notices"),
-      process.versions.electron,
-    );
-  }, sharedAssets);
-  expect(assets).toHaveLength(sharedAssets.length);
   const failures: string[] = [];
   for (let index = 0; index < assets.length; index += 12) {
     const results = await page.evaluate(

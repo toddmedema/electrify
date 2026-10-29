@@ -56,6 +56,7 @@ const FACILITIES: Record<ModFacilityNameType, true> = {
   Geothermal: true,
   "Enhanced Geothermal": true,
   Battery: true,
+  "Iron-Air Battery": true,
   "Pumped Hydro": true,
 };
 // Mod programs are exactly the build-out programs whose cost a mod can scale.

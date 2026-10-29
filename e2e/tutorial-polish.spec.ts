@@ -1,4 +1,6 @@
 import { expect, test } from "./fixtures";
+import { sortBuildCatalog } from "./layout";
+import { reviewScreenshot } from "./review-screenshot";
 
 for (const theme of ["light", "dark"]) {
   test(`tutorial explanation uses the available width in ${theme}`, async ({
@@ -50,6 +52,12 @@ for (const theme of ["light", "dark"]) {
       .getByRole("button", { name: "Start Generators", exact: true })
       .click();
     await page.locator(".button-buildFacility").click();
+    await expect(page.locator(".tutorialHud")).toContainText("Sort generators");
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`sort-${theme}.png`),
+      animations: "disabled",
+    });
+    await sortBuildCatalog(page);
     await expect(page.locator(".tutorialHud")).toContainText("Compare cost");
     await expect(
       page.getByRole("tablist", { name: "Build categories" }),
@@ -75,7 +83,7 @@ for (const theme of ["light", "dark"]) {
     await page
       .getByRole("button", { name: "Show Natural Gas Peaker details" })
       .click();
-    const details = page.locator(".generatorDetails");
+    const details = page.locator(".buildDetails");
     await expect(details).toBeVisible();
     const rows = details.getByRole("row");
     for (const row of await rows.all()) {

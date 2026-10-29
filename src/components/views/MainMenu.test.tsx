@@ -157,11 +157,26 @@ describe("MainMenu", () => {
       screen.getByRole("button", { name: "Saved games" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Play" })).toHaveClass(
-      "MuiButton-contained",
+      "MuiButton-text",
     );
     expect(
       screen.queryByRole("button", { name: "Continue" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("moves the active button to a hovered control and continues keyboard navigation from there", async () => {
+    // jsdom reports no layout, so give the menu's controls a rect for useMenuKeys to see.
+    const clientRects = jest
+      .spyOn(HTMLElement.prototype, "getClientRects")
+      .mockReturnValue([{}] as unknown as DOMRectList);
+    const user = userEvent.setup();
+    render(<MainMenu {...props()} />);
+    expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+    await user.hover(screen.getByRole("button", { name: "Manual" }));
+    expect(screen.getByRole("button", { name: "Manual" })).toHaveFocus();
+    await user.keyboard("{ArrowUp}");
+    expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+    clientRects.mockRestore();
   });
 
   it("links to Discord first in the footer", () => {
@@ -170,7 +185,11 @@ describe("MainMenu", () => {
     const discord = screen.getByRole("link", {
       name: "Join the Electrify Discord",
     });
-    expect(discord).toHaveAttribute("href", "https://discord.gg/Chrjk36DC");
+    expect(discord).toHaveAttribute("href", "https://discord.gg/ethMFvvmup");
+    expect(screen.getByRole("link", { name: "Send feedback" })).toHaveAttribute(
+      "href",
+      "https://forms.gle/nSpkVzcFcXMQMMgb9",
+    );
     expect(
       screen.getAllByRole("link", {
         name: /Discord|feedback|About|Privacy/,

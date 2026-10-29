@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { readSavedGame } from "./save-fixture";
 
 for (const scenario of [106, 107]) {
   for (const theme of ["light", "dark"]) {
@@ -56,21 +57,29 @@ for (const scenario of [106, 107]) {
         await expect(dialog).toContainText("2026");
         await expect(dialog).toContainText("2028");
       } else {
-        await expect(dialog).toContainText("Fund winterization ($90M)");
-        await expect(dialog).toContainText(/gas.price/i);
+        await expect(
+          dialog.getByRole("button", {
+            name: /^Retrofit remaining plants \(\$/,
+          }),
+        ).toBeVisible();
+        await expect(dialog).toContainText("90% of capacity available");
+        await expect(dialog).toContainText(
+          "Already protected plants and work in progress are excluded.",
+        );
       }
       await expect(dialog).toContainText(
         scenario === 106 ? "Forgo funding" : "Keep construction budget",
       );
-      const paused = await page.locator("#appbar:visible").first().innerText();
+      const dateDisplay = page
+        .locator("#appbar:visible .gameStatus .weak.gameStatusValue")
+        .first();
+      const paused = await dateDisplay.innerText();
       await page.keyboard.press("Escape");
       await page.keyboard.press("3");
       await page.mouse.click(1, 1);
       await page.waitForTimeout(400);
       await expect(dialog).toBeVisible();
-      expect(await page.locator("#appbar:visible").first().innerText()).toBe(
-        paused,
-      );
+      expect(await dateDisplay.innerText()).toBe(paused);
       await page.keyboard.press("Tab");
       expect(
         await dialog.evaluate((el) => el.contains(document.activeElement)),
@@ -94,15 +103,33 @@ for (const scenario of [106, 107]) {
       await chosen.focus();
       await page.keyboard.press("Enter");
       await expect(dialog).not.toBeVisible();
-      // Leaving the page flushes the accepted response through the real autosave path.
+      // Await the real asynchronous save flush and verify the accepted receipt before leaving.
+      const decisionKey =
+        scenario === 106
+          ? "story:106:data-center-boom:connection"
+          : "story:107:texas-deep-freeze:winterization";
+      const optionId =
+        scenario === 106
+          ? theme === "light"
+            ? "fast-track"
+            : "phased"
+          : theme === "light"
+            ? "winterize"
+            : "standard";
+      await expect
+        .poll(
+          async () =>
+            (await readSavedGame(page))?.worldEvents.occurrences.find(
+              (event) => event.key === decisionKey,
+            )?.attributes.choice,
+        )
+        .toBe(optionId);
       await page.goto("/");
       await page.getByRole("button", { name: "Continue", exact: true }).click();
       await expect(page.locator("#appbar:visible").first()).toBeVisible();
       await expect(dialog).not.toBeVisible();
       await fast.click();
-      await expect
-        .poll(async () => page.locator("#appbar:visible").first().innerText())
-        .not.toBe(paused);
+      await expect.poll(async () => dateDisplay.innerText()).not.toBe(paused);
       await expect(dialog).not.toBeVisible();
     });
   }

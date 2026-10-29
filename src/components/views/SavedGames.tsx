@@ -161,6 +161,7 @@ export default function SavedGames(): React.JSX.Element {
             <TextField
               fullWidth
               size="small"
+              className="saveSearch"
               label="Search saves"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -249,7 +250,7 @@ export default function SavedGames(): React.JSX.Element {
                     Export current game
                   </Button>
                   <Button
-                    color="error"
+                    color="primary"
                     onClick={() => {
                       setError("");
                       setDeleting({
@@ -315,10 +316,8 @@ export default function SavedGames(): React.JSX.Element {
               >
                 <Box
                   sx={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) auto",
-                    alignItems: "start",
-                    columnGap: 1,
+                    position: "relative",
+                    pr: 5,
                   }}
                 >
                   <Box sx={{ minWidth: 0 }}>
@@ -331,6 +330,8 @@ export default function SavedGames(): React.JSX.Element {
                     </Typography>
                   </Box>
                   <IconButton
+                    edge="end"
+                    sx={{ position: "absolute", top: -8, right: 0 }}
                     aria-label={`Actions for ${title}`}
                     aria-haspopup="menu"
                     aria-expanded={menu?.save.id === save.id ? true : undefined}
@@ -458,7 +459,6 @@ export default function SavedGames(): React.JSX.Element {
             </MenuItem>
           )}
         <MenuItem
-          sx={{ color: "error.main" }}
           onClick={() => {
             setError("");
             setDeleting(menu?.save);
@@ -509,7 +509,7 @@ export default function SavedGames(): React.JSX.Element {
             Cancel
           </Button>
           <Button
-            color="error"
+            color="primary"
             variant="contained"
             disabled={busy}
             onClick={() => {

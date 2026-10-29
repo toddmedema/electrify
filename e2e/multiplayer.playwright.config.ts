@@ -35,6 +35,9 @@ export default defineConfig({
   workers: 1,
   timeout: 120000,
   expect: { timeout: 20000 },
+  // A diagnostic retry records a full trace, but a failed first attempt still fails the gate.
+  retries: process.env.CI ? 1 : 0,
+  failOnFlakyTests: true,
   reporter: [
     ["list"],
     [
@@ -50,7 +53,8 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${port}`,
     headless: true,
     viewport: { width: 1280, height: 900 },
-    trace: "retain-on-failure",
+    trace: process.env.CI ? "on-first-retry" : "retain-on-failure",
+    screenshot: "only-on-failure",
   },
   webServer: {
     command: productionRoot ? "node scripts/ci/serve.js" : "npm start",

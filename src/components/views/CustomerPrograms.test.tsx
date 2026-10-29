@@ -11,7 +11,7 @@ import { previewPolicy } from "../../helpers/PolicyPreview";
 import { ProgramsScreen } from "./CustomerPrograms";
 import { PolicyId } from "../../Types";
 import { GENERATORS } from "../../data/Facilities";
-import { POLICIES } from "../../data/Policies";
+import { POLICIES, POLICY_IDS } from "../../data/Policies";
 import { formatMoneyConcise } from "../../helpers/Format";
 import { emptyPolicies, programCustomers } from "../../helpers/Policies";
 import { suggestedPolicyStartHour } from "../../helpers/PolicyWindow";
@@ -225,8 +225,8 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   jest.useRealTimers();
 });
 
-test.each<PolicyId>(["solar", "efficiency"])(
-  "%s keeps energy tradeoffs visible when peak demand is unchanged",
+test.each<PolicyId>(POLICY_IDS)(
+  "%s details end with the demand comparison",
   (id) => {
     jest.useFakeTimers();
     const worker = {
@@ -243,6 +243,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
       current: [47000000, 40000000],
       changed: [47000000, 30000000],
     };
+    result.after.cash = -1;
     const store = configureStore({
       reducer: { game: gameReducer, ui: uiReducer },
       preloadedState: { game },
@@ -254,7 +255,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
     );
     fireEvent.click(
       screen.getByRole("button", {
-        name: `${POLICIES[id].name} · Not started`,
+        name: new RegExp(`^${POLICIES[id].name} ·`),
       }),
     );
     act(() => jest.advanceTimersByTime(250));
@@ -264,17 +265,15 @@ test.each<PolicyId>(["solar", "efficiency"])(
       screen.queryByRole("button", { name: "View demand" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("How it works")).not.toBeInTheDocument();
-    expect(fact("Monthly budget")).toMatch(/\/moCurrent profit: .*\/mo/);
-    expect(screen.queryByText(/^Facility comparable/) !== null).toBe(
-      id === "solar",
-    );
-    expect(screen.getByText(/^Electricity supplied:/)).toBeVisible();
-    const hint = screen.getByText(/^Little change in peak demand/);
-    expect(hint).toBeVisible();
-    expect(hint).toHaveTextContent(
-      id === "solar"
-        ? "Little change in peak demand. Daylight savings may leave the evening peak unchanged."
-        : "Little change in peak demand. Efficiency savings are largest for heating and cooling, so mild weather may leave the peak unchanged.",
+    expect(
+      screen.getByRole("img", { name: /^Estimated demand:/ }),
+    ).toBeVisible();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(fact("Monthly cost")).toEqual(
+      id === "solar" || id === "efficiency"
+        ? expect.stringMatching(/^\$[\d.]+[kKMB]?\/mo$/)
+        : undefined,
     );
 
     view.unmount();
@@ -611,9 +610,7 @@ test("solar facts compare a same-size facility and distinguish annual energy fro
   expect(fact("Duration")).toBe("48 monthsFinishes Jan 2024");
   expect(fact("If started now")).toBeUndefined();
   expect(fact("While active")).toBeUndefined();
-  expect(fact("Monthly budget")).toMatch(
-    /\$[\d.]+[kKMB]?\/moCurrent profit: \$[\d.]+[kKMB]?\/mo/,
-  );
+  expect(fact("Monthly cost")).toMatch(/^\$[\d.]+[kKMB]?\/mo$/);
   fireEvent.click(screen.getByText("Compare utility solar"));
   const impact = fact("At completion")!;
   const comparable = screen

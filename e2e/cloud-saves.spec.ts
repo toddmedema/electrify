@@ -281,7 +281,7 @@ for (const theme of ["light", "dark"]) {
     ]);
     await expect(
       primary.getByRole("button", { name: "Saved games", exact: true }),
-    ).toHaveClass(/MuiButton-outlined/);
+    ).toHaveClass(/MuiButton-text/);
     if (theme === "light" && info.project.name === "desktop-chromium") {
       await screenshot(page, info, "main-menu-desktop-light.png");
     }

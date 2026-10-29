@@ -140,6 +140,8 @@ const expectStartHidden = () =>
   ).not.toBeInTheDocument();
 
 it("waits for an explicit location and a prepared grid, then starts paired scenarios with the same seed", async () => {
+  // The start year defaults to the current year; pin the clock so the test cannot age out.
+  jest.setSystemTime(new Date(2026, 5, 1));
   const onStart = jest.fn();
   await renderSetup(onStart);
   expectStartHidden();
@@ -155,7 +157,7 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
     screen.getByRole("combobox", { name: "Data centers open" }),
   ).toBeVisible();
   expectStartHidden();
-  expect(request.startingYear).toBe(new Date().getFullYear());
+  expect(request.startingYear).toBe(2026);
   const growth = preparedScenario();
   reply(growth);
   expect(startButton()).toBeEnabled();

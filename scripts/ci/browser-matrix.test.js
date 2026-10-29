@@ -37,8 +37,10 @@ test("production browser shards run the complete PR matrix exactly once", () => 
     ...list([
       "--config=e2e/playwright.config.ts",
       "build-options.spec.ts",
+      "contextual-learning.spec.ts",
       "escape-close.spec.ts",
       "game-workspace.spec.ts",
+      "mission-evidence.spec.ts",
       "tutorial-exit.spec.ts",
       "cloud-saves.spec.ts",
       "menu-keyboard.spec.ts",
@@ -47,6 +49,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "browser-environment.spec.ts",
       "loading-navigation.spec.ts",
       "facilities-production-chart.spec.ts",
+      "production-chart-motion.spec.ts",
       "intertie-order.spec.ts",
       "operations-priorities.spec.ts",
       ...projects,
@@ -54,6 +57,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
     ...list([
       "--config=e2e/playwright.config.ts",
       "multiline-text.spec.ts",
+      "learning-pages.spec.ts",
       "ui-chart-build-polish.spec.ts",
       "modal-layout.spec.ts",
       "sign-in.spec.ts",

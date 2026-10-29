@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expectDialogToFit } from "./dialog-layout";
 import { expect, Locator, test } from "./fixtures";
 import { openBuild } from "./layout";
@@ -118,7 +119,7 @@ for (const theme of ["light", "dark"] as const) {
           expect(box.height).toBeGreaterThanOrEqual(44);
         }
       }
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: info.outputPath(`build-header-${theme}.png`),
         animations: "disabled",
       });
@@ -182,7 +183,7 @@ for (const theme of ["light", "dark"] as const) {
             );
             expect(lines).toBeGreaterThan(1);
           }
-          await page.screenshot({
+          await reviewScreenshot(page, {
             path: info.outputPath(`solar-purchase-${theme}.png`),
             animations: "disabled",
           });
@@ -198,12 +199,14 @@ for (const theme of ["light", "dark"] as const) {
       page,
     }, info) => {
       const details = page.getByRole("button", { name: /^Show .* details$/ });
+      // The Build shell appears before its worker-backed quotes and disclosures.
+      await expect(details.first()).toBeVisible();
       while (await details.count()) await details.first().click();
       await expect(
         page.locator(".MuiCollapse-root:not(.MuiCollapse-entered)"),
       ).toHaveCount(0);
       await expectTextToFit(
-        page.locator(".generatorDetailLabel, .generatorDetailValue"),
+        page.locator(".buildDetailLabel, .buildDetailValue"),
       );
       const gas = page.locator(".buildOption").filter({
         has: page.getByRole("button", {
@@ -214,7 +217,7 @@ for (const theme of ["light", "dark"] as const) {
       await gas
         .getByRole("rowheader", { name: "Non-fuel start cost", exact: true })
         .scrollIntoViewIfNeeded();
-      await page.screenshot({
+      await reviewScreenshot(page, {
         path: info.outputPath(`generator-details-${theme}.png`),
         animations: "disabled",
       });

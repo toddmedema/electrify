@@ -309,3 +309,30 @@ test("player diagnostics cannot disclose a surprise through a real truncated-win
   expect(JSON.stringify(report.diagnostics)).toContain("Private turbine loss");
   expect(JSON.stringify(report)).toContain("0.371");
 });
+
+test("player facts clear zero signs without changing valid negative modifiers", () => {
+  const pack = prepared();
+  pack.scenario = {
+    ...pack.scenario,
+    startingFleet: [{ name: "Natural Gas Peaker", peakMW: 600, ageYears: 0 }],
+  };
+  pack.events = [
+    {
+      id: "cooling",
+      title: "Cooling",
+      message: "Temperatures fall slightly.",
+      startMonth: 1,
+      durationMonths: 1,
+      effects: { temperatureOffsetC: -0.001 },
+    },
+  ];
+  const scenario = modScenario(pack, undefined, "Employee");
+  scenario.facilities[0].initialAgeYears = -0;
+  const facts = modPlayerFacts(scenario);
+  const fleet = facts.sections.find((section) => section.id === "fleet")!;
+  expect(fleet.rows[0].details).toContain("Age at start: 0 years");
+  const author = buildModAuthorReport(pack);
+  const monthly = author.sections.find((section) => section.id === "monthly")!;
+  expect(monthly.rows[0].value).toContain("Temperature: -0.001 °C");
+  expect(Object.is(scenario.facilities[0].initialAgeYears, -0)).toBe(true);
+});

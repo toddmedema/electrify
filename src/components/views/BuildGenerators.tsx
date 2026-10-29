@@ -1,4 +1,4 @@
-import { GameToolCloseContext } from "../base/GameWorkspaceContext";
+import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
 import {
@@ -9,11 +9,6 @@ import {
   FormControlLabel,
   List,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableRow,
   Typography,
   useMediaQuery,
 } from "@mui/material";
@@ -34,7 +29,6 @@ import {
   FUELS,
   MONTH_NAMES,
   MONTHS,
-  TICKS_PER_YEAR,
   WEATHER_DEPENDENT_FUELS,
 } from "../../Constants";
 import { getHydroAvailability } from "../../data/HydroSites";
@@ -45,9 +39,10 @@ import {
   GeneratorShoppingType,
   FuelNameType,
   LocationType,
-  TickPresentFutureType,
 } from "../../Types";
-import { generateNewTimeline } from "../../reducers/Game";
+import { useOutlookWorker } from "../base/useOutlookWorker";
+import { signature } from "../base/DeferredProjection";
+import { sameBuildQuote, useBuildAffordability } from "../base/useBuildCash";
 import {
   resilienceBuildOptions,
   ResilienceBuildOptionType,
@@ -66,13 +61,13 @@ import {
   expectedMonthlyOutputShape,
   ExpectedOutputShape,
 } from "../../helpers/ExpectedOutput";
-import { MANUAL_ENTRY, ManualEntryTitleType } from "../base/ManualEntries";
+import { MANUAL_ENTRY } from "../base/ManualEntries";
 import {
   formatLargeMassValueConcise,
   formatMass,
   largeMassUnit,
 } from "../../helpers/Units";
-import ManualLink from "../base/ManualLink";
+import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
 import { useUnits } from "../base/UnitsContext";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
@@ -80,8 +75,9 @@ import {
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
-import PurchaseReviewDialog, {
-  financingShortfallText,
+import {
+  LivePurchaseReviewDialog as PurchaseReviewDialog,
+  BuildCashWarning,
 } from "../base/PurchaseReviewDialog";
 import {
   getBuildAvailability,
@@ -89,7 +85,7 @@ import {
   siteCountLabel,
 } from "../base/BuildAvailability";
 import HydroPrimer, { useHydroPrimer } from "../base/HydroPrimer";
-import { getScenario } from "../../data/Scenarios";
+import { getScenario, getTutorialStep } from "../../data/Scenarios";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import Sparkline from "../base/Sparkline";
@@ -181,26 +177,6 @@ function typicalCapacityFactor(
   return shape?.kind === "water-inflow" ? shape.mean : generator.capacityFactor;
 }
 
-function GeneratorDetailRow(props: {
-  label: string;
-  value: React.ReactNode;
-  entry: ManualEntryTitleType;
-}): React.JSX.Element {
-  return (
-    <TableRow>
-      <TableCell component="th" scope="row" className="generatorDetailLabel">
-        {props.label}
-      </TableCell>
-      <TableCell align="right" className="generatorDetailValue">
-        {props.value}
-      </TableCell>
-      <TableCell className="generatorDetailHelp">
-        <ManualLink entry={props.entry} label={props.label.toLowerCase()} />
-      </TableCell>
-    </TableRow>
-  );
-}
-
 interface GeneratorBuildItemProps {
   hydroAvailability?: ReturnType<typeof getHydroAvailability>;
   onUseSiteMaximum?: (peakW: number) => void;
@@ -258,6 +234,7 @@ export function GeneratorBuildItem(
     true,
     props.interestRate,
   );
+  const affordable = useBuildAffordability(cash, downpayment);
   const includedOptions = resilienceOptions.filter((option) => option.selected);
   const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
   const maxSizeW = floorToTwoSignificantDigits(generator.maxPeakW);
@@ -278,7 +255,9 @@ export function GeneratorBuildItem(
         props.location,
         generator.viableLocationsRemaining,
       );
-  const shortfall = financingShortfallText(cash, downpayment);
+  const shortfall = !affordable ? (
+    <BuildCashWarning cash={cash} downpayment={downpayment} />
+  ) : undefined;
   const canBuild = buildable && !shortfall;
   const buildSubtitle = (buildable && shortfall) || secondaryText;
   const hasVariableOM = generator.variableOperatingCostPerMWh !== undefined;
@@ -321,10 +300,11 @@ export function GeneratorBuildItem(
     hasOptions && props.withResilience
       ? props.withResilience(resilienceSelection)
       : generator;
-  const quoteCanBuild =
-    buildable &&
-    purchaseTerms(quote.buildCost, true, props.interestRate).downpayment <=
-      cash;
+  const quoteAffordable = useBuildAffordability(
+    cash,
+    purchaseTerms(quote.buildCost, true, props.interestRate).downpayment,
+  );
+  const quoteCanBuild = buildable && quoteAffordable;
   const resilienceOptionId = React.useId();
   // Each line under an option says what it buys; a warning line says what it costs the player
   const optionDetails = (
@@ -347,12 +327,15 @@ export function GeneratorBuildItem(
           STANDARD_GAS_DESIGN_MIN_TEMP_C;
         const lines: { text: string; warning?: boolean }[] = [
           {
-            text: coldPackageEffect(
-              props.withResilience({ [option.upgrade]: true }).resilience
-                ?.designMinTempC ?? standardMinTempC,
-              standardMinTempC,
-              units,
-            ),
+            text:
+              generator.fuel !== "Natural Gas"
+                ? "Permanently halves this plant’s output losses in the deep freeze."
+                : coldPackageEffect(
+                    props.withResilience({ [option.upgrade]: true }).resilience
+                      ?.designMinTempC ?? standardMinTempC,
+                    standardMinTempC,
+                    units,
+                  ),
           },
         ];
         if (option.defaultSelected) {
@@ -526,138 +509,119 @@ export function GeneratorBuildItem(
               </Stack>
             </Box>
           )}
-          <TableContainer>
-            <Table
-              size="small"
-              aria-label="generator properties"
-              className="generatorDetails"
-            >
-              <TableBody>
-                {props.secondaryMetric !== "lcWh" && (
-                  <GeneratorDetailRow
-                    label="Lifetime cost"
-                    value={
-                      formatMoneyConcise(generator.lcWh * 1000000) + "/MWh"
-                    }
-                    entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
-                  />
-                )}
-                <GeneratorDetailRow
-                  // Lifetime cost still assumes average water years; this is the year ahead
-                  label={
-                    waterShape
-                      ? "Capacity factor, this forecast"
-                      : "Expected capacity factor"
-                  }
-                  value={percent(capacityFactor)}
-                  entry={MANUAL_ENTRY.CAPACITY_FACTOR}
-                />
-                {generator.minimumStableOutput !== undefined && (
-                  <GeneratorDetailRow
-                    label="Minimum output"
-                    value={
-                      percent(generator.minimumStableOutput) +
-                      " · " +
-                      formatWatts(
-                        generator.peakW * generator.minimumStableOutput,
-                      )
-                    }
-                    entry={MANUAL_ENTRY.RAMP_RATE}
-                  />
-                )}
-                <GeneratorDetailRow
-                  label={hasVariableOM ? "Fixed O&M" : "Base O&M"}
+          <BuildDetails label="generator properties">
+            {props.secondaryMetric !== "lcWh" && (
+              <BuildDetailRow
+                label="Lifetime cost"
+                value={formatMoneyConcise(generator.lcWh * 1000000) + "/MWh"}
+                entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
+              />
+            )}
+            <BuildDetailRow
+              // Lifetime cost still assumes average water years; this is the year ahead
+              label={
+                waterShape
+                  ? "Capacity factor, this forecast"
+                  : "Expected capacity factor"
+              }
+              value={percent(capacityFactor)}
+              entry={MANUAL_ENTRY.CAPACITY_FACTOR}
+            />
+            {generator.minimumStableOutput !== undefined && (
+              <BuildDetailRow
+                label="Minimum output"
+                value={
+                  percent(generator.minimumStableOutput) +
+                  " · " +
+                  formatWatts(generator.peakW * generator.minimumStableOutput)
+                }
+                entry={MANUAL_ENTRY.RAMP_RATE}
+              />
+            )}
+            <BuildDetailRow
+              label={hasVariableOM ? "Fixed O&M" : "Base O&M"}
+              value={formatMoneyConcise(generator.annualOperatingCost) + "/yr"}
+              entry={MANUAL_ENTRY.OPERATING_COSTS}
+            />
+            {hasVariableOM && (
+              <>
+                <BuildDetailRow
+                  label="Variable O&M"
                   value={
-                    formatMoneyConcise(generator.annualOperatingCost) + "/yr"
+                    "$" +
+                    (generator.variableOperatingCostPerMWh || 0).toFixed(2) +
+                    "/MWh"
                   }
                   entry={MANUAL_ENTRY.OPERATING_COSTS}
                 />
-                {hasVariableOM && (
-                  <>
-                    <GeneratorDetailRow
-                      label="Variable O&M"
-                      value={
-                        "$" +
-                        (generator.variableOperatingCostPerMWh || 0).toFixed(
-                          2,
-                        ) +
-                        "/MWh"
-                      }
-                      entry={MANUAL_ENTRY.OPERATING_COSTS}
-                    />
-                    <GeneratorDetailRow
-                      label="Expected variable O&M"
-                      value={formatMoneyConcise(estimatedVariableOM) + "/yr"}
-                      entry={MANUAL_ENTRY.OPERATING_COSTS}
-                    />
-                  </>
-                )}
-                {generator.costPerStart !== undefined && (
-                  <GeneratorDetailRow
-                    label="Non-fuel start cost"
-                    value={
-                      formatMoneyConcise(generator.costPerStart) + "/start"
-                    }
-                    entry={MANUAL_ENTRY.OPERATING_COSTS}
-                  />
-                )}
-                {(hasVariableOM || generator.costPerStart !== undefined) && (
-                  <GeneratorDetailRow
-                    label="Estimated annual O&M"
-                    value={
-                      formatMoneyConcise(
-                        estimatedAnnualOperatingCost(generator),
-                      ) + "/yr"
-                    }
-                    entry={MANUAL_ENTRY.OPERATING_COSTS}
-                  />
-                )}
-                {fuelPrices[generator.fuel] && (
-                  <GeneratorDetailRow
-                    label="Fuel costs"
-                    value={
-                      formatMoneyConcise(
-                        generator.btuPerWh * (fuelPrices[generator.fuel] ?? 0),
-                      ) + "/MWh"
-                    }
-                    entry={MANUAL_ENTRY.FUEL_COSTS}
-                  />
-                )}
-                {generator.spinMinutes > 1 && (
-                  <GeneratorDetailRow
-                    label="Ramp up/down time"
-                    value={generator.spinMinutes + " min"}
-                    entry={MANUAL_ENTRY.RAMP_RATE}
-                  />
-                )}
-                <GeneratorDetailRow
-                  label="Accounting lifetime"
-                  value={generator.lifespanYears + " years"}
-                  entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
+                <BuildDetailRow
+                  label="Expected variable O&M"
+                  value={formatMoneyConcise(estimatedVariableOM) + "/yr"}
+                  entry={MANUAL_ENTRY.OPERATING_COSTS}
                 />
-                {sites && (
-                  <GeneratorDetailRow
-                    label="Sites left"
-                    value={`${sites.remaining} of ${sites.total}`}
-                    entry={MANUAL_ENTRY.PROJECT_SITES}
-                  />
-                )}
-                <GeneratorDetailRow
-                  label="Direct emissions"
-                  value={formatMass(kgCO2ePerMWh, units) + "/MWh"}
-                  entry={MANUAL_ENTRY.EMISSIONS}
-                />
-                <GeneratorDetailRow
-                  label="Construction emissions"
-                  value={`${formatLargeMassValueConcise(
-                    constructionKgco2eTotal,
-                    units,
-                  )} ${largeMassUnit(units)}`}
-                  entry={MANUAL_ENTRY.EMISSIONS}
-                />
-              </TableBody>
-            </Table>
-          </TableContainer>
+              </>
+            )}
+            {generator.costPerStart !== undefined && (
+              <BuildDetailRow
+                label="Non-fuel start cost"
+                value={formatMoneyConcise(generator.costPerStart) + "/start"}
+                entry={MANUAL_ENTRY.OPERATING_COSTS}
+              />
+            )}
+            {(hasVariableOM || generator.costPerStart !== undefined) && (
+              <BuildDetailRow
+                label="Estimated annual O&M"
+                value={
+                  formatMoneyConcise(estimatedAnnualOperatingCost(generator)) +
+                  "/yr"
+                }
+                entry={MANUAL_ENTRY.OPERATING_COSTS}
+              />
+            )}
+            {fuelPrices[generator.fuel] && (
+              <BuildDetailRow
+                label="Fuel costs"
+                value={
+                  formatMoneyConcise(
+                    generator.btuPerWh * (fuelPrices[generator.fuel] ?? 0),
+                  ) + "/MWh"
+                }
+                entry={MANUAL_ENTRY.FUEL_COSTS}
+              />
+            )}
+            {generator.spinMinutes > 1 && (
+              <BuildDetailRow
+                label="Ramp up/down time"
+                value={generator.spinMinutes + " min"}
+                entry={MANUAL_ENTRY.RAMP_RATE}
+              />
+            )}
+            <BuildDetailRow
+              label="Accounting lifetime"
+              value={generator.lifespanYears + " years"}
+              entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
+            />
+            {sites && (
+              <BuildDetailRow
+                label="Sites left"
+                value={`${sites.remaining} of ${sites.total}`}
+                entry={MANUAL_ENTRY.PROJECT_SITES}
+              />
+            )}
+            <BuildDetailRow
+              label="Direct emissions"
+              value={formatMass(kgCO2ePerMWh, units) + "/MWh"}
+              entry={MANUAL_ENTRY.EMISSIONS}
+            />
+            <BuildDetailRow
+              label="Construction emissions"
+              value={`${formatLargeMassValueConcise(
+                constructionKgco2eTotal,
+                units,
+              )} ${largeMassUnit(units)}`}
+              entry={MANUAL_ENTRY.EMISSIONS}
+            />
+          </BuildDetails>
         </>
       }
     >
@@ -838,61 +802,17 @@ function GeneratorComparison(props: {
   );
 }
 
-type GeneratorSortKey = "buildCost" | "yearsToBuild" | "lcWh";
+type GeneratorSortKey = "buildCost" | "yearsToBuild" | "lcWh" | "emissions";
 
 const sortOptions: ReadonlyArray<readonly [GeneratorSortKey, string]> = [
-  ["buildCost", "Build Cost"],
-  ["yearsToBuild", "Build Time"],
+  ["buildCost", "Build cost"],
+  ["yearsToBuild", "Build time"],
   ["lcWh", "Cost per MWh"],
+  ["emissions", "Emissions"],
 ];
 
 function valueLabelFormat(x: number) {
   return formatWatts(sliderTickToW(x));
-}
-
-interface BuildForecast {
-  timeline: TickPresentFutureType[];
-  windSpeeds: number[];
-  offshoreWindSpeeds: number[];
-  airborneWindSpeeds: number[];
-  solarIrradiances: number[];
-}
-
-// The three-year forecast is the one expensive part of a quote (tens of milliseconds), and it
-// reads nearly all of the game: the clock, fleet, customers, loans, weather position and story
-// state. So it is keyed on the game object itself rather than a hand-picked subset of it. Redux
-// hands back a new object whenever anything in the game changes and the same object otherwise,
-// which makes the key exact: the size slider, sort, compare and details reuse the forecast, and
-// so do remounts (StrictMode's double render, switching catalog tabs) while the game is unchanged.
-// Only the per-size GENERATORS quote and output shapes, both cheap, rerun on a slider move.
-// Weak, so a replaced game state is collected along with its forecast.
-const buildForecasts = new WeakMap<GameType, BuildForecast>();
-
-function getBuildForecast(
-  game: GameType,
-  now: TickPresentFutureType,
-): BuildForecast {
-  const cached = buildForecasts.get(game);
-  if (cached) {
-    return cached;
-  }
-  const timeline = generateNewTimeline(
-    game,
-    now.cash,
-    now.customers,
-    TICKS_PER_YEAR * 3,
-  );
-  const forecast: BuildForecast = {
-    timeline,
-    windSpeeds: timeline.map((w) => w.windKph),
-    offshoreWindSpeeds: timeline.flatMap((w) =>
-      w.windOffshoreKph === undefined ? [] : [w.windOffshoreKph],
-    ),
-    airborneWindSpeeds: timeline.map((w) => w.windAirborneKph),
-    solarIrradiances: timeline.map((w) => w.solarIrradianceWM2),
-  };
-  buildForecasts.set(game, forecast);
-  return forecast;
 }
 
 export interface StateProps {
@@ -916,22 +836,10 @@ export interface DispatchProps {
 
 export type Props = StateProps & DispatchProps;
 
-export default function BuildGenerators(props: Props): React.JSX.Element {
-  const closeTool = React.useContext(GameToolCloseContext);
+function BuildGenerators(props: Props): React.JSX.Element {
+  const completeBuild = React.useContext(GameBuildCompleteContext);
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    const request = evidenceRequest;
-    if (
-      request &&
-      typeof request.target === "object" &&
-      request.target.card === "FACILITIES" &&
-      request.target.view === "BUILD_GENERATORS" &&
-      !facilityDragActive
-    ) {
-      onEvidenceReady?.(request, evidenceAnchor.current);
-    }
-  }, [evidenceRequest, facilityDragActive, onEvidenceReady]);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const listRef = useToolScroll<HTMLUListElement>("generators.scroll");
@@ -957,9 +865,41 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     [],
   );
   const [primerVisible, dismissPrimer] = useHydroPrimer();
+  // Typical-year weather should settle while time runs. Month/fleet/rate/story decisions
+  // refresh it in the existing outlook worker; live cash below still controls affordability.
+  const forecastKey =
+    signature(game) +
+    (game.speed === "PAUSED"
+      ? `/${game.date.minute}/${now?.cash}/${now?.customers}`
+      : "");
+  const forecast = useOutlookWorker(
+    "build",
+    now ? forecastKey : undefined,
+    game,
+  );
+  React.useEffect(() => {
+    const request = evidenceRequest;
+    if (
+      forecast &&
+      request &&
+      typeof request.target === "object" &&
+      request.target.card === "FACILITIES" &&
+      request.target.view === "BUILD_GENERATORS" &&
+      !facilityDragActive
+    ) {
+      onEvidenceReady?.(request, evidenceAnchor.current);
+    }
+  }, [forecast, evidenceRequest, facilityDragActive, onEvidenceReady]);
 
   if (!now) {
     return <span />;
+  }
+  if (!forecast) {
+    return (
+      <Typography role="status" sx={{ padding: 2 }}>
+        Calculating quotes…
+      </Typography>
+    );
   }
 
   const cash = now.cash;
@@ -969,7 +909,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     offshoreWindSpeeds,
     airborneWindSpeeds,
     solarIrradiances,
-  } = getBuildForecast(game, now);
+  } = forecast;
   const hydroAvailability = getHydroAvailability(
     game,
     exactSizes.Hydro ?? sliderTickToW(sliderTick),
@@ -996,17 +936,23 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     )
     .filter(
       (generator) =>
-        game.scenarioId !== 1 ||
-        game.tutorialStep !== 1 ||
+        getTutorialStep(game)?.phase !== "GENERATOR_CHOICES" ||
         ["Natural Gas", "Sun", "Wind"].includes(generator.fuel),
     );
   // Technologies that burn the same fuel stay side by side, placed among the rest by their better
   // member, so the gas peaker and combined cycle read as one choice of how to burn gas
+  const sortValue = (generator: GeneratorShoppingType) =>
+    sort === "emissions"
+      ? generator.btuPerWh * (FUELS[generator.fuel]?.kgCO2ePerBtu ?? 0)
+      : generator[sort];
   const bestInFuel = new Map<string, number>();
   shownGenerators.forEach((generator) =>
     bestInFuel.set(
       generator.fuel,
-      Math.min(bestInFuel.get(generator.fuel) ?? Infinity, generator[sort]),
+      Math.min(
+        bestInFuel.get(generator.fuel) ?? Infinity,
+        sortValue(generator),
+      ),
     ),
   );
   const generators = shownGenerators.sort((a, b) => {
@@ -1018,6 +964,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     if (spentA !== spentB) {
       return spentA ? 1 : -1;
     }
+    if (sort === "emissions") return sortValue(a) - sortValue(b);
     if (props.focusFuel && a.fuel !== b.fuel) {
       if (a.fuel === props.focusFuel) {
         return -1;
@@ -1031,7 +978,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     if (a.fuel !== b.fuel && groupA !== groupB) {
       return groupA - groupB;
     }
-    return a[sort] - b[sort];
+    return sortValue(a) - sortValue(b);
   });
   const outputShapes = new Map(
     generators.map((generator) => [
@@ -1163,7 +1110,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                       : withResilienceOptions(g, game, selection),
                     financed,
                   );
-                  (closeTool ?? onBack)();
+                  (completeBuild ?? onBack)();
                 }}
               />
             </React.Fragment>
@@ -1173,3 +1120,5 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     </div>
   );
 }
+
+export default React.memo(BuildGenerators, sameBuildQuote);

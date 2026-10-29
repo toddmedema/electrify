@@ -35,6 +35,7 @@ import FitScreenIcon from "@mui/icons-material/FitScreen";
 import SaveIcon from "@mui/icons-material/Save";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
@@ -57,6 +58,8 @@ import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { facilityLifetime } from "../../helpers/Financials";
 import {
   formatMoneyConcise,
+  formatCustomerCount,
+  formatPercent,
   formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
@@ -87,6 +90,8 @@ import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
 } from "../base/ChartForecastDemandByType";
 import ChartFinances from "../base/ChartFinances";
+import ManualLink from "../base/ManualLink";
+import { MANUAL_ENTRY } from "../base/ManualEntries";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
@@ -125,10 +130,12 @@ import PowerExchangeSummary, {
 } from "../base/PowerExchangeSummary";
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
 import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
+import ChartMonthlySpareCapacity from "../base/ChartMonthlySpareCapacity";
 import { ToolScrollMemory } from "../base/GameToolMemory";
 
 export type InsightLayerId =
   | "supplyDemand"
+  | "spareCapacity"
   | "powerExchange"
   | "demandByType"
   | "supplyByFuel"
@@ -157,6 +164,7 @@ export interface InsightLayerDefinition {
 
 export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
+  { id: "spareCapacity", label: "Lowest spare capacity", group: "Grid" },
   {
     id: "powerExchange",
     label: "Power exchange",
@@ -233,6 +241,7 @@ export const INSIGHT_PRESETS: Record<
     label: "Reliability",
     layers: [
       "supplyDemand",
+      "spareCapacity",
       "powerExchange",
       "supplyByFuel",
       "storage",
@@ -1496,7 +1505,12 @@ export default class Insights extends React.Component<Props, State> {
               game.startingYear,
             )}
             title={finance.label}
-            format={finance.format}
+            format={id === "customers" ? formatCustomerCount : finance.format}
+            formatAxis={
+              id === "customers"
+                ? (value) => formatCustomerCount(value, 2)
+                : undefined
+            }
             // Cash clips at zero and says so; profit keeps its axis and names its losses
             domainMin={finance.key === "cash" ? 0 : undefined}
             negativeNote={
@@ -1532,12 +1546,44 @@ export default class Insights extends React.Component<Props, State> {
                   title={
                     key === "inflationRate" ? "Inflation" : "Interest rate"
                   }
-                  format={(value) => (value * 100).toFixed(2) + "%"}
+                  format={(value) => formatPercent(value, 2)}
                   startingYear={game.startingYear}
                   domain={projection.domain.x}
                   syncKey={SYNC_KEY}
                 />
               ))}
+            </>
+          );
+          break;
+        case "spareCapacity":
+          body = (
+            <>
+              <ChartLegend
+                items={[
+                  { name: "Recorded", color: chartPalette().supply },
+                  {
+                    name: "Projected",
+                    color: chartPalette().supply,
+                    dash: "4,4",
+                  },
+                ]}
+              />
+              <ChartMonthlySpareCapacity
+                height={140}
+                past={projection.financePast}
+                projected={projection.financeProjected}
+                startingYear={game.startingYear}
+                domain={projection.domain}
+                syncKey={SYNC_KEY}
+              />
+              <Typography
+                variant="caption"
+                component="p"
+                sx={{ mx: 2, my: 1, color: "text.secondary" }}
+              >
+                Lowest reserve in each month. Below zero means a reserve
+                deficit.
+              </Typography>
             </>
           );
           break;
@@ -1782,7 +1828,12 @@ export default class Insights extends React.Component<Props, State> {
         aria-label={`${definition.label} evidence`}
       >
         <Toolbar className="insightsTrackHeader">
-          <Typography variant="h6">{definition.label}</Typography>
+          <Typography variant="h6">
+            {definition.label}
+            {id === "powerExchange" && (
+              <ManualLink entry={MANUAL_ENTRY.INTERTIES} />
+            )}
+          </Typography>
           {this.state.layersOpen && (
             <span className="insightsTrackActions">
               <IconButton
@@ -1855,7 +1906,7 @@ export default class Insights extends React.Component<Props, State> {
             : `Restore “${selected}”?`;
     const description =
       presetDialog === "saveAs"
-        ? `Save the current ${this.state.layers.length} charts and their order as a reusable preset.`
+        ? null
         : presetDialog === "rename"
           ? "Give this preset a short, recognizable name."
           : presetDialog === "delete"
@@ -1870,13 +1921,17 @@ export default class Insights extends React.Component<Props, State> {
         fullWidth
         maxWidth="xs"
         aria-labelledby="insight-preset-dialog-title"
-        aria-describedby="insight-preset-dialog-description"
+        aria-describedby={
+          description ? "insight-preset-dialog-description" : undefined
+        }
       >
         <DialogTitle id="insight-preset-dialog-title">{title}</DialogTitle>
         <DialogContent>
-          <DialogContentText id="insight-preset-dialog-description">
-            {description}
-          </DialogContentText>
+          {description && (
+            <DialogContentText id="insight-preset-dialog-description">
+              {description}
+            </DialogContentText>
+          )}
           {naming ? (
             <TextField
               autoFocus
@@ -1914,7 +1969,7 @@ export default class Insights extends React.Component<Props, State> {
           <Button onClick={() => this.closePresetDialog()}>Cancel</Button>
           <Button
             variant="contained"
-            color={presetDialog === "delete" ? "error" : "primary"}
+            color="primary"
             onClick={() => {
               if (presetDialog === "saveAs") {
                 this.createCustomPreset();
@@ -1990,17 +2045,12 @@ export default class Insights extends React.Component<Props, State> {
     const sampled = sampleForecastTimeline(
       viewportTimeline,
       viewportSampleInterval,
-      projection.projectionStepMinutes,
     );
     // Range bands must see every modeled hour so brief peaks and shortages survive aggregation.
     const supplyDemandTimeline =
       viewportRange[1] - viewportRange[0] > 24 * MINUTES_PER_MONTH
         ? viewportSupplyDemand
-        : sampleForecastTimeline(
-            viewportSupplyDemand,
-            viewportSampleInterval,
-            projection.projectionStepMinutes,
-          );
+        : sampleForecastTimeline(viewportSupplyDemand, viewportSampleInterval);
     let viewportDomainMin = Number.POSITIVE_INFINITY;
     let viewportDomainMax = Number.NEGATIVE_INFINITY;
     for (const tick of supplyDemandTimeline) {
@@ -2126,17 +2176,16 @@ export default class Insights extends React.Component<Props, State> {
                     </span>
                   )}
                 >
-                  <ListSubheader>Default presets</ListSubheader>
+                  {!!this.state.presetLibrary.custom.length && (
+                    <ListSubheader>Default presets</ListSubheader>
+                  )}
                   {Object.entries(INSIGHT_PRESETS).map(([id, preset]) => (
                     <MenuItem key={id} value={id} data-insight-preset={id}>
                       {preset.label}
                     </MenuItem>
                   ))}
                   {!!this.state.presetLibrary.custom.length && (
-                    <ListSubheader>
-                      Your presets ({this.state.presetLibrary.custom.length}/
-                      {MAX_CUSTOM_INSIGHT_PRESETS})
-                    </ListSubheader>
+                    <ListSubheader>Your presets</ListSubheader>
                   )}
                   {this.state.presetLibrary.custom.map((preset) => (
                     <MenuItem
@@ -2149,9 +2198,11 @@ export default class Insights extends React.Component<Props, State> {
                       </span>
                     </MenuItem>
                   ))}
-                  <MenuItem value="custom" disabled>
-                    Unsaved view
-                  </MenuItem>
+                  {this.state.preset === "custom" && (
+                    <MenuItem value="custom" disabled>
+                      Unsaved view
+                    </MenuItem>
+                  )}
                 </Select>
                 <Tooltip title="Rename, save a copy, restore, or delete">
                   <IconButton
@@ -2217,8 +2268,8 @@ export default class Insights extends React.Component<Props, State> {
               >
                 <SaveIcon fontSize="small" />
                 {this.state.preset === "custom"
-                  ? "Save as new preset"
-                  : "Save preset changes"}
+                  ? "Save as new"
+                  : "Save changes"}
               </MenuItem>
               {this.state.preset !== "custom" && (
                 <MenuItem
@@ -2227,12 +2278,16 @@ export default class Insights extends React.Component<Props, State> {
                   onClick={() => this.openPresetDialog("saveAs")}
                 >
                   <AddIcon fontSize="small" />
-                  Save as new preset
+                  Save as new
                 </MenuItem>
               )}
               {selectedCustom && (
-                <MenuItem onClick={() => this.openPresetDialog("rename")}>
-                  Rename preset…
+                <MenuItem
+                  className="insightsPresetRenameMenuItem"
+                  onClick={() => this.openPresetDialog("rename")}
+                >
+                  <EditOutlinedIcon fontSize="small" />
+                  Rename
                 </MenuItem>
               )}
               {selectedCustom && (
@@ -2241,7 +2296,7 @@ export default class Insights extends React.Component<Props, State> {
                   onClick={() => this.openPresetDialog("delete")}
                 >
                   <DeleteOutlineIcon fontSize="small" />
-                  Delete custom preset
+                  Delete custom
                 </MenuItem>
               )}
               {selectedDefault &&

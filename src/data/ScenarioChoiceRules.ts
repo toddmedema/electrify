@@ -20,16 +20,6 @@ export const DATA_CENTER_GRANT: Record<DifficultyType, number> = {
   CEO: 15000000,
 };
 
-// Rounded 2020-dollar planning allowance for the thermal fleet, wind and expansion.
-// See src/testing/SCENARIO_CHOICE_BALANCE.md. Difficulty changes risk, not service cost.
-export const WINTERIZATION_COST: Record<DifficultyType, number> = {
-  Intern: 90000000,
-  Employee: 90000000,
-  Manager: 90000000,
-  VP: 90000000,
-  CEO: 90000000,
-};
-
 /** Months are authored one-based offsets, before the source's preparation lead. */
 export const SCENARIO_CHOICE_RULES: CatalogScenarioChoice[] = [
   {
@@ -90,12 +80,12 @@ export const SCENARIO_CHOICE_RULES: CatalogScenarioChoice[] = [
       options: [
         {
           id: "winterize",
-          label: "Fund winterization",
-          costDollars: { byDifficulty: WINTERIZATION_COST },
+          label: "Retrofit remaining plants",
+          costDollars: 0,
           description:
-            "Halve February’s output losses at gas, coal, nuclear, and wind plants.",
+            "Permanently winterize remaining gas, coal, nuclear, and wind plants.",
           message:
-            "Winterization halves February 2021 output losses. Demand and gas prices still surge.",
+            "Winterization installation started. Demand and gas prices still surge during the freeze.",
         },
         {
           id: "standard",
@@ -103,9 +93,9 @@ export const SCENARIO_CHOICE_RULES: CatalogScenarioChoice[] = [
           costDollars: 0,
           meaningful: false,
           description:
-            "Save cash for construction and accept February’s full output losses, including a 38% drop at gas plants.",
+            "Keep cash for construction or individual upgrades. Existing winterization still protects its plants.",
           message:
-            "Construction budget kept. February 2021 output losses apply in full.",
+            "Construction budget kept. Existing winterization stays with its plants.",
         },
       ],
     },

@@ -114,6 +114,37 @@ describe("current facility economics", () => {
     expect(battery?.yearsToBuild).toBeCloseTo(1.5, 2);
   });
 
+  it("unlocks 100-hour iron-air storage only from the 2030 commercial rollout", () => {
+    const find = (year: number) =>
+      STORAGE(stateAt(france, year), 1000000000).find(
+        (facility) => facility.name === "Iron-Air Battery",
+      );
+    expect(find(2026)).toBeUndefined();
+    expect(find(2029)).toBeUndefined();
+    const ironAir = find(2030)!;
+    expect(ironAir).toMatchObject({
+      peakW: 10000000,
+      peakWh: 1000000000,
+      maxPeakWh: 10000000000,
+      roundTripEfficiency: 0.425,
+      lifespanYears: 20,
+      spinMinutes: 10,
+      yearsToBuild: 2,
+      hourlyLoss: 0.0001,
+      constructionKgco2ePerWh: 0.08,
+    });
+    // A 10 MW reference system, using the supplier's projected costs in game dollars.
+    expect(ironAir.buildCost).toBeCloseTo(
+      2150 * 10000 * (304.702 / 292.655),
+      2,
+    );
+    expect(ironAir.annualOperatingCost).toBeCloseTo(
+      17.5 * 10000 * (304.702 / 292.655),
+      2,
+    );
+    expect(find(2040)?.peakW).toBe(ironAir.peakW);
+  });
+
   it("scales natural-gas start maintenance from EIA's 419 MW reference", () => {
     expect(
       generatorAt(2023, "Natural Gas Peaker", 419000000)?.costPerStart,
@@ -507,11 +538,11 @@ describe("weather resilience defaults", () => {
       });
       expect(g.resilienceExtraBuildCost).toBeUndefined();
     });
-    // The package is a small, exact share of the otherwise identical scaled price.
+    // Both gas cycles have the same capacity-based targeted protection price.
     const [iceGas] = icelandGas;
     const extra = iceGas.resilienceExtraBuildCost as number;
-    const base = iceGas.buildCost - extra;
-    expect(extra).toBe(Math.round(base * 0.02));
+    expect(extra).toBe(icelandGas[1].resilienceExtraBuildCost);
+    expect(extra).toBeGreaterThan(0);
   });
 
   it("offers solar hail resistance unselected by default", () => {

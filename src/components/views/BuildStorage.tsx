@@ -1,16 +1,8 @@
-import { GameToolCloseContext } from "../base/GameWorkspaceContext";
+import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
+import { sameBuildQuote, useBuildAffordability } from "../base/useBuildCash";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
-import {
-  Button,
-  List,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableRow,
-  Typography,
-} from "@mui/material";
+import { Button, List, Typography } from "@mui/material";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { facilityLoanMonths, purchaseTerms } from "../../helpers/Financials";
 import {
@@ -21,21 +13,21 @@ import {
 } from "../../helpers/Format";
 import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
-import ManualLink from "../base/ManualLink";
+import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
   averageBuildSize,
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
-import PurchaseReviewDialog, {
-  financingShortfallText,
+import {
+  LivePurchaseReviewDialog as PurchaseReviewDialog,
+  BuildCashWarning,
 } from "../base/PurchaseReviewDialog";
 import {
   getBuildAvailability,
   getSiteInventory,
   siteCountLabel,
-  ViableLocationsRow,
 } from "../base/BuildAvailability";
 import BuildMetric from "../base/BuildMetric";
 import {
@@ -45,6 +37,19 @@ import {
 import { useUnits } from "../base/UnitsContext";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import { GameType, LocationType, StorageShoppingType } from "../../Types";
+
+function storageBuildSummary(storage: StorageShoppingType): string {
+  switch (storage.name) {
+    case "Battery":
+      return "Fast response, four hours of power";
+    case "Iron-Air Battery":
+      return "100 hours of power; low charging efficiency";
+    case "Pumped Hydro":
+      return "Reservoir storage; slow to build";
+    default:
+      return storage.description;
+  }
+}
 
 interface StorageBuildItemProps {
   cash: number;
@@ -57,6 +62,9 @@ interface StorageBuildItemProps {
 
 function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const { storage, cash } = props;
+  // The catalog key also identifies facilities in saves, replay actions and mods.
+  const displayName =
+    storage.name === "Battery" ? "Lithium Battery" : storage.name;
   const units = useUnits();
   const [open, setOpen] = React.useState(false);
   const { downpayment } = purchaseTerms(
@@ -64,6 +72,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     true,
     props.interestRate,
   );
+  const affordable = useBuildAffordability(cash, downpayment);
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
   const maxSizeWh = floorToTwoSignificantDigits(storage.maxPeakWh);
   const { buildable, secondaryText, offerMaxSize } = getBuildAvailability({
@@ -80,7 +89,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     props.location,
     storage.viableLocationsRemaining,
   );
-  const shortfall = financingShortfallText(cash, downpayment);
+  const shortfall = !affordable ? (
+    <BuildCashWarning cash={cash} downpayment={downpayment} />
+  ) : undefined;
   const buildSubtitle = (buildable && shortfall) || secondaryText;
 
   const openReview = (e: React.SyntheticEvent) => {
@@ -90,10 +101,11 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
 
   return (
     <BuildOptionCard
-      name={storage.name}
+      className="storageBuildOption"
+      name={displayName}
       iconSrc={`/images/${storage.name.toLowerCase()}.svg`}
       review={{
-        ariaLabel: `Review purchase of ${storage.name}`,
+        ariaLabel: `Review purchase of ${displayName}`,
         disabled: !!shortfall || !buildable,
         onClick: openReview,
       }}
@@ -106,6 +118,15 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         )
       }
       context={buildable && sites ? siteCountLabel(sites) : undefined}
+      summary={
+        <Typography
+          className="buildOptionDescription"
+          variant="body2"
+          color="textSecondary"
+        >
+          {storageBuildSummary(storage)}
+        </Typography>
+      }
       warning={!buildable || shortfall ? buildSubtitle : undefined}
       metrics={
         <>
@@ -122,10 +143,6 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
             value={`${Math.round(storage.yearsToBuild * 12)} mo`}
           />
           <BuildMetric
-            label="Energy capacity"
-            value={formatWattHours(storage.peakWh)}
-          />
-          <BuildMetric
             label="At full power"
             value={`${Number((storage.peakWh / storage.peakW).toFixed(1))} hr`}
           />
@@ -136,68 +153,49 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         </>
       }
       details={
-        <>
-          <Typography
-            className="buildOptionDescription"
-            variant="body2"
-            color="textSecondary"
-          >
-            {storage.description}
-          </Typography>
-          <TableContainer>
-            <Table size="small" aria-label="storage properties">
-              <TableBody>
-                <TableRow>
-                  <TableCell>Operating costs (/yr)</TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(storage.annualOperatingCost)}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>
-                    Ramp up/down time
-                    <ManualLink
-                      entry={MANUAL_ENTRY.RAMP_RATE}
-                      label="ramp rate"
-                    />
-                    <Typography variant="body2" color="textSecondary">
-                      To go from zero to full output
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">{storage.spinMinutes} min</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Lifespan</TableCell>
-                  <TableCell align="right">
-                    {storage.lifespanYears} years
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Stored energy lost per hour</TableCell>
-                  <TableCell align="right">
-                    {Number((storage.hourlyLoss * 100).toFixed(3))}%
-                  </TableCell>
-                </TableRow>
-                <ViableLocationsRow sites={sites} />
-                <TableRow>
-                  <TableCell>Construction emissions</TableCell>
-                  <TableCell align="right">
-                    {`${formatLargeMassValueConcise(
-                      (storage.constructionKgco2ePerWh || 0) * storage.peakWh,
-                      units,
-                    )} ${largeMassUnit(units)}`}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </>
+        <BuildDetails label="storage properties">
+          <BuildDetailRow
+            label="Operating costs"
+            value={`${formatMoneyConcise(storage.annualOperatingCost)}/yr`}
+            entry={MANUAL_ENTRY.OPERATING_COSTS}
+          />
+          <BuildDetailRow
+            label="Ramp up/down time"
+            value={`${storage.spinMinutes} min`}
+            entry={MANUAL_ENTRY.RAMP_RATE}
+          />
+          <BuildDetailRow
+            label="Accounting lifetime"
+            value={`${storage.lifespanYears} years`}
+            entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
+          />
+          <BuildDetailRow
+            label="Stored energy lost per hour"
+            value={`${Number((storage.hourlyLoss * 100).toFixed(3))}%`}
+            entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
+          />
+          {sites && (
+            <BuildDetailRow
+              label="Sites left"
+              value={`${sites.remaining} of ${sites.total}`}
+              entry={MANUAL_ENTRY.PROJECT_SITES}
+            />
+          )}
+          <BuildDetailRow
+            label="Construction emissions"
+            value={`${formatLargeMassValueConcise(
+              (storage.constructionKgco2ePerWh || 0) * storage.peakWh,
+              units,
+            )} ${largeMassUnit(units)}`}
+            entry={MANUAL_ENTRY.EMISSIONS}
+          />
+        </BuildDetails>
       }
     >
       <PurchaseReviewDialog
         open={open}
         onClose={() => setOpen(false)}
-        title={`Build ${formatWattHours(storage.peakWh)} ${storage.name}?`}
+        title={`Build ${formatWattHours(storage.peakWh)} ${displayName}?`}
         cash={cash}
         buildCost={storage.buildCost}
         interestRate={props.interestRate}
@@ -249,8 +247,8 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
 type StorageSortKey = "buildCost" | "yearsToBuild";
 
 const sortOptions: ReadonlyArray<readonly [StorageSortKey, string]> = [
-  ["buildCost", "Build Cost"],
-  ["yearsToBuild", "Build Time"],
+  ["buildCost", "Build cost"],
+  ["yearsToBuild", "Build time"],
 ];
 
 function valueLabelFormat(x: number) {
@@ -268,8 +266,8 @@ export interface DispatchProps {
 
 export type Props = StateProps & DispatchProps;
 
-export default function StorageBuildDialog(props: Props): React.JSX.Element {
-  const closeTool = React.useContext(GameToolCloseContext);
+function StorageBuildDialog(props: Props): React.JSX.Element {
+  const completeBuild = React.useContext(GameBuildCompleteContext);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const listRef = useToolScroll<HTMLUListElement>("storage.scroll");
@@ -332,7 +330,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
             location={game.location}
             onBuild={(financed: boolean) => {
               props.onBuildStorage(g, financed);
-              (closeTool ?? onBack)();
+              (completeBuild ?? onBack)();
             }}
           />
         ))}
@@ -340,3 +338,5 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
     </div>
   );
 }
+
+export default React.memo(StorageBuildDialog, sameBuildQuote);

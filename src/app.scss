@@ -40,6 +40,10 @@
   --font-size-display: 1.5rem; /* 24px */
   --font-weight-regular: 400;
   --font-weight-emphasis: 600;
+  --daylight-fill: #e6edf3;
+  --daylight-ink: #455a64;
+  --night-fill: #354254;
+  --night-ink: #e6edf5;
   --bg-primary: #ffffff;
   --bg-raised: #f5f7fa;
   --bg-sunken: #edf1f5;
@@ -106,6 +110,10 @@
 [data-theme="dark"] {
   // A cool charcoal ladder separates page, panels and interactions without relying on heavy
   // shadows. The slight blue bias also harmonises with the supply/interactive accent.
+  --daylight-fill: #455568;
+  --daylight-ink: #e6edf5;
+  --night-fill: #18212b;
+  --night-ink: #9aa9ba;
   --bg-primary: #0b1016;
   --bg-raised: #18212b;
   --bg-sunken: #070a0f;
@@ -335,6 +343,13 @@ button,
   outline-offset: 2px;
 }
 
+// Material inputs already draw their focus indicator on their border or underline. An outline
+// on the inner input adds a second, square border inside the rounded control.
+:is(.MuiOutlinedInput-root, .MuiInput-root, .MuiFilledInput-root)
+  .MuiInputBase-input:focus {
+  outline: none !important;
+}
+
 // Programmatic focus after a tap should not leave button rings on a touch interface. Keyboard
 // navigation restores them immediately; controller navigation always keeps its own indicators.
 html[data-touch-input="true"]:not([data-controller-input="true"])
@@ -361,6 +376,25 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
 }
 .keyboardMenu .MuiTouchRipple-ripplePulsate {
   display: none;
+}
+// The home menu's text buttons are plain until one is active. The active button carries the
+// primary fill as its focus indicator, so it drops the separate ring from .keyboardMenu :focus.
+// Hovering a control moves real focus to it (MainMenu.focusHomeButton), so :focus alone tracks
+// the pointer as well as keyboard and controller navigation.
+#centeredMenu
+  :is(.mainActions, .resourceActions, .discoveryActions)
+  .MuiButton-root {
+  &:hover {
+    background-color: transparent; // keep the inactive state borderless and unfilled
+  }
+
+  &:focus {
+    background-color: var(--interactive-strong);
+    color: var(--interactive-contrast);
+    // The fill is the focus indicator here, so drop both the global :focus-visible ring
+    // (which is !important) and the .keyboardMenu :focus ring for these controls.
+    outline: none !important;
+  }
 }
 html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   .keyboardMenu
@@ -520,6 +554,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   border-bottom: 1px solid var(--border-subtle);
 }
 .achievementArt {
+  position: relative;
   width: 48px;
   height: 48px;
   flex: 0 0 48px;
@@ -534,28 +569,29 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   flex: 1;
   min-width: 0;
 }
-.achievementRowHeading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px 16px;
-  flex-wrap: wrap;
+.achievementRowHeading.MuiTypography-root {
   margin-bottom: 4px;
-  h3 {
-    font-weight: 600;
-  }
+  font-weight: 600;
 }
 .achievementState {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-  font-size: 0.8125rem;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--bg-primary);
   color: var(--font-color-faded);
+  .MuiSvgIcon-root {
+    font-size: 16px;
+  }
 }
 .isUnlocked .achievementState {
   color: var(--delta-good);
 }
-// Earned awards keep their colour; the "Locked" label still carries the state in text.
+// Earned awards keep their colour; the lock badge also identifies unearned awards.
 .isLocked .achievementArt img {
   filter: grayscale(1);
   opacity: 0.7;
@@ -621,11 +657,6 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   .achievementRow {
     gap: 12px;
     padding: 16px 0;
-  }
-  .achievementRowHeading {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
   }
 }
 
@@ -939,10 +970,6 @@ $topbar_height: 56px;
   position: relative;
 }
 
-#gameCardMenu .MuiMenuItem-root:not(.Mui-disabled) {
-  color: var(--font-color-primary);
-}
-
 .offlineDot {
   position: absolute;
   top: 8px;
@@ -996,10 +1023,13 @@ $topbar_height: 56px;
   .missionRiskButton {
     min-width: 0;
     flex: 0 1 auto;
-    gap: 4px;
+    gap: 8px;
     margin-inline-start: -8px;
     padding-inline: 8px;
     white-space: nowrap;
+  }
+  .missionRiskEvent .statusLabel {
+    font-weight: 400;
   }
   // The icon signals the action without making the entire status line look like a link.
   .missionRiskEvent .conceptIcon {
@@ -1027,9 +1057,15 @@ $topbar_height: 56px;
   flex: 1 1 auto;
   white-space: nowrap;
 }
-.missionSummaryMonths {
+.missionSummaryMonths.MuiButton-root {
   flex: 0 0 auto;
   margin-left: auto;
+  min-width: 0;
+  padding: 0 8px;
+  margin-inline-end: -8px;
+  font: inherit;
+  // Expand the hit area without increasing the status row's height.
+  margin-block: -12px;
 }
 .missionSummaryHeadline,
 .missionRiskText {
@@ -1047,7 +1083,8 @@ $topbar_height: 56px;
 }
 
 @media (pointer: coarse) {
-  .missionSummary .MuiButton-root {
+  .missionSummary .MuiButton-root,
+  .missionSummaryMonths {
     min-height: 44px;
   }
 }
@@ -1283,6 +1320,7 @@ $topbar_height: 56px;
   // The first status icon sits 20px past the divider (the bar's gap plus the readout's own
   // inset); the months left end the same 20px before the speed controls
   .gameStatusBar .missionSummaryMonths {
+    margin-inline-end: 0;
     padding-inline-end: $space-1;
   }
 }
@@ -1402,25 +1440,10 @@ $pane_header_height: 48px;
   padding: 0 12px 8px;
 }
 
-// Wrapped rows use the available card width, including their final row.
-.build-list-item.buildOption.transmissionProject {
-  .buildOptionMetrics,
-  .intertieDetailMetrics {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 0 12px 12px;
-    > .buildOptionMetric {
-      flex: 1 1 120px;
-      min-width: 0;
-    }
-  }
-}
-
 @media (max-width: ($phone_width - 1px)) {
-  .build-list-item.buildOption.transmissionProject .buildOptionMetrics {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .build-list-item.buildOption.storageBuildOption
+    .buildOptionMetric:last-child {
+    grid-column: span 2;
   }
 }
 
@@ -1643,6 +1666,7 @@ $pane_header_height: 48px;
 
 .insightsPresetSaveMenuItem,
 .insightsPresetSaveAsMenuItem,
+.insightsPresetRenameMenuItem,
 .insightsPresetResetMenuItem {
   > svg {
     margin-right: 12px;
@@ -2266,6 +2290,11 @@ $pane_header_height: 48px;
 .accessibleChart {
   width: 100%;
   min-width: 0;
+}
+.chartTooltipContext {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
 }
 .chartTooltipValues {
   display: grid;
@@ -3963,6 +3992,9 @@ $pane_header_height: 48px;
     height: 40px;
 
     .facilityActivity {
+      // The triangle's open upper-right corner keeps the lower exchange arrow visible.
+      top: -2px;
+      bottom: auto;
       color: $font_color_primary;
     }
   }
@@ -4061,22 +4093,8 @@ $pane_header_height: 48px;
   line-height: 20px;
 }
 
-.tutorialHudHint {
-  margin-top: 4px;
-  color: $font_color_faded;
-  font-size: var(--font-size-caption);
-  line-height: 18px;
-
-  strong {
-    color: $font_color_primary;
-    font-weight: 600;
-  }
-}
-
-// Hang the explanation and hint off the action's text (20px icon + 8px gap) so every line starts
-// at one left edge.
-.tutorialHud .tutorialPrompt,
-.tutorialHudHint {
+// Hang the explanation off the action's text (20px icon + 8px gap).
+.tutorialHud .tutorialPrompt {
   padding-left: 28px;
 }
 
@@ -4131,10 +4149,6 @@ $pane_header_height: 48px;
     min-height: 0;
     overflow: auto;
   }
-  // A full-width flex basis plus the hanging indent would otherwise run past the right edge
-  .tutorialHudHint {
-    box-sizing: border-box;
-  }
   // A plain div with no role, so flattening it into the HUD's row loses no semantics
   .tutorialHudFooter {
     display: contents;
@@ -4175,15 +4189,12 @@ $pane_header_height: 48px;
 }
 
 // Wider screens put the step name, the text and the buttons side by side. The header and footer
-// span both text rows and keep a fixed line at the top as tall as the theme's 40px buttons, so
-// they line up with the action and Next never moves as the text grows; a step without a hint
-// leaves the second row empty.
+// keep a fixed line at the top as tall as the theme's 40px buttons, so they line up with the
+// action and Next never moves as the explanation grows.
 @media screen and (min-width: $fold_pane_min_width) {
   .tutorialHud {
     display: grid;
-    grid-template-areas:
-      "header content footer"
-      "header hint footer";
+    grid-template-areas: "header content footer";
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: start;
     column-gap: 24px;
@@ -4208,10 +4219,6 @@ $pane_header_height: 48px;
     padding-top: 12px;
   }
 
-  .tutorialHudHint {
-    grid-area: hint;
-  }
-
   .tutorialHudFooter {
     grid-area: footer;
   }
@@ -4219,15 +4226,12 @@ $pane_header_height: 48px;
   // The phone's arrangement at every width: Exit quiet on the left, the step count beside the
   // primary action on the right, so the controls never swap sides as the window changes.
   .tutorialHud {
-    grid-template-areas:
-      "exit content step back next"
-      "exit hint step back next";
+    grid-template-areas: "exit content step back next";
     grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     column-gap: $space-2;
   }
 
-  .tutorialHudContent,
-  .tutorialHudHint {
+  .tutorialHudContent {
     margin-left: $space-4;
     margin-right: $space-4;
   }
@@ -4602,10 +4606,6 @@ $homeSmokeCycle: 5.6s;
   @include staticHomeLogo;
 }
 
-html[data-startup-visit="returning"] #appStartup {
-  @include staticHomeLogo;
-}
-
 #appStartup {
   position: fixed;
   inset: 0;
@@ -4858,7 +4858,9 @@ html[data-startup-visit="returning"] #appStartup {
     .MuiCardHeader-subheader {
       grid-column: 1 / 3;
       grid-row: 2;
-      color: inherit;
+      &.buildOptionHeaderWarning {
+        color: inherit;
+      }
     }
     .MuiCardHeader-action {
       grid-column: 3;
@@ -5211,103 +5213,28 @@ html[data-startup-visit="returning"] #appStartup {
 .facilitySupplyChart {
   flex: 0 0 auto;
 }
-.productionMix {
-  position: relative;
-  height: 4px;
-  flex: 0 0 auto;
-}
-.productionMixTarget {
-  appearance: none;
-  // Borrow the chart's static axis footer for the hit area, leaving the plot and fleet clear.
+.dayNightRibbon {
   position: absolute;
-  inset: auto 16px 0;
-  z-index: 1;
   display: flex;
-  align-items: flex-end;
-  min-height: 40px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  border-radius: var(--radius-sm);
-}
-.productionMixTrack {
-  display: flex;
-  width: 100%;
-  height: 4px;
+  overflow: hidden;
   border-radius: var(--radius-pill);
-  background: var(--border-subtle);
-}
-.productionMixSegment {
-  height: 100%;
-  flex: 0 0 auto;
-  &:first-child {
-    border-top-left-radius: inherit;
-    border-bottom-left-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  > span {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    box-shadow: inherit;
   }
-  &:last-child {
-    border-top-right-radius: inherit;
-    border-bottom-right-radius: inherit;
+  [data-phase="day"] {
+    background: var(--daylight-fill);
+    color: var(--daylight-ink);
   }
-  &.isHovered {
-    height: calc(100% + 2px);
-    transform: translateY(-1px);
-  }
-  + .productionMixSegment {
-    box-shadow: inset 1px 0 var(--bg-primary);
-  }
-}
-.productionMixTooltip.MuiTooltip-tooltip {
-  box-sizing: border-box;
-  width: 256px;
-  max-width: calc(100vw - 32px);
-  max-height: min(300px, calc(100dvh - 32px));
-  overflow-y: auto;
-  margin: 4px 0 !important;
-  padding: 12px;
-  border: 1px solid var(--tooltip-border);
-  border-radius: var(--radius-md);
-  background: var(--tooltip-bg);
-  box-shadow: 0 8px 24px var(--tooltip-shadow);
-  color: var(--font-color-primary);
-  font-size: var(--font-size-caption);
-  line-height: 1.5;
-  font-variant-numeric: tabular-nums;
-  font-weight: 400;
-}
-.productionMixDetails {
-  display: grid;
-  gap: 8px;
-}
-.productionMixSources {
-  display: grid;
-  gap: 4px;
-}
-.productionMixSource {
-  display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  &.isHovered {
-    font-weight: 700;
-  }
-}
-.productionMixSwatch {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-.productionMixTotal {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 8px;
-}
-@media (pointer: coarse) {
-  .productionMixTarget {
-    min-height: 44px;
+  [data-phase="night"] {
+    background: var(--night-fill);
+    color: var(--night-ink);
   }
 }
 .dailyProductionChart .chartLegend {
@@ -5382,6 +5309,19 @@ html[data-startup-visit="returning"] #appStartup {
   }
   > .facilityDisclosure {
     position: relative; // above the shared output fill, alongside the grip
+  }
+  // The disclosure excludes the grip. Draw its keyboard ring around the whole header,
+  // inside the scroll pane so both vertical edges remain visible.
+  &:has(> .facilityDisclosure:focus-visible)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--focus-ring);
+    pointer-events: none;
+    z-index: 3;
+  }
+  > .facilityDisclosure:focus-visible {
+    outline: none !important;
   }
 }
 .facilityDisclosure {
@@ -6051,9 +5991,6 @@ $programs_column: 800px;
   gap: $space-3;
   padding-top: $space-2;
 }
-.customerProgramTradeoff {
-  line-height: 1.5;
-}
 @media screen and (max-width: ($phone_width - 1px)) {
   .customerProgramHeading h2 {
     font-size: 1.375rem;
@@ -6218,11 +6155,15 @@ $programs_column: 800px;
 }
 
 .constructionInterties {
-  padding: $space-4 $space-2;
+  padding: 0;
+
+  .transmissionProjects {
+    display: block;
+  }
 }
 
-// Shared geometry keeps generator properties aligned regardless of their help content.
-.generatorDetails {
+// Shared geometry aligns properties and manual help in every construction catalog.
+.buildDetails {
   table-layout: fixed;
   .MuiTableCell-root {
     height: 48px;
@@ -6231,15 +6172,15 @@ $programs_column: 800px;
     vertical-align: middle;
     border-color: var(--border-subtle);
   }
-  .generatorDetailLabel {
+  .buildDetailLabel {
     width: 54%;
     padding-left: 16px;
   }
-  .generatorDetailValue {
+  .buildDetailValue {
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
-  .generatorDetailHelp {
+  .buildDetailHelp {
     width: 48px;
     padding: 4px;
   }
@@ -6251,16 +6192,16 @@ $programs_column: 800px;
   }
 }
 @media (max-width: ($phone_width - 1px)) {
-  .generatorDetails .generatorDetailLabel {
+  .buildDetails .buildDetailLabel {
     // Leave enough room for complete cost/unit values beside the help target.
     width: 44%;
   }
 }
 @media (pointer: coarse) {
-  .generatorDetails .generatorDetailHelp {
+  .buildDetails .buildDetailHelp {
     width: 52px;
   }
-  .generatorDetails .MuiTableCell-root {
+  .buildDetails .MuiTableCell-root {
     height: 52px;
   }
 }
@@ -6786,6 +6727,33 @@ $programs_column: 800px;
   box-sizing: border-box;
   padding: 2px;
   border-radius: 50%;
+  background: var(--font-color-primary);
+}
+
+// Preserve the artwork's silhouette in every avatar, including the manual and catalogs.
+// The dark backing follows that silhouette instead of clipping diamonds into circles.
+[data-theme]
+  .MuiAvatar-root:has(
+    > .MuiAvatar-img[src$="battery.svg"],
+    > .MuiAvatar-img[src$="/pumped hydro.svg"]
+  ),
+.scenarioDossierIcon:is([src$="battery.svg"], [src$="/pumped hydro.svg"]) {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+[data-theme] .MuiAvatar-root:has(> .MuiAvatar-img[src$="/transmission.svg"]),
+img[src$="/transmission.svg"] {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+[data-theme="dark"]
+  :is(
+    .MuiAvatar-root:has(> .MuiAvatar-img[src$="/transmission.svg"]),
+    img[src$="/transmission.svg"]:not(.MuiAvatar-img)
+  ) {
+  box-sizing: border-box;
+  // Inset the steep sides and base evenly; square padding leaves a heavy base stripe.
+  padding: 4px 3px 2px;
   background: var(--font-color-primary);
 }
 
@@ -7522,6 +7490,10 @@ $programs_column: 800px;
   }
 }
 
+.saveSearch .MuiInputLabel-root:not(.MuiInputLabel-shrink) {
+  transform: translate(14px, calc(var(--control-size) / 2 - 50%));
+}
+
 .saveStatusAction {
   padding: 0;
   border: 0;
@@ -7701,4 +7673,13 @@ $programs_column: 800px;
   .coopSavesBar .MuiButton-root {
     min-height: 44px;
   }
+}
+
+// Native selects keep the trigger blue while their option list uses readable body text.
+select:not(:disabled) {
+  color: var(--interactive-strong);
+}
+option {
+  color: var(--font-color-primary);
+  background: var(--bg-primary);
 }

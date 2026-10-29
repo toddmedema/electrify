@@ -1,3 +1,4 @@
+import { FEEDBACK_URL } from "../../CommunityLinks";
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import {
@@ -19,11 +20,14 @@ import {
   getTimeFromTimeline,
 } from "../../helpers/DateTime";
 import { projectedShortfall } from "../../helpers/MissionStatus";
-import { formatMoneyStable, formatWatts } from "../../helpers/Format";
+import {
+  formatMoneyStable,
+  formatWatts,
+  formatNumber,
+} from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import {
   isBigScreen,
-  isDesktopScreen,
   isPaneLayout,
   openWindow,
   SIDE_LAYOUT_MEDIA,
@@ -99,7 +103,7 @@ export interface Props extends StateProps, DispatchProps {}
 const LOW_RESERVE_RATIO = 0.1;
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 /** Status row controls that keep keyboard focus when the row moves into or out of the top bar. */
-const RESTORABLE_STATUS_FOCUS = [".missionRiskButton"];
+const RESTORABLE_STATUS_FOCUS = [".missionRiskButton", ".missionSummaryMonths"];
 
 type GridHealthState =
   "stable" | "low-reserve" | "at-limit" | "blackout-ahead" | "blackout";
@@ -286,6 +290,7 @@ export function GameAppBar(props: Props) {
     null,
   );
   const online = useOnline();
+  const connectionDescriptionId = React.useId();
   // The Scenario tool opens by navigation (see evidenceCard); there is nothing in it to point at
   React.useEffect(() => {
     if (evidenceRequest?.target === "mission-details" && !facilityDragActive) {
@@ -347,7 +352,8 @@ export function GameAppBar(props: Props) {
    * built once per actual change and handed back as the same elements. React then skips them
    * entirely on the frames in between, which is where a good quarter of the frame budget went.
    */
-  const desktop = isDesktopScreen();
+  // Layout and speed availability must use the same media-query snapshot during resize.
+  const desktop = singleRow;
   const speedOptions = React.useMemo(
     () =>
       buildSpeedOptions({
@@ -377,13 +383,21 @@ export function GameAppBar(props: Props) {
           data-achievements-trigger
           className="gameMenuButton"
           onClick={handleMenuClick}
-          aria-label={online ? "menu" : "menu, offline"}
+          aria-label="menu"
+          aria-describedby={online ? undefined : connectionDescriptionId}
           edge="start"
           color="primary"
           size="large"
         >
           <MoreVertIcon />
-          {!online && <span className="offlineDot" aria-hidden="true" />}
+          {!online && (
+            <>
+              <span className="offlineDot" aria-hidden="true" />
+              <span id={connectionDescriptionId} className="srOnly">
+                Offline: saving to this device only
+              </span>
+            </>
+          )}
         </IconButton>
         <Menu
           id="gameCardMenu"
@@ -407,7 +421,7 @@ export function GameAppBar(props: Props) {
           {!inMultiplayer && (
             <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
           )}
-          <MenuItem onClick={() => openWindow("/about.html#feedback")}>
+          <MenuItem onClick={() => openWindow(FEEDBACK_URL)}>
             Send feedback
           </MenuItem>
           {/* Mid-tutorial, the thing a player who has seen enough wants is the next tutorial,
@@ -441,6 +455,7 @@ export function GameAppBar(props: Props) {
     [
       menuAnchorEl,
       online,
+      connectionDescriptionId,
       onManual,
       onSettings,
       props.onSavedGames,
@@ -591,8 +606,8 @@ export function GameAppBar(props: Props) {
           color="textSecondary"
           sx={{ px: 2, pb: 0.5 }}
         >
-          Friend’s target: {game.challenge.target.toLocaleString("en-US")} ·
-          Shared score · unverified
+          Friend’s target: {formatNumber(game.challenge.target)} · Shared score
+          · unverified
         </Typography>
       )}
       <span className="srOnly" aria-live="polite">

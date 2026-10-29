@@ -1,4 +1,5 @@
 import * as React from "react";
+import { withoutNegativeZero } from "../../helpers/Format";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { chartScale, eventMarkersPlugin } from "./UPlotHelpers";
@@ -34,6 +35,13 @@ export interface BuildContext<S> {
    * viewBox by this, so lengths and font sizes are multiplied by it to match.
    */
   scale: number;
+  /**
+   * Optional chart-specific updater: refresh changed pixels and keep visible cursor hooks
+   * current when retaining data. Other charts use the normal setData path.
+   */
+  registerDataUpdate?: (
+    update: (plot: uPlot, data: uPlot.AlignedData) => void,
+  ) => void;
 }
 
 export interface UPlotChartProps<S> {
@@ -83,6 +91,7 @@ function tooltipPlugin<S>(
 ): uPlot.Plugin {
   let el: HTMLDivElement | null = null;
   let header: HTMLDivElement;
+  let context: HTMLDivElement;
   let columns: Array<{ total: HTMLElement; rows: HTMLDivElement }>;
   let dismiss: (event: KeyboardEvent) => void;
   // A synced chart moves its cursor when a neighbour is hovered, which is the point -- but it
@@ -107,7 +116,9 @@ function tooltipPlugin<S>(
             values.appendChild(column);
             return { total, rows };
           });
-          el.append(header, values);
+          context = document.createElement("div");
+          context.className = "chartTooltipContext";
+          el.append(header, values, context);
           // uPlot ignores moves whose target isn't the plot itself. This breakdown takes pointer
           // events so it can scroll, so a fast pointer landing on it would otherwise strand the
           // cursor and leave the tooltip behind; hand those moves back to the plot instead.
@@ -158,6 +169,8 @@ function tooltipPlugin<S>(
             columns[i].total.textContent = rows[0];
             columns[i].rows.textContent = rows.slice(1).join("\n");
           });
+          context.textContent = groups.slice(2).join("\n\n");
+          context.hidden = !context.textContent;
           el.style.maxWidth = `${u.over.clientWidth}px`;
         } else {
           el.textContent = text;
@@ -193,6 +206,9 @@ export default function UPlotChart<S>(
   const rootRef = React.useRef<HTMLDivElement>(null);
   const plotRef = React.useRef<uPlot | null>(null);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
+  const dataUpdateRef = React.useRef<
+    ((plot: uPlot, data: uPlot.AlignedData) => void) | undefined
+  >();
   const [width, setWidth] = React.useState(0);
   const [selectedPoint, setSelectedPoint] = React.useState<number | null>(null);
   // The cursor consults this synchronously, including compatibility mouse events delivered
@@ -209,8 +225,10 @@ export default function UPlotChart<S>(
     () => new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }),
     [],
   );
-  const formatSummaryValue =
+  const summaryFormatter =
     props.formatSummaryValue || ((value: number) => number.format(value));
+  const formatSummaryValue = (value: number, index: number) =>
+    withoutNegativeZero(summaryFormatter(value === 0 ? 0 : value, index));
   const seriesSummary = (props.summaryData || data)
     .slice(1)
     .map((series, index) => {
@@ -375,7 +393,14 @@ export default function UPlotChart<S>(
     }
     const getState = () => stateRef.current;
     const scale = chartScale(width);
-    const built = buildRef.current({ getState, scale });
+    dataUpdateRef.current = undefined;
+    const built = buildRef.current({
+      getState,
+      scale,
+      registerDataUpdate: (update) => {
+        dataUpdateRef.current = update;
+      },
+    });
     const alignedAxis = axisAlignment?.register(() =>
       plotRef.current?.redraw(true, true),
     );
@@ -448,6 +473,7 @@ export default function UPlotChart<S>(
       plot.destroy();
       plotRef.current = null;
       drawnRef.current = null;
+      dataUpdateRef.current = undefined;
     };
     // Data changes go through setData below; only size, shape and palette rebuild
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -463,7 +489,8 @@ export default function UPlotChart<S>(
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {
-      plotRef.current.setData(data);
+      if (dataUpdateRef.current) dataUpdateRef.current(plotRef.current, data);
+      else plotRef.current.setData(data);
       drawnRef.current = data;
     }
   });

@@ -26,7 +26,8 @@ export default defineConfig({
     baseURL,
     headless: true,
     screenshot: "only-on-failure",
-    trace: "retain-on-failure",
+    // Trace diagnostic retries in CI; keep first-attempt evidence during local iteration.
+    trace: process.env.CI ? "on-first-retry" : "retain-on-failure",
   },
   projects: [
     {

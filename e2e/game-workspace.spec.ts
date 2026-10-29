@@ -1,3 +1,5 @@
+import { reviewScreenshot } from "./review-screenshot";
+import { openBuild } from "./layout";
 import { expect, Page, test } from "./fixtures";
 import path from "node:path";
 
@@ -33,7 +35,179 @@ async function settleSheets(page: Page) {
   });
 }
 
+for (const side of [false, true]) {
+  test(`purchases ${side ? "keep Build open in a side panel" : "close Build in an overlay"}`, async ({
+    page,
+  }, info) => {
+    test.skip(
+      side && !!info.project.use.hasTouch,
+      "Side-panel coverage uses the desktop project",
+    );
+    const width = side
+      ? 1300
+      : info.project.use.hasTouch
+        ? page.viewportSize()!.width
+        : 1299;
+    await page.setViewportSize({ width, height: page.viewportSize()!.height });
+    await startGame(page, "dark", 100);
+    for (const [category, purchase] of [
+      ["Generators", "Solar"],
+      ["Storage", "Pumped Hydro"],
+      ["Interties", "Pacific Northwest intertie"],
+    ]) {
+      const build = await openBuild(page);
+      await build.getByRole("tab", { name: category, exact: true }).click();
+      const before = await page
+        .locator(".facilityRow, .transmissionLine")
+        .count();
+      await build
+        .getByRole("button", {
+          name: `Review purchase of ${purchase}`,
+          exact: true,
+        })
+        .click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Take loan", exact: true })
+        .click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(page.locator(".facilityRow, .transmissionLine")).toHaveCount(
+        before + 1,
+      );
+      if (side) {
+        await expect(build).toBeVisible();
+        await build
+          .getByRole("button", { name: "Close Build", exact: true })
+          .click();
+      } else {
+        await expect(build).toHaveCount(0);
+      }
+    }
+  });
+}
+
 for (const theme of ["light", "dark"] as const) {
+  test(`main game content stays centered at 1800px while tools use spare width in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop-chromium");
+    await page.setViewportSize({ width: 3200, height: 1100 });
+    await startGame(page, theme, 111);
+    const fleet = page.locator(".gameFleet");
+    const build = page.getByRole("region", { name: "Build", exact: true });
+    const insights = page.getByRole("region", {
+      name: "Insights",
+      exact: true,
+    });
+    const expectCenteredFleet = async (left: number, right: number) => {
+      const box = (await fleet.boundingBox())!;
+      expect(box.width).toBe(Math.min(1800, right - left));
+      expect(
+        Math.abs(box.x + box.width / 2 - (left + right) / 2),
+      ).toBeLessThanOrEqual(1);
+      expect((await page.locator("#appbar").boundingBox())!.width).toBe(
+        page.viewportSize()!.width,
+      );
+      expect(
+        (await page.locator(".gameStage .facilities").boundingBox())!.width,
+      ).toBe(box.width);
+      expect(
+        (await page.locator(".unifiedFacilitiesList").boundingBox())!.width,
+      ).toBeLessThanOrEqual(box.width);
+    };
+    await expectCenteredFleet(0, 3200);
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`centered-fleet-${theme}.png`),
+      animations: "disabled",
+    });
+    await openBuild(page);
+    await expectCenteredFleet(480, 3200);
+    await page.locator("#insightsNav").click();
+    await expect(insights).toBeVisible();
+    await expectCenteredFleet(480, 2720);
+    await expectSideRails(page);
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`centered-fleet-tools-${theme}.png`),
+      animations: "disabled",
+    });
+    // Three and four rails still leave a capped, centered fleet on a 4K display.
+    await page.setViewportSize({ width: 3840, height: 1100 });
+    await page.locator("#programsNav").click();
+    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
+    await expectCenteredFleet(960, 3360);
+    await expectSideRails(page);
+    await expect(insights.locator("#chartForecastSupplyDemand")).toBeVisible({
+      timeout: 60_000,
+    });
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`centered-fleet-three-panels-${theme}.png`),
+      animations: "disabled",
+    });
+    await page.locator("#eventsNav").click();
+    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(4);
+    await expectCenteredFleet(960, 2880);
+    await expectSideRails(page);
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`centered-fleet-four-panels-${theme}.png`),
+      animations: "disabled",
+    });
+    await page
+      .getByRole("button", { name: "Close Programs", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Close Events", exact: true })
+      .click();
+    // Only shrink once the open tools leave less than 1800px for the main content.
+    await page.setViewportSize({ width: 2240, height: 1100 });
+    await expectCenteredFleet(480, 1760);
+    await expectSideRails(page);
+    await build
+      .getByRole("button", { name: "Close Build", exact: true })
+      .click();
+    await expectCenteredFleet(0, 1760);
+    await insights
+      .getByRole("button", { name: "Close Insights", exact: true })
+      .click();
+    await expectCenteredFleet(0, 2240);
+  });
+
+  test(`mission header uses regular event text and matching button hover in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await startGame(page, theme, 111);
+    const event = page.locator(".missionRiskEvent");
+    await expect(event).toBeVisible();
+    await expect(event.locator(".missionRiskText")).toHaveCSS(
+      "font-weight",
+      "400",
+    );
+    const months = page.getByRole("button", { name: /^\d+ months? left$/ });
+    if (!testInfo.project.use.hasTouch) {
+      const background = await months.evaluate(
+        (element) => getComputedStyle(element).backgroundColor,
+      );
+      await event.hover();
+      await expect(event).not.toHaveCSS("background-color", background);
+      const hover = await event.evaluate(async (element) => {
+        await Promise.all(
+          element.getAnimations().map((animation) => animation.finished),
+        );
+        return getComputedStyle(element).backgroundColor;
+      });
+      await months.hover();
+      await expect(months).toHaveCSS("background-color", hover);
+    }
+    await page.mouse.move(0, 0);
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`mission-header-${theme}.png`),
+      animations: "disabled",
+    });
+    await months.click();
+    await expect(
+      page.getByRole("region", { name: "Scenario", exact: true }),
+    ).toBeVisible();
+  });
+
   test(`mobile grid status keeps the header height during a blackout in ${theme}`, async ({
     page,
   }, testInfo) => {
@@ -59,7 +233,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("tooltip", { name: /^Blackout, .* short/ }),
     ).toBeVisible();
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`grid-blackout-${theme}.png`),
       animations: "disabled",
     });
@@ -235,8 +409,25 @@ test("Build and Programs restore selections and scrolling without reopening hidd
     name: /^Efficiency rebates ·/,
   });
   await rebate.scrollIntoViewIfNeeded();
-  const listScroll = await body.evaluate((element) => element.scrollTop);
+  // A real click can scroll its target after the initial visibility check.
+  // Record the opening position during click capture, before React opens details.
+  const openingPosition = await body.evaluateHandle((element) => {
+    const position = { scrollTop: Number.NaN };
+    element.addEventListener(
+      "click",
+      () => {
+        position.scrollTop = element.scrollTop;
+      },
+      { capture: true, once: true },
+    );
+    return position;
+  });
   await rebate.click();
+  const listScroll = await openingPosition.evaluate(
+    (position) => position.scrollTop,
+  );
+  await openingPosition.dispose();
+  expect(Number.isFinite(listScroll)).toBe(true);
   await expect(
     programs.getByRole("button", { name: "Start next month", exact: true }),
   ).toBeEnabled({ timeout: 60_000 });
@@ -381,7 +572,7 @@ for (const theme of ["light", "dark"] as const) {
       );
     }
     await expectFloatingDock(page);
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`workspace-facilities-${theme}.png`),
       animations: "disabled",
     });
@@ -441,7 +632,7 @@ for (const theme of ["light", "dark"] as const) {
         (element) => element.scrollWidth - element.clientWidth,
       ),
     ).toBeLessThanOrEqual(1);
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`workspace-insights-${theme}.png`),
       // Keep review images focused on the layout after keyboard assertions above.
       style:
@@ -550,7 +741,7 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
     ).toBeVisible();
     await expect(page.locator(".gameToolPanel")).toHaveCount(0);
   }
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-touch-labels.png"),
     animations: "disabled",
   });
@@ -639,7 +830,7 @@ test("Programs keeps points visible through monthly forecast refreshes", async (
   await expect(pricing).not.toHaveAttribute("data-score-blanked", "true");
   await settleSheets(page);
   await page.mouse.move(0, 0);
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("programs-points-estimate.png"),
     animations: "disabled",
   });
@@ -654,7 +845,7 @@ test("Programs keeps points visible through monthly forecast refreshes", async (
   if (testInfo.project.use.hasTouch) {
     await settleSheets(page);
     await page.mouse.move(0, 0);
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath("insights-scenario-range.png"),
       animations: "disabled",
     });
@@ -675,7 +866,7 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   const changed = Number(await rate.inputValue());
   expect(changed).toBeGreaterThan(original);
   await settleSheets(page);
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-programs-overview.png"),
     animations: "disabled",
   });
@@ -686,15 +877,17 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await expect(
     programs.getByRole("button", { name: "Start next month", exact: true }),
   ).toBeEnabled({ timeout: 60_000 });
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-programs-detail.png"),
     animations: "disabled",
   });
   await programs.locator(".customerProgramsBody").evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
-  await expect(programs.getByText(/^Peak demand:/)).toBeInViewport();
-  await page.screenshot({
+  await expect(
+    programs.getByRole("img", { name: /^Estimated demand:/ }),
+  ).toBeInViewport();
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-programs-detail-impact.png"),
     animations: "disabled",
   });
@@ -791,7 +984,7 @@ test("wide screens keep several tools beside the fleet and remember them across 
   // Narrowing preserves the focused decision instead of hiding it for the newer tool.
   const rate = page.locator("#rateSlider input");
   const value = await rate.inputValue();
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-side-rails-desktop.png"),
     style:
       ".gameToolTitle:focus { outline: none !important; box-shadow: none !important; }",
@@ -945,7 +1138,7 @@ test("short desktop rails keep their heading, scroll body, and floating dock rea
       .evaluate((element) => element.scrollTop),
   ).toBeGreaterThan(0);
   await expect(page.locator("#eventsNav")).toBeInViewport();
-  await page.screenshot({
+  await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-short-desktop.png"),
     animations: "disabled",
   });
@@ -1014,14 +1207,16 @@ for (const width of [360, 390]) {
     await programs.locator(".customerProgramsBody").evaluate((element) => {
       element.scrollTop = element.scrollHeight;
     });
-    await expect(programs.getByText(/^Peak demand:/)).toBeInViewport();
+    await expect(
+      programs.getByRole("img", { name: /^Estimated demand:/ }),
+    ).toBeInViewport();
     expect(
       await page
         .locator(".gameWorkspace")
         .evaluate((element) => element.scrollWidth - element.clientWidth),
     ).toBeLessThanOrEqual(1);
     await expect(page.locator("#eventsNav")).toBeInViewport();
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`workspace-floating-dock-${width}.png`),
       animations: "disabled",
     });

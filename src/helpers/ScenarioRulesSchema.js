@@ -15,6 +15,7 @@ const FACILITY_NAMES = [
   "Geothermal",
   "Enhanced Geothermal",
   "Battery",
+  "Iron-Air Battery",
   "Pumped Hydro",
 ];
 

@@ -68,59 +68,6 @@ test("URL-normalized parent segments still resolve inside the renderer bundle", 
   }
 });
 
-test("only the fixed app notice URL reads the packaged platform's Chromium terms", () => {
-  const root = path.resolve("build");
-  const runtimeNotices = path.resolve("resources/runtime-notices");
-  for (const suffix of ["", "?v=1", "#license"])
-    assert.equal(
-      resolveAsset(
-        root,
-        `electrify://app/notices-chromium.html${suffix}`,
-        runtimeNotices,
-      ),
-      path.join(runtimeNotices, "LICENSES.chromium.html"),
-    );
-  assert.equal(
-    resolveAsset(
-      "build",
-      "electrify://app/notices-chromium.html",
-      runtimeNotices,
-    ),
-    path.join(runtimeNotices, "LICENSES.chromium.html"),
-    "Relative bundle roots have the same fixed notice exception",
-  );
-  assert.equal(
-    resolveAsset(root, "electrify://app/notices-chromium.html"),
-    path.join(root, "notices-chromium.html"),
-    "The development renderer retains its bundled notice file",
-  );
-  for (const file of [
-    "LICENSE",
-    "manifest.json",
-    "runtime-notices/LICENSE",
-    "notices-chromium.html/other",
-  ])
-    assert.equal(
-      resolveAsset(root, `electrify://app/${file}`, runtimeNotices),
-      path.join(root, file),
-      "The notice exception must not expose other packaged resources",
-    );
-  for (const url of [
-    "https://app/notices-chromium.html",
-    "electrify://other/notices-chromium.html",
-    "electrify://user@app/notices-chromium.html",
-    "electrify://app:123/notices-chromium.html",
-    "electrify://app/%2e%2e%2fnotices-chromium.html",
-    "electrify://app/%5c..%5cnotices-chromium.html",
-    "electrify://app/%00notices-chromium.html",
-  ])
-    assert.throws(
-      () => resolveAsset(root, url, runtimeNotices),
-      undefined,
-      url,
-    );
-});
-
 test("privileged IPC requires the actual game main frame, never child or foreign frames", () => {
   const mainFrame = { url: "electrify://app/index.html" };
   const webContents = { mainFrame };

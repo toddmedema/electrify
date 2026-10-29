@@ -1,3 +1,4 @@
+import { startIntertieBuildFixture } from "./intertie-build-fixture";
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import path from "path";
 import { expect, test } from "./fixtures";
@@ -13,8 +14,7 @@ for (const theme of ["light", "dark"] as const) {
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);
-    await page.goto("/?scenario=111");
-    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await startIntertieBuildFixture(page);
     const facilities = page.locator(".facilities:visible");
     await openPane(
       facilities,
@@ -26,10 +26,10 @@ for (const theme of ["light", "dark"] as const) {
       name: "Review purchase of Pacific Northwest intertie",
     });
     const card = page.locator(".transmissionProject").filter({ has: review });
-    await expect(card).toContainText("$1.8M");
+    await expect(card).toContainText("$14.4M");
     const metrics = card.locator(".buildOptionMetrics");
     const cells = metrics.locator(":scope > .buildOptionMetric");
-    await expect(cells).toHaveCount(6);
+    await expect(cells).toHaveCount(5);
     const metricBoxes = await cells.evaluateAll((elements) =>
       elements.map((element) => {
         const cell = element.getBoundingClientRect();
@@ -47,12 +47,17 @@ for (const theme of ["light", "dark"] as const) {
     expect(metricBoxes.every((cell) => cell.valueTop >= cell.labelBottom)).toBe(
       true,
     );
-    // Build is a narrow sheet or side panel at every width, so the metrics pair into rows.
-    expect(metricBoxes[0].y).toBe(metricBoxes[1].y);
-    expect(metricBoxes[2].y).toBe(metricBoxes[3].y);
-    expect(metricBoxes[4].y).toBe(metricBoxes[5].y);
-    expect(metricBoxes[2].y).toBeGreaterThan(metricBoxes[0].y);
-    expect(metricBoxes[4].y).toBeGreaterThan(metricBoxes[2].y);
+    if (page.viewportSize()!.width >= 768) {
+      // The wide build sheet fits all five primary metrics on one row.
+      expect(metricBoxes.every((cell) => cell.y === metricBoxes[0].y)).toBe(
+        true,
+      );
+    } else {
+      expect(metricBoxes[0].y).toBe(metricBoxes[1].y);
+      expect(metricBoxes[2].y).toBe(metricBoxes[3].y);
+      expect(metricBoxes[2].y).toBeGreaterThan(metricBoxes[0].y);
+      expect(metricBoxes[4].y).toBeGreaterThan(metricBoxes[2].y);
+    }
     await expect(card).not.toContainText("Portfolio outlook");
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
@@ -65,8 +70,14 @@ for (const theme of ["light", "dark"] as const) {
       /MuiCollapse-entered/,
     );
     const chart = card.locator(".intertieAvailability");
-    const details = card.locator(".intertieDetailMetrics");
-    await expect(details.locator(".buildOptionMetric")).toHaveCount(3);
+    const details = card.getByRole("table", { name: "intertie properties" });
+    await expect(details.getByRole("row")).toHaveCount(3);
+    for (const row of await details.getByRole("row").all()) {
+      await expect(row.locator(":scope > *")).toHaveCount(3);
+      await expect(
+        row.locator(":scope > *").last().getByRole("button"),
+      ).toBeVisible();
+    }
     await expect(card).not.toContainText("Purchase cost change / year");
     await expect(card).not.toContainText("If open with your current fleet");
     const chartBox = (await chart.boundingBox())!;
@@ -79,7 +90,7 @@ for (const theme of ["light", "dark"] as const) {
       (await chart.locator("svg").boundingBox())!.height,
     ).toBeGreaterThanOrEqual(64);
     // Every wrapped metric row fills the card rather than reserving empty grid cells.
-    for (const strip of [card.locator(".buildOptionMetrics"), details]) {
+    for (const strip of [card.locator(".buildOptionMetrics")]) {
       const rowEnds = await strip
         .locator(":scope > .buildOptionMetric")
         .evaluateAll((cells) => {
@@ -127,7 +138,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).not.toContainText("Shortfall covered");
     await expect(dialog).toContainText("Ready in 12 months.");
     await expect(dialog).not.toContainText("Line capacity");
-    await expect(dialog).toContainText(/Import capacity\s*4MW/);
+    await expect(dialog).toContainText(/Import capacity\s*40MW/);
     await expect(dialog).toContainText(/Export capacity\s*5MW/);
     const cashFact = dialog
       .locator(".decisionImpactFact")
@@ -138,9 +149,9 @@ for (const theme of ["light", "dark"] as const) {
     expect(quoted).not.toBeNull();
     // This scenario's balances are quoted in millions, rounded to one decimal.
     expect(Number(quoted![1])).toBeCloseTo(cash / 1_000_000, 1);
-    expect(Number(quoted![2])).toBeCloseTo((cash - 1_800_000) / 1_000_000, 1);
+    expect(Number(quoted![2])).toBeCloseTo((cash - 14_400_000) / 1_000_000, 1);
     await expect(dialog).toContainText("Payments start now");
-    await expect(dialog).toContainText("$2.88k/mo");
+    await expect(dialog).toContainText("$23.1k/mo");
     // Every purchase fact fits alongside both actions on desktop and a 390px phone; a shorter
     // phone scrolls the facts between the title and the pinned actions.
     const short = testInfo.project.use.viewport!.height < 600;

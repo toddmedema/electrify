@@ -13,9 +13,7 @@ import { loadSimData } from "./SimData";
 
 const { parse, stringify } = require("../../electron/steam-multiplayer.cjs");
 
-test("advance a browser-created multiplayer save through every real simulation tick", () => {
-  const file = process.env.E2E_WORLD_FILE!;
-  const throughMonth = Number(process.env.E2E_WORLD_MONTH);
+function advance(file: string, throughMonth: number) {
   expect(Number.isSafeInteger(throughMonth) && throughMonth > 0).toBe(true);
   const saved = parse(fs.readFileSync(file, "utf8"));
   const { scenario, location } = matchScenario(savedMatchSpec(saved));
@@ -45,4 +43,50 @@ test("advance a browser-created multiplayer save through every real simulation t
   // Exercise the same untrusted-save boundary the browser will use on resuming.
   expect(() => restoreWorld(checkpoint, world.epoch)).not.toThrow();
   fs.writeFileSync(file, stringify(checkpoint));
-}, 120000);
+}
+
+// Keep the one-shot CLI for direct reproduction. Playwright keeps this same Jest test alive
+// over IPC, amortizing the transform/import cost while every request runs all assertions above.
+function serve(): Promise<void> {
+  // Jest replaces both global process and require("process"); Node 24 exposes the real IPC.
+  const ipc = process.getBuiltinModule("process");
+  return new Promise((resolve) => {
+    const receive = (message: {
+      type: string;
+      id: number;
+      file: string;
+      month: number;
+    }) => {
+      if (message.type !== "advance") return;
+      try {
+        advance(message.file, message.month);
+        ipc.send!({ type: "result", id: message.id });
+      } catch (error) {
+        ipc.send!({
+          type: "result",
+          id: message.id,
+          error:
+            error instanceof Error
+              ? error.stack || error.message
+              : String(error),
+        });
+      }
+    };
+    ipc.on("message", receive);
+    ipc.once("disconnect", () => {
+      ipc.removeListener("message", receive);
+      resolve();
+    });
+    ipc.send!({ type: "ready" });
+  });
+}
+
+test(
+  "advance a browser-created multiplayer save through every real simulation tick",
+  async () => {
+    if (process.env.E2E_WORLD_SERVICE === "1") await serve();
+    else
+      advance(process.env.E2E_WORLD_FILE!, Number(process.env.E2E_WORLD_MONTH));
+  },
+  process.env.E2E_WORLD_SERVICE === "1" ? 1800000 : 120000,
+);

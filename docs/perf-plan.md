@@ -126,6 +126,12 @@ ends the run early. It reports, as a median of warmed runs:
 - the Immer overhead ratio between the two;
 - total ms per simulated year.
 
+Both paths first warm the full workload, including construction and long histories. Measured
+pairs alternate which path goes first. Each playthrough collects garbage before timing starts,
+so it pays for its own allocations rather than leftovers from the preceding path; collections
+during its ticks remain timed. The entry point enables GC explicitly and the bench rejects a
+runner that cannot establish that starting condition.
+
 Wall-clock numbers are reported, not gated. Two ratios are gated, because a ratio measured in one
 process cancels machine speed (the `--benchmark-stories` pattern): the overall draft/plain tick
 ratio and the paired draft/plain median rollover ratio from B7. Their ceilings sit in `scripts/perf/bench-baselines.json` with a
@@ -700,3 +706,84 @@ ceilings are retained instead of the generated 1.851/1.333 suggestions. The web 
 (912.113/1450.318/26.630 kB) and its 10% tolerance pass and are retained. This PR raises no golden,
 bundle, census or ratio ceiling relative to `20fb39c0`; the paired and frame figures above remain
 explicitly scoped to the earlier source revision.
+
+## Production chart motion
+
+At 1× the daily chart advances every 200 ms. Its Now line and label interpolate
+between known ticks with one scheduled halfway position. Curves and the solid/dashed
+recorded/forecast classification update at simulation ticks. Curve pixels are reused
+while x samples, scales, blackout shading, filled bands and rounded device-pixel
+strokes stay identical. A retained tick repaints only the history/forecast strip;
+its tooltip and accessible summary still read exact current values. Halfway guide
+movement requires no canvas redraw or React animation frame.
+Inspection, pause, reduced motion, forecast edits and range changes synchronize the
+guide to the current tick. Near either edge it snaps to keep the label clamped.
+Faster speeds use the usual renderer.
+
+Run the paired browser benchmark against separately built base and candidate
+directories (use the normal worktree, dependency and asset preflights):
+
+```sh
+MOTION_BASE=/absolute/path/to/base-build \
+MOTION_CANDIDATE=/absolute/path/to/candidate-build \
+  node scripts/perf/chart-motion.js
+```
+
+The default matrix alternates three pairs of eight-second windows for ordinary
+and hydro scenarios, desktop at both pixel densities, a 390 px phone, and faster
+speed controls. It fixes the fresh-run seed, warms each page, and records build
+identities and the actual GPU backend. The 10% gate uses each case's paired median
+of chart drawing plus browser rendering, rasterization and compositing across the
+whole window, including work between simulation ticks. Trace intervals are scoped
+to the current renderer and GPU processes and merged per thread. Output and
+compressed traces stay under `.tmp/chart-motion/qa`.
+
+`--untraced-only` separately gates renderer CPU without tracing. `MOTION_CASE`
+selects a focused workload; a partial run does not establish the full matrix.
+`MOTION_CHANNEL=shell` selects the headless-shell software backend for diagnosis.
+On macOS, `MOTION_KEEP_AWAKE=1` holds a bounded wake assertion during measurement
+and stops it afterward; it starts only after the shared validation slot opens.
+Timing windows with fewer than 50 display callbacks per second are rejected;
+investigate host power/display throttling or a regression before measuring again.
+These are paired lab measurements, not a guarantee for every device or GPU.
+
+### 2026-10-26 paired results
+
+Baseline `edcea86f` (`main.b5bd9d57.js`) and the implementation
+(`main.3f86f5ac.js`) were measured with Chromium 151.0.7922.34, headless
+Apple M5 Max / ANGLE Metal. Each matrix used three alternating pairs of 8-second
+windows per scene, with a separate untraced matrix. All 108 windows met the
+cadence and matching-progress guards; the minimum display-callback rate was
+119.61 Hz. Complete artifact hashes stayed unchanged in both matrices.
+
+| Scene                             | Render pairs            | Render median | Untraced renderer CPU median |
+| --------------------------------- | ----------------------- | ------------- | ---------------------------- |
+| Hydro, desktop 1920, DPR 2, 1×    | +20.23%, +0.23%, +4.45% | +4.45%        | +6.95%                       |
+| Ordinary, desktop 1920, DPR 2, 1× | +4.20%, +2.84%, +8.10%  | +4.20%        | -2.70%                       |
+| Hydro, phone 390, 1×              | +4.08%, +1.91%, +6.64%  | +4.08%        | +3.17%                       |
+| Ordinary, desktop 1920, 1×        | +1.82%, +4.91%, +3.94%  | +3.94%        | -0.94%                       |
+| Ordinary, phone 390, 1×           | +5.18%, +11.19%, +3.73% | +5.18%        | +1.30%                       |
+| Hydro, desktop 1920, 1×           | +5.01%, +2.02%, +2.53%  | +2.53%        | +2.98%                       |
+| Desktop 1920, 3×                  | +1.75%, -0.77%, -3.44%  | -0.77%        | +1.54%                       |
+| Phone 390, 3×                     | +7.57%, +8.81%, +8.06%  | +8.06%        | -2.69%                       |
+| Desktop 1920, 12×                 | -1.35%, -1.41%, -2.67%  | -1.41%        | -0.80%                       |
+
+The predeclared 10% gate applies to each scene’s paired median. Individual samples
+vary, including the larger hydro/DPR-2 sample shown above; every sample is retained.
+The worst rendering median was +8.06%; the worst untraced renderer CPU median
+was +6.95% (+7.15% including the GPU process). The probe opens on public
+`valToPos` calls as well as canvas drawing, including cache comparisons before
+a retained strip paint. Faster native fallbacks can include more preparation
+in the candidate’s scope, making those comparisons conservative.
+
+Negative controls rejected both the original tick-only UI (no sub-tick guide
+movement) and a continuous-guide prototype (+43.50% rendering work under the
+same final harness). Desktop 1920, phone 390/360, larger-text DPR-2, reduced-motion,
+inspection, speed, theme, resize, unmount and live day-rollover checks passed.
+The bitmap cache is scoped to the Facilities daily chart; Insights event-annotation
+charts keep their existing renderer. No simulation or bundle ceiling was changed.
+
+Raw reports and compressed traces are local under
+`.tmp/chart-motion/qa/v22-final-nine-traced` and
+`.tmp/chart-motion/qa/v22-final-nine-untraced`; the rejected continuous control is
+under `.tmp/chart-motion/qa/final-budget-negative-control`.
