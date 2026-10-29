@@ -1776,11 +1776,19 @@ for (const count of [2, 4]) {
       await pages[1]
         .getByRole("button", { name: "normal speed", exact: true })
         .click();
-      // A paused shared clock does not acknowledge this player's selection.
-      // Wait before selecting Slow again, which is ignored while it is still selected.
-      await expect(
-        pages[1].getByRole("button", { name: "normal speed", exact: true }),
-      ).toHaveAttribute("aria-pressed", "true");
+      // Verify host acceptance while the guest's snapshots are deliberately held.
+      // Waiting for its selected button would deadlock the stale-selection reversal.
+      await expect
+        .poll(
+          () =>
+            room.views.get(room.members[1].id)?.game?.multiplayer?.clock
+              ?.selectedSpeed,
+        )
+        .toBe("NORMAL");
+      if (count === 2)
+        await expect(
+          clock(buyer).getByRole("button", { name: "slow speed", exact: true }),
+        ).toHaveAttribute("aria-pressed", "true");
       for (const page of pages)
         await expect(clock(page)).toHaveAttribute(
           "data-active-speed",
