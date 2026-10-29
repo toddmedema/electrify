@@ -1,6 +1,5 @@
 import cloneDeep from "lodash.clonedeep";
 import { parseSave, serializeSave } from "../SaveGame";
-import { decodeReplay, encodeReplay, serializeReplay } from "../Replay";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { validCompiledScenarioRules } from "../helpers/ScenarioRules";
 import { validScenarioMod } from "../helpers/ScenarioMod";
@@ -8,11 +7,7 @@ import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
-import {
-  createGame,
-  createGameFromReplay,
-  runSimulation,
-} from "../testing/Simulator";
+import { createGame, runSimulation } from "../testing/Simulator";
 import type { GameType } from "../Types";
 import { tickState } from "./Game";
 import { roundTrip } from "../testing/SaveForgery";
@@ -32,7 +27,7 @@ const input: ModPackage = {
   scenario: { cash: 1e9 },
 };
 
-test("current111 community rules have no choice and preserve the cap, goals, save and internal replay", () => {
+test("current111 community rules have no choice and preserve the cap, goals and save", () => {
   const scenario = modScenario(input, undefined, "Employee");
   const rules = scenario.mod!.rules;
   expect(validScenarioMod(scenario.mod, scenario)).toBe(true);
@@ -69,17 +64,12 @@ test("current111 community rules have no choice and preserve the cap, goals, sav
   };
   advance(original, 35);
   const saved = parseSave(roundTrip(original));
-  const replay = decodeReplay(encodeReplay(serializeReplay(original)!));
   expect(saved).not.toBeNull();
-  expect(replay).not.toBeNull();
   expect(saved!.game.customScenario).toEqual(scenario);
-  expect(replay!.customScenario).toEqual(scenario);
   const resumed = cloneDeep(saved!.game);
-  const playback = createGameFromReplay(replay!);
   for (const month of [36, 37, 38]) {
     advance(original, month);
     advance(resumed, month);
-    advance(playback, month);
     const now = getTimeFromTimeline(original.date.minute, original.timeline)!;
     expect(
       now.transmissionCapacityLimitsWByCorridor?.["california-north"],
@@ -87,12 +77,10 @@ test("current111 community rules have no choice and preserve the cap, goals, sav
     expect(now.importedW).toBeLessThanOrEqual(month < 38 ? 4e6 : 40e6);
     expect(now.exportedW).toBeLessThanOrEqual(month < 38 ? 4e6 : 40e6);
     expect(resumed.monthlyHistory).toEqual(original.monthlyHistory);
-    expect(playback.monthlyHistory).toEqual(original.monthlyHistory);
     expect(resumed.worldEvents).toEqual(original.worldEvents);
-    expect(playback.worldEvents).toEqual(original.worldEvents);
     expect(parseSave(serializeSave(original))).not.toBeNull();
   }
-  for (const game of [original, resumed, playback]) {
+  for (const game of [original, resumed]) {
     advance(game, 60);
     expect(gameObjectiveResults(game).map((result) => result.status)).toEqual([
       "completed",
@@ -105,7 +93,6 @@ test("current111 community rules have no choice and preserve the cap, goals, sav
   expect(simulation.outcome).toBe("completed");
   expect(simulation.months).toEqual([...original.monthlyHistory].reverse());
   expect(resumed.monthlyHistory).toEqual(original.monthlyHistory);
-  expect(playback.monthlyHistory).toEqual(original.monthlyHistory);
 });
 
 test("all fourteen current arc snapshots validate through ordinary compilation", () => {

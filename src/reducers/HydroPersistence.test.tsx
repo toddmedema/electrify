@@ -3,11 +3,10 @@ import { LOCATIONS } from "../Constants";
 import { DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { GENERATORS } from "../data/Facilities";
 import { getHydroAvailability } from "../data/HydroSites";
-import { createGame, createGameFromReplay } from "../testing/Simulator";
+import { createGame } from "../testing/Simulator";
 import { parseSave, serializeSave } from "../SaveGame";
-import { decodeReplay, encodeReplay, serializeReplay } from "../Replay";
 import { GameType, ScenarioFacilityType } from "../Types";
-import gameReducer, { buildFacility, sellFacility, tickState } from "./Game";
+import gameReducer, { buildFacility, sellFacility } from "./Game";
 const options = { scenarioId: 103, seed: 123 };
 function dispatch(state: GameType, action: Parameters<typeof gameReducer>[1]) {
   return cloneDeep(gameReducer(state, action));
@@ -53,37 +52,6 @@ it("round trips historical and reserved claims through real save validation afte
   const spoof = cloneDeep(saved);
   spoof.game.location.lat += 1;
   expect(parseSave(spoof)).toBeNull();
-});
-it("live and replay agree through build, completion, sale and cancellation", () => {
-  let live = createGame(options);
-  tickState(live);
-  live = dispatch(
-    live,
-    buildFacility({ facility: quote(live, 0.00000001), financed: false }),
-  );
-  tickState(live);
-  expect(live.commissionedHydroSiteIds).toHaveLength(1);
-  live = dispatch(live, sellFacility(live.facilities[0].id));
-  tickState(live);
-  live = dispatch(
-    live,
-    buildFacility({ facility: quote(live, 1), financed: false }),
-  );
-  tickState(live);
-  live = dispatch(live, sellFacility(live.facilities[0].id));
-  tickState(live);
-  const replay = decodeReplay(
-    JSON.parse(JSON.stringify(encodeReplay(serializeReplay(live)!))),
-  )!;
-  const watched = createGameFromReplay(replay);
-  while (watched.date.minute < live.date.minute) tickState(watched);
-  expect(watched.commissionedHydroSiteIds).toEqual(
-    live.commissionedHydroSiteIds,
-  );
-  expect(watched.facilities).toEqual(live.facilities);
-  expect(JSON.parse(JSON.stringify(watched.timeline))).toEqual(
-    JSON.parse(JSON.stringify(live.timeline)),
-  );
 });
 it("rejects invalid starting Hydro through initialization without silently dropping plants", () => {
   for (const facilities of [

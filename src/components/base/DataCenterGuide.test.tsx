@@ -24,7 +24,6 @@ import userEvent from "@testing-library/user-event";
 function mount({
   requested = true,
   inGame = true,
-  replaying = false,
   blocked = false,
   peakW = 100000000,
 } = {}) {
@@ -36,14 +35,12 @@ function mount({
       game: (
         state: {
           inGame: boolean;
-          replayPlayback: boolean;
           speed: SpeedType;
           customScenario: {
             loadAdditions: { id: string; peakW: number; startsYear: number }[];
           };
         } = {
           inGame,
-          replayPlayback: replaying,
           speed: "NORMAL",
           customScenario: {
             loadAdditions: [
@@ -240,7 +237,7 @@ it("does not reoffer to someone who has played Mission 1", () => {
   expect(getScenarioPlayCounts()[TUTORIALS[0].id]).toBe(1);
 });
 
-it.each([{ requested: false }, { replaying: true }])(
+it.each([{ requested: false }])(
   "does not offer outside a new data center launch: %p",
   (options) => {
     mount(options);

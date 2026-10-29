@@ -99,7 +99,7 @@ describe("public utility rate following its target", () => {
     expect(manual.dollarsPerkWh).toBe(0.08);
   });
 
-  it("snaps to the target when following is turned back on, and records it for replay", () => {
+  it("snaps to the target when following is turned back on", () => {
     const manual = gameReducer(
       createGame({ scenarioId: PUBLIC_ID }),
       delta({ dollarsPerkWh: 0.08 }),
@@ -107,10 +107,6 @@ describe("public utility rate following its target", () => {
     const resumed = gameReducer(manual, delta({ rateFollowsTarget: true }));
     expect(resumed.rateFollowsTarget).toBe(true);
     expect(resumed.dollarsPerkWh).toBe(target(resumed));
-    expect(resumed.replayLog?.at(-1)?.payload).toEqual({
-      dollarsPerkWh: target(resumed),
-      rateFollowsTarget: true,
-    });
   });
 
   it("cannot follow a target that an investor-owned utility doesn't have", () => {

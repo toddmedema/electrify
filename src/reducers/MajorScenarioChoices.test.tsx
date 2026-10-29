@@ -1,7 +1,7 @@
 import { GENERATORS } from "../data/Facilities";
 import cloneDeep from "lodash.clonedeep";
 import { TICK_MINUTES } from "../Constants";
-import { createGame, createGameFromReplay } from "../testing/Simulator";
+import { createGame } from "../testing/Simulator";
 import reducer, {
   generateNewTimeline,
   tickState,
@@ -22,7 +22,6 @@ import {
   MINUTES_PER_MONTH,
 } from "../helpers/DateTime";
 import { parseSave } from "../SaveGame";
-import { decodeReplay, encodeReplay, serializeReplay } from "../Replay";
 import {
   DATA_CENTER_DECISION_KEY,
   DATA_CENTER_GRANT,
@@ -49,7 +48,6 @@ function ready(scenarioId: number, month: number) {
     1000000000,
     game.scenarioId === 106 ? 16500 : 472701,
   );
-  game.replayLog = [];
   return game;
 }
 const now = (game: ReturnType<typeof ready>) =>
@@ -186,7 +184,7 @@ test.each([
   [107, 36, DEEP_FREEZE_DECISION_KEY, "winterize", 51],
   [107, 36, DEEP_FREEZE_DECISION_KEY, "standard", 51],
 ] as const)(
-  "scenario %s / month %s / %s / %s survives save and deterministic replay",
+  "scenario %s / month %s / %s / %s survives save continuation",
   (scenarioId, month, decisionId, optionId, endMonth) => {
     let live = createGame({ scenarioId, difficulty: "Intern", seed: 2468 });
     const advance = (game: typeof live, target: number) => {
@@ -195,21 +193,11 @@ test.each([
     advance(live, month);
     live = cloneDeep(reducer(live, choose(decisionId, optionId)));
     const saved = cloneDeep(parseSave(roundTrip(live))!.game);
-    const replayed = createGameFromReplay(
-      decodeReplay(encodeReplay(serializeReplay(live)!))!,
-    );
     advance(live, endMonth);
     advance(saved, endMonth);
-    advance(replayed, endMonth);
     expect(saved.loadAdditions).toEqual(live.loadAdditions);
-    expect(replayed.loadAdditions).toEqual(live.loadAdditions);
     expect(saved.worldEvents.occurrences).toEqual(live.worldEvents.occurrences);
-    expect(replayed.worldEvents.occurrences).toEqual(
-      live.worldEvents.occurrences,
-    );
     expect(now(saved).cash).toBe(now(live).cash);
-    expect(now(replayed).cash).toBe(now(live).cash);
-    expect(replayed.monthlyHistory).toEqual(live.monthlyHistory);
   },
   120000,
 );

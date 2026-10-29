@@ -174,8 +174,6 @@ export function startDesktopFeedback(store: AppStore) {
     const liveSegment =
       current.game.inGame &&
       previousState.game.inGame &&
-      !current.game.replayPlayback &&
-      !previousState.game.replayPlayback &&
       !current.saves?.transitioning &&
       !previousState.saves?.transitioning &&
       current.ui.evidenceRunId === previousState.ui.evidenceRunId &&

@@ -11,7 +11,6 @@ import {
   loaded,
   quit,
   resume,
-  startReplay,
   multiplayerSnapshot,
 } from "./GameActions";
 import type { RootState } from "../Store";
@@ -163,14 +162,6 @@ export const cardSlice = createSlice({
     // A resumed game takes the same route as a new one: the loading screen is what re-reads the
     // weather and fuel price CSVs, which don't survive a reload
     builder.addCase(resume, (state) => {
-      return {
-        name: "LOADING" as CardNameType,
-        ts: Date.now(),
-        history: ["LOADING", ...(state.history || [])],
-      };
-    });
-    // Watching a replay goes the same way, since it re-runs the simulation from the seed
-    builder.addCase(startReplay, (state) => {
       return {
         name: "LOADING" as CardNameType,
         ts: Date.now(),

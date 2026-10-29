@@ -1,8 +1,7 @@
 import cloneDeep from "lodash.clonedeep";
 import { getTimeFromTimeline } from "../helpers/DateTime";
-import { encodeReplay, decodeReplay, serializeReplay } from "../Replay";
 import { parseSave, serializeSave } from "../SaveGame";
-import { createGame, createGameFromReplay } from "../testing/Simulator";
+import { createGame } from "../testing/Simulator";
 import gameReducer, {
   buildTransmissionLine,
   reprioritizeTransmissionLine,
@@ -36,10 +35,6 @@ describe("reprioritizeTransmissionLine", () => {
     ]);
     expect(after.transmission!.lines[0].paused).toBe(true);
     expect(after.facilities).toEqual(state.facilities);
-    expect(after.replayLog!.at(-1)).toMatchObject({
-      type: "reprioritizeTransmissionLine",
-      payload: { spotInList: 0, delta: 1 },
-    });
     expect(after.meaningfulDecisions.at(-1)).toMatchObject({
       kind: "trading",
       before: "0",
@@ -108,18 +103,13 @@ describe("reprioritizeTransmissionLine", () => {
     expect(gameReducer(state, reprioritizeTransmissionLine(move))).toBe(state);
   });
 
-  it("ignores moves without interties and during replay viewing", () => {
+  it("ignores moves without interties", () => {
     const move = reprioritizeTransmissionLine({ spotInList: 0, delta: 1 });
     const empty = createGame({ scenarioId: 100 });
     expect(gameReducer(empty, move)).toBe(empty);
-    const replay = {
-      ...twoInterties(),
-      replayPlayback: { actions: [], index: 0 },
-    };
-    expect(gameReducer(replay, move)).toBe(replay);
   });
 
-  it("round trips and replays the order deterministically", () => {
+  it("round trips the order through saves", () => {
     let state = twoInterties();
     tickState(state);
     state = cloneDeep(
@@ -129,32 +119,8 @@ describe("reprioritizeTransmissionLine", () => {
       ),
     );
     tickState(state);
-    const replay = decodeReplay(encodeReplay(serializeReplay(state)!))!;
-    expect(replay).not.toBeNull();
-    const replayed = createGameFromReplay(replay);
-    tickState(replayed);
-    tickState(replayed);
-    expect(replayed.transmission).toEqual(state.transmission);
-    // Runtime forecast metadata is not part of a recorded or saved tick.
-    expect(JSON.stringify(replayed.timeline)).toBe(
-      JSON.stringify(state.timeline),
+    expect(parseSave(serializeSave(state))?.game.transmission).toEqual(
+      state.transmission,
     );
-    for (const payload of [
-      null,
-      {},
-      { spotInList: -1, delta: 1 },
-      { spotInList: 0, delta: 0.5 },
-    ]) {
-      expect(
-        decodeReplay(
-          encodeReplay({
-            ...replay,
-            actions: [
-              { minute: 0, type: "reprioritizeTransmissionLine", payload },
-            ],
-          }),
-        ),
-      ).toBeNull();
-    }
   });
 });

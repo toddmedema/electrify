@@ -214,14 +214,9 @@ it("rumbles once for a live committed milestone even while sound is muted", () =
   h.stop();
 });
 
-it("ignores replay, restored history, save transitions, rewinds and failed outcomes", () => {
+it("ignores restored history, save transitions, rewinds and failed outcomes", () => {
   const h = harness();
   h.update({
-    game: { ...h.state().game, replayPlayback: { actions: [], index: 0 } },
-  });
-  h.complete(1);
-  h.update({
-    game: { ...h.state().game, replayPlayback: undefined },
     ui: { ...h.state().ui, evidenceRunId: 2 },
   });
   h.update({

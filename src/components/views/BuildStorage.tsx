@@ -70,7 +70,7 @@ interface StorageBuildItemProps {
 
 function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const { storage, cash } = props;
-  // The catalog key also identifies facilities in saves, replay actions and mods.
+  // The catalog key also identifies facilities in saves and mods.
   const displayName =
     storage.name === "Battery" ? "Lithium Battery" : storage.name;
   const units = useUnits();

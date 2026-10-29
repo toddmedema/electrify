@@ -37,8 +37,7 @@ export interface DesktopScore {
 }
 export type DesktopCloudState = "disabled" | "offline" | "ready" | "failed";
 export interface DesktopActivity {
-  phase:
-    "loading" | "menu" | "playing" | "paused" | "replay" | "victory" | "ended";
+  phase: "loading" | "menu" | "playing" | "paused" | "victory" | "ended";
   scenarioId?: number;
   year?: number;
   totalYears?: number;

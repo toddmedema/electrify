@@ -6,13 +6,7 @@ import uiReducer, {
   setFacilityDragActive,
 } from "../reducers/UI";
 import cardReducer, { navigate } from "../reducers/Card";
-import {
-  loaded,
-  quit,
-  resume,
-  start,
-  startReplay,
-} from "../reducers/GameActions";
+import { loaded, quit, resume, start } from "../reducers/GameActions";
 import { createGame } from "../testing/Simulator";
 
 function fixture() {
@@ -72,7 +66,6 @@ it("cancels requests on ordinary navigation and every run lifecycle boundary", (
     loaded(),
     quit(),
     { type: resume.type },
-    { type: startReplay.type },
     { type: "game/initGame" },
   ]) {
     const state = uiReducer(undefined, requestEvidence("finances"));

@@ -170,15 +170,9 @@ function validateActivity(input) {
     "timelineEnabled",
   ]);
   if (
-    ![
-      "loading",
-      "menu",
-      "playing",
-      "paused",
-      "replay",
-      "victory",
-      "ended",
-    ].includes(input.phase) ||
+    !["loading", "menu", "playing", "paused", "victory", "ended"].includes(
+      input.phase,
+    ) ||
     typeof input.timelineEnabled !== "boolean" ||
     (input.scenarioId !== undefined &&
       (!Number.isSafeInteger(input.scenarioId) ||

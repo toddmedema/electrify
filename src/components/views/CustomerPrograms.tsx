@@ -751,12 +751,12 @@ export function ProgramsScreen({
   // individual decision; the standalone screen retains its existing pause behavior.
   const reviewingDecision = !embedded || !!selected;
   React.useEffect(() => {
-    if (!reviewingDecision || game.replayPlayback) return;
+    if (!reviewingDecision) return;
     dispatch(openPolicyDecision(token));
     return () => {
       dispatch(closePolicyDecision(token));
     };
-  }, [dispatch, token, reviewingDecision, game.replayPlayback]);
+  }, [dispatch, token, reviewingDecision]);
   const snapshot = useEstimateSnapshot(game);
   const policiesOn = policyAvailable(game);
   const cash = currentCash(game);
@@ -930,7 +930,6 @@ export function ProgramsScreen({
           <Button onClick={() => setSelected(undefined)}>Back</Button>
           {policy && operating && current!.pending && (
             <Button
-              disabled={!!game.replayPlayback}
               onClick={() => {
                 dispatch(cancelPolicy({ id: policy, ...current!.pending! }));
                 setSelected(undefined);
@@ -945,7 +944,7 @@ export function ProgramsScreen({
             !current!.pending && (
               <Button
                 variant={unchanged ? "contained" : "outlined"}
-                disabled={effective >= end || !!game.replayPlayback}
+                disabled={effective >= end}
                 onClick={() => {
                   dispatch(
                     schedulePolicy({
@@ -972,8 +971,7 @@ export function ProgramsScreen({
                   isFlexibilityPolicy(policy) &&
                   tier === "On" &&
                   !flexibilityAvailable(game, policy, effective) &&
-                  current!.adoption === 0) ||
-                !!game.replayPlayback
+                  current!.adoption === 0)
               }
               onClick={() => {
                 if (cancelling)

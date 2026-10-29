@@ -192,7 +192,6 @@ test("all presence phases and authored scenarios have complete bounded localizat
     "menu",
     "playing",
     "paused",
-    "replay",
     "victory",
     "ended",
   ])
@@ -309,8 +308,8 @@ test("v001 Timeline markers use documented icon-first arguments, instantaneous r
   assert.equal(calls.filter((entry) => entry[0] === "event").length, 6);
 });
 
-test("default-off, offline, unavailable, replay, loading and stale-scenario markers are harmless without backfill", () => {
-  for (const phase of ["menu", "loading", "replay"]) {
+test("default-off, offline, unavailable, loading and stale-scenario markers are harmless without backfill", () => {
+  for (const phase of ["menu", "loading"]) {
     const { service, calls } = fixture();
     service.setActivity({ ...activity, phase });
     service.addEvent(event);
@@ -346,7 +345,6 @@ test("Timeline mode tracks loading, gameplay, pause/menu and completion; disabli
     "loading",
     "playing",
     "paused",
-    "replay",
     "victory",
     "ended",
     "menu",
@@ -354,7 +352,7 @@ test("Timeline mode tracks loading, gameplay, pause/menu and completion; disabli
     service.setActivity({ ...activity, phase });
   assert.deepEqual(
     calls.filter((entry) => entry[0] === "mode").map((entry) => entry[2]),
-    [4, 1, 3, 1, 3, 3, 3],
+    [4, 1, 3, 3, 3, 3],
   );
   assert(
     calls

@@ -142,7 +142,7 @@ for that portfolio's provenance.
 ## Verification implications
 
 The same installed facility must receive the same freeze protection after an
-individual upgrade, bulk purchase, save/import, replay, and forecast. Already
+individual upgrade, bulk purchase, save/import and forecast. Already
 protected assets must reduce the bulk quote, and newly commissioned unprotected
 assets must remain exposed. Pending work must not receive protection before
 completion. A fully protected fleet should offer a zero-work acknowledgement

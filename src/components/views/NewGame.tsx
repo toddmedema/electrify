@@ -364,7 +364,7 @@ export default function NewGame(props: Props): React.JSX.Element {
                     variant="body2"
                     color="textSecondary"
                   >
-                    You can replay any lesson whenever you want.
+                    You can repeat any lesson whenever you want.
                   </Typography>
                 </span>
               </div>

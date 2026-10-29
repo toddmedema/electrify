@@ -180,7 +180,7 @@ by `node scripts/generate-achievements.js` and `desktop:build`.
 
 First Spark and Grid Graduate use actual walkthrough completion, including the final challenge;
 exiting a tutorial or merely reaching its time limit does not count. Other achievements require
-an official non-tutorial run. Custom runs, replay playback, forecast calculations and modified
+an official non-tutorial run. Custom runs, forecast calculations and modified
 simulation harnesses are excluded. Scenario achievements require the committed `completed`
 outcome at full duration, including normal objectives. Every difficulty qualifies; a CEO win
 also contributes one distinct scenario to Master of the Grid. A score dialog alone is never
@@ -227,7 +227,7 @@ ID, confirmation counts conservatively account for every older accepted request;
 cannot acknowledge a newer batch. Fully received requests reset that accounting.
 
 Automated tests cover threshold boundaries, all scenario/difficulty completions, save/resume,
-forecast/replay exclusion, offline earning/reconnect/relaunch, callback packing for all supported
+forecast exclusion, offline earning/reconnect/relaunch, callback packing for all supported
 OSes, overlapping batches and corrupt-journal recovery. Before advertising Steam Achievements,
 test the published configuration on the real App ID/private build: earn a tutorial and scenario
 award, inspect their overlay notifications/icons, earn offline, reconnect, relaunch, check a
@@ -239,8 +239,8 @@ and [ISteamUserStats](https://partner.steamgames.com/doc/api/ISteamUserStats).
 
 ### Rich Presence and recording highlights
 
-Steam friends see the authored scenario and year progress, with separate menu, loading, pause,
-replay and completion states. The adapter sets `steam_display` localization tokens rather than
+Steam friends see the authored scenario and year progress, with separate menu, loading, pause
+and completion states. The adapter sets `steam_display` localization tokens rather than
 accepting arbitrary status text. It never publishes custom save names, run identifiers, account
 details or imported titles. Unknown scenario IDs use "Custom grid". Identical updates are skipped;
 reconnection publishes the current state, and exit clears all presence keys.
@@ -251,11 +251,11 @@ array without running browser/reducer code. Upload the VDF under **Edit Steamwor
 Community → Rich Presence**, then publish those settings. English is the game's current supported
 language and Steam's fallback. Add reviewed language tokens to the catalog when supporting more
 languages. Verify the real App ID with [Steam's Rich Presence tester](https://steamcommunity.com/dev/testrichpresence),
-including menu → scenario/year → pause/replay → completion → exit and a second Steam account.
+including menu → scenario/year → pause → completion → exit and a second Steam account.
 
 Recording highlights are off by default. Enabling them adds instantaneous major-construction,
 blackout/recovery and victory markers to Steam Timeline; it does not start video recording.
-The player controls Game Recording in Steam. Replay/restored history is not backfilled, offline
+The player controls Game Recording in Steam. Restored history is not backfilled, offline
 markers are not queued, and one occurrence is emitted once per run during the process lifetime.
 Native dedupe stores at most 64 runs and 4096 occurrences per run, and stops adding markers at
 those limits. These identifiers stay local and are never sent to Steam.
@@ -266,7 +266,7 @@ playable. Native tests resolve the bundled exports and exercise exact arguments,
 zero real-time offset/duration; simulation years are descriptive text. These synchronous calls
 do not add another callback pump. Live acceptance still requires Steam Game Recording enabled on the
 private build, actual marker/clip inspection, default-off/on/off behavior, repeated milestones,
-replay exclusion, offline/reconnect and quit. SDK capability tests do not verify recorded video.
+offline/reconnect and quit. SDK capability tests do not verify recorded video.
 
 References: [Rich Presence localization](https://partner.steamgames.com/doc/api/ISteamFriends#richpresencelocalization),
 [Steam Timeline guidance](https://partner.steamgames.com/doc/features/timeline), and the
@@ -469,7 +469,7 @@ the start. The host picks any authored scenario or a custom game. Guests follow 
 scenario, difficulty and custom settings read-only, and mark **Ready** for exactly what is shown;
 any change by the host clears it. **Start for everyone** launches that scenario for the lobby once
 a friend has joined and everyone is connected. Everyone
-selects a running speed to begin. Tutorials, challenge links, replays and Data Center setup are
+selects a running speed to begin. Tutorials, challenge links and Data Center setup are
 single-player only. The host chooses a scenario in the normal selection screens; guests follow that selection.
 
 Every company plays the scenario as authored: its location, opening fleet, cash, customers,

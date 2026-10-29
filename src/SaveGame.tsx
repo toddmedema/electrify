@@ -392,7 +392,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     game.customerRate < 0 ||
     (game.rateFollowsTarget !== undefined &&
       typeof game.rateFollowsTarget !== "boolean") ||
-    // Checked in full rather than trusted, the same way decodeReplay checks a replay's: the
+    // Check the full location rather than trusting an imported object: the
     // location's id becomes the path of the weather file the loading screen fetches, and its
     // lat/long and time zone drive the sun model. A save is hand-editable too
     !isValidLocation(game.location)

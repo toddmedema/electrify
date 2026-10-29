@@ -38,7 +38,7 @@ export const mapStateToProps = (state: AppStateType): StateProps => {
       ...state.game,
       difficulty: state.ui.previewDifficulty ?? state.game.difficulty,
     },
-    // The game the player set up last time, so tweaking one setting and replaying doesn't mean
+    // The game the player set up last time, so tweaking one setting and starting again doesn't mean
     // re-entering all of them
     scenario:
       eventId === undefined

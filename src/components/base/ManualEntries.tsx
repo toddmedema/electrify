@@ -1038,7 +1038,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.SCORE,
     group: "Gameplay",
     keywords:
-      "points scoring high score end of game investor public replay watch",
+      "points scoring high score end of game investor public leaderboard",
     entry: (
       <div>
         <p>
@@ -1057,8 +1057,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           three categories: Service, Financial performance, and Environmental
           impact. Only completed missions earn leaderboard ranks and competitive
           personal bests. Failed runs still show their points and actual
-          outcomes. Log in to submit a completed mission and replay. Use the
-          leaderboard's play buttons to see how others beat your score!
+          outcomes. Log in to submit a completed mission to the leaderboard.
         </p>
         <p>
           Customer retention remains a mission requirement where listed; it adds

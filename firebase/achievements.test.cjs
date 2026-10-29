@@ -136,6 +136,7 @@ test("current competitive scores require completion and the three numeric catego
   };
   await assertSucceeds(setDoc(doc(db, "scores", "completed"), score));
   for (const [index, patch] of [
+    { extra: "unsupported metadata" },
     { outcome: "bankrupt" },
     { outcome: "fired" },
     { outcome: null },
@@ -161,4 +162,16 @@ test("current competitive scores require completion and the three numeric catego
   await assertSucceeds(
     setDoc(doc(db, "scores", "legacy"), { uid: "alice", score: 100 }),
   );
+});
+
+test("unconfigured collections reject reads and writes", async () => {
+  for (const context of [
+    environment.authenticatedContext("alice"),
+    environment.unauthenticatedContext(),
+  ]) {
+    const unsupported = doc(context.firestore(), "unsupported", "record");
+    await assertFails(getDoc(unsupported));
+    await assertFails(setDoc(unsupported, { uid: "alice" }));
+    await assertFails(deleteDoc(unsupported));
+  }
 });

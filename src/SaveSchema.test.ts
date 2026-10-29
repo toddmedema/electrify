@@ -7,16 +7,11 @@ const game = createGame({ scenarioId: 101, seed: 31337 });
 
 it.each([
   undefined,
-  0,
-  1,
-  2,
-  3,
-  4,
-  5,
+  ...Array.from({ length: SAVE_SCHEMA_VERSION }, (_, version) => version),
   SAVE_SCHEMA_VERSION + 1,
   -1,
   1.5,
-  "6",
+  String(SAVE_SCHEMA_VERSION),
   null,
 ])(
   "rejects an unsupported or malformed schema %p without repairing it",

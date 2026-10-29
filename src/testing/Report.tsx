@@ -166,7 +166,6 @@ export function formatReport(
           : `completed all ${opts.months} months`
     }`,
   );
-  lines.push(`  Player actions   ${result.actionCount}`);
   if (first && last) {
     lines.push(
       `  Cash             ${formatMoneyConcise(first.cash)} -> ${formatMoneyConcise(last.cash)}`,

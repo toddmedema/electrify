@@ -15,7 +15,7 @@ then **Start**. **Author report** reveals all rules, including surprise events.
 Importing the same local ID offers **Update**, **Keep both** or **Cancel**.
 Disable a mod to keep it installed without making it playable. **Remove** deletes
 a local copy; **Unsubscribe** requires Steam. Updates and removal do not change
-existing runs, replays or co-op campaigns. Start a new run to use an updated package.
+existing runs or co-op campaigns. Start a new run to use an updated package.
 
 ## Create a scenario
 

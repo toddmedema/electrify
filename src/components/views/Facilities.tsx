@@ -82,9 +82,6 @@ interface FacilityListItemProps {
   storyOutputMultiplier: number;
   hazardStatus?: FacilityHazardStatusType;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
-  // A replay is a recording of somebody else's decisions; letting the viewer make their own
-  // would desync the run from the actions still queued up against it
-  readOnly: boolean;
   onTogglePause: DispatchProps["onTogglePause"];
   onPause: DispatchProps["onPause"];
   onSell: DispatchProps["onSell"];
@@ -213,7 +210,6 @@ const RESERVOIR_WARNING_FRACTION = 0.2;
 
 function FacilityActions(props: {
   facility: FacilityOperatingType;
-  readOnly: boolean;
   upgrading: boolean;
   onPause: DispatchProps["onPause"];
   onTogglePause: DispatchProps["onTogglePause"];
@@ -225,11 +221,9 @@ function FacilityActions(props: {
     onOpenSell,
     onPause,
     onTogglePause,
-    readOnly,
     upgrading,
     onCancelRetrofit,
   } = props;
-  if (readOnly) return null;
   const underConstruction = facility.yearsToBuildLeft > 0;
   return (
     <div className="facilityActions">
@@ -297,7 +291,6 @@ const MemoizedFacilityActions = React.memo(
       previousUnderConstruction === nextUnderConstruction &&
       previous.upgrading === next.upgrading &&
       previous.onCancelRetrofit === next.onCancelRetrofit &&
-      previous.readOnly === next.readOnly &&
       previous.onPause === next.onPause &&
       previous.onTogglePause === next.onTogglePause &&
       previous.onOpenSell === next.onOpenSell
@@ -317,7 +310,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     onTogglePause,
     onPause,
     onSelect,
-    readOnly,
     selected,
     storyOutputMultiplier,
     hazardStatus,
@@ -325,14 +317,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     onArrivalShown,
   } = props;
   // Early walkthroughs hide reordering; keep the icon in their inspection target.
-  const reorderDisabled =
-    readOnly ||
-    !!(
-      game.inGame &&
-      activeScenario(game)?.tutorialSteps?.[
-        game.tutorialStep
-      ]?.hideUi?.includes("facilityActions")
-    );
+  const reorderDisabled = !!(
+    game.inGame &&
+    activeScenario(game)?.tutorialSteps?.[game.tutorialStep]?.hideUi?.includes(
+      "facilityActions",
+    )
+  );
   const underConstruction = facility.yearsToBuildLeft > 0;
   const installing = underConstruction
     ? undefined
@@ -361,11 +351,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     return () => window.clearTimeout(timer);
   }, [arriving]);
   React.useEffect(() => {
-    if (wasBuilding.current && !underConstruction && !readOnly) {
+    if (wasBuilding.current && !underConstruction) {
       setReady(true);
     }
     wasBuilding.current = underConstruction;
-  }, [underConstruction, readOnly]);
+  }, [underConstruction]);
   React.useEffect(() => {
     if (!ready) return;
     const timer = window.setTimeout(() => setReady(false), 2400);
@@ -539,7 +529,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           style={getDraggableStyle(provided.draggableProps.style)}
         >
           <div
-            className={`facilityRowHeader${arriving && !readOnly ? " facilityArrival" : ""}${ready ? " facilityReady" : ""}`}
+            className={`facilityRowHeader${arriving ? " facilityArrival" : ""}${ready ? " facilityReady" : ""}`}
             data-storage={!!storage || undefined}
             onAnimationEnd={(event) => {
               if (event.animationName === "facilityArrival") setArriving(false);
@@ -688,14 +678,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               seed={game.seed}
               location={game.location}
               game={game}
-              readOnly={readOnly}
               onRetrofit={props.onRetrofit}
             />
           )}
           {selected && (
             <MemoizedFacilityActions
               facility={facility}
-              readOnly={readOnly}
               upgrading={upgrading}
               onPause={onPause}
               onTogglePause={onTogglePause}
@@ -939,7 +927,6 @@ export default class Facilities extends React.Component<Props> {
       selectedFacilityId,
     } = this.props;
     const facilitiesCount = game.facilities.length;
-    const readOnly = !!game.replayPlayback;
     const intertiesAvailable = !!(
       game.transmission &&
       (game.multiplayer || corridorsForLocation(game.location).length)
@@ -999,7 +986,6 @@ export default class Facilities extends React.Component<Props> {
                             )}
                             hazardStatus={facilityHazardStatus(game, g)}
                             spotInList={i}
-                            readOnly={readOnly}
                           />
                         ),
                       )}
@@ -1008,7 +994,7 @@ export default class Facilities extends React.Component<Props> {
                   )}
                 </Droppable>
               </DragDropContext>
-              {facilitiesCount < 2 && !readOnly && (
+              {facilitiesCount < 2 && (
                 <Typography
                   color="textSecondary"
                   variant="body2"
