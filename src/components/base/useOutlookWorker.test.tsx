@@ -49,28 +49,31 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-it("never runs a forecast in render and retains the last result during monthly refresh", () => {
-  const view = renderHook(
-    ({ state }) =>
-      useOutlookWorker("hydro", String(state.date.monthsElapsed), state),
-    {
-      initialProps: { state: game(1) },
-    },
-  );
-  expect(view.result.current).toBeUndefined();
-  expect(mockCompute).not.toHaveBeenCalled();
-  expect(worker.postMessage).not.toHaveBeenCalled();
-  flush();
-  const result = [{ fraction: 0.4 }];
-  reply(0, result);
-  expect(view.result.current).toBe(result);
-  view.rerender({ state: game(2) });
-  expect(view.result.current).toBe(result);
-  flush();
-  expect(worker.postMessage).toHaveBeenCalledTimes(2);
-  expect(mockCreateWorker).toHaveBeenCalledTimes(1);
-  expect(mockCompute).not.toHaveBeenCalled();
-});
+it.each(["hydro", "build"] as const)(
+  "never runs a %s forecast in render and retains the last result during monthly refresh",
+  (kind) => {
+    const view = renderHook(
+      ({ state }) =>
+        useOutlookWorker(kind, String(state.date.monthsElapsed), state),
+      {
+        initialProps: { state: game(1) },
+      },
+    );
+    expect(view.result.current).toBeUndefined();
+    expect(mockCompute).not.toHaveBeenCalled();
+    expect(worker.postMessage).not.toHaveBeenCalled();
+    flush();
+    const result = [{ fraction: 0.4 }];
+    reply(0, result);
+    expect(view.result.current).toBe(result);
+    view.rerender({ state: game(2) });
+    expect(view.result.current).toBe(result);
+    flush();
+    expect(worker.postMessage).toHaveBeenCalledTimes(2);
+    expect(mockCreateWorker).toHaveBeenCalledTimes(1);
+    expect(mockCompute).not.toHaveBeenCalled();
+  },
+);
 
 it("coalesces edits in flight and ignores superseded replies", () => {
   const view = renderHook(

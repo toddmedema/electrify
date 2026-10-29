@@ -6,6 +6,18 @@ import {
 } from "../../helpers/HydroOutlook";
 import { generateNewTimeline } from "../../reducers/Game";
 import type { GameType, TickPresentFutureType } from "../../Types";
+import type { OutputWeatherTick } from "../../helpers/ExpectedOutput";
+
+export interface BuildForecast {
+  timeline: OutputWeatherTick[];
+  windSpeeds: number[];
+  offshoreWindSpeeds: number[];
+  airborneWindSpeeds: number[];
+  solarIrradiances: number[];
+}
+
+// Also shares synchronous fallback work across StrictMode renders and catalog remounts.
+const buildForecasts = new WeakMap<GameType, BuildForecast>();
 
 /** Weather, load and route restrictions needed by the neighboring market outlook. */
 export type IntertieForecastTick = Pick<
@@ -33,6 +45,7 @@ export function forecastCutoffIndex(
 }
 
 export interface OutlookResults {
+  build: BuildForecast | undefined;
   hydro: ReservoirOutlookPoint[] | undefined;
   intertie: IntertieForecastTick[] | undefined;
 }
@@ -54,6 +67,47 @@ export function computeOutlook<K extends OutlookKind>(
 ): OutlookResults[K] {
   const now = currentTick(game);
   if (!now) return undefined;
+  if (kind === "build") {
+    let result = buildForecasts.get(game);
+    if (!result) {
+      const timeline = generateNewTimeline(
+        game,
+        now.cash,
+        now.customers,
+        TICKS_PER_YEAR * 3,
+      );
+      result = {
+        // Do not clone thousands of unused finance/dispatch properties back to the UI.
+        timeline: timeline.map(
+          ({
+            minute,
+            windKph,
+            windOffshoreKph,
+            windAirborneKph,
+            solarIrradianceWM2,
+            hydroRunoffMm,
+            renewableCapacityFactors,
+          }) => ({
+            minute,
+            windKph,
+            windOffshoreKph,
+            windAirborneKph,
+            solarIrradianceWM2,
+            hydroRunoffMm,
+            renewableCapacityFactors,
+          }),
+        ),
+        windSpeeds: timeline.map((tick) => tick.windKph),
+        offshoreWindSpeeds: timeline.flatMap((tick) =>
+          tick.windOffshoreKph === undefined ? [] : [tick.windOffshoreKph],
+        ),
+        airborneWindSpeeds: timeline.map((tick) => tick.windAirborneKph),
+        solarIrradiances: timeline.map((tick) => tick.solarIrradianceWM2),
+      };
+      buildForecasts.set(game, result);
+    }
+    return result as OutlookResults[K];
+  }
   if (kind === "hydro") {
     return reservoirOutlook(
       now,
