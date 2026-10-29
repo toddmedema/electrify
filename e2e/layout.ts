@@ -125,8 +125,13 @@ export async function sortBuildCatalog(
   if (await select.isVisible()) {
     await select.click();
     await page.getByRole("option", { name: order, exact: true }).click();
+    await expect(select).toContainText(order);
   } else {
     await compact.click();
     await page.getByRole("menuitem", { name: order, exact: true }).click();
+    await expect(compact).toHaveAttribute(
+      "aria-label",
+      `Sort facilities: ${order}`,
+    );
   }
 }
