@@ -731,7 +731,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#chartForecastSupplyDemand",
         action: "Find the predicted blackout",
         content: (
-          <TutorialPrompt text="The chart shows one representative day per month." />
+          <TutorialPrompt text="The chart shows one representative day per month. Supply and demand are estimates, so leave room for forecast error." />
         ),
       },
       {
@@ -803,7 +803,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#chartForecastWeather",
         action: "Compare weather with demand",
         content: (
-          <TutorialPrompt text="Weather drives demand and renewable output. In this game, emissions affect your score and any carbon fee, not local weather." />
+          <TutorialPrompt text="Weather drives demand and renewable output. Forecasts use seasonal averages farther ahead, while actual weather varies between years. Emissions affect your score and carbon fees, not local weather." />
         ),
       },
       {
