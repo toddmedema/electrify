@@ -87,5 +87,5 @@ export function choiceStatus(
 export function buildoutImpact(game: GameType, id: BuildoutPolicyId): string {
   return id === "solar"
     ? `${formatWatts(POLICIES.solar.cap * programCustomers(game))} of rooftop panels`
-    : `Home and business use ${formatPercent(POLICIES.efficiency.applianceSaving)} lower, heating and cooling ${formatPercent(POLICIES.efficiency.weatherSaving)} lower`;
+    : `Home and business demand ${formatPercent(POLICIES.efficiency.applianceSaving)} lower, heating and cooling ${formatPercent(POLICIES.efficiency.weatherSaving)} lower`;
 }

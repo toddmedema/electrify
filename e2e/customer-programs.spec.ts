@@ -41,7 +41,7 @@ for (const theme of ["light", "dark"]) {
       "Reduce daytime demand with rooftop panels",
     );
     await expect(dialog.getByText(/^Facility comparable/)).toBeHidden();
-    await expect(dialog).toContainText("Current profit:");
+    await expect(dialog).not.toContainText("Current profit:");
     await expect(dialog).toContainText("48 months");
     await expect(dialog).toContainText("Finishes Jan 2024");
     const facts = dialog.locator(".customerProgramFacts").first();
@@ -67,8 +67,11 @@ for (const theme of ["light", "dark"]) {
     const applyBounds = (await apply.boundingBox())!;
     expect(applyBounds.y).toBeCloseTo(backBounds.y, 0);
     expect(applyBounds.height).toBeCloseTo(backBounds.height, 0);
-    await expect(dialog).toContainText("Peak demand:");
-    await expect(dialog.getByText(/^Electricity supplied:/)).toBeVisible();
+    await expect(
+      dialog
+        .locator(".customerProgramDetail > :last-child")
+        .getByRole("img", { name: /^Estimated demand:/ }),
+    ).toBeVisible();
     await page.keyboard.press("g");
     await expect(dialog).toBeVisible();
     await expect(page.locator(".buildOption")).toHaveCount(0);
@@ -78,7 +81,9 @@ for (const theme of ["light", "dark"]) {
     await page.screenshot({
       path: testInfo.outputPath(`program-${theme}.png`),
     });
-    await dialog.getByText(/^Peak demand:/).scrollIntoViewIfNeeded();
+    await dialog
+      .getByRole("img", { name: /^Estimated demand:/ })
+      .scrollIntoViewIfNeeded();
     await page.screenshot({
       path: testInfo.outputPath(`comparison-${theme}.png`),
     });

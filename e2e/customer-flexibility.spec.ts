@@ -33,9 +33,7 @@ for (const theme of ["light", "dark"]) {
       await expect(
         dialog.getByText("Installation cost", { exact: true }),
       ).toBeVisible();
-      await expect(
-        dialog.getByText(/at full rollout · while on/),
-      ).toBeVisible();
+      await expect(dialog.getByText(/at full rollout while on/)).toBeVisible();
       await expect(
         dialog.getByText("Local equipment", { exact: true }),
       ).toBeHidden();

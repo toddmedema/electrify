@@ -884,7 +884,9 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await programs.locator(".customerProgramsBody").evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
-  await expect(programs.getByText(/^Peak demand:/)).toBeInViewport();
+  await expect(
+    programs.getByRole("img", { name: /^Estimated demand:/ }),
+  ).toBeInViewport();
   await reviewScreenshot(page, {
     path: testInfo.outputPath("workspace-programs-detail-impact.png"),
     animations: "disabled",
@@ -1205,7 +1207,9 @@ for (const width of [360, 390]) {
     await programs.locator(".customerProgramsBody").evaluate((element) => {
       element.scrollTop = element.scrollHeight;
     });
-    await expect(programs.getByText(/^Peak demand:/)).toBeInViewport();
+    await expect(
+      programs.getByRole("img", { name: /^Estimated demand:/ }),
+    ).toBeInViewport();
     expect(
       await page
         .locator(".gameWorkspace")
