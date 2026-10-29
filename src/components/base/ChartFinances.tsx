@@ -103,7 +103,11 @@ export function financeXValue(
     : (point.month - startingYear * 12 - 1) * MINUTES_PER_MONTH;
 }
 
-function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+function buildOptions({
+  getState,
+  scale,
+  fontScale,
+}: BuildContext<State>): uPlot.Options {
   return {
     width: 0, // set by UPlotChart
     height: 0,
@@ -172,7 +176,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       },
     ],
     plugins: [
-      titlePlugin(() => getState().title, 7),
+      titlePlugin(() => getState().title, 7, fontScale),
       // The band plugin bails on an empty list, so charts without a note push nothing
       bandsPlugin(() => getState().pastSpans, chartPalette().blackout, 0.3),
       bandsPlugin(

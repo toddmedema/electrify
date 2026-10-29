@@ -2,10 +2,15 @@ import * as React from "react";
 import { withoutNegativeZero } from "../../helpers/Format";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
-import { chartScale, eventMarkersPlugin } from "./UPlotHelpers";
+import {
+  chartScale,
+  eventMarkersPlugin,
+  expandedChartOptions,
+} from "./UPlotHelpers";
 import { getThemeVersion, subscribeThemeMode } from "../../Theme";
 import { getTextScale, subscribeTextSize } from "../../TextSize";
 import { useControllerInput } from "../../desktop/InputPresentation";
+import { ChartPresentationContext } from "./ChartPresentationContext";
 import { ChartAnnotationsContext } from "./ChartAnnotationsContext";
 import { ChartAxisAlignmentContext } from "./ChartAxisAlignment";
 import {
@@ -35,6 +40,8 @@ export interface BuildContext<S> {
    * viewBox by this, so lengths and font sizes are multiplied by it to match.
    */
   scale: number;
+  /** Canvas caption scale in an expanded inspection view. */
+  fontScale?: number;
   /**
    * Optional chart-specific updater: refresh changed pixels and keep visible cursor hooks
    * current when retaining data. Other charts use the normal setData path.
@@ -200,6 +207,9 @@ export default function UPlotChart<S>(
 ): React.JSX.Element {
   const { ariaLabel, id, height, state, data, structureKey, syncKey } = props;
   const controllerInput = useControllerInput();
+  const presentation = React.useContext(ChartPresentationContext);
+  const presentationRef = React.useRef(presentation);
+  presentationRef.current = presentation;
   const annotations = React.useContext(ChartAnnotationsContext);
   const axisAlignment = React.useContext(ChartAxisAlignmentContext);
   const viewport = React.useContext(ChartViewportContext);
@@ -337,7 +347,10 @@ export default function UPlotChart<S>(
         width: nextWidth,
         height: Math.max(
           1,
-          Math.round((heightRef.current || 300) * chartScale(nextWidth)),
+          Math.round(
+            presentationRef.current?.height ??
+              (heightRef.current || 300) * chartScale(nextWidth),
+          ),
         ),
       });
     };
@@ -394,13 +407,17 @@ export default function UPlotChart<S>(
     const getState = () => stateRef.current;
     const scale = chartScale(width);
     dataUpdateRef.current = undefined;
-    const built = buildRef.current({
+    const options = buildRef.current({
       getState,
       scale,
+      fontScale: presentation?.fontScale,
       registerDataUpdate: (update) => {
         dataUpdateRef.current = update;
       },
     });
+    const built = presentation
+      ? expandedChartOptions(options, presentation.fontScale)
+      : options;
     const alignedAxis = axisAlignment?.register(() =>
       plotRef.current?.redraw(true, true),
     );
@@ -425,7 +442,10 @@ export default function UPlotChart<S>(
       {
         ...built,
         width,
-        height: Math.max(1, Math.round((height || 300) * scale)),
+        height: Math.max(
+          1,
+          Math.round(presentation?.height ?? (height || 300) * scale),
+        ),
         // Only x is synced: these charts plot watts against watt-hours against dollars, so
         // matching their y scales would line up numbers that have nothing to do with each other
         cursor: {
@@ -452,6 +472,7 @@ export default function UPlotChart<S>(
           eventMarkersPlugin(
             () => annotationsRef.current.events,
             () => annotationsRef.current.activeEventKey,
+            presentation?.fontScale,
           ),
           tooltipPlugin(
             getState,
@@ -485,6 +506,7 @@ export default function UPlotChart<S>(
     textScale,
     fontReady,
     axisAlignment,
+    presentation,
   ]);
 
   React.useLayoutEffect(() => {
@@ -510,6 +532,7 @@ export default function UPlotChart<S>(
     themeVersion,
     textScale,
     fontReady,
+    presentation,
   ]);
 
   React.useLayoutEffect(() => {
@@ -709,6 +732,7 @@ export default function UPlotChart<S>(
     textScale,
     viewportEnabled,
     fontReady,
+    presentation,
   ]);
 
   React.useLayoutEffect(() => {

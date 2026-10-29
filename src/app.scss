@@ -7802,3 +7802,120 @@ option {
   color: var(--font-color-primary);
   background: var(--bg-primary);
 }
+
+// Chart inspection uses the full viewport while retaining the shared chart surface.
+.insightsExpandChart.MuiIconButton-root {
+  min-width: var(--control-size);
+  min-height: var(--control-size);
+  margin-left: 4px;
+  color: var(--interactive-strong);
+  flex-shrink: 0;
+}
+.fuelPriceFilter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 16px 8px;
+  font-size: var(--font-size-body2);
+  > span {
+    margin-right: 4px;
+    color: var(--font-color-faded);
+  }
+  .MuiButton-root {
+    gap: 8px;
+    padding: 4px 8px;
+    min-height: var(--control-size);
+    border: 1px solid transparent;
+    color: var(--font-color-primary);
+    &[aria-pressed="true"] {
+      border-color: var(--interactive-strong);
+      background: var(--bg-selected);
+      font-weight: 700;
+    }
+    svg {
+      width: 40px;
+      height: 6px;
+      flex-shrink: 0;
+    }
+  }
+}
+.insightsChartDialog {
+  .MuiDialog-paper.MuiDialog-paperFullScreen {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  .MuiDialog-paper {
+    background: var(--chart-surface);
+  }
+  .expandedChartTitle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    > span {
+      min-width: 0;
+    }
+    .MuiIconButton-root {
+      flex-shrink: 0;
+    }
+  }
+  .insightsViewportToolbar {
+    flex-shrink: 0;
+    max-width: none;
+  }
+  .insightsViewportButtons {
+    .insightsViewportButton,
+    .MuiIconButton-root {
+      width: var(--control-size);
+      height: var(--control-size);
+      flex-basis: var(--control-size);
+    }
+  }
+  .expandedChartContent {
+    padding: 8px 0 16px;
+    min-width: 0;
+  }
+  .fuelPriceFilter .MuiButton-root {
+    font-size: var(--font-size-body1);
+  }
+  .chartLegend,
+  .chartTooltip {
+    font-size: var(--font-size-body1);
+  }
+  .chartLegend {
+    padding: 8px 16px;
+  }
+  .chartLegendSwatch-line {
+    width: 32px;
+  }
+}
+
+@media (max-width: 600px) {
+  .insightsChartDialog .insightsViewportToolbar {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 8px 16px;
+    .insightsViewportDate {
+      flex: 1 0 100%;
+      white-space: normal;
+    }
+  }
+}
+
+.insights .MuiToolbar-root.insightsTrackHeader {
+  flex-flow: row nowrap !important;
+  > h6 {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

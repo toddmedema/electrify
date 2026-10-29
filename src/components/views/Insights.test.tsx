@@ -1,6 +1,8 @@
 import { configureStore, createNextState } from "@reduxjs/toolkit";
 import {
   act,
+  fireEvent,
+  waitFor,
   isInaccessible,
   render as renderUI,
   screen,
@@ -27,6 +29,7 @@ import {
 import { GameType, TickPresentFutureType } from "../../Types";
 import Insights, {
   INSIGHT_PRESETS,
+  INSIGHT_LAYERS,
   MAX_CUSTOM_INSIGHT_PRESETS,
   withRequiredLayers,
 } from "./Insights";
@@ -41,6 +44,7 @@ jest.mock("../base/GameCard", () => ({
 
 interface ChartMockProps {
   currentMinute?: number;
+  selectedFuel?: string;
   title?: string;
   hideTitle?: boolean;
   format?: (value: number) => number | string;
@@ -213,8 +217,14 @@ jest.mock("../base/ChartFinances", () => ({
 jest.mock("../base/ChartForecastFuelPrices", () => ({
   __esModule: true,
   PRICED_FUELS: [],
-  default: ({ syncKey }: ChartMockProps) => (
-    <div role="img" data-chart="fuel-prices" data-sync-key={syncKey} />
+  default: ({ syncKey, selectedFuel }: ChartMockProps) => (
+    <div
+      role="img"
+      aria-label="Fuel price inspection"
+      data-chart="fuel-prices"
+      data-sync-key={syncKey}
+      data-fuel={selectedFuel || "all"}
+    />
   ),
 }));
 jest.mock("../base/ChartForecastDemandByType", () => ({
@@ -542,6 +552,72 @@ describe("Insights layers", () => {
     // must not inherit their mutable weather/fuel/economy projection caches.
     loadSimData(overviewGame.location);
     cacheProjection(overviewGame, overviewProjection);
+  });
+
+  it("offers chart expansion beside plotted layers, never summaries", () => {
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(INSIGHT_LAYERS.map((layer) => layer.id)),
+    );
+    renderInsights();
+    const tracks = screen.getAllByRole("region", { name: / evidence$/ });
+    for (const track of tracks) {
+      const name = track.getAttribute("aria-label")!.replace(/ evidence$/, "");
+      const expand = within(track).queryByRole("button", {
+        name: `Expand ${name} chart`,
+      });
+      expect(expand !== null).toBe(
+        !["Power exchange", "Finance details"].includes(name),
+      );
+    }
+  });
+
+  it("keeps fuel selection and time zoom when expanding and closing a chart", async () => {
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(["fuelPrices", "cash"]),
+    );
+    renderInsights();
+    const layers = localStorage.getItem("insightsLayers");
+    fireEvent.click(screen.getByRole("button", { name: "Coal" }));
+    expect(
+      screen.getByRole("img", { name: "Fuel price inspection" }),
+    ).toHaveAttribute("data-fuel", "Coal");
+    const expand = screen.getByRole("button", {
+      name: "Expand Fuel Prices chart",
+    });
+    act(() => expand.focus());
+    fireEvent.click(expand);
+    const dialog = screen.getByRole("dialog", { name: "Fuel Prices" });
+    expect(
+      within(dialog).getByRole("button", { name: "Coal" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const chart = within(dialog).getByRole("img", {
+      name: "Fuel price inspection",
+    });
+    expect(chart).toHaveAttribute("data-fuel", "Coal");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Zoom in" }));
+    const date = within(dialog).getByLabelText(
+      /^Displayed date range:/,
+    ).textContent;
+    fireEvent.click(within(dialog).getByRole("button", { name: "All fuels" }));
+    expect(
+      within(dialog).getByRole("img", { name: "Fuel price inspection" }),
+    ).toHaveAttribute("data-fuel", "all");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(expand).toHaveFocus();
+    expect(screen.getByLabelText(/^Displayed date range:/)).toHaveTextContent(
+      date!,
+    );
+    expect(localStorage.getItem("insightsLayers")).toBe(layers);
+    expect(screen.getByRole("button", { name: "All fuels" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("shows expanded finance rows and both rate graphs", () => {
