@@ -2,11 +2,15 @@ import { GameToolMemoryContext } from "../base/GameToolMemory";
 import { getHydroAvailability, HYDRO_SITES } from "../../data/HydroSites";
 import { LOCATIONS } from "../../Constants";
 import * as React from "react";
+import { configureStore, createNextState } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitForElementToBeRemoved,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { GENERATORS } from "../../data/Facilities";
@@ -24,43 +28,136 @@ import {
 import { DOWNPAYMENT_PERCENT, TICKS_PER_YEAR } from "../../Constants";
 import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
 import { purchaseTerms } from "../../helpers/Financials";
+import { computeOutlook } from "../base/OutlookForecast";
+import type { EvidenceRequestType } from "../../Types";
 
 jest.mock("../base/ManualLink", () => () => null);
 
-it("resizes an unaffordable generator to the largest affordable slider size", () => {
-  const game = createGame({ scenarioId: 100 });
-  const quote = (size: number) =>
-    GENERATORS(game, size, [], []).find((item) => item.name === "Solar")!;
-  const cash = purchaseTerms(
-    quote(70e6).buildCost,
-    true,
-    game.interestRate,
-  ).downpayment;
-  game.timeline = game.timeline.map((tick) => ({ ...tick, cash }));
-  const onBuildGenerator = jest.fn();
-  render(
-    <BuildGenerators
-      game={game}
-      onBuildGenerator={onBuildGenerator}
-      onBack={jest.fn()}
-    />,
-  );
-  const review = screen.getByRole("button", {
-    name: "Review purchase of Solar",
-  });
-  expect(review).toBeDisabled();
-  const card = screen.getByText(
-    (_text, element) => element?.getAttribute("data-build-option") === "Solar",
-  );
-  fireEvent.click(
-    within(card).getByRole("button", {
-      name: "Use max size",
-    }),
-  );
-  expect(review).toBeEnabled();
-  fireEvent.click(review);
-  fireEvent.click(screen.getByRole("button", { name: "Take loan" }));
-  expect(onBuildGenerator.mock.calls[0][0].peakW).toBe(70e6);
+it.each([false, true])(
+  "resizes an unaffordable generator to the largest affordable slider size (live cash: %s)",
+  (live) => {
+    const game = createGame({ scenarioId: 100 });
+    const quote = (size: number) =>
+      GENERATORS(game, size, [], []).find((item) => item.name === "Solar")!;
+    const cash = purchaseTerms(
+      quote(70e6).buildCost,
+      true,
+      game.interestRate,
+    ).downpayment;
+    const cashAt = (amount: number) => ({
+      ...game,
+      timeline: game.timeline.map((tick) => ({ ...tick, cash: amount })),
+    });
+    const store = configureStore({
+      reducer: {
+        game: (
+          state = cashAt(live ? 0 : cash),
+          action: { type: string; payload?: typeof game },
+        ) => (action.type === "replace" ? action.payload! : state),
+      },
+    });
+    const onBuildGenerator = jest.fn();
+    const catalog = (
+      <BuildGenerators
+        game={store.getState().game}
+        onBuildGenerator={onBuildGenerator}
+        onBack={jest.fn()}
+      />
+    );
+    render(live ? <Provider store={store}>{catalog}</Provider> : catalog);
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "18" } });
+    const review = screen.getByRole("button", {
+      name: "Review purchase of Solar",
+    });
+    expect(review).toBeDisabled();
+    const card = screen.getByText(
+      (_text, element) =>
+        element?.getAttribute("data-build-option") === "Solar",
+    );
+    const useMax = () =>
+      within(card).queryByRole("button", { name: "Use max size" });
+    expect(Boolean(useMax())).toBe(!live);
+    const updateCash = (amount: number) =>
+      act(() => {
+        store.dispatch({ type: "replace", payload: cashAt(amount) });
+      });
+    const smallerCash = purchaseTerms(
+      quote(60e6).buildCost,
+      true,
+      game.interestRate,
+    ).downpayment;
+    updateCash(smallerCash);
+    expect(useMax()).toBeInTheDocument();
+    updateCash(0);
+    expect(Boolean(useMax())).toBe(!live);
+    updateCash(smallerCash);
+    // Both sizes remain below the Review threshold, so the click must read current cash.
+    updateCash(cash);
+    fireEvent.click(
+      within(card).getByRole("button", {
+        name: "Use max size",
+      }),
+    );
+    expect(review).toBeEnabled();
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Take loan" }));
+    expect(onBuildGenerator.mock.calls[0][0].peakW).toBe(70e6);
+  },
+);
+
+it("focuses requested evidence after background quotes arrive", () => {
+  const game = createGame({ scenarioId: 103, seed: 12345 });
+  const result = computeOutlook("build", game);
+  const originalWorker = global.Worker;
+  const worker = {
+    postMessage: jest.fn(),
+    terminate: jest.fn(),
+    onmessage: null as Worker["onmessage"],
+  };
+  const factory = jest
+    .spyOn(
+      jest.requireMock("../base/OutlookWorkerClient"),
+      "createOutlookWorker",
+    )
+    .mockReturnValue(worker as unknown as Worker);
+  const request: EvidenceRequestType = {
+    id: 1,
+    runId: 0,
+    target: { card: "FACILITIES", view: "BUILD_GENERATORS" },
+  };
+  const ready = jest.fn();
+  jest.useFakeTimers();
+  global.Worker = jest.fn() as unknown as typeof Worker;
+  try {
+    const view = render(
+      <BuildGenerators
+        game={game}
+        onBack={jest.fn()}
+        onBuildGenerator={jest.fn()}
+        evidenceRequest={request}
+        onEvidenceReady={ready}
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Calculating quotes");
+    expect(ready).not.toHaveBeenCalled();
+    act(() => jest.runAllTimers());
+    const { requestId } = worker.postMessage.mock.calls[0][0];
+    act(() =>
+      worker.onmessage?.call(
+        worker as unknown as Worker,
+        { data: { requestId, result } } as MessageEvent,
+      ),
+    );
+    expect(ready).toHaveBeenCalledWith(
+      request,
+      screen.getByLabelText("Generator build options"),
+    );
+    view.unmount();
+  } finally {
+    factory.mockRestore();
+    global.Worker = originalWorker;
+    jest.useRealTimers();
+  }
 });
 
 describe("the three-year build forecast", () => {
@@ -82,6 +179,71 @@ describe("the three-year build forecast", () => {
         .map((chart) => chart.getAttribute("aria-label")),
     };
   }
+
+  it("keeps typical-year quotes stable while the live clock advances", async () => {
+    let game = {
+      ...createGame({ scenarioId: 103, seed: 12345 }),
+      speed: "NORMAL" as const,
+    };
+    const view = render(<BuildGenerators game={game} {...callbacks} />);
+    const original = quotes(view.container).charts;
+    const catalog = jest.spyOn(Facilities, "GENERATORS");
+    for (let i = 0; i < 3; i++) {
+      game = createNextState(game, (draft) => GameReducer.tickState(draft));
+      view.rerender(<BuildGenerators game={game} {...callbacks} />);
+    }
+    await waitFor(() => expect(timeline).toHaveBeenCalledTimes(1));
+    expect(catalog).not.toHaveBeenCalled();
+    catalog.mockRestore();
+    expect(quotes(view.container).charts).toEqual(original);
+  });
+
+  it("updates affordability and an open review from live cash without rebuilding quotes", () => {
+    const initial = {
+      ...createGame({ scenarioId: 103, seed: 12345 }),
+      speed: "NORMAL" as const,
+    };
+    const cashAt = (cash: number) => ({
+      ...initial,
+      timeline: initial.timeline.map((tick) => ({ ...tick, cash })),
+    });
+    const store = configureStore({
+      reducer: {
+        game: (
+          state = cashAt(0),
+          action: { type: string; payload?: typeof initial },
+        ) => (action.type === "replace" ? action.payload! : state),
+      },
+    });
+    render(
+      <Provider store={store}>
+        <BuildGenerators game={store.getState().game} {...callbacks} />
+      </Provider>,
+    );
+    const review = screen.getByRole("button", {
+      name: "Review purchase of Solar",
+    });
+    expect(review).toBeDisabled();
+    act(() => {
+      store.dispatch({ type: "replace", payload: cashAt(1e12) });
+    });
+    expect(review).toBeEnabled();
+    fireEvent.click(review);
+    const dialog = screen.getByRole("dialog");
+    expect(
+      within(dialog).getByRole("button", { name: "Pay cash" }),
+    ).toBeEnabled();
+    act(() => {
+      store.dispatch({ type: "replace", payload: cashAt(0) });
+    });
+    expect(
+      within(dialog).getByRole("button", { name: "Pay cash" }),
+    ).toBeDisabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Take loan" }),
+    ).toBeDisabled();
+    expect(timeline).toHaveBeenCalledTimes(1);
+  });
 
   it("is computed once per game state across slider, compare, details and remounts", () => {
     const game = createGame({ scenarioId: 100, difficulty: "Employee" });
@@ -128,13 +290,13 @@ describe("the three-year build forecast", () => {
     generators.mockRestore();
   });
 
-  it("is recomputed when the game state changes", () => {
+  it("refreshes changed paused inputs without rebuilding for an equal state", async () => {
     const game = createGame({ scenarioId: 100, difficulty: "Employee" });
     const view = render(<BuildGenerators game={game} {...callbacks} />);
     expect(timeline).toHaveBeenCalledTimes(1);
-    // A new state object, even with equal contents, is a new forecast
+    // Equal inputs do not need another simulation.
     view.rerender(<BuildGenerators game={{ ...game }} {...callbacks} />);
-    expect(timeline).toHaveBeenCalledTimes(2);
+    expect(timeline).toHaveBeenCalledTimes(1);
     // And a changed input reaches it: here the cash the forecast starts from
     const richer = {
       ...game,
@@ -145,8 +307,30 @@ describe("the three-year build forecast", () => {
       ),
     };
     view.rerender(<BuildGenerators game={richer} {...callbacks} />);
-    expect(timeline).toHaveBeenCalledTimes(3);
-    expect(timeline.mock.calls[2][1]).toBe(1e12);
+    await waitFor(() => expect(timeline).toHaveBeenCalledTimes(2));
+    expect(timeline.mock.calls[1][1]).toBe(1e12);
+  });
+
+  it("refreshes running quotes at month boundaries and after fleet decisions", async () => {
+    let game = {
+      ...createGame({ scenarioId: 103, seed: 12345 }),
+      speed: "FAST" as const,
+    };
+    const view = render(<BuildGenerators game={game} {...callbacks} />);
+    expect(timeline).toHaveBeenCalledTimes(1);
+    for (let i = 0; i < 96; i++)
+      game = createNextState(game, (draft) => GameReducer.tickState(draft));
+    // Discard the reducer's own rollover forecast calls; measure only the catalog.
+    timeline.mockClear();
+    view.rerender(<BuildGenerators game={game} {...callbacks} />);
+    await waitFor(() => expect(timeline).toHaveBeenCalledTimes(1));
+    const changed = GameReducer.default(
+      game,
+      GameReducer.togglePauseFacility(game.facilities[0].id),
+    );
+    timeline.mockClear();
+    view.rerender(<BuildGenerators game={changed} {...callbacks} />);
+    await waitFor(() => expect(timeline).toHaveBeenCalledTimes(1));
   });
 
   it("quotes exactly what a freshly computed forecast quotes", () => {

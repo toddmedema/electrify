@@ -118,11 +118,20 @@ export async function sortBuildCatalog(
     name: "Sort facilities",
     exact: true,
   });
+  const compact = page.getByRole("button", { name: /^Sort facilities:/ });
+  await expect(
+    select.or(compact).filter({ visible: true }).first(),
+  ).toBeVisible();
   if (await select.isVisible()) {
     await select.click();
     await page.getByRole("option", { name: order, exact: true }).click();
+    await expect(select).toContainText(order);
   } else {
-    await page.getByRole("button", { name: /^Sort facilities:/ }).click();
+    await compact.click();
     await page.getByRole("menuitem", { name: order, exact: true }).click();
+    await expect(compact).toHaveAttribute(
+      "aria-label",
+      `Sort facilities: ${order}`,
+    );
   }
 }

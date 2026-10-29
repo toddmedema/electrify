@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -10,41 +11,121 @@ import { GameType, isStorage } from "../../Types";
 import BuildStorage from "./BuildStorage";
 import { STORAGE } from "../../data/Facilities";
 import { purchaseTerms } from "../../helpers/Financials";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
 
 jest.mock("../base/ManualLink", () => () => null);
 
-it("resizes an unaffordable battery to the largest affordable slider size", () => {
-  const state = game();
-  state.date.year = 2020;
-  const quote = (size: number) =>
-    STORAGE(state, size).find((item) => item.name === "Battery")!;
-  const cash = purchaseTerms(
-    quote(70e6).buildCost,
-    true,
-    state.interestRate,
-  ).downpayment;
-  state.timeline = state.timeline.map((tick) => ({ ...tick, cash }));
-  const onBuildStorage = jest.fn();
+it.each([false, true])(
+  "resizes an unaffordable battery to the largest affordable slider size (live cash: %s)",
+  (live) => {
+    const state = game();
+    state.date.year = 2020;
+    const quote = (size: number) =>
+      STORAGE(state, size).find((item) => item.name === "Battery")!;
+    const cash = purchaseTerms(
+      quote(70e6).buildCost,
+      true,
+      state.interestRate,
+    ).downpayment;
+    const cashAt = (amount: number) => ({
+      ...state,
+      timeline: state.timeline.map((tick) => ({ ...tick, cash: amount })),
+    });
+    const store = configureStore({
+      reducer: {
+        game: (
+          state = cashAt(live ? 0 : cash),
+          action: { type: string; payload?: typeof state },
+        ) => (action.type === "replace" ? action.payload! : state),
+      },
+    });
+    const onBuildStorage = jest.fn();
+    const catalog = (
+      <BuildStorage
+        game={store.getState().game}
+        onBuildStorage={onBuildStorage}
+        onBack={jest.fn()}
+      />
+    );
+    render(live ? <Provider store={store}>{catalog}</Provider> : catalog);
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "18" } });
+    const review = screen.getByRole("button", {
+      name: "Review purchase of Lithium Battery",
+    });
+    expect(review).toBeDisabled();
+    const card = screen.getByText(
+      (_text, element) =>
+        element?.getAttribute("data-build-option") === "Lithium Battery",
+    );
+    const useMax = () =>
+      within(card).queryByRole("button", { name: "Use max size" });
+    expect(Boolean(useMax())).toBe(!live);
+    const updateCash = (amount: number) =>
+      act(() => {
+        store.dispatch({ type: "replace", payload: cashAt(amount) });
+      });
+    const smallerCash = purchaseTerms(
+      quote(60e6).buildCost,
+      true,
+      state.interestRate,
+    ).downpayment;
+    updateCash(smallerCash);
+    expect(useMax()).toBeInTheDocument();
+    updateCash(0);
+    expect(Boolean(useMax())).toBe(!live);
+    updateCash(smallerCash);
+    // Both sizes remain below the Review threshold, so the click must read current cash.
+    updateCash(cash);
+    fireEvent.click(within(card).getByRole("button", { name: "Use max size" }));
+    expect(review).toBeEnabled();
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Take loan" }));
+    expect(onBuildStorage.mock.calls[0][0].peakWh).toBe(70e6);
+  },
+);
+
+it("keeps storage affordability and its open review current independently of the quote", () => {
+  const initial = {
+    ...createGame({ scenarioId: 100, seed: 12345 }),
+    speed: "FAST" as const,
+  };
+  const cashAt = (cash: number) => ({
+    ...initial,
+    timeline: initial.timeline.map((tick) => ({ ...tick, cash })),
+  });
+  const store = configureStore({
+    reducer: {
+      game: (
+        state = cashAt(0),
+        action: { type: string; payload?: typeof initial },
+      ) => (action.type === "replace" ? action.payload! : state),
+    },
+  });
   render(
-    <BuildStorage
-      game={state}
-      onBuildStorage={onBuildStorage}
-      onBack={jest.fn()}
-    />,
+    <Provider store={store}>
+      <BuildStorage
+        game={store.getState().game}
+        onBack={jest.fn()}
+        onBuildStorage={jest.fn()}
+      />
+    </Provider>,
   );
   const review = screen.getByRole("button", {
-    name: "Review purchase of Lithium Battery",
+    name: "Review purchase of Pumped Hydro",
   });
   expect(review).toBeDisabled();
-  const card = screen.getByText(
-    (_text, element) =>
-      element?.getAttribute("data-build-option") === "Lithium Battery",
-  );
-  fireEvent.click(within(card).getByRole("button", { name: "Use max size" }));
+  act(() => {
+    store.dispatch({ type: "replace", payload: cashAt(1e12) });
+  });
   expect(review).toBeEnabled();
   fireEvent.click(review);
-  fireEvent.click(screen.getByRole("button", { name: "Take loan" }));
-  expect(onBuildStorage.mock.calls[0][0].peakWh).toBe(70e6);
+  expect(screen.getByRole("button", { name: "Pay cash" })).toBeEnabled();
+  act(() => {
+    store.dispatch({ type: "replace", payload: cashAt(0) });
+  });
+  expect(screen.getByRole("button", { name: "Pay cash" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Take loan" })).toBeDisabled();
 });
 
 function game(): GameType {

@@ -210,18 +210,22 @@ test("reduced motion skips the logo movement and stagger", async ({ page }) => {
   const logo = page.locator("#menuCard .homeLogo");
   await expect(logo).toBeVisible();
   expect(
-    await page.locator("html").getAttribute("data-menu-animation-requested"),
-  ).toBeNull();
-  expect(
     await logo.evaluate(
       (element) => element.getAnimations({ subtree: true }).length,
     ),
   ).toBe(0);
+  // Control feedback can still be settling after the startup handoff. The audit below
+  // rejects entrance motion even if it finishes before this animation count settles.
+  await expect
+    .poll(() =>
+      page
+        .locator("#menuCard")
+        .evaluate((element) => element.getAnimations({ subtree: true }).length),
+    )
+    .toBe(0);
   expect(
-    await page
-      .locator("#menuCard")
-      .evaluate((element) => element.getAnimations({ subtree: true }).length),
-  ).toBe(0);
+    await page.locator("html").getAttribute("data-menu-animation-requested"),
+  ).toBeNull();
 });
 
 for (const theme of ["light", "dark"]) {

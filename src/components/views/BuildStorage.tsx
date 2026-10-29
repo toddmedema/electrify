@@ -1,5 +1,10 @@
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
+import {
+  sameBuildQuote,
+  useBuildAffordability,
+  useBuildCashReader,
+} from "../base/useBuildCash";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
 import { Button, List, Typography } from "@mui/material";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
@@ -21,8 +26,9 @@ import {
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
-import PurchaseReviewDialog, {
-  financingShortfallText,
+import {
+  LivePurchaseReviewDialog as PurchaseReviewDialog,
+  BuildCashWarning,
 } from "../base/PurchaseReviewDialog";
 import {
   getBuildAvailability,
@@ -74,6 +80,12 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     true,
     props.interestRate,
   );
+  const affordable = useBuildAffordability(cash, downpayment);
+  const minimumAffordable = useBuildAffordability(
+    cash,
+    purchaseTerms(props.minimumBuildCost ?? Infinity, true, props.interestRate)
+      .downpayment,
+  );
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
   const maxSizeWh = floorToTwoSignificantDigits(storage.maxPeakWh);
   const { buildable, secondaryText, offerMaxSize } = getBuildAvailability({
@@ -90,13 +102,11 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     props.location,
     storage.viableLocationsRemaining,
   );
-  const shortfall = financingShortfallText(cash, downpayment);
+  const shortfall = !affordable ? (
+    <BuildCashWarning cash={cash} downpayment={downpayment} />
+  ) : undefined;
   const buildSubtitle = (buildable && shortfall) || secondaryText;
-  const offerAffordableSize =
-    buildable &&
-    !!shortfall &&
-    purchaseTerms(props.minimumBuildCost, true, props.interestRate)
-      .downpayment <= cash;
+  const offerAffordableSize = buildable && !!shortfall && minimumAffordable;
 
   const openReview = (e: React.SyntheticEvent) => {
     setOpen(true);
@@ -270,10 +280,11 @@ export interface DispatchProps {
 
 export type Props = StateProps & DispatchProps;
 
-export default function StorageBuildDialog(props: Props): React.JSX.Element {
+function StorageBuildDialog(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const readCash = useBuildCashReader(now?.cash ?? 0);
   const listRef = useToolScroll<HTMLUListElement>("storage.scroll");
   const revealResizedRow = useBuildRowReveal(listRef);
   const [sliderTick, setSliderTick] = useToolState<number>("storage.size", () =>
@@ -335,7 +346,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
               const size =
                 largestAffordableBuildSize(
                   buildSizeOptions(4, 37, peakWh),
-                  cash,
+                  readCash(),
                   (capacity) =>
                     STORAGE(game, capacity).find(
                       (item) => item.name === g.name,
@@ -359,3 +370,5 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
     </div>
   );
 }
+
+export default React.memo(StorageBuildDialog, sameBuildQuote);

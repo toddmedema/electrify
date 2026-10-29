@@ -7,6 +7,46 @@ import { intertieOutlook } from "../../helpers/IntertieOutlook";
 import { intertieContextForGame } from "../../helpers/Transmission";
 import { forecastWorkerSnapshot } from "./ForecastWorkerSnapshot";
 import { computeOutlook, forecastCutoffIndex } from "./OutlookForecast";
+import { GENERATORS } from "../../data/Facilities";
+import { expectedMonthlyOutputShape } from "../../helpers/ExpectedOutput";
+
+it("preserves generator quotes and typical-year output with compact worker readings", () => {
+  const game = createGame({ scenarioId: 108, seed: 12345 });
+  const before = JSON.stringify(game);
+  const now = game.timeline[0];
+  const full = generateNewTimeline(
+    game,
+    now.cash,
+    now.customers,
+    TICKS_PER_YEAR * 3,
+  );
+  const compact = computeOutlook("build", forecastWorkerSnapshot(game))!;
+  const quote = (forecast: typeof compact) =>
+    GENERATORS(
+      game,
+      100e6,
+      forecast.windSpeeds,
+      forecast.solarIrradiances,
+      forecast.offshoreWindSpeeds,
+      forecast.airborneWindSpeeds,
+    );
+  const expected = {
+    timeline: full,
+    windSpeeds: full.map((tick) => tick.windKph),
+    offshoreWindSpeeds: full.flatMap((tick) =>
+      tick.windOffshoreKph === undefined ? [] : [tick.windOffshoreKph],
+    ),
+    airborneWindSpeeds: full.map((tick) => tick.windAirborneKph),
+    solarIrradiances: full.map((tick) => tick.solarIrradianceWM2),
+  };
+  expect(quote(compact)).toEqual(quote(expected));
+  for (const generator of quote(compact))
+    expect(expectedMonthlyOutputShape(generator, compact.timeline)).toEqual(
+      expectedMonthlyOutputShape(generator, full),
+    );
+  expect(compact.timeline[0]).not.toHaveProperty("cash");
+  expect(JSON.stringify(game)).toBe(before);
+});
 
 it("preserves the old hydro forecast with an active fleet, story and pending customer policy", () => {
   const game = reducer(
