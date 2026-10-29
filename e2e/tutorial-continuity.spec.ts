@@ -2,37 +2,52 @@ import { expect, Page, test } from "./fixtures";
 import { isPaneLayout, openPane, waitForSettled } from "./layout";
 
 async function startLesson(page: Page, name: string) {
-  await page.addInitScript((lesson) => {
-    localStorage.clear();
-    localStorage.setItem(
-      "plays",
-      JSON.stringify({
-        plays: [0, 1, 2, 4, 3, 5]
-          .slice(
-            0,
-            [
-              "Electricity",
-              "Generators",
-              "Storage",
-              "Finances",
-              "Pricing",
-              "Forecasting",
-            ].indexOf(lesson),
-          )
-          .map((scenarioId) => ({
-            scenarioId,
-            timesPlayed: 1,
-            date: "2026-09-18",
-          })),
-      }),
-    );
-  }, name);
+  await page.addInitScript(
+    ({ lesson, theme }) => {
+      localStorage.clear();
+      localStorage.setItem("theme", theme);
+      localStorage.setItem(
+        "plays",
+        JSON.stringify({
+          plays: [0, 1, 2, 4, 3, 5]
+            .slice(
+              0,
+              [
+                "Electricity",
+                "Generators",
+                "Storage",
+                "Finances",
+                "Pricing",
+                "Forecasting",
+              ].indexOf(lesson),
+            )
+            .map((scenarioId) => ({
+              scenarioId,
+              timesPlayed: 1,
+              date: "2026-09-18",
+            })),
+        }),
+      );
+    },
+    {
+      lesson: name,
+      theme: test.info().project.name.startsWith("mobile-") ? "dark" : "light",
+    },
+  );
   await page.goto("/");
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await page
     .getByRole("button", { name: `Start ${name}`, exact: true })
     .click();
   await expect(page.locator(".tutorialHud")).toBeVisible();
+}
+
+async function captureTutorial(page: Page, name: string) {
+  await expect(page.locator(".snackbar")).toBeHidden();
+  await page.screenshot({
+    path: test.info().outputPath(name),
+    animations: "disabled",
+  });
 }
 
 async function next(page: Page) {
@@ -76,6 +91,7 @@ test("Pricing reveals customers once and keeps the chosen rate when 1x starts it
 }) => {
   await startLesson(page, "Pricing");
   await page.locator("#programsNav").click();
+  await captureTutorial(page, "pricing-mechanisms.png");
   const rate = page.locator("#rateSlider input");
   await rate.focus();
   await rate.press("ArrowLeft");
@@ -128,12 +144,13 @@ test("Storage names its fresh challenge, keeps practice until approval, and leav
   await expect(page.locator(".tutorialHud")).toContainText(
     "Check generation comes before storage",
   );
-  await next(page);
   const start = page.getByRole("button", {
     name: "Start final challenge",
     exact: true,
   });
   await expect(start).toBeVisible();
+  await expect(page.locator(".tutorialHudVisuallyHidden")).toHaveText("6 of 7");
+  await captureTutorial(page, "storage-challenge-handoff.png");
   await page.getByRole("button", { name: "slow speed", exact: true }).click();
   await expect(start).toBeVisible();
   await expect(page.locator(".facilityRowHeader")).toHaveCount(3);
@@ -212,8 +229,9 @@ test("Forecasting reveals later charts and waits for explicit fresh-challenge ap
   await page.getByRole("button", { name: "slow speed", exact: true }).click();
   await expect(start).toBeVisible();
   await expect(page.locator(".tutorialHud")).toContainText(
-    "Start again before the blackout",
+    "Restart for the final challenge",
   );
+  await captureTutorial(page, "forecasting-restart.png");
   await start.click();
   await expect(page.locator(".tutorialHud")).toContainText(
     "Finish new generation",
