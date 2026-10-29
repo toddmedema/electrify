@@ -3387,6 +3387,14 @@ function canFollowInflation(state: GameType): boolean {
 }
 
 /**
+ * Whether the rate moves with inflation: the saved setting, honoured only where following is
+ * allowed, so an edited save cannot inflate an investor's or a multiplayer company's rate.
+ */
+function followsInflation(state: GameType): boolean {
+  return !!state.rateFollowsInflation && canFollowInflation(state);
+}
+
+/**
  * The rate a following public utility charges at `date`: the current rate carried forward by
  * whatever inflation has passed since now, mirroring the live rollover's January step.
  */
@@ -3405,8 +3413,8 @@ function inflationAdjustedRateAt(state: GameType, date: DateType): number {
 
 /** Current-month edits stay in force; future months carry the rate forward with inflation. */
 function customerBaseRateAt(state: GameType, date: DateType): number {
-  return state.rateFollowsInflation &&
-    date.monthsElapsed > state.date.monthsElapsed
+  return date.monthsElapsed > state.date.monthsElapsed &&
+    followsInflation(state)
     ? inflationAdjustedRateAt(state, date)
     : state.dollarsPerkWh;
 }
@@ -3803,7 +3811,7 @@ export function* tickStatePhases(
           `${POLICIES[id].name}: ${policyChoiceLabel(id, state.policies!.programs[id])} starts this month.`,
         ),
       );
-      if (state.rateFollowsInflation) {
+      if (followsInflation(state)) {
         // The retail index steps once a year, in January; carry the rate across that step.
         const previousDate = getDateFromMinute(
           state.date.minute - TICK_MINUTES,

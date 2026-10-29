@@ -160,4 +160,27 @@ describe("public utility rate following inflation", () => {
     expect(next.rateFollowsInflation).toBe(false);
     expect(next.dollarsPerkWh).toBe(game.dollarsPerkWh);
   });
+
+  it("ignores a saved follow setting on a run that cannot follow inflation", () => {
+    // parseSave accepts the boolean on any run, so an edited save can carry it.
+    const game = {
+      ...createGame({ scenarioId: INVESTOR_ID }),
+      rateFollowsInflation: true,
+    };
+    const rate = game.dollarsPerkWh;
+    const now = game.timeline[0];
+    const forecast = generateNewTimeline(
+      game,
+      now.cash,
+      now.customers,
+      13 * 24,
+      60,
+    );
+    expect(forecast[12 * 24].customerBillingRate).toBe(rate);
+    runMonths(game, 13);
+    expect(
+      getRateInflationIndex(game.date, game.startingYear, game.seed),
+    ).not.toBe(1);
+    expect(game.dollarsPerkWh).toBe(rate);
+  });
 });
