@@ -1107,7 +1107,11 @@ function completeRetrofits(state: GameType, simulated = false) {
       );
     delete facility.upgradeInProgress;
     if (simulated) return;
-    const message = `Upgrade complete: ${facility.name} is back online with ${retrofitLabel(upgrade.upgrade)}`;
+    // Staged winterization keeps the plant running, so it never comes back online.
+    const message =
+      upgrade.upgrade === "coldWeatherPackage"
+        ? `Upgrade complete: ${facility.name} now has ${retrofitLabel(upgrade.upgrade)}`
+        : `Upgrade complete: ${facility.name} is back online with ${retrofitLabel(upgrade.upgrade)}`;
     logGameEvent(state, "CONSTRUCTION", message, {
       actionTarget: { card: "FACILITIES", view: "FLEET" },
     });
