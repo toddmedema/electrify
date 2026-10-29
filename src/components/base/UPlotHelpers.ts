@@ -134,8 +134,44 @@ export function expandedChartOptions(
       /(\d+)px/,
       (_match, size) => `${Math.round(Number(size) * fontScale)}px`,
     );
+  const padding: uPlot.Padding = options.padding
+    ? [...options.padding]
+    : [null, null, null, null];
+  const xAxisIndex =
+    options.axes?.findIndex((axis) => axis.scale === "x") ?? -1;
+  if (xAxisIndex >= 0 && !options.axes?.some((axis) => axis.side === 1)) {
+    const axis = options.axes![xAxisIndex];
+    const originalRight = padding[1];
+    padding[1] = (plot, side, sides, cycle) => {
+      const reserve =
+        typeof originalRight === "function"
+          ? originalRight(plot, side, sides, cycle)
+          : (originalRight ?? 0);
+      const range = plot.scales.x;
+      const splits =
+        typeof axis.splits === "function"
+          ? axis.splits(plot, xAxisIndex, range.min ?? 0, range.max ?? 0, 0, 0)
+          : (axis.splits ?? []);
+      const labels =
+        typeof axis.values === "function"
+          ? axis.values(plot, splits, xAxisIndex, 0, 0)
+          : [];
+      const finalLabel = labels[labels.length - 1];
+      if (finalLabel == null) return reserve;
+      const font = enlargeFont(axis.font);
+      // Endpoint dates are centered on the plot edge; enlarged labels need room beyond it.
+      return Math.ceil(
+        Math.max(
+          reserve,
+          textWidth(String(finalLabel), font, Number.parseFloat(font)) / 2 +
+            4 * getTextScale(),
+        ),
+      );
+    };
+  }
   return {
     ...options,
+    padding,
     axes: options.axes?.map((axis) => {
       const font = enlargeFont(axis.font);
       const originalSize = axis.size;

@@ -7813,14 +7813,22 @@ option {
 }
 .fuelPriceFilter {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   padding: 4px 16px 8px;
   font-size: var(--font-size-body2);
-  > span {
+  container-type: inline-size;
+  container-name: fuel-prices;
+  .fuelPriceFilterLabel {
     margin-right: 4px;
     color: var(--font-color-faded);
+  }
+  .fuelPriceFilterOptions {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    min-width: 0;
+    gap: 4px;
   }
   .MuiButton-root {
     gap: 8px;
@@ -7859,6 +7867,7 @@ option {
     gap: 16px;
     padding: 8px 16px;
     border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
     > span {
       min-width: 0;
     }
@@ -7879,8 +7888,22 @@ option {
     }
   }
   .expandedChartContent {
+    display: flex;
+    flex-direction: column;
     padding: 8px 0 16px;
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .expandedChartBody {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    > * {
+      flex-shrink: 0;
+    }
   }
   .fuelPriceFilter .MuiButton-root {
     font-size: var(--font-size-body1);
@@ -7894,6 +7917,31 @@ option {
   }
   .chartLegendSwatch-line {
     width: 32px;
+  }
+}
+
+// Three named controls per row keep the fuel key to two rows on phones and narrow panes.
+// The sample sits above its name so the dash pattern stays long enough to recognize.
+@container fuel-prices (max-width: 568px) {
+  .fuelPriceFilterLabel {
+    display: none;
+  }
+  .fuelPriceFilter .fuelPriceFilterOptions {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr));
+    .MuiButton-root {
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
+      padding: 4px;
+      font-size: var(--font-size-body2);
+      line-height: 1.25;
+      white-space: normal;
+      svg {
+        width: 32px;
+      }
+    }
   }
 }
 

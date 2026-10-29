@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openBuild } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`simulation assumptions support decisions in ${theme}`, async ({
@@ -10,46 +10,13 @@ for (const theme of ["light", "dark"] as const) {
       localStorage.clear();
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
-      localStorage.setItem("insightsLayers", JSON.stringify(["fuelPrices"]));
     }, theme);
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
-    const insights = page.locator(".insights:visible");
-    await openPane(
-      insights,
-      page.getByRole("button", { name: "Insights", exact: true }),
-    );
-    const costs = insights
-      .locator("details")
-      .filter({ hasText: "Compare possible costs in five years" });
-    await costs.locator("summary").click();
-    await expect(costs).toContainText("today's fuel use continues");
-    await expect(costs.getByText(/Prime borrowing rate:/)).toHaveCount(3);
-    expect(
-      await costs.evaluate((el) => el.scrollWidth - el.clientWidth),
-    ).toBeLessThanOrEqual(1);
     const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
-    if (
-      reviewDir &&
-      theme === "light" &&
-      testInfo.project.name === "desktop-chromium"
-    ) {
-      await costs.scrollIntoViewIfNeeded();
-      // Finish the view transition before capturing the review frame.
-      await page.waitForTimeout(400);
-      await page.screenshot({
-        path: path.join(reviewDir, "desktop-cost-assumptions-light.png"),
-      });
-    }
-    const facilities = page.locator(".facilities:visible");
-    await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
-    await page.locator(".button-buildFacility").click();
-    await page.locator(".button-buildGenerator").click();
-    const first = page.locator(".buildOption").first();
+    const build = await openBuild(page);
+    const first = build.locator(".buildOption").first();
     await first.getByRole("button", { name: /Show .* details/ }).click();
     await expect(first).toContainText("Accounting lifetime");
     await first.getByRole("button", { name: /Review purchase of/ }).click();
@@ -76,9 +43,7 @@ for (const theme of ["light", "dark"] as const) {
     }
     await dialog.getByRole("button", { name: "close", exact: true }).click();
     await expect(dialog).not.toBeVisible();
-    await page.getByRole("button", { name: "close", exact: true }).click();
-    await facilities.locator(".button-buildFacility").click();
-    await page.getByRole("tab", { name: "Interties", exact: true }).click();
+    await build.getByRole("tab", { name: "Interties", exact: true }).click();
     // The neighbour's emissions are a metric on the corridor card now, beside its cost and
     // build time, rather than a separate disclosure below the list.
     const trade = page

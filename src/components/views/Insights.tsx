@@ -105,7 +105,6 @@ import ChartForecastWater from "../base/ChartForecastWater";
 import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
-import EconomicFutureComparison from "../base/EconomicFutureComparison";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { UnitsContext } from "../base/UnitsContext";
 import {
@@ -1739,7 +1738,6 @@ export default class Insights extends React.Component<Props, State> {
                 multiyear={multiyear}
                 syncKey={syncKey}
               />
-              <EconomicFutureComparison game={game} />
             </>
           );
           break;
