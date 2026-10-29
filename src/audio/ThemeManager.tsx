@@ -40,6 +40,7 @@ export class ThemeManager {
   private paused: boolean;
   private theme: MusicDefinition;
   private timeout: ReturnType<typeof setTimeout> | null = null;
+  private loopResumeListener: (() => void) | null = null;
   private recoveryTimeout: ReturnType<typeof setTimeout> | null = null;
   private mixedPressure = 0;
   private transitionEndsAt = 0;
@@ -99,9 +100,13 @@ export class ThemeManager {
   }
 
   private fadeOut() {
-    if (this.timeout) {
+    if (this.timeout !== null) {
       clearTimeout(this.timeout);
       this.timeout = null;
+    }
+    if (this.loopResumeListener !== null) {
+      this.context.removeEventListener("statechange", this.loopResumeListener);
+      this.loopResumeListener = null;
     }
     // Every caller of this is ending the current playback, so there is no longer a position to
     // measure against -- loopTheme sets it again when it starts the next one.
@@ -242,14 +247,51 @@ export class ThemeManager {
       return;
     }
 
-    // Wrap the theme when it actually ends. A theme resumed part-way through has that much less
-    // left to play, so arming this with the full duration would push the loop boundary later on
-    // every pause / resume.
+    this.scheduleLoop();
+  }
+
+  private scheduleLoop() {
+    if (this.themeStartedAt === null || this.paused || this.theme.loop) {
+      return;
+    }
+    // JavaScript timers can keep advancing while the browser's audio clock is suspended.
+    // Wait for that clock to restart rather than polling a nearly finished track in a loop.
+    if (this.context.state !== "running") {
+      if (this.context.state !== "closed") {
+        const onStateChange = () => {
+          if (
+            this.context.state !== "running" &&
+            this.context.state !== "closed"
+          ) {
+            return;
+          }
+          this.context.removeEventListener("statechange", onStateChange);
+          this.loopResumeListener = null;
+          this.scheduleLoop();
+        };
+        this.loopResumeListener = onStateChange;
+        this.context.addEventListener("statechange", onStateChange);
+      }
+      return;
+    }
+
+    // A timer is only a wake-up: the playhead decides when the theme has actually finished.
+    // Backdating themeStartedAt on resume also keeps this deadline at the original loop boundary.
+    const remainingMs =
+      (this.themeStartedAt +
+        this.theme.durationMs / 1000 -
+        this.context.currentTime) *
+      1000;
+    if (remainingMs <= 0) {
+      this.loopTheme();
+      return;
+    }
     this.timeout = setTimeout(
       () => {
-        this.loopTheme();
+        this.timeout = null;
+        this.scheduleLoop();
       },
-      theme.durationMs - offsetSeconds * 1000,
+      Math.max(1, Math.ceil(remainingMs)),
     );
   }
 

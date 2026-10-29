@@ -242,8 +242,8 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
 type StorageSortKey = "buildCost" | "yearsToBuild";
 
 const sortOptions: ReadonlyArray<readonly [StorageSortKey, string]> = [
-  ["buildCost", "Build Cost"],
-  ["yearsToBuild", "Build Time"],
+  ["buildCost", "Build cost"],
+  ["yearsToBuild", "Build time"],
 ];
 
 function valueLabelFormat(x: number) {

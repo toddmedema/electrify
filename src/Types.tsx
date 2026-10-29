@@ -798,13 +798,16 @@ export interface TutorialStepType {
   // the objective always opens on a deed instead of a paragraph to read
   action: string;
   content: React.JSX.Element;
+  // Runtime restrictions follow authored phases rather than positions in the walkthrough.
+  phase?:
+    | "GENERATOR_CHOICES"
+    | "INTERTIE_STRESS_PREPARE"
+    | "INTERTIE_STRESS_INSPECT"
+    | "INTERTIE_STRESS_SUPPLY";
   // Game chrome this step doesn't need yet. The first mission starts almost bare and reveals
   // controls as they're taught, so a new player isn't choosing between a dozen buttons before
   // they've made their first move. Presentation only: the gates never depend on it
   hideUi?: TutorialUiIdType[];
-  // Extra help, always shown beneath the step's sentence. Kept outside content so authored
-  // steps state the task first and the help second, in a consistent style.
-  hint?: React.ReactNode;
   // Present = the step is action-gated ("play, don't tell"): the HUD shows a "complete
   // objective" status instead of a Next button, and the walkthrough advances the moment this
   // returns true. Evaluated after every dispatch - including every tick - so keep it to
@@ -1138,7 +1141,7 @@ export interface FacilityResilienceType {
   // "Sun" with trackers: the share of hail damage a tracked array still takes, fixed at build by
   // the stow angle the trackers of that year could reach.
   trackerHailDamageFactor?: number; // (0, 1]
-  coldWeatherPackage?: boolean; // "Natural Gas" fuel only, either cycle
+  coldWeatherPackage?: boolean; // Gas, coal, nuclear, and onshore wind
   // "Natural Gas" fuel only: the coldest representative-day minimum the plant runs through without a
   // derate, resolved at build or retrofit from the location so it cannot drift afterwards.
   designMinTempC?: number; // [-60, 0]
@@ -1192,6 +1195,8 @@ export interface WorldEventEffectsType {
   /** Fixed company-wide operating expense charged once per active story month. */
   operatingExpensePerMonth?: number;
   facilityOutputMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
+  /** Cold-only losses; installed winterization halves their loss on each facility. */
+  winterizationOutputMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
   facilityOutputMultipliersById?: Record<string, number>;
 }
 

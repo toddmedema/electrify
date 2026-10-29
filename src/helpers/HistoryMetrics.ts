@@ -2,6 +2,9 @@ import numbro from "numbro";
 import { DerivedHistoryType, UnitSystemType } from "../Types";
 import {
   formatMoneyConcise,
+  formatPercent,
+  formatFixed,
+  withoutNegativeZero,
   formatMoneyStable,
   formatWattHours,
 } from "./Format";
@@ -125,7 +128,7 @@ export function historyMetrics(
     interestRate: {
       label: "Interest rate",
       higherIsBetter: false,
-      format: (n: number) => `${(n * 100).toFixed(2)}%`,
+      format: (n: number) => formatPercent(n, 2),
       nesting: 2,
     },
     expensesCarbonFee: {
@@ -162,7 +165,7 @@ export function historyMetrics(
     },
     inflationRate: {
       label: "Inflation",
-      format: (n: number) => `${(n * 100).toFixed(1)}%`,
+      format: (n: number) => formatPercent(n, 1),
     },
   };
 }
@@ -180,9 +183,10 @@ export function formatCustomerChange(
     mantissa: 1,
     trimMantissa: true,
   });
+  const sign = change >= 0 ? "+" : "-";
   const percent =
     customers > 0
-      ? ` (${change >= 0 ? "+" : "-"}${((Math.abs(change) / customers) * 100).toFixed(1)}%)`
+      ? ` (${withoutNegativeZero(`${sign}${formatFixed((Math.abs(change) / customers) * 100, 1)}`)}%)`
       : "";
-  return `${change >= 0 ? "+" : "-"}${formattedChange}${percent}`;
+  return `${withoutNegativeZero(`${sign}${formattedChange}`)}${percent}`;
 }

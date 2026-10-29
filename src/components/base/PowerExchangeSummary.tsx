@@ -1,5 +1,3 @@
-import ManualLink from "./ManualLink";
-import { MANUAL_ENTRY } from "./ManualEntries";
 import * as React from "react";
 import { Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -86,7 +84,6 @@ export default function PowerExchangeSummary({
           </Typography>
         </div>
       </div>
-      <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
       <dl className="powerExchangeMetrics">
         <div>
           <dt>Power flowing</dt>

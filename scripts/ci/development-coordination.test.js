@@ -108,6 +108,38 @@ test("two checkouts queue heavy work; valid nested ownership does not deadlock",
   await secondExit;
 });
 
+test("three shared validation slots admit three owners and queue the fourth", async (t) => {
+  const root = fixture(t);
+  const options = { root, slots: 3, wait: false };
+  const leases = [];
+  t.after(() => leases.forEach((lease) => lease.release()));
+  for (let index = 0; index < 3; index++)
+    leases.push(await acquireLease("heavy", options));
+  assert.equal(new Set(leases.map((lease) => lease.token)).size, 3);
+  const nested = await acquireLease("heavy", {
+    ...options,
+    inherited: leases[1].token,
+  });
+  assert.equal(nested.inherited, true);
+  nested.release();
+  await assert.rejects(acquireLease("heavy", options), /held by PID/);
+  const abort = new AbortController();
+  await assert.rejects(
+    acquireLease("heavy", {
+      ...options,
+      wait: true,
+      signal: abort.signal,
+      onWait: () => abort.abort(),
+    }),
+    /abort/i,
+  );
+  leases[1].release();
+  const successor = await acquireLease("heavy", options);
+  leases.push(successor);
+  leases[1].release();
+  await assert.rejects(acquireLease("heavy", options), /held by PID/);
+});
+
 test("dead owners are recovered and foreign releases cannot remove the successor", async (t) => {
   const root = fixture(t);
   const first = worker(t, root, "checkout-a");

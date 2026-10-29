@@ -2,6 +2,27 @@ import numbro from "numbro";
 import { pow } from "./Pow";
 import { log10 } from "./Libm";
 
+/** Remove a minus only when the displayed number has rounded to zero. */
+export function withoutNegativeZero(formatted: string): string {
+  return formatted.replace(
+    /^([^0-9−-]*)[−-]([^0-9−-]*)(0+(?:[.,]0+)*)(?=$|[^0-9.,])/,
+    "$1$2$3",
+  );
+}
+
+/** Locale-formatted UI numbers share the same zero-sign rule after rounding. */
+export function formatNumber(
+  value: number,
+  options?: Intl.NumberFormatOptions,
+): string {
+  return withoutNegativeZero(value.toLocaleString("en-US", options));
+}
+
+/** Fixed decimals for display, preserving genuine negative values and trailing zeroes. */
+export function formatFixed(value: number, digits: number): string {
+  return withoutNegativeZero(value.toFixed(digits));
+}
+
 /**
  * Format power using its actual magnitude, without promoting sub-GW values to GW. Values of 10 or
  * more in their unit are always whole numbers ("541MW"); smaller ones keep one decimal ("9.8GW")
@@ -164,13 +185,13 @@ export function formatWattHoursOfPeak(current: number, peak: number): string {
 /** A 0-1 fraction as a whole (or `digits`-decimal) percentage: 0.456 → "46%". */
 export function formatPercent(fraction: number, digits = 0): string {
   return digits > 0
-    ? `${(fraction * 100).toFixed(digits)}%`
+    ? `${formatFixed(fraction * 100, digits)}%`
     : `${Math.round(fraction * 100)}%`;
 }
 
 /** A whole count with thousands separators, independent of the browser's locale. */
 export function formatCount(n: number): string {
-  return Math.round(n).toLocaleString("en-US");
+  return formatNumber(Math.round(n));
 }
 
 /** A dollar amount per megawatt-hour, in the concise money style: "$42.5/MWh". */
@@ -201,4 +222,15 @@ export function formatBuildMonths(
 /** A game score as a whole number with thousands separators. */
 export function formatScore(score: number): string {
   return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
+}
+
+/** Compact customer counts, with separate precision for chart axes and inspection. */
+export function formatCustomerCount(
+  value: number,
+  significantDigits = 3,
+): string {
+  return formatNumber(value, {
+    notation: "compact",
+    maximumSignificantDigits: significantDigits,
+  });
 }

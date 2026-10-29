@@ -16,9 +16,10 @@ before/after source fingerprint continues to reject validation of changing sourc
 ## Heavy work and ports
 
 The existing npm check, build, Jest, browser, simulation, benchmark, and typecheck
-commands acquire one machine-wide reservation before their generators or tests
-start. A competing invocation waits without suspending the current test. Nested
-commands inherit validated ownership, so `check:ci` can invoke builds and tests
+commands acquire one of three machine-wide reservations before their generators or
+tests start. When all three slots are occupied, a competing invocation waits without
+suspending the current test. Nested commands inherit validated ownership, so
+`check:ci` can invoke builds and tests
 without waiting on itself. Direct Node invocations are for tooling tests and
 diagnostics; use the npm commands for development validation.
 
@@ -99,7 +100,9 @@ behavior inputs, including local environment files, invalidate a run just like t
 source changes. Cache reuse never authorizes a partial run to claim full coverage.
 
 For isolated runner measurements, manually dispatch Test Code with
-`benchmark-work=true`. It runs the ordinary combined test job first, then measures
-one-shot/persistent save advancement, four covered suites with cold/restored
-transforms, and optional review captures at all three CI viewport widths. Results
-are retained in `diagnostics-tests`; no additional job or required gate is added.
+`benchmark-work=true`. Each of the three test workers runs its ordinary suites first, then
+measures its own workload: CPU checks compare four covered suites with cold/restored transforms,
+desktop integration measures one-shot/persistent save advancement, and the browser worker
+captures optional review images at all three CI viewport widths. Results are retained in
+`diagnostics-cpu`, `diagnostics-desktop` and `diagnostics-browser`; no additional job or
+required gate is added.

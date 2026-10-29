@@ -25,15 +25,25 @@ export function baselineChoiceActions(
 
 export function baselineMeaningfulChoices(
   scenarioId: number,
-  result?: SimResultType,
+  result: SimResultType,
 ) {
-  return SCENARIO_CHOICES.filter(
-    (choice) =>
-      choice.scenarioId === scenarioId &&
-      (!result || choice.atMonth < result.months.length) &&
-      choice.options.find((option) => option.cost("Intern") === 0)
-        ?.meaningful !== false,
-  ).length;
+  return SCENARIO_CHOICES.filter((choice) => {
+    if (
+      choice.scenarioId !== scenarioId ||
+      choice.atMonth >= result.months.length
+    )
+      return false;
+    // State-priced bulk work has no meaningful static price. Read the branch actually taken.
+    const receipt = result.storyOccurrences.find(
+      (event) => event.key === choice.id,
+    );
+    const option = choice.options.find(
+      (option) => option.id === receipt?.attributes.choice,
+    );
+    if (!option || option.meaningful === false) return false;
+    const work = receipt?.attributes.retrofitFacilityIds;
+    return !Array.isArray(work) || work.length > 0;
+  }).length;
 }
 
 /**

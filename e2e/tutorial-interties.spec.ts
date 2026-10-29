@@ -1,5 +1,6 @@
 import path from "path";
 import { expect, test } from "./fixtures";
+import { reviewScreenshot } from "./review-screenshot";
 
 test("Mission 7 teaches limited two-way interties without trapping recovery", async ({
   page,
@@ -31,7 +32,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await page.getByRole("button", { name: "Start Interties" }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Step 1 of 19" }),
+    page.getByRole("heading", { name: "Step 1 of 18" }),
   ).toBeVisible();
   await expect(page.locator(".button-buildFacility")).toBeVisible();
   if (testInfo.project.name.startsWith("mobile-")) {
@@ -51,7 +52,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await expect(page.locator(".tutorialHud")).toContainText("Tap Interties");
   await intertiesTab.click();
   await expect(
-    page.getByRole("heading", { name: "Step 3 of 19" }),
+    page.getByRole("heading", { name: "Step 3 of 18" }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", {
@@ -69,7 +70,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   // The open dialog aria-hides the rest of the app, so role queries cannot see the HUD while
   // it is up; read the counter's spoken text directly instead.
   await expect(page.locator(".tutorialHudVisuallyHidden")).toHaveText(
-    "4 of 19",
+    "4 of 18",
   );
   await page
     .getByRole("dialog")
@@ -79,7 +80,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     page.getByText(/Building \d+% · \d+ months? left/),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Step 5 of 19" }),
+    page.getByRole("heading", { name: "Step 5 of 18" }),
   ).toBeVisible();
   // Playwright's mouse remains over the new snackbar after the approval layout changes.
   // MUI deliberately pauses auto-hide on hover; move away as a touch user would release.
@@ -95,21 +96,21 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   });
   // Construction alone is not enough: the objective advances only after this explicit pause.
   await expect(
-    page.getByRole("heading", { name: "Step 6 of 19" }),
+    page.getByRole("heading", { name: "Step 6 of 18" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "pause", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Step 7 of 19" }),
+    page.getByRole("heading", { name: "Step 7 of 18" }),
   ).toBeVisible();
 
   await page.getByLabel("Trading rule").click();
   await page.getByRole("option", { name: "Buy for shortages only" }).click();
   await expect(
-    page.getByRole("heading", { name: "Step 8 of 19" }),
+    page.getByRole("heading", { name: "Step 8 of 18" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Step 9 of 19" }),
+    page.getByRole("heading", { name: "Step 9 of 18" }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Inspect Natural Gas Peaker" })
@@ -119,7 +120,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   ).toHaveClass(/tutorialTarget/);
   await page.getByRole("button", { name: "Pause Natural Gas Peaker" }).click();
   await expect(
-    page.getByRole("heading", { name: "Step 11 of 19" }),
+    page.getByRole("heading", { name: "Step 11 of 18" }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "fast speed" }).click();
@@ -135,7 +136,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   });
   await page.getByRole("button", { name: "pause", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Step 13 of 19" }),
+    page.getByRole("heading", { name: "Step 13 of 18" }),
   ).toBeVisible();
 
   const exchange = page.locator('[data-layer="powerExchange"]');
@@ -143,6 +144,12 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await expect(exchange).toContainText("Power flowing");
   await expect(exchange).toContainText("Available capacity");
   await expect(exchange).toContainText("Neighbor price");
+  await expect(
+    exchange.getByRole("button", { name: "What is Interties?" }),
+  ).toBeVisible();
+  await expect(
+    exchange.getByText("How interties work", { exact: true }),
+  ).toHaveCount(0);
   if (testInfo.project.name.startsWith("mobile-")) {
     const viewport = await page.evaluate(() => ({
       height: window.innerHeight,
@@ -163,14 +170,24 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     ).toBe(true);
   }
 
-  await page.getByRole("button", { name: "Next" }).click();
+  await page.mouse.move(0, 0);
+  await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+  await reviewScreenshot(page, {
+    path: testInfo.outputPath("interties-help.png"),
+    animations: "disabled",
+  });
+  await exchange.getByRole("button", { name: "What is Interties?" }).click();
+  const help = page.getByRole("dialog", { name: "Manual help" });
   await expect(
-    page.getByText(/Hot, sunny weather can reduce how much the line carries/),
+    help.getByRole("heading", { name: "Interties", exact: true }),
   ).toBeVisible();
+  await help.getByRole("button", { name: "close", exact: true }).click();
+  await expect(help).toBeHidden();
+  await page.mouse.move(0, 0);
   await page.getByRole("button", { name: "Next" }).click();
   // The first capstone proves two-way trading before the guided stress exercise.
   await expect(
-    page.getByRole("heading", { name: "Your turn 15 of 19" }),
+    page.getByRole("heading", { name: "Your turn 14 of 18" }),
   ).toBeVisible();
 
   const facilities = page.locator(".facilities:visible");
@@ -182,7 +199,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   });
   await page.getByRole("button", { name: "pause", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Your turn 15 of 19" }),
+    page.getByRole("heading", { name: "Your turn 14 of 18" }),
   ).toBeVisible();
 
   await facilities.getByLabel("Trading rule").click();
@@ -191,7 +208,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     .click();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(
-    page.getByRole("heading", { name: "Step 16 of 19" }),
+    page.getByRole("heading", { name: "Step 15 of 18" }),
   ).toBeVisible({ timeout: 15000 });
   await expect(page.locator(".tutorialHud")).toContainText(
     "Your neighbor will have only 150 MW",
@@ -201,7 +218,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Inspect shortage safely" }).click();
   await expect(
-    page.getByRole("heading", { name: "Step 17 of 19" }),
+    page.getByRole("heading", { name: "Step 16 of 18" }),
   ).toBeVisible();
   await facilities
     .getByRole("button", { name: "Inspect Northern intertie" })
@@ -230,7 +247,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   }
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Step 18 of 19" }),
+    page.getByRole("heading", { name: "Step 17 of 18" }),
   ).toBeVisible();
   const gas = facilities.getByRole("button", {
     name: "Inspect Natural Gas Peaker",
@@ -240,7 +257,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     .getByRole("button", { name: "Resume Natural Gas Peaker" })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Your turn 19 of 19" }),
+    page.getByRole("heading", { name: "Your turn 18 of 18" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(

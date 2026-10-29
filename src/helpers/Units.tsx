@@ -136,5 +136,5 @@ export function formatPricePerLargeMass(
   dollarsPerKg: number,
   units: UnitSystemType,
 ): string {
-  return `$${Math.round(toDisplayPricePerLargeMass(dollarsPerKg, units)).toLocaleString("en-US")}/${isImperial(units) ? "ton" : "tonne"}`;
+  return `$${formatCount(toDisplayPricePerLargeMass(dollarsPerKg, units))}/${isImperial(units) ? "ton" : "tonne"}`;
 }

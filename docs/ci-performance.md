@@ -1,61 +1,70 @@
 # PR testing performance
 
-CI uses **six jobs per PR**: shared renderer builds, three native package builds, one
-worker for all tests and static checks, and the required `check` gate. Unit, simulation,
-security-rule, browser, multiplayer/mod and controller suites retain their existing cases,
-viewports, seeds and coverage floors. Packaged Electron journeys now run once on Linux;
-Windows and macOS retain native packaging verification but no longer execute UI journeys.
+CI uses **eight jobs per PR**: shared renderer builds, three native package builds, three
+Linux test workers, and the required `check` gate. Unit, simulation, security-rule, browser,
+multiplayer/mod and controller suites retain their existing cases, viewports, seeds and
+coverage floors. Packaged Electron journeys run once on Linux; Windows and macOS retain
+native packaging verification.
 
-## Six-job layout
+## Eight-job layout
 
 1. **Shared production builds** compiles/verifies the desktop renderer/catalogs and web build
    once each on Linux, checks bundle size, and uploads the artifacts. Separate input-validated
-   compiler caches keep editions apart. The test worker owns strict lint, so CRA's duplicate
+   compiler caches keep editions apart. The CPU worker owns strict lint, so CRA's duplicate
    lint plugin is disabled.
 2. **Linux x64 build** packages and verifies the Linux depot.
 3. **Windows x64 build** packages and verifies the Windows depot.
 4. **macOS universal build** packages, signs and verifies one app containing both Intel and
    Apple Silicon slices. Neither slice is launched in this job.
-5. **All tests and static checks** runs types, strict lint, formatting, native Node units, CI
-   tooling, Firestore rules, the isolated tick-ratio benchmark, every covered Jest unit and
-   long simulation, coverage validation, and the simulation CLI. It then packages its own
-   Linux test depot and runs the complete PR browser matrix, multiplayer/mod management,
-   controller journeys and the full packaged Electron suite under Xvfb.
-6. **check** waits for the shared renderer job, all three native builds and the test worker.
+5. **CPU tests and static checks** starts immediately alongside the shared builds. It runs
+   types, strict lint, formatting, native Node units, CI tooling, Firestore rules, the isolated
+   tick-ratio benchmark, every covered Jest unit and long simulation, coverage validation,
+   and the simulation CLI. It needs no compiled renderer, browser or native window manager.
+6. **Production browser tests** downloads only the shared web renderer and runs the complete
+   PR smoke/layout matrix at the existing desktop, 390 px and 360 px viewports.
+7. **Desktop integration tests** downloads only the shared desktop renderer, packages its own
+   Linux test depot, and runs multiplayer/mod management, controller journeys and the full
+   packaged Electron suite under Xvfb.
+8. **check** waits for both shared builds, all three native packages and all three test workers.
    It passes only when every dependency succeeds. Failed, skipped, cancelled and timed-out
    results cannot pass the required gate. Workflow tests execute the gate's shell command
-   against each of these outcomes.
+   against each of these outcomes for every dependency.
 
-The test worker and native package workers depend only on the shared renderer job. They run
-independently: a native package failure cannot prevent testing, and a test failure cannot
-prevent native packaging. Building a separate Linux test depot costs a few seconds and avoids
-waiting for the Linux package job or transferring its large app directory. The required gate
-uses GitHub Actions' dependency results directly, without polling the jobs API.
+The browser, desktop integration and native package workers depend only on the shared build
+job. CPU checks have no build dependency. A native package failure cannot prevent testing,
+any test worker can fail without suppressing another, and test failures cannot prevent native
+packaging. Building a separate Linux test depot costs a few seconds and avoids waiting for the
+Linux package job or transferring its large app directory. The required gate uses GitHub
+Actions' dependency results directly, without polling the jobs API.
 
-All heavy test phases run sequentially so CPU work cannot make UI deadlines depend on load.
-Covered Jest and simulations use at most four workers, browser tests use two, and native
-Electron and controller journeys use one. A failed phase does not skip later suites. Unit and
-simulation discovery use a single `1/1` manifest; coverage validation still requires every
-discovered unit suite to have passed and retains zero-hit files before enforcing the unchanged
-`package.json` thresholds. Browser tests run the complete desktop/390 px smoke and
-desktop/390/360 px layout matrix without sharding.
+Each worker runs its heavy phases sequentially so CPU work cannot make UI deadlines depend
+on load. Covered Jest and simulations use at most four workers, browser tests use two, and
+native Electron and controller journeys use one. A failed phase does not skip later phases
+in its worker. Unit and simulation discovery use a single `1/1` manifest; coverage validation
+still requires every discovered unit suite to have passed and retains zero-hit files before
+enforcing the unchanged `package.json` thresholds. The browser matrix runs without sharding.
 
-The combined test harness refuses local native-window runs. For a windowless reproduction of
-its complete CPU plan, run `npm run test:ci-all -- --cpu-only` with Java 21 available for the
-Firestore emulator. First run `npm run compatibility:generate` and `npm run icons:generate`,
-because the harness suppresses redundant generation pre-hooks. Ordinary local validation
-continues to use `npm run check` and `npm run check:ci`; the latter leaves native packaged
-journeys to CI.
+The harness selects one explicit group with `npm run test:ci-all -- --group=cpu`,
+`--group=browser` or `--group=desktop`. Unknown, conflicting and repeated options fail before
+any suite runs. The default runs all groups; `--cpu-only` remains an alias for `--group=cpu`.
+Groups containing native windows refuse local execution. For a windowless reproduction of
+all CPU checks, use `--cpu-only` with Java 21 available for the Firestore emulator. First run
+`npm run compatibility:generate` and `npm run icons:generate`, because the harness suppresses
+redundant generation pre-hooks. Ordinary local validation continues to use `npm run check`
+and `npm run check:ci`; the latter leaves native packaged journeys to CI.
 
-The test worker restores the full locked toolchain. All three native build workers use the
-lean locked dependency profile. Every target verifies shared renderer assets against its
-local checkout, packages natively and verifies native binaries; Mac also verifies both final
-architecture slices and the finished signature. Native build jobs do not install browsers,
-Java, Xvfb or a window manager.
+All three test workers restore the full locked toolchain. Each restores its own checkout and
+cached dependencies, but production compilation stays in the shared build job. Only UI workers
+install the locked Chromium headless shell; only desktop integration installs Xvfb and Openbox.
+Unit/simulation transform caches belong to CPU checks, and the world-advance transform cache
+belongs to desktop integration. All three native package workers retain the lean locked
+profile and verify shared assets, native binaries and, on Mac, both slices and the signature.
 
-The test worker caches Chromium's locked headless shell and native packaging downloads. It
-uploads coverage, suite manifests, structured browser reports, traces and failure screenshots
-even if a test phase fails. Browser, multiplayer, controller and packaged-desktop reports keep
+The workers upload separate `diagnostics-cpu`, `diagnostics-browser` and `diagnostics-desktop`
+artifacts even if a phase fails. CPU diagnostics include coverage and suite manifests; UI
+reports retain their existing structured results, traces and failure screenshots. Each harness
+run also saves `test-results/ci-<group>.json` and adds its phase results and execution durations
+to the Actions summary. Browser, multiplayer, controller and packaged-desktop reports keep
 separate directories. Native CI retains DOM/network traces and sources without a continuous
 screenshot filmstrip during passing tests.
 
@@ -86,13 +95,16 @@ a separate local command.
 
 Run **Test Code** manually with **Archive and upload all three verified offline desktop builds**
 enabled, or `gh workflow run workflow.yml --ref <branch> -f qa-artifacts=true`. This uses the same
-six jobs and full tests. PRs retain diagnostics but omit downloadable archives. Tar preserves
+eight jobs and full tests. PRs retain diagnostics but omit downloadable archives. Tar preserves
 executable permissions; compressed archives upload without another compression pass.
 
 ## Timing
 
-The original successful runs inspected on October 14, 2026 took roughly 9–12 minutes.
-[The latest](https://github.com/toddmedema/electrify/actions/runs/38651304477) reached `check` in 9:28.
-Measure the independent build and test paths separately within the six-job cap; native UI execution is now Linux-only.
-Report measured end-to-end times, cache state and runner queueing in the PR. CPU suites stay on
-Linux because measurements on the other platforms produced substantially longer simulation runs.
+Two successful runs inspected on October 28, 2026 took roughly 37–38 minutes under the
+combined test layout. [One run](https://github.com/toddmedema/electrify/actions/runs/40761411856)
+spent 34m 41s executing checks: about 12 minutes in CPU/static checks, 11 minutes in browser
+tests and 11½ minutes in desktop integration. The three groups now overlap on separate Linux
+runners. A 15–18 minute workflow is an estimate to validate, not a measured result of the split.
+Report measured end-to-end times, phase durations, cache state, runner queueing and total
+runner minutes in the PR. CPU suites stay on Linux because measurements on the other platforms
+produced substantially longer simulation runs.

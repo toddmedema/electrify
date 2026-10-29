@@ -43,6 +43,8 @@ interface ChartMockProps {
   currentMinute?: number;
   title?: string;
   hideTitle?: boolean;
+  format?: (value: number) => number | string;
+  formatAxis?: (value: number) => number | string;
   id?: string;
   syncKey?: string;
   timeline?: unknown[];
@@ -191,12 +193,16 @@ jest.mock("../base/ChartFinances", () => ({
     domain,
     title,
     hideTitle,
+    format,
+    formatAxis,
   }: ChartMockProps) => (
     <div
       role="img"
       id={id}
       data-testid={id}
       data-visible-title={hideTitle ? "" : title}
+      data-inspected-value={format?.(123456)}
+      data-axis-value={(formatAxis || format)?.(123456)}
       data-sync-key={syncKey}
       data-points={timeline?.length}
       data-domain={domainValue(domain)}
@@ -598,6 +604,32 @@ describe("Insights layers", () => {
     expect(
       screen.queryByRole("button", { name: "Remove Cash" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("adds monthly lowest spare capacity to Reliability and lets players toggle the layer", async () => {
+    renderInsights();
+    await choosePreset("Reliability");
+    const track = screen.getByRole("region", {
+      name: "Lowest spare capacity evidence",
+    });
+    expect(
+      within(track).getByRole("img", { name: /Monthly lowest spare capacity/ }),
+    ).toBeInTheDocument();
+    const headings = screen.getAllByRole("heading", { level: 6 });
+    expect(headings[1]).toHaveTextContent("Supply & Demand");
+    expect(headings[2]).toHaveTextContent("Lowest spare capacity");
+    await user.click(labelledButton(/Layers/));
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: "Lowest spare capacity",
+      }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Lowest spare capacity evidence" }),
+    ).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("insightsLayers")!)).not.toContain(
+      "spareCapacity",
+    );
   });
 
   // Regression test. Construction progress was part of the projection's cache key, so every
@@ -1013,9 +1045,24 @@ describe("Insights layers", () => {
     expect(screen.getAllByRole("heading", { level: 6 })[1]).toHaveTextContent(
       "Power exchange",
     );
+    const exchange = screen.getByRole("region", {
+      name: "Power exchange evidence",
+    });
+    expect(
+      within(exchange).getByRole("button", { name: "What is Interties?" }),
+    ).toBeVisible();
+    expect(within(exchange).queryByText("How interties work")).toBeNull();
     expect(localStorage.getItem("insightsLayers")).toBe(
       JSON.stringify(["cash", "supplyDemand"]),
     );
+  });
+
+  it("gives the customer chart two significant digits on axes and three on inspection", () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["customers"]));
+    renderInsights();
+    const chart = screen.getByTestId("chartInsightsCustomersPlot");
+    expect(chart).toHaveAttribute("data-axis-value", "120K");
+    expect(chart).toHaveAttribute("data-inspected-value", "123K");
   });
 
   it("applies presets and gives every chart the shared cursor key", async () => {

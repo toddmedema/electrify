@@ -10,6 +10,7 @@ import {
 } from "../../reducers/Game";
 import { snackbarOpen } from "../../reducers/UI";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
+import { getTutorialStep } from "../../data/Scenarios";
 import { accessContextForGame } from "../../data/IntertieAccess";
 import { intertieBuildQuote } from "../../helpers/Transmission";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
@@ -41,7 +42,8 @@ export default function BuildFacilities({
   const completeBuild = React.useContext(GameBuildCompleteContext);
   const game = useAppSelector((state) => state.game);
   const card = useAppSelector((state) => state.card.name);
-  const introductoryChoices = game.scenarioId === 1 && game.tutorialStep === 1;
+  const introductoryChoices =
+    getTutorialStep(game)?.phase === "GENERATOR_CHOICES";
   const intertiesAvailable =
     !!game.transmission &&
     (!!game.multiplayer || corridorsForLocation(game.location).length > 0);

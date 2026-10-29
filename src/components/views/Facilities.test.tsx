@@ -125,7 +125,7 @@ describe("the fleet list", () => {
   it.each([
     [2000, 0, 0, false, "filling"],
     [500, 0, 0, false, "draining"],
-    [1000, 0, 0, false, "steady"],
+    [1000, 0, 0, false, ""],
     [2000, 1000, 0, false, "spilling"],
     [500, 0, 1000, true, "draining"],
     [500, 0, 0, true, "filling"],
@@ -142,10 +142,18 @@ describe("the fleet list", () => {
       hydro.hydroLastBypassWh = Number(bypass);
       hydro.paused = Boolean(paused);
       renderFacilities(hydroGame, null);
-      expect(rows()[0]).toHaveTextContent(String(label));
+      expect(rows()[0]).toHaveTextContent(label || hydro.name);
+      expect(rows()[0]).not.toHaveTextContent("steady");
+      expect(
+        within(rows()[0]).queryAllByText("·", { exact: true }),
+      ).toHaveLength(label ? 1 : 0);
       expect(rows()[0]).not.toHaveTextContent("50%");
       await user.click(rows()[0]);
-      expect(rows()[0]).toHaveTextContent(String(label));
+      expect(rows()[0]).toHaveTextContent(label || hydro.name);
+      expect(rows()[0]).not.toHaveTextContent("steady");
+      expect(
+        within(rows()[0]).queryAllByText("·", { exact: true }),
+      ).toHaveLength(label ? 1 : 0);
     },
   );
 
@@ -494,12 +502,20 @@ describe("weather hazards in the fleet", () => {
       startsMinute: state.date.minute - MINUTES_PER_MONTH / 2,
       completesMinute: state.date.minute + MINUTES_PER_MONTH / 2,
     };
+    gas.currentW = gas.peakW / 2;
     const { onCancelRetrofit } = renderFacilities(state, gas.id);
     const gasRow = rows().find((row) =>
       row.getAttribute("aria-label")?.startsWith(`Inspect ${gas.name}`),
     )!;
-    expect(gasRow).toHaveTextContent("Upgrading 50%");
-    expect(gasRow).toHaveTextContent("cold-weather package, 16 days left");
+    expect(gasRow).toHaveTextContent(
+      "Winterizing 50% · 90% capacity available",
+    );
+    expect(
+      screen.getByRole("img", {
+        name: `${gas.name} installing winterization, 90% capacity available`,
+      }),
+    ).toBeInTheDocument();
+    expect(gasRow).toHaveTextContent("16 days left");
     // The only plant out of service, so the only progress bar on the pane. The bar is
     // aria-hidden (the percentage is in the text), so there is no role to query it by.
     // eslint-disable-next-line testing-library/no-node-access

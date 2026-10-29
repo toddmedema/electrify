@@ -36,6 +36,8 @@ export interface Props {
   hideTitle?: boolean;
   timeline: ChartData[];
   format: (n: number) => number | string;
+  /** Axis labels can use less precision than inspected values. */
+  formatAxis?: (n: number) => number | string;
   /**
    * Floors the y axis at this value. Lower points still sit in the data, so the line clips at
    * the axis and the tooltip and the bands below carry the negative part of the story.
@@ -65,6 +67,7 @@ interface State {
   timeline: ChartData[];
   title: string;
   format: Props["format"];
+  formatAxis: Props["format"];
   range: [number, number];
   domain: [number, number];
   multiyear: boolean;
@@ -145,7 +148,8 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       }),
       yAxis(scale, {
         grid: true,
-        values: (_u, splits) => splits.map((t) => String(getState().format(t))),
+        values: (_u, splits) =>
+          splits.map((t) => String(getState().formatAxis(t))),
       }),
     ],
     series: [
@@ -232,6 +236,7 @@ const ChartFinances = (props: Props): React.JSX.Element => {
     timeline: props.timeline,
     title: props.hideTitle ? "" : props.title,
     format: props.format,
+    formatAxis: props.formatAxis || props.format,
     range: [rangeMin, rangeMax],
     domain,
     multiyear,

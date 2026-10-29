@@ -23,7 +23,11 @@ import {
   summarizeTimeline,
 } from "../../helpers/DateTime";
 import { projectedShortfall } from "../../helpers/MissionStatus";
-import { formatMoneyStable, formatWatts } from "../../helpers/Format";
+import {
+  formatMoneyStable,
+  formatWatts,
+  formatNumber,
+} from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import {
   isBigScreen,
@@ -640,8 +644,8 @@ export function GameAppBar(props: Props) {
           color="textSecondary"
           sx={{ px: 2, pb: 0.5 }}
         >
-          Friend’s target: {game.challenge.target.toLocaleString("en-US")} ·
-          Shared score · unverified
+          Friend’s target: {formatNumber(game.challenge.target)} · Shared score
+          · unverified
         </Typography>
       )}
       <span className="srOnly" aria-live="polite">

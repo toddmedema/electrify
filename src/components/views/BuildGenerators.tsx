@@ -84,7 +84,7 @@ import {
   siteCountLabel,
 } from "../base/BuildAvailability";
 import HydroPrimer, { useHydroPrimer } from "../base/HydroPrimer";
-import { getScenario } from "../../data/Scenarios";
+import { getScenario, getTutorialStep } from "../../data/Scenarios";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import Sparkline from "../base/Sparkline";
@@ -322,12 +322,15 @@ export function GeneratorBuildItem(
           STANDARD_GAS_DESIGN_MIN_TEMP_C;
         const lines: { text: string; warning?: boolean }[] = [
           {
-            text: coldPackageEffect(
-              props.withResilience({ [option.upgrade]: true }).resilience
-                ?.designMinTempC ?? standardMinTempC,
-              standardMinTempC,
-              units,
-            ),
+            text:
+              generator.fuel !== "Natural Gas"
+                ? "Permanently halves this plant’s output losses in the deep freeze."
+                : coldPackageEffect(
+                    props.withResilience({ [option.upgrade]: true }).resilience
+                      ?.designMinTempC ?? standardMinTempC,
+                    standardMinTempC,
+                    units,
+                  ),
           },
         ];
         if (option.defaultSelected) {
@@ -797,8 +800,8 @@ function GeneratorComparison(props: {
 type GeneratorSortKey = "buildCost" | "yearsToBuild" | "lcWh" | "emissions";
 
 const sortOptions: ReadonlyArray<readonly [GeneratorSortKey, string]> = [
-  ["buildCost", "Build Cost"],
-  ["yearsToBuild", "Build Time"],
+  ["buildCost", "Build cost"],
+  ["yearsToBuild", "Build time"],
   ["lcWh", "Cost per MWh"],
   ["emissions", "Emissions"],
 ];
@@ -953,8 +956,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     )
     .filter(
       (generator) =>
-        game.scenarioId !== 1 ||
-        game.tutorialStep !== 1 ||
+        getTutorialStep(game)?.phase !== "GENERATOR_CHOICES" ||
         ["Natural Gas", "Sun", "Wind"].includes(generator.fuel),
     );
   // Technologies that burn the same fuel stay side by side, placed among the rest by their better

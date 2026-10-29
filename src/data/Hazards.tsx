@@ -43,9 +43,6 @@ export const HAIL_RESISTANT_DAMAGE_FACTOR = 0.3;
 /** Extra build cost for hail-resistant design. Source: DOE FEMP solar hail resilience guide. */
 export const HAIL_RESISTANT_BUILD_SHARE = 0.03;
 
-/** Extra build cost for a cold-weather package (heat tracing, enclosures, instrument heat). */
-export const COLD_PACKAGE_BUILD_SHARE = 0.02;
-
 /**
  * An upgrade added to a standing plant costs this multiple of building it in (crews remobilize
  * and work around finished equipment), charged on the plant's replacement value, and holds the
@@ -54,8 +51,6 @@ export const COLD_PACKAGE_BUILD_SHARE = 0.02;
 export const RETROFIT_COST_MULTIPLIER = 1.5;
 export const HAIL_RESISTANT_RETROFIT_SHARE =
   HAIL_RESISTANT_BUILD_SHARE * RETROFIT_COST_MULTIPLIER;
-export const COLD_PACKAGE_RETROFIT_SHARE =
-  COLD_PACKAGE_BUILD_SHARE * RETROFIT_COST_MULTIPLIER;
 
 /**
  * Single-axis solar trackers, priced and dated from Nextpower (formerly Nextracker), the largest
@@ -111,7 +106,7 @@ export const WEATHER_HAZARD_TUTORIAL_SCENARIOS: ReadonlySet<number> = new Set([
 /**
  * Scenarios with an authored freeze of their own (103's shale-boom cold snap, 107's Texas deep
  * freeze with its winterization choice). Generic extreme cold would double-count it, so only
- * hail runs there and the cold-weather build option is hidden.
+ * hail runs there. Permanent winterization still protects plants in authored freezes.
  */
 export const WEATHER_HAZARD_AUTHORED_FREEZE_SCENARIOS: ReadonlySet<number> =
   new Set([103, 107]);

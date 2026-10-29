@@ -58,6 +58,8 @@ import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { facilityLifetime } from "../../helpers/Financials";
 import {
   formatMoneyConcise,
+  formatCustomerCount,
+  formatPercent,
   formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
@@ -88,6 +90,8 @@ import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
 } from "../base/ChartForecastDemandByType";
 import ChartFinances from "../base/ChartFinances";
+import ManualLink from "../base/ManualLink";
+import { MANUAL_ENTRY } from "../base/ManualEntries";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
@@ -126,10 +130,12 @@ import PowerExchangeSummary, {
 } from "../base/PowerExchangeSummary";
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
 import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
+import ChartMonthlySpareCapacity from "../base/ChartMonthlySpareCapacity";
 import { ToolScrollMemory } from "../base/GameToolMemory";
 
 export type InsightLayerId =
   | "supplyDemand"
+  | "spareCapacity"
   | "powerExchange"
   | "demandByType"
   | "supplyByFuel"
@@ -158,6 +164,7 @@ export interface InsightLayerDefinition {
 
 export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
+  { id: "spareCapacity", label: "Lowest spare capacity", group: "Grid" },
   {
     id: "powerExchange",
     label: "Power exchange",
@@ -234,6 +241,7 @@ export const INSIGHT_PRESETS: Record<
     label: "Reliability",
     layers: [
       "supplyDemand",
+      "spareCapacity",
       "powerExchange",
       "supplyByFuel",
       "storage",
@@ -1497,7 +1505,12 @@ export default class Insights extends React.Component<Props, State> {
               game.startingYear,
             )}
             title={finance.label}
-            format={finance.format}
+            format={id === "customers" ? formatCustomerCount : finance.format}
+            formatAxis={
+              id === "customers"
+                ? (value) => formatCustomerCount(value, 2)
+                : undefined
+            }
             // Cash clips at zero and says so; profit keeps its axis and names its losses
             domainMin={finance.key === "cash" ? 0 : undefined}
             negativeNote={
@@ -1533,12 +1546,44 @@ export default class Insights extends React.Component<Props, State> {
                   title={
                     key === "inflationRate" ? "Inflation" : "Interest rate"
                   }
-                  format={(value) => (value * 100).toFixed(2) + "%"}
+                  format={(value) => formatPercent(value, 2)}
                   startingYear={game.startingYear}
                   domain={projection.domain.x}
                   syncKey={SYNC_KEY}
                 />
               ))}
+            </>
+          );
+          break;
+        case "spareCapacity":
+          body = (
+            <>
+              <ChartLegend
+                items={[
+                  { name: "Recorded", color: chartPalette().supply },
+                  {
+                    name: "Projected",
+                    color: chartPalette().supply,
+                    dash: "4,4",
+                  },
+                ]}
+              />
+              <ChartMonthlySpareCapacity
+                height={140}
+                past={projection.financePast}
+                projected={projection.financeProjected}
+                startingYear={game.startingYear}
+                domain={projection.domain}
+                syncKey={SYNC_KEY}
+              />
+              <Typography
+                variant="caption"
+                component="p"
+                sx={{ mx: 2, my: 1, color: "text.secondary" }}
+              >
+                Lowest reserve in each month. Below zero means a reserve
+                deficit.
+              </Typography>
             </>
           );
           break;
@@ -1783,7 +1828,12 @@ export default class Insights extends React.Component<Props, State> {
         aria-label={`${definition.label} evidence`}
       >
         <Toolbar className="insightsTrackHeader">
-          <Typography variant="h6">{definition.label}</Typography>
+          <Typography variant="h6">
+            {definition.label}
+            {id === "powerExchange" && (
+              <ManualLink entry={MANUAL_ENTRY.INTERTIES} />
+            )}
+          </Typography>
           {this.state.layersOpen && (
             <span className="insightsTrackActions">
               <IconButton

@@ -166,6 +166,20 @@ test("keyboard and pointer actions work during the entrance", async ({
   await expect(page.locator(".facilities:visible")).toBeVisible();
 });
 
+test("hovering a home control makes it the active button, and keyboard continues from there", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" }); // skip the entrance stagger
+  await page.goto("/");
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  const manual = page.getByRole("button", { name: "Manual", exact: true });
+  await expect(page.locator("#appStartup")).toHaveCount(0); // the menu is revealed
+  await manual.hover();
+  await expect(manual).toBeFocused(); // the pointer moved the active button to Manual
+  await page.keyboard.press("ArrowUp");
+  await expect(play).toBeFocused(); // keyboard continues from the hovered control
+});
+
 test("a failed load can be retried", async ({ page }) => {
   await page.route("**/*achievements*.js", (route) => route.abort());
   await page.goto("/");
@@ -196,18 +210,22 @@ test("reduced motion skips the logo movement and stagger", async ({ page }) => {
   const logo = page.locator("#menuCard .homeLogo");
   await expect(logo).toBeVisible();
   expect(
-    await page.locator("html").getAttribute("data-menu-animation-requested"),
-  ).toBeNull();
-  expect(
     await logo.evaluate(
       (element) => element.getAnimations({ subtree: true }).length,
     ),
   ).toBe(0);
+  // Control feedback can still be settling after the startup handoff. The audit below
+  // rejects entrance motion even if it finishes before this animation count settles.
+  await expect
+    .poll(() =>
+      page
+        .locator("#menuCard")
+        .evaluate((element) => element.getAnimations({ subtree: true }).length),
+    )
+    .toBe(0);
   expect(
-    await page
-      .locator("#menuCard")
-      .evaluate((element) => element.getAnimations({ subtree: true }).length),
-  ).toBe(0);
+    await page.locator("html").getAttribute("data-menu-animation-requested"),
+  ).toBeNull();
 });
 
 for (const theme of ["light", "dark"]) {

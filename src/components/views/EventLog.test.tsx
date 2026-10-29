@@ -53,6 +53,12 @@ describe("EventLog", () => {
     expect(screen.queryByRole("heading", { name: "Right now" })).toBeNull();
     expect(screen.queryByText(/Projects & outcomes/)).toBeNull();
     expect(screen.getAllByText("Wildfire emergency")).toHaveLength(1);
+    expect(
+      screen
+        .getByText("Ongoing events")
+        .compareDocumentPosition(screen.getByText("Coming up")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const request = { id: 1, runId: 0, target: { card: "EVENTS" as const } };
     view.rerender(<EventLog {...passed} evidenceRequest={request} />);
     expect(screen.getByText("A recorded build.")).toBeVisible();

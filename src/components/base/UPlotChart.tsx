@@ -1,4 +1,5 @@
 import * as React from "react";
+import { withoutNegativeZero } from "../../helpers/Format";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { chartScale, eventMarkersPlugin } from "./UPlotHelpers";
@@ -224,8 +225,10 @@ export default function UPlotChart<S>(
     () => new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }),
     [],
   );
-  const formatSummaryValue =
+  const summaryFormatter =
     props.formatSummaryValue || ((value: number) => number.format(value));
+  const formatSummaryValue = (value: number, index: number) =>
+    withoutNegativeZero(summaryFormatter(value === 0 ? 0 : value, index));
   const seriesSummary = (props.summaryData || data)
     .slice(1)
     .map((series, index) => {

@@ -1,5 +1,11 @@
 # Major scenario choice balance QA
 
+**Permanent winterization (October 2026):** Deep Freeze now offers the ordinary permanent
+facility upgrade in bulk, charging only for eligible assets still needing protection.
+The fixed $90M fee and choice-wide protection described below are historical. Current
+prices, technology scope, installation impact, and measured outcomes are documented in
+[the winterization design and research](../../docs/winterization.md).
+
 **Wildfire redesign:** the wildfire preparedness, restoration-cost and passive-grid comparisons
 below are historical. Scenario 111 now starts with a pivotal Northern intertie that loses 90%
 of its capacity; see [the current mission design](../../docs/wildfire-intertie.md).
@@ -74,7 +80,7 @@ elapsed game months; they include the scenario's normal end-of-mission objective
 
 ## Why these amounts and branches
 
-**Winterization costs a fixed $90M in 2020 dollars.** Real-world research supersedes the
+**Historical winterization package: fixed $90M in 2020 dollars.** Real-world research supersedes the
 previous $250M balance-only estimate. A normalized thermal-retrofit benchmark plus a conservative
 allowance for wind protection gives $82.33M for the starting portfolio and $5.37M for a
 representative 1.8 GW gas expansion, rounded from $87.70M to $90M. This is a transferred

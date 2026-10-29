@@ -1,4 +1,5 @@
 import * as React from "react";
+import { formatNumber } from "../../helpers/Format";
 import { connect } from "react-redux";
 import { AppStateType } from "../../Types";
 import TutorialPrompt from "./TutorialPrompt";
@@ -10,7 +11,7 @@ function CustomerGrowthChallenge({
 }) {
   return (
     <TutorialPrompt
-      text={`Reach at least ${Math.ceil(startingCustomers * 1.05).toLocaleString("en-US")} customers (5% above the starting ${startingCustomers.toLocaleString("en-US")}) in six months while staying profitable and reliable.`}
+      text={`Reach at least ${formatNumber(Math.ceil(startingCustomers * 1.05))} customers (5% above the starting ${formatNumber(startingCustomers)}) in six months. Offer a modest discount below market, cover expenses and keep supply above demand.`}
     />
   );
 }

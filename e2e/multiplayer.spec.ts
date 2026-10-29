@@ -1761,6 +1761,18 @@ for (const count of [2, 4]) {
       await pages[0]
         .getByRole("button", { name: "pause", exact: true })
         .click();
+      // Delay the guest's acknowledgment so its next click reverses an in-flight choice,
+      // even though its last host snapshot still shows SLOW selected.
+      if (count === 2) {
+        await expect(clock(buyer)).toHaveAttribute(
+          "data-active-speed",
+          "PAUSED",
+        );
+        await expect(
+          clock(buyer).getByRole("button", { name: "slow speed", exact: true }),
+        ).toHaveAttribute("aria-pressed", "true");
+        room.heldViews.add(buyerId);
+      }
       await pages[1]
         .getByRole("button", { name: "normal speed", exact: true })
         .click();
@@ -1781,6 +1793,7 @@ for (const count of [2, 4]) {
         await pages[1]
           .getByRole("button", { name: "slow speed", exact: true })
           .click();
+      if (count === 2) room.heldViews.delete(buyerId);
       for (const page of pages)
         await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
       // Normal settings navigation is another local pause that freezes every player.
@@ -2683,7 +2696,7 @@ for (const scenarioId of [106, 107] as const) {
       const buttons =
         scenarioId === 106
           ? [/^Accept funded connection$/, /^Require phased connections$/]
-          : [/^Fund winterization/, /^Keep construction budget$/];
+          : [/^Retrofit remaining plants/, /^Keep construction budget$/];
       await dialogs[0].getByRole("button", { name: buttons[0] }).focus();
       await host.keyboard.press("Enter");
       await expect(dialogs[0]).toBeHidden();
@@ -2767,8 +2780,20 @@ for (const scenarioId of [106, 107] as const) {
         const receipt = game.worldEvents.occurrences.find(
           (event) => event.key === decisionKey,
         )!;
-        expect(receipt.attributes.cost).toBe(
-          scenarioId === 107 && index === 0 ? 90e6 : 0,
+        expect(receipt.attributes.cost).toBe(0);
+        const retrofitPayments = game.worldEvents.occurrences.filter(
+          (event) =>
+            event.attributes.retrofit === true &&
+            event.startsMinute === receipt.startsMinute,
+        );
+        expect(retrofitPayments.length > 0).toBe(
+          scenarioId === 107 && index === 0,
+        );
+        expect(Number(receipt.attributes.retrofitCost ?? 0)).toBe(
+          retrofitPayments.reduce(
+            (sum, event) => sum + Number(event.attributes.cost),
+            0,
+          ),
         );
         expect(receipt.attributes.upfrontGrant).toBe(
           scenarioId === 106 && index === 0 ? 15e6 : 0,

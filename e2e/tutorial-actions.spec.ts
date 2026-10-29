@@ -1,5 +1,6 @@
 import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
+import { sortBuildCatalog } from "./layout";
 
 const missions = [
   { name: "Electricity", id: 0, actions: [] },
@@ -90,6 +91,7 @@ for (const [index, mission] of missions.entries()) {
     if (mission.name === "Generators") {
       const build = dock.getByRole("button", { name: "Build", exact: true });
       await build.click();
+      await sortBuildCatalog(page);
       const purchase = page
         .getByRole("button", { name: /Review purchase of/ })
         .first();

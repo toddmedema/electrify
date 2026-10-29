@@ -14,3 +14,12 @@ test("legacy regional restoration summaries retain their established rounded wor
     scenarioEffectsSummary({ operatingExpensePerMonth: 123456.789012 }),
   ).toEqual(["Restoration: $123,457/month"]);
 });
+
+test("a small credit rounded to zero never has a negative zero sign", () => {
+  expect(scenarioEffectsSummary({ operatingExpensePerMonth: -0.01 })).toEqual([
+    "Restoration: $0/month",
+  ]);
+  expect(
+    scenarioEffectsSummary({ operatingExpensePerMonth: -0.01 }, true),
+  ).toEqual(["Operating expense: $-0.01/month"]);
+});

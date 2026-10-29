@@ -377,6 +377,25 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
 .keyboardMenu .MuiTouchRipple-ripplePulsate {
   display: none;
 }
+// The home menu's text buttons are plain until one is active. The active button carries the
+// primary fill as its focus indicator, so it drops the separate ring from .keyboardMenu :focus.
+// Hovering a control moves real focus to it (MainMenu.focusHomeButton), so :focus alone tracks
+// the pointer as well as keyboard and controller navigation.
+#centeredMenu
+  :is(.mainActions, .resourceActions, .discoveryActions)
+  .MuiButton-root {
+  &:hover {
+    background-color: transparent; // keep the inactive state borderless and unfilled
+  }
+
+  &:focus {
+    background-color: var(--interactive-strong);
+    color: var(--interactive-contrast);
+    // The fill is the focus indicator here, so drop both the global :focus-visible ring
+    // (which is !important) and the .keyboardMenu :focus ring for these controls.
+    outline: none !important;
+  }
+}
 html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   .keyboardMenu
   .settingsGroup
@@ -1421,33 +1440,10 @@ $pane_header_height: 48px;
   padding: 0 12px 8px;
 }
 
-// Wrapped rows use the available card width, including their final row.
-.build-list-item.buildOption.transmissionProject {
-  .buildOptionMetrics {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 0 12px 12px;
-    > .buildOptionMetric {
-      flex: 1 1 120px;
-      min-width: 0;
-    }
-  }
-}
-
 @media (max-width: ($phone_width - 1px)) {
   .build-list-item.buildOption.storageBuildOption
     .buildOptionMetric:last-child {
     grid-column: span 2;
-  }
-
-  .build-list-item.buildOption.transmissionProject .buildOptionMetrics {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-
-    > .buildOptionMetric:last-child:nth-child(odd) {
-      grid-column: 1 / -1;
-    }
   }
 }
 
@@ -4101,6 +4097,9 @@ $pane_header_height: 48px;
     height: 40px;
 
     .facilityActivity {
+      // The triangle's open upper-right corner keeps the lower exchange arrow visible.
+      top: -2px;
+      bottom: auto;
       color: $font_color_primary;
     }
   }
@@ -4199,22 +4198,8 @@ $pane_header_height: 48px;
   line-height: 20px;
 }
 
-.tutorialHudHint {
-  margin-top: 4px;
-  color: $font_color_faded;
-  font-size: var(--font-size-caption);
-  line-height: 18px;
-
-  strong {
-    color: $font_color_primary;
-    font-weight: 600;
-  }
-}
-
-// Hang the explanation and hint off the action's text (20px icon + 8px gap) so every line starts
-// at one left edge.
-.tutorialHud .tutorialPrompt,
-.tutorialHudHint {
+// Hang the explanation off the action's text (20px icon + 8px gap).
+.tutorialHud .tutorialPrompt {
   padding-left: 28px;
 }
 
@@ -4269,10 +4254,6 @@ $pane_header_height: 48px;
     min-height: 0;
     overflow: auto;
   }
-  // A full-width flex basis plus the hanging indent would otherwise run past the right edge
-  .tutorialHudHint {
-    box-sizing: border-box;
-  }
   // A plain div with no role, so flattening it into the HUD's row loses no semantics
   .tutorialHudFooter {
     display: contents;
@@ -4313,15 +4294,12 @@ $pane_header_height: 48px;
 }
 
 // Wider screens put the step name, the text and the buttons side by side. The header and footer
-// span both text rows and keep a fixed line at the top as tall as the theme's 40px buttons, so
-// they line up with the action and Next never moves as the text grows; a step without a hint
-// leaves the second row empty.
+// keep a fixed line at the top as tall as the theme's 40px buttons, so they line up with the
+// action and Next never moves as the explanation grows.
 @media screen and (min-width: $fold_pane_min_width) {
   .tutorialHud {
     display: grid;
-    grid-template-areas:
-      "header content footer"
-      "header hint footer";
+    grid-template-areas: "header content footer";
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: start;
     column-gap: 24px;
@@ -4346,10 +4324,6 @@ $pane_header_height: 48px;
     padding-top: 12px;
   }
 
-  .tutorialHudHint {
-    grid-area: hint;
-  }
-
   .tutorialHudFooter {
     grid-area: footer;
   }
@@ -4357,15 +4331,12 @@ $pane_header_height: 48px;
   // The phone's arrangement at every width: Exit quiet on the left, the step count beside the
   // primary action on the right, so the controls never swap sides as the window changes.
   .tutorialHud {
-    grid-template-areas:
-      "exit content step back next"
-      "exit hint step back next";
+    grid-template-areas: "exit content step back next";
     grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     column-gap: $space-2;
   }
 
-  .tutorialHudContent,
-  .tutorialHudHint {
+  .tutorialHudContent {
     margin-left: $space-4;
     margin-right: $space-4;
   }
@@ -4992,7 +4963,9 @@ $homeSmokeCycle: 5.6s;
     .MuiCardHeader-subheader {
       grid-column: 1 / 3;
       grid-row: 2;
-      color: inherit;
+      &.buildOptionHeaderWarning {
+        color: inherit;
+      }
     }
     .MuiCardHeader-action {
       grid-column: 3;
@@ -5441,6 +5414,19 @@ $homeSmokeCycle: 5.6s;
   }
   > .facilityDisclosure {
     position: relative; // above the shared output fill, alongside the grip
+  }
+  // The disclosure excludes the grip. Draw its keyboard ring around the whole header,
+  // inside the scroll pane so both vertical edges remain visible.
+  &:has(> .facilityDisclosure:focus-visible)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--focus-ring);
+    pointer-events: none;
+    z-index: 3;
+  }
+  > .facilityDisclosure:focus-visible {
+    outline: none !important;
   }
 }
 .facilityDisclosure {
@@ -6280,7 +6266,7 @@ $programs_column: 800px;
   padding: 0;
 
   .transmissionProjects {
-    padding: $space-2;
+    display: block;
   }
 }
 
@@ -6849,6 +6835,33 @@ $programs_column: 800px;
   box-sizing: border-box;
   padding: 2px;
   border-radius: 50%;
+  background: var(--font-color-primary);
+}
+
+// Preserve the artwork's silhouette in every avatar, including the manual and catalogs.
+// The dark backing follows that silhouette instead of clipping diamonds into circles.
+[data-theme]
+  .MuiAvatar-root:has(
+    > .MuiAvatar-img[src$="battery.svg"],
+    > .MuiAvatar-img[src$="/pumped hydro.svg"]
+  ),
+.scenarioDossierIcon:is([src$="battery.svg"], [src$="/pumped hydro.svg"]) {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+[data-theme] .MuiAvatar-root:has(> .MuiAvatar-img[src$="/transmission.svg"]),
+img[src$="/transmission.svg"] {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+[data-theme="dark"]
+  :is(
+    .MuiAvatar-root:has(> .MuiAvatar-img[src$="/transmission.svg"]),
+    img[src$="/transmission.svg"]:not(.MuiAvatar-img)
+  ) {
+  box-sizing: border-box;
+  // Inset the steep sides and base evenly; square padding leaves a heavy base stripe.
+  padding: 4px 3px 2px;
   background: var(--font-color-primary);
 }
 

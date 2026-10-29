@@ -86,6 +86,31 @@ describe("UPlotChart resizing", () => {
     jest.useRealTimers();
   });
 
+  it("never announces negative zero in a chart summary", () => {
+    const props = {
+      ariaLabel: "Zero chart",
+      state: {},
+      data: [
+        [0, 1],
+        [-0, -0.001],
+      ] as uPlot.AlignedData,
+      buildOptions: () => ({ width: 0, height: 0, series: [{}, {}] }),
+    };
+    const view = render(<UPlotChart {...props} />);
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      /latest -0\.001, range -0\.001 to 0/,
+    );
+    view.rerender(
+      <UPlotChart
+        {...props}
+        formatSummaryValue={(value) => value.toFixed(1)}
+      />,
+    );
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      /latest 0\.0, range 0\.0 to 0\.0/,
+    );
+  });
+
   it("feeds a chart-owned updater fresh data while accessible values remain current, and restores default updates after rebuild", () => {
     const update = jest.fn();
     const custom = ({

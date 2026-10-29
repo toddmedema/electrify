@@ -477,6 +477,18 @@ describe("authored upcoming-event previews", () => {
 });
 
 describe("Texas Deep Freeze", () => {
+  it("retains cold losses after recording onset and resolving the same month again", () => {
+    const initial = resolveStoryAtDate(context(49, 107));
+    const repeated = resolveStoryAtDate({
+      ...context(49, 107),
+      occurrences: initial.occurrences,
+    });
+    expect(repeated.effects).toEqual(initial.effects);
+    expect(
+      repeated.effects.winterizationOutputMultipliersByFuel?.["Natural Gas"],
+    ).toBe(0.62);
+  });
+
   it("starts only in February 2021 and expires completely in March", () => {
     const january = resolveStoryAtDate(context(48, 107));
     const february = resolveStoryAtDate(context(49, 107));
@@ -491,7 +503,7 @@ describe("Texas Deep Freeze", () => {
       temperatureOffsetC: -20,
       demandMultiplier: 1.27,
       fuelPriceMultipliers: { "Natural Gas": 2.8 },
-      facilityOutputMultipliersByFuel: {
+      winterizationOutputMultipliersByFuel: {
         "Natural Gas": 0.62,
         Coal: 0.73,
         Uranium: 0.77,
