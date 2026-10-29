@@ -318,7 +318,8 @@ thermals or battery constraints. This host cannot establish the M5's 8.33 ms fra
 
 - Live reducer batches create one plain working state from the untouched Immer draft, isolate
   each settled timeline frame and mutable fleet fields, and adopt once. Month inputs are copied
-  only at rollover. Unchanged history/events retain their references. Reusing resolved story effects removes repeated price/fee lookups.
+  only at rollover. Unchanged history/events retain their references. Reusing resolved story
+  effects removes repeated price/fee lookups.
 - The initial shared projection and month-keyed hydro/intertie outlooks run in persistent workers.
   Results are scoped to the exact run and request; stale/imported results are rejected, rapid
   requests coalesce, data loads remain retryable, and failures retain the after-paint fallback.

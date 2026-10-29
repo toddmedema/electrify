@@ -458,7 +458,7 @@ describe("building intertie tiers directly", () => {
     ).toBe(before);
   });
 
-  it("round trips a directly built tier through saves", () => {
+  it("round trips a directly built tier through saves and rejects an impossible tier", () => {
     const before = createGame({ scenarioId: 112, seed: 249007 });
     const state = cloneDeep(
       gameReducer(
@@ -473,6 +473,16 @@ describe("building intertie tiers directly", () => {
     expect(state.transmission!.lines).toHaveLength(1);
     const saved = parseSave(serializeSave(state));
     expect(saved?.game.transmission).toEqual(state.transmission);
+    expect(
+      gameReducer(
+        before,
+        buildTransmissionLine({
+          corridorId: CORRIDOR,
+          financed: true,
+          tier: 99,
+        }),
+      ),
+    ).toBe(before);
   });
 
   it("retains the existing physical capacity ceiling", () => {
@@ -500,6 +510,8 @@ describe("intertie operating controls", () => {
       );
       const line = built.transmission!.lines[0];
       expect(line).toBeDefined();
+      const malformed = "bad" as unknown as number;
+      expect(gameReducer(built, cancelTransmissionLine(malformed))).toBe(built);
       const cancelled = gameReducer(built, cancelTransmissionLine(line.id));
       expect(cancelled.transmission!.lines).toHaveLength(0);
       expect(

@@ -95,6 +95,9 @@ test("schedule, replace, cancel and reject stale/no-op edits without changing th
   expect(gameReducer(game, schedulePolicy({ ...change, month: 2 }))).toEqual(
     game,
   );
+  // Multiplayer commands reach this reducer as untrusted JSON.
+  const malformed = { ...change, tier: "Huge" } as unknown as typeof change;
+  expect(gameReducer(game, schedulePolicy(malformed))).toBe(game);
   // Scheduling the current tier replaces the pending start with no change.
   game = gameReducer(game, schedulePolicy({ ...change, tier: "Off" }));
   expect(game.policies!.programs.efficiency.pending).toBeUndefined();

@@ -32,7 +32,8 @@ const RESILIENCE_FIELDS_BY_FUEL: Readonly<Record<string, readonly string[]>> = {
 
 /**
  * Weather hardening on a quote or a saved facility: known flags only, each on the technology it
- * applies to, with a bounded gas design temperature and tracker hail share, so an edited save cannot harden a plant it does not describe.
+ * applies to, with a bounded gas design temperature and tracker hail share, so an edited save
+ * cannot harden a plant it does not describe.
  */
 export function validResilienceRecord(fuel: unknown, raw: unknown): boolean {
   if (raw === undefined) return true;
@@ -156,11 +157,11 @@ export function validBuildFacility(raw: unknown): raw is {
     ) ||
     (facility.tracksStarts !== undefined &&
       typeof facility.tracksStarts !== "boolean") ||
-    // Bounded as well as non-negative. These quotes go straight
-    // into the run's emissions and score, so an unbounded value from a crafted quote would
-    // poison both. The ceilings sit an order of magnitude above the dirtiest thing buildable
-    // (hydro at 2 kgCO2e/W, batteries at 0.08 kgCO2e/Wh), which leaves plenty of headroom for
-    // any future technology without letting an arbitrary number through.
+    // Bounded as well as non-negative. These quotes go straight into the run's emissions and
+    // score, so an unbounded value from a crafted quote would poison both. The ceilings sit an
+    // order of magnitude above the dirtiest thing buildable (hydro at 2 kgCO2e/W, batteries at
+    // 0.08 kgCO2e/Wh), which leaves plenty of headroom for any future technology without letting
+    // an arbitrary number through.
     ["constructionKgco2ePerW", "constructionKgco2ePerWh"].some(
       (key) =>
         typeof facility[key] === "number" &&

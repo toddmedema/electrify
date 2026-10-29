@@ -3863,7 +3863,7 @@ export function* tickStatePhases(
   if (stressWasActive && state.tutorialIntertieStress?.completed)
     state.timeline = reforecastSupply(state, true);
 
-  // After the tick, the way a player's click lands after the tick that brought the clock to it
+  // A choice that came due during this tick pauses the clock before the next one
   if (pendingScenarioChoice(state)) {
     state.scenarioChoicePause ??= speedBeforeTick;
     setForegroundSpeed(state, "PAUSED");

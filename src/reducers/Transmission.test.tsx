@@ -495,7 +495,7 @@ describe("transmission actions", () => {
       tickState(state);
       expect(state.speed).toBe("PAUSED");
       expect(state.date.minute).toBe(stressMinute);
-      // The exercise is persistent, finite, validated, and counted as a deliberate decision.
+      // The exercise is persistent, finite and validated.
       expect(
         parseSave(serializeSave(state))?.game.tutorialIntertieStress,
       ).toEqual(state.tutorialIntertieStress);
