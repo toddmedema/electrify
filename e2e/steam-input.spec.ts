@@ -261,6 +261,47 @@ test.beforeEach(async ({ page }) => {
   }, glyphs);
 });
 
+test("desktop home buttons share a width and Escape returns from menu pages", async ({
+  page,
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  await expect(play).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Achievements", exact: true }),
+  ).toHaveCount(0);
+  const bounds = (await play.boundingBox())!;
+  for (const button of await page.locator("#centeredMenu button").all()) {
+    const box = (await button.boundingBox())!;
+    expect(box.width, await button.innerText()).toBeCloseTo(bounds.width, 0);
+    expect(box.x, await button.innerText()).toBeCloseTo(bounds.x, 0);
+  }
+  if (
+    process.env.REVIEW_SCREENSHOT_DIR &&
+    testInfo.project.name === "deck-800-light"
+  ) {
+    await page.getByRole("button", { name: "Manual", exact: true }).focus();
+    await page.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        "menu-steam-desktop.png",
+      ),
+      animations: "disabled",
+    });
+  }
+  for (const title of ["Manual", "Settings", "Mods"]) {
+    await page.getByRole("button", { name: title, exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: title, exact: true }),
+    ).toBeVisible();
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    await page.keyboard.press("Escape");
+    await expect(play).toBeVisible();
+    await expect(page.locator(".screenPage")).toHaveCount(0);
+  }
+});
+
 test("controller text entry searches the manual, cancels and restores field focus", async ({
   page,
 }) => {

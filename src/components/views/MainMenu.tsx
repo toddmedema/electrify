@@ -20,7 +20,6 @@ import {
 } from "../../helpers/Share";
 import InstallAppButton from "../base/InstallAppButton";
 import { getDesktop, isDesktopApp } from "../../Desktop";
-import { useDesktopState } from "../../DesktopState";
 import { useMenuKeys } from "../base/useMenuKeys";
 // Keep Steam's co-op UI and authoritative worker out of the browser edition entirely.
 const MultiplayerButton =
@@ -69,7 +68,6 @@ function focusHomeButton(event: React.PointerEvent) {
 const MainMenu = (props: Props): React.JSX.Element => {
   const menuKeys = useMenuKeys();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
-  const steamAvailable = useDesktopState()?.steam.available;
   // The desktop game bundles no website pages, so those open in the player's browser.
   const sitePage = (path: string) =>
     desktopApp
@@ -214,7 +212,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           >
             Settings
           </Button>
-          {!steamAvailable && (
+          {!desktopApp && (
             <Button
               data-achievements-trigger
               variant="text"

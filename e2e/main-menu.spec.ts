@@ -303,3 +303,62 @@ test("home actions and resources remain reachable at low height with and without
     ).toBeLessThanOrEqual(1);
   }
 });
+
+for (const theme of ["light", "dark"]) {
+  test(`all home menu buttons share the primary action width in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript(
+      (value) => localStorage.setItem("theme", value),
+      theme,
+    );
+    for (const hasSave of [false, true]) {
+      if (hasSave) {
+        await page.goto("/?scenario=103");
+        await page
+          .getByRole("button", { name: "Start game", exact: true })
+          .click();
+        await expect
+          .poll(async () => Boolean(await readSavedGame(page)))
+          .toBe(true);
+      }
+      await page.goto("/");
+      const primary = page.getByRole("button", {
+        name: hasSave ? "Start a new game" : "Play",
+        exact: true,
+      });
+      await expect(primary).toBeVisible();
+      await page.evaluate(() =>
+        window.dispatchEvent(
+          new Event("beforeinstallprompt", { cancelable: true }),
+        ),
+      );
+      await expect(
+        page.getByRole("button", { name: "Install app" }),
+      ).toBeVisible();
+      const bounds = (await primary.boundingBox())!;
+      for (const button of await page.locator("#centeredMenu button").all()) {
+        const box = (await button.boundingBox())!;
+        expect(box.width, await button.innerText()).toBeCloseTo(
+          bounds.width,
+          0,
+        );
+        expect(box.x, await button.innerText()).toBeCloseTo(bounds.x, 0);
+      }
+      if (
+        hasSave &&
+        process.env.REVIEW_SCREENSHOT_DIR &&
+        ((theme === "light" && testInfo.project.name === "desktop-chromium") ||
+          (theme === "dark" && testInfo.project.name === "mobile-390px"))
+      ) {
+        await page.mouse.move(0, 0);
+        await page.getByRole("button", { name: "Manual", exact: true }).focus();
+        await page.screenshot({
+          path: `${process.env.REVIEW_SCREENSHOT_DIR}/menu-${theme}-${testInfo.project.name}.png`,
+          animations: "disabled",
+        });
+      }
+    }
+  });
+}
