@@ -41,7 +41,7 @@ independent median columns. Every pair produced matching SHA-256 hashes of the
 complete enumerable game state and serialized commitment metadata, computed
 outside the timed ticks.
 
-A separate post-timing audit replayed the same windows through both variants,
+A separate post-timing audit repeated the same windows through both variants,
 checking the owning failure conditions and cash at every completed month.
 All runs remained playable and completed all 96 months;
 the active workload ends at month 156 of its 240-month scenario. Its prior

@@ -19,10 +19,7 @@ import ConceptIcon from "./ConceptIcon";
 export default function ScenarioChoiceDialog() {
   const game = useAppSelector((state) => state.game);
   const dispatch = useAppDispatch();
-  const decision =
-    game.inGame && !game.replayPlayback
-      ? pendingScenarioChoice(game)
-      : undefined;
+  const decision = game.inGame ? pendingScenarioChoice(game) : undefined;
   if (!decision) return null;
   const company = game.multiplayer?.clock?.players.find(
     (player) => player.id === game.multiplayer?.seat,

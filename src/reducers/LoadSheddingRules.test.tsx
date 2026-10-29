@@ -33,16 +33,11 @@ import {
 import { scenarioRules, scenarioRulesIdentity } from "../helpers/ScenarioRules";
 import { validScenarioRuleState } from "../helpers/ScenarioRuleValidation";
 import { buildStorySnapshot } from "../helpers/Story";
-import { serializeReplay } from "../Replay";
 import { canonical, digest } from "../testing/CanonicalHash";
 import { STANDARD_BALANCE_PLAYS } from "../testing/BalancePlaybooks";
 import { parseSave } from "../SaveGame";
 import { expectSaveForgeries, roundTrip } from "../testing/SaveForgery";
-import {
-  createGame,
-  createGameFromReplay,
-  runSimulation,
-} from "../testing/Simulator";
+import { createGame, runSimulation } from "../testing/Simulator";
 import type { ActiveWorldEventType, GameType } from "../Types";
 import { generateNewTimeline, tickState } from "./Game";
 
@@ -259,7 +254,7 @@ test.each(DIFFICULTY_IDS)(
   },
 );
 
-test("an actual onset preserves plain, Immer batch, worker, save and internal replay results", () => {
+test("an actual onset preserves plain, Immer batch, worker and save results", () => {
   const before = createGame({ scenarioId: 113, difficulty: "CEO", seed: 1 });
   advance(before, 36 * MINUTES_PER_MONTH - MINUTES_PER_MONTH / TICKS_PER_MONTH);
   const plain = cloneDeep(before);
@@ -300,11 +295,6 @@ test("an actual onset preserves plain, Immer batch, worker, save and internal re
     getTimeFromTimeline(plain.date.minute, plain.timeline)!,
   )(Infinity)!;
   expect(canonical(decoded)).toEqual(canonical(projection));
-  const replay = createGameFromReplay(serializeReplay(plain)!);
-  advance(replay, plain.date.minute);
-  expect(replay.monthlyHistory).toEqual(plain.monthlyHistory);
-  expect(replay.worldEvents).toEqual(plain.worldEvents);
-  expect(replay.facilities).toEqual(plain.facilities);
 });
 
 test("missing, duplicate, forged, future and active-copy edits reject beside an intact save", () => {

@@ -1,6 +1,6 @@
 import type { VictoryType } from "./Types";
 
-/** Transient reducer effect scope. Never enters deterministic game or replay state. */
+/** Transient reducer effect scope. Never enters deterministic game state. */
 export interface RunSaveEffects {
   outcome: (victory: VictoryType, message?: () => string) => void;
 }

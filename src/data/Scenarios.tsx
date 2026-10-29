@@ -439,18 +439,10 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
         target: '[aria-label="Reorder Coal"]',
+        nextLabel: "Start final challenge",
         action: "Check generation comes before storage",
         content: (
-          <TutorialPrompt text="Spare power charges storage only when generation comes first. Charging storage loses some energy." />
-        ),
-      },
-      {
-        card: "FACILITIES",
-        hideUi: EARLY_MISSION_HIDDEN,
-        nextLabel: "Start final challenge",
-        action: "Prepare for the evening peak challenge",
-        content: (
-          <TutorialPrompt text="Restart with a smaller coal plant and the original storage. Your practice purchase is cleared." />
+          <TutorialPrompt text="Spare power charges storage only when generation comes first. Charging loses some energy. The challenge clears your practice purchase and restarts with a smaller coal plant." />
         ),
       },
       {
@@ -639,7 +631,7 @@ export const SCENARIOS: ScenarioType[] = [
         advanceOn: (s: AppStateType) => s.game.dollarsPerkWh < 0.07,
         action: "Drag the rate slider below the market price",
         content: (
-          <TutorialPrompt text="A rate below the market price wins more customers." />
+          <TutorialPrompt text="Investor utilities gain customers by pricing below market. Public utilities’ customers don’t switch over price; rates below their target earn score, and rates above it lose score." />
         ),
       },
       {
@@ -817,9 +809,9 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "INSIGHTS",
         nextLabel: "Start final challenge",
-        action: "Prepare for the forecast shortage challenge",
+        action: "Restart for the final challenge",
         content: (
-          <TutorialPrompt text="Start again before the blackout, then build enough generation to cover summer demand." />
+          <TutorialPrompt text="The next step resets time and your grid to the start of this tutorial. Then you’ll build generation to prevent the summer blackout." />
         ),
       },
       {

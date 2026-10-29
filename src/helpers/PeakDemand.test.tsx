@@ -1,9 +1,5 @@
 import cloneDeep from "lodash.clonedeep";
-import {
-  createGame,
-  createGameFromReplay,
-  runSimulation,
-} from "../testing/Simulator";
+import { createGame, runSimulation } from "../testing/Simulator";
 import gameReducer, {
   delta,
   generateNewTimeline,
@@ -37,7 +33,6 @@ import {
 } from "../Constants";
 import { GameType, DeferredResidentialLoad } from "../Types";
 import { parseSave, serializeSave } from "../SaveGame";
-import { decodeReplay, serializeReplay } from "../Replay";
 
 let baseline: GameType;
 beforeAll(() => {
@@ -276,7 +271,7 @@ test("constant curtailment credits drive the same effective-price memory used fo
   expect(checked).toBeGreaterThan(0);
 });
 
-test("both offer actions cancel, save, resume and replay deterministically through stopping", () => {
+test("both offer actions cancel, save and resume through stopping", () => {
   let game = cloneDeep(baseline);
   for (const id of ["timeOfUse", "curtailment"] as const) {
     const change = { id, tier: "On", month: 1 } as const;
@@ -301,15 +296,10 @@ test("both offer actions cancel, save, resume and replay deterministically throu
     game = cloneDeep(gameReducer(game, schedulePolicy(change)));
   }
   month(game);
-  const replay = createGameFromReplay(serializeReplay(game)!);
-  month(replay);
-  month(replay);
-  expect(replay.policies).toEqual(game.policies);
-  expect(
-    replay.timeline.map((t) => [t.cash, t.demandW, t.customerBillingRate]),
-  ).toEqual(
-    game.timeline.map((t) => [t.cash, t.demandW, t.customerBillingRate]),
-  );
+  for (const id of ["timeOfUse", "curtailment"] as const) {
+    expect(game.policies!.programs[id].tier).toBe("Off");
+    expect(game.policies!.programs[id].pending).toBeUndefined();
+  }
   expect(restored.timeline.map((t) => t.revenue)).toEqual(
     parseSave(
       JSON.parse(JSON.stringify(serializeSave(restored))),
@@ -318,8 +308,6 @@ test("both offer actions cancel, save, resume and replay deterministically throu
   const invalid = serializeSave(restored);
   invalid.game.timeline[0].customerBillingRate = -1;
   expect(parseSave(invalid)).toBeNull();
-
-  expect(decodeReplay(serializeReplay(game))).not.toBeNull();
 });
 
 test.each([false, true])(
@@ -404,13 +392,13 @@ test.each([18 * 60, 22 * 60])(
       prior.deferredResidentialWh! + addedWh,
       6,
     );
-    const replayedForecast = generateNewTimeline(
+    const continuedForecast = generateNewTimeline(
       parseSave(JSON.parse(JSON.stringify(serializeSave(game))))!.game,
       now.cash,
       now.customers,
     );
     expect(rebuilt.map((t) => t.deferredResidentialWh)).toEqual(
-      replayedForecast.map((t) => t.deferredResidentialWh),
+      continuedForecast.map((t) => t.deferredResidentialWh),
     );
     expect(
       rebuilt.find((t) => t.minute % 1440 === 1425)!.deferredResidentialWh,

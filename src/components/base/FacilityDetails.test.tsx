@@ -455,12 +455,6 @@ describe("weather resilience details", () => {
     expect(operation).toHaveTextContent("(<100%)");
   });
 
-  it("hides the purchase in a replay", () => {
-    const game = coldGame();
-    showDetails(game, game.facilities[0], { readOnly: true });
-    expect(screen.queryByRole("region", { name: "Upgrades" })).toBeNull();
-  });
-
   it("leaves gas out where winters never get cold enough to matter", () => {
     const game = carbonFee();
     showDetails(game, game.facilities[0]);

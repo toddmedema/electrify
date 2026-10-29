@@ -610,18 +610,6 @@ describe("weather hazards in the fleet", () => {
     });
     expect(onSelect).not.toHaveBeenCalled();
   });
-
-  it("shows a replay's hardening without offering to buy any", () => {
-    const state = {
-      ...gameWithSolar(),
-      replayPlayback: { actions: [], index: 0 },
-    } as GameType;
-    state.facilities[2].resilience = { hailResistant: true };
-    renderFacilities(state, 3);
-    const details = screen.getByRole("region", { name: "Upgrades" });
-    expect(details).not.toHaveTextContent("Standard panels");
-    expect(within(details).queryByRole("button")).toBeNull();
-  });
 });
 
 describe("the interties view", () => {
@@ -1065,22 +1053,6 @@ describe("unified connections", () => {
     expect(building).toHaveTextContent("Emissions");
     expect(building).not.toHaveTextContent("Import available now");
     expect(building).toHaveTextContent("Typical price");
-  });
-
-  it("permits inspecting replay connections but disables trading and building", async () => {
-    const game = connectedGame();
-    game.replayPlayback = {
-      actions: [],
-      index: 0,
-    } as GameType["replayPlayback"];
-    renderFacilities(game, null);
-    expect(screen.queryByRole("button", { name: "Build" })).toBeNull();
-    expect(screen.getByText("No power flowing")).toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "Trading rule" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Reorder / })).toBeNull();
-    expect(
-      screen.getByText("Trading rule: Buy for shortages, sell extra"),
-    ).toBeInTheDocument();
   });
 });
 

@@ -378,7 +378,6 @@ for (const mission of [
     if (mission === "Storage") {
       await hud.getByRole("button", { name: "Next", exact: true }).click();
       await expect(hud).toContainText("Check generation comes before storage");
-      await hud.getByRole("button", { name: "Next", exact: true }).click();
       const start = hud.getByRole("button", {
         name: "Start final challenge",
         exact: true,

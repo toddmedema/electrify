@@ -17,6 +17,7 @@ import { parseSave, serializeSave } from "../SaveGame";
 import { COOP_TEST_SPEC, coopSeats } from "../testing/MultiplayerFixtures";
 import { DIFFICULTY_IDS } from "../Constants";
 import { validBrowseState } from "./Browse";
+import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 
 beforeAll(() => {
   loadSimData("SF");
@@ -473,7 +474,7 @@ test("future and unsupported shared schemas are rejected without mutating the ch
     { ...saved, gameSchema: 99 },
     { ...saved, schema: 1 },
     { ...saved, schema: 2 },
-    { ...saved, gameSchema: 5 },
+    { ...saved, gameSchema: SAVE_SCHEMA_VERSION - 1 },
     { ...saved, gameSchema: undefined },
     { ...saved, rules: "previous-release" },
   ]) {

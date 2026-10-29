@@ -249,7 +249,7 @@ it("baselines saved/restored history and preference enabling, including rewindin
   stop();
 });
 
-it("ignores replay, restored victories and failures but records a completed run once", async () => {
+it("ignores restored victories and failures but records a completed run once", async () => {
   const f = fixture();
   const stop = startDesktopActivity(f.store, f.desktop);
   const victory = {
@@ -259,12 +259,8 @@ it("ignores replay, restored victories and failures but records a completed run 
   } as VictoryType;
   f.update((state) => ({
     ...state,
-    game: {
-      ...state.game,
-      replayPlayback: {} as NonNullable<RootState["game"]["replayPlayback"]>,
-      eventLog: [event(1, "BLACKOUT")],
-    },
-    ui: { ...state.ui, victory },
+    saves: { ...state.saves, activeId: "restored" },
+    ui: { ...state.ui, evidenceRunId: 1, victory },
   }));
   await flush();
   expect(f.addTimelineEvent).not.toHaveBeenCalled();
@@ -272,7 +268,6 @@ it("ignores replay, restored victories and failures but records a completed run 
     ...state,
     saves: { ...state.saves, activeId: "run-b" },
     ui: { ...state.ui, evidenceRunId: 2, victory: null },
-    game: { ...state.game, replayPlayback: undefined },
   }));
   f.update((state) => ({
     ...state,
@@ -338,16 +333,13 @@ it("drops queued highlights when a delayed native call outlives its play segment
   f.update((state) => ({
     ...state,
     ui: { ...state.ui, evidenceRunId: 2 },
-    game: {
-      ...state.game,
-      replayPlayback: {} as NonNullable<RootState["game"]["replayPlayback"]>,
-    },
+    saves: { ...state.saves, transitioning: true },
   }));
   release();
   await flush();
   expect(f.addTimelineEvent).not.toHaveBeenCalled();
   expect(f.setActivity).toHaveBeenLastCalledWith(
-    expect.objectContaining({ phase: "replay" }),
+    expect.objectContaining({ phase: "loading" }),
   );
   stop();
 });

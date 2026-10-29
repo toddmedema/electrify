@@ -14,9 +14,8 @@ import {
   emptyPolicies,
   programCustomers,
 } from "../helpers/Policies";
-import { serializeReplay } from "../Replay";
 import { parseSave } from "../SaveGame";
-import { createGame, createGameFromReplay } from "../testing/Simulator";
+import { createGame } from "../testing/Simulator";
 import type { GameType, GeneratorOperatingType } from "../Types";
 import { isStorage } from "../Types";
 import { generateNewTimeline, tickState } from "./Game";
@@ -306,42 +305,6 @@ test("rooftop electricity serves homes first and only its true surplus charges c
     expect(now.demandW > 0).toBe(loadShare > 1);
     expect(now.revenue).toBe(0);
   }
-});
-
-test("new flexibility scheduling replays with identical actual dispatch and program costs", () => {
-  const game = createGame({
-    scenarioId: 110,
-    seed: 44,
-    initialPrograms: { thermal: "On", evCharging: "On", battery: "On" },
-  });
-  const play = (state: GameType) => {
-    const readings = [];
-    while (state.date.monthsElapsed < 3) {
-      tickState(state);
-      const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
-      readings.push({
-        minute: now.minute,
-        demandW: now.demandW,
-        cash: now.cash,
-        expensesPolicy: now.expensesPolicy,
-        thermalShiftedW: now.thermalShiftedW ?? 0,
-        evShiftedW: now.evShiftedW ?? 0,
-        batteryChargeW: now.customerBatteryChargeW ?? 0,
-        batteryDischargeW: now.customerBatteryDischargeW ?? 0,
-        storedWh: now.customerBatteryWh ?? 0,
-      });
-    }
-    return readings;
-  };
-  const actual = play(game);
-  expect(actual.some((tick) => tick.expensesPolicy! > 0)).toBe(true);
-  expect(actual.some((tick) => tick.thermalShiftedW > 0)).toBe(true);
-  expect(actual.some((tick) => tick.evShiftedW > 0)).toBe(true);
-  expect(actual.some((tick) => tick.batteryChargeW > 0)).toBe(true);
-  expect(actual.some((tick) => tick.batteryDischargeW > 0)).toBe(true);
-  const replay = createGameFromReplay(serializeReplay(game)!);
-  expect(play(replay)).toEqual(actual);
-  expect(replay.policies).toEqual(game.policies);
 });
 
 test("a historical grid cannot dispatch modern customer batteries despite a synthetic rollout record", () => {

@@ -30,7 +30,7 @@ finished with, and any invariant violations. Outcomes match the real game: compl
 or fired after three consecutive months below 90% supplied (95% on CEO difficulty),
 or when a required scenario objective is decided against the company.
 `npm run sim -- --help` lists the flags; `--list` shows the scenario ids.
-One explicit storage decision can be replayed with, for example,
+One explicit storage decision can be exercised with, for example,
 `--build Battery --build-mwh 800 --finance`; generator builds use `--build-mw`.
 Pass `--without-stories` to run the same playthrough as an authored-effects control, and
 `--without-hazards` to switch off hail and extreme cold (`weatherHazardsEnabled: false` in
@@ -38,7 +38,7 @@ Pass `--without-stories` to run the same playthrough as an authored-effects cont
 hits, repair costs, cold snaps and derated plant-months. `WeatherHazardBalance.sim.test.tsx` runs a
 solar-and-gas fleet for twenty years at Denver, Dallas, SF, PIT and Reykjavik and bounds the
 storm counts; `reducers/WeatherHazard.test.tsx` covers onset, repair costs, repair, retrofits,
-save/resume and replay.
+save/resume.
 
 Story balance uses the checked-in seeds 1–20 across all six scored scenarios and five
 difficulties, running the same UI-legal playbooks as the CEO economics tests with authored effects
@@ -289,7 +289,7 @@ with the same demand type should share a label because Insights groups them into
 
 The shared modal blocks navigation and dismissal; the reducer blocks the clock until an explicit
 response is accepted. Selecting closes the prompt and leaves play paused so the player can inspect
-the result before resuming. Saves retain unanswered prompts and replay actions retain answers.
+the result before resuming. Saves retain unanswered prompts and accepted answers.
 
 Accepted choices are story occurrences with the definition ID as their key and
 `attributes.choice` as the option ID. Future `WorldEvents` phase descriptions and previews can
@@ -298,7 +298,7 @@ The forecast cache includes occurrence attributes, so an answer refreshes future
 Costs are charged once and retained as operating expenses through reforecasting.
 
 The headless baseline bot explicitly selects the first free option. Add focused reducer tests
-for each consequential branch, including future effects, save and replay parity.
+for each consequential branch, including future effects and save continuation.
 Pass `scenarioResponses: { [decisionId]: optionId }` to select a specific branch in a simulation;
 an invalid or unaffordable response throws instead of leaving the bot stuck at the prompt.
 Wildfire Emergency now uses ordinary construction and dispatch decisions rather than a scenario

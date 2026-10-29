@@ -7,13 +7,11 @@ import {
   serializeCommitmentMetadata,
 } from "../helpers/Commitment";
 import { getTimeFromTimeline } from "../helpers/DateTime";
-import { serializeReplay } from "../Replay";
 import { getStore } from "../StoreRegistry";
-import { createGame, createGameFromReplay } from "../testing/Simulator";
+import { createGame } from "../testing/Simulator";
 import { FacilityUpgradeType, GameType } from "../Types";
 import gameReducer, {
   buildTransmissionLine,
-  delta,
   loaded,
   quit,
   resume,
@@ -228,22 +226,6 @@ describe("live tick working state", () => {
     expect(actual.tutorialIntertieStress?.completed).toBe(true);
     expect(actual.speed).toBe("PAUSED");
   });
-
-  it("preserves the draft path for recorded actions in a replay", () => {
-    const played = createGame({ scenarioId: 101, seed: 61 });
-    const recorded = gameReducer(played, delta({ dollarsPerkWh: 0.08 }));
-    const state = createGameFromReplay(serializeReplay(recorded)!);
-    const before = mutableCopy(state);
-    const expected = mutableCopy(state);
-    tickState(expected);
-    freeze(state, true);
-
-    const actual = draftTick(state);
-
-    expectSameState(actual, expected);
-    expectSameState(state, before);
-    expect(actual.replayPlayback?.index).toBeGreaterThan(0);
-  });
 });
 
 describe("live presentation tick batches", () => {
@@ -262,9 +244,6 @@ describe("live presentation tick batches", () => {
     getStore().dispatch(quit());
     getStore().dispatch(tick());
     getStore().dispatch(resume(state));
-    // resume deliberately strips replay state from saves; this fixture is a watched replay.
-    if (state.replayPlayback)
-      getStore().dispatch(delta({ replayPlayback: state.replayPlayback }));
     getStore().dispatch(loaded());
     getStore().dispatch(setSpeed("ULTRA"));
     const before = getStore().getState().game;
@@ -278,13 +257,7 @@ describe("live presentation tick batches", () => {
     wallClockMs = steps * TICK_MS.ULTRA;
     getStore().dispatch(tick());
     const actual = getStore().getState().game;
-    // The preserved Immer replay path drops non-enumerable metadata on settled past frames;
-    // only future commitment decisions consume it. Live working-state ticks preserve all rows.
-    expectSameState(
-      actual,
-      expected,
-      state.replayPlayback ? actual.date.minute + TICK_MINUTES : -Infinity,
-    );
+    expectSameState(actual, expected);
     expectSameState(before, saved);
     return { actual, before };
   }
@@ -373,14 +346,5 @@ describe("live presentation tick batches", () => {
     expect(actual.speed).toBe("PAUSED");
     expect(actual.monthlyHistory.length).toBe(before.monthlyHistory.length + 1);
     expect(actual.worldEvents).not.toBe(before.worldEvents);
-  });
-
-  it("applies recorded replay actions inside the real presentation batch", () => {
-    const played = createGame({ scenarioId: 101, seed: 61 });
-    const recorded = gameReducer(played, delta({ dollarsPerkWh: 0.08 }));
-    const state = createGameFromReplay(serializeReplay(recorded)!);
-    const { actual, before } = presentBatch(state, 12);
-    expect(actual.date.minute - before.date.minute).toBe(12 * TICK_MINUTES);
-    expect(actual.replayPlayback?.index).toBeGreaterThan(0);
   });
 });

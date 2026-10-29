@@ -47,7 +47,7 @@ export interface PurchaseReviewDialogProps {
   refinancedBalance?: number;
   /** The loan's term; facilities pass facilityLoanMonths, interties keep the standard term */
   loanMonths?: number;
-  /** Gating beyond affordability (replay, an invalid quote); affordability is checked here */
+  /** Gating beyond affordability (such as an invalid quote); affordability is checked here */
   cashDisabled?: boolean;
   loanDisabled?: boolean;
   /** Shown above the facts: a site note, build options, a mission deadline */

@@ -154,112 +154,112 @@
             {
               "object": "Math",
               "property": "pow",
-              "message": "Math.pow's last bit depends on the platform's C library. Use pow from helpers/Pow so simulations replay identically everywhere."
+              "message": "Math.pow's last bit depends on the platform's C library. Use pow from helpers/Pow so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "exp",
-              "message": "Math.exp rounds differently on arm64 than on x86-64. Use exp from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.exp rounds differently on arm64 than on x86-64. Use exp from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "expm1",
-              "message": "Math.expm1 rounds differently on arm64 than on x86-64. Use expm1 from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.expm1 rounds differently on arm64 than on x86-64. Use expm1 from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "log",
-              "message": "Math.log rounds differently on arm64 than on x86-64. Use log from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.log rounds differently on arm64 than on x86-64. Use log from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "log1p",
-              "message": "Math.log1p rounds differently on arm64 than on x86-64. Use log1p from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.log1p rounds differently on arm64 than on x86-64. Use log1p from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "log2",
-              "message": "Math.log2 rounds differently on arm64 than on x86-64. Use log2 from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.log2 rounds differently on arm64 than on x86-64. Use log2 from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "log10",
-              "message": "Math.log10 rounds differently on arm64 than on x86-64. Use log10 from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.log10 rounds differently on arm64 than on x86-64. Use log10 from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "sin",
-              "message": "Math.sin rounds differently on arm64 than on x86-64. Use sin from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.sin rounds differently on arm64 than on x86-64. Use sin from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "cos",
-              "message": "Math.cos rounds differently on arm64 than on x86-64. Use cos from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.cos rounds differently on arm64 than on x86-64. Use cos from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "tan",
-              "message": "Math.tan rounds differently on arm64 than on x86-64. Use tan from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.tan rounds differently on arm64 than on x86-64. Use tan from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "asin",
-              "message": "Math.asin rounds differently on arm64 than on x86-64. Use asin from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.asin rounds differently on arm64 than on x86-64. Use asin from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "acos",
-              "message": "Math.acos rounds differently on arm64 than on x86-64. Use acos from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.acos rounds differently on arm64 than on x86-64. Use acos from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "atan",
-              "message": "Math.atan rounds differently on arm64 than on x86-64. Use atan from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.atan rounds differently on arm64 than on x86-64. Use atan from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "atan2",
-              "message": "Math.atan2 rounds differently on arm64 than on x86-64. Use atan2 from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.atan2 rounds differently on arm64 than on x86-64. Use atan2 from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "sinh",
-              "message": "Math.sinh rounds differently on arm64 than on x86-64. Use sinh from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.sinh rounds differently on arm64 than on x86-64. Use sinh from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "cosh",
-              "message": "Math.cosh rounds differently on arm64 than on x86-64. Use cosh from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.cosh rounds differently on arm64 than on x86-64. Use cosh from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "tanh",
-              "message": "Math.tanh rounds differently on arm64 than on x86-64. Use tanh from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.tanh rounds differently on arm64 than on x86-64. Use tanh from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "asinh",
-              "message": "Math.asinh rounds differently on arm64 than on x86-64. Use asinh from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.asinh rounds differently on arm64 than on x86-64. Use asinh from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "acosh",
-              "message": "Math.acosh rounds differently on arm64 than on x86-64. Use acosh from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.acosh rounds differently on arm64 than on x86-64. Use acosh from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "atanh",
-              "message": "Math.atanh rounds differently on arm64 than on x86-64. Use atanh from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.atanh rounds differently on arm64 than on x86-64. Use atanh from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "cbrt",
-              "message": "Math.cbrt rounds differently on arm64 than on x86-64. Use cbrt from helpers/Libm so simulations replay identically everywhere."
+              "message": "Math.cbrt rounds differently on arm64 than on x86-64. Use cbrt from helpers/Libm so simulations produce identical results everywhere."
             },
             {
               "object": "Math",
               "property": "random",
-              "message": "Use addressed draws from helpers/Math with the stored seed. Ambient randomness breaks saves and replays."
+              "message": "Use addressed draws from helpers/Math with the stored seed. Ambient randomness breaks saved-run determinism."
             },
             {
               "object": "globalThis",
@@ -286,7 +286,7 @@
             "error",
             {
               "selector": "BinaryExpression[operator='**']:not([right.type='Literal'][right.value=2]):not([left.type='Literal'][left.value=2][right.type='Literal'][right.raw=/^[0-9_]+$/]):not([left.type='Literal'][left.value=2][right.type='UnaryExpression'][right.operator=/^[+-]$/][right.argument.type='Literal'][right.argument.raw=/^[0-9_]+$/]), AssignmentExpression[operator='**=']",
-              "message": "Only squares and literal integer powers of two may use **. Use pow from helpers/Pow for other exponents so simulations replay identically everywhere."
+              "message": "Only squares and literal integer powers of two may use **. Use pow from helpers/Pow for other exponents so simulations produce identical results everywhere."
             }
           ]
         }

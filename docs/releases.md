@@ -16,7 +16,7 @@ Web and desktop builds use their build-start timestamp as the version, for examp
 `v26sept26-1507` in Settings and `26sept26-1507` in metadata. The timestamp uses fixed PST
 (UTC−8, including summer), a two-digit day/year, and 24-hour time. Settings and the deployed
 `/package.json` report the same version.
-Game analytics events include it as `app_version`; new scores, personal bests, replays, and saves
+Game analytics events include it as `app_version`; new scores, personal bests, and saves
 use `appVersion`. Steam scores store the ASCII version in zero-padded int32 score-detail slots.
 Existing records keep their original metadata. The development server stamps its start time;
 unbuilt test/CLI entry points use `dev`. Electron's required semver package field stays separate

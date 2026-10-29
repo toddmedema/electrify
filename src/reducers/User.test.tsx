@@ -1,4 +1,3 @@
-import manifest from "../data/RunCompatibility.json";
 import { configureStore } from "@reduxjs/toolkit";
 import userReducer, {
   delta,
@@ -10,9 +9,7 @@ import userReducer, {
   submitHighscore,
   restoreCompetitiveBests,
 } from "./User";
-import { MAX_REPLAY_BYTES } from "../Replay";
-import { LOCATIONS } from "../Constants";
-import { ReplayType, UserType } from "../Types";
+import { UserType } from "../Types";
 
 jest.mock("../AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
@@ -55,28 +52,13 @@ function makeStore(user: UserType = {}) {
   });
 }
 
-function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
-  return {
-    appVersion: "fixture",
-    compatibilityId: manifest.compatibilityId,
-    monthlyCash: [],
-    scenarioId: 101,
-    difficulty: "Employee",
-    seed: 12345,
-    location: LOCATIONS.SF,
-    actions: [{ minute: 1440, type: "sellFacility", payload: 3 }],
-    ...overrides,
-  };
-}
-
-function aSubmission(replay?: ReplayType, score = 420) {
+function aSubmission(score = 420) {
   return {
     score,
     outcome: "completed" as const,
     scoreBreakdown: { service: 400, financial: 20, environmental: 0 },
     scenarioId: 101,
     difficulty: "Employee" as const,
-    replay,
   };
 }
 
@@ -90,7 +72,7 @@ function silenceWarnings() {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockAddDoc.mockResolvedValue({ id: "replay-1" });
+  mockAddDoc.mockResolvedValue({ id: "score-1" });
   mockSetDoc.mockResolvedValue(undefined);
   mockGetDocs.mockResolvedValue({
     empty: true,
@@ -134,12 +116,10 @@ describe("submitHighscore", () => {
     expect(store.getState().user.bests?.["v2:102"]).toBeUndefined();
   });
   it.each(["bankrupt", "fired"] as const)(
-    "rejects a %s result before any score, replay or personal-best write",
+    "rejects a %s result before any score or personal-best write",
     async (outcome) => {
       const store = makeStore(SIGNED_IN);
-      await store.dispatch(
-        submitHighscore({ ...aSubmission(aReplay()), outcome }),
-      );
+      await store.dispatch(submitHighscore({ ...aSubmission(), outcome }));
       expect(mockAddDoc).not.toHaveBeenCalled();
       expect(mockSetDoc).not.toHaveBeenCalled();
       expect(store.getState().user.bests).toBeUndefined();
@@ -158,25 +138,17 @@ describe("submitHighscore", () => {
     });
   });
   it("writes nothing for a player who isn't signed in", async () => {
-    await makeStore().dispatch(submitHighscore(aSubmission(aReplay())));
+    await makeStore().dispatch(submitHighscore(aSubmission()));
     expect(mockAddDoc).not.toHaveBeenCalled();
   });
 
-  it("stores the replay and points the score at it", async () => {
-    await makeStore(SIGNED_IN).dispatch(
-      submitHighscore(aSubmission(aReplay())),
-    );
-
-    const [replayWrite] = writesTo("replays");
-    expect(replayWrite[1].seed).toBe(12345);
-    // JSON rather than an array of maps, so it can't run into Firestore's rules about arrays
-    expect(typeof replayWrite[1].actions).toBe("string");
-    expect(replayWrite[1].uid).toBe("player-1");
-
-    const [scoreWrite] = writesTo("scores");
-    expect(scoreWrite[1].score).toBe(420);
-    expect(scoreWrite[1].appVersion).toBe("26sept26-1507");
-    expect(scoreWrite[1].replayId).toBe("replay-1");
+  it("submits the score with its build version", async () => {
+    await makeStore(SIGNED_IN).dispatch(submitHighscore(aSubmission()));
+    expect(mockAddDoc).toHaveBeenCalledTimes(1);
+    expect(writesTo("scores")[0][1]).toMatchObject({
+      score: 420,
+      appVersion: "26sept26-1507",
+    });
   });
 
   // Denormalized onto the score so that drawing a fifty row board is one query rather than
@@ -194,60 +166,9 @@ describe("submitHighscore", () => {
     expect("displayName" in writesTo("scores")[0][1]).toBe(false);
   });
 
-  it("still submits the score when the run wasn't recorded", async () => {
-    await makeStore(SIGNED_IN).dispatch(submitHighscore(aSubmission()));
-
-    expect(writesTo("replays").length).toBe(0);
-    const [scoreWrite] = writesTo("scores");
-    expect(scoreWrite[1].score).toBe(420);
-    expect(scoreWrite[1].appVersion).toBe("26sept26-1507");
-    expect("replayId" in scoreWrite[1]).toBe(false);
-  });
-
-  /**
-   * A replay is a bonus on top of a score. Every way the extra write can fail -- rules that
-   * haven't been deployed yet, a dropped network, an oversized run -- costs the replay and not
-   * the score the player actually earned.
-   */
-  it("submits the score even when the replay write is rejected", async () => {
-    const warn = silenceWarnings();
-    mockAddDoc.mockRejectedValueOnce(new Error("permission-denied"));
-    mockAddDoc.mockResolvedValueOnce({ id: "score-1" });
-
-    await makeStore(SIGNED_IN).dispatch(
-      submitHighscore(aSubmission(aReplay())),
-    );
-
-    const [scoreWrite] = writesTo("scores");
-    expect(scoreWrite[1].score).toBe(420);
-    expect(scoreWrite[1].appVersion).toBe("26sept26-1507");
-    expect("replayId" in scoreWrite[1]).toBe(false);
-    warn.mockRestore();
-  });
-
-  it("drops a replay too big for a Firestore document", async () => {
-    const warn = silenceWarnings();
-    // One oversized payload rather than a realistic action list; what matters is the byte count
-    const huge = aReplay({
-      actions: [
-        {
-          minute: 0,
-          type: "sellFacility",
-          payload: "x".repeat(MAX_REPLAY_BYTES + 1),
-        },
-      ],
-    });
-
-    await makeStore(SIGNED_IN).dispatch(submitHighscore(aSubmission(huge)));
-
-    expect(writesTo("replays").length).toBe(0);
-    expect(writesTo("scores").length).toBe(1);
-    warn.mockRestore();
-  });
-
   it("records a first score as the personal best", async () => {
     const store = makeStore(SIGNED_IN);
-    await store.dispatch(submitHighscore(aSubmission(undefined, 640)));
+    await store.dispatch(submitHighscore(aSubmission(640)));
 
     expect(store.getState().user.bests?.["v2:101"].score).toBe(640);
     // Mirrored onto the profile document too, so it survives a new browser
@@ -265,11 +186,11 @@ describe("submitHighscore", () => {
       },
     });
 
-    await store.dispatch(submitHighscore(aSubmission(undefined, 500)));
+    await store.dispatch(submitHighscore(aSubmission(500)));
     expect(store.getState().user.bests?.["v2:101"].score).toBe(640);
     expect(mockSetDoc).not.toHaveBeenCalled();
 
-    await store.dispatch(submitHighscore(aSubmission(undefined, 812)));
+    await store.dispatch(submitHighscore(aSubmission(812)));
     expect(store.getState().user.bests?.["v2:101"]).toEqual(
       expect.objectContaining({ score: 812, difficulty: "Employee" }),
     );

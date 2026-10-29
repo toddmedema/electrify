@@ -41,11 +41,9 @@ it.each([
       {
         ...original,
         difficulty: "CEO",
-        replayPlayback: { actions: [], index: 0 },
       },
       launchRun({ identity, challenge }),
     );
-    expect(accepted.replayPlayback).toBeUndefined();
     expect(accepted.monthlyHistory).toEqual([]);
     expect(accepted.difficulty).toBe("Employee");
     // Real loaded data came from createGame; only network callbacks are replaced, not initGame.
@@ -83,7 +81,6 @@ it.each([
       JSON.stringify(original.timeline),
     );
     expect(accepted.facilities).toEqual(original.facilities);
-    expect(accepted.replayLog).toEqual([]);
     let right = cloneDeep(accepted);
     for (let i = 0; i < 2; i++) {
       right = cloneDeep(

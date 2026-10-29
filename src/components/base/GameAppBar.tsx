@@ -344,12 +344,8 @@ export function GameAppBar(props: Props) {
   const inMultiplayer = !!multiplayer;
   const clock = multiplayer?.clock;
   const speed = clock?.selectedSpeed ?? game.speed;
-  // Watching somebody else's run rather than playing your own. The speed controls stay live --
-  // being able to pause and fast forward is most of the point of a replay
-  const isReplay = !!game.replayPlayback;
   // Undefined outside a tutorial, and on the last one - so this doubles as "is there a next
-  // tutorial to offer?" for the menu item below. Also undefined throughout a replay, since a
-  // tutorial never sets a score and so never has one to watch
+  // tutorial to offer?" for the menu item below.
   const nextTutorial = getNextTutorial(game.scenarioId);
   // A tutorial's progress isn't worth resuming, so its menu item just says where it goes - only a
   // real run gets the "Save & Quit" reminder that leaving keeps it around to come back to
@@ -451,11 +447,7 @@ export function GameAppBar(props: Props) {
             </MenuItem>
           )}
           <MenuItem onClick={handleQuit}>
-            {isReplay
-              ? "Exit replay"
-              : isTutorial
-                ? "Main menu"
-                : "Save & Quit"}
+            {isTutorial ? "Main menu" : "Save & Quit"}
           </MenuItem>
           {process.env.REACT_APP_DESKTOP === "true" && isDesktopApp() && (
             <MenuItem
@@ -484,7 +476,6 @@ export function GameAppBar(props: Props) {
       onNextTutorial,
       handleQuit,
       nextTutorial,
-      isReplay,
       isTutorial,
     ],
   );
@@ -598,13 +589,12 @@ export function GameAppBar(props: Props) {
                 )}
               </span>
             </span>
-            {isReplay && <span className="replayBadge">REPLAY</span>}
           </Typography>
           {singleRow && statusRow}
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
       </div>
-      {!isTutorial && !isReplay && props.saveState === "failed" && (
+      {!isTutorial && props.saveState === "failed" && (
         <Typography
           className="saveStatus"
           data-save-state={props.saveState}
@@ -620,7 +610,7 @@ export function GameAppBar(props: Props) {
           </button>
         </Typography>
       )}
-      {!isTutorial && !isReplay && props.saveState !== "failed" && (
+      {!isTutorial && props.saveState !== "failed" && (
         <span
           hidden
           data-save-state={props.saveState}

@@ -442,15 +442,11 @@ describe("recordTutorialExited", () => {
     expect(getPlayedScenarioIds()).toEqual([]);
   });
 
-  it("ignores scenarios without a walkthrough, and replays", () => {
+  it("ignores scenarios without a walkthrough", () => {
     const game = initialState(steps, { tutorialStep: 0 }).game;
     recordTutorialExited({
       ...game,
       customScenario: { ...DEFAULT_CUSTOM_SCENARIO, tutorialSteps: undefined },
-    });
-    recordTutorialExited({
-      ...game,
-      replayPlayback: {} as GameType["replayPlayback"],
     });
     expect(getPlayedScenarioIds()).toEqual([]);
   });

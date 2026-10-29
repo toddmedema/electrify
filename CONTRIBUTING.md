@@ -53,7 +53,7 @@ The full check runs this preflight automatically before starting any gates.
 
 The headless simulator drives the real game reducer. Use it to check balance
 without playing through the UI; see the [simulation guide](src/testing/README.md).
-Keep replay outcomes deterministic by using the seeded helpers in
+Keep simulation outcomes deterministic by using the seeded helpers in
 `src/helpers/Math.tsx`, `pow` from `src/helpers/Pow.ts` for powers and
 `src/helpers/Libm.ts` for `exp`, `log`, `sin` and other transcendentals.
 

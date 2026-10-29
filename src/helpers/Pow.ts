@@ -4,7 +4,7 @@
  * V8 evaluates `Math.pow` (and `**`) with the C library's `std::pow`, unlike every other Math
  * function, which it ships its own fdlibm port of. So the last bit of a power depends on the
  * machine: glibc on Linux, the Universal CRT on Windows, Apple's libm on macOS. That is invisible
- * to a player, but a replay or a golden hash is a chain of millions of dependent operations, and a
+ * to a player, but a golden hash is a chain of millions of dependent operations, and a
  * one-ulp difference in a handful of powers was enough to send scenario 108 down a different path
  * on Windows than on Linux CI.
  *

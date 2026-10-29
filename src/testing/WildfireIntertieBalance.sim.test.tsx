@@ -1,8 +1,7 @@
 import cloneDeep from "lodash.clonedeep";
 import { parseSave, serializeSave } from "../SaveGame";
-import { serializeReplay } from "../Replay";
 import { runMonths } from "./SimulationTestHelpers";
-import { createGame, createGameFromReplay, runSimulation } from "./Simulator";
+import { createGame, runSimulation } from "./Simulator";
 import { expectNoViolations } from "./SimulationTestHelpers";
 import { scenarioObjectiveFailure } from "../reducers/Game";
 jest.setTimeout(120000);
@@ -65,7 +64,7 @@ it.each(["Intern", "CEO"] as const)(
   },
 );
 
-it("preserves the outage and its restoration across save continuation and replay", () => {
+it("preserves the outage and its restoration across save continuation", () => {
   const game = createGame({
     scenarioId: 111,
     difficulty: "CEO",
@@ -78,8 +77,4 @@ it("preserves the outage and its restoration across save continuation and replay
   runMonths(resumed, 2);
   expect(resumed.monthlyHistory).toEqual(game.monthlyHistory);
   expect(resumed.worldEvents).toEqual(game.worldEvents);
-  const replay = createGameFromReplay(serializeReplay(game)!);
-  runMonths(replay, 39);
-  expect(replay.monthlyHistory).toEqual(game.monthlyHistory);
-  expect(replay.worldEvents).toEqual(game.worldEvents);
 });

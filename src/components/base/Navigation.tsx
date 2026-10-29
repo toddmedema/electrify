@@ -72,7 +72,6 @@ export default function Navigation({
   const dispatch = useAppDispatch();
   const controllerInput = useControllerInput();
   const cardName = useAppSelector(selectCardName);
-  const readOnly = useAppSelector((state) => !!state.game.replayPlayback);
   const unreadEvents = useAppSelector(
     (state) =>
       (state.game.eventLog[0]?.id || 0) > state.game.eventLogReadThroughId,
@@ -96,7 +95,6 @@ export default function Navigation({
   const { labelId, fromTouch, buttonLabels, dockLabels } = useDockLabels();
   const tools = GAME_TOOLS.filter(
     (tool) =>
-      (!readOnly || tool.id !== "BUILD_GENERATORS") &&
       (hasScenarioDetails || tool.id !== "SCENARIO") &&
       (!tutorialActions || tutorialActions.includes(tool.id)),
   );

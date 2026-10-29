@@ -1,12 +1,12 @@
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
-import { start, delta, quit, startReplay } from "../../reducers/Game";
+import { start, delta, quit } from "../../reducers/Game";
 import { getHistoryApi } from "../../Globals";
 import { scenarioListUrl } from "../../ScenarioUrl";
 import { store } from "../../Store";
-import { delta as uiDelta, snackbarOpen } from "../../reducers/UI";
+import { delta as uiDelta } from "../../reducers/UI";
 import { startWithSaveGuard } from "./StartGame";
-import { AppStateType, GameType, ReplayType } from "../../Types";
+import { AppStateType, GameType } from "../../Types";
 import NewGameDetails, { DispatchProps, StateProps } from "./NewGameDetails";
 import { coopControls } from "../../multiplayer/Registry";
 
@@ -61,16 +61,6 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         dispatch(delta({ difficulty }));
         dispatch(start(scenarioId));
       });
-    },
-    // A replay also replaces the current live run, so await its last checkpoint first.
-    onWatchReplay: (replay: ReplayType) => {
-      startWithSaveGuard(dispatch, () => {
-        getHistoryApi().replaceState(null, "", scenarioListUrl());
-        dispatch(startReplay(replay));
-      });
-    },
-    onReplayError: (message: string) => {
-      dispatch(snackbarOpen(message));
     },
   };
 };

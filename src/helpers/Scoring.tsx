@@ -38,7 +38,7 @@ export const SCORE_LABELS: Record<
 };
 
 /**
- * The label for a breakdown key. Breakdowns can arrive from saves, replays and the leaderboard,
+ * The label for a breakdown key. Breakdowns can arrive from saves and the leaderboard,
  * so an unrecognised key falls back to itself instead of rendering blank.
  */
 export function scoreLabel(category: string): string {

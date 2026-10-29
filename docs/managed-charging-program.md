@@ -88,5 +88,5 @@ while the existing energy obligation remains.
 Focused helper tests require zero historical flexibility, limited 2015 impact, regional
 fleet differences, bounded future adoption, an inflexible transport floor, costs tied to
 enrollment, and conservation through midnight/cancellation/deadline recovery. The root
-policy integration also needs save/replay, preview/live queue ownership, monthly cost,
+policy integration also needs save/import, preview/live queue ownership, monthly cost,
 and full simulation checks.

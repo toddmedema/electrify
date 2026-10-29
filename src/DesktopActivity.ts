@@ -17,19 +17,15 @@ export function desktopActivity(state: RootState): DesktopActivity {
   if (card.name === "LOADING" || saves.transitioning)
     return { phase: "loading", timelineEnabled };
   const phase = ui.victory
-    ? game.replayPlayback
-      ? "replay"
-      : ui.victory.outcome === "completed"
-        ? "victory"
-        : "ended"
+    ? ui.victory.outcome === "completed"
+      ? "victory"
+      : "ended"
     : !game.inGame || card.name === "MAIN_MENU"
       ? "menu"
-      : game.replayPlayback
-        ? "replay"
-        : game.speed === "PAUSED" ||
-            ["SETTINGS", "MANUAL", "MODS"].includes(card.name)
-          ? "paused"
-          : "playing";
+      : game.speed === "PAUSED" ||
+          ["SETTINGS", "MANUAL", "MODS"].includes(card.name)
+        ? "paused"
+        : "playing";
   if (phase === "menu") return { phase, timelineEnabled };
   const scenarioId = ui.victory?.scenarioId ?? game.scenarioId;
   const scenario = SCENARIOS.find(({ id }) => id === scenarioId);
@@ -62,7 +58,7 @@ const highlightKind: Partial<
   BLACKOUT_OVER: "recovery",
 };
 
-/** Observe committed events, never forecast data, saved history, or replay playback. */
+/** Observe committed events, never forecast data or saved history. */
 export function startDesktopActivity(
   store: ActivityStore,
   desktop: DesktopBridge,
@@ -115,7 +111,6 @@ export function startDesktopActivity(
       !previous.game.inGame ||
       !previous.settings.steamTimelineEnabled ||
       !game.inGame ||
-      !!game.replayPlayback ||
       !!current.saves.transitioning;
     const send = (eventId: string, kind: DesktopTimelineEvent["kind"]) => {
       const event: DesktopTimelineEvent = {
@@ -130,7 +125,6 @@ export function startDesktopActivity(
           const live = store.getState();
           return live.settings.steamTimelineEnabled &&
             runKey(live) === runId &&
-            !live.game.replayPlayback &&
             !live.saves.transitioning &&
             (kind === "victory" || live.game.inGame)
             ? desktop.addTimelineEvent!(event)
@@ -150,7 +144,6 @@ export function startDesktopActivity(
         enabled &&
         !reset &&
         previous.settings.steamTimelineEnabled &&
-        !game.replayPlayback &&
         !current.saves.transitioning &&
         previous.ui.victory !== victory &&
         !victories.has(runId)

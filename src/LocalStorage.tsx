@@ -104,7 +104,7 @@ export function getPlayedScenarioIds(): number[] {
   return Object.keys(getScenarioPlayCounts()).map(Number);
 }
 
-// Counts completed plays without appending one entry per replay, which would grow this list
+// Counts completed plays without appending one entry per completed run, which would grow this list
 // forever.
 export function getScenarioPlayCounts(): Record<number, number> {
   return getPlays().reduce<Record<number, number>>((counts, play) => {

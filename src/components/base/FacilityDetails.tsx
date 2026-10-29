@@ -75,8 +75,6 @@ export interface Props {
   location: LocationType;
   /** Needed by a hydro plant's water outlook and by the weather resilience section */
   game?: GameType;
-  // A replay can inspect a facility's hardening but not buy any
-  readOnly?: boolean;
   onRetrofit?: (payload: RetrofitFacilityAction) => void;
 }
 
@@ -146,14 +144,13 @@ export function fuelPriceTrend(
 }
 
 /**
- * How the facility is hardened against the weather hazard its technology faces and - outside a
- * replay - an offer to add the upgrade to the standing plant.
+ * How the facility is hardened against the weather hazard its technology faces, with an offer
+ * to add the upgrade to the standing plant.
  */
 function WeatherResilienceSection(props: {
   facility: FacilityOperatingType;
   game: GameType;
   summary: FacilityResilienceSummaryType;
-  readOnly?: boolean;
   onRetrofit?: Props["onRetrofit"];
 }): React.JSX.Element {
   const { facility, game, summary, onRetrofit } = props;
@@ -172,7 +169,7 @@ function WeatherResilienceSection(props: {
   const cash = currentCash(game);
   const shortfall = cost === undefined ? 0 : Math.max(0, cost - cash);
   const shortfallText = `${formatMoneyConcise(shortfall)} more cash needed`;
-  const canOffer = !props.readOnly && !!onRetrofit && cost !== undefined;
+  const canOffer = !!onRetrofit && cost !== undefined;
   const designMinTempC =
     facility.resilience?.designMinTempC ?? STANDARD_GAS_DESIGN_MIN_TEMP_C;
   const detail =
@@ -555,7 +552,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           </dl>
         </section>
       )}
-      {props.game && !props.readOnly && (
+      {props.game && (
         <GasConversion
           facility={facility}
           game={props.game}
@@ -567,7 +564,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           facility={facility}
           game={props.game}
           summary={resilience}
-          readOnly={props.readOnly}
           onRetrofit={props.onRetrofit}
         />
       )}

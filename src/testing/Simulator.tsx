@@ -23,7 +23,6 @@ import gameReducer, {
   reprioritizeFacility,
   setTradingPolicy,
   start,
-  startReplay,
   sellFacility,
   retrofitFacility,
   tickState,
@@ -47,7 +46,6 @@ import {
   GeneratorShoppingType,
   LocationType,
   MonthlyHistoryType,
-  ReplayType,
   ScenarioType,
   TickPresentFutureType,
 } from "../Types";
@@ -184,7 +182,6 @@ export interface SimResultType {
   wasFired: boolean;
   firedAtMonth: number | null;
   outcome: "completed" | "bankrupt" | "fired";
-  actionCount: number;
   meaningfulDecisionCount: number;
   meaningfulDecisionCategoryCount: number;
   meaningfulDecisionCategories: MeaningfulDecisionKindType[];
@@ -346,42 +343,6 @@ function setUpGame(
       schedulePolicy({ id: id as PolicyId, tier, month: 1 }),
     );
   });
-  return cloneDeep(state);
-}
-
-/**
- * Sets a game up to play a replay back, the way the loading screen does in the browser: the
- * scenario and the seed the replay carries, and nothing else of the original run. Ticking the
- * result forward re-runs that run, applying each recorded action as the clock reaches it.
- *
- * Also a regression harness -- replay a recorded game against a new build and diff the monthly
- * history to see what a balance change actually did.
- */
-export function createGameFromReplay(replay: ReplayType): GameType {
-  if (replay.scenarioId === 999 && !replay.customScenario)
-    throw new Error(
-      "A mod replay requires its exact normalized scenario snapshot.",
-    );
-  const scenario =
-    replay.customScenario ||
-    SCENARIOS.find((s: ScenarioType) => s.id === replay.scenarioId) ||
-    SCENARIOS[0];
-  // The replay's own location, not the scenario's: that is the whole point of recording it, and
-  // it is also what the loading screen uses in the browser
-  loadSimData(replay.location);
-  let state = gameReducer(undefined, startReplay(replay));
-  state = gameReducer(
-    state,
-    initGame({
-      facilities: scenario.facilities,
-      cash: scenario.cash,
-      customers:
-        scenario.startingCustomers || getStartingCustomers(replay.location),
-      location: replay.location,
-      seed: replay.seed,
-    }),
-  );
-  // Redux Toolkit freezes reducer output in development; the tick loop mutates state in place
   return cloneDeep(state);
 }
 
@@ -648,7 +609,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
   while (state.date.monthsElapsed < resolved.months) {
     // The baseline bot explicitly chooses a free option; the game never defaults for a player.
     const decision = pendingScenarioChoice(state);
-    if (decision && !state.replayPlayback) {
+    if (decision) {
       const choiceDifficulty = state.difficulty;
       const requested = resolved.scenarioResponses[decision.id];
       if (requested === undefined && options.scenarioResponseMode === "strict")
@@ -813,7 +774,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
         : firedAtMonth !== null
           ? "fired"
           : "completed",
-    actionCount: state.replayLog?.length || 0,
     meaningfulDecisionCount: state.meaningfulDecisions.length,
     meaningfulDecisionCategoryCount: meaningfulDecisionCategoryCount(
       state.meaningfulDecisions,

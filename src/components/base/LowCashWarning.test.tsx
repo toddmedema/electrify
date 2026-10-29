@@ -29,7 +29,7 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-it("pauses, quotes the exact accepted rate, records it for replay, and resumes", () => {
+it("pauses, quotes the exact accepted rate, and resumes", () => {
   store.dispatch(offerLowCashWarning());
   const { dialog } = store.getState().ui;
   expect(store.getState().game.speed).toBe("PAUSED");
@@ -45,10 +45,6 @@ it("pauses, quotes the exact accepted rate, records it for replay, and resumes",
   expect(store.getState().game.speed).toBe("PAUSED");
   dialog.action!({} as React.MouseEvent<HTMLElement>);
   expect(store.getState().game.dollarsPerkWh).toBeCloseTo(price / 100, 10);
-  expect(store.getState().game.replayLog?.at(-1)).toMatchObject({
-    type: "delta",
-    payload: { dollarsPerkWh: store.getState().game.dollarsPerkWh },
-  });
   expect(store.getState().game.speed).toBe("NORMAL");
 });
 
@@ -90,16 +86,13 @@ it("opens automatically exactly once under StrictMode and stays paused if play w
   spy.mockRestore();
 });
 
-it("waits behind another prompt and never offers during replay or above the threshold", () => {
+it("waits behind another prompt and never offers above the threshold", () => {
   store.dispatch(
     dialogOpen({ title: "Another prompt", message: "", open: true }),
   );
   store.dispatch(offerLowCashWarning());
   expect(store.getState().ui.dialog.title).toBe("Another prompt");
   store.dispatch(dialogClose());
-  store.dispatch(delta({ replayPlayback: { actions: [], index: 0 } }));
-  store.dispatch(offerLowCashWarning());
-  expect(store.getState().ui.dialog.open).toBe(false);
   const game = createGame({ scenarioId: 100, seed: 123 });
   currentTick(game)!.cash = 100_000;
   store.dispatch(resume(game));
