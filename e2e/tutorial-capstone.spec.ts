@@ -122,6 +122,14 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await expect(
     page.getByRole("heading", { name: /Mission complete!/ }),
   ).toBeVisible();
+  // The handoff names the next mission and what it covers, so the player knows where they're going
+  const completionDialog = page.getByRole("dialog");
+  await expect(
+    completionDialog.getByText("Up next: Mission 2: Generators"),
+  ).toBeVisible();
+  await expect(
+    completionDialog.getByText("Build a generator", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Next tutorial" }),
   ).toBeVisible();

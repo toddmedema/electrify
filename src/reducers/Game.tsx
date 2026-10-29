@@ -3548,10 +3548,10 @@ export function tutorialCompleteDialog({
           {completed} of {TUTORIALS.length} missions complete
         </strong>
         {nextTutorial && (
-          <span>
-            <br />
-            Up next: {nextTutorial.name}
-          </span>
+          <div className="tutorialNextPreview">
+            <strong>Up next: {nextTutorial.name}</strong>
+            <span>{nextTutorial.summary}</span>
+          </div>
         )}
       </div>
     ),
