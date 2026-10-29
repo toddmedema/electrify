@@ -1,9 +1,8 @@
 import cloneDeep from "lodash.clonedeep";
-import { createGame, createGameFromReplay } from "../testing/Simulator";
+import { createGame } from "../testing/Simulator";
 import gameReducer, { generateNewTimeline, tickState } from "../reducers/Game";
 import { schedulePolicy, cancelPolicy } from "../reducers/GameActions";
 import { parseSave, serializeSave } from "../SaveGame";
-import { serializeReplay, decodeReplay } from "../Replay";
 import type { DeferredResidentialLoad, GameType } from "../Types";
 import {
   applyPeakDemand,
@@ -116,7 +115,7 @@ test("independent windows bill recovered energy at a discount even during a new 
   );
 });
 
-test("window edits preview, cancel, save and replay across a month boundary", () => {
+test("window edits preview, cancel and save across a month boundary", () => {
   let game = cloneDeep(baseline);
   const change = {
     id: "timeOfUse",
@@ -155,13 +154,6 @@ test("window edits preview, cancel, save and replay across a month boundary", ()
   expect(game.timeline.map((t) => t.deferredResidential)).toEqual(
     once.map((t) => t.deferredResidential),
   );
-  const replay = createGameFromReplay(serializeReplay(game)!);
-  while (replay.date.minute < game.date.minute) tickState(replay);
-  expect(replay.policies).toEqual(game.policies);
-  expect(
-    getTimeFromTimeline(replay.date.minute, replay.timeline)!
-      .deferredResidential,
-  ).toEqual(now.deferredResidential);
 });
 
 test.each([-1, 24, 1.5, NaN, "22", null])(
@@ -178,13 +170,6 @@ test.each([-1, 24, 1.5, NaN, "22", null])(
     const policies = emptyPolicies();
     Object.assign(policies.programs.timeOfUse, { startHour });
     expect(validPolicies(policies, 0)).toBe(false);
-    const replay = serializeReplay(baseline)!;
-    replay.actions.push({
-      type: "schedulePolicy",
-      minute: 0,
-      payload: { id: "timeOfUse", tier: "On", month: 1, startHour },
-    } as (typeof replay.actions)[number]);
-    expect(decodeReplay(replay)).toBeNull();
   },
 );
 

@@ -139,7 +139,7 @@ it("preserves neighboring-market outlooks using only the four returned hourly re
   );
 });
 
-it("keeps all forecast inputs while omitting growing playback and UI records", () => {
+it("keeps all forecast inputs while omitting growing UI records", () => {
   const game = createGame({ scenarioId: 108, seed: 18 });
   const snapshot = forecastWorkerSnapshot(game);
   expect(snapshot.timeline).toBe(game.timeline);
@@ -147,7 +147,6 @@ it("keeps all forecast inputs while omitting growing playback and UI records", (
   expect(snapshot.facilities).toBe(game.facilities);
   expect(snapshot.worldEvents).toBe(game.worldEvents);
   expect(snapshot.runIdentity).toBeUndefined();
-  expect(snapshot.replayLog).toBeUndefined();
   expect(snapshot.eventLog).toEqual([]);
   expect(snapshot.meaningfulDecisions).toEqual([]);
 });

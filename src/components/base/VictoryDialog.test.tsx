@@ -131,7 +131,7 @@ describe("VictoryDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("summarizes mission results without replaying the run", () => {
+  it("summarizes mission results", () => {
     renderDialog({
       victory: aVictory({
         debrief: {
@@ -228,8 +228,7 @@ describe("VictoryDialog", () => {
     ).toBeVisible();
   });
 
-  // A custom game shares its scenario id with every other custom game, and a replay is someone
-  // else's run - neither is comparable to anything on the board
+  // Custom games share a scenario id, so their scores are not comparable on the board.
   it("leaves out the rank and the best for an unranked run", () => {
     renderDialog({ victory: aVictory({ ranked: false }) });
     expect(mockFetchGlobalRank).not.toHaveBeenCalled();
@@ -252,9 +251,9 @@ describe("VictoryDialog", () => {
     expect(onClose).toHaveBeenCalled();
     await userEvent.click(screen.getByText("New game"));
     expect(onQuit).toHaveBeenCalled();
-    const replay = screen.getByRole("button", { name: "Replay" });
-    expect(replay).toHaveClass("MuiButton-outlined");
-    await userEvent.click(replay);
+    const playAgain = screen.getByRole("button", { name: "Play again" });
+    expect(playAgain).toHaveClass("MuiButton-outlined");
+    await userEvent.click(playAgain);
     expect(onRetry).toHaveBeenCalledWith(victory);
   });
 

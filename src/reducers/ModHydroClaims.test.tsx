@@ -16,14 +16,9 @@ import {
 import { modResolvedSetup, modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
 import { modPackage } from "../testing/ModFixtures";
-import { decodeReplay, encodeReplay, serializeReplay } from "../Replay";
 import { parseSave, serializeSave } from "../SaveGame";
 import { loadSimData } from "../testing/SimData";
-import {
-  createGame,
-  createGameFromReplay,
-  runSimulation,
-} from "../testing/Simulator";
+import { createGame, runSimulation } from "../testing/Simulator";
 import type { ScenarioType } from "../Types";
 import { tickState } from "./Game";
 import { roundTrip } from "../testing/SaveForgery";
@@ -58,7 +53,7 @@ function rehash(resolved: ScenarioType) {
   resolved.mod.runtimeDigest = modRuntimeDigest(resolved.mod);
 }
 
-test("a mod inherits its base's researched Hydro inventory through ticks, saves and replay", () => {
+test("a mod inherits its base's researched Hydro inventory through ticks and saves", () => {
   const resolved = scenario();
   const original = cloneDeep(resolved);
   const game = createGame(options(resolved));
@@ -82,17 +77,6 @@ test("a mod inherits its base's researched Hydro inventory through ticks, saves 
   );
   expect(restored!.game.facilities).toEqual(
     JSON.parse(JSON.stringify(game.facilities)),
-  );
-  const replay = decodeReplay(
-    JSON.parse(JSON.stringify(encodeReplay(serializeReplay(game)!))),
-  );
-  expect(replay).not.toBeNull();
-  const watched = createGameFromReplay(replay!);
-  while (watched.date.minute < game.date.minute) tickState(watched);
-  expect(validHydroClaims(watched)).toBe(true);
-  expect(watched.facilities).toEqual(game.facilities);
-  expect(watched.commissionedHydroSiteIds).toEqual(
-    game.commissionedHydroSiteIds,
   );
   expect(runSimulation({ ...options(resolved), months: 2 }).violations).toEqual(
     [],

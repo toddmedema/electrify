@@ -23,25 +23,12 @@ test("shows pricing and the market benchmark without a customer-program requirem
   expect(screen.getByRole("slider")).toBeVisible();
 });
 
-test("commits a rate change and keeps replay pricing read-only", () => {
+test("commits a rate change", () => {
   const game = createGame({ scenarioId: 100 });
   const onDelta = jest.fn();
-  const view = render(<RateControls game={game} onDelta={onDelta} />);
+  render(<RateControls game={game} onDelta={onDelta} />);
   fireEvent.keyDown(screen.getByRole("slider"), { key: "ArrowRight" });
   expect(onDelta).toHaveBeenCalledWith({ dollarsPerkWh: expect.any(Number) });
-  view.rerender(
-    <RateControls
-      game={{
-        ...game,
-        replayPlayback: {
-          actions: [],
-          index: 0,
-        },
-      }}
-      onDelta={onDelta}
-    />,
-  );
-  expect(screen.getByRole("slider")).toBeDisabled();
 });
 
 it.each(["Investor", "Public"] as const)(

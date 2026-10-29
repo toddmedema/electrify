@@ -152,7 +152,7 @@ untracked. Agents without a verified hook should format the files they changed b
   screen from the card-navigation state.
 - Saves accept only the current structure in `src/SaveSchema.ts`; there are no prelaunch
   migrations or historical simulation runtimes. Keep untrusted-import validation,
-  current-format round trips and deterministic replay behavior covered by tests.
+  current-format round trips and deterministic simulation behavior covered by tests.
 - `src/testing/Simulator.tsx` drives the real reducer, not a second model. Add economic invariants
   to `src/testing/Invariants.tsx`; do not duplicate game formulas in the simulator.
 - Background reading, loaded only when relevant: `docs/demand-model.md` (customer demand),
@@ -240,7 +240,7 @@ untracked. Agents without a verified hook should format the files they changed b
 ## Guardrails
 
 - Keep seeded simulation paths deterministic. Use the seed helpers in `src/helpers/Math.tsx`, not
-  ambient randomness, for any outcome that affects a replay. Raise powers with `pow` from
+  ambient randomness, for any simulation outcome. Raise powers with `pow` from
   `src/helpers/Pow.ts`: `Math.pow` and `**` round differently on Windows than on Linux CI. Take
   `exp`, `log`, `sin` and other transcendentals from `src/helpers/Libm.ts`: `Math`'s round
   differently on arm64 than on x86-64.

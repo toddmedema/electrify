@@ -75,8 +75,8 @@ export class ThemeManager {
     this.paused = true;
     // Stamp our place in the theme before fadeOut() tears the sources down. Taken at the moment
     // pause is requested, so the fade-out tail -- which keeps sounding for up to
-    // MUSIC_FADE_SECONDS after this -- gets replayed under the fade-in on the way back.
-    // Replaying that brief tail under a fade reads as natural.
+    // MUSIC_FADE_SECONDS after this -- repeats under the fade-in on the way back.
+    // Repeating that brief tail under a fade reads as natural.
     this.resumeOffsetSeconds = this.elapsedInTheme();
     this.clearRecovery();
     this.fadeOut();
@@ -345,7 +345,7 @@ export class ThemeManager {
       }
     } else if (this.recoveryTimeout === null) {
       // Hold through brief recoveries so fast simulation ticks cannot make the mix flutter.
-      // Read the latest pressure after the hold rather than replaying a stale grid state.
+      // Read the latest pressure after the hold rather than using a stale grid state.
       this.recoveryTimeout = setTimeout(() => {
         this.recoveryTimeout = null;
         this.mixedPressure = this.pressure();

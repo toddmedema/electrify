@@ -124,13 +124,12 @@ test("bankruptcy unlocks once in every official scenario and difficulty without 
     }
   }
 });
-test("tutorials, custom runs, simulation harness overrides and replays cannot earn bankruptcy", () => {
+test("tutorials, custom runs and simulation harness overrides cannot earn bankruptcy", () => {
   const tutorial = game(0);
   hooks.finish(tutorial, "bankrupt");
   expect(earned(tutorial)).toEqual([]);
   for (const patch of [
     { customScenario: SCENARIOS[0] },
-    { replayPlayback: {} as GameType["replayPlayback"] },
     { meaningfulDecisionGateWaived: true },
     { storyEffectsDisabled: true },
     { weatherHazardsDisabled: true },
@@ -152,14 +151,13 @@ test("a committed bankruptcy earns Out of Juice and preserves it in a save", () 
   expect(earned(restored)).toEqual(["OUT_OF_JUICE"]);
   expect(restored.desktopAchievements!.completion).toBeUndefined();
 });
-test("firing, shortened runs, custom runs, simulation harness overrides and replays cannot earn successful finish achievements", () => {
+test("firing, shortened runs, custom runs and simulation harness overrides cannot earn successful finish achievements", () => {
   const fired = finished();
   hooks.finish(fired, "fired");
   expect(earned(fired)).toEqual([]);
   for (const patch of [
     { monthlyHistory: [month()] },
     { customScenario: SCENARIOS[0] },
-    { replayPlayback: {} as GameType["replayPlayback"] },
     { meaningfulDecisionGateWaived: true },
   ]) {
     const state = Object.assign(finished(), patch);
@@ -186,11 +184,6 @@ test("First Spark uses the actual final tutorial step; other tutorials report di
     expect(earned(state).includes("FIRST_SPARK")).toBe(id === 0);
     expect(earned(state)).not.toContain("STAYING_POWER");
   }
-  const state = game(0);
-  state.tutorialStep = 999;
-  state.replayPlayback = {} as GameType["replayPlayback"];
-  hooks.tutorial(state);
-  expect(earned(state)).toEqual([]);
 });
 test("reliability requires positive demand and includes exactly 99.9%", () => {
   expect(reliable(month({ demandWh: 0, supplyWh: 0 }))).toBe(false);

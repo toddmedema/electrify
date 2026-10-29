@@ -324,7 +324,7 @@ describe("construction emissions", () => {
     const game = richGame();
     const facility = quoteFor(game, "Wind", 100000000);
     expect(validBuildFacility({ facility, financed: false })).toBe(true);
-    // Replay documents are untrusted, and this number lands straight in the run's score.
+    // Imported quotes are untrusted, and this number lands straight in the run's score.
     expect(
       validBuildFacility({
         facility: { ...facility, constructionKgco2ePerW: 1e9 },

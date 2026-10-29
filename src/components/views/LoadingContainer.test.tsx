@@ -3,13 +3,7 @@ import cardReducer, {
   navigate,
   navigateBack,
 } from "../../reducers/Card";
-import {
-  loaded,
-  start,
-  resume,
-  startReplay,
-  launchRun,
-} from "../../reducers/GameActions";
+import { loaded, start, resume, launchRun } from "../../reducers/GameActions";
 import { UnknownAction } from "@reduxjs/toolkit";
 import { TUTORIALS } from "../../data/Scenarios";
 import { store } from "../../Store";
@@ -94,7 +88,7 @@ it("a delayed tutorial restoration cannot replace a screen the player opened", (
   ]);
 });
 
-it.each([start.type, resume.type, startReplay.type, launchRun.type])(
+it.each([start.type, resume.type, launchRun.type])(
   "%s finishes loading without taking navigation from the player's newer screen",
   (type) => {
     const loading = cardReducer(initialCard, { type });

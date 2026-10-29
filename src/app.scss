@@ -42,8 +42,8 @@
   --font-weight-emphasis: 600;
   --daylight-fill: #e6edf3;
   --daylight-ink: #455a64;
-  --night-fill: #354254;
-  --night-ink: #e6edf5;
+  --night-fill: #bcc8d5;
+  --night-ink: #455568;
   --bg-primary: #ffffff;
   --bg-raised: #f5f7fa;
   --bg-sunken: #edf1f5;
@@ -110,7 +110,7 @@
 [data-theme="dark"] {
   // A cool charcoal ladder separates page, panels and interactions without relying on heavy
   // shadows. The slight blue bias also harmonises with the supply/interactive accent.
-  --daylight-fill: #455568;
+  --daylight-fill: #354252;
   --daylight-ink: #e6edf5;
   --night-fill: #18212b;
   --night-ink: #9aa9ba;
@@ -731,20 +731,6 @@ table {
 span.weak {
   color: $font_color_faded;
   font-weight: 400;
-}
-
-// Says which of the two things sharing the game UI you're looking at. Deliberately loud: the
-// controls a replay hides are the other clue, and their absence is easy to miss
-.replayBadge {
-  margin-left: 8px;
-  padding: 1px 8px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-selected);
-  color: $font_color_primary;
-  font-size: 0.6em;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  vertical-align: middle;
 }
 
 // Tall enough for the icon buttons it carries
@@ -2648,12 +2634,8 @@ $pane_header_height: 48px;
   }
 }
 
-// The leaderboard on the scenario details screen. The rank and replay columns used to be
-// padding="none", which put the rank digits hard against x=0 -- on a desktop window that is the
-// window edge, so they read as clipped. The outer cells provide the screen-edge gutters rather
-// than the table, keeping each row's border full width. The outer columns still need to stay
-// narrow, so 1% width makes the browser shrink them to their content and spend the leftover on
-// the name.
+// Outer leaderboard cells provide screen-edge gutters while keeping row borders full width.
+// Keep rank digits narrow so the remaining space goes to the name.
 #HighScores {
   max-width: $abswidthmax;
   margin: 0 auto;
@@ -2670,14 +2652,9 @@ $pane_header_height: 48px;
     padding-right: 16px;
   }
 
-  .rank,
-  .replay {
+  .rank {
     width: 1%;
     white-space: nowrap;
-  }
-
-  .replay {
-    text-align: center;
   }
 }
 
@@ -4897,21 +4874,35 @@ $homeSmokeCycle: 5.6s;
   }
 }
 
-// A once-only note above the first site-limited option; quieter than the cards it introduces.
+// Once-only help belongs to Hydro's card, beside the site information it explains.
 .buildPrimer {
-  margin: 0 8px 8px;
-  padding: 12px 12px 4px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 12px 12px;
+  padding: 8px;
   background: var(--bg-raised);
+  border-radius: var(--radius-sm);
 
+  .buildPrimerCopy {
+    flex: 1;
+    min-width: 0;
+  }
   h2 {
     margin: 0 0 4px;
     font-weight: 600;
   }
-  .MuiButton-root {
-    min-height: 40px;
-    margin-left: -8px;
+  .buildPrimerDismiss {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    margin: -4px -4px 0 0;
+  }
+}
+@media (pointer: coarse) {
+  .buildPrimer .buildPrimerDismiss {
+    width: 44px;
+    height: 44px;
   }
 }
 
@@ -5331,15 +5322,24 @@ $homeSmokeCycle: 5.6s;
     align-items: center;
     justify-content: center;
     height: 100%;
-    box-shadow: inherit;
   }
   [data-phase="day"] {
-    background: var(--daylight-fill);
     color: var(--daylight-ink);
   }
   [data-phase="night"] {
-    background: var(--night-fill);
     color: var(--night-ink);
+  }
+}
+.productionWeather {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 4px 12px 0;
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption-sm);
+  line-height: 16px;
+  > span {
+    white-space: nowrap;
   }
 }
 .dailyProductionChart .chartLegend {

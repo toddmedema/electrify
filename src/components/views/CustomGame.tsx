@@ -763,7 +763,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     <TableCell>Seed</TableCell>
                     <TableCell>
                       {/* Everything random in a run - weather, fuel prices - comes from the seed, so
-                    the same seed and settings replay the same game */}
+                    the same seed and settings produce the same game */}
                       <TextField
                         id="seed"
                         disabled={guest}

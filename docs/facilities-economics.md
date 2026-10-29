@@ -478,5 +478,5 @@ Completion applies the existing EIA-based CC heat rate, ramp/start time,
 minimum output, fixed and variable O&M, start cost and capacity factor. Costs
 are translated back to the asset's original cost-index basis so subsequent
 inflation is applied exactly once. Cancellation before completion refunds
-payment and removes the investment decision. The shared retrofit replay and
-save paths preserve both the outage and completion.
+payment and removes the investment decision. The retrofit
+save path preserves both the outage and completion.

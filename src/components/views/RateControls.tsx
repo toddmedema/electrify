@@ -326,7 +326,6 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
           <FormControlLabel
             className="programsRateFollow"
             labelPlacement="start"
-            disabled={!!game.replayPlayback}
             label="Follow target"
             control={
               <Switch
@@ -368,7 +367,6 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
       >
         <CommittedSlider
           id="rateSlider"
-          disabled={!!game.replayPlayback}
           committed={game.dollarsPerkWh}
           aria-label="The rate you charge for electricity generation"
           valueLabelDisplay="auto"

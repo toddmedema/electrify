@@ -118,7 +118,7 @@ for (const profile of Object.values(TRANSMISSION_PROFILES)) {
   }
 }
 
-/** Complete catalog, retained for save/replay validation and built-line price/rating lookups. */
+/** Complete catalog, retained for save validation and built-line price/rating lookups. */
 export const ADJACENT_MARKETS = [...uniqueMarkets.values()] as const;
 export const TRANSMISSION_CORRIDORS = [...uniqueCorridors.values()] as const;
 

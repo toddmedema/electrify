@@ -103,10 +103,10 @@ clips any energy that no longer fits, with the removed amount reported as loss. 
 loss is also explicit. Tick energy uses the same representative-day units as utility storage;
 time compression affects financial accounting, not stored energy. Pre-dispatch discharge and
 post-dispatch charging must pass the updated energy forward and retain start-of-tick state
-when rebuilding a forecast, saving or replaying a run.
+when rebuilding a forecast, saving or resuming a run.
 
 The helper suite asserts historical limits, bounded future eligibility, country differences,
 cohort immutability, aging, enrollment, empty rollout, reserve protection, power/headroom limits,
 Off behavior and full-cycle conservation. The integrated reducer must additionally demonstrate
 that grid charging changes actual exported surplus, PV recovery never duplicates self-consumption,
-and save/reforecast/replay preserve battery state.
+and save/reforecast/resume preserve battery state.

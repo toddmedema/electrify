@@ -11,8 +11,6 @@
       "#Status_playingProgress" "{#Scenario_%scenario%} · Year %year% of %total%"
       "#Status_paused" "{#Scenario_%scenario%} · Grid paused"
       "#Status_pausedProgress" "{#Scenario_%scenario%} · Year %year% of %total% · Grid paused"
-      "#Status_replay" "{#Scenario_%scenario%} · Watching a replay"
-      "#Status_replayProgress" "{#Scenario_%scenario%} · Year %year% of %total% · Watching a replay"
       "#Status_victory" "{#Scenario_%scenario%} · Scenario completed"
       "#Status_victoryProgress" "{#Scenario_%scenario%} · Year %year% of %total% · Scenario completed"
       "#Status_ended" "{#Scenario_%scenario%} · Run ended"

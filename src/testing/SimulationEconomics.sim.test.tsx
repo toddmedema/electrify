@@ -18,7 +18,6 @@ describe("simulation economics", () => {
       sellAtMonth: 39,
     });
     expectNoViolations(shortcut);
-    expect(shortcut.actionCount).toBe(2);
     expect(shortcut.outcome).not.toBe("completed");
   });
 
@@ -29,7 +28,6 @@ describe("simulation economics", () => {
       dollarsPerkWh: 0.12,
     });
     expectNoViolations(shortcut);
-    expect(shortcut.actionCount).toBe(1);
     expect(shortcut.outcome).not.toBe("completed");
   });
 

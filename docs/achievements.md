@@ -5,7 +5,7 @@ The same 35 achievements, including bankruptcy's **Out of Juice**, work on web a
 `public/images/` icon, which must be a dedicated design that follows the icon rules in `AGENTS.md`.
 The shared evaluator observes committed simulation evidence. Official scenarios qualify on any
 difficulty unless a requirement specifies CEO; tutorials require their final challenge. Custom
-games, replay playback, forecasts and modified simulation harnesses do not earn achievements.
+games, forecasts and modified simulation harnesses do not earn achievements.
 
 The `achievements` lazy chunk installs the evaluator before game saves are parsed or restored.
 Per-run evidence is stored in optional `game.desktopAchievements` telemetry. A save whose
@@ -71,7 +71,7 @@ only while that bar is on screen; tutorials and build screens hide it. It never 
 snackbars, pauses its eight-second timer while hovered or focused, and offers View achievements
 and an always-visible 44 px close button.
 Reloads, cloud downloads and restored native history
-do not replay notifications. Steam availability clears/suppresses the web popup queue; Steam
+do not repeat notifications. Steam availability clears/suppresses the web popup queue; Steam
 Offline Mode continues using Steam's notification interface.
 
 The renderer can read the current native player's existing achievement history through a bounded

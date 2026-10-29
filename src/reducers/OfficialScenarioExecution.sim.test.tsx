@@ -21,7 +21,6 @@ import {
   validCompiledScenarioRules,
 } from "../helpers/ScenarioRules";
 import { buildStorySnapshot } from "../helpers/Story";
-import { serializeReplay } from "../Replay";
 import { parseSave } from "../SaveGame";
 import { getStore } from "../StoreRegistry";
 import {
@@ -32,7 +31,6 @@ import {
   playOfficialExecution,
 } from "../testing/OfficialScenarioExecutionFixtures";
 import { expectSaveForgeries, roundTrip } from "../testing/SaveForgery";
-import { createGameFromReplay } from "../testing/Simulator";
 import type { ActiveWorldEventType, GameType } from "../Types";
 import { canonical, digest } from "../testing/CanonicalHash";
 import {
@@ -147,15 +145,6 @@ function expectSave(game: GameType, label: string) {
   expectSavedQuoteCells(resumed, original);
   expectSamePhysical(resumed, original, `${label} continued`, true);
 }
-function expectReplay(game: GameType, label: string) {
-  const recorded = serializeReplay(game);
-  expect(recorded).toBeDefined();
-  expect(recorded!.scenarioId).toBe(game.scenarioId);
-  expect(recorded!.customScenario).toBeUndefined();
-  const replay = createGameFromReplay(recorded!);
-  while (replay.date.minute < game.date.minute) tickState(replay);
-  expectSamePhysical(replay, game, label);
-}
 function expectWorker(game: GameType, label: string) {
   const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
   const direct = selectProjection(game, now);
@@ -259,7 +248,7 @@ test.each(OFFICIAL_EXECUTION_IDS)(
 );
 
 for (const scenarioId of OFFICIAL_EXECUTION_IDS)
-  test(`official ${scenarioId} reaches native save/replay/worker and live batch boundaries with a legal full campaign`, () => {
+  test(`official ${scenarioId} reaches native save/worker and live batch boundaries with a legal full campaign`, () => {
     const scenario = getScenario(scenarioId)!;
     const rules = scenarioRules(scenario, { difficulty: "CEO", seed: 12345 })!;
     const physicalEvents = rules.events.filter(
@@ -305,15 +294,10 @@ for (const scenarioId of OFFICIAL_EXECUTION_IDS)
         if (!saves.has(game.date.monthsElapsed)) return;
         expectSave(game, `${scenarioId} month ${game.date.monthsElapsed}`);
         reached.add(`save:${game.date.monthsElapsed}`);
-        if (game.date.monthsElapsed !== critical) return;
-        expectReplay(game, `${scenarioId} reached-onset replay`);
-        reached.add("replay");
       },
       choice(game, phase, id) {
         expectSave(game, `${scenarioId} ${phase} ${id}`);
         reached.add(`${phase}:${id}`);
-        if (phase !== "answered") return;
-        expectReplay(game, `${scenarioId} answered ${id} replay`);
       },
     });
     const game = result.game;
@@ -328,7 +312,6 @@ for (const scenarioId of OFFICIAL_EXECUTION_IDS)
       ),
     ).toBe(true);
     expect(reached.has("worker/plain/Immer/12/120")).toBe(true);
-    expect(reached.has("replay")).toBe(true);
     expect(
       [...reached].filter((label) => label.startsWith("save:")).sort(),
     ).toEqual(

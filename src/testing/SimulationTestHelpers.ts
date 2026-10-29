@@ -12,17 +12,6 @@ export const ECONOMICS_SCENARIOS = SCENARIOS.filter(
   (scenario) => !scenario.tutorialSteps,
 );
 
-// Mandatory baseline responses are recorded actions; a binding connection also earns credit.
-export function baselineChoiceActions(
-  result: SimResultType,
-  scenarioId: number,
-) {
-  return SCENARIO_CHOICES.filter(
-    (choice) =>
-      choice.scenarioId === scenarioId && choice.atMonth < result.months.length,
-  ).length;
-}
-
 export function baselineMeaningfulChoices(
   scenarioId: number,
   result: SimResultType,
@@ -76,7 +65,7 @@ export function runMonths(state: GameType, months: number) {
   const until = state.date.monthsElapsed + months;
   while (state.date.monthsElapsed < until) {
     const decision = pendingScenarioChoice(state);
-    if (decision && !state.replayPlayback) {
+    if (decision) {
       const option = decision.options.find(
         (option) => option.cost(state.difficulty) === 0,
       );

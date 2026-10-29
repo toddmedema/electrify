@@ -1,6 +1,6 @@
 ---
 name: verify-electrify
-description: Design and run verification for Electrify behavior changes, regression fixes, and guardrail improvements. Use when choosing evidence beyond routine formatting, especially for simulation, save/replay, boundary, or UI-flow changes.
+description: Design and run verification for Electrify behavior changes, regression fixes, and guardrail improvements. Use when choosing evidence beyond routine formatting, especially for simulation, save/import, boundary, or UI-flow changes.
 ---
 
 # Verify Electrify
@@ -12,8 +12,8 @@ to prove, without adding a second checklist of gates.
 ## Choose the contract
 
 State the observable failure or invariant before choosing a test. Trace the
-affected entry points: live play, headless simulation, forecast workers, replay,
-save upgrade/import, or multiplayer, as applicable. Search the neighboring suites
+affected entry points: live play, headless simulation, forecast workers,
+save import, or multiplayer, as applicable. Search the neighboring suites
 and reuse their fixtures and setup rather than building a parallel model.
 
 Prefer making invalid states unrepresentable with types or a single owning API.

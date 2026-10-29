@@ -133,7 +133,7 @@ class SteamActivity {
     const mode =
       this.current.phase === "loading"
         ? 4
-        : this.current.phase === "playing" || this.current.phase === "replay"
+        : this.current.phase === "playing"
           ? 1
           : 3;
     const timelineKey = JSON.stringify([enabled, mode, description.text]);
@@ -160,7 +160,7 @@ class SteamActivity {
       this.stopped ||
       !this.supported ||
       !this.current?.timelineEnabled ||
-      ["menu", "loading", "replay"].includes(this.current.phase) ||
+      ["menu", "loading"].includes(this.current.phase) ||
       this.current.scenarioId !== event.scenarioId
     )
       return;

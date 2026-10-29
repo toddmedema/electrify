@@ -763,6 +763,29 @@ it("keeps expanded details with their generator when tutorial choices expand", (
   ).toBeGreaterThan(4);
 });
 
+it("remembers dismissal of Hydro help when reopening the build screen", () => {
+  localStorage.removeItem("hydroPrimerSeen");
+  const game = createGame({ scenarioId: 103 });
+  const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
+  const view = render(<BuildGenerators game={game} {...callbacks} />);
+  fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
+  const help = screen.getByRole("region", { name: "About Hydro" });
+  expect(help).toHaveTextContent("Each plant uses a whole site");
+  fireEvent.click(
+    within(help).getByRole("button", { name: "Dismiss About Hydro" }),
+  );
+  expect(screen.queryByRole("region", { name: "About Hydro" })).toBeNull();
+  expect(localStorage.getItem("hydroPrimerSeen")).toBe("true");
+  expect(
+    screen.getByRole("button", { name: "Review purchase of Hydro" }),
+  ).toBeInTheDocument();
+  view.unmount();
+  render(<BuildGenerators game={game} {...callbacks} />);
+  fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
+  expect(screen.queryByRole("region", { name: "About Hydro" })).toBeNull();
+  localStorage.removeItem("hydroPrimerSeen");
+});
+
 it("quotes a Hydro site maximum and updates the shared slider", () => {
   const game = createGame({ scenarioId: 104, difficulty: "CEO" });
   game.location = LOCATIONS.PIT;

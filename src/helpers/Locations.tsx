@@ -33,7 +33,7 @@ export function getScenarioLocation(
  * Whether an id is safe to build a weather file path out of.
  *
  * The id goes straight into `/data/weather/<id>.bin` (and into a filesystem path headless), and
- * it now arrives from a saved game, a replay document or local storage rather than from a union
+ * it now arrives from a saved game or local storage rather than from a union
  * the compiler checked - so `../` has to be ruled out before it gets there.
  */
 export function isValidLocationId(id: unknown): id is LocationIdType {
@@ -41,8 +41,7 @@ export function isValidLocationId(id: unknown): id is LocationIdType {
 }
 
 /**
- * Whether a blob is a usable location. Used on the way in from anywhere untrusted - a replay
- * document, most of all, which is a stranger's JSON driving the real simulation.
+ * Whether an imported or locally stored value is a usable location.
  */
 export function isValidLocation(value: unknown): value is LocationType {
   if (typeof value !== "object" || value === null) {

@@ -48,7 +48,6 @@ export const store = configureStore({
           "ui.snackbar.action",
           "game.timeline",
           "game.monthlyHistory",
-          "game.replayLog",
         ],
       },
     }).concat(

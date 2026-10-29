@@ -107,8 +107,7 @@ export function startAchievementServices(
       priorAccountCompletion = JSON.stringify(progress?.completion);
       return;
     }
-    if (saves.transitioning || game.replayPlayback || game.customScenario)
-      return;
+    if (saves.transitioning || game.customScenario) return;
     const intent = {
       earned: progress.earned.filter((id) => !priorAccountAwards.has(id)),
       completion:
