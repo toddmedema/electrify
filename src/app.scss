@@ -4897,21 +4897,35 @@ $homeSmokeCycle: 5.6s;
   }
 }
 
-// A once-only note above the first site-limited option; quieter than the cards it introduces.
+// Once-only help belongs to Hydro's card, beside the site information it explains.
 .buildPrimer {
-  margin: 0 8px 8px;
-  padding: 12px 12px 4px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 12px 12px;
+  padding: 8px;
   background: var(--bg-raised);
+  border-radius: var(--radius-sm);
 
+  .buildPrimerCopy {
+    flex: 1;
+    min-width: 0;
+  }
   h2 {
     margin: 0 0 4px;
     font-weight: 600;
   }
-  .MuiButton-root {
-    min-height: 40px;
-    margin-left: -8px;
+  .buildPrimerDismiss {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    margin: -4px -4px 0 0;
+  }
+}
+@media (pointer: coarse) {
+  .buildPrimer .buildPrimerDismiss {
+    width: 44px;
+    height: 44px;
   }
 }
 

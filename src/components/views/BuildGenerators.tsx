@@ -186,6 +186,7 @@ function typicalCapacityFactor(
 
 interface GeneratorBuildItemProps {
   hydroAvailability?: ReturnType<typeof getHydroAvailability>;
+  onDismissHydroPrimer?: () => void;
   onUseSiteMaximum?: (peakW: number) => void;
   onUseMaxSize?: (peakW: number) => void;
   cash: number;
@@ -225,6 +226,7 @@ export function GeneratorBuildItem(
     props.location,
   );
   const [open, setOpen] = React.useState(false);
+  const siteSummary = React.useRef<HTMLDivElement>(null);
   const resilienceOptions = props.resilienceOptions ?? [];
   const hasOptions = resilienceOptions.length > 0 && !!props.withResilience;
   const defaultSelection = (): ResilienceSelectionType =>
@@ -459,23 +461,34 @@ export function GeneratorBuildItem(
       sizeAction={sizeAction}
       context={context}
       summary={
-        props.hydroAvailability && (
-          <Box sx={{ px: 2, pb: 1 }}>
-            <Typography variant="body2">
-              {props.hydroAvailability.remaining.length} sites left ·{" "}
-              {props.hydroAvailability.eligible.length}{" "}
-              {props.hydroAvailability.eligible.length === 1 ? "fits" : "fit"}
-              {props.hydroAvailability.largest &&
-                ` · largest: ${formatWatts(props.hydroAvailability.largest.maxPeakW, 6)}`}
-            </Typography>
-            {props.hydroAvailability.selected && (
+        <>
+          {props.hydroAvailability && (
+            <Box ref={siteSummary} tabIndex={-1} sx={{ px: 2, pb: 1 }}>
               <Typography variant="body2">
-                Site: {props.hydroAvailability.selected.name} ·{" "}
-                {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max
+                {props.hydroAvailability.remaining.length} sites left ·{" "}
+                {props.hydroAvailability.eligible.length}{" "}
+                {props.hydroAvailability.eligible.length === 1 ? "fits" : "fit"}
+                {props.hydroAvailability.largest &&
+                  ` · largest: ${formatWatts(props.hydroAvailability.largest.maxPeakW, 6)}`}
               </Typography>
-            )}
-          </Box>
-        )
+              {props.hydroAvailability.selected && (
+                <Typography variant="body2">
+                  Site: {props.hydroAvailability.selected.name} ·{" "}
+                  {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)}{" "}
+                  max
+                </Typography>
+              )}
+            </Box>
+          )}
+          {props.onDismissHydroPrimer && (
+            <HydroPrimer
+              onDismiss={() => {
+                siteSummary.current?.focus();
+                props.onDismissHydroPrimer?.();
+              }}
+            />
+          )}
+        </>
       }
       warning={canBuild ? undefined : buildSubtitle}
       metrics={
@@ -1103,10 +1116,10 @@ function BuildGenerators(props: Props): React.JSX.Element {
           const compared = comparedNames.includes(g.name);
           return (
             <React.Fragment key={g.name}>
-              {showPrimer && g.name === "Hydro" && hydroSites && (
-                <HydroPrimer onDismiss={dismissPrimer} />
-              )}
               <GeneratorBuildItem
+                onDismissHydroPrimer={
+                  showPrimer && g.name === "Hydro" ? dismissPrimer : undefined
+                }
                 hydroAvailability={
                   g.name === "Hydro" ? hydroAvailability : undefined
                 }
