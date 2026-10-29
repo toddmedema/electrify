@@ -277,6 +277,16 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: { name: "BUILD_GENERATORS", dontRemember: true },
         hideUi: EARLY_MISSION_HIDDEN,
+        target: ".constructionCapacitySlider",
+        phase: "GENERATOR_CHOICES",
+        action: "Choose a plant size",
+        content: (
+          <TutorialPrompt text="Use the size slider to change both cost and build time. Smaller plants cost less and can be built faster." />
+        ),
+      },
+      {
+        card: { name: "BUILD_GENERATORS", dontRemember: true },
+        hideUi: EARLY_MISSION_HIDDEN,
         target: '[aria-label^="Review purchase of"]',
         phase: "GENERATOR_CHOICES",
         continueOn: (s: AppStateType) => s.game.facilities.length >= 2,

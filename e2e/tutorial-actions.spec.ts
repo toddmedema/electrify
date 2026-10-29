@@ -92,6 +92,10 @@ for (const [index, mission] of missions.entries()) {
       const build = dock.getByRole("button", { name: "Build", exact: true });
       await build.click();
       await sortBuildCatalog(page);
+      await page
+        .locator(".tutorialHud")
+        .getByRole("button", { name: "Next", exact: true })
+        .click();
       const purchase = page
         .getByRole("button", { name: /Review purchase of/ })
         .first();

@@ -1,6 +1,7 @@
 import path from "path";
 import { expect, test } from "./fixtures";
 import { expectDialogToFit } from "./dialog-layout";
+import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   for (const scenario of [
@@ -17,16 +18,49 @@ for (const theme of ["light", "dark"] as const) {
         localStorage.setItem("audioEnabled", "false");
       }, theme);
       await page.goto(`/?scenario=${scenario.id}`);
-      if (scenario.id === 100) {
+      {
         await page
           .getByRole("button", { name: "Victory Conditions", exact: true })
           .click();
         const briefing = page.getByRole("dialog");
-        await expect(briefing).toContainText(
-          "retain at least 80% of starting customers",
-        );
+        await expect(briefing.locator("..")).toHaveCSS("opacity", "1");
+        const requirements = briefing.getByRole("region", {
+          name: "Requirements",
+        });
+        const scoring = briefing.getByRole("region", { name: "Scoring" });
+        await expect(requirements).toBeVisible();
+        await expect(
+          scoring.getByText("Service", { exact: true }),
+        ).toBeVisible();
+        await expect(scoring).toContainText("Financial performance");
+        await expect(scoring).toContainText("Environmental impact");
+        await expect(requirements).not.toContainText("points");
+        if (scenario.id === 100) {
+          await expect(requirements).toContainText(
+            "Retain ≥80% of starting customers",
+          );
+        }
+        const help = briefing.locator("details");
+        await expect(help).not.toHaveAttribute("open", "");
+        await help.locator("summary").click();
+        await expect(help).toHaveAttribute("open", "");
+        await help.locator("summary").click();
         await expect(briefing).not.toContainText("build or upgrade the grid");
         await expectDialogToFit(briefing);
+        if (process.env.REVIEW_SCREENSHOT_DIR && scenario.id === 100) {
+          await briefing
+            .locator(".MuiDialogContent-root")
+            .evaluate((content) => {
+              content.scrollTop = 0;
+            });
+          await page.mouse.move(0, 0);
+          await briefing.screenshot({
+            path: path.join(
+              process.env.REVIEW_SCREENSHOT_DIR,
+              `requirements-${testInfo.project.name}-${theme}.png`,
+            ),
+          });
+        }
         await briefing
           .getByRole("button", { name: "Close", exact: true })
           .click();
@@ -34,38 +68,62 @@ for (const theme of ["light", "dark"] as const) {
       await page
         .getByRole("button", { name: "Start game", exact: true })
         .click();
-      await page
-        .locator("#navfooter:visible")
-        .getByRole("button", { name: "Scenario", exact: true })
-        .first()
-        .click();
       const dialog = page.getByRole("region", {
         name: "Scenario",
         exact: true,
       });
+      await openPane(
+        dialog,
+        page
+          .locator("#navfooter:visible")
+          .getByRole("button", { name: "Scenario", exact: true }),
+      );
+      await dialog.evaluate(async (panel) => {
+        await Promise.all(
+          panel.getAnimations().map((animation) => animation.finished),
+        );
+      });
       await expect(dialog).toContainText(scenario.name);
       await expectDialogToFit(dialog);
       const rules = dialog.locator(".missionRequirements dt");
-      const progress = dialog.locator(".missionRequirements dd");
-      await expect(progress).toHaveCount(await rules.count());
+      const rows = await rules.evaluateAll((terms) =>
+        terms.map((term) => {
+          const descriptions: string[] = [];
+          let next = term.nextElementSibling;
+          while (next?.tagName === "DD") {
+            descriptions.push(next.textContent || "");
+            next = next.nextElementSibling;
+          }
+          return descriptions;
+        }),
+      );
+      expect(rows.length).toBeGreaterThan(0);
+      for (const descriptions of rows) {
+        expect(descriptions.length).toBeGreaterThan(0);
+        expect(descriptions.join("").trim()).not.toBe("");
+      }
       if (scenario.id === 100) {
         await expect(dialog).toContainText(
-          "Retain ≥800,000 customers at term end",
+          "Retain ≥80% of starting customers · Dec 2031",
         );
         await expect(dialog).not.toContainText("Invest in the grid");
       }
       if (scenario.window) {
-        await expect(rules.first()).toHaveText(
-          `≥99.5% of demand monthly · ${scenario.window}`,
+        const target = `≥99.5% of demand monthly · ${scenario.window}`;
+        const requirement = rows.find((descriptions) =>
+          descriptions.includes(target),
         );
-        await expect(progress.first()).toContainText("Not started");
-        await expect(progress.first()).toContainText(/0\/\d+ months completed/);
+        expect(requirement).toBeDefined();
+        expect(requirement?.join(" ")).toContain("Not started");
+        expect(requirement?.join(" ")).toMatch(/0\/\d+ months completed/);
       }
-      // Check rendered line boxes; two DOM rows alone would miss wrapping.
+      // Keep targets and progress compact; explanatory descriptions can wrap.
       // At 360px, long date windows may reflow, but must remain fully readable.
       if (testInfo.project.use.viewport!.width >= 390) {
         const wrapped = await dialog
-          .locator(".missionRequirements dt, .missionRequirements dd")
+          .locator(
+            ".missionRequirements dd:has(> .missionRequirementStatus), .missionRequirements dd:has(+ dd > .missionRequirementStatus)",
+          )
           .evaluateAll((rows) =>
             rows
               .filter(

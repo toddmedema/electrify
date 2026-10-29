@@ -129,6 +129,8 @@ export interface DesktopBridge {
     scenarioId: number;
     difficulty?: DifficultyType;
     scope: "global" | "friends" | "player";
+    startRank?: number;
+    endRank?: number;
     challengeId: string;
   }): Promise<DesktopScore[]>;
   submitScore(score: {

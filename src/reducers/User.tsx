@@ -16,6 +16,7 @@ import {
   getDoc,
   getDocs,
   limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -193,6 +194,7 @@ export async function fetchGlobalRank(
       where("scoreVersion", "==", SCORE_VERSION),
       where("outcome", "==", "completed"),
       where("score", ">", score),
+      orderBy("score", "desc"),
     ),
   );
   return better.data().count + 1;

@@ -18,9 +18,11 @@ import { verifyMenuKeyboard } from "./menu-keyboard";
 
 type SteamTestWindow = typeof window & {
   mockSteamDeliveries?: Set<Promise<void>>;
+  mockSteamDeliveryTail?: Promise<void>;
   mockSteamAcknowledge?: (id: number, error?: string) => Promise<void>;
   releaseMockSteamDelivery?: () => void;
   receivedMockSteamEvent?: unknown;
+  receivedMockSteamEvents?: NativeEvent[];
   mockSteamGeneration?: number;
   mockSharedSaveRequests?: number;
   mockScoreSubmissions?: number;
@@ -56,27 +58,36 @@ function receiveSteamEvent({
 }): void {
   const target = window as SteamTestWindow;
   const pending = (target.mockSteamDeliveries ??= new Set<Promise<void>>());
-  const delivery = (async () => {
-    const bytes = Uint8Array.from(atob(compressed), (character) =>
-      character.charCodeAt(0),
-    );
-    const json = await new Response(
-      new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip")),
-    ).text();
-    if (generation !== (target.mockSteamGeneration ?? 0)) return;
-    const event = JSON.parse(json, (_key, value) =>
-      value &&
-      typeof value === "object" &&
-      Object.keys(value).length === 1 &&
-      ["Infinity", "-Infinity", "NaN"].includes(value.$electrifyNumber)
-        ? Number(value.$electrifyNumber)
-        : value,
-    );
-    window.dispatchEvent(new CustomEvent("mockSteamEvent", { detail: event }));
-  })();
+  // Native IPC publishes lobby state in order. Async gzip decoding must preserve it.
+  const delivery = (target.mockSteamDeliveryTail ?? Promise.resolve())
+    .catch(() => undefined)
+    .then(async () => {
+      if (generation !== (target.mockSteamGeneration ?? 0)) return;
+      const bytes = Uint8Array.from(atob(compressed), (character) =>
+        character.charCodeAt(0),
+      );
+      const json = await new Response(
+        new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip")),
+      ).text();
+      if (generation !== (target.mockSteamGeneration ?? 0)) return;
+      const event = JSON.parse(json, (_key, value) =>
+        value &&
+        typeof value === "object" &&
+        Object.keys(value).length === 1 &&
+        ["Infinity", "-Infinity", "NaN"].includes(value.$electrifyNumber)
+          ? Number(value.$electrifyNumber)
+          : value,
+      );
+      window.dispatchEvent(
+        new CustomEvent("mockSteamEvent", { detail: event }),
+      );
+    });
+  target.mockSteamDeliveryTail = delivery;
   pending.add(delivery);
   const acknowledge = (error?: unknown) => {
     pending.delete(delivery);
+    if (target.mockSteamDeliveryTail === delivery)
+      delete target.mockSteamDeliveryTail;
     void target.mockSteamAcknowledge!(
       id,
       error === undefined
@@ -126,7 +137,7 @@ async function createSteamTransport(page: Page) {
       const obsolete = [...pending.entries()];
       const next = ++generation;
       await session.send("Runtime.evaluate", {
-        expression: `window.mockSteamGeneration = ${next}`,
+        expression: `window.mockSteamGeneration = ${next}; delete window.mockSteamDeliveryTail;`,
         returnByValue: true,
       });
       // Native leave cancels the old channel without waiting for an async decoder.
@@ -1009,6 +1020,71 @@ test("mock Steam lobby publication skips registered players who have not joined"
   expect(room.transportErrors).toEqual([]);
 });
 
+test("mock Steam preserves lobby update order while an earlier decode is pending", async ({
+  page,
+}) => {
+  const transport = await createSteamTransport(page);
+  const state = (ready: string): NativeEvent => ({
+    kind: "state",
+    state: {
+      available: true,
+      members: [{ id: "guest", name: "Guest", ready }],
+      connected: [],
+    },
+  });
+  const events = [state(""), state("current-selection")];
+  await page.evaluate((events) => {
+    const target = window as SteamTestWindow;
+    let decoded = 0;
+    // Control completion order independently of Chromium's gzip scheduling.
+    Response.prototype.text = function () {
+      const json = JSON.stringify(events[decoded++]);
+      return decoded === 1
+        ? new Promise<string>((resolve) => {
+            target.releaseMockSteamDelivery = () => resolve(json);
+          })
+        : Promise.resolve(json);
+    };
+    target.receivedMockSteamEvents = [];
+    window.addEventListener("mockSteamEvent", (event) => {
+      target.receivedMockSteamEvents!.push(
+        (event as CustomEvent<NativeEvent>).detail,
+      );
+    });
+  }, events);
+  const first = transport.send(events[0]);
+  await page.waitForFunction(
+    () =>
+      typeof (window as SteamTestWindow).releaseMockSteamDelivery ===
+      "function",
+  );
+  const second = transport.send(events[1]);
+  try {
+    await page.waitForFunction(() => {
+      const target = window as SteamTestWindow;
+      return (
+        target.mockSteamDeliveries?.size === 2 ||
+        !!target.receivedMockSteamEvents?.length
+      );
+    });
+    expect(
+      await page.evaluate(
+        () => (window as SteamTestWindow).receivedMockSteamEvents,
+      ),
+    ).toEqual([]);
+  } finally {
+    await page.evaluate(() =>
+      (window as SteamTestWindow).releaseMockSteamDelivery?.(),
+    );
+    await Promise.all([first, second]);
+  }
+  expect(
+    await page.evaluate(
+      () => (window as SteamTestWindow).receivedMockSteamEvents,
+    ),
+  ).toEqual(events);
+});
+
 test("mock Steam delivery survives garbage collection while decompression is pending", async ({
   page,
 }) => {
@@ -1776,6 +1852,19 @@ for (const count of [2, 4]) {
       await pages[1]
         .getByRole("button", { name: "normal speed", exact: true })
         .click();
+      // Verify host acceptance while the guest's snapshots are deliberately held.
+      // Waiting for its selected button would deadlock the stale-selection reversal.
+      await expect
+        .poll(
+          () =>
+            room.views.get(room.members[1].id)?.game?.multiplayer?.clock
+              ?.selectedSpeed,
+        )
+        .toBe("NORMAL");
+      if (count === 2)
+        await expect(
+          clock(buyer).getByRole("button", { name: "slow speed", exact: true }),
+        ).toHaveAttribute("aria-pressed", "true");
       for (const page of pages)
         await expect(clock(page)).toHaveAttribute(
           "data-active-speed",

@@ -74,6 +74,23 @@ for (const mission of [
       if (mission === "Generators") {
         await expect(hud).toContainText("Sort generators");
         await sortBuildCatalog(page);
+        await expect(hud).toContainText("Choose a plant size");
+        await expect(hud).toContainText("both cost and build time");
+        const solar = page.locator('.buildOption[data-build-option="Solar"]');
+        const cost = solar
+          .locator(".buildOptionMetric")
+          .filter({ hasText: "Build cost" });
+        const time = solar
+          .locator(".buildOptionMetric")
+          .filter({ hasText: "Build time" });
+        const beforeCost = await cost.innerText();
+        const beforeTime = await time.innerText();
+        const slider = page.getByRole("slider");
+        await slider.focus();
+        await slider.press("ArrowLeft");
+        await expect(cost).not.toHaveText(beforeCost);
+        await expect(time).not.toHaveText(beforeTime);
+        await hud.getByRole("button", { name: "Next", exact: true }).click();
       }
       await expect(hud).toContainText(
         mission === "Generators" ? "Review a generator" : "Review a storage",
