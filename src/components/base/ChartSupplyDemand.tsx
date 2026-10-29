@@ -42,7 +42,11 @@ import {
   LocationType,
   SpeedType,
   TickPresentFutureType,
+  UnitSystemType,
 } from "../../Types";
+
+import { formatTemperature } from "../../helpers/Units";
+import { useUnits } from "./UnitsContext";
 
 type ChartData = Pick<
   TickPresentFutureType,
@@ -54,7 +58,8 @@ type ChartData = Pick<
   | "storageDischargeW"
   | "importedW"
   | "exportedW"
->;
+> &
+  Partial<Pick<TickPresentFutureType, "temperatureC" | "windKph">>;
 
 interface BlackoutEdges {
   minute: number;
@@ -92,6 +97,7 @@ interface State {
   totalDemand: number[];
   loadStack: number[][];
   startingYear: number;
+  units: UnitSystemType;
 }
 
 // Fuel boundaries stay lighter than the demand the player has to meet. Solid records and
@@ -398,6 +404,26 @@ function buildOptions({
   };
 }
 
+// Descriptive conditions, independent of the simulation's facility-specific limits.
+export function productionWeather(
+  tick: Pick<ChartData, "temperatureC" | "windKph">,
+  units: UnitSystemType,
+): string[] {
+  const conditions: string[] = [];
+  if (tick.temperatureC !== undefined) {
+    const label =
+      tick.temperatureC <= 0 ? "Cold " : tick.temperatureC >= 30 ? "Hot " : "";
+    conditions.push(`${label}${formatTemperature(tick.temperatureC, units)}`);
+  }
+  if (tick.windKph !== undefined) {
+    const speed = units === "imperial" ? tick.windKph / 1.609344 : tick.windKph;
+    conditions.push(
+      `${tick.windKph >= 30 ? "Windy" : "Wind"} ${Math.round(speed)} ${units === "imperial" ? "mph" : "km/h"}`,
+    );
+  }
+  return conditions;
+}
+
 export function formatProductionTooltip(
   idx: number,
   state: Pick<
@@ -408,11 +434,12 @@ export function formatProductionTooltip(
     | "supply"
     | "totalDemand"
     | "startingYear"
-  >,
+  > & { units?: UnitSystemType },
 ): string {
   const d = state.timeline[idx];
   const date = getDateFromMinute(d.minute, state.startingYear);
   const time = formatClockTime(date.minuteOfDay);
+  const weather = productionWeather(d, state.units ?? "metric");
   const loads: Array<[string, number | undefined]> = [
     ["Storage charging", d.storageChargeW],
     ["Interties", d.exportedW],
@@ -432,6 +459,7 @@ export function formatProductionTooltip(
     ...(d.demandW > d.supplyW
       ? [`Blackout: ${formatWatts(d.demandW - d.supplyW)} unmet`]
       : []),
+    ...(weather.length ? ["", `Weather: ${weather.join(" · ")}`] : []),
   ].join("\n");
 }
 
@@ -441,6 +469,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     getThemeVersion,
     getThemeVersion,
   );
+  const units = useUnits();
   const {
     startingYear,
     height,
@@ -585,7 +614,12 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     totalDemand,
     loadStack,
     startingYear,
+    units,
   };
+  const currentWeather = productionWeather(
+    timeline.findLast((tick) => tick.minute <= currentMinute) ?? timeline[0],
+    units,
+  );
 
   return (
     <div id="chartSupplyDemand" className="dailyProductionChart">
@@ -653,6 +687,14 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         structureKey={sources.join(",")}
         tooltip={formatProductionTooltip}
       />
+      {currentWeather.length > 0 && (
+        <div className="productionWeather" aria-label="Current weather">
+          <span>Weather now</span>
+          {currentWeather.map((condition) => (
+            <span key={condition}>{condition}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

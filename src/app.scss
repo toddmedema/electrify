@@ -42,8 +42,8 @@
   --font-weight-emphasis: 600;
   --daylight-fill: #e6edf3;
   --daylight-ink: #455a64;
-  --night-fill: #354254;
-  --night-ink: #e6edf5;
+  --night-fill: #bcc8d5;
+  --night-ink: #455568;
   --bg-primary: #ffffff;
   --bg-raised: #f5f7fa;
   --bg-sunken: #edf1f5;
@@ -110,7 +110,7 @@
 [data-theme="dark"] {
   // A cool charcoal ladder separates page, panels and interactions without relying on heavy
   // shadows. The slight blue bias also harmonises with the supply/interactive accent.
-  --daylight-fill: #455568;
+  --daylight-fill: #354252;
   --daylight-ink: #e6edf5;
   --night-fill: #18212b;
   --night-ink: #9aa9ba;
@@ -5331,15 +5331,24 @@ $homeSmokeCycle: 5.6s;
     align-items: center;
     justify-content: center;
     height: 100%;
-    box-shadow: inherit;
   }
   [data-phase="day"] {
-    background: var(--daylight-fill);
     color: var(--daylight-ink);
   }
   [data-phase="night"] {
-    background: var(--night-fill);
     color: var(--night-ink);
+  }
+}
+.productionWeather {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 4px 12px 0;
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption-sm);
+  line-height: 16px;
+  > span {
+    white-space: nowrap;
   }
 }
 .dailyProductionChart .chartLegend {
