@@ -303,7 +303,7 @@ it("shows the current weather rather than the end of the forecast, and follows u
   );
   const { rerender } = render(chart("metric", 30));
   expect(screen.getByLabelText("Current weather")).toHaveTextContent(
-    "Weather nowCold -2°CWindy 32 km/h",
+    "Cold -2°CWindy 32 km/h",
   );
   expect(screen.getByLabelText("Current weather")).not.toHaveTextContent("Hot");
   rerender(chart("imperial", 30));

@@ -689,7 +689,6 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
       />
       {currentWeather.length > 0 && (
         <div className="productionWeather" aria-label="Current weather">
-          <span>Weather now</span>
           {currentWeather.map((condition) => (
             <span key={condition}>{condition}</span>
           ))}

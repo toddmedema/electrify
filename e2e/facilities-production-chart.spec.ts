@@ -28,7 +28,6 @@ for (const theme of ["light", "dark"]) {
     await expect(ribbon).toHaveAttribute("aria-hidden", "true");
     await expect(ribbon).toHaveCSS("background-image", /linear-gradient/);
     const weather = chart.getByLabel("Current weather");
-    await expect(weather).toContainText("Weather now");
     await expect(weather).toContainText(/-?\d+°C/);
     await expect(weather).toContainText(/Wind(?:y)? \d+ km\/h/);
     expect(
