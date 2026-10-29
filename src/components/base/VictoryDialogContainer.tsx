@@ -11,6 +11,8 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     victory: state.ui.victory,
     loggedIn: Boolean(state.user.uid),
+    uid: state.user.uid,
+    displayName: state.user.displayName,
   };
 };
 

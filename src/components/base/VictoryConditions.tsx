@@ -20,77 +20,121 @@ export interface Props {
   difficulty: DifficultyType;
 }
 
-/**
- * How a scenario is scored, in the player's terms. Shared by the scenario details screen and the
- * custom game screen, which both offer it behind an info button.
- *
- * The score rules come from helpers/Scoring `SCORE_RULES`; the Manual describes them by hand.
- */
-export default function VictoryConditions(props: Props): React.JSX.Element {
-  const { scenario } = props;
-  const { ownership, dollarsPerkWh } = scenario;
+/** Requirements lead; canonical scoring rules and measurement help stay separate. */
+export default function VictoryConditions({
+  scenario,
+  difficulty,
+}: Props): React.JSX.Element {
   const objectives = scenarioObjectiveDefinitions(scenario);
   const units = useUnits();
-  const perEmissions = formatLargeMassApprox(KG_PER_MEGATONNE, units);
-  const requiredObjectives = (
-    <>
-      <p>
-        In all scenarios, you fail if you go bankrupt or serve less than{" "}
-        {formatRequiredShare(blackoutFiringThreshold(props.difficulty))} of
-        demand in three consecutive months.
-      </p>
-      {objectives.length > 0 && (
-        <Box component="section" aria-label="Mission objectives">
-          {objectives.map((objective) => (
-            <Box key={objective.id} sx={{ mt: 2, overflowWrap: "anywhere" }}>
-              <Typography component="p" sx={{ fontWeight: 600, mb: 0.5 }}>
-                {objective.required ? "Required" : "Optional"}:{" "}
-                {objective.label}
-              </Typography>
-              <Typography
-                component="p"
-                variant="body2"
-                color="text.secondary"
-                sx={{ mb: 0.5 }}
-              >
-                {objectiveDefinition(objective.metric)}
-              </Typography>
-              <Typography component="p" variant="body2">
-                {objectiveTargetText(objective)} ·{" "}
-                {objectiveWindowText(
-                  objective,
-                  scenario.startingYear,
-                  scenario.durationMonths,
-                )}
-              </Typography>
-              {!objective.required && (
-                <Typography
-                  component="p"
-                  variant="body2"
-                  color="text.secondary"
-                >
-                  Stretch goal; does not end or fail the run.
-                </Typography>
-              )}
-            </Box>
-          ))}
+  const rules = scoreRuleText(
+    scenario.ownership,
+    scenario.dollarsPerkWh,
+    formatLargeMassApprox(KG_PER_MEGATONNE, units),
+  );
+  const requirementsId = React.useId();
+  const optionalId = React.useId();
+  const scoringId = React.useId();
+  const required = objectives.filter((objective) => objective.required);
+  const optional = objectives.filter((objective) => !objective.required);
+  const objectiveRows = (goals: typeof objectives) => (
+    <ul className="victoryObjectiveList">
+      {goals.map((objective) => (
+        <li key={objective.id}>
+          <Typography component="p" variant="body2" sx={{ fontWeight: 600 }}>
+            {objective.label}
+          </Typography>
+          <Typography component="p" variant="body2" color="textSecondary">
+            {objectiveTargetText(objective)} ·{" "}
+            {objectiveWindowText(
+              objective,
+              scenario.startingYear,
+              scenario.durationMonths,
+            )}
+          </Typography>
+        </li>
+      ))}
+    </ul>
+  );
+
+  return (
+    <div className="victoryConditions">
+      <Box component="section" aria-labelledby={requirementsId}>
+        <Typography
+          id={requirementsId}
+          component="h2"
+          variant="subtitle1"
+          sx={{ fontWeight: 600 }}
+        >
+          Requirements
+        </Typography>
+        <ul className="victorySurvivalList">
+          <li>Finish the term without bankruptcy.</li>
+          <li>
+            Serve at least{" "}
+            {formatRequiredShare(blackoutFiringThreshold(difficulty))} of
+            demand. Three consecutive months below this end the run.
+          </li>
+        </ul>
+        {required.length > 0 && objectiveRows(required)}
+      </Box>
+
+      {optional.length > 0 && (
+        <Box component="section" aria-labelledby={optionalId}>
+          <Typography
+            id={optionalId}
+            component="h2"
+            variant="subtitle1"
+            sx={{ fontWeight: 600 }}
+          >
+            Optional goals
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            Stretch goals; not required to win.
+          </Typography>
+          {objectiveRows(optional)}
         </Box>
       )}
-    </>
-  );
-  const rules = scoreRuleText(ownership, dollarsPerkWh, perEmissions);
-  return (
-    <div>
-      {requiredObjectives}
-      <p>
-        Complete the mission to earn a leaderboard rank and a competitive
-        personal best. Failed runs still show their points and actual outcomes.
-      </p>
-      {Object.entries(rules).map(([category, rule]) => (
-        <p key={category}>
-          <strong>{scoreLabel(category)}:</strong> {rule}
-        </p>
-      ))}
+
+      <Box
+        component="section"
+        className="victoryScoring"
+        aria-labelledby={scoringId}
+      >
+        <Typography
+          id={scoringId}
+          component="h2"
+          variant="subtitle1"
+          sx={{ fontWeight: 600 }}
+        >
+          Scoring
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Complete the mission to rank on the leaderboard.
+        </Typography>
+        <dl className="victoryScoringRules">
+          {Object.entries(rules).map(([category, rule]) => (
+            <div key={category}>
+              <dt>{scoreLabel(category)}</dt>
+              <dd>{rule}</dd>
+            </div>
+          ))}
+        </dl>
+      </Box>
+
+      {objectives.length > 0 && (
+        <details className="victoryMeasurementHelp">
+          <summary>How objectives are measured</summary>
+          <dl>
+            {objectives.map((objective) => (
+              <div key={objective.id}>
+                <dt>{objective.label}</dt>
+                <dd>{objectiveDefinition(objective.metric)}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      )}
     </div>
   );
 }

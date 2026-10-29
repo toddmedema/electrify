@@ -189,10 +189,25 @@ class SteamLeaderboards {
 
   read(selection) {
     return this.serialize(async () => {
+      if (
+        selection.startRank !== undefined ||
+        selection.endRank !== undefined
+      ) {
+        if (
+          selection.scope !== "global" ||
+          !Number.isSafeInteger(selection.startRank) ||
+          !Number.isSafeInteger(selection.endRank) ||
+          selection.startRank < 1 ||
+          selection.endRank < selection.startRank ||
+          selection.endRank > 2147483647 ||
+          selection.endRank - selection.startRank >= 100
+        )
+          throw new Error("Invalid leaderboard range");
+      }
       const handle = await this.handle(selection);
       if (this.stopped) throw new Error("Steam is shutting down");
       const modes = {
-        global: [0, 1, 100],
+        global: [0, selection.startRank ?? 1, selection.endRank ?? 100],
         friends: [2, 0, 0],
         player: [1, 0, 0],
       };

@@ -1,5 +1,9 @@
 import { DesktopBridge, DesktopScore } from "./Desktop";
-import { desktopGlobalRank, submitDesktopScore } from "./DesktopScores";
+import {
+  desktopGlobalRank,
+  desktopScoreRank,
+  submitDesktopScore,
+} from "./DesktopScores";
 
 jest.mock("./AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
@@ -7,7 +11,10 @@ function bridge(entries: () => DesktopScore[]) {
   const desktop = {
     apiVersion: 1,
     submitScore: jest.fn().mockResolvedValue(undefined),
-    getLeaderboard: jest.fn(async () => entries()),
+    getLeaderboard: jest.fn<
+      Promise<DesktopScore[]>,
+      [Parameters<DesktopBridge["getLeaderboard"]>[0]]
+    >(async () => entries()),
   };
   window.electrifyDesktop = desktop as unknown as DesktopBridge;
   return desktop;
@@ -89,5 +96,35 @@ it.each(["bankrupt", "fired"] as const)(
       outcome,
     });
     expect(desktop.submitScore).not.toHaveBeenCalled();
+  },
+);
+
+it("uses the completed run's actual Steam rank when it is a personal best", async () => {
+  const desktop = bridge(() => [entry(540, 47)]);
+  await expect(desktopScoreRank(101, "CEO", 540)).resolves.toBe(47);
+  expect(desktop.getLeaderboard).toHaveBeenCalledTimes(1);
+});
+
+it.each([1, 47, 147, 201])(
+  "places a lower run at rank %s beyond Steam's initial page",
+  async (rank) => {
+    const desktop = bridge(() => [entry(999)]);
+    desktop.getLeaderboard.mockImplementation(async (...args: unknown[]) => {
+      const request = args[0] as Parameters<DesktopBridge["getLeaderboard"]>[0];
+      if (request.scope === "player") return [entry(999)];
+      const position = request.startRank!;
+      return position > 200
+        ? []
+        : [entry(position < rank ? 900 : 540, position)];
+    });
+    await expect(desktopScoreRank(101, "CEO", 540)).resolves.toBe(rank);
+    expect(
+      desktop.getLeaderboard.mock.calls.every((call) => {
+        const selection = (call as unknown[])[0] as Parameters<
+          DesktopBridge["getLeaderboard"]
+        >[0];
+        return selection.scenarioId === 101 && selection.difficulty === "CEO";
+      }),
+    ).toBe(true);
   },
 );
