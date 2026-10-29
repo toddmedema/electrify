@@ -288,6 +288,7 @@ test("recipe, worker, environment and artifact changes invalidate keys without e
         ELECTRIFY_E2E_OUTPUT_DIR: "/tmp/new",
         ELECTRIFY_DEVELOPMENT_LEASE: "another",
         npm_lifecycle_event: "check:ci",
+        CODEX_TOOL_CALL_ID: "another-tool-call",
       },
     }),
     before,
@@ -295,6 +296,10 @@ test("recipe, worker, environment and artifact changes invalidate keys without e
   assert.notEqual(
     key("tests", { env: { TOKEN: secret, FEATURE: "two" } }),
     before,
+  );
+  assert.notEqual(
+    key("tests", { env: { CODEX_UNKNOWN_INPUT: "one" } }),
+    key("tests", { env: { CODEX_UNKNOWN_INPUT: "two" } }),
   );
   assert.notEqual(key("tests", { workers: 2 }), key("tests"));
   assert.notEqual(key("tests", { command: ["npm", "changed"] }), key("tests"));
