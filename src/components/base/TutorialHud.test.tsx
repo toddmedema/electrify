@@ -67,23 +67,31 @@ describe("TutorialHud", () => {
       false,
     ],
   ] as [string, Partial<TutorialStepType>, boolean][])(
-    "reserves the continuation instruction for manual steps (%s)",
+    "reserves the desktop background sweep for manual steps (%s)",
     (_name, overrides, manual) => {
       render(
         <TutorialHud
           {...props({ desktop: true, step: objective(overrides) })}
         />,
       );
-      const instruction = screen.queryByText(/when you’re ready\./);
-      expect(instruction !== null).toBe(manual);
+      const sweep = screen.queryByTestId("tutorial-hud-sweep");
+      expect(sweep !== null).toBe(manual);
+      expect(screen.queryByText(/when you’re ready\./)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("tutorial-next-pulse"),
+      ).not.toBeInTheDocument();
     },
   );
 
   it.each(["Next", "Start final challenge"])(
-    "hides the %s instruction in sheet mode while retaining its button",
+    "keeps the %s button pulse in sheet mode without a background sweep or extra text",
     (nextLabel) => {
       render(<TutorialHud {...props({ step: objective({ nextLabel }) })} />);
       expect(screen.queryByText(/when you’re ready\./)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("tutorial-hud-sweep"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("tutorial-next-pulse")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: nextLabel })).toHaveClass(
         "MuiButton-contained",
       );
@@ -149,9 +157,8 @@ describe("TutorialHud", () => {
     );
     expect(
       screen.getByRole("button", { name: "Start final challenge" }),
-    ).toHaveAccessibleDescription(
-      "Select Start final challenge when you’re ready.",
-    );
+    ).toHaveAccessibleDescription("");
+    expect(screen.getByTestId("tutorial-hud-sweep")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "1×" }));
     expect(hudProps.onNext).not.toHaveBeenCalled();
     await user.click(
@@ -270,7 +277,7 @@ describe("TutorialHud", () => {
     );
     expect(
       screen.getByRole("button", { name: "Next" }),
-    ).toHaveAccessibleDescription("Select Next when you’re ready.");
+    ).toHaveAccessibleDescription("");
     await user.click(screen.getByRole("button", { name: "Back" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
     rerender(<TutorialHud {...hudProps} stepIndex={2} />);

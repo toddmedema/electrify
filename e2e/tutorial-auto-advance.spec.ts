@@ -79,7 +79,7 @@ for (const mission of [
         mission === "Generators" ? "Review a generator" : "Review a storage",
       );
       // These steps advance from the review control; Next remains an optional fallback.
-      await expect(hud.locator(".tutorialHudContinue")).toHaveCount(0);
+      await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(0);
       await expect(hud.locator(".tutorialHudNextPulse")).toHaveCount(0);
       await expect(
         hud.getByRole("button", { name: "Next", exact: true }),
@@ -247,17 +247,16 @@ for (const mission of [
       ).toBe("none");
       await expect(progress).not.toHaveAttribute("aria-valuenow", "0");
       expect((await progress.boundingBox())!.width).toBe(initialBox!.width);
-      // Seek the animation timeline to prove both glows repeat without waiting eight seconds.
       const next = hud.getByRole("button", { name: "Next", exact: true });
       if (testInfo.project.name === "desktop-chromium") {
-        // The hint follows side-panel mode, including live resizes at its exact boundary.
+        // The background sweep follows side-panel mode, including resizes at its exact boundary.
         for (const width of [1299, 1300, 1299, 1300]) {
           await page.setViewportSize({ width, height: 800 });
           await expect(page.locator(".gameStage")).toHaveAttribute(
             "data-layout",
             width === 1300 ? "side" : "sheet",
           );
-          await expect(hud.locator(".tutorialHudContinue")).toHaveCount(
+          await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(
             width === 1300 ? 1 : 0,
           );
           await expect(next).toBeVisible();
@@ -266,36 +265,78 @@ for (const mission of [
       const sideLayout =
         (await page.locator(".gameStage").getAttribute("data-layout")) ===
         "side";
-      await expect(next).toHaveAccessibleDescription(
-        sideLayout ? "Select Next when you’re ready." : "",
-      );
+      await expect(next).toHaveAccessibleDescription("");
+      await expect(hud.getByText(/when you’re ready/)).toHaveCount(0);
       const cue = next.locator(".tutorialHudNextPulse");
-      await expect(cue).toHaveCSS("animation-delay", "0s, 4s");
-      const reminders = await cue.evaluate((element) => {
-        const animation = element
-          .getAnimations()
-          .find(
-            (candidate) =>
-              candidate instanceof CSSAnimation &&
-              candidate.animationName === "tutorialNextPulse",
-          )!;
-        animation.pause();
-        return [4000, 4320, 4640, 4960, 8320].map((time) => {
-          animation.currentTime = time;
-          const transform = getComputedStyle(element).transform;
-          return transform === "none" ? 1 : new DOMMatrixReadOnly(transform).a;
+      const sweep = hud.getByTestId("tutorial-hud-sweep");
+      if (sideLayout) {
+        await expect(cue).toHaveCount(0);
+        // Seek the real pseudo-element animation: left to right, then a quiet pause and repeat.
+        const positions = await sweep.evaluate((element) => {
+          const animation = element
+            .getAnimations({ subtree: true })
+            .find(
+              (candidate) =>
+                candidate instanceof CSSAnimation &&
+                candidate.animationName === "tutorialBarSweep",
+            )!;
+          animation.pause();
+          return [0, 800, 1600, 4000, 8000, 8800].map((time) => {
+            animation.currentTime = time;
+            return new DOMMatrixReadOnly(
+              getComputedStyle(element, "::before").transform,
+            ).m41;
+          });
         });
-      });
-      expect(reminders[0]).toBe(reminders[2]);
-      expect(reminders[1]).not.toBe(reminders[0]);
-      expect(reminders[3]).toBe(reminders[1]);
-      expect(reminders[4]).toBe(reminders[1]);
+        expect(positions[0]).toBeLessThan(positions[1]);
+        expect(positions[1]).toBeLessThan(positions[2]);
+        expect(positions[2]).toBe(positions[3]);
+        expect(positions[0]).toBe(positions[4]);
+        expect(positions[1]).toBe(positions[5]);
+      } else {
+        await expect(sweep).toHaveCount(0);
+        await expect(cue).toHaveCSS("animation-delay", "0s, 4s");
+        const reminders = await cue.evaluate((element) => {
+          const animation = element
+            .getAnimations()
+            .find(
+              (candidate) =>
+                candidate instanceof CSSAnimation &&
+                candidate.animationName === "tutorialNextPulse",
+            )!;
+          animation.pause();
+          return [4000, 4320, 4640, 4960, 8320].map((time) => {
+            animation.currentTime = time;
+            const transform = getComputedStyle(element).transform;
+            return transform === "none"
+              ? 1
+              : new DOMMatrixReadOnly(transform).a;
+          });
+        });
+        expect(reminders[0]).toBe(reminders[2]);
+        expect(reminders[1]).not.toBe(reminders[0]);
+        expect(reminders[3]).toBe(reminders[1]);
+        expect(reminders[4]).toBe(reminders[1]);
+      }
       await page.emulateMedia({ reducedMotion: "reduce" });
-      await expect(cue).toHaveCSS("animation-name", "none");
-      await expect(hud.locator(".tutorialHudContinue")).toHaveCount(
-        sideLayout ? 1 : 0,
-      );
+      if (sideLayout) {
+        expect(
+          await sweep.evaluate(
+            (element) => getComputedStyle(element, "::before").animationName,
+          ),
+        ).toBe("none");
+        await expect(sweep).not.toHaveCSS(
+          "background-color",
+          "rgba(0, 0, 0, 0)",
+        );
+      } else {
+        await expect(cue).toHaveCSS("animation-name", "none");
+      }
       await expect(next).toHaveClass(/MuiButton-contained/);
+      await reviewScreenshot(page, {
+        path: testInfo.outputPath("manual-next-reduced.png"),
+        animations: "disabled",
+      });
       await page.emulateMedia({ reducedMotion: "no-preference" });
       await page.mouse.move(0, 0);
       await expect(page.getByRole("tooltip")).toBeHidden();
@@ -311,7 +352,7 @@ for (const mission of [
         "Order a second generator of a different type",
       );
       await expect(progress).not.toHaveClass(/tutorialTarget/);
-      await expect(hud.locator(".tutorialHudContinue")).toHaveCount(0);
+      await expect(sweep).toHaveCount(0);
       await expect(hud.locator(".tutorialHudNextPulse")).toHaveCount(0);
       await expect(
         hud.getByRole("button", { name: "Next", exact: true }),
@@ -335,13 +376,14 @@ for (const mission of [
       const sideLayout =
         (await page.locator(".gameStage").getAttribute("data-layout")) ===
         "side";
-      await expect(start).toHaveAccessibleDescription(
-        sideLayout ? "Select Start final challenge when you’re ready." : "",
-      );
-      await expect(hud.locator(".tutorialHudContinue")).toHaveCount(
+      await expect(start).toHaveAccessibleDescription("");
+      await expect(hud.getByText(/when you’re ready/)).toHaveCount(0);
+      await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(
         sideLayout ? 1 : 0,
       );
-      await expect(start.locator(".tutorialHudNextPulse")).toBeVisible();
+      await expect(start.locator(".tutorialHudNextPulse")).toHaveCount(
+        sideLayout ? 0 : 1,
+      );
       await page.mouse.move(0, 0);
       await expect(page.getByRole("tooltip")).toBeHidden();
       if (process.env.REVIEW_SCREENSHOT_DIR) {
@@ -355,7 +397,7 @@ for (const mission of [
       await expect(hud).toContainText(
         "Supply the evening peak with stored energy",
       );
-      await expect(hud.locator(".tutorialHudContinue")).toHaveCount(0);
+      await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(0);
     }
   });
 }

@@ -322,7 +322,7 @@ export default function TutorialHud({
   // thing on screen asking to be tapped
   const requiresNext =
     !isGatedStep(step) && !step.continueOn && !step.continueOnClick;
-  const showContinueHint = requiresNext && desktop;
+  const showBarSweep = requiresNext && desktop;
   const nextLabel = step.nextLabel || "Next";
   const progressText = `${stepIndex + 1} of ${totalSteps}`;
   const advanceOnClick = onAutoAdvance ?? onNext;
@@ -500,6 +500,14 @@ export default function TutorialHud({
       className={`tutorialHud${step.capstone ? " tutorialHud-capstone" : ""}${step.nextLabel ? " tutorialHud-namedAction" : ""}`}
       aria-labelledby="tutorial-step-title"
     >
+      {showBarSweep && (
+        <span
+          key={stepIndex}
+          className="tutorialHudSweep"
+          data-testid="tutorial-hud-sweep"
+          aria-hidden
+        />
+      )}
       <div className="tutorialHudHeader">
         <Typography id="tutorial-step-title" component="h2" variant="subtitle2">
           {step.capstone ? "Your turn" : "Step"}{" "}
@@ -524,14 +532,6 @@ export default function TutorialHud({
               <span>{action}</span>
             </p>
             {content}
-            {showContinueHint && (
-              <p
-                id="tutorial-continue-instruction"
-                className="tutorialHudContinue"
-              >
-                Select <strong>{nextLabel}</strong> when you’re ready.
-              </p>
-            )}
           </div>
         </div>
       </div>
@@ -557,17 +557,15 @@ export default function TutorialHud({
             color="primary"
             size="small"
             variant={requiresNext ? "contained" : "text"}
-            aria-describedby={
-              showContinueHint ? "tutorial-continue-instruction" : undefined
-            }
             endIcon={requiresNext ? <ArrowForwardIcon /> : undefined}
             onClick={onNext}
           >
             {/* Restart the cue each step while the button keeps keyboard focus. */}
-            {requiresNext && (
+            {requiresNext && !desktop && (
               <span
                 key={stepIndex}
                 className="tutorialHudNextPulse"
+                data-testid="tutorial-next-pulse"
                 aria-hidden
               />
             )}
