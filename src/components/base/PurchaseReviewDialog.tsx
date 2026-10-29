@@ -10,6 +10,7 @@ import DecisionImpactPreview, {
 import { purchaseTerms } from "../../helpers/Financials";
 import { formatMoneyConcise } from "../../helpers/Format";
 import { LOAN_MONTHS } from "../../Constants";
+import { useBuildCash } from "./useBuildCash";
 
 /**
  * The one warning a purchase card shows when the loan's down payment is out of reach, or
@@ -22,6 +23,17 @@ export function financingShortfallText(
   return cash >= downpayment
     ? undefined
     : `Need ${formatMoneyConcise(downpayment)} down payment · you have ${formatMoneyConcise(cash)}`;
+}
+
+/** Keep balance changes local to this text instead of redrawing the quote's metrics and chart. */
+export function BuildCashWarning({
+  cash,
+  downpayment,
+}: {
+  cash: number;
+  downpayment: number;
+}): React.JSX.Element {
+  return <>{financingShortfallText(useBuildCash(cash), downpayment)}</>;
 }
 
 export interface PurchaseReviewDialogProps {
@@ -57,6 +69,14 @@ export interface PurchaseReviewDialogProps {
   onClose: () => void;
   /** Called at most once per opening, however quickly the buttons are clicked */
   onPurchase: (financed: boolean) => void;
+}
+
+/** Catalog quotes stay stable while this review reads the balance directly from the game. */
+export function LivePurchaseReviewDialog(
+  props: PurchaseReviewDialogProps,
+): React.JSX.Element {
+  const cash = useBuildCash(props.cash, props.open);
+  return <PurchaseReviewDialog {...props} cash={cash} />;
 }
 
 /**
