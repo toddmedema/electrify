@@ -1,5 +1,40 @@
 import { expect, Locator, Page } from "@playwright/test";
 
+/** Google sign-in and its optional consent remain usable at every supported width. */
+export async function expectMailingListChoice(
+  scope: Page | Locator,
+  buttonName = "Sign in with Google",
+) {
+  const checkbox = scope.getByRole("checkbox", {
+    name: "Sign me up for the Electrify mailing list",
+  });
+  const button = scope.getByRole("button", { name: buttonName, exact: true });
+  await expect(checkbox).toHaveCount(1);
+  await expect(checkbox).toBeVisible();
+  await expect(checkbox).not.toBeChecked();
+  await expect(button).toBeVisible();
+  await expect(
+    scope.getByRole("button", { name: "Sign in with Apple", exact: true }),
+  ).toHaveCount(0);
+  for (const control of [checkbox.locator("xpath=ancestor::label"), button]) {
+    const geometry = await control.evaluate((element) => {
+      const { x, width, height } = element.getBoundingClientRect();
+      return {
+        x,
+        width,
+        height,
+        viewportWidth: window.innerWidth,
+        minimumHeight: matchMedia("(pointer: coarse)").matches ? 44 : 40,
+      };
+    });
+    expect(geometry.x).toBeGreaterThanOrEqual(0);
+    expect(geometry.x + geometry.width).toBeLessThanOrEqual(
+      geometry.viewportWidth + 1,
+    );
+    expect(geometry.height).toBeGreaterThanOrEqual(geometry.minimumHeight);
+  }
+}
+
 /**
  * Tools open deliberately from the dock at every width. Keep this compatibility helper for
  * existing walkthrough specs: a wide screen no longer opens Insights and Events automatically.

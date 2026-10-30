@@ -3,6 +3,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GameType } from "../../Types";
 import NewGameDetails, { Props } from "./NewGameDetails";
+import { login } from "../../Globals";
 import { DesktopBridge } from "../../Desktop";
 import { ScoreType } from "../../Types";
 
@@ -53,6 +54,22 @@ function props(overrides: Partial<Props> = {}): Props {
 }
 
 describe("NewGameDetails leaderboard", () => {
+  it.each([false, true])(
+    "passes mailing-list choice %s to Google sign-in",
+    async (mailingList) => {
+      render(<NewGameDetails {...props()} />);
+      const checkbox = screen.getByRole("checkbox", {
+        name: "Sign me up for the Electrify mailing list",
+      });
+      expect(checkbox).not.toBeChecked();
+      if (mailingList) await userEvent.click(checkbox);
+      await userEvent.click(
+        screen.getByRole("button", { name: "Sign in with Google" }),
+      );
+      expect(login).toHaveBeenLastCalledWith({ mailingList });
+    },
+  );
+
   afterEach(() => {
     delete window.electrifyDesktop;
   });

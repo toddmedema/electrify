@@ -69,3 +69,7 @@ public/icons.json
 
 # Build-specific Steam App ID/mode generated for the desktop depot, never shipped from source.
 desktop-config.json
+
+# Server-only Firebase function configuration and local secret overrides.
+/firebase/functions/.env*
+/firebase/functions/.secret*

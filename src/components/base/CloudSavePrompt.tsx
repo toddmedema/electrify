@@ -12,6 +12,7 @@ import { cloudSavePromptVisible } from "../../reducers/GameActions";
 import { getLocalStorage, login } from "../../Globals";
 import { setStorageKeyValue } from "../../LocalStorage";
 import { isDesktopApp } from "../../Desktop";
+import MailingListCheckbox from "./MailingListCheckbox";
 
 export const CLOUD_PROMPT_KEY = "electrify-cloud-save-prompt-seen";
 export default function CloudSavePrompt(): React.JSX.Element {
@@ -21,6 +22,7 @@ export default function CloudSavePrompt(): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [mailingList, setMailingList] = useState(false);
   const visible =
     !(process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) &&
     open &&
@@ -74,6 +76,11 @@ export default function CloudSavePrompt(): React.JSX.Element {
         <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
           You can also sign in later from Saved games.
         </Typography>
+        <MailingListCheckbox
+          checked={mailingList}
+          onChange={setMailingList}
+          disabled={busy}
+        />
         {error && (
           <Typography color="error" role="alert" sx={{ mt: 2 }}>
             Sign-in didn't finish. Please try again.
@@ -89,7 +96,7 @@ export default function CloudSavePrompt(): React.JSX.Element {
           disabled={busy}
           onClick={async () => {
             setBusy(true);
-            const ok = await login();
+            const ok = await login({ mailingList });
             setBusy(false);
             if (ok) setOpen(false);
             else setError(true);

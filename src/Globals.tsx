@@ -9,6 +9,7 @@ import {
 import { Firestore, getFirestore } from "firebase/firestore";
 import { isDesktopApp } from "./Desktop";
 import { APP_VERSION } from "./AppVersion";
+import { subscribeAfterSignIn } from "./MailingList";
 
 const firebaseApp =
   process.env.REACT_APP_DESKTOP === "true" &&
@@ -32,11 +33,22 @@ const firebaseApp =
 export const firebaseAppAuth = firebaseApp ? getAuth(firebaseApp) : undefined;
 const provider = new GoogleAuthProvider();
 
-export function login(): Promise<boolean> {
+export interface SignInOptions {
+  mailingList?: boolean;
+}
+
+export function login(options: SignInOptions = {}): Promise<boolean> {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp())
     return Promise.resolve(false);
   return signInWithPopup(firebaseAppAuth!, provider)
-    .then(() => {
+    .then((credential) => {
+      if (options.mailingList) {
+        // Auth listeners can close the dialog before signup finishes.
+        // Keep signup independent of login and cloud sync.
+        void subscribeAfterSignIn(firebaseAppAuth!, credential.user).catch(
+          () => undefined,
+        );
+      }
       // The signed in user reaches the app through firebaseAppAuth.onAuthStateChanged
       // (see App.tsx); nothing is needed here. Do not log the credential -- it carries an
       // access token, and the console is readable by anything running on the page.

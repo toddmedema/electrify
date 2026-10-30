@@ -123,9 +123,15 @@ it("prepares one snapshot and creates a frozen share link after sign-in", async 
     mockAuth.currentUser = { uid: "account" };
     return true;
   });
+  const checkbox = within(sharing).getByRole("checkbox", {
+    name: "Sign me up for the Electrify mailing list",
+  });
+  expect(checkbox).not.toBeChecked();
+  await user.click(checkbox);
   await user.click(
     within(sharing).getByRole("button", { name: "Sign in and share" }),
   );
+  expect(mockLogin).toHaveBeenCalledWith({ mailingList: true });
   expect(mockCreate).toHaveBeenCalledWith("account", snapshot);
   const link = await within(sharing).findByRole("textbox", {
     name: "Share link",
@@ -505,22 +511,31 @@ it("offers optional cloud sign-in only once after Save & Quit", async () => {
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
-it("keeps the cloud invitation available after a cancelled sign-in", async () => {
-  renderWithSaves(<CloudSavePrompt />, {
-    cloudState: "signedOut",
-    entries: [existingSave],
-    cloudPromptRequested: true,
-  });
-  await userEvent.click(
-    screen.getByRole("button", { name: "Sign in with Google" }),
-  );
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Sign-in didn't finish",
-  );
-  expect(
-    screen.getByRole("button", { name: "Continue without syncing" }),
-  ).toBeEnabled();
-});
+it.each([false, true])(
+  "keeps the cloud invitation available after cancelling with mailing-list choice %s",
+  async (mailingList) => {
+    renderWithSaves(<CloudSavePrompt />, {
+      cloudState: "signedOut",
+      entries: [existingSave],
+      cloudPromptRequested: true,
+    });
+    const checkbox = screen.getByRole("checkbox", {
+      name: "Sign me up for the Electrify mailing list",
+    });
+    expect(checkbox).not.toBeChecked();
+    if (mailingList) await userEvent.click(checkbox);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sign in with Google" }),
+    );
+    expect(mockLogin).toHaveBeenCalledWith({ mailingList });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Sign-in didn't finish",
+    );
+    expect(
+      screen.getByRole("button", { name: "Continue without syncing" }),
+    ).toBeEnabled();
+  },
+);
 
 it("does not interrupt shared links with the cloud invitation", () => {
   window.history.replaceState(null, "", "/?game=Abc123Xy90");
@@ -532,3 +547,19 @@ it("does not interrupt shared links with the cloud invitation", () => {
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(localStorage.getItem(CLOUD_PROMPT_KEY)).toBeNull();
 });
+
+it.each([false, true])(
+  "passes mailing-list choice %s from Saved games",
+  async (mailingList) => {
+    renderWithSaves(<CloudSaveStatus />, { cloudState: "signedOut" });
+    const checkbox = screen.getByRole("checkbox", {
+      name: "Sign me up for the Electrify mailing list",
+    });
+    expect(checkbox).not.toBeChecked();
+    if (mailingList) await userEvent.click(checkbox);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sign in with Google" }),
+    );
+    expect(mockLogin).toHaveBeenCalledWith({ mailingList });
+  },
+);

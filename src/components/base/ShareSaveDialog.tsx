@@ -14,6 +14,7 @@ import { createSharedSave } from "../../CloudSaveTransport";
 import { firebaseAppAuth, login } from "../../Globals";
 import { snapshotSavedGame } from "../../SaveSession";
 import type { SaveFileType } from "../../Types";
+import MailingListCheckbox from "./MailingListCheckbox";
 
 export default function ShareSaveDialog({
   id,
@@ -26,6 +27,7 @@ export default function ShareSaveDialog({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [mailingList, setMailingList] = useState(false);
   const [file, setFile] = useState<SaveFileType>();
   const request = useRef(0);
   const input = useRef<HTMLInputElement>(null);
@@ -50,6 +52,7 @@ export default function ShareSaveDialog({
     setUrl("");
     setError("");
     setCopied(false);
+    setMailingList(false);
     setFile(undefined);
     if (id) {
       setBusy(true);
@@ -76,7 +79,7 @@ export default function ShareSaveDialog({
     const generation = request.current;
     setError("");
     setBusy(true);
-    if (!firebaseAppAuth?.currentUser && !(await login())) {
+    if (!firebaseAppAuth?.currentUser && !(await login({ mailingList }))) {
       if (generation === request.current) {
         setBusy(false);
         setError("Sign-in didn't finish. Please try again.");
@@ -124,6 +127,13 @@ export default function ShareSaveDialog({
               Sign in with Google to create a share link. No account is needed
               to open it.
             </Typography>
+          )}
+          {!url && !firebaseAppAuth?.currentUser && (
+            <MailingListCheckbox
+              checked={mailingList}
+              onChange={setMailingList}
+              disabled={busy || !file}
+            />
           )}
           {copied && (
             <Typography role="status" color="success.main">

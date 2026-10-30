@@ -1,5 +1,5 @@
 import path from "path";
-import { openSavedGames } from "./layout";
+import { expectMailingListChoice, openSavedGames } from "./layout";
 import { expect, Page, test, TestInfo } from "./fixtures";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
@@ -261,6 +261,7 @@ for (const theme of ["light", "dark"]) {
       .getByRole("menuitem", { name: "Save & Quit", exact: true })
       .click();
     await expect(invitation).toBeVisible();
+    await expectMailingListChoice(invitation);
     await expect(invitation).toContainText("even offline");
     await expect(invitation).toContainText("sign in later from Saved games");
     await checkDialogLayout(page, "Back up your saves to the cloud", info);
@@ -297,6 +298,7 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.getByRole("button", { name: "Sign in with Google", exact: true }),
     ).toBeVisible();
+    await expectMailingListChoice(page);
     await expect(page.getByLabel("Save game file")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Import", exact: true }),
@@ -340,6 +342,7 @@ for (const theme of ["light", "dark"]) {
       "expires after a year without being opened",
     );
     await expect(sharing).toContainText("No account is needed to open it");
+    await expectMailingListChoice(sharing, "Sign in and share");
     await expect(
       sharing.getByRole("button", { name: "Sign in and share", exact: true }),
     ).toBeEnabled();

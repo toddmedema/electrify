@@ -5,6 +5,7 @@ import {
   Paper,
   Portal,
   Snackbar,
+  Stack,
   Typography,
 } from "@mui/material";
 import LinearProgress from "@mui/material/LinearProgress";
@@ -24,6 +25,7 @@ import { retryAchievementSync } from "./Runtime";
 import { useOnline } from "../components/base/OnlineStatus";
 import { useMenuKeys } from "../components/base/useMenuKeys";
 import { useSwipeToDismiss } from "../components/base/SwipeDismiss";
+import MailingListCheckbox from "../components/base/MailingListCheckbox";
 
 /** Long enough to read the name and requirement; hover or focus holds it on screen. */
 export const ACHIEVEMENT_TOAST_MS = 10_000;
@@ -36,6 +38,7 @@ export function AchievementGallery(): React.JSX.Element {
   const [filter, setFilter] = React.useState<Filter>("all");
   const [signingIn, setSigningIn] = React.useState(false);
   const [signInError, setSignInError] = React.useState(false);
+  const [mailingList, setMailingList] = React.useState(false);
   const onBack = () => {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
@@ -96,7 +99,7 @@ export function AchievementGallery(): React.JSX.Element {
     setSigningIn(true);
     setSignInError(false);
     try {
-      if (!(await login())) setSignInError(true);
+      if (!(await login({ mailingList }))) setSignInError(true);
     } catch {
       setSignInError(true);
     } finally {
@@ -140,13 +143,20 @@ export function AchievementGallery(): React.JSX.Element {
               )}
             </div>
             {!state.uid && firebaseAppAuth && (
-              <Button
-                variant="outlined"
-                disabled={signingIn || !online}
-                onClick={() => void signIn()}
-              >
-                {signingIn ? "Signing in…" : "Sign in with Google"}
-              </Button>
+              <Stack spacing={1} sx={{ flexShrink: 0, maxWidth: "100%" }}>
+                <MailingListCheckbox
+                  checked={mailingList}
+                  onChange={setMailingList}
+                  disabled={signingIn || !online}
+                />
+                <Button
+                  variant="outlined"
+                  disabled={signingIn || !online}
+                  onClick={() => void signIn()}
+                >
+                  {signingIn ? "Signing in…" : "Sign in with Google"}
+                </Button>
+              </Stack>
             )}
             {account && state.sync === "failed" && online && (
               <Button variant="outlined" onClick={retryAchievementSync}>
