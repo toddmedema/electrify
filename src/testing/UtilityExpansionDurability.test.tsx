@@ -1,6 +1,6 @@
 import * as Economy from "../data/Economy";
 import { loanBalanceAfterTicks } from "../helpers/Financials";
-import { TICKS_PER_MONTH } from "../Constants";
+import { TICKS_PER_MONTH, TICK_MINUTES } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { runMonths } from "./SimulationTestHelpers";
 import cloneDeep from "lodash.clonedeep";
@@ -295,8 +295,10 @@ it("validates canonical acquired assets and network consideration before economi
   runMonths(game, 2);
   game = buy(game, "ridge-electric");
   const saved = JSON.parse(JSON.stringify(serializeSave(game)));
+  expect(validUtilityExpansion(saved.game)).toBe(true);
   const unloaded = jest.spyOn(Economy, "hasEconomy").mockReturnValue(false);
   try {
+    expect(validUtilityExpansion(saved.game)).toBe(true);
     expect(parseSave(saved)).not.toBeNull();
     for (const mutate of [
       (g: GameType) => {
@@ -316,6 +318,13 @@ it("validates canonical acquired assets and network consideration before economi
         g.facilities.find(
           (facility) => facility.operatingAreaId === "ridge-electric",
         )!.minuteOperational! += 15;
+      },
+      (g: GameType) => {
+        const gas = g.facilities.find(
+          (f) =>
+            f.operatingAreaId === "ridge-electric" && f.fuel === "Natural Gas",
+        )!;
+        gas.resilienceExtraBuildCost! += 1000;
       },
     ]) {
       const altered = JSON.parse(JSON.stringify(saved));
@@ -347,3 +356,55 @@ it("acknowledges ownership immediately without inventing completed-month history
   expect(JSON.stringify(game.monthlyHistory)).toBe(history);
   expect(game.objectiveProgress!.completedMonths).toBe(completed);
 });
+
+it("projected corporate debt advances only for future elapsed ticks, with real payments unchanged", () => {
+  const game = buy(ready("valley-electric"), "valley-electric");
+  const initial = cloneDeep(game.utilityExpansion!.loans);
+  const now = currentTick(game)!;
+  const balances: number[][] = [];
+  generateForecastTimeline(
+    game,
+    now.cash,
+    now.customers,
+    3,
+    TICK_MINUTES,
+    (forecast) =>
+      balances.push(
+        forecast.utilityExpansion!.loans.map((loan) => loan.loanAmountLeft),
+      ),
+  );
+  expect(balances).toHaveLength(3);
+  expect(balances[0]).toEqual(initial.map((loan) => loan.loanAmountLeft));
+  expect(game.utilityExpansion!.loans).toEqual(initial);
+  for (let step = 1; step < balances.length; step++) {
+    tickState(game);
+    game.utilityExpansion!.loans.forEach((loan, index) => {
+      expect(balances[step][index]).toBeCloseTo(loan.loanAmountLeft, 6);
+      expect(loan.loanAmountLeft).toBeCloseTo(
+        loanBalanceAfterTicks(
+          initial[index].principal,
+          initial[index].loanMonthlyPayment,
+          initial[index].interestRate,
+          step,
+        ),
+        2,
+      );
+    });
+  }
+});
+
+it.each(["storyEffectsDisabled", "weatherHazardsDisabled"] as const)(
+  "seller equipment preserves authored cold protection with buyer %s",
+  (flag) => {
+    const opening = copyOfficialGame(
+      reducer(ready("ridge-electric"), delta({ [flag]: true })),
+    );
+    const game = buy(opening, "ridge-electric");
+    const gas = game.facilities.find(
+      (f) => f.operatingAreaId === "ridge-electric" && f.fuel === "Natural Gas",
+    )!;
+    expect(gas.resilience?.coldWeatherPackage).toBe(true);
+    expect(gas.resilienceExtraBuildCost).toBe(147475);
+    expect(roundtrip(game)).toEqual(JSON.parse(JSON.stringify(game)));
+  },
+);

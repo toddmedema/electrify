@@ -1,6 +1,7 @@
+import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import type { OperatingAreaState, UtilityAreaId } from "../Types";
 import { areaBaselineDemand } from "../helpers/AreaDemand";
-import { EXPANSION_SCENARIO_ID, UTILITY_AREAS } from "../data/UtilityExpansion";
+import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { acquireUtility } from "./GameActions";
 import {
   acquisitionQuote,
@@ -1892,7 +1893,7 @@ export const gameSlice = createSlice({
         );
       }
 
-      if (state.scenarioId === EXPANSION_SCENARIO_ID) {
+      if (isUtilityExpansionGame(state)) {
         state.utilityExpansion = {
           areas: [initialOperatingArea()],
           loans: [],
@@ -2314,7 +2315,7 @@ export default gameSlice.reducer;
 /** Calendar-owned notices; cap changes themselves remain a pure dated entitlement lookup. */
 export function recordExpansionMilestones(state: GameType): void {
   if (
-    state.scenarioId !== EXPANSION_SCENARIO_ID ||
+    !isUtilityExpansionGame(state) ||
     !ownedUtility(state, "valley-electric") ||
     state.date.monthNumber !== 1
   )
@@ -3589,7 +3590,15 @@ function completedMonthCount(state: GameType): number {
   );
 }
 
-function tickWorkingStateStep(state: GameType, saveEffects?: RunSaveEffects) {
+export type CompletedMonthObserver = (
+  timeline: readonly TickPresentFutureType[],
+) => void;
+
+function tickWorkingStateStep(
+  state: GameType,
+  saveEffects?: RunSaveEffects,
+  onCompletedMonth?: CompletedMonthObserver,
+) {
   const minute = state.date.minute + TICK_MINUTES;
   const frame = getTimeFromTimeline(minute, state.timeline);
   if (frame) {
@@ -3607,7 +3616,7 @@ function tickWorkingStateStep(state: GameType, saveEffects?: RunSaveEffects) {
       checkedKeys: [...state.worldEvents.checkedKeys],
     };
   }
-  tickState(state, saveEffects);
+  tickState(state, saveEffects, onCompletedMonth);
 }
 
 function adoptTickWorkingState(
@@ -3642,8 +3651,12 @@ function adoptTickWorkingState(
 // Ticks the state forward in place
 // Exported so the headless simulator (src/testing/Simulator.tsx) can drive the sim
 // without the wall-clock timers that the `tick` action uses.
-export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
-  const phases = tickStatePhases(state, saveEffects);
+export function tickState(
+  state: GameType,
+  saveEffects?: RunSaveEffects,
+  onCompletedMonth?: CompletedMonthObserver,
+) {
+  const phases = tickStatePhases(state, saveEffects, onCompletedMonth);
   while (!phases.next().done) {
     /* Single-player has no peer settlement. */
   }
@@ -3653,11 +3666,12 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
 export function* tickStatePhases(
   state: GameType,
   saveEffects?: RunSaveEffects,
+  onCompletedMonth?: CompletedMonthObserver,
 ): Generator<PeerPlan, void, PeerSettlement | undefined> {
   if (isDraft(state)) {
     const snapshot = current(state);
     const working = tickWorkingState(snapshot);
-    tickWorkingStateStep(working, saveEffects);
+    tickWorkingStateStep(working, saveEffects, onCompletedMonth);
     adoptTickWorkingState(state, snapshot, working);
     return;
   }
@@ -3753,6 +3767,8 @@ export function* tickStatePhases(
       state.customerRate = now.customerRate;
 
       // Record final history for the month, then generate the new timeline
+      // Observe the same settled frames as history, before rollover.
+      onCompletedMonth?.(state.timeline);
       history.unshift(summarizeTimeline(state.timeline, state.startingYear));
       recordGameObjectiveMonth(state, history[0]);
       // Reprice the company's credit off the year that just closed, before the forecast is built
@@ -4951,7 +4967,8 @@ function* operatingAreasPhases(
         loan.loanMonthlyPayment / ticksPerMonth - interest,
       ),
     );
-    if (!preRoll) {
+    // A forecast re-dispatches the current frame without advancing any elapsed ledger.
+    if (!preRoll && advanceConstruction) {
       loan.loanAmountLeft -= principal;
       repayment += principal + interest;
     }

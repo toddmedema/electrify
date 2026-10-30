@@ -191,3 +191,67 @@ test("editor numeric unit boundaries agree with the parser at and beside each li
     expect(modDiagnostics(pack).length === 0).toBe(expected);
   }
 });
+
+test("ownership, original-asset retirement and cohort goals match the production deadline contract", () => {
+  const pack = validateMod(createAuthoringTemplate());
+  const goals = [
+    {
+      id: "acquire-neighbor",
+      label: "Acquire a neighbor",
+      metric: "utilityOwnership",
+      targets: ["valley-electric", "ridge-electric"],
+      deadlineMonth: 1,
+    },
+    {
+      id: "retire-original",
+      label: "Retire original equipment",
+      metric: "assetRetirement",
+      assetIds: ["scenario-116-valley-oil"],
+      deadlineMonth: 1,
+    },
+    {
+      id: "retain-cohorts",
+      label: "Retain each cohort",
+      metric: "cohortRetention",
+      minRetainedShare: 0.9,
+      deadlineMonth: 1,
+    },
+  ];
+  for (const goal of goals) {
+    const valid = { ...pack, objectives: [goal] };
+    expect(validate(valid)).toBe(true);
+    expect(modDiagnostics(valid)).toEqual([]);
+    const missingDeadline: Record<string, unknown> = { ...goal };
+    delete missingDeadline.deadlineMonth;
+    const field =
+      "targets" in goal
+        ? "targets"
+        : "assetIds" in goal
+          ? "assetIds"
+          : undefined;
+    const invalidGoals = [
+      missingDeadline,
+      { ...goal, fromMonth: 1 },
+      { ...goal, throughMonth: 1 },
+      ...(field
+        ? [
+            { ...goal, [field]: [] },
+            { ...goal, [field]: ["same-id", "same-id"] },
+            { ...goal, [field]: ["Invalid ID"] },
+            {
+              ...goal,
+              [field]: Array.from({ length: 17 }, (_, i) => `id-${i}`),
+            },
+          ]
+        : [
+            { ...goal, minRetainedShare: -0.01 },
+            { ...goal, minRetainedShare: 1.01 },
+          ]),
+    ];
+    for (const objective of invalidGoals) {
+      const invalid = { ...pack, objectives: [objective] };
+      expect(validate(invalid)).toBe(false);
+      expect(modDiagnostics(invalid).length).toBeGreaterThan(0);
+    }
+  }
+});

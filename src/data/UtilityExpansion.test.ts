@@ -1,3 +1,4 @@
+import { winterizationPrice } from "../helpers/Winterization";
 import fs from "fs";
 import path from "path";
 import {
@@ -19,6 +20,7 @@ import { getWeather, hasWeather, initWeather } from "./Weather";
 import { SCENARIOS } from "./Scenarios";
 import {
   UTILITY_AREAS,
+  INHERITED_COLD_PACKAGE_COST_2005,
   UTILITY_TARGETS,
   utilityEntitlementsAt,
 } from "./UtilityExpansion";
@@ -239,4 +241,15 @@ it("inherited fictional hydro claims cannot become greenfield sites in custom ga
       10e6,
     ).status,
   ).toBe("available");
+});
+
+it("pins inherited Ridge cold protection to its owning January 2005 winterization quote", () => {
+  loadSimData(UTILITY_AREAS.champlain.location);
+  expect(INHERITED_COLD_PACKAGE_COST_2005["scenario-116-ridge-gas-cc"]).toBe(
+    winterizationPrice(
+      { fuel: "Natural Gas", peakW: 100e6 },
+      { date: getDateFromMinute(0, 2005), startingYear: 2005, seed: 12345 },
+      true,
+    ),
+  );
 });

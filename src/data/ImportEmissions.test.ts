@@ -44,7 +44,7 @@ it("gives every neighboring market a sourced, year-by-year proxy", () => {
   expect(importEmissionsKgco2ePerMWh("unmeasured", 2024)).toBe(445);
 });
 
-it("dates every corridor to when its real path could first carry power", () => {
+it("dates every corridor to its real or authored opening year", () => {
   for (const corridor of TRANSMISSION_CORRIDORS) {
     const [from, until = Infinity] = INTERTIE_CORRIDOR_YEARS[corridor.id];
     expect(Number.isInteger(from)).toBe(true);
@@ -57,6 +57,24 @@ it("dates every corridor to when its real path could first carry power", () => {
   }
   expect(corridorOpenInYear("unknown", 1980)).toBe(true);
 });
+
+it.each(["vt-valley-pool", "vt-ridge-pool"])(
+  "preserves %s's authored ISO New England proxy throughout the scenario",
+  (marketId) => {
+    for (const [year, emissions] of [
+      [2005, 417],
+      [2010, 376],
+      [2011, 354],
+      [2024, 354],
+      [2030, 354],
+    ]) {
+      expect(importEmissionsKgco2ePerMWh(marketId, year)).toBe(emissions);
+      expect(seriesAt(INTERTIE_MARKET_TRENDS[marketId].prices, year)).toBe(60);
+    }
+    expect(intertiePriceIndex(marketId, 2005)).toBe(1);
+    expect(intertiePriceIndex(marketId, 2024)).toBe(1);
+  },
+);
 
 it("retains sourced neighboring differences without calling hydro zero-carbon", () => {
   const quebec = adjacentMarketForCorridor("ny-quebec-upgrade")!.id;

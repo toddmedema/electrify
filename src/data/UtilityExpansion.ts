@@ -7,6 +7,16 @@ import type {
 
 /** Fictional 2005-dollar portfolios; the historical reference years are not a reconstruction. */
 export const EXPANSION_SCENARIO_ID = 116;
+/** Existing Ridge package, quoted by winterizationPrice for 100 MW in January 2005 dollars.
+ * Freeze inherited book cost so import validation does not depend on economy loading.
+ * New construction continues to use the dated winterization owner.
+ */
+export const INHERITED_COLD_PACKAGE_COST_2005: Readonly<
+  Record<string, number | undefined>
+> = {
+  "scenario-116-ridge-gas-cc": 147475,
+};
+
 export type UtilityEnergyShares = Readonly<{
   Residential: number;
   Commercial: number;

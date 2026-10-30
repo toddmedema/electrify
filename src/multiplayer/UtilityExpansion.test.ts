@@ -248,6 +248,9 @@ it.each([180e6, 280e6])(
         Residential: champlain.demandW,
         Commercial: 0,
         Industrial: 0,
+        "Data Centers": 0,
+        Mining: 0,
+        Transportation: 0,
       };
       if (game === seller) {
         const ridge = next.areaTicks!["ridge-electric"]!;
@@ -256,6 +259,9 @@ it.each([180e6, 280e6])(
           Residential: ridge.demandW,
           Commercial: 0,
           Industrial: 0,
+          "Data Centers": 0,
+          Mining: 0,
+          Transportation: 0,
         };
       }
     }

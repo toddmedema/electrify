@@ -1,3 +1,4 @@
+import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
 import { UTILITY_TARGETS } from "../data/UtilityExpansion";
 import { currentTick } from "../helpers/GameSelectors";
@@ -65,7 +66,7 @@ const peerLine: Validator = (game, payload) => {
       game.multiplayer?.peers?.some(
         (p) => p.corridor.id === target.corridorId,
       ) ||
-      (game.scenarioId === 116 &&
+      (isUtilityExpansionGame(game) &&
         UTILITY_TARGETS.some((t) => t.corridorId === target.corridorId))
     ) ||
     typeof target.financed !== "boolean"

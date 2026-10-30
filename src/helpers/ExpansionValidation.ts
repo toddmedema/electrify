@@ -1,3 +1,9 @@
+import { isStorage } from "../Types";
+import {
+  isUtilityExpansionGame,
+  validUtilityExpansionSetup,
+  validUtilityExpansionHeader,
+} from "./ExpansionContext";
 import type {
   GameType,
   OperatingAreaState,
@@ -6,7 +12,11 @@ import type {
 } from "../Types";
 import { TICK_MINUTES, LOAN_MONTHS } from "../Constants";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
-import { UTILITY_AREAS, UTILITY_TARGETS } from "../data/UtilityExpansion";
+import {
+  UTILITY_AREAS,
+  UTILITY_TARGETS,
+  INHERITED_COLD_PACKAGE_COST_2005,
+} from "../data/UtilityExpansion";
 import {
   acquisitionAssets,
   operatingAreaPool,
@@ -39,7 +49,7 @@ const record = (value: unknown): value is Record<string, unknown> =>
 export function validUtilityExpansion(game: GameType): boolean {
   if (game.operatingAreaId !== undefined) return false;
   const state = game.utilityExpansion;
-  if (game.scenarioId !== 116 || game.customScenario) {
+  if (!isUtilityExpansionGame(game)) {
     return (
       state === undefined &&
       game.facilities.every((f) => f.operatingAreaId === undefined) &&
@@ -57,6 +67,11 @@ export function validUtilityExpansion(game: GameType): boolean {
     !Array.isArray(state.loans) ||
     state.loans.length > 4 ||
     state.areas[0]?.id !== "champlain"
+  )
+    return false;
+  if (
+    !validUtilityExpansionHeader(game) ||
+    (game.customScenario && !validUtilityExpansionSetup(game.customScenario))
   )
     return false;
   const ids = new Set<UtilityAreaId>();
@@ -243,6 +258,15 @@ export function validUtilityExpansion(game: GameType): boolean {
       )
         return true;
       const expected = expectedAssets.get(f.startingAssetId);
+      const packageCost = INHERITED_COLD_PACKAGE_COST_2005[f.startingAssetId];
+      if (
+        packageCost !== undefined &&
+        (isStorage(f) ||
+          f.resilienceExtraBuildCost !== packageCost ||
+          !f.resilience?.coldWeatherPackage)
+      )
+        return true;
+
       if (
         expected &&
         (f.name !== expected.name ||

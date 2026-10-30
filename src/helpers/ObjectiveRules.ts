@@ -1,3 +1,4 @@
+import { isUtilityExpansionGame } from "./ExpansionContext";
 import { formatCount, formatNumber } from "./Format";
 import {
   DifficultyType,
@@ -472,7 +473,7 @@ export function initializeGameObjectiveProgress(game: GameType): void {
       ? createObjectiveProgress(
           objectives,
           objectiveContextForGame(game, scenario),
-          scenario.id === 116
+          isUtilityExpansionGame(game)
             ? 90000
             : game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
         )
@@ -558,7 +559,7 @@ export function validGameObjectiveProgress(game: GameType): boolean {
   const progress = game.objectiveProgress;
   if (
     progress.retentionBaseline !==
-      (scenario.id === 116
+      (isUtilityExpansionGame(game)
         ? 90000
         : game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER) ||
     !validObjectiveProgress(progress, objectives, context)
@@ -566,11 +567,13 @@ export function validGameObjectiveProgress(game: GameType): boolean {
     return false;
   if (
     scenario.mod &&
-    game.customerMarketSize !==
+    (isUtilityExpansionGame(game)
+      ? game.utilityExpansion?.areas[0]?.customerMarketSize
+      : game.customerMarketSize) !==
       scenario.mod.parameters.startingCustomers * CUSTOMER_MARKET_MULTIPLIER
   )
     return false;
-  if (scenario.id === 116) {
+  if (isUtilityExpansionGame(game)) {
     const expansion = game.utilityExpansion;
     if (!expansion) return false;
     for (const objective of objectives) {

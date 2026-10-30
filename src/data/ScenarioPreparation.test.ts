@@ -1,11 +1,19 @@
 import { SCENARIOS } from "./Scenarios";
+import { UTILITY_AREAS, utilityEntitlementsAt } from "./UtilityExpansion";
+import type { UtilityAreaId } from "../Types";
 import { scenarioRules } from "../helpers/ScenarioRules";
 import { getDateFromMinute } from "../helpers/DateTime";
 
 // Pin historical headline dates while checking the actual engine schedule, including seeded arcs.
 const HEADLINERS: Record<
   number,
-  { year: number; month: number; lastMonth?: number; phase?: string }
+  {
+    year: number;
+    month: number;
+    lastMonth?: number;
+    phase?: string;
+    entitlement?: { areaId: UtilityAreaId; id: string };
+  }
 > = {
   100: { year: 2020, month: 48, phase: "ratchet-onset" },
   101: { year: 2002, month: 84, phase: "procurement-step" },
@@ -21,6 +29,11 @@ const HEADLINERS: Record<
   113: { year: 2018, month: 12, phase: "availability-step-1" },
   114: { year: 2014, month: 12, phase: "reservoir-step-1" },
   115: { year: 2021, month: 4, phase: "summer-peak-1" },
+  116: {
+    year: 2017,
+    month: 0,
+    entitlement: { areaId: "valley-electric", id: "valley-nuclear" },
+  },
 };
 
 test.each(SCENARIOS.filter((scenario) => !scenario.tutorialSteps))(
@@ -31,6 +44,14 @@ test.each(SCENARIOS.filter((scenario) => !scenario.tutorialSteps))(
     const date = getDateFromMinute(0, scenario.startingYear);
     expect(date.monthNumber).toBe(1);
     const leadMonths = [1, 2468, 9981].map((seed) => {
+      if (headline.entitlement) {
+        const { areaId, id } = headline.entitlement;
+        const source = UTILITY_AREAS[areaId].entitlements.find(
+          (item) => item.id === id,
+        )!;
+        const year = source.reductionYear!;
+        return (year - scenario.startingYear) * 12;
+      }
       if (!headline.phase) {
         const load = scenario.loadAdditions![0];
         return (
@@ -57,3 +78,20 @@ test.each(SCENARIOS.filter((scenario) => !scenario.tutorialSteps))(
     }
   },
 );
+
+test("Across the Valley's headline applies through the dated entitlement API", () => {
+  const source = UTILITY_AREAS["valley-electric"].entitlements.find(
+    ({ id }) => id === "valley-nuclear",
+  )!;
+  expect(source.reductionYear).toBe(2017);
+  expect(
+    utilityEntitlementsAt("valley-electric", 2016).find(
+      ({ id }) => id === source.id,
+    )?.nominalW,
+  ).toBe(source.nominalW);
+  expect(
+    utilityEntitlementsAt("valley-electric", 2017).find(
+      ({ id }) => id === source.id,
+    )?.nominalW,
+  ).toBe(source.reducedNominalW);
+});

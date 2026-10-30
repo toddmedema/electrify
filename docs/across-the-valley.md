@@ -132,3 +132,15 @@ Waiting until January 2014 made both transactions affordable but left the new
 plant unfinished during 2016 shortages. The May 2013 cash/peaker plan clears
 both working-capital and construction constraints without changing source
 prices, difficulty, tariff strategy or reliability rules.
+
+Inherited Ridge gas keeps a fixed $147,475 opening cold-weather package value,
+quoted by the normal winterization owner for 100 MW in January 2005. This authored
+book component keeps offline save validation exact; new construction and
+retrofits continue to use current dated quotes.
+
+Community mods can use Across the Valley as a base while keeping its 2005
+Burlington opening, 90,000 customers, demand profile, starting fleet and 240-month
+term. Cash, tariffs, construction/program modifiers and authored events remain
+customizable. Its four obligations are inherited unless the package replaces
+them. Importing only its official arc into another base adds no global shock:
+utility ownership and dated seller contracts belong to the expansion base.

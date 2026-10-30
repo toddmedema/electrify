@@ -1,3 +1,4 @@
+import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import {
   MULTIPLAYER_LINK_BUDGET_FRACTION,
   MULTIPLAYER_LINK_BUILD_COST_PER_W,
@@ -889,14 +890,11 @@ function validGrid(world: World, initial: World, i: number) {
   const g = world.grids[i];
   const scenario = getScenario(g.scenarioId, g.customScenario)!;
   const expectedConnections = initial.grids[i].transmission!.lines;
-  const nativeLines =
-    g.scenarioId === 116
-      ? (g.transmission?.lines ?? []).filter((line) =>
-          ["vt-champlain-valley", "vt-champlain-ridge"].includes(
-            line.corridorId,
-          ),
-        )
-      : [];
+  const nativeLines = isUtilityExpansionGame(g)
+    ? (g.transmission?.lines ?? []).filter((line) =>
+        ["vt-champlain-valley", "vt-champlain-ridge"].includes(line.corridorId),
+      )
+    : [];
   const lineCount = expectedConnections.length + nativeLines.length;
   return (
     !!parseSave(

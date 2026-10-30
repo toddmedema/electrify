@@ -247,7 +247,7 @@ export function AchievementGallery(): React.JSX.Element {
               <Typography color="text.secondary">
                 {filter === "unlocked"
                   ? "Complete Mission 1: Electricity to earn First Spark."
-                  : "You've earned all 35 achievements."}
+                  : `You've earned all ${catalog.length} achievements.`}
               </Typography>
               <Button onClick={() => setFilter("all")}>
                 Show all achievements

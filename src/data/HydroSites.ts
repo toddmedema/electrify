@@ -1,3 +1,4 @@
+import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { EXPANSION_SCENARIO_ID, getUtilityArea } from "./UtilityExpansion";
 import type { GameType, LocationType, ScenarioFacilityType } from "../Types";
 import { LOCATIONS } from "../Constants";
@@ -246,7 +247,7 @@ export function validHydroClaims(state: HydroState): boolean {
   if (state.utilityExpansion) {
     const areas = state.utilityExpansion.areas;
     if (
-      state.scenarioId !== EXPANSION_SCENARIO_ID ||
+      !isUtilityExpansionGame(state) ||
       !Array.isArray(areas) ||
       new Set(areas.map((area) => area.id)).size !== areas.length ||
       !Array.isArray(state.commissionedHydroSiteIds)
@@ -260,6 +261,8 @@ export function validHydroClaims(state: HydroState): boolean {
       inventory?.siteIds.forEach((id) => allowed.add(id));
       return validHydroClaims({
         ...state,
+        scenarioId: EXPANSION_SCENARIO_ID,
+        customScenario: undefined,
         utilityExpansion: undefined,
         location: definition.location,
         facilities: state.facilities.filter(

@@ -23,10 +23,10 @@ const normalizedDocument = (text: string) =>
 test("the generated arc document covers every actual imported phase, decision and load", () => {
   expect(reference.map((arc) => arc.id)).toEqual(MOD_SCENARIO_IDS);
   for (const arc of reference) {
-    // Data Center Boom is a load and connection choice, with no timed phase.
+    // Expansion has base-owned portfolios; every other imported arc carries events, loads or choices.
     expect(
-      arc.phases.length + arc.choices.length + arc.loads.length,
-    ).toBeGreaterThan(0);
+      arc.phases.length + arc.choices.length + arc.loads.length === 0,
+    ).toBe(arc.id === 116);
     expect(new Set(arc.phases.map((phase) => phase.id)).size).toBe(
       arc.phases.length,
     );

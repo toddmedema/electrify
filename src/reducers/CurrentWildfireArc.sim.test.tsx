@@ -93,13 +93,13 @@ test("current111 community rules have no choice and preserve the cap and save", 
   expect(resumed.monthlyHistory).toEqual(original.monthlyHistory);
 });
 
-test("all fourteen current arc snapshots validate through ordinary compilation", () => {
+test("all fifteen current arc snapshots validate through ordinary compilation", () => {
   const groups = [
     [100, 101, 103, 105, 106],
     [102, 104, 110, 111],
     [107, 108],
     [113, 114],
-    [115],
+    [115, 116],
   ];
   for (const ids of groups) {
     const scenario = modScenario({

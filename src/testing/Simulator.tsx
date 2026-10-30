@@ -668,6 +668,33 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     SimResultType["expansionAreaMetrics"]
   > = {};
   let consolidatedImportWh = 0;
+  const observeCompletedMonth = state.utilityExpansion
+    ? (completedTimeline: readonly TickPresentFutureType[]) => {
+        const hours = (TICK_MINUTES / 60) * GAME_TO_REAL_YEARS;
+        for (const completedTick of completedTimeline) {
+          consolidatedImportWh += (completedTick.importedW ?? 0) * hours;
+          for (const area of state.utilityExpansion!.areas) {
+            const tick = completedTick.areaTicks?.[area.id];
+            if (!tick) continue;
+            const metrics = (expansionAreaMetrics[area.id] ??= {
+              demandWh: 0,
+              supplyWh: 0,
+              importedWh: 0,
+              kgco2e: 0,
+              minimumMarginW: Infinity,
+            });
+            metrics.demandWh += tick.demandW * hours;
+            metrics.supplyWh += Math.min(tick.supplyW, tick.demandW) * hours;
+            metrics.importedWh += (tick.importedW ?? 0) * hours;
+            metrics.kgco2e += tick.kgco2e;
+            metrics.minimumMarginW = Math.min(
+              metrics.minimumMarginW,
+              tick.reserveW ?? tick.supplyW - tick.demandW,
+            );
+          }
+        }
+      }
+    : undefined;
   let stateOfChargeSum = 0;
   let stateOfChargeTicks = 0;
   let ticks = 0;
@@ -717,11 +744,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       // Upfront response costs are explicit actions, not unexplained tick expenses.
       prevTick = null;
     }
-    // Rollover replaces state.timeline; retain the completed frames used by monthly history.
-    const settlingTimeline = state.utilityExpansion
-      ? state.timeline
-      : undefined;
-    tickState(state);
+    tickState(state, undefined, observeCompletedMonth);
     ticks++;
 
     const now = getTimeFromTimeline(state.date.minute, state.timeline);
@@ -730,31 +753,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     }
     lastTick = now;
     const rolledOver = state.monthlyHistory.length > previousMonthCount;
-    if (settlingTimeline && rolledOver) {
-      const hours = (TICK_MINUTES / 60) * GAME_TO_REAL_YEARS;
-      for (const completedTick of settlingTimeline) {
-        consolidatedImportWh += (completedTick.importedW ?? 0) * hours;
-        for (const area of state.utilityExpansion!.areas) {
-          const tick = completedTick.areaTicks?.[area.id];
-          if (!tick) continue;
-          const metrics = (expansionAreaMetrics[area.id] ??= {
-            demandWh: 0,
-            supplyWh: 0,
-            importedWh: 0,
-            kgco2e: 0,
-            minimumMarginW: Infinity,
-          });
-          metrics.demandWh += tick.demandW * hours;
-          metrics.supplyWh += Math.min(tick.supplyW, tick.demandW) * hours;
-          metrics.importedWh += (tick.importedW ?? 0) * hours;
-          metrics.kgco2e += tick.kgco2e;
-          metrics.minimumMarginW = Math.min(
-            metrics.minimumMarginW,
-            tick.reserveW ?? tick.supplyW - tick.demandW,
-          );
-        }
-      }
-    }
 
     checkTick(
       collector,

@@ -412,7 +412,15 @@ const objective = () => ({
       ),
     };
     const required = ["id", "label", "metric"];
-    if (["customerRetention", "fuelRetirement"].includes(metric)) {
+    if (
+      [
+        "customerRetention",
+        "fuelRetirement",
+        "utilityOwnership",
+        "assetRetirement",
+        "cohortRetention",
+      ].includes(metric)
+    ) {
       props.deadlineMonth = month();
       required.push("deadlineMonth");
     } else {
@@ -451,6 +459,19 @@ const objective = () => ({
         ),
       },
       fuelRetirement: { fuel: fuel() },
+      utilityOwnership: {
+        targets: { ...list(id(), 16, 1), uniqueItems: true },
+      },
+      assetRetirement: {
+        assetIds: { ...list(id(), 16, 1), uniqueItems: true },
+      },
+      cohortRetention: {
+        minRetainedShare: numeric(
+          0,
+          1,
+          "Minimum share of transfer customers retained in every operating area",
+        ),
+      },
       monthlyBilledRate: {
         maxDollarsPerKWh: numeric(
           0,

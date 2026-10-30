@@ -16,8 +16,8 @@ export interface IntertieMarketTrendType {
 
 // prettier-ignore
 export const INTERTIE_MARKET_TRENDS: Readonly<Record<string, IntertieMarketTrendType>> = {
-  "vt-valley-pool": {emissions:[[2005,417],[2010,376],[2011,354],[2024,354]],prices:[[2005,60],[2024,60]],emissionsBasis:"ISO New England operating-generation CO2 proxy; held at 2011 intensity through 2024",emissionsSource:"https://www.iso-ne.com/static-assets/documents/genrtion_resrcs/reports/emission/2011_emissions_report.pdf"},
-  "vt-ridge-pool": {emissions:[[2005,417],[2010,376],[2011,354],[2024,354]],prices:[[2005,60],[2024,60]],emissionsBasis:"ISO New England operating-generation CO2 proxy; held at 2011 intensity through 2024",emissionsSource:"https://www.iso-ne.com/static-assets/documents/genrtion_resrcs/reports/emission/2011_emissions_report.pdf"},
+  "vt-valley-pool": {emissions:[[2000,417],[2005,417],[2010,376],[2011,354],[2024,354],[2030,354]],prices:[[2000,60],[2005,60],[2024,60],[2030,60]],emissionsBasis:"ISO New England operating-generation CO2 proxy; held at 2005 intensity before 2005 and at 2011 intensity from 2011 onward",emissionsSource:"https://www.iso-ne.com/static-assets/documents/genrtion_resrcs/reports/emission/2011_emissions_report.pdf"},
+  "vt-ridge-pool": {emissions:[[2000,417],[2005,417],[2010,376],[2011,354],[2024,354],[2030,354]],prices:[[2000,60],[2005,60],[2024,60],[2030,60]],emissionsBasis:"ISO New England operating-generation CO2 proxy; held at 2005 intensity before 2005 and at 2011 intensity from 2011 onward",emissionsSource:"https://www.iso-ne.com/static-assets/documents/genrtion_resrcs/reports/emission/2011_emissions_report.pdf"},
   "pacific-northwest": {emissions:[[1980,60],[1990,70],[1995,88],[2000,150],[2005,160],[2010,152],[2012,81],[2015,123],[2020,119],[2023,142],[2024,131],[2030,80],[2040,40],[2050,20]],prices:[[1980,8],[1985,22],[1990,22],[1995,15],[2000,125],[2001,180],[2005,60],[2010,36],[2015,23],[2020,22],[2021,52],[2022,83],[2023,80],[2024,55],[2030,50],[2040,50],[2050,50]],emissionsBasis:"Washington + Oregon generation proxy",emissionsSource:"https://www.eia.gov/electricity/data/state/"},
   "desert-southwest": {emissions:[[1980,800],[1985,780],[1990,700],[2000,651],[2005,630],[2010,557],[2015,486],[2020,369],[2024,298],[2030,230],[2040,130],[2050,70]],prices:[[1990,35],[2000,105],[2005,58],[2010,37],[2015,25],[2020,38],[2021,55],[2022,85],[2023,62],[2024,33],[2030,45],[2040,45],[2050,45]],emissionsBasis:"Arizona + New Mexico + Nevada generation proxy",emissionsSource:"https://www.eia.gov/electricity/data/state/"},
   "pjm-miso-upgrade-market": {emissions:[[1980,800],[1990,784],[2000,815],[2005,783],[2010,723],[2015,638],[2020,520],[2024,470],[2030,360],[2040,220],[2050,130]],prices:[[1990,28],[2000,32],[2005,48],[2008,50],[2010,34],[2015,27],[2020,23],[2021,38],[2022,65],[2023,36],[2024,31],[2030,42],[2040,42],[2050,40]],emissionsBasis:"MISO footprint (generation of ND, MN, WI, IA, MI, IN, MO, AR, LA, MS) proxy",emissionsSource:"https://www.eia.gov/electricity/data/state/"},
@@ -324,6 +324,9 @@ export const INTERTIE_MARKET_TRENDS: Readonly<Record<string, IntertieMarketTrend
 
 // prettier-ignore
 export const INTERTIE_CORRIDOR_YEARS: Readonly<Record<string, readonly [from: number, until?: number]>> = {
+  // Fictional local acquisition routes are available from the authored 2005 scenario opening.
+  "vt-champlain-valley": [2005],
+  "vt-champlain-ridge": [2005],
   "california-north": [1968],
   "california-south": [1980],
   "pjm-miso-upgrade": [1965],

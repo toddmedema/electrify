@@ -111,6 +111,7 @@ import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
+import { isUtilityExpansionGame } from "../../helpers/ExpansionContext";
 import {
   acquisitionTargetForCorridor,
   ownedUtility,
@@ -781,10 +782,9 @@ export default function TransmissionPanel({
               {(droppable) => (
                 <div ref={droppable.innerRef} {...droppable.droppableProps}>
                   {state.lines.map((line, index) => {
-                    const acquisitionTarget =
-                      game.scenarioId === 116
-                        ? acquisitionTargetForCorridor(line.corridorId)
-                        : undefined;
+                    const acquisitionTarget = isUtilityExpansionGame(game)
+                      ? acquisitionTargetForCorridor(line.corridorId)
+                      : undefined;
                     const utilityOwned =
                       acquisitionTarget &&
                       ownedUtility(game, acquisitionTarget.id);

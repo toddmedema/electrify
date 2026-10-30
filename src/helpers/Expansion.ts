@@ -1,3 +1,5 @@
+import { isStorage } from "../Types";
+import { isUtilityExpansionGame } from "./ExpansionContext";
 import {
   transmissionRatingW,
   intertieContextForGame,
@@ -18,6 +20,7 @@ import { DAYS_PER_YEAR, DIFFICULTIES, LOAN_MONTHS } from "../Constants";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
 import {
   EXPANSION_SCENARIO_ID,
+  INHERITED_COLD_PACKAGE_COST_2005,
   UTILITY_AREAS,
   UTILITY_TARGETS,
   utilityEntitlementsAt,
@@ -102,6 +105,11 @@ export function acquisitionAssets(
   const definition = UTILITY_AREAS[targetId];
   const opening = {
     ...game,
+    scenarioId: EXPANSION_SCENARIO_ID,
+    customScenario: undefined,
+    // Existing seller equipment keeps its authored protection even in an unscored sandbox.
+    storyEffectsDisabled: false,
+    weatherHazardsDisabled: false,
     operatingAreaId: undefined,
     utilityExpansion: undefined,
     location: definition.location,
@@ -117,6 +125,13 @@ export function acquisitionAssets(
     const quote = startingFacilityQuote(opening, search);
     if (!quote) return undefined;
     const { viableLocationsRemaining: _remaining, ...technology } = quote;
+    const packageCost = INHERITED_COLD_PACKAGE_COST_2005[search.assetId ?? ""];
+    if (packageCost !== undefined && !isStorage(technology)) {
+      technology.buildCost +=
+        packageCost - (technology.resilienceExtraBuildCost ?? 0);
+      technology.resilienceExtraBuildCost = packageCost;
+    }
+
     const age = search.initialAgeYears ?? 0;
     result.push({
       ...technology,
@@ -185,7 +200,7 @@ export function acquisitionQuote(
   const target = UTILITY_TARGETS.find((entry) => entry.id === targetId);
   const expansion = game.utilityExpansion;
   if (
-    game.scenarioId !== EXPANSION_SCENARIO_ID ||
+    !isUtilityExpansionGame(game) ||
     !target ||
     !expansion ||
     ownedUtility(game, targetId)
