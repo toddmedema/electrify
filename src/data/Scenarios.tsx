@@ -1,7 +1,4 @@
-import {
-  officialReliabilityMetadata,
-  officialRetentionMetadata,
-} from "./OfficialScenarioRules";
+import { officialRetentionMetadata } from "./OfficialScenarioRules";
 import { beginIntertieStress } from "../reducers/GameActions";
 import * as React from "react";
 import CustomerGrowthChallenge from "../components/base/CustomerGrowthChallenge";
@@ -1395,7 +1392,7 @@ export const SCENARIOS: ScenarioType[] = [
       tone: "storm",
       fantasy: "Keep Austin powered through a brutal winter storm.",
       objective:
-        "Strengthen the grid and keep every customer supplied during the February 2021 freeze.",
+        "Strengthen the grid to supply customers through the February 2021 freeze.",
       threat: "Heating demand surges as equipment freezes.",
     },
     ownership: "Public",
@@ -1410,7 +1407,6 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.09,
     cash: 335000000,
     feePerKgCO2e: 0,
-    reliabilityObjective: officialReliabilityMetadata(107, 2017),
     // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. To keep the
     // starting fleet legible, the sub-5% biomass share is grouped with coal and the sub-5% solar
     // share with wind; the published 3,827 MW total is unchanged.
@@ -1473,7 +1469,7 @@ export const SCENARIOS: ScenarioType[] = [
       tone: "storm",
       fantasy: "Keep Spain powered through a hot, dry summer.",
       objective:
-        "Serve every customer through three months of rising cooling demand and shrinking water supplies.",
+        "Keep power flowing as cooling demand rises and water supplies shrink.",
       threat:
         "Drought leaves less water for hydro. Hot river water also limits reactor cooling, cutting nuclear output.",
     },
@@ -1487,7 +1483,6 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.24,
     cash: 180000000,
     feePerKgCO2e: 50 / 1000,
-    reliabilityObjective: officialReliabilityMetadata(108, 2023),
     // A 1%-scale model of Spain's 2024 national fleet: 32.043GW solar PV, 32.007GW
     // wind, 20.4% combined cycle, 13.3% hydro, 5.5% nuclear, and 3.356GW storage.
     // https://www.ree.es/sites/default/files/2025-02/EN_0402_NP_Solar_FV_kuder_potencia_instalada.pdf
@@ -1568,9 +1563,6 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.14,
     cash: 180000000,
     feePerKgCO2e: 50 / 1000,
-    // The trip can occur from July 2026 through January 2027. Requiring the whole window and
-    // its aftermath keeps the hidden seeded month out of the objective text.
-    reliabilityObjective: officialReliabilityMetadata(110, 2023),
     facilities: [
       {
         assetId: "scenario-110-grand-nuclear-unit",
@@ -1623,7 +1615,7 @@ export const SCENARIOS: ScenarioType[] = [
       fantasy:
         "Keep Los Angeles supplied when wildfire cuts your northern intertie.",
       objective:
-        "Supply at least 99.5% of demand during the January and February 2025 intertie outage.",
+        "Replace lost imports during the January and February 2025 intertie outage.",
       threat: "Your existing northern intertie will lose 90% of its capacity.",
     },
     ownership: "Public",
@@ -1636,7 +1628,6 @@ export const SCENARIOS: ScenarioType[] = [
     feePerKgCO2e: 50 / 1000,
     intertiesEnabled: true,
     startingInterties: ["california-north"],
-    reliabilityObjective: officialReliabilityMetadata(111, 2022),
     // A deliberately import-dependent utility, not LADWP's historical generation portfolio.
     facilities: [
       {
@@ -1709,7 +1700,6 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.07,
     cash: 140000000,
     feePerKgCO2e: 0,
-    reliabilityObjective: officialReliabilityMetadata(113, 2016),
     // One percent of Eskom's 2018 nominal capacity: 38.5GW coal, 1.86GW nuclear at Koeberg,
     // 2.4GW of open-cycle diesel peakers, and the wind and solar the renewable independent power
     // producer programme had delivered by then. https://www.eskom.co.za/dataportal/supply-side/
@@ -1816,13 +1806,6 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.05,
     cash: 90000000,
     feePerKgCO2e: 0,
-    // The only objective in the set that is not a flat 100%. Every other scenario asks the
-    // player to prevent a shortage; this one asks them to hold a grid together through one,
-    // on a fleet whose fuel arrives as rain. A plan good enough to get through the worst of
-    // Kariba still trims a fraction of a percent in the pre-rains months, and failing it for
-    // that is grading the weather rather than the decisions. Passive play sheds 86% in the
-    // October of this year, so this stays a long way from a formality.
-    reliabilityObjective: officialReliabilityMetadata(114, 2012),
     // Twenty percent of Zambia's 2014 fleet: Kariba North Bank at 1,080MW after its extension,
     // Kafue Gorge at 990MW, Victoria Falls at 108MW, and a little emergency diesel. Maamba's
     // coal units had not yet been commissioned, which is what leaves the grid with no reserve.
@@ -1902,7 +1885,6 @@ export const SCENARIOS: ScenarioType[] = [
     cash: 120000000,
     feePerKgCO2e: 0,
     // Delhi set an all-time peak of 8,656MW on 19 June 2024 after weeks above 45C.
-    reliabilityObjective: officialReliabilityMetadata(115, 2018),
     // Ten percent of the capacity tied to Delhi in 2021: its share of central coal stations,
     // the Bawana and Pragati gas plants, allocated Rajasthan and Gujarat wind, and the rooftop
     // and allocated solar that had been built by then.

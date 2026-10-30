@@ -12,7 +12,10 @@ import type {
   RuleReport,
 } from "../data/ScenarioRules";
 import type { DifficultyType, PolicyId, ScenarioType } from "../Types";
-import { scenarioObjectiveDefinitions } from "../helpers/ObjectiveRules";
+import {
+  reliabilityRuleText,
+  scenarioObjectiveDefinitions,
+} from "../helpers/ObjectiveRules";
 import { objectiveDefinition } from "../helpers/ScenarioObjectives";
 import {
   objectiveTargetText,
@@ -389,6 +392,7 @@ function facts(
     id: "objectives",
     title: "Scenario objectives",
     rows: [
+      { label: "Reliability", value: reliabilityRuleText(rules.difficulty) },
       {
         label: "Objective intent",
         value:
@@ -770,12 +774,7 @@ export function buildModAuthorReport(input: unknown): ModAuthorReport {
     pack?.baseScenarioId === undefined
       ? undefined
       : getScenario(pack.baseScenarioId);
-  const inheritedObjectives = base
-    ? inheritedModObjectives(
-        base,
-        pack?.scenario?.startingYear ?? base.startingYear,
-      )
-    : [];
+  const inheritedObjectives = base ? inheritedModObjectives(base) : [];
   const report: ModAuthorReport = {
     title: pack?.title ?? "Author validation report",
     description: pack?.description ?? "",

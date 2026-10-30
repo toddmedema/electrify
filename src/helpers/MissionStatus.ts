@@ -11,7 +11,8 @@ import {
   demandServed,
   formatRequiredShare,
   hasChronicBlackouts,
-  blackoutFiringThreshold,
+  reliabilityThreshold,
+  reliabilityRuleText,
   gameObjectiveResults,
 } from "./ObjectiveRules";
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
@@ -41,9 +42,7 @@ export interface MissionRequirement {
   reason?: string;
 }
 
-// A month that fell a hair short must never print as a whole "100%": the reliability
-// objective can require exactly 100% served, and a rounded-up reading would contradict the
-// FAILED chip beside it. Rounding down keeps the number on the honest side of the threshold.
+// Keep displayed monthly service on the honest side of the failure threshold.
 function formatServed(fraction: number): string {
   const floored = Math.floor(fraction * 1000) / 10;
   return Number.isInteger(floored) ? `${floored}%` : `${floored.toFixed(1)}%`;
@@ -88,10 +87,7 @@ function objectiveRequirement(
     result.observed === undefined
       ? "pending"
       : objectiveValueText(objective, result.observed, result.target);
-  const compact =
-    objective.metric === "monthlyReliability"
-      ? `Demand served ≥ ${objectiveValueText(objective, result.target)} (${observed})`
-      : `${target} (${observed})`;
+  const compact = `${target} (${observed})`;
   return {
     id: result.id,
     label: result.label,
@@ -133,7 +129,7 @@ export function getMissionStatus(game: GameType) {
   });
   const latest = history.slice(0, 3);
   const firingThreshold = formatRequiredShare(
-    blackoutFiringThreshold(game.difficulty),
+    reliabilityThreshold(game.difficulty),
   );
   const consecutive =
     latest.length === 3 &&
@@ -143,7 +139,7 @@ export function getMissionStatus(game: GameType) {
     );
   requirements.push({
     id: "survival",
-    label: "Avoid chronic blackouts",
+    label: "Keep power flowing",
     compact: `Avoid 3 consecutive months < ${firingThreshold} served (${
       latest.length
         ? latest
@@ -160,7 +156,7 @@ export function getMissionStatus(game: GameType) {
           .map((row) => formatServed(demandServed(row)))
           .join(" · ")}`
       : "No completed months",
-    target: `Avoid 3 consecutive months <${firingThreshold} served`,
+    target: reliabilityRuleText(game.difficulty),
     timing:
       "Checked at month end; current ticks are not completed-month results",
     status: consecutive
@@ -289,17 +285,13 @@ export function selectMissionRisk(
   const mission = suppliedStatus ?? getMissionStatus(game);
   const missed = mission.requirements.find(
     (row) =>
-      row.required !== false &&
-      row.status === "failed" &&
-      (row.definition || row.id === "reliability"),
+      row.required !== false && row.status === "failed" && row.definition,
   );
   if (missed)
     return {
-      id:
-        missed.id === "reliability" ? "reliability" : `objective:${missed.id}`,
+      id: `objective:${missed.id}`,
       label: `${missed.label} missed · Scenario`,
-      shortLabel:
-        missed.id === "reliability" ? "Reliability missed" : "Objective missed",
+      shortLabel: "Objective missed",
       target: "mission-details",
     };
   // A shortage later in today's operating sample is reported by the grid readout beside this

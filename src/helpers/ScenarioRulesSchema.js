@@ -68,7 +68,6 @@ const REPORT_KINDS = [
   "deepFreeze",
 ];
 const OBJECTIVE_METRICS = [
-  "monthlyReliability",
   "customerRetention",
   "emissionsBudget",
   "emissionsPerDeliveredMWh",
@@ -554,7 +553,6 @@ function ruleDiagnostics(value, path = "") {
   };
   const objective = (v, p) => {
     const fields = {
-      monthlyReliability: ["minDemandServedShare"],
       customerRetention: ["minRetainedShare", "deadlineMonth"],
       emissionsBudget: ["budgetTonnesCO2e"],
       emissionsPerDeliveredMWh: ["maxKgCO2ePerMWh"],

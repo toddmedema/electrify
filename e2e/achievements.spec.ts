@@ -120,7 +120,7 @@ test("gallery lists all requirements, filters earned awards, restores keyboard f
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("button", { name: "Achievements", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeFocused();
   await page.reload();
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });

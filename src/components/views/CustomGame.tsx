@@ -753,6 +753,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                       <DifficultyPicker
                         id="difficulty"
                         variant="select"
+                        showDescription
                         value={game.difficulty}
                         onChange={(difficulty) => onDelta({ difficulty })}
                         readOnly={guest}

@@ -35,23 +35,14 @@ export const absoluteMonth = (year: number, month: number): number =>
   year * 12 + month - 1;
 export const demandServed = (month: MonthlyHistoryType): number =>
   month.demandWh > 0 ? month.supplyWh / month.demandWh : 1;
-export function reliabilityMonths(
-  scenario: ScenarioType,
-  history: MonthlyHistoryType[],
-): MonthlyHistoryType[] {
-  const objective = scenario.reliabilityObjective;
-  if (!objective) return [];
-  const first = absoluteMonth(objective.year, objective.month);
-  return history.filter(
-    (month) =>
-      absoluteMonth(month.year, month.month) >= first &&
-      absoluteMonth(month.year, month.month) <
-        first + (objective.durationMonths || 1),
-  );
-}
 /** The same three completed-month firing rule used by the game and headless playtests. */
-export const blackoutFiringThreshold = (difficulty: DifficultyType): number =>
-  difficulty === "CEO" ? 0.95 : 0.9;
+export const reliabilityThreshold = (difficulty: DifficultyType): number =>
+  ({ Intern: 0.9, Employee: 0.95, Manager: 0.97, VP: 0.99, CEO: 0.995 })[
+    difficulty
+  ];
+
+export const reliabilityRuleText = (difficulty: DifficultyType): string =>
+  `Serving less than ${formatRequiredShare(reliabilityThreshold(difficulty))} of demand for 3 months in a row ends the run.`;
 
 export function hasChronicBlackouts(
   history: MonthlyHistoryType[],
@@ -62,8 +53,11 @@ export function hasChronicBlackouts(
     history
       .slice(0, 3)
       .every(
-        (month) =>
-          month.supplyWh < month.demandWh * blackoutFiringThreshold(difficulty),
+        (month, index, months) =>
+          month.supplyWh < month.demandWh * reliabilityThreshold(difficulty) &&
+          (index === 0 ||
+            absoluteMonth(months[index - 1].year, months[index - 1].month) ===
+              absoluteMonth(month.year, month.month) + 1),
       )
   );
 }
@@ -72,20 +66,6 @@ export function hasChronicBlackouts(
 export function formatRequiredShare(fraction: number): string {
   const percent = Math.round(fraction * 1000) / 10;
   return `${Number.isInteger(percent) ? percent : percent.toFixed(1)}%`;
-}
-
-/** The reliability objective's verdict on the completed months it has seen so far. */
-export function reliabilityFailure(
-  scenario: ScenarioType,
-  history: MonthlyHistoryType[],
-): string | undefined {
-  const result = historyObjectiveResults(scenario, history, {
-    completedMonths: latestCompletedMonth(scenario, history),
-  }).find(
-    (result) =>
-      result.metric === "monthlyReliability" && result.status === "failed",
-  );
-  return result?.reason;
 }
 
 /**
@@ -136,10 +116,8 @@ export function retentionUnreachable(
 }
 
 /**
- * A scenario objective that is already decided before the term ends. A reliability month that
- * fell short can never be un-missed, and customers that cannot grow back in the time left will
- * not be there at the end, so the run ends now instead of asking the player to fast-forward
- * through years with nothing at stake. Customer retention is otherwise evaluated at term end.
+ * An objective that is already decided before term end, such as a customer count that
+ * cannot recover in the time left. Customer retention is otherwise evaluated at term end.
  */
 export function decidedObjectiveFailure(
   scenario: ScenarioType,
@@ -176,11 +154,8 @@ export function scenarioObjectiveFailure(
 const definitionsCache = new WeakMap<
   ScenarioType,
   {
-    rules: ReturnType<typeof scenarioRules>;
-    reliability: ScenarioType["reliabilityObjective"];
     retention: number | undefined;
     duration: number;
-    startingYear: number;
     result: CompiledRuleObjective[];
   }
 >();
@@ -196,29 +171,11 @@ export function scenarioObjectiveDefinitions(
   const cached = definitionsCache.get(scenario);
   if (
     cached &&
-    cached.reliability === scenario.reliabilityObjective &&
     cached.retention === scenario.minimumCustomerRetention &&
-    cached.duration === scenario.durationMonths &&
-    cached.startingYear === scenario.startingYear
+    cached.duration === scenario.durationMonths
   )
     return cached.result;
   const result: CompiledRuleObjective[] = [];
-  const reliability = scenario.reliabilityObjective;
-  if (reliability) {
-    const fromMonth =
-      absoluteMonth(reliability.year, reliability.month) -
-      absoluteMonth(scenario.startingYear, 1);
-    result.push({
-      id: "reliability",
-      label: reliability.goal ?? `Serve demand during the ${reliability.label}`,
-      metric: "monthlyReliability",
-      required: true,
-      inherited: true,
-      fromMonth,
-      throughMonth: fromMonth + (reliability.durationMonths || 1) - 1,
-      minDemandServedShare: reliability.minimumDemandServed,
-    });
-  }
   if (scenario.minimumCustomerRetention !== undefined)
     result.push({
       id: "retention",
@@ -230,29 +187,11 @@ export function scenarioObjectiveDefinitions(
       minRetainedShare: scenario.minimumCustomerRetention,
     });
   definitionsCache.set(scenario, {
-    rules: compiled,
-    reliability: scenario.reliabilityObjective,
     retention: scenario.minimumCustomerRetention,
     duration: scenario.durationMonths,
-    startingYear: scenario.startingYear,
     result,
   });
   return result;
-}
-
-function latestCompletedMonth(
-  scenario: ScenarioType,
-  history: readonly MonthlyHistoryType[],
-): number {
-  return Math.max(
-    0,
-    ...history.map(
-      (row) =>
-        absoluteMonth(row.year, row.month) -
-        absoluteMonth(scenario.startingYear, 1) +
-        1,
-    ),
-  );
 }
 
 const definitionIdentity = new WeakMap<
@@ -329,7 +268,7 @@ function historyProgress(
   return progress;
 }
 
-/** Legacy phrasing is presentation of the shared verdict, never a second pass/fail calculation. */
+/** Present inherited retention results using the shared verdict. */
 function inheritedResultReasons(
   results: ObjectiveResult[],
   scenario: ScenarioType,
@@ -338,41 +277,6 @@ function inheritedResultReasons(
 ): ObjectiveResult[] {
   return results.map((result) => {
     if (!result.objective.inherited) return result;
-    const objective = scenario.reliabilityObjective;
-    if (result.objective.metric === "monthlyReliability" && objective) {
-      if (result.status === "failed") {
-        const failed = progress.entries
-          .find((entry) => entry.id === result.id)
-          ?.observations.slice()
-          .reverse()
-          .find(
-            ([, numerator, denominator]) =>
-              numerator !== null &&
-              denominator !== null &&
-              denominator > 0 &&
-              numerator / denominator < objective.minimumDemandServed,
-          );
-        const served =
-          failed && failed[1] !== null && failed[2]
-            ? failed[1] / failed[2]
-            : result.observed;
-        if (served !== undefined)
-          return {
-            ...result,
-            reason: `You served ${(Math.floor(served * 10000) / 100).toFixed(2)}% of demand during the ${objective.label}; this mission requires ${formatRequiredShare(objective.minimumDemandServed)}.`,
-          };
-      }
-      if (
-        result.status === "unverifiable" &&
-        context.completedMonths > result.objective.throughMonth
-      ) {
-        const required = objective.durationMonths || 1;
-        return {
-          ...result,
-          reason: `The ${objective.label} is unverifiable: exactly one completed record is required for each of its ${required} months (${objective.month}/${objective.year} through ${((objective.month - 1 + required - 1) % 12) + 1}/${objective.year + Math.floor((objective.month - 1 + required - 1) / 12)}).`,
-        };
-      }
-    }
     if (
       result.objective.metric === "customerRetention" &&
       result.status === "failed" &&
@@ -736,8 +640,7 @@ export function runFailure(
     return {
       outcome: "fired",
       title: "Fired!",
-      reason:
-        "Blackouts continued for 3 months, so the utility board ended your term.",
+      reason: `You served less than ${formatRequiredShare(reliabilityThreshold(game.difficulty))} of demand for 3 months in a row, so the utility board ended your term.`,
     };
   if (objectiveFailure)
     return {

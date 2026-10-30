@@ -9,7 +9,6 @@ import {
 import { DIFFICULTY_IDS } from "../Constants";
 import { getDateFromMinute } from "../helpers/DateTime";
 import { getScenarioLocation } from "../helpers/Locations";
-import { absoluteMonth } from "../helpers/ObjectiveRules";
 import {
   getHydroInventoryKey,
   resolveStartingHydroSites,
@@ -76,26 +75,8 @@ export function modIssue(pack: ModPackage): string | undefined {
   return errors.length ? errors.map((d) => d.message).join("\n") : undefined;
 }
 /** Replace-ready inherited objective definitions use the base's fixed offsets, including preparation. */
-export function inheritedModObjectives(
-  base: ScenarioType,
-  startingYear = base.startingYear,
-): RuleObjective[] {
+export function inheritedModObjectives(base: ScenarioType): RuleObjective[] {
   const objectives: RuleObjective[] = [];
-  if (base.reliabilityObjective) {
-    const o = base.reliabilityObjective;
-    const fromMonth =
-      absoluteMonth(o.year + startingYear - base.startingYear, o.month) -
-      absoluteMonth(startingYear, 1) +
-      1;
-    objectives.push({
-      id: `base-${base.id}-reliability`,
-      metric: "monthlyReliability",
-      label: o.goal ?? o.label,
-      fromMonth,
-      throughMonth: fromMonth + (o.durationMonths ?? 1) - 1,
-      minDemandServedShare: o.minimumDemandServed,
-    });
-  }
   if (base.minimumCustomerRetention !== undefined)
     objectives.push({
       id: `base-${base.id}-retention`,
@@ -199,14 +180,7 @@ function resolveModSetup(input: unknown) {
       ...(prepared.loadAdditions ?? []),
     ],
   };
-  if (pack.objectives !== undefined) {
-    delete resolved.reliabilityObjective;
-    delete resolved.minimumCustomerRetention;
-  } else if (base.reliabilityObjective)
-    resolved.reliabilityObjective = {
-      ...base.reliabilityObjective,
-      year: base.reliabilityObjective.year + startingYear - base.startingYear,
-    };
+  if (pack.objectives !== undefined) delete resolved.minimumCustomerRetention;
   return {
     pack,
     base,
@@ -259,9 +233,7 @@ function resolveMod(
   if (cached)
     return detached({ ...cached, scenario: cached.scenarios[difficulty]! });
   const inherited =
-    pack.objectives === undefined
-      ? inheritedModObjectives(base, startingYear)
-      : [];
+    pack.objectives === undefined ? inheritedModObjectives(base) : [];
   const definitions: ScenarioRuleDefinitions = {
     officialArcs: arcs,
     objectives: pack.objectives ?? inherited,
@@ -396,9 +368,7 @@ function resolveMod(
       mod: { ...version, runtimeDigest: modRuntimeDigest(version) },
     };
   }
-  diagnostics.push(
-    ...resolvedScenarioDiagnostics(resolved, baseScenarioId, DIFFICULTY_IDS),
-  );
+  diagnostics.push(...resolvedScenarioDiagnostics(resolved, DIFFICULTY_IDS));
   if (utf8Bytes(JSON.stringify(resolved)).length > RULE_LIMITS.compiledBytes)
     diagnostics.push({
       code: "compiled-bytes",
@@ -481,7 +451,6 @@ export function modValidationDiagnostics(input: unknown): ModDiagnostic[] {
 
 function resolvedScenarioDiagnostics(
   scenario: ScenarioType,
-  baseId: number,
   difficulties: readonly DifficultyType[],
 ): ModDiagnostic[] {
   const diagnostics: ModDiagnostic[] = [];
@@ -491,21 +460,7 @@ function resolvedScenarioDiagnostics(
     message: string,
     severity: "error" | "warning" = "error",
   ) => diagnostics.push({ code, path, severity, message });
-  const objective = scenario.reliabilityObjective;
   const duration = scenario.durationMonths || 240;
-  if (objective) {
-    const first =
-      absoluteMonth(objective.year, objective.month) -
-      absoluteMonth(scenario.startingYear, 1) +
-      1;
-    const last = first + (objective.durationMonths || 1) - 1;
-    if (first < 1 || last > duration)
-      add(
-        "objective-outside-term",
-        "scenario.reliabilityObjective",
-        `Inherited reliability objective from base ${baseId} requires months ${first}–${last}, but this run ends at month ${duration}. Extend scenario.durationMonths to at least ${last}.`,
-      );
-  }
   const location = getScenarioLocation(scenario);
   if (!location) {
     add(

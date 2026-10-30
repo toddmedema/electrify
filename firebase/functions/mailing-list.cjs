@@ -39,7 +39,9 @@ async function subscribe(request, { apiKey, fetch: send = fetch }) {
     body: JSON.stringify({
       email_address: email,
       status: "subscribed",
-      timestamp_signup: new Date().toISOString(),
+      // Mailchimp rejects JS ISO timestamps with milliseconds and a zone suffix.
+      // Keep UTC, but send its accepted YYYY-MM-DD HH:mm:ss representation.
+      timestamp_signup: new Date().toISOString().slice(0, 19).replace("T", " "),
       tags: ["Electrify account signup", "electrify-updates-v1"],
     }),
   });

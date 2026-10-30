@@ -71,7 +71,11 @@ it("shares the displayed mission status with the risk check on each render", () 
   );
 
   mockSelectMissionRisk.mockClear();
-  mockRequirements.push({ id: "reliability", status: "failed" });
+  mockRequirements.push({
+    id: "retention",
+    status: "failed",
+    definition: "Customers retained",
+  });
   view.rerender(summary(makeGame(2)));
   expect(mockSelectMissionRisk).toHaveBeenCalledTimes(1);
   expect(mockSelectMissionRisk.mock.calls[0][2]).toBe(
@@ -146,16 +150,16 @@ it("keeps the runway warning off the frame that makes the projection stale", () 
 
 it("clears an expired early risk without synchronously rebuilding the runway forecast", () => {
   mockSelectMissionRisk.mockReturnValue({
-    id: "reliability",
-    label: "Required reliability window missed",
-    shortLabel: "Reliability missed",
+    id: "objective:retention",
+    label: "Required retention target missed",
+    shortLabel: "Objective missed",
     target: "mission-details",
   });
   const view = render(summary(makeGame(10)));
   mockSelectMissionRisk.mockClear();
   mockSelectMissionRisk.mockReturnValue(runway(3));
   view.rerender(summary(makeGame(11)));
-  expect(screen.queryByText("Reliability missed")).not.toBeInTheDocument();
+  expect(screen.queryByText("Objective missed")).not.toBeInTheDocument();
   expect(mockSelectMissionRisk).not.toHaveBeenCalled();
   expect(mockSelectProjection).not.toHaveBeenCalled();
   act(() => {
@@ -191,17 +195,21 @@ describe("an early risk that appears on the rollover frame replaces the kept one
     expect(screen.getByText("Check finances")).toBeTruthy();
   });
 
-  it("a missed reliability window", () => {
+  it("a missed retention target", () => {
     const view = steadyState(event);
-    mockRequirements.push({ id: "reliability", status: "failed" });
+    mockRequirements.push({
+      id: "retention",
+      status: "failed",
+      definition: "Customers retained",
+    });
     mockSelectMissionRisk.mockReturnValue({
-      id: "reliability",
-      label: "Required reliability window missed",
-      shortLabel: "Reliability missed",
+      id: "objective:retention",
+      label: "Required retention target missed",
+      shortLabel: "Objective missed",
       target: "mission-details",
     });
     view.rerender(summary(makeGame(2)));
-    expect(screen.getByText("Reliability missed")).toBeTruthy();
+    expect(screen.getByText("Objective missed")).toBeTruthy();
   });
 
   it("a required authored objective uses the settled verdict immediately", () => {
