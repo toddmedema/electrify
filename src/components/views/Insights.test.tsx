@@ -845,6 +845,8 @@ describe("Insights layers", () => {
     expect(
       screen.getByLabelText("Displayed date range: 2020–39"),
     ).toBeVisible();
+    // Already wider than the scenario: nothing further out to go to.
+    expect(labelledButton("Zoom out")).toBeDisabled();
   });
 
   it.each([1, 12, 60, 192, 0])(

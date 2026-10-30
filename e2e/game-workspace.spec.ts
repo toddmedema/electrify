@@ -517,9 +517,10 @@ test("Insights and Events reopen at the scroll position the player left", async 
 });
 
 async function expectFloatingDock(page: Page) {
-  const [stage, facilities, dock, width] = await Promise.all([
+  const [stage, facilities, fleet, dock, width] = await Promise.all([
     page.locator(".gameStage").boundingBox(),
     page.locator(".gameStage .facilities").boundingBox(),
+    page.locator(".gameFleet").boundingBox(),
     page.locator("#navfooter").boundingBox(),
     page.evaluate(() => window.innerWidth),
   ]);
@@ -529,10 +530,17 @@ async function expectFloatingDock(page: Page) {
   ).toBeLessThanOrEqual(1);
   expect(dock!.y).toBeLessThan(facilities!.y + facilities!.height);
   expect(dock!.y + dock!.height).toBeLessThanOrEqual(stage!.y + stage!.height);
-  // Centered on the window, so opening or closing a side tool never moves it.
-  expect(Math.abs(dock!.x + dock!.width / 2 - width / 2)).toBeLessThanOrEqual(
-    1,
-  );
+  // Centered on the window, so opening a side tool doesn't move it, unless that would cover
+  // the tool: then it centres on the free stage. Either way it stays clear of side tools.
+  const center = dock!.x + dock!.width / 2;
+  expect(
+    Math.min(
+      Math.abs(center - width / 2),
+      Math.abs(center - (fleet!.x + fleet!.width / 2)),
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(dock!.x).toBeGreaterThanOrEqual(fleet!.x);
+  expect(dock!.x + dock!.width).toBeLessThanOrEqual(fleet!.x + fleet!.width);
 }
 
 async function expectSideRails(page: Page) {

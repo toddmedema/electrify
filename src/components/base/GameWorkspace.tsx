@@ -47,6 +47,27 @@ export function toolWidth(width: number) {
   );
 }
 
+/** Five 72px actions, their gaps, the dock's padding and border, and a margin each side. */
+const DOCK_CLEARANCE_WIDTH = 402;
+
+/**
+ * Where to centre the dock when the window centre would put it over a side tool: the middle of
+ * the free stage. Undefined when the window centre is clear.
+ */
+export function dockCenter(
+  width: number,
+  leftTools: number,
+  rightTools: number,
+  tool: number,
+): number | undefined {
+  const start = leftTools * tool;
+  const end = width - rightTools * tool;
+  const half = DOCK_CLEARANCE_WIDTH / 2;
+  return width / 2 - half >= start && width / 2 + half <= end
+    ? undefined
+    : (start + end) / 2;
+}
+
 /** How many tools fit beside the fleet at this window width, keeping it at phone width or more. */
 export function maxOpenTools(width: number) {
   if (width < SIDE_TOOL_MIN_WIDTH) return 1;
@@ -94,6 +115,10 @@ export default function GameWorkspace() {
     ordered.filter((tool) => visible.includes(tool) && sideFor(tool) === side);
   const left = shownOnSide("decision");
   const right = shownOnSide("intelligence");
+  const dockLeft =
+    layout === "side"
+      ? dockCenter(width, left.length, right.length, toolWidth(width))
+      : undefined;
   React.useEffect(() => {
     const resize = () => {
       // Keep the rail the player is working in when columns collapse.
@@ -181,7 +206,14 @@ export default function GameWorkspace() {
   return (
     <GameToolMemoryContext.Provider value={memory.current}>
       <GameWorkspaceContext.Provider value={true}>
-        <div className="gameWorkspace">
+        <div
+          className="gameWorkspace"
+          style={
+            dockLeft === undefined
+              ? undefined
+              : { ["--game-dock-left" as string]: `${dockLeft}px` }
+          }
+        >
           <GameAppBar />
           <div
             className="gameStage"

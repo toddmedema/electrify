@@ -4,6 +4,17 @@ import { store } from "../Store";
 import { CARD_TRANSITION_ANIMATION_MS } from "../Constants";
 import Compositor, { Props } from "./Compositor";
 
+// The store-connected deferral has its own suite; this one renders Compositor without a Provider.
+jest.mock("./base/DeferredSnackbar", () => {
+  const { Snackbar } = jest.requireActual("@mui/material");
+  return {
+    __esModule: true,
+    default: ({ overModal: _overModal, ...props }: Record<string, unknown>) => (
+      <Snackbar {...props} />
+    ),
+  };
+});
+
 jest.mock("./base/AudioContainer", () => () => null);
 jest.mock("./base/VictoryDialogContainer", () => () => null);
 jest.mock("./base/SaveTransitionDialog", () => () => null);

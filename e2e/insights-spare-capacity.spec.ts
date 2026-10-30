@@ -33,7 +33,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(track).toBeVisible();
     await expect(track.locator("canvas")).toBeVisible();
     const chart = track.getByRole("img", {
-      name: /Monthly lowest spare capacity/,
+      name: /Monthly lowest reserve/,
     });
     await chart.press("Home");
     await expect(track.getByRole("status")).toContainText(

@@ -1042,9 +1042,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Your score tracks how you do as CEO. Check{" "}
-          <strong>Victory conditions</strong> for reliability and customer
-          goals; tutorial missions have their own objectives.
+          Your score tracks how you do as CEO. Check <strong>Goals</strong> for
+          reliability and customer targets; tutorial missions have their own
+          objectives.
         </p>
         <p>
           In every scenario, you fail if you go bankrupt or serve less than 90%

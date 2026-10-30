@@ -88,7 +88,7 @@ export default function SavedGames(): React.JSX.Element {
       setError(
         failure instanceof Error
           ? failure.message
-          : "Couldn't complete this action. Please try again.",
+          : "Couldn't complete this action. Try again.",
       );
       return false;
     } finally {

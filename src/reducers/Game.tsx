@@ -1,4 +1,8 @@
 import {
+  BLACKOUT_OVER_TOAST,
+  BLACKOUT_TOAST_PREFIX,
+} from "../helpers/BlackoutToast";
+import {
   matchesStartingFacility,
   startingFacilitySearch,
   startingFacilityQuote,
@@ -3525,8 +3529,8 @@ export function* tickStatePhases(
     }
     if (!state.multiplayer && inBlackout !== wasInBlackout) {
       const message = inBlackout
-        ? `Blackout: ${formatWatts(now.demandW - now.supplyW)} short. Customers leave while it lasts. Build more supply, or resume a paused plant.`
-        : "Blackout over. Supply is meeting demand again.";
+        ? `${BLACKOUT_TOAST_PREFIX} ${formatWatts(now.demandW - now.supplyW)} short. Customers leave while it lasts. Build more supply, or resume a paused plant.`
+        : BLACKOUT_OVER_TOAST;
       setTimeout(() => {
         // Pausing a plant is the usual way into a blackout, and it raises its own "Paused X /
         // UNDO" toast. There's only one snackbar slot, so stealing it would take the undo away

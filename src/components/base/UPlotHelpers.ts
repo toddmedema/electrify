@@ -575,7 +575,6 @@ function clipToPlot(u: uPlot) {
   u.ctx.clip();
 }
 
-/** Shaded vertical bands, used for the stretches of the day that browned out. */
 const BAND_MERGE_GAP_PX = 2;
 const BAND_STRIP_PX = 6;
 
@@ -595,6 +594,7 @@ export function mergeBandPixels(
   return merged;
 }
 
+/** Shaded vertical bands, used for the stretches of the day that browned out. */
 export function bandsPlugin(
   getSpans: () => Array<[number, number]>,
   color: string,

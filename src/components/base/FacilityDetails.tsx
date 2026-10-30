@@ -441,7 +441,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             )}
             {storage && (
               <Stat
-                label="Round-trip efficiency"
+                label="Efficiency"
                 value={formatPercent(storage.roundTripEfficiency)}
               />
             )}

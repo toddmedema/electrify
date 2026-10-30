@@ -86,6 +86,7 @@
   --focus-ring: var(--interactive-blue);
   --blackout-red: #c62828; /* red800 - matches blackoutColor in Theme.tsx */
   --blackout-tint: rgba(198, 40, 40, 0.07);
+  --blackout-on-tint: #b71c1c; /* red900 */
   --blackout-glow: rgba(
     229,
     57,
@@ -101,6 +102,7 @@
   // (16:1) and the glyph carries the amber: 6:1 on the fill, well past 3:1 for an icon
   --warning-fill: #ffe082; /* amber200 */
   --warning-on-fill: #5c3d00;
+  --dialog-paper: #ffffff;
   --warning-icon: #7a4500; /* deep amber */
   --mark-bg: #ffe082; /* amber200 - the manual's search highlight */
   // A badge too small to carry text: yellow for the warning, rimmed in deep amber so it still
@@ -160,6 +162,7 @@
   );
   --blackout-red: #ef5350; /* red400 */
   --blackout-tint: rgba(239, 83, 80, 0.16);
+  --blackout-on-tint: #ffb4ab; /* above 4.5:1 on the tint at every width */
   --blackout-glow: rgba(
     244,
     67,
@@ -170,6 +173,7 @@
   --delta-bad: #ef5350; /* red400 */
   --warning-fill: #6d4c00; /* text 6.6:1 */
   --warning-on-fill: #ffe0a3;
+  --dialog-paper: #111820;
   --warning-icon: #ffd54f; /* amber300 - 5.5:1 on the fill */
   --mark-bg: #6d4c00;
   --warning-dot: #ffd54f;
@@ -1162,7 +1166,7 @@ $topbar_height: 56px;
 
   &.gridHealth-blackout {
     background: var(--blackout-tint);
-    color: var(--delta-bad);
+    color: var(--blackout-on-tint);
   }
 }
 
@@ -2069,6 +2073,7 @@ $pane_header_height: 48px;
     inset: auto 0 -4px;
     // Retain breathing room around the line for the tutorial's target ring.
     padding: 4px 0;
+    pointer-events: none;
     z-index: 100;
 
     // A permanent track, so the bar reads as elapsed time rather than a stray rule.
@@ -6044,11 +6049,18 @@ $homeSmokeCycle: 5.6s;
 .decisionImpactFact .manual-link {
   margin-block: -12px;
 }
+.MuiDialog-paper {
+  timeline-scope: --dialog-scroll;
+}
+.MuiDialog-paper .MuiDialogContent-root {
+  scroll-timeline: --dialog-scroll block;
+}
 .MuiDialog-paper .MuiDialogActions-root {
   position: relative;
   border-top: 1px solid var(--border-subtle);
 }
-// A fade over the content's last line says there is more above the sticky actions.
+// A fade says there is more above the sticky actions. It follows the content's scroll timeline,
+// which is inactive when nothing scrolls, so a dialog that fits shows none.
 .MuiDialog-paper .MuiDialogContent-root + .MuiDialogActions-root::before {
   content: "";
   position: absolute;
@@ -6056,8 +6068,31 @@ $homeSmokeCycle: 5.6s;
   right: 0;
   bottom: 100%;
   height: 16px;
-  background: linear-gradient(to top, var(--bg-primary), transparent);
+  opacity: 0;
+  background: linear-gradient(to top, var(--dialog-paper), transparent);
   pointer-events: none;
+  animation: dialogMoreBelow linear both;
+  animation-timeline: --dialog-scroll;
+}
+@keyframes dialogMoreBelow {
+  from {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+// MUI's menu sets its own item height above the small breakpoint.
+.MuiMenu-paper .MuiMenuItem-root {
+  min-height: 40px;
+}
+@media (pointer: coarse) {
+  .MuiMenu-paper .MuiMenuItem-root {
+    min-height: 44px;
+  }
 }
 @media (max-height: 720px) {
   .decisionImpactFact {
@@ -6068,8 +6103,30 @@ $homeSmokeCycle: 5.6s;
   .buildOptionMetrics {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
+  // Every row fills the card: a lone last metric takes the whole row.
+  .buildOptionMetric:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
   .insightsLayerPanel {
     grid-template-columns: 1fr;
+  }
+}
+// A narrow side tool holds three metrics a row; six tracks let a short last row still fill it.
+@media (min-width: 1024px) {
+  @container game-tool (max-width: 479px) {
+    .buildOptionMetrics {
+      grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    }
+    .buildOptionMetric {
+      grid-column: span 2;
+    }
+    .buildOptionMetric:last-child:nth-child(3n + 1) {
+      grid-column: span 6;
+    }
+    .buildOptionMetric:last-child:nth-child(3n + 2),
+    .buildOptionMetric:nth-last-child(2):nth-child(3n + 1) {
+      grid-column: span 3;
+    }
   }
 }
 .buildOption .MuiCardHeader-title {
@@ -7147,13 +7204,28 @@ img[src$="/transmission.svg"] {
   }
 }
 
-// The grid readout opens its manual entry, without looking like a second primary control.
 .gameMonthlyProfitButton {
   padding: 0;
   border: 0;
   background: none;
   font: inherit;
   cursor: pointer;
+}
+// The controls stay text-sized in the bar; a coarse pointer gets a 44px target around them.
+@media (pointer: coarse) {
+  .gameMonthlyProfitButton,
+  .gridHealthHelp {
+    position: relative;
+    &::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 44px;
+      transform: translateY(-50%);
+    }
+  }
 }
 .scenarioOutlook {
   display: flex;
@@ -7172,6 +7244,7 @@ img[src$="/transmission.svg"] {
     order: -2;
   }
 }
+// The grid readout opens its manual entry, without looking like a second primary control.
 .gridHealthHelp {
   padding: 0;
   border: 0;

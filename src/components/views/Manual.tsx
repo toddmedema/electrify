@@ -49,14 +49,14 @@ export interface Props extends StateProps, DispatchProps {}
 // the two in sync.
 const GROUP_HEADER_HEIGHT = 32;
 
-// Pinned first, then by group in the order the groups are declared, then alphabetically. Sorted
-// once here rather than on every keystroke
 /** A touch-only device has no keys to learn; a tablet with a keyboard reports a fine pointer. */
 const hideKeyboardEntry = (entry: ManualEntryType) =>
   entry.title === MANUAL_ENTRY.KEYBOARD_SHORTCUTS &&
   window.matchMedia("(hover: none) and (pointer: coarse)").matches &&
   !window.matchMedia("(any-pointer: fine)").matches;
 
+// Pinned first, then by group in the order the groups are declared, then alphabetically. Sorted
+// once here rather than on every keystroke
 const SORTED_ENTRIES = [...MANUAL_ENTRIES].sort((a, b) => {
   if (Boolean(a.pinned) !== Boolean(b.pinned)) {
     return a.pinned ? -1 : 1;

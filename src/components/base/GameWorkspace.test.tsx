@@ -5,6 +5,7 @@ import { Provider } from "react-redux";
 import cardReducer, { initialCard } from "../../reducers/Card";
 import GameWorkspace, {
   MIN_FLEET_WIDTH,
+  dockCenter,
   SIDE_TOOL_MIN_WIDTH,
   maxOpenTools,
   toolWidth,
@@ -298,3 +299,11 @@ it.each([390, SIDE_TOOL_MIN_WIDTH - 1, SIDE_TOOL_MIN_WIDTH])(
     expect(action("Build")).toHaveAttribute("aria-expanded", String(staysOpen));
   },
 );
+
+it("moves the dock off a side tool only when the window centre would cover it", () => {
+  // 1024: a 360px tool reaches past the dock's left edge at the window centre.
+  expect(dockCenter(1024, 1, 0, 360)).toBe(692);
+  expect(dockCenter(1024, 0, 1, 360)).toBe(332);
+  expect(dockCenter(1440, 1, 0, 403)).toBeUndefined();
+  expect(dockCenter(1024, 0, 0, 360)).toBeUndefined();
+});

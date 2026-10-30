@@ -47,16 +47,15 @@ for (const theme of ["light", "dark"] as const) {
     expect(metricBoxes.every((cell) => cell.valueTop >= cell.labelBottom)).toBe(
       true,
     );
-    if (page.viewportSize()!.width >= 768) {
-      // The wide build sheet fits all five primary metrics on one row.
+    if ((await card.boundingBox())!.width >= 700) {
+      // A wide card fits all five primary metrics on one row.
       expect(metricBoxes.every((cell) => cell.y === metricBoxes[0].y)).toBe(
         true,
       );
     } else {
+      // A narrow card wraps its metrics onto rows without overlapping them.
       expect(metricBoxes[0].y).toBe(metricBoxes[1].y);
-      expect(metricBoxes[2].y).toBe(metricBoxes[3].y);
-      expect(metricBoxes[2].y).toBeGreaterThan(metricBoxes[0].y);
-      expect(metricBoxes[4].y).toBeGreaterThan(metricBoxes[2].y);
+      expect(metricBoxes[4].y).toBeGreaterThan(metricBoxes[0].y);
     }
     await expect(card).not.toContainText("Portfolio outlook");
     await card

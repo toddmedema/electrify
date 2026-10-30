@@ -1210,6 +1210,7 @@ export default function TransmissionPanel({
           variant="body2"
           color="textSecondary"
           className="transmissionIntro"
+          sx={{ px: 1.5, pt: 1 }}
         >
           Connect to a neighboring grid to buy power when short and sell when
           you have spare.

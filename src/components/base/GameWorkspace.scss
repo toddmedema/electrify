@@ -56,8 +56,9 @@
   align-items: stretch;
   gap: 4px;
   bottom: var(--game-dock-bottom);
-  // Centered on the whole window so opening or closing a side tool never moves it.
-  left: 50%;
+  // Centered on the whole window so opening or closing a side tool never moves it, unless a
+  // narrow window would put it over that tool (see dockCenter).
+  left: var(--game-dock-left, 50%);
   transform: translateX(-50%);
   width: max-content;
   max-width: calc(100% - 16px);
@@ -271,10 +272,13 @@
   .eventLog > .scrollable,
   .scenarioDetails > .scrollable,
   .buildFacilities .cardList,
-  .buildFacilities .constructionInterties,
-  .customerProgramsBody {
+  .buildFacilities .constructionInterties {
     padding-bottom: var(--game-dock-clearance);
     scroll-padding-bottom: var(--game-dock-clearance);
+  }
+  .customerProgramsBody {
+    padding-bottom: calc(var(--game-dock-clearance) + 16px);
+    scroll-padding-bottom: calc(var(--game-dock-clearance) + 16px);
   }
 
   // A program's commit controls stay above the dock while their surface continues behind it.

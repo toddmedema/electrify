@@ -595,10 +595,15 @@ export function GameAppBar(props: Props) {
             {showProfit && (
               <Tooltip title="Current month forecast: revenue minus operating expenses, including interest and imports.">
                 <Typography
-                  component="button"
-                  type="button"
-                  className="gameMonthlyProfit gameMonthlyProfitButton"
-                  onClick={() => props.onEvidence?.("finances")}
+                  // Tutorials lock navigation, so the figure opens nothing there.
+                  {...(isTutorial
+                    ? { component: "span" }
+                    : {
+                        component: "button",
+                        type: "button",
+                        onClick: () => props.onEvidence?.("finances"),
+                      })}
+                  className={`gameMonthlyProfit${isTutorial ? "" : " gameMonthlyProfitButton"}`}
                   color={
                     monthlyProfit < 0
                       ? "error"
@@ -674,21 +679,19 @@ export function GameAppBar(props: Props) {
       <span className="srOnly" aria-live="polite">
         {gridHealth.announcement}
       </span>
-      <Tooltip title={yearProgress}>
+      <div
+        id="yearProgressBar"
+        role="progressbar"
+        aria-label={yearProgress}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(date.percentOfYear * 100)}
+      >
         <div
-          id="yearProgressBar"
-          role="progressbar"
-          aria-label={yearProgress}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(date.percentOfYear * 100)}
-        >
-          <div
-            className="yearProgressFill"
-            style={{ width: `${date.percentOfYear * 100}%` }}
-          />
-        </div>
-      </Tooltip>
+          className="yearProgressFill"
+          style={{ width: `${date.percentOfYear * 100}%` }}
+        />
+      </div>
     </div>
   );
 }

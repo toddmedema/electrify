@@ -291,7 +291,7 @@ export default function FacilityContextMenu(props: {
               {affected.some((f) => f.hydroSiteId) && (
                 <DialogContentText>
                   {confirmation.key === "cancelConstruction"
-                    ? "Cancelling frees the hydro sites."
+                    ? "Canceling frees the hydro sites."
                     : "Selling won't free the hydro sites."}
                 </DialogContentText>
               )}

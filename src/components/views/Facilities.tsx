@@ -448,7 +448,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } else if (facility.peakWh) {
     reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
-    reading = `${formatWattsOfPeak(facility.currentW, facility.peakW)} · ${Math.round(Math.abs(outputFraction) * 100)}%`;
+    reading = formatWattsOfPeak(facility.currentW, facility.peakW);
+    // A reservoir row's percentage would read as how full it is, which its gauge already shows.
+    if (!(fuel === "Hydro" && facility.reservoirCapacityWh))
+      reading += ` · ${Math.round(Math.abs(outputFraction) * 100)}%`;
     if (fuel === "Hydro" && facility.reservoirCapacityWh) {
       // Last-tick water balance stays meaningful on mount and selection. Paused turbines can
       // retain ramping currentW internally, so exclude their output from the water balance.

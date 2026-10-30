@@ -196,11 +196,11 @@ if (typeof window !== "undefined") {
 }
 
 /**
- * From this width the game workspace opens tools in side columns beside the fleet, and the app
- * bar folds its status row into the top bar so the window gains one row of game.
+ * From this width the app bar folds its status row into the top bar, so the window gains one row
+ * of game, and the desktop-only speed appears.
  */
 export const SIDE_LAYOUT_MIN_WIDTH = 1300;
-/** From here tools sit beside the fleet. Separate from the desktop bar and speed controls. */
+/** From this width the game workspace opens tools in side columns beside the fleet. */
 export const SIDE_TOOL_MIN_WIDTH = 1024;
 export const SIDE_LAYOUT_MEDIA = `(min-width:${SIDE_LAYOUT_MIN_WIDTH}px)`;
 
@@ -208,14 +208,15 @@ export function isBigScreen(): boolean {
   return getViewportWidth() >= 700;
 }
 
-/**
- * Wide enough to show Facilities and Insights side by side without the bottom navigation.
- * Keep in sync with $desktop_breakpoint in app.scss.
- */
+/** Wide enough for a tool to sit beside the fleet instead of rising over it as a sheet. */
 export function isSideToolLayout(): boolean {
   return getViewportWidth() >= SIDE_TOOL_MIN_WIDTH;
 }
 
+/**
+ * Wide enough for the single-row app bar and the fastest speed.
+ * Keep in sync with $desktop_breakpoint in app.scss.
+ */
 export function isDesktopScreen(): boolean {
   return getViewportWidth() >= SIDE_LAYOUT_MIN_WIDTH;
 }

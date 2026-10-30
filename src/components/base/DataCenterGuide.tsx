@@ -126,7 +126,7 @@ export default function DataCenterGuide() {
         action: "Review your goals, then finish the tour",
         nextLabel: "Finish tour",
         content: (
-          <TutorialPrompt text="Scenario shows your timeframe, victory conditions and score rules. After the tour, choose 1× to start time. Pause whenever you need to plan." />
+          <TutorialPrompt text="Scenario shows your timeframe, goals and score rules. After the tour, choose 1× to start time. Pause whenever you need to plan." />
         ),
       },
     ];

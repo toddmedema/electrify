@@ -90,6 +90,7 @@ export const uiSlice = createSlice({
             timeout: action.payload.timeout || initialUI.snackbar.timeout,
             action: action.payload.action,
             actionLabel: action.payload.actionLabel,
+            overModal: action.payload.overModal,
           },
         };
       }

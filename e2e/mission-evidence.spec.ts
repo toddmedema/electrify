@@ -67,7 +67,7 @@ for (const theme of ["light", "dark"]) {
     );
     // The announced fee takes the goal's place, keeping the tracker to one line.
     await expect(page.locator(".missionSummaryCopy:visible")).toContainText(
-      "Upcoming:",
+      info.project.name.startsWith("mobile") ? "Next:" : "Upcoming:",
     );
     const copy = await page.locator(".missionSummary:visible").boundingBox();
     expect(copy!.height).toBeLessThanOrEqual(56);
@@ -308,15 +308,17 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(grid).toHaveClass(/gridHealth-blackout-ahead/);
   if (info.project.name === "mobile-390px") {
     const warning = grid.getByRole("button", {
-      name: /^Current grid status: Blackout ahead, .+ short at /,
+      name: /^Current grid status: Blackout (today|tonight) at \d+ [AP]M, .+ short$/,
     });
     await expect(warning).toBeVisible();
     await warning.tap();
     await expect(
-      page.getByRole("tooltip", { name: /^Blackout ahead, .+ short at / }),
+      page.getByRole("tooltip", {
+        name: /^Blackout (today|tonight) at \d+ [AP]M, .+ short$/,
+      }),
     ).toBeVisible();
   } else {
-    await expect(grid).toContainText("Blackout ahead");
+    await expect(grid).toContainText(/Blackout (today|tonight) at/);
     await expect(grid).toHaveClass(/statusWarning/);
   }
   await expect(page.locator(".missionRiskButton:visible")).not.toContainText(

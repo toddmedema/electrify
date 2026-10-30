@@ -826,7 +826,7 @@ it("quotes a Hydro site maximum and updates the shared slider", () => {
     screen.getByRole("button", { name: "Review purchase of Hydro" }),
   );
   expect(screen.getByRole("dialog")).toHaveTextContent(
-    "Only cancelling before completion frees it",
+    "Only canceling before completion frees it",
   );
   fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
   expect(onBuild).toHaveBeenCalledWith(

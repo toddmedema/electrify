@@ -693,7 +693,7 @@ export function GeneratorBuildItem(
               <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
                 {props.hydroAvailability.selected.name} ·{" "}
                 {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max.
-                Uses the whole site. Only cancelling before completion frees it.
+                Uses the whole site. Only canceling before completion frees it.
               </Typography>
             )}
             {hasOptions &&
