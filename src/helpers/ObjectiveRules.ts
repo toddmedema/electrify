@@ -212,7 +212,7 @@ export function objectiveContextForGame(
     GameType,
     "seed" | "startingYear" | "date" | "customerMarketSize"
   > &
-    Partial<Pick<GameType, "difficulty">>,
+    Partial<Pick<GameType, "difficulty" | "utilityExpansion">>,
   scenario: ScenarioType,
 ): ObjectiveContext {
   const definitions = scenarioObjectiveDefinitions(scenario, {
@@ -242,7 +242,24 @@ export function objectiveContextForGame(
     durationMonths: scenario.durationMonths,
     ownership: scenario.ownership,
     ...(isUtilityExpansionScenario(scenario)
-      ? { retentionAtDeadlineOnly: true }
+      ? {
+          retentionAtDeadlineOnly: true,
+          retentionBaselines: Object.fromEntries(
+            definitions.flatMap((objective) =>
+              objective.metric === "customerRetention"
+                ? [
+                    [
+                      objective.deadlineMonth,
+                      expansionRetentionBaseline(
+                        game,
+                        (objective.deadlineMonth + 1) * MINUTES_PER_MONTH,
+                      ),
+                    ],
+                  ]
+                : [],
+            ),
+          ),
+        }
       : {}),
     completedMonths: Math.min(scenario.durationMonths, game.date.monthsElapsed),
     marketSize: customerMarketSizeAt(
@@ -734,6 +751,7 @@ export function runFailure(
       startingYear: game.startingYear ?? scenario.startingYear,
       date: game.date,
       customerMarketSize: game.customerMarketSize,
+      utilityExpansion: game.utilityExpansion,
     },
     scenario,
   );

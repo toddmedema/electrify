@@ -166,6 +166,15 @@ export function createObjectiveProgress(
   return { ...plain, checksum: progressChecksum(plain) };
 }
 
+/** A finished deadline keeps the customers admitted before that deadline, even after a merger. */
+function retentionBaselineFor(
+  objective: CompiledRuleObjective & { metric: "customerRetention" },
+  context: ObjectiveContext,
+  fallback: number,
+): number {
+  return context.retentionBaselines?.[objective.deadlineMonth] ?? fallback;
+}
+
 /** A transfer changes the aggregate baseline without rewriting completed monthly facts. */
 export function rebaseObjectiveRetention(
   progress: ObjectiveProgress,
@@ -183,8 +192,13 @@ export function rebaseObjectiveRetention(
       ([month, numerator, denominator]) => [
         month,
         numerator,
-        objective.metric === "customerRetention" && denominator !== null
-          ? retentionBaseline
+        objective.metric === "customerRetention" &&
+        denominator !== null &&
+        !(
+          context.retentionAtDeadlineOnly &&
+          context.completedMonths > objective.deadlineMonth
+        )
+          ? retentionBaselineFor(objective, context, retentionBaseline)
           : denominator,
       ],
     );
@@ -212,7 +226,7 @@ export function objectiveMonthObservation(
   switch (objective.metric) {
     case "customerRetention":
       numerator = row.customers;
-      denominator = baseline;
+      denominator = retentionBaselineFor(objective, context, baseline);
       break;
     case "emissionsBudget":
       numerator = row.kgco2e;
@@ -434,9 +448,10 @@ export function evaluateScenarioObjectives(
         if (
           latest?.[1] !== null &&
           latest?.[1] !== undefined &&
-          progress.retentionBaseline > 0
+          latest[2] !== null &&
+          latest[2] > 0
         ) {
-          result.observed = latest[1] / progress.retentionBaseline;
+          result.observed = latest[1] / latest[2];
           const remaining = Math.max(0, objective.deadlineMonth - latest[0]);
           failed =
             latest[0] === objective.deadlineMonth
@@ -448,7 +463,7 @@ export function evaluateScenarioObjectives(
                   context.ownership,
                   context.marketSize,
                 ) <
-                  progress.retentionBaseline * result.target;
+                  latest[2] * result.target;
         }
         break;
       }
@@ -706,7 +721,12 @@ export function validObjectiveProgress(
           ].includes(objective.metric) &&
             denominator !== 1) ||
           (objective.metric === "customerRetention" &&
-            denominator !== progress.retentionBaseline) ||
+            denominator !==
+              retentionBaselineFor(
+                objective,
+                context,
+                progress.retentionBaseline,
+              )) ||
           (objective.metric === "fuelRetirement" &&
             !Number.isSafeInteger(numerator)) ||
           (objective.metric === "localFuelShare" &&

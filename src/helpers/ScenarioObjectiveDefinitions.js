@@ -1,7 +1,7 @@
 /* Shared metric sentences for runtime, author tools and the offline editor schema. */
 const OBJECTIVE_DEFINITIONS = {
   customerRetention:
-    "Customers at the deadline divided by the run's recorded starting customers.",
+    "Customers at the deadline divided by the goal's recorded customer baseline.",
   emissionsBudget:
     "Total electricity and construction emissions over the window, including imports and exports.",
   emissionsPerDeliveredMWh:

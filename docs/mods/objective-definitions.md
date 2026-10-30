@@ -4,7 +4,7 @@ Generated from the evaluator's shared metric definitions.
 
 | Metric                     | Definition                                                                                                                                                    |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `customerRetention`        | Customers at the deadline divided by the run's recorded starting customers.                                                                                   |
+| `customerRetention`        | Customers at the deadline divided by the goal's recorded customer baseline.                                                                                   |
 | `emissionsBudget`          | Total electricity and construction emissions over the window, including imports and exports.                                                                  |
 | `emissionsPerDeliveredMWh` | Total emissions, including imports, exports and construction, per delivered customer MWh over the window.                                                     |
 | `localFuelShare`           | Selected fuels' delivered electricity divided by all local fuel-delivered electricity over the window; imports and storage discharge have no fuel provenance. |

@@ -31,6 +31,8 @@ export interface ObjectiveContext {
   marketSize?: number;
   /** Acquisitions use one aggregate baseline and are judged only at their deadline. */
   retentionAtDeadlineOnly?: boolean;
+  /** Derived from immutable transfer receipts; never persisted as customer state. */
+  retentionBaselines?: Readonly<Record<number, number>>;
 }
 
 export interface ObjectiveMonthFacts {
