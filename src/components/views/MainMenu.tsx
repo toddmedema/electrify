@@ -20,7 +20,6 @@ import {
 } from "../../helpers/Share";
 import InstallAppButton from "../base/InstallAppButton";
 import { getDesktop, isDesktopApp } from "../../Desktop";
-import { useDesktopState } from "../../DesktopState";
 import { useMenuKeys } from "../base/useMenuKeys";
 // Keep Steam's co-op UI and authoritative worker out of the browser edition entirely.
 const MultiplayerButton =
@@ -56,7 +55,8 @@ const DiscordIcon = () => (
 
 // The home menu's text buttons are plain until one is active. The active button carries the
 // primary fill (its focus indicator) and follows both pointer and keyboard/controller focus,
-// so hovering a control moves real focus to it; Enter/Space/A then activate that button.
+// so moving the pointer over a control focuses it; Enter/Space/A then activate that button.
+// Boundary events alone can come from the entrance moving beneath a stationary pointer.
 const HOME_MENU_BUTTONS =
   ".mainActions button, .resourceActions button, .discoveryActions button";
 function focusHomeButton(event: React.PointerEvent) {
@@ -69,7 +69,6 @@ function focusHomeButton(event: React.PointerEvent) {
 const MainMenu = (props: Props): React.JSX.Element => {
   const menuKeys = useMenuKeys();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
-  const steamAvailable = useDesktopState()?.steam.available;
   // The desktop game bundles no website pages, so those open in the player's browser.
   const sitePage = (path: string) =>
     desktopApp
@@ -137,7 +136,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
         id="centeredMenu"
         className="keyboardMenu"
         {...menuKeys}
-        onPointerOver={focusHomeButton}
+        onPointerMove={focusHomeButton}
         sx={{ px: 3 }}
       >
         <Stack
@@ -214,7 +213,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           >
             Settings
           </Button>
-          {!steamAvailable && (
+          {!desktopApp && (
             <Button
               data-achievements-trigger
               variant="text"

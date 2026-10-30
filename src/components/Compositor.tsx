@@ -266,8 +266,12 @@ const shortcutHandlers = {
   // The workspace handles tool dismissal, allowing nested controls to consume Escape first.
   // Full-screen destinations follow their Back button through history.
   ESCAPE: () => {
-    const { card, game } = store.getState();
-    if (game.inGame && !isGameCard(card.name)) {
+    const { card } = store.getState();
+    if (
+      card.name !== "MAIN_MENU" &&
+      card.name !== "LOADING" &&
+      !isGameCard(card.name)
+    ) {
       store.dispatch(navigateBack());
       // Escape may arrive before the gallery's entry focus settles.
       if (card.name === "ACHIEVEMENTS")

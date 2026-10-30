@@ -1,4 +1,5 @@
 import path from "path";
+import { readSavedGame } from "./save-fixture";
 import { expect, Locator, Page, test } from "./fixtures";
 
 test.setTimeout(90_000);
@@ -201,4 +202,50 @@ test("Escape matches Back for Manual, Settings, and Saved games", async ({
       await expect(page.locator(".gameMenuButton")).toBeVisible();
     }
   }
+});
+
+test("Escape returns from main menu pages without starting a game", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("audioEnabled", "false");
+    localStorage.setItem(
+      "plays",
+      JSON.stringify({
+        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
+      }),
+    );
+  });
+  await page.goto("/");
+  for (const [button, title] of [
+    ["Manual", "Manual"],
+    ["Settings", "Settings"],
+    ["Achievements", "Achievements"],
+    ["Play", "Choose a game"],
+  ]) {
+    await page.getByRole("button", { name: button, exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: title, exact: true }),
+    ).toBeVisible();
+    // Exercise the global fallback even on pages that also handle Escape on their controls.
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    if (title === "Manual")
+      await page.getByRole("textbox", { name: "Search the manual" }).focus();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#menuCard")).toBeVisible();
+    await expect(page.locator(".screenPage")).toHaveCount(0);
+  }
+  await page.goto("/?scenario=103");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Saved games", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Saved games", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#menuCard")).toBeVisible();
+  await expect(page.locator(".screenPage")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#menuCard")).toBeVisible();
 });

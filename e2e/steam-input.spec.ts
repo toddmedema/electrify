@@ -261,6 +261,86 @@ test.beforeEach(async ({ page }) => {
   }, glyphs);
 });
 
+test("desktop home buttons share a width and Escape returns from menu pages", async ({
+  page,
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  await expect(play).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Achievements", exact: true }),
+  ).toHaveCount(0);
+  const bounds = (await play.boundingBox())!;
+  for (const button of await page.locator("#centeredMenu button").all()) {
+    const box = (await button.boundingBox())!;
+    expect(box.width, await button.innerText()).toBeCloseTo(bounds.width, 0);
+    expect(box.x, await button.innerText()).toBeCloseTo(bounds.x, 0);
+  }
+  if (
+    process.env.REVIEW_SCREENSHOT_DIR &&
+    testInfo.project.name === "deck-800-light"
+  ) {
+    await page.getByRole("button", { name: "Manual", exact: true }).focus();
+    await page.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        "menu-steam-desktop.png",
+      ),
+      animations: "disabled",
+    });
+  }
+  for (const title of ["Manual", "Settings", "Mods"]) {
+    await page.getByRole("button", { name: title, exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: title, exact: true }),
+    ).toBeVisible();
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    await page.keyboard.press("Escape");
+    await expect(play).toBeVisible();
+    await expect(page.locator(".screenPage")).toHaveCount(0);
+  }
+});
+
+test("menu movement under a stationary pointer preserves keyboard navigation", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  const friends = page.getByRole("button", {
+    name: "Play with friends",
+    exact: true,
+  });
+  const manual = page.getByRole("button", { name: "Manual", exact: true });
+  await friends.hover();
+  await expect(friends).toBeFocused();
+  await play.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(friends).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(manual).toBeFocused();
+
+  // Like the desktop entrance, move controls away and back beneath an unmoved mouse.
+  await page.locator("#centeredMenu").evaluate((menu) => {
+    menu.style.transform = "translateX(10000px)";
+  });
+  await expect(page.locator("#centeredMenu:hover")).toHaveCount(0);
+  await friends.evaluate(
+    (button) =>
+      new Promise<void>((resolve) => {
+        button.addEventListener("pointerover", () => resolve(), { once: true });
+        document.getElementById("centeredMenu")!.style.transform = "none";
+      }),
+  );
+  await expect(manual).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(friends).toBeFocused();
+
+  // Moving the mouse intentionally still selects the hovered control.
+  await manual.hover();
+  await expect(manual).toBeFocused();
+});
+
 test("controller text entry searches the manual, cancels and restores field focus", async ({
   page,
 }) => {

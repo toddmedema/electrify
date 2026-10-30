@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MainMenu, { Props } from "./MainMenu";
 import type { DesktopBridge, DesktopState } from "../../Desktop";
@@ -47,7 +47,10 @@ function props(overrides: Partial<Props> = {}): Props {
 }
 
 describe("MainMenu", () => {
-  afterEach(() => delete window.electrifyDesktop);
+  afterEach(() => {
+    delete window.electrifyDesktop;
+    jest.restoreAllMocks();
+  });
 
   it("keeps the first-run sound prompt in the browser", () => {
     render(<MainMenu {...props({ audioEnabled: undefined })} />);
@@ -70,7 +73,6 @@ describe("MainMenu", () => {
       "Manual",
       "Mods",
       "Settings",
-      "Achievements",
       "Quit",
     ]);
     expect(resources.getByRole("button", { name: "Mods" })).toHaveClass(
@@ -85,30 +87,31 @@ describe("MainMenu", () => {
     async (audioEnabled) => {
       window.electrifyDesktop = desktopBridge();
       render(<MainMenu {...props({ audioEnabled })} />);
-      await waitFor(() =>
-        expect(window.electrifyDesktop!.getState).toHaveBeenCalled(),
-      );
       expect(
         screen.queryByRole("button", { name: "Turn on sound" }),
       ).not.toBeInTheDocument();
     },
   );
-  it("offers the gallery without Steam", async () => {
-    window.electrifyDesktop = desktopBridge();
+  it("offers the gallery in the browser", async () => {
     const onAchievements = jest.fn();
     render(<MainMenu {...props({ onAchievements })} />);
     await userEvent.click(screen.getByRole("button", { name: "Achievements" }));
     expect(onAchievements).toHaveBeenCalledTimes(1);
   });
-  it("defers to Steam's achievement interface when available", async () => {
-    window.electrifyDesktop = desktopBridge(true);
-    render(<MainMenu {...props()} />);
-    await waitFor(() =>
+  it.each([false, true])(
+    "leaves achievements to Steam from the first render, with Steam available: %s",
+    async (available) => {
+      window.electrifyDesktop = desktopBridge(available);
+      render(<MainMenu {...props()} />);
       expect(
         screen.queryByRole("button", { name: "Achievements" }),
-      ).not.toBeInTheDocument(),
-    );
-  });
+      ).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Manual" }));
+      expect(
+        screen.queryByRole("button", { name: "Achievements" }),
+      ).not.toBeInTheDocument();
+    },
+  );
   it("starts a new game from the primary play action", async () => {
     const onStart = jest.fn();
     const user = userEvent.setup();
@@ -176,6 +179,27 @@ describe("MainMenu", () => {
     expect(screen.getByRole("button", { name: "Manual" })).toHaveFocus();
     await user.keyboard("{ArrowUp}");
     expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+    clientRects.mockRestore();
+  });
+
+  it("keeps keyboard focus when layout moves a control under a stationary pointer", async () => {
+    const clientRects = jest
+      .spyOn(HTMLElement.prototype, "getClientRects")
+      .mockReturnValue([{}] as unknown as DOMRectList);
+    const user = userEvent.setup();
+    render(<MainMenu {...props()} />);
+    const play = screen.getByRole("button", { name: "Play" });
+    const manual = screen.getByRole("button", { name: "Manual" });
+    await user.keyboard("{ArrowDown}");
+    expect(manual).toHaveFocus();
+
+    // Animated layout can send a boundary event without the player moving the pointer.
+    fireEvent.pointerOver(play);
+    expect(manual).toHaveFocus();
+
+    // Deliberate pointer movement still selects the button under the pointer.
+    await user.hover(play);
+    expect(play).toHaveFocus();
     clientRects.mockRestore();
   });
 
