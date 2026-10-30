@@ -64,12 +64,23 @@ for (const theme of ["light", "dark"]) {
     const checkboxes = pane.getByRole("checkbox", { name: /^Select / });
     await expect(checkboxes).toHaveCount(0);
     // Preview is reversible and keeps facility text in place, including when modifiers overlap.
-    const textBox = await rows.first().locator(".facilityText").boundingBox();
+    const textLayout = () =>
+      rows.first().evaluate((row) => {
+        const bounds = row.getBoundingClientRect();
+        const text = row
+          .querySelector(".facilityText")!
+          .getBoundingClientRect();
+        return {
+          x: text.x - bounds.x,
+          y: text.y - bounds.y,
+          width: text.width,
+          height: text.height,
+        };
+      });
+    const textBox = await textLayout();
     await page.keyboard.down("Shift");
     await expect(checkboxes).toHaveCount(5);
-    expect(await rows.first().locator(".facilityText").boundingBox()).toEqual(
-      textBox,
-    );
+    expect(await textLayout()).toEqual(textBox);
     if (process.env.PR_SCREENSHOTS && theme === "light") {
       await page.screenshot({
         path: path.join(
