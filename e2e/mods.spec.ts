@@ -1348,7 +1348,7 @@ for (const layout of [
     await mockDesktop(page, false, layout.theme);
     await page.goto("/");
     await page
-      .getByRole("button", { name: "Start a new game", exact: true })
+      .getByRole("button", { name: "New game", exact: true })
       .or(page.getByRole("button", { name: "Play", exact: true }))
       .click();
     await page.getByLabel("Open community scenarios").click();
@@ -1431,7 +1431,9 @@ test("empty mod library offers Workshop first and template results in the shared
   await dismissToast(page);
   expect(await noHorizontalScroll(page)).toBe(true);
   await page.getByRole("button", { name: "Back", exact: true }).click();
-  await expect(mods).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true }),
+  ).toBeFocused();
 });
 
 test("an empty library finishes its first Workshop subscription on overlay return", async ({
