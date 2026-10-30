@@ -86,7 +86,7 @@ import {
 import PolicyDemandChart, {
   PolicyDemandChartPlaceholder,
 } from "../base/PolicyDemandChart";
-import { generateNewTimeline } from "../../reducers/Game";
+import { generateForecastTimeline } from "../../reducers/Game";
 import { HOURS_PER_YEAR_REAL, TICKS_PER_YEAR } from "../../Constants";
 import { getSolarOutputFactor } from "../../helpers/Energy";
 import {
@@ -277,7 +277,7 @@ function BuildoutSummary({
     const now = currentTick(snapshot);
     if (id !== "solar" || !now) return undefined;
     // A full year avoids presenting a single sunny or dark month as annual production.
-    const ticks = generateNewTimeline(
+    const ticks = generateForecastTimeline(
       snapshot,
       now.cash,
       now.customers,

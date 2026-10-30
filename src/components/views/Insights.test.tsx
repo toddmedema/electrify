@@ -78,7 +78,7 @@ it("keeps first worker startup and long worker recovery out of the Insights rend
     getProjection: (now: TickPresentFutureType) => unknown;
   };
   const originalWorker = global.Worker;
-  const generate = jest.spyOn(GameModule, "generateNewTimeline");
+  const generate = jest.spyOn(GameModule, "generateForecastTimeline");
   global.Worker = jest.fn() as unknown as typeof Worker;
   try {
     expect(internals.getProjection(game.timeline[0])).toBeUndefined();
@@ -717,7 +717,7 @@ describe("Insights layers", () => {
       initialBuild: { name: "Wind", peakW: 100000000, financed: true },
     });
     expect(game.facilities.some((f) => f.yearsToBuildLeft > 0)).toBe(true);
-    const generate = jest.spyOn(GameModule, "generateNewTimeline");
+    const generate = jest.spyOn(GameModule, "generateForecastTimeline");
     const props = {
       selectedFacilityId: null,
       facilityDragActive: false,
