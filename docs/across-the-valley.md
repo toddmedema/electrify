@@ -150,6 +150,8 @@ totals, transaction and financial ledgers, and one forecast timeline.
 
 The combined-company model uses the original tick and bundle budgets from
 `master`, with the existing 10% bundle tolerance. The final production build is
-991.77 kB gzip for main JavaScript and 1590.22 kB across all JavaScript. No npm
-dependencies are added. Only scenario 116's intended outputs are rebaselined;
-all earlier scenarios retain their seeded outputs.
+991.86 kB gzip for main JavaScript and 1590.47 kB across all JavaScript. No npm
+dependencies are added. Scenario 116's economic outputs reflect the combined
+model; earlier scenarios retain their seeded economic outputs. Six variant
+result hashes also reflect the clarified retention-definition text. Restoring
+only that sentence in memory reproduces all six earlier hashes exactly.
