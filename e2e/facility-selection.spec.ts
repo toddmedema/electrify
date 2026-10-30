@@ -28,6 +28,7 @@ for (const theme of ["light", "dark"]) {
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(page.locator("#menuCard")).toBeHidden();
     await openPane(pane, nav);
     const rows = pane.locator(".facilityRow");
     const disclosure = (index: number) =>
@@ -74,13 +75,28 @@ for (const theme of ["light", "dark"]) {
     await expect(
       pane.locator(".facilitySelectionBar").getByRole("status"),
     ).toHaveText("2 facilities selected");
+    // Escape also clears the group when focus has moved into the chart.
+    const chart = pane.locator("#chartSupplyDemand");
+    await chart.getByRole("img").press("Home");
+    await expect(chart.locator(".chartTooltip")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(pane.locator(".bulkSelected")).toHaveCount(0);
+    await expect(chart.locator(".chartTooltip")).toBeHidden();
+    const selectPair = async () => {
+      await disclosure(0).click();
+      await disclosure(2).click({ modifiers: ["Meta"] });
+    };
+    await selectPair();
     await rows.first().scrollIntoViewIfNeeded();
     await disclosure(2).click({ button: "right" });
     const menu = page.getByRole("menu", { name: "Facility actions" });
     await page.keyboard.press("Escape");
     await expect(disclosure(2)).toBeFocused();
+    await expect(pane.locator(".bulkSelected")).toHaveCount(0);
+    await selectPair();
     await disclosure(2).click({ button: "right" });
-    await expect(menu).toContainText("2 facilities selected");
+    await expect(menu).not.toContainText("facilities selected");
+    await expect(menu).not.toContainText("Counts show eligible facilities");
     await page.keyboard.press("End");
     await expect(
       menu.getByRole("menuitem", { name: "Sell (2)", exact: true }),
@@ -176,16 +192,17 @@ for (const theme of ["light", "dark"]) {
     ).toHaveAttribute("aria-pressed", "true");
     await expect(
       pane.locator(".facilitySelectionBar").getByRole("status"),
-    ).toHaveText("2 facilities selected");
+    ).toHaveCount(0);
+    await expect(pane.locator(".bulkSelected")).toHaveCount(0);
     await speed.getByRole("button", { name: "pause", exact: true }).click();
     // An unselected row has its own actions; dismissing a sale must leave the fleet intact.
     await disclosure(3).click({ button: "right" });
     await menu.getByRole("menuitem", { name: "Sell", exact: true }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Cancel", exact: true })
-      .click();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+    // Dismissing a single facility's dialog keeps its existing inspection selection.
+    await expect(pane.locator(".bulkSelected")).toHaveCount(1);
     await expect(rows).toHaveCount(5);
     await expect(disclosure(3)).toBeFocused();
     // Re-select a range and confirm the bulk sale using the real persisted game state.

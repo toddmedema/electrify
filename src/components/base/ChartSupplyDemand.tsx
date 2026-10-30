@@ -616,10 +616,6 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     startingYear,
     units,
   };
-  const currentWeather = productionWeather(
-    timeline.findLast((tick) => tick.minute <= currentMinute) ?? timeline[0],
-    units,
-  );
 
   return (
     <div id="chartSupplyDemand" className="dailyProductionChart">
@@ -687,13 +683,6 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         structureKey={sources.join(",")}
         tooltip={formatProductionTooltip}
       />
-      {currentWeather.length > 0 && (
-        <div className="productionWeather" aria-label="Current weather">
-          {currentWeather.map((condition) => (
-            <span key={condition}>{condition}</span>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

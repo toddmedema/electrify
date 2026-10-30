@@ -191,7 +191,7 @@ export default function FacilityContextMenu(props: {
   const title =
     selected.length === 1
       ? `${formatFacilitySize(selected[0])} ${selected[0].name}`
-      : `${selected.length} facilities selected`;
+      : null;
   return (
     <>
       <Menu
@@ -206,12 +206,7 @@ export default function FacilityContextMenu(props: {
           paper: { className: "facilityContextMenu" },
         }}
       >
-        <ListSubheader disableSticky>{title}</ListSubheader>
-        {selected.length > 1 && (
-          <ListSubheader disableSticky className="facilityMenuHint">
-            Counts show eligible facilities
-          </ListSubheader>
-        )}
+        {title && <ListSubheader disableSticky>{title}</ListSubheader>}
         {offered.flatMap((action, index) => [
           ...(action.key === "sell" && index > 0
             ? [<Divider key="sale-divider" />]

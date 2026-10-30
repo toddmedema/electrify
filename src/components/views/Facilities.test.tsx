@@ -72,6 +72,7 @@ interface Handlers {
 function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
+  ref?: React.RefObject<Facilities>,
 ): Handlers {
   const handlers: Handlers = {
     onTogglePause: jest.fn(),
@@ -87,6 +88,7 @@ function renderFacilities(
     const [selected, setSelected] = React.useState(selectedFacilityId);
     return (
       <Facilities
+        ref={ref}
         game={game}
         selectedFacilityId={selected}
         onTransmissionUpgrade={() => undefined}
@@ -1293,6 +1295,107 @@ describe("mouse facility selection", () => {
     ).toBe(true);
   });
 
+  it("clears multi-select with Escape when focus is outside the fleet", () => {
+    const view = renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    expect(
+      rows().filter((row) => row.getAttribute("aria-pressed") === "true"),
+    ).toHaveLength(3);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(
+      rows().every((row) => row.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    const calls = view.onSelect.mock.calls.length;
+    cleanup();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("keeps single inspection intact outside the fleet and clears it locally", () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(rows()[0], { key: "Escape" });
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "false");
+    expect(rows()[0]).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("leaves Escape to the incoming screen while the fleet is inert", () => {
+    const view = renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    // Compositor marks the outgoing screen inert until its exit animation unmounts it.
+    // eslint-disable-next-line testing-library/no-node-access
+    const surface = rows()[0].closest(".facilitiesBody")!;
+    surface.setAttribute("inert", "");
+    const calls = view.onSelect.mock.calls.length;
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("keeps Escape available after selected facilities leave the fleet", () => {
+    const game = fleet();
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    game.facilities = [];
+    const calls = view.onSelect.mock.calls.length;
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("preserves keyboard inspection when a canceled drag only has stale mouse IDs", () => {
+    const game = fleet();
+    const ref = React.createRef<Facilities>();
+    const view = renderFacilities(game, null, ref);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    game.facilities = game.facilities.slice(3);
+    act(() => ref.current!.props.onSelect(game.facilities[0].id));
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    const calls = view.onSelect.mock.calls.length;
+    act(() =>
+      ref.current!.onBeforeDragStart({
+        draggableId: "f4",
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        mode: "SNAP",
+      }),
+    );
+    act(() =>
+      ref.current!.onDragEnd({
+        draggableId: "f4",
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        destination: null,
+        reason: "CANCEL",
+        mode: "SNAP",
+        combine: null,
+      }),
+    );
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("clears multi-select when Escape closes its context menu", async () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    fireEvent.contextMenu(rows()[1]);
+    expect(
+      screen.getByRole("menu", { name: "Facility actions" }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(
+      rows().every((row) => row.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
+  });
+
   it("offers eligible bulk pause and resume actions without toggling the wrong state", async () => {
     const game = fleet();
     game.facilities[1].paused = true;
@@ -1302,7 +1405,8 @@ describe("mouse facility selection", () => {
     fireEvent.click(rows()[2], { shiftKey: true });
     fireEvent.contextMenu(rows()[1]);
     const menu = screen.getByRole("menu", { name: "Facility actions" });
-    expect(menu).toHaveTextContent("3 facilities selected");
+    expect(menu).not.toHaveTextContent("facilities selected");
+    expect(menu).not.toHaveTextContent("Counts show eligible facilities");
     expect(
       within(menu).getByRole("menuitem", { name: "Resume (1)" }),
     ).toBeInTheDocument();

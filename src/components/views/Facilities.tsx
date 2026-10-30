@@ -880,16 +880,31 @@ export default class Facilities extends React.Component<Props, SelectionState> {
 
   private closeMenu = () => this.setState({ menu: null });
 
-  private onSelectionKeyDown = (event: React.KeyboardEvent) => {
+  private liveSelectionCount = () =>
+    this.props.game.facilities.filter((facility) =>
+      this.state.ids.includes(facility.id),
+    ).length;
+
+  private onGlobalSelectionKeyDown = (event: KeyboardEvent) =>
+    this.onSelectionKeyDown(event, true);
+
+  private onSelectionKeyDown = (
+    event: KeyboardEvent | React.KeyboardEvent,
+    multiOnly = false,
+  ) => {
     if (
       event.key === "Escape" &&
       !event.defaultPrevented &&
       !this.dragging &&
-      this.state.ids.length
+      !this.scrollBody?.closest("[inert]") &&
+      this.liveSelectionCount() > (multiOnly ? 1 : 0)
     ) {
-      event.preventDefault();
-      event.stopPropagation();
+      const modal = document.querySelector(
+        '.MuiModal-root:not(.MuiModal-hidden), [data-manual-help="true"], [data-scenario-choice="true"], [data-data-center-guide="true"]',
+      );
       this.clearSelection();
+      // A modal also owns Escape: let it dismiss normally as the group clears behind it.
+      if (!modal) event.preventDefault();
     }
   };
 
@@ -1002,6 +1017,15 @@ export default class Facilities extends React.Component<Props, SelectionState> {
 
   public componentDidMount() {
     this.resolveEvidence();
+    document.addEventListener("keydown", this.onGlobalSelectionKeyDown, true);
+  }
+
+  public componentWillUnmount() {
+    document.removeEventListener(
+      "keydown",
+      this.onGlobalSelectionKeyDown,
+      true,
+    );
   }
 
   private evidenceAnchor = React.createRef<HTMLDivElement>();
@@ -1038,6 +1062,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   public onDragEnd(result: DropResult) {
     this.dragging = false;
     this.setState({ groupDragging: false });
+    if (result.reason === "CANCEL" && this.liveSelectionCount() > 1)
+      this.clearSelection();
     if (result.source.droppableId === "interties") {
       this.props.onFacilityDragEnd(
         result.source.index,

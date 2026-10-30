@@ -5421,18 +5421,6 @@ $homeSmokeCycle: 5.6s;
     color: var(--night-ink);
   }
 }
-.productionWeather {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin: 4px 12px 0;
-  color: var(--font-color-faded);
-  font-size: var(--font-size-caption-sm);
-  line-height: 16px;
-  > span {
-    white-space: nowrap;
-  }
-}
 .dailyProductionChart .chartLegend {
   padding: 8px 12px 0;
   gap: 4px 8px;
