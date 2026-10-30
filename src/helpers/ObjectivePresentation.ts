@@ -19,7 +19,9 @@ const number = (
   if (percent && comparison !== undefined && !precise) {
     const whole = Math.round(value * 100);
     const target = Number((comparison * 100).toPrecision(6));
-    const sameSide = whole >= target === value * 100 >= target;
+    const roundedMeets = whole >= target;
+    const actualMeets = value * 100 >= target;
+    const sameSide = roundedMeets === actualMeets;
     if (Number.isInteger(target) && sameSide && whole !== target)
       return formatNumber(whole / 100, { style: "percent" });
   }
