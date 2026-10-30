@@ -8072,12 +8072,32 @@ option {
   font-size: var(--font-size-caption);
 }
 
-.facilitySelectionCheck.MuiSvgIcon-root {
+.facilitySelectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.facilitySelectionSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  width: 20px;
+  width: 40px;
   height: 20px;
-  margin-right: 8px;
   color: var(--interactive-strong);
+}
+.facilityRowHeader > .facilitySelectionCheckbox.MuiCheckbox-root {
+  position: absolute;
+  right: 44px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  padding: 10px;
+  color: var(--font-color-faded);
+  &.Mui-checked {
+    color: var(--interactive-strong);
+  }
 }
 .facilityContextMenu .MuiMenuItem-root {
   min-height: 40px;
@@ -8086,6 +8106,11 @@ option {
 }
 
 @media (pointer: coarse) {
+  .facilityRowHeader > .facilitySelectionCheckbox.MuiCheckbox-root {
+    width: 44px;
+    height: 44px;
+    right: 42px;
+  }
   .facilitySelectionBar .MuiButton-root,
   .facilityContextMenu .MuiMenuItem-root {
     min-height: 44px;
