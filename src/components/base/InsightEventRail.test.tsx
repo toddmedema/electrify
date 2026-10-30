@@ -15,9 +15,9 @@ it("identifies each event and its date before opening details", () => {
         },
         {
           key: "fee",
-          title: "Pollution fees rising",
+          title: "Carbon fee rising",
           label: "Expected Jan 2027",
-          message: "Coal and gas costing more to run.",
+          message: "Coal and gas will cost more to run.",
         },
       ]}
       onActiveChange={jest.fn()}
@@ -30,7 +30,7 @@ it("identifies each event and its date before opening details", () => {
   });
   for (const [title, date] of [
     ["Data Centers coming online", "Jan 2026"],
-    ["Pollution fees rising", "Jan 2027"],
+    ["Carbon fee rising", "Jan 2027"],
   ]) {
     const chip = within(events).getByRole("button", {
       name: `Expected ${date}: ${title}`,

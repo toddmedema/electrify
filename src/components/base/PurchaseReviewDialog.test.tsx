@@ -36,8 +36,8 @@ describe("PurchaseReviewDialog", () => {
   it("quotes the same terms the reducer books", () => {
     renderDialog({ refinancedBalance: 500000 });
     const terms = purchaseTerms(2000000, true, 0.05, 500000);
-    expect(screen.getByText(/now \+/)).toHaveTextContent(
-      `${formatMoneyConcise(terms.downpayment)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo (5.00% for 30 years)`,
+    expect(screen.getByText(/\/mo · /)).toHaveTextContent(
+      `${formatMoneyConcise(terms.downpayment)} + ${formatMoneyConcise(terms.monthlyPayment)}/mo · 5.00%, 30 yrs`,
     );
     expect(screen.getByText(/Includes refinancing/)).toBeInTheDocument();
     expect(screen.getByText("Online in")).toBeInTheDocument();

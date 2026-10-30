@@ -82,7 +82,7 @@ export default function ShareSaveDialog({
     if (!firebaseAppAuth?.currentUser && !(await login({ mailingList }))) {
       if (generation === request.current) {
         setBusy(false);
-        setError("Sign-in didn't finish. Please try again.");
+        setError("Couldn't finish sign-in. Try again.");
       }
       return;
     }

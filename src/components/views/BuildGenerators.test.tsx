@@ -398,12 +398,12 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
 
   expect(
     screen.getByRole("row", {
-      name: /Fixed O&M.*\$2\.88M/,
+      name: /Fixed upkeep.*\$2\.88M/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Variable O&M.*\$1\.24\/MWh/,
+      name: /Variable upkeep.*\$1\.24\/MWh/,
     }),
   ).toBeInTheDocument();
   expect(
@@ -413,7 +413,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated annual O&M.*\$11\.9M\/yr/,
+      name: /Estimated annual upkeep.*\$11\.9M\/yr/,
     }),
   ).toBeInTheDocument();
 
@@ -426,7 +426,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   expect(impact).not.toHaveTextContent("What changes");
   expect(impact).toHaveTextContent("Cash purchase");
   expect(impact).toHaveTextContent(
-    /Loan option.*now \+.*\/mo \(\d+\.\d+% for 30 years\)/,
+    /Loan option.* \+ .*\/mo · \d+\.\d+%, 30 yrs/,
   );
   expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
@@ -508,17 +508,17 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
 
   expect(
     screen.getByRole("row", {
-      name: /Fixed O&M.*\$3\.09M\/yr/,
+      name: /Fixed upkeep.*\$3\.09M\/yr/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Variable O&M.*\$25\.71\/MWh/,
+      name: /Variable upkeep.*\$25\.71\/MWh/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated annual O&M.*\$7\.59M\/yr/,
+      name: /Estimated annual upkeep.*\$7\.59M\/yr/,
     }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Non-fuel start cost")).toBeNull();
@@ -713,10 +713,12 @@ it("draws each generator's typical year against one shared scale", () => {
     screen.getAllByRole("img", { name: /^Typical year: .*lowest in/ }).length,
   ).toBeGreaterThan(0);
   expect(
-    screen.getAllByText(/^Low [A-Z][a-z]{2} \d+%$/).length,
+    screen.getAllByText(/^[A-Z][a-z]{2} low: \d+% of capacity$/).length,
   ).toBeGreaterThan(0);
   expect(screen.getAllByText("On demand").length).toBeGreaterThan(0);
-  expect(screen.getByText(/^Low [A-Z][a-z]{2} \d+% water in$/)).toBeVisible();
+  expect(
+    screen.getByText(/^[A-Z][a-z]{2} low: \d+% of typical water$/),
+  ).toBeVisible();
   expect(
     screen.getByRole("img", { name: /^Typical year of water inflow: / }),
   ).toBeInTheDocument();
@@ -824,7 +826,7 @@ it("quotes a Hydro site maximum and updates the shared slider", () => {
     screen.getByRole("button", { name: "Review purchase of Hydro" }),
   );
   expect(screen.getByRole("dialog")).toHaveTextContent(
-    "Only cancelling before completion frees it",
+    "Only canceling before completion frees it",
   );
   fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
   expect(onBuild).toHaveBeenCalledWith(
@@ -1020,7 +1022,7 @@ describe("weather hardening in the purchase dialog", () => {
     });
     expect(option).not.toBeChecked();
     expect(option).toHaveAccessibleDescription(
-      /more morning and evening power.*Stows steeply in hail\. Can't be added after building\./,
+      /more morning and evening power.*Stows in hail\. Can't be added later\./,
     );
     fireEvent.click(option);
     fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
@@ -1112,7 +1114,7 @@ describe("weather hardening in the purchase dialog", () => {
       name: "Expected impact",
     });
     expect(impact).toHaveTextContent(
-      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * packaged.buildCost)} now`,
+      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * packaged.buildCost)} +`,
     );
     expect(impact).toHaveTextContent(
       `→ ${formatMoneyConcise(cash - packaged.buildCost)}`,
@@ -1124,7 +1126,7 @@ describe("weather hardening in the purchase dialog", () => {
       `→ ${formatMoneyConcise(cash - plain.buildCost)}`,
     );
     expect(impact).toHaveTextContent(
-      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * plain.buildCost)} now`,
+      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * plain.buildCost)} +`,
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Take loan" }));
     expect(onBuild).toHaveBeenCalledWith(true, {

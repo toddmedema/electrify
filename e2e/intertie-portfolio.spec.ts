@@ -47,11 +47,24 @@ for (const theme of ["light", "dark"] as const) {
     expect(metricBoxes.every((cell) => cell.valueTop >= cell.labelBottom)).toBe(
       true,
     );
-    if (page.viewportSize()!.width >= 768) {
-      // The wide build sheet fits all five primary metrics on one row.
+    // Cells on one row never overlap, whatever the width.
+    for (const [index, cell] of metricBoxes.entries()) {
+      const next = metricBoxes[index + 1];
+      if (next?.y === cell.y) {
+        expect(cell.x + cell.width).toBeLessThanOrEqual(next.x);
+      }
+    }
+    if ((await card.boundingBox())!.width >= 700) {
+      // A wide card fits all five primary metrics on one row.
       expect(metricBoxes.every((cell) => cell.y === metricBoxes[0].y)).toBe(
         true,
       );
+    } else if (page.viewportSize()!.width >= 1024) {
+      // A side tool holds three metrics a row, then two.
+      expect(metricBoxes[1].y).toBe(metricBoxes[0].y);
+      expect(metricBoxes[2].y).toBe(metricBoxes[0].y);
+      expect(metricBoxes[3].y).toBeGreaterThan(metricBoxes[0].y);
+      expect(metricBoxes[4].y).toBe(metricBoxes[3].y);
     } else {
       expect(metricBoxes[0].y).toBe(metricBoxes[1].y);
       expect(metricBoxes[2].y).toBe(metricBoxes[3].y);

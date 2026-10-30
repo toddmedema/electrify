@@ -169,9 +169,11 @@ for (const theme of ["light", "dark"]) {
     const image = chart.getByRole("img");
     await expect(chart.getByText("Storage", { exact: true })).toBeVisible();
     await expect(chart.getByText("Interties", { exact: true })).toBeVisible();
-    await expect(chart.getByText("Variable", { exact: true })).toBeVisible();
     await expect(
-      chart.getByText("Dispatchable", { exact: true }),
+      chart.getByText("Variable (solar, wind)", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      chart.getByText("Dispatchable (coal, gas…)", { exact: true }),
     ).toBeVisible();
     await expect(chart.locator(".chartLegendItem")).toHaveCount(5);
     await expect(chart.locator(".chartLegendItem").first()).toHaveText(
@@ -374,9 +376,11 @@ for (const theme of ["light", "dark"]) {
     await expect(
       chart.getByText("Production by fuel", { exact: true }),
     ).toHaveCount(0);
-    await expect(chart.getByText("Variable", { exact: true })).toBeVisible();
     await expect(
-      chart.getByText("Dispatchable", { exact: true }),
+      chart.getByText("Variable (solar, wind)", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      chart.getByText("Dispatchable (coal, gas…)", { exact: true }),
     ).toBeVisible();
     await expect(chart.getByText("Sun", { exact: true })).toHaveCount(0);
     await expect(chart.getByText("Wind", { exact: true })).toHaveCount(0);

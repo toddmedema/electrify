@@ -46,7 +46,7 @@ it("shows the owning verdict and Optional meaning in Mission Status without subs
   render(
     <ScenarioDetailsContent game={game} scenario={activeScenario(game)!} />,
   );
-  const rules = screen.getByRole("region", { name: "Victory conditions" });
+  const rules = screen.getByRole("region", { name: "Goals" });
   expect(within(rules).getByText("Keep bills affordable")).toBeInTheDocument();
   expect(within(rules).getByText("Optional")).toBeInTheDocument();
   expect(rules).toHaveTextContent("Bills ≤$0.1/kWh each month");

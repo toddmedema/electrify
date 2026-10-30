@@ -108,7 +108,7 @@ test.each([
   [2_678_123_456, "$2.68B"],
   [2_600_000_000, "$2.60B"],
   [268_123_456, "$268M"],
-  [-2_678_123, "$-2.68M"],
+  [-2_678_123, "-$2.68M"],
 ])("solvency cash %s uses the header's rounded amount %s", (cash, amount) => {
   const game = createNextState(fixture(), (g) => {
     g.timeline[0].cash = cash;
@@ -164,11 +164,11 @@ test("retention shows completed-month customers against the final target while r
   expect(requirement(low, "retention").status).toBe("in-progress");
   expect(getMissionStatus(low).headline?.id).toBe("retention");
   expect(getMissionStatus(low).headline?.compact).toMatch(
-    /^Retain ≥.*% of starting customers/,
+    /^Keep ≥.*% of starting customers/,
   );
   expect(requirement(low, "retention").target).toContain("starting customers");
   expect(requirement(low, "retention").definition).toContain(
-    "recorded starting customers",
+    "share of your starting customers",
   );
 });
 

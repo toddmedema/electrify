@@ -48,7 +48,7 @@ it("shows the score so far beside where the current pace ends it", () => {
   expect(outlook).toHaveTextContent("Projected final");
   expect(
     screen.getByRole("region", { name: "Score breakdown" }),
-  ).toHaveTextContent(/electricity supplied/i);
+  ).toHaveTextContent(/TWh supplied/i);
 });
 
 it("keeps one concise loss line under the score chart and removes redundant goal forecasts", () => {
@@ -81,7 +81,7 @@ it("keeps one concise loss line under the score chart and removes redundant goal
     name: "Scenario forecast",
   });
   expect(status).toHaveTextContent(
-    "Projected loss: Cash below $0 at Jan 2022. Demand served <95% for 3 consecutive months at Jan 2025.",
+    "Projected loss: Cash below $0 by Jan 2022. Under 95% of demand served for 3 months by Jan 2025.",
   );
   expect(
     screen.getByRole("img", { name: /Projected loss periods shaded/ }),
@@ -90,7 +90,7 @@ it("keeps one concise loss line under the score chart and removes redundant goal
   expect(status).toContainHTML("<strong>Projected loss:</strong>");
   expect(status).toHaveClass("insightsWarning");
   expect(within(status).getByTestId("WarningAmberIcon")).toBeInTheDocument();
-  const conditions = screen.getByRole("region", { name: "Victory conditions" });
+  const conditions = screen.getByRole("region", { name: "Goals" });
   expect(conditions).not.toHaveTextContent(
     /Projected miss|Projected to meet|Projected loss/,
   );

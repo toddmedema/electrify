@@ -48,9 +48,7 @@ for (const theme of ["light", "dark"] as const) {
         });
       }
       {
-        await page
-          .getByRole("button", { name: "Victory Conditions", exact: true })
-          .click();
+        await page.getByRole("button", { name: "Goals", exact: true }).click();
         const briefing = page.getByRole("dialog");
         await expect(briefing.locator("..")).toHaveCSS("opacity", "1");
         const requirements = briefing.getByRole("region", {
@@ -66,7 +64,7 @@ for (const theme of ["light", "dark"] as const) {
         await expect(requirements).not.toContainText("points");
         if (scenario.id === 100) {
           await expect(requirements).toContainText(
-            "Retain ≥80% of starting customers",
+            "Keep ≥80% of starting customers",
           );
         }
         await expect(requirements).toContainText(
@@ -142,7 +140,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       if (scenario.id === 100) {
         await expect(dialog).toContainText(
-          "Retain ≥80% of starting customers · Dec 2031",
+          "Keep ≥80% of starting customers by Dec 2031",
         );
         await expect(dialog).not.toContainText("Invest in the grid");
       }
@@ -150,7 +148,7 @@ for (const theme of ["light", "dark"] as const) {
         "Serving less than 95% of demand for 3 months in a row ends the run.",
       );
       await expect(
-        dialog.getByRole("region", { name: "Victory conditions" }),
+        dialog.getByRole("region", { name: "Goals" }),
       ).not.toContainText(
         /Not started|Recorded:|months completed|Delivered customer electricity divided/,
       );
@@ -160,7 +158,7 @@ for (const theme of ["light", "dark"] as const) {
           dialog.getByRole("status", { name: "Scenario forecast" }),
         ).toHaveAttribute("data-status", /^(win|loss|unknown)$/);
         await dialog
-          .getByRole("region", { name: "Victory conditions" })
+          .getByRole("region", { name: "Goals" })
           .scrollIntoViewIfNeeded();
         await dialog.screenshot({
           path: path.join(

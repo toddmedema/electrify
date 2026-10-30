@@ -84,7 +84,7 @@ export default function CloudSavePrompt(): React.JSX.Element {
           />
           {error && (
             <Typography color="error" role="alert">
-              Sign-in didn't finish. Please try again.
+              Couldn't finish sign-in. Try again.
             </Typography>
           )}
         </Stack>

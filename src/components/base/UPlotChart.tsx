@@ -57,6 +57,8 @@ export interface UPlotChartProps<S> {
   id?: string;
   /** Height in design units; see DESIGN_WIDTH */
   height?: number;
+  /** Use `height` as measured pixels rather than a design height scaled with the width. */
+  exactHeight?: boolean;
   /** Everything the option callbacks and plugins need, recomputed every render */
   state: S;
   data: uPlot.AlignedData;
@@ -231,6 +233,8 @@ export default function UPlotChart<S>(
   const measuredWidthRef = React.useRef(0);
   const heightRef = React.useRef(height);
   heightRef.current = height;
+  const exactHeightRef = React.useRef(props.exactHeight);
+  exactHeightRef.current = props.exactHeight;
   const number = React.useMemo(
     () => new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }),
     [],
@@ -349,7 +353,9 @@ export default function UPlotChart<S>(
           1,
           Math.round(
             presentationRef.current?.height ??
-              (heightRef.current || 300) * chartScale(nextWidth),
+              (exactHeightRef.current
+                ? heightRef.current || 300
+                : (heightRef.current || 300) * chartScale(nextWidth)),
           ),
         ),
       });
@@ -444,7 +450,10 @@ export default function UPlotChart<S>(
         width,
         height: Math.max(
           1,
-          Math.round(presentation?.height ?? (height || 300) * scale),
+          Math.round(
+            presentation?.height ??
+              (height || 300) * (props.exactHeight ? 1 : scale),
+          ),
         ),
         // Only x is synced: these charts plot watts against watt-hours against dollars, so
         // matching their y scales would line up numbers that have nothing to do with each other

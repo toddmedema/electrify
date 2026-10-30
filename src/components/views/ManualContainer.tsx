@@ -1,3 +1,4 @@
+import { restoreMenuFocus } from "../base/useMenuKeys";
 import type { AppDispatch, RootState } from "../../Store";
 import { connect } from "react-redux";
 import {
@@ -14,11 +15,12 @@ const mapStateToProps = (state: RootState): StateProps => {
   };
 };
 
-const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
+export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onBack: () => {
       dispatch(manualTrailCleared());
       dispatch(navigateBack());
+      restoreMenuFocus("[data-manual-trigger]");
     },
     onFollowLink: (to, from) => {
       dispatch(navigate({ name: "MANUAL", entry: to, fromEntry: from }));

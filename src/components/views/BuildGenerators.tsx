@@ -10,8 +10,9 @@ import {
   List,
   Stack,
   Typography,
-  useMediaQuery,
+  IconButton,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   estimatedAnnualOperatingCost,
@@ -21,6 +22,7 @@ import {
 } from "../../helpers/Financials";
 import {
   floorToTwoSignificantDigits,
+  formatBuildMonths,
   formatMoneyConcise,
   formatWatts,
 } from "../../helpers/Format";
@@ -148,7 +150,7 @@ function ExpectedOutputMetric(props: {
     );
     const low = shape.monthly[shape.lowMonth];
     const water = shape.kind === "water-inflow";
-    caption = `Low ${MONTHS[shape.lowMonth]} ${percent(low)}${water ? " water in" : ""}`;
+    caption = `${MONTHS[shape.lowMonth]} low: ${percent(low)} ${water ? "of typical water" : "of capacity"}`;
     chart = (
       <Sparkline
         values={shape.monthly}
@@ -218,7 +220,6 @@ export function GeneratorBuildItem(
 ): React.JSX.Element {
   const { generator, cash } = props;
   const units = useUnits();
-  const wideLayout = useMediaQuery("(min-width:600px)");
   const kgCO2ePerBtu = FUELS[generator.fuel]?.kgCO2ePerBtu ?? 0;
   const fuelPrices = getFuelPricesPerMBTU(
     props.date,
@@ -338,7 +339,7 @@ export function GeneratorBuildItem(
           {
             text: "Follows the sun for about 20% more morning and evening power.",
           },
-          { text: "Stows steeply in hail. Can't be added after building." },
+          { text: "Stows in hail. Can't be added later." },
         ];
       case "hailResistant":
         return [];
@@ -457,7 +458,6 @@ export function GeneratorBuildItem(
         disabled: !canBuild,
         onClick: openReview,
       }}
-      headerActions={wideLayout && compareAction}
       sizeAction={sizeAction}
       context={context}
       summary={
@@ -504,7 +504,7 @@ export function GeneratorBuildItem(
           />
           <BuildMetric
             label="Build time"
-            value={`${Math.round(generator.yearsToBuild * 12)} mo`}
+            value={formatBuildMonths(generator.yearsToBuild)}
           />
           <ExpectedOutputMetric
             shape={outputShape}
@@ -518,7 +518,7 @@ export function GeneratorBuildItem(
           )}
         </>
       }
-      footerActions={!wideLayout && compareAction}
+      footerActions={compareAction}
       details={
         <>
           <Typography
@@ -574,14 +574,14 @@ export function GeneratorBuildItem(
               />
             )}
             <BuildDetailRow
-              label={hasVariableOM ? "Fixed O&M" : "Base O&M"}
+              label={hasVariableOM ? "Fixed upkeep" : "Upkeep"}
               value={formatMoneyConcise(generator.annualOperatingCost) + "/yr"}
               entry={MANUAL_ENTRY.OPERATING_COSTS}
             />
             {hasVariableOM && (
               <>
                 <BuildDetailRow
-                  label="Variable O&M"
+                  label="Variable upkeep"
                   value={
                     "$" +
                     (generator.variableOperatingCostPerMWh || 0).toFixed(2) +
@@ -590,7 +590,7 @@ export function GeneratorBuildItem(
                   entry={MANUAL_ENTRY.OPERATING_COSTS}
                 />
                 <BuildDetailRow
-                  label="Expected variable O&M"
+                  label="Expected variable upkeep"
                   value={formatMoneyConcise(estimatedVariableOM) + "/yr"}
                   entry={MANUAL_ENTRY.OPERATING_COSTS}
                 />
@@ -605,7 +605,7 @@ export function GeneratorBuildItem(
             )}
             {(hasVariableOM || generator.costPerStart !== undefined) && (
               <BuildDetailRow
-                label="Estimated annual O&M"
+                label="Estimated annual upkeep"
                 value={
                   formatMoneyConcise(estimatedAnnualOperatingCost(generator)) +
                   "/yr"
@@ -693,7 +693,7 @@ export function GeneratorBuildItem(
               <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
                 {props.hydroAvailability.selected.name} ·{" "}
                 {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max.
-                Uses the whole site. Only cancelling before completion frees it.
+                Uses the whole site. Only canceling before completion frees it.
               </Typography>
             )}
             {hasOptions &&
@@ -791,6 +791,7 @@ function GeneratorComparison(props: {
   generators: GeneratorShoppingType[];
   outputShapes: Map<string, ExpectedOutputShape | undefined>;
   onClear: () => void;
+  onRemove: (name: string) => void;
 }): React.JSX.Element | null {
   if (props.generators.length === 0) {
     return null;
@@ -816,9 +817,17 @@ function GeneratorComparison(props: {
             <Typography variant="body2" sx={{ fontWeight: 800 }}>
               {generator.name}
             </Typography>
+            <IconButton
+              className="generatorComparisonRemove"
+              size="small"
+              aria-label={`Remove ${generator.name} from comparison`}
+              onClick={() => props.onRemove(generator.name)}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
             <Typography variant="caption">
               {formatMoneyConcise(generator.buildCost)} ·{" "}
-              {Math.round(generator.yearsToBuild * 12)} mo
+              {formatBuildMonths(generator.yearsToBuild)}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               {formatWatts(
@@ -1104,6 +1113,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
         generators={comparedGenerators}
         outputShapes={outputShapes}
         onClear={() => setComparedNames([])}
+        onRemove={toggleCompare}
       />
       <List ref={listRef} dense className="scrollable cardList">
         {generators.map((g: GeneratorShoppingType) => {

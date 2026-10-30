@@ -221,7 +221,7 @@ function WeatherResilienceSection(props: {
             Solar trackers
           </Typography>
           <Typography variant="body2" color="textSecondary">
-            More morning and evening power. Trackers stow ahead of hail.
+            About 20% more morning and evening power.
           </Typography>
         </div>
       )}
@@ -366,10 +366,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
       {underConstruction && (
         <section className="facilityDetailSection" aria-label="Construction">
           <dl className="facilityStats">
-            <Stat
-              label="Nameplate capacity"
-              value={formatWatts(facility.peakW)}
-            />
+            <Stat label="Capacity" value={formatWatts(facility.peakW)} />
             {storage && (
               <Stat
                 label="Energy capacity"
@@ -377,14 +374,12 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               />
             )}
             <Stat
-              label="Refund if cancelled"
+              label="Refund if canceled"
               value={
                 <>
                   {formatMoneyConcise(facilityCashBack(facility, date.minute))}
                   {facility.loanAmountLeft > 0 && (
-                    <span className="facilityStatNote">
-                      After settling the loan
-                    </span>
+                    <span className="facilityStatNote">After loan payoff</span>
                   )}
                 </>
               }
@@ -398,10 +393,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             Operation
           </Typography>
           <dl className="facilityStats">
-            <Stat
-              label="Nameplate capacity"
-              value={formatWatts(facility.peakW)}
-            />
+            <Stat label="Capacity" value={formatWatts(facility.peakW)} />
             {!storage && maxOutputFactor < 1 && (
               <Stat
                 label="Current max output"
@@ -449,7 +441,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             )}
             {storage && (
               <Stat
-                label="Round-trip efficiency"
+                label="Efficiency"
                 value={formatPercent(storage.roundTripEfficiency)}
               />
             )}

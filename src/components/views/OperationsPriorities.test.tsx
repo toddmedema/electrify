@@ -30,9 +30,7 @@ test("a current shortage never replaces the two pinned requirements or repeats t
   });
   render(<OperationsPriorities {...props(game)} />);
   expect(screen.getByRole("heading", { name: "Goals" })).toBeVisible();
-  expect(
-    screen.getByRole("button", { name: /Keep the utility solvent/ }),
-  ).toBeVisible();
+  expect(screen.getByRole("button", { name: /Stay solvent/ })).toBeVisible();
   expect(
     screen.getByRole("button", {
       name: /Keep power flowing/,
@@ -46,9 +44,6 @@ test("players can choose concurrent goals and their choices survive remount", as
   const passed = props(createGame({ scenarioId: 100 }));
   const view = render(<OperationsPriorities {...passed} />);
   await user.click(screen.getByRole("button", { name: "Choose pinned goals" }));
-  await user.click(
-    screen.getByRole("menuitemcheckbox", { name: "Keep power flowing" }),
-  );
   await user.click(
     screen.getByRole("menuitemcheckbox", {
       name: /Retain the community/,
@@ -65,9 +60,7 @@ test("players can choose concurrent goals and their choices survive remount", as
       name: /Retain the community/,
     }),
   ).not.toBeInTheDocument();
-  await user.click(
-    screen.getByRole("button", { name: /Keep the utility solvent/ }),
-  );
+  await user.click(screen.getByRole("button", { name: /Stay solvent/ }));
   expect(passed.onEvidence).toHaveBeenCalledWith("finances");
 });
 

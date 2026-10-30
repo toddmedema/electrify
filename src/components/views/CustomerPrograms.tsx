@@ -439,8 +439,8 @@ function useEstimate<T>(
     return {
       error:
         state.reason === "startup"
-          ? "Could not start the preview. Reopen the program to retry."
-          : "Could not estimate this change. Reopen the program to retry.",
+          ? "Couldn't start the preview. Reopen the program to retry."
+          : "Couldn't estimate this change. Reopen the program to retry.",
     };
   }
   return {};

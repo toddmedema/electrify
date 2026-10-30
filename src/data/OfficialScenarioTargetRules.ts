@@ -144,7 +144,7 @@ export const END_OF_ERA_RULES: OfficialScenarioRuleDefinition = {
           "Operating coal plants at least 30 years old temporarily produce less power.",
         startMonth: 73,
         durationMonths: 24,
-        preview: "Aging coal plants producing less power.",
+        preview: "Aging coal plants will produce less power.",
         effects: {
           outputMultipliersBySelector: [
             {
@@ -178,7 +178,7 @@ export const END_OF_ERA_RULES: OfficialScenarioRuleDefinition = {
         title: "Aging slowdown ends",
         message: "Older coal plants return to full output.",
         startMonth: 97,
-        preview: "Temporary limits on older coal plants lifting.",
+        preview: "Temporary limits on older coal plants will lift.",
       },
       {
         id: "compliance",
@@ -186,7 +186,7 @@ export const END_OF_ERA_RULES: OfficialScenarioRuleDefinition = {
         message: "Coal running costs rise and output is limited.",
         startMonth: 181,
         durationMonths: 60,
-        preview: "Coal plants costing more to run and producing less power.",
+        preview: "Coal plants will cost more to run and produce less power.",
         effects: {
           operatingCostMultipliersByFuel: {
             Coal: byDifficulty(END_OF_ERA_BALANCE, (balance) => balance.coalOM),
@@ -205,7 +205,7 @@ export const END_OF_ERA_RULES: OfficialScenarioRuleDefinition = {
         message:
           "Review the grid's recorded results for the previous twelve months.",
         startMonth: 217,
-        preview: "Assessing the move away from coal.",
+        preview: "The move away from coal will be assessed.",
       },
     ],
     objectives: [
@@ -398,7 +398,7 @@ export const HURRICANE_RULES: OfficialScenarioRuleDefinition = {
         message:
           "Storm repairs finish. Affected generator output and oil prices return to normal.",
         startMonth: { from: 102, to: 107 },
-        preview: "Plant output and oil prices returning to normal.",
+        preview: "Plant output and oil prices will return to normal.",
         report: {
           id: "restoration-affected",
           kind: "affectedFacilities",
