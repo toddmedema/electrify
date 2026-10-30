@@ -170,7 +170,7 @@ test("retention shows completed-month customers against the final target while r
     "Retain ≥90% of customers",
   );
   expect(requirement(low, "retention").definition).toContain(
-    "recorded starting customers",
+    "recorded customer baseline",
   );
 });
 
