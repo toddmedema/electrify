@@ -570,8 +570,15 @@ export default class Compositor extends React.Component<Props, {}> {
             key={transitionKey}
             nodeRef={transitionNodeRef}
             onEnter={() => {
-              if (transitionNodeRef.current)
-                transitionNodeRef.current.inert = false;
+              const screen = transitionNodeRef.current;
+              if (screen) {
+                screen.inert = false;
+                // A quick Back can reuse the still-mounted home screen. Reset on every
+                // entrance, including those that do not rerun its initial-focus effect.
+                screen
+                  .querySelector<HTMLElement>("#menuCard [data-main-action]")
+                  ?.focus({ preventScroll: true });
+              }
             }}
             onExit={() => {
               // The outgoing screen stays visible while fading, but can't receive input.

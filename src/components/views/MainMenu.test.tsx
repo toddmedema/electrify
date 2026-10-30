@@ -92,9 +92,14 @@ describe("MainMenu", () => {
       ).not.toBeInTheDocument();
     },
   );
-  it("offers the gallery in the browser", async () => {
+  it("offers the gallery before Manual in the browser", async () => {
     const onAchievements = jest.fn();
     render(<MainMenu {...props({ onAchievements })} />);
+    expect(
+      within(screen.getByRole("navigation", { name: "Game resources" }))
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Achievements", "Manual", "Settings"]);
     await userEvent.click(screen.getByRole("button", { name: "Achievements" }));
     expect(onAchievements).toHaveBeenCalledTimes(1);
   });
@@ -137,7 +142,7 @@ describe("MainMenu", () => {
       screen.getByRole("button", { name: "Continue" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Start a new game" }),
+      screen.getByRole("button", { name: "New game" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Game resources" }),
@@ -147,7 +152,7 @@ describe("MainMenu", () => {
     ).getAllByRole("button");
     expect(buttons.map((button) => button.textContent)).toEqual([
       "Continue",
-      "Start a new game",
+      "New game",
       "Saved games",
     ]);
     await userEvent.click(screen.getByRole("button", { name: "Saved games" }));
@@ -178,7 +183,7 @@ describe("MainMenu", () => {
     await user.hover(screen.getByRole("button", { name: "Manual" }));
     expect(screen.getByRole("button", { name: "Manual" })).toHaveFocus();
     await user.keyboard("{ArrowUp}");
-    expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Achievements" })).toHaveFocus();
     clientRects.mockRestore();
   });
 
@@ -189,13 +194,13 @@ describe("MainMenu", () => {
     const user = userEvent.setup();
     render(<MainMenu {...props()} />);
     const play = screen.getByRole("button", { name: "Play" });
-    const manual = screen.getByRole("button", { name: "Manual" });
+    const achievements = screen.getByRole("button", { name: "Achievements" });
     await user.keyboard("{ArrowDown}");
-    expect(manual).toHaveFocus();
+    expect(achievements).toHaveFocus();
 
     // Animated layout can send a boundary event without the player moving the pointer.
     fireEvent.pointerOver(play);
-    expect(manual).toHaveFocus();
+    expect(achievements).toHaveFocus();
 
     // Deliberate pointer movement still selects the button under the pointer.
     await user.hover(play);
