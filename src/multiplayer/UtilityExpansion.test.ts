@@ -1,4 +1,5 @@
-import "../Store";
+import { store } from "../Store";
+import { YEARS_PER_TICK, TICK_MINUTES } from "../Constants";
 import { loadSimData } from "../testing/SimData";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { acquisitionQuote } from "../helpers/Expansion";
@@ -113,4 +114,58 @@ it("host rejects forged human-target ownership and wrong-target connections", ()
     }),
   ).toMatch(/changed|quote/i);
   expect(JSON.stringify(world.grids[0])).toBe(before);
+});
+
+it("host completes an owned-area plant without scheduling renderer notifications", () => {
+  const world = ready();
+  const quote = acquisitionQuote(world.grids[0], "ridge-electric")!;
+  expect(
+    command(world, {
+      kind: "action",
+      name: "acquireUtility",
+      payload: {
+        targetId: quote.targetId,
+        financed: true,
+        quoteKey: quote.quoteKey,
+      },
+    }),
+  ).toBeUndefined();
+  expect(
+    command(world, {
+      kind: "action",
+      name: "buildFacility",
+      payload: {
+        facility: { name: "Natural Gas CC", peakW: 100e6 },
+        financed: true,
+        operatingAreaId: "ridge-electric",
+      },
+    }),
+  ).toBeUndefined();
+  const project = world.grids[0].facilities.find(
+    (facility) =>
+      facility.operatingAreaId === "ridge-electric" &&
+      facility.yearsToBuildLeft > 0,
+  )!;
+  expect(project).toBeDefined();
+  project.yearsToBuildLeft = YEARS_PER_TICK / 2;
+  for (const seat of world.seats)
+    applyCommand(world, seat.id, {
+      matchId: world.matchId,
+      epoch: world.epoch,
+      sequence: (world.sequences[seat.id] || 0) + 1,
+      command: { kind: "ready" },
+    });
+  jest.useFakeTimers();
+  const dispatch = jest.spyOn(store, "dispatch");
+  try {
+    stepWorld(world);
+    expect(project.yearsToBuildLeft).toBe(0);
+    expect(world.grids[0].date.minute).toBe(TICK_MINUTES);
+    jest.runOnlyPendingTimers();
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(world.grids[0].multiplayer?.peers).toHaveLength(1);
+  } finally {
+    dispatch.mockRestore();
+    jest.useRealTimers();
+  }
 });

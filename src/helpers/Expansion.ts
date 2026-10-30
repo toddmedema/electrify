@@ -446,7 +446,6 @@ export function operatingAreaView(
   return {
     ...state,
     operatingAreaId: area.id,
-    multiplayer: undefined,
     location: definition.location,
     startingDemandScale: definition.demandScale,
     demandShapeExponent: definition.demandShapeExponent,

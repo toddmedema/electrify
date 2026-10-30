@@ -11,7 +11,7 @@ import {
   retrofitCost,
 } from "../../helpers/Hazards";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { FacilityOperatingType, GameType } from "../../Types";
+import { FacilityOperatingType, GameType, isStorage } from "../../Types";
 import userEvent from "@testing-library/user-event";
 import FacilityDetails from "./FacilityDetails";
 import { UnitsContext } from "./UnitsContext";
@@ -472,6 +472,8 @@ describe("weather resilience details", () => {
 it("reports hydro inflow from the plant's operating area", () => {
   const game = createGame({ scenarioId: 116 });
   const hydro = game.facilities.find((facility) => facility.fuel === "Hydro")!;
+  if (isStorage(hydro))
+    throw new Error("Expected an operating hydro generator");
   const facility: FacilityOperatingType = {
     ...hydro,
     operatingAreaId: "valley-electric",
