@@ -265,9 +265,11 @@ for (const theme of ["light", "dark"]) {
     await expect(invitation).toContainText("even offline");
     await expect(invitation).toContainText("sign in later from Saved games");
     await checkDialogLayout(page, "Back up your saves to the cloud", info);
-    if (theme === "light" && info.project.name === "mobile-390px") {
-      await screenshot(page, info, "cloud-invitation-mobile-light.png");
-    }
+    await screenshot(
+      page,
+      info,
+      `cloud-invitation-${info.project.name}-${theme}.png`,
+    );
     await invitation
       .getByRole("button", { name: "Continue without syncing", exact: true })
       .click();

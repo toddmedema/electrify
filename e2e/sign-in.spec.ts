@@ -17,7 +17,7 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await expectMailingListChoice(page);
     const mailingList = page.getByRole("checkbox", {
-      name: "Sign me up for the Electrify mailing list",
+      name: "Join the Electrify mailing list",
     });
     await mailingList.check();
     await expect(mailingList).toBeChecked();

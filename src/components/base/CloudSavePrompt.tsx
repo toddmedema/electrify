@@ -5,6 +5,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Stack,
   Typography,
 } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
@@ -64,33 +65,33 @@ export default function CloudSavePrompt(): React.JSX.Element {
       aria-labelledby="cloud-prompt-title"
       aria-describedby="cloud-prompt-description"
     >
-      <DialogTitle id="cloud-prompt-title">
+      <DialogTitle id="cloud-prompt-title" sx={{ pb: 1 }}>
         Back up your saves to the cloud
       </DialogTitle>
-      <DialogContent>
-        <Typography id="cloud-prompt-description">
-          Sign in with Google to keep a private cloud backup and continue on
-          another device. Your games still save and load on this device, even
-          offline.
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          You can also sign in later from Saved games.
-        </Typography>
-        <MailingListCheckbox
-          checked={mailingList}
-          onChange={setMailingList}
-          disabled={busy}
-        />
-        {error && (
-          <Typography color="error" role="alert" sx={{ mt: 2 }}>
-            Sign-in didn't finish. Please try again.
+      <DialogContent sx={{ pb: 0 }}>
+        <Stack spacing={1.5} useFlexGap>
+          <Typography id="cloud-prompt-description">
+            Sign in to keep a private cloud backup and continue on another
+            device. Your games still save and load on this device, even offline.
           </Typography>
-        )}
+          <Typography variant="body2" color="text.secondary">
+            You can also sign in later from Saved games.
+          </Typography>
+          <MailingListCheckbox
+            checked={mailingList}
+            onChange={setMailingList}
+            disabled={busy}
+          />
+          {error && (
+            <Typography color="error" role="alert">
+              Sign-in didn't finish. Please try again.
+            </Typography>
+          )}
+        </Stack>
       </DialogContent>
-      <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
-        <Button disabled={busy} onClick={dismiss}>
-          Continue without syncing
-        </Button>
+      <DialogActions
+        sx={{ flexDirection: "column", alignItems: "stretch", pt: 1, gap: 1 }}
+      >
         <Button
           variant="contained"
           disabled={busy}
@@ -103,6 +104,9 @@ export default function CloudSavePrompt(): React.JSX.Element {
           }}
         >
           {busy ? "Signing in…" : "Sign in with Google"}
+        </Button>
+        <Button disabled={busy} onClick={dismiss}>
+          Continue without syncing
         </Button>
       </DialogActions>
     </Dialog>

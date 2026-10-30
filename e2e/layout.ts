@@ -6,7 +6,7 @@ export async function expectMailingListChoice(
   buttonName = "Sign in with Google",
 ) {
   const checkbox = scope.getByRole("checkbox", {
-    name: "Sign me up for the Electrify mailing list",
+    name: "Join the Electrify mailing list",
   });
   const button = scope.getByRole("button", { name: buttonName, exact: true });
   await expect(checkbox).toHaveCount(1);

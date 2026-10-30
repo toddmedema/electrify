@@ -4,7 +4,7 @@ Web sign-in uses the existing Google Firebase OAuth popup. The auth-state
 listener starts profile, achievement and cloud-save sync. The Steam desktop
 edition continues using Steam accounts.
 
-Each web sign-in entry point includes an unchecked “Sign me up for the Electrify
+Each web sign-in entry point includes an unchecked “Join the Electrify
 mailing list” checkbox. Choosing it subscribes the account email after a successful
 Google login. Leaving it unchecked, cancelling OAuth, restoring an existing
 session or playing through Steam never initiates a subscription. The choice is

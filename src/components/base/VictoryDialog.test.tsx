@@ -79,7 +79,7 @@ describe("VictoryDialog", () => {
       const onLogin = jest.fn();
       renderDialog({ loggedIn: false, onLogin });
       const checkbox = screen.getByRole("checkbox", {
-        name: "Sign me up for the Electrify mailing list",
+        name: "Join the Electrify mailing list",
       });
       expect(checkbox).not.toBeChecked();
       if (mailingList) await userEvent.click(checkbox);

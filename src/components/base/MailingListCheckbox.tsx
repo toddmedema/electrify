@@ -14,14 +14,16 @@ export default function MailingListCheckbox({
       sx={{ m: 0, minHeight: 44 }}
       control={
         <Checkbox
+          size="small"
+          sx={{ width: 44, height: 44, p: 1.5, ml: -1.5, flexShrink: 0 }}
           checked={checked}
           onChange={(_, value) => onChange(value)}
           disabled={disabled}
         />
       }
       label={
-        <Typography variant="body2">
-          Sign me up for the Electrify mailing list
+        <Typography component="span" variant="body2">
+          Join the Electrify mailing list
         </Typography>
       }
     />

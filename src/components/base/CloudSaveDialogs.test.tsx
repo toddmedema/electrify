@@ -124,7 +124,7 @@ it("prepares one snapshot and creates a frozen share link after sign-in", async 
     return true;
   });
   const checkbox = within(sharing).getByRole("checkbox", {
-    name: "Sign me up for the Electrify mailing list",
+    name: "Join the Electrify mailing list",
   });
   expect(checkbox).not.toBeChecked();
   await user.click(checkbox);
@@ -520,7 +520,7 @@ it.each([false, true])(
       cloudPromptRequested: true,
     });
     const checkbox = screen.getByRole("checkbox", {
-      name: "Sign me up for the Electrify mailing list",
+      name: "Join the Electrify mailing list",
     });
     expect(checkbox).not.toBeChecked();
     if (mailingList) await userEvent.click(checkbox);
@@ -553,7 +553,7 @@ it.each([false, true])(
   async (mailingList) => {
     renderWithSaves(<CloudSaveStatus />, { cloudState: "signedOut" });
     const checkbox = screen.getByRole("checkbox", {
-      name: "Sign me up for the Electrify mailing list",
+      name: "Join the Electrify mailing list",
     });
     expect(checkbox).not.toBeChecked();
     if (mailingList) await userEvent.click(checkbox);

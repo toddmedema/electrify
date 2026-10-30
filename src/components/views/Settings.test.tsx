@@ -67,7 +67,7 @@ describe("Settings", () => {
     const onLogin = jest.fn();
     const view = renderSettings({ onLogin });
     const checkbox = screen.getByRole("checkbox", {
-      name: "Sign me up for the Electrify mailing list",
+      name: "Join the Electrify mailing list",
     });
     const signIn = screen.getByRole("button", { name: "Sign in with Google" });
     expect(checkbox).not.toBeChecked();
@@ -83,7 +83,7 @@ describe("Settings", () => {
     renderSettings();
     expect(
       screen.getByRole("checkbox", {
-        name: "Sign me up for the Electrify mailing list",
+        name: "Join the Electrify mailing list",
       }),
     ).not.toBeChecked();
   });

@@ -59,7 +59,7 @@ describe("NewGameDetails leaderboard", () => {
     async (mailingList) => {
       render(<NewGameDetails {...props()} />);
       const checkbox = screen.getByRole("checkbox", {
-        name: "Sign me up for the Electrify mailing list",
+        name: "Join the Electrify mailing list",
       });
       expect(checkbox).not.toBeChecked();
       if (mailingList) await userEvent.click(checkbox);
