@@ -67,8 +67,6 @@ function requiredWindow(
 
 export function objectiveTarget(objective: CompiledRuleObjective): number {
   switch (objective.metric) {
-    case "monthlyReliability":
-      return objective.minDemandServedShare;
     case "customerRetention":
     case "cohortRetention":
       return objective.minRetainedShare;
@@ -98,7 +96,6 @@ export function objectiveTargetMet(
   if (!nonnegative(observed)) return false;
   const target = objectiveTarget(objective);
   return [
-    "monthlyReliability",
     "customerRetention",
     "localFuelShare",
     "utilityOwnership",
@@ -178,10 +175,6 @@ export function objectiveMonthObservation(
   let numerator: number | undefined;
   let denominator: number | undefined = 1;
   switch (objective.metric) {
-    case "monthlyReliability":
-      numerator = row.supplyWh;
-      denominator = row.demandWh;
-      break;
     case "customerRetention":
       numerator = row.customers;
       denominator = baseline;
@@ -395,10 +388,6 @@ export function evaluateScenarioObjectives(
       invalid = true;
     let failed = false;
     switch (objective.metric) {
-      case "monthlyReliability":
-        if (ratios.length) result.observed = Math.min(...ratios);
-        failed = ratios.some((value) => !objectiveTargetMet(objective, value));
-        break;
       case "customerRetention": {
         const latest = entry?.observations
           .filter(([month]) => month < context.completedMonths)
@@ -466,8 +455,6 @@ export function evaluateScenarioObjectives(
         objective.metric === "customerRetention" && !ended
           ? "The required customer count cannot be reached by the deadline, even with the fastest possible growth."
           : {
-              monthlyReliability:
-                "At least one completed month supplied less than the required share of customer demand.",
               customerRetention:
                 "Customers at the deadline were below the required share of starting customers.",
               emissionsBudget:

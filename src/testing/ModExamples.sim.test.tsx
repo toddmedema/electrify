@@ -1,3 +1,4 @@
+import { hasChronicBlackouts } from "../helpers/ObjectiveRules";
 import { ruleChoices } from "../helpers/ScenarioRuleDependencies";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import {
@@ -133,7 +134,9 @@ for (const id of MOD_EXAMPLE_IDS) {
           expect(result.violations).toEqual([]);
           expect(result.outcome).toBe("completed");
           expect(result.months).toHaveLength(scenario.durationMonths);
-          expect(result.objectiveResults.length).toBeGreaterThan(0);
+          expect(result.objectiveResults).toHaveLength(
+            scenario.mod!.rules.objectives.length,
+          );
           expect(
             result.objectiveResults.every(
               (goal) => goal.status === "completed",
@@ -162,7 +165,7 @@ for (const id of MOD_EXAMPLE_IDS) {
   }
 }
 
-test("neglecting expansion in the funded connection example really fails its unchanged reliability goal", () => {
+test("neglecting expansion in the funded connection example hits the shared reliability rule", () => {
   const id = "funded-or-phased-connection";
   const { pack, scenario } = modExampleScenario(id);
   const decision = ruleChoices(scenario.mod!.rules)[0];
@@ -177,18 +180,7 @@ test("neglecting expansion in the funded connection example really fails its unc
   });
   expect(result.violations).toEqual([]);
   expect(result.outcome).toBe("fired");
-  expect(result.firedAtMonth).toBe(73);
-  expect(result.objectiveResults).toContainEqual(
-    expect.objectContaining({
-      id: "connection-reliability",
-      status: "failed",
-      target: 0.995,
-      observedMonths: 1,
-    }),
+  expect(hasChronicBlackouts([...result.months].reverse(), "Employee")).toBe(
+    true,
   );
-  expect(
-    result.objectiveResults.find(
-      (goal) => goal.id === "connection-reliability",
-    )!.observed,
-  ).toBeLessThan(0.995);
 });

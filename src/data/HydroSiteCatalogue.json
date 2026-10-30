@@ -10476,6 +10476,7 @@
   "inventories": {
     "BurlingtonVT": {
       "status": "researched",
+      "newConstructionAllowed": false,
       "locationLat": 44.4759,
       "locationLong": -73.2121,
       "siteIds": ["scenario-116-champlain-hydro-site"],
@@ -10483,6 +10484,7 @@
     },
     "RutlandVT": {
       "status": "researched",
+      "newConstructionAllowed": false,
       "locationLat": 43.6106,
       "locationLong": -72.9726,
       "siteIds": ["scenario-116-valley-hydro-site"],

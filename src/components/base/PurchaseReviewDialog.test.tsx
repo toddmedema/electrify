@@ -93,7 +93,8 @@ describe("PurchaseReviewDialog", () => {
     const rejected = jest.fn().mockResolvedValue(false);
     const { button } = renderDialog({ onPurchase: rejected });
     fireEvent.click(button("Take loan"));
-    await waitFor(() => expect(rejected).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(button("Take loan")).toBeEnabled());
+    expect(rejected).toHaveBeenCalledTimes(1);
     fireEvent.click(button("Take loan"));
     expect(rejected).toHaveBeenCalledTimes(2);
   });

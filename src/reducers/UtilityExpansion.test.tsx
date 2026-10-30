@@ -1,3 +1,5 @@
+import { runMonths } from "../testing/SimulationTestHelpers";
+import { retrofitCost, retrofittedResilience } from "../helpers/Hazards";
 import { TICKS_PER_HOUR, GAME_TO_REAL_YEARS } from "../Constants";
 import cloneDeep from "lodash.clonedeep";
 import { createGame } from "../testing/Simulator";
@@ -9,6 +11,7 @@ import reducer, {
   tickState,
   togglePauseTransmissionLine,
   recordExpansionMilestones,
+  retrofitFacility,
 } from "./Game";
 import { acquireUtility } from "./GameActions";
 import {
@@ -16,6 +19,7 @@ import {
   acquisitionQuote,
   networkCarryingValue,
   ownedUtility,
+  gameForOperatingArea,
 } from "../helpers/Expansion";
 import {
   getTimeFromTimeline,
@@ -346,3 +350,37 @@ it.each(["", "not-an-area", "valley-electric"])(
     ).toBe(game);
   },
 );
+
+test("acquired plant retrofit eligibility and completed design use its local area", () => {
+  const game = buy(ready("ridge-electric"), "ridge-electric");
+  const facility = game.facilities.find(
+    (plant) =>
+      plant.operatingAreaId === "ridge-electric" &&
+      plant.fuel === "Natural Gas",
+  )!;
+  facility.resilience = undefined;
+  // Give the company a warm headquarters: equipment in Vermont still needs Vermont protection.
+  game.location = { id: "Miami", name: "Miami", lat: 25.76, long: -80.19 };
+  const local = gameForOperatingArea(game, "ridge-electric")!;
+  const cost = retrofitCost(facility, local, "coldWeatherPackage");
+  expect(cost).toBeDefined();
+  expect(retrofitCost(facility, game, "coldWeatherPackage")).toBeUndefined();
+  const design = retrofittedResilience(facility, local, "coldWeatherPackage");
+  const installed = cloneDeep(
+    reducer(
+      game,
+      retrofitFacility({
+        facilityId: facility.id,
+        upgrade: "coldWeatherPackage",
+      }),
+    ),
+  );
+  expect(
+    installed.facilities.find((plant) => plant.id === facility.id)!
+      .upgradeInProgress?.cost,
+  ).toBe(cost);
+  runMonths(installed, 1);
+  expect(
+    installed.facilities.find((plant) => plant.id === facility.id)!.resilience,
+  ).toEqual(design);
+});

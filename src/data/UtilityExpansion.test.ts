@@ -1,6 +1,11 @@
 import fs from "fs";
 import path from "path";
-import { DAYS_PER_YEAR, GAME_TO_REAL_YEARS, TICK_MINUTES } from "../Constants";
+import {
+  DAYS_PER_YEAR,
+  GAME_TO_REAL_YEARS,
+  TICK_MINUTES,
+  LOCATIONS,
+} from "../Constants";
 import { areaBaselineDemand } from "../helpers/AreaDemand";
 import { getDateFromMinute } from "../helpers/DateTime";
 import { weatherLocationIds } from "../helpers/WeatherLocations";
@@ -140,7 +145,7 @@ describe("Across the Valley catalog", () => {
   it("uses utility-scale authored lines and fresh seeds without a reliability override", () => {
     const scenario = SCENARIOS.find(({ id }) => id === 116)!;
     expect(scenario.seed).toBeUndefined();
-    expect(scenario.reliabilityObjective).toBeUndefined();
+    expect(scenario).not.toHaveProperty("reliabilityObjective");
     expect(scenario.durationMonths).toBe(240);
     expect(scenario.ownership).toBe("Investor");
     const corridors = corridorsForLocation(UTILITY_AREAS.champlain.location);
@@ -199,4 +204,39 @@ it("browser and worker weather initialization awaits every owned-area record", a
   } finally {
     global.fetch = originalFetch;
   }
+});
+
+it("inherited fictional hydro claims cannot become greenfield sites in custom games", () => {
+  for (const id of ["champlain", "valley-electric"] as const) {
+    const definition = UTILITY_AREAS[id];
+    const downloadedLocation = { ...definition.location, resources: undefined };
+    expect(
+      getHydroAvailability(
+        {
+          location: downloadedLocation,
+          scenarioId: 999,
+          facilities: [],
+          commissionedHydroSiteIds: [],
+        },
+        10e6,
+      ).status,
+    ).toBe("prohibited");
+    expect(
+      resolveStartingHydroSites(
+        downloadedLocation,
+        definition.facilities,
+      ).filter(Boolean),
+    ).toHaveLength(1);
+  }
+  expect(
+    getHydroAvailability(
+      {
+        location: LOCATIONS.PIT,
+        scenarioId: 999,
+        facilities: [],
+        commissionedHydroSiteIds: [],
+      },
+      10e6,
+    ).status,
+  ).toBe("available");
 });

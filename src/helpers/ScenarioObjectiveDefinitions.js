@@ -1,7 +1,5 @@
 /* Shared metric sentences for runtime, author tools and the offline editor schema. */
 const OBJECTIVE_DEFINITIONS = {
-  monthlyReliability:
-    "Delivered customer electricity divided by customer demand each completed month.",
   customerRetention:
     "Customers at the deadline divided by the run's recorded starting customers.",
   emissionsBudget:

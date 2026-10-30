@@ -12,8 +12,7 @@ const number = (
   const rounded = Number(value.toPrecision(6));
   const compared =
     comparison === undefined ? undefined : Number(comparison.toPrecision(6));
-  // Keep a measured value on its actual side of a nearby target. A rounded-up 100%
-  // beside a failed reliability verdict would contradict the recorded result.
+  // Keep a measured value on its actual side of a nearby target.
   const precise = comparison === undefined || rounded === compared;
   return formatNumber(precise ? value : rounded, {
     maximumSignificantDigits: precise ? 21 : 6,
@@ -27,7 +26,6 @@ export function objectiveValueText(
   comparison?: number,
 ): string {
   switch (objective.metric) {
-    case "monthlyReliability":
     case "customerRetention":
     case "cohortRetention":
     case "localFuelShare":
@@ -76,8 +74,6 @@ export function objectiveWindowText(
 export function objectiveTargetText(objective: CompiledRuleObjective): string {
   const target = objectiveValueText(objective, objectiveTarget(objective));
   switch (objective.metric) {
-    case "monthlyReliability":
-      return `≥${target} of demand monthly`;
     case "customerRetention":
       return `Retain ≥${target} of starting customers`;
     case "cohortRetention":
@@ -108,14 +104,12 @@ export function objectiveObservedText(result: ObjectiveResult): string {
     result.target,
   );
   const label =
-    result.metric === "monthlyReliability"
-      ? "Lowest "
-      : result.metric === "customerRetention"
-        ? "Latest month close "
-        : result.metric === "monthlyBilledRate" ||
-            result.metric === "monthEndDebt"
-          ? "Highest "
-          : "";
+    result.metric === "customerRetention"
+      ? "Latest month close "
+      : result.metric === "monthlyBilledRate" ||
+          result.metric === "monthEndDebt"
+        ? "Highest "
+        : "";
   return `${label}${value} · ${result.observedMonths}/${result.requiredMonths} months completed${result.status === "unverifiable" ? " · not verifiable" : ""}`;
 }
 

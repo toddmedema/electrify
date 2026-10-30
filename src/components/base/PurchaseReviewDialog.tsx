@@ -71,7 +71,7 @@ export interface PurchaseReviewDialogProps {
   /** A visible cancel action in addition to the dialog close control. */
   cancelLabel?: string;
   onClose: () => void;
-  /** Called at most once per opening, however quickly the buttons are clicked */
+  /** One submission at a time; resolving false unlocks a rejected purchase for retry. */
   onPurchase: (financed: boolean) => void | boolean | Promise<void | boolean>;
 }
 

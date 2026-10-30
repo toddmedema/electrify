@@ -11,6 +11,8 @@ export interface HydroSite {
   lon: number;
 }
 export interface HydroInventory {
+  /** Inherited fictional equipment does not establish a new development site. */
+  newConstructionAllowed?: boolean;
   status: "researched" | "unresearched";
   siteIds: string[];
   researchDisposition: string;
@@ -144,7 +146,8 @@ export function getHydroAvailability(state: HydroState, peakW: number) {
     | "empty"
     | "exhausted"
     | "too-large" =
-    state.location.resources?.hydro === false
+    state.location.resources?.hydro === false ||
+    inventory?.newConstructionAllowed === false
       ? "prohibited"
       : !inventory || inventory.status === "unresearched"
         ? "unavailable"

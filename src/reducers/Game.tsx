@@ -11,6 +11,7 @@ import {
   transferUtility,
   entitlementSources,
   operatingAreaView,
+  gameForOperatingArea,
   ownedIntertieCapacityW,
 } from "../helpers/Expansion";
 import {
@@ -1104,17 +1105,29 @@ function recordColdSnap(
  * rollover meets that month's weather with its upgrade. Forecasts use isUpgradingAt for the outage
  * and install technology conversions on their private fleet in supplyForecastPass.
  */
+/** Existing equipment keeps the geography of its operating area for quotes and upgrades. */
+function facilityOperatingContext(
+  state: GameType,
+  facility: FacilityOperatingType,
+): GameType | undefined {
+  return facility.operatingAreaId
+    ? gameForOperatingArea(state, facility.operatingAreaId)
+    : state;
+}
+
 function completeRetrofits(state: GameType, simulated = false) {
   state.facilities.forEach((facility) => {
     const upgrade = upgradeInProgress(facility);
     if (!upgrade || state.date.minute < upgrade.completesMinute) return;
+    const context = facilityOperatingContext(state, facility);
+    if (!context) return;
     if (upgrade.upgrade === "combinedCycle") {
-      completeGasConversion(facility, state);
+      completeGasConversion(facility, context);
       if (!simulated) desktopSimulationHooks()?.converted(state, facility.id);
     } else
       facility.resilience = retrofittedResilience(
         facility,
-        state,
+        context,
         upgrade.upgrade,
       );
     delete facility.upgradeInProgress;
@@ -2929,11 +2942,13 @@ function applyRetrofitFacility(
   if (!validRetrofitFacility(payload)) return false;
   const facility = state.facilities.find(({ id }) => id === payload.facilityId);
   if (!facility || facility.yearsToBuildLeft > 0) return false;
+  const context = facilityOperatingContext(state, facility);
+  if (!context) return false;
   const conversion = payload.upgrade === "combinedCycle";
   const cost =
     payload.upgrade === "combinedCycle"
-      ? gasConversionQuote(facility, state)?.cost
-      : retrofitCost(facility, state, payload.upgrade);
+      ? gasConversionQuote(facility, context)?.cost
+      : retrofitCost(facility, context, payload.upgrade);
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   if (cost === undefined || !Number.isFinite(cost) || cost < 0 || !now)
     return false;
@@ -3984,13 +3999,17 @@ export function* tickStatePhases(
       if (failure) {
         const summary = summarizeHistory(history);
         const yearsSurvived = state.date.year - state.startingYear;
+        const durationSurvived =
+          yearsSurvived > 0
+            ? `${yearsSurvived} ${yearsSurvived === 1 ? "year" : "years"}`
+            : `${state.date.monthsElapsed} ${state.date.monthsElapsed === 1 ? "month" : "months"}`;
         const failureMessage = () =>
           `${
             failure.outcome === "bankrupt"
               ? "You've run out of money."
               : failure.reason
           }
-                You survived for ${yearsSurvived} years,
+                You survived for ${durationSurvived},
                 earned ${formatMoneyConcise(summary.revenue)} in revenue
                 and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of greenhouse gases, measured as CO2e.`;
 
@@ -6289,8 +6308,10 @@ function supplyForecastPass(
           t.minute >= facility.upgradeInProgress.completesMinute &&
           facility.gasCycle === "simple"
         ) {
+          const context = facilityOperatingContext(newState, facility);
+          if (!context) return;
           completeGasConversion(facility, {
-            ...newState,
+            ...context,
             date: getDateFromMinute(
               facility.upgradeInProgress.completesMinute,
               state.startingYear,
@@ -6423,8 +6444,10 @@ function reforecastSupply(
       const converted =
         conversionMinute === undefined ? undefined : { ...facility };
       if (converted && conversionMinute !== undefined) {
+        const context = facilityOperatingContext(state, converted);
+        if (!context) return;
         completeGasConversion(converted, {
-          ...state,
+          ...context,
           date: getDateFromMinute(conversionMinute, state.startingYear),
         });
       }

@@ -3,7 +3,7 @@ import { GameType, ScenarioType } from "../../Types";
 import { MissionProjection } from "../../helpers/MissionProjection";
 import {
   gameObjectiveResults,
-  blackoutFiringThreshold,
+  reliabilityThreshold,
   formatRequiredShare,
 } from "../../helpers/ObjectiveRules";
 import { objectiveValueText } from "../../helpers/ObjectivePresentation";
@@ -69,14 +69,11 @@ export function scenarioLossSummary(
     const result = objectives.get(risk.id);
     if (risk.id === "cash") phrase = "Cash below $0";
     else if (risk.id === "survival")
-      phrase = `Demand served <${formatRequiredShare(blackoutFiringThreshold(game.difficulty))} for 3 months`;
+      phrase = `Demand served <${formatRequiredShare(reliabilityThreshold(game.difficulty))} for 3 consecutive months`;
     else if (result) {
       const objective = result.objective;
       const target = objectiveValueText(objective, result.target);
       switch (objective.metric) {
-        case "monthlyReliability":
-          phrase = `Demand served <${target}`;
-          break;
         case "customerRetention":
           phrase = `Customers retained <${target}`;
           break;

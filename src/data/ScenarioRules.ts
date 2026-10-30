@@ -137,10 +137,6 @@ type ObjectiveBase = { id: string; label: string; required?: boolean };
 type ObjectiveWindow = { fromMonth: number; throughMonth: number };
 export type RuleObjective = ObjectiveBase &
   (
-    | (ObjectiveWindow & {
-        metric: "monthlyReliability";
-        minDemandServedShare: number;
-      })
     | {
         metric: "customerRetention";
         minRetainedShare: number;
@@ -253,10 +249,6 @@ export type CompiledRuleObjective = ObjectiveBase & {
   required: boolean;
   inherited?: boolean;
 } & (
-    | (ObjectiveWindow & {
-        metric: "monthlyReliability";
-        minDemandServedShare: number;
-      })
     | {
         metric: "customerRetention";
         minRetainedShare: number;
