@@ -3986,6 +3986,20 @@ $pane_header_height: 48px;
     }
   }
 
+  // In a sheet, upcoming events share the list's one surface.
+  @media (max-width: 1023px) {
+    .upcomingEvents {
+      background: transparent;
+
+      .eventLogItem,
+      .eventLogItem.importance-NOTABLE,
+      .eventLogItem.importance-CRITICAL {
+        border-left: 0;
+        background: transparent;
+      }
+    }
+  }
+
   .eventLogItem {
     display: grid;
     grid-template-columns: 20px 1fr;
@@ -7211,19 +7225,25 @@ img[src$="/transmission.svg"] {
   font: inherit;
   cursor: pointer;
 }
-// The controls stay text-sized in the bar; a coarse pointer gets a 44px target around them.
+// The controls stay text-sized in the bar; a transparent target gives them full height.
+.gameMonthlyProfitButton,
+.gridHealthHelp {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 40px;
+    transform: translateY(-50%);
+  }
+}
 @media (pointer: coarse) {
   .gameMonthlyProfitButton,
   .gridHealthHelp {
-    position: relative;
     &::after {
-      content: "";
-      position: absolute;
-      top: 50%;
-      left: 0;
-      right: 0;
       height: 44px;
-      transform: translateY(-50%);
     }
   }
 }

@@ -280,7 +280,7 @@ it("shows lithium and iron-air efficiency before opening details", () => {
   );
   const table = screen.getByRole("table", { name: "storage properties" });
   expect(
-    within(table).queryByRole("row", { name: /Round-trip efficiency/ }),
+    within(table).queryByRole("row", { name: /Efficiency/ }),
   ).not.toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),

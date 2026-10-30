@@ -1,6 +1,7 @@
 import {
   BLACKOUT_OVER_TOAST,
   BLACKOUT_TOAST_PREFIX,
+  blackoutToastCanShow,
 } from "../helpers/BlackoutToast";
 import {
   matchesStartingFacility,
@@ -3535,8 +3536,9 @@ export function* tickStatePhases(
         // Pausing a plant is the usual way into a blackout, and it raises its own "Paused X /
         // UNDO" toast. There's only one snackbar slot, so stealing it would take the undo away
         // at the exact moment the player most wants it. The pulsing top bar and the red sky band
-        // already carry the blackout, so this toast yields rather than competes.
-        if (getStore().getState().ui.snackbar.open) {
+        // already carry the blackout, so this toast yields rather than competes. It still
+        // replaces the previous blackout toast, which would otherwise be stale.
+        if (!blackoutToastCanShow(getStore().getState().ui.snackbar)) {
           return;
         }
         getStore().dispatch(

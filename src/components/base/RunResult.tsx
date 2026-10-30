@@ -1,8 +1,11 @@
 import { Box, Typography } from "@mui/material";
-import numbro from "numbro";
 import { VictoryDebriefType, VictoryType } from "../../Types";
 import ConceptIcon from "./ConceptIcon";
-import { formatMoneyConcise, formatScore } from "../../helpers/Format";
+import {
+  formatCustomerCount,
+  formatMoneyConcise,
+  formatScore,
+} from "../../helpers/Format";
 import { scoreLabel } from "../../helpers/Scoring";
 import { formatLargeMass } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
@@ -77,7 +80,7 @@ export function RunDebrief({
     {
       concept: "customers" as const,
       label: "customers",
-      value: numbro(debrief.finalCustomers).format({ average: true }),
+      value: formatCustomerCount(debrief.finalCustomers),
     },
     {
       concept: "danger" as const,

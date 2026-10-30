@@ -28,6 +28,7 @@ import GameWorkspace from "./base/GameWorkspace";
 import { GAME_TOOLS, GameTool } from "./base/Navigation";
 import { restoreMenuFocus } from "./base/useMenuKeys";
 import DeferredSnackbar from "./base/DeferredSnackbar";
+import { isBlackoutToast } from "../helpers/BlackoutToast";
 import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
@@ -690,8 +691,10 @@ export default class Compositor extends React.Component<Props, {}> {
           </DialogActions>
         </Dialog>
         <DeferredSnackbar
+          // A blackout toast replacing another gets its own full timer.
+          key={isBlackoutToast(ui.snackbar.message) ? ui.snackbar.message : ""}
           overModal={ui.snackbar.overModal}
-          className={`snackbar ${isGameCard(this.props.card.name) ? "snackbar-above-nav" : ""}`}
+          className={`snackbar ${isGameCard(this.props.card.name) && !ui.snackbar.overModal ? "snackbar-above-nav" : ""}`}
           // Bottom left is the MUI default, which on a wide screen leaves the toast hanging
           // off the side of the centered app frame
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
