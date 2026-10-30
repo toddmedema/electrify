@@ -8123,3 +8123,41 @@ option {
   line-height: 20px;
   white-space: normal;
 }
+
+.acquisitionReviewIntro {
+  display: grid;
+  gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.transmissionAcquisition {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding-block: 8px;
+
+  .MuiButton-root {
+    min-height: 40px;
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
+}
+
+.utilityAcquisitionHint {
+  display: block;
+}
+
+.facilityAreaLabel {
+  display: block;
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.buildOperatingArea {
+  padding: 8px 16px 12px;
+  box-sizing: border-box;
+}

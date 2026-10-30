@@ -1,0 +1,226 @@
+import * as React from "react";
+import { Button, Typography } from "@mui/material";
+import DecisionDialog from "./DecisionDialog";
+import { AcquireUtilityAction, GameType } from "../../Types";
+import { useAppDispatch } from "../../Store";
+import {
+  openPolicyDecision,
+  closePolicyDecision,
+} from "../../reducers/GameActions";
+import { previewUtilityAcquisition } from "../../reducers/Game";
+import { acquisitionQuote } from "../../helpers/Expansion";
+import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
+import { currentTick } from "../../helpers/GameSelectors";
+import PurchaseReviewDialog from "./PurchaseReviewDialog";
+import { useBuildCash } from "./useBuildCash";
+
+interface Props {
+  game: GameType;
+  targetId: string;
+  onClose: () => void;
+  onAcquire: (payload: AcquireUtilityAction) => boolean | Promise<boolean>;
+}
+
+function marginText(marginW: number | undefined): string {
+  if (marginW === undefined) return "Not owned";
+  return marginW < 0
+    ? `${formatWatts(-marginW)} shortfall`
+    : `${formatWatts(marginW)} spare`;
+}
+
+/** Reviews the same dated seller snapshot that the owning purchase API validates. */
+export default function AcquisitionReviewDialog({
+  game,
+  targetId,
+  onClose,
+  onAcquire,
+}: Props): React.JSX.Element | null {
+  const dispatch = useAppDispatch();
+  const [error, setError] = React.useState<string>();
+  React.useEffect(() => {
+    const token = `acquisition:${targetId}`;
+    dispatch(openPolicyDecision(token));
+    return () => {
+      dispatch(closePolicyDecision(token));
+    };
+  }, [dispatch, targetId]);
+  const quote = acquisitionQuote(game, targetId);
+  const cash = useBuildCash(currentTick(game)?.cash ?? 0);
+  const preview = React.useMemo(
+    () => previewUtilityAcquisition(game, targetId, true),
+    [game, targetId],
+  );
+  if (!quote)
+    return (
+      <DecisionDialog
+        open
+        title="Acquisition unavailable"
+        onClose={onClose}
+        actions={<Button onClick={onClose}>Cancel</Button>}
+      >
+        <Typography role="alert">
+          This utility is no longer available to acquire. Review your
+          connections and current ownership.
+        </Typography>
+      </DecisionDialog>
+    );
+  const valley = quote.targetId === "valley-electric";
+
+  return (
+    <PurchaseReviewDialog
+      open
+      title={`Acquire ${quote.name}?`}
+      titleId="utility-acquisition-title"
+      cash={cash}
+      buildCost={quote.equityPrice}
+      cashOnlyFee={quote.fee}
+      interestRate={game.interestRate}
+      cancelLabel="Cancel"
+      upkeepPerMonth={quote.networkOMPerMonth}
+      upkeepLabel="Service-network costs"
+      upkeepDetail="Operating costs continue alongside the acquired plants, purchased power and debt payments."
+      preface={
+        <div className="acquisitionReviewIntro">
+          {error && (
+            <Typography role="alert" color="error">
+              {error}
+            </Typography>
+          )}
+          <Typography variant="body2">
+            Ownership, customers, plants and contracts transfer immediately.
+            Company-wide electricity prices apply to the expanded utility.
+          </Typography>
+          <Typography
+            variant="body2"
+            color={valley ? "warning.main" : "textSecondary"}
+          >
+            {valley
+              ? game.date.year >= 2017
+                ? "Valley’s nuclear contract is now 80MW (76MW deliverable), reduced in January 2017."
+                : "Valley’s nuclear contract falls from 160MW to 80MW in January 2017 (152MW to 76MW deliverable). Plan replacement supply."
+              : "Ridge’s industrial customers bring steadier demand, with greater exposure to gas prices and wind."}
+          </Typography>
+          {cash < quote.financedCashDue && (
+            <Typography variant="body2" color="warning.main">
+              Need {formatMoneyConcise(quote.financedCashDue)} cash for the down
+              payment and fee. You have {formatMoneyConcise(cash)}.
+            </Typography>
+          )}
+        </div>
+      }
+      leadingFacts={[
+        {
+          concept: "money",
+          label: "Seller equity price",
+          value: formatMoneyConcise(quote.equityPrice),
+          detail: `${formatMoneyConcise(quote.fee)} transaction fee, paid in cash with either option.`,
+        },
+        {
+          concept: "finances",
+          label: "Assumed debt",
+          value: formatMoneyConcise(quote.assumedDebt),
+          detail: `${formatMoneyConcise(quote.cashMonthlyDebtService)}/mo at 5% fixed interest over 20 years, including with a cash purchase. This debt remains after selling plants.`,
+        },
+      ]}
+      extraFacts={[
+        {
+          concept: "customers",
+          label: "Customers joining",
+          value: Math.round(quote.customers).toLocaleString(),
+          detail: `${Math.round(quote.addressablePool).toLocaleString()} addressable accounts. Tracked separately from Champlain’s original customers.`,
+        },
+        {
+          concept: "goal",
+          label: "Acquisition obligations",
+          value: "Acquire either utility by December 2014.",
+          detail:
+            "Retire acquired original oil plants by December 2023 and retain 90% of each area’s customers at the end of 2024. Acquisitions after 2023 exclude the original oil plant.",
+        },
+        {
+          concept: "finances",
+          label: "Combined debt payments with financing",
+          value: `${formatMoneyConcise(quote.monthlyDebtService)}/mo`,
+          detail: `${formatMoneyConcise(quote.newLoan)} new borrowing plus the assumed debt.`,
+        },
+        {
+          concept: "supply",
+          label: "Worst local supply margin",
+          value: preview
+            ? `${marginText(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
+            : "Forecast unavailable",
+          detail:
+            preview?.areaMargins
+              .map(
+                (area) =>
+                  `${area.name}: ${marginText(area.beforeW)} → ${marginText(area.afterW)}`,
+              )
+              .join(" · ") ??
+            "Includes local demand and the connection’s transfer limit.",
+        },
+        {
+          concept: "money",
+          label: "Projected month-end cash with financing",
+          value: preview
+            ? `${formatMoneyConcise(preview.beforeMonthlyCash)} → ${formatMoneyConcise(preview.afterMonthlyCash)}`
+            : "Forecast unavailable",
+        },
+        {
+          concept: "supply",
+          label: "Operating plants",
+          value: quote.facilities
+            .map(
+              (facility) => `${facility.name} ${formatWatts(facility.peakW)}`,
+            )
+            .join(" · "),
+          detail: quote.facilities
+            .map(
+              (facility) =>
+                `${facility.name}: ${facility.ageYears.toFixed(1)} years old`,
+            )
+            .join(" · "),
+        },
+        {
+          concept: "supply",
+          label: "Purchased power",
+          value: quote.contracts
+            .map(
+              (contract) =>
+                `${contract.name}: ${contract.balancing ? "up to " : ""}${formatWatts(contract.deliverableW)}${contract.balancing ? " · variable availability" : ""}`,
+            )
+            .join(" · "),
+          detail: quote.contracts
+            .map(
+              (contract) =>
+                `${contract.name}: ${formatMoneyConcise(contract.pricePerMWh)}/MWh ${contract.balancing ? "reference; price and availability vary. Not firm reserve." : "delivered"}`,
+            )
+            .join(" · "),
+        },
+      ]}
+      onClose={onClose}
+      onPurchase={async (financed) => {
+        setError(undefined);
+        try {
+          const accepted = await onAcquire({
+            targetId: quote.targetId,
+            financed,
+            quoteKey: quote.quoteKey,
+          });
+          if (accepted) {
+            onClose();
+            return true;
+          }
+          setError(
+            "The deal changed or cash is insufficient. Review the current terms and try again.",
+          );
+        } catch (reason) {
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "The purchase could not be completed. Please try again.",
+          );
+        }
+        return false;
+      }}
+    />
+  );
+}

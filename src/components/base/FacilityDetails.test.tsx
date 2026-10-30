@@ -468,3 +468,25 @@ describe("weather resilience details", () => {
     expect(screen.queryByRole("region", { name: "Upgrades" })).toBeNull();
   });
 });
+
+it("reports hydro inflow from the plant's operating area", () => {
+  const game = createGame({ scenarioId: 116 });
+  const hydro = game.facilities.find((facility) => facility.fuel === "Hydro")!;
+  const facility: FacilityOperatingType = {
+    ...hydro,
+    operatingAreaId: "valley-electric",
+    hydroWhPerMm: 1e6,
+  };
+  const tick = game.timeline.find(
+    (frame) => frame.minute === game.date.minute,
+  )!;
+  tick.hydroRunoffMm = 200;
+  tick.areaTicks = {
+    ...tick.areaTicks,
+    "valley-electric": { ...tick, areaTicks: undefined, hydroRunoffMm: 2 },
+  };
+  showDetails(game, facility);
+  const water = screen.getByRole("region", { name: "Water" });
+  expect(water).toHaveTextContent(/Inflow this month\s*2MWh/);
+  expect(water).not.toHaveTextContent(/Inflow this month\s*200MWh/);
+});

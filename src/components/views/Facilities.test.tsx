@@ -424,6 +424,25 @@ describe("the fleet list", () => {
     expect(onPause).toHaveBeenCalledWith(facility.id, facility.name);
   });
 
+  it("names the original Oil A retirement target in its direct sale confirmation", async () => {
+    const expansion = createGame({ scenarioId: 116 });
+    const oil = expansion.facilities.find(
+      (facility) => facility.startingAssetId === "scenario-116-champlain-oil-a",
+    )!;
+    const { onSell } = renderFacilities(expansion, oil.id);
+    await user.click(
+      screen.getByRole("button", {
+        name: "Sell Champlain Electric Oil A",
+      }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAccessibleName(
+      "Sell 40MW Champlain Electric Oil A facility?",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Sell" }));
+    expect(onSell).toHaveBeenCalledWith(oil.id);
+  });
+
   it("can sell the only facility left in a fleet", async () => {
     const onePlant = createGame({ scenarioId: 5 });
     const { onSell } = renderFacilities(onePlant, onePlant.facilities[0].id);

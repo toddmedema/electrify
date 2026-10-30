@@ -1,3 +1,6 @@
+import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
+import { UTILITY_TARGETS } from "../data/UtilityExpansion";
+import { currentTick } from "../helpers/GameSelectors";
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import {
   validRetrofitFacility,
@@ -12,6 +15,7 @@ import type {
   GameType,
   TradingPolicyType,
 } from "../Types";
+import { operatingAreaView } from "../helpers/Expansion";
 import type { gameSlice } from "../reducers/Game";
 import type * as GameActions from "../reducers/GameActions";
 
@@ -57,8 +61,12 @@ const dispatchPosition =
 const peerLine: Validator = (game, payload) => {
   const target = payload as { corridorId?: string; financed?: boolean };
   return !target ||
-    !game.multiplayer?.peers?.some(
-      (p) => p.corridor.id === target.corridorId,
+    !(
+      game.multiplayer?.peers?.some(
+        (p) => p.corridor.id === target.corridorId,
+      ) ||
+      (game.scenarioId === 116 &&
+        UTILITY_TARGETS.some((t) => t.corridorId === target.corridorId))
     ) ||
     typeof target.financed !== "boolean"
     ? { error: "Choose another player's intertie" }
@@ -85,9 +93,17 @@ const buildFacility: Validator = (game, payload) => {
   const build = payload as {
     facility?: Partial<FacilityShoppingType>;
     financed?: boolean;
+    operatingAreaId?: import("../Types").UtilityAreaId;
   };
   if (!build || !build.facility || typeof build.financed !== "boolean")
     return { error: "That build is unavailable" };
+  if (build.operatingAreaId !== undefined) {
+    const area = game.utilityExpansion?.areas.find(
+      (a) => a.id === build.operatingAreaId,
+    );
+    if (!area) return { error: "Choose an owned operating area" };
+    game = operatingAreaView(game, area);
+  }
   const requested = build.facility;
   const size = requested.peakWh ?? requested.peakW;
   if (
@@ -119,11 +135,30 @@ const buildFacility: Validator = (game, payload) => {
     return { error: "Choose valid facility options" };
   if (!isStorage(quote) && requested.resilience)
     quote = withResilienceOptions(quote, game, requested.resilience);
-  return { payload: { facility: quote, financed: build.financed } };
+  return {
+    payload: {
+      facility: quote,
+      financed: build.financed,
+      ...(build.operatingAreaId
+        ? { operatingAreaId: build.operatingAreaId }
+        : {}),
+    },
+  };
 };
 
 /** The co-op allowlist: every game action a player may send, with its payload check. */
 const GAME_COMMAND_VALIDATORS = {
+  acquireUtility: (game, payload) => {
+    if (!validAcquisitionAction(payload))
+      return { error: "Choose a valid acquisition" };
+    const quote = acquisitionQuote(game, payload.targetId);
+    if (!quote || quote.quoteKey !== payload.quoteKey)
+      return { error: "This acquisition quote has changed. Review it again." };
+    const due = payload.financed ? quote.financedCashDue : quote.cashDue;
+    return (currentTick(game)?.cash ?? -1) >= due
+      ? { payload }
+      : { error: "Not enough cash for this acquisition" };
+  },
   buildFacility,
   sellFacility: facility,
   togglePauseFacility: facility,

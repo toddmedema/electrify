@@ -28,6 +28,15 @@ export interface ScenarioIntertieAccess {
 }
 /** Fixed utility access allocations, not the full regional network. Never scale with live demand. */
 export const SCENARIO_INTERTIE_ACCESS: readonly ScenarioIntertieAccess[] = [
+  ...["vt-champlain-valley", "vt-champlain-ridge"].map((corridorId) => ({
+    scenarioId: 116,
+    locationId: "BurlingtonVT",
+    corridorId,
+    capacityW: 100e6,
+    availableSupplyW: 100e6,
+    importAccessWByTier: [40e6, 60e6, 80e6, 100e6] as const,
+    availableDemandW: 80e6,
+  })),
   {
     scenarioId: 100,
     locationId: "SF",
@@ -354,7 +363,12 @@ export function corridorsForGame(
     return [
       ...(game.multiplayer.peers?.map((p) => p.corridor) ?? []),
       ...corridorsForLocation(game.location)
-        .filter((c) => starting.includes(c.id))
+        .filter(
+          (c) =>
+            starting.includes(c.id) ||
+            (game.scenarioId === 116 &&
+              ["vt-champlain-valley", "vt-champlain-ridge"].includes(c.id)),
+        )
         .map((c) => effectiveCorridor(c.id, accessContextForGame(game))!),
     ];
   }

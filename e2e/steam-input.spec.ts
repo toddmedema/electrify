@@ -8,7 +8,7 @@ import type {
 } from "../src/Desktop";
 import type { InstalledMod } from "../src/mods/Types";
 import type { LobbyState } from "../src/multiplayer/Native";
-import { readSaveRecords } from "./save-fixture";
+import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
 const glyphs: InputFrame["glyphs"] = {
   up: { label: "D-pad up" },
@@ -67,7 +67,7 @@ async function select(
   const group = control.locator("..");
   if (
     (await control.getAttribute("tabindex")) === "-1" &&
-    (await group.getAttribute("role")) === "group"
+    ["group", "tablist"].includes((await group.getAttribute("role")) ?? "")
   ) {
     // Roving groups expose one vertical tab stop. Enter it before moving within
     // the group, just as a player does with the D-pad.
@@ -863,4 +863,71 @@ test("controller advances the first tutorial through inspection, chart and clock
   // Tutorial-hidden actions must stay unavailable through controller shortcuts too.
   await input(page, "build");
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+});
+
+test("controller reviews, cancels and confirms a utility acquisition", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=116");
+  const start = page.getByRole("button", { name: "Start game", exact: true });
+  await select(page, start);
+  await input(page, "confirm");
+  await expect(page.locator("#appbar:visible")).toBeVisible();
+  await input(page, "build");
+  const build = page.getByRole("region", { name: "Build", exact: true });
+  await select(
+    page,
+    build.getByRole("tab", { name: "Interties", exact: true }),
+  );
+  await input(page, "confirm");
+  await select(
+    page,
+    build.getByRole("button", { name: /Review purchase of .*Ridge Electric/ }),
+  );
+  await input(page, "confirm");
+  const dialog = page.getByRole("dialog");
+  await select(
+    page,
+    dialog.getByRole("button", { name: "Take loan", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(dialog).toHaveCount(0);
+  // Fixture advances only construction; the acquisition still uses its real owning action.
+  await editSavedGame(page, ({ game }) => {
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    for (const tick of game.timeline) tick.cash = 1e9;
+  });
+  await page.goto("/");
+  await select(
+    page,
+    page.getByRole("button", { name: "Continue", exact: true }),
+  );
+  await input(page, "confirm");
+  const line = page
+    .locator(".facilities:visible .transmissionLine")
+    .filter({ hasText: "Ridge Electric" });
+  await select(page, line.getByRole("button", { name: /^Inspect / }));
+  await input(page, "confirm");
+  const acquire = line.getByRole("button", {
+    name: "Acquire Ridge Electric",
+    exact: true,
+  });
+  await select(page, acquire);
+  await input(page, "confirm");
+  await expect(dialog).toHaveAccessibleName("Acquire Ridge Electric?");
+  await input(page, "back");
+  await expect(dialog).toHaveCount(0);
+  await expect(acquire).toBeFocused();
+  await input(page, "confirm");
+  await select(
+    page,
+    dialog.getByRole("button", { name: "Take loan", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(dialog).toHaveCount(0);
+  await expect(line).toContainText("Owned · Ridge Electric");
+  const saved = await readSavedGame(page);
+  expect(
+    saved?.utilityExpansion?.areas.some((area) => area.id === "ridge-electric"),
+  ).toBe(true);
 });

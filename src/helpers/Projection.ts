@@ -48,7 +48,12 @@ export interface ProjectionView {
   /** Private forecast fleet/loan facts for objectives that monthly chart rows cannot measure. */
   objectiveAssets?: Pick<
     ObjectiveMonthFacts,
-    "month" | "debtPrincipal" | "ownedFuels"
+    | "month"
+    | "debtPrincipal"
+    | "ownedFuels"
+    | "ownedUtilities"
+    | "ownedAssetIds"
+    | "minimumCohortRetention"
   >[];
   timeline: TickPresentFutureType[];
   sampled: TickPresentFutureType[];
@@ -156,6 +161,19 @@ export function projectionSignature(game: GameType): string {
     JSON.stringify(game.location),
     game.customerMarketSize,
     game.startingDemandScale,
+    JSON.stringify(
+      game.utilityExpansion && {
+        acquisitions: game.utilityExpansion.acquisitions,
+        areas: game.utilityExpansion.areas.map((area) => ({
+          id: area.id,
+          transferredCustomers: area.transferredCustomers,
+          pool: area.customerMarketSize,
+          activatedMinute: area.activatedMinute,
+          networkInitialValue: area.networkInitialValue,
+          policies: area.policies,
+        })),
+      },
+    ),
     game.creditPremium,
     JSON.stringify(game.loadAdditions),
     game.storyEffectsDisabled,
@@ -187,8 +205,14 @@ function buildProjection(
   const needsAssets = scenarioObjectiveDefinitions(
     getScenario(game.scenarioId, game.customScenario),
     game,
-  ).some(
-    ({ metric }) => metric === "monthEndDebt" || metric === "fuelRetirement",
+  ).some(({ metric }) =>
+    [
+      "monthEndDebt",
+      "fuelRetirement",
+      "utilityOwnership",
+      "assetRetirement",
+      "cohortRetention",
+    ].includes(metric),
   );
   const objectiveAssets: NonNullable<ProjectionView["objectiveAssets"]> = [];
   const timeline = generateForecastTimeline(
@@ -217,7 +241,24 @@ function buildProjection(
             debtPrincipal: getTotalDebt([
               ...state.facilities,
               ...(state.transmission?.lines ?? []),
+              ...(state.utilityExpansion?.loans ?? []),
             ]),
+            ...(state.utilityExpansion
+              ? {
+                  ownedUtilities: state.utilityExpansion.acquisitions.map(
+                    (a) => a.targetId,
+                  ),
+                  ownedAssetIds: state.facilities.flatMap((f) =>
+                    f.startingAssetId ? [f.startingAssetId] : [],
+                  ),
+                  minimumCohortRetention: Math.min(
+                    1,
+                    ...state.utilityExpansion.areas.map(
+                      (area) => area.customers / area.transferredCustomers,
+                    ),
+                  ),
+                }
+              : {}),
           });
         }
       : undefined,

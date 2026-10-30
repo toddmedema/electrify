@@ -1,3 +1,8 @@
+import { UTILITY_AREAS, utilityEntitlementsAt } from "../data/UtilityExpansion";
+import {
+  acquisitionTargetForCorridor,
+  ownedUtility,
+} from "../helpers/Expansion";
 import { validHydroClaims } from "../data/HydroSites";
 import {
   GAME_TO_REAL_YEARS,
@@ -29,6 +34,7 @@ import {
   physicalNeighborImportSupplyW,
   intertieOfferLimits,
   intertieContextForGame,
+  transmissionRatingW,
 } from "../helpers/Transmission";
 
 type TickFieldType = keyof TickPresentFutureType;
@@ -389,7 +395,8 @@ export function checkTick(
     storageGridW +
     -(now.customerBatteryGridChargeW || 0) +
     (now.importedW || 0) -
-    (now.exportedW || 0);
+    (now.exportedW || 0) -
+    (now.curtailedW ?? 0);
   if (
     isFinite_(now.supplyW) &&
     Math.abs(expectedSupplyW - now.supplyW) >
@@ -403,6 +410,23 @@ export function checkTick(
       `expected ${Math.round(expectedSupplyW)}W but supplyW is ${Math.round(now.supplyW)}W`,
     );
   }
+
+  const curtailedW = now.curtailedW ?? 0;
+  const unusedLocalW = Object.values(now.areaTicks ?? {}).reduce(
+    (sum, tick) => sum + (tick ? Math.max(0, tick.supplyW - tick.demandW) : 0),
+    0,
+  );
+  if (
+    !Number.isFinite(curtailedW) ||
+    curtailedW < 0 ||
+    Math.abs(curtailedW - unusedLocalW) >
+      Math.max(1, unusedLocalW * RELATIVE_TOLERANCE)
+  )
+    collector.add(
+      "curtailment accounts only for unused local output",
+      when,
+      `${curtailedW}W curtailed vs ${unusedLocalW}W unused`,
+    );
 
   checkTrade(collector, state, now, when);
 
@@ -452,7 +476,15 @@ export function checkTick(
             ? line.loanMonthlyPayment / TICKS_PER_MONTH
             : 0),
         0,
-      );
+      ) +
+      (state.utilityExpansion?.loans.reduce(
+        (sum, loan) =>
+          sum +
+          (loan.loanAmountLeft > 0
+            ? loan.loanMonthlyPayment / TICKS_PER_MONTH
+            : 0),
+        0,
+      ) ?? 0);
     const upperBound = prev.cash + now.revenue - expenses;
     const lowerBound = upperBound - maxPrincipal;
     if (
@@ -602,11 +634,69 @@ function checkTrade(
   const importedW = now.importedW || 0;
   const exportedW = now.exportedW || 0;
   const capacityW = now.transmissionCapacityW || 0;
-  if (importedW + exportedW > capacityW * (1 + RELATIVE_TOLERANCE) + 1) {
+  const entitlementW = now.entitlementImportedW ?? 0;
+  const entitlementCapacityW = now.entitlementImportCapacityW ?? 0;
+  const externalImportW = importedW - entitlementW;
+  if (
+    !Number.isFinite(entitlementW) ||
+    !Number.isFinite(entitlementCapacityW) ||
+    entitlementW < 0 ||
+    entitlementCapacityW < 0 ||
+    entitlementW > entitlementCapacityW * (1 + RELATIVE_TOLERANCE) + 1 ||
+    externalImportW < -1
+  ) {
+    collector.add(
+      "purchased entitlements remain within source interfaces",
+      when,
+      `purchased ${entitlementW}W of ${entitlementCapacityW}W, total imports ${importedW}W`,
+    );
+  }
+  if (state.utilityExpansion) {
+    let areaCapacityW = 0;
+    let areaPurchasedW = 0;
+    state.utilityExpansion.areas.forEach((area) => {
+      const definition = UTILITY_AREAS[area.id];
+      const tick = now.areaTicks?.[area.id];
+      const cap = tick?.entitlementImportCapacityW ?? 0;
+      const purchased = tick?.entitlementImportedW ?? 0;
+      const maximum = Math.min(
+        definition.sourceInterfaceW,
+        utilityEntitlementsAt(area.id, state.date.year).reduce(
+          (sum, source) => sum + source.nominalW * source.deliverability,
+          0,
+        ),
+      );
+      areaCapacityW += cap;
+      areaPurchasedW += purchased;
+      if (
+        !Number.isFinite(cap) ||
+        !Number.isFinite(purchased) ||
+        cap < 0 ||
+        purchased < 0 ||
+        cap > maximum + 1 ||
+        purchased > cap + 1
+      )
+        collector.add(
+          "each area's purchases respect its own dated source rights",
+          when,
+          `${area.id}: ${purchased}/${cap}W, maximum ${maximum}W`,
+        );
+    });
+    if (
+      Math.abs(areaCapacityW - entitlementCapacityW) > 1 ||
+      Math.abs(areaPurchasedW - entitlementW) > 1
+    )
+      collector.add(
+        "company entitlement totals preserve local source identity",
+        when,
+        `${areaPurchasedW}/${areaCapacityW}W vs ${entitlementW}/${entitlementCapacityW}W`,
+      );
+  }
+  if (externalImportW + exportedW > capacityW * (1 + RELATIVE_TOLERANCE) + 1) {
     collector.add(
       "trade stays within transmission capacity",
       when,
-      `imported ${Math.round(importedW)}W + exported ${Math.round(exportedW)}W vs ${Math.round(capacityW)}W`,
+      `imported ${Math.round(externalImportW)}W + exported ${Math.round(exportedW)}W vs ${Math.round(capacityW)}W`,
     );
   }
   if (importedW > 0 && exportedW > 0) {
@@ -647,6 +737,27 @@ function checkTrade(
     for (const line of state.transmission.lines.filter(
       (l) => l.yearsToBuildLeft <= 0,
     )) {
+      const ownedTarget = acquisitionTargetForCorridor(line.corridorId);
+      if (ownedTarget && ownedUtility(state, ownedTarget.id)) {
+        const local = now.areaTicks?.[ownedTarget.id];
+        const ownLimit =
+          local && !line.paused
+            ? Math.min(
+                transmissionRatingW(line, now),
+                transmissionRatingW(line, local),
+              )
+            : 0;
+        if (
+          Math.abs(line.currentFlowW ?? 0) >
+          ownLimit * (1 + RELATIVE_TOLERANCE) + 1
+        )
+          collector.add(
+            "owned-area transfers respect both weather-adjusted wires",
+            when,
+            `${line.corridorId}: ${line.currentFlowW}W, limit ${ownLimit}W`,
+          );
+        continue;
+      }
       const market = effectiveMarket(line.corridorId, context, line.capacityW);
       if (!market) continue;
       const limits = intertieOfferLimits(line, context, now.minute, conditions);
@@ -689,14 +800,25 @@ function checkTrade(
         );
     }
   }
-  if (importedW > 0 && state.transmission && now.temperatureC !== undefined) {
+  if (
+    externalImportW > 0 &&
+    state.transmission &&
+    now.temperatureC !== undefined
+  ) {
     const context = intertieContextForGame(state);
     const conditions = {
       temperatureC: now.temperatureC,
       solarIrradianceWM2: now.solarIrradianceWM2 || 0,
     };
     const offers = state.transmission.lines
-      .filter(({ yearsToBuildLeft }) => yearsToBuildLeft <= 0)
+      .filter(
+        ({ yearsToBuildLeft, corridorId }) =>
+          yearsToBuildLeft <= 0 &&
+          !ownedUtility(
+            state,
+            acquisitionTargetForCorridor(corridorId)?.id ?? "",
+          ),
+      )
       .map((line) => ({
         ...intertieOfferLimits(line, context, now.minute, conditions),
         exportLimitW: 0,
@@ -707,11 +829,11 @@ function checkTrade(
       Infinity,
       0,
     ).importedW.reduce((sum, w) => sum + w, 0);
-    if (importedW > neighbourLimitW * (1 + RELATIVE_TOLERANCE) + 1) {
+    if (externalImportW > neighbourLimitW * (1 + RELATIVE_TOLERANCE) + 1) {
       collector.add(
         "imports stay within what neighbours can spare",
         when,
-        `imported ${Math.round(importedW)}W vs ${Math.round(neighbourLimitW)}W available`,
+        `imported ${Math.round(externalImportW)}W vs ${Math.round(neighbourLimitW)}W available`,
       );
     }
   }

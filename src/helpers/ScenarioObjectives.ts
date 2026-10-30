@@ -51,6 +51,8 @@ function observationWindow(
     return [0, objective.deadlineMonth];
   if (objective.metric === "fuelRetirement")
     return [objective.deadlineMonth, term - 1];
+  if ("deadlineMonth" in objective)
+    return [objective.deadlineMonth, objective.deadlineMonth];
   return [objective.fromMonth, objective.throughMonth];
 }
 
@@ -68,7 +70,10 @@ export function objectiveTarget(objective: CompiledRuleObjective): number {
     case "monthlyReliability":
       return objective.minDemandServedShare;
     case "customerRetention":
+    case "cohortRetention":
       return objective.minRetainedShare;
+    case "utilityOwnership":
+      return 1;
     case "emissionsBudget":
       return objective.budgetKgCO2e;
     case "emissionsPerDeliveredMWh":
@@ -76,6 +81,7 @@ export function objectiveTarget(objective: CompiledRuleObjective): number {
     case "localFuelShare":
       return objective.minShare;
     case "fuelRetirement":
+    case "assetRetirement":
       return 0;
     case "monthlyBilledRate":
       return objective.maxDollarsPerKWh;
@@ -91,9 +97,13 @@ export function objectiveTargetMet(
 ): boolean {
   if (!nonnegative(observed)) return false;
   const target = objectiveTarget(objective);
-  return ["monthlyReliability", "customerRetention", "localFuelShare"].includes(
-    objective.metric,
-  )
+  return [
+    "monthlyReliability",
+    "customerRetention",
+    "localFuelShare",
+    "utilityOwnership",
+    "cohortRetention",
+  ].includes(objective.metric)
     ? observed >= target
     : observed <= target;
 }
@@ -201,6 +211,27 @@ export function objectiveMonthObservation(
         numerator = undefined;
       break;
     }
+    case "utilityOwnership":
+      numerator =
+        facts.ownedUtilities === undefined
+          ? undefined
+          : Number(
+              objective.targets.some((target) =>
+                facts.ownedUtilities!.includes(target),
+              ),
+            );
+      break;
+    case "assetRetirement":
+      numerator =
+        facts.ownedAssetIds === undefined
+          ? undefined
+          : objective.assetIds.filter((asset) =>
+              facts.ownedAssetIds!.includes(asset),
+            ).length;
+      break;
+    case "cohortRetention":
+      numerator = facts.minimumCohortRetention;
+      break;
     case "fuelRetirement":
       numerator =
         facts.ownedFuels === undefined
@@ -414,6 +445,14 @@ export function evaluateScenarioObjectives(
           result.observed !== undefined &&
           !objectiveTargetMet(objective, result.observed);
         break;
+      case "utilityOwnership":
+      case "cohortRetention":
+        if (ratios.length) result.observed = Math.min(...ratios);
+        failed =
+          ended &&
+          ratios.some((value) => !objectiveTargetMet(objective, value));
+        break;
+      case "assetRetirement":
       case "fuelRetirement":
       case "monthlyBilledRate":
       case "monthEndDebt":
@@ -443,6 +482,12 @@ export function evaluateScenarioObjectives(
                 "At least one completed month billed more than the starting-year rate ceiling.",
               monthEndDebt:
                 "Loan principal at a completed month close exceeded the starting-year ceiling.",
+              utilityOwnership:
+                "No target utility was acquired by the deadline.",
+              assetRetirement:
+                "An original oil asset remained owned at the retirement deadline.",
+              cohortRetention:
+                "At least one operating area retained less than the required share of its transfer customers.",
             }[objective.metric];
     } else if (
       invalid ||
@@ -530,7 +575,7 @@ export function validObjectiveResult(value: unknown): value is ObjectiveResult {
     (result.objective.metric === "fuelRetirement"
       ? result.requiredMonths <= 1200 - result.objective.deadlineMonth
       : result.requiredMonths ===
-        (result.objective.metric === "customerRetention"
+        ("deadlineMonth" in result.objective
           ? 1
           : result.objective.throughMonth - result.objective.fromMonth + 1)) &&
     integer(result.observedMonths, 0, result.requiredMonths) &&
@@ -624,9 +669,14 @@ export function validObjectiveProgress(
           !Number.isFinite(numeratorTotal) ||
           !Number.isFinite(denominatorTotal) ||
           (denominator > 0 && !Number.isFinite(numerator / denominator)) ||
-          (["emissionsBudget", "fuelRetirement", "monthEndDebt"].includes(
-            objective.metric,
-          ) &&
+          ([
+            "emissionsBudget",
+            "fuelRetirement",
+            "monthEndDebt",
+            "utilityOwnership",
+            "assetRetirement",
+            "cohortRetention",
+          ].includes(objective.metric) &&
             denominator !== 1) ||
           (objective.metric === "customerRetention" &&
             denominator !== progress.retentionBaseline) ||

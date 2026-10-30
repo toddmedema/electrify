@@ -1,4 +1,4 @@
-import { TickPresentFutureType } from "../Types";
+import { TickPresentFutureType, UtilityAreaId } from "../Types";
 
 interface ForecastMetadata {
   dispatchTargets: Record<number, number>;
@@ -64,6 +64,19 @@ export function copyCommitmentMetadata(
   source: TickPresentFutureType,
   destination: TickPresentFutureType,
 ) {
+  if (source.areaTicks) {
+    const areas = { ...destination.areaTicks };
+    for (const id of Object.keys(source.areaTicks) as UtilityAreaId[]) {
+      const original = source.areaTicks[id];
+      if (!original) continue;
+      const local = areas[id] === original ? { ...original } : areas[id];
+      if (local) {
+        copyCommitmentMetadata(original, local);
+        areas[id] = local;
+      }
+    }
+    destination.areaTicks = areas;
+  }
   const sourceMetadata = metadata(source);
   if (!sourceMetadata) {
     return;
@@ -72,6 +85,20 @@ export function copyCommitmentMetadata(
     configurable: true,
     enumerable: false,
     value: sourceMetadata,
+    writable: true,
+  });
+}
+
+/** Area-local dispatch shares the company's forecast metadata, keyed by global facility IDs. */
+export function shareCommitmentMetadata(
+  source: TickPresentFutureType,
+  destination: TickPresentFutureType,
+) {
+  const shared = metadata(source, true)!;
+  Object.defineProperty(destination as ForecastTick, FORECAST_METADATA, {
+    configurable: true,
+    enumerable: false,
+    value: shared,
     writable: true,
   });
 }
@@ -166,6 +193,7 @@ export function shouldKeepGeneratorCommitted({
 export type SavedCommitmentMetadata = {
   dispatchTargets: Record<string, number>;
   runningCostToNextDispatch: Record<string, number | null>;
+  areas?: Partial<Record<UtilityAreaId, SavedCommitmentMetadata>>;
 } | null;
 
 /**
@@ -176,23 +204,34 @@ export type SavedCommitmentMetadata = {
 export function serializeCommitmentMetadata(
   timeline: TickPresentFutureType[],
 ): SavedCommitmentMetadata[] | undefined {
-  if (!timeline.some((tick) => metadata(tick))) {
-    return undefined;
-  }
-  return timeline.map((tick) => {
+  const serializeTick = (
+    tick: TickPresentFutureType,
+  ): SavedCommitmentMetadata => {
     const current = metadata(tick);
-    if (!current) {
-      return null;
+    const areas: Partial<Record<UtilityAreaId, SavedCommitmentMetadata>> = {};
+    for (const id of Object.keys(tick.areaTicks ?? {}) as UtilityAreaId[]) {
+      const local = tick.areaTicks?.[id];
+      if (local) {
+        const saved = serializeTick(local);
+        if (saved) areas[id] = saved;
+      }
     }
+    const hasAreas = Object.keys(areas).length > 0;
+    if (!current && !hasAreas) return null;
     const runningCostToNextDispatch: Record<string, number | null> = {};
-    Object.entries(current.runningCostToNextDispatch).forEach(([id, cost]) => {
-      runningCostToNextDispatch[id] = Number.isFinite(cost) ? cost : null;
-    });
+    Object.entries(current?.runningCostToNextDispatch ?? {}).forEach(
+      ([id, cost]) => {
+        runningCostToNextDispatch[id] = Number.isFinite(cost) ? cost : null;
+      },
+    );
     return {
-      dispatchTargets: { ...current.dispatchTargets },
+      dispatchTargets: { ...current?.dispatchTargets },
       runningCostToNextDispatch,
+      ...(hasAreas ? { areas } : {}),
     };
-  });
+  };
+  const saved = timeline.map(serializeTick);
+  return saved.some(Boolean) ? saved : undefined;
 }
 
 function validRecord(
@@ -216,16 +255,30 @@ export function validCommitmentMetadata(
   raw: unknown,
   ticks: number,
 ): raw is SavedCommitmentMetadata[] {
+  const validEntry = (entry: unknown, allowAreas: boolean): boolean => {
+    if (entry === null) return true;
+    if (!entry || typeof entry !== "object" || Array.isArray(entry))
+      return false;
+    const value = entry as Exclude<SavedCommitmentMetadata, null>;
+    return (
+      validRecord(value.dispatchTargets, false) &&
+      validRecord(value.runningCostToNextDispatch, true) &&
+      (value.areas === undefined ||
+        (allowAreas &&
+          !!value.areas &&
+          typeof value.areas === "object" &&
+          !Array.isArray(value.areas) &&
+          Object.entries(value.areas).every(
+            ([id, local]) =>
+              ["champlain", "valley-electric", "ridge-electric"].includes(id) &&
+              validEntry(local, false),
+          )))
+    );
+  };
   return (
     Array.isArray(raw) &&
     raw.length === ticks &&
-    raw.every(
-      (entry) =>
-        entry === null ||
-        (typeof entry === "object" &&
-          validRecord(entry.dispatchTargets, false) &&
-          validRecord(entry.runningCostToNextDispatch, true)),
-    )
+    raw.every((entry) => validEntry(entry, true))
   );
 }
 
@@ -234,11 +287,11 @@ export function restoreCommitmentMetadata(
   timeline: TickPresentFutureType[],
   saved: SavedCommitmentMetadata[],
 ) {
-  timeline.forEach((tick, i) => {
-    const entry = saved[i];
-    if (!entry) {
-      return;
-    }
+  const restoreTick = (
+    tick: TickPresentFutureType,
+    entry: SavedCommitmentMetadata,
+  ) => {
+    if (!entry) return;
     const restored = metadata(tick, true)!;
     Object.entries(entry.dispatchTargets).forEach(([id, targetW]) => {
       restored.dispatchTargets[Number(id)] = targetW;
@@ -246,5 +299,10 @@ export function restoreCommitmentMetadata(
     Object.entries(entry.runningCostToNextDispatch).forEach(([id, cost]) => {
       restored.runningCostToNextDispatch[Number(id)] = cost ?? Infinity;
     });
-  });
+    for (const id of Object.keys(entry.areas ?? {}) as UtilityAreaId[]) {
+      const local = tick.areaTicks?.[id];
+      if (local) restoreTick(local, entry.areas![id] ?? null);
+    }
+  };
+  timeline.forEach((tick, i) => restoreTick(tick, saved[i]));
 }

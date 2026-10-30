@@ -29,6 +29,7 @@ export function objectiveValueText(
   switch (objective.metric) {
     case "monthlyReliability":
     case "customerRetention":
+    case "cohortRetention":
     case "localFuelShare":
       return number(value, comparison, true);
     case "emissionsBudget":
@@ -39,6 +40,10 @@ export function objectiveValueText(
       return `$${number(value, comparison)}/kWh`;
     case "monthEndDebt":
       return `$${number(value, comparison)} principal`;
+    case "utilityOwnership":
+      return `${number(value)} acquired ${value === 1 ? "utility" : "utilities"}`;
+    case "assetRetirement":
+      return `${number(value)} original oil ${value === 1 ? "asset" : "assets"}`;
     case "fuelRetirement":
       return `${number(value)} owned ${objective.fuel} ${value === 1 ? "asset" : "assets"}`;
   }
@@ -75,6 +80,12 @@ export function objectiveTargetText(objective: CompiledRuleObjective): string {
       return `≥${target} of demand monthly`;
     case "customerRetention":
       return `Retain ≥${target} of starting customers`;
+    case "cohortRetention":
+      return `Retain ≥${target} in every operating area`;
+    case "utilityOwnership":
+      return "Acquire at least one target utility";
+    case "assetRetirement":
+      return `Retire original oil assets (${target} remaining)`;
     case "localFuelShare":
       return `≥${target} local delivery from ${objective.fuels.join(", ")}`;
     case "fuelRetirement":

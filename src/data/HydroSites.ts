@@ -1,3 +1,4 @@
+import { EXPANSION_SCENARIO_ID, getUtilityArea } from "./UtilityExpansion";
 import type { GameType, LocationType, ScenarioFacilityType } from "../Types";
 import { LOCATIONS } from "../Constants";
 import catalogue from "./HydroSiteCatalogue.json";
@@ -34,6 +35,7 @@ type HydroState = Pick<
   | "commissionedHydroSiteIds"
   | "scenarioId"
   | "customScenario"
+  | "utilityExpansion"
 >;
 export function isConventionalHydro(facility: {
   fuel?: unknown;
@@ -238,6 +240,45 @@ export function resolveStartingHydroSites(
   return assignments;
 }
 export function validHydroClaims(state: HydroState): boolean {
+  if (state.utilityExpansion) {
+    const areas = state.utilityExpansion.areas;
+    if (
+      state.scenarioId !== EXPANSION_SCENARIO_ID ||
+      !Array.isArray(areas) ||
+      new Set(areas.map((area) => area.id)).size !== areas.length ||
+      !Array.isArray(state.commissionedHydroSiteIds)
+    )
+      return false;
+    const allowed = new Set<string>();
+    const validAreas = areas.every((area) => {
+      const definition = getUtilityArea(area.id);
+      if (!definition) return false;
+      const inventory = resolveHydroInventory(definition.location);
+      inventory?.siteIds.forEach((id) => allowed.add(id));
+      return validHydroClaims({
+        ...state,
+        utilityExpansion: undefined,
+        location: definition.location,
+        facilities: state.facilities.filter(
+          (facility) => (facility.operatingAreaId ?? "champlain") === area.id,
+        ),
+        commissionedHydroSiteIds: state.commissionedHydroSiteIds.filter((id) =>
+          inventory?.siteIds.includes(id),
+        ),
+      });
+    });
+    return (
+      validAreas &&
+      new Set(state.commissionedHydroSiteIds).size ===
+        state.commissionedHydroSiteIds.length &&
+      state.commissionedHydroSiteIds.every((id) => allowed.has(id)) &&
+      state.facilities.every((facility) =>
+        areas.some(
+          (area) => area.id === (facility.operatingAreaId ?? "champlain"),
+        ),
+      )
+    );
+  }
   if (
     !Array.isArray(state.commissionedHydroSiteIds) ||
     !validHydroInventorySource(state) ||

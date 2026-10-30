@@ -18,6 +18,15 @@ function fixture() {
   const forecast = [
     {
       minute: 0,
+      areaTicks: {
+        "ridge-electric": {
+          minute: 0,
+          demandW: 2,
+          supplyW: 2,
+          customers: 50,
+          demandByType: { Industrial: 2 },
+        },
+      },
       supplyW: 20,
       demandW: 10,
       cash: 100,

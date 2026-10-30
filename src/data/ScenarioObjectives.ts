@@ -39,6 +39,11 @@ export interface ObjectiveMonthFacts {
   debtPrincipal?: number;
   /** Counts every owned asset, including paused and unfinished facilities. */
   ownedFuels?: Partial<Record<FuelNameType, number>>;
+  ownedUtilities?: string[];
+  /** Stable original equipment identities still owned at this month close. */
+  ownedAssetIds?: string[];
+  /** Lowest current/transfer ratio among the original and every acquired cohort. */
+  minimumCohortRetention?: number;
 }
 
 /** Missing/invalid observations are explicit nulls, never zero or a passing ratio. */

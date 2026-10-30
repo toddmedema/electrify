@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button } from "@mui/material";
+import { Button, Typography } from "@mui/material";
 import DecisionDialog from "./DecisionDialog";
 import ConceptIcon from "./ConceptIcon";
 import ManualLink from "./ManualLink";
@@ -42,6 +42,8 @@ export interface PurchaseReviewDialogProps {
   title: React.ReactNode;
   cash: number;
   buildCost: number;
+  /** Transaction fees are paid in cash with either payment choice. */
+  cashOnlyFee?: number;
   interestRate: number;
   /** An existing loan balance rolled into the new one, as an intertie upgrade does */
   refinancedBalance?: number;
@@ -66,9 +68,11 @@ export interface PurchaseReviewDialogProps {
   onlineInLabel?: string;
   titleId?: string;
   loanButtonId?: string;
+  /** A visible cancel action in addition to the dialog close control. */
+  cancelLabel?: string;
   onClose: () => void;
   /** Called at most once per opening, however quickly the buttons are clicked */
-  onPurchase: (financed: boolean) => void;
+  onPurchase: (financed: boolean) => void | boolean | Promise<void | boolean>;
 }
 
 /** Catalog quotes stay stable while this review reads the balance directly from the game. */
@@ -90,6 +94,7 @@ export default function PurchaseReviewDialog(
     open,
     cash,
     buildCost,
+    cashOnlyFee = 0,
     interestRate,
     refinancedBalance = 0,
     loanMonths = LOAN_MONTHS,
@@ -99,9 +104,11 @@ export default function PurchaseReviewDialog(
   // A double-click dispatches two click events before the closing dialog has necessarily
   // unmounted. The ref closes that window synchronously, and reopening rearms it.
   const purchaseSubmitted = React.useRef(false);
+  const [submitting, setSubmitting] = React.useState(false);
   React.useEffect(() => {
     if (open) {
       purchaseSubmitted.current = false;
+      setSubmitting(false);
     }
   }, [open]);
   const loan = purchaseTerms(
@@ -111,16 +118,24 @@ export default function PurchaseReviewDialog(
     refinancedBalance,
     loanMonths,
   );
-  const cashDisabled = !!props.cashDisabled || cash < buildCost;
-  const loanDisabled = !!props.loanDisabled || cash < loan.downpayment;
+  const cashDue = buildCost + cashOnlyFee;
+  const financedCashDue = loan.downpayment + cashOnlyFee;
+  const cashDisabled = submitting || !!props.cashDisabled || cash < cashDue;
+  const loanDisabled =
+    submitting || !!props.loanDisabled || cash < financedCashDue;
 
-  const submit = (financed: boolean, event: React.MouseEvent) => {
+  const submit = async (financed: boolean, event: React.MouseEvent) => {
     event.stopPropagation();
     if (purchaseSubmitted.current) {
       return;
     }
     purchaseSubmitted.current = true;
-    onPurchase(financed);
+    setSubmitting(true);
+    const result = await onPurchase(financed);
+    if (result === false) {
+      purchaseSubmitted.current = false;
+      setSubmitting(false);
+    }
   };
 
   const facts: DecisionImpactFactType[] = [
@@ -128,7 +143,7 @@ export default function PurchaseReviewDialog(
     {
       concept: "money",
       label: "Cash purchase",
-      value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - buildCost)}`,
+      value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - cashDue)}`,
     },
     {
       concept: "finances",
@@ -136,8 +151,12 @@ export default function PurchaseReviewDialog(
       help: (
         <ManualLink entry={MANUAL_ENTRY.INTEREST_RATES} label="interest rate" />
       ),
-      value: `${formatMoneyConcise(loan.downpayment)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo (${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years)`,
+      value: `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo (${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years)`,
       detail: `Payments start now.${
+        cashOnlyFee > 0
+          ? ` Includes a ${formatMoneyConcise(cashOnlyFee)} cash-only transaction fee.`
+          : ""
+      }${
         refinancedBalance > 0
           ? ` Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
           : ""
@@ -167,7 +186,10 @@ export default function PurchaseReviewDialog(
   return (
     <DecisionDialog
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (!purchaseSubmitted.current) onClose();
+      }}
+      closeDisabled={submitting}
       fullWidth
       maxWidth="sm"
       titleId={props.titleId}
@@ -176,6 +198,21 @@ export default function PurchaseReviewDialog(
       contentClassName="noPadding"
       actions={
         <>
+          {submitting && (
+            <Typography role="status" variant="body2">
+              Submitting…
+            </Typography>
+          )}
+          {props.cancelLabel && (
+            <Button
+              disabled={submitting}
+              onClick={() => {
+                if (!purchaseSubmitted.current) onClose();
+              }}
+            >
+              {props.cancelLabel}
+            </Button>
+          )}
           <Button
             color="primary"
             variant="contained"

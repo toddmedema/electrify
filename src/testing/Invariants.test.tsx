@@ -143,3 +143,58 @@ describe("weather hazard checks", () => {
     ).toContain("hail only damages operating solar");
   });
 });
+
+it("accepts actual entitlement purchases and rejects a forged source-interface claim", () => {
+  const state = createGame({ scenarioId: 116, seed: 12345 });
+  tickState(state);
+  const before = cloneDeep(
+    getTimeFromTimeline(state.date.minute, state.timeline)!,
+  );
+  tickState(state);
+  const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+  expect(now.entitlementImportedW).toBeGreaterThan(0);
+  const valid = new InvariantCollector();
+  checkTick(valid, state, before, now, "utility tick", false);
+  expect(valid.getViolations()).toEqual([]);
+
+  const corrupted = cloneDeep(now);
+  corrupted.entitlementImportedW =
+    (corrupted.entitlementImportCapacityW ?? 0) + 1e6;
+  const invalid = new InvariantCollector();
+  checkTick(invalid, state, before, corrupted, "corrupt purchase", false);
+  expect(invalid.getViolations()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        rule: "purchased entitlements remain within source interfaces",
+      }),
+    ]),
+  );
+
+  const forgedArea = cloneDeep(now);
+  forgedArea.areaTicks!.champlain!.entitlementImportCapacityW = 1e12;
+  const invalidArea = new InvariantCollector();
+  checkTick(invalidArea, state, before, forgedArea, "corrupt interface", false);
+  expect(invalidArea.getViolations()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        rule: "each area's purchases respect its own dated source rights",
+      }),
+    ]),
+  );
+});
+
+it("rejects invented curtailment instead of hiding an energy imbalance", () => {
+  const collector = inspect((tick) => {
+    tick.curtailedW = 1e9;
+  });
+  expect(collector.getViolations()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        rule: "curtailment accounts only for unused local output",
+      }),
+      expect.objectContaining({
+        rule: "generation, storage and trade balance supply",
+      }),
+    ]),
+  );
+});

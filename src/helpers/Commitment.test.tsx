@@ -97,3 +97,45 @@ describe("generator commitment optimization", () => {
     expect(JSON.stringify(forecast)).not.toContain("dispatchTarget");
   });
 });
+
+test("an owned area's prepared generator decisions survive copy and JSON save", () => {
+  const {
+    copyCommitmentMetadata,
+    serializeCommitmentMetadata,
+    restoreCommitmentMetadata,
+    validCommitmentMetadata,
+  } = jest.requireActual<typeof import("./Commitment")>("./Commitment");
+  const local = [tick(0), tick(0), tick(1)];
+  prepareGeneratorCommitment({
+    facilityId: 7,
+    forecast: local,
+    minimumOperatingCost: () => 20,
+  });
+  const timeline = local.map(
+    (area) =>
+      ({ areaTicks: { "ridge-electric": area } }) as TickPresentFutureType,
+  );
+  const saved = JSON.parse(
+    JSON.stringify(serializeCommitmentMetadata(timeline)),
+  );
+  expect(validCommitmentMetadata(saved, 3)).toBe(true);
+  const restored = JSON.parse(
+    JSON.stringify(timeline),
+  ) as TickPresentFutureType[];
+  restoreCommitmentMetadata(restored, saved);
+  expect(
+    shouldKeepGeneratorCommitted({
+      facilityId: 7,
+      forecast: restored.map((t) => t.areaTicks!["ridge-electric"]!),
+      fromIndex: 0,
+      startCost: 50,
+      minimumOperatingCost: () => 1000,
+    }),
+  ).toBe(true);
+  const copied = timeline.map((t) => ({ ...t }));
+  timeline.forEach((t, i) => copyCommitmentMetadata(t, copied[i]));
+  expect(serializeCommitmentMetadata(copied)).toEqual(saved);
+  const bad = JSON.parse(JSON.stringify(saved));
+  bad[0].areas["ridge-electric"].areas = { champlain: bad[1] };
+  expect(validCommitmentMetadata(bad, 3)).toBe(false);
+});

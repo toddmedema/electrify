@@ -38,6 +38,7 @@ import {
 } from "../../helpers/GameSelectors";
 import { chartPalette, facilityColor, withAlpha } from "../../Theme";
 import {
+  AcquireUtilityAction,
   FacilityOperatingType,
   isStorage,
   GameType,
@@ -73,6 +74,12 @@ import {
 } from "../../helpers/Hazards";
 import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
+import { getUtilityArea } from "../../data/UtilityExpansion";
+import { gameForOperatingArea } from "../../helpers/Expansion";
+import {
+  facilityDisplayName,
+  facilityActionName,
+} from "../base/FacilityLabels";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
@@ -244,7 +251,7 @@ function FacilityActions(props: {
           className="facilityCancelConstruction"
           variant="outlined"
           startIcon={<CancelIcon />}
-          aria-label={"Cancel upgrade of " + facility.name}
+          aria-label={"Cancel upgrade of " + facilityActionName(facility)}
           onClick={() => onCancelRetrofit(facility.id)}
         >
           <span className="facilityActionLabel">Cancel upgrade</span>
@@ -258,13 +265,13 @@ function FacilityActions(props: {
           }
           aria-label={
             facility.paused
-              ? "Resume " + facility.name
-              : "Pause " + facility.name
+              ? "Resume " + facilityActionName(facility)
+              : "Pause " + facilityActionName(facility)
           }
           onClick={() =>
             facility.paused
               ? onTogglePause(facility.id)
-              : onPause(facility.id, facility.name)
+              : onPause(facility.id, facilityActionName(facility))
           }
         >
           <span className="facilityActionLabel">
@@ -278,7 +285,7 @@ function FacilityActions(props: {
         startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
         aria-label={
           (underConstruction ? "Cancel construction of " : "Sell ") +
-          facility.name
+          facilityActionName(facility)
         }
         onClick={onOpenSell}
       >
@@ -326,6 +333,19 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     arriving: arrivalRequested,
     onArrivalShown,
   } = props;
+  const detailGame = React.useMemo(() => {
+    if (!selected || !facility.operatingAreaId) return game;
+    const local = gameForOperatingArea(game, facility.operatingAreaId);
+    if (!local) return game;
+    return {
+      ...local,
+      timeline: local.timeline.map((tick, index) => ({
+        ...tick,
+        cash: game.timeline[index]?.cash ?? tick.cash,
+        netWorth: game.timeline[index]?.netWorth ?? tick.netWorth,
+      })),
+    };
+  }, [game, selected, facility.operatingAreaId]);
   // Early walkthroughs hide reordering; keep the icon in their inspection target.
   const reorderDisabled = !!(
     game.inGame &&
@@ -555,7 +575,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 type="button"
                 {...provided.dragHandleProps}
                 className="facilityDragHandle"
-                aria-label={"Reorder " + facility.name}
+                aria-label={"Reorder " + facilityActionName(facility)}
                 title="Drag to reorder"
                 onClick={(event) => {
                   if (event.shiftKey || event.ctrlKey || event.metaKey)
@@ -577,7 +597,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               type="button"
               className="facilityDisclosure"
               aria-label={
-                `Inspect ${facility.name}` +
+                `Inspect ${facilityActionName(facility)}` +
                 (hazardStatus && !underConstruction
                   ? `, ${hazardStatusText(hazardStatus).spoken}`
                   : "") +
@@ -597,7 +617,14 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     }}
                     primary={
                       <>
-                        <span className="facilityName">{facility.name}</span>
+                        <span className="facilityName">
+                          {facilityDisplayName(facility)}
+                        </span>
+                        {facility.operatingAreaId && (
+                          <span className="facilityAreaLabel">
+                            {getUtilityArea(facility.operatingAreaId)?.name}
+                          </span>
+                        )}
                         {ready && (
                           <span className="facilityReadyLabel">Ready</span>
                         )}
@@ -667,7 +694,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 checked={props.bulkSelected}
                 onClick={(event) => props.onToggleSelection(facility.id, event)}
                 slotProps={{
-                  input: { "aria-label": `Select ${facility.name}` },
+                  input: {
+                    "aria-label": `Select ${facilityActionName(facility)}`,
+                  },
                 }}
               />
             )}
@@ -681,7 +710,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               title={
                 <>
                   {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                  {formatFacilitySize(facility)} {facility.name.toLowerCase()}{" "}
+                  {formatFacilitySize(facility)}{" "}
+                  {facility.operatingAreaId
+                    ? facilityActionName(facility)
+                    : facility.name.toLowerCase()}{" "}
                   facility?
                 </>
               }
@@ -717,8 +749,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               facility={facility}
               date={game.date}
               seed={game.seed}
-              location={game.location}
-              game={game}
+              location={detailGame.location}
+              game={detailGame}
+              hydroGame={game}
               onRetrofit={props.onRetrofit}
             />
           )}
@@ -805,6 +838,9 @@ export interface DispatchProps {
   onTransmissionCancel?: (id: number) => void;
   onTransmissionPause?: (id: number, name: string, paused: boolean) => void;
   onTransmissionUpgrade: (corridorId: string, financed: boolean) => void;
+  onUtilityAcquire?: (
+    payload: AcquireUtilityAction,
+  ) => boolean | Promise<boolean>;
   onTradingPolicy: (policy: TradingPolicyType) => void;
 }
 
@@ -1400,6 +1436,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   game={game}
                   onBuild={onTransmissionBuild}
                   onUpgrade={onTransmissionUpgrade}
+                  onAcquire={this.props.onUtilityAcquire}
                   onCancel={this.props.onTransmissionCancel}
                   onPause={this.props.onTransmissionPause}
                   onPolicy={onTradingPolicy}

@@ -80,6 +80,7 @@ import {
 } from "../../helpers/IntertieOutlook";
 import { purchaseTerms } from "../../helpers/Financials";
 import {
+  AcquireUtilityAction,
   GameType,
   TradingPolicyType,
   TransmissionCorridorDefinitionType,
@@ -109,6 +110,12 @@ import FlowBar from "../base/FlowBar";
 import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
+import {
+  acquisitionTargetForCorridor,
+  ownedUtility,
+  ownedIntertieCapacityW,
+} from "../../helpers/Expansion";
 
 type IntertieSortKey = "yearsToBuild" | "buildCost" | "emissions";
 const sortOptions: ReadonlyArray<readonly [IntertieSortKey, string]> = [
@@ -410,6 +417,7 @@ function IntertieUpgradeControl(props: {
   units: UnitSystemType;
   onUpgrade: (corridorId: string, financed: boolean) => void;
   context: IntertieAccessContext;
+  owned?: boolean;
 }): React.JSX.Element | null {
   const { line, cash, year, interestRate, units, onUpgrade, context } = props;
   const [reviewing, setReviewing] = React.useState(false);
@@ -444,16 +452,19 @@ function IntertieUpgradeControl(props: {
   const { downpayment } = purchaseTerms(quote.buildCost, true, interestRate);
   const shortfall = financingShortfallText(cash ?? 0, downpayment);
   const months = Math.max(1, Math.round(quote.yearsToBuild * 12));
-  const capacityBefore = intertieDirectionalCapacities(
-    line.corridorId,
-    context,
-    line.capacityW,
-  );
-  const capacityAfter = intertieDirectionalCapacities(
-    line.corridorId,
-    context,
-    quote.targetCapacityW,
-  );
+  const capacityBefore = props.owned
+    ? { importCapacityW: line.capacityW, exportCapacityW: line.capacityW }
+    : intertieDirectionalCapacities(line.corridorId, context, line.capacityW);
+  const capacityAfter = props.owned
+    ? {
+        importCapacityW: quote.targetCapacityW,
+        exportCapacityW: quote.targetCapacityW,
+      }
+    : intertieDirectionalCapacities(
+        line.corridorId,
+        context,
+        quote.targetCapacityW,
+      );
   return (
     <div className="transmissionUpgrade">
       {shortfall && (
@@ -505,7 +516,11 @@ function IntertieUpgradeControl(props: {
             (line.annualOperatingCost * props.costIndex) / 12
           }
           upkeepPerMonth={(quote.annualOperatingCost * props.costIndex) / 12}
-          upkeepDetail="Plus electricity purchases and loan payments."
+          upkeepDetail={
+            props.owned
+              ? "Plus loan payments."
+              : "Plus electricity purchases and loan payments."
+          }
           onlineInLabel="Upgrade complete in"
           onlineInMonths={months}
           extraFacts={[
@@ -535,6 +550,7 @@ export interface TransmissionPanelProps {
   onBuild: (corridorId: string, financed: boolean, tier?: number) => void;
   onUpgrade: (corridorId: string, financed: boolean) => void;
   onPolicy: (policy: TradingPolicyType) => void;
+  onAcquire?: (payload: AcquireUtilityAction) => boolean | Promise<boolean>;
 }
 
 // Live state for the section header, beside the rule it results from
@@ -587,6 +603,7 @@ export default function TransmissionPanel({
   onBuild,
   onUpgrade,
   onPolicy,
+  onAcquire,
   onCancel,
   onPause,
   onBeforeDragStart,
@@ -596,6 +613,9 @@ export default function TransmissionPanel({
   const units = useUnits();
   const projectsRef = React.useRef<HTMLUListElement>(null);
   const revealResizedRow = useBuildRowReveal(projectsRef);
+  const [acquisitionTargetId, setAcquisitionTargetId] = React.useState<
+    string | null
+  >(null);
   const [cancelLine, setCancelLine] =
     React.useState<TransmissionLineOperatingType | null>(null);
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
@@ -723,6 +743,14 @@ export default function TransmissionPanel({
 
   return (
     <div className={projectsOnly ? "transmissionPanel" : "transmissionFleet"}>
+      {acquisitionTargetId && onAcquire && (
+        <AcquisitionReviewDialog
+          game={game}
+          targetId={acquisitionTargetId}
+          onClose={() => setAcquisitionTargetId(null)}
+          onAcquire={onAcquire}
+        />
+      )}
       {!projectsOnly && (
         <section aria-labelledby="your-interties-title">
           <Typography
@@ -753,18 +781,38 @@ export default function TransmissionPanel({
               {(droppable) => (
                 <div ref={droppable.innerRef} {...droppable.droppableProps}>
                   {state.lines.map((line, index) => {
+                    const acquisitionTarget =
+                      game.scenarioId === 116
+                        ? acquisitionTargetForCorridor(line.corridorId)
+                        : undefined;
+                    const utilityOwned =
+                      acquisitionTarget &&
+                      ownedUtility(game, acquisitionTarget.id);
+                    const availableAcquisition =
+                      acquisitionTarget &&
+                      !utilityOwned &&
+                      line.yearsToBuildLeft <= 0;
                     const peer = game.multiplayer?.peers?.find(
                       (p) => p.corridor.id === line.corridorId,
                     );
                     const market = adjacentMarketForCorridor(line.corridorId);
-                    const capacities = intertieDirectionalCapacities(
-                      line.corridorId,
-                      intertieContext,
-                      line.capacityW,
-                    );
+                    const capacities = utilityOwned
+                      ? {
+                          importCapacityW: line.capacityW,
+                          exportCapacityW: line.capacityW,
+                        }
+                      : intertieDirectionalCapacities(
+                          line.corridorId,
+                          intertieContext,
+                          line.capacityW,
+                        );
                     const rating =
-                      peer?.ratingW ??
-                      (now ? transmissionRatingW(line, now) : line.capacityW);
+                      utilityOwned && now
+                        ? ownedIntertieCapacityW(game, line, now)
+                        : (peer?.ratingW ??
+                          (now
+                            ? transmissionRatingW(line, now)
+                            : line.capacityW));
                     const routeLimitW =
                       now?.transmissionCapacityLimitsWByCorridor?.[
                         line.corridorId
@@ -788,18 +836,20 @@ export default function TransmissionPanel({
                     const constructionStyle = building
                       ? { opacity: theme.palette.action.disabledOpacity }
                       : undefined;
-                    const importableW = peer
-                      ? Math.min(rating, peer.availableSupplyW ?? 0)
-                      : now
-                        ? intertieImportLimitW(
-                            line,
-                            intertieContext,
-                            now.minute,
-                            now,
-                          )
-                        : rating;
+                    const importableW = utilityOwned
+                      ? rating
+                      : peer
+                        ? Math.min(rating, peer.availableSupplyW ?? 0)
+                        : now
+                          ? intertieImportLimitW(
+                              line,
+                              intertieContext,
+                              now.minute,
+                              now,
+                            )
+                          : rating;
                     const outlook =
-                      selectedLine === line.id
+                      selectedLine === line.id && !utilityOwned
                         ? outlookFor(line.corridorId, line.capacityW)
                         : undefined;
                     // Signed against capacity in the direction of flow, so the row reads the same way a
@@ -904,7 +954,9 @@ export default function TransmissionPanel({
                                 <span className="transmissionLineText">
                                   <span className="transmissionLineName">
                                     <span className="facilityName">
-                                      {line.name}
+                                      {utilityOwned
+                                        ? `Owned · ${acquisitionTarget.name}`
+                                        : line.name}
                                     </span>
                                     {restricted && !building && (
                                       <Chip
@@ -931,6 +983,16 @@ export default function TransmissionPanel({
                                       </span>
                                     )}
                                   </Typography>
+                                  {availableAcquisition && (
+                                    <Typography
+                                      component="span"
+                                      variant="caption"
+                                      color="primary"
+                                      className="utilityAcquisitionHint"
+                                    >
+                                      Acquisition available
+                                    </Typography>
+                                  )}
                                   {building && (
                                     <span
                                       className="constructionProgress"
@@ -1014,7 +1076,7 @@ export default function TransmissionPanel({
                                       </dd>
                                     </div>
                                   )}
-                                  {!building && now && (
+                                  {!building && now && !utilityOwned && (
                                     <>
                                       <div className="facilityStat">
                                         <dt>Price now</dt>
@@ -1041,7 +1103,7 @@ export default function TransmissionPanel({
                                       </div>
                                     </>
                                   )}
-                                  {market && (
+                                  {market && !utilityOwned && (
                                     <div className="facilityStat">
                                       <dt>Emissions (CO2e)</dt>
                                       <dd className="facilityStatValue">
@@ -1053,6 +1115,14 @@ export default function TransmissionPanel({
                                           units,
                                         )}
                                         /MWh
+                                      </dd>
+                                    </div>
+                                  )}
+                                  {utilityOwned && (
+                                    <div className="facilityStat">
+                                      <dt>Transfer capacity now</dt>
+                                      <dd className="facilityStatValue">
+                                        {formatWatts(rating)}
                                       </dd>
                                     </div>
                                   )}
@@ -1084,40 +1154,64 @@ export default function TransmissionPanel({
                                     color="textSecondary"
                                   >
                                     Flow limited by:{" "}
-                                    {game.multiplayer
-                                      ? "Player generation, demand, and shared line capacity"
-                                      : line.paused
-                                        ? "Paused"
-                                        : state.tradingPolicy === "CLOSED" ||
-                                            (state.tradingPolicy ===
-                                              "SURPLUS_ONLY" &&
-                                              flowW >= 0)
-                                          ? "Trading rule"
-                                          : flowW < 0
-                                            ? Math.abs(flowW) >=
-                                              capacities.exportCapacityW - 1
-                                              ? "Export capacity"
-                                              : Math.abs(flowW) >= rating - 1
-                                                ? "Weather"
-                                                : "Local surplus"
-                                            : Math.abs(flowW) < importableW - 1
-                                              ? "Local demand or trading rule"
-                                              : neighborImportSupplyW(
-                                                    line.corridorId,
-                                                    intertieContext,
-                                                    now.minute,
-                                                    now,
-                                                    line.capacityW,
-                                                  ) < rating
-                                                ? "Neighbor supply"
-                                                : rating <
-                                                    capacities.importCapacityW
+                                    {utilityOwned
+                                      ? "Local generation, demand and weather-adjusted wire capacity"
+                                      : game.multiplayer
+                                        ? "Player generation, demand, and shared line capacity"
+                                        : line.paused
+                                          ? "Paused"
+                                          : state.tradingPolicy === "CLOSED" ||
+                                              (state.tradingPolicy ===
+                                                "SURPLUS_ONLY" &&
+                                                flowW >= 0)
+                                            ? "Trading rule"
+                                            : flowW < 0
+                                              ? Math.abs(flowW) >=
+                                                capacities.exportCapacityW - 1
+                                                ? "Export capacity"
+                                                : Math.abs(flowW) >= rating - 1
                                                   ? "Weather"
-                                                  : "Import capacity"}
+                                                  : "Local surplus"
+                                              : Math.abs(flowW) <
+                                                  importableW - 1
+                                                ? "Local demand or trading rule"
+                                                : neighborImportSupplyW(
+                                                      line.corridorId,
+                                                      intertieContext,
+                                                      now.minute,
+                                                      now,
+                                                      line.capacityW,
+                                                    ) < rating
+                                                  ? "Neighbor supply"
+                                                  : rating <
+                                                      capacities.importCapacityW
+                                                    ? "Weather"
+                                                    : "Import capacity"}
                                     .
                                   </Typography>
                                 )}
                                 {outlook && <IntertieYear outlook={outlook} />}
+                                {availableAcquisition && onAcquire && (
+                                  <div className="transmissionAcquisition">
+                                    <Button
+                                      variant="contained"
+                                      onClick={() => {
+                                        setAcquisitionTargetId(
+                                          acquisitionTarget.id,
+                                        );
+                                      }}
+                                    >
+                                      Acquire {acquisitionTarget.name}
+                                    </Button>
+                                    <Typography
+                                      variant="caption"
+                                      color="textSecondary"
+                                    >
+                                      Completed connection qualifies. Upgrades
+                                      increase transfer capacity.
+                                    </Typography>
+                                  </div>
+                                )}
                                 {!building && (
                                   <>
                                     {peer?.upgradeRequestedBy && (
@@ -1143,6 +1237,7 @@ export default function TransmissionPanel({
                                       interestRate={game.interestRate}
                                       units={units}
                                       onUpgrade={onUpgrade}
+                                      owned={!!utilityOwned}
                                     />
                                   </>
                                 )}

@@ -5,6 +5,7 @@ import { GENERATORS, STORAGE } from "../data/Facilities";
 import { getScenario } from "../data/Scenarios";
 import { copyCommitmentMetadata } from "../helpers/Commitment";
 import { currentTick } from "../helpers/GameSelectors";
+import { acquisitionQuote, operatingAreaView } from "../helpers/Expansion";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import gameReducer, {
@@ -22,6 +23,7 @@ import gameReducer, {
 } from "../reducers/Game";
 import {
   chooseScenarioResponse,
+  acquireUtility,
   schedulePolicy,
 } from "../reducers/GameActions";
 import type { DifficultyType, GameType } from "../Types";
@@ -57,6 +59,13 @@ export function officialCommand(
   return copyOfficialGame(gameReducer(game, action));
 }
 export function officialQuote(game: GameType, build: InitialBuildType) {
+  if (build.operatingAreaId) {
+    const area = game.utilityExpansion?.areas.find(
+      (a) => a.id === build.operatingAreaId,
+    );
+    if (!area) throw new Error("Cannot build outside an owned area");
+    game = operatingAreaView(game, area);
+  }
   const quotes =
     build.peakWh !== undefined
       ? STORAGE(game, build.peakWh)
@@ -84,6 +93,24 @@ function applyScheduled(
   action: ScheduledSimActionType,
 ): GameType {
   switch (action.type) {
+    case "acquire": {
+      const quote = acquisitionQuote(game, action.targetId);
+      if (!quote) throw new Error(`Unavailable utility: ${action.targetId}`);
+      return officialCommand(
+        game,
+        acquireUtility({
+          targetId: action.targetId,
+          financed: action.financed,
+          quoteKey: quote.quoteKey,
+        }),
+      );
+    }
+    case "retire": {
+      const facility = game.facilities.find(
+        (item) => item.startingAssetId === action.assetId,
+      );
+      return facility ? officialCommand(game, sellFacility(facility.id)) : game;
+    }
     case "rate":
       return officialCommand(
         game,
@@ -95,6 +122,7 @@ function applyScheduled(
         buildFacility({
           facility: officialQuote(game, action.build),
           financed: action.build.financed,
+          operatingAreaId: action.build.operatingAreaId,
         }),
       );
     case "retrofit":

@@ -1,3 +1,4 @@
+import cloneDeep from "lodash.clonedeep";
 import { monthMinute, ProjectionView } from "../../helpers/Projection";
 import { GAME_TO_REAL_YEARS } from "../../Constants";
 import {
@@ -17,6 +18,7 @@ type NumericTickKey = {
 type ObjectTickKey = Exclude<keyof TickPresentFutureType, NumericTickKey>;
 // Exhaustive: a new nonnumeric tick field needs an explicit transport representation.
 const objectFields = {
+  areaTicks: "areas",
   supplyByFuel: "dictionary",
   demandByType: "dictionary",
   renewableCapacityFactors: "dictionary",
@@ -27,13 +29,15 @@ const objectFields = {
   deferredThermalStart: "queue",
   deferredCharging: "queue",
   deferredChargingStart: "queue",
-} as const satisfies Record<ObjectTickKey, "dictionary" | "queue">;
+} as const satisfies Record<ObjectTickKey, "dictionary" | "queue" | "areas">;
 type DictionaryKey = {
   [K in ObjectTickKey]: (typeof objectFields)[K] extends "dictionary"
     ? K
     : never;
 }[ObjectTickKey];
-type QueueKey = Exclude<ObjectTickKey, DictionaryKey>;
+type QueueKey = {
+  [K in ObjectTickKey]: (typeof objectFields)[K] extends "queue" ? K : never;
+}[ObjectTickKey];
 const dictionaryKeys = Object.keys(objectFields).filter(
   (key) => objectFields[key as ObjectTickKey] === "dictionary",
 ) as DictionaryKey[];
@@ -61,6 +65,10 @@ interface PackedQueue {
 export interface ProjectionTransport {
   ticks: {
     numbers: PackedNumbers;
+    areas: {
+      presence: Uint8Array<ArrayBuffer>;
+      values: TickPresentFutureType["areaTicks"][];
+    };
     dictionaries: Record<DictionaryKey, PackedDictionary>;
     queues: Record<QueueKey, PackedQueue>;
     queueEntries: PackedNumbers;
@@ -190,6 +198,11 @@ export function packProjection(projection: ProjectionView): {
     );
   });
   const queueEntries = addNumbers(packNumbers(entries));
+  const areas = {
+    presence: Uint8Array.from(forecast, (tick) => presence(tick, "areaTicks")),
+    values: cloneDeep(forecast.map((tick) => tick.areaTicks)),
+  };
+  transfers.push(areas.presence.buffer);
   const indices = new Map(forecast.map((tick, index) => [tick, index]));
   const historicalCount = projection.timeline.length - forecast.length;
   const sampledIndices = Uint32Array.from(
@@ -209,7 +222,7 @@ export function packProjection(projection: ProjectionView): {
   } = projection;
   return {
     transport: {
-      ticks: { numbers, dictionaries, queues, queueEntries },
+      ticks: { numbers, dictionaries, queues, queueEntries, areas },
       sampledIndices,
       cashMonths: projection.cashProjected.length,
       view,
@@ -274,6 +287,11 @@ export function projectionDecoder(
           row[key] = entries;
         }
       });
+      if (transport.ticks.areas.presence[rowIndex])
+        row.areaTicks =
+          transport.ticks.areas.presence[rowIndex] === 1
+            ? undefined
+            : cloneDeep(transport.ticks.areas.values[rowIndex]);
       forecast.push(row as TickPresentFutureType);
       tickIndex++;
       if (performance.now() >= deadline) return undefined;

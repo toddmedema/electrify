@@ -150,6 +150,14 @@ function commandResult(before: GameType, after: GameType): GameType {
   // shared tick's energy and settlement intact; immediate company transfers still book here.
   if (recorded && updated) {
     const { cash, netWorth } = updated;
+    const ownership =
+      before.utilityExpansion?.acquisitions.length !==
+      after.utilityExpansion?.acquisitions.length
+        ? {
+            areaTicks: cloneDeep(updated.areaTicks),
+            customers: updated.customers,
+          }
+        : {};
     const previousReceipts = new Set(
       before.worldEvents.occurrences.map((event) => event.key),
     );
@@ -178,6 +186,7 @@ function commandResult(before: GameType, after: GameType): GameType {
       revenue: recorded.revenue + transfers.grant,
       revenueGrants: (recorded.revenueGrants ?? 0) + transfers.grant,
       expensesOM: recorded.expensesOM + transfers.cost,
+      ...ownership,
     });
   }
   result.transmission?.lines.forEach((line) => {
@@ -880,14 +889,22 @@ function validGrid(world: World, initial: World, i: number) {
   const g = world.grids[i];
   const scenario = getScenario(g.scenarioId, g.customScenario)!;
   const expectedConnections = initial.grids[i].transmission!.lines;
-  const lineCount = expectedConnections.length;
+  const nativeLines =
+    g.scenarioId === 116
+      ? (g.transmission?.lines ?? []).filter((line) =>
+          ["vt-champlain-valley", "vt-champlain-ridge"].includes(
+            line.corridorId,
+          ),
+        )
+      : [];
+  const lineCount = expectedConnections.length + nativeLines.length;
   return (
     !!parseSave(
       serializeSave({
         ...g,
         multiplayer: undefined,
         transmission: intertiesEnabledForScenario(scenario, g.location)
-          ? { tradingPolicy: g.transmission!.tradingPolicy, lines: [] }
+          ? { tradingPolicy: g.transmission!.tradingPolicy, lines: nativeLines }
           : undefined,
       }),
     ) &&
@@ -924,9 +941,11 @@ function validGrid(world: World, initial: World, i: number) {
     }) &&
     g.transmission.lines.every(
       (line) =>
-        expectedConnections.some(
+        (expectedConnections.some(
           (expected) => expected.corridorId === line.corridorId,
-        ) && validTransmissionLine(line, g.date.year, accessContextForGame(g)),
+        ) ||
+          nativeLines.includes(line)) &&
+        validTransmissionLine(line, g.date.year, accessContextForGame(g)),
     )
   );
 }

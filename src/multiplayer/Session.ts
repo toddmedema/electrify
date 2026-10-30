@@ -530,6 +530,7 @@ export class MultiplayerSession {
       const payload = command.payload as {
         facility: import("../Types").FacilityShoppingType;
         financed: boolean;
+        operatingAreaId?: import("../Types").UtilityAreaId;
       };
       const { name, peakW, peakWh, gasCycle, resilience } = payload.facility;
       command = {
@@ -537,6 +538,9 @@ export class MultiplayerSession {
         payload: {
           facility: { name, peakW, peakWh, gasCycle, resilience },
           financed: payload.financed,
+          ...(payload.operatingAreaId !== undefined
+            ? { operatingAreaId: payload.operatingAreaId }
+            : {}),
         },
       };
     }

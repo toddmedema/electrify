@@ -1,3 +1,5 @@
+import { BuildOperatingAreaContext } from "../base/BuildOperatingAreaContext";
+import { gameForOperatingArea } from "../../helpers/Expansion";
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import {
@@ -43,7 +45,12 @@ import {
 import { useUnits } from "../base/UnitsContext";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import useBuildRowReveal from "../base/useBuildRowReveal";
-import { GameType, LocationType, StorageShoppingType } from "../../Types";
+import {
+  GameType,
+  LocationType,
+  StorageShoppingType,
+  UtilityAreaId,
+} from "../../Types";
 
 function storageBuildSummary(storage: StorageShoppingType): string {
   switch (storage.name) {
@@ -274,7 +281,11 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onBuildStorage: (storage: StorageShoppingType, financed: boolean) => void;
+  onBuildStorage: (
+    storage: StorageShoppingType,
+    financed: boolean,
+    operatingAreaId?: UtilityAreaId,
+  ) => void;
   onBack: () => void;
 }
 
@@ -282,7 +293,15 @@ export type Props = StateProps & DispatchProps;
 
 function StorageBuildDialog(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
-  const { game, onBack } = props;
+  const { onBack } = props;
+  const operatingAreaId = React.useContext(BuildOperatingAreaContext);
+  const game = React.useMemo(
+    () =>
+      operatingAreaId
+        ? (gameForOperatingArea(props.game, operatingAreaId) ?? props.game)
+        : props.game,
+    [props.game, operatingAreaId],
+  );
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readCash = useBuildCashReader(now?.cash ?? 0);
   const listRef = useToolScroll<HTMLUListElement>("storage.scroll");
@@ -361,7 +380,9 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
             interestRate={game.interestRate}
             location={game.location}
             onBuild={(financed: boolean) => {
-              props.onBuildStorage(g, financed);
+              if (operatingAreaId)
+                props.onBuildStorage(g, financed, operatingAreaId);
+              else props.onBuildStorage(g, financed);
               (completeBuild ?? onBack)();
             }}
           />

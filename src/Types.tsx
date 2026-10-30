@@ -368,8 +368,12 @@ export interface RawWeatherType {
 // All amounts are the average across the time window
 export type TickPresentFutureType = Partial<FuelPricesType> &
   HistoryForecastShared & {
+    /** Local operating-area frames; their supply cannot cross a wire without settlement. */
+    areaTicks?: Partial<Record<UtilityAreaId, TickPresentFutureType>>;
     minute: number;
     supplyW: number; // Watts
+    /** Undelivered area surplus, excluded from consolidated customer service. */
+    curtailedW?: number;
     availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity
     demandW: number; // Watts
     reserveW?: number; // Signed supply margin plus local spare output reachable next tick
@@ -424,6 +428,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     rooftopSolarW?: number;
     supplyByFuel: FuelProductionType;
     /** Positive gross flow into/out of the player's grid during this tick. */
+    entitlementImportedW?: number;
+    entitlementImportCapacityW?: number;
     importedW?: number;
     exportedW?: number;
     transmissionCapacityW?: number;
@@ -526,6 +532,7 @@ export function isStorage<T extends { peakWh?: number }>(
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
   startingAssetId?: string;
+  operatingAreaId?: UtilityAreaId;
   id: number; // Monotonically increasing
   // Signed for storage: negative while charging
   currentW: number;
@@ -1219,6 +1226,8 @@ export interface PolicyChangeType {
 }
 /** One co-op grid's tick offer or need, planned before any grid settles the shared tick. */
 export interface PeerPlan {
+  /** Contract headroom may support owned areas, but cannot be offered for outside resale. */
+  restrictedOfferW?: number;
   offerW: number;
   shortageW: number;
   pricePerMWh: number;
@@ -1254,7 +1263,48 @@ export interface PeerSettlement {
   exportedW: number;
   importEmissionsKgPerMWh: number;
 }
+export type UtilityAreaId = "champlain" | "valley-electric" | "ridge-electric";
+export type UtilityTargetId = Exclude<UtilityAreaId, "champlain">;
+export interface AcquisitionLoan {
+  id: string;
+  targetId: UtilityTargetId;
+  kind: "purchase" | "assumed";
+  principal: number;
+  loanAmountLeft: number;
+  loanMonthlyPayment: number;
+  interestRate: number;
+  months: number;
+  minuteCreated: number;
+}
+export interface OperatingAreaState {
+  id: UtilityAreaId;
+  customers: number;
+  transferredCustomers: number;
+  /** Pool at activation; grow from activatedMinute, never from the beginning twice. */
+  customerMarketSize: number;
+  activatedMinute: number;
+  networkInitialValue: number;
+  retentionLowWatermark: number;
+  policies?: PoliciesType;
+}
+export interface UtilityExpansionState {
+  areas: OperatingAreaState[];
+  loans: AcquisitionLoan[];
+  acquisitions: {
+    targetId: UtilityTargetId;
+    minute: number;
+    financed: boolean;
+  }[];
+}
+export interface AcquireUtilityAction {
+  targetId: UtilityTargetId;
+  financed: boolean;
+  quoteKey: string;
+}
 export interface GameType {
+  utilityExpansion?: UtilityExpansionState;
+  /** Private scoped view used by the shared local-area dispatch engine. */
+  operatingAreaId?: UtilityAreaId;
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {
     seat: string;

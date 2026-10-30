@@ -18,6 +18,7 @@ import type {
   ObjectiveResult,
 } from "../data/ScenarioObjectives";
 import { getScenario } from "../data/Scenarios";
+import { UTILITY_EXPANSION_OBJECTIVES } from "../data/UtilityExpansionObjectives";
 import { scenarioRules } from "./ScenarioRules";
 import { ruleDigest, canonicalRuleJson } from "./RuleIdentity";
 import { MINUTES_PER_MONTH } from "./DateTime";
@@ -190,6 +191,7 @@ export function scenarioObjectiveDefinitions(
   parameters?: Pick<GameType, "difficulty" | "seed">,
 ): CompiledRuleObjective[] {
   if (!scenario || scenario.tutorialSteps) return [];
+  if (scenario.id === 116) return UTILITY_EXPANSION_OBJECTIVES;
   const compiled = scenarioRules(scenario, parameters);
   if (compiled && (scenario.id !== 999 || scenario.mod))
     return compiled.objectives;
@@ -532,7 +534,9 @@ export function initializeGameObjectiveProgress(game: GameType): void {
       ? createObjectiveProgress(
           objectives,
           objectiveContextForGame(game, scenario),
-          game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
+          scenario.id === 116
+            ? 90000
+            : game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
         )
       : undefined;
 }
@@ -575,11 +579,28 @@ export function recordGameObjectiveMonth(
     {
       month,
       history: row,
+      ...(game.utilityExpansion
+        ? {
+            ownedUtilities: game.utilityExpansion.acquisitions.map(
+              ({ targetId }) => targetId,
+            ),
+            ownedAssetIds: game.facilities.flatMap((facility) =>
+              facility.startingAssetId ? [facility.startingAssetId] : [],
+            ),
+            minimumCohortRetention: Math.min(
+              1,
+              ...game.utilityExpansion.areas.map(
+                (area) => area.customers / area.transferredCustomers,
+              ),
+            ),
+          }
+        : {}),
       ...(needsDebt
         ? {
             debtPrincipal: getTotalDebt([
               ...game.facilities,
               ...(game.transmission?.lines ?? []),
+              ...(game.utilityExpansion?.loans ?? []),
             ]),
           }
         : {}),
@@ -599,7 +620,9 @@ export function validGameObjectiveProgress(game: GameType): boolean {
   const progress = game.objectiveProgress;
   if (
     progress.retentionBaseline !==
-      game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER ||
+      (scenario.id === 116
+        ? 90000
+        : game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER) ||
     !validObjectiveProgress(progress, objectives, context)
   )
     return false;
@@ -609,6 +632,47 @@ export function validGameObjectiveProgress(game: GameType): boolean {
       scenario.mod.parameters.startingCustomers * CUSTOMER_MARKET_MULTIPLIER
   )
     return false;
+  if (scenario.id === 116) {
+    const expansion = game.utilityExpansion;
+    if (!expansion) return false;
+    for (const objective of objectives) {
+      const evidence = progress.entries.find(
+        (entry) => entry.id === objective.id,
+      );
+      if (objective.metric === "utilityOwnership") {
+        for (const [month, numerator, denominator] of evidence?.observations ??
+          []) {
+          const atClose = expansion.acquisitions.some(
+            (acquisition) =>
+              objective.targets.includes(acquisition.targetId) &&
+              acquisition.minute < (month + 1) * MINUTES_PER_MONTH,
+          );
+          if (numerator !== Number(atClose) || denominator !== 1) return false;
+        }
+      }
+      if (
+        objective.metric === "cohortRetention" &&
+        game.date.monthsElapsed === scenario.durationMonths
+      ) {
+        const final = evidence?.observations.find(
+          ([month]) => month === objective.deadlineMonth,
+        );
+        const observed = Math.min(
+          1,
+          ...expansion.areas.map(
+            (area) => area.customers / area.transferredCustomers,
+          ),
+        );
+        if (
+          final &&
+          (final[1] === null ||
+            Math.abs(final[1] - observed) > 1e-8 ||
+            final[2] !== 1)
+        )
+          return false;
+      }
+    }
+  }
   const observationsByObjective = new Map(
     progress.entries.map((entry) => [
       entry.id,
@@ -634,7 +698,10 @@ export function validGameObjectiveProgress(game: GameType): boolean {
       // their own recorded observations; never infer them from today's fleet.
       if (
         objective.metric === "monthEndDebt" ||
-        objective.metric === "fuelRetirement"
+        objective.metric === "fuelRetirement" ||
+        objective.metric === "utilityOwnership" ||
+        objective.metric === "assetRetirement" ||
+        objective.metric === "cohortRetention"
       )
         continue;
       const first =
