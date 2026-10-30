@@ -78,7 +78,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           rel: "noopener noreferrer",
         }
       : { href: path };
-  const startLabel = props.hasSavedGame ? "Start a new game" : "Play";
+  const startLabel = props.hasSavedGame ? "New game" : "Play";
   const [shareStatus, setShareStatus] = React.useState("");
   // An <img> can't read the page's custom properties, so dark swaps in a copy of the logo painted
   // in dark's desaturated blue; the overlaid pulse and smoke follow --interactive-blue on their own

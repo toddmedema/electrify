@@ -446,11 +446,11 @@ describe("the fleet list", () => {
       facility.loanAmountLeft = loanAmountLeft;
       const { onSell } = renderFacilities(game, facility.id);
       const construction = screen.getByRole("region", { name: "Construction" });
-      expect(construction).toHaveTextContent("Nameplate capacity320MW");
+      expect(construction).toHaveTextContent("Capacity320MW");
       const refund = formatMoneyConcise(200e6 - loanAmountLeft);
-      expect(construction).toHaveTextContent(`Refund if cancelled${refund}`);
+      expect(construction).toHaveTextContent(`Refund if canceled${refund}`);
       expect(
-        within(construction).queryByText("After settling the loan") !== null,
+        within(construction).queryByText("After loan payoff") !== null,
       ).toBe(loanAmountLeft > 0);
       await user.click(
         screen.getByRole("button", {
@@ -1063,9 +1063,9 @@ describe("unified connections", () => {
     expect(building).toHaveTextContent("Import capacity180MW");
     expect(building).toHaveTextContent("Export capacity150MW");
     expect(building).toHaveTextContent(
-      `Refund if cancelled${formatMoneyConcise(game.transmission!.lines[1].buildCost - 1000)}`,
+      `Refund if canceled${formatMoneyConcise(game.transmission!.lines[1].buildCost - 1000)}`,
     );
-    expect(building).toHaveTextContent("After settling the loan");
+    expect(building).toHaveTextContent("After loan payoff");
     expect(building).toHaveTextContent("Emissions");
     expect(building).not.toHaveTextContent("Import available now");
     expect(building).toHaveTextContent("Typical price");
@@ -1123,7 +1123,7 @@ describe("the intertie upgrade control", () => {
     expect(handleUpgrade).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent(/Construction emits.*CO2e/);
-    expect(dialog).toHaveTextContent(/for 30 years/);
+    expect(dialog).toHaveTextContent(/30 yrs/);
     expect(dialog).toHaveTextContent("Upkeep after upgrade");
     expect(dialog).not.toHaveTextContent("Line capacity");
     expect(dialog).toHaveTextContent("Import capacity150MW → 210MW");

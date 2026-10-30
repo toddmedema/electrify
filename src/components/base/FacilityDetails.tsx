@@ -221,7 +221,7 @@ function WeatherResilienceSection(props: {
             Solar trackers
           </Typography>
           <Typography variant="body2" color="textSecondary">
-            More morning and evening power. Trackers stow ahead of hail.
+            About 20% more morning and evening power.
           </Typography>
         </div>
       )}
@@ -367,7 +367,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         <section className="facilityDetailSection" aria-label="Construction">
           <dl className="facilityStats">
             <Stat
-              label="Nameplate capacity"
+              label="Capacity"
               value={formatWatts(facility.peakW)}
             />
             {storage && (
@@ -377,13 +377,13 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               />
             )}
             <Stat
-              label="Refund if cancelled"
+              label="Refund if canceled"
               value={
                 <>
                   {formatMoneyConcise(facilityCashBack(facility, date.minute))}
                   {facility.loanAmountLeft > 0 && (
                     <span className="facilityStatNote">
-                      After settling the loan
+                      After loan payoff
                     </span>
                   )}
                 </>
@@ -399,7 +399,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           </Typography>
           <dl className="facilityStats">
             <Stat
-              label="Nameplate capacity"
+              label="Capacity"
               value={formatWatts(facility.peakW)}
             />
             {!storage && maxOutputFactor < 1 && (

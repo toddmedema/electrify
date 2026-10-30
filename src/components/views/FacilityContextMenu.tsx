@@ -249,6 +249,7 @@ export default function FacilityContextMenu(props: {
               ? `Pay ${formatMoneyConcise(cost)}`
               : confirmation.label
           }
+          cancelLabel="Nevermind"
           confirmDisabled={!affected.length || shortfall > 0}
           destructive={cost === undefined}
           onCancel={() => setPending(null)}

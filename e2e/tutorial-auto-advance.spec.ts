@@ -116,7 +116,7 @@ for (const mission of [
       await expect(hud).toContainText(
         mission === "Generators"
           ? "Construction started"
-          : "vertical bar shows how much energy is stored",
+          : "vertical bar shows energy stored",
       );
     } else if (mission === "Forecasting") {
       await page.locator(".facilityRow .facilityDisclosure").first().click();

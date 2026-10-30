@@ -138,7 +138,7 @@ export function AchievementGallery(): React.JSX.Element {
               )}
               {signInError && (
                 <Typography color="error" role="alert">
-                  Sign-in couldn't finish. Please try again.
+                  Couldn't finish sign-in. Try again.
                 </Typography>
               )}
             </div>

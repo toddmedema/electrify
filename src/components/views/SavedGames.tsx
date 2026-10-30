@@ -291,7 +291,7 @@ export default function SavedGames(): React.JSX.Element {
                 variant="contained"
                 onClick={() => dispatch(navigate("NEW_GAME"))}
               >
-                Start a new game
+                New game
               </Button>
             </Paper>
           )}

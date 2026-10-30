@@ -1321,6 +1321,17 @@ $topbar_height: 56px;
   }
 }
 
+.gameCashNegative {
+  color: var(--delta-bad);
+}
+
+// Phones read "136 mo left": the event beside it needs the room.
+@media (max-width: 599px) {
+  .missionSummaryMonthsTail {
+    display: none;
+  }
+}
+
 // Abbreviate the months and hour together before the wide bar gets crowded.
 @container appbar (max-width: 1365px) {
   .missionSummaryMonthsTail,
@@ -2328,6 +2339,10 @@ $pane_header_height: 48px;
   padding: 0;
   flex: 0 1 auto;
   justify-content: flex-end;
+}
+
+.chartLegendNote {
+  font-weight: 400;
 }
 
 .chartLegendItem {

@@ -136,7 +136,7 @@ export default function PurchaseReviewDialog(
       help: (
         <ManualLink entry={MANUAL_ENTRY.INTEREST_RATES} label="interest rate" />
       ),
-      value: `${formatMoneyConcise(loan.downpayment)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo (${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years)`,
+      value: `${formatMoneyConcise(loan.downpayment)} + ${formatMoneyConcise(loan.monthlyPayment)}/mo · ${(interestRate * 100).toFixed(2)}%, ${Math.round(loanMonths / 12)} yrs`,
       detail: `Payments start now.${
         refinancedBalance > 0
           ? ` Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`

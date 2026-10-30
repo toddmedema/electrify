@@ -1,6 +1,6 @@
 import { currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
-import { Button } from "@mui/material";
+import { Button, useMediaQuery } from "@mui/material";
 import { EvidenceTargetType, GameType } from "../../Types";
 import {
   getMissionStatus,
@@ -123,6 +123,7 @@ export default function MissionSummary({
 }) {
   const mission = getMissionStatus(game);
   const risk = useMissionRisk(game, mission, upcoming);
+  const phone = useMediaQuery("(max-width:599px)", { noSsr: true });
   // The grid readout beside this already reports a shortage happening right now.
   const active = activeEvents[0];
   const shownRisk =
@@ -145,6 +146,10 @@ export default function MissionSummary({
     !shownRisk.id.startsWith("event:") &&
     !shownRisk.id.startsWith("active:");
   // The stable risk identity, not changing tick values, owns the polite announcement.
+  // Phones keep the room for the event's name.
+  const shortLabel = phone
+    ? shownRisk?.shortLabel.replace(/^Upcoming: /, "Next: ")
+    : shownRisk?.shortLabel;
   const announcement = React.useMemo(
     () => shownRisk?.label || "",
     [shownRisk?.id], // eslint-disable-line react-hooks/exhaustive-deps
@@ -177,9 +182,7 @@ export default function MissionSummary({
                   fontSize="small"
                 />
               </span>
-              <span className="missionRiskText statusLabel">
-                {shownRisk.shortLabel}
-              </span>
+              <span className="missionRiskText statusLabel">{shortLabel}</span>
             </Button>
           ) : (
             mission.headline &&

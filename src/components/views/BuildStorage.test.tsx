@@ -199,7 +199,7 @@ it("deduplicates storage purchase impact and shows loan terms inline", async () 
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).toHaveTextContent("Cash purchase");
   expect(impact).toHaveTextContent(
-    /Loan option.*now \+.*\/mo \(\d+\.\d+% for 30 years\)/,
+    /Loan option.* \+ .*\/mo · \d+\.\d+%, 30 yrs/,
   );
   expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");

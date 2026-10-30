@@ -507,14 +507,9 @@ export default function Settings(props: Props): React.JSX.Element {
                   id="keyboard-shortcuts-summary"
                   sx={{ minHeight: 56, px: 2 }}
                 >
-                  <Box>
-                    <Typography sx={{ fontWeight: 600 }}>
-                      Keys for faster play
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      View {SHORTCUTS.length} shortcuts
-                    </Typography>
-                  </Box>
+                  <Typography sx={{ fontWeight: 600 }}>
+                    View {SHORTCUTS.length} shortcuts
+                  </Typography>
                 </AccordionSummary>
                 <AccordionDetails
                   id="keyboard-shortcuts-content"

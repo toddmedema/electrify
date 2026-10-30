@@ -211,7 +211,7 @@ export const SCENARIOS: ScenarioType[] = [
         hideUi: MISSION_ONE_CAPSTONE,
         action: "Reach midnight without a blackout",
         content: (
-          <TutorialPrompt text="Watch coal output climb slowly as sunlight fades." />
+          <TutorialPrompt text="Watch coal output climb slowly as sunlight fades. Reserve is spare power you could add within 15 minutes. Low reserve is a warning, not a blackout." />
         ),
         capstone: {
           // The step before is tapping 1x, so the player arrives with the clock already running.
@@ -347,7 +347,7 @@ export const SCENARIOS: ScenarioType[] = [
           preserveProgress: true,
           success: generatorCapstoneSucceeded,
           successMessage:
-            "Final challenge complete—you ordered two different generator types. Their output and running costs will shape your grid.",
+            "Final challenge complete. You ordered two different generator types. Their output and running costs will shape your grid.",
           failureMessage:
             "Order a different generator type from your first purchase. Your starting coal plant does not count.",
         },
@@ -432,7 +432,7 @@ export const SCENARIOS: ScenarioType[] = [
           '.facilityRowHeader[data-storage="true"]:has(.capacityProgressBar)',
         action: "Check the storage bar",
         content: (
-          <TutorialPrompt text="The vertical bar shows how much energy is stored (MW hours). The horizontal bar shows you how much energy the plant is currently charging or discharging (MW)." />
+          <TutorialPrompt text="The vertical bar shows energy stored (MWh). The horizontal bar shows charging or discharging (MW)." />
         ),
       },
       {
@@ -468,7 +468,7 @@ export const SCENARIOS: ScenarioType[] = [
             hasBlackout(s) ||
             (s.game.date.minute >= 2880 && !storageCapstoneSucceeded(s)),
           successMessage:
-            "Final challenge complete—the storage charged with extra energy, then supplied the grid during peak demand without a blackout.",
+            "Final challenge complete. Storage charged on spare energy, then covered the peak.",
           failureMessage:
             "The storage did not fill and empty before the deadline, or demand exceeded supply. Check how full it is and the facility order before retrying.",
         },
@@ -577,7 +577,7 @@ export const SCENARIOS: ScenarioType[] = [
           failure: (s: AppStateType) =>
             s.game.date.monthsElapsed >= 1 && !financesCapstoneSucceeded(s),
           successMessage:
-            "Final challenge complete—revenue covered fuel and operating costs, leaving a monthly profit while the grid stayed reliable.",
+            "Final challenge complete. Revenue covered fuel and operating costs, leaving a monthly profit while the grid stayed reliable.",
           failureMessage:
             "Revenue did not cover fuel, operating, and loan costs, or demand exceeded supply. Use the financial layers to set a workable rate before retrying.",
         },
@@ -662,7 +662,7 @@ export const SCENARIOS: ScenarioType[] = [
             hasBlackout(s) ||
             (s.game.date.monthsElapsed >= 6 && !pricingCapstoneSucceeded(s)),
           successMessage:
-            "Final challenge complete—the lower rate grew the customer base by 5% while monthly revenue covered costs and supply met demand.",
+            "Final challenge complete. The lower rate grew the customer base by 5% while monthly revenue covered costs and supply met demand.",
           failureMessage:
             "You need six months of target customer numbers, positive monthly profit and reliable supply. Balance growth and costs before retrying.",
         },
@@ -741,7 +741,7 @@ export const SCENARIOS: ScenarioType[] = [
           s.game.eventLog.some((event) => event.kind === "BLACKOUT"),
         action: "Tap 1× to observe the blackout",
         content: (
-          <TutorialPrompt text="See what a forecast blackout looks like when it arrives." />
+          <TutorialPrompt text="Insights shows the forecast blackout." />
         ),
       },
       {
@@ -786,9 +786,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#insightsNav",
         advanceOn: onInsights,
         action: "Tap Insights",
-        content: (
-          <TutorialPrompt text="Possible fuel costs live in the Insights forecast." />
-        ),
+        content: <TutorialPrompt text="Insights forecasts fuel costs." />,
       },
       {
         card: "INSIGHTS",
@@ -827,7 +825,7 @@ export const SCENARIOS: ScenarioType[] = [
             (s.game.date.monthsElapsed >= 7 &&
               !forecastingCapstoneSucceeded(s)),
           successMessage:
-            "Final challenge complete—construction finished before peak demand, and the added generator prevented the predicted summer shortage.",
+            "Final challenge complete. Your new generator prevented the summer shortage.",
           failureMessage:
             "Demand exceeded available supply before the new generator was ready. Recheck the forecast shortage and start construction sooner.",
         },
@@ -998,7 +996,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: '[data-layer="powerExchange"]',
         action: "Find imports on the chart",
         content: (
-          <TutorialPrompt text="Imports appear alongside your shortage. Line and neighbor limits constrain backup; purchased emissions count in your total." />
+          <TutorialPrompt text="Imports appear alongside your shortage. Line and neighbor limits apply. Purchased emissions count in your total." />
         ),
       },
       {

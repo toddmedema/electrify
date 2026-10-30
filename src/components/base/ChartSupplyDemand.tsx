@@ -108,6 +108,13 @@ const SUPPLY_FORECAST_DASH = [2, 3];
 const DEMAND_FORECAST_DASH = [8, 4];
 type SupplySource = "Variable" | "Dispatchable" | "Storage" | "Interties";
 
+const SOURCE_LEGEND: Record<SupplySource, string> = {
+  Variable: "Variable (solar, wind)",
+  Dispatchable: "Dispatchable (coal, gas…)",
+  Storage: "Storage",
+  Interties: "Interties",
+};
+
 function sourcePattern(source: SupplySource): LegendItemType["pattern"] {
   if (source === "Storage") return "hatch";
   if (source === "Interties") return "vertical";
@@ -624,7 +631,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           items={[
             { name: "Demand", color: chartPalette().demand, dash: "8,4" },
             ...sources.map((source) => ({
-              name: source,
+              name: SOURCE_LEGEND[source],
               color: sourcePattern(source)
                 ? chartPalette().powerFlowPattern
                 : sourceColor(source),
@@ -634,6 +641,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
                 : undefined,
             })),
           ]}
+          note="Dashed = forecast · Red = shortage"
         />
       )}
       <UPlotChart<State>

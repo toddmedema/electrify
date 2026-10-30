@@ -494,10 +494,10 @@ for (const [theme, winning] of [
         page.getByRole("button", { name: "Scenario", exact: true }),
       );
       await expect(
-        scenario.getByRole("region", { name: "Victory conditions" }),
+        scenario.getByRole("region", { name: "Goals" }),
       ).toContainText("≥99.5% of demand monthly · Jan 2026–Dec 2028");
       await expect(
-        scenario.getByRole("region", { name: "Victory conditions" }),
+        scenario.getByRole("region", { name: "Goals" }),
       ).not.toContainText(/months completed|Not started/);
       expect(
         (await readSavedGame(page))!.objectiveProgress?.completedMonths,
@@ -1059,7 +1059,7 @@ for (const [theme, requiredBills] of [
       exact: true,
     });
     await openPane(panel, scenarioButton);
-    const rules = panel.getByRole("region", { name: "Victory conditions" });
+    const rules = panel.getByRole("region", { name: "Goals" });
     await expect(
       rules.getByText("Keep bills affordable", { exact: true }),
     ).toBeVisible();
@@ -1348,7 +1348,7 @@ for (const layout of [
     await mockDesktop(page, false, layout.theme);
     await page.goto("/");
     await page
-      .getByRole("button", { name: "Start a new game", exact: true })
+      .getByRole("button", { name: "New game", exact: true })
       .or(page.getByRole("button", { name: "Play", exact: true }))
       .click();
     await page.getByLabel("Open community scenarios").click();

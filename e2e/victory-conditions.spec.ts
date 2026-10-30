@@ -20,7 +20,7 @@ for (const theme of ["light", "dark"] as const) {
       await page.goto(`/?scenario=${scenario.id}`);
       {
         await page
-          .getByRole("button", { name: "Victory Conditions", exact: true })
+          .getByRole("button", { name: "Goals", exact: true })
           .click();
         const briefing = page.getByRole("dialog");
         await expect(briefing.locator("..")).toHaveCSS("opacity", "1");
@@ -37,7 +37,7 @@ for (const theme of ["light", "dark"] as const) {
         await expect(requirements).not.toContainText("points");
         if (scenario.id === 100) {
           await expect(requirements).toContainText(
-            "Retain ≥80% of starting customers",
+            "Keep ≥80% of starting customers",
           );
         }
         const help = briefing.locator("details");
@@ -104,7 +104,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       if (scenario.id === 100) {
         await expect(dialog).toContainText(
-          "Retain ≥80% of starting customers · Dec 2031",
+          "Keep ≥80% of starting customers by Dec 2031",
         );
         await expect(dialog).not.toContainText("Invest in the grid");
       }
@@ -117,7 +117,7 @@ for (const theme of ["light", "dark"] as const) {
         expect(requirement).toEqual([target]);
       }
       await expect(
-        dialog.getByRole("region", { name: "Victory conditions" }),
+        dialog.getByRole("region", { name: "Goals" }),
       ).not.toContainText(
         /Not started|Recorded:|months completed|Delivered customer electricity divided/,
       );

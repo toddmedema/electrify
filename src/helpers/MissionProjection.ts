@@ -231,7 +231,7 @@ export function projectMission(
   const lowestCash = Math.min(...months.map((row) => row.cash + cashAnchor));
   requirements.push({
     id: "cash",
-    label: "Keep the utility solvent",
+    label: "Stay solvent",
     required: true,
     failureMonth: bankrupt ? monthIndex(bankrupt, game) : undefined,
     status: bankrupt

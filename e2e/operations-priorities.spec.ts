@@ -87,7 +87,7 @@ for (const layout of [
         ).toBeGreaterThanOrEqual(0);
       }
       await expect(
-        page.getByRole("button", { name: /Keep the utility solvent/ }),
+        page.getByRole("button", { name: /Stay solvent/ }),
       ).toBeVisible();
       await expect(page.getByText(/^Calculating forecast/)).toHaveCount(0, {
         timeout: 45000,
@@ -99,7 +99,7 @@ for (const layout of [
         ),
       });
       await page
-        .getByRole("button", { name: /Keep the utility solvent/ })
+        .getByRole("button", { name: /Stay solvent/ })
         .click();
       await expect(page.locator('[data-layer="financeDetails"]')).toBeVisible();
     } else {

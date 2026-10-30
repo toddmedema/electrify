@@ -673,7 +673,7 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
   if (page.viewportSize()!.width < 700) {
     // Phones shrink a stable grid to a checked bolt; the readout is a tap away.
     const summary =
-      /^Stable, \d.* [kMGT]?W demand met with \d.* [kMGT]?W reserve$/;
+      /^Stable, \d.*[kMGT]?W demand met with \d.*[kMGT]?W reserve$/;
     const bolt = status.getByRole("button", {
       name: /^Current grid status: Stable, /,
     });
@@ -691,7 +691,7 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
     await expect(page.getByRole("tooltip", { name: summary })).toHaveCount(0);
   } else {
     await expect(status.locator(".gridHealthMetric")).toHaveText(
-      /^Stable, \d.* [kMGT]?W$/,
+      /^Stable, \d.*[kMGT]?W reserve$/,
     );
     await expect(status.locator(".gridHealthMetric")).toHaveCSS(
       "text-align",

@@ -148,8 +148,8 @@ export const LOAD_SHEDDING_RULES: OfficialScenarioRuleDefinition = {
         visibility: "forecast" as const,
         preview:
           step === 0
-            ? "Coal output decreasing."
-            : "Coal output decreasing further.",
+            ? "Coal output will decrease."
+            : "Coal output will decrease further.",
         effects: {
           outputMultipliersByFuel: {
             Coal: difficultyValues("coalOutputMultipliers", step),

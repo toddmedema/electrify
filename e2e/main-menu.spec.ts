@@ -325,7 +325,7 @@ for (const theme of ["light", "dark"]) {
       }
       await page.goto("/");
       const primary = page.getByRole("button", {
-        name: hasSave ? "Start a new game" : "Play",
+        name: hasSave ? "New game" : "Play",
         exact: true,
       });
       await expect(primary).toBeVisible();

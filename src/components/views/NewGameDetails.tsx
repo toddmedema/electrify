@@ -400,7 +400,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   action={
                     <IconButton
                       onClick={toggleVictoryDialog}
-                      aria-label="Victory Conditions"
+                      aria-label="Goals"
                       color="primary"
                       size="small"
                     >
@@ -465,7 +465,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
           <VictoryConditionsDialog
             open={victoryDialogOpen || false}
             onClose={() => this.setState({ victoryDialogOpen: false })}
-            title="Victory Conditions"
+            title="Goals"
             scenario={scenario}
             difficulty={game.difficulty}
           />

@@ -573,12 +573,12 @@ export function getDateFromMinute(
   };
 }
 
-// eg "4am", "12pm" - a bare clock time for chart axes, where the day and month are already known
+// eg "4 AM", "12 PM" - a bare clock time for chart axes, where the day and month are already known
 export function formatMinuteOfDayChartAxis(minute: number): string {
   const hourOfDay = Math.floor((minute % 1440) / 60);
   return (
     (hourOfDay % 12 === 0 ? 12 : hourOfDay % 12) +
-    (hourOfDay < 12 ? "am" : "pm")
+    (hourOfDay < 12 ? " AM" : " PM")
   );
 }
 

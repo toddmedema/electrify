@@ -104,6 +104,9 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 const LOW_RESERVE_RATIO = 0.1;
+const MINUTES_PER_DAY = 1440;
+/** From 6 PM a same-day blackout reads as "tonight". */
+const EVENING_MINUTE = 18 * 60;
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 /** Status row controls that keep keyboard focus when the row moves into or out of the top bar. */
 const RESTORABLE_STATUS_FOCUS = [".missionRiskButton", ".missionSummaryMonths"];
@@ -146,11 +149,16 @@ export function getGridHealth(
 
   const ahead = projectedShortfall(game.timeline, game.date.minute);
   if (ahead) {
-    const at = formatHour(getDateFromMinute(ahead.minute, game.startingYear));
+    const when = getDateFromMinute(ahead.minute, game.startingYear);
+    const at = formatHour(when);
+    const sameDay =
+      Math.floor(ahead.minute / MINUTES_PER_DAY) ===
+      Math.floor(game.date.minute / MINUTES_PER_DAY);
+    const day = when.minuteOfDay >= EVENING_MINUTE ? "tonight" : "today";
     return {
       state: "blackout-ahead",
-      label: "Blackout ahead",
-      metric: `${formatWatts(ahead.demandW - ahead.supplyW)} short at ${at}`,
+      label: sameDay ? `Blackout ${day} at ${at}` : `Blackout ahead at ${at}`,
+      metric: `${formatWatts(ahead.demandW - ahead.supplyW)} short`,
       announcement: `Blackout expected at ${at}. Demand will be higher than supply.`,
     };
   }
@@ -171,7 +179,7 @@ export function getGridHealth(
     return {
       state: "low-reserve",
       label: "Low reserve",
-      metric: `${formatWatts(reserveW)} reserve (${reservePercent}%)`,
+      metric: `${formatWatts(reserveW)} (${reservePercent}%)`,
       announcement: "Low reserve.",
     };
   }
@@ -184,17 +192,12 @@ export function getGridHealth(
   };
 }
 
-/** "72MW" -> "72 MW", the spacing the status row reads with. */
-function spacedWatts(watts: number): string {
-  return formatWatts(watts).replace(/([kMGT]?W)$/, " $1");
-}
-
 /** The full stable readout, which phones keep behind the icon's tooltip. */
 export function stableGridSummary(
   game: GameType,
   now: TickPresentFutureType,
 ): string {
-  return `Stable, ${spacedWatts(now.demandW)} demand met with ${spacedWatts(
+  return `Stable, ${formatWatts(now.demandW)} demand met with ${formatWatts(
     Math.max(0, reserveCapacityW(game, now)),
   )} reserve`;
 }
@@ -531,10 +534,7 @@ export function GameAppBar(props: Props) {
               />
             </span>
             <strong className="gridHealthMetric">
-              {gridHealth.label},{" "}
-              {gridHealth.state === "stable"
-                ? spacedWatts(reserveCapacityW(game, now))
-                : gridHealth.metric}
+              {gridHealth.label}, {gridHealth.metric}
             </strong>
           </div>
         </div>
@@ -558,7 +558,9 @@ export function GameAppBar(props: Props) {
         <Toolbar className={inBlackout ? "blackout-pulsing" : ""}>
           {menu}
           <Typography variant="h6" className="gameStatus">
-            <span className="gameStatusValue">
+            <span
+              className={`gameStatusValue${now.cash < 0 ? " gameCashNegative" : ""}`}
+            >
               {formatMoneyStable(now.cash)}
             </span>
             {showProfit && (

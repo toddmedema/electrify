@@ -696,7 +696,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               {facility.hydroSiteId && (
                 <DialogContentText>
                   {underConstruction
-                    ? "Cancelling frees this site."
+                    ? "Canceling frees this site."
                     : "Selling won't free this site."}
                 </DialogContentText>
               )}

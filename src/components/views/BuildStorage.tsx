@@ -169,7 +169,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
       details={
         <BuildDetails label="storage properties">
           <BuildDetailRow
-            label="Operating costs"
+            label="Upkeep"
             value={`${formatMoneyConcise(storage.annualOperatingCost)}/yr`}
             entry={MANUAL_ENTRY.OPERATING_COSTS}
           />

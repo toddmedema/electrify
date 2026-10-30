@@ -28,7 +28,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("option", { name: "Reliability", exact: true })
       .click();
     const track = insights.getByRole("region", {
-      name: "Lowest spare capacity evidence",
+      name: "Lowest reserve evidence",
     });
     await expect(track).toBeVisible();
     await expect(track.locator("canvas")).toBeVisible();
@@ -44,7 +44,7 @@ for (const theme of ["light", "dark"] as const) {
       "Projected monthly minimum",
     );
     await expect(track.getByRole("status")).toContainText(
-      "Lowest spare capacity:",
+      "Lowest reserve:",
     );
     await chart.press("Escape");
     expect(
@@ -55,7 +55,7 @@ for (const theme of ["light", "dark"] as const) {
     await insights.getByRole("button", { name: /^Layers \(/ }).click();
     await expect(
       insights.getByRole("checkbox", {
-        name: "Lowest spare capacity",
+        name: "Lowest reserve",
         exact: true,
       }),
     ).toBeChecked();

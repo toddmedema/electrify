@@ -26,7 +26,7 @@ export const DESIGN_WIDTH = 350;
  * How far past its design width a chart is allowed to be blown up.
  *
  * The 350-wide design space was drawn for a phone, and scaling it straight to the pane means a
- * chart in a 700px column gets 24px axis labels: "440MW" and "12am" set larger than any text
+ * chart in a 700px column gets 24px axis labels: "440MW" and "12 AM" set larger than any text
  * around them, for no more information than they carried at 12px. Past this the pane gets the
  * extra width as plot rather than as type -- which is also where the room for a fifth chart on
  * screen comes from, since heights are quoted in the same space.

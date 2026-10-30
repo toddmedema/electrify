@@ -2,6 +2,7 @@ import type { CompiledRuleObjective } from "../data/ScenarioRules";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import { objectiveDefinition } from "./ScenarioObjectives";
 import {
+  finishedObjectiveStatusText,
   objectiveObservedText,
   objectiveTargetText,
   objectiveValueText,
@@ -40,6 +41,37 @@ it("retains the actual side of an arbitrarily close share target", () => {
   expect(
     objectiveTargetText({ ...reliability, minDemandServedShare: 0.9999999 }),
   ).toBe("≥99.99999% of demand monthly");
+});
+
+it("rounds a reading to a whole percent unless that would cross the target", () => {
+  const retention: CompiledRuleObjective = {
+    id: "retention",
+    label: "Retain the community",
+    required: true,
+    metric: "customerRetention",
+    deadlineMonth: 11,
+    minRetainedShare: 0.8,
+  };
+  expect(objectiveValueText(retention, 1.01234, 0.8)).toBe("101%");
+  expect(objectiveValueText(retention, 0.79996, 0.8)).toContain("79.99");
+  expect(
+    objectiveObservedText(
+      result({
+        objective: retention,
+        id: "retention",
+        metric: "customerRetention",
+        target: 0.8,
+        observed: 1.01234,
+        observedMonths: 0,
+        requiredMonths: 1,
+      }),
+    ),
+  ).toBe("101% now");
+});
+
+it("names a goal that never closed as not reached once the run is over", () => {
+  expect(finishedObjectiveStatusText.inProgress).toBe("Not reached");
+  expect(finishedObjectiveStatusText.pending).toBe("Not reached");
 });
 
 it("formats calendar windows from the canonical zero-based inclusive months", () => {

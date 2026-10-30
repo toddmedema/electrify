@@ -14,13 +14,13 @@ import { DifficultyType } from "../../Types";
 // Interface copy stays out of Constants.tsx so editing it never changes the run compatibility ID
 export const DIFFICULTY_DESCRIPTIONS: Record<DifficultyType, string> = {
   Intern:
-    "Most forgiving: much lower costs, very fast building, and smaller penalties from outages.",
+    "Most forgiving: much lower costs, very fast building, smaller outage penalties.",
   Employee:
-    "Forgiving: lower costs, faster building, and smaller penalties from outages.",
+    "Forgiving: lower costs, faster building, smaller outage penalties.",
   Manager:
-    "Balanced: some help with costs, building time, and outage penalties.",
+    "Balanced: some help with costs, building time, outage penalties.",
   VP: "Demanding: a little help with costs and building time.",
-  CEO: "Full challenge: unadjusted costs, building times, and outage penalties.",
+  CEO: "Full challenge: unadjusted costs, building times, outage penalties.",
 };
 
 export interface DifficultyPickerProps {

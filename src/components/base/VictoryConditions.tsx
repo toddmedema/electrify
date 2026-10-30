@@ -3,8 +3,7 @@ import { DifficultyType, ScenarioType } from "../../Types";
 import { Box, Typography } from "@mui/material";
 import { objectiveDefinition } from "../../helpers/ScenarioObjectives";
 import {
-  objectiveTargetText,
-  objectiveWindowText,
+  objectiveGoalText,
 } from "../../helpers/ObjectivePresentation";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
@@ -45,8 +44,7 @@ export default function VictoryConditions({
             {objective.label}
           </Typography>
           <Typography component="p" variant="body2" color="textSecondary">
-            {objectiveTargetText(objective)} ·{" "}
-            {objectiveWindowText(
+            {objectiveGoalText(
               objective,
               scenario.startingYear,
               scenario.durationMonths,

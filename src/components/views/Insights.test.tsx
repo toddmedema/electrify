@@ -663,7 +663,7 @@ describe("Insights layers", () => {
       "Insights",
       "Supply & Demand",
       "Cash",
-      "Emissions (CO2e)",
+      "Emissions (CO₂e)",
     ];
     expect(headings).toHaveLength(expected.length);
     expected.forEach((label, index) =>
@@ -686,22 +686,22 @@ describe("Insights layers", () => {
     renderInsights();
     await choosePreset("Reliability");
     const track = screen.getByRole("region", {
-      name: "Lowest spare capacity evidence",
+      name: "Lowest reserve evidence",
     });
     expect(
-      within(track).getByRole("img", { name: /Monthly lowest spare capacity/ }),
+      within(track).getByRole("img", { name: /Monthly lowest reserve/ }),
     ).toBeInTheDocument();
     const headings = screen.getAllByRole("heading", { level: 6 });
     expect(headings[1]).toHaveTextContent("Supply & Demand");
-    expect(headings[2]).toHaveTextContent("Lowest spare capacity");
+    expect(headings[2]).toHaveTextContent("Lowest reserve");
     await user.click(labelledButton(/Layers/));
     await user.click(
       screen.getByRole("checkbox", {
-        name: "Lowest spare capacity",
+        name: "Lowest reserve",
       }),
     );
     expect(
-      screen.queryByRole("region", { name: "Lowest spare capacity evidence" }),
+      screen.queryByRole("region", { name: "Lowest reserve evidence" }),
     ).not.toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("insightsLayers")!)).not.toContain(
       "spareCapacity",
@@ -746,7 +746,7 @@ describe("Insights layers", () => {
         startsMinute: 6 * MINUTES_PER_MONTH,
         endsMinute: 7 * MINUTES_PER_MONTH,
         label: "Expected Jul 2023",
-        title: "Higher pollution fee begins",
+        title: "Higher carbon fee begins",
         message: "Polluting plants become more expensive to run.",
       },
       {
@@ -763,9 +763,9 @@ describe("Insights layers", () => {
       name: "Upcoming scenario events",
     });
     expect(region).toHaveTextContent("Jul 2023");
-    expect(region).toHaveTextContent("Higher pollution fee begins");
+    expect(region).toHaveTextContent("Higher carbon fee begins");
     const event = within(region).getByRole("button", {
-      name: "Expected Jul 2023: Higher pollution fee begins",
+      name: "Expected Jul 2023: Higher carbon fee begins",
     });
     expect(event).toHaveAttribute("aria-expanded", "false");
     await user.click(event);
@@ -1212,7 +1212,7 @@ describe("Insights layers", () => {
       .getAllByRole("heading", { level: 6 })
       .map((heading) => heading.textContent);
     expect(headings.indexOf("Revenue")).toBeLessThan(
-      headings.indexOf("Emissions (CO2e)"),
+      headings.indexOf("Emissions (CO₂e)"),
     );
 
     await user.click(labelledButton("Preset actions"));

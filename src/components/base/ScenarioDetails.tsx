@@ -380,7 +380,7 @@ export function ScenarioDetailsContent({
           component="h3"
           sx={{ fontWeight: 600 }}
         >
-          Victory conditions
+          Goals
         </Typography>
         {scenario.id === 3 && <CustomerGrowthChallenge />}
         <Box component="dl" className="missionRequirements">

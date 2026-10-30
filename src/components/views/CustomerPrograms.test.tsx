@@ -208,7 +208,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
     workers[workers.length - 1].onerror!(failure);
   });
   expect(failure.preventDefault).toHaveBeenCalled();
-  expect(screen.getByRole("alert")).toHaveTextContent("Could not estimate");
+  expect(screen.getByRole("alert")).toHaveTextContent("Couldn't estimate");
   expect(apply).toBeDisabled();
   fallback.mockRestore();
   moveWindow();

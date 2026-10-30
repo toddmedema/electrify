@@ -7,8 +7,9 @@ import { scoreLabel } from "../../helpers/Scoring";
 import { formatLargeMass } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import {
+  finishedObjectiveStatusText,
+  objectiveDefinitionText,
   objectiveObservedText,
-  objectiveStatusText,
   objectiveTargetText,
 } from "../../helpers/ObjectivePresentation";
 
@@ -134,14 +135,14 @@ export function RunDebrief({
                   sx={{ fontWeight: 600 }}
                 >
                   {result.label} · {result.required ? "Required" : "Optional"} ·{" "}
-                  {objectiveStatusText[result.status]}
+                  {finishedObjectiveStatusText[result.status]}
                 </Typography>
                 <Typography
                   component="p"
                   variant="body2"
                   color="text.secondary"
                 >
-                  {result.definition}
+                  {objectiveDefinitionText(result)}
                 </Typography>
                 <Typography component="p" variant="body2">
                   {objectiveTargetText(result.objective)} ·{" "}

@@ -52,7 +52,7 @@ it.each(["Public", "Investor"] as const)(
       />,
     );
     expect(
-      screen.getByText(/Retain ≥90% of starting customers/),
+      screen.getByText(/Keep ≥90% of starting customers/),
     ).toBeInTheDocument();
     expect(screen.getByText(/≥99% of demand monthly/)).toHaveTextContent(
       "Jan–Feb 2025",

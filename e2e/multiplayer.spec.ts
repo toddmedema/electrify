@@ -2640,7 +2640,7 @@ for (const scenarioId of [106, 107] as const) {
           : "Keep the lights on through the freeze";
       const target =
         scenarioId === 106
-          ? "Retain ≥90% of starting customers · Dec 2035"
+          ? "Keep ≥90% of starting customers by Dec 2035"
           : "≥99.5% of demand monthly · Feb 2021";
       const scenarioPanel = (page: Page) =>
         page.getByRole("region", { name: "Scenario", exact: true });
@@ -2653,7 +2653,7 @@ for (const scenarioId of [106, 107] as const) {
         await expect(panel).toContainText(goal);
         await expect(panel).not.toContainText("Modded");
         const conditions = panel.getByRole("region", {
-          name: "Victory conditions",
+          name: "Goals",
         });
         await expect(conditions).toContainText(target);
         await expect(conditions).not.toContainText(

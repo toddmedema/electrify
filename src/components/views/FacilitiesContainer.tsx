@@ -2,6 +2,10 @@ import type { AppDispatch } from "../../Store";
 import { connectToStore } from "../base/ConnectToStore";
 import { navigate } from "../../reducers/Card";
 import {
+  INTERTIE_UPGRADE_APPROVED,
+  intertieApprovedMessage,
+} from "../../helpers/BuildConsequences";
+import {
   sellFacility,
   setSpeed,
   togglePauseFacility,
@@ -111,11 +115,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         ({ id }) => id === corridorId,
       );
       if (corridor) {
-        dispatch(
-          snackbarOpen(
-            `Intertie approved — power can flow in ${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}.`,
-          ),
-        );
+        dispatch(snackbarOpen(intertieApprovedMessage(corridor.yearsToBuild)));
       }
     },
     onTransmissionCancel: (id) => {
@@ -136,11 +136,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onTransmissionUpgrade: (corridorId, financed) => {
       dispatch(upgradeTransmissionLine({ corridorId, financed }));
-      dispatch(
-        snackbarOpen(
-          "Upgrade approved. The line stays operational during construction.",
-        ),
-      );
+      dispatch(snackbarOpen(INTERTIE_UPGRADE_APPROVED));
     },
     onTradingPolicy: (policy) => {
       dispatch(setTradingPolicy(policy));

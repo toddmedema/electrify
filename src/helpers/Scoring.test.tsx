@@ -281,9 +281,9 @@ describe("SCORE_RULES", () => {
       "financial",
       "environmental",
     ]);
-    expect(investor.service).toContain("Earn 1 point per terawatt-hour");
+    expect(investor.service).toContain("Earn 1 point per TWh");
     expect(investor.service).toContain(
-      "Lose 8 points per TWh of customer demand not served.",
+      "Lose 8 points per TWh of unmet demand.",
     );
     expect(investor.environmental).toBe(
       "Lose 2 points per 1 Mt of greenhouse gas emissions.",
@@ -295,7 +295,7 @@ describe("SCORE_RULES", () => {
     );
     expect(publicText.financial).toContain("starting-year dollars");
     expect(publicText.service).toContain(
-      "Lose 10 points per TWh of customer demand not served.",
+      "Lose 10 points per TWh of unmet demand.",
     );
   });
 

@@ -27,7 +27,7 @@ for (const theme of ["light", "dark"] as const) {
       panel.getByRole("status", { name: "Scenario forecast" }),
     ).toHaveAttribute("data-status", /^(win|loss|unknown)$/);
     const requirements = panel.getByRole("region", {
-      name: "Victory conditions",
+      name: "Goals",
     });
     await expect(requirements).not.toContainText(
       /Projected miss|Projected to meet|Projected loss|Not started|Recorded:|months completed|Delivered customer electricity divided/,
@@ -136,13 +136,13 @@ test("scenario outlook flags insolvency with the first projected month-end", asy
   await expect(failure.locator("strong")).toHaveText("Projected loss:");
   await expect(failure.locator("svg")).toBeVisible();
   await expect(failure).toContainText(
-    /Projected loss: Cash below \$0 at \w+ \d{4}\./,
+    /Projected loss: Cash below \$0 by \w+ \d{4}\./,
   );
   await expect(
     outlook.getByRole("img", { name: /Projected loss periods shaded/ }),
   ).toBeVisible();
   await expect(
-    panel.getByRole("region", { name: "Victory conditions" }),
+    panel.getByRole("region", { name: "Goals" }),
   ).not.toContainText("Projected miss");
   if (!testInfo.project.use.hasTouch) {
     await expect(page.locator(".gameStage")).toHaveAttribute(

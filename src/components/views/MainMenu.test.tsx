@@ -137,7 +137,7 @@ describe("MainMenu", () => {
       screen.getByRole("button", { name: "Continue" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Start a new game" }),
+      screen.getByRole("button", { name: "New game" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Game resources" }),
@@ -147,7 +147,7 @@ describe("MainMenu", () => {
     ).getAllByRole("button");
     expect(buttons.map((button) => button.textContent)).toEqual([
       "Continue",
-      "Start a new game",
+      "New game",
       "Saved games",
     ]);
     await userEvent.click(screen.getByRole("button", { name: "Saved games" }));
