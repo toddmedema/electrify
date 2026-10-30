@@ -4,7 +4,6 @@ Generated from the evaluator's shared metric definitions.
 
 | Metric                     | Definition                                                                                                                                                    |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `monthlyReliability`       | Delivered customer electricity divided by customer demand each completed month.                                                                               |
 | `customerRetention`        | Customers at the deadline divided by the run's recorded starting customers.                                                                                   |
 | `emissionsBudget`          | Total electricity and construction emissions over the window, including imports and exports.                                                                  |
 | `emissionsPerDeliveredMWh` | Total emissions, including imports, exports and construction, per delivered customer MWh over the window.                                                     |

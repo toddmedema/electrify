@@ -7,8 +7,7 @@ import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import { scoreLabel, scoreRuleText } from "../../helpers/Scoring";
 import {
-  blackoutFiringThreshold,
-  formatRequiredShare,
+  reliabilityRuleText,
   scenarioObjectiveDefinitions,
 } from "../../helpers/ObjectiveRules";
 
@@ -66,11 +65,7 @@ export default function VictoryConditions({
         </Typography>
         <ul className="victorySurvivalList">
           <li>Finish the term without bankruptcy.</li>
-          <li>
-            Serve at least{" "}
-            {formatRequiredShare(blackoutFiringThreshold(difficulty))} of
-            demand. Three consecutive months below this end the run.
-          </li>
+          <li>{reliabilityRuleText(difficulty)}</li>
         </ul>
         {required.length > 0 && objectiveRows(required)}
       </Box>

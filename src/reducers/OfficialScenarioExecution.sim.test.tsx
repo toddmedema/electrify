@@ -1,3 +1,4 @@
+import { STANDARD_BALANCE_PLAYS } from "../testing/BalancePlaybooks";
 import { deserialize, serialize } from "v8";
 import { createNextState } from "@reduxjs/toolkit";
 import { TICK_MINUTES, TICK_MS } from "../Constants";
@@ -212,11 +213,7 @@ function expectOpeningDiscount(
 ): boolean {
   if (game.date.minute !== 0 || game.scenarioId !== 101) return false;
   const event = rules.events.find((item) => item.id === "bridge-contracts")!;
-  const build = {
-    name: "Natural Gas CC",
-    peakW: 600e6,
-    financed: true,
-  };
+  const build = STANDARD_BALANCE_PLAYS[101].initialBuild!;
   const ordinary = officialQuote(
     { ...game, storyEffectsDisabled: true },
     build,

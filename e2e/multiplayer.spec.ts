@@ -2048,10 +2048,10 @@ const cooperativeMod = (published: boolean): InstalledMod => ({
     },
     objectives: [
       {
-        id: "serve-customers",
-        label: "Keep your grid reliable",
-        metric: "monthlyReliability",
-        minDemandServedShare: 0.5,
+        id: "affordable",
+        label: "Keep bills affordable",
+        metric: "monthlyBilledRate",
+        maxDollarsPerKWh: 1,
         fromMonth: 1,
         throughMonth: 6,
       },
@@ -2221,9 +2221,9 @@ for (const width of [1280, 390, 360]) {
       await expect(preview).toContainText(
         "Modded · Unranked · No achievements",
       );
-      await expect(preview).toContainText("Keep your grid reliable");
+      await expect(preview).toContainText("Keep bills affordable");
       await expect(preview).toContainText(
-        "Delivered customer electricity divided by customer demand each completed month.",
+        "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
       );
       await expect(preview).toContainText("Grid funding");
       await expect(preview).not.toContainText("Private surprise");
@@ -2396,7 +2396,7 @@ for (const width of [1280, 390, 360]) {
       scenarioPanel,
       guest.getByRole("button", { name: "Scenario", exact: true }),
     );
-    await expect(scenarioPanel).toContainText("Keep your grid reliable");
+    await expect(scenarioPanel).toContainText("Keep bills affordable");
     await guest.keyboard.press("Escape");
     await saveAndQuit(guest);
     await saveAndQuit(host);
@@ -2640,13 +2640,11 @@ for (const scenarioId of [106, 107] as const) {
         });
       };
       const goal =
-        scenarioId === 106
-          ? "Retain the community"
-          : "Keep the lights on through the freeze";
+        scenarioId === 106 ? "Retain the community" : "Keep power flowing";
       const target =
         scenarioId === 106
           ? "Keep ≥90% of starting customers by Dec 2035"
-          : "≥99.5% of demand monthly · Feb 2021";
+          : "Serving less than 95% of demand for 3 months in a row ends the run.";
       const scenarioPanel = (page: Page) =>
         page.getByRole("region", { name: "Scenario", exact: true });
       const showGoal = async (page: Page) => {
@@ -2947,11 +2945,6 @@ for (const scenarioId of [106, 107] as const) {
           )!;
           expect(february).toBeDefined();
           expect(february.demandWh).toBeGreaterThan(0);
-          expect(
-            game.objectiveProgress!.entries.find(
-              (entry) => entry.id === "reliability",
-            )!.observations,
-          ).toEqual([[49, february.supplyWh, february.demandWh]]);
         }
       const facts = (game: GameType) => ({
         date: game.date,

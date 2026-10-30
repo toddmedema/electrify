@@ -147,15 +147,13 @@ function objectiveDetail(result: ObjectiveResult, game: GameType): string {
   if (result.observed === undefined || result.status === "unverifiable")
     return "Forecast does not cover every required month or measurement.";
   const prefix =
-    result.metric === "monthlyReliability"
-      ? "Lowest demand served"
-      : result.metric === "customerRetention"
-        ? "Customers retained at deadline"
-        : result.metric === "monthlyBilledRate"
-          ? "Highest billed rate"
-          : result.metric === "monthEndDebt"
-            ? "Highest debt"
-            : "Projected value";
+    result.metric === "customerRetention"
+      ? "Customers retained at deadline"
+      : result.metric === "monthlyBilledRate"
+        ? "Highest billed rate"
+        : result.metric === "monthEndDebt"
+          ? "Highest debt"
+          : "Projected value";
   // An hourly estimate needs little precision, except when rounding would conceal a miss.
   const rounded = Number(result.observed.toPrecision(3));
   const shown =

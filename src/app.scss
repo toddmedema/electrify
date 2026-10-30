@@ -410,6 +410,9 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
 #centeredMenu
   :is(.mainActions, .resourceActions, .discoveryActions)
   .MuiButton-root {
+  // This fill is a cursor, so cross-fading it leaves the previous selection painted.
+  transition: none;
+
   @media (hover: hover) and (pointer: fine) {
     &:hover {
       background-color: transparent; // keep the inactive state borderless and unfilled

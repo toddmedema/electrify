@@ -1,10 +1,6 @@
 import { OFFICIAL_EFFECT_SCENARIO_RULES } from "./OfficialScenarioEffectRules";
 import { OFFICIAL_TARGET_SCENARIO_RULES } from "./OfficialScenarioTargetRules";
-import type {
-  DifficultyType,
-  ScenarioType,
-  StoryAttributeValueType,
-} from "../Types";
+import type { DifficultyType, StoryAttributeValueType } from "../Types";
 import type {
   CompiledRuleEvent,
   RuleNumber,
@@ -57,8 +53,6 @@ export interface OfficialScenarioRuleDefinition {
   arcId: string;
   definitions: ScenarioRuleDefinitions;
   presentation: Record<string, OfficialRulePresentation>;
-  /** Presentation metadata only; thresholds and windows belong to definitions.objectives. */
-  reliabilityNoun?: string;
 }
 
 export interface LoadSheddingBalanceType {
@@ -123,7 +117,6 @@ const difficultyValues = (
 export const LOAD_SHEDDING_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 113,
   arcId: "load-shedding",
-  reliabilityNoun: "2022 power shortage",
   definitions: {
     events: [
       {
@@ -163,26 +156,7 @@ export const LOAD_SHEDDING_RULES: OfficialScenarioRuleDefinition = {
         },
       })),
     ],
-    objectives: [
-      {
-        id: "reliability",
-        label: "Keep the lights on through the 2022 shortage",
-        metric: "monthlyReliability",
-        fromMonth: 73,
-        throughMonth: 84,
-        minDemandServedShare: 0.995,
-      },
-    ],
-    debriefReports: [
-      {
-        id: "load-shedding-reliability",
-        label: "2022 power shortage",
-        kind: "reliability",
-        fromMonth: 73,
-        throughMonth: 84,
-        minDemandServedShare: 0.995,
-      },
-    ],
+    objectives: [],
   },
   presentation: {
     "maintenance-backlog": {
@@ -236,28 +210,6 @@ export const OFFICIAL_SCENARIO_RULES: readonly OfficialScenarioRuleDefinition[] 
   ];
 export const officialScenarioRuleDefinition = (scenarioId: number) =>
   OFFICIAL_SCENARIO_RULES.find((entry) => entry.scenarioId === scenarioId);
-
-/** Derived bridge for existing goal-label/import presentation; it owns no judgment or numbers. */
-export function officialReliabilityMetadata(
-  scenarioId: number,
-  startingYear: number,
-): ScenarioType["reliabilityObjective"] {
-  const entry = officialScenarioRuleDefinition(scenarioId);
-  const goal = entry?.definitions.objectives.find(
-    (objective) => objective.metric === "monthlyReliability",
-  );
-  if (!entry || !goal || goal.metric !== "monthlyReliability") return undefined;
-  return {
-    year: startingYear + Math.floor((goal.fromMonth - 1) / 12),
-    month: ((goal.fromMonth - 1) % 12) + 1,
-    ...(goal.throughMonth > goal.fromMonth
-      ? { durationMonths: goal.throughMonth - goal.fromMonth + 1 }
-      : {}),
-    minimumDemandServed: goal.minDemandServedShare,
-    label: entry.reliabilityNoun ?? goal.label,
-    goal: goal.label,
-  };
-}
 
 /** Catalog setup keeps the shared goal's display value without a second threshold. */
 export function officialRetentionMetadata(

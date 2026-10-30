@@ -98,7 +98,6 @@ function validModSetup(scenario: ScenarioType): boolean {
       "demandShapeExponent",
       "loadAdditions",
       "minimumCustomerRetention",
-      "reliabilityObjective",
       "dollarsPerkWh",
       "durationMonths",
       "endTitle",
@@ -309,27 +308,6 @@ function validModSetup(scenario: ScenarioType): boolean {
         return false;
     }
   }
-  const objective = scenario.reliabilityObjective;
-  if (
-    objective &&
-    (!plain(objective) ||
-      !keys(objective, [
-        "year",
-        "month",
-        "durationMonths",
-        "minimumDemandServed",
-        "label",
-        "goal",
-      ]) ||
-      !number(objective.year, 1980, 2300, true) ||
-      !number(objective.month, 1, 12, true) ||
-      !number(objective.durationMonths ?? 1, 1, 1200, true) ||
-      !number(objective.minimumDemandServed, 0, 1) ||
-      !safeText(objective.label, 100) ||
-      (objective.goal !== undefined && !safeText(objective.goal, 200)))
-  )
-    return false;
-  if (scenario.reliabilityObjective === null) return false;
   return (
     canonicalRuleJson(
       [...(scenario.eventScenarioIds ?? [])].sort((a, b) => a - b),

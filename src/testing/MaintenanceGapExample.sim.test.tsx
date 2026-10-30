@@ -49,7 +49,7 @@ for (const optionId of ["accelerate", "standard"] as const) {
           fallback: false,
         },
       ]);
-      expect(run.objectiveResults).toHaveLength(2);
+      expect(run.objectiveResults).toHaveLength(1);
       expect(
         run.objectiveResults.every((goal) => goal.status === "completed"),
       ).toBe(true);
@@ -125,19 +125,15 @@ for (const optionId of ["accelerate", "standard"] as const) {
   });
 }
 
-test("neglecting reserve fails the example's unchanged maintenance reliability goal", () => {
+test("a temporary maintenance shortage has no extra failure gate", () => {
   const [run] = runModSimulation(pack, {
     responses: responses("standard"),
     simulation: { dollarsPerkWh: 0.12 },
   });
   expect(run.result.violations).toEqual([]);
   expect(run.result.builds).toEqual([]);
-  expect(run.outcome).toBe("fired");
-  expect(run.outcomeMonth).toBe(18);
-  expect(run.objectiveResults).toContainEqual(
-    expect.objectContaining({
-      id: "maintenance-service",
-      status: "failed",
-    }),
-  );
+  expect(run.outcome).toBe("completed");
+  expect(
+    run.result.months.some((month) => month.supplyWh < month.demandWh),
+  ).toBe(true);
 });

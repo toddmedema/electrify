@@ -12,7 +12,6 @@ import {
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
 import ShareIcon from "@mui/icons-material/Share";
-import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import {
   buildGameShareContent,
   canShare,
@@ -192,6 +191,16 @@ const MainMenu = (props: Props): React.JSX.Element => {
             justifyContent: "center",
           }}
         >
+          {!desktopApp && (
+            <Button
+              data-achievements-trigger
+              variant="text"
+              color="primary"
+              onClick={props.onAchievements}
+            >
+              Achievements
+            </Button>
+          )}
           <Button
             data-manual-trigger
             variant="text"
@@ -218,16 +227,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
           >
             Settings
           </Button>
-          {!desktopApp && (
-            <Button
-              data-achievements-trigger
-              variant="text"
-              color="primary"
-              onClick={props.onAchievements}
-            >
-              Achievements
-            </Button>
-          )}
           {desktopApp && (
             <Button
               variant="text"
@@ -251,13 +250,9 @@ const MainMenu = (props: Props): React.JSX.Element => {
               justifyContent: "center",
             }}
           >
-            {!desktopApp && <InstallAppButton />}
+            {!desktopApp && <InstallAppButton showIcon={false} />}
             {props.audioEnabled === undefined && !desktopApp && (
-              <Button
-                color="primary"
-                startIcon={<VolumeUpIcon />}
-                onClick={() => props.onAudioChange(true)}
-              >
+              <Button color="primary" onClick={() => props.onAudioChange(true)}>
                 Turn on sound
               </Button>
             )}
@@ -303,7 +298,8 @@ const MainMenu = (props: Props): React.JSX.Element => {
             aria-label="Share Electrify"
             size="large"
           >
-            <ShareIcon />
+            {/* Share has one extra pixel of leading whitespace beside the other footer glyphs. */}
+            <ShareIcon sx={{ transform: "translateX(-1px)" }} />
           </IconButton>
         )}
       </footer>

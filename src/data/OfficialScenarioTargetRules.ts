@@ -480,7 +480,6 @@ export const HURRICANE_RULES: OfficialScenarioRuleDefinition = {
 export const NUCLEAR_TRIP_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 110,
   arcId: "nuclear-trip",
-  reliabilityNoun: "reactor shutdown window and recovery",
   definitions: {
     events: [
       {
@@ -517,26 +516,7 @@ export const NUCLEAR_TRIP_RULES: OfficialScenarioRuleDefinition = {
         },
       },
     ],
-    objectives: [
-      {
-        id: "reliability",
-        label: "Keep the lights on through the reactor shutdown",
-        metric: "monthlyReliability",
-        fromMonth: 43,
-        throughMonth: 60,
-        minDemandServedShare: 0.995,
-      },
-    ],
-    debriefReports: [
-      {
-        id: "nuclear-shutdown-reliability",
-        label: "reactor shutdown window and recovery",
-        kind: "reliability",
-        fromMonth: 43,
-        throughMonth: 60,
-        minDemandServedShare: 0.995,
-      },
-    ],
+    objectives: [],
   },
   presentation: {
     "contingency-review": {
@@ -578,7 +558,6 @@ export const WILDFIRE_CORRIDOR_ID = "california-north";
 export const CALIFORNIA_WILDFIRE_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 111,
   arcId: "wildfire-intertie",
-  reliabilityNoun: "January and February 2025 intertie outage",
   definitions: {
     events: [
       {
@@ -611,26 +590,7 @@ export const CALIFORNIA_WILDFIRE_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 15,
       },
     ],
-    objectives: [
-      {
-        id: "reliability",
-        label: "Keep the lights on through the wildfire emergency",
-        metric: "monthlyReliability",
-        fromMonth: 37,
-        throughMonth: 38,
-        minDemandServedShare: 0.995,
-      },
-    ],
-    debriefReports: [
-      {
-        id: "wildfire-reliability",
-        label: "January and February 2025 intertie outage",
-        kind: "reliability",
-        fromMonth: 37,
-        throughMonth: 38,
-        minDemandServedShare: 0.995,
-      },
-    ],
+    objectives: [],
   },
   presentation: {
     readiness: {

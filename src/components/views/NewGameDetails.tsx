@@ -44,6 +44,7 @@ import {
 
 import { formatScore } from "../../helpers/Format";
 import { isDesktopApp } from "../../Desktop";
+import { reliabilityRuleText } from "../../helpers/ObjectiveRules";
 import { SCORE_VERSION } from "../../helpers/Scoring";
 
 export interface StateProps {
@@ -436,6 +437,11 @@ export default class NewGameDetails extends React.Component<Props, State> {
                       readOnly={coop?.role === "guest"}
                     />
                   </div>
+                )}
+                {this.props.challenge && (
+                  <Typography variant="body2" color="text.secondary">
+                    {reliabilityRuleText(game.difficulty)}
+                  </Typography>
                 )}
                 {coop ? (
                   <CoopStartButton

@@ -33,9 +33,12 @@ for (const theme of ["light", "dark"] as const) {
       /Projected miss|Projected to meet|Projected loss|Not started|Recorded:|months completed|Delivered customer electricity divided/,
     );
     await expect(
-      requirements.getByText("≥99.5% of demand monthly · Jan–Feb 2025", {
-        exact: true,
-      }),
+      requirements.getByText(
+        "Serving less than 95% of demand for 3 months in a row ends the run.",
+        {
+          exact: true,
+        },
+      ),
     ).toBeAttached();
     const outlook = panel.getByRole("region", { name: "Score outlook" });
     await expect(

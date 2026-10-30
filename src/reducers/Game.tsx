@@ -3804,13 +3804,17 @@ export function* tickStatePhases(
       if (failure) {
         const summary = summarizeHistory(history);
         const yearsSurvived = state.date.year - state.startingYear;
+        const durationSurvived =
+          yearsSurvived > 0
+            ? `${yearsSurvived} ${yearsSurvived === 1 ? "year" : "years"}`
+            : `${state.date.monthsElapsed} ${state.date.monthsElapsed === 1 ? "month" : "months"}`;
         const failureMessage = () =>
           `${
             failure.outcome === "bankrupt"
               ? "You've run out of money."
               : failure.reason
           }
-                You survived for ${yearsSurvived} years,
+                You survived for ${durationSurvived},
                 earned ${formatMoneyConcise(summary.revenue)} in revenue
                 and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of greenhouse gases, measured as CO2e.`;
 
