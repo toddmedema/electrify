@@ -15,6 +15,7 @@ interface DecisionDialogProps {
   onClose: () => void;
   children?: React.ReactNode;
   actions: React.ReactNode;
+  actionsClassName?: string;
   closable?: boolean;
   closeDisabled?: boolean;
   isolateClicks?: boolean;
@@ -30,6 +31,7 @@ export default function DecisionDialog({
   onClose,
   children,
   actions,
+  actionsClassName,
   closable,
   closeDisabled,
   isolateClicks,
@@ -67,7 +69,7 @@ export default function DecisionDialog({
       {children && (
         <DialogContent className={contentClassName}>{children}</DialogContent>
       )}
-      <DialogActions>{actions}</DialogActions>
+      <DialogActions className={actionsClassName}>{actions}</DialogActions>
     </Dialog>
   );
 }

@@ -1,3 +1,5 @@
+import { generateForecastTimeline } from "../reducers/Game";
+import { isStorage } from "../Types";
 import { TICK_MINUTES } from "../Constants";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { loanBalanceAfterTicks } from "../helpers/Financials";
@@ -305,4 +307,107 @@ it("corporate loans pay only elapsed ticks across the first acquired month close
       balance: Number(loan.loanAmountLeft.toFixed(2)),
     }).toEqual({ loan: loan.id, balance: Number(expected.toFixed(2)) });
   }
+});
+
+it("a legal 2013 battery in an acquired area stays bounded through play, save and forecasts", () => {
+  const fixture = EXPANSION_BALANCE_CASES.find(
+    ({ id }) => id === "valley-electric-firm-loan",
+  )!;
+  const actions: ScheduledSimActionType[] = [
+    ...expansionBalanceActions(fixture, 12345),
+    {
+      month: 96,
+      type: "build",
+      build: {
+        name: "Solar",
+        peakW: 500e6,
+        financed: true,
+        operatingAreaId: "valley-electric",
+      },
+    },
+    {
+      month: 108,
+      type: "build",
+      build: {
+        name: "Solar",
+        peakW: 500e6,
+        financed: true,
+        operatingAreaId: "valley-electric",
+      },
+    },
+    {
+      month: 97,
+      type: "build",
+      build: {
+        name: "Battery",
+        peakWh: 64e6,
+        financed: true,
+        operatingAreaId: "valley-electric",
+      },
+    },
+  ];
+  actions.sort((left, right) => left.month - right.month);
+  let maximumStoredWh = 0;
+  let observedTicks = 0;
+  const { game, violations } = playOfficialExecution(
+    116,
+    {
+      throughMonth: 132,
+      beforeTick(state) {
+        const storage = state.facilities.filter(isStorage);
+        for (const battery of storage) {
+          expect(battery.operatingAreaId).toBe("valley-electric");
+          expect(battery.currentWh).toBeGreaterThanOrEqual(0);
+          expect(battery.currentWh).toBeLessThanOrEqual(battery.peakWh);
+          maximumStoredWh = Math.max(maximumStoredWh, battery.currentWh);
+          observedTicks++;
+        }
+      },
+    },
+    {
+      difficulty: "Employee",
+      seed: 12345,
+      plan: { scheduledActions: actions },
+    },
+  );
+  expect(violations).toEqual([]);
+  expect(observedTicks).toBeGreaterThan(96);
+  expect(
+    game.facilities.filter(
+      (facility) =>
+        facility.operatingAreaId === "valley-electric" &&
+        facility.name === "Solar",
+    ),
+  ).toHaveLength(2);
+  expect(maximumStoredWh).toBeGreaterThan(0);
+  const restored = parseSave(JSON.parse(JSON.stringify(serializeSave(game))));
+  expect(restored).not.toBeNull();
+  expect(serialGame(restored!.game)).toEqual(serialGame(game));
+  const before = JSON.stringify(game);
+  const forecast = generateForecastTimeline(
+    game,
+    currentTick(game)!.cash,
+    currentTick(game)!.customers,
+    96,
+  );
+  for (const tick of forecast) {
+    expect(tick.areaTicks!["valley-electric"]!.storedWh).toBeGreaterThanOrEqual(
+      0,
+    );
+    expect(tick.areaTicks!["valley-electric"]!.storedWh).toBeLessThanOrEqual(
+      64e6,
+    );
+  }
+  expect(JSON.stringify(game)).toBe(before);
+  const simulated = runSimulation({
+    scenarioId: 116,
+    difficulty: "Employee",
+    seed: 12345,
+    months: 132,
+    scheduledActions: actions,
+  });
+  expect(simulated.violations).toEqual([]);
+  expect(canonical(simulated.months)).toEqual(
+    canonical([...game.monthlyHistory].reverse()),
+  );
 });

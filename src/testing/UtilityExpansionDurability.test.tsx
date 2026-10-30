@@ -22,6 +22,7 @@ import { parseSave, serializeSave } from "../SaveGame";
 import type { GameType, UtilityTargetId } from "../Types";
 import { copyOfficialGame } from "./OfficialScenarioExecutionFixtures";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
+import { getMissionStatus } from "../helpers/MissionStatus";
 
 function ready(targetId: UtilityTargetId): GameType {
   let game = createGame({
@@ -324,4 +325,25 @@ it("validates canonical acquired assets and network consideration before economi
   } finally {
     unloaded.mockRestore();
   }
+});
+
+it("acknowledges ownership immediately without inventing completed-month history", () => {
+  let game = ready("ridge-electric");
+  const before = gameObjectiveResults(game);
+  expect(
+    before.find((result) => result.metric === "utilityOwnership")!.status,
+  ).toBe("pending");
+  const history = JSON.stringify(game.monthlyHistory);
+  const completed = game.objectiveProgress!.completedMonths;
+  game = buy(game, "ridge-electric");
+  const after = gameObjectiveResults(game);
+  expect(
+    after.find((result) => result.metric === "utilityOwnership")!.status,
+  ).toBe("completed");
+  expect(
+    after.find((result) => result.metric === "cohortRetention")!.status,
+  ).toBe("pending");
+  expect(getMissionStatus(game).headline!.id).toBe("retire-champlain-oil");
+  expect(JSON.stringify(game.monthlyHistory)).toBe(history);
+  expect(game.objectiveProgress!.completedMonths).toBe(completed);
 });

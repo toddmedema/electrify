@@ -383,7 +383,12 @@ function historyObjectiveResults(
 
 const resultCache = new WeakMap<
   ObjectiveProgress,
-  { completedMonths: number; rulesDigest: string; results: ObjectiveResult[] }
+  {
+    completedMonths: number;
+    rulesDigest: string;
+    acquisitionKey: string;
+    results: ObjectiveResult[];
+  }
 >();
 /** Shared recorded evidence; forecast callers extend a copy without changing the live run. */
 export function gameObjectiveProgress(
@@ -410,10 +415,15 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
   if (!objectives.length) return [];
   const context = objectiveContextForGame(game, scenario);
   const progress = gameObjectiveProgress(game)!;
+  const acquisitionKey =
+    game.utilityExpansion?.acquisitions
+      .map(({ targetId, minute }) => `${targetId}:${minute}`)
+      .join("|") ?? "";
   const cached = resultCache.get(progress);
   if (
     cached?.completedMonths === context.completedMonths &&
-    cached.rulesDigest === context.rulesDigest
+    cached.rulesDigest === context.rulesDigest &&
+    cached.acquisitionKey === acquisitionKey
   )
     return cached.results;
   const results = inheritedResultReasons(
@@ -421,10 +431,34 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
     scenario,
     progress,
     context,
-  );
+  ).map((result) => {
+    const objective = result.objective;
+    // An accepted, irreversible ownership receipt proves this obligation immediately.
+    // Month-close observations remain the authoritative deadline evidence.
+    if (
+      objective.metric !== "utilityOwnership" ||
+      context.completedMonths > objective.deadlineMonth
+    )
+      return result;
+    const acquired = game.utilityExpansion?.acquisitions.some(
+      (receipt) =>
+        objective.targets.includes(receipt.targetId) &&
+        receipt.minute < (objective.deadlineMonth + 1) * MINUTES_PER_MONTH,
+    );
+    return acquired
+      ? {
+          ...result,
+          status: "completed" as const,
+          observed: 1,
+          observedMonths: 1,
+          reason: undefined,
+        }
+      : result;
+  });
   resultCache.set(progress, {
     completedMonths: context.completedMonths,
     rulesDigest: context.rulesDigest,
+    acquisitionKey,
     results,
   });
   return results;

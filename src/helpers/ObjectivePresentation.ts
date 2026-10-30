@@ -79,9 +79,9 @@ export function objectiveTargetText(objective: CompiledRuleObjective): string {
     case "cohortRetention":
       return `Retain ≥${target} in every operating area`;
     case "utilityOwnership":
-      return "Acquire at least one target utility";
+      return objective.label;
     case "assetRetirement":
-      return `Retire original oil assets (${target} remaining)`;
+      return objective.label;
     case "localFuelShare":
       return `≥${target} local delivery from ${objective.fuels.join(", ")}`;
     case "fuelRetirement":
@@ -96,6 +96,12 @@ export function objectiveTargetText(objective: CompiledRuleObjective): string {
 }
 
 export function objectiveObservedText(result: ObjectiveResult): string {
+  if (result.metric === "utilityOwnership")
+    return result.observed === 1
+      ? "Utility acquired"
+      : result.status === "failed"
+        ? "No utility acquired by the deadline"
+        : "No utility acquired yet";
   if (result.observed === undefined)
     return `${result.observedMonths}/${result.requiredMonths} months completed${result.status === "unverifiable" ? " · history incomplete, not verifiable" : ""}`;
   const value = objectiveValueText(

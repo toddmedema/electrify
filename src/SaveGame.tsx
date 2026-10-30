@@ -594,6 +594,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     !validPolicies(
       game.policies,
       Math.floor(game.date.minute / MINUTES_PER_MONTH),
+      game.scenarioId === 116 && !!game.utilityExpansion,
     )
   )
     return null;

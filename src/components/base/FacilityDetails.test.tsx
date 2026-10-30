@@ -1,3 +1,6 @@
+import { Provider } from "react-redux";
+import { configureStore } from "@reduxjs/toolkit";
+import uiReducer from "../../reducers/UI";
 import * as React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import cloneDeep from "lodash.clonedeep";
@@ -487,7 +490,10 @@ it("reports hydro inflow from the plant's operating area", () => {
     ...tick.areaTicks,
     "valley-electric": { ...tick, areaTicks: undefined, hydroRunoffMm: 2 },
   };
-  showDetails(game, facility);
+  const store = configureStore({ reducer: { ui: uiReducer } });
+  render(
+    <Provider store={store}>{details(game, facility, jest.fn())}</Provider>,
+  );
   const water = screen.getByRole("region", { name: "Water" });
   expect(water).toHaveTextContent(/Inflow this month\s*2MWh/);
   expect(water).not.toHaveTextContent(/Inflow this month\s*200MWh/);

@@ -100,6 +100,7 @@ import {
   policyAvailable,
   validPolicyChange,
   samePolicyChoice,
+  syncCompanyPolicyPending,
   isOperatingPolicy,
   buildoutComplete,
   programCustomers,
@@ -3304,7 +3305,14 @@ function applyPolicyEdit(
     !cancel &&
     !isOperatingPolicy(payload.id) &&
     !isFlexibilityPolicy(payload.id) &&
-    buildoutComplete(existing?.adoption ?? 0)
+    (state.utilityExpansion
+      ? state.utilityExpansion.areas.every((area) =>
+          buildoutComplete(
+            (area.id === "champlain" ? state.policies : area.policies)
+              ?.programs[payload.id].adoption ?? 0,
+          ),
+        )
+      : buildoutComplete(existing?.adoption ?? 0))
   )
     return false;
   const before = policyChoiceLabel(payload.id, existing?.pending ?? existing);
@@ -3334,13 +3342,7 @@ function applyPolicyEdit(
     }
   }
   const program = state.policies!.programs[payload.id];
-  for (const area of state.utilityExpansion?.areas ?? []) {
-    if (area.id === "champlain") continue;
-    area.policies ??= emptyPolicies(state.date.monthsElapsed);
-    const local = area.policies.programs[payload.id];
-    if (program.pending) local.pending = { ...program.pending };
-    else delete local.pending;
-  }
+  syncCompanyPolicyPending(state, payload.id);
   const after = policyChoiceLabel(
     payload.id,
     cancel ? existing : (program.pending ?? program),
@@ -4190,6 +4192,9 @@ function getDemandW(
       (area) => area.id === game.operatingAreaId,
     );
     if (cohort) now.customers = cohort.customers;
+    now.customerRate =
+      getTimeFromTimeline(game.date.minute, game.timeline)?.customerRate ??
+      prev.customerRate;
   }
   const { baselineW, weatherShare } = areaBaselineDemand(
     date,
@@ -4360,12 +4365,13 @@ function reforecastWeatherAndPrices(
         forecast.windOffshoreKph = weather.WIND_OFFSHORE_KPH;
       }
       if (state.utilityExpansion && !state.operatingAreaId) {
+        const previousAreaTicks = forecast.areaTicks;
         forecast.areaTicks = {};
         for (const area of state.utilityExpansion.areas)
           forecast.areaTicks[area.id] = operatingAreaWeather(
             state,
             area,
-            forecast,
+            { ...forecast, areaTicks: previousAreaTicks },
             forecastWeather,
           );
       }
@@ -4394,6 +4400,17 @@ function reforecastDemand(
     deferredThermal: initialThermal,
     deferredCharging: initialCharging,
   } as TickPresentFutureType;
+  if (state.utilityExpansion && !state.operatingAreaId && prev.areaTicks) {
+    prev = {
+      ...prev,
+      areaTicks: Object.fromEntries(
+        Object.entries(prev.areaTicks).map(([id, local]) => [
+          id,
+          local ? beforeAreaProgramTick(local) : local,
+        ]),
+      ),
+    };
+  }
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
@@ -4511,6 +4528,44 @@ function advanceGamePolicies(
   }
   return [...activated];
 }
+const AREA_PROGRAM_TICK_FIELDS = [
+  "customerBillingRate",
+  "deferredResidentialWh",
+  "deferredResidentialWhStart",
+  "deferredResidential",
+  "deferredResidentialStart",
+  "shiftedResidentialW",
+  "deferredThermal",
+  "deferredThermalStart",
+  "deferredCharging",
+  "deferredChargingStart",
+  "thermalShiftedW",
+  "thermalRecoveredW",
+  "evShiftedW",
+  "evRecoveredW",
+  "customerBatteryWh",
+  "customerBatteryWhStart",
+  "customerBatteryChargeW",
+  "customerBatteryGridChargeW",
+  "customerBatteryDischargeW",
+  "customerBatteryLossWh",
+  "rooftopSurplusW",
+  "rebateEligibleW",
+  "efficiencySavedW",
+  "rooftopSolarW",
+] as const;
+function beforeAreaProgramTick(
+  local: TickPresentFutureType,
+): TickPresentFutureType {
+  return {
+    ...local,
+    deferredResidential: cloneDeep(local.deferredResidentialStart ?? []),
+    deferredThermal: cloneDeep(local.deferredThermalStart ?? []),
+    deferredCharging: cloneDeep(local.deferredChargingStart ?? []),
+    customerBatteryWh: local.customerBatteryWhStart ?? 0,
+  };
+}
+
 function operatingAreaWeather(
   state: GameType,
   area: OperatingAreaState,
@@ -4527,7 +4582,7 @@ function operatingAreaWeather(
       )(date)
     : getWeather(date, state.seed, 0, definition.location.id);
   const hydro = getHydroConditions(date, state.seed, 0, definition.location.id);
-  return {
+  const local: TickPresentFutureType = {
     ...tick,
     areaTicks: undefined,
     customers: area.customers,
@@ -4543,6 +4598,26 @@ function operatingAreaWeather(
     snowpackMm: hydro.snowpackMm,
     hydroRunoffMm: hydro.runoffMm,
   };
+  const previous = tick.areaTicks?.[area.id];
+  local.customerRate = previous?.customerRate ?? local.customerRate;
+  for (const key of AREA_PROGRAM_TICK_FIELDS) {
+    delete local[key];
+    if (previous && Object.prototype.hasOwnProperty.call(previous, key))
+      Object.assign(local, { [key]: cloneDeep(previous[key]) });
+  }
+  if (!previous && area.id !== "champlain") {
+    const scenario =
+      getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
+    const sellerRate = getMarketRate(
+      scenario.dollarsPerkWh,
+      getDateFromMinute(area.activatedMinute, state.startingYear),
+      state.startingYear,
+      state.seed,
+    );
+    local.customerRate = sellerRate;
+    local.customerBillingRate = sellerRate;
+  }
+  return local;
 }
 function* operatingAreasPhases(
   state: GameType,
@@ -6353,7 +6428,10 @@ function supplyForecastPass(
             for (const area of state.utilityExpansion?.areas ?? []) {
               const old = current.areaTicks[area.id],
                 fresh = t.areaTicks[area.id];
-              if (old && fresh) fresh.customers = old.customers;
+              if (old && fresh) {
+                fresh.customers = old.customers;
+                fresh.customerRate = old.customerRate;
+              }
             }
         }
         t.netWorth = getNetWorth(
@@ -6633,10 +6711,51 @@ function generateTimeline(
       // reforecastWeatherAndPrices asserts its own tick literal.
     } as TickPresentFutureType;
   }
-  state.timeline = reforecastWeatherAndPrices(state, forecastWeather);
   const previousDemandTick = readOnlyState.timeline.findLast(
     (tick) => tick.minute < state.date.minute,
   );
+  if (state.utilityExpansion && !state.operatingAreaId && state.timeline[0]) {
+    const currentSource = getTimeFromTimeline(
+      state.date.minute,
+      readOnlyState.timeline,
+    );
+    state.timeline[0].areaTicks = {};
+    for (const area of state.utilityExpansion.areas) {
+      const previous = previousDemandTick?.areaTicks?.[area.id];
+      const opening = currentSource?.areaTicks?.[area.id];
+      const source = previous ?? opening;
+      if (!source) continue;
+      const residential = cloneDeep(
+        previous?.deferredResidential ??
+          opening?.deferredResidentialStart ??
+          [],
+      );
+      const thermal = cloneDeep(
+        previous?.deferredThermal ?? opening?.deferredThermalStart ?? [],
+      );
+      const charging = cloneDeep(
+        previous?.deferredCharging ?? opening?.deferredChargingStart ?? [],
+      );
+      const batteryWh =
+        previous?.customerBatteryWh ?? opening?.customerBatteryWhStart ?? 0;
+      state.timeline[0].areaTicks[area.id] = {
+        ...source,
+        minute: state.date.minute,
+        customerRate: opening?.customerRate ?? source.customerRate,
+        customerBillingRate:
+          opening?.customerBillingRate ?? source.customerBillingRate,
+        deferredResidential: residential,
+        deferredResidentialStart: residential,
+        deferredThermal: thermal,
+        deferredThermalStart: thermal,
+        deferredCharging: charging,
+        deferredChargingStart: charging,
+        customerBatteryWh: batteryWh,
+        customerBatteryWhStart: batteryWh,
+      };
+    }
+  }
+  state.timeline = reforecastWeatherAndPrices(state, forecastWeather);
   state.timeline = reforecastDemand(
     state,
     tickScale,

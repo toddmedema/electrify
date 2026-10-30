@@ -77,7 +77,7 @@ export function validUtilityExpansion(game: GameType): boolean {
         Math.min(1, area.customers / area.transferredCustomers) + 1e-9 ||
       area.customers > operatingAreaPool(area, game.date.minute) * (1 + 1e-9) ||
       (area.policies !== undefined &&
-        !validPolicies(area.policies, game.date.monthsElapsed))
+        !validPolicies(area.policies, game.date.monthsElapsed, true))
     )
       return false;
     ids.add(area.id);
@@ -112,6 +112,17 @@ export function validUtilityExpansion(game: GameType): boolean {
         return false;
       if (!validNetworkValue(game, area)) return false;
     }
+  }
+  for (const id of ["efficiency", "solar"] as const) {
+    const programs = state.areas.map(
+      (area) =>
+        (area.id === "champlain" ? game.policies : area.policies)?.programs[id],
+    );
+    if (
+      programs.every((program) => (program?.adoption ?? 0) >= 1) &&
+      programs.some((program) => !!program?.pending)
+    )
+      return false;
   }
   if (
     !close(

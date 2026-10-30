@@ -6,7 +6,11 @@ import {
   MINUTES_PER_MONTH,
   summarizeTimeline,
 } from "./DateTime";
-import { emptyPolicies, samePolicyChoice } from "./Policies";
+import {
+  emptyPolicies,
+  samePolicyChoice,
+  syncCompanyPolicyPending,
+} from "./Policies";
 import { TICK_MINUTES } from "../Constants";
 
 export function previewPolicy(
@@ -22,6 +26,7 @@ export function previewPolicy(
     const { id: _id, ...pending } = change;
     program.pending = pending;
   }
+  syncCompanyPolicyPending(draft, change.id);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   if (!now) throw new Error("No current simulation tick");
   const ticks = Math.ceil(

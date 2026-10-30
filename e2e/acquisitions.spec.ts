@@ -138,6 +138,7 @@ for (const theme of ["light", "dark"] as const) {
       if (
         process.env.REVIEW_SCREENSHOT_DIR &&
         index === 0 &&
+        testInfo.project.name !== "mobile-390px" &&
         theme ===
           (testInfo.project.name === "desktop-chromium" ? "light" : "dark")
       ) {
@@ -145,7 +146,7 @@ for (const theme of ["light", "dark"] as const) {
         await page.screenshot({
           path: path.join(
             process.env.REVIEW_SCREENSHOT_DIR,
-            `acquisition-${testInfo.project.name}.png`,
+            `acquisition-${testInfo.project.name}-${theme}.png`,
           ),
           animations: "disabled",
         });
@@ -159,6 +160,12 @@ for (const theme of ["light", "dark"] as const) {
       await page.keyboard.press("Enter");
       await expect(dialog).toHaveCount(0);
       await expect(line).toContainText(`Owned · ${target}`);
+      await expect(
+        page.locator(".missionSummaryHeadline:visible"),
+      ).toContainText("Retire Champlain's original Oil A");
+      await expect(
+        page.locator(".missionSummaryHeadline:visible"),
+      ).not.toContainText("Acquire");
       await expect(
         line.getByRole("button", { name: `Acquire ${target}`, exact: true }),
       ).toHaveCount(0);
@@ -207,23 +214,49 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("option", { name: "Ridge Electric", exact: true })
       .click();
     await page.getByRole("slider").first().press("Home");
-    await page
-      .getByRole("button", {
-        name: "Review purchase of Lithium Battery",
-        exact: true,
-      })
-      .click();
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Take loan", exact: true })
-      .click();
-    expect(
-      (await readSavedGame(page))?.facilities.some(
-        (facility) =>
-          facility.name === "Battery" &&
-          facility.operatingAreaId === "ridge-electric",
+    await expect(
+      page.getByRole("combobox", { name: "Operating area", exact: true }),
+    ).toContainText("Ridge Electric");
+    await expect(
+      page.getByText(
+        "No storage projects are available in this operating area in 2005.",
+        { exact: true },
       ),
-    ).toBe(true);
+    ).toBeVisible();
+    const programs = page.getByRole("region", {
+      name: "Programs",
+      exact: true,
+    });
+    await openPane(
+      programs,
+      page.getByRole("button", { name: "Programs", exact: true }),
+    );
+    await page
+      .getByRole("combobox", { name: "Program operating area", exact: true })
+      .click();
+    await page
+      .getByRole("option", { name: "Valley Electric", exact: true })
+      .click();
+    await expect(programs).toContainText(
+      "costs and benefits below are for Valley Electric",
+    );
+    await expect(
+      programs.getByRole("button", { name: /^Efficiency rebates ·/ }),
+    ).toBeVisible();
+    if (
+      process.env.REVIEW_SCREENSHOT_DIR &&
+      testInfo.project.name === "mobile-390px" &&
+      theme === "light"
+    ) {
+      await page.mouse.move(0, 0);
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `programs-${testInfo.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
     const acquired = await readSavedGame(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Continue", exact: true }).click();

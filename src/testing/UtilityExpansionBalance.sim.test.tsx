@@ -82,13 +82,14 @@ it.each(DIFFICULTY_IDS)(
 for (const difficulty of difficulties)
   for (const seed of seeds) {
     it.each(cases)(`${difficulty} seed ${seed}: $id`, (fixture) => {
+      const scheduledActions = expansionBalanceActions(fixture, seed);
       const result = runSimulation({
         scenarioId: 116,
         difficulty,
         seed,
         months: 240,
         endOnDecidedObjective: false,
-        scheduledActions: expansionBalanceActions(fixture, seed),
+        scheduledActions,
       });
       const demandWh = result.months.reduce(
         (sum, month) => sum + month.demandWh,
@@ -120,6 +121,7 @@ for (const difficulty of difficulties)
           }),
         ),
         acquisitions: result.finalUtilityExpansion?.acquisitions,
+        builds: result.builds,
         demandWh,
         supplyWh,
         servedFraction: supplyWh / demandWh,
@@ -140,6 +142,12 @@ for (const difficulty of difficulties)
         reachedFinalRetention: result.months.length === 240,
       });
       expectNoViolations(result);
+      expect(result.builds).toHaveLength(
+        scheduledActions.filter(
+          (action) =>
+            action.type === "build" && action.month < result.months.length,
+        ).length,
+      );
       expect(result.finalUtilityExpansion?.acquisitions.length).toBe(
         fixture.portfolio === "line-only"
           ? 0

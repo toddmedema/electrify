@@ -135,7 +135,11 @@ it("host completes an owned-area plant without scheduling renderer notifications
       kind: "action",
       name: "buildFacility",
       payload: {
-        facility: { name: "Natural Gas CC", peakW: 100e6 },
+        facility: {
+          name: "Natural Gas CC",
+          peakW: 100e6,
+          gasCycle: "combined",
+        },
         financed: true,
         operatingAreaId: "ridge-electric",
       },

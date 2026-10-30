@@ -97,6 +97,7 @@ describe("PurchaseReviewDialog", () => {
     expect(rejected).toHaveBeenCalledTimes(1);
     fireEvent.click(button("Take loan"));
     expect(rejected).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(button("Take loan")).toBeEnabled());
   });
 
   it("keeps a submitted purchase open and locked until the owner rejects or accepts it", async () => {

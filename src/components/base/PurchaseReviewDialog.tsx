@@ -195,6 +195,7 @@ export default function PurchaseReviewDialog(
       titleId={props.titleId}
       title={props.title}
       closable
+      actionsClassName={props.cancelLabel ? "purchaseReviewActions" : undefined}
       contentClassName="noPadding"
       actions={
         <>
@@ -205,6 +206,7 @@ export default function PurchaseReviewDialog(
           )}
           {props.cancelLabel && (
             <Button
+              className="purchaseReviewCancel"
               disabled={submitting}
               onClick={() => {
                 if (!purchaseSubmitted.current) onClose();
