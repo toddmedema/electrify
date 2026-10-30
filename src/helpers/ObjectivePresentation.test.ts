@@ -8,22 +8,23 @@ import {
   objectiveWindowText,
 } from "./ObjectivePresentation";
 
-const reliability: CompiledRuleObjective = {
-  id: "reliability",
-  label: "Keep the lights on",
+const localShare: CompiledRuleObjective = {
+  id: "localShare",
+  label: "Deliver local wind",
+  fuels: ["Wind"],
   required: true,
-  metric: "monthlyReliability",
+  metric: "localFuelShare",
   fromMonth: 12,
   throughMonth: 23,
-  minDemandServedShare: 0.995,
+  minShare: 0.995,
 };
 const result = (changes: Partial<ObjectiveResult> = {}): ObjectiveResult => ({
-  objective: reliability,
-  id: reliability.id,
-  metric: reliability.metric,
-  label: reliability.label,
+  objective: localShare,
+  id: localShare.id,
+  metric: localShare.metric,
+  label: localShare.label,
   required: true,
-  definition: objectiveDefinition(reliability.metric),
+  definition: objectiveDefinition(localShare.metric),
   status: "inProgress",
   target: 0.995,
   observedMonths: 1,
@@ -32,28 +33,28 @@ const result = (changes: Partial<ObjectiveResult> = {}): ObjectiveResult => ({
 });
 
 it("retains the actual side of an arbitrarily close share target", () => {
-  expect(objectiveValueText(reliability, 0.99999999999999, 1)).not.toBe("100%");
-  expect(objectiveValueText(reliability, 0.99500000000001, 0.995)).not.toBe(
+  expect(objectiveValueText(localShare, 0.99999999999999, 1)).not.toBe("100%");
+  expect(objectiveValueText(localShare, 0.99500000000001, 0.995)).not.toBe(
     "99.5%",
   );
-  expect(objectiveValueText(reliability, 0.995)).toBe("99.5%");
-  expect(
-    objectiveTargetText({ ...reliability, minDemandServedShare: 0.9999999 }),
-  ).toBe("≥99.99999% of demand monthly");
+  expect(objectiveValueText(localShare, 0.995)).toBe("99.5%");
+  expect(objectiveTargetText({ ...localShare, minShare: 0.9999999 })).toBe(
+    "≥99.99999% local delivery from Wind",
+  );
 });
 
 it("formats calendar windows from the canonical zero-based inclusive months", () => {
-  expect(objectiveWindowText(reliability, 2020, 60)).toBe("2021");
+  expect(objectiveWindowText(localShare, 2020, 60)).toBe("2021");
   expect(
     objectiveWindowText(
-      { ...reliability, fromMonth: 17, throughMonth: 19 },
+      { ...localShare, fromMonth: 17, throughMonth: 19 },
       2020,
       60,
     ),
   ).toBe("Jun–Aug 2021");
   expect(
     objectiveWindowText(
-      { ...reliability, fromMonth: 17, throughMonth: 30 },
+      { ...localShare, fromMonth: 17, throughMonth: 30 },
       2020,
       60,
     ),
@@ -171,6 +172,6 @@ it.each<[CompiledRuleObjective, number, string]>([
 );
 
 it("clears zero signs without hiding a genuinely negative objective measurement", () => {
-  expect(objectiveValueText(reliability, -0)).toBe("0%");
-  expect(objectiveValueText(reliability, -0.00001)).not.toBe("0%");
+  expect(objectiveValueText(localShare, -0)).toBe("0%");
+  expect(objectiveValueText(localShare, -0.00001)).not.toBe("0%");
 });

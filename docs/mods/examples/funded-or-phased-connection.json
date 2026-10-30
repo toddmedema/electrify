@@ -19,14 +19,6 @@
   ],
   "objectives": [
     {
-      "id": "connection-reliability",
-      "label": "Serve the connected city",
-      "metric": "monthlyReliability",
-      "fromMonth": 73,
-      "throughMonth": 108,
-      "minDemandServedShare": 0.995
-    },
-    {
       "id": "resident-retention",
       "label": "Retain your starting customers",
       "metric": "customerRetention",

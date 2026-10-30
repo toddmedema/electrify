@@ -421,13 +421,6 @@ const objective = () => ({
       required.push("fromMonth", "throughMonth");
     }
     const targets = {
-      monthlyReliability: {
-        minDemandServedShare: numeric(
-          0,
-          1,
-          "Completed-month demand served share; every month",
-        ),
-      },
       customerRetention: {
         minRetainedShare: numeric(
           0,

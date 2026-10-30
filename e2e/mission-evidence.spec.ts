@@ -91,7 +91,9 @@ for (const theme of ["light", "dark"]) {
     await settle(page);
     await page.getByRole("button", { name: "144 months left" }).click();
     const dialog = page.getByRole("region", { name: "Scenario", exact: true });
-    await expect(dialog).toContainText("90%");
+    await expect(dialog).toContainText(
+      "Serving less than 95% of demand for 3 months in a row ends the run.",
+    );
     await expect(dialog).toContainText("month-end");
     await page.keyboard.press("Escape");
     await expect(

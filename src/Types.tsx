@@ -947,18 +947,6 @@ export interface ScenarioType {
   loadAdditions?: ScenarioLoadAdditionType[];
   /** Optional mission gate evaluated at the authored end date. */
   minimumCustomerRetention?: number;
-  /** Optional requirement to serve a specific month without falling below a reliability target. */
-  reliabilityObjective?: {
-    year: number;
-    month: number;
-    /** Consecutive calendar months that must each meet the target. Defaults to one. */
-    durationMonths?: number;
-    minimumDemandServed: number;
-    /** Noun phrase naming the event window, read inside sentences: "during the {label}". */
-    label: string;
-    /** Imperative pinned-goal heading in sentence case, e.g. "Keep the lights on through the freeze". */
-    goal?: string;
-  };
   dollarsPerkWh: number;
   durationMonths: number;
   endTitle?: string;
