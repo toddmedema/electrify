@@ -41,6 +41,14 @@ export async function openSettingsWithKeyboard(page: Page): Promise<void> {
     await expect(friends).toBeFocused();
     await page.keyboard.press("ArrowDown");
   }
+  const achievements = page.getByRole("button", {
+    name: "Achievements",
+    exact: true,
+  });
+  if (await achievements.isVisible()) {
+    await expect(achievements).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+  }
   await expect(
     page.getByRole("button", { name: "Manual", exact: true }),
   ).toBeFocused();
@@ -129,10 +137,22 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
     await expect(friends).toBeFocused();
     await page.keyboard.press("ArrowDown");
   }
+  const achievements = page.getByRole("button", {
+    name: "Achievements",
+    exact: true,
+  });
+  if (await achievements.isVisible()) {
+    await expect(achievements).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+  }
   await expect(
     page.getByRole("button", { name: "Manual", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("ArrowUp");
+  if (await achievements.isVisible()) {
+    await expect(achievements).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+  }
   if (await friends.isVisible()) {
     await expect(friends).toBeFocused();
     await page.keyboard.press("ArrowUp");

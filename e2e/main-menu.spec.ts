@@ -155,7 +155,7 @@ test("keyboard and pointer actions work during the entrance", async ({
   await expect(page.locator("#appStartup")).toHaveCount(0);
   await page.keyboard.press("ArrowDown");
   await expect(
-    page.getByRole("button", { name: "Manual", exact: true }),
+    page.getByRole("button", { name: "Achievements", exact: true }),
   ).toBeFocused();
   await expect(
     page.getByRole("button", { name: "Settings", exact: true }),
@@ -172,10 +172,13 @@ test("hovering a home control makes it the active button, and keyboard continues
   await page.emulateMedia({ reducedMotion: "reduce" }); // skip the entrance stagger
   await page.goto("/");
   const play = page.getByRole("button", { name: "Play", exact: true });
-  const manual = page.getByRole("button", { name: "Manual", exact: true });
+  const achievements = page.getByRole("button", {
+    name: "Achievements",
+    exact: true,
+  });
   await expect(page.locator("#appStartup")).toHaveCount(0); // the menu is revealed
-  await manual.hover();
-  await expect(manual).toBeFocused(); // the pointer moved the active button to Manual
+  await achievements.hover();
+  await expect(achievements).toBeFocused(); // the pointer moved the active button to Achievements
   await page.keyboard.press("ArrowUp");
   await expect(play).toBeFocused(); // keyboard continues from the hovered control
 });
@@ -258,10 +261,13 @@ for (const exit of ["Back", "Escape"]) {
       await expect(play).toBeFocused();
       // A fresh return must also leave subsequent navigation alone.
       await page.keyboard.press("ArrowDown");
-      const manual = page.getByRole("button", { name: "Manual", exact: true });
-      await expect(manual).toBeFocused();
+      const firstResource = page.getByRole("button", {
+        name: "Achievements",
+        exact: true,
+      });
+      await expect(firstResource).toBeFocused();
       await page.clock.runFor(1000);
-      await expect(manual).toBeFocused();
+      await expect(firstResource).toBeFocused();
     }
   });
 }
@@ -375,6 +381,8 @@ for (const theme of ["light", "dark"]) {
       );
     });
     await expect(install).toBeVisible();
+    await expect(install.locator("svg")).toHaveCount(0);
+    await expect(sound.locator("svg")).toHaveCount(0);
     await sound.click();
     await expect(sound).toBeHidden();
     await expect(install).toBeVisible();
@@ -453,7 +461,7 @@ for (const theme of ["light", "dark"]) {
       }
       await page.goto("/");
       const primary = page.getByRole("button", {
-        name: hasSave ? "Start a new game" : "Play",
+        name: hasSave ? "New game" : "Play",
         exact: true,
       });
       await expect(primary).toBeVisible();

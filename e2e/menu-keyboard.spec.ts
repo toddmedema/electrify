@@ -1,6 +1,10 @@
 import path from "node:path";
 import { expect, test } from "./fixtures";
-import { exitSettingsWithBodyArrow, verifyMenuKeyboard } from "./menu-keyboard";
+import {
+  exitSettingsWithBodyArrow,
+  openSettingsWithKeyboard,
+  verifyMenuKeyboard,
+} from "./menu-keyboard";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -211,9 +215,7 @@ test("selection is visible in both themes without horizontal overflow", async ({
       path: path.join(shots, "menu-selection-light.png"),
       animations: "disabled",
     });
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("Enter");
+  await openSettingsWithKeyboard(page);
   const appearance = page.getByRole("group", { name: "Appearance" });
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");

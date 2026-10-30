@@ -160,6 +160,7 @@ export function InstallPromptProvider(props: {
 export default function InstallAppButton(props: {
   label?: string;
   afterMilestone?: boolean;
+  showIcon?: boolean;
 }): React.JSX.Element | null {
   const install = React.useContext(InstallContext);
   const [instructionsOpen, setInstructionsOpen] = React.useState(false);
@@ -182,7 +183,7 @@ export default function InstallAppButton(props: {
       <Button
         variant="text"
         color="primary"
-        startIcon={<InstallMobileIcon />}
+        startIcon={props.showIcon !== false && <InstallMobileIcon />}
         onClick={onInstall}
       >
         {props.label || "Install app"}

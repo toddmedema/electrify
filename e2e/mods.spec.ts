@@ -1348,7 +1348,7 @@ for (const layout of [
     await mockDesktop(page, false, layout.theme);
     await page.goto("/");
     await page
-      .getByRole("button", { name: "Start a new game", exact: true })
+      .getByRole("button", { name: "New game", exact: true })
       .or(page.getByRole("button", { name: "Play", exact: true }))
       .click();
     await page.getByLabel("Open community scenarios").click();

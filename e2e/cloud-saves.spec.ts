@@ -278,7 +278,7 @@ for (const theme of ["light", "dark"]) {
     const primary = page.getByRole("region", { name: "Primary actions" });
     await expect(primary.getByRole("button")).toHaveText([
       "Continue",
-      "Start a new game",
+      "New game",
       "Saved games",
     ]);
     await expect(
