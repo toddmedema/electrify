@@ -55,7 +55,8 @@ const DiscordIcon = () => (
 
 // The home menu's text buttons are plain until one is active. The active button carries the
 // primary fill (its focus indicator) and follows both pointer and keyboard/controller focus,
-// so hovering a control moves real focus to it; Enter/Space/A then activate that button.
+// so moving the pointer over a control focuses it; Enter/Space/A then activate that button.
+// Boundary events alone can come from the entrance moving beneath a stationary pointer.
 const HOME_MENU_BUTTONS =
   ".mainActions button, .resourceActions button, .discoveryActions button";
 function focusHomeButton(event: React.PointerEvent) {
@@ -135,7 +136,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
         id="centeredMenu"
         className="keyboardMenu"
         {...menuKeys}
-        onPointerOver={focusHomeButton}
+        onPointerMove={focusHomeButton}
         sx={{ px: 3 }}
       >
         <Stack

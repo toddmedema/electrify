@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MainMenu, { Props } from "./MainMenu";
 import type { DesktopBridge, DesktopState } from "../../Desktop";
@@ -47,7 +47,10 @@ function props(overrides: Partial<Props> = {}): Props {
 }
 
 describe("MainMenu", () => {
-  afterEach(() => delete window.electrifyDesktop);
+  afterEach(() => {
+    delete window.electrifyDesktop;
+    jest.restoreAllMocks();
+  });
 
   it("keeps the first-run sound prompt in the browser", () => {
     render(<MainMenu {...props({ audioEnabled: undefined })} />);
@@ -176,6 +179,27 @@ describe("MainMenu", () => {
     expect(screen.getByRole("button", { name: "Manual" })).toHaveFocus();
     await user.keyboard("{ArrowUp}");
     expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+    clientRects.mockRestore();
+  });
+
+  it("keeps keyboard focus when layout moves a control under a stationary pointer", async () => {
+    const clientRects = jest
+      .spyOn(HTMLElement.prototype, "getClientRects")
+      .mockReturnValue([{}] as unknown as DOMRectList);
+    const user = userEvent.setup();
+    render(<MainMenu {...props()} />);
+    const play = screen.getByRole("button", { name: "Play" });
+    const manual = screen.getByRole("button", { name: "Manual" });
+    await user.keyboard("{ArrowDown}");
+    expect(manual).toHaveFocus();
+
+    // Animated layout can send a boundary event without the player moving the pointer.
+    fireEvent.pointerOver(play);
+    expect(manual).toHaveFocus();
+
+    // Deliberate pointer movement still selects the button under the pointer.
+    await user.hover(play);
+    expect(play).toHaveFocus();
     clientRects.mockRestore();
   });
 
