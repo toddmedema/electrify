@@ -8462,6 +8462,21 @@ option {
   white-space: normal;
 }
 
+#utility-acquisition-title-heading + .MuiDialogContent-root {
+  > .decisionImpact {
+    padding-top: 0;
+
+    .decisionImpactFact:first-child {
+      padding-top: 0;
+      border-top: 0;
+    }
+  }
+
+  .decisionImpactFactDetail {
+    white-space: pre-line;
+  }
+}
+
 .acquisitionReviewIntro {
   display: grid;
   gap: 12px;

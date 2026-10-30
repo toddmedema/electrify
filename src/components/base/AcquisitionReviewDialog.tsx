@@ -13,6 +13,7 @@ import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import PurchaseReviewDialog from "./PurchaseReviewDialog";
 import { useBuildCash } from "./useBuildCash";
+import { LOAN_MONTHS } from "../../Constants";
 
 interface Props {
   game: GameType;
@@ -64,6 +65,12 @@ export default function AcquisitionReviewDialog({
       </DecisionDialog>
     );
   const valley = quote.targetId === "valley-electric";
+  const sharedCosts = `${formatMoneyConcise(quote.assumedDebt)} assumed debt at 5% for 20 years and current network costs included. Plant operations and purchased power vary.`;
+  const contractChange = valley
+    ? game.date.year >= 2017
+      ? "Valley’s nuclear contract is now 80MW (76MW deliverable), reduced in January 2017."
+      : "Valley’s nuclear contract falls from 160MW to 80MW in January 2017 (152MW to 76MW deliverable)."
+    : "";
 
   return (
     <PurchaseReviewDialog
@@ -76,47 +83,33 @@ export default function AcquisitionReviewDialog({
       interestRate={game.interestRate}
       cancelLabel="Cancel"
       upkeepPerMonth={quote.networkOMPerMonth}
-      upkeepLabel="Service-network costs"
-      upkeepDetail="Operating costs continue alongside the acquired plants, purchased power and debt payments."
+      paymentSummary={{
+        cash: {
+          value: `${formatMoneyConcise(quote.cashDue)} upfront + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
+          detail: `${formatMoneyConcise(quote.fee)} fee included. ${sharedCosts}`,
+        },
+        loan: {
+          value: `${formatMoneyConcise(quote.financedCashDue)} upfront + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
+          detail: `${formatMoneyConcise(quote.fee)} fee included. New loan: ${(game.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years. ${sharedCosts}`,
+        },
+      }}
       preface={
-        <div className="acquisitionReviewIntro">
-          {error && (
-            <Typography role="alert" color="error">
-              {error}
-            </Typography>
-          )}
-          <Typography
-            variant="body2"
-            color={valley ? "warning.main" : "textSecondary"}
-          >
-            {valley
-              ? game.date.year >= 2017
-                ? "Valley’s nuclear contract is now 80MW (76MW deliverable), reduced in January 2017."
-                : "Valley’s nuclear contract falls from 160MW to 80MW in January 2017 (152MW to 76MW deliverable). Plan replacement supply."
-              : "Ridge’s industrial customers bring steadier demand, with greater exposure to gas prices and wind."}
-          </Typography>
-          {cash < quote.financedCashDue && (
-            <Typography variant="body2" color="warning.main">
-              Need {formatMoneyConcise(quote.financedCashDue)} cash for the down
-              payment and fee. You have {formatMoneyConcise(cash)}.
-            </Typography>
-          )}
-        </div>
+        error || cash < quote.financedCashDue ? (
+          <div className="acquisitionReviewIntro">
+            {error && (
+              <Typography role="alert" color="error">
+                {error}
+              </Typography>
+            )}
+            {cash < quote.financedCashDue && (
+              <Typography variant="body2" color="warning.main">
+                Need {formatMoneyConcise(quote.financedCashDue)} cash for the
+                down payment and fee. You have {formatMoneyConcise(cash)}.
+              </Typography>
+            )}
+          </div>
+        ) : undefined
       }
-      leadingFacts={[
-        {
-          concept: "money",
-          label: "Seller equity price",
-          value: formatMoneyConcise(quote.equityPrice),
-          detail: `${formatMoneyConcise(quote.fee)} transaction fee, paid in cash with either option.`,
-        },
-        {
-          concept: "finances",
-          label: "Assumed debt",
-          value: formatMoneyConcise(quote.assumedDebt),
-          detail: `${formatMoneyConcise(quote.cashMonthlyDebtService)}/mo at 5% fixed interest over 20 years, including with a cash purchase.`,
-        },
-      ]}
       extraFacts={[
         {
           concept: "customers",
@@ -127,14 +120,7 @@ export default function AcquisitionReviewDialog({
           concept: "goal",
           label: "Acquisition obligations",
           value: "Acquire either utility by December 2014.",
-          detail:
-            "Retire acquired original oil plants by December 2023 and retain 90% of your expanded customer base at the end of 2024. Acquisitions after 2023 exclude the original oil plant.",
-        },
-        {
-          concept: "finances",
-          label: "Combined debt payments with financing",
-          value: `${formatMoneyConcise(quote.monthlyDebtService)}/mo`,
-          detail: `${formatMoneyConcise(quote.newLoan)} new borrowing plus the assumed debt.`,
+          detail: `Retire acquired original oil plants by December 2023 and retain 90% of your expanded customer base at the end of 2024. Acquisitions after 2023 exclude the original oil plant.${contractChange ? `\n\n${contractChange}` : ""}`,
         },
         {
           concept: "supply",

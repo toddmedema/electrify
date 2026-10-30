@@ -58,6 +58,11 @@ export interface PurchaseReviewDialogProps {
   leadingFacts?: DecisionImpactFactType[];
   /** Facts appended after the money, upkeep and timing facts */
   extraFacts?: DecisionImpactFactType[];
+  /** Complete payment summaries when a purchase also assumes debts or running costs. */
+  paymentSummary?: {
+    cash: Pick<DecisionImpactFactType, "value" | "detail">;
+    loan: Pick<DecisionImpactFactType, "value" | "detail">;
+  };
   upkeepPerMonth: number;
   /** When set, upkeep reads as a change from this monthly figure */
   upkeepBeforePerMonth?: number;
@@ -143,7 +148,10 @@ export default function PurchaseReviewDialog(
     {
       concept: "money",
       label: "Cash purchase",
-      value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - cashDue)}`,
+      value:
+        props.paymentSummary?.cash.value ??
+        `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - cashDue)}`,
+      detail: props.paymentSummary?.cash.detail,
     },
     {
       concept: "finances",
@@ -151,26 +159,34 @@ export default function PurchaseReviewDialog(
       help: (
         <ManualLink entry={MANUAL_ENTRY.INTEREST_RATES} label="interest rate" />
       ),
-      value: `${formatMoneyConcise(financedCashDue)} + ${formatMoneyConcise(loan.monthlyPayment)}/mo · ${(interestRate * 100).toFixed(2)}%, ${loanMonths / 12} yrs`,
-      detail: `Payments start now.${
-        cashOnlyFee > 0
-          ? ` Includes a ${formatMoneyConcise(cashOnlyFee)} cash-only transaction fee.`
-          : ""
-      }${
-        refinancedBalance > 0
-          ? ` Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
-          : ""
-      }`,
-    },
-    {
-      concept: "money",
-      label: props.upkeepLabel ?? "Estimated upkeep",
       value:
-        props.upkeepBeforePerMonth === undefined
-          ? `${formatMoneyConcise(props.upkeepPerMonth)}/mo`
-          : `${formatMoneyConcise(props.upkeepBeforePerMonth)} → ${formatMoneyConcise(props.upkeepPerMonth)}/mo`,
-      detail: props.upkeepDetail,
+        props.paymentSummary?.loan.value ??
+        `${formatMoneyConcise(financedCashDue)} + ${formatMoneyConcise(loan.monthlyPayment)}/mo · ${(interestRate * 100).toFixed(2)}%, ${loanMonths / 12} yrs`,
+      detail:
+        props.paymentSummary?.loan.detail ??
+        `Payments start now.${
+          cashOnlyFee > 0
+            ? ` Includes a ${formatMoneyConcise(cashOnlyFee)} cash-only transaction fee.`
+            : ""
+        }${
+          refinancedBalance > 0
+            ? ` Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
+            : ""
+        }`,
     },
+    ...(props.paymentSummary !== undefined
+      ? []
+      : [
+          {
+            concept: "money" as const,
+            label: props.upkeepLabel ?? "Estimated upkeep",
+            value:
+              props.upkeepBeforePerMonth === undefined
+                ? `${formatMoneyConcise(props.upkeepPerMonth)}/mo`
+                : `${formatMoneyConcise(props.upkeepBeforePerMonth)} → ${formatMoneyConcise(props.upkeepPerMonth)}/mo`,
+            detail: props.upkeepDetail,
+          },
+        ]),
     ...(props.onlineInMonths === undefined
       ? []
       : [

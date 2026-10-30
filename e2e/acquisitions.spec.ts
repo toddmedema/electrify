@@ -109,8 +109,25 @@ for (const theme of ["light", "dark"] as const) {
       await expect(dialog).toHaveAccessibleName(`Acquire ${target}?`);
       await expectContinuousDialogSurface(dialog);
       await expectDialogToFit(dialog);
-      await expect(dialog).toContainText("Assumed debt");
-      await expect(dialog).toContainText("Service-network costs");
+      await expect(dialog).not.toContainText("Seller equity price");
+      await expect(dialog).not.toContainText("Assumed debt");
+      await expect(dialog).not.toContainText("Service-network costs");
+      await expect(dialog).not.toContainText("Combined debt payments");
+      for (const label of ["Cash purchase", "Loan option"]) {
+        const payment = dialog
+          .locator(".decisionImpactFact")
+          .filter({ hasText: new RegExp(`^${label}`) });
+        await expect(payment).toHaveCount(1);
+        await expect(payment.locator(".decisionImpactFactValue")).toContainText(
+          /upfront \+ .*\/mo/,
+        );
+        await expect(
+          payment.locator(".decisionImpactFactDetail"),
+        ).toContainText("current network costs included");
+        await expect(
+          payment.locator(".decisionImpactFactDetail"),
+        ).toContainText("Plant operations and purchased power vary");
+      }
       await expect(dialog).toContainText("Company supply margin");
       await expect(dialog).toContainText("Projected month-end cash");
       await expect(dialog).toContainText("Operating plants");
@@ -122,16 +139,13 @@ for (const theme of ["light", "dark"] as const) {
         "This debt remains after selling plants",
       );
       await expect(dialog).not.toContainText("addressable accounts");
-      const [titleBox, introBox] = await Promise.all([
+      const [titleBox, firstFactBox] = await Promise.all([
         dialog.locator(".closableDialogTitleText").boundingBox(),
-        dialog
-          .locator(".acquisitionReviewIntro .MuiTypography-root")
-          .first()
-          .boundingBox(),
+        dialog.locator(".decisionImpactFactLabel").first().boundingBox(),
       ]);
-      expect(introBox!.y - titleBox!.y - titleBox!.height).toBeLessThanOrEqual(
-        20,
-      );
+      expect(
+        firstFactBox!.y - titleBox!.y - titleBox!.height,
+      ).toBeLessThanOrEqual(32);
       const loanFact = dialog
         .locator(".decisionImpactFact")
         .filter({ hasText: /^Loan option/ });
@@ -189,7 +203,11 @@ for (const theme of ["light", "dark"] as const) {
       await expect(help).toBeFocused();
       await expect(dialog).toBeVisible();
       if (target === "Valley Electric") {
-        await expect(dialog).toContainText("January 2017");
+        const obligations = dialog
+          .locator(".decisionImpactFact")
+          .filter({ hasText: /^Acquisition obligations/ });
+        await expect(obligations).toContainText("January 2017");
+        await expect(dialog).not.toContainText("Plan replacement supply");
         await expect(dialog).toContainText(
           "up to 50MW · variable availability",
         );
@@ -241,15 +259,9 @@ for (const theme of ["light", "dark"] as const) {
         theme ===
           (testInfo.project.name === "desktop-chromium" ? "light" : "dark")
       ) {
-        if (testInfo.project.name === "mobile-360px") {
-          await loanFact.scrollIntoViewIfNeeded();
-          await expect(
-            loanFact.locator(".decisionImpactFactValue"),
-          ).toBeInViewport({ ratio: 1 });
-          await expect(
-            loanFact.locator(".decisionImpactFactDetail"),
-          ).toBeInViewport({ ratio: 1 });
-        }
+        await dialog.locator(".MuiDialogContent-root").evaluate((element) => {
+          element.scrollTop = 0;
+        });
         await page.mouse.move(0, 0);
         await page.screenshot({
           path: path.join(
