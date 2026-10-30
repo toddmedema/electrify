@@ -5,6 +5,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -1258,6 +1259,169 @@ describe("mouse facility selection", () => {
     return game;
   }
 
+  it.each([
+    ["Shift", "shiftKey"],
+    ["Meta", "metaKey"],
+    ["Control", "ctrlKey"],
+  ])("previews selection checkboxes only while %s is held", (key, flag) => {
+    renderFacilities(fleet(), null);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.keyDown(document.body, { key, [flag]: true });
+    expect(screen.getAllByRole("checkbox")).toHaveLength(5);
+    expect(
+      screen
+        .getAllByRole("checkbox")
+        .every((box) => !(box as HTMLInputElement).checked),
+    ).toBe(true);
+    fireEvent.keyUp(document.body, { key });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Actions" })).toBeNull();
+  });
+
+  it("keeps checkboxes after a deliberate selection and separates toggling from inspection", async () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.click(rows()[2], { metaKey: true });
+    fireEvent.keyUp(document.body, { key: "Meta" });
+    expect(screen.getAllByRole("checkbox")).toHaveLength(5);
+    expect(
+      screen.getByRole("checkbox", { name: "Select Plant 1" }),
+    ).toBeChecked();
+    await user.click(screen.getByRole("checkbox", { name: "Select Plant 2" }));
+    expect(
+      screen.getByRole("status", { name: "Facility selection" }),
+    ).toHaveTextContent("3 facilities selected");
+    fireEvent.click(rows()[4]);
+    expect(rows()[4]).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("checkbox", { name: "Select Plant 5" }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("status", { name: "Facility selection" }),
+    ).toHaveTextContent("3 facilities selected");
+    await user.click(screen.getByRole("button", { name: "Clear selection" }));
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("opens the existing eligible actions from the selection bar without a context click", async () => {
+    const game = fleet();
+    game.facilities[1].paused = true;
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0], { ctrlKey: true });
+    fireEvent.click(rows()[1], { ctrlKey: true });
+    const actions = screen.getByRole("button", { name: "Actions" });
+    expect(actions).toHaveAttribute("aria-haspopup", "menu");
+    await user.click(actions);
+    const menu = screen.getByRole("menu", { name: "Facility actions" });
+    expect(
+      within(menu).getByRole("menuitem", { name: "Resume (1)" }),
+    ).toBeInTheDocument();
+    await user.click(within(menu).getByRole("menuitem", { name: "Pause (1)" }));
+    expect(view.onPause).toHaveBeenCalledWith(1, "Plant 1");
+    await user.click(actions);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(rows()[0]).toHaveFocus());
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("clears a deliberate single selection and an empty selection mode with Escape", async () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0], { metaKey: true });
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.click(rows()[0], { metaKey: true });
+    await user.click(screen.getByRole("checkbox", { name: "Select Plant 1" }));
+    expect(screen.getAllByRole("checkbox")).toHaveLength(5);
+    expect(screen.getByRole("button", { name: "Actions" })).toBeDisabled();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("clears a deliberate single selection when Escape cancels a keyboard drag", () => {
+    const ref = React.createRef<Facilities>();
+    renderFacilities(fleet(), null, ref);
+    fireEvent.click(rows()[0], { metaKey: true });
+    act(() =>
+      ref.current!.onBeforeDragStart({
+        draggableId: "f1",
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        mode: "SNAP",
+      }),
+    );
+    act(() =>
+      ref.current!.onDragEnd({
+        draggableId: "f1",
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        destination: null,
+        reason: "CANCEL",
+        mode: "SNAP",
+        combine: null,
+      }),
+    );
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Actions" })).toBeNull();
+    expect(rows()[0]).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("resets modifier previews on blur and ignores modifiers while editing or behind a dialog", () => {
+    renderFacilities(fleet(), null);
+    fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
+    fireEvent.blur(window);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    const input = document.createElement("input");
+    document.body.append(input);
+    fireEvent.keyDown(input, { key: "Control", ctrlKey: true });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    input.remove();
+    fireEvent.contextMenu(rows()[0]);
+    fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
+    expect(screen.queryByRole("checkbox", { hidden: true })).toBeNull();
+  });
+
+  it("returns focus to inspection when releasing a modifier hides a focused preview checkbox", () => {
+    renderFacilities(fleet(), null);
+    fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
+    const checkbox = screen.getByRole("checkbox", { name: "Select Plant 2" });
+    act(() => checkbox.focus());
+    fireEvent.keyUp(checkbox, { key: "Shift" });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(rows()[1]).toHaveFocus();
+  });
+
+  it("restores preview focus when returning to the window without stealing a later focus choice", () => {
+    renderFacilities(fleet(), null);
+    fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
+    act(() => screen.getByRole("checkbox", { name: "Select Plant 2" }).focus());
+    fireEvent.blur(window);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.focus(window);
+    expect(rows()[1]).toHaveFocus();
+    fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
+    act(() => screen.getByRole("checkbox", { name: "Select Plant 2" }).focus());
+    fireEvent.blur(window);
+    act(() => rows()[3].focus());
+    fireEvent.focus(window);
+    expect(rows()[3]).toHaveFocus();
+  });
+
+  it("supports ranges from the checkbox as well as the inspection target", async () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[1], { metaKey: true });
+    await user.keyboard("{Shift>}");
+    await user.click(screen.getByRole("checkbox", { name: "Select Plant 4" }));
+    await user.keyboard("{/Shift}");
+    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "true",
+      "true",
+      "true",
+      "false",
+    ]);
+  });
+
   it("selects anchored ranges in either direction and toggles nonadjacent facilities with Ctrl or Cmd", () => {
     renderFacilities(fleet(), null);
     fireEvent.click(rows()[1]);
@@ -1394,6 +1558,7 @@ describe("mouse facility selection", () => {
     expect(
       rows().every((row) => row.getAttribute("aria-pressed") === "false"),
     ).toBe(true);
+    await waitFor(() => expect(rows()[1]).toHaveFocus());
   });
 
   it("offers eligible bulk pause and resume actions without toggling the wrong state", async () => {

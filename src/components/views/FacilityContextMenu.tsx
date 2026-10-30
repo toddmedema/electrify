@@ -125,6 +125,7 @@ export default function FacilityContextMenu(props: {
   game: GameType;
   target: FacilityMenuTarget | null;
   onClose: () => void;
+  onMenuExited?: () => void;
   onSell: DispatchProps["onSell"];
   onTogglePause: DispatchProps["onTogglePause"];
   onPause: DispatchProps["onPause"];
@@ -204,6 +205,7 @@ export default function FacilityContextMenu(props: {
         slotProps={{
           list: { "aria-label": "Facility actions" },
           paper: { className: "facilityContextMenu" },
+          transition: { onExited: props.onMenuExited },
         }}
       >
         {title && <ListSubheader disableSticky>{title}</ListSubheader>}

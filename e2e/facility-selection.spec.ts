@@ -61,8 +61,57 @@ for (const theme of ["light", "dark"]) {
       }
       return;
     }
+    const checkboxes = pane.getByRole("checkbox", { name: /^Select / });
+    await expect(checkboxes).toHaveCount(0);
+    // Preview is reversible and keeps facility text in place, including when modifiers overlap.
+    const textBox = await rows.first().locator(".facilityText").boundingBox();
+    await page.keyboard.down("Shift");
+    await expect(checkboxes).toHaveCount(5);
+    expect(await rows.first().locator(".facilityText").boundingBox()).toEqual(
+      textBox,
+    );
+    if (process.env.PR_SCREENSHOTS && theme === "light") {
+      await page.screenshot({
+        path: path.join(
+          process.env.PR_SCREENSHOTS,
+          "facilities-preview-light.png",
+        ),
+      });
+    }
+    await page.keyboard.down("Control");
+    await page.keyboard.up("Shift");
+    await expect(checkboxes).toHaveCount(5);
+    await page.keyboard.up("Control");
+    await expect(checkboxes).toHaveCount(0);
+    await disclosure(1).focus();
+    await page.keyboard.down("Shift");
+    await page.keyboard.press("Tab");
+    await expect(rows.nth(1).locator(".facilityDragHandle")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(checkboxes.first()).toBeFocused();
+    await page.keyboard.up("Shift");
+    await expect(disclosure(0)).toBeFocused();
+    await expect(checkboxes).toHaveCount(0);
+    // Canceling a keyboard drag clears deliberate selection even when only one is checked.
+    await disclosure(0).click({ modifiers: ["Meta"] });
+    await rows.first().locator(".facilityDragHandle").focus();
+    await page.keyboard.press("Space");
+    await expect(rows.first()).toHaveClass(/dragging/);
+    await page.keyboard.press("Escape");
+    await expect(checkboxes).toHaveCount(0);
+    await expect(pane.locator(".bulkSelected")).toHaveCount(0);
     await disclosure(0).click();
+    await expect(checkboxes).toHaveCount(0);
     await disclosure(2).click({ modifiers: ["Shift"] });
+    await expect(checkboxes).toHaveCount(5);
+    // Once selection starts, checkboxes work without a modifier and inspection preserves it.
+    await checkboxes.nth(3).check();
+    await expect(disclosure(3)).toHaveAttribute("aria-expanded", "false");
+    await checkboxes.nth(3).uncheck();
+    await disclosure(4).click();
+    await expect(disclosure(4)).toHaveAttribute("aria-expanded", "true");
+    await expect(checkboxes.nth(4)).not.toBeChecked();
+    await disclosure(4).click();
     await expect(
       pane.locator(".facilitySelectionBar").getByRole("status"),
     ).toHaveText("3 facilities selected");
@@ -88,13 +137,16 @@ for (const theme of ["light", "dark"]) {
     };
     await selectPair();
     await rows.first().scrollIntoViewIfNeeded();
-    await disclosure(2).click({ button: "right" });
+    const actions = pane.getByRole("button", { name: "Actions", exact: true });
+    await actions.click();
     const menu = page.getByRole("menu", { name: "Facility actions" });
     await page.keyboard.press("Escape");
-    await expect(disclosure(2)).toBeFocused();
+    await expect(disclosure(0)).toBeFocused();
+    await expect(checkboxes).toHaveCount(0);
     await expect(pane.locator(".bulkSelected")).toHaveCount(0);
     await selectPair();
-    await disclosure(2).click({ button: "right" });
+    await actions.focus();
+    await page.keyboard.press("Enter");
     await expect(menu).not.toContainText("facilities selected");
     await expect(menu).not.toContainText("Counts show eligible facilities");
     await page.keyboard.press("End");
@@ -222,7 +274,15 @@ for (const theme of ["light", "dark"]) {
     ]);
     // A narrow window can still have a mouse. The context menu must stay within it.
     await page.setViewportSize({ width: 360, height: 800 });
-    await disclosure(0).click({ button: "right" });
+    await disclosure(0).click();
+    await disclosure(1).click({ modifiers: ["Meta"] });
+    await expect(actions).toBeVisible();
+    await expect(checkboxes).toHaveCount(3);
+    await expect(pane).toHaveJSProperty(
+      "scrollWidth",
+      await pane.evaluate((el) => el.clientWidth),
+    );
+    await actions.click();
     await expect(menu).toBeVisible();
     await expect(page.locator(".facilityContextMenu")).toHaveCSS(
       "transform",
@@ -237,5 +297,13 @@ for (const theme of ["light", "dark"]) {
     await page.screenshot({
       path: info.outputPath(`facility-menu-mouse-360-${theme}.png`),
     });
+    if (process.env.PR_SCREENSHOTS) {
+      await page.screenshot({
+        path: path.join(
+          process.env.PR_SCREENSHOTS,
+          `facilities-selection-360-${theme}.png`,
+        ),
+      });
+    }
   });
 }

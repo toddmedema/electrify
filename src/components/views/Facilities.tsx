@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   Avatar,
   Button,
+  Checkbox,
   Chip,
   DialogContentText,
   List,
@@ -84,7 +85,10 @@ interface FacilityListItemProps {
   game: GameType;
   selected: boolean;
   bulkSelected: boolean;
+  selectionEnabled: boolean;
+  showCheckboxes: boolean;
   selectionCount: number;
+  onToggleSelection: (id: number, event: React.MouseEvent) => void;
   onRowClick: (id: number, event: React.MouseEvent) => void;
   onContextMenu: (id: number, event: React.MouseEvent) => void;
   storyOutputMultiplier: number;
@@ -646,12 +650,27 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     </span>
                   )}
                 </span>
-                {props.bulkSelected && (
-                  <CheckIcon className="facilitySelectionCheck" aria-hidden />
+                {props.selectionEnabled && (
+                  <span className="facilitySelectionSlot" aria-hidden>
+                    {props.bulkSelected && !props.showCheckboxes && (
+                      <CheckIcon fontSize="small" />
+                    )}
+                  </span>
                 )}
                 <ChevronDownGlyph className="facilityChevron" aria-hidden />
               </ListItem>
             </button>
+            {props.showCheckboxes && (
+              <Checkbox
+                className="facilitySelectionCheckbox"
+                size="small"
+                checked={props.bulkSelected}
+                onClick={(event) => props.onToggleSelection(facility.id, event)}
+                slotProps={{
+                  input: { "aria-label": `Select ${facility.name}` },
+                }}
+              />
+            )}
           </div>
           {open && (
             // Inside the row, so isolateClicks keeps every click in the confirmation dialog
@@ -796,6 +815,8 @@ interface SelectionState {
   anchor: number | null;
   menu: FacilityMenuTarget | null;
   groupDragging: boolean;
+  selectionMode: boolean;
+  modifierHeld: boolean;
 }
 
 export default class Facilities extends React.Component<Props, SelectionState> {
@@ -804,8 +825,13 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     anchor: null,
     menu: null,
     groupDragging: false,
+    selectionMode: false,
+    modifierHeld: false,
   };
   private draggedIds: number[] = [];
+  private selectionFocus: HTMLButtonElement | null = null;
+  private previewFocus: HTMLButtonElement | null = null;
+  private menuFocus: HTMLButtonElement | null = null;
 
   private mouseEnabled = () =>
     window.matchMedia("(any-pointer: fine)").matches &&
@@ -816,7 +842,11 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       ]?.hideUi?.includes("facilityActions")
     );
 
-  private onRowClick = (id: number, event: React.MouseEvent) => {
+  private onRowClick = (
+    id: number,
+    event: React.MouseEvent,
+    toggle = false,
+  ) => {
     if (!this.mouseEnabled()) {
       this.props.onSelect(this.props.selectedFacilityId === id ? null : id);
       return;
@@ -836,21 +866,26 @@ export default class Facilities extends React.Component<Props, SelectionState> {
             ? [...new Set([...current, ...range])]
             : range,
         anchor,
+        selectionMode: true,
       });
       this.props.onSelect(null);
-    } else if (event.ctrlKey || event.metaKey) {
+    } else if (toggle || event.ctrlKey || event.metaKey) {
       this.setState({
         ids: current.includes(id)
           ? current.filter((selected) => selected !== id)
           : [...current, id],
         anchor: id,
+        selectionMode: true,
       });
-      this.props.onSelect(null);
+      if (!toggle) this.props.onSelect(null);
     } else {
-      this.setState({ ids: [id], anchor: id });
+      if (!this.selectionModeActive()) this.setState({ ids: [id], anchor: id });
       this.props.onSelect(this.props.selectedFacilityId === id ? null : id);
     }
   };
+
+  private onToggleSelection = (id: number, event: React.MouseEvent) =>
+    this.onRowClick(id, event, true);
 
   private onContextMenu = (id: number, event: React.MouseEvent) => {
     if (!this.mouseEnabled()) return;
@@ -864,11 +899,13 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     const button = event.currentTarget.querySelector<HTMLButtonElement>(
       ".facilityDisclosure",
     );
+    this.menuFocus = button;
     button?.focus();
     const bounds = button?.getBoundingClientRect();
     const ids = this.state.ids.includes(id) ? this.state.ids : [id];
     this.setState({
       ids,
+      modifierHeld: false,
       anchor: this.state.ids.includes(id) ? this.state.anchor : id,
       menu: {
         ids,
@@ -880,13 +917,93 @@ export default class Facilities extends React.Component<Props, SelectionState> {
 
   private closeMenu = () => this.setState({ menu: null });
 
+  private openActions = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    this.menuFocus =
+      this.scrollBody?.querySelector<HTMLButtonElement>(
+        ".bulkSelected .facilityDisclosure",
+      ) ?? null;
+    this.setState({
+      modifierHeld: false,
+      menu: {
+        ids: this.props.game.facilities
+          .filter((facility) => this.state.ids.includes(facility.id))
+          .map((facility) => facility.id),
+        top: bounds.bottom,
+        left: bounds.left,
+      },
+    });
+  };
+
   private liveSelectionCount = () =>
     this.props.game.facilities.filter((facility) =>
       this.state.ids.includes(facility.id),
     ).length;
 
-  private onGlobalSelectionKeyDown = (event: KeyboardEvent) =>
+  // Empty checkbox selections remain editable until explicitly cleared. Stale IDs from
+  // departed facilities must still leave Escape to the active screen.
+  private selectionModeActive = () =>
+    this.state.selectionMode &&
+    (!this.state.ids.length || this.liveSelectionCount() > 0);
+
+  private modalOpen = () =>
+    !!document.querySelector(
+      '.MuiModal-root:not(.MuiModal-hidden), [data-manual-help="true"], [data-scenario-choice="true"], [data-data-center-guide="true"]',
+    );
+
+  private updateModifierPreview = (event: KeyboardEvent) => {
+    const target = event.target;
+    const editing =
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        !!target.closest(
+          'input:not([type="checkbox"]), textarea, select, [contenteditable="true"]',
+        ));
+    const modifierHeld =
+      (event.shiftKey || event.ctrlKey || event.metaKey) &&
+      event.key !== "Escape" &&
+      this.mouseEnabled() &&
+      !!this.scrollBody &&
+      !this.scrollBody.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      !editing &&
+      !this.modalOpen();
+    if (modifierHeld !== this.state.modifierHeld) {
+      const focus = !modifierHeld ? this.focusedPreviewDisclosure() : null;
+      this.setState({ modifierHeld }, () => {
+        if (!this.selectionModeActive() && !this.modalOpen()) focus?.focus();
+      });
+    }
+  };
+
+  private focusedPreviewDisclosure = () =>
+    document.activeElement
+      ?.closest(".facilitySelectionCheckbox")
+      ?.closest(".facilityRowHeader")
+      ?.querySelector<HTMLButtonElement>(".facilityDisclosure") ?? null;
+
+  private resetModifierPreview = () => {
+    if (this.state.modifierHeld) {
+      if (!this.selectionModeActive())
+        this.previewFocus = this.focusedPreviewDisclosure();
+      this.setState({ modifierHeld: false });
+    }
+  };
+
+  private restorePreviewFocus = () => {
+    if (
+      document.activeElement === document.body &&
+      this.previewFocus?.isConnected &&
+      !this.previewFocus.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      !this.modalOpen()
+    )
+      this.previewFocus.focus();
+    this.previewFocus = null;
+  };
+
+  private onGlobalSelectionKeyDown = (event: KeyboardEvent) => {
+    this.updateModifierPreview(event);
     this.onSelectionKeyDown(event, true);
+  };
 
   private onSelectionKeyDown = (
     event: KeyboardEvent | React.KeyboardEvent,
@@ -897,11 +1014,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       !event.defaultPrevented &&
       !this.dragging &&
       !this.scrollBody?.closest("[inert]") &&
-      this.liveSelectionCount() > (multiOnly ? 1 : 0)
+      (this.liveSelectionCount() > (multiOnly ? 1 : 0) ||
+        this.selectionModeActive())
     ) {
-      const modal = document.querySelector(
-        '.MuiModal-root:not(.MuiModal-hidden), [data-manual-help="true"], [data-scenario-choice="true"], [data-data-center-guide="true"]',
-      );
+      const modal = this.modalOpen();
       this.clearSelection();
       // A modal also owns Escape: let it dismiss normally as the group clears behind it.
       if (!modal) event.preventDefault();
@@ -909,8 +1025,39 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   };
 
   private clearSelection = () => {
-    this.setState({ ids: [], anchor: null, menu: null });
+    const active = document.activeElement;
+    const focus =
+      active
+        ?.closest(".facilityRow")
+        ?.querySelector<HTMLButtonElement>(".facilityDisclosure") ??
+      (this.state.menu ? this.menuFocus : null) ??
+      (active?.closest(".facilitySelectionBar")
+        ? this.scrollBody?.querySelector<HTMLButtonElement>(
+            ".facilityDisclosure",
+          )
+        : null);
+    const menuOpen = !!this.state.menu;
+    // The menu's focus trap must finish exiting before a removed toolbar trigger can be
+    // replaced with a row target. Otherwise it immediately pulls focus back into the menu.
+    if (menuOpen) this.selectionFocus = focus ?? null;
+    this.setState(
+      {
+        ids: [],
+        anchor: null,
+        menu: null,
+        selectionMode: false,
+        modifierHeld: false,
+      },
+      () => {
+        if (!menuOpen) focus?.focus();
+      },
+    );
     this.props.onSelect(null);
+  };
+
+  private restoreSelectionFocus = () => {
+    if (this.selectionFocus?.isConnected) this.selectionFocus.focus();
+    this.selectionFocus = null;
   };
   constructor(props: Props) {
     super(props);
@@ -1018,6 +1165,9 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   public componentDidMount() {
     this.resolveEvidence();
     document.addEventListener("keydown", this.onGlobalSelectionKeyDown, true);
+    document.addEventListener("keyup", this.updateModifierPreview, true);
+    window.addEventListener("blur", this.resetModifierPreview);
+    window.addEventListener("focus", this.restorePreviewFocus);
   }
 
   public componentWillUnmount() {
@@ -1026,6 +1176,9 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       this.onGlobalSelectionKeyDown,
       true,
     );
+    document.removeEventListener("keyup", this.updateModifierPreview, true);
+    window.removeEventListener("blur", this.resetModifierPreview);
+    window.removeEventListener("focus", this.restorePreviewFocus);
   }
 
   private evidenceAnchor = React.createRef<HTMLDivElement>();
@@ -1062,7 +1215,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   public onDragEnd(result: DropResult) {
     this.dragging = false;
     this.setState({ groupDragging: false });
-    if (result.reason === "CANCEL" && this.liveSelectionCount() > 1)
+    if (
+      result.reason === "CANCEL" &&
+      (this.liveSelectionCount() > 1 || this.selectionModeActive())
+    )
       this.clearSelection();
     if (result.source.droppableId === "interties") {
       this.props.onFacilityDragEnd(
@@ -1106,6 +1262,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     const selection = game.facilities.filter((f) =>
       this.state.ids.includes(f.id),
     );
+    const selectionEnabled = this.mouseEnabled();
+    const selectionMode = this.selectionModeActive();
+    const showCheckboxes =
+      selectionEnabled && (this.state.modifierHeld || selectionMode);
     const facilitiesCount = game.facilities.length;
     const intertiesAvailable = !!(
       game.transmission &&
@@ -1135,14 +1295,28 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                 className="facilitySelectionBar"
                 onKeyDown={this.onSelectionKeyDown}
               >
-                {selection.length > 1 ? (
+                {selectionMode || selection.length > 1 ? (
                   <>
-                    <span role="status">
-                      {selection.length} facilities selected
+                    <span role="status" aria-label="Facility selection">
+                      {selection.length}{" "}
+                      {selection.length === 1 ? "facility" : "facilities"}{" "}
+                      selected
                     </span>
-                    <Button size="small" onClick={this.clearSelection}>
-                      Clear selection
-                    </Button>
+                    <div className="facilitySelectionActions">
+                      <Button
+                        size="small"
+                        endIcon={<ChevronDownGlyph />}
+                        aria-haspopup="menu"
+                        aria-expanded={!!this.state.menu}
+                        disabled={!selection.length}
+                        onClick={this.openActions}
+                      >
+                        Actions
+                      </Button>
+                      <Button size="small" onClick={this.clearSelection}>
+                        Clear selection
+                      </Button>
+                    </div>
                   </>
                 ) : (
                   <span>
@@ -1193,6 +1367,9 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                             onRowClick={this.onRowClick}
                             onContextMenu={this.onContextMenu}
                             bulkSelected={selection.some((f) => f.id === g.id)}
+                            selectionEnabled={selectionEnabled}
+                            showCheckboxes={showCheckboxes}
+                            onToggleSelection={this.onToggleSelection}
                             selectionCount={selection.length}
                             selected={selectedFacilityId === g.id}
                             storyOutputMultiplier={storyOutputMultiplier(
@@ -1236,6 +1413,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
             game={game}
             target={this.state.menu}
             onClose={this.closeMenu}
+            onMenuExited={this.restoreSelectionFocus}
             onSell={onSell}
             onPause={onPause}
             onTogglePause={onTogglePause}
