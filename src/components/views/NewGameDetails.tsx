@@ -28,7 +28,7 @@ import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
 import { DIFFICULTY_LABELS, difficultyLabel } from "../../Constants";
 import DifficultyPicker from "../base/DifficultyPicker";
 import { getDb, login } from "../../Globals";
-import MailingListCheckbox from "../base/MailingListCheckbox";
+import GoogleSignIn from "../base/GoogleSignIn";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
@@ -63,7 +63,6 @@ export interface DispatchProps {
 }
 
 interface State {
-  mailingList?: boolean;
   scores?: ScoreType[];
   allScores?: ScoreType[];
   myTopScore?: ScoreType;
@@ -401,7 +400,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   action={
                     <IconButton
                       onClick={toggleVictoryDialog}
-                      aria-label="Victory Conditions"
+                      aria-label="Goals"
                       color="primary"
                       size="small"
                     >
@@ -471,7 +470,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
           <VictoryConditionsDialog
             open={victoryDialogOpen || false}
             onClose={() => this.setState({ victoryDialogOpen: false })}
-            title="Victory Conditions"
+            title="Goals"
             scenario={scenario}
             difficulty={game.difficulty}
           />
@@ -609,20 +608,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
           {/* Below the board rather than in place of it: the board is the reason to log in */}
           {!challenge && !uid && !desktopApp && (
             <div style={{ textAlign: "center", margin: "12px 0 24px" }}>
-              <MailingListCheckbox
-                checked={!!this.state.mailingList}
-                onChange={(mailingList) => this.setState({ mailingList })}
-              />
-              <br />
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={() =>
-                  void login({ mailingList: !!this.state.mailingList })
-                }
-              >
-                Sign in with Google
-              </Button>
+              <GoogleSignIn centered onSignIn={login} />
               <Typography variant="body2" color="textSecondary">
                 To set a high score under your own name
               </Typography>

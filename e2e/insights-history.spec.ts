@@ -88,7 +88,7 @@ test("public pricing shows the rate score and the customer retention objective",
     .click();
   await expect(
     page.getByRole("region", { name: "Scenario", exact: true }),
-  ).toContainText("Retain ≥90% of customers");
+  ).toContainText("Keep ≥90% of customer baseline");
   if (reviewDir && testInfo.project.name === "desktop-chromium") {
     await page.waitForTimeout(400);
     await page.screenshot({

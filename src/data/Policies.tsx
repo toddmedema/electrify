@@ -58,7 +58,7 @@ export const POLICIES = {
   efficiency: {
     name: "Efficiency rebates",
     description:
-      "Reduce home and business demand especially heating and cooling. Savings start to fade after ten years.",
+      "Reduce home and business demand, especially heating and cooling. Savings start to fade after ten years.",
     // At full adoption: lighting and appliance upgrades cut all home and business use, while
     // insulation, sealing and efficient heat pumps cut the weather-driven part of it much more.
     // DOE's Weatherization Assistance Program evaluations report heating and cooling savings of

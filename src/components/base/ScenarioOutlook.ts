@@ -69,13 +69,13 @@ export function scenarioLossSummary(
     const result = objectives.get(risk.id);
     if (risk.id === "cash") phrase = "Cash below $0";
     else if (risk.id === "survival")
-      phrase = `Demand served <${formatRequiredShare(reliabilityThreshold(game.difficulty))} for 3 consecutive months`;
+      phrase = `Under ${formatRequiredShare(reliabilityThreshold(game.difficulty))} of demand served for 3 months`;
     else if (result) {
       const objective = result.objective;
       const target = objectiveValueText(objective, result.target);
       switch (objective.metric) {
         case "customerRetention":
-          phrase = `Customers retained <${target}`;
+          phrase = `Under ${target} of customers kept`;
           break;
         case "emissionsBudget":
           phrase = `Emissions >${target}`;
@@ -106,7 +106,7 @@ export function scenarioLossSummary(
     const month = risk.failureMonth;
     return month === undefined
       ? `${phrase}.`
-      : `${phrase} at ${MONTHS[month % 12]} ${game.startingYear + Math.floor(month / 12)}.`;
+      : `${phrase} by ${MONTHS[month % 12]} ${game.startingYear + Math.floor(month / 12)}.`;
   });
   const months = risks.flatMap((risk) =>
     risk.failureMonth === undefined ? [] : [risk.failureMonth],

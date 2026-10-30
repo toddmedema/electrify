@@ -387,7 +387,7 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                         error={!validAccounts}
                         helperText={
                           validAccounts
-                            ? "Customer accounts, not population. Adjust to match the area you want to explore."
+                            ? "Customer accounts, not population."
                             : "Enter a whole number from 1 to 100,000,000."
                         }
                         onChange={(event) => {

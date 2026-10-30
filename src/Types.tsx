@@ -1453,6 +1453,8 @@ export interface SnackbarType {
   open: boolean;
   message: string;
   timeout: number;
+  /** Feedback from the open dialog itself, which would otherwise wait for it to close. */
+  overModal?: boolean;
 }
 
 /**

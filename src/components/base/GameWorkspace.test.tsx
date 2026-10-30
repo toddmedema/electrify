@@ -2,10 +2,12 @@ import { configureStore } from "@reduxjs/toolkit";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
+import { flushSync } from "react-dom";
 import cardReducer, { initialCard } from "../../reducers/Card";
 import GameWorkspace, {
   MIN_FLEET_WIDTH,
-  SIDE_LAYOUT_MIN_WIDTH,
+  dockCenter,
+  SIDE_TOOL_MIN_WIDTH,
   maxOpenTools,
   toolWidth,
 } from "./GameWorkspace";
@@ -81,13 +83,14 @@ function setup(width = 390) {
       card: { ...initialCard, name: "FACILITIES" as const },
     },
   });
-  render(
+  const view = render(
     <Provider store={store}>
       <GameWorkspace />
     </Provider>,
   );
   return {
     store,
+    rerender: view.rerender,
     user: userEvent.setup({ delay: null }),
     action: (name: string) =>
       within(
@@ -186,7 +189,8 @@ it("keeps as many tools open as fit beside a phone-width fleet", async () => {
 });
 
 it.each([
-  [1299, 1],
+  [1023, 1],
+  [1024, 1],
   [1300, 2],
   [1512, 2],
   [1920, 3],
@@ -196,7 +200,7 @@ it.each([
   expect(maxOpenTools(width)).toBe(tools);
   // Sheets float over the fleet; columns must leave it at least phone width.
   expect(
-    width < SIDE_LAYOUT_MIN_WIDTH ||
+    width < SIDE_TOOL_MIN_WIDTH ||
       width - tools * toolWidth(width) >= MIN_FLEET_WIDTH,
   ).toBe(true);
 });
@@ -219,6 +223,38 @@ it("keeps the active tool mounted when narrowing and restores both rails when wi
   expect(screen.getByRole("region", { name: "Insights" })).toBeVisible();
   expect(screen.getByRole("slider", { name: "Electricity rate" })).toBe(rate);
   expect(rate).toHaveFocus();
+});
+
+it("restores side rails when an earlier resize listener redraws the workspace", async () => {
+  let redraw: (() => void) | undefined;
+  const redrawBeforeWorkspace = () => flushSync(() => redraw?.());
+  // App dispatches layoutChanged from its earlier resize listener. A parent can redraw
+  // this component before the browser reaches its own listener for the same event.
+  window.addEventListener("resize", redrawBeforeWorkspace);
+  try {
+    const { store, user, action, rerender } = setup(2240);
+    await user.click(action("Programs"));
+    await user.click(action("Insights"));
+    const rate = screen.getByRole("slider", { name: "Electricity rate" });
+    act(() => rate.focus());
+    resize(390);
+    expect(screen.getAllByRole("region")).toHaveLength(1);
+    expect(rate).toHaveFocus();
+
+    redraw = () =>
+      rerender(
+        <Provider store={store}>
+          <GameWorkspace />
+        </Provider>,
+      );
+    resize(2240);
+    expect(screen.getAllByRole("region")).toHaveLength(2);
+    expect(screen.getByRole("region", { name: "Insights" })).toBeVisible();
+    expect(screen.getByRole("slider", { name: "Electricity rate" })).toBe(rate);
+    expect(rate).toHaveFocus();
+  } finally {
+    window.removeEventListener("resize", redrawBeforeWorkspace);
+  }
 });
 
 it("reveals a remembered compact tool instead of toggling an unseen rail closed", async () => {
@@ -244,7 +280,7 @@ it("switches at layout boundaries without discarding the other open tool", async
   await user.click(action("Events"));
   await user.click(action("Programs"));
   expect(screen.getAllByRole("region")).toHaveLength(2);
-  resize(1299);
+  resize(1023);
   expect(screen.getAllByRole("region")).toHaveLength(1);
   expect(screen.getByRole("heading", { name: "Programs" })).toBeVisible();
   expect(screen.queryByRole("tablist", { name: "Decisions" })).toBeNull();
@@ -284,16 +320,24 @@ it("keeps Build and the opposite desktop rail open after a purchase", async () =
   expect(store.getState().card.name).toBe("BUILD_GENERATORS");
 });
 
-it.each([390, SIDE_LAYOUT_MIN_WIDTH - 1, SIDE_LAYOUT_MIN_WIDTH])(
+it.each([390, SIDE_TOOL_MIN_WIDTH - 1, SIDE_TOOL_MIN_WIDTH])(
   "only closes Build after a purchase when %ipx uses an overlay",
   async (width) => {
     const { user, action } = setup(width);
     await user.click(action("Build"));
     await user.click(screen.getByRole("button", { name: "Finish purchase" }));
-    const staysOpen = width >= SIDE_LAYOUT_MIN_WIDTH;
+    const staysOpen = width >= SIDE_TOOL_MIN_WIDTH;
     expect(screen.queryAllByRole("region", { name: "Build" })).toHaveLength(
       Number(staysOpen),
     );
     expect(action("Build")).toHaveAttribute("aria-expanded", String(staysOpen));
   },
 );
+
+it("moves the dock off a side tool only when the window centre would cover it", () => {
+  // 1024: a 360px tool reaches past the dock's left edge at the window centre.
+  expect(dockCenter(1024, 1, 0, 360)).toBe(692);
+  expect(dockCenter(1024, 0, 1, 360)).toBe(332);
+  expect(dockCenter(1440, 1, 0, 403)).toBeUndefined();
+  expect(dockCenter(1024, 0, 0, 360)).toBeUndefined();
+});

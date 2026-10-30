@@ -55,6 +55,7 @@ import {
   corridorOpenInYear,
 } from "../../data/IntertieTrends";
 import {
+  formatBuildMonths,
   formatMoneyConcise,
   formatWatts,
   formatWattsOfPeak,
@@ -333,7 +334,7 @@ function IntertieBuildItem(props: {
           />
           <BuildMetric
             label="Build time"
-            value={`${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}`}
+            value={formatBuildMonths(corridor.yearsToBuild)}
           />
           <BuildMetric
             label="Total cost"
@@ -1072,14 +1073,14 @@ export default function TransmissionPanel({
                                   )}
                                   {building && (
                                     <div className="facilityStat">
-                                      <dt>Refund if cancelled</dt>
+                                      <dt>Refund if canceled</dt>
                                       <dd className="facilityStatValue">
                                         {formatMoneyConcise(
                                           line.buildCost - line.loanAmountLeft,
                                         )}
                                         {line.loanAmountLeft > 0 && (
                                           <span className="facilityStatNote">
-                                            After settling the loan
+                                            After loan payoff
                                           </span>
                                         )}
                                       </dd>
@@ -1114,7 +1115,7 @@ export default function TransmissionPanel({
                                   )}
                                   {market && !utilityOwned && (
                                     <div className="facilityStat">
-                                      <dt>Emissions (CO2e)</dt>
+                                      <dt>Emissions (CO₂e)</dt>
                                       <dd className="facilityStatValue">
                                         {formatMass(
                                           importEmissionsKgco2ePerMWh(
@@ -1312,6 +1313,18 @@ export default function TransmissionPanel({
         </section>
       )}
 
+      {projectsOnly && (
+        <Typography
+          component="p"
+          variant="body2"
+          color="textSecondary"
+          className="transmissionIntro"
+          sx={{ px: 1.5, pt: 1 }}
+        >
+          Connect to a neighboring grid to buy power when short and sell when
+          you have spare.
+        </Typography>
+      )}
       {projectsOnly && !unbuiltCorridors.length && (
         <Typography sx={{ px: 1.5, pt: 1 }}>
           {corridors.length

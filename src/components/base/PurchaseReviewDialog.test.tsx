@@ -42,8 +42,8 @@ describe("PurchaseReviewDialog", () => {
   it("quotes the same terms the reducer books", () => {
     renderDialog({ refinancedBalance: 500000 });
     const terms = purchaseTerms(2000000, true, 0.05, 500000);
-    expect(screen.getByText(/now \+/)).toHaveTextContent(
-      `${formatMoneyConcise(terms.downpayment)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo (5.00% for 30 years)`,
+    expect(screen.getByText(/\/mo · /)).toHaveTextContent(
+      `${formatMoneyConcise(terms.downpayment)} + ${formatMoneyConcise(terms.monthlyPayment)}/mo · 5.00%, 30 yrs`,
     );
     expect(screen.getByText(/Includes refinancing/)).toBeInTheDocument();
     expect(screen.getByText("Online in")).toBeInTheDocument();
@@ -72,8 +72,8 @@ describe("PurchaseReviewDialog", () => {
     const { button } = renderDialog({ cash: 450000, cashOnlyFee: 100000 });
     const terms = purchaseTerms(2000000, true, 0.05);
     expect(button("Take loan")).toBeDisabled();
-    expect(screen.getByText(/now \+/)).toHaveTextContent(
-      `${formatMoneyConcise(terms.downpayment + 100000)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo`,
+    expect(screen.getByText(/\/mo · /)).toHaveTextContent(
+      `${formatMoneyConcise(terms.downpayment + 100000)} + ${formatMoneyConcise(terms.monthlyPayment)}/mo`,
     );
     expect(screen.getByText(/cash-only transaction fee/)).toBeInTheDocument();
   });

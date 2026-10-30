@@ -1830,6 +1830,11 @@ for (const count of [2, 4]) {
       await expect
         .poll(() => room.views.get(buyerId)?.game?.facilities.length)
         .toBe(fleetBefore + 1);
+      // A side panel stays open after a purchase, and holds the clock until it closes.
+      if (buyer.viewportSize()!.width >= 1024)
+        await buyer
+          .getByRole("button", { name: "Close Build", exact: true })
+          .click();
       await expect(buyer.locator(".facilities:visible")).toBeVisible();
       for (const page of pages)
         await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
@@ -2638,7 +2643,7 @@ for (const scenarioId of [106, 107] as const) {
         scenarioId === 106 ? "Retain the community" : "Keep power flowing";
       const target =
         scenarioId === 106
-          ? "Retain ≥90% of customers · Dec 2035"
+          ? "Keep ≥90% of customer baseline by Dec 2035"
           : "Serving less than 95% of demand for 3 months in a row ends the run.";
       const scenarioPanel = (page: Page) =>
         page.getByRole("region", { name: "Scenario", exact: true });
@@ -2651,7 +2656,7 @@ for (const scenarioId of [106, 107] as const) {
         await expect(panel).toContainText(goal);
         await expect(panel).not.toContainText("Modded");
         const conditions = panel.getByRole("region", {
-          name: "Victory conditions",
+          name: "Goals",
         });
         await expect(conditions).toContainText(target);
         await expect(conditions).not.toContainText(

@@ -21,10 +21,11 @@ import { formatMoneyStable } from "./Format";
 import { selectProjection } from "./Projection";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import {
+  objectiveDefinitionText,
+  objectiveGoalText,
   objectiveObservedText,
   objectiveTargetText,
   objectiveValueText,
-  objectiveWindowText,
 } from "./ObjectivePresentation";
 
 export interface MissionRequirement {
@@ -82,7 +83,6 @@ function objectiveRequirement(
   } as const;
   const target = objectiveTargetText(objective);
   const current = objectiveObservedText(result);
-  const window = objectiveWindowText(objective, startingYear, durationMonths);
   const observed =
     result.observed === undefined
       ? "pending"
@@ -91,11 +91,11 @@ function objectiveRequirement(
   return {
     id: result.id,
     label: result.label,
-    definition: result.definition,
+    definition: objectiveDefinitionText(result),
     required: result.required,
     reason: result.reason,
     current,
-    target: `${target} · ${window}`,
+    target: objectiveGoalText(objective, startingYear, durationMonths),
     compact: `${result.required ? "" : "Optional · "}${compact}${result.status === "unverifiable" ? " · incomplete history" : ""}`,
     timing: `Completed months ${(first % 12) + 1}/${startingYear + Math.floor(first / 12)}–${(last % 12) + 1}/${startingYear + Math.floor(last / 12)}${result.required ? "" : "; optional, does not end the run"}`,
     status: statuses[result.status],
@@ -116,12 +116,12 @@ export function getMissionStatus(game: GameType) {
   );
   requirements.push({
     id: "cash",
-    label: "Keep the utility solvent",
+    label: "Stay solvent",
     compact: `Cash ≥ $0 (${now ? formatMoneyStable(now.cash) : "unavailable"})`,
     current: now
       ? `${formatMoneyStable(now.cash)} now`
       : "Current cash unavailable",
-    target: "Cash ≥$0 at every month-end",
+    target: "Cash ≥ $0 at each month-end",
     timing:
       "Checked at month end; negative cash now is a warning, not a final outcome",
     status: "in-progress",

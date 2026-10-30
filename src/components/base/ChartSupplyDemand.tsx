@@ -71,6 +71,8 @@ export interface Props {
   location: LocationType;
   height?: number;
   legend?: boolean;
+  /** Treat `height` as measured pixels. */
+  exactHeight?: boolean;
   timeline: ChartData[];
   startingYear: number;
   /** Individual fuel details follow the dispatch order in the facility list. */
@@ -107,6 +109,13 @@ const DEMAND_WIDTH = 3;
 const SUPPLY_FORECAST_DASH = [2, 3];
 const DEMAND_FORECAST_DASH = [8, 4];
 type SupplySource = "Variable" | "Dispatchable" | "Storage" | "Interties";
+
+const SOURCE_LEGEND: Record<SupplySource, string> = {
+  Variable: "Variable (solar, wind)",
+  Dispatchable: "Dispatchable (coal, gas…)",
+  Storage: "Storage",
+  Interties: "Interties",
+};
 
 function sourcePattern(source: SupplySource): LegendItemType["pattern"] {
   if (source === "Storage") return "hatch";
@@ -293,7 +302,7 @@ function buildOptions({
     width: 0, // set by UPlotChart
     height: 0,
     pxAlign: 1,
-    padding: [18 * scale, 5 * scale, 24 * getTextScale(), 0],
+    padding: [18 * scale, 16, 24 * getTextScale(), 0],
     cursor: {
       x: true,
       y: false,
@@ -366,7 +375,7 @@ function buildOptions({
     ],
     plugins: [
       dayNightRibbonPlugin(getState),
-      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.2),
+      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout),
       baselinePlugin(chartPalette().axis),
       cache.plugin,
       motion.plugin,
@@ -384,7 +393,10 @@ function buildOptions({
             const ratio = uPlot.pxRatio;
             u.ctx.save();
             u.ctx.font = chartFont(ratio);
-            u.ctx.fillStyle = tickLabelFill();
+            u.ctx.fillStyle =
+              getComputedStyle(document.documentElement).getPropertyValue(
+                "--cursor-line",
+              ) || tickLabelFill();
             u.ctx.textAlign = "center";
             u.ctx.textBaseline = "alphabetic";
             const halfWidth = u.ctx.measureText("Now").width / 2;
@@ -624,7 +636,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           items={[
             { name: "Demand", color: chartPalette().demand, dash: "8,4" },
             ...sources.map((source) => ({
-              name: source,
+              name: SOURCE_LEGEND[source],
               color: sourcePattern(source)
                 ? chartPalette().powerFlowPattern
                 : sourceColor(source),
@@ -634,9 +646,11 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
                 : undefined,
             })),
           ]}
+          note="Dashed = forecast · Red = shortage"
         />
       )}
       <UPlotChart<State>
+        exactHeight={props.exactHeight}
         ariaLabel={`Chart of electricity supply and demand over the day. Day/night ribbon: ${describeDayNight(dayNight)}. Generation is grouped as Variable and Dispatchable. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
         interactiveTooltip
         formatSummaryValue={formatWatts}

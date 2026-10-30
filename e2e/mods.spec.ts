@@ -496,12 +496,12 @@ for (const [theme, winning] of [
         page.getByRole("button", { name: "Scenario", exact: true }),
       );
       await expect(
-        scenario.getByRole("region", { name: "Victory conditions" }),
+        scenario.getByRole("region", { name: "Goals" }),
       ).toContainText(
         "Serving less than 95% of demand for 3 months in a row ends the run.",
       );
       await expect(
-        scenario.getByRole("region", { name: "Victory conditions" }),
+        scenario.getByRole("region", { name: "Goals" }),
       ).not.toContainText(/months completed|Not started/);
       await page.keyboard.press("Escape");
       await appbar
@@ -1050,7 +1050,7 @@ for (const [theme, requiredBills] of [
       exact: true,
     });
     await openPane(panel, scenarioButton);
-    const rules = panel.getByRole("region", { name: "Victory conditions" });
+    const rules = panel.getByRole("region", { name: "Goals" });
     await expect(
       rules.getByText("Keep bills affordable", { exact: true }),
     ).toBeVisible();

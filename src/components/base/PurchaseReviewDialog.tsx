@@ -151,7 +151,7 @@ export default function PurchaseReviewDialog(
       help: (
         <ManualLink entry={MANUAL_ENTRY.INTEREST_RATES} label="interest rate" />
       ),
-      value: `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo (${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years)`,
+      value: `${formatMoneyConcise(financedCashDue)} + ${formatMoneyConcise(loan.monthlyPayment)}/mo · ${(interestRate * 100).toFixed(2)}%, ${loanMonths / 12} yrs`,
       detail: `Payments start now.${
         cashOnlyFee > 0
           ? ` Includes a ${formatMoneyConcise(cashOnlyFee)} cash-only transaction fee.`

@@ -116,7 +116,7 @@ for (const mission of [
       await expect(hud).toContainText(
         mission === "Generators"
           ? "Construction started"
-          : "vertical bar shows how much energy is stored",
+          : "vertical bar shows energy stored",
       );
     } else if (mission === "Forecasting") {
       await page.locator(".facilityRow .facilityDisclosure").first().click();
@@ -229,7 +229,9 @@ for (const mission of [
       });
     }
     if (mission === "Generators") {
-      const progress = page.getByRole("progressbar", { name: "Year progress" });
+      const progress = page.getByRole("progressbar", {
+        name: /^Year \d+: \d+% elapsed$/,
+      });
       await expect(progress).toHaveAttribute("aria-valuenow", "0");
       const initialBox = await progress.boundingBox();
       expect(initialBox!.width).toBeGreaterThan(300);
@@ -267,14 +269,14 @@ for (const mission of [
       const next = hud.getByRole("button", { name: "Next", exact: true });
       if (testInfo.project.name === "desktop-chromium") {
         // The background sweep follows side-panel mode, including resizes at its exact boundary.
-        for (const width of [1299, 1300, 1299, 1300]) {
+        for (const width of [1023, 1024, 1023, 1024]) {
           await page.setViewportSize({ width, height: 800 });
           await expect(page.locator(".gameStage")).toHaveAttribute(
             "data-layout",
-            width === 1300 ? "side" : "sheet",
+            width === 1024 ? "side" : "sheet",
           );
           await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(
-            width === 1300 ? 1 : 0,
+            width === 1024 ? 1 : 0,
           );
           await expect(next).toBeVisible();
         }

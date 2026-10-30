@@ -198,7 +198,7 @@ it("does not publish after a cancelled sign-in", async () => {
     screen.getByRole("button", { name: "Sign in and share" }),
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Sign-in didn't finish",
+    "Couldn't finish sign-in",
   );
   expect(mockCreate).not.toHaveBeenCalled();
 });
@@ -529,7 +529,7 @@ it.each([false, true])(
     );
     expect(mockLogin).toHaveBeenCalledWith({ mailingList });
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Sign-in didn't finish",
+      "Couldn't finish sign-in",
     );
     expect(
       screen.getByRole("button", { name: "Continue without syncing" }),

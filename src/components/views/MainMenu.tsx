@@ -201,7 +201,12 @@ const MainMenu = (props: Props): React.JSX.Element => {
               Achievements
             </Button>
           )}
-          <Button variant="text" color="primary" onClick={props.onManual}>
+          <Button
+            data-manual-trigger
+            variant="text"
+            color="primary"
+            onClick={props.onManual}
+          >
             Manual
           </Button>
           {desktopApp && getDesktop()?.mods && (

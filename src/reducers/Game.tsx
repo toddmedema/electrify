@@ -15,6 +15,11 @@ import {
   entitlementSources,
 } from "../helpers/Expansion";
 import {
+  BLACKOUT_OVER_TOAST,
+  BLACKOUT_TOAST_PREFIX,
+  blackoutToastCanShow,
+} from "../helpers/BlackoutToast";
+import {
   matchesStartingFacility,
   startingFacilitySearch,
   startingFacilityQuote,
@@ -2514,7 +2519,7 @@ function applySellFacility(state: GameType, id: number): boolean {
     state,
     sold.yearsToBuildLeft > 0 ? "BUILD" : "SELL",
     sold.yearsToBuildLeft > 0
-      ? `Cancelled construction of ${sold.name}`
+      ? `Canceled construction of ${sold.name}`
       : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold, state.date.minute))}`,
   );
   const ownedState = `${sold.name}:${sold.peakWh ?? sold.peakW}:${sold.loanAmountTotal > 0 ? "financed" : "cash"}`;
@@ -2749,7 +2754,7 @@ function applyCancelTransmissionLine(state: GameType, id: number): boolean {
   state.meaningfulDecisions = state.meaningfulDecisions.filter(
     (item) => item.lever !== `intertie:${id}`,
   );
-  logGameEvent(state, "BUILD", `Cancelled construction of ${line.name}`);
+  logGameEvent(state, "BUILD", `Canceled construction of ${line.name}`);
   state.timeline = reforecastSupply(state, true);
   return true;
 }
@@ -3004,7 +3009,7 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
   logGameEvent(
     state,
     "BUILD",
-    `Cancelled ${retrofitLabel(upgrade.upgrade)} on ${facility.name}; refunded ${formatMoneyConcise(refund)}.`,
+    `Canceled ${retrofitLabel(upgrade.upgrade)} on ${facility.name}; refunded ${formatMoneyConcise(refund)}.`,
     {
       importance: "NOTABLE",
       actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -3681,7 +3686,11 @@ export function* tickStatePhases(
     if (inBlackout) {
       if (!state.blackout) {
         state.blackout = { startMinute: state.date.minute, unservedWh: 0 };
-        logGameEvent(state, "BLACKOUT", "Blackout: demand outran your supply");
+        logGameEvent(
+          state,
+          "BLACKOUT",
+          `Blackout: ${formatWatts(now.demandW - now.supplyW)} short.`,
+        );
       }
       // What the lights being out is actually costing, in the same units the score is docked in.
       // Accumulated per tick rather than worked out at the end, since the gap moves the whole
@@ -3700,14 +3709,15 @@ export function* tickStatePhases(
     }
     if (!state.multiplayer && inBlackout !== wasInBlackout) {
       const message = inBlackout
-        ? "Blackout! Demand is outrunning your supply."
-        : "Blackout over - supply is meeting demand again.";
+        ? `${BLACKOUT_TOAST_PREFIX} ${formatWatts(now.demandW - now.supplyW)} short. Customers leave while it lasts. Build more supply, or resume a paused plant.`
+        : BLACKOUT_OVER_TOAST;
       setTimeout(() => {
         // Pausing a plant is the usual way into a blackout, and it raises its own "Paused X /
         // UNDO" toast. There's only one snackbar slot, so stealing it would take the undo away
         // at the exact moment the player most wants it. The pulsing top bar and the red sky band
-        // already carry the blackout, so this toast yields rather than competes.
-        if (getStore().getState().ui.snackbar.open) {
+        // already carry the blackout, so this toast yields rather than competes. It still
+        // replaces the previous blackout toast, which would otherwise be stale.
+        if (!blackoutToastCanShow(getStore().getState().ui.snackbar)) {
           return;
         }
         getStore().dispatch(

@@ -53,7 +53,7 @@ for (const theme of ["light", "dark"]) {
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     const cashWarning = page.getByRole("dialog", {
-      name: "You're about to run out of cash - raise your rates?",
+      name: "Low on cash. Raise rates?",
       exact: true,
     });
     await cashWarning
