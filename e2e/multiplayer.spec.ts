@@ -1831,9 +1831,10 @@ for (const count of [2, 4]) {
         .poll(() => room.views.get(buyerId)?.game?.facilities.length)
         .toBe(fleetBefore + 1);
       // A side panel stays open after a purchase, and holds the clock until it closes.
-      await buyer
-        .getByRole("button", { name: "Close Build", exact: true })
-        .click();
+      if (buyer.viewportSize()!.width >= 1024)
+        await buyer
+          .getByRole("button", { name: "Close Build", exact: true })
+          .click();
       await expect(buyer.locator(".facilities:visible")).toBeVisible();
       for (const page of pages)
         await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
