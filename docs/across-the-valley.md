@@ -145,3 +145,11 @@ Reports record company-wide energy, finances, customer retention, accepted
 transactions, timed obligations and outcomes. Early losses are not evidence about
 later events. Current-format saves persist the aggregate customer and market
 totals, transaction and financial ledgers, and one forecast timeline.
+
+## Production performance
+
+The combined-company model uses the original tick and bundle budgets from
+`master`, with the existing 10% bundle tolerance. The final production build is
+991.77 kB gzip for main JavaScript and 1590.22 kB across all JavaScript. No npm
+dependencies are added. Only scenario 116's intended outputs are rebaselined;
+all earlier scenarios retain their seeded outputs.
