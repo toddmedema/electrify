@@ -125,7 +125,7 @@ imports remove internal transfers, while network and debt costs remain booked
 once. The report records its generated simulation compatibility ID and base
 revision; full matrices must be regenerated when relevant behavior changes.
 
-The initial CEO Valley cash plan at month 96 could not fund both acquisition and
+On prefinal commit `0c9d62bc`, the initial CEO Valley cash plan at month 96 could not fund both acquisition and
 the first CC: it left $27.22–28.07M for firm portfolios against roughly $49.8M
 down, while mixed portfolios were $1.33–2.23M short of the acquisition itself.
 Waiting until January 2014 made both transactions affordable but left the new
@@ -154,3 +154,43 @@ save validator, including the existing simulation worker variants; it adds no np
 dependencies. The total-JavaScript budget increases by exactly those 36,098 bytes
 to retain its existing headroom. Main JavaScript, CSS, tick-performance ceilings
 and the 10% bundle tolerance remain unchanged.
+
+## Measured balance results
+
+Integrated revision `20739447`, compatibility `rules-1-cc10b5a4703425ac478d93c5d771ab3826120f4c401bbecfc29b855ad4ef37be`. All **200 tests passed**: 195 full campaign runs plus five residual-value audits, across every difficulty and seeds 12345, 1 and 7. Runtime revision `9b26f534` has identical simulation inputs to the integrated revision.
+
+- **135/135 prepared routes** completed December 2024 and every required objective, covering both targets, cash/loan purchases, firm/mixed portfolios and both-target expansion. All reached January 2017 and both retirement deadlines; Valley-owned cases experienced the supply reduction.
+- All **795 planned plant builds** and **180 purchases** were accepted at their scheduled month, in the correct operating area and payment mode. Zero simulation invariants failed; local/company delivered and demanded energy reconcile within **0.969 Wh** over full campaigns.
+- Overall: **143/195 mission wins**, **180/195 physical survivals**. All 30 line-only controls physically survived but failed the acquisition mission. Unprepared acquisitions: Valley 0/15 mission wins and 7/15 physical survivals; Ridge 8/15 wins/survivals. Early failures began at month 140; only 9/15 unprepared runs per target completed January 2017, so the earlier losses establish nothing about the later supply cut.
+
+The same annual competitor-benchmark tariff applies. Financed routes buy and start a 150 MW local CC in January 2013. Cash routes buy and start a lower-upfront-cost 150 MW peaker in May 2013; both-target expansion buys Ridge in January 2014. Cash/loan rows are disclosed practical construction plans, not a pure borrowing-cost experiment. Earlier January shortfall figures in the detailed report are explicitly historical diagnostics from prefinal `0c9d62bc`, not affordability claims about the final climate-corrected source.
+
+### CEO, seed 12345
+
+Money is closing nominal $M; energy covers the full reached campaign. CO₂e includes operating/imported emissions plus new construction. Negative margins show constrained shortfalls, so completion does not mean zero outages.
+
+| Plan             | Cash $M | Debt $M | Net worth $M | Demand / served TWh | External imports TWh | CO₂e Mt |
+| ---------------- | ------- | ------- | ------------ | ------------------- | -------------------- | ------- |
+| Valley firm loan | 3,331.4 | 1,089.0 | 3,697.0      | 82.839 / 82.802     | 56.973               | 9.330   |
+| Ridge firm loan  | 3,094.6 | 916.6   | 3,433.2      | 66.110 / 66.105     | 36.169               | 10.692  |
+| Both firm loan   | 3,763.5 | 1,761.5 | 4,255.9      | 97.031 / 96.995     | 59.475               | 13.847  |
+
+Local meters cover each area’s ownership period. Local imports include internal support and must not be added to company imports.
+
+| Plan             | Area            | Final accounts | Demand / served TWh | Gross imports TWh | CO₂e Mt | Worst margin MW |
+| ---------------- | --------------- | -------------- | ------------------- | ----------------- | ------- | --------------- |
+| Valley firm loan | champlain       | 137,975        | 51.047 / 51.047     | 33.444            | 5.930   | 0.1             |
+| Valley firm loan | valley-electric | 211,219        | 31.792 / 31.755     | 23.566            | 3.406   | -141.2          |
+| Ridge firm loan  | champlain       | 137,975        | 51.047 / 51.047     | 33.433            | 5.923   | 0.1             |
+| Ridge firm loan  | ridge-electric  | 70,258         | 15.063 / 15.058     | 2.742             | 4.770   | -23.5           |
+| Both firm loan   | champlain       | 137,969        | 51.046 / 51.046     | 33.448            | 5.938   | 0.1             |
+| Both firm loan   | valley-electric | 213,666        | 32.002 / 31.971     | 23.560            | 3.478   | -141.2          |
+| Both firm loan   | ridge-electric  | 70,396         | 13.982 / 13.979     | 2.520             | 4.440   | -28.0           |
+
+### Sixty matched target comparisons
+
+Pairing the same difficulty, seed, portfolio and payment plan, Valley finished with **$193.3–763.2M more net worth**, **$61.7–174.6M more debt**, **19.62–21.09 TWh more external imports**, and **114.0–184.4 MW worse minimum constrained margin** in every pair. Its recorded CO₂e per served MWh was lower in 60/60 pairs; absolute emissions were lower in 57/60. Ridge therefore did not dominate these controlled examples. The strategies are not an optimization search, so the result does not establish a universally best choice.
+
+All five difficulty audits keep acquired generator residuals below enterprise consideration: Valley $66.3–110.6M versus $610M EV; Ridge $149.5–249.1M versus $360M EV. The remainder is the non-resellable service network.
+
+Reproduce the full report with `ELECTRIFY_EXPANSION_BALANCE=full ELECTRIFY_EXPANSION_BALANCE_REPORT=/tmp/electrify-expansion-balance.json npm run test:once -- UtilityExpansionBalance --runInBand`. The generated JSON retains schedules, actual receipts, per-area meters, finances, cohort retention, objectives and event reachability.
