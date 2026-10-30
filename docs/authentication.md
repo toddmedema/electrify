@@ -100,7 +100,10 @@ A project owner should complete these steps before retrying:
    `MAILCHIMP_API_KEY` must have an enabled version. Create it through the Firebase
    CLI's interactive prompt if absent; never paste the key into a GitHub issue,
    workflow log or client environment variable.
-4. Allow API enablement to propagate, then open the failed Actions run and choose
+4. Check the deployment account's function permissions below. In particular,
+   resolve the [Service Account User error](#service-account-user-error-on-retry)
+   if the CLI reports missing `iam.serviceAccounts.actAs`.
+5. Allow API enablement and IAM changes to propagate, then open the failed Actions run and choose
    **Re-run all jobs**. Keep the backend deploy required before publishing the
    client; skipping it would publish signup controls without their backend.
 
@@ -117,3 +120,31 @@ Do not replace the CI credential with an owner key to bypass missing setup.
 
 After deployment succeeds, perform the live subscription checks above. A green
 infrastructure deploy does not verify Mailchimp welcome-email delivery.
+
+### Service Account User error on retry
+
+[Attempt 2](https://github.com/toddmedema/electrify/actions/runs/41004209464/attempts/2)
+failed in Firebase's IAM preflight: the deployment principal lacked
+`iam.serviceAccounts.actAs` on `electrify-game@appspot.gserviceaccount.com`.
+This check runs before API provisioning, so this attempt does not confirm that
+the earlier API setup is complete.
+
+As a project owner:
+
+1. Identify the deployment principal from `client_email` in the original JSON
+   used for GitHub's `FIREBASE_SERVICE_ACCOUNT` secret. GitHub does not reveal a
+   saved secret's value. The principal is the CI service account, not the human
+   owner running these setup steps.
+2. Open [Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts?project=electrify-game)
+   and select `electrify-game@appspot.gserviceaccount.com`, the target named in
+   the error.
+3. Under **Permissions**, find **Principals with access to this service account**
+   and choose **Grant access**. Enter the deployment principal's email and select
+   **Service Account User** (`roles/iam.serviceAccountUser`), then save. If it
+   already has another role on this account, edit its entry and add this role.
+   This grants access on the named account rather than every account in the project;
+   see [Google's service account access instructions](https://docs.cloud.google.com/iam/docs/manage-access-service-accounts).
+4. Wait for IAM propagation, then rerun the failed deployment. If another
+   `actAs` error names a different account, apply the grant to that named account
+   as well; the App Engine account checked by the CLI is distinct from the
+   default Compute Engine runtime account used by second-generation functions.
