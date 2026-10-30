@@ -4,12 +4,15 @@ import { sessionChanged } from "../../SaveLibrary";
 import { login } from "../../Globals";
 import { refreshToUpdate } from "../../helpers/Cache";
 import { isDesktopApp } from "../../Desktop";
+import { useState } from "react";
+import MailingListCheckbox from "./MailingListCheckbox";
 
 /**
  * Cloud backup messages that need the player: the sign-in invitation and the alerts that ask
  * for an action. Routine sync state lives in the header (CloudSyncIndicator).
  */
 export default function CloudSaveStatus(): React.JSX.Element | null {
+  const [mailingList, setMailingList] = useState(false);
   const dispatch = useAppDispatch();
   const {
     cloudState,
@@ -41,13 +44,18 @@ export default function CloudSaveStatus(): React.JSX.Element | null {
           Saves stay on this device. Sign in for cloud backup and access on
           other devices.
         </Typography>
-        <Button
-          variant="outlined"
-          onClick={() => void login()}
-          sx={{ flexShrink: 0 }}
-        >
-          Sign in with Google
-        </Button>
+        <Stack spacing={1} sx={{ flexShrink: 0, maxWidth: "100%" }}>
+          <MailingListCheckbox
+            checked={mailingList}
+            onChange={setMailingList}
+          />
+          <Button
+            variant="outlined"
+            onClick={() => void login({ mailingList })}
+          >
+            Sign in with Google
+          </Button>
+        </Stack>
       </Stack>
     );
   if (!incompatibleCloudSaves.length && !cloudConflicts) return null;

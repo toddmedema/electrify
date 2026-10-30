@@ -73,6 +73,21 @@ beforeEach(() => {
 });
 
 describe("VictoryDialog", () => {
+  it.each([false, true])(
+    "passes mailing-list choice %s from the result invitation",
+    async (mailingList) => {
+      const onLogin = jest.fn();
+      renderDialog({ loggedIn: false, onLogin });
+      const checkbox = screen.getByRole("checkbox", {
+        name: "Join the Electrify mailing list",
+      });
+      expect(checkbox).not.toBeChecked();
+      if (mailingList) await userEvent.click(checkbox);
+      await userEvent.click(screen.getByRole("button", { name: "Log in" }));
+      expect(onLogin).toHaveBeenCalledWith({ mailingList });
+    },
+  );
+
   it("shows the played scenario and difficulty's board to guests after completion", () => {
     renderDialog({ loggedIn: false, victory: aVictory({ ranked: false }) });
     expect(

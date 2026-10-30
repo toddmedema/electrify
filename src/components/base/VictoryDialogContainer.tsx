@@ -35,8 +35,8 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         dispatch(start(victory.scenarioId));
       });
     },
-    onLogin: () => {
-      login();
+    onLogin: (options) => {
+      void login(options);
     },
     onShared: (victory: VictoryType, method: string) => {
       logEvent("score_share", {

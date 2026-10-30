@@ -33,6 +33,8 @@ import { clearAppCache } from "../../helpers/Cache";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus, useMenuKeys } from "../base/useMenuKeys";
+import type { SignInOptions } from "../../Globals";
+import MailingListCheckbox from "../base/MailingListCheckbox";
 const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
@@ -51,7 +53,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onLogin: () => void;
+  onLogin: (options?: SignInOptions) => void;
   onLogout: () => void;
   onChangeName: () => void;
   onAudioChange: (change: boolean) => void;
@@ -194,6 +196,7 @@ function VolumeSlider(props: {
 
 export default function Settings(props: Props): React.JSX.Element {
   const [creditsOpen, setCreditsOpen] = React.useState(false);
+  const [mailingList, setMailingList] = React.useState(false);
   const canInstallApp = useCanInstallApp();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
   const desktop = useDesktopState();
@@ -442,7 +445,9 @@ export default function Settings(props: Props): React.JSX.Element {
                       width: { xs: "100%", sm: "auto" },
                       flexWrap: "wrap",
                       "& .MuiButton-root": {
-                        flex: { xs: "1 1 140px", sm: "0 0 auto" },
+                        flex: props.loggedIn
+                          ? { xs: "1 1 140px", sm: "0 0 auto" }
+                          : "0 0 auto",
                       },
                     }}
                   >
@@ -456,9 +461,18 @@ export default function Settings(props: Props): React.JSX.Element {
                         </Button>
                       </>
                     ) : (
-                      <Button variant="outlined" onClick={props.onLogin}>
-                        Sign in with Google
-                      </Button>
+                      <Stack spacing={1} sx={{ maxWidth: "100%" }}>
+                        <MailingListCheckbox
+                          checked={mailingList}
+                          onChange={setMailingList}
+                        />
+                        <Button
+                          variant="outlined"
+                          onClick={() => props.onLogin({ mailingList })}
+                        >
+                          Sign in with Google
+                        </Button>
+                      </Stack>
                     )}
                   </Stack>
                 </SettingRow>

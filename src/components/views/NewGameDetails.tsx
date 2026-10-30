@@ -28,6 +28,7 @@ import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
 import { DIFFICULTY_LABELS, difficultyLabel } from "../../Constants";
 import DifficultyPicker from "../base/DifficultyPicker";
 import { getDb, login } from "../../Globals";
+import MailingListCheckbox from "../base/MailingListCheckbox";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
@@ -61,6 +62,7 @@ export interface DispatchProps {
 }
 
 interface State {
+  mailingList?: boolean;
   scores?: ScoreType[];
   allScores?: ScoreType[];
   myTopScore?: ScoreType;
@@ -601,7 +603,18 @@ export default class NewGameDetails extends React.Component<Props, State> {
           {/* Below the board rather than in place of it: the board is the reason to log in */}
           {!challenge && !uid && !desktopApp && (
             <div style={{ textAlign: "center", margin: "12px 0 24px" }}>
-              <Button variant="outlined" color="primary" onClick={login}>
+              <MailingListCheckbox
+                checked={!!this.state.mailingList}
+                onChange={(mailingList) => this.setState({ mailingList })}
+              />
+              <br />
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() =>
+                  void login({ mailingList: !!this.state.mailingList })
+                }
+              >
                 Sign in with Google
               </Button>
               <Typography variant="body2" color="textSecondary">

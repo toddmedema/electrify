@@ -22,8 +22,8 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
-    onLogin: () => {
-      login();
+    onLogin: (options) => {
+      void login(options);
     },
     onLogout: () => {
       dispatch(logout());

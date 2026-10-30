@@ -12,7 +12,8 @@ import {
   challengeShareContent,
   challengeComparison,
 } from "../../helpers/Challenge";
-import { logEvent } from "../../Globals";
+import { logEvent, SignInOptions } from "../../Globals";
+import MailingListCheckbox from "./MailingListCheckbox";
 import ShareIcon from "@mui/icons-material/Share";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
@@ -37,7 +38,7 @@ export interface DispatchProps {
   onClose: () => void;
   onQuit: () => void;
   onRetry: (victory: VictoryType) => void;
-  onLogin: () => void;
+  onLogin: (options?: SignInOptions) => void;
   // Reported once the player has actually shared, with how it went out
   onShared: (victory: VictoryType, method: string) => void;
   onShareFailed: () => void;
@@ -57,6 +58,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
   const { victory, loggedIn, onClose, onQuit, onLogin } = props;
   const [preview, setPreview] = React.useState(false);
   const [sharing, setSharing] = React.useState(false);
+  const [mailingList, setMailingList] = React.useState(false);
   const [rank, setRank] = React.useState<number | undefined>(undefined);
   const [rankFailed, setRankFailed] = React.useState(false);
 
@@ -231,7 +233,16 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               color="textSecondary"
               component="div"
             >
-              <Button color="primary" onClick={onLogin} size="small">
+              <MailingListCheckbox
+                checked={mailingList}
+                onChange={setMailingList}
+              />
+              <br />
+              <Button
+                color="primary"
+                onClick={() => onLogin({ mailingList })}
+                size="small"
+              >
                 Log in
               </Button>
               to join the leaderboard

@@ -67,10 +67,10 @@
     "update-weather": "node scripts/update-weather.js",
     "fetch-watersheds": "node scripts/fetch-watersheds.js",
     "eject": "react-scripts eject",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\"",
-    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" --max-warnings=0",
-    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\" --max-warnings=0",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\" --fix",
     "typecheck": "node scripts/dev/run.js types",
     "check": "node scripts/dev/run.js check",
     "check:ci": "node scripts/dev/run.js check --ci",
@@ -293,7 +293,8 @@
       },
       {
         "files": [
-          "electron/**/*.cjs"
+          "electron/**/*.cjs",
+          "firebase/functions/**/*.cjs"
         ],
         "env": {
           "node": true,
