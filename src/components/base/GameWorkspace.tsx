@@ -119,8 +119,13 @@ export default function GameWorkspace() {
     layout === "side"
       ? dockCenter(width, left.length, right.length, toolWidth(width))
       : undefined;
+  const resizeState = React.useRef({ active, tools, buildCategory });
+  React.useLayoutEffect(() => {
+    resizeState.current = { active, tools, buildCategory };
+  });
   React.useEffect(() => {
     const resize = () => {
+      const { active, tools, buildCategory } = resizeState.current;
       // Keep the rail the player is working in when columns collapse.
       const focused =
         document.activeElement?.closest<HTMLElement>("[data-game-tool]");
@@ -135,9 +140,11 @@ export default function GameWorkspace() {
       }
       setWidth(window.innerWidth);
     };
+    // An earlier resize listener can synchronously redraw the workspace. Keep this
+    // subscription in place so that redraw cannot remove it from the current event.
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  });
+  }, [dispatch]);
   React.useLayoutEffect(() => {
     // Keep focus in the active tool when the layout changes, without stealing it
     // from a retained pricing slider or chart.

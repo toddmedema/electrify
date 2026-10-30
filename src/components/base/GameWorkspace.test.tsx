@@ -2,6 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
+import { flushSync } from "react-dom";
 import cardReducer, { initialCard } from "../../reducers/Card";
 import GameWorkspace, {
   MIN_FLEET_WIDTH,
@@ -82,13 +83,14 @@ function setup(width = 390) {
       card: { ...initialCard, name: "FACILITIES" as const },
     },
   });
-  render(
+  const view = render(
     <Provider store={store}>
       <GameWorkspace />
     </Provider>,
   );
   return {
     store,
+    rerender: view.rerender,
     user: userEvent.setup({ delay: null }),
     action: (name: string) =>
       within(
@@ -221,6 +223,38 @@ it("keeps the active tool mounted when narrowing and restores both rails when wi
   expect(screen.getByRole("region", { name: "Insights" })).toBeVisible();
   expect(screen.getByRole("slider", { name: "Electricity rate" })).toBe(rate);
   expect(rate).toHaveFocus();
+});
+
+it("restores side rails when an earlier resize listener redraws the workspace", async () => {
+  let redraw: (() => void) | undefined;
+  const redrawBeforeWorkspace = () => flushSync(() => redraw?.());
+  // App dispatches layoutChanged from its earlier resize listener. A parent can redraw
+  // this component before the browser reaches its own listener for the same event.
+  window.addEventListener("resize", redrawBeforeWorkspace);
+  try {
+    const { store, user, action, rerender } = setup(2240);
+    await user.click(action("Programs"));
+    await user.click(action("Insights"));
+    const rate = screen.getByRole("slider", { name: "Electricity rate" });
+    act(() => rate.focus());
+    resize(390);
+    expect(screen.getAllByRole("region")).toHaveLength(1);
+    expect(rate).toHaveFocus();
+
+    redraw = () =>
+      rerender(
+        <Provider store={store}>
+          <GameWorkspace />
+        </Provider>,
+      );
+    resize(2240);
+    expect(screen.getAllByRole("region")).toHaveLength(2);
+    expect(screen.getByRole("region", { name: "Insights" })).toBeVisible();
+    expect(screen.getByRole("slider", { name: "Electricity rate" })).toBe(rate);
+    expect(rate).toHaveFocus();
+  } finally {
+    window.removeEventListener("resize", redrawBeforeWorkspace);
+  }
 });
 
 it("reveals a remembered compact tool instead of toggling an unseen rail closed", async () => {
