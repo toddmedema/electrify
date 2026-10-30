@@ -98,9 +98,7 @@ for (const layout of [
           `operations-${layout.width}-${layout.theme}.png`,
         ),
       });
-      await page
-        .getByRole("button", { name: /Stay solvent/ })
-        .click();
+      await page.getByRole("button", { name: /Stay solvent/ }).click();
       await expect(page.locator('[data-layer="financeDetails"]')).toBeVisible();
     } else {
       await expect(page.locator(".operationsPriorities")).toHaveCount(0);

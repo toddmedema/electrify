@@ -43,9 +43,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(track.getByRole("status")).toContainText(
       "Projected monthly minimum",
     );
-    await expect(track.getByRole("status")).toContainText(
-      "Lowest reserve:",
-    );
+    await expect(track.getByRole("status")).toContainText("Lowest reserve:");
     await chart.press("Escape");
     expect(
       await insights.evaluate(

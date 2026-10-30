@@ -19,9 +19,7 @@ for (const theme of ["light", "dark"] as const) {
       }, theme);
       await page.goto(`/?scenario=${scenario.id}`);
       {
-        await page
-          .getByRole("button", { name: "Goals", exact: true })
-          .click();
+        await page.getByRole("button", { name: "Goals", exact: true }).click();
         const briefing = page.getByRole("dialog");
         await expect(briefing.locator("..")).toHaveCSS("opacity", "1");
         const requirements = briefing.getByRole("region", {

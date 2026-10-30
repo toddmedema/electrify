@@ -141,9 +141,9 @@ test("scenario outlook flags insolvency with the first projected month-end", asy
   await expect(
     outlook.getByRole("img", { name: /Projected loss periods shaded/ }),
   ).toBeVisible();
-  await expect(
-    panel.getByRole("region", { name: "Goals" }),
-  ).not.toContainText("Projected miss");
+  await expect(panel.getByRole("region", { name: "Goals" })).not.toContainText(
+    "Projected miss",
+  );
   if (!testInfo.project.use.hasTouch) {
     await expect(page.locator(".gameStage")).toHaveAttribute(
       "data-layout",

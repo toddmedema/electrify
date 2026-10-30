@@ -417,9 +417,9 @@ for (const theme of ["light", "dark"] as const) {
     await battery
       .getByRole("button", { name: "Show Lithium Battery details" })
       .click();
-    await expect(
-      battery.getByRole("row", { name: /Efficiency/ }),
-    ).toHaveCount(0);
+    await expect(battery.getByRole("row", { name: /Efficiency/ })).toHaveCount(
+      0,
+    );
     const lossHelp = battery
       .getByRole("row", { name: /Stored energy lost per hour/ })
       .getByRole("button");
@@ -529,12 +529,10 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       })
       .click();
-    await expect(
-      ironAir.getByRole("row", { name: /Upkeep/ }),
-    ).toBeVisible();
-    await expect(
-      ironAir.getByRole("row", { name: /Efficiency/ }),
-    ).toHaveCount(0);
+    await expect(ironAir.getByRole("row", { name: /Upkeep/ })).toBeVisible();
+    await expect(ironAir.getByRole("row", { name: /Efficiency/ })).toHaveCount(
+      0,
+    );
     expect(
       await ironAir.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);

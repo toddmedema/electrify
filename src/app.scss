@@ -6602,9 +6602,12 @@ $programs_column: 800px;
     justify-content: center;
   }
 }
+// Leave enough room for complete cost/unit values beside the help target.
+.gameToolPanel .buildDetails .buildDetailLabel {
+  width: 44%;
+}
 @media (max-width: ($phone_width - 1px)) {
   .buildDetails .buildDetailLabel {
-    // Leave enough room for complete cost/unit values beside the help target.
     width: 44%;
   }
 }

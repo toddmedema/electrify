@@ -312,7 +312,8 @@ describe("The Shale Boom pilot arc", () => {
       },
       {
         title: "Gas output recovering",
-        message: "Plant limits will lift and lower boom-era prices will return.",
+        message:
+          "Plant limits will lift and lower boom-era prices will return.",
       },
       {
         title: "Gas boom ending",
