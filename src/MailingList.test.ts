@@ -27,7 +27,7 @@ beforeEach(() => {
 });
 
 it.each(["subscribed", "already-subscribed"])(
-  "reports %s and submits only the captured identity and consent",
+  "reports %s and submits only the consent",
   async (status) => {
     submit.mockResolvedValue({ data: { status } });
     await subscribeAfterSignIn(auth, user);
@@ -37,11 +37,7 @@ it.each(["subscribed", "already-subscribed"])(
       "subscribeMailingList",
       { timeout: 20000 },
     );
-    expect(submit).toHaveBeenCalledWith({
-      uid: "player",
-      consent: true,
-      consentVersion: "electrify-updates-v1",
-    });
+    expect(submit).toHaveBeenCalledWith({ consent: true });
     expect(dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: expect.stringContaining(

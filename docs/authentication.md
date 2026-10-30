@@ -12,9 +12,10 @@ local to the sign-in screen and is not saved to the account or device.
 
 The client calls `subscribeMailingList` in `us-central1` without delaying login or
 cloud sync. The callable validates Firebase authentication, a verified Google
-email, the matching user ID and the consent version. It derives the email from the
-verified token, never from a client-supplied address. The Mailchimp API key remains
-in Firebase Secret Manager.
+email and explicit consent. It derives the email from the verified token, never from
+a client-supplied address. The Mailchimp API key remains in Firebase Secret Manager.
+Failures appear in the function's Cloud Logging entries as `Mailing-list signup
+failed`, with Mailchimp's status and error title but no address.
 
 New contacts are created with `status: subscribed` (single opt-in, no confirmation
 step), a signup timestamp and consent/source tags. Mailchimp's create endpoint
@@ -25,7 +26,7 @@ reports success or directs the player to About if signup fails, even after the
 sign-in dialog closes. This checkbox is an invitation to join, not a subscription
 management or unsubscribe control.
 
-## Production setup before merging
+## Production setup
 
 1. Complete the [one-time Google Cloud setup](#one-time-google-cloud-setup) below.
    API enablement and IAM grants persist across releases; they do not need to be
@@ -45,8 +46,9 @@ management or unsubscribe control.
 4. Install the server lockfile with `npm ci --prefix firebase/functions`, then
    deploy with
    `npx firebase-tools@15.32.1 deploy --only functions:mailing-list --project electrify-game`.
-   The production workflow also installs and deploys this function before the web
-   bundle. Missing secrets or deployment permissions must be resolved first.
+   The production workflow also installs and deploys this function with Firestore
+   before the web bundle. Both backend deployments must succeed before publishing
+   the client; resolve the setup or deployment failure before retrying.
 5. With a fresh Google test address, check the box and sign in. Verify exactly one
    subscribed contact in Mailchimp and one welcome notification, without any
    confirmation requirement. Test unchecked and cancelled sign-ins, repeat logins,

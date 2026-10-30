@@ -34,7 +34,7 @@ import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus, useMenuKeys } from "../base/useMenuKeys";
 import type { SignInOptions } from "../../Globals";
-import MailingListCheckbox from "../base/MailingListCheckbox";
+import GoogleSignIn from "../base/GoogleSignIn";
 const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
@@ -196,7 +196,6 @@ function VolumeSlider(props: {
 
 export default function Settings(props: Props): React.JSX.Element {
   const [creditsOpen, setCreditsOpen] = React.useState(false);
-  const [mailingList, setMailingList] = React.useState(false);
   const canInstallApp = useCanInstallApp();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
   const desktop = useDesktopState();
@@ -461,18 +460,7 @@ export default function Settings(props: Props): React.JSX.Element {
                         </Button>
                       </>
                     ) : (
-                      <Stack spacing={1} sx={{ maxWidth: "100%" }}>
-                        <MailingListCheckbox
-                          checked={mailingList}
-                          onChange={setMailingList}
-                        />
-                        <Button
-                          variant="outlined"
-                          onClick={() => props.onLogin({ mailingList })}
-                        >
-                          Sign in with Google
-                        </Button>
-                      </Stack>
+                      <GoogleSignIn onSignIn={props.onLogin} />
                     )}
                   </Stack>
                 </SettingRow>
