@@ -54,9 +54,10 @@ beforeEach(() => {
   window.matchMedia = (query: string) => ({
     ...originalMatchMedia(query),
     matches:
-      (query.includes("min-width:1300px") ||
-        query.includes("min-width:1024px")) &&
-      mockDesktop,
+      ((query.includes("min-width:1300px") ||
+        query.includes("min-width:700px")) &&
+        mockDesktop) ||
+      (query.includes("min-width:600px") && mockPaneLayout),
   });
 });
 afterEach(() => {
@@ -480,7 +481,7 @@ describe("GameAppBar", () => {
         const status = screen.getByRole("button", {
           name: `Current grid status: ${summary}`,
         });
-        expect(status).toHaveTextContent(/^$/);
+        expect(status).toHaveTextContent(/^(Low|Limit|Soon|Blackout)$/);
         expect(screen.queryByText(summary)).not.toBeInTheDocument();
         fireEvent.click(status);
         expect(

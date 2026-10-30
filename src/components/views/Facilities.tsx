@@ -36,7 +36,7 @@ import {
   activeScenario,
   currentGenerationW,
 } from "../../helpers/GameSelectors";
-import { chartPalette, facilityColor, withAlpha } from "../../Theme";
+import { chartPalette, facilityColor } from "../../Theme";
 import {
   FacilityOperatingType,
   isStorage,
@@ -56,6 +56,8 @@ import {
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import FlowBar from "../base/FlowBar";
+import { getStorageBoolean, setStorageKeyValue } from "../../LocalStorage";
+import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
@@ -446,7 +448,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } else if (facility.peakWh) {
     reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
-    reading = formatWattsOfPeak(facility.currentW, facility.peakW);
+    reading = `${formatWattsOfPeak(facility.currentW, facility.peakW)} · ${Math.round(Math.abs(outputFraction) * 100)}%`;
     if (fuel === "Hydro" && facility.reservoirCapacityWh) {
       // Last-tick water balance stays meaningful on mount and selection. Paused turbines can
       // retain ramping currentW internally, so exclude their output from the water balance.
@@ -638,14 +640,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       className="constructionProgress"
                       data-paused={game.speed === "PAUSED"}
                       aria-hidden
-                      style={{ background: withAlpha(accentColor, 0.24) }}
                     >
                       <span
                         className="constructionProgressFill"
-                        style={{
-                          width: `${builtFraction * 100}%`,
-                          background: accentColor,
-                        }}
+                        style={{ width: `${builtFraction * 100}%` }}
                       />
                     </span>
                   )}
@@ -749,6 +747,7 @@ function FacilitySupplyChart({
   anchor: React.RefObject<HTMLDivElement>;
 }) {
   const fuelOrder = getDispatchOrderedFuels(game.facilities);
+  const height = useFleetChartHeight();
   return (
     <div
       ref={anchor}
@@ -757,7 +756,8 @@ function FacilitySupplyChart({
       aria-label="Supply and demand"
     >
       <ChartSupplyDemand
-        height={180}
+        height={height}
+        exactHeight
         timeline={game.timeline}
         fuelOrder={fuelOrder}
         currentMinute={game.date.minute}
@@ -768,6 +768,29 @@ function FacilitySupplyChart({
       />
     </div>
   );
+}
+
+const HINT_MIN_FACILITIES = 4;
+const BULK_HINT_SEEN_KEY = "facilityBulkHintSeen";
+
+/** The fleet chart's height: taller where the window has room, never a letterbox. */
+export function fleetChartHeight(width: number, height: number): number {
+  const fit = (min: number, share: number, max: number) =>
+    Math.round(Math.max(min, Math.min(max, height * share)));
+  if (width >= SIDE_LAYOUT_MIN_WIDTH) return fit(180, 0.25, 260);
+  if (width < 600) return fit(200, 0.38, 420);
+  return width > height ? fit(180, 0.3, 260) : fit(180, 0.28, 340);
+}
+
+function useFleetChartHeight(): number {
+  const measure = () => fleetChartHeight(window.innerWidth, window.innerHeight);
+  const [height, setHeight] = React.useState(measure);
+  React.useEffect(() => {
+    const resize = () => setHeight(measure());
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
+  return height;
 }
 
 export interface StateProps {
@@ -1158,6 +1181,11 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   }
 
   public componentDidUpdate() {
+    if (
+      this.state.ids.length > 1 &&
+      !getStorageBoolean(BULK_HINT_SEEN_KEY, false)
+    )
+      setStorageKeyValue(BULK_HINT_SEEN_KEY, true);
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
   }
@@ -1319,10 +1347,19 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                     </div>
                   </>
                 ) : (
-                  <span>
-                    Shift-click a range · Ctrl/⌘-click to add · Right-click for
-                    actions
-                  </span>
+                  <>
+                    <span className="facilitySelectionTitle">
+                      Facilities ({game.facilities.length})
+                    </span>
+                    {game.facilities.length >= HINT_MIN_FACILITIES &&
+                      !activeScenario(game)?.tutorialSteps &&
+                      !getStorageBoolean(BULK_HINT_SEEN_KEY, false) && (
+                        <span>
+                          Shift-click a range · Ctrl/⌘-click to add ·
+                          Right-click for actions
+                        </span>
+                      )}
+                  </>
                 )}
               </div>
             )}

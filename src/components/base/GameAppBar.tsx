@@ -29,12 +29,7 @@ import {
   formatNumber,
 } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
-import {
-  isBigScreen,
-  isPaneLayout,
-  openWindow,
-  SIDE_LAYOUT_MEDIA,
-} from "../../Globals";
+import { isBigScreen, openWindow, SIDE_LAYOUT_MEDIA } from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { setSpeed, startTutorial } from "../../reducers/Game";
 import { quitSavedGame, runSaveTransition } from "../../SaveSession";
@@ -50,7 +45,8 @@ import { useOnline } from "./OnlineStatus";
 import { buildSpeedOptions, sharedClockSpeedProps } from "./SpeedControls";
 import MissionSummary from "./MissionSummary";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
-import { acknowledgeEvidence } from "../../reducers/UI";
+import { acknowledgeEvidence, manualHelpOpen } from "../../reducers/UI";
+import { MANUAL_ENTRY } from "./ManualEntries";
 import { openEvidence } from "../../helpers/Evidence";
 import {
   ActiveEventGroupType,
@@ -93,6 +89,7 @@ export interface DispatchProps {
   onEvidence?: (target: EvidenceTargetType) => void;
   onEvidenceAcknowledged?: (request: EvidenceRequestType) => void;
   onManual: () => void;
+  onReserveHelp?: () => void;
   onSettings: () => void;
   onAchievements?: () => void;
   onSavedGames?: () => void;
@@ -109,7 +106,11 @@ const MINUTES_PER_DAY = 1440;
 const EVENING_MINUTE = 18 * 60;
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 /** Status row controls that keep keyboard focus when the row moves into or out of the top bar. */
-const RESTORABLE_STATUS_FOCUS = [".missionRiskButton", ".missionSummaryMonths"];
+const RESTORABLE_STATUS_FOCUS = [
+  ".gridHealthHelp",
+  ".missionRiskButton",
+  ".missionSummaryMonths",
+];
 
 type GridHealthState =
   "stable" | "low-reserve" | "at-limit" | "blackout-ahead" | "blackout";
@@ -204,6 +205,14 @@ export function stableGridSummary(
 
 const STATUS_TOOLTIP_MS = 2500;
 
+/** Never color or an icon alone: every state that needs attention has a word, even on a phone. */
+const STATUS_WORD: Record<Exclude<GridHealthState, "stable">, string> = {
+  "low-reserve": "Low",
+  "at-limit": "Limit",
+  "blackout-ahead": "Soon",
+  blackout: "Blackout",
+};
+
 /**
  * Grid health on a phone: a fixed-size icon whose tooltip carries the full readout. Hover and
  * keyboard focus open it as usual; a tap toggles it, until a tap elsewhere or a few seconds.
@@ -273,6 +282,11 @@ function CompactGridStatus({
                 />
               )}
             </span>
+            {health.state !== "stable" && (
+              <span className="gridHealthStatusWord">
+                {STATUS_WORD[health.state]}
+              </span>
+            )}
           </button>
         </Tooltip>
       </ClickAwayListener>
@@ -288,8 +302,15 @@ export function GameAppBar(props: Props) {
     onEvidence,
     onEvidenceAcknowledged,
   } = props;
-  const { game, onManual, onNextTutorial, onQuit, onSettings, onSpeedChange } =
-    props;
+  const {
+    game,
+    onManual,
+    onNextTutorial,
+    onQuit,
+    onReserveHelp,
+    onSettings,
+    onSpeedChange,
+  } = props;
   const date = game.date;
   const now = getTimeFromTimeline(date.minute, game.timeline);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<HTMLElement | null>(
@@ -307,7 +328,8 @@ export function GameAppBar(props: Props) {
   const bigScreen = isBigScreen();
   // Tracks resizes even while paused, when the bar otherwise has no reason to re-render.
   const singleRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
-  const showProfit = useMediaQuery("(min-width:1024px)", { noSsr: true });
+  const showProfit = useMediaQuery("(min-width:700px)", { noSsr: true });
+  const roomForStatusText = useMediaQuery("(min-width:600px)", { noSsr: true });
   const monthlyProfit = React.useMemo(
     () =>
       showProfit
@@ -499,13 +521,14 @@ export function GameAppBar(props: Props) {
   // Tutorials have no mission row, so the readout would be too short to hold a full-size control;
   // their HUD tells the story instead.
   const activeEvents = (!isTutorial && props.activeEvents) || NO_ACTIVE_EVENTS;
-  // Every phone status uses the same space; changing reserve must not resize the header.
-  const compactStatus = !isPaneLayout();
+  // Phones keep a fixed icon, plus one word whenever the grid needs attention.
+  const compactStatus = !roomForStatusText;
   const summary =
     gridHealth.state === "stable"
       ? stableGridSummary(game, now)
       : `${gridHealth.label}, ${gridHealth.metric}`;
 
+  const yearProgress = `Year ${date.year}: ${Math.round(date.percentOfYear * 100)}% elapsed`;
   const statusRow = (
     <div className="gameStatusBar">
       {compactStatus ? (
@@ -520,7 +543,12 @@ export function GameAppBar(props: Props) {
           role="group"
           aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
         >
-          <div className="gridHealthSummary">
+          <button
+            type="button"
+            className="gridHealthSummary gridHealthHelp"
+            aria-label={`${gridHealth.label}, ${gridHealth.metric}. Open the Reserve manual entry`}
+            onClick={() => onReserveHelp?.()}
+          >
             <span className="statusIcon" aria-hidden="true">
               <ConceptIcon
                 concept={
@@ -536,7 +564,7 @@ export function GameAppBar(props: Props) {
             <strong className="gridHealthMetric">
               {gridHealth.label}, {gridHealth.metric}
             </strong>
-          </div>
+          </button>
         </div>
       )}
       {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
@@ -643,19 +671,21 @@ export function GameAppBar(props: Props) {
       <span className="srOnly" aria-live="polite">
         {gridHealth.announcement}
       </span>
-      <div
-        id="yearProgressBar"
-        role="progressbar"
-        aria-label="Year progress"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(date.percentOfYear * 100)}
-      >
+      <Tooltip title={yearProgress}>
         <div
-          className="yearProgressFill"
-          style={{ width: `${date.percentOfYear * 100}%` }}
-        />
-      </div>
+          id="yearProgressBar"
+          role="progressbar"
+          aria-label={yearProgress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(date.percentOfYear * 100)}
+        >
+          <div
+            className="yearProgressFill"
+            style={{ width: `${date.percentOfYear * 100}%` }}
+          />
+        </div>
+      </Tooltip>
     </div>
   );
 }
@@ -692,6 +722,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onManual: () => {
       dispatch(navigate("MANUAL"));
+    },
+    onReserveHelp: () => {
+      dispatch(manualHelpOpen(MANUAL_ENTRY.RESERVE_CAPACITY));
     },
     onSettings: () => {
       dispatch(navigate("SETTINGS"));

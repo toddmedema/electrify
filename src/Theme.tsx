@@ -191,7 +191,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   light: {
     ...PRODUCTION_COLORS.light,
     variableFill: withAlpha(PRODUCTION_COLORS.light.variable, 0.18),
-    onDemandFill: withAlpha(PRODUCTION_COLORS.light.onDemand, 0.29),
+    onDemandFill: withAlpha(PRODUCTION_COLORS.light.onDemand, 0.2),
     powerFlowFill: withAlpha(GRID_STEEL.light, 0.08),
     powerFlowPattern: withAlpha(GRID_STEEL.light, 0.8),
     storage: blue[800],

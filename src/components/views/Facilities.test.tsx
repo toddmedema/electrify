@@ -21,7 +21,7 @@ import gameReducer, {
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
-import Facilities from "./Facilities";
+import Facilities, { fleetChartHeight } from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
 import * as transmission from "../../helpers/Transmission";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
@@ -1720,5 +1720,17 @@ describe("mouse facility selection", () => {
       [{ facilityId: 1, upgrade: "hailResistant" }],
       [{ facilityId: 2, upgrade: "hailResistant" }],
     ]);
+  });
+});
+
+describe("fleetChartHeight", () => {
+  it.each([
+    [360, 640, 243],
+    [390, 844, 321],
+    [768, 1024, 287],
+    [1024, 768, 230],
+    [844, 390, 180],
+  ])("sizes a %ix%i window to %ipx", (width, height, expected) => {
+    expect(fleetChartHeight(width, height)).toBe(expected);
   });
 });

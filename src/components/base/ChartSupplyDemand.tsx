@@ -71,6 +71,8 @@ export interface Props {
   location: LocationType;
   height?: number;
   legend?: boolean;
+  /** Treat `height` as measured pixels. */
+  exactHeight?: boolean;
   timeline: ChartData[];
   startingYear: number;
   /** Individual fuel details follow the dispatch order in the facility list. */
@@ -300,7 +302,7 @@ function buildOptions({
     width: 0, // set by UPlotChart
     height: 0,
     pxAlign: 1,
-    padding: [18 * scale, 5 * scale, 24 * getTextScale(), 0],
+    padding: [18 * scale, 16, 24 * getTextScale(), 0],
     cursor: {
       x: true,
       y: false,
@@ -391,7 +393,10 @@ function buildOptions({
             const ratio = uPlot.pxRatio;
             u.ctx.save();
             u.ctx.font = chartFont(ratio);
-            u.ctx.fillStyle = tickLabelFill();
+            u.ctx.fillStyle =
+              getComputedStyle(document.documentElement).getPropertyValue(
+                "--cursor-line",
+              ) || tickLabelFill();
             u.ctx.textAlign = "center";
             u.ctx.textBaseline = "alphabetic";
             const halfWidth = u.ctx.measureText("Now").width / 2;
@@ -645,6 +650,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         />
       )}
       <UPlotChart<State>
+        exactHeight={props.exactHeight}
         ariaLabel={`Chart of electricity supply and demand over the day. Day/night ribbon: ${describeDayNight(dayNight)}. Generation is grouped as Variable and Dispatchable. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
         interactiveTooltip
         formatSummaryValue={formatWatts}

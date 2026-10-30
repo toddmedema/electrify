@@ -56,7 +56,7 @@
      band below the text rather than painted across the whole fill. */
   --flow-hatch: rgba(0, 132, 248, 0.8);
   // Forward flow behind every fleet row: one neutral tint, so rows read as one system
-  --flow-fill: color-mix(in srgb, var(--font-color-primary) 7%, transparent);
+  --flow-meter: color-mix(in srgb, var(--font-color-primary) 55%, transparent);
   --border-strong: #a4b0bd;
   --border-tile: #d5dde6;
   --font-color-primary: #172334;
@@ -86,7 +86,12 @@
   --focus-ring: var(--interactive-blue);
   --blackout-red: #c62828; /* red800 - matches blackoutColor in Theme.tsx */
   --blackout-tint: rgba(198, 40, 40, 0.07);
-  --blackout-glow: rgba(229, 57, 53, 0.7);
+  --blackout-glow: rgba(
+    229,
+    57,
+    53,
+    0.3
+  ); /* app-bar text stays 4.5:1 at the pulse's peak */
   // The two directions a number can move in. Both are the darker end of their ramp so they
   // clear 4.5:1 on the page as text, since the arrow beside them is decoration rather than the
   // message -- red/green alone would leave a colourblind reader with only the arrow
@@ -95,6 +100,7 @@
   // A warning fills its row rather than tinting text, so the label keeps full body contrast
   // (16:1) and the glyph carries the amber: 6:1 on the fill, well past 3:1 for an icon
   --warning-fill: #ffe082; /* amber200 */
+  --warning-on-fill: #5c3d00;
   --warning-icon: #7a4500; /* deep amber */
   --mark-bg: #ffe082; /* amber200 - the manual's search highlight */
   // A badge too small to carry text: yellow for the warning, rimmed in deep amber so it still
@@ -154,16 +160,22 @@
   );
   --blackout-red: #ef5350; /* red400 */
   --blackout-tint: rgba(239, 83, 80, 0.16);
-  --blackout-glow: rgba(244, 67, 54, 0.75);
+  --blackout-glow: rgba(
+    244,
+    67,
+    54,
+    0.35
+  ); /* app-bar text stays 4.5:1 at the pulse's peak */
   --delta-good: #66bb6a; /* green400 */
   --delta-bad: #ef5350; /* red400 */
   --warning-fill: #6d4c00; /* text 6.6:1 */
+  --warning-on-fill: #ffe0a3;
   --warning-icon: #ffd54f; /* amber300 - 5.5:1 on the fill */
   --mark-bg: #6d4c00;
   --warning-dot: #ffd54f;
   --warning-dot-rim: #ffd54f;
   --capacity-bar: #e0e0e0;
-  --facility-idle-opacity: 0.7;
+  --facility-idle-opacity: 0.85;
   --shadow-ring: rgba(0, 0, 0, 0.72);
   --tooltip-border: rgba(148, 163, 184, 0.24);
   --tooltip-bg: #111820;
@@ -487,13 +499,17 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   margin-left: 4px !important;
 }
 
-@media screen and (max-width: ($desktop_breakpoint - 1px)) {
+@media (pointer: coarse) {
+  .snackbarClose {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+// Phones dismiss a toast by swiping it; tablets keep the visible close button.
+@media screen and (max-width: 599px) {
   .snackbarClose {
     display: none !important;
-  }
-
-  .snackbar-above-nav {
-    bottom: calc(56px + env(safe-area-inset-bottom) + 8px) !important;
   }
 }
 
@@ -1177,7 +1193,7 @@ $topbar_height: 56px;
 // "Cash out in ~5 mo" read as the same kind of alert. Comes after both rows' own backgrounds.
 .statusWarning {
   background: var(--warning-fill);
-  color: $font_color_primary;
+  color: var(--warning-on-fill);
 
   .conceptIcon {
     color: var(--warning-icon);
@@ -2039,11 +2055,20 @@ $pane_header_height: 48px;
     inset: auto 0 -4px;
     // Retain breathing room around the line for the tutorial's target ring.
     padding: 4px 0;
-    pointer-events: none;
     z-index: 100;
 
+    // A permanent track, so the bar reads as elapsed time rather than a stray rule.
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 4px 0;
+      height: 1px;
+      background: var(--border-subtle);
+    }
+
     .yearProgressFill {
-      height: 2px;
+      position: relative;
+      height: 1px;
       background: $font_color_faded;
     }
   }
@@ -2342,6 +2367,12 @@ $pane_header_height: 48px;
 }
 
 .chartLegendNote {
+  font-weight: 400;
+}
+
+// DSK-14: the date is a quiet reference beside the money.
+#topbar .gameStatusValue.weak {
+  font-size: 14px;
   font-weight: 400;
 }
 
@@ -3518,6 +3549,10 @@ $pane_header_height: 48px;
 
   .facilityRow.selected,
   .transmissionLine.selected {
+    background: var(--bg-raised);
+  }
+  .facilityRow.selected > .facilityRowHeader,
+  .transmissionLine.selected > .facilityRowHeader {
     background: var(--bg-selected);
   }
 
@@ -3993,9 +4028,12 @@ $pane_header_height: 48px;
 
   .outputProgressBar {
     // One neutral tint for forward flow on every row; reverse flow sets its own inline
-    background-color: var(--flow-fill);
+    background-color: var(--flow-meter);
     position: absolute;
-    inset: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 4px;
     pointer-events: none;
     transform-origin: left center;
     // Keep a hint of motion without leaving the utilization display several simulation frames
@@ -5442,7 +5480,7 @@ $homeSmokeCycle: 5.6s;
   }
 }
 .dailyProductionChart .chartLegend {
-  padding: 8px 12px 0;
+  padding: 8px 16px 0;
   gap: 4px 8px;
 }
 .chartLegendSwatch-pattern {
@@ -5490,7 +5528,9 @@ $homeSmokeCycle: 5.6s;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px 16px 8px;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 8px 16px;
   font-size: var(--font-size-body2);
   font-weight: 600;
   text-transform: none;
@@ -5565,8 +5605,10 @@ $homeSmokeCycle: 5.6s;
   min-width: 48px;
 }
 .facilityRowIcon .facilityIconIdle {
-  // Only quiet the illustration; reserve levels and state labels stay legible.
+  // Only quiet the illustration; reserve levels and state labels stay legible. The ring keeps
+  // a dark outline from dissolving into the dark page.
   opacity: var(--facility-idle-opacity);
+  box-shadow: 0 0 0 1px var(--border-strong);
 }
 .facilityDisclosure .MuiListItemText-root {
   margin: 0;
@@ -5732,7 +5774,8 @@ $homeSmokeCycle: 5.6s;
   background: transparent;
   color: var(--font-color-faded);
   cursor: grab;
-  touch-action: none;
+  // Vertical swipes scroll the list; the drag library takes over after its long press.
+  touch-action: pan-y;
 
   > .MuiSvgIcon-root {
     flex-shrink: 0;
@@ -5756,42 +5799,42 @@ $homeSmokeCycle: 5.6s;
   flex-direction: column;
   min-width: 0;
 }
+// Output and construction share one 4px meter on the row's bottom edge, so rows keep one height.
+.base_main .facilityRowHeader > .facilityDisclosure,
+.base_main .facilityDisclosure .facility {
+  position: static;
+}
+.base_main .facilityRowHeader:has(> .outputProgressBar)::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: var(--border-subtle);
+  pointer-events: none;
+}
+.base_main .facilityRowHeader > .outputProgressBar {
+  z-index: 1;
+}
 .facilityDisclosure .constructionProgress {
   display: block;
-  position: relative;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   height: 4px;
-  margin-top: 8px;
-  border-radius: var(--radius-sm);
-  background: var(--border-subtle); /* fallback; the fuel tint is set inline */
+  background: var(--border-subtle);
 }
+// Neutral at every fuel: identity stays in the icon, and the fill reads as one progress grammar.
 .facilityDisclosure .constructionProgressFill {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
   border-radius: inherit;
+  background: var(--font-color-faded);
   transition: width 200ms linear;
-}
-// The glow is its own head on the leading edge rather than a shadow on the whole fill: a 4px
-// bar clips a shadow away vertically, and at 100% there is no edge left for it to escape past,
-// so the mark disappears exactly when the build is most worth noticing. A dot that overhangs
-// the end stays visible at every width. The blue is fixed on purpose — "under construction"
-// should read the same whatever the fuel accent is. The dot's core is the page background
-// rather than an accent-derived colour because the fixed blue glow is byte-identical to the
-// storage fill (--interactive-blue and chartPalette().storage are the same hue), which would
-// otherwise swallow the head on every battery build; a pinhole of page background contrasts
-// against blue, amber and brown alike, and flips light/dark with the theme.
-.facilityDisclosure .constructionProgressFill::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 0;
-  width: 2px;
-  height: 2px;
-  transform: translate(50%, -50%);
-  border-radius: 50%;
-  background: var(--bg-primary);
-  box-shadow: 0 0 6px 3px var(--tutorial-glow);
 }
 .transmissionFleet {
   margin-top: 0;
@@ -7011,10 +7054,53 @@ img[src$="/transmission.svg"] {
   }
 }
 
+// The grid readout opens its manual entry, without looking like a second primary control.
+.gridHealthHelp {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+// Tablets have room for words, so the readout sits beside the mission instead of icon-only.
+@media (min-width: 600px) and (max-width: 1023px) {
+  .gameStatusBar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+  .gameStatusBar .gridHealth {
+    flex: 0 0 auto;
+    padding-right: 16px;
+  }
+  .gameStatusBar .missionSummary,
+  .gameStatusBar .missionSummary:has(.missionRiskButton) {
+    flex: 1 1 0;
+    min-width: 0;
+    border-top: 0;
+  }
+}
+
+.gridHealthStatusWord {
+  margin-inline-start: 4px;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  color: var(--font-color-primary);
+  white-space: nowrap;
+}
+.gridHealthStatusButton:has(.gridHealthStatusWord) {
+  width: auto;
+  padding-inline: 8px;
+}
+
 .gridHealthStatusButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 44px;
   width: 44px;
   height: 44px;
   padding: 0;
@@ -8049,7 +8135,7 @@ option {
     align-items: center;
     justify-content: space-between;
     gap: 4px 8px;
-    padding: 4px 16px;
+    padding: 0 16px;
     min-height: 40px;
     color: var(--font-color-faded);
     font-size: var(--font-size-caption);
@@ -8059,9 +8145,20 @@ option {
     }
   }
 }
+.facilitySelectionTitle {
+  color: var(--font-color-primary);
+  font-size: var(--font-size-body2);
+  font-weight: 600;
+}
 .base_main .facilityRow.bulkSelected {
   background: var(--bg-selected);
-  box-shadow: inset 3px 0 var(--interactive-blue);
+}
+// The expanded row's detail keeps its own raised surface when the row is also bulk-selected.
+.base_main .facilityRow.selected.bulkSelected {
+  background: var(--bg-raised);
+}
+.base_main .facilityRow.bulkSelected > .facilityRowHeader {
+  background: var(--bg-selected);
 }
 .unifiedFacilitiesList[data-group-dragging="true"]
   .bulkSelected:not(.dragging) {

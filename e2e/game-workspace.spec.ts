@@ -475,7 +475,7 @@ test("Insights and Events reopen at the scroll position the player left", async 
   // only the upcoming card and an empty history at the start of a run.
   await page.setViewportSize({
     width: page.viewportSize()!.width,
-    height: 480,
+    height: 400,
   });
   await startGame(page, "light");
   for (const [nav, pane] of [
@@ -565,7 +565,7 @@ for (const theme of ["light", "dark"] as const) {
     for (const label of ["Build", "Programs", "Insights", "Events"]) {
       const action = dock.getByRole("button", { name: label, exact: true });
       await expect(action).toBeVisible();
-      await expect(action).not.toContainText(label);
+      await expect(action).toContainText(label);
       await expect(action).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       const box = (await action.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(
@@ -1127,10 +1127,10 @@ for (const theme of ["light", "dark"] as const) {
         ),
       });
     }
-    for (const width of [1024, 1023, 390, 360]) {
+    for (const width of [700, 699, 390, 360]) {
       await page.setViewportSize({ width, height: 800 });
       const profit = appbar.getByLabel(/^Monthly profit forecast/);
-      if (width >= 1024) await expect(profit).toBeVisible();
+      if (width >= 700) await expect(profit).toBeVisible();
       else await expect(profit).toHaveCount(0);
       expect(
         await appbar.evaluate(

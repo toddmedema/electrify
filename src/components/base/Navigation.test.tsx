@@ -155,7 +155,7 @@ describe("Navigation", () => {
     for (const name of ["Build", "Programs", "Insights", "Events"]) {
       const button = screen.getByRole("button", { name });
       expect(button).toBeVisible();
-      expect(button).not.toHaveTextContent(name);
+      expect(button).toHaveTextContent(name);
     }
     expect(screen.queryByRole("button", { name: "Facilities" })).toBeNull();
   });
