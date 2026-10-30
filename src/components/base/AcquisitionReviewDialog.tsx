@@ -21,8 +21,7 @@ interface Props {
   onAcquire: (payload: AcquireUtilityAction) => boolean | Promise<boolean>;
 }
 
-function marginText(marginW: number | undefined): string {
-  if (marginW === undefined) return "Not owned";
+function marginText(marginW: number): string {
   return marginW < 0
     ? `${formatWatts(-marginW)} shortfall`
     : `${formatWatts(marginW)} spare`;
@@ -86,10 +85,6 @@ export default function AcquisitionReviewDialog({
               {error}
             </Typography>
           )}
-          <Typography variant="body2">
-            Ownership, customers, plants and contracts transfer immediately.
-            Company-wide electricity prices apply to the expanded utility.
-          </Typography>
           <Typography
             variant="body2"
             color={valley ? "warning.main" : "textSecondary"}
@@ -119,7 +114,7 @@ export default function AcquisitionReviewDialog({
           concept: "finances",
           label: "Assumed debt",
           value: formatMoneyConcise(quote.assumedDebt),
-          detail: `${formatMoneyConcise(quote.cashMonthlyDebtService)}/mo at 5% fixed interest over 20 years, including with a cash purchase. This debt remains after selling plants.`,
+          detail: `${formatMoneyConcise(quote.cashMonthlyDebtService)}/mo at 5% fixed interest over 20 years, including with a cash purchase.`,
         },
       ]}
       extraFacts={[
@@ -127,14 +122,13 @@ export default function AcquisitionReviewDialog({
           concept: "customers",
           label: "Customers joining",
           value: Math.round(quote.customers).toLocaleString(),
-          detail: `${Math.round(quote.addressablePool).toLocaleString()} addressable accounts. Tracked separately from Champlain’s original customers.`,
         },
         {
           concept: "goal",
           label: "Acquisition obligations",
           value: "Acquire either utility by December 2014.",
           detail:
-            "Retire acquired original oil plants by December 2023 and retain 90% of each area’s customers at the end of 2024. Acquisitions after 2023 exclude the original oil plant.",
+            "Retire acquired original oil plants by December 2023 and retain 90% of your expanded customer base at the end of 2024. Acquisitions after 2023 exclude the original oil plant.",
         },
         {
           concept: "finances",
@@ -144,18 +138,10 @@ export default function AcquisitionReviewDialog({
         },
         {
           concept: "supply",
-          label: "Worst local supply margin",
+          label: "Company supply margin",
           value: preview
             ? `${marginText(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
             : "Forecast unavailable",
-          detail:
-            preview?.areaMargins
-              .map(
-                (area) =>
-                  `${area.name}: ${marginText(area.beforeW)} → ${marginText(area.afterW)}`,
-              )
-              .join(" · ") ??
-            "Includes local demand and the connection’s transfer limit.",
         },
         {
           concept: "money",

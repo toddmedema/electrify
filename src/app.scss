@@ -5921,14 +5921,19 @@ $homeSmokeCycle: 5.6s;
   background: transparent;
   gap: 12px;
 }
-.decisionImpactFact > div {
+.decisionImpactFactWithHelp {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.decisionImpactFactHelp {
+  display: flex;
+  align-items: flex-start;
+}
+.decisionImpactFactContent {
   display: grid;
   grid-template-columns: minmax(100px, 0.7fr) minmax(0, 1.3fr);
   gap: 4px 12px;
 }
-.decisionImpactFact
-  > div
-  > .MuiTypography-caption:last-child:not(:first-child) {
+.decisionImpactFactDetail {
   grid-column: 2;
 }
 .MuiDialog-paper .noPadding > .decisionImpact {
@@ -6235,12 +6240,10 @@ $programs_column: 800px;
   padding-bottom: 4px;
 }
 @media (max-width: ($phone_width - 1px)) {
-  .decisionImpactFact > div {
+  .decisionImpactFactContent {
     grid-template-columns: 1fr;
   }
-  .decisionImpactFact
-    > div
-    > .MuiTypography-caption:last-child:not(:first-child) {
+  .decisionImpactFactDetail {
     grid-column: 1;
   }
   .transmissionLine > .facilityRowHeader > .facilityDisclosure {
@@ -8127,7 +8130,7 @@ option {
 .acquisitionReviewIntro {
   display: grid;
   gap: 12px;
-  padding: 16px 24px;
+  padding: 0 24px 12px;
   border-bottom: 1px solid var(--border-strong);
 }
 
