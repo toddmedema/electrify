@@ -1,6 +1,6 @@
 import { SCENARIOS } from "./Scenarios";
 import { UTILITY_AREAS, utilityEntitlementsAt } from "./UtilityExpansion";
-import type { UtilityAreaId } from "../Types";
+import type { UtilityId } from "../Types";
 import { scenarioRules } from "../helpers/ScenarioRules";
 import { getDateFromMinute } from "../helpers/DateTime";
 
@@ -12,7 +12,7 @@ const HEADLINERS: Record<
     month: number;
     lastMonth?: number;
     phase?: string;
-    entitlement?: { areaId: UtilityAreaId; id: string };
+    entitlement?: { utilityId: UtilityId; id: string };
   }
 > = {
   100: { year: 2020, month: 48, phase: "ratchet-onset" },
@@ -32,7 +32,7 @@ const HEADLINERS: Record<
   116: {
     year: 2017,
     month: 0,
-    entitlement: { areaId: "valley-electric", id: "valley-nuclear" },
+    entitlement: { utilityId: "valley-electric", id: "valley-nuclear" },
   },
 };
 
@@ -45,8 +45,8 @@ test.each(SCENARIOS.filter((scenario) => !scenario.tutorialSteps))(
     expect(date.monthNumber).toBe(1);
     const leadMonths = [1, 2468, 9981].map((seed) => {
       if (headline.entitlement) {
-        const { areaId, id } = headline.entitlement;
-        const source = UTILITY_AREAS[areaId].entitlements.find(
+        const { utilityId, id } = headline.entitlement;
+        const source = UTILITY_AREAS[utilityId].entitlements.find(
           (item) => item.id === id,
         )!;
         const year = source.reductionYear!;

@@ -2,7 +2,7 @@ import type { AppDispatch } from "../../Store";
 import { connectToStore } from "../base/ConnectToStore";
 import { navigate } from "../../reducers/Card";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
-import { AppStateType, StorageShoppingType, UtilityAreaId } from "../../Types";
+import { AppStateType, StorageShoppingType } from "../../Types";
 import BuildStorage, { DispatchProps, StateProps } from "./BuildStorage";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -16,12 +16,8 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onBack: () => {
       dispatch(navigate("FACILITIES"));
     },
-    onBuildStorage: (
-      facility: StorageShoppingType,
-      financed: boolean,
-      operatingAreaId?: UtilityAreaId,
-    ) => {
-      dispatch(purchaseFacility(facility, financed, operatingAreaId));
+    onBuildStorage: (facility: StorageShoppingType, financed: boolean) => {
+      dispatch(purchaseFacility(facility, financed));
     },
   };
 };

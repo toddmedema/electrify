@@ -1,5 +1,3 @@
-import { BuildOperatingAreaContext } from "../base/BuildOperatingAreaContext";
-import { gameForOperatingArea } from "../../helpers/Expansion";
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
@@ -36,7 +34,6 @@ import {
 import { getHydroAvailability } from "../../data/HydroSites";
 import { GENERATORS } from "../../data/Facilities";
 import {
-  UtilityAreaId,
   DateType,
   GameType,
   GeneratorShoppingType,
@@ -868,7 +865,6 @@ export interface DispatchProps {
   onBuildGenerator: (
     generator: GeneratorShoppingType,
     financed: boolean,
-    operatingAreaId?: UtilityAreaId,
   ) => void;
   onBack: () => void;
 }
@@ -879,15 +875,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
-  const { onBack } = props;
-  const operatingAreaId = React.useContext(BuildOperatingAreaContext);
-  const game = React.useMemo(
-    () =>
-      operatingAreaId
-        ? (gameForOperatingArea(props.game, operatingAreaId) ?? props.game)
-        : props.game,
-    [props.game, operatingAreaId],
-  );
+  const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readCash = useBuildCashReader(now?.cash ?? 0);
   const listRef = useToolScroll<HTMLUListElement>("generators.scroll");
@@ -1198,9 +1186,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
                     selection === undefined
                       ? g
                       : withResilienceOptions(g, game, selection);
-                  if (operatingAreaId)
-                    props.onBuildGenerator(selected, financed, operatingAreaId);
-                  else props.onBuildGenerator(selected, financed);
+                  props.onBuildGenerator(selected, financed);
                   (completeBuild ?? onBack)();
                 }}
               />

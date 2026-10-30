@@ -53,31 +53,31 @@ records via Open-Meteo for Burlington (44.4759, -73.2121), Rutland (43.6106,
 -72.9726) and White River Junction (43.6489, -72.3193). Each binary contains
 13,248 hourly observations of the game's representative monthly days. All three
 records resolve to `America/New_York`; all locations have `VT` state metadata and
-therefore use the shared fuel-heating archetype. Browser, worker, headless and
-offline data entry points load all three records for Burlington. The shared
-runtime retains its established 2019 historical cutoff; subsequent play uses
+therefore use the shared fuel-heating archetype. The merged company uses
+Burlington weather for its one operating area. The other records remain authored
+location data. The shared runtime retains its established 2019 historical cutoff; subsequent play uses
 seeded weather forecasts, while the downloaded later observations remain on disk.
 
-Calibration fixes each area's accounts, disables customer switching and growth,
-and uses neutral pricing. It evaluates the real `areaBaselineDemand` and
+Seller-profile calibration fixes each utility's accounts, disables customer
+switching and growth, and uses neutral pricing. It evaluates the real `areaBaselineDemand` and
 `demandByTypeAt` helpers at every quarter-hour of the 2005 weather. Structural
 end-use growth is frozen while fitting. Shape exponent is fitted to peak/mean;
 scale is fitted second to annual delivered energy, using the game's normal
 representative-day annualization. Account counts are never fitting parameters.
 
-| Area      | Accounts / addressable pool |    Demand exponent |       Demand scale | Fitted annual MWh | Fitted peak MW |
+| Utility   | Accounts / addressable pool |    Demand exponent |       Demand scale | Fitted annual MWh | Fitted peak MW |
 | --------- | --------------------------: | -----------------: | -----------------: | ----------------: | -------------: |
 | Champlain |            90,000 / 180,000 | 1.1099837624991467 |  6.595735259684209 |         2,000,000 |            352 |
 | Valley    |           159,000 / 318,000 | 1.1856851657201783 | 4.1378209720279155 |         2,200,000 |            406 |
 | Ridge     |            50,000 / 100,000 | 0.9882172536490237 |  5.877229717601884 |         1,000,000 |            160 |
 
 `src/data/UtilityExpansion.test.ts` checks annual energy within 5% and peak within
-10%. Explicit sector mixes retain each sector's daily profile rather than being
-renormalized away at every tick, so Ridge's larger industrial share is steadier.
+10%. The acquired portfolio contributes to one combined demand profile and sector
+mix; it does not keep its own customer population, weather or dispatch.
 Old callers retain their original demand calculation exactly. Later regional
 end-use trends continue normally; no data-center or mining block is scheduled.
-The locations share correlated Vermont weather: owning another utility does not
-guarantee weather diversification.
+Acquired facilities join the existing fleet and use the same operating-area
+weather. Acquisitions do not add weather diversification.
 
 Existing Champlain and Valley hydro plants have bounded, explicitly fictional
 inherited inventory claims. The catalogue provenance names the issue rather than
@@ -85,53 +85,35 @@ claiming these are researched historical sites. No new conventional hydro,
 pumped hydro, geothermal or inland offshore wind is offered. Acquired reservoirs
 activate at half full.
 
-## Balance and regression evidence
+## One combined company
 
-The reusable fixture is `src/testing/UtilityExpansionBalanceFixtures.ts`; the
-runner is `src/testing/UtilityExpansionBalance.sim.test.tsx`. Routine CI runs eight
-representative full-term cases and audits residual values at all five
-difficulties. The full authoring matrix uses seeds 12345, 1 and 7 at every
-difficulty, covering 195 runs: a line-only control and unprepared financed
-acquisition for each target; firm and mixed portfolios with both cash and loan
-purchases for each target; and a financed acquisition of both utilities.
+An acquisition adds the seller's current customers and addressable market once.
+After that transfer there is one customer count, one demand profile, one fleet,
+one policy ledger and one dispatch calculation. All generation and storage can
+serve the combined load. There are no service-area selectors, separate customer
+retention tests or internal transfer-capacity constraints.
 
-```sh
-ELECTRIFY_EXPANSION_BALANCE=full \
-ELECTRIFY_EXPANSION_BALANCE_REPORT=/tmp/electrify-expansion-balance.json \
-npm run test:once -- UtilityExpansionBalance --runInBand
-```
+The combined demand profile blends the authored portfolios using their fixed
+customer counts to weight demand scale and shape. Sector shares use customer
+counts multiplied by demand scale. The resulting composition applies to one
+evolving company customer count and Burlington weather. Customer switching and
+growth apply to the whole company. Existing customer-program installations, stored
+energy, incentives and historical benefits are preserved at their actual amounts;
+buying customers does not install another copy of that equipment.
 
-The identical annual tariff strategy follows the existing competitor benchmark
-from the initial $0.105/kWh for every case. Lines begin at month 0; the first
-financed purchase occurs at month 96 (January 2013). Cash strategies buy at month
-100 (May 2013), reserving working capital for a cheaper 150 MW local gas peaker
-instead of the first CC unit. These are distinct purchase and construction plans,
-not an isolated comparison of borrowing costs. The firm portfolio adds 100 MW
-Champlain gas CC units at months 0, 60 and 144, plus 150 MW local gas CC units in
-the acquired area at months 96 and 156 when financed; cash plans replace the
-month-96 CC with the month-100 peaker. The mixed portfolio replaces the month-60
-unit with 200 MW wind and the month-156 unit with 300 MW local wind. The both-target
-case also buys Ridge at month 108 and builds its local 150 MW CC units at months
-108 and 168. All construction follows ordinary financing and lead times. Original
-Champlain oil A retires at month 180; acquired oil assets retire at month 216.
-Controls omit acquisition deliberately; unprepared cases omit added generation.
+Acquisition receipts retain target identity and timing for purchased-power
+contracts, retirement obligations and transaction validation. Corporate borrowing
+and the non-resellable service-network assets remain in their financial ledgers.
+They do not track separate operating customer populations. Network impairment
+uses combined company retention while each asset keeps its purchase vintage and
+480-month depreciation schedule.
 
-Reports separate physical survival from mission completion, and explicitly mark
-whether a run reached the 2017 supply reduction, 2023 acquired-oil deadline and
-2024 retention evaluation. An early loss is not evidence about a later event.
-Local meters retain delivered energy, demand, gross imports (including physical
-internal support), emissions and the worst constrained margin. Consolidated
-imports remove internal transfers, while network and debt costs remain booked
-once. The report records its generated simulation compatibility ID and base
-revision; full matrices must be regenerated when relevant behavior changes.
-
-On prefinal commit `0c9d62bc`, the initial CEO Valley cash plan at month 96 could not fund both acquisition and
-the first CC: it left $27.22–28.07M for firm portfolios against roughly $49.8M
-down, while mixed portfolios were $1.33–2.23M short of the acquisition itself.
-Waiting until January 2014 made both transactions affordable but left the new
-plant unfinished during 2016 shortages. The May 2013 cash/peaker plan clears
-both working-capital and construction constraints without changing source
-prices, difficulty, tariff strategy or reliability rules.
+The end-of-2024 retention goal is 90% of the original 90,000 customers plus the
+customers transferred in purchases before that evaluation. A purchase during
+Keep playing does not rewrite an already recorded mission result. The original
+Oil A and acquired original oil retirement deadlines remain unchanged. Valley's
+nuclear purchase still drops from 160 MW to 80 MW in January 2017, and all bounded
+purchased-power rights serve the combined company without external resale.
 
 Inherited Ridge gas keeps a fixed $147,475 opening cold-weather package value,
 quoted by the normal winterization owner for 100 MW in January 2005. This authored
@@ -145,52 +127,21 @@ customizable. Its four obligations are inherited unless the package replaces
 them. Importing only its official arc into another base adds no global shock:
 utility ownership and dated seller contracts belong to the expansion base.
 
-## Production bundle budget
+## Verification and balance
 
-Compared with dependency commit `86850f16`, the frozen production build adds
-36.10 kB gzip across all JavaScript (2.30%), from 1566.29 to
-1602.39 kB. The increase is the operating-area engine, catalog, acquisition UI and
-save validator, including the existing simulation worker variants; it adds no npm
-dependencies. The total-JavaScript budget increases by exactly those 36,098 bytes
-to retain its existing headroom. Main JavaScript, CSS, tick-performance ceilings
-and the 10% bundle tolerance remain unchanged.
+The reusable fixture is `src/testing/UtilityExpansionBalanceFixtures.ts`; the
+runner is `src/testing/UtilityExpansionBalance.sim.test.tsx`. Full authoring
+coverage uses seeds 12345, 1 and 7 at every difficulty: each target with cash and
+financed purchases, firm and mixed portfolios, line-only and unprepared controls,
+and an optional purchase of both targets.
 
-## Measured balance results
+```sh
+ELECTRIFY_EXPANSION_BALANCE=full \
+ELECTRIFY_EXPANSION_BALANCE_REPORT=/tmp/electrify-expansion-balance.json \
+npm run test:once -- UtilityExpansionBalance --runInBand
+```
 
-Integrated revision `20739447`, compatibility `rules-1-cc10b5a4703425ac478d93c5d771ab3826120f4c401bbecfc29b855ad4ef37be`. All **200 tests passed**: 195 full campaign runs plus five residual-value audits, across every difficulty and seeds 12345, 1 and 7. Runtime revision `9b26f534` has identical simulation inputs to the integrated revision.
-
-- **135/135 prepared routes** completed December 2024 and every required objective, covering both targets, cash/loan purchases, firm/mixed portfolios and both-target expansion. All reached January 2017 and both retirement deadlines; Valley-owned cases experienced the supply reduction.
-- All **795 planned plant builds** and **180 purchases** were accepted at their scheduled month, in the correct operating area and payment mode. Zero simulation invariants failed; local/company delivered and demanded energy reconcile within **0.969 Wh** over full campaigns.
-- Overall: **143/195 mission wins**, **180/195 physical survivals**. All 30 line-only controls physically survived but failed the acquisition mission. Unprepared acquisitions: Valley 0/15 mission wins and 7/15 physical survivals; Ridge 8/15 wins/survivals. Early failures began at month 140; only 9/15 unprepared runs per target completed January 2017, so the earlier losses establish nothing about the later supply cut.
-
-The same annual competitor-benchmark tariff applies. Financed routes buy and start a 150 MW local CC in January 2013. Cash routes buy and start a lower-upfront-cost 150 MW peaker in May 2013; both-target expansion buys Ridge in January 2014. Cash/loan rows are disclosed practical construction plans, not a pure borrowing-cost experiment. Earlier January shortfall figures in the detailed report are explicitly historical diagnostics from prefinal `0c9d62bc`, not affordability claims about the final climate-corrected source.
-
-### CEO, seed 12345
-
-Money is closing nominal $M; energy covers the full reached campaign. CO₂e includes operating/imported emissions plus new construction. Negative margins show constrained shortfalls, so completion does not mean zero outages.
-
-| Plan             | Cash $M | Debt $M | Net worth $M | Demand / served TWh | External imports TWh | CO₂e Mt |
-| ---------------- | ------- | ------- | ------------ | ------------------- | -------------------- | ------- |
-| Valley firm loan | 3,331.4 | 1,089.0 | 3,697.0      | 82.839 / 82.802     | 56.973               | 9.330   |
-| Ridge firm loan  | 3,094.6 | 916.6   | 3,433.2      | 66.110 / 66.105     | 36.169               | 10.692  |
-| Both firm loan   | 3,763.5 | 1,761.5 | 4,255.9      | 97.031 / 96.995     | 59.475               | 13.847  |
-
-Local meters cover each area’s ownership period. Local imports include internal support and must not be added to company imports.
-
-| Plan             | Area            | Final accounts | Demand / served TWh | Gross imports TWh | CO₂e Mt | Worst margin MW |
-| ---------------- | --------------- | -------------- | ------------------- | ----------------- | ------- | --------------- |
-| Valley firm loan | champlain       | 137,975        | 51.047 / 51.047     | 33.444            | 5.930   | 0.1             |
-| Valley firm loan | valley-electric | 211,219        | 31.792 / 31.755     | 23.566            | 3.406   | -141.2          |
-| Ridge firm loan  | champlain       | 137,975        | 51.047 / 51.047     | 33.433            | 5.923   | 0.1             |
-| Ridge firm loan  | ridge-electric  | 70,258         | 15.063 / 15.058     | 2.742             | 4.770   | -23.5           |
-| Both firm loan   | champlain       | 137,969        | 51.046 / 51.046     | 33.448            | 5.938   | 0.1             |
-| Both firm loan   | valley-electric | 213,666        | 32.002 / 31.971     | 23.560            | 3.478   | -141.2          |
-| Both firm loan   | ridge-electric  | 70,396         | 13.982 / 13.979     | 2.520             | 4.440   | -28.0           |
-
-### Sixty matched target comparisons
-
-Pairing the same difficulty, seed, portfolio and payment plan, Valley finished with **$193.3–763.2M more net worth**, **$61.7–174.6M more debt**, **19.62–21.09 TWh more external imports**, and **114.0–184.4 MW worse minimum constrained margin** in every pair. Its recorded CO₂e per served MWh was lower in 60/60 pairs; absolute emissions were lower in 57/60. Ridge therefore did not dominate these controlled examples. The strategies are not an optimization search, so the result does not establish a universally best choice.
-
-All five difficulty audits keep acquired generator residuals below enterprise consideration: Valley $66.3–110.6M versus $610M EV; Ridge $149.5–249.1M versus $360M EV. The remainder is the non-resellable service network.
-
-Reproduce the full report with `ELECTRIFY_EXPANSION_BALANCE=full ELECTRIFY_EXPANSION_BALANCE_REPORT=/tmp/electrify-expansion-balance.json npm run test:once -- UtilityExpansionBalance --runInBand`. The generated JSON retains schedules, actual receipts, per-area meters, finances, cohort retention, objectives and event reachability.
+Reports record company-wide energy, finances, customer retention, accepted
+transactions, timed obligations and outcomes. Early losses are not evidence about
+later events. Current-format saves persist the aggregate customer and market
+totals, transaction and financial ledgers, and one forecast timeline.

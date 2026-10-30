@@ -1,21 +1,20 @@
-import { isStorage } from "../Types";
+import {
+  isStorage,
+  type AcquireUtilityAction,
+  type AcquisitionLoan,
+  type FacilityOperatingType,
+  type GameType,
+  type UtilityId,
+  type UtilityTargetId,
+  type UtilityNetworkAsset,
+} from "../Types";
 import { isUtilityExpansionGame } from "./ExpansionContext";
 import {
-  transmissionRatingW,
   intertieContextForGame,
   importAvailabilityFraction,
   adjacentMarketPricePerMWh,
 } from "./Transmission";
 import { importEmissionsKgco2ePerMWh } from "../data/ImportEmissions";
-import type {
-  AcquireUtilityAction,
-  AcquisitionLoan,
-  FacilityOperatingType,
-  GameType,
-  OperatingAreaState,
-  UtilityAreaId,
-  UtilityTargetId,
-} from "../Types";
 import { DAYS_PER_YEAR, DIFFICULTIES, LOAN_MONTHS } from "../Constants";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
 import {
@@ -39,47 +38,56 @@ import { customerMarketSizeAt } from "./Customers";
 import { startingFacilityQuote } from "./StartingFacilities";
 import { startingFacilityStarts } from "./StartingFacilityStarts";
 import { windAnnualOutputDegradation } from "../data/Facilities";
-import { emptyPolicies } from "./Policies";
+import {
+  buildoutComplete,
+  isOperatingPolicy,
+  programCustomers,
+} from "./Policies";
 
 export function acquisitionTargetForCorridor(corridorId: string) {
   return UTILITY_TARGETS.find((target) => target.corridorId === corridorId);
 }
-export function ownedUtility(game: GameType, targetId: string): boolean {
-  return !!game.utilityExpansion?.areas.some((area) => area.id === targetId);
+export function ownedUtility(
+  game: Pick<GameType, "utilityExpansion">,
+  targetId: string,
+): boolean {
+  return (
+    !!game.utilityExpansion &&
+    (targetId === "champlain" ||
+      game.utilityExpansion.acquisitions.some(
+        (receipt) => receipt.targetId === targetId,
+      ))
+  );
 }
-export function initialOperatingArea(): OperatingAreaState {
-  return {
-    id: "champlain",
-    customers: 90000,
-    transferredCustomers: 90000,
-    customerMarketSize: 180000,
-    activatedMinute: 0,
-    networkInitialValue: 0,
-    retentionLowWatermark: 1,
-  };
+/** Immutable transfer receipts extend the one company's retention benchmark. */
+export function expansionRetentionBaseline(
+  game: Pick<GameType, "utilityExpansion">,
+  beforeMinute = Infinity,
+): number {
+  return (
+    UTILITY_AREAS.champlain.customers +
+    (game.utilityExpansion?.acquisitions.reduce(
+      (sum, receipt) =>
+        sum +
+        (receipt.minute < beforeMinute ? receipt.transferredCustomers : 0),
+      0,
+    ) ?? 0)
+  );
 }
-/** The pre-purchase seller advances from January 2005 exactly once. */
-export function sellerCustomers(targetId: UtilityAreaId, minute: number) {
+/** Sellers grow neutrally until the dated transfer; they are never separately simulated. */
+export function sellerCustomers(targetId: UtilityId, minute: number) {
   return customerMarketSizeAt(UTILITY_AREAS[targetId].customers, minute);
 }
-export function operatingAreaPool(area: OperatingAreaState, minute: number) {
-  return customerMarketSizeAt(
-    area.customerMarketSize,
-    Math.max(0, minute - area.activatedMinute),
-  );
-}
 export function networkCarryingValue(
-  area: OperatingAreaState,
+  asset: UtilityNetworkAsset,
   minute: number,
 ): number {
-  const months = Math.max(
-    0,
-    (minute - area.activatedMinute) / MINUTES_PER_MONTH,
-  );
+  if (minute < asset.activatedMinute) return 0;
+  const months = (minute - asset.activatedMinute) / MINUTES_PER_MONTH;
   return (
-    area.networkInitialValue *
+    asset.initialValue *
     Math.max(0, 1 - months / 480) *
-    area.retentionLowWatermark
+    asset.retentionLowWatermark
   );
 }
 export function expansionNetWorth(
@@ -87,8 +95,8 @@ export function expansionNetWorth(
   minute: number,
 ): number {
   return (
-    (game.utilityExpansion?.areas.reduce(
-      (sum, area) => sum + networkCarryingValue(area, minute),
+    (game.utilityExpansion?.networkAssets.reduce(
+      (sum, asset) => sum + networkCarryingValue(asset, minute),
       0,
     ) ?? 0) -
     (game.utilityExpansion?.loans.reduce(
@@ -110,7 +118,6 @@ export function acquisitionAssets(
     // Existing seller equipment keeps its authored protection even in an unscored sandbox.
     storyEffectsDisabled: false,
     weatherHazardsDisabled: false,
-    operatingAreaId: undefined,
     utilityExpansion: undefined,
     location: definition.location,
     commissionedHydroSiteIds: [],
@@ -136,7 +143,6 @@ export function acquisitionAssets(
     result.push({
       ...technology,
       startingAssetId: search.assetId,
-      operatingAreaId: targetId,
       hydroSiteId: search.hydroSiteId ?? quote.hydroSiteId,
       ...(quote.fuel === "Wind"
         ? { annualOutputDegradation: windAnnualOutputDegradation(2005 - age) }
@@ -293,7 +299,7 @@ export function validAcquisitionAction(
     typeof action.quoteKey === "string"
   );
 }
-/** Mutates only after every eligibility, quote, asset and cash guard has passed. */
+/** Every guard passes before ownership, money, equipment or the shared customer pool changes. */
 export function transferUtility(game: GameType, value: unknown): boolean {
   if (!validAcquisitionAction(value)) return false;
   const quote = acquisitionQuote(game, value.targetId);
@@ -309,6 +315,7 @@ export function transferUtility(game: GameType, value: unknown): boolean {
   if (now.cash < due) return false;
   const assets = acquisitionAssets(game, value.targetId);
   if (!assets) return false;
+  const oldProgramCustomers = programCustomers(game);
   const loan = (
     kind: AcquisitionLoan["kind"],
     principal: number,
@@ -325,41 +332,30 @@ export function transferUtility(game: GameType, value: unknown): boolean {
     months,
     minuteCreated: game.date.minute,
   });
-  const area: OperatingAreaState = {
-    id: value.targetId,
-    customers: quote.customers,
-    transferredCustomers: quote.customers,
-    customerMarketSize: quote.addressablePool,
-    activatedMinute: game.date.minute,
-    networkInitialValue: quote.networkInitialValue,
-    retentionLowWatermark: 1,
-    policies: emptyPolicies(game.date.monthsElapsed),
-  };
-  // Choices carry forward; installed hardware and historical incentives do not.
-  if (game.policies && area.policies)
-    for (const id of Object.keys(
-      area.policies.programs,
-    ) as (keyof typeof area.policies.programs)[]) {
-      area.policies.programs[id].tier = game.policies.programs[id].tier;
-      area.policies.programs[id].startHour =
-        game.policies.programs[id].startHour;
-      area.policies.programs[id].pending = game.policies.programs[id]
-        .pending && { ...game.policies.programs[id].pending };
-    }
   now.cash -= due;
   now.customers += quote.customers;
-  game.utilityExpansion.areas.push(area);
-  game.customerMarketSize = game.utilityExpansion.areas.reduce(
-    (sum, entry) =>
-      sum +
-      entry.customerMarketSize / customerMarketSizeAt(1, entry.activatedMinute),
-    0,
-  );
   game.utilityExpansion.acquisitions.push({
     targetId: value.targetId,
     minute: game.date.minute,
     financed: value.financed,
+    transferredCustomers: quote.customers,
   });
+  game.customerMarketSize =
+    UTILITY_AREAS.champlain.addressablePool +
+    game.utilityExpansion.acquisitions.reduce(
+      (sum, receipt) => sum + UTILITY_AREAS[receipt.targetId].addressablePool,
+      0,
+    );
+  const network: UtilityNetworkAsset = {
+    targetId: value.targetId,
+    activatedMinute: game.date.minute,
+    initialValue: quote.networkInitialValue,
+    retentionLowWatermark: Math.min(
+      1,
+      now.customers / expansionRetentionBaseline(game),
+    ),
+  };
+  game.utilityExpansion.networkAssets.push(network);
   game.utilityExpansion.loans.push(
     loan("assumed", quote.assumedDebt, 0.05, 240),
   );
@@ -368,136 +364,98 @@ export function transferUtility(game: GameType, value: unknown): boolean {
       loan("purchase", quote.newLoan, game.interestRate, LOAN_MONTHS),
     );
   game.facilities.push(...assets);
-  assets.forEach((asset) => {
+  for (const asset of assets)
     if (
       asset.hydroSiteId &&
       !game.commissionedHydroSiteIds.includes(asset.hydroSiteId)
     )
       game.commissionedHydroSiteIds.push(asset.hydroSiteId);
-  });
-  now.netWorth -= quote.fee;
+  const ratio = oldProgramCustomers / programCustomers(game);
+  for (const [id, program] of Object.entries(game.policies?.programs ?? {})) {
+    if (isOperatingPolicy(id as import("../Types").PolicyId)) continue;
+    program.adoption *= ratio;
+    if (program.installs)
+      program.installs = program.installs.map(([month, share]) => [
+        month,
+        share * ratio,
+      ]);
+    if (!buildoutComplete(program.adoption)) delete program.completedMonth;
+  }
+  const target = UTILITY_TARGETS.find(
+    (target) => target.id === value.targetId,
+  )!;
+  const line = game.transmission?.lines.find(
+    (line) => line.corridorId === target.corridorId,
+  );
+  if (line) {
+    line.paused = false;
+    line.currentFlowW = 0;
+  }
+  now.netWorth +=
+    networkCarryingValue(network, game.date.minute) -
+    network.initialValue -
+    quote.fee;
   return true;
 }
 
-/** Finite source rights are separate from sellable generators and acquisition corridors. */
+/** Owned source rights serve one company load, with each package's own finite interface. */
 export function entitlementSources(
   game: GameType,
   now: import("../Types").TickPresentFutureType,
-): { capacityW: number; pricePerMWh: number; emissionsKgPerMWh: number }[] {
-  if (!game.operatingAreaId) return [];
-  const definition = UTILITY_AREAS[game.operatingAreaId];
+): {
+  id: string;
+  utilityId: UtilityId;
+  capacityW: number;
+  pricePerMWh: number;
+  emissionsKgPerMWh: number;
+}[] {
+  if (!game.utilityExpansion) return [];
   const date = getDateFromMinute(now.minute, 2005);
   const index = hasEconomy() ? getInflationIndex(date, 2005, game.seed) : 1;
-  let interfaceLeft = definition.sourceInterfaceW;
-  return utilityEntitlementsAt(game.operatingAreaId, date.year).map(
-    (source) => {
-      const context = intertieContextForGame(game);
-      const balancingCorridor = "vt-champlain-valley";
-      const availability = source.balancing
-        ? importAvailabilityFraction(
-            balancingCorridor,
-            context,
-            now.minute,
-            now,
-          )
-        : source.deliverability;
-      const capacityW = Math.min(interfaceLeft, source.nominalW * availability);
-      interfaceLeft -= capacityW;
-      return {
-        capacityW,
-        pricePerMWh: source.balancing
-          ? adjacentMarketPricePerMWh(
-              balancingCorridor,
-              context,
-              now.minute,
-              now,
-            ) *
-            (source.pricePerMWh / 60)
-          : source.pricePerMWh * index,
-        emissionsKgPerMWh:
-          source.emissionsKgPerMWh ??
-          (source.marketId
-            ? importEmissionsKgco2ePerMWh(source.marketId, date.year)
-            : 0),
-      };
-    },
+  const active = new Set(
+    game.utilityExpansion.acquisitions
+      .filter((receipt) => receipt.minute <= now.minute)
+      .map((receipt) => receipt.targetId),
   );
-}
-
-const operatingAreaTimelines = new WeakMap<
-  GameType["timeline"],
-  Map<UtilityAreaId, GameType["timeline"]>
->();
-function operatingAreaTimeline(
-  state: GameType,
-  area: OperatingAreaState,
-): GameType["timeline"] {
-  let cached = operatingAreaTimelines.get(state.timeline);
-  if (!cached) {
-    cached = new Map();
-    operatingAreaTimelines.set(state.timeline, cached);
-  }
-  let timeline = cached.get(area.id);
-  if (!timeline) {
-    timeline = state.timeline.map(
-      (tick) =>
-        tick.areaTicks?.[area.id] ?? {
-          ...tick,
-          areaTicks: undefined,
-          customers: area.customers,
-        },
-    );
-    cached.set(area.id, timeline);
-  }
-  return timeline;
-}
-
-/** Scope the existing engine to one owned area instead of inventing a second model. */
-export function operatingAreaView(
-  state: GameType,
-  area: OperatingAreaState,
-): GameType {
-  const definition = UTILITY_AREAS[area.id];
-  return {
-    ...state,
-    operatingAreaId: area.id,
-    location: definition.location,
-    startingDemandScale: definition.demandScale,
-    demandShapeExponent: definition.demandShapeExponent,
-    customerMarketSize:
-      area.customerMarketSize / customerMarketSizeAt(1, area.activatedMinute),
-    policies: area.id === "champlain" ? state.policies : area.policies,
-    facilities: state.facilities.filter(
-      (f) => (f.operatingAreaId ?? "champlain") === area.id,
+  const ids: UtilityId[] = [
+    "champlain",
+    ...UTILITY_TARGETS.filter((target) => active.has(target.id)).map(
+      (target) => target.id,
     ),
-    transmission: area.id === "champlain" ? state.transmission : undefined,
-    timeline: operatingAreaTimeline(state, area),
-  };
-}
-export function gameForOperatingArea(
-  state: GameType,
-  id: UtilityAreaId,
-): GameType | undefined {
-  const area = state.utilityExpansion?.areas.find((entry) => entry.id === id);
-  return area ? operatingAreaView(state, area) : undefined;
-}
-
-/** Owned endpoints use the physical wire, replacing external market-access entitlements. */
-export function ownedIntertieCapacityW(
-  game: GameType,
-  line: import("../Types").TransmissionLineOperatingType,
-  tick: import("../Types").TickPresentFutureType,
-): number {
-  const target = acquisitionTargetForCorridor(line.corridorId);
-  if (
-    !target ||
-    !ownedUtility(game, target.id) ||
-    line.paused ||
-    line.yearsToBuildLeft > 0
-  )
-    return 0;
-  return Math.min(
-    transmissionRatingW(line, tick.areaTicks?.champlain ?? tick),
-    transmissionRatingW(line, tick.areaTicks?.[target.id] ?? tick),
-  );
+  ];
+  return ids
+    .flatMap((id) => {
+      let interfaceLeft = UTILITY_AREAS[id].sourceInterfaceW;
+      return utilityEntitlementsAt(id, date.year).map((source) => {
+        const context = intertieContextForGame(game);
+        const corridor = "vt-champlain-valley";
+        const availability = source.balancing
+          ? importAvailabilityFraction(corridor, context, now.minute, now)
+          : source.deliverability;
+        const capacityW = Math.min(
+          interfaceLeft,
+          source.nominalW * availability,
+        );
+        interfaceLeft -= capacityW;
+        return {
+          id: source.id,
+          utilityId: id,
+          capacityW,
+          pricePerMWh: source.balancing
+            ? adjacentMarketPricePerMWh(corridor, context, now.minute, now) *
+              (source.pricePerMWh / 60)
+            : source.pricePerMWh * index,
+          emissionsKgPerMWh:
+            source.emissionsKgPerMWh ??
+            (source.marketId
+              ? importEmissionsKgco2ePerMWh(source.marketId, date.year)
+              : 0),
+        };
+      });
+    })
+    .sort(
+      (a, b) =>
+        a.pricePerMWh - b.pricePerMWh ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
 }

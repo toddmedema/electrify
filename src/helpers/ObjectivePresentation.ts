@@ -27,7 +27,6 @@ export function objectiveValueText(
 ): string {
   switch (objective.metric) {
     case "customerRetention":
-    case "cohortRetention":
     case "localFuelShare":
       return number(value, comparison, true);
     case "emissionsBudget":
@@ -75,9 +74,7 @@ export function objectiveTargetText(objective: CompiledRuleObjective): string {
   const target = objectiveValueText(objective, objectiveTarget(objective));
   switch (objective.metric) {
     case "customerRetention":
-      return `Retain ≥${target} of starting customers`;
-    case "cohortRetention":
-      return `Retain ≥${target} in every operating area`;
+      return `Retain ≥${target} of customers`;
     case "utilityOwnership":
       return objective.label;
     case "assetRetirement":

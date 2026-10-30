@@ -1,6 +1,3 @@
-import { Provider } from "react-redux";
-import { configureStore } from "@reduxjs/toolkit";
-import uiReducer from "../../reducers/UI";
 import * as React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import cloneDeep from "lodash.clonedeep";
@@ -14,7 +11,7 @@ import {
   retrofitCost,
 } from "../../helpers/Hazards";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { FacilityOperatingType, GameType, isStorage } from "../../Types";
+import { FacilityOperatingType, GameType } from "../../Types";
 import userEvent from "@testing-library/user-event";
 import FacilityDetails from "./FacilityDetails";
 import { UnitsContext } from "./UnitsContext";
@@ -470,31 +467,4 @@ describe("weather resilience details", () => {
     showDetails(game, gas || withSolar(game));
     expect(screen.queryByRole("region", { name: "Upgrades" })).toBeNull();
   });
-});
-
-it("reports hydro inflow from the plant's operating area", () => {
-  const game = createGame({ scenarioId: 116 });
-  const hydro = game.facilities.find((facility) => facility.fuel === "Hydro")!;
-  if (isStorage(hydro))
-    throw new Error("Expected an operating hydro generator");
-  const facility: FacilityOperatingType = {
-    ...hydro,
-    operatingAreaId: "valley-electric",
-    hydroWhPerMm: 1e6,
-  };
-  const tick = game.timeline.find(
-    (frame) => frame.minute === game.date.minute,
-  )!;
-  tick.hydroRunoffMm = 200;
-  tick.areaTicks = {
-    ...tick.areaTicks,
-    "valley-electric": { ...tick, areaTicks: undefined, hydroRunoffMm: 2 },
-  };
-  const store = configureStore({ reducer: { ui: uiReducer } });
-  render(
-    <Provider store={store}>{details(game, facility, jest.fn())}</Provider>,
-  );
-  const water = screen.getByRole("region", { name: "Water" });
-  expect(water).toHaveTextContent(/Inflow this month\s*2MWh/);
-  expect(water).not.toHaveTextContent(/Inflow this month\s*200MWh/);
 });

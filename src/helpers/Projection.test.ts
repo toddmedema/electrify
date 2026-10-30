@@ -215,8 +215,8 @@ it("forecasts weather and its demand effects instead of revealing the future rec
   expect(JSON.stringify(game)).toBe(before);
 });
 
-it("projects acquisition obligations and corporate debt from cloned area facts", () => {
-  let game = cloneDeep(createGame({ scenarioId: 116, seed: 12345 }));
+function acquiredGame(seed = 12345) {
+  let game = cloneDeep(createGame({ scenarioId: 116, seed }));
   game.timeline[0].cash = 1e9;
   game = cloneDeep(
     reducer(
@@ -239,24 +239,29 @@ it("projects acquisition obligations and corporate debt from cloned area facts",
       }),
     ),
   );
+  return game;
+}
+
+it("projects acquisition obligations and corporate debt from the combined company", () => {
+  const game = acquiredGame();
   const before = JSON.stringify(game);
   const projection = selectProjection(game, game.timeline[0]);
+  expect(projection.forecast[0].customers).toBe(game.timeline[0].customers);
   expect(projection.objectiveAssets!.length).toBeGreaterThan(0);
   const opening = projection.objectiveAssets![0];
   expect(opening.ownedUtilities).toEqual(["ridge-electric"]);
   expect(opening.ownedAssetIds).toContain("scenario-116-champlain-oil-a");
-  expect(opening.minimumCohortRetention).toBeGreaterThan(0);
   expect(opening.debtPrincipal).toBeGreaterThan(250e6);
   expect(JSON.stringify(game)).toBe(before);
 });
 
-it("reuses a running operating-area forecast between decisions and month rollovers", () => {
-  const game = cloneDeep(createGame({ scenarioId: 116, seed: 7 }));
+it("reuses a running company forecast between decisions and month rollovers", () => {
+  const game = acquiredGame(7);
   const initial = selectProjection(game, game.timeline[0]);
   expect(generate).toHaveBeenCalledTimes(1);
   game.date = getDateFromMinute(15, game.startingYear);
-  game.utilityExpansion!.areas[0].customers -= 1;
-  game.utilityExpansion!.areas[0].retentionLowWatermark = 0.999;
+  game.timeline[0].customers -= 1;
+  game.utilityExpansion!.networkAssets[0].retentionLowWatermark = 0.999;
   expect(selectProjection(game, game.timeline[0])).toBe(initial);
   expect(generate).toHaveBeenCalledTimes(1);
   game.date = getDateFromMinute(MINUTES_PER_MONTH, game.startingYear);

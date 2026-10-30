@@ -65,9 +65,7 @@ for (const theme of ["light", "dark"] as const) {
         await expect(scoring).toContainText("Environmental impact");
         await expect(requirements).not.toContainText("points");
         if (scenario.id === 100) {
-          await expect(requirements).toContainText(
-            "Retain ≥80% of starting customers",
-          );
+          await expect(requirements).toContainText("Retain ≥80% of customers");
         }
         await expect(requirements).toContainText(
           "Serving less than 95% of demand for 3 months in a row ends the run.",
@@ -142,7 +140,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       if (scenario.id === 100) {
         await expect(dialog).toContainText(
-          "Retain ≥80% of starting customers · Dec 2031",
+          "Retain ≥80% of customers · Dec 2031",
         );
         await expect(dialog).not.toContainText("Invest in the grid");
       }

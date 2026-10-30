@@ -41,7 +41,7 @@ describe("prefetchScenarioData", () => {
     await prefetchScenarioData({ id: "BurlingtonVT" } as LocationType);
     expect(postMessage).toHaveBeenCalledWith({
       type: "CACHE_SCENARIO_DATA",
-      locationIds: ["BurlingtonVT", "RutlandVT", "WhiteRiverJunctionVT"],
+      locationIds: ["BurlingtonVT"],
     });
   });
 

@@ -53,7 +53,6 @@ export interface ProjectionView {
     | "ownedFuels"
     | "ownedUtilities"
     | "ownedAssetIds"
-    | "minimumCohortRetention"
   >[];
   timeline: TickPresentFutureType[];
   sampled: TickPresentFutureType[];
@@ -164,14 +163,13 @@ export function projectionSignature(game: GameType): string {
     JSON.stringify(
       game.utilityExpansion && {
         acquisitions: game.utilityExpansion.acquisitions,
-        areas: game.utilityExpansion.areas.map((area) => ({
-          id: area.id,
-          transferredCustomers: area.transferredCustomers,
-          pool: area.customerMarketSize,
-          activatedMinute: area.activatedMinute,
-          networkInitialValue: area.networkInitialValue,
-          policies: area.policies,
-        })),
+        networkAssets: game.utilityExpansion.networkAssets.map(
+          ({ targetId, activatedMinute, initialValue }) => ({
+            targetId,
+            activatedMinute,
+            initialValue,
+          }),
+        ),
       },
     ),
     game.creditPremium,
@@ -211,7 +209,6 @@ function buildProjection(
       "fuelRetirement",
       "utilityOwnership",
       "assetRetirement",
-      "cohortRetention",
     ].includes(metric),
   );
   const objectiveAssets: NonNullable<ProjectionView["objectiveAssets"]> = [];
@@ -250,12 +247,6 @@ function buildProjection(
                   ),
                   ownedAssetIds: state.facilities.flatMap((f) =>
                     f.startingAssetId ? [f.startingAssetId] : [],
-                  ),
-                  minimumCohortRetention: Math.min(
-                    1,
-                    ...state.utilityExpansion.areas.map(
-                      (area) => area.customers / area.transferredCustomers,
-                    ),
                   ),
                 }
               : {}),

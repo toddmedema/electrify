@@ -1,4 +1,7 @@
-import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
+import {
+  isUtilityExpansionGame,
+  ownedUtilityConnection,
+} from "../helpers/ExpansionContext";
 import { getScenario } from "./Scenarios";
 import type { FrozenStartingIntertieAccessType, GameType } from "../Types";
 import { validFrozenStartingIntertieScenario } from "../helpers/FrozenStartingInterties";
@@ -16,6 +19,7 @@ export interface IntertieAccessContext {
   scenarioId?: number;
   frozenStartingIntertieAccess?: FrozenStartingIntertieAccessType;
   locationId?: string;
+  ownedUtilityCorridors?: readonly string[];
 }
 export interface ScenarioIntertieAccess {
   scenarioId: number;
@@ -276,11 +280,14 @@ export const SCENARIO_INTERTIE_ACCESS: readonly ScenarioIntertieAccess[] = [
 ];
 export function accessContextForGame(
   game: Pick<GameType, "scenarioId" | "location" | "customScenario"> &
-    Partial<Pick<GameType, "multiplayer">>,
+    Partial<Pick<GameType, "multiplayer" | "utilityExpansion">>,
 ): IntertieAccessContext {
   const custom = game.customScenario;
   return {
     peers: game.multiplayer?.peers,
+    ownedUtilityCorridors: ["vt-champlain-valley", "vt-champlain-ridge"].filter(
+      (id) => ownedUtilityConnection(game, id),
+    ),
     scenarioId: isUtilityExpansionGame(game)
       ? 116
       : game.customScenario
@@ -358,7 +365,7 @@ export function effectiveMarket(
 /** Corridors that can be ordered this year: their path exists and has not been cut off. */
 export function corridorsForGame(
   game: Pick<GameType, "scenarioId" | "location" | "customScenario"> &
-    Partial<Pick<GameType, "multiplayer">> & {
+    Partial<Pick<GameType, "multiplayer" | "utilityExpansion">> & {
       date: Pick<GameType["date"], "year">;
     },
 ) {

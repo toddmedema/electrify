@@ -2,9 +2,7 @@ import * as React from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
-import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
-import cloneDeep from "lodash.clonedeep";
-import { acquisitionQuote, transferUtility } from "../../helpers/Expansion";
+import gameReducer from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import * as client from "../../helpers/PolicyPreviewClient";
@@ -607,89 +605,4 @@ test("solar facts compare a same-size facility and distinguish annual energy fro
     "cash",
   );
   view.unmount();
-});
-
-test("program review separates completed home hardware from a fresh acquired area", () => {
-  let game = createGame({ scenarioId: 116, seed: 12345 });
-  game.policies = emptyPolicies(game.date.monthsElapsed);
-  for (const id of ["efficiency", "solar"] as const)
-    Object.assign(game.policies.programs[id], {
-      tier: "Off",
-      adoption: 1,
-      spent: 2e6,
-      completedMonth: 0,
-    });
-  game = cloneDeep(
-    gameReducer(
-      game,
-      buildTransmissionLine({
-        corridorId: "vt-champlain-valley",
-        financed: true,
-      }),
-    ),
-  );
-  game.transmission!.lines[0].yearsToBuildLeft = 0;
-  const quote = acquisitionQuote(game, "valley-electric")!;
-  expect(
-    transferUtility(game, {
-      targetId: quote.targetId,
-      financed: true,
-      quoteKey: quote.quoteKey,
-    }),
-  ).toBe(true);
-  game.speed = "NORMAL";
-  const store = configureStore({
-    reducer: { game: gameReducer, ui: uiReducer },
-    preloadedState: { game },
-  });
-  const view = render(
-    <Provider store={store}>
-      <ProgramsScreen onClose={jest.fn()} />
-    </Provider>,
-  );
-  expect(store.getState().game.policyPause).toBeDefined();
-  expect(
-    screen.getByRole("button", {
-      name: "Efficiency rebates · Completed Jan 2005",
-    }),
-  ).toBeVisible();
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: "Efficiency rebates · Completed Jan 2005",
-    }),
-  );
-  expect(fact("Total spent")).toBe("$2M");
-  fireEvent.mouseDown(
-    screen.getByRole("combobox", { name: "Program operating area" }),
-  );
-  fireEvent.click(screen.getByRole("option", { name: "Valley Electric" }));
-  expect(
-    screen.getByText(/costs and benefits below are for Valley Electric/),
-  ).toBeVisible();
-  expect(
-    screen.queryByRole("button", { name: /Efficiency rebates · Completed/ }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
-  ).toBeVisible();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Efficiency rebates · Not started" }),
-  );
-  expect(fact("Monthly cost")).toMatch(/^\$[\d.]+[kKMB]?\/mo$/);
-  expect(
-    screen.getByRole("heading", { name: /Estimated company demand/ }),
-  ).toBeVisible();
-  expect(store.getState().game.policyPause).toBeDefined();
-  expect(store.getState().game.speed).toBe("PAUSED");
-  expect(store.getState().game.policies!.programs.solar.adoption).toBe(1);
-  const acquired = store
-    .getState()
-    .game.utilityExpansion!.areas.find(
-      (area) => area.id === "valley-electric",
-    )!;
-  expect(acquired.policies!.programs.solar.adoption).toBe(0);
-  expect(acquired.policies!.programs.solar.spent).toBe(0);
-  view.unmount();
-  expect(store.getState().game.policyPause).toBeUndefined();
-  expect(store.getState().game.speed).toBe("NORMAL");
 });

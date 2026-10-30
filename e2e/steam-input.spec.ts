@@ -928,6 +928,8 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   await expect(line).toContainText("Owned · Ridge Electric");
   const saved = await readSavedGame(page);
   expect(
-    saved?.utilityExpansion?.areas.some((area) => area.id === "ridge-electric"),
+    saved?.utilityExpansion?.acquisitions.some(
+      (receipt) => receipt.targetId === "ridge-electric",
+    ),
   ).toBe(true);
 });

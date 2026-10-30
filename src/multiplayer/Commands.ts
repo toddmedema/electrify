@@ -16,7 +16,6 @@ import type {
   GameType,
   TradingPolicyType,
 } from "../Types";
-import { operatingAreaView } from "../helpers/Expansion";
 import type { gameSlice } from "../reducers/Game";
 import type * as GameActions from "../reducers/GameActions";
 
@@ -94,17 +93,13 @@ const buildFacility: Validator = (game, payload) => {
   const build = payload as {
     facility?: Partial<FacilityShoppingType>;
     financed?: boolean;
-    operatingAreaId?: import("../Types").UtilityAreaId;
   };
   if (!build || !build.facility || typeof build.financed !== "boolean")
     return { error: "That build is unavailable" };
-  if (build.operatingAreaId !== undefined) {
-    const area = game.utilityExpansion?.areas.find(
-      (a) => a.id === build.operatingAreaId,
-    );
-    if (!area) return { error: "Choose an owned operating area" };
-    game = operatingAreaView(game, area);
-  }
+  if (Object.prototype.hasOwnProperty.call(build, "operatingAreaId"))
+    return {
+      error: "Build for the company without an operating-area destination",
+    };
   const requested = build.facility;
   const size = requested.peakWh ?? requested.peakW;
   if (
@@ -140,9 +135,6 @@ const buildFacility: Validator = (game, payload) => {
     payload: {
       facility: quote,
       financed: build.financed,
-      ...(build.operatingAreaId
-        ? { operatingAreaId: build.operatingAreaId }
-        : {}),
     },
   };
 };

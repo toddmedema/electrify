@@ -99,16 +99,15 @@ describe("Across the Valley catalog", () => {
     },
   );
 
-  it("loads each local weather series before any acquisition and preserves distinct observations", () => {
+  it("requires company weather only while retaining the separately sampled playable-city records", () => {
     loadSimData(UTILITY_AREAS.champlain.location);
     expect(hasWeather(UTILITY_AREAS.champlain.location)).toBe(true);
     expect(weatherLocationIds(UTILITY_AREAS.champlain.location)).toEqual([
       "BurlingtonVT",
-      "RutlandVT",
-      "WhiteRiverJunctionVT",
     ]);
-    const temperatures = Object.values(UTILITY_AREAS).map((area) =>
-      Array.from(
+    const temperatures = Object.values(UTILITY_AREAS).map((area) => {
+      loadSimData(area.location);
+      return Array.from(
         { length: 12 },
         (_, month) =>
           getWeather(
@@ -117,8 +116,8 @@ describe("Across the Valley catalog", () => {
             0,
             area.location.id,
           ).TEMP_C,
-      ),
-    );
+      );
+    });
     expect(temperatures[0]).not.toEqual(temperatures[1]);
     expect(temperatures[1]).not.toEqual(temperatures[2]);
   });
@@ -166,7 +165,7 @@ describe("Across the Valley catalog", () => {
   });
 });
 
-it("browser and worker weather initialization awaits every owned-area record", async () => {
+it("browser and worker initialization await the single company weather record", async () => {
   const originalFetch = global.fetch;
   const fetchWeather = jest.fn((input: RequestInfo | URL) => {
     const id = String(input).split("/").at(-1)!;
@@ -191,8 +190,6 @@ it("browser and worker weather initialization awaits every owned-area record", a
     );
     expect(fetchWeather.mock.calls.map(([url]) => url)).toEqual([
       "/data/weather/BurlingtonVT.bin",
-      "/data/weather/RutlandVT.bin",
-      "/data/weather/WhiteRiverJunctionVT.bin",
     ]);
     expect(hasWeather(UTILITY_AREAS.champlain.location)).toBe(true);
     global.fetch = jest.fn(() =>

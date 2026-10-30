@@ -2,11 +2,9 @@ import cloneDeep from "lodash.clonedeep";
 import { TICKS_PER_MONTH, TICK_MINUTES, YEARS_PER_TICK } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { POLICIES } from "../data/Policies";
-import { getScenario } from "../data/Scenarios";
 import { UTILITY_TARGETS } from "../data/UtilityExpansion";
 import { customerBatteryFleet } from "../helpers/CustomerBatteries";
-import { getMarketRate } from "../helpers/Customers";
-import { acquisitionQuote, gameForOperatingArea } from "../helpers/Expansion";
+import { acquisitionQuote } from "../helpers/Expansion";
 import { currentTick } from "../helpers/GameSelectors";
 import { programCustomers } from "../helpers/Policies";
 import { previewPolicy } from "../helpers/PolicyPreview";
@@ -62,22 +60,36 @@ function buy(game: GameType, targetId: UtilityTargetId): GameType {
   );
 }
 
-it("company-wide rollout choices remain available while a newly acquired cohort is unfinished", () => {
+it("enlarging one company preserves installed efficiency and reopens its unfinished rollout", () => {
   let game = connection(preparedCompany(), "valley-electric");
   game = copyOfficialGame(
     reducer(game, schedulePolicy({ id: "efficiency", tier: "On", month: 1 })),
   );
-  expect(game.policies?.programs.efficiency.pending?.tier).toBe("On");
   runMonths(game, POLICIES.efficiency.buildoutMonths);
   expect(game.policies!.programs.efficiency.adoption).toBe(1);
   const original = cloneDeep(game.policies!.programs.efficiency);
+  const originalEligible = programCustomers(game);
+  const savedW = currentTick(game)!.efficiencySavedW;
   game = buy(game, "valley-electric");
-  const target = () =>
-    game.utilityExpansion!.areas.find((area) => area.id === "valley-electric")!
-      .policies!.programs.efficiency;
-  expect(target().adoption).toBe(0);
-  expect(target().installs).toEqual([]);
-  expect(target().spent).toBe(0);
+  const merged = game.policies!.programs.efficiency;
+  const eligible = programCustomers(game);
+  expect(merged.adoption).toBeLessThan(1);
+  expect(merged.adoption * eligible).toBeCloseTo(
+    original.adoption * originalEligible,
+    6,
+  );
+  expect(merged.completedMonth).toBeUndefined();
+  expect(merged.spent).toBe(original.spent);
+  expect(merged.spending).toBe(original.spending);
+  expect(currentTick(game)!.efficiencySavedW).toBe(savedW);
+  expect(merged.installs).toHaveLength(original.installs!.length);
+  merged.installs!.forEach(([month, share], index) => {
+    expect(month).toBe(original.installs![index][0]);
+    expect(share * eligible).toBeCloseTo(
+      original.installs![index][1] * originalEligible,
+      6,
+    );
+  });
   game = copyOfficialGame(
     reducer(
       game,
@@ -89,16 +101,13 @@ it("company-wide rollout choices remain available while a newly acquired cohort 
     ),
   );
   expect(game.policies!.programs.efficiency.pending?.tier).toBe("Off");
-  expect(target().pending?.tier).toBe("Off");
   expect(
     parseSave(JSON.parse(JSON.stringify(serializeSave(game)))),
   ).not.toBeNull();
+  const paused = cloneDeep(game.policies!.programs.efficiency);
   runMonths(game, 1);
-  expect(game.policies!.programs.efficiency.installs).toEqual(
-    original.installs,
-  );
+  expect(game.policies!.programs.efficiency.installs).toEqual(paused.installs);
   expect(game.policies!.programs.efficiency.spent).toBe(original.spent);
-  expect(target().adoption).toBe(0);
   game = copyOfficialGame(
     reducer(
       game,
@@ -110,9 +119,12 @@ it("company-wide rollout choices remain available while a newly acquired cohort 
     ),
   );
   runMonths(game, 1);
-  expect(target().adoption).toBeGreaterThan(0);
-  expect(target().spent).toBeGreaterThan(0);
-  expect(game.policies!.programs.efficiency.spent).toBe(original.spent);
+  expect(game.policies!.programs.efficiency.adoption).toBeGreaterThan(
+    paused.adoption,
+  );
+  expect(game.policies!.programs.efficiency.spent).toBeGreaterThan(
+    original.spent,
+  );
 });
 
 it("policy previews apply the same company-wide choice as the owning action", () => {
@@ -142,7 +154,7 @@ it("policy previews apply the same company-wide choice as the owning action", ()
   expect(JSON.stringify(game)).toBe(before);
 });
 
-it("acquisition starts fresh hardware and demand queues, while each existing area's carry survives month rollover", () => {
+it("a purchase preserves one installed battery fleet, stored energy and demand queues through month rollover", () => {
   let game = buy(
     connection(preparedCompany(), "ridge-electric"),
     "ridge-electric",
@@ -160,64 +172,50 @@ it("acquisition starts fresh hardware and demand queues, while each existing are
   );
   runMonths(game, 1);
   while (game.date.minuteOfDay < 22 * 60) tickState(game);
-  const local = gameForOperatingArea(game, "champlain")!;
-  const fleet = customerBatteryFleet(
-    game.policies!.programs.battery,
-    game.date.monthsElapsed,
-    game.startingYear,
-    programCustomers(local),
-    local.location,
-  );
-  expect(fleet.capacityWh).toBeGreaterThan(0);
-  const frame = currentTick(game)!;
-  frame.areaTicks!.champlain!.customerBatteryWh = fleet.capacityWh / 2;
-  frame.areaTicks!.champlain!.customerBatteryWhStart = fleet.capacityWh / 2;
-  frame.customerBatteryWh = Object.values(frame.areaTicks!).reduce(
-    (sum, area) => sum + (area?.customerBatteryWh ?? 0),
-    0,
-  );
-  frame.customerBatteryWhStart = frame.customerBatteryWh;
+  const fleet = () =>
+    customerBatteryFleet(
+      game.policies!.programs.battery,
+      game.date.monthsElapsed,
+      game.startingYear,
+      programCustomers(game),
+      game.location,
+    );
+  const capacity = fleet().capacityWh;
+  expect(capacity).toBeGreaterThan(0);
+  currentTick(game)!.customerBatteryWh = capacity / 2;
+  currentTick(game)!.customerBatteryWhStart = capacity / 2;
   game = connection(game, "valley-electric");
   game = copyOfficialGame(reducer(game, delta({ dollarsPerkWh: 0.2 })));
-  const previous = cloneDeep(currentTick(game)!.areaTicks!.champlain!);
-  const programs = cloneDeep(game.policies);
-  expect(previous.deferredResidential!.length).toBeGreaterThan(0);
-  const sellerRate = getMarketRate(
-    getScenario(116)!.dollarsPerkWh,
-    game.date,
-    game.startingYear,
-    game.seed,
-  );
+  const before = cloneDeep(currentTick(game)!);
+  const policies = cloneDeep(game.policies!);
+  expect(before.deferredResidential!.length).toBeGreaterThan(0);
   game = buy(game, "valley-electric");
-  const transferred = currentTick(game)!.areaTicks!["valley-electric"]!;
-  expect(transferred.customerBatteryWhStart ?? 0).toBe(0);
-  expect(transferred.customerBatteryWh ?? 0).toBe(0);
-  expect(transferred.deferredResidentialStart).toEqual([]);
-  expect(transferred.deferredThermalStart ?? []).toEqual([]);
-  expect(transferred.deferredChargingStart ?? []).toEqual([]);
-  expect(transferred.customerRate).toBe(sellerRate);
-  expect(
-    game.utilityExpansion!.areas.find((area) => area.id === "valley-electric")!
-      .policies!.programs.battery.installs,
-  ).toEqual([]);
-  expect(game.policies).toEqual(programs);
-  expect(currentTick(game)!.areaTicks!.champlain!.customerBatteryWh).toBe(
-    previous.customerBatteryWh,
+  expect(fleet().capacityWh).toBeCloseTo(capacity, 6);
+  expect(game.policies!.programs.battery.spent).toBe(
+    policies.programs.battery.spent,
   );
+  expect(game.policies!.programs.battery.spending).toBe(
+    policies.programs.battery.spending,
+  );
+  const transferred = currentTick(game)!;
+  expect(transferred.customerBatteryWh).toBe(before.customerBatteryWh);
+  expect(transferred.customerBatteryWhStart).toBe(
+    before.customerBatteryWhStart,
+  );
+  expect(transferred.deferredResidential).toEqual(before.deferredResidential);
+  expect(transferred.deferredThermal).toEqual(before.deferredThermal);
+  expect(transferred.deferredCharging).toEqual(before.deferredCharging);
+  expect(transferred.customerRate).toBe(before.customerRate);
   expect(
-    currentTick(game)!.areaTicks!.champlain!.deferredResidentialStart,
-  ).toEqual(previous.deferredResidentialStart);
+    parseSave(JSON.parse(JSON.stringify(serializeSave(game)))),
+  ).not.toBeNull();
   while (game.date.minuteOfDay < 1440 - TICK_MINUTES) tickState(game);
   const closes = game.timeline.at(-1)!;
   tickState(game);
-  const next = currentTick(game)!;
-  expect(next.areaTicks!.champlain!.deferredResidentialStart).toEqual(
-    closes.areaTicks!.champlain!.deferredResidential,
+  expect(currentTick(game)!.deferredResidentialStart).toEqual(
+    closes.deferredResidential,
   );
-  expect(next.areaTicks!.champlain!.customerBatteryWhStart).toBe(
-    closes.areaTicks!.champlain!.customerBatteryWh,
-  );
-  expect(next.areaTicks!["valley-electric"]!.customerBatteryWhStart ?? 0).toBe(
-    0,
+  expect(currentTick(game)!.customerBatteryWhStart).toBe(
+    closes.customerBatteryWh,
   );
 });

@@ -46,9 +46,13 @@ const keysAre = (value: object, keys: readonly string[]) =>
 function observationWindow(
   objective: CompiledRuleObjective,
   term: number,
+  retentionAtDeadlineOnly = false,
 ): [number, number] {
   if (objective.metric === "customerRetention")
-    return [0, objective.deadlineMonth];
+    return [
+      retentionAtDeadlineOnly ? objective.deadlineMonth : 0,
+      objective.deadlineMonth,
+    ];
   if (objective.metric === "fuelRetirement")
     return [objective.deadlineMonth, term - 1];
   if ("deadlineMonth" in objective)
@@ -68,7 +72,6 @@ function requiredWindow(
 export function objectiveTarget(objective: CompiledRuleObjective): number {
   switch (objective.metric) {
     case "customerRetention":
-    case "cohortRetention":
       return objective.minRetainedShare;
     case "utilityOwnership":
       return 1;
@@ -95,12 +98,9 @@ export function objectiveTargetMet(
 ): boolean {
   if (!nonnegative(observed)) return false;
   const target = objectiveTarget(objective);
-  return [
-    "customerRetention",
-    "localFuelShare",
-    "utilityOwnership",
-    "cohortRetention",
-  ].includes(objective.metric)
+  return ["customerRetention", "localFuelShare", "utilityOwnership"].includes(
+    objective.metric,
+  )
     ? observed >= target
     : observed <= target;
 }
@@ -118,6 +118,9 @@ function initialEvidenceDigest(
     durationMonths: context.durationMonths,
     ownership: context.ownership,
     retentionBaseline: baseline,
+    ...(context.retentionAtDeadlineOnly
+      ? { retentionAtDeadlineOnly: true }
+      : {}),
   });
 }
 
@@ -160,6 +163,38 @@ export function createObjectiveProgress(
       digest: initialEvidenceDigest(objective, context, retentionBaseline),
     })),
   };
+  return { ...plain, checksum: progressChecksum(plain) };
+}
+
+/** A transfer changes the aggregate baseline without rewriting completed monthly facts. */
+export function rebaseObjectiveRetention(
+  progress: ObjectiveProgress,
+  objectives: readonly CompiledRuleObjective[],
+  context: ObjectiveContext,
+  retentionBaseline: number,
+): ObjectiveProgress {
+  if (progress.retentionBaseline === retentionBaseline) return progress;
+  const definitions = new Map(
+    objectives.map((objective) => [objective.id, objective]),
+  );
+  const entries = progress.entries.map((entry) => {
+    const objective = definitions.get(entry.id)!;
+    const observations: ObjectiveObservation[] = entry.observations.map(
+      ([month, numerator, denominator]) => [
+        month,
+        numerator,
+        objective.metric === "customerRetention" && denominator !== null
+          ? retentionBaseline
+          : denominator,
+      ],
+    );
+    const digest = observations.reduce(
+      nextEvidenceDigest,
+      initialEvidenceDigest(objective, context, retentionBaseline),
+    );
+    return { ...entry, observations, digest };
+  });
+  const plain = { ...progress, retentionBaseline, entries };
   return { ...plain, checksum: progressChecksum(plain) };
 }
 
@@ -222,9 +257,6 @@ export function objectiveMonthObservation(
               facts.ownedAssetIds!.includes(asset),
             ).length;
       break;
-    case "cohortRetention":
-      numerator = facts.minimumCohortRetention;
-      break;
     case "fuelRetirement":
       numerator =
         facts.ownedFuels === undefined
@@ -273,7 +305,11 @@ export function recordObjectiveMonth(
   const entries = progress.entries.map((entry) => {
     const objective = definitions.get(entry.id);
     if (!objective) return entry;
-    const [first, last] = observationWindow(objective, context.durationMonths);
+    const [first, last] = observationWindow(
+      objective,
+      context.durationMonths,
+      context.retentionAtDeadlineOnly,
+    );
     if (facts.month < first || facts.month > last) return entry;
     if (
       entry.observations.some((observation) => observation[0] === facts.month)
@@ -347,7 +383,10 @@ export function evaluateScenarioObjectives(
       requiredMonths,
       status:
         context.completedMonths <=
-        (objective.metric === "customerRetention" ? 0 : first)
+        (objective.metric === "customerRetention" &&
+        !context.retentionAtDeadlineOnly
+          ? 0
+          : first)
           ? "pending"
           : "inProgress",
     };
@@ -402,13 +441,14 @@ export function evaluateScenarioObjectives(
           failed =
             latest[0] === objective.deadlineMonth
               ? !objectiveTargetMet(objective, result.observed)
-              : bestReachableCustomers(
+              : !context.retentionAtDeadlineOnly &&
+                bestReachableCustomers(
                   latest[1],
                   remaining,
                   context.ownership,
                   context.marketSize,
                 ) <
-                progress.retentionBaseline * result.target;
+                  progress.retentionBaseline * result.target;
         }
         break;
       }
@@ -435,7 +475,6 @@ export function evaluateScenarioObjectives(
           !objectiveTargetMet(objective, result.observed);
         break;
       case "utilityOwnership":
-      case "cohortRetention":
         if (ratios.length) result.observed = Math.min(...ratios);
         failed =
           ended &&
@@ -473,8 +512,6 @@ export function evaluateScenarioObjectives(
                 "No target utility was acquired by the deadline.",
               assetRetirement:
                 "An original oil asset remained owned at the retirement deadline.",
-              cohortRetention:
-                "At least one operating area retained less than the required share of its transfer customers.",
             }[objective.metric];
     } else if (
       invalid ||
@@ -623,7 +660,11 @@ export function validObjectiveProgress(
       !/^sha256-[a-f0-9]{64}$/.test(entry.digest)
     )
       return false;
-    const [first, last] = observationWindow(objective, context.durationMonths);
+    const [first, last] = observationWindow(
+      objective,
+      context.durationMonths,
+      context.retentionAtDeadlineOnly,
+    );
     let previous = -1,
       digest = initialEvidenceDigest(
         objective,
@@ -662,7 +703,6 @@ export function validObjectiveProgress(
             "monthEndDebt",
             "utilityOwnership",
             "assetRetirement",
-            "cohortRetention",
           ].includes(objective.metric) &&
             denominator !== 1) ||
           (objective.metric === "customerRetention" &&

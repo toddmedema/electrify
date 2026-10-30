@@ -111,7 +111,6 @@ export function expansionBalanceActions(
             name: fixture.financed ? "Natural Gas CC" : "Natural Gas Peaker",
             peakW: 150e6,
             financed: true,
-            operatingAreaId: target.id,
           },
         },
         {
@@ -121,7 +120,6 @@ export function expansionBalanceActions(
             name: fixture.portfolio === "mixed" ? "Wind" : "Natural Gas CC",
             peakW: fixture.portfolio === "mixed" ? 300e6 : 150e6,
             financed: true,
-            operatingAreaId: target.id,
           },
         },
       );
@@ -152,7 +150,6 @@ export function expansionBalanceActions(
           name: "Natural Gas CC",
           peakW: 150e6,
           financed: true,
-          operatingAreaId: "ridge-electric",
         },
       },
       {
@@ -162,7 +159,6 @@ export function expansionBalanceActions(
           name: "Natural Gas CC",
           peakW: 150e6,
           financed: true,
-          operatingAreaId: "ridge-electric",
         },
       },
       { month: 216, type: "retire", assetId: "scenario-116-ridge-oil" },

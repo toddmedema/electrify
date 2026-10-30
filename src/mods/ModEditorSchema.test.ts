@@ -209,13 +209,6 @@ test("ownership, original-asset retirement and cohort goals match the production
       assetIds: ["scenario-116-valley-oil"],
       deadlineMonth: 1,
     },
-    {
-      id: "retain-cohorts",
-      label: "Retain each cohort",
-      metric: "cohortRetention",
-      minRetainedShare: 0.9,
-      deadlineMonth: 1,
-    },
   ];
   for (const goal of goals) {
     const valid = { ...pack, objectives: [goal] };

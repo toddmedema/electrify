@@ -2638,7 +2638,7 @@ for (const scenarioId of [106, 107] as const) {
         scenarioId === 106 ? "Retain the community" : "Keep power flowing";
       const target =
         scenarioId === 106
-          ? "Retain ≥90% of starting customers · Dec 2035"
+          ? "Retain ≥90% of customers · Dec 2035"
           : "Serving less than 95% of demand for 3 months in a row ends the run.";
       const scenarioPanel = (page: Page) =>
         page.getByRole("region", { name: "Scenario", exact: true });

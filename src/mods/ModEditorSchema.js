@@ -418,7 +418,6 @@ const objective = () => ({
         "fuelRetirement",
         "utilityOwnership",
         "assetRetirement",
-        "cohortRetention",
       ].includes(metric)
     ) {
       props.deadlineMonth = month();
@@ -464,13 +463,6 @@ const objective = () => ({
       },
       assetRetirement: {
         assetIds: { ...list(id(), 16, 1), uniqueItems: true },
-      },
-      cohortRetention: {
-        minRetainedShare: numeric(
-          0,
-          1,
-          "Minimum share of transfer customers retained in every operating area",
-        ),
       },
       monthlyBilledRate: {
         maxDollarsPerKWh: numeric(

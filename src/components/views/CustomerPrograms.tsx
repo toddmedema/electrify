@@ -1,5 +1,3 @@
-import { gameForOperatingArea } from "../../helpers/Expansion";
-import { getUtilityArea } from "../../data/UtilityExpansion";
 import {
   activeScenario,
   currentCash,
@@ -15,10 +13,6 @@ import {
   Dialog,
   LinearProgress,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Typography,
 } from "@mui/material";
 import GroupsIcon from "@mui/icons-material/Groups";
@@ -39,7 +33,6 @@ import {
 } from "../../reducers/GameActions";
 import {
   GameType,
-  UtilityAreaId,
   PolicyChangeType,
   PolicyId,
   PolicyProgramType,
@@ -403,7 +396,6 @@ function useEstimateSnapshot(game: GameType): GameType {
     previous !== game &&
     (game.speed === "PAUSED" ||
       game.date.monthsElapsed !== previous.date.monthsElapsed ||
-      game.operatingAreaId !== previous.operatingAreaId ||
       game.policies !== previous.policies ||
       game.worldEvents.occurrences !== previous.worldEvents.occurrences ||
       game.facilities.length !== previous.facilities.length)
@@ -656,8 +648,7 @@ function PolicyProgramDetail({
       ) : (
         <>
           <Typography component="h3" variant="subtitle1">
-            Estimated {game.utilityExpansion ? "company " : ""}demand ·{" "}
-            {labelMonth(game, month)}
+            Estimated demand · {labelMonth(game, month)}
           </Typography>
           {error ? (
             <Alert severity="error">{error}</Alert>
@@ -695,30 +686,7 @@ export function ProgramsScreen({
   pricing?: React.ReactNode;
   onBackChange?: React.Dispatch<React.SetStateAction<(() => void) | undefined>>;
 }) {
-  const companyGame = useAppSelector((s) => s.game);
-  const [selectedArea, setSelectedArea] = useToolState<UtilityAreaId>(
-    "programs.operatingArea",
-    "champlain",
-  );
-  const areas = companyGame.utilityExpansion?.areas ?? [];
-  const operatingAreaId = companyGame.utilityExpansion
-    ? areas.some((area) => area.id === selectedArea)
-      ? selectedArea
-      : "champlain"
-    : undefined;
-  const game = React.useMemo(() => {
-    const local =
-      operatingAreaId && gameForOperatingArea(companyGame, operatingAreaId);
-    if (!local) return companyGame;
-    return {
-      ...local,
-      timeline: local.timeline.map((tick, index) => ({
-        ...tick,
-        cash: companyGame.timeline[index]?.cash ?? tick.cash,
-        netWorth: companyGame.timeline[index]?.netWorth ?? tick.netWorth,
-      })),
-    };
-  }, [companyGame, operatingAreaId]);
+  const game = useAppSelector((s) => s.game);
   const dispatch = useAppDispatch();
   const manualOpen = useAppSelector((s) => !!s.ui.manualHelpEntry);
   const activeCard = useAppSelector((s) => s.card?.name);
@@ -789,7 +757,7 @@ export function ProgramsScreen({
       dispatch(closePolicyDecision(token));
     };
   }, [dispatch, token, reviewingDecision]);
-  const snapshot = useEstimateSnapshot(companyGame);
+  const snapshot = useEstimateSnapshot(game);
   const policiesOn = policyAvailable(game);
   const cash = currentCash(game);
   const effective = game.date.monthsElapsed + 1;
@@ -908,35 +876,6 @@ export function ProgramsScreen({
         }
       >
         {!selected && pricing}
-        {areas.length > 1 && (
-          <Box className="programOperatingArea">
-            <FormControl fullWidth size="small">
-              <InputLabel id="program-operating-area-label">
-                Program operating area
-              </InputLabel>
-              <Select
-                labelId="program-operating-area-label"
-                label="Program operating area"
-                value={operatingAreaId}
-                onChange={(event) => {
-                  setSelected(undefined);
-                  setSelectedArea(event.target.value as UtilityAreaId);
-                }}
-              >
-                {areas.map((area) => (
-                  <MenuItem key={area.id} value={area.id}>
-                    {getUtilityArea(area.id)?.name ?? area.id}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Typography variant="body2" color="textSecondary">
-              Program choices apply to all operating areas; costs and benefits
-              below are for{" "}
-              {getUtilityArea(operatingAreaId ?? "champlain")?.name}.
-            </Typography>
-          </Box>
-        )}
         {!selected ? (
           <ProgramList
             game={game}

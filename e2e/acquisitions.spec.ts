@@ -33,13 +33,13 @@ for (const theme of ["light", "dark"] as const) {
     const facilities = page.locator(".facilities:visible");
     await expect(
       facilities.getByRole("button", {
-        name: "Inspect Champlain Electric Oil A",
+        name: "Inspect Oil A",
         exact: true,
       }),
     ).toBeVisible();
     await expect(
       facilities.getByRole("button", {
-        name: "Inspect Champlain Electric Oil B",
+        name: "Inspect Oil B",
         exact: true,
       }),
     ).toBeVisible();
@@ -102,16 +102,92 @@ for (const theme of ["light", "dark"] as const) {
         testInfo.project.use.hasTouch ? 44 : 40,
       );
       await acquire.click();
-      const dialog = page.getByRole("dialog");
+      const dialog = page.getByRole("dialog", {
+        name: `Acquire ${target}?`,
+        exact: true,
+      });
       await expect(dialog).toHaveAccessibleName(`Acquire ${target}?`);
       await expectContinuousDialogSurface(dialog);
       await expectDialogToFit(dialog);
       await expect(dialog).toContainText("Assumed debt");
       await expect(dialog).toContainText("Service-network costs");
-      await expect(dialog).toContainText("Worst local supply margin");
+      await expect(dialog).toContainText("Company supply margin");
       await expect(dialog).toContainText("Projected month-end cash");
       await expect(dialog).toContainText("Operating plants");
       await expect(dialog).toContainText("Purchased power");
+      await expect(dialog).not.toContainText(
+        "Ownership, customers, plants and contracts transfer immediately",
+      );
+      await expect(dialog).not.toContainText(
+        "This debt remains after selling plants",
+      );
+      await expect(dialog).not.toContainText("addressable accounts");
+      const [titleBox, introBox] = await Promise.all([
+        dialog.locator(".closableDialogTitleText").boundingBox(),
+        dialog
+          .locator(".acquisitionReviewIntro .MuiTypography-root")
+          .first()
+          .boundingBox(),
+      ]);
+      expect(introBox!.y - titleBox!.y - titleBox!.height).toBeLessThanOrEqual(
+        20,
+      );
+      const loanFact = dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: /^Loan option/ });
+      const help = loanFact.getByRole("button", {
+        name: "What is interest rate?",
+        exact: true,
+      });
+      await loanFact.scrollIntoViewIfNeeded();
+      await expect(loanFact.locator(".decisionImpactFactValue")).toBeInViewport(
+        { ratio: 1 },
+      );
+      await expect(
+        loanFact.locator(".decisionImpactFactDetail"),
+      ).toBeInViewport({ ratio: 1 });
+      const [labelBox, valueBox, iconBox, helpBox] = await Promise.all([
+        loanFact.locator(".decisionImpactFactLabel").boundingBox(),
+        loanFact.locator(".decisionImpactFactValue").boundingBox(),
+        loanFact.locator(":scope > .conceptIcon").boundingBox(),
+        help.boundingBox(),
+      ]);
+      expect(
+        Math.abs(
+          iconBox!.y + iconBox!.height / 2 - labelBox!.y - labelBox!.height / 2,
+        ),
+      ).toBeLessThanOrEqual(3);
+      expect(helpBox!.height).toBeGreaterThanOrEqual(
+        testInfo.project.use.hasTouch ? 44 : 40,
+      );
+      expect(helpBox!.x).toBeGreaterThanOrEqual(
+        valueBox!.x + valueBox!.width - 1,
+      );
+      if ((testInfo.project.use.viewport?.width ?? 1280) >= 600) {
+        expect(Math.abs(labelBox!.y - valueBox!.y)).toBeLessThanOrEqual(1);
+        const cashValueBox = await dialog
+          .locator(".decisionImpactFact")
+          .filter({ hasText: /^Cash purchase/ })
+          .locator(".decisionImpactFactValue")
+          .boundingBox();
+        expect(Math.abs(cashValueBox!.x - valueBox!.x)).toBeLessThanOrEqual(1);
+      }
+      await help.focus();
+      await page.keyboard.press("Enter");
+      const manual = page.getByRole("dialog", {
+        name: "Manual help",
+        exact: true,
+      });
+      await expect(
+        manual.getByRole("heading", {
+          name: "Interest Rates & Inflation",
+          exact: true,
+        }),
+      ).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(manual).toBeHidden();
+      await expect(help).toBeFocused();
+      await expect(dialog).toBeVisible();
       if (target === "Valley Electric") {
         await expect(dialog).toContainText("January 2017");
         await expect(dialog).toContainText(
@@ -165,6 +241,15 @@ for (const theme of ["light", "dark"] as const) {
         theme ===
           (testInfo.project.name === "desktop-chromium" ? "light" : "dark")
       ) {
+        if (testInfo.project.name === "mobile-360px") {
+          await loanFact.scrollIntoViewIfNeeded();
+          await expect(
+            loanFact.locator(".decisionImpactFactValue"),
+          ).toBeInViewport({ ratio: 1 });
+          await expect(
+            loanFact.locator(".decisionImpactFactDetail"),
+          ).toBeInViewport({ ratio: 1 });
+        }
         await page.mouse.move(0, 0);
         await page.screenshot({
           path: path.join(
@@ -183,6 +268,13 @@ for (const theme of ["light", "dark"] as const) {
       await page.keyboard.press("Enter");
       await expect(dialog).toHaveCount(0);
       await expect(line).toContainText(`Owned · ${target}`);
+      await expect(line).toContainText("Connection upkeep");
+      await expect(
+        line.getByRole("button", {
+          name: /^Review upgrade|^Pause|^Resume|^Reorder/,
+        }),
+      ).toHaveCount(0);
+      await expect(line).not.toContainText("Transfer capacity");
       await expect(
         page.locator(".missionSummaryHeadline:visible"),
       ).toContainText("Retire Champlain's original Oil A");
@@ -192,27 +284,32 @@ for (const theme of ["light", "dark"] as const) {
       await expect(
         line.getByRole("button", { name: `Acquire ${target}`, exact: true }),
       ).toHaveCount(0);
-      await expect(
-        facilities
-          .locator(".facilityAreaLabel")
-          .filter({ hasText: target })
-          .first(),
-      ).toBeVisible();
+      const purchased = await readSavedGame(page);
+      expect(purchased!.facilities.length).toBeGreaterThan(
+        beforeCancel!.facilities.length,
+      );
+      expect(
+        purchased!.utilityExpansion!.acquisitions.some(
+          (receipt) =>
+            receipt.targetId ===
+            (index === 0 ? "valley-electric" : "ridge-electric"),
+        ),
+      ).toBe(true);
       expect(
         await facilities.evaluate(
           (element) => element.scrollWidth - element.clientWidth,
         ),
       ).toBeLessThanOrEqual(1);
     }
-    // New construction belongs to the chosen operating area, with its local quote context.
+    await expect(
+      facilities.getByRole("combobox", { name: "Trading rule", exact: true }),
+    ).toHaveCount(0);
+    // Acquired plants and customers use the ordinary shared company controls.
     await openBuild(page);
     await page.getByRole("tab", { name: "Generators", exact: true }).click();
-    await page
-      .getByRole("combobox", { name: "Operating area", exact: true })
-      .click();
-    await page
-      .getByRole("option", { name: "Valley Electric", exact: true })
-      .click();
+    await expect(
+      page.getByRole("combobox", { name: "Operating area", exact: true }),
+    ).toHaveCount(0);
     await page.getByRole("slider").first().press("Home");
     await page
       .getByRole("button", { name: "Review purchase of Solar", exact: true })
@@ -223,28 +320,19 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     expect(
       (await readSavedGame(page))?.facilities.some(
-        (facility) =>
-          facility.name === "Solar" &&
-          facility.operatingAreaId === "valley-electric",
+        (facility) => facility.name === "Solar",
       ),
     ).toBe(true);
     await openBuild(page);
     await page.getByRole("tab", { name: "Storage", exact: true }).click();
-    await page
-      .getByRole("combobox", { name: "Operating area", exact: true })
-      .click();
-    await page
-      .getByRole("option", { name: "Ridge Electric", exact: true })
-      .click();
     await page.getByRole("slider").first().press("Home");
     await expect(
       page.getByRole("combobox", { name: "Operating area", exact: true }),
-    ).toContainText("Ridge Electric");
+    ).toHaveCount(0);
     await expect(
-      page.getByText(
-        "No storage projects are available in this operating area in 2005.",
-        { exact: true },
-      ),
+      page.getByText("No storage projects are available in 2005.", {
+        exact: true,
+      }),
     ).toBeVisible();
     const programs = page.getByRole("region", {
       name: "Programs",
@@ -254,15 +342,12 @@ for (const theme of ["light", "dark"] as const) {
       programs,
       page.getByRole("button", { name: "Programs", exact: true }),
     );
-    await page
-      .getByRole("combobox", { name: "Program operating area", exact: true })
-      .click();
-    await page
-      .getByRole("option", { name: "Valley Electric", exact: true })
-      .click();
-    await expect(programs).toContainText(
-      "costs and benefits below are for Valley Electric",
-    );
+    await expect(
+      programs.getByRole("combobox", {
+        name: "Program operating area",
+        exact: true,
+      }),
+    ).toHaveCount(0);
     await expect(
       programs.getByRole("button", { name: /^Efficiency rebates ·/ }),
     ).toBeVisible();

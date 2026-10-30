@@ -10,7 +10,12 @@ import {
   projectionDecoder,
 } from "../components/base/ProjectionTransport";
 import { UTILITY_AREAS, UTILITY_TARGETS } from "../data/UtilityExpansion";
-import { acquisitionQuote } from "../helpers/Expansion";
+import {
+  acquisitionQuote,
+  expansionRetentionBaseline,
+} from "../helpers/Expansion";
+import { acquireUtility } from "../reducers/GameActions";
+import { runMonths } from "./SimulationTestHelpers";
 import { currentTick } from "../helpers/GameSelectors";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { selectProjection } from "../helpers/Projection";
@@ -29,6 +34,7 @@ import { coopSeats } from "./MultiplayerFixtures";
 import {
   copyOfficialGame,
   officialQuote,
+  officialCommand,
   playOfficialExecution,
 } from "./OfficialScenarioExecutionFixtures";
 import { loadSimData } from "./SimData";
@@ -230,7 +236,6 @@ function applyScheduled(
         payload: {
           facility: officialQuote(game, action.build),
           financed: action.build.financed,
-          operatingAreaId: action.build.operatingAreaId,
         },
       });
       break;
@@ -326,7 +331,7 @@ it("corporate loans pay only elapsed ticks across the first acquired month close
   }
 });
 
-it("a legal 2013 battery in an acquired area stays bounded through play, save and forecasts", () => {
+it("a legal 2013 company battery after acquisition stays bounded through play, save and forecasts", () => {
   const fixture = EXPANSION_BALANCE_CASES.find(
     ({ id }) => id === "valley-electric-firm-loan",
   )!;
@@ -339,7 +344,6 @@ it("a legal 2013 battery in an acquired area stays bounded through play, save an
         name: "Solar",
         peakW: 500e6,
         financed: true,
-        operatingAreaId: "valley-electric",
       },
     },
     {
@@ -349,7 +353,6 @@ it("a legal 2013 battery in an acquired area stays bounded through play, save an
         name: "Solar",
         peakW: 500e6,
         financed: true,
-        operatingAreaId: "valley-electric",
       },
     },
     {
@@ -359,7 +362,6 @@ it("a legal 2013 battery in an acquired area stays bounded through play, save an
         name: "Battery",
         peakWh: 64e6,
         financed: true,
-        operatingAreaId: "valley-electric",
       },
     },
   ];
@@ -373,7 +375,6 @@ it("a legal 2013 battery in an acquired area stays bounded through play, save an
       beforeTick(state) {
         const storage = state.facilities.filter(isStorage);
         for (const battery of storage) {
-          expect(battery.operatingAreaId).toBe("valley-electric");
           expect(battery.currentWh).toBeGreaterThanOrEqual(0);
           expect(battery.currentWh).toBeLessThanOrEqual(battery.peakWh);
           maximumStoredWh = Math.max(maximumStoredWh, battery.currentWh);
@@ -390,11 +391,7 @@ it("a legal 2013 battery in an acquired area stays bounded through play, save an
   expect(violations).toEqual([]);
   expect(observedTicks).toBeGreaterThan(96);
   expect(
-    game.facilities.filter(
-      (facility) =>
-        facility.operatingAreaId === "valley-electric" &&
-        facility.name === "Solar",
-    ),
+    game.facilities.filter((facility) => facility.name === "Solar"),
   ).toHaveLength(2);
   expect(maximumStoredWh).toBeGreaterThan(0);
   const restored = parseSave(JSON.parse(JSON.stringify(serializeSave(game))));
@@ -408,12 +405,8 @@ it("a legal 2013 battery in an acquired area stays bounded through play, save an
     96,
   );
   for (const tick of forecast) {
-    expect(tick.areaTicks!["valley-electric"]!.storedWh).toBeGreaterThanOrEqual(
-      0,
-    );
-    expect(tick.areaTicks!["valley-electric"]!.storedWh).toBeLessThanOrEqual(
-      64e6,
-    );
+    expect(tick.storedWh).toBeGreaterThanOrEqual(0);
+    expect(tick.storedWh).toBeLessThanOrEqual(64e6);
   }
   expect(JSON.stringify(game)).toBe(before);
   const simulated = runSimulation({
@@ -427,4 +420,90 @@ it("a legal 2013 battery in an acquired area stays bounded through play, save an
   expect(canonical(simulated.months)).toEqual(
     canonical([...game.monthlyHistory].reverse()),
   );
+});
+
+it("a late purchase rebases one customer goal before the deadline and preserves it after the term", () => {
+  const fixture = EXPANSION_BALANCE_CASES.find(
+    ({ id }) => id === "valley-electric-firm-loan",
+  )!;
+  const scheduledActions: ScheduledSimActionType[] = [
+    ...expansionBalanceActions(fixture, 12345),
+    {
+      month: 0,
+      type: "intertie",
+      corridorId: "vt-champlain-ridge",
+      financed: true,
+    },
+  ];
+  scheduledActions.sort((a, b) => a.month - b.month);
+  let beforeDeadline: GameType | undefined;
+  const { game } = playOfficialExecution(
+    116,
+    {
+      monthClose(state) {
+        if (state.date.monthsElapsed === 239)
+          beforeDeadline = copyOfficialGame(state);
+      },
+    },
+    { difficulty: "Employee", seed: 12345, plan: { scheduledActions } },
+  );
+  expect(beforeDeadline).toBeDefined();
+  const scoredProgress = JSON.parse(JSON.stringify(game.objectiveProgress));
+  const scoredResult = gameObjectiveResults(game).find(
+    ({ metric }) => metric === "customerRetention",
+  )!;
+  expect(scoredResult.status).toBe("completed");
+
+  const earlierQuote = acquisitionQuote(beforeDeadline!, "ridge-electric")!;
+  expect(earlierQuote).toBeDefined();
+  const oldBaseline = beforeDeadline!.objectiveProgress!.retentionBaseline;
+  const earlier = officialCommand(
+    beforeDeadline!,
+    acquireUtility({
+      targetId: "ridge-electric",
+      financed: true,
+      quoteKey: earlierQuote.quoteKey,
+    }),
+  );
+  expect(earlier.utilityExpansion!.acquisitions).toHaveLength(2);
+  expect(earlier.objectiveProgress!.retentionBaseline).toBe(
+    oldBaseline + earlierQuote.customers,
+  );
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(earlier)))),
+  ).not.toBeNull();
+  runMonths(earlier, 1);
+  expect(
+    gameObjectiveResults(earlier).find(
+      ({ metric }) => metric === "customerRetention",
+    )!.status,
+  ).toBe("completed");
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(earlier)))),
+  ).not.toBeNull();
+
+  const laterQuote = acquisitionQuote(game, "ridge-electric")!;
+  expect(laterQuote).toBeDefined();
+  const later = officialCommand(
+    game,
+    acquireUtility({
+      targetId: "ridge-electric",
+      financed: true,
+      quoteKey: laterQuote.quoteKey,
+    }),
+  );
+  expect(later.utilityExpansion!.acquisitions).toHaveLength(2);
+  expect(expansionRetentionBaseline(later)).toBe(
+    scoredProgress.retentionBaseline + laterQuote.customers,
+  );
+  expect(later.objectiveProgress).toEqual(scoredProgress);
+  expect(
+    gameObjectiveResults(later).find(
+      ({ metric }) => metric === "customerRetention",
+    ),
+  ).toEqual(scoredResult);
+  expect(later.monthlyHistory).toEqual(game.monthlyHistory);
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(later)))),
+  ).not.toBeNull();
 });

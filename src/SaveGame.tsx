@@ -1,4 +1,3 @@
-import { isUtilityExpansionGame } from "./helpers/ExpansionContext";
 import { validUtilityExpansion } from "./helpers/ExpansionValidation";
 import { validScenarioMod } from "./helpers/ScenarioMod";
 import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
@@ -595,7 +594,6 @@ export function parseSave(raw: unknown): SaveGameType | null {
     !validPolicies(
       game.policies,
       Math.floor(game.date.minute / MINUTES_PER_MONTH),
-      isUtilityExpansionGame(game as GameType) && !!game.utilityExpansion,
     )
   )
     return null;

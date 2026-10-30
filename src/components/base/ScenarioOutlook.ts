@@ -98,9 +98,6 @@ export function scenarioLossSummary(
         case "assetRetirement":
           phrase = "An original oil asset is still owned";
           break;
-        case "cohortRetention":
-          phrase = `An operating area retains <${target}`;
-          break;
         case "monthEndDebt":
           phrase = `Debt >${target}`;
           break;

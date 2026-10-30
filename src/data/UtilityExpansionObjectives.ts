@@ -27,9 +27,9 @@ export const UTILITY_EXPANSION_OBJECTIVES: CompiledRuleObjective[] = [
     required: true,
   },
   {
-    id: "retain-each-area",
-    label: "Retain 90% of every operating area's customers",
-    metric: "cohortRetention",
+    id: "retain-customers",
+    label: "Retain 90% of your expanded customer base",
+    metric: "customerRetention",
     minRetainedShare: 0.9,
     deadlineMonth: 239,
     required: true,

@@ -5924,8 +5924,9 @@ $homeSmokeCycle: 5.6s;
   background: transparent;
   gap: 12px;
 }
-.decisionImpactFactWithHelp {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+.decisionImpactFact {
+  // Keep each value column aligned even when only one row has a manual help target.
+  grid-template-columns: auto minmax(0, 1fr) var(--control-size);
 }
 .decisionImpactFactHelp {
   display: flex;
@@ -5933,6 +5934,7 @@ $homeSmokeCycle: 5.6s;
 }
 .decisionImpactFactContent {
   display: grid;
+  align-items: start;
   grid-template-columns: minmax(100px, 0.7fr) minmax(0, 1.3fr);
   gap: 4px 12px;
 }
@@ -6245,6 +6247,10 @@ $programs_column: 800px;
 @media (max-width: ($phone_width - 1px)) {
   .decisionImpactFactContent {
     grid-template-columns: 1fr;
+  }
+  .decisionImpactFact:not(.decisionImpactFactWithHelp)
+    .decisionImpactFactContent {
+    grid-column: 2 / -1;
   }
   .decisionImpactFactDetail {
     grid-column: 1;
@@ -8133,7 +8139,7 @@ option {
 .acquisitionReviewIntro {
   display: grid;
   gap: 12px;
-  padding: 0 24px 12px;
+  padding: 0 16px 12px;
   border-bottom: 1px solid var(--border-strong);
 }
 
@@ -8153,25 +8159,6 @@ option {
 
 .utilityAcquisitionHint {
   display: block;
-}
-
-.facilityAreaLabel {
-  display: block;
-  color: var(--font-color-faded);
-  font-size: var(--font-size-caption);
-  font-weight: 400;
-  line-height: 1.5;
-}
-
-.buildOperatingArea {
-  padding: 8px 16px 12px;
-  box-sizing: border-box;
-}
-
-.programOperatingArea {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 16px;
 }
 
 @media (max-width: 390px) {

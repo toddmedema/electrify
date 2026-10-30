@@ -74,12 +74,7 @@ import {
 } from "../../helpers/Hazards";
 import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
-import { getUtilityArea } from "../../data/UtilityExpansion";
-import { gameForOperatingArea } from "../../helpers/Expansion";
-import {
-  facilityDisplayName,
-  facilityActionName,
-} from "../base/FacilityLabels";
+import { facilityDisplayName } from "../base/FacilityLabels";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
@@ -251,7 +246,7 @@ function FacilityActions(props: {
           className="facilityCancelConstruction"
           variant="outlined"
           startIcon={<CancelIcon />}
-          aria-label={"Cancel upgrade of " + facilityActionName(facility)}
+          aria-label={"Cancel upgrade of " + facilityDisplayName(facility)}
           onClick={() => onCancelRetrofit(facility.id)}
         >
           <span className="facilityActionLabel">Cancel upgrade</span>
@@ -265,13 +260,13 @@ function FacilityActions(props: {
           }
           aria-label={
             facility.paused
-              ? "Resume " + facilityActionName(facility)
-              : "Pause " + facilityActionName(facility)
+              ? "Resume " + facilityDisplayName(facility)
+              : "Pause " + facilityDisplayName(facility)
           }
           onClick={() =>
             facility.paused
               ? onTogglePause(facility.id)
-              : onPause(facility.id, facilityActionName(facility))
+              : onPause(facility.id, facilityDisplayName(facility))
           }
         >
           <span className="facilityActionLabel">
@@ -285,7 +280,7 @@ function FacilityActions(props: {
         startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
         aria-label={
           (underConstruction ? "Cancel construction of " : "Sell ") +
-          facilityActionName(facility)
+          facilityDisplayName(facility)
         }
         onClick={onOpenSell}
       >
@@ -333,19 +328,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     arriving: arrivalRequested,
     onArrivalShown,
   } = props;
-  const detailGame = React.useMemo(() => {
-    if (!selected || !facility.operatingAreaId) return game;
-    const local = gameForOperatingArea(game, facility.operatingAreaId);
-    if (!local) return game;
-    return {
-      ...local,
-      timeline: local.timeline.map((tick, index) => ({
-        ...tick,
-        cash: game.timeline[index]?.cash ?? tick.cash,
-        netWorth: game.timeline[index]?.netWorth ?? tick.netWorth,
-      })),
-    };
-  }, [game, selected, facility.operatingAreaId]);
   // Early walkthroughs hide reordering; keep the icon in their inspection target.
   const reorderDisabled = !!(
     game.inGame &&
@@ -575,7 +557,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 type="button"
                 {...provided.dragHandleProps}
                 className="facilityDragHandle"
-                aria-label={"Reorder " + facilityActionName(facility)}
+                aria-label={"Reorder " + facilityDisplayName(facility)}
                 title="Drag to reorder"
                 onClick={(event) => {
                   if (event.shiftKey || event.ctrlKey || event.metaKey)
@@ -597,7 +579,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               type="button"
               className="facilityDisclosure"
               aria-label={
-                `Inspect ${facilityActionName(facility)}` +
+                `Inspect ${facilityDisplayName(facility)}` +
                 (hazardStatus && !underConstruction
                   ? `, ${hazardStatusText(hazardStatus).spoken}`
                   : "") +
@@ -620,11 +602,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                         <span className="facilityName">
                           {facilityDisplayName(facility)}
                         </span>
-                        {facility.operatingAreaId && (
-                          <span className="facilityAreaLabel">
-                            {getUtilityArea(facility.operatingAreaId)?.name}
-                          </span>
-                        )}
                         {ready && (
                           <span className="facilityReadyLabel">Ready</span>
                         )}
@@ -695,7 +672,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 onClick={(event) => props.onToggleSelection(facility.id, event)}
                 slotProps={{
                   input: {
-                    "aria-label": `Select ${facilityActionName(facility)}`,
+                    "aria-label": `Select ${facilityDisplayName(facility)}`,
                   },
                 }}
               />
@@ -711,9 +688,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 <>
                   {underConstruction ? "Cancel construction of" : "Sell"}{" "}
                   {formatFacilitySize(facility)}{" "}
-                  {facility.operatingAreaId
-                    ? facilityActionName(facility)
-                    : facility.name.toLowerCase()}{" "}
+                  {facilityDisplayName(facility) === facility.name
+                    ? facility.name.toLowerCase()
+                    : facilityDisplayName(facility)}{" "}
                   facility?
                 </>
               }
@@ -749,9 +726,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               facility={facility}
               date={game.date}
               seed={game.seed}
-              location={detailGame.location}
-              game={detailGame}
-              hydroGame={game}
+              location={game.location}
+              game={game}
               onRetrofit={props.onRetrofit}
             />
           )}

@@ -1,5 +1,5 @@
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
-import { EXPANSION_SCENARIO_ID, getUtilityArea } from "./UtilityExpansion";
+import { UTILITY_AREAS, UTILITY_TARGETS } from "./UtilityExpansion";
 import type { GameType, LocationType, ScenarioFacilityType } from "../Types";
 import { LOCATIONS } from "../Constants";
 import catalogue from "./HydroSiteCatalogue.json";
@@ -245,45 +245,29 @@ export function resolveStartingHydroSites(
 }
 export function validHydroClaims(state: HydroState): boolean {
   if (state.utilityExpansion) {
-    const areas = state.utilityExpansion.areas;
     if (
       !isUtilityExpansionGame(state) ||
-      !Array.isArray(areas) ||
-      new Set(areas.map((area) => area.id)).size !== areas.length ||
+      !Array.isArray(state.utilityExpansion.acquisitions) ||
+      !validHydroInventorySource(state) ||
       !Array.isArray(state.commissionedHydroSiteIds)
     )
       return false;
-    const allowed = new Set<string>();
-    const validAreas = areas.every((area) => {
-      const definition = getUtilityArea(area.id);
-      if (!definition) return false;
-      const inventory = resolveHydroInventory(definition.location);
-      inventory?.siteIds.forEach((id) => allowed.add(id));
-      return validHydroClaims({
-        ...state,
-        scenarioId: EXPANSION_SCENARIO_ID,
-        customScenario: undefined,
-        utilityExpansion: undefined,
-        location: definition.location,
-        facilities: state.facilities.filter(
-          (facility) => (facility.operatingAreaId ?? "champlain") === area.id,
-        ),
-        commissionedHydroSiteIds: state.commissionedHydroSiteIds.filter((id) =>
-          inventory?.siteIds.includes(id),
-        ),
-      });
-    });
-    return (
-      validAreas &&
-      new Set(state.commissionedHydroSiteIds).size ===
-        state.commissionedHydroSiteIds.length &&
-      state.commissionedHydroSiteIds.every((id) => allowed.has(id)) &&
-      state.facilities.every((facility) =>
-        areas.some(
-          (area) => area.id === (facility.operatingAreaId ?? "champlain"),
-        ),
-      )
+    const owned = new Set(
+      state.utilityExpansion.acquisitions.map(({ targetId }) => targetId),
     );
+    const definitions = [
+      UTILITY_AREAS.champlain,
+      ...UTILITY_TARGETS.filter(({ id }) => owned.has(id)).map(
+        ({ id }) => UTILITY_AREAS[id],
+      ),
+    ];
+    const allowed = new Set(
+      definitions.flatMap(
+        (definition) =>
+          resolveHydroInventory(definition.location)?.siteIds ?? [],
+      ),
+    );
+    return validHydroClaimSet(state, allowed);
   }
   if (
     !Array.isArray(state.commissionedHydroSiteIds) ||
@@ -298,6 +282,14 @@ export function validHydroClaims(state: HydroState): boolean {
   const ids = new Set(
     inventory?.status === "researched" ? inventory.siteIds : [],
   );
+  return validHydroClaimSet(state, ids);
+}
+
+/** Inherited sites retain asset provenance while sharing one company's weather and dispatch. */
+function validHydroClaimSet(
+  state: HydroState,
+  ids: ReadonlySet<string>,
+): boolean {
   const history = new Set(state.commissionedHydroSiteIds);
   if (
     history.size !== state.commissionedHydroSiteIds.length ||

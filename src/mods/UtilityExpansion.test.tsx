@@ -51,7 +51,7 @@ const pack = (): ModPackage => ({
 
 beforeEach(() => loadSimData(UTILITY_AREAS.champlain.location));
 
-it("mod base 116 preserves source rights, operating areas, obligations and exact save/forecast behavior", () => {
+it("mod base 116 preserves source rights, company customers, obligations and exact save/forecast behavior", () => {
   const scenario = modScenario(pack());
   let game = createGame({
     scenarioId: 999,
@@ -60,9 +60,7 @@ it("mod base 116 preserves source rights, operating areas, obligations and exact
     difficulty: "Employee",
   });
   expect(isUtilityExpansionGame(game)).toBe(true);
-  expect(game.utilityExpansion!.areas.map((area) => area.id)).toEqual([
-    "champlain",
-  ]);
+  expect(game.utilityExpansion!.networkAssets).toEqual([]);
   expect(game.objectiveProgress!.retentionBaseline).toBe(90000);
   expect(game.objectiveProgress!.entries).toHaveLength(4);
   expect(currentTick(game)!.entitlementImportCapacityW).toBeGreaterThan(0);
@@ -88,16 +86,20 @@ it("mod base 116 preserves source rights, operating areas, obligations and exact
       }),
     ),
   );
-  expect(game.utilityExpansion!.areas.map((area) => area.id)).toEqual([
-    "champlain",
-    "ridge-electric",
-  ]);
+  expect(
+    game.utilityExpansion!.acquisitions.map((receipt) => receipt.targetId),
+  ).toEqual(["ridge-electric"]);
   const before = JSON.parse(JSON.stringify(serializeSave(game)));
   const now = currentTick(game)!;
   const forecast = generateForecastTimeline(game, now.cash, now.customers, 8);
-  expect(forecast.every((tick) => !!tick.areaTicks?.["ridge-electric"])).toBe(
-    true,
-  );
+  expect(
+    forecast.every(
+      (tick) => !Object.prototype.hasOwnProperty.call(tick, "areaTicks"),
+    ),
+  ).toBe(true);
+  expect(
+    forecast.every((tick) => tick.entitlementImportCapacityW! > 209e6),
+  ).toBe(true);
   expect(JSON.stringify(serializeSave(game).game)).toBe(
     JSON.stringify(before.game),
   );

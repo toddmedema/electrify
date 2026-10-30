@@ -1,4 +1,8 @@
-import { UTILITY_AREAS, utilityEntitlementsAt } from "../data/UtilityExpansion";
+import {
+  UTILITY_AREAS,
+  UTILITY_TARGETS,
+  utilityEntitlementsAt,
+} from "../data/UtilityExpansion";
 import {
   acquisitionTargetForCorridor,
   ownedUtility,
@@ -25,7 +29,7 @@ import {
   HAIL_DEFINITION_ID,
   isWeatherHazardEligible,
 } from "../helpers/Hazards";
-import { MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { POLICIES } from "../data/Policies";
 import { getSolarOutputFactor } from "../helpers/Energy";
 import { programCustomers } from "../helpers/Policies";
@@ -34,7 +38,6 @@ import {
   physicalNeighborImportSupplyW,
   intertieOfferLimits,
   intertieContextForGame,
-  transmissionRatingW,
 } from "../helpers/Transmission";
 
 type TickFieldType = keyof TickPresentFutureType;
@@ -395,8 +398,7 @@ export function checkTick(
     storageGridW +
     -(now.customerBatteryGridChargeW || 0) +
     (now.importedW || 0) -
-    (now.exportedW || 0) -
-    (now.curtailedW ?? 0);
+    (now.exportedW || 0);
   if (
     isFinite_(now.supplyW) &&
     Math.abs(expectedSupplyW - now.supplyW) >
@@ -410,23 +412,6 @@ export function checkTick(
       `expected ${Math.round(expectedSupplyW)}W but supplyW is ${Math.round(now.supplyW)}W`,
     );
   }
-
-  const curtailedW = now.curtailedW ?? 0;
-  const unusedLocalW = Object.values(now.areaTicks ?? {}).reduce(
-    (sum, tick) => sum + (tick ? Math.max(0, tick.supplyW - tick.demandW) : 0),
-    0,
-  );
-  if (
-    !Number.isFinite(curtailedW) ||
-    curtailedW < 0 ||
-    Math.abs(curtailedW - unusedLocalW) >
-      Math.max(1, unusedLocalW * RELATIVE_TOLERANCE)
-  )
-    collector.add(
-      "curtailment accounts only for unused local output",
-      when,
-      `${curtailedW}W curtailed vs ${unusedLocalW}W unused`,
-    );
 
   checkTrade(collector, state, now, when);
 
@@ -652,44 +637,36 @@ function checkTrade(
     );
   }
   if (state.utilityExpansion) {
-    let areaCapacityW = 0;
-    let areaPurchasedW = 0;
-    state.utilityExpansion.areas.forEach((area) => {
-      const definition = UTILITY_AREAS[area.id];
-      const tick = now.areaTicks?.[area.id];
-      const cap = tick?.entitlementImportCapacityW ?? 0;
-      const purchased = tick?.entitlementImportedW ?? 0;
-      const maximum = Math.min(
-        definition.sourceInterfaceW,
-        utilityEntitlementsAt(area.id, state.date.year).reduce(
-          (sum, source) => sum + source.nominalW * source.deliverability,
-          0,
+    const owned = new Set(
+      state.utilityExpansion.acquisitions
+        .filter((receipt) => receipt.minute <= now.minute)
+        .map(({ targetId }) => targetId),
+    );
+    const definitions = [
+      UTILITY_AREAS.champlain,
+      ...UTILITY_TARGETS.filter(({ id }) => owned.has(id)).map(
+        ({ id }) => UTILITY_AREAS[id],
+      ),
+    ];
+    const year = getDateFromMinute(now.minute, state.startingYear).year;
+    const maximum = definitions.reduce(
+      (sum, definition) =>
+        sum +
+        Math.min(
+          definition.sourceInterfaceW,
+          utilityEntitlementsAt(definition.id, year).reduce(
+            (rights, source) =>
+              rights + source.nominalW * source.deliverability,
+            0,
+          ),
         ),
-      );
-      areaCapacityW += cap;
-      areaPurchasedW += purchased;
-      if (
-        !Number.isFinite(cap) ||
-        !Number.isFinite(purchased) ||
-        cap < 0 ||
-        purchased < 0 ||
-        cap > maximum + 1 ||
-        purchased > cap + 1
-      )
-        collector.add(
-          "each area's purchases respect its own dated source rights",
-          when,
-          `${area.id}: ${purchased}/${cap}W, maximum ${maximum}W`,
-        );
-    });
-    if (
-      Math.abs(areaCapacityW - entitlementCapacityW) > 1 ||
-      Math.abs(areaPurchasedW - entitlementW) > 1
-    )
+      0,
+    );
+    if (entitlementCapacityW > maximum + 1)
       collector.add(
-        "company entitlement totals preserve local source identity",
+        "company purchases respect owned dated source rights",
         when,
-        `${areaPurchasedW}/${areaCapacityW}W vs ${entitlementW}/${entitlementCapacityW}W`,
+        `${entitlementW}/${entitlementCapacityW}W, maximum ${maximum}W`,
       );
   }
   if (externalImportW + exportedW > capacityW * (1 + RELATIVE_TOLERANCE) + 1) {
@@ -740,23 +717,18 @@ function checkTrade(
       (l) => l.yearsToBuildLeft <= 0,
     )) {
       const ownedTarget = acquisitionTargetForCorridor(line.corridorId);
-      if (ownedTarget && ownedUtility(state, ownedTarget.id)) {
-        const local = now.areaTicks?.[ownedTarget.id];
-        const ownLimit =
-          local && !line.paused
-            ? Math.min(
-                transmissionRatingW(line, now),
-                transmissionRatingW(line, local),
-              )
-            : 0;
-        if (
-          Math.abs(line.currentFlowW ?? 0) >
-          ownLimit * (1 + RELATIVE_TOLERANCE) + 1
+      if (
+        ownedTarget &&
+        state.utilityExpansion?.acquisitions.some(
+          (receipt) =>
+            receipt.targetId === ownedTarget.id && receipt.minute <= now.minute,
         )
+      ) {
+        if ((line.currentFlowW ?? 0) !== 0)
           collector.add(
-            "owned-area transfers respect both weather-adjusted wires",
+            "acquired corridors carry no external trades",
             when,
-            `${line.corridorId}: ${line.currentFlowW}W, limit ${ownLimit}W`,
+            `${line.corridorId}: ${line.currentFlowW}W`,
           );
         continue;
       }

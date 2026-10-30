@@ -162,7 +162,6 @@ function accumulateTick(
       Object.entries(t),
     ) as TickPresentFutureType;
     // Local resumable frames and recovery batches are not numeric averaged chart history.
-    delete sample.areaTicks;
     delete sample.deferredResidential;
     delete sample.deferredResidentialStart;
     delete sample.deferredThermal;

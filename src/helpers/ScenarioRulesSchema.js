@@ -77,7 +77,6 @@ const OBJECTIVE_METRICS = [
   "monthEndDebt",
   "utilityOwnership",
   "assetRetirement",
-  "cohortRetention",
 ];
 /** Reject functions, accessors, cycles and nonfinite values before detaching JSON data. */
 function isRuleJson(value, ancestors = new Set(), depth = 0) {
@@ -563,7 +562,6 @@ function ruleDiagnostics(value, path = "") {
       fuelRetirement: ["fuel", "deadlineMonth"],
       utilityOwnership: ["targets", "deadlineMonth"],
       assetRetirement: ["assetIds", "deadlineMonth"],
-      cohortRetention: ["minRetainedShare", "deadlineMonth"],
       monthlyBilledRate: ["maxDollarsPerKWh"],
       monthEndDebt: ["maxDebtDollars"],
     };
@@ -581,7 +579,6 @@ function ruleDiagnostics(value, path = "") {
           "fuelRetirement",
           "utilityOwnership",
           "assetRetirement",
-          "cohortRetention",
         ].includes(v?.metric)
           ? []
           : ["fromMonth", "throughMonth"]),
@@ -600,7 +597,6 @@ function ruleDiagnostics(value, path = "") {
         "fuelRetirement",
         "utilityOwnership",
         "assetRetirement",
-        "cohortRetention",
       ].includes(v.metric)
     )
       month(v.deadlineMonth, at(p, "deadlineMonth"));

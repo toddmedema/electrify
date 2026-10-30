@@ -1,19 +1,18 @@
-import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
-import type { OperatingAreaState, UtilityAreaId } from "../Types";
+import { combinedUtilityDemandProfile } from "../helpers/CombinedUtilityDemand";
+import {
+  isUtilityExpansionGame,
+  ownedUtilityConnection,
+} from "../helpers/ExpansionContext";
 import { areaBaselineDemand } from "../helpers/AreaDemand";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { acquireUtility } from "./GameActions";
 import {
   acquisitionQuote,
-  acquisitionTargetForCorridor,
   expansionNetWorth,
-  initialOperatingArea,
+  expansionRetentionBaseline,
   ownedUtility,
   transferUtility,
   entitlementSources,
-  operatingAreaView,
-  gameForOperatingArea,
-  ownedIntertieCapacityW,
 } from "../helpers/Expansion";
 import {
   matchesStartingFacility,
@@ -76,6 +75,7 @@ import {
   initializeGameObjectiveProgress,
   recordGameObjectiveMonth,
   gameObjectiveResults,
+  rebaseGameRetentionBaseline,
 } from "../helpers/ObjectiveRules";
 import { chooseScenarioResponse } from "./GameActions";
 import {
@@ -101,7 +101,6 @@ import {
   policyAvailable,
   validPolicyChange,
   samePolicyChoice,
-  syncCompanyPolicyPending,
   isOperatingPolicy,
   buildoutComplete,
   programCustomers,
@@ -296,7 +295,6 @@ import {
 } from "../data/Facilities";
 import {
   copyCommitmentMetadata,
-  shareCommitmentMetadata,
   hasPreparedGeneratorCommitment,
   prepareGeneratorCommitment,
   recordDispatchTarget,
@@ -366,7 +364,6 @@ import {
 interface BuildFacilityAction {
   facility: FacilityShoppingType;
   financed: boolean;
-  operatingAreaId?: UtilityAreaId;
 }
 
 interface ReprioritizeAction {
@@ -1108,21 +1105,11 @@ function recordColdSnap(
  * rollover meets that month's weather with its upgrade. Forecasts use isUpgradingAt for the outage
  * and install technology conversions on their private fleet in supplyForecastPass.
  */
-/** Existing equipment keeps the geography of its operating area for quotes and upgrades. */
-function facilityOperatingContext(
-  state: GameType,
-  facility: FacilityOperatingType,
-): GameType | undefined {
-  return facility.operatingAreaId
-    ? gameForOperatingArea(state, facility.operatingAreaId)
-    : state;
-}
-
 function completeRetrofits(state: GameType, simulated = false) {
   state.facilities.forEach((facility) => {
     const upgrade = upgradeInProgress(facility);
     if (!upgrade || state.date.minute < upgrade.completesMinute) return;
-    const context = facilityOperatingContext(state, facility);
+    const context = state;
     if (!context) return;
     if (upgrade.upgrade === "combinedCycle") {
       completeGasConversion(facility, context);
@@ -1637,7 +1624,6 @@ export const gameSlice = createSlice({
       delete state.objectiveProgress;
       delete state.tutorialIntertieStress;
       delete state.utilityExpansion;
-      delete state.operatingAreaId;
       delete state.policies;
       delete state.policyPause;
       const a = action.payload;
@@ -1895,13 +1881,10 @@ export const gameSlice = createSlice({
 
       if (isUtilityExpansionGame(state)) {
         state.utilityExpansion = {
-          areas: [initialOperatingArea()],
+          networkAssets: [],
           loans: [],
           acquisitions: [],
         };
-        state.facilities.forEach((facility) => {
-          facility.operatingAreaId = "champlain";
-        });
         state.timeline = reforecastDemand(state);
       }
       desktopSimulationHooks()?.initialize(state);
@@ -2356,30 +2339,16 @@ export function applyAcquireUtility(
       : undefined;
   if (!quote || !transferUtility(state, payload)) return false;
   const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
-  const area = state.utilityExpansion!.areas.find(
-    (entry) => entry.id === quote.targetId,
-  )!;
-  now.areaTicks = {
-    ...now.areaTicks,
-    [area.id]: operatingAreaWeather(state, area, now),
-  };
-  now.areaTicks[area.id]!.customers = area.customers;
-  refreshInterestRate(state, now.cash, now.netWorth);
-  const transferredCustomers = now.customers;
-  const cohortCounts = Object.fromEntries(
-    state.utilityExpansion!.areas.map((entry) => [
-      entry.id,
-      now.areaTicks?.[entry.id]?.customers ?? entry.customers,
-    ]),
+  now.entitlementImportCapacityW = entitlementSources(state, now).reduce(
+    (sum, source) => sum + source.capacityW,
+    0,
   );
-  state.timeline = reforecastDemand(state);
-  const currentFrame = getTimeFromTimeline(state.date.minute, state.timeline)!;
-  currentFrame.customers = transferredCustomers;
-  for (const entry of state.utilityExpansion!.areas) {
-    const local = currentFrame.areaTicks?.[entry.id];
-    if (local) local.customers = cohortCounts[entry.id];
-  }
-  state.timeline = reforecastSupply(state, true);
+  rebaseGameRetentionBaseline(state, expansionRetentionBaseline(state));
+  refreshInterestRate(state, now.cash, now.netWorth);
+  // The settled current tick retains its meters, stored energy and program queues. Ownership
+  // and cash transfer now; the enlarged demand and shared fleet settle on the next elapsed tick.
+  state.timeline = reforecastDemand(state, 1, [], [], [], undefined, true);
+  state.timeline = reforecastSupply(state, true, TICK_MINUTES, undefined, true);
   logGameEvent(
     state,
     "BUILD",
@@ -2403,9 +2372,8 @@ export interface UtilityAcquisitionPreview {
   afterMarginW: number;
   beforeMonthlyCash: number;
   afterMonthlyCash: number;
-  areaMargins: { name: string; beforeW: number | undefined; afterW: number }[];
 }
-/** The review dialog uses the real dispatch on private snapshots. */
+/** Review uses the same company demand and dispatch owners on private snapshots. */
 export function previewUtilityAcquisition(
   game: GameType,
   targetId: string,
@@ -2417,11 +2385,9 @@ export function previewUtilityAcquisition(
   const tick = getTimeFromTimeline(snapshot.date.minute, snapshot.timeline);
   if (!tick) return undefined;
   const before = generateForecastTimeline(snapshot, tick.cash, tick.customers);
-  // The preview is useful even when the player is still saving up for the deal.
-  tick.cash = Math.max(
-    tick.cash,
-    financed ? quote.financedCashDue : quote.cashDue,
-  );
+  const due = financed ? quote.financedCashDue : quote.cashDue;
+  const cashBefore = tick.cash;
+  tick.cash = Math.max(cashBefore, due);
   if (
     !transferUtility(snapshot, {
       targetId: quote.targetId,
@@ -2430,32 +2396,18 @@ export function previewUtilityAcquisition(
     })
   )
     return undefined;
-  const due = financed ? quote.financedCashDue : quote.cashDue;
-  const cashBefore = getTimeFromTimeline(game.date.minute, game.timeline)!.cash;
+  rebaseGameRetentionBaseline(snapshot, expansionRetentionBaseline(snapshot));
   tick.cash = cashBefore - due;
   const after = generateForecastTimeline(snapshot, tick.cash, tick.customers);
-  const margin = (ticks: TickPresentFutureType[], id: UtilityAreaId) =>
+  const margin = (ticks: TickPresentFutureType[]) =>
     Math.min(
-      ...ticks.map((frame) => {
-        const local = frame.areaTicks?.[id];
-        return (
-          local?.reserveW ?? (local ? local.supplyW - local.demandW : Infinity)
-        );
-      }),
+      ...ticks.map((tick) => tick.reserveW ?? tick.supplyW - tick.demandW),
     );
-  const areaMargins = snapshot.utilityExpansion!.areas.map((area) => ({
-    name: UTILITY_AREAS[area.id].name,
-    beforeW: ownedUtility(game, area.id) ? margin(before, area.id) : undefined,
-    afterW: margin(after, area.id),
-  }));
   return {
-    beforeMarginW: Math.min(
-      ...game.utilityExpansion.areas.map((area) => margin(before, area.id)),
-    ),
-    afterMarginW: Math.min(...areaMargins.map((area) => area.afterW)),
+    beforeMarginW: margin(before),
+    afterMarginW: margin(after),
     beforeMonthlyCash: before.at(-1)?.cash ?? cashBefore,
     afterMonthlyCash: after.at(-1)?.cash ?? tick.cash,
-    areaMargins,
   };
 }
 
@@ -2484,16 +2436,12 @@ function applyBuildFacility(
   state: GameType,
   payload: BuildFacilityAction,
 ): boolean {
-  if (!validBuildFacility(payload)) return false;
+  if (
+    !validBuildFacility(payload) ||
+    Object.prototype.hasOwnProperty.call(payload, "operatingAreaId")
+  )
+    return false;
   const requested = payload.facility;
-  const requestedArea =
-    payload.operatingAreaId ??
-    (state.utilityExpansion ? "champlain" : undefined);
-  const area =
-    requestedArea &&
-    state.utilityExpansion?.areas.find((entry) => entry.id === requestedArea);
-  if (payload.operatingAreaId !== undefined && !area) return false;
-  const buildState = area ? operatingAreaView(state, area) : state;
   // Validate future shopping quotes as carefully as current catalog entries.
   if (
     requested.name === "Iron-Air Battery" &&
@@ -2502,7 +2450,7 @@ function applyBuildFacility(
     return false;
   const hydro = isConventionalHydro(requested);
   const hydroSite = hydro
-    ? getHydroAvailability(buildState, requested.peakW)
+    ? getHydroAvailability(state, requested.peakW)
     : undefined;
   if (hydro && (state.date.year <= 1882 || hydroSite?.status !== "available"))
     return false;
@@ -2521,8 +2469,8 @@ function applyBuildFacility(
     return false;
   }
   const viableLocationsRemaining = getViableLocationsRemaining(
-    buildState.location,
-    buildState.facilities,
+    state.location,
+    state.facilities,
     built.name,
   );
   // Recheck current state instead of trusting the shopping-card snapshot in the action. It keeps
@@ -2542,7 +2490,6 @@ function applyBuildFacility(
   state = buildFacilityHelper(state, built, payload.financed);
   const added = state.facilities.find(({ id }) => !existingIds.has(id));
   if (!added) return false;
-  if (requestedArea) added.operatingAreaId = requestedArea;
   // Book this loan at the quoted rate, then price the next one against the new debt and cash.
   if (payload.financed) refreshInterestRate(state, now.cash);
   if (isMaterialCapacityDecision(state, added.peakW)) {
@@ -2674,6 +2621,7 @@ function applyReprioritizeTransmissionLine(
   )
     return false;
   const moved = lines[payload.spotInList];
+  if (ownedUtilityConnection(state, moved.corridorId)) return false;
   arrayMove(lines, payload.spotInList, destination);
   recordMeaningfulDecision(state, {
     lever: `trading-order:${moved.id}`,
@@ -2786,7 +2734,13 @@ function applyBuildTransmissionLine(
 function applyCancelTransmissionLine(state: GameType, id: number): boolean {
   const line = state.transmission?.lines.find((item) => item.id === id);
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
-  if (!line || line.yearsToBuildLeft <= 0 || !now || !state.transmission)
+  if (
+    !line ||
+    ownedUtilityConnection(state, line.corridorId) ||
+    line.yearsToBuildLeft <= 0 ||
+    !now ||
+    !state.transmission
+  )
     return false;
   now.cash += line.buildCost - line.loanAmountLeft;
   state.transmission.lines = state.transmission.lines.filter(
@@ -2805,7 +2759,12 @@ function applyTogglePauseTransmissionLine(
   id: number,
 ): boolean {
   const line = state.transmission?.lines.find((item) => item.id === id);
-  if (!line || line.yearsToBuildLeft > 0) return false;
+  if (
+    !line ||
+    ownedUtilityConnection(state, line.corridorId) ||
+    line.yearsToBuildLeft > 0
+  )
+    return false;
   const before = line.paused ? "paused" : "operating";
   line.paused = !line.paused;
   recordMeaningfulDecision(state, {
@@ -2834,7 +2793,14 @@ function applyUpgradeTransmissionLine(
   );
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   // Only a finished line can be widened, and only one job at a time.
-  if (!line || !now || line.yearsToBuildLeft > 0 || line.upgrade) return false;
+  if (
+    !line ||
+    ownedUtilityConnection(state, line.corridorId) ||
+    !now ||
+    line.yearsToBuildLeft > 0 ||
+    line.upgrade
+  )
+    return false;
   // Priced straight off the authored corridor, with no difficulty or inflation multiplier, the
   // same way building the line was: interties are quoted from TRANSMISSION_PROFILE_DATA as-is.
   const quote = intertieUpgradeQuote(
@@ -2945,7 +2911,7 @@ function applyRetrofitFacility(
   if (!validRetrofitFacility(payload)) return false;
   const facility = state.facilities.find(({ id }) => id === payload.facilityId);
   if (!facility || facility.yearsToBuildLeft > 0) return false;
-  const context = facilityOperatingContext(state, facility);
+  const context = state;
   if (!context) return false;
   const conversion = payload.upgrade === "combinedCycle";
   const cost =
@@ -3307,14 +3273,7 @@ function applyPolicyEdit(
     !cancel &&
     !isOperatingPolicy(payload.id) &&
     !isFlexibilityPolicy(payload.id) &&
-    (state.utilityExpansion
-      ? state.utilityExpansion.areas.every((area) =>
-          buildoutComplete(
-            (area.id === "champlain" ? state.policies : area.policies)
-              ?.programs[payload.id].adoption ?? 0,
-          ),
-        )
-      : buildoutComplete(existing?.adoption ?? 0))
+    buildoutComplete(existing?.adoption ?? 0)
   )
     return false;
   const before = policyChoiceLabel(payload.id, existing?.pending ?? existing);
@@ -3344,7 +3303,6 @@ function applyPolicyEdit(
     }
   }
   const program = state.policies!.programs[payload.id];
-  syncCompanyPolicyPending(state, payload.id);
   const after = policyChoiceLabel(
     payload.id,
     cancel ? existing : (program.pending ?? program),
@@ -4144,45 +4102,6 @@ function getDemandW(
   now: TickPresentFutureType,
   tickScale = 1,
 ) {
-  if (game.utilityExpansion && !game.operatingAreaId) {
-    const priorAreaTicks = now.areaTicks;
-    now.areaTicks = {};
-    now.customers = 0;
-    now.demandW = 0;
-    const totals = { ...now.demandByType };
-    DEMAND_TYPES.forEach((type) => {
-      totals[type] = 0;
-    });
-    for (const area of game.utilityExpansion.areas) {
-      const view = operatingAreaView(game, area);
-      advancePolicies(view, date.monthsElapsed);
-      if (area.id !== "champlain") area.policies = view.policies;
-      const local = priorAreaTicks?.[area.id]
-        ? { ...priorAreaTicks[area.id]! }
-        : operatingAreaWeather(game, area, now);
-      local.expensesPolicy =
-        (POLICY_IDS.reduce(
-          (sum, id) => sum + (view.policies?.programs[id].spending ?? 0),
-          0,
-        ) *
-          tickScale) /
-        TICKS_PER_MONTH;
-      const prior = prev.areaTicks?.[area.id] ?? {
-        ...local,
-        minute: prev.minute,
-        customers: area.customers,
-      };
-      local.demandW = getDemandW(date, view, prior, local, tickScale);
-      now.areaTicks[area.id] = local;
-      now.customers += local.customers;
-      now.demandW += local.demandW;
-      DEMAND_TYPES.forEach((type) => {
-        totals[type] += local.demandByType[type];
-      });
-    }
-    now.demandByType = totals;
-    return now.demandW;
-  }
   const scenario =
     getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
   now.customerRate = updateCustomerRate(
@@ -4204,22 +4123,21 @@ function getDemandW(
     tickScale,
   });
   // A current-frame reforecast is not another customer-growth interval.
-  if (game.operatingAreaId && now.minute === game.date.minute) {
-    const cohort = game.utilityExpansion?.areas.find(
-      (area) => area.id === game.operatingAreaId,
-    );
-    if (cohort) now.customers = cohort.customers;
-    now.customerRate =
-      getTimeFromTimeline(game.date.minute, game.timeline)?.customerRate ??
-      prev.customerRate;
+  if (game.utilityExpansion && now.minute === game.date.minute) {
+    const current = getTimeFromTimeline(game.date.minute, game.timeline);
+    now.customers = current?.customers ?? prev.customers;
+    now.customerRate = current?.customerRate ?? prev.customerRate;
   }
+  const profile = game.utilityExpansion
+    ? combinedUtilityDemandProfile(game)
+    : undefined;
   const { baselineW, weatherShare } = areaBaselineDemand(
     date,
     game.location,
     now.temperatureC,
     now.customers,
-    game.startingDemandScale,
-    game.demandShapeExponent ?? 1,
+    profile?.demandScale ?? game.startingDemandScale,
+    profile?.demandShapeExponent ?? game.demandShapeExponent ?? 1,
   );
   const effects = storyEffectsAt(date, game);
   const baselineDemandW = baselineW * (effects.demandMultiplier || 1);
@@ -4229,9 +4147,7 @@ function getDemandW(
     game.startingYear,
     game.location,
     game.loadAdditions,
-    game.operatingAreaId
-      ? UTILITY_AREAS[game.operatingAreaId].energyShares
-      : undefined,
+    profile?.energyShares,
   );
   // Demand is rebuilt here; the supply pass must not restore a previous forecast's discharge.
   delete now.customerBatteryDischargeW;
@@ -4381,17 +4297,6 @@ function reforecastWeatherAndPrices(
       } else {
         forecast.windOffshoreKph = weather.WIND_OFFSHORE_KPH;
       }
-      if (state.utilityExpansion && !state.operatingAreaId) {
-        const previousAreaTicks = forecast.areaTicks;
-        forecast.areaTicks = {};
-        for (const area of state.utilityExpansion.areas)
-          forecast.areaTicks[area.id] = operatingAreaWeather(
-            state,
-            area,
-            { ...forecast, areaTicks: previousAreaTicks },
-            forecastWeather,
-          );
-      }
       return forecast;
     }
     return t;
@@ -4405,6 +4310,7 @@ function reforecastDemand(
   initialThermal: TickPresentFutureType["deferredThermal"] = [],
   initialCharging: TickPresentFutureType["deferredCharging"] = [],
   representedTransportationW?: number,
+  preserveCurrentFrame = false,
 ): TickPresentFutureType[] {
   const projection = {
     ...state,
@@ -4417,19 +4323,11 @@ function reforecastDemand(
     deferredThermal: initialThermal,
     deferredCharging: initialCharging,
   } as TickPresentFutureType;
-  if (state.utilityExpansion && !state.operatingAreaId && prev.areaTicks) {
-    prev = {
-      ...prev,
-      areaTicks: Object.fromEntries(
-        Object.entries(prev.areaTicks).map(([id, local]) => [
-          id,
-          local ? beforeAreaProgramTick(local) : local,
-        ]),
-      ),
-    };
-  }
   return state.timeline.map((t: TickPresentFutureType) => {
-    if (t.minute >= state.date.minute) {
+    if (
+      t.minute >= state.date.minute &&
+      !(preserveCurrentFrame && t.minute === state.date.minute)
+    ) {
       const date = getDateFromMinute(t.minute, state.startingYear);
       advanceGamePolicies(
         projection,
@@ -4520,562 +4418,12 @@ function forecastIndexAt(state: GameType, minute: number): number {
 }
 
 // Updates game state and now in place
-/** Installation costs and historical hardware belong to cohorts, even with company-wide choices. */
 function advanceGamePolicies(
   state: GameType,
   month: number,
   representedTransportationW?: number,
 ) {
-  if (!state.utilityExpansion || state.operatingAreaId)
-    return advancePolicies(state, month, representedTransportationW);
-  const activated = new Set<import("../Types").PolicyId>();
-  for (const area of state.utilityExpansion.areas) {
-    const view = operatingAreaView(state, area);
-    const localTransportation = view.timeline.length
-      ? view.timeline.reduce(
-          (sum, tick) => sum + tick.demandByType.Transportation,
-          0,
-        ) / view.timeline.length
-      : 0;
-    advancePolicies(view, month, localTransportation).forEach((id) =>
-      activated.add(id),
-    );
-    if (area.id === "champlain") state.policies = view.policies;
-    else area.policies = view.policies;
-  }
-  return [...activated];
-}
-const AREA_PROGRAM_TICK_FIELDS = [
-  "customerBillingRate",
-  "deferredResidentialWh",
-  "deferredResidentialWhStart",
-  "deferredResidential",
-  "deferredResidentialStart",
-  "shiftedResidentialW",
-  "deferredThermal",
-  "deferredThermalStart",
-  "deferredCharging",
-  "deferredChargingStart",
-  "thermalShiftedW",
-  "thermalRecoveredW",
-  "evShiftedW",
-  "evRecoveredW",
-  "customerBatteryWh",
-  "customerBatteryWhStart",
-  "customerBatteryChargeW",
-  "customerBatteryGridChargeW",
-  "customerBatteryDischargeW",
-  "customerBatteryLossWh",
-  "rooftopSurplusW",
-  "rebateEligibleW",
-  "efficiencySavedW",
-  "rooftopSolarW",
-] as const;
-function beforeAreaProgramTick(
-  local: TickPresentFutureType,
-): TickPresentFutureType {
-  return {
-    ...local,
-    deferredResidential: cloneDeep(local.deferredResidentialStart ?? []),
-    deferredThermal: cloneDeep(local.deferredThermalStart ?? []),
-    deferredCharging: cloneDeep(local.deferredChargingStart ?? []),
-    customerBatteryWh: local.customerBatteryWhStart ?? 0,
-  };
-}
-
-function operatingAreaWeather(
-  state: GameType,
-  area: OperatingAreaState,
-  tick: TickPresentFutureType,
-  forecastWeather = false,
-): TickPresentFutureType {
-  const definition = UTILITY_AREAS[area.id];
-  const date = getDateFromMinute(tick.minute, state.startingYear);
-  const weather = forecastWeather
-    ? createWeatherForecast(
-        state.date,
-        state.seed,
-        definition.location.id,
-      )(date)
-    : getWeather(date, state.seed, 0, definition.location.id);
-  const hydro = getHydroConditions(date, state.seed, 0, definition.location.id);
-  const local: TickPresentFutureType = {
-    ...tick,
-    areaTicks: undefined,
-    customers: area.customers,
-    windKph: weather.WIND_KPH,
-    windAirborneKph: getAirborneWindReferenceKph(weather.WIND_KPH),
-    temperatureC: weather.TEMP_C,
-    solarIrradianceWM2: getRawSolarIrradianceWM2(
-      date,
-      definition.location,
-      weather.CLOUD_PCT,
-    ),
-    precipitationMm: hydro.precipitationMm,
-    snowpackMm: hydro.snowpackMm,
-    hydroRunoffMm: hydro.runoffMm,
-  };
-  const previous = tick.areaTicks?.[area.id];
-  local.customerRate = previous?.customerRate ?? local.customerRate;
-  for (const key of AREA_PROGRAM_TICK_FIELDS) {
-    delete local[key];
-    if (previous && Object.prototype.hasOwnProperty.call(previous, key))
-      Object.assign(local, { [key]: cloneDeep(previous[key]) });
-  }
-  if (!previous && area.id !== "champlain") {
-    const scenario =
-      getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
-    const sellerRate = getMarketRate(
-      scenario.dollarsPerkWh,
-      getDateFromMinute(area.activatedMinute, state.startingYear),
-      state.startingYear,
-      state.seed,
-    );
-    local.customerRate = sellerRate;
-    local.customerBillingRate = sellerRate;
-  }
-  return local;
-}
-function* operatingAreasPhases(
-  state: GameType,
-  prev: TickPresentFutureType,
-  now: TickPresentFutureType,
-  simulated?: boolean,
-  preRoll?: boolean,
-  optimizeCommitment = true,
-  stepMinutes = TICK_MINUTES,
-  advanceConstruction = true,
-): Generator<PeerPlan, TickPresentFutureType, PeerSettlement | undefined> {
-  const expansion = state.utilityExpansion!;
-  // Warmup advances dispatch toward the new weather frame, without any elapsed accounts,
-  // repayments, construction, stored energy, installations or lifetime benefits.
-  const warmup = preRoll
-    ? {
-        frame: { ...now },
-        facilities: state.facilities.map((node) => ({
-          node,
-          value: cloneDeep(node),
-        })),
-        lines: (state.transmission?.lines ?? []).map((node) => ({
-          node,
-          value: cloneDeep(node),
-        })),
-        loans: expansion.loans.map((node) => ({ node, value: { ...node } })),
-        commissioned: [...state.commissionedHydroSiteIds],
-        policies: cloneDeep(state.policies),
-        areaPolicies: expansion.areas.map((area) => ({
-          area,
-          policies: cloneDeep(area.policies),
-        })),
-      }
-    : undefined;
-  const views = expansion.areas.map((area) => {
-    const view = operatingAreaView(state, area);
-    if (area.id !== "champlain") {
-      advancePolicies(view, Math.floor(now.minute / MINUTES_PER_MONTH));
-      area.policies = view.policies;
-    }
-    return view;
-  });
-  const localTicks = expansion.areas.map((area) => {
-    const frame =
-      now.areaTicks?.[area.id] ?? operatingAreaWeather(state, area, now);
-    return { ...frame, areaTicks: undefined };
-  });
-  const phases = views.map((view, index) => {
-    const area = expansion.areas[index];
-    const prior = prev.areaTicks?.[area.id] ?? {
-      ...localTicks[index],
-      minute: prev.minute,
-      customers: area.customers,
-      cash: 0,
-    };
-    localTicks[index].cash = 0;
-    shareCommitmentMetadata(now, localTicks[index]);
-    const generator = supplyFacilitiesFinancesPhases(
-      view,
-      { ...prior, cash: 0 },
-      localTicks[index],
-      simulated,
-      preRoll,
-      optimizeCommitment,
-      stepMinutes,
-      advanceConstruction,
-    );
-    const plan = generator.next();
-    if (plan.done)
-      throw new Error("An operating area must publish its bounded supply plan");
-    return { generator, plan: plan.value };
-  });
-  const remaining = phases.map(({ plan }) => ({
-    offer: plan.offerW,
-    need: plan.shortageW,
-  }));
-  const settlements: PeerSettlement[] = phases.map(() => ({
-    importedW: 0,
-    exportedW: 0,
-    importEmissionsKgPerMWh: 0,
-  }));
-  const lines = expansion.areas.map((area) => {
-    const target = acquisitionTargetForCorridor(
-      state.transmission?.lines.find(
-        (line) => acquisitionTargetForCorridor(line.corridorId)?.id === area.id,
-      )?.corridorId ?? "",
-    );
-    const line =
-      target &&
-      state.transmission?.lines.find(
-        (entry) => entry.corridorId === target.corridorId,
-      );
-    const capacity = line
-      ? ownedIntertieCapacityW(state, line, {
-          ...now,
-          areaTicks: Object.fromEntries(
-            expansion.areas.map((entry, i) => [entry.id, localTicks[i]]),
-          ),
-        })
-      : 0;
-    return { line, left: capacity, flow: 0 };
-  });
-  // The authored topology is a bounded star. A target-to-target path consumes both wires.
-  for (let buyer = 0; buyer < remaining.length; buyer++)
-    for (let seller = 0; seller < remaining.length; seller++) {
-      if (
-        buyer === seller ||
-        remaining[buyer].need <= 0 ||
-        remaining[seller].offer <= 0
-      )
-        continue;
-      const path = [buyer, seller].filter((index) => index !== 0);
-      const watts = Math.min(
-        remaining[buyer].need,
-        remaining[seller].offer,
-        ...path.map((index) => lines[index].left),
-      );
-      if (!(watts > 0)) continue;
-      remaining[buyer].need -= watts;
-      remaining[seller].offer -= watts;
-      settlements[buyer].importedW += watts;
-      settlements[seller].exportedW += watts;
-      settlements[buyer].importEmissionsKgPerMWh +=
-        watts * phases[seller].plan.emissionsAt(settlements[seller].exportedW);
-      path.forEach((index) => {
-        lines[index].left -= watts;
-        lines[index].flow += index === seller ? watts : -watts;
-      });
-    }
-  let external: PeerSettlement | undefined;
-  if (state.multiplayer && !simulated) {
-    external = yield {
-      ...phases[0].plan,
-      ...phases[0].plan.externalPlanAfterOwnedExports?.(
-        settlements[0].exportedW,
-      ),
-      shortageW:
-        remaining[0].need +
-        remaining
-          .slice(1)
-          .reduce(
-            (sum, area, index) =>
-              sum + Math.min(area.need, lines[index + 1].left),
-            0,
-          ),
-    };
-    if (external) {
-      let incoming = external.importedW;
-      for (let index = 0; index < remaining.length; index++) {
-        const delivered = Math.min(
-          incoming,
-          remaining[index].need,
-          index === 0 ? Infinity : lines[index].left,
-        );
-        incoming -= delivered;
-        remaining[index].need -= delivered;
-        settlements[index].importedW += delivered;
-        settlements[index].importEmissionsKgPerMWh +=
-          delivered * external.importEmissionsKgPerMWh;
-        if (index) {
-          lines[index].left -= delivered;
-          lines[index].flow -= delivered;
-        }
-      }
-      settlements[0].exportedW += external.exportedW;
-      settlements[0].externalExportW = external.exportedW;
-    }
-  }
-  settlements.forEach((settlement) => {
-    if (settlement.importedW > 0)
-      settlement.importEmissionsKgPerMWh /= settlement.importedW;
-  });
-  const completed = phases.map(({ generator }, index) => {
-    const result = generator.next(settlements[index]);
-    if (!result.done) throw new Error("Area dispatch did not settle");
-    // Pre-roll stabilizes outputs against a weather frame; it is no elapsed customer time.
-    if (preRoll) result.value.customers = expansion.areas[index].customers;
-    return result.value;
-  });
-  now.areaTicks = {};
-  const sumKeys = [
-    "supplyW",
-    "demandW",
-    "availableSupplyW",
-    "storedWh",
-    "storageLossWh",
-    "storageChargeW",
-    "storageDischargeW",
-    "hydroReservoirWh",
-    "hydroReservoirCapacityWh",
-    "hydroSpillWh",
-    "hydroMandatedReleaseW",
-    "revenue",
-    "revenueExports",
-    "revenueGrants",
-    "expensesImports",
-    "expensesOM",
-    "expensesFuel",
-    "expensesCarbonFee",
-    "expensesInterest",
-    "expensesPolicy",
-    "localKgco2e",
-    "importedKgco2e",
-    "constructionKgco2e",
-    "kgco2e",
-    "customers",
-    "importedW",
-    "exportedW",
-    "entitlementImportedW",
-    "entitlementImportCapacityW",
-    "customerBatteryWh",
-    "customerBatteryChargeW",
-    "customerBatteryDischargeW",
-    "customerBatteryLossWh",
-  ] as const;
-  for (const key of sumKeys)
-    now[key] = completed.reduce((sum, tick) => sum + (tick[key] ?? 0), 0);
-  // Consolidated service is the sum actually served locally; surplus behind a constrained wire
-  // cannot conceal another area's shortage in revenue, retention or objectives.
-  now.curtailedW = completed.reduce(
-    (sum, tick) => sum + Math.max(0, tick.supplyW - tick.demandW),
-    0,
-  );
-  now.supplyW = completed.reduce(
-    (sum, tick) => sum + Math.min(tick.supplyW, tick.demandW),
-    0,
-  );
-  const deliveredW = now.supplyW;
-  now.customerBillingRate =
-    deliveredW > 0
-      ? completed.reduce(
-          (sum, tick) =>
-            sum +
-            Math.min(tick.supplyW, tick.demandW) *
-              (tick.customerBillingRate ?? state.dollarsPerkWh),
-          0,
-        ) / deliveredW
-      : state.dollarsPerkWh;
-  now.customerRate =
-    now.customers > 0
-      ? completed.reduce(
-          (sum, tick) => sum + tick.customers * tick.customerRate,
-          0,
-        ) / now.customers
-      : state.customerRate;
-  now.demandByType = { ...completed[0].demandByType };
-  now.supplyByFuel = {};
-  DEMAND_TYPES.forEach((type) => {
-    now.demandByType[type] = completed.reduce(
-      (sum, tick) => sum + tick.demandByType[type],
-      0,
-    );
-  });
-  completed.forEach((tick, index) => {
-    const area = expansion.areas[index];
-    now.areaTicks![area.id] = tick;
-    Object.entries(tick.supplyByFuel).forEach(([fuel, watts]) => {
-      now.supplyByFuel[fuel as FuelNameType] =
-        (now.supplyByFuel[fuel as FuelNameType] ?? 0) + watts;
-    });
-    if (!preRoll && (!simulated || now.minute > state.date.minute)) {
-      area.customers = tick.customers;
-      area.retentionLowWatermark = Math.min(
-        area.retentionLowWatermark,
-        1,
-        tick.customers / area.transferredCustomers,
-      );
-    }
-  });
-  const internalImports =
-    settlements.reduce((sum, settlement) => sum + settlement.importedW, 0) -
-    (external?.importedW ?? 0);
-  const internalExports =
-    settlements.reduce((sum, settlement) => sum + settlement.exportedW, 0) -
-    (external?.exportedW ?? 0);
-  const internalEmissions =
-    settlements.reduce(
-      (sum, settlement) =>
-        sum + settlement.importedW * settlement.importEmissionsKgPerMWh,
-      0,
-    ) -
-    (external?.importedW ?? 0) * (external?.importEmissionsKgPerMWh ?? 0);
-  const ticksPerHour = 60 / stepMinutes;
-  now.importedW = Math.max(0, (now.importedW ?? 0) - internalImports);
-  now.exportedW = Math.max(0, (now.exportedW ?? 0) - internalExports);
-  now.importedKgco2e = Math.max(
-    0,
-    (now.importedKgco2e ?? 0) -
-      ((internalEmissions / ticksPerHour) * GAME_TO_REAL_YEARS) / 1e6,
-  );
-  now.kgco2e =
-    (now.localKgco2e ?? 0) +
-    (now.importedKgco2e ?? 0) +
-    (now.constructionKgco2e ?? 0);
-  now.reserveW = Math.min(
-    ...completed.map((tick) => tick.reserveW ?? tick.supplyW - tick.demandW),
-  );
-  now.transmissionCapacityW = completed[0].transmissionCapacityW;
-  now.importKgco2ePerMWh =
-    (now.importedW ?? 0) > 0
-      ? ((now.importedKgco2e ?? 0) * ticksPerHour * 1e6) /
-        GAME_TO_REAL_YEARS /
-        now.importedW!
-      : 0;
-  now.cash = prev.cash + completed.reduce((sum, tick) => sum + tick.cash, 0);
-  if (external) {
-    const price = peerTradePrice(state, now);
-    const bought =
-      (((external.importedW / ticksPerHour) * GAME_TO_REAL_YEARS) / 1e6) *
-      price;
-    const sold =
-      (((external.exportedW / ticksPerHour) * GAME_TO_REAL_YEARS) / 1e6) *
-      price;
-    now.expensesImports += bought;
-    now.revenueExports += sold;
-    now.revenue += sold;
-    now.cash += sold - bought;
-  }
-  const ticksPerMonth = TICKS_PER_MONTH / (stepMinutes / TICK_MINUTES);
-  let repayment = 0;
-  expansion.loans.forEach((loan) => {
-    if (loan.loanAmountLeft <= 0) return;
-    const interest =
-      getPaymentInterest(loan.loanAmountLeft, loan.interestRate) /
-      ticksPerMonth;
-    const principal = Math.max(
-      0,
-      Math.min(
-        loan.loanAmountLeft,
-        loan.loanMonthlyPayment / ticksPerMonth - interest,
-      ),
-    );
-    // A forecast re-dispatches the current frame without advancing any elapsed ledger.
-    if (!preRoll && advanceConstruction) {
-      loan.loanAmountLeft -= principal;
-      repayment += principal + interest;
-    }
-    now.expensesInterest += interest;
-  });
-  const index = getInflationIndex(
-    getDateFromMinute(now.minute, state.startingYear),
-    2005,
-    state.seed,
-  );
-  const networkOM =
-    (expansion.areas.reduce(
-      (sum, area) => sum + UTILITY_AREAS[area.id].annualNetworkOM,
-      0,
-    ) *
-      index *
-      DIFFICULTIES[state.difficulty].expensesOM) /
-    (12 * ticksPerMonth);
-  now.expensesOM += networkOM;
-  now.cash = Math.round(now.cash - repayment - networkOM);
-  now.netWorth = getNetWorth(
-    state.facilities,
-    now.cash,
-    now.minute,
-    state.transmission?.lines,
-    state,
-  );
-  lines.forEach(({ line, flow }, index) => {
-    if (index && line) line.currentFlowW = flow;
-  });
-  state.customerMarketSize = expansion.areas.reduce(
-    (sum, area) =>
-      sum +
-      area.customerMarketSize / customerMarketSizeAt(1, area.activatedMinute),
-    0,
-  );
-  if (warmup) {
-    for (const { node, value } of warmup.facilities) {
-      const output = node.currentW,
-        committed = node.committed;
-      for (const key of Object.keys(node))
-        if (!(key in value))
-          delete (node as unknown as Record<string, unknown>)[key];
-      Object.assign(node, value, { currentW: output, committed });
-    }
-    for (const { node, value } of warmup.lines) {
-      const flow = node.currentFlowW;
-      Object.assign(node, value, { currentFlowW: flow });
-    }
-    warmup.loans.forEach(({ node, value }) => Object.assign(node, value));
-    state.commissionedHydroSiteIds = warmup.commissioned;
-    state.policies = warmup.policies;
-    warmup.areaPolicies.forEach(({ area, policies }) => {
-      area.policies = policies;
-    });
-    now.cash = warmup.frame.cash;
-    for (const area of expansion.areas) {
-      const local = now.areaTicks?.[area.id],
-        prior = warmup.frame.areaTicks?.[area.id];
-      if (!local) continue;
-      local.customers = area.customers;
-      if (prior) {
-        local.cash = prior.cash;
-        local.customerRate = prior.customerRate;
-        for (const key of [
-          "customerBatteryWh",
-          "customerBatteryWhStart",
-          "customerBatteryLossWh",
-        ] as const)
-          local[key] = prior[key];
-      }
-      const facilities = state.facilities.filter(
-        (facility) => (facility.operatingAreaId ?? "champlain") === area.id,
-      );
-      local.storedWh = facilities.reduce(
-        (sum, facility) => sum + (isStorage(facility) ? facility.currentWh : 0),
-        0,
-      );
-      local.hydroReservoirWh = facilities.reduce(
-        (sum, facility) => sum + (facility.reservoirWh ?? 0),
-        0,
-      );
-    }
-    now.storedWh = state.facilities.reduce(
-      (sum, facility) => sum + (isStorage(facility) ? facility.currentWh : 0),
-      0,
-    );
-    now.hydroReservoirWh = state.facilities.reduce(
-      (sum, facility) => sum + (facility.reservoirWh ?? 0),
-      0,
-    );
-    now.customerRate = warmup.frame.customerRate;
-    for (const key of [
-      "customerBatteryWh",
-      "customerBatteryWhStart",
-      "customerBatteryLossWh",
-    ] as const)
-      now[key] = warmup.frame[key];
-    now.netWorth = getNetWorth(
-      state.facilities,
-      now.cash,
-      now.minute,
-      state.transmission?.lines,
-      state,
-    );
-  }
-  return now;
+  return advancePolicies(state, month, representedTransportationW);
 }
 
 function updateSupplyFacilitiesFinances(
@@ -5101,9 +4449,7 @@ export function peerTradePrice(
   state: GameType,
   tick: TickPresentFutureType,
 ): number {
-  return state.operatingAreaId
-    ? Number.MAX_SAFE_INTEGER
-    : (state.multiplayer?.pricePerMWh ?? basePeerTradePrice(tick));
+  return state.multiplayer?.pricePerMWh ?? basePeerTradePrice(tick);
 }
 
 function* supplyFacilitiesFinancesPhases(
@@ -5116,18 +4462,26 @@ function* supplyFacilitiesFinancesPhases(
   stepMinutes = TICK_MINUTES,
   advanceConstruction = true,
 ): Generator<PeerPlan, TickPresentFutureType, PeerSettlement | undefined> {
-  if (state.utilityExpansion && !state.operatingAreaId)
-    return yield* operatingAreasPhases(
-      state,
-      prev,
-      now,
-      simulated,
-      preRoll,
-      optimizeCommitment,
-      stepMinutes,
-      advanceConstruction,
-    );
   const { facilities } = state;
+  const noElapsed =
+    state.utilityExpansion && (preRoll || !advanceConstruction)
+      ? {
+          frame: { ...now },
+          facilities: facilities.map((node) => ({
+            node,
+            value: cloneDeep(node),
+          })),
+          lines: (state.transmission?.lines ?? []).map((node) => ({
+            node,
+            value: cloneDeep(node),
+          })),
+          loans: state.utilityExpansion.loans.map((node) => ({
+            node,
+            value: { ...node },
+          })),
+          commissioned: [...state.commissionedHydroSiteIds],
+        }
+      : undefined;
   const tickScale = stepMinutes / TICK_MINUTES;
   const ticksPerHour = 60 / stepMinutes;
   const ticksPerMonth = TICKS_PER_MONTH / tickScale;
@@ -5191,8 +4545,7 @@ function* supplyFacilitiesFinancesPhases(
   const difficulty = DIFFICULTIES[state.difficulty];
   // Only a live co-op tick settles with peers. Forecasts and pre-rolls estimate peer supply as
   // zero, so they charge storage and value spare output like a single-player grid.
-  const peerSettlement =
-    (!!state.multiplayer && !simulated) || !!state.operatingAreaId;
+  const peerSettlement = !!state.multiplayer && !simulated;
 
   // Everything being built right now emits while it is being built, spread evenly across each
   // project's schedule. Derived from how far each clock actually moved rather than from elapsed
@@ -5703,69 +5056,11 @@ function* supplyFacilitiesFinancesPhases(
   supply -= redundantEntitlementW;
   let peer: PeerSettlement | undefined;
   if (peerSettlement) {
-    const reserveW = state.operatingAreaId
-      ? 0
-      : now.demandW * PEER_TRADE_RESERVE_FRACTION;
-    const nativeSurplusW = Math.max(0, supply - now.demandW - reserveW);
-    const unusedEntitlementW = entitlementCapacityW - entitlementDeliveredW;
-    const nativeHeadroomW = Math.max(
-      0,
-      peerHeadroom.reduce((sum, item) => sum + item.watts, 0) -
-        Math.max(0, now.demandW + reserveW - supply),
-    );
+    const reserveW = now.demandW * PEER_TRADE_RESERVE_FRACTION;
     const intensity = (g: GeneratorOperatingType) =>
       (g.btuPerWh || 0) * (FUELS[g.fuel]?.kgCO2ePerBtu || 0) * 1e6;
     peer = yield {
-      ...(state.operatingAreaId
-        ? {
-            externalPlanAfterOwnedExports: (ownedExportW: number) => {
-              // Owned transfers consume surplus, then contracted rights, then native headroom.
-              // Human neighbors can buy only the native energy left after those transfers.
-              const surplusLeftW = Math.max(0, nativeSurplusW - ownedExportW);
-              const usedHeadroomW = Math.max(
-                0,
-                ownedExportW - nativeSurplusW - unusedEntitlementW,
-              );
-              const offerW =
-                supply < now.demandW
-                  ? 0
-                  : surplusLeftW + Math.max(0, nativeHeadroomW - usedHeadroomW);
-              return {
-                offerW,
-                emissionsAt: (exportedW: number) => {
-                  const nativeSupplyW = supply - entitlementDeliveredW;
-                  const nativeWeight = facilities.reduce(
-                    (sum, g) =>
-                      sum +
-                      (isStorage(g) || g.paused
-                        ? 0
-                        : g.currentW * intensity(g)),
-                    0,
-                  );
-                  const surplusW = Math.min(exportedW, surplusLeftW);
-                  let weighted =
-                    nativeSupplyW > 0
-                      ? (surplusW * nativeWeight) / nativeSupplyW
-                      : 0;
-                  let extraW = Math.max(0, exportedW - surplusW);
-                  let skippedW = usedHeadroomW;
-                  for (const item of peerHeadroom) {
-                    const usedW = Math.min(item.watts, skippedW);
-                    skippedW -= usedW;
-                    const deliveredW = Math.min(item.watts - usedW, extraW);
-                    extraW -= deliveredW;
-                    weighted += deliveredW * intensity(item.generator);
-                  }
-                  return exportedW > 0 ? weighted / exportedW : 0;
-                },
-              };
-            },
-          }
-        : {}),
       offerW:
-        (state.operatingAreaId
-          ? entitlementCapacityW - entitlementDeliveredW
-          : 0) +
         Math.max(0, supply - now.demandW - reserveW) +
         Math.max(
           0,
@@ -5777,6 +5072,30 @@ function* supplyFacilitiesFinancesPhases(
       temperatureC: now.temperatureC,
       solarIrradianceWM2: now.solarIrradianceWM2,
       emissionsAt: (exportedW) => {
+        if (state.utilityExpansion) {
+          const surplusW = Math.min(
+            exportedW,
+            Math.max(0, supply - now.demandW - reserveW),
+          );
+          const nativeSupplyW = supply - entitlementDeliveredW;
+          const nativeWeight = facilities.reduce(
+            (sum, facility) =>
+              sum +
+              (isStorage(facility) || facility.paused
+                ? 0
+                : facility.currentW * intensity(facility)),
+            0,
+          );
+          let weighted =
+            nativeSupplyW > 0 ? (surplusW * nativeWeight) / nativeSupplyW : 0;
+          let extraW = Math.max(0, exportedW - surplusW);
+          for (const item of peerHeadroom) {
+            const deliveredW = Math.min(item.watts, extraW);
+            extraW -= deliveredW;
+            weighted += deliveredW * intensity(item.generator);
+          }
+          return exportedW > 0 ? weighted / exportedW : 0;
+        }
         let watts = entitlementDeliveredW,
           weighted = 0;
         let boughtW = entitlementDeliveredW;
@@ -5818,15 +5137,6 @@ function* supplyFacilitiesFinancesPhases(
       0,
       (peer?.exportedW || 0) - Math.max(0, supply - now.demandW),
     );
-    const ownedExportW = (peer?.exportedW || 0) - (peer?.externalExportW || 0);
-    const extraEntitlementW = Math.min(
-      extra,
-      Math.max(0, ownedExportW - Math.max(0, supply - now.demandW)),
-      entitlementCapacityW - entitlementDeliveredW,
-    );
-    entitlementDeliveredW += extraEntitlementW;
-    supply += extraEntitlementW;
-    extra -= extraEntitlementW;
     for (const { generator, watts } of peerHeadroom) {
       const delivered = Math.min(watts, extra);
       generator.currentW += delivered;
@@ -5862,14 +5172,14 @@ function* supplyFacilitiesFinancesPhases(
       leftovers -= draw;
     }
   }
+  transmission.lines.forEach((line) => {
+    if (ownedUtilityConnection(state, line.corridorId)) line.currentFlowW = 0;
+  });
   const operatingLines = transmission.lines.filter(
     ({ yearsToBuildLeft, corridorId }) =>
       yearsToBuildLeft <= 0 &&
       !isPeerCorridorId(corridorId) &&
-      !(
-        state.operatingAreaId &&
-        ownedUtility(state, acquisitionTargetForCorridor(corridorId)?.id ?? "")
-      ),
+      !ownedUtilityConnection(state, corridorId),
   );
   const intertieContext = intertieContextForGame(state);
   const tradingYear = intertieYear(now.minute, state.startingYear);
@@ -5929,9 +5239,8 @@ function* supplyFacilitiesFinancesPhases(
     supply - (peer?.importedW || 0) + (peer?.exportedW || 0);
   const localSupplyW = supply - charge - batteryAfter.gridChargeW;
   const clearing = clearTransmissionMarket({
-    // Owned settlement adds and subtracts separately computed flows. Normalize only its
-    // arithmetic boundary before deciding whether any native outside trade really exists.
-    localSupplyW: state.operatingAreaId
+    // Contract/load arithmetic may leave a few ULPs at the served-load boundary.
+    localSupplyW: state.utilityExpansion
       ? supplyAtDemandBoundary(localSupplyW, now.demandW)
       : localSupplyW,
     demandW: now.demandW,
@@ -5967,12 +5276,8 @@ function* supplyFacilitiesFinancesPhases(
     importEmissionsWeight += basisW * offer.emissionsKgco2ePerMWh;
     importEmissionsBasisW += basisW;
   });
-  importCostPerHour +=
-    (peer?.importedW || 0) *
-    (state.operatingAreaId ? 0 : peerTradePrice(state, now));
-  exportRevenuePerHour +=
-    (peer?.exportedW || 0) *
-    (state.operatingAreaId ? 0 : peerTradePrice(state, now));
+  importCostPerHour += (peer?.importedW || 0) * peerTradePrice(state, now);
+  exportRevenuePerHour += (peer?.exportedW || 0) * peerTradePrice(state, now);
   let entitlementLeftW = entitlementDeliveredW;
   for (const offer of entitlementOffers) {
     const delivered = Math.min(entitlementLeftW, offer.capacityW);
@@ -5993,7 +5298,7 @@ function* supplyFacilitiesFinancesPhases(
           offers.length
         : 0;
   supply = clearing.localAvailableSupplyW;
-  if (state.operatingAreaId) {
+  if (state.utilityExpansion) {
     now.entitlementImportedW = entitlementDeliveredW;
     now.entitlementImportCapacityW = entitlementCapacityW;
   }
@@ -6326,6 +5631,36 @@ function* supplyFacilitiesFinancesPhases(
     transmissionPrincipalRepayment += paymentPrincipal;
     line.loanAmountLeft -= paymentPrincipal;
   });
+  let corporatePrincipalRepayment = 0;
+  if (state.utilityExpansion) {
+    for (const loan of state.utilityExpansion.loans) {
+      if (loan.loanAmountLeft <= 0) continue;
+      const interest =
+        getPaymentInterest(loan.loanAmountLeft, loan.interestRate) /
+        ticksPerMonth;
+      const principal = Math.max(
+        0,
+        Math.min(
+          loan.loanAmountLeft,
+          loan.loanMonthlyPayment / ticksPerMonth - interest,
+        ),
+      );
+      if (!preRoll && advanceConstruction) {
+        loan.loanAmountLeft -= principal;
+        corporatePrincipalRepayment += principal;
+      }
+      expensesInterest += interest;
+    }
+    const annualNetworkOM =
+      UTILITY_AREAS.champlain.annualNetworkOM +
+      state.utilityExpansion.networkAssets.reduce(
+        (sum, asset) => sum + UTILITY_AREAS[asset.targetId].annualNetworkOM,
+        0,
+      );
+    expensesOM +=
+      (annualNetworkOM * costIndexNow * difficulty.expensesOM) /
+      (12 * ticksPerMonth);
+  }
   const expensesCarbonFee = carbonFee * feeableKgco2e;
 
   // Customers
@@ -6361,6 +5696,18 @@ function* supplyFacilitiesFinancesPhases(
     organicGrowthRate,
     tickScale,
   });
+  if (state.utilityExpansion && !preRoll && advanceConstruction) {
+    const retention = Math.min(
+      1,
+      now.customers / expansionRetentionBaseline(state),
+    );
+    state.utilityExpansion.networkAssets.forEach((asset) => {
+      asset.retentionLowWatermark = Math.min(
+        asset.retentionLowWatermark,
+        retention,
+      );
+    });
+  }
   now.cash = Math.round(
     prev.cash +
       revenue -
@@ -6371,13 +5718,15 @@ function* supplyFacilitiesFinancesPhases(
       expensesInterest -
       (now.expensesPolicy || 0) -
       principalRepayment -
-      transmissionPrincipalRepayment,
+      transmissionPrincipalRepayment -
+      corporatePrincipalRepayment,
   );
   now.netWorth = getNetWorth(
     facilities,
     now.cash,
     now.minute,
     transmission.lines,
+    state,
   );
   now.revenue = revenue + (rebookingFrame ? choiceGrant : 0);
   now.revenueExports = revenueExports;
@@ -6405,6 +5754,44 @@ function* supplyFacilitiesFinancesPhases(
   now.inflationRate = getInflationRate(tickMonth, state.seed);
   now.interestRate = getPrimeRate(tickMonth, state.seed) * state.creditPremium;
 
+  if (noElapsed) {
+    for (const { node, value } of noElapsed.facilities) {
+      const output = node.currentW,
+        committed = node.committed;
+      for (const key of Object.keys(node))
+        if (!(key in value))
+          delete (node as unknown as Record<string, unknown>)[key];
+      Object.assign(node, value, { currentW: output, committed });
+    }
+    for (const { node, value } of noElapsed.lines)
+      Object.assign(node, value, { currentFlowW: node.currentFlowW });
+    noElapsed.loans.forEach(({ node, value }) => Object.assign(node, value));
+    state.commissionedHydroSiteIds = noElapsed.commissioned;
+    now.cash = noElapsed.frame.cash;
+    now.customers = noElapsed.frame.customers;
+    now.customerRate = noElapsed.frame.customerRate;
+    for (const key of [
+      "customerBatteryWh",
+      "customerBatteryWhStart",
+      "customerBatteryLossWh",
+    ] as const)
+      now[key] = noElapsed.frame[key];
+    now.storedWh = facilities.reduce(
+      (sum, facility) => sum + (isStorage(facility) ? facility.currentWh : 0),
+      0,
+    );
+    now.hydroReservoirWh = facilities.reduce(
+      (sum, facility) => sum + (facility.reservoirWh ?? 0),
+      0,
+    );
+    now.netWorth = getNetWorth(
+      facilities,
+      now.cash,
+      now.minute,
+      transmission.lines,
+      state,
+    );
+  }
   return now;
 }
 
@@ -6416,6 +5803,7 @@ function supplyForecastPass(
   withoutMinimumStableOutput = false,
   stepMinutes = TICK_MINUTES,
   observe?: ForecastObserver,
+  preserveCurrentFrame = false,
 ): TickPresentFutureType[] {
   // updateSupplyFacilitiesFinances ramps generators, charges batteries and pays down loans by
   // mutating the facilities in place, so forecasting has to run against a copy of them. A shallow
@@ -6443,7 +5831,10 @@ function supplyForecastPass(
   let prev = newState.timeline[0];
   return newState.timeline.map((t: TickPresentFutureType) => {
     const sourceTick = t;
-    if (t.minute >= state.date.minute) {
+    if (
+      t.minute >= state.date.minute &&
+      !(preserveCurrentFrame && t.minute === state.date.minute)
+    ) {
       advanceGamePolicies(newState, Math.floor(t.minute / MINUTES_PER_MONTH));
       // Both forecast passes use private facilities, even when their caller omits `simulated`.
       // Install the conversion here so baseline dispatch and the optimized pass see the same
@@ -6454,7 +5845,7 @@ function supplyForecastPass(
           t.minute >= facility.upgradeInProgress.completesMinute &&
           facility.gasCycle === "simple"
         ) {
-          const context = facilityOperatingContext(newState, facility);
+          const context = newState;
           if (!context) return;
           completeGasConversion(facility, {
             ...context,
@@ -6495,15 +5886,6 @@ function supplyForecastPass(
         }
         if (currentCustomers !== undefined) {
           t.customers = currentCustomers;
-          if (current?.areaTicks && t.areaTicks)
-            for (const area of state.utilityExpansion?.areas ?? []) {
-              const old = current.areaTicks[area.id],
-                fresh = t.areaTicks[area.id];
-              if (old && fresh) {
-                fresh.customers = old.customers;
-                fresh.customerRate = old.customerRate;
-              }
-            }
         }
         t.netWorth = getNetWorth(
           state.facilities,
@@ -6572,17 +5954,25 @@ function reforecastSupply(
   simulated?: boolean,
   stepMinutes = TICK_MINUTES,
   observe?: ForecastObserver,
+  preserveCurrentFrame = false,
 ): TickPresentFutureType[] {
   // First record the merit-order request each generator would receive without minimum-load
   // constraints. The optimized pass then scans those per-facility requests to compare the cost
   // of remaining online with the cost of the next start. Keeping this as two linear passes avoids
   // recursively re-simulating the fleet for every plant on every tick.
-  const baseline = supplyForecastPass(state, true, true, stepMinutes);
+  const baseline = supplyForecastPass(
+    state,
+    true,
+    true,
+    stepMinutes,
+    undefined,
+    preserveCurrentFrame,
+  );
   // Recorded ticks can be Immer drafts when this is called from a reducer. Commitment metadata
   // is deliberately attached with Object.defineProperty, which Immer forbids on a draft; the
   // optimizer only reads from the current tick onwards anyway, so leave the recorded past alone.
   const futureBaseline = baseline.slice(
-    forecastIndexAt(state, state.date.minute),
+    forecastIndexAt(state, state.date.minute) + (preserveCurrentFrame ? 1 : 0),
   );
   state.facilities.forEach((facility) => {
     if (!isStorage(facility) && (facility.minimumStableOutput || 0) > 0) {
@@ -6593,7 +5983,7 @@ function reforecastSupply(
       const converted =
         conversionMinute === undefined ? undefined : { ...facility };
       if (converted && conversionMinute !== undefined) {
-        const context = facilityOperatingContext(state, converted);
+        const context = state;
         if (!context) return;
         completeGasConversion(converted, {
           ...context,
@@ -6623,6 +6013,7 @@ function reforecastSupply(
     false,
     stepMinutes,
     observe,
+    preserveCurrentFrame,
   );
 }
 
@@ -6785,47 +6176,6 @@ function generateTimeline(
   const previousDemandTick = readOnlyState.timeline.findLast(
     (tick) => tick.minute < state.date.minute,
   );
-  if (state.utilityExpansion && !state.operatingAreaId && state.timeline[0]) {
-    const currentSource = getTimeFromTimeline(
-      state.date.minute,
-      readOnlyState.timeline,
-    );
-    state.timeline[0].areaTicks = {};
-    for (const area of state.utilityExpansion.areas) {
-      const previous = previousDemandTick?.areaTicks?.[area.id];
-      const opening = currentSource?.areaTicks?.[area.id];
-      const source = previous ?? opening;
-      if (!source) continue;
-      const residential = cloneDeep(
-        previous?.deferredResidential ??
-          opening?.deferredResidentialStart ??
-          [],
-      );
-      const thermal = cloneDeep(
-        previous?.deferredThermal ?? opening?.deferredThermalStart ?? [],
-      );
-      const charging = cloneDeep(
-        previous?.deferredCharging ?? opening?.deferredChargingStart ?? [],
-      );
-      const batteryWh =
-        previous?.customerBatteryWh ?? opening?.customerBatteryWhStart ?? 0;
-      state.timeline[0].areaTicks[area.id] = {
-        ...source,
-        minute: state.date.minute,
-        customerRate: opening?.customerRate ?? source.customerRate,
-        customerBillingRate:
-          opening?.customerBillingRate ?? source.customerBillingRate,
-        deferredResidential: residential,
-        deferredResidentialStart: residential,
-        deferredThermal: thermal,
-        deferredThermalStart: thermal,
-        deferredCharging: charging,
-        deferredChargingStart: charging,
-        customerBatteryWh: batteryWh,
-        customerBatteryWhStart: batteryWh,
-      };
-    }
-  }
   state.timeline = reforecastWeatherAndPrices(state, forecastWeather);
   state.timeline = reforecastDemand(
     state,

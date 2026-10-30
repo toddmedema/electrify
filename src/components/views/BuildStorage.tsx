@@ -1,5 +1,3 @@
-import { BuildOperatingAreaContext } from "../base/BuildOperatingAreaContext";
-import { gameForOperatingArea } from "../../helpers/Expansion";
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import {
@@ -45,12 +43,7 @@ import {
 import { useUnits } from "../base/UnitsContext";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import useBuildRowReveal from "../base/useBuildRowReveal";
-import {
-  GameType,
-  LocationType,
-  StorageShoppingType,
-  UtilityAreaId,
-} from "../../Types";
+import { GameType, LocationType, StorageShoppingType } from "../../Types";
 
 function storageBuildSummary(storage: StorageShoppingType): string {
   switch (storage.name) {
@@ -281,11 +274,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onBuildStorage: (
-    storage: StorageShoppingType,
-    financed: boolean,
-    operatingAreaId?: UtilityAreaId,
-  ) => void;
+  onBuildStorage: (storage: StorageShoppingType, financed: boolean) => void;
   onBack: () => void;
 }
 
@@ -293,15 +282,7 @@ export type Props = StateProps & DispatchProps;
 
 function StorageBuildDialog(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
-  const { onBack } = props;
-  const operatingAreaId = React.useContext(BuildOperatingAreaContext);
-  const game = React.useMemo(
-    () =>
-      operatingAreaId
-        ? (gameForOperatingArea(props.game, operatingAreaId) ?? props.game)
-        : props.game,
-    [props.game, operatingAreaId],
-  );
+  const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readCash = useBuildCashReader(now?.cash ?? 0);
   const listRef = useToolScroll<HTMLUListElement>("storage.scroll");
@@ -354,8 +335,7 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
       />
       {storage.length === 0 && (
         <Typography role="status" sx={{ px: 2, py: 2 }}>
-          No storage projects are available in this operating area in{" "}
-          {game.date.year}.
+          No storage projects are available in {game.date.year}.
         </Typography>
       )}
       <List ref={listRef} dense className="scrollable cardList">
@@ -386,9 +366,7 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
             interestRate={game.interestRate}
             location={game.location}
             onBuild={(financed: boolean) => {
-              if (operatingAreaId)
-                props.onBuildStorage(g, financed, operatingAreaId);
-              else props.onBuildStorage(g, financed);
+              props.onBuildStorage(g, financed);
               (completeBuild ?? onBack)();
             }}
           />

@@ -1,7 +1,3 @@
-import cloneDeep from "lodash.clonedeep";
-import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
-import { acquisitionQuote, transferUtility } from "../../helpers/Expansion";
-import { BuildOperatingAreaContext } from "../base/BuildOperatingAreaContext";
 import {
   act,
   fireEvent,
@@ -290,48 +286,4 @@ it("shows lithium and iron-air efficiency before opening details", () => {
     screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),
   );
   expect(screen.getByRole("dialog")).toHaveAccessibleName(/Lithium Battery/);
-});
-
-it("builds available storage in the selected acquired operating area", () => {
-  let state = createGame({ scenarioId: 116, seed: 12345 });
-  // The existing catalog's battery availability begins in 2009.
-  state.date.year = 2010;
-  state = cloneDeep(
-    gameReducer(
-      state,
-      buildTransmissionLine({
-        corridorId: "vt-champlain-ridge",
-        financed: true,
-      }),
-    ),
-  );
-  state.transmission!.lines[0].yearsToBuildLeft = 0;
-  const quote = acquisitionQuote(state, "ridge-electric")!;
-  expect(
-    transferUtility(state, {
-      targetId: quote.targetId,
-      financed: true,
-      quoteKey: quote.quoteKey,
-    }),
-  ).toBe(true);
-  const onBuildStorage = jest.fn();
-  render(
-    <BuildOperatingAreaContext.Provider value="ridge-electric">
-      <BuildStorage
-        game={state}
-        onBuildStorage={onBuildStorage}
-        onBack={jest.fn()}
-      />
-    </BuildOperatingAreaContext.Provider>,
-  );
-  fireEvent.keyDown(screen.getByRole("slider"), { key: "Home" });
-  fireEvent.click(
-    screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Take loan" }));
-  expect(onBuildStorage).toHaveBeenCalledWith(
-    expect.objectContaining({ name: "Battery" }),
-    true,
-    "ridge-electric",
-  );
 });

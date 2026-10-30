@@ -1,5 +1,6 @@
 import compatibility from "../data/RunCompatibility.json";
 import fs from "fs";
+import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { DIFFICULTY_IDS } from "../Constants";
 import { acquisitionAssets } from "../helpers/Expansion";
 import { facilityCashBack } from "../helpers/Financials";
@@ -100,18 +101,14 @@ for (const difficulty of difficulties)
         (sum, month) => sum + month.supplyWh,
         0,
       );
-      const localMeters = Object.values(result.expansionAreaMetrics ?? {});
       for (const [key, expected] of [
         ["demandWh", demandWh],
         ["supplyWh", supplyWh],
+        ["kgco2e", result.months.reduce((sum, month) => sum + month.kgco2e, 0)],
       ] as const) {
-        const localTotal = localMeters.reduce(
-          (sum, area) => sum + area![key],
-          0,
-        );
-        expect(Math.abs(localTotal - expected)).toBeLessThanOrEqual(
-          Math.max(1, expected * 1e-12),
-        );
+        expect(
+          Math.abs(result.companyMetrics![key] - expected),
+        ).toBeLessThanOrEqual(Math.max(1, expected * 1e-12));
       }
       evidence.push({
         difficulty,
@@ -122,18 +119,14 @@ for (const difficulty of difficulties)
         violations: result.violationCountByRule,
         outcome: result.outcome,
         physicallySurvived: result.physicallySurvived,
-        consolidatedImportWh: result.consolidatedImportWh,
+        companyMetrics: result.companyMetrics,
         finalCash: result.finalCash,
         finalDebt: result.finalDebt,
         finalNetWorth: result.finalNetWorth,
-        customers: result.finalUtilityExpansion?.areas.map(
-          ({ id, customers, transferredCustomers, retentionLowWatermark }) => ({
-            id,
-            customers,
-            transferredCustomers,
-            retentionLowWatermark,
-          }),
-        ),
+        customers: result.months.at(-1)?.customers,
+        retentionBaseline: result.retentionBaseline,
+        retainedShare:
+          (result.months.at(-1)?.customers ?? 0) / result.retentionBaseline!,
         acquisitions: result.finalUtilityExpansion?.acquisitions,
         builds: result.builds,
         scheduledBuilds: scheduledActions.filter(
@@ -158,12 +151,23 @@ for (const difficulty of difficulties)
             (month) => month.minimumSupplyMarginW ?? Infinity,
           ),
         ),
-        areas: result.expansionAreaMetrics,
         objectives: result.objectiveResults,
         reached2017: result.months.length >= 145,
         reachedRetirementDeadline: result.months.length >= 228,
         reachedFinalRetention: result.months.length === 240,
       });
+      expect(result.retentionBaseline).toBe(
+        90000 +
+          (result.finalUtilityExpansion?.acquisitions.reduce(
+            (sum, receipt) =>
+              sum +
+              (receipt.minute <
+              result.scenario.durationMonths * MINUTES_PER_MONTH
+                ? receipt.transferredCustomers
+                : 0),
+            0,
+          ) ?? 0),
+      );
       expectNoViolations(result);
       expect(result.builds).toHaveLength(
         scheduledActions.filter(

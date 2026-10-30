@@ -155,7 +155,7 @@ function commandResult(before: GameType, after: GameType): GameType {
       before.utilityExpansion?.acquisitions.length !==
       after.utilityExpansion?.acquisitions.length
         ? {
-            areaTicks: cloneDeep(updated.areaTicks),
+            entitlementImportCapacityW: updated.entitlementImportCapacityW,
             customers: updated.customers,
           }
         : {};

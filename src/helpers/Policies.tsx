@@ -69,17 +69,6 @@ export function emptyPolicies(month = 0): PoliciesType {
     },
   };
 }
-/** Choices are company-wide; each area's installations and historical spending stay local. */
-export function syncCompanyPolicyPending(game: GameType, id: PolicyId): void {
-  const pending = game.policies?.programs[id].pending;
-  for (const area of game.utilityExpansion?.areas ?? []) {
-    if (area.id === "champlain") continue;
-    area.policies ??= emptyPolicies(game.date.monthsElapsed);
-    if (pending) area.policies.programs[id].pending = { ...pending };
-    else delete area.policies.programs[id].pending;
-  }
-}
-
 export function policyAvailable(game: GameType): boolean {
   return (
     POLICY_SCENARIOS.includes(game.scenarioId) &&
@@ -124,7 +113,6 @@ function validInstalls(id: PolicyId, s: PolicyProgramType, month: number) {
 export function validPolicies(
   value: unknown,
   currentMonth: number,
-  allowCompletedPending = false,
 ): value is PoliciesType {
   const p = value as PoliciesType | undefined;
   return (
@@ -157,8 +145,7 @@ export function validPolicies(
           (validPolicyChange({ id, ...s.pending }) &&
             s.pending.month === currentMonth + 1 &&
             // A finished build-out has nothing left to start or pause.
-            (allowCompletedPending ||
-              isOperatingPolicy(id) ||
+            (isOperatingPolicy(id) ||
               isFlexibilityPolicy(id) ||
               !buildoutComplete(s.adoption))))
       );

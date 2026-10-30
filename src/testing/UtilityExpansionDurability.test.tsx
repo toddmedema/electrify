@@ -66,14 +66,14 @@ function roundtrip(game: GameType): GameType {
 }
 
 it.each<UtilityTargetId>(["valley-electric", "ridge-electric"])(
-  "%s persists exact ownership, cohorts, debt and assets through save/resume",
+  "%s persists exact ownership, customers, debt and assets through save/resume",
   (targetId) => {
     let game = ready(targetId);
     expect(
       parseSave(JSON.parse(JSON.stringify(serializeSave(game)))),
     ).not.toBeNull();
     game = buy(game, targetId);
-    expect(game.utilityExpansion!.areas).toHaveLength(2);
+    expect(game.utilityExpansion!.networkAssets).toHaveLength(1);
     expect(game.utilityExpansion!.loans).toHaveLength(2);
     expect(roundtrip(game)).toEqual(JSON.parse(JSON.stringify(game)));
     const resumed = roundtrip(game);
@@ -113,7 +113,7 @@ it("rejects duplicate ownership and stale terms atomically through the owning ac
   ).toBe(before);
 });
 
-it("forecast clones cannot mutate live ownership, cash, debts, policy cohorts or event history", () => {
+it("forecast clones cannot mutate live ownership, cash, debts, program equipment or event history", () => {
   const game = buy(ready("ridge-electric"), "ridge-electric");
   const before = JSON.stringify(game);
   const commitmentBefore = JSON.stringify(
@@ -134,14 +134,15 @@ it("forecast clones cannot mutate live ownership, cash, debts, policy cohorts or
 it("corporate loans survive plant sales and opening asset equity is not counted twice", () => {
   let game = buy(ready("ridge-electric"), "ridge-electric");
   const debts = cloneDeep(game.utilityExpansion!.loans);
-  const asset = game.facilities.find(
-    (f) => f.operatingAreaId === "ridge-electric",
+  const asset = game.facilities.find((f) =>
+    f.startingAssetId?.startsWith("scenario-116-ridge-"),
   )!;
   game = copyOfficialGame(reducer(game, sellFacility(asset.id)));
   expect(game.utilityExpansion!.loans).toEqual(debts);
   expect(
-    game.utilityExpansion!.areas.find((a) => a.id === "ridge-electric")!
-      .networkInitialValue,
+    game.utilityExpansion!.networkAssets.find(
+      (a) => a.targetId === "ridge-electric",
+    )!.initialValue,
   ).toBeGreaterThan(0);
 });
 
@@ -149,7 +150,9 @@ it("rejects inconsistent or forged acquisition import ledgers", () => {
   const game = buy(ready("ridge-electric"), "ridge-electric");
   const mutations: ((g: GameType) => void)[] = [
     (g) => {
-      g.utilityExpansion!.areas.push(cloneDeep(g.utilityExpansion!.areas[1]));
+      g.utilityExpansion!.networkAssets.push(
+        cloneDeep(g.utilityExpansion!.networkAssets[0]),
+      );
     },
     (g) => {
       g.utilityExpansion!.loans.pop();
@@ -158,47 +161,59 @@ it("rejects inconsistent or forged acquisition import ledgers", () => {
       g.utilityExpansion!.loans[0].loanAmountLeft = 0;
     },
     (g) => {
-      g.utilityExpansion!.areas[1].transferredCustomers *= 2;
+      g.utilityExpansion!.acquisitions[0].transferredCustomers *= 2;
     },
     (g) => {
-      g.utilityExpansion!.areas[1].networkInitialValue += 1e6;
+      g.utilityExpansion!.networkAssets[0].initialValue += 1e6;
     },
     (g) => {
-      g.utilityExpansion!.areas[1].retentionLowWatermark = 2;
+      g.utilityExpansion!.networkAssets[0].retentionLowWatermark = 2;
+    },
+    (g) => {
+      g.utilityExpansion!.acquisitions.push(
+        cloneDeep(g.utilityExpansion!.acquisitions[0]),
+      );
+    },
+    (g) => {
+      Object.assign(g, { operatingAreaId: "champlain" });
+    },
+    (g) => {
+      Object.assign(g.facilities[0], { operatingAreaId: "ridge-electric" });
+    },
+    (g) => {
+      Object.assign(currentTick(g)!, { areaTicks: {} });
+    },
+    (g) => {
+      g.customerMarketSize += 100;
+    },
+    (g) => {
+      g.transmission!.lines[0].paused = true;
+    },
+    (g) => {
+      g.transmission!.lines[0].currentFlowW = 1;
+    },
+    (g) => {
+      currentTick(g)!.customers = g.customerMarketSize * 1e6;
+    },
+    (g) => {
+      currentTick(g)!.entitlementImportCapacityW = 1e12;
+    },
+    (g) => {
+      currentTick(g)!.entitlementImportedW = 1e12;
     },
     (g) => {
       g.facilities.find(
-        (f) => f.operatingAreaId === "ridge-electric",
-      )!.operatingAreaId = "valley-electric";
-    },
-    (g) => {
-      g.operatingAreaId = "champlain";
-    },
-    (g) => {
-      g.utilityExpansion!.areas[1].customers += 100;
-    },
-    (g) => {
-      currentTick(g)!.customers += 100;
-    },
-    (g) => {
-      currentTick(g)!.areaTicks!["ridge-electric"]!.entitlementImportCapacityW =
-        1e12;
-    },
-    (g) => {
-      currentTick(g)!.areaTicks!["ridge-electric"]!.entitlementImportedW = 1e12;
-    },
-    (g) => {
-      g.facilities.find((f) => f.operatingAreaId === "ridge-electric")!.peakW *=
-        2;
+        (f) => f.startingAssetId === "scenario-116-ridge-gas-cc",
+      )!.peakW *= 2;
     },
     (g) => {
       g.facilities.find(
-        (f) => f.operatingAreaId === "ridge-electric",
+        (f) => f.startingAssetId === "scenario-116-ridge-gas-cc",
       )!.buildCost *= 2;
     },
     (g) => {
       g.facilities.find(
-        (f) => f.operatingAreaId === "ridge-electric",
+        (f) => f.startingAssetId === "scenario-116-ridge-gas-cc",
       )!.minuteOperational! += 15;
     },
   ];
@@ -208,7 +223,7 @@ it("rejects inconsistent or forged acquisition import ledgers", () => {
     expect(parseSave(raw)).toBeNull();
   }
   expect(gameObjectiveResults(game).map((o) => o.id)).toContain(
-    "retain-each-area",
+    "retain-customers",
   );
 });
 
@@ -302,27 +317,28 @@ it("validates canonical acquired assets and network consideration before economi
     expect(parseSave(saved)).not.toBeNull();
     for (const mutate of [
       (g: GameType) => {
-        g.utilityExpansion!.areas[1].networkInitialValue += 1e6;
+        g.utilityExpansion!.networkAssets[0].initialValue += 1e6;
       },
       (g: GameType) => {
-        g.facilities.find(
-          (facility) => facility.operatingAreaId === "ridge-electric",
+        g.facilities.find((facility) =>
+          facility.startingAssetId?.startsWith("scenario-116-ridge-"),
         )!.peakW *= 2;
       },
       (g: GameType) => {
-        g.facilities.find(
-          (facility) => facility.operatingAreaId === "ridge-electric",
+        g.facilities.find((facility) =>
+          facility.startingAssetId?.startsWith("scenario-116-ridge-"),
         )!.buildCost *= 2;
       },
       (g: GameType) => {
-        g.facilities.find(
-          (facility) => facility.operatingAreaId === "ridge-electric",
+        g.facilities.find((facility) =>
+          facility.startingAssetId?.startsWith("scenario-116-ridge-"),
         )!.minuteOperational! += 15;
       },
       (g: GameType) => {
         const gas = g.facilities.find(
           (f) =>
-            f.operatingAreaId === "ridge-electric" && f.fuel === "Natural Gas",
+            f.startingAssetId?.startsWith("scenario-116-ridge-") &&
+            f.fuel === "Natural Gas",
         )!;
         gas.resilienceExtraBuildCost! += 1000;
       },
@@ -350,7 +366,7 @@ it("acknowledges ownership immediately without inventing completed-month history
     after.find((result) => result.metric === "utilityOwnership")!.status,
   ).toBe("completed");
   expect(
-    after.find((result) => result.metric === "cohortRetention")!.status,
+    after.find((result) => result.metric === "customerRetention")!.status,
   ).toBe("pending");
   expect(getMissionStatus(game).headline!.id).toBe("retire-champlain-oil");
   expect(JSON.stringify(game.monthlyHistory)).toBe(history);
@@ -401,7 +417,9 @@ it.each(["storyEffectsDisabled", "weatherHazardsDisabled"] as const)(
     );
     const game = buy(opening, "ridge-electric");
     const gas = game.facilities.find(
-      (f) => f.operatingAreaId === "ridge-electric" && f.fuel === "Natural Gas",
+      (f) =>
+        f.startingAssetId?.startsWith("scenario-116-ridge-") &&
+        f.fuel === "Natural Gas",
     )!;
     expect(gas.resilience?.coldWeatherPackage).toBe(true);
     expect(gas.resilienceExtraBuildCost).toBe(147475);

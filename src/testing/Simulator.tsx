@@ -4,7 +4,7 @@ import {
   chooseScenarioResponse,
   acquireUtility,
 } from "../reducers/GameActions";
-import { acquisitionQuote, operatingAreaView } from "../helpers/Expansion";
+import { acquisitionQuote } from "../helpers/Expansion";
 // The game reducer dispatches follow-up actions of its own (the construction complete snackbar,
 // the end of game dialogs), so it needs a live store to reach even though the simulation drives
 // the reducer directly. Importing Store creates and registers it.
@@ -65,7 +65,6 @@ import { loadSimData } from "./SimData";
 export type StrategyType = "none" | "keepUp";
 
 interface InitialBuildBaseType {
-  operatingAreaId?: import("../Types").UtilityAreaId;
   name: string;
   financed: boolean;
   priority?: "default" | "reserve";
@@ -174,13 +173,12 @@ export interface ResolvedSimOptionsType {
 }
 
 export interface BuildRecordType {
-  operatingAreaId?: import("../Types").UtilityAreaId;
   month: number;
   name: string;
   buildCost: number;
 }
 
-export interface ExpansionAreaMetrics {
+export interface CompanyEnergyMetrics {
   demandWh: number;
   supplyWh: number;
   importedWh: number;
@@ -189,10 +187,8 @@ export interface ExpansionAreaMetrics {
 }
 export interface SimResultType {
   physicallySurvived?: boolean;
-  consolidatedImportWh?: number;
-  expansionAreaMetrics?: Partial<
-    Record<import("../Types").UtilityAreaId, ExpansionAreaMetrics>
-  >;
+  companyMetrics?: CompanyEnergyMetrics;
+  retentionBaseline?: number;
   options: ResolvedSimOptionsType;
   scenario: ScenarioType;
   ticks: number;
@@ -450,13 +446,6 @@ function shoppingFacility(
   state: GameType,
   build: InitialBuildType,
 ): FacilityShoppingType | undefined {
-  if (build.operatingAreaId) {
-    const area = state.utilityExpansion?.areas.find(
-      (a) => a.id === build.operatingAreaId,
-    );
-    if (!area) return undefined;
-    state = operatingAreaView(state, area);
-  }
   return build.peakWh !== undefined
     ? STORAGE(state, build.peakWh).find(
         (facility) => facility.available && facility.name === build.name,
@@ -497,9 +486,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
           month: 0,
           name: initialBuild.name,
           buildCost: initialBuild.buildCost,
-          ...(initialBuild.operatingAreaId
-            ? { operatingAreaId: initialBuild.operatingAreaId }
-            : {}),
         },
       ]
     : [];
@@ -563,7 +549,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
                   buildFacility({
                     facility,
                     financed: action.build.financed,
-                    operatingAreaId: action.build.operatingAreaId,
                   }),
                 ),
                 action.build.priority,
@@ -577,9 +562,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
                 month,
                 name: added.name,
                 buildCost: added.buildCost,
-                ...(added.operatingAreaId
-                  ? { operatingAreaId: added.operatingAreaId }
-                  : {}),
               });
             break;
           }
@@ -664,34 +646,26 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       });
   };
   applyScheduledActions(0);
-  const expansionAreaMetrics: NonNullable<
-    SimResultType["expansionAreaMetrics"]
-  > = {};
-  let consolidatedImportWh = 0;
+  const companyMetrics: CompanyEnergyMetrics = {
+    demandWh: 0,
+    supplyWh: 0,
+    importedWh: 0,
+    kgco2e: 0,
+    minimumMarginW: Infinity,
+  };
   const observeCompletedMonth = state.utilityExpansion
     ? (completedTimeline: readonly TickPresentFutureType[]) => {
         const hours = (TICK_MINUTES / 60) * GAME_TO_REAL_YEARS;
-        for (const completedTick of completedTimeline) {
-          consolidatedImportWh += (completedTick.importedW ?? 0) * hours;
-          for (const area of state.utilityExpansion!.areas) {
-            const tick = completedTick.areaTicks?.[area.id];
-            if (!tick) continue;
-            const metrics = (expansionAreaMetrics[area.id] ??= {
-              demandWh: 0,
-              supplyWh: 0,
-              importedWh: 0,
-              kgco2e: 0,
-              minimumMarginW: Infinity,
-            });
-            metrics.demandWh += tick.demandW * hours;
-            metrics.supplyWh += Math.min(tick.supplyW, tick.demandW) * hours;
-            metrics.importedWh += (tick.importedW ?? 0) * hours;
-            metrics.kgco2e += tick.kgco2e;
-            metrics.minimumMarginW = Math.min(
-              metrics.minimumMarginW,
-              tick.reserveW ?? tick.supplyW - tick.demandW,
-            );
-          }
+        for (const tick of completedTimeline) {
+          companyMetrics.demandWh += tick.demandW * hours;
+          companyMetrics.supplyWh +=
+            Math.min(tick.supplyW, tick.demandW) * hours;
+          companyMetrics.importedWh += (tick.importedW ?? 0) * hours;
+          companyMetrics.kgco2e += tick.kgco2e;
+          companyMetrics.minimumMarginW = Math.min(
+            companyMetrics.minimumMarginW,
+            tick.reserveW ?? tick.supplyW - tick.demandW,
+          );
         }
       }
     : undefined;
@@ -865,7 +839,11 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     finalFacilities: state.facilities as FacilityOperatingType[],
     finalUtilityExpansion: state.utilityExpansion,
     ...(state.utilityExpansion
-      ? { expansionAreaMetrics, consolidatedImportWh, physicallySurvived }
+      ? {
+          companyMetrics,
+          physicallySurvived,
+          retentionBaseline: state.objectiveProgress?.retentionBaseline,
+        }
       : {}),
     finalDebt: getTotalDebt([
       ...state.facilities,

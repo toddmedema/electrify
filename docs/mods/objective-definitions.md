@@ -13,4 +13,3 @@ Generated from the evaluator's shared metric definitions.
 | `monthEndDebt`             | Outstanding loan principal each month, excluding interest.                                                                                                    |
 | `utilityOwnership`         | Acquire at least one named utility by the deadline; a completed connection alone does not transfer ownership.                                                 |
 | `assetRetirement`          | Retire the named original assets by the deadline; replacement equipment is not targeted.                                                                      |
-| `cohortRetention`          | At the final deadline, retain the required share of every operating area's transfer customers; another area's growth cannot offset a loss.                    |

@@ -1,4 +1,4 @@
-import { facilityActionName } from "./FacilityLabels";
+import { facilityDisplayName } from "./FacilityLabels";
 import GasConversion from "./GasConversion";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import { currentCash } from "../../helpers/GameSelectors";
@@ -76,8 +76,6 @@ export interface Props {
   location: LocationType;
   /** Needed by a hydro plant's water outlook and by the weather resilience section */
   game?: GameType;
-  /** Full company dispatch remains the owner of reservoir forecasts across connected areas. */
-  hydroGame?: GameType;
   onRetrofit?: (payload: RetrofitFacilityAction) => void;
 }
 
@@ -255,7 +253,7 @@ function WeatherResilienceSection(props: {
         <ConfirmDialog
           open
           isolateClicks
-          title={`${actionLabel} to ${facilityActionName(facility)}?`}
+          title={`${actionLabel} to ${facilityDisplayName(facility)}?`}
           contentClassName="facilityRetrofitDialog"
           confirmLabel={`Pay ${formatMoneyConcise(cost)}`}
           confirmDisabled={shortfall > 0}
@@ -475,10 +473,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         </section>
       )}
       {isHydro && props.game && (
-        <HydroWaterSection
-          facility={facility}
-          game={props.hydroGame ?? props.game}
-        />
+        <HydroWaterSection facility={facility} game={props.game} />
       )}
       {!underConstruction && (
         <section className="facilityDetailSection" aria-label="Economics">

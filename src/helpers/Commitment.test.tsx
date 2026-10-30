@@ -98,23 +98,23 @@ describe("generator commitment optimization", () => {
   });
 });
 
-test("an owned area's prepared generator decisions survive copy and JSON save", () => {
+test("one company's prepared generator decisions survive copy and JSON save", () => {
   const {
     copyCommitmentMetadata,
     serializeCommitmentMetadata,
     restoreCommitmentMetadata,
     validCommitmentMetadata,
   } = jest.requireActual<typeof import("./Commitment")>("./Commitment");
-  const local = [tick(0), tick(0), tick(1)];
-  prepareGeneratorCommitment({
-    facilityId: 7,
-    forecast: local,
-    minimumOperatingCost: () => 20,
-  });
-  const timeline = local.map(
-    (area) =>
-      ({ areaTicks: { "ridge-electric": area } }) as TickPresentFutureType,
+  const timeline = [tick(0), tick(0), tick(1)];
+  timeline.forEach((frame, i) =>
+    recordDispatchTarget(frame, 8, i === 2 ? 2 : 0),
   );
+  for (const facilityId of [7, 8])
+    prepareGeneratorCommitment({
+      facilityId,
+      forecast: timeline,
+      minimumOperatingCost: () => 20,
+    });
   const saved = JSON.parse(
     JSON.stringify(serializeCommitmentMetadata(timeline)),
   );
@@ -123,19 +123,20 @@ test("an owned area's prepared generator decisions survive copy and JSON save", 
     JSON.stringify(timeline),
   ) as TickPresentFutureType[];
   restoreCommitmentMetadata(restored, saved);
-  expect(
-    shouldKeepGeneratorCommitted({
-      facilityId: 7,
-      forecast: restored.map((t) => t.areaTicks!["ridge-electric"]!),
-      fromIndex: 0,
-      startCost: 50,
-      minimumOperatingCost: () => 1000,
-    }),
-  ).toBe(true);
-  const copied = timeline.map((t) => ({ ...t }));
-  timeline.forEach((t, i) => copyCommitmentMetadata(t, copied[i]));
+  for (const facilityId of [7, 8])
+    expect(
+      shouldKeepGeneratorCommitted({
+        facilityId,
+        forecast: restored,
+        fromIndex: 0,
+        startCost: 50,
+        minimumOperatingCost: () => 1000,
+      }),
+    ).toBe(true);
+  const copied = timeline.map((frame) => ({ ...frame }));
+  timeline.forEach((frame, i) => copyCommitmentMetadata(frame, copied[i]));
   expect(serializeCommitmentMetadata(copied)).toEqual(saved);
   const bad = JSON.parse(JSON.stringify(saved));
-  bad[0].areas["ridge-electric"].areas = { champlain: bad[1] };
+  bad[0].runningCostToNextDispatch[7] = -1;
   expect(validCommitmentMetadata(bad, 3)).toBe(false);
 });

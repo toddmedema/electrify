@@ -29,6 +29,8 @@ export interface ObjectiveContext {
   ownership: "Investor" | "Public";
   completedMonths: number;
   marketSize?: number;
+  /** Acquisitions use one aggregate baseline and are judged only at their deadline. */
+  retentionAtDeadlineOnly?: boolean;
 }
 
 export interface ObjectiveMonthFacts {
@@ -42,8 +44,6 @@ export interface ObjectiveMonthFacts {
   ownedUtilities?: string[];
   /** Stable original equipment identities still owned at this month close. */
   ownedAssetIds?: string[];
-  /** Lowest current/transfer ratio among the original and every acquired cohort. */
-  minimumCohortRetention?: number;
 }
 
 /** Missing/invalid observations are explicit nulls, never zero or a passing ratio. */

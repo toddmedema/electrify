@@ -5,7 +5,7 @@ import { GENERATORS, STORAGE } from "../data/Facilities";
 import { getScenario } from "../data/Scenarios";
 import { copyCommitmentMetadata } from "../helpers/Commitment";
 import { currentTick } from "../helpers/GameSelectors";
-import { acquisitionQuote, operatingAreaView } from "../helpers/Expansion";
+import { acquisitionQuote } from "../helpers/Expansion";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import gameReducer, {
@@ -59,13 +59,6 @@ export function officialCommand(
   return copyOfficialGame(gameReducer(game, action));
 }
 export function officialQuote(game: GameType, build: InitialBuildType) {
-  if (build.operatingAreaId) {
-    const area = game.utilityExpansion?.areas.find(
-      (a) => a.id === build.operatingAreaId,
-    );
-    if (!area) throw new Error("Cannot build outside an owned area");
-    game = operatingAreaView(game, area);
-  }
   const quotes =
     build.peakWh !== undefined
       ? STORAGE(game, build.peakWh)
@@ -122,7 +115,6 @@ function applyScheduled(
         buildFacility({
           facility: officialQuote(game, action.build),
           financed: action.build.financed,
-          operatingAreaId: action.build.operatingAreaId,
         }),
       );
     case "retrofit":

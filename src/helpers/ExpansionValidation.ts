@@ -1,14 +1,8 @@
-import { isStorage } from "../Types";
 import {
-  isUtilityExpansionGame,
-  validUtilityExpansionSetup,
-  validUtilityExpansionHeader,
-} from "./ExpansionContext";
-import type {
-  GameType,
-  OperatingAreaState,
-  TickPresentFutureType,
-  UtilityAreaId,
+  isStorage,
+  type GameType,
+  type UtilityNetworkAsset,
+  type UtilityTargetId,
 } from "../Types";
 import { TICK_MINUTES, LOAN_MONTHS } from "../Constants";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
@@ -19,10 +13,9 @@ import {
 } from "../data/UtilityExpansion";
 import {
   acquisitionAssets,
-  operatingAreaPool,
   sellerCustomers,
   entitlementSources,
-  operatingAreaView,
+  expansionRetentionBaseline,
 } from "./Expansion";
 import {
   facilityCashBack,
@@ -30,8 +23,13 @@ import {
   loanBalanceAfterTicks,
 } from "./Financials";
 import { getDateFromMinute, getTimeFromTimeline } from "./DateTime";
-import { validPolicies } from "./Policies";
 import { customerMarketSizeAt } from "./Customers";
+import {
+  isUtilityExpansionGame,
+  validUtilityExpansionSetup,
+  validUtilityExpansionHeader,
+  ownedUtilityConnection,
+} from "./ExpansionContext";
 
 const nonnegative = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -44,135 +42,114 @@ const minute = (value: unknown, current: number): value is number =>
   value % TICK_MINUTES === 0;
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
+const obsoleteAreaState = (game: GameType) =>
+  Object.prototype.hasOwnProperty.call(game, "operatingAreaId") ||
+  game.facilities.some((f) =>
+    Object.prototype.hasOwnProperty.call(f, "operatingAreaId"),
+  ) ||
+  game.timeline.some((t) =>
+    Object.prototype.hasOwnProperty.call(t, "areaTicks"),
+  );
 
-/** Current-format ownership is one consistent ledger, never inferred from company totals. */
+/** Current saves contain one company and one bounded, receipt-owned acquisition ledger. */
 export function validUtilityExpansion(game: GameType): boolean {
-  if (game.operatingAreaId !== undefined) return false;
+  if (obsoleteAreaState(game)) return false;
   const state = game.utilityExpansion;
-  if (!isUtilityExpansionGame(game)) {
-    return (
-      state === undefined &&
-      game.facilities.every((f) => f.operatingAreaId === undefined) &&
-      game.timeline.every((t) => t.areaTicks === undefined)
-    );
-  }
+  if (!isUtilityExpansionGame(game)) return state === undefined;
   if (
     !state ||
     !record(state) ||
-    !Array.isArray(state.areas) ||
-    state.areas.length < 1 ||
-    state.areas.length > 3 ||
+    Object.keys(state).some(
+      (key) => !["networkAssets", "loans", "acquisitions"].includes(key),
+    ) ||
+    !Array.isArray(state.networkAssets) ||
     !Array.isArray(state.acquisitions) ||
-    state.acquisitions.length !== state.areas.length - 1 ||
     !Array.isArray(state.loans) ||
+    state.acquisitions.length > 2 ||
+    state.networkAssets.length !== state.acquisitions.length ||
     state.loans.length > 4 ||
-    state.areas[0]?.id !== "champlain"
-  )
-    return false;
-  if (
     !validUtilityExpansionHeader(game) ||
     (game.customScenario && !validUtilityExpansionSetup(game.customScenario))
   )
     return false;
-  const ids = new Set<UtilityAreaId>();
-  for (const area of state.areas) {
+  const targets = new Set<UtilityTargetId>();
+  for (const receipt of state.acquisitions) {
     if (
-      !record(area) ||
-      !Object.prototype.hasOwnProperty.call(UTILITY_AREAS, area.id) ||
-      ids.has(area.id) ||
-      !minute(area.activatedMinute, game.date.minute) ||
-      !nonnegative(area.customers) ||
-      !nonnegative(area.transferredCustomers) ||
-      area.transferredCustomers === 0 ||
-      !nonnegative(area.customerMarketSize) ||
-      area.customerMarketSize <= 0 ||
-      !nonnegative(area.networkInitialValue) ||
-      !nonnegative(area.retentionLowWatermark) ||
-      area.retentionLowWatermark >
-        Math.min(1, area.customers / area.transferredCustomers) + 1e-9 ||
-      area.customers > operatingAreaPool(area, game.date.minute) * (1 + 1e-9) ||
-      (area.policies !== undefined &&
-        !validPolicies(area.policies, game.date.monthsElapsed, true))
+      !record(receipt) ||
+      !UTILITY_TARGETS.some((target) => target.id === receipt.targetId) ||
+      targets.has(receipt.targetId) ||
+      !minute(receipt.minute, game.date.minute) ||
+      typeof receipt.financed !== "boolean" ||
+      !nonnegative(receipt.transferredCustomers) ||
+      !close(
+        receipt.transferredCustomers,
+        sellerCustomers(receipt.targetId, receipt.minute),
+      )
     )
       return false;
-    ids.add(area.id);
-    if (area.id === "champlain") {
-      if (
-        area.activatedMinute !== 0 ||
-        area.transferredCustomers !== 90000 ||
-        area.customerMarketSize !== 180000 ||
-        area.networkInitialValue !== 0
-      )
-        return false;
-    } else {
-      const acquisitions = state.acquisitions.filter(
-        (a) => a?.targetId === area.id,
-      );
-      if (
-        acquisitions.length !== 1 ||
-        acquisitions[0].minute !== area.activatedMinute ||
-        typeof acquisitions[0].financed !== "boolean" ||
-        !close(
-          area.transferredCustomers,
-          sellerCustomers(area.id, area.activatedMinute),
-        ) ||
-        !close(
-          area.customerMarketSize,
-          customerMarketSizeAt(
-            UTILITY_AREAS[area.id].addressablePool,
-            area.activatedMinute,
-          ),
-        )
-      )
-        return false;
-      if (!validNetworkValue(game, area)) return false;
-    }
+    targets.add(receipt.targetId);
   }
-  for (const id of ["efficiency", "solar"] as const) {
-    const programs = state.areas.map(
-      (area) =>
-        (area.id === "champlain" ? game.policies : area.policies)?.programs[id],
+  const pool =
+    UTILITY_AREAS.champlain.addressablePool +
+    state.acquisitions.reduce(
+      (sum, receipt) => sum + UTILITY_AREAS[receipt.targetId].addressablePool,
+      0,
+    );
+  const current = getTimeFromTimeline(game.date.minute, game.timeline);
+  if (
+    !close(game.customerMarketSize, pool) ||
+    !current ||
+    !nonnegative(current.customers) ||
+    current.customers >
+      customerMarketSizeAt(pool, game.date.minute) * (1 + 1e-9)
+  )
+    return false;
+  if (
+    game.transmission?.lines.some(
+      (line) =>
+        ownedUtilityConnection(game, line.corridorId) &&
+        (line.paused || line.currentFlowW !== 0),
+    )
+  )
+    return false;
+  const networks = new Set<UtilityTargetId>();
+  const retained = Math.min(
+    1,
+    current.customers / expansionRetentionBaseline(game),
+  );
+  for (const network of state.networkAssets) {
+    const receipt = state.acquisitions.find(
+      (receipt) => receipt.targetId === network?.targetId,
     );
     if (
-      programs.every((program) => (program?.adoption ?? 0) >= 1) &&
-      programs.some((program) => !!program?.pending)
+      !record(network) ||
+      !receipt ||
+      networks.has(network.targetId) ||
+      network.activatedMinute !== receipt.minute ||
+      !nonnegative(network.initialValue) ||
+      !nonnegative(network.retentionLowWatermark) ||
+      network.retentionLowWatermark > retained + 1e-9 ||
+      !validNetworkValue(game, network)
     )
       return false;
+    networks.add(network.targetId);
   }
-  if (
-    !close(
-      game.customerMarketSize,
-      state.areas.reduce(
-        (sum, area) =>
-          sum +
-          area.customerMarketSize /
-            customerMarketSizeAt(1, area.activatedMinute),
-        0,
-      ),
-    )
-  )
-    return false;
-  if (
-    state.acquisitions.some(
-      (a) =>
-        !record(a) ||
-        !ids.has(a.targetId) ||
-        !minute(a.minute, game.date.minute),
-    )
-  )
-    return false;
   const loanIds = new Set<string>();
   for (const loan of state.loans) {
-    const target = UTILITY_TARGETS.find((t) => t.id === loan?.targetId);
-    const area = state.areas.find((a) => a.id === loan?.targetId);
+    const target = UTILITY_TARGETS.find(
+      (target) => target.id === loan?.targetId,
+    );
+    const receipt = state.acquisitions.find(
+      (receipt) => receipt.targetId === loan?.targetId,
+    );
     if (
       !record(loan) ||
       !target ||
-      !area ||
+      !receipt ||
       !["assumed", "purchase"].includes(loan.kind) ||
       loan.id !== `scenario-116-${target.id}-${loan.kind}` ||
       loanIds.has(loan.id) ||
-      loan.minuteCreated !== area.activatedMinute ||
+      loan.minuteCreated !== receipt.minute ||
       ![
         loan.principal,
         loan.loanAmountLeft,
@@ -201,29 +178,24 @@ export function validUtilityExpansion(game: GameType): boolean {
       Math.max(1, loan.principal) * 1e-7
     )
       return false;
-    const index = hasEconomy()
-      ? getInflationIndex(
-          getDateFromMinute(area.activatedMinute, 2005),
-          2005,
-          game.seed,
-        )
-      : undefined;
-    const expected =
-      loan.kind === "assumed" ? target.assumedDebt : target.equityPrice * 0.8;
-    if (index !== undefined && !close(loan.principal, expected * index))
-      return false;
+    if (hasEconomy()) {
+      const index = getInflationIndex(
+        getDateFromMinute(receipt.minute, 2005),
+        2005,
+        game.seed,
+      );
+      const expected =
+        loan.kind === "assumed" ? target.assumedDebt : target.equityPrice * 0.8;
+      if (!close(loan.principal, expected * index)) return false;
+    }
     loanIds.add(loan.id);
   }
   if (
     state.acquisitions.some(
-      (a) => a.financed !== loanIds.has(`scenario-116-${a.targetId}-purchase`),
-    )
-  )
-    return false;
-  if (
-    state.areas.some(
-      (a) =>
-        a.id !== "champlain" && !loanIds.has(`scenario-116-${a.id}-assumed`),
+      (receipt) =>
+        receipt.financed !==
+          loanIds.has(`scenario-116-${receipt.targetId}-purchase`) ||
+        !loanIds.has(`scenario-116-${receipt.targetId}-assumed`),
     )
   )
     return false;
@@ -231,11 +203,10 @@ export function validUtilityExpansion(game: GameType): boolean {
     string,
     import("../Types").FacilityOperatingType
   >();
-  for (const area of state.areas) {
-    if (area.id === "champlain") continue;
+  for (const receipt of state.acquisitions) {
     const inherited = acquisitionAssets(
-      { ...game, date: getDateFromMinute(area.activatedMinute, 2005) },
-      area.id,
+      { ...game, date: getDateFromMinute(receipt.minute, 2005) },
+      receipt.targetId,
     );
     if (!inherited) return false;
     inherited.forEach((asset) => {
@@ -244,151 +215,104 @@ export function validUtilityExpansion(game: GameType): boolean {
     });
   }
   const assetIds = new Set<string>();
-  if (
-    game.facilities.some((f) => {
-      if (!f.operatingAreaId || !ids.has(f.operatingAreaId)) return true;
-      if (!f.startingAssetId) return false;
-      const definition = Object.values(UTILITY_AREAS).find((a) =>
-        a.facilities.some((original) => original.assetId === f.startingAssetId),
-      );
-      if (
-        !definition ||
-        definition.id !== f.operatingAreaId ||
-        assetIds.has(f.startingAssetId)
-      )
-        return true;
-      const expected = expectedAssets.get(f.startingAssetId);
-      const packageCost = INHERITED_COLD_PACKAGE_COST_2005[f.startingAssetId];
-      if (
-        packageCost !== undefined &&
-        (isStorage(f) ||
-          f.resilienceExtraBuildCost !== packageCost ||
-          !f.resilience?.coldWeatherPackage)
-      )
-        return true;
-
-      if (
-        expected &&
-        (f.name !== expected.name ||
-          f.fuel !== expected.fuel ||
-          f.gasCycle !== expected.gasCycle ||
-          f.peakW !== expected.peakW ||
-          !close(f.buildCost, expected.buildCost) ||
-          f.minuteOperational !== expected.minuteOperational ||
-          f.minuteCreated !== expected.minuteCreated ||
-          f.loanAmountLeft !== 0 ||
-          f.loanAmountTotal !== 0 ||
-          f.loanMonthlyPayment !== 0 ||
-          f.interestRate !== 0 ||
-          (f.constructionKgco2eTotal ?? 0) !== 0 ||
-          (f.constructionKgco2eEmitted ?? 0) !== 0)
-      )
-        return true;
-      assetIds.add(f.startingAssetId);
-      return false;
-    })
-  )
-    return false;
-  const current = getTimeFromTimeline(game.date.minute, game.timeline);
-  if (
-    !current ||
-    !close(
-      current.customers,
-      state.areas.reduce((sum, area) => sum + area.customers, 0),
-    ) ||
-    state.areas.some(
-      (area) =>
-        !close(current.areaTicks?.[area.id]?.customers ?? NaN, area.customers),
+  for (const facility of game.facilities) {
+    const id = facility.startingAssetId;
+    if (!id) continue;
+    const definition = Object.values(UTILITY_AREAS).find((portfolio) =>
+      portfolio.facilities.some((asset) => asset.assetId === id),
+    );
+    if (
+      !definition ||
+      (definition.id !== "champlain" && !targets.has(definition.id)) ||
+      assetIds.has(id)
     )
-  )
-    return false;
-  return game.timeline.every((tick) => validAreaTicks(tick, state.areas, game));
+      return false;
+    assetIds.add(id);
+    const expected = expectedAssets.get(id);
+    const packageCost = INHERITED_COLD_PACKAGE_COST_2005[id];
+    if (
+      packageCost !== undefined &&
+      (isStorage(facility) ||
+        facility.resilienceExtraBuildCost !== packageCost ||
+        !facility.resilience?.coldWeatherPackage)
+    )
+      return false;
+    if (
+      expected &&
+      (facility.name !== expected.name ||
+        facility.fuel !== expected.fuel ||
+        facility.gasCycle !== expected.gasCycle ||
+        facility.peakW !== expected.peakW ||
+        !close(facility.buildCost, expected.buildCost) ||
+        facility.minuteOperational !== expected.minuteOperational ||
+        facility.minuteCreated !== expected.minuteCreated ||
+        facility.loanAmountLeft !== 0 ||
+        facility.loanAmountTotal !== 0 ||
+        facility.loanMonthlyPayment !== 0 ||
+        facility.interestRate !== 0 ||
+        (facility.constructionKgco2eTotal ?? 0) !== 0 ||
+        (facility.constructionKgco2eEmitted ?? 0) !== 0)
+    )
+      return false;
+  }
+  return game.timeline.every((tick) => {
+    if (
+      tick.entitlementImportedW === undefined ||
+      tick.entitlementImportCapacityW === undefined
+    )
+      return false;
+    const capacity = entitlementSources(game, tick).reduce(
+      (sum, source) => sum + source.capacityW,
+      0,
+    );
+    return (
+      nonnegative(tick.entitlementImportedW) &&
+      nonnegative(tick.entitlementImportCapacityW) &&
+      close(tick.entitlementImportCapacityW, capacity) &&
+      tick.entitlementImportedW <= capacity + 0.01 &&
+      tick.entitlementImportedW <= (tick.importedW ?? 0) + 0.01
+    );
+  });
 }
 
-function validNetworkValue(game: GameType, area: OperatingAreaState): boolean {
-  if (area.id === "champlain") return true;
-  const target = UTILITY_TARGETS.find((t) => t.id === area.id)!;
-  const date = getDateFromMinute(area.activatedMinute, 2005);
+function validNetworkValue(
+  game: GameType,
+  network: UtilityNetworkAsset,
+): boolean {
+  const target = UTILITY_TARGETS.find(
+    (target) => target.id === network.targetId,
+  );
+  if (!target) return false;
+  const date = getDateFromMinute(network.activatedMinute, 2005);
   const assets = acquisitionAssets(
     { ...game, date, commissionedHydroSiteIds: [] },
-    area.id,
+    network.targetId,
   );
-  if (!assets) return false;
   const assumed = game.utilityExpansion?.loans.find(
-    (loan) => loan.targetId === area.id && loan.kind === "assumed",
+    (loan) => loan.targetId === network.targetId && loan.kind === "assumed",
   );
-  if (!assumed || !nonnegative(assumed.principal) || assumed.principal <= 0)
-    return false;
-  const transactionIndex = assumed.principal / target.assumedDebt;
   if (
-    hasEconomy() &&
-    !close(transactionIndex, getInflationIndex(date, 2005, game.seed))
+    !assets ||
+    !assumed ||
+    !nonnegative(assumed.principal) ||
+    assumed.principal <= 0
   )
+    return false;
+  const index = assumed.principal / target.assumedDebt;
+  if (hasEconomy() && !close(index, getInflationIndex(date, 2005, game.seed)))
     return false;
   const purchase = game.utilityExpansion?.loans.find(
-    (loan) => loan.targetId === area.id && loan.kind === "purchase",
+    (loan) => loan.targetId === network.targetId && loan.kind === "purchase",
   );
-  if (
-    purchase &&
-    !close(purchase.principal, target.equityPrice * 0.8 * transactionIndex)
-  )
+  if (purchase && !close(purchase.principal, target.equityPrice * 0.8 * index))
     return false;
-  const enterprise =
-    (target.equityPrice + target.assumedDebt) * transactionIndex;
+  const enterprise = (target.equityPrice + target.assumedDebt) * index;
   const generators = assets.reduce(
     (sum, asset) => sum + facilityCashBack(asset, date.minute),
     0,
   );
   return (
     generators <= enterprise &&
-    close(area.networkInitialValue, enterprise - generators)
-  );
-}
-
-function validAreaTicks(
-  tick: TickPresentFutureType,
-  areas: OperatingAreaState[],
-  game: GameType,
-): boolean {
-  if (!record(tick.areaTicks)) return false;
-  for (const [id, local] of Object.entries(tick.areaTicks)) {
-    const area = areas.find((a) => a.id === id);
-    if (
-      !area ||
-      !record(local) ||
-      local.areaTicks !== undefined ||
-      local.minute !== tick.minute
-    )
-      return false;
-    const sourceCapacity = entitlementSources(
-      operatingAreaView(game, area),
-      local,
-    ).reduce((sum, source) => sum + source.capacityW, 0);
-    if (
-      !nonnegative(local.entitlementImportedW) ||
-      !nonnegative(local.entitlementImportCapacityW) ||
-      !close(local.entitlementImportCapacityW, sourceCapacity) ||
-      local.entitlementImportedW > sourceCapacity + 0.01 ||
-      local.entitlementImportedW > (local.importedW ?? 0) + 0.01 ||
-      sourceCapacity > UTILITY_AREAS[area.id].sourceInterfaceW + 0.01
-    )
-      return false;
-    if (
-      ![
-        local.customers,
-        local.demandW,
-        local.supplyW,
-        local.storedWh,
-        local.kgco2e,
-        local.importedW,
-        local.exportedW,
-      ].every(nonnegative) ||
-      !record(local.demandByType) ||
-      !Object.values(local.demandByType).every(nonnegative)
-    )
-      return false;
-  }
-  return areas.every(
-    (area) => tick.minute < area.activatedMinute || !!tick.areaTicks?.[area.id],
+    close(network.initialValue, enterprise - generators)
   );
 }

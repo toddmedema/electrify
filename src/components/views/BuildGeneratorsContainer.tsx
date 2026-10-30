@@ -2,11 +2,7 @@ import type { AppDispatch } from "../../Store";
 import { connectToStore } from "../base/ConnectToStore";
 import { navigate } from "../../reducers/Card";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
-import {
-  AppStateType,
-  GeneratorShoppingType,
-  UtilityAreaId,
-} from "../../Types";
+import { AppStateType, GeneratorShoppingType } from "../../Types";
 import BuildGenerators, { DispatchProps, StateProps } from "./BuildGenerators";
 import { focusEvidence } from "../../helpers/Evidence";
 
@@ -30,12 +26,8 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onBack: () => {
       dispatch(navigate("FACILITIES"));
     },
-    onBuildGenerator: (
-      facility: GeneratorShoppingType,
-      financed: boolean,
-      operatingAreaId?: UtilityAreaId,
-    ) => {
-      dispatch(purchaseFacility(facility, financed, operatingAreaId));
+    onBuildGenerator: (facility: GeneratorShoppingType, financed: boolean) => {
+      dispatch(purchaseFacility(facility, financed));
     },
   };
 };

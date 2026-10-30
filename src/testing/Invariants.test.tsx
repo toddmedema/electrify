@@ -170,28 +170,32 @@ it("accepts actual entitlement purchases and rejects a forged source-interface c
     ]),
   );
 
-  const forgedArea = cloneDeep(now);
-  forgedArea.areaTicks!.champlain!.entitlementImportCapacityW = 1e12;
-  const invalidArea = new InvariantCollector();
-  checkTick(invalidArea, state, before, forgedArea, "corrupt interface", false);
-  expect(invalidArea.getViolations()).toEqual(
+  const forgedRights = cloneDeep(now);
+  forgedRights.entitlementImportCapacityW = 1e12;
+  const invalidRights = new InvariantCollector();
+  checkTick(
+    invalidRights,
+    state,
+    before,
+    forgedRights,
+    "corrupt interface",
+    false,
+  );
+  expect(invalidRights.getViolations()).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
-        rule: "each area's purchases respect its own dated source rights",
+        rule: "company purchases respect owned dated source rights",
       }),
     ]),
   );
 });
 
-it("rejects invented curtailment instead of hiding an energy imbalance", () => {
+it("rejects invented supply in the shared company energy balance", () => {
   const collector = inspect((tick) => {
-    tick.curtailedW = 1e9;
+    tick.supplyW += 1e9;
   });
   expect(collector.getViolations()).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({
-        rule: "curtailment accounts only for unused local output",
-      }),
       expect.objectContaining({
         rule: "generation, storage and trade balance supply",
       }),

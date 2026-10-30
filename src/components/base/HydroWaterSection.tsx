@@ -1,4 +1,3 @@
-import { getUtilityArea } from "../../data/UtilityExpansion";
 import { currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { Typography } from "@mui/material";
@@ -56,13 +55,7 @@ export default function HydroWaterSection(props: {
 }): React.JSX.Element {
   const { facility, game } = props;
   const outlook = useReservoirOutlook(game);
-  const companyTick = currentTick(game);
-  const now = facility.operatingAreaId
-    ? (companyTick?.areaTicks?.[facility.operatingAreaId] ?? companyTick)
-    : companyTick;
-  const location = facility.operatingAreaId
-    ? (getUtilityArea(facility.operatingAreaId)?.location ?? game.location)
-    : game.location;
+  const now = currentTick(game);
   const capacityWh = facility.reservoirCapacityWh || 0;
   const heading = (
     <Typography component="h3" className="facilityDetailHeading">
@@ -92,7 +85,7 @@ export default function HydroWaterSection(props: {
     fraction,
     spilling: (facility.hydroLastSpillWh || 0) > 0,
     monthNumber: game.date.monthNumber,
-    latitude: location.lat,
+    latitude: game.location.lat,
     outlook,
     fleet,
   });

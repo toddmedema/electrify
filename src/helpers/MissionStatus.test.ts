@@ -164,9 +164,11 @@ test("retention shows completed-month customers against the final target while r
   expect(requirement(low, "retention").status).toBe("in-progress");
   expect(getMissionStatus(low).headline?.id).toBe("retention");
   expect(getMissionStatus(low).headline?.compact).toMatch(
-    /^Retain ≥.*% of starting customers/,
+    /^Retain ≥.*% of customers/,
   );
-  expect(requirement(low, "retention").target).toContain("starting customers");
+  expect(requirement(low, "retention").target).toContain(
+    "Retain ≥90% of customers",
+  );
   expect(requirement(low, "retention").definition).toContain(
     "recorded starting customers",
   );

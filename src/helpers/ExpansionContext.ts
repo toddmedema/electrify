@@ -1,5 +1,9 @@
 import type { GameType, ScenarioType } from "../Types";
-import { EXPANSION_SCENARIO_ID, UTILITY_AREAS } from "../data/UtilityExpansion";
+import {
+  EXPANSION_SCENARIO_ID,
+  UTILITY_AREAS,
+  UTILITY_TARGETS,
+} from "../data/UtilityExpansion";
 
 /** The fixed seller epoch, operating areas and inherited inventories are one scenario contract. */
 export const UTILITY_EXPANSION_FIXED_SETUP = {
@@ -82,5 +86,21 @@ export function validUtilityExpansionSetup(scenario: ScenarioType): boolean {
     scenario.demandShapeExponent ===
       UTILITY_AREAS.champlain.demandShapeExponent &&
     sameDefinition(scenario.facilities, UTILITY_AREAS.champlain.facilities)
+  );
+}
+
+/** Ownership survives independently of the physical connection's current readings. */
+export function ownedUtilityConnection(
+  game: Pick<GameType, "utilityExpansion">,
+  corridorId: string,
+): boolean {
+  const target = UTILITY_TARGETS.find(
+    (target) => target.corridorId === corridorId,
+  );
+  return (
+    !!target &&
+    !!game.utilityExpansion?.acquisitions.some(
+      (receipt) => receipt.targetId === target.id,
+    )
   );
 }

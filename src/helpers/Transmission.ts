@@ -753,6 +753,8 @@ export function intertieUpgradeQuote(
   buildTimeMultiplier = 1,
   context?: IntertieAccessContext,
 ): IntertieUpgradeQuote | undefined {
+  if (context?.ownedUtilityCorridors?.includes(line.corridorId))
+    return undefined;
   const corridor = effectiveCorridor(line.corridorId, context);
   if (!corridor) return undefined;
   const step = intertieUpgradeCount(line, context);

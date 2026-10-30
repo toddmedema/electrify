@@ -1,3 +1,4 @@
+import { DEMAND_TYPES } from "../data/DemandProfiles";
 import cloneDeep from "lodash.clonedeep";
 import { isStorage } from "../Types";
 import { getTimeFromTimeline } from "../helpers/DateTime";
@@ -79,9 +80,9 @@ it("host acquires a fictional utility while keeping other human companies indepe
     },
   };
   expect(command(world, action)).toBeUndefined();
-  expect(world.grids[0].utilityExpansion!.areas.map((a) => a.id)).toContain(
-    "ridge-electric",
-  );
+  expect(
+    world.grids[0].utilityExpansion!.acquisitions.map((a) => a.targetId),
+  ).toContain("ridge-electric");
   expect(JSON.stringify(world.grids[1])).toBe(peerBefore);
   expect(roomView(world, "0").game!.utilityExpansion).toEqual(
     world.grids[0].utilityExpansion,
@@ -131,7 +132,7 @@ it("host rejects forged human-target ownership and wrong-target connections", ()
   expect(JSON.stringify(world.grids[0])).toBe(before);
 });
 
-it("host completes an owned-area plant without scheduling renderer notifications", () => {
+it("host completes a shared company plant without scheduling renderer notifications", () => {
   const world = ready();
   const quote = acquisitionQuote(world.grids[0], "ridge-electric")!;
   expect(
@@ -156,14 +157,11 @@ it("host completes an owned-area plant without scheduling renderer notifications
           gasCycle: "combined",
         },
         financed: true,
-        operatingAreaId: "ridge-electric",
       },
     }),
   ).toBeUndefined();
   const project = world.grids[0].facilities.find(
-    (facility) =>
-      facility.operatingAreaId === "ridge-electric" &&
-      facility.yearsToBuildLeft > 0,
+    (facility) => facility.yearsToBuildLeft > 0,
   )!;
   expect(project).toBeDefined();
   project.yearsToBuildLeft = YEARS_PER_TICK / 2;
@@ -189,9 +187,9 @@ it("host completes an owned-area plant without scheduling renderer notifications
   }
 });
 
-it.each([180e6, 280e6])(
-  "human exports burn native gas after owned transfers at %i W local demand instead of reselling contract rights",
-  (ownDemandW) => {
+it.each([300e6, 400e6])(
+  "pooled company exports native gas at %i W demand without reselling source rights",
+  (companyDemandW) => {
     const world = ready();
     const quote = acquisitionQuote(world.grids[0], "ridge-electric")!;
     expect(
@@ -222,12 +220,10 @@ it.each([180e6, 280e6])(
     const seller = world.grids[0];
     const gas = seller.facilities.find((f) => f.yearsToBuildLeft > 0)!;
     expect(gas.fuel).toBe("Natural Gas");
+    if (isStorage(gas)) throw new Error("Expected gas generation");
     gas.yearsToBuildLeft = 0;
     gas.currentW = gas.peakW;
-    if (isStorage(gas)) throw new Error("Expected the commissioned gas plant");
     gas.committed = true;
-    // The real commitment owner sees a known request on the next tick, so this running
-    // plant remains online even when contracts could cover this tick's own load.
     recordDispatchTarget(
       getTimeFromTimeline(2 * TICK_MINUTES, seller.timeline)!,
       gas.id,
@@ -238,32 +234,16 @@ it.each([180e6, 280e6])(
       forecast: seller.timeline,
       minimumOperatingCost: () => 0,
     });
+    const demand = (game: typeof seller, watts: number) => {
+      const tick = getTimeFromTimeline(TICK_MINUTES, game.timeline)!;
+      tick.demandW = watts;
+      for (const type of DEMAND_TYPES)
+        tick.demandByType[type] = type === "Residential" ? watts : 0;
+    };
     for (const game of world.grids) {
       for (const facility of game.facilities)
-        facility.paused = facility.id !== gas.id || game !== seller;
-      const next = getTimeFromTimeline(TICK_MINUTES, game.timeline)!;
-      const champlain = next.areaTicks!.champlain!;
-      champlain.demandW = game === seller ? ownDemandW : 800e6;
-      champlain.demandByType = {
-        Residential: champlain.demandW,
-        Commercial: 0,
-        Industrial: 0,
-        "Data Centers": 0,
-        Mining: 0,
-        Transportation: 0,
-      };
-      if (game === seller) {
-        const ridge = next.areaTicks!["ridge-electric"]!;
-        ridge.demandW = 200e6;
-        ridge.demandByType = {
-          Residential: ridge.demandW,
-          Commercial: 0,
-          Industrial: 0,
-          "Data Centers": 0,
-          Mining: 0,
-          Transportation: 0,
-        };
-      }
+        facility.paused = game !== seller || facility.id !== gas.id;
+      demand(game, game === seller ? companyDemandW : 800e6);
     }
     for (const seat of world.seats)
       applyCommand(world, seat.id, {
@@ -276,59 +256,37 @@ it.each([180e6, 280e6])(
     for (const game of isolated.grids)
       for (const line of game.transmission!.lines)
         if (line.corridorId.startsWith("peer:")) line.paused = true;
-    const disconnected = cloneDeep(isolated);
-    disconnected.grids[0].transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-ridge",
-    )!.paused = true;
     const rightsOnly = cloneDeep(world);
     for (const facility of rightsOnly.grids[0].facilities)
       facility.paused = true;
-    const rightsFrame = getTimeFromTimeline(
-      TICK_MINUTES,
-      rightsOnly.grids[0].timeline,
-    )!;
-    rightsFrame.areaTicks!.champlain!.demandW = 50e6;
-    rightsFrame.areaTicks!["ridge-electric"]!.demandW = 10e6;
+    demand(rightsOnly.grids[0], 50e6);
     stepWorld(rightsOnly);
     expect(rightsOnly.edges[0].flowW).toBe(0);
     expect(currentTick(rightsOnly.grids[0])!.exportedW).toBe(0);
-    stepWorld(disconnected);
     stepWorld(isolated);
     stepWorld(world);
     const sentW = world.edges[0].flowW;
     expect(sentW).toBeGreaterThan(1e6);
-    const sold = currentTick(world.grids[0])!;
-    const alone = currentTick(isolated.grids[0])!;
-    const buyer = currentTick(world.grids[1])!;
-    const buyerAlone = currentTick(isolated.grids[1])!;
-    const deliveredGas = world.grids[0].facilities.find(
-      (f) => f.id === gas.id,
-    )!;
-    const isolatedGas = isolated.grids[0].facilities.find(
-      (f) => f.id === gas.id,
-    )!;
-    const disconnectedGas = disconnected.grids[0].facilities.find(
-      (f) => f.id === gas.id,
-    )!;
-    // One neighbor leaves unused rights; the other also consumes native headroom.
-    expect(isolatedGas.currentW - disconnectedGas.currentW > 1e6).toBe(
-      ownDemandW === 280e6,
-    );
+    const sold = currentTick(world.grids[0])!,
+      alone = currentTick(isolated.grids[0])!;
+    const buyer = currentTick(world.grids[1])!,
+      buyerAlone = currentTick(isolated.grids[1])!;
+    const actualGas = world.grids[0].facilities.find((f) => f.id === gas.id)!,
+      isolatedGas = isolated.grids[0].facilities.find((f) => f.id === gas.id)!;
     expect(sold.entitlementImportedW).toBeCloseTo(
       alone.entitlementImportedW!,
       4,
     );
-    expect(deliveredGas.currentW - isolatedGas.currentW).toBeCloseTo(sentW, 4);
-    const exportedBtu =
-      ((sentW * gas.btuPerWh!) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
-    const kg = exportedBtu * FUELS["Natural Gas"]!.kgCO2ePerBtu;
+    expect(actualGas.currentW - isolatedGas.currentW).toBeCloseTo(sentW, 4);
+    const btu = ((sentW * gas.btuPerWh!) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+    const kg = btu * FUELS["Natural Gas"]!.kgCO2ePerBtu;
     const fuelPrice = getFuelPricesPerMBTU(
       seller.date,
       seller.seed,
       seller.location,
     )["Natural Gas"]!;
     expect(sold.expensesFuel - alone.expensesFuel).toBeCloseTo(
-      (exportedBtu * fuelPrice) / 1e6,
+      (btu * fuelPrice) / 1e6,
       4,
     );
     expect(sold.localKgco2e! - alone.localKgco2e!).toBeCloseTo(kg, 4);
@@ -343,7 +301,7 @@ it.each([180e6, 280e6])(
       world.grids[0],
       null,
       sold,
-      "native human export",
+      "shared native export",
       false,
     );
     expect(
@@ -351,3 +309,24 @@ it.each([180e6, 280e6])(
     ).toBeUndefined();
   },
 );
+
+it("the host rejects obsolete build destinations instead of creating a second dispatch area", () => {
+  const world = ready();
+  const before = JSON.stringify(world.grids[0]);
+  expect(
+    command(world, {
+      kind: "action",
+      name: "buildFacility",
+      payload: {
+        facility: {
+          name: "Natural Gas CC",
+          peakW: 100e6,
+          gasCycle: "combined",
+        },
+        financed: true,
+        operatingAreaId: "ridge-electric",
+      },
+    }),
+  ).toMatch(/without an operating.area/i);
+  expect(JSON.stringify(world.grids[0])).toBe(before);
+});

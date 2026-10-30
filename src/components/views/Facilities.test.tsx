@@ -433,13 +433,11 @@ describe("the fleet list", () => {
     const { onSell } = renderFacilities(expansion, oil.id);
     await user.click(
       screen.getByRole("button", {
-        name: "Sell Champlain Electric Oil A",
+        name: "Sell Oil A",
       }),
     );
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveAccessibleName(
-      "Sell 40MW Champlain Electric Oil A facility?",
-    );
+    expect(dialog).toHaveAccessibleName("Sell 40MW Oil A facility?");
     await user.click(within(dialog).getByRole("button", { name: "Sell" }));
     expect(onSell).toHaveBeenCalledWith(oil.id);
   });
