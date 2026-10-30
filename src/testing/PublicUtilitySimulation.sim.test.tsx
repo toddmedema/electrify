@@ -1,7 +1,10 @@
 import { LOCATIONS } from "../Constants";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { EMPTY_HISTORY } from "../helpers/DateTime";
-import { scenarioObjectiveFailure } from "../reducers/Game";
+import {
+  hasChronicBlackouts,
+  scenarioObjectiveFailure,
+} from "../reducers/Game";
 import { parseSave } from "../SaveGame";
 import { DifficultyType, ScenarioType } from "../Types";
 import {
@@ -238,9 +241,11 @@ describe("researched public-utility scenarios", () => {
     const result = runSimulation({ scenarioId: 106, difficulty });
     expectNoViolations(result);
     expect(result.outcome).toBe("fired");
-    expect(result.months[result.months.length - 1].customers).toBeLessThan(
-      manassas.startingCustomers! * manassas.minimumCustomerRetention!,
-    );
+    expect(
+      hasChronicBlackouts([...result.months].reverse(), difficulty) ||
+        scenarioObjectiveFailure(manassas, [...result.months].reverse()) !==
+          undefined,
+    ).toBe(true);
   });
 
   it("rejects an unattended Data Center Boom run on Intern for physical objectives", () => {
@@ -286,11 +291,11 @@ describe("researched public-utility scenarios", () => {
   });
 
   it.each(difficulties)(
-    "rejects an unattended Texas Deep Freeze run on %s",
+    "records the unattended Texas freeze shortage without a one-month loss on %s",
     (difficulty) => {
       const result = runSimulation({ scenarioId: 107, difficulty });
       expectNoViolations(result);
-      expect(result.outcome).toBe("fired");
+      expect(result.outcome).toBe("completed");
       const uri = result.months.find(
         (month) => month.year === 2021 && month.month === 2,
       )!;

@@ -45,12 +45,16 @@ describe("major scenario choice balance", () => {
             scenarioId,
             difficulty,
             scenarioResponses,
-            // Assume preparedness makes fossil backup unnecessary: mothball one plant,
+            // Assume preparedness makes fossil backup unnecessary: mothball both fossil plants,
             // after responding, and leave it off through the emergency. Data Center simply
             // neglects expansion. No cash injection, forced state, or artificial price is used.
             scheduledActions:
               scenarioId === 107
-                ? [{ month: 37, type: "toggle", facilityId: 2 }]
+                ? [1, 2].map((facilityId) => ({
+                    month: 37,
+                    type: "toggle" as const,
+                    facilityId,
+                  }))
                 : [],
           });
           [winning, losing].forEach((result) => {
@@ -92,7 +96,7 @@ describe("major scenario choice balance", () => {
   });
 
   it.each(["Intern", "CEO"] as const)(
-    "winterization supports a smaller fleet on %s",
+    "winterization reduces freeze shortages on %s",
     (difficulty) => {
       const decision = SCENARIO_CHOICES.find(
         (choice) => choice.scenarioId === 107,
@@ -115,9 +119,15 @@ describe("major scenario choice balance", () => {
         (result) => expect(result.violations).toEqual([]),
       );
       expect(protectedSmall.outcome).toBe("completed");
-      expect(exposedSmall.outcome).toBe("fired");
-      expect(physicalObjectiveFailure(exposedSmall)).toMatch(
-        /February 2021 freeze/,
+      expect(exposedSmall.outcome).toBe("completed");
+      const freeze = (result: SimResultType) =>
+        result.months.find(
+          (month) => month.year === 2021 && month.month === 2,
+        )!;
+      expect(
+        freeze(protectedSmall).supplyWh / freeze(protectedSmall).demandWh,
+      ).toBeGreaterThan(
+        freeze(exposedSmall).supplyWh / freeze(exposedSmall).demandWh,
       );
       expect(expanded.outcome).toBe("completed");
       expect(expandedProtected.outcome).toBe("completed");

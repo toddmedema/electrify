@@ -116,7 +116,7 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-test("two real official companies reach every Load Shedding step and final window with exact checkpoint continuation", () => {
+test("two real official companies reach every Load Shedding step and term end with exact checkpoint continuation", () => {
   const { world, resumed, reached } = playLoadSheddingWorld();
   expect(world.spec).toEqual({ scenarioId: 113, difficulty: "Employee" });
   expect(reached.map((point) => point.month)).toEqual([30, 36, 48, 60, 72, 84]);
@@ -146,14 +146,7 @@ test("two real official companies reach every Load Shedding step and final windo
     expect(
       game.worldEvents.active.some((event) => declared.includes(event.key)),
     ).toBe(false);
-    expect(gameObjectiveResults(game)).toContainEqual(
-      expect.objectContaining({
-        id: "reliability",
-        observedMonths: 12,
-        requiredMonths: 12,
-        status: "completed",
-      }),
-    );
+    expect(gameObjectiveResults(game)).toEqual([]);
     expect(world.outcomes[seat.id].outcome).toBe("completed");
     const violations = new InvariantCollector();
     for (const month of game.monthlyHistory)

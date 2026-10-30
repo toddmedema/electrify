@@ -1,5 +1,8 @@
 # Major scenario choice balance QA
 
+Reliability verdicts in the historical balance figures below predate the shared
+difficulty-based three-month rule. A single deficient month no longer ends a run.
+
 **Permanent winterization (October 2026):** Deep Freeze now offers the ordinary permanent
 facility upgrade in bulk, charging only for eligible assets still needing protection.
 The fixed $90M fee and choice-wide protection described below are historical. Current
@@ -40,7 +43,7 @@ default seed **12345** for Data Center and Wildfire, and Deep Freeze's authored 
 This proves reachable outcomes for reproducible seeds; it is not
 a claim that every strategy or weather seed wins. Both answers must actually be accepted before
 the outcome, all tick/month invariants must pass, and winning runs must clear the scenario's
-real duration and reliability/customer-retention objectives. Accepted action counts
+real duration, the shared reliability rule and customer-retention objectives. Accepted action counts
 are checked separately as internal balance metrics.
 
 **October 2026:** data-center blocks now draw their annual utilization steadily,
@@ -91,8 +94,8 @@ The standard winning plans record $3,228.9M Intern / $2,844.3M CEO in the choice
 paying leaves $3,138.9M / $2,754.3M. The fee is affordable and may be attractive. It should
 not be inflated merely to consume surplus cash or equalize final wealth.
 Winterization supports 100 MW of new gas on Intern or 300 MW on CEO; both protected plans
-win, while those same fleets without winterization lose the February objective (92.36% and
-90.06% served respectively). Building 900 MW instead wins without winterization on both
+win, while those same fleets without winterization serve 92.36% and
+90.06% respectively during February. Building 900 MW instead wins without winterization on both
 settings. Paying for winterization on that already sufficient fleet leaves less cash at the
 end. Thus preparation can substitute for capacity, while retaining the budget is valuable
 when the player has already prepared through construction. Winterization does not remove
@@ -118,7 +121,7 @@ Both adequate-grid plans still win under either response. Keeping cash ends $143
 on Intern and $5,603 ahead on CEO, so the free choice is neither unwinnable nor mechanically
 dominated in these examples. The narrow CEO difference should not be presented as universal
 parity: spending on preparation is often economically sensible. Poor dispatch still fails
-the physical reliability objective after either answer. Choice-month cash after payment is
+the shared reliability rule after either answer. Choice-month cash after payment is
 $58.9M Intern / $27.7M CEO.
 
 **Restoration is separately calibrated to observed event costs.** LADWP's $78M January 2025

@@ -1,7 +1,6 @@
 import { DIFFICULTY_IDS } from "../Constants";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { getScenario } from "../data/Scenarios";
-import type { ObjectiveContext } from "../data/ScenarioObjectives";
 import { resolveStoryAtDate, upcomingStoryPhases } from "../data/WorldEvents";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import {
@@ -9,19 +8,13 @@ import {
   validCompiledScenarioRules,
 } from "../helpers/ScenarioRules";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
-import { ruleDigest } from "../helpers/RuleIdentity";
-import {
-  createObjectiveProgress,
-  recordObjectiveMonth,
-  evaluateScenarioObjectives,
-} from "../helpers/ScenarioObjectives";
 import { buildStorySnapshot } from "../helpers/Story";
 import {
   intertieContextForGame,
   intertieOfferLimits,
   transmissionRatingW,
 } from "../helpers/Transmission";
-import type { ActiveWorldEventType, MonthlyHistoryType } from "../Types";
+import type { ActiveWorldEventType } from "../Types";
 import { digest } from "./CanonicalHash";
 import { createGame } from "./Simulator";
 
@@ -95,56 +88,6 @@ test.each(DIFFICULTY_IDS)(
     ).toMatchSnapshot();
   },
 );
-
-const month = (served: number, index: number) =>
-  ({
-    year: scenario.startingYear + Math.floor(index / 12),
-    month: (index % 12) + 1,
-    supplyWh: served,
-    demandWh: 100,
-  }) as unknown as MonthlyHistoryType;
-function objectiveStatus(history: MonthlyHistoryType[]) {
-  const rules = rulesFor("CEO");
-  const context: ObjectiveContext = {
-    rulesDigest: ruleDigest(rules.objectives),
-    seed: 12345,
-    startingYear: scenario.startingYear,
-    durationMonths: scenario.durationMonths,
-    ownership: scenario.ownership,
-    completedMonths: scenario.durationMonths,
-  };
-  let progress = createObjectiveProgress(
-    rules.objectives,
-    context,
-    scenario.startingCustomers!,
-  );
-  history.forEach((row, index) => {
-    progress = recordObjectiveMonth(
-      progress,
-      rules.objectives,
-      { month: 36 + index, history: row },
-      context,
-    );
-  });
-  return evaluateScenarioObjectives(rules.objectives, progress, context)[0];
-}
-
-test("native 111 goals complete on met demand, fail on a missed month and stay unverifiable without evidence", () => {
-  const met = objectiveStatus([36, 37].map((index) => month(100, index)));
-  expect(met).toMatchObject({
-    metric: "monthlyReliability",
-    status: "completed",
-    target: 0.995,
-    observedMonths: 2,
-    requiredMonths: 2,
-  });
-  expect(objectiveStatus([month(90, 36)])).toMatchObject({
-    status: "failed",
-    target: 0.995,
-    observedMonths: 1,
-  });
-  expect(objectiveStatus([]).status).toBe("unverifiable");
-});
 
 test("the owning route API caps the surviving intertie in the outage and leaves independent connections alone", () => {
   const game = createGame({ scenarioId: 111, difficulty: "CEO", seed: 12345 });

@@ -305,19 +305,6 @@ const retention = (
   deadlineMonth,
   minRetainedShare,
 });
-const reliability = (
-  label: string,
-  fromMonth: number,
-  throughMonth: number,
-  minDemandServedShare = 0.995,
-): RuleObjective => ({
-  id: "reliability",
-  label,
-  metric: "monthlyReliability",
-  fromMonth,
-  throughMonth,
-  minDemandServedShare,
-});
 const reliabilityReport = (
   id: string,
   fromMonth: number,
@@ -352,7 +339,6 @@ export const DATA_CENTER_RULES: OfficialScenarioRuleDefinition = {
 export const DEEP_FREEZE_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 107,
   arcId: "texas-deep-freeze",
-  reliabilityNoun: "February 2021 freeze",
   definitions: {
     events: [
       {
@@ -386,7 +372,7 @@ export const DEEP_FREEZE_RULES: OfficialScenarioRuleDefinition = {
           "Normal plant output and gas prices returning as the cold eases.",
       },
     ],
-    objectives: [reliability("Keep the lights on through the freeze", 50, 50)],
+    objectives: [],
     debriefReports: [
       {
         id: "deep-freeze-review",
@@ -923,7 +909,6 @@ export const RENEWABLES_RULES: OfficialScenarioRuleDefinition = {
 export const HEATWAVE_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 108,
   arcId: "heatwave-drought",
-  reliabilityNoun: "2026 heatwave and drought",
   definitions: {
     events: [
       {
@@ -988,19 +973,7 @@ export const HEATWAVE_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
           "Cooler weather lowering demand, with slower reservoir recovery.",
       },
     ],
-    objectives: [
-      reliability("Keep the lights on through the heatwave", 42, 44),
-    ],
-    debriefReports: [
-      {
-        id: "heatwave-drought-reliability",
-        label: "2026 heatwave and drought",
-        kind: "reliability",
-        fromMonth: 42,
-        throughMonth: 44,
-        minDemandServedShare: 0.995,
-      },
-    ],
+    objectives: [],
   },
   presentation: {
     "seasonal-warning": {
@@ -1043,7 +1016,6 @@ export const HEATWAVE_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
 export const KARIBA_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 114,
   arcId: "kariba-drought",
-  reliabilityNoun: "2016 drought",
   definitions: {
     events: [
       {
@@ -1086,19 +1058,7 @@ export const KARIBA_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
         },
       })),
     ],
-    objectives: [
-      reliability("Keep the grid running through the drought", 49, 60, 0.98),
-    ],
-    debriefReports: [
-      {
-        id: "kariba-drought-reliability",
-        label: "2016 drought",
-        kind: "reliability",
-        fromMonth: 49,
-        throughMonth: 60,
-        minDemandServedShare: 0.98,
-      },
-    ],
+    objectives: [],
   },
   presentation: {
     "poor-rains-forecast": {
@@ -1138,7 +1098,6 @@ export const KARIBA_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
 export const DELHI_SUMMER_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 115,
   arcId: "delhi-summer",
-  reliabilityNoun: "record summer of 2024",
   definitions: {
     events: [
       {
@@ -1187,19 +1146,7 @@ export const DELHI_SUMMER_RULES: OfficialScenarioRuleDefinition = {
         },
       })),
     ],
-    objectives: [
-      reliability("Keep the lights on through the record summer", 77, 79),
-    ],
-    debriefReports: [
-      {
-        id: "delhi-summer-reliability",
-        label: "record summer of 2024",
-        kind: "reliability",
-        fromMonth: 77,
-        throughMonth: 79,
-        minDemandServedShare: 0.995,
-      },
-    ],
+    objectives: [],
   },
   presentation: {
     "summer-outlook": {

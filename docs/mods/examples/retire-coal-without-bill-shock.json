@@ -74,14 +74,6 @@
       "fromMonth": 1,
       "throughMonth": 36,
       "maxDebtDollars": 300000000
-    },
-    {
-      "id": "replacement-reliability",
-      "label": "Keep customers supplied",
-      "metric": "monthlyReliability",
-      "fromMonth": 25,
-      "throughMonth": 36,
-      "minDemandServedShare": 0.995
     }
   ],
   "debriefReports": [

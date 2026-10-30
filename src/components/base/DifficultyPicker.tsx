@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import { DIFFICULTY_IDS, DIFFICULTY_LABELS } from "../../Constants";
 import { DifficultyType } from "../../Types";
+import { reliabilityRuleText } from "../../helpers/ObjectiveRules";
 
 // Interface copy stays out of Constants.tsx so editing it never changes the run compatibility ID
 export const DIFFICULTY_DESCRIPTIONS: Record<DifficultyType, string> = {
@@ -28,7 +29,7 @@ export interface DifficultyPickerProps {
   onChange: (difficulty: DifficultyType) => void;
   // A row of buttons for a screen built around the choice, or a compact select for a settings table
   variant: "toggle" | "select";
-  // Toggle only: the chosen difficulty's description beneath the buttons
+  // The chosen difficulty's reliability rule; toggle controls also describe the economic effects.
   showDescription?: boolean;
   id?: string;
   /** Shows the choice someone else is making, such as a co-op host's difficulty. */
@@ -50,25 +51,35 @@ export default function DifficultyPicker({
 }: DifficultyPickerProps): React.JSX.Element {
   if (variant === "select") {
     return (
-      <Select
-        id={id}
-        disabled={readOnly}
-        inputProps={{ "aria-label": "Difficulty" }}
-        value={value}
-        onChange={(e: SelectChangeEvent<DifficultyType>) => {
-          if (isDifficulty(e.target.value)) {
-            onChange(e.target.value);
-          }
-        }}
-      >
-        {DIFFICULTY_IDS.map((d) => (
-          <MenuItem value={d} key={d}>
-            <Tooltip title={DIFFICULTY_DESCRIPTIONS[d]} placement="right">
-              <span>{DIFFICULTY_LABELS[d]}</span>
-            </Tooltip>
-          </MenuItem>
-        ))}
-      </Select>
+      <>
+        <Select
+          id={id}
+          disabled={readOnly}
+          inputProps={{ "aria-label": "Difficulty" }}
+          value={value}
+          onChange={(e: SelectChangeEvent<DifficultyType>) => {
+            if (isDifficulty(e.target.value)) {
+              onChange(e.target.value);
+            }
+          }}
+        >
+          {DIFFICULTY_IDS.map((d) => (
+            <MenuItem value={d} key={d}>
+              <Tooltip
+                title={`${DIFFICULTY_DESCRIPTIONS[d]} ${reliabilityRuleText(d)}`}
+                placement="right"
+              >
+                <span>{DIFFICULTY_LABELS[d]}</span>
+              </Tooltip>
+            </MenuItem>
+          ))}
+        </Select>
+        {showDescription && (
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+            {reliabilityRuleText(value)}
+          </Typography>
+        )}
+      </>
     );
   }
   return (
@@ -91,7 +102,7 @@ export default function DifficultyPicker({
             value={d}
             key={d}
             disabled={readOnly}
-            title={DIFFICULTY_DESCRIPTIONS[d]}
+            title={`${DIFFICULTY_DESCRIPTIONS[d]} ${reliabilityRuleText(d)}`}
             aria-label={DIFFICULTY_LABELS[d]}
           >
             {DIFFICULTY_LABELS[d]}
@@ -115,7 +126,8 @@ export default function DifficultyPicker({
                 visibility: difficulty === value ? "visible" : "hidden",
               }}
             >
-              {DIFFICULTY_DESCRIPTIONS[difficulty]}
+              {DIFFICULTY_DESCRIPTIONS[difficulty]}{" "}
+              {reliabilityRuleText(difficulty)}
             </span>
           ))}
         </Typography>

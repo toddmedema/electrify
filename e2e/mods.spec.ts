@@ -316,7 +316,9 @@ for (const [theme, winning] of [
     await easy.focus();
     await page.keyboard.press("Enter");
     await expect(easy).toHaveAttribute("aria-pressed", "true");
-    await expect(launch).toContainText("Serve the connected city");
+    await expect(launch).toContainText(
+      "Serving less than 95% of demand for 3 months in a row ends the run.",
+    );
     await expect(launch).toContainText("Retain your starting customers");
     await expect(launch).toContainText(
       "Modded run · unranked · no achievements",
@@ -495,38 +497,29 @@ for (const [theme, winning] of [
       );
       await expect(
         scenario.getByRole("region", { name: "Victory conditions" }),
-      ).toContainText("≥99.5% of demand monthly · Jan 2026–Dec 2028");
+      ).toContainText(
+        "Serving less than 95% of demand for 3 months in a row ends the run.",
+      );
       await expect(
         scenario.getByRole("region", { name: "Victory conditions" }),
       ).not.toContainText(/months completed|Not started/);
-      expect(
-        (await readSavedGame(page))!.objectiveProgress?.completedMonths,
-      ).toBe(73);
       await page.keyboard.press("Escape");
       await appbar
         .getByRole("button", { name: "fast speed", exact: true })
         .click();
     }
     const result = page.getByRole("dialog", {
-      name: winning
-        ? "A bigger city, a bigger grid"
-        : "Mission objective missed",
+      name: winning ? "A bigger city, a bigger grid" : "Fired!",
       exact: true,
     });
     await advanceExampleTo(page, result);
-    const evidence = result.getByRole("region", {
-      name: "Objective results",
-    });
-    await expect(evidence).toContainText(
-      `Serve the connected city · Required · ${winning ? "Met" : "Failed"}`,
-    );
-    await expect(evidence).toContainText("Months 73–108");
-    await expect(evidence).toContainText(
-      winning ? "36/36 months completed" : "1/36 months completed",
-    );
+    const evidence = result.getByRole("region", { name: "Mission results" });
+    await expect(
+      result.getByRole("region", { name: "Objective results" }),
+    ).toContainText("Retain your starting customers");
     if (!winning)
-      await expect(evidence).toContainText(
-        "At least one completed month supplied less than the required share of customer demand.",
+      await expect(result).toContainText(
+        "You served less than 95% of demand for 3 months in a row",
       );
     await expect(result).toContainText(
       "Modded run · not ranked and no achievements.",
@@ -536,9 +529,7 @@ for (const [theme, winning] of [
       page.locator("iframe#webpack-dev-server-client-overlay"),
     ).toHaveCount(0);
     expect(await noHorizontalScroll(page)).toBe(true);
-    const goal = evidence
-      .getByText("Serve the connected city", { exact: false })
-      .first();
+    const goal = evidence.getByText("served", { exact: true }).first();
     await scrollEvidenceIntoView(goal);
     await expect(goal).toBeInViewport({ ratio: 1 });
     // The evidence scrolls inside the dialog while its action footer stays usable.
@@ -567,7 +558,7 @@ for (const [theme, winning] of [
       "aria-pressed",
       "true",
     );
-    await expect(appbar).toContainText(winning ? "Jan 2029" : "Feb 2026");
+    await expect(appbar).toContainText(winning ? "Jan 2029" : "Apr 2026");
     if (winning && page.viewportSize()!.width === 1280) {
       // The flow above is checked at 1280×800. A taller normal desktop capture
       // fits the complete intro and results without a clipped scroll seam.
@@ -1029,11 +1020,11 @@ for (const [theme, requiredBills] of [
         objectives: [
           {
             id: "supply",
-            label: "Keep demand supplied",
-            metric: "monthlyReliability",
+            label: "Limit bills",
+            metric: "monthlyBilledRate",
             fromMonth: 1,
             throughMonth: 2,
-            minDemandServedShare: 0,
+            maxDollarsPerKWh: 1,
           },
           {
             id: "bills",
@@ -1529,12 +1520,12 @@ test("mod details distinguish player rules from the complete author report", asy
       facilities: { Solar: { buildCost: 0.8 } },
       objectives: [
         {
-          id: "serve-demand",
-          label: "Keep your grid reliable",
-          metric: "monthlyReliability",
+          id: "affordable",
+          label: "Keep bills affordable",
+          metric: "monthlyBilledRate",
           fromMonth: 1,
           throughMonth: 6,
-          minDemandServedShare: 0.9,
+          maxDollarsPerKWh: 1,
         },
       ],
       choices: [
@@ -1689,7 +1680,7 @@ test("mod details distinguish player rules from the complete author report", asy
   ).not.toContainText("Preparing baseline forecast");
   await expect(
     details.getByRole("region", { name: "Scenario objectives" }),
-  ).toContainText("Keep your grid reliable");
+  ).toContainText("Keep bills affordable");
   const timeline = details.getByRole("region", {
     name: "Announced timeline",
   });
@@ -1726,7 +1717,7 @@ test("mod details distinguish player rules from the complete author report", asy
   await expect(
     page.locator("iframe#webpack-dev-server-client-overlay"),
   ).toHaveCount(0);
-  const goal = details.getByText("Keep your grid reliable", { exact: true });
+  const goal = details.getByText("Keep bills affordable", { exact: true });
   await scrollEvidenceIntoView(goal);
   await expect(goal).toBeInViewport({ ratio: 1 });
   await expect(
