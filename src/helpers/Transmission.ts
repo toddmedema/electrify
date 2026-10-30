@@ -145,6 +145,7 @@ export function intertieContextForGame(
         | "tutorialIntertieStress"
         | "startingYear"
         | "multiplayer"
+        | "utilityExpansion"
       >
     >,
 ): IntertieContext {
@@ -155,6 +156,7 @@ export function intertieContextForGame(
       location: game.location,
       customScenario: game.customScenario,
       multiplayer: game.multiplayer,
+      utilityExpansion: game.utilityExpansion,
     }),
     tutorialSupplyLimitW: game.tutorialIntertieStress?.active
       ? 150e6

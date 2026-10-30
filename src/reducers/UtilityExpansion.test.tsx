@@ -15,8 +15,10 @@ import {
   networkCarryingValue,
   ownedUtility,
 } from "../helpers/Expansion";
-import { accessContextForGame } from "../data/IntertieAccess";
-import { intertieUpgradeQuote } from "../helpers/Transmission";
+import {
+  intertieContextForGame,
+  intertieUpgradeQuote,
+} from "../helpers/Transmission";
 import type { GameType, UtilityTargetId } from "../Types";
 import reducer, {
   buildTransmissionLine,
@@ -207,7 +209,18 @@ it("keeps corporate debt after plant sales and never writes impaired network val
 });
 
 it("rejects no-op spending and operation controls on an acquired connection", () => {
-  const game = buy(ready());
+  const opening = ready();
+  const openingLine = opening.transmission!.lines[0];
+  expect(
+    intertieUpgradeQuote(
+      openingLine,
+      opening.date.year,
+      1,
+      1,
+      intertieContextForGame(opening),
+    ),
+  ).toBeDefined();
+  const game = buy(opening);
   const line = game.transmission!.lines[0];
   expect(
     intertieUpgradeQuote(
@@ -215,7 +228,7 @@ it("rejects no-op spending and operation controls on an acquired connection", ()
       game.date.year,
       1,
       1,
-      accessContextForGame(game),
+      intertieContextForGame(game),
     ),
   ).toBeUndefined();
   expect(reducer(game, togglePauseTransmissionLine(line.id))).toEqual(game);

@@ -198,6 +198,7 @@ describe("intertie context", () => {
     expect(result).toEqual({
       startingYear: 2020,
       peers,
+      ownedUtilityCorridors: [],
       scenarioId: 100,
       locationId: "SF",
       tutorialSupplyLimitW: 150e6,
@@ -219,6 +220,7 @@ describe("intertie context", () => {
     expect(result).toEqual({
       startingYear: undefined,
       peers: undefined,
+      ownedUtilityCorridors: [],
       scenarioId: undefined,
       locationId: "SF",
       tutorialSupplyLimitW: undefined,
