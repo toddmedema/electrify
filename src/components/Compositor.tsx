@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  Snackbar,
   SnackbarContent,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
@@ -28,6 +27,7 @@ import AudioContainer from "./base/AudioContainer";
 import GameWorkspace from "./base/GameWorkspace";
 import { GAME_TOOLS, GameTool } from "./base/Navigation";
 import { restoreMenuFocus } from "./base/useMenuKeys";
+import DeferredSnackbar from "./base/DeferredSnackbar";
 import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
@@ -689,7 +689,7 @@ export default class Compositor extends React.Component<Props, {}> {
             )}
           </DialogActions>
         </Dialog>
-        <Snackbar
+        <DeferredSnackbar
           className={`snackbar ${isGameCard(this.props.card.name) ? "snackbar-above-nav" : ""}`}
           // Bottom left is the MUI default, which on a wide screen leaves the toast hanging
           // off the side of the centered app frame
@@ -732,7 +732,7 @@ export default class Compositor extends React.Component<Props, {}> {
               </>
             }
           />
-        </Snackbar>
+        </DeferredSnackbar>
         {/* Connected, so they still update when shouldComponentUpdate blocks this component --
             neither is driven by the current card, and both can open over any of them */}
         <VictoryDialogContainer />

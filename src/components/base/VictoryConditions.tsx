@@ -2,9 +2,7 @@ import * as React from "react";
 import { DifficultyType, ScenarioType } from "../../Types";
 import { Box, Typography } from "@mui/material";
 import { objectiveDefinition } from "../../helpers/ScenarioObjectives";
-import {
-  objectiveGoalText,
-} from "../../helpers/ObjectivePresentation";
+import { objectiveGoalText } from "../../helpers/ObjectivePresentation";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import { scoreLabel, scoreRuleText } from "../../helpers/Scoring";

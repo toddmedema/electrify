@@ -366,10 +366,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
       {underConstruction && (
         <section className="facilityDetailSection" aria-label="Construction">
           <dl className="facilityStats">
-            <Stat
-              label="Capacity"
-              value={formatWatts(facility.peakW)}
-            />
+            <Stat label="Capacity" value={formatWatts(facility.peakW)} />
             {storage && (
               <Stat
                 label="Energy capacity"
@@ -382,9 +379,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 <>
                   {formatMoneyConcise(facilityCashBack(facility, date.minute))}
                   {facility.loanAmountLeft > 0 && (
-                    <span className="facilityStatNote">
-                      After loan payoff
-                    </span>
+                    <span className="facilityStatNote">After loan payoff</span>
                   )}
                 </>
               }
@@ -398,10 +393,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             Operation
           </Typography>
           <dl className="facilityStats">
-            <Stat
-              label="Capacity"
-              value={formatWatts(facility.peakW)}
-            />
+            <Stat label="Capacity" value={formatWatts(facility.peakW)} />
             {!storage && maxOutputFactor < 1 && (
               <Stat
                 label="Current max output"

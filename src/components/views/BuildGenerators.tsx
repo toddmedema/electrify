@@ -10,8 +10,9 @@ import {
   List,
   Stack,
   Typography,
-  useMediaQuery,
+  IconButton,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   estimatedAnnualOperatingCost,
@@ -219,7 +220,6 @@ export function GeneratorBuildItem(
 ): React.JSX.Element {
   const { generator, cash } = props;
   const units = useUnits();
-  const wideLayout = useMediaQuery("(min-width:600px)");
   const kgCO2ePerBtu = FUELS[generator.fuel]?.kgCO2ePerBtu ?? 0;
   const fuelPrices = getFuelPricesPerMBTU(
     props.date,
@@ -458,7 +458,6 @@ export function GeneratorBuildItem(
         disabled: !canBuild,
         onClick: openReview,
       }}
-      headerActions={wideLayout && compareAction}
       sizeAction={sizeAction}
       context={context}
       summary={
@@ -519,7 +518,7 @@ export function GeneratorBuildItem(
           )}
         </>
       }
-      footerActions={!wideLayout && compareAction}
+      footerActions={compareAction}
       details={
         <>
           <Typography
@@ -792,6 +791,7 @@ function GeneratorComparison(props: {
   generators: GeneratorShoppingType[];
   outputShapes: Map<string, ExpectedOutputShape | undefined>;
   onClear: () => void;
+  onRemove: (name: string) => void;
 }): React.JSX.Element | null {
   if (props.generators.length === 0) {
     return null;
@@ -817,6 +817,14 @@ function GeneratorComparison(props: {
             <Typography variant="body2" sx={{ fontWeight: 800 }}>
               {generator.name}
             </Typography>
+            <IconButton
+              className="generatorComparisonRemove"
+              size="small"
+              aria-label={`Remove ${generator.name} from comparison`}
+              onClick={() => props.onRemove(generator.name)}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
             <Typography variant="caption">
               {formatMoneyConcise(generator.buildCost)} ·{" "}
               {formatBuildMonths(generator.yearsToBuild)}
@@ -1105,6 +1113,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
         generators={comparedGenerators}
         outputShapes={outputShapes}
         onClear={() => setComparedNames([])}
+        onRemove={toggleCompare}
       />
       <List ref={listRef} dense className="scrollable cardList">
         {generators.map((g: GeneratorShoppingType) => {

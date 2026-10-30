@@ -102,7 +102,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       },
     ],
     plugins: [
-      bandsPlugin(() => getState().negativeSpans, palette.blackout, 0.15),
+      bandsPlugin(() => getState().negativeSpans, palette.blackout),
       {
         hooks: {
           draw: (plot) => {

@@ -1431,7 +1431,7 @@ export default class Insights extends React.Component<Props, State> {
           {iconButton(
             "Zoom out",
             <ZoomOutIcon />,
-            rangesEqual(scenarioRange, range),
+            full || rangesEqual(scenarioRange, range),
             () => setRange(scenarioRange),
           )}
           {iconButton("Fit full timeline", <FitScreenIcon />, full, () =>

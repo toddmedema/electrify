@@ -123,7 +123,7 @@ function ScoreOutlook({
     >
       <Typography
         id="scenario-outlook-title"
-        variant="h6"
+        variant="subtitle1"
         component="h3"
         sx={{ fontWeight: 600 }}
       >
@@ -142,7 +142,13 @@ function ScoreOutlook({
               {change !== 0 && (
                 <span
                   className="scenarioOutlookChange"
-                  data-direction={change > 0 ? "up" : "down"}
+                  data-direction={
+                    outlook?.status === "loss"
+                      ? "neutral"
+                      : change > 0
+                        ? "up"
+                        : "down"
+                  }
                 >
                   {change > 0 ? "+" : "−"}
                   {formatScore(Math.abs(change))}
@@ -182,10 +188,22 @@ function ScoreOutlook({
               <WarningAmberIcon fontSize="small" aria-hidden="true" />
               <span>
                 <strong>Projected loss:</strong> {loss.text}
+                {outlook.shortageFrom && (
+                  <span className="scenarioBuildNothing">
+                    If you build nothing: shortages from {outlook.shortageFrom}.
+                  </span>
+                )}
               </span>
             </>
           ) : (
-            loss.text
+            <>
+              {loss.text}
+              {outlook?.shortageFrom && (
+                <span className="scenarioBuildNothing">
+                  If you build nothing: shortages from {outlook.shortageFrom}.
+                </span>
+              )}
+            </>
           )}
         </Typography>
       )}
@@ -302,7 +320,7 @@ export function ScenarioDetailsContent({
       >
         <Typography
           id="scenario-score-title"
-          variant="h6"
+          variant="subtitle1"
           component="h3"
           sx={{ fontWeight: 600 }}
         >
@@ -376,7 +394,7 @@ export function ScenarioDetailsContent({
       <Box component="section" aria-labelledby="scenario-rules-title">
         <Typography
           id="scenario-rules-title"
-          variant="h6"
+          variant="subtitle1"
           component="h3"
           sx={{ fontWeight: 600 }}
         >

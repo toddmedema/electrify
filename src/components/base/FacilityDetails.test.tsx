@@ -268,7 +268,9 @@ describe("weather resilience details", () => {
     expect(section()).toHaveTextContent(
       "Solar trackersAbout 20% more morning and evening power.",
     );
-    expect(section()).toHaveTextContent("About 20% more morning and evening power.");
+    expect(section()).toHaveTextContent(
+      "About 20% more morning and evening power.",
+    );
   });
 
   it("offers no retrofit while a plant is under construction", () => {

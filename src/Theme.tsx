@@ -125,6 +125,8 @@ interface ChartPaletteType {
   onDemand: string;
   variableFill: string;
   onDemandFill: string;
+  /** The wash behind a shortfall or warning band. */
+  bandAlpha: number;
   powerFlowFill: string;
   powerFlowPattern: string;
   /** Facilities that burn or catch nothing, which borrow the battery UI's blue */
@@ -192,6 +194,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     ...PRODUCTION_COLORS.light,
     variableFill: withAlpha(PRODUCTION_COLORS.light.variable, 0.18),
     onDemandFill: withAlpha(PRODUCTION_COLORS.light.onDemand, 0.2),
+    bandAlpha: 0.1,
     powerFlowFill: withAlpha(GRID_STEEL.light, 0.08),
     powerFlowPattern: withAlpha(GRID_STEEL.light, 0.8),
     storage: blue[800],
@@ -223,6 +226,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     ...PRODUCTION_COLORS.dark,
     variableFill: withAlpha(PRODUCTION_COLORS.dark.variable, 0.17),
     onDemandFill: withAlpha(PRODUCTION_COLORS.dark.onDemand, 0.25),
+    bandAlpha: 0.16,
     powerFlowFill: withAlpha(GRID_STEEL.dark, 0.08),
     powerFlowPattern: withAlpha(GRID_STEEL.dark, 0.8),
     storage: blue[300],
@@ -416,6 +420,11 @@ export function createAppTheme(mode: ThemeModeType): Theme {
             "&:not(.Mui-disabled)": {
               color: mode === "light" ? primaryDarkColor : palette.interactive,
             },
+            "&.Mui-selected:not(.Mui-disabled)": {
+              color: "var(--font-color-primary)",
+              backgroundColor: "var(--bg-selected)",
+              borderColor: "var(--border-selected)",
+            },
             textTransform: "none",
             fontWeight: 600,
             minHeight: 40,
@@ -455,6 +464,8 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiMenuItem: {
         styleOverrides: {
           root: {
+            minHeight: 40,
+            "@media (pointer: coarse)": { minHeight: 44 },
             "&:not(.Mui-disabled)": {
               color: mode === "dark" ? "#e6edf5" : "#172334",
             },
@@ -507,7 +518,13 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiSwitch: {
         styleOverrides: {
           switchBase: {
-            "&:not(.Mui-disabled)": { color: "var(--interactive-strong)" },
+            // Blue means on: an off thumb is neutral.
+            "&:not(.Mui-disabled):not(.Mui-checked)": {
+              color: "var(--font-color-faded)",
+            },
+            "&.Mui-checked:not(.Mui-disabled)": {
+              color: "var(--interactive-strong)",
+            },
           },
         },
       },

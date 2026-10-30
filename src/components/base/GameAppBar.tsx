@@ -421,6 +421,7 @@ export function GameAppBar(props: Props) {
           data-settings-trigger
           data-saves-trigger
           data-achievements-trigger
+          data-manual-trigger
           className="gameMenuButton"
           onClick={handleMenuClick}
           aria-label="menu"
@@ -594,8 +595,10 @@ export function GameAppBar(props: Props) {
             {showProfit && (
               <Tooltip title="Current month forecast: revenue minus operating expenses, including interest and imports.">
                 <Typography
-                  component="span"
-                  className="gameMonthlyProfit"
+                  component="button"
+                  type="button"
+                  className="gameMonthlyProfit gameMonthlyProfitButton"
+                  onClick={() => props.onEvidence?.("finances")}
                   color={
                     monthlyProfit < 0
                       ? "error"

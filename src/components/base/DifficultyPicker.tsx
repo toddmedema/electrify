@@ -17,8 +17,7 @@ export const DIFFICULTY_DESCRIPTIONS: Record<DifficultyType, string> = {
     "Most forgiving: much lower costs, very fast building, smaller outage penalties.",
   Employee:
     "Forgiving: lower costs, faster building, smaller outage penalties.",
-  Manager:
-    "Balanced: some help with costs, building time, outage penalties.",
+  Manager: "Balanced: some help with costs, building time, outage penalties.",
   VP: "Demanding: a little help with costs and building time.",
   CEO: "Full challenge: unadjusted costs, building times, outage penalties.",
 };

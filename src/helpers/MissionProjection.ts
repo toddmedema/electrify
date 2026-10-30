@@ -41,6 +41,8 @@ export interface MissionProjection {
   status: "win" | "loss" | "unknown";
   requirements: RequirementProjection[];
   through: string;
+  /** The first forecast month with unmet demand. The forecast assumes no more building. */
+  shortageFrom?: string;
 }
 
 const monthIndex = (row: MonthlyHistoryType, game: GameType) =>
@@ -296,7 +298,11 @@ export function projectMission(
           : "Not enough monthly coverage to rule out a blackout streak.",
   });
   const required = requirements.filter((row) => row.required);
+  const shortage = months.find((row) => row.supplyWh < row.demandWh);
   return {
+    shortageFrom: shortage
+      ? monthLabel(monthIndex(shortage, game), game)
+      : undefined,
     status: required.some(
       (row) => row.status === "at-risk" || row.status === "failed",
     )

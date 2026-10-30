@@ -127,12 +127,10 @@
   position: absolute;
   z-index: 5;
   bottom: 0;
-  left: max(16px, env(safe-area-inset-left));
-  right: max(16px, env(safe-area-inset-right));
+  left: 0;
+  right: 0;
   display: flex;
   height: min(72dvh, calc(100% - 8px));
-  max-width: 1120px;
-  margin-inline: auto;
   pointer-events: none;
 }
 
@@ -148,8 +146,10 @@
   flex-direction: column;
   overflow: hidden;
   pointer-events: auto;
-  border: 1px solid var(--border-strong);
-  border-radius: 16px 16px 0 0;
+  // Full bleed: side gutters would show fragments of the live fleet behind the sheet.
+  border-top: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
   background: var(--bg-primary);
   box-shadow: 0 4px 24px var(--shadow-ring);
   animation: gameToolRise 200ms ease-out;
@@ -199,11 +199,12 @@
   .MuiIconButton-root {
     width: var(--control-size);
     height: var(--control-size);
-    color: var(--interactive-strong);
+    color: var(--font-color-faded);
   }
 }
 
 .gameToolBody {
+  container: game-tool / inline-size;
   flex: 1 1 0;
   min-height: 0;
   min-width: 0;
@@ -228,6 +229,36 @@
   }
   .insights {
     container-type: inline-size;
+  }
+  // A sheet's content uses the sheet; a capped column reads as a page inside a page.
+  .screenCatalog,
+  .screenCatalog > .cardList,
+  .screenCatalog > .constructionHeader,
+  .screenCatalog > .MuiToolbar-root,
+  .screenCatalog > .generatorComparison,
+  .buildOption,
+  .insightsViewportToolbar,
+  .insightsTracks {
+    max-width: none;
+  }
+}
+
+@container game-tool (min-width: 700px) {
+  .buildFacilities .cardList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 8px;
+    align-items: start;
+    > :not(.buildOption) {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+// Portrait tablets: the sheet's top meets the chart, so a decision never hides its evidence.
+@media (min-width: 700px) and (orientation: portrait) {
+  .gameStage[data-layout="sheet"] .gameToolTray {
+    height: calc(100% - var(--game-chart-block, 294px));
   }
 }
 
@@ -357,12 +388,7 @@
 
 @media (max-width: 599px) {
   .gameToolTray {
-    left: max(4px, env(safe-area-inset-left));
-    right: max(4px, env(safe-area-inset-right));
     height: calc(100% - 8px);
-  }
-  .gameToolPanel {
-    border-radius: 12px 12px 0 0;
   }
 }
 

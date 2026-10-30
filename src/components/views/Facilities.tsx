@@ -748,6 +748,19 @@ function FacilitySupplyChart({
 }) {
   const fuelOrder = getDispatchOrderedFuels(game.facilities);
   const height = useFleetChartHeight();
+  // A portrait tablet's sheet starts where this block ends.
+  React.useLayoutEffect(() => {
+    const element = anchor.current;
+    const stage = element?.closest(".gameStage");
+    if (!element || !stage) return;
+    const bottom =
+      element.getBoundingClientRect().bottom -
+      stage.getBoundingClientRect().top;
+    document.documentElement.style.setProperty(
+      "--game-chart-block",
+      `${Math.round(bottom)}px`,
+    );
+  }, [anchor, height]);
   return (
     <div
       ref={anchor}

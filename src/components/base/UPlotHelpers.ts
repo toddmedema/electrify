@@ -576,10 +576,28 @@ function clipToPlot(u: uPlot) {
 }
 
 /** Shaded vertical bands, used for the stretches of the day that browned out. */
+const BAND_MERGE_GAP_PX = 2;
+const BAND_STRIP_PX = 6;
+
+/** Sorted pixel spans with touching or nearly touching neighbours joined. */
+export function mergeBandPixels(
+  spans: Array<[number, number] | number[]>,
+  gap: number,
+): Array<[number, number]> {
+  const merged: Array<[number, number]> = [];
+  [...spans]
+    .sort((a, b) => a[0] - b[0])
+    .forEach(([from, to]) => {
+      const last = merged[merged.length - 1];
+      if (last && from - last[1] <= gap) last[1] = Math.max(last[1], to);
+      else merged.push([from, to]);
+    });
+  return merged;
+}
+
 export function bandsPlugin(
   getSpans: () => Array<[number, number]>,
   color: string,
-  opacity: number,
 ): uPlot.Plugin {
   return {
     hooks: {
@@ -590,11 +608,22 @@ export function bandsPlugin(
         }
         u.ctx.save();
         clipToPlot(u);
-        u.ctx.fillStyle = withAlpha(color, opacity);
-        for (const [from, to] of spans) {
-          const x0 = u.valToPos(from, "x", true);
-          const x1 = u.valToPos(to, "x", true);
-          u.ctx.fillRect(x0, u.bbox.top, Math.max(1, x1 - x0), u.bbox.height);
+        // Touching months merge into one band, so a long shortfall has no stripes; the faint
+        // wash keeps the series readable and the solid strip on top carries the meaning.
+        const merged = mergeBandPixels(
+          spans.map(([from, to]) => [
+            u.valToPos(from, "x", true),
+            u.valToPos(to, "x", true),
+          ]),
+          BAND_MERGE_GAP_PX * uPlot.pxRatio,
+        );
+        const strip = BAND_STRIP_PX * uPlot.pxRatio;
+        for (const [x0, x1] of merged) {
+          const width = Math.max(1, x1 - x0);
+          u.ctx.fillStyle = withAlpha(color, chartPalette().bandAlpha);
+          u.ctx.fillRect(x0, u.bbox.top, width, u.bbox.height);
+          u.ctx.fillStyle = color;
+          u.ctx.fillRect(x0, u.bbox.top, width, strip);
         }
         u.ctx.restore();
       },

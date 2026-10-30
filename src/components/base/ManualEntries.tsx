@@ -186,8 +186,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           You can meet growing demand by building more power plants, or by
           helping <EntryLink to={MANUAL_ENTRY.CUSTOMERS}>customers</EntryLink>{" "}
-          use less electricity. Set these in Programs; changes start next
-          month.
+          use less electricity. Set these in Programs; changes start next month.
         </p>
         <p>
           <strong>Efficiency and rooftop solar rebates:</strong> Each is a

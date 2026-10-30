@@ -160,7 +160,7 @@ for (const theme of ["light", "dark"] as const) {
         ).toContainText("At full power");
         await expect(
           metrics.locator(".buildOptionMetric").nth(4),
-        ).toContainText("Round-trip efficiency");
+        ).toContainText("Efficiency");
         for (const description of await cards
           .locator(".buildOptionDescription")
           .all()) {
@@ -207,12 +207,8 @@ for (const theme of ["light", "dark"] as const) {
           .getByRole("button", { name: /^Compare/ })
           .boundingBox())!;
         const reviewBox = (await review.boundingBox())!;
-        if (page.viewportSize()!.width >= 600) {
-          expect(compare.y).toBeCloseTo(reviewBox.y, 0);
-          expect(reviewBox.x - (compare.x + compare.width)).toBeCloseTo(4, 0);
-        } else {
-          expect(compare.y).toBeGreaterThan(reviewBox.y + reviewBox.height);
-        }
+        // Compare sits with Show details at every width; Review stays the header's one action.
+        expect(compare.y).toBeGreaterThan(reviewBox.y + reviewBox.height);
       }
       await reviewScreenshot(page, {
         path: testInfo.outputPath(`${kind}-${theme}.png`),
@@ -292,7 +288,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       if (kind === "Storage") {
         await expect(
-          properties.getByRole("row", { name: /Round-trip efficiency/ }),
+          properties.getByRole("row", { name: /Efficiency/ }),
         ).toHaveCount(0);
       }
       await expect(
@@ -411,7 +407,7 @@ for (const theme of ["light", "dark"] as const) {
         .locator(".buildOptionMetrics")
         .locator(".buildOptionMetric")
         .nth(4),
-    ).toHaveText("Round-trip efficiency85%");
+    ).toHaveText("Efficiency85%");
     expect(
       await battery.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
@@ -422,7 +418,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Show Lithium Battery details" })
       .click();
     await expect(
-      battery.getByRole("row", { name: /Round-trip efficiency/ }),
+      battery.getByRole("row", { name: /Efficiency/ }),
     ).toHaveCount(0);
     const lossHelp = battery
       .getByRole("row", { name: /Stored energy lost per hour/ })
@@ -522,7 +518,7 @@ for (const theme of ["light", "dark"] as const) {
         .locator(".buildOptionMetrics")
         .locator(".buildOptionMetric")
         .nth(4),
-    ).toHaveText("Round-trip efficiency43%");
+    ).toHaveText("Efficiency43%");
     await reviewScreenshot(page, {
       path: testInfo.outputPath(`Storage-iron-air-${theme}.png`),
       animations: "disabled",
@@ -537,7 +533,7 @@ for (const theme of ["light", "dark"] as const) {
       ironAir.getByRole("row", { name: /Operating costs/ }),
     ).toBeVisible();
     await expect(
-      ironAir.getByRole("row", { name: /Round-trip efficiency/ }),
+      ironAir.getByRole("row", { name: /Efficiency/ }),
     ).toHaveCount(0);
     expect(
       await ironAir.evaluate((el) => el.scrollWidth - el.clientWidth),

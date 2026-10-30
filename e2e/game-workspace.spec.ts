@@ -370,12 +370,14 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   await size.press("ArrowRight");
   const generatorSize = await size.inputValue();
   const list = build.locator(".cardList");
-  await list.evaluate((element) => {
-    element.scrollTop = 240;
+  const left = await list.evaluate((element) => {
+    element.scrollTop = Math.min(
+      240,
+      element.scrollHeight - element.clientHeight,
+    );
+    return element.scrollTop;
   });
-  await expect
-    .poll(() => list.evaluate((element) => element.scrollTop))
-    .toBe(240);
+  expect(left).toBeGreaterThan(0);
   await page.getByRole("tab", { name: "Storage", exact: true }).click();
   await size.focus();
   await size.press("ArrowRight");

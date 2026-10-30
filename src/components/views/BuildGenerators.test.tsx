@@ -716,7 +716,9 @@ it("draws each generator's typical year against one shared scale", () => {
     screen.getAllByText(/^[A-Z][a-z]{2} low: \d+% of capacity$/).length,
   ).toBeGreaterThan(0);
   expect(screen.getAllByText("On demand").length).toBeGreaterThan(0);
-  expect(screen.getByText(/^[A-Z][a-z]{2} low: \d+% of typical water$/)).toBeVisible();
+  expect(
+    screen.getByText(/^[A-Z][a-z]{2} low: \d+% of typical water$/),
+  ).toBeVisible();
   expect(
     screen.getByRole("img", { name: /^Typical year of water inflow: / }),
   ).toBeInTheDocument();

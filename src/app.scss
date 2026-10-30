@@ -406,8 +406,10 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
 #centeredMenu
   :is(.mainActions, .resourceActions, .discoveryActions)
   .MuiButton-root {
-  &:hover {
-    background-color: transparent; // keep the inactive state borderless and unfilled
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background-color: transparent; // keep the inactive state borderless and unfilled
+    }
   }
 
   &:focus {
@@ -484,6 +486,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     position: relative;
+    flex-wrap: nowrap;
     touch-action: none;
     transition: transform 120ms ease-out;
   }
@@ -1205,6 +1208,17 @@ $topbar_height: 56px;
   display: flex;
   align-items: center;
   line-height: 0;
+}
+
+@media (pointer: coarse) {
+  .MuiSlider-thumb {
+    width: 28px;
+    height: 28px;
+    &::after {
+      width: 44px;
+      height: 44px;
+    }
+  }
 }
 
 .statusLabel {
@@ -2187,6 +2201,27 @@ $pane_header_height: 48px;
   gap: 8px;
 }
 
+.generatorComparisonRemove.MuiIconButton-root {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  color: var(--font-color-faded);
+}
+
+// A phone keeps the catalog in view: the tray is one short swipeable row.
+@media (max-width: 599px) {
+  .generatorComparisonChoices {
+    display: flex;
+    overflow-x: auto;
+  }
+  .generatorComparisonChoice {
+    flex: 0 0 200px;
+  }
+  .generatorComparisonChoice .MuiTypography-caption:last-child {
+    display: none;
+  }
+}
+
 .generatorComparisonChoice {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -2209,8 +2244,7 @@ $pane_header_height: 48px;
 }
 
 @media (max-width: ($phone_width - 1px)) {
-  .decisionImpactFacts,
-  .generatorComparisonChoices {
+  .decisionImpactFacts {
     grid-template-columns: 1fr;
   }
 }
@@ -2490,9 +2524,25 @@ $pane_header_height: 48px;
 
 .scenarioStartButton.MuiButton-root {
   justify-self: center;
-  min-width: 190px;
+  min-width: 320px;
   min-height: 52px;
   padding-inline: 28px;
+}
+
+.leaderboard {
+  width: 100%;
+}
+
+// A short phone keeps the one action in reach above the long briefing.
+@media (max-width: 599px) and (max-height: 700px) {
+  .scenarioStartControls {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding-block: 8px;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-subtle);
+  }
 }
 
 .difficultyPicker {
@@ -2644,6 +2694,7 @@ $pane_header_height: 48px;
   .scenarioStartButton.MuiButton-root {
     justify-self: stretch;
     width: 100%;
+    min-width: 0;
   }
 
   .difficultyPicker .MuiToggleButton-root {
@@ -3155,8 +3206,10 @@ $pane_header_height: 48px;
       border-top-left-radius: var(--radius-md);
       border-top-right-radius: var(--radius-md);
 
-      &:hover {
-        background: var(--bg-raised);
+      @media (hover: hover) and (pointer: fine) {
+        &:hover {
+          background: var(--bg-raised);
+        }
       }
 
       // WCAG 2.4.7: keyboard users need to see which entry they're on
@@ -3767,8 +3820,10 @@ $pane_header_height: 48px;
         background: var(--bg-selected);
         color: var(--interactive-strong);
 
-        &:hover {
-          background: var(--bg-selected);
+        @media (hover: hover) and (pointer: fine) {
+          &:hover {
+            background: var(--bg-selected);
+          }
         }
       }
 
@@ -3885,10 +3940,6 @@ $pane_header_height: 48px;
     background: var(--bg-primary);
   }
 
-  .upcomingEvents > .eventLogSectionHeader {
-    background: var(--bg-sunken);
-  }
-
   .eventHistoryFilterButton {
     min-height: var(--control-size);
     padding-inline: 8px;
@@ -3935,10 +3986,11 @@ $pane_header_height: 48px;
     grid-template-columns: 20px 1fr;
     gap: 0 12px;
     align-items: start;
-    padding: 12px;
-    border: 1px solid var(--border-tile);
-    border-radius: var(--radius-md);
-    background: var(--bg-raised);
+    padding: 12px 16px;
+    border: 0;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: 0;
+    background: transparent;
 
     &.actionable {
       cursor: pointer;
@@ -3955,10 +4007,6 @@ $pane_header_height: 48px;
       &:focus-visible {
         outline-offset: -2px;
       }
-    }
-
-    &.importance-NOTABLE {
-      border-left: 4px solid var(--border-strong);
     }
 
     &.importance-CRITICAL {
@@ -5311,8 +5359,10 @@ $homeSmokeCycle: 5.6s;
     border-radius: 3px;
     transition: text-decoration-color 120ms ease-out;
 
-    &:hover {
-      text-decoration-color: currentColor;
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        text-decoration-color: currentColor;
+      }
     }
 
     &:focus-visible {
@@ -5548,8 +5598,10 @@ $homeSmokeCycle: 5.6s;
   align-items: stretch;
   border-top: 1px solid var(--border-subtle);
   // One surface spans the grip and disclosure; details are a separate interaction area.
-  &:hover {
-    background: var(--bg-raised);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--bg-raised);
+    }
   }
   > .facilityDisclosure {
     position: relative; // above the shared output fill, alongside the grip
@@ -5982,7 +6034,48 @@ $homeSmokeCycle: 5.6s;
 .decisionImpactFact > div {
   display: grid;
   grid-template-columns: minmax(100px, 0.7fr) minmax(0, 1.3fr);
+  align-items: baseline;
   gap: 4px 12px;
+}
+// Neutral: green is kept for favorable deltas, and the help target adds no row height.
+.decisionImpactFact > .conceptIcon {
+  color: var(--font-color-faded);
+}
+.decisionImpactFact .MuiIconButton-root {
+  margin-block: -12px;
+}
+.MuiDialog-paper .MuiDialogActions-root {
+  position: relative;
+  border-top: 1px solid var(--border-subtle);
+}
+// A fade over the content's last line says there is more above the sticky actions.
+.MuiDialog-paper .MuiDialogContent-root + .MuiDialogActions-root::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 16px;
+  background: linear-gradient(to top, var(--bg-primary), transparent);
+  pointer-events: none;
+}
+@media (max-height: 720px) {
+  .decisionImpactFact {
+    padding-block: 8px;
+  }
+}
+@media (max-width: 399px) {
+  .buildOptionMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .insightsLayerPanel {
+    grid-template-columns: 1fr;
+  }
+}
+.buildOption .MuiCardHeader-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .decisionImpactFact
   > div
@@ -7055,6 +7148,30 @@ img[src$="/transmission.svg"] {
 }
 
 // The grid readout opens its manual entry, without looking like a second primary control.
+.gameMonthlyProfitButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.scenarioOutlook {
+  display: flex;
+  flex-direction: column;
+}
+.scenarioBuildNothing {
+  display: block;
+  color: var(--font-color-faded);
+}
+// Phones lead with the outcome, directly under the section title.
+@media (max-width: 599px) {
+  .scenarioOutlook > [aria-label="Scenario forecast"] {
+    order: -1;
+  }
+  .scenarioOutlook > h3 {
+    order: -2;
+  }
+}
 .gridHealthHelp {
   padding: 0;
   border: 0;
@@ -7353,8 +7470,10 @@ img[src$="/transmission.svg"] {
       padding-right: calc(var(--space-4) + var(--space-5));
     }
 
-    > summary:hover {
-      background: var(--bg-selected);
+    @media (hover: hover) and (pointer: fine) {
+      > summary:hover {
+        background: var(--bg-selected);
+      }
     }
 
     > summary::-webkit-details-marker {

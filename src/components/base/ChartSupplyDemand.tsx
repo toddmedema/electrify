@@ -375,7 +375,7 @@ function buildOptions({
     ],
     plugins: [
       dayNightRibbonPlugin(getState),
-      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.2),
+      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout),
       baselinePlugin(chartPalette().axis),
       cache.plugin,
       motion.plugin,
