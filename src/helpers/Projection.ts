@@ -7,7 +7,7 @@ import {
 } from "./DateTime";
 import { forecastShortfalls } from "./ForecastShortfalls";
 import { sampleForecastTimeline } from "./ForecastSampling";
-import { generateNewTimeline } from "../reducers/Game";
+import { generateForecastTimeline } from "../reducers/Game";
 import { GameType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
 import type { ObjectiveMonthFacts } from "../data/ScenarioObjectives";
 import { scenarioObjectiveDefinitions } from "./ObjectiveRules";
@@ -191,7 +191,7 @@ function buildProjection(
     ({ metric }) => metric === "monthEndDebt" || metric === "fuelRetirement",
   );
   const objectiveAssets: NonNullable<ProjectionView["objectiveAssets"]> = [];
-  const timeline = generateNewTimeline(
+  const timeline = generateForecastTimeline(
     game,
     now.cash,
     now.customers,
