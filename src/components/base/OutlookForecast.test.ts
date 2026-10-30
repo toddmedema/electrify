@@ -1,6 +1,9 @@
 import { TICK_MINUTES, TICKS_PER_YEAR } from "../../Constants";
 import { createGame } from "../../testing/Simulator";
-import reducer, { generateNewTimeline } from "../../reducers/Game";
+import reducer, {
+  generateForecastTimeline,
+  generateNewTimeline,
+} from "../../reducers/Game";
 import { schedulePolicy } from "../../reducers/GameActions";
 import { reservoirOutlook } from "../../helpers/HydroOutlook";
 import { intertieOutlook } from "../../helpers/IntertieOutlook";
@@ -14,7 +17,7 @@ it("preserves generator quotes and typical-year output with compact worker readi
   const game = createGame({ scenarioId: 108, seed: 12345 });
   const before = JSON.stringify(game);
   const now = game.timeline[0];
-  const full = generateNewTimeline(
+  const full = generateForecastTimeline(
     game,
     now.cash,
     now.customers,
@@ -48,7 +51,7 @@ it("preserves generator quotes and typical-year output with compact worker readi
   expect(JSON.stringify(game)).toBe(before);
 });
 
-it("preserves the old hydro forecast with an active fleet, story and pending customer policy", () => {
+it("uses estimated weather for a hydro forecast with an active fleet, story and pending customer policy", () => {
   const game = reducer(
     createGame({ scenarioId: 108, seed: 7 }),
     schedulePolicy({
@@ -62,7 +65,7 @@ it("preserves the old hydro forecast with an active fleet, story and pending cus
   const now = game.timeline[0];
   const expected = reservoirOutlook(
     now,
-    generateNewTimeline(game, now.cash, now.customers, TICKS_PER_YEAR),
+    generateForecastTimeline(game, now.cash, now.customers, TICKS_PER_YEAR),
     game.startingYear,
   );
   expect(computeOutlook("hydro", forecastWorkerSnapshot(game))).toEqual(
@@ -81,7 +84,7 @@ it("preserves neighboring-market outlooks using only the four returned hourly re
     }),
   );
   const now = game.timeline[0];
-  const full = generateNewTimeline(
+  const full = generateForecastTimeline(
     {
       ...game,
       facilities: game.facilities.filter((f) => f.yearsToBuildLeft <= 0),

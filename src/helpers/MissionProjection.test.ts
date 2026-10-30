@@ -13,7 +13,10 @@ import { projectMission } from "./MissionProjection";
 import { recordGameObjectiveMonth } from "./ObjectiveRules";
 import { selectProjection, ProjectionView } from "./Projection";
 import { getTotalDebt } from "./Financials";
-import { generateNewTimeline } from "../reducers/Game";
+import {
+  generateForecastTimeline,
+  generateNewTimeline,
+} from "../reducers/Game";
 
 const reliability: RuleObjective = {
   id: "reliable",
@@ -310,14 +313,11 @@ it("collects forecast loan and ownership facts from a private fleet without chan
     game.facilities[0].fuel!,
   );
   expect(game).toEqual(before);
-  const observed: number[] = [];
-  generateNewTimeline(
-    game,
-    game.timeline[0].cash,
-    1000,
-    2,
-    60,
-    (_state, tick) => observed.push(tick.minute),
-  );
-  expect(observed).toEqual([0, 60]);
+  for (const generate of [generateNewTimeline, generateForecastTimeline]) {
+    const observed: number[] = [];
+    generate(game, game.timeline[0].cash, 1000, 2, 60, (_state, tick) =>
+      observed.push(tick.minute),
+    );
+    expect(observed).toEqual([0, 60]);
+  }
 });

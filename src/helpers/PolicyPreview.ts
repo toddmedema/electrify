@@ -1,6 +1,6 @@
 import cloneDeep from "lodash.clonedeep";
 import { GameType, PolicyChangeType, TickPresentFutureType } from "../Types";
-import { generateNewTimeline } from "../reducers/Game";
+import { generateForecastTimeline } from "../reducers/Game";
 import {
   getTimeFromTimeline,
   MINUTES_PER_MONTH,
@@ -27,8 +27,8 @@ export function previewPolicy(
   const ticks = Math.ceil(
     ((month + 1) * MINUTES_PER_MONTH - game.date.minute) / TICK_MINUTES,
   );
-  const before = generateNewTimeline(game, now.cash, now.customers, ticks);
-  const after = generateNewTimeline(draft, now.cash, now.customers, ticks);
+  const before = generateForecastTimeline(game, now.cash, now.customers, ticks);
+  const after = generateForecastTimeline(draft, now.cash, now.customers, ticks);
   const selected = (timeline: TickPresentFutureType[]) =>
     timeline.filter((t) => Math.floor(t.minute / MINUTES_PER_MONTH) === month);
   const current = selected(before);

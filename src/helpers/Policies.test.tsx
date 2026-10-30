@@ -13,6 +13,7 @@ import {
 import { POLICIES, residentialSolarCostPerW } from "../data/Policies";
 import { createGame } from "../testing/Simulator";
 import gameReducer, {
+  generateForecastTimeline,
   generateNewTimeline,
   tickState,
   setSpeed,
@@ -216,14 +217,14 @@ test("solar affects only eligible daylight load after efficiency; neutral demand
   expect(tick.demandByType.Industrial).toBe(original.demandByType.Industrial);
 });
 
-test("preview is isolated, matches the real forecast and monthly costs reach cash/history", () => {
+test("preview is isolated, matches the estimated forecast and monthly costs reach cash/history", () => {
   let game = createGame({ scenarioId: 106, seed: 4 });
   const untouched = cloneDeep(game);
   const preview = previewPolicy(game, change, 1);
   expect(game).toEqual(untouched);
   game = cloneDeep(gameReducer(game, schedulePolicy(change)));
   const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-  const forecast = generateNewTimeline(
+  const forecast = generateForecastTimeline(
     game,
     now.cash,
     now.customers,

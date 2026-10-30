@@ -95,7 +95,7 @@ export default class ChartForecastWeather extends React.PureComponent<
     const units = this.context as UnitSystemType;
     const { domain, height, timeline, startingYear, multiyear, syncKey } =
       this.props;
-    // Downsample the data to 6 per day to make it more vague / forecast-y
+    // Six points per representative day keep the long-range chart readable.
     const data = sampleTimeline(timeline, 240);
 
     const minutes = new Array<number>(data.length);

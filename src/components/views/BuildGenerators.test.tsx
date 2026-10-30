@@ -164,7 +164,7 @@ describe("the three-year build forecast", () => {
   const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
   let timeline: jest.SpyInstance;
   beforeEach(() => {
-    timeline = jest.spyOn(GameReducer, "generateNewTimeline");
+    timeline = jest.spyOn(GameReducer, "generateForecastTimeline");
   });
   afterEach(() => {
     timeline.mockRestore();

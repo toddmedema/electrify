@@ -218,6 +218,7 @@ import {
 } from "../data/DemandProfiles";
 import { combineStoryEffects, resolveStoryAtDate } from "../data/WorldEvents";
 import { getRawSolarIrradianceWM2, getWeather } from "../data/Weather";
+import { createWeatherForecast } from "../helpers/WeatherForecast";
 import { COLD_MAX_GAS_PRICE_MULTIPLIER } from "../data/Hazards";
 import {
   activeWeatherHazardsFor,
@@ -4065,12 +4066,22 @@ function getDemandW(
   );
 }
 
-function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
+function reforecastWeatherAndPrices(
+  state: GameType,
+  forecastWeather = false,
+): TickPresentFutureType[] {
+  const weatherAt = forecastWeather
+    ? createWeatherForecast(state.date, state.seed, state.location.id)
+    : (date: DateType) => getWeather(date, state.seed);
   // Resource forecasts are also shown before the player builds a hydro plant.
   const hasHydro =
     (getViableLocationCount(state.location, "Hydro") || 0) > 0 ||
     state.facilities.some((facility) => facility.fuel === "Hydro");
   const watershedId = state.location.watershedId || state.location.id;
+  const watershedWeatherAt =
+    forecastWeather && hasHydro
+      ? createWeatherForecast(state.date, state.seed, watershedId)
+      : undefined;
   const hydrologyByMonth = new Map<
     string,
     ReturnType<typeof getHydroConditions>
@@ -4078,14 +4089,20 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
-      const weather = getWeather(date, state.seed);
+      const weather = weatherAt(date);
       const effects = storyEffectsAt(date, state);
       const fuelPrices = getEffectiveFuelPrices(date, state, effects);
       const hydroKey = `${date.year}-${date.monthNumber}`;
       let hydrology = hydrologyByMonth.get(hydroKey);
       if (!hydrology) {
         hydrology = hasHydro
-          ? getHydroConditions(date, state.seed, 0, watershedId)
+          ? getHydroConditions(
+              date,
+              state.seed,
+              0,
+              watershedId,
+              watershedWeatherAt,
+            )
           : {
               precipitationMm: 0,
               snowpackMm: 0,
@@ -5614,12 +5631,53 @@ function reforecastSupply(
   );
 }
 
+/** The actual weather trajectory used to settle live ticks and resumed games. */
 export function generateNewTimeline(
-  readOnlyState: GameType,
+  state: GameType,
   cash: number,
   customers: number,
   ticks = TICKS_PER_DAY,
   stepMinutes = TICK_MINUTES,
+  observe?: ForecastObserver,
+): TickPresentFutureType[] {
+  return generateTimeline(
+    state,
+    cash,
+    customers,
+    ticks,
+    stepMinutes,
+    false,
+    observe,
+  );
+}
+
+/** Player-facing projections run the same demand/dispatch engine on estimated weather. */
+export function generateForecastTimeline(
+  state: GameType,
+  cash: number,
+  customers: number,
+  ticks = TICKS_PER_DAY,
+  stepMinutes = TICK_MINUTES,
+  observe?: ForecastObserver,
+): TickPresentFutureType[] {
+  return generateTimeline(
+    state,
+    cash,
+    customers,
+    ticks,
+    stepMinutes,
+    true,
+    observe,
+  );
+}
+
+function generateTimeline(
+  readOnlyState: GameType,
+  cash: number,
+  customers: number,
+  ticks: number,
+  stepMinutes: number,
+  forecastWeather: boolean,
   observe?: ForecastObserver,
 ): TickPresentFutureType[] {
   // Forecasts only read the live state. Snapshot a draft once so the horizon does not repeatedly
@@ -5727,7 +5785,7 @@ export function generateNewTimeline(
       // reforecastWeatherAndPrices asserts its own tick literal.
     } as TickPresentFutureType;
   }
-  state.timeline = reforecastWeatherAndPrices(state);
+  state.timeline = reforecastWeatherAndPrices(state, forecastWeather);
   const previousDemandTick = readOnlyState.timeline.findLast(
     (tick) => tick.minute < state.date.minute,
   );
