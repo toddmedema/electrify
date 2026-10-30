@@ -19,6 +19,7 @@ const smoke = [
   "facilities-production-chart.spec.ts",
   "production-chart-motion.spec.ts",
   "intertie-order.spec.ts",
+  "facility-selection.spec.ts",
   "operations-priorities.spec.ts",
 ];
 const layout = [

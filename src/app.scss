@@ -5421,18 +5421,6 @@ $homeSmokeCycle: 5.6s;
     color: var(--night-ink);
   }
 }
-.productionWeather {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin: 4px 12px 0;
-  color: var(--font-color-faded);
-  font-size: var(--font-size-caption-sm);
-  line-height: 16px;
-  > span {
-    white-space: nowrap;
-  }
-}
 .dailyProductionChart .chartLegend {
   padding: 8px 12px 0;
   gap: 4px 8px;
@@ -8028,4 +8016,80 @@ option {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+
+// Mouse selection remains separate from the one expanded inspection row.
+.facilitySelectionBar {
+  display: none;
+}
+@media (any-pointer: fine) {
+  .facilitySelectionBar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 8px;
+    padding: 4px 16px;
+    min-height: 40px;
+    color: var(--font-color-faded);
+    font-size: var(--font-size-caption);
+    .MuiButton-root {
+      min-height: 40px;
+      text-transform: none;
+    }
+  }
+}
+.base_main .facilityRow.bulkSelected {
+  background: var(--bg-selected);
+  box-shadow: inset 3px 0 var(--interactive-blue);
+}
+.unifiedFacilitiesList[data-group-dragging="true"]
+  .bulkSelected:not(.dragging) {
+  opacity: 0.4;
+}
+.facilityDragCount {
+  position: absolute;
+  top: 0;
+  left: 8px;
+  z-index: 1;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  background: var(--interactive-strong);
+  color: var(--interactive-contrast);
+  font-size: var(--font-size-caption);
+}
+.facilityMenuHint.MuiListSubheader-root {
+  max-width: 320px;
+  white-space: normal;
+  line-height: 20px;
+  padding-bottom: 8px;
+  font-size: var(--font-size-caption);
+}
+
+.facilitySelectionCheck.MuiSvgIcon-root {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  color: var(--interactive-strong);
+}
+.facilityContextMenu .MuiMenuItem-root {
+  min-height: 40px;
+  max-width: min(360px, calc(100vw - 32px));
+  white-space: normal;
+}
+
+@media (pointer: coarse) {
+  .facilitySelectionBar .MuiButton-root,
+  .facilityContextMenu .MuiMenuItem-root {
+    min-height: 44px;
+  }
+}
+
+.facilityContextMenu .MuiListSubheader-root {
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 8px 16px;
+  line-height: 20px;
+  white-space: normal;
 }

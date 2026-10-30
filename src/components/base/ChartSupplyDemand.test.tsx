@@ -5,7 +5,6 @@ import ChartSupplyDemand, {
   supplyDemandStack,
   Props,
 } from "./ChartSupplyDemand";
-import { UnitsContext } from "./UnitsContext";
 import { LOCATIONS } from "../../Constants";
 
 const timeline: Props["timeline"] = [
@@ -286,43 +285,35 @@ it("keeps daylight times out of the supply and demand tooltip", () => {
   expect(tooltip).not.toMatch(/sunrise|solar noon|sunset/i);
 });
 
-it("shows the current weather rather than the end of the forecast, and follows unit changes", () => {
+it("keeps weather in the chart tooltip without a separate weather strip", () => {
   const ticks = [
     { ...timeline[0], temperatureC: -2, windKph: 32 },
     { ...timeline[1], temperatureC: 35, windKph: 8 },
   ];
-  const chart = (units: "metric" | "imperial", minute: number) => (
-    <UnitsContext.Provider value={units}>
-      <ChartSupplyDemand
-        timeline={ticks}
-        currentMinute={minute}
-        location={LOCATIONS.SF}
-        startingYear={2020}
-      />
-    </UnitsContext.Provider>
+  render(
+    <ChartSupplyDemand
+      timeline={ticks}
+      currentMinute={30}
+      location={LOCATIONS.SF}
+      startingYear={2020}
+    />,
   );
-  const { rerender } = render(chart("metric", 30));
-  expect(screen.getByLabelText("Current weather")).toHaveTextContent(
-    "Cold -2°CWindy 32 km/h",
+  expect(screen.queryByLabelText("Current weather")).not.toBeInTheDocument();
+  const state = {
+    timeline: ticks,
+    ...supplyDemandStack(ticks, []),
+    startingYear: 2020,
+  };
+  expect(formatProductionTooltip(0, { ...state, units: "metric" })).toContain(
+    "Weather: Cold -2°C · Windy 32 km/h",
   );
-  expect(screen.getByLabelText("Current weather")).not.toHaveTextContent("Hot");
-  rerender(chart("imperial", 30));
-  expect(screen.getByLabelText("Current weather")).toHaveTextContent(
-    "Cold 28°F",
+  expect(formatProductionTooltip(0, { ...state, units: "imperial" })).toContain(
+    "Weather: Cold 28°F · Windy 20 mph",
   );
-  expect(screen.getByLabelText("Current weather")).toHaveTextContent(
-    "Windy 20 mph",
+  expect(formatProductionTooltip(1, { ...state, units: "metric" })).toContain(
+    "Weather: Hot 35°C · Wind 8 km/h",
   );
-  rerender(chart("metric", 60));
-  expect(screen.getByLabelText("Current weather")).toHaveTextContent(
-    "Hot 35°CWind 8 km/h",
+  expect(formatProductionTooltip(1, { ...state, units: "imperial" })).toContain(
+    "Weather: Hot 95°F · Wind 5 mph",
   );
-  expect(
-    formatProductionTooltip(1, {
-      timeline: ticks,
-      ...supplyDemandStack(ticks, []),
-      startingYear: 2020,
-      units: "imperial",
-    }),
-  ).toContain("Weather: Hot 95°F · Wind 5 mph");
 });

@@ -1,5 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -59,6 +60,7 @@ function playedGame(ticks: number): GameType {
 }
 
 interface Handlers {
+  onTogglePause: jest.Mock;
   onPause: jest.Mock;
   onSelect: jest.Mock;
   onReprioritize: jest.Mock;
@@ -70,8 +72,10 @@ interface Handlers {
 function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
+  ref?: React.RefObject<Facilities>,
 ): Handlers {
   const handlers: Handlers = {
+    onTogglePause: jest.fn(),
     onPause: jest.fn(),
     onSelect: jest.fn(),
     onReprioritize: jest.fn(),
@@ -84,6 +88,7 @@ function renderFacilities(
     const [selected, setSelected] = React.useState(selectedFacilityId);
     return (
       <Facilities
+        ref={ref}
         game={game}
         selectedFacilityId={selected}
         onTransmissionUpgrade={() => undefined}
@@ -91,7 +96,7 @@ function renderFacilities(
         onTransmissionBuild={() => undefined}
         onTradingPolicy={() => undefined}
         onSell={handlers.onSell}
-        onTogglePause={() => undefined}
+        onTogglePause={handlers.onTogglePause}
         onPause={handlers.onPause}
         onReprioritize={handlers.onReprioritize}
         onRetrofit={handlers.onRetrofit}
@@ -371,29 +376,39 @@ describe("the fleet list", () => {
       </Provider>,
     );
 
-    ref.current!.onBeforeDragStart();
+    act(() => ref.current!.onBeforeDragStart());
     expect(onFacilityDragStart).toHaveBeenCalledWith("FAST");
     expect(
-      ref.current!.shouldComponentUpdate({
-        ...props,
-        game: {
-          ...fast,
-          date: { ...fast.date, minute: fast.date.minute + 1_000 },
+      ref.current!.shouldComponentUpdate(
+        {
+          ...props,
+          game: {
+            ...fast,
+            date: { ...fast.date, minute: fast.date.minute + 1_000 },
+          },
         },
-      }),
+        ref.current!.state,
+      ),
     ).toBe(false);
 
-    ref.current!.onDragEnd({
-      draggableId: `f${fast.facilities[0].id}`,
-      type: "DEFAULT",
-      source: { droppableId: "droppable", index: 0 },
-      destination: null,
-      reason: "CANCEL",
-      mode: "FLUID",
-      combine: null,
-    });
+    act(() =>
+      ref.current!.onDragEnd({
+        draggableId: `f${fast.facilities[0].id}`,
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        destination: null,
+        reason: "CANCEL",
+        mode: "FLUID",
+        combine: null,
+      }),
+    );
     expect(onFacilityDragEnd).toHaveBeenCalledWith(0, null, "FAST");
-    expect(ref.current!.shouldComponentUpdate({ ...props, game })).toBe(true);
+    expect(
+      ref.current!.shouldComponentUpdate(
+        { ...props, game },
+        ref.current!.state,
+      ),
+    ).toBe(true);
   });
 
   it("can pause the only facility in a fleet", async () => {
@@ -1218,5 +1233,327 @@ describe("the intertie upgrade control", () => {
       screen.getByLabelText(`Inspect ${line.name}`, { exact: false }),
     );
     expect(screen.getByText(/Corridor full/)).toBeInTheDocument();
+  });
+});
+
+describe("mouse facility selection", () => {
+  const matchMedia = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = (query) => ({
+      ...matchMedia(query),
+      matches: query === "(any-pointer: fine)",
+    });
+  });
+  afterEach(() => {
+    window.matchMedia = matchMedia;
+  });
+
+  function fleet(): GameType {
+    const game = createGame({ scenarioId: 100 });
+    game.facilities = Array.from({ length: 5 }, (_, i) => ({
+      ...cloneDeep(game.facilities[i % 2]),
+      id: i + 1,
+      name: `Plant ${i + 1}`,
+    }));
+    return game;
+  }
+
+  it("selects anchored ranges in either direction and toggles nonadjacent facilities with Ctrl or Cmd", () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[1]);
+    fireEvent.click(rows()[4], { shiftKey: true });
+    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "true",
+      "true",
+      "true",
+      "true",
+    ]);
+    fireEvent.click(rows()[0], { shiftKey: true });
+    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual([
+      "true",
+      "true",
+      "false",
+      "false",
+      "false",
+    ]);
+    fireEvent.click(rows()[3], { ctrlKey: true });
+    fireEvent.click(rows()[1], { metaKey: true });
+    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual([
+      "true",
+      "false",
+      "false",
+      "true",
+      "false",
+    ]);
+    fireEvent.contextMenu(rows()[1], { button: 0, ctrlKey: true });
+    expect(rows()[1]).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("menu")).toBeNull();
+    fireEvent.keyDown(rows()[0], { key: "Escape" });
+    expect(
+      rows().every((row) => row.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
+  });
+
+  it("clears multi-select with Escape when focus is outside the fleet", () => {
+    const view = renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    expect(
+      rows().filter((row) => row.getAttribute("aria-pressed") === "true"),
+    ).toHaveLength(3);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(
+      rows().every((row) => row.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    const calls = view.onSelect.mock.calls.length;
+    cleanup();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("keeps single inspection intact outside the fleet and clears it locally", () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(rows()[0], { key: "Escape" });
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "false");
+    expect(rows()[0]).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("leaves Escape to the incoming screen while the fleet is inert", () => {
+    const view = renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    // Compositor marks the outgoing screen inert until its exit animation unmounts it.
+    // eslint-disable-next-line testing-library/no-node-access
+    const surface = rows()[0].closest(".facilitiesBody")!;
+    surface.setAttribute("inert", "");
+    const calls = view.onSelect.mock.calls.length;
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("keeps Escape available after selected facilities leave the fleet", () => {
+    const game = fleet();
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    game.facilities = [];
+    const calls = view.onSelect.mock.calls.length;
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("preserves keyboard inspection when a canceled drag only has stale mouse IDs", () => {
+    const game = fleet();
+    const ref = React.createRef<Facilities>();
+    const view = renderFacilities(game, null, ref);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    game.facilities = game.facilities.slice(3);
+    act(() => ref.current!.props.onSelect(game.facilities[0].id));
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    const calls = view.onSelect.mock.calls.length;
+    act(() =>
+      ref.current!.onBeforeDragStart({
+        draggableId: "f4",
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        mode: "SNAP",
+      }),
+    );
+    act(() =>
+      ref.current!.onDragEnd({
+        draggableId: "f4",
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        destination: null,
+        reason: "CANCEL",
+        mode: "SNAP",
+        combine: null,
+      }),
+    );
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("clears multi-select when Escape closes its context menu", async () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    fireEvent.contextMenu(rows()[1]);
+    expect(
+      screen.getByRole("menu", { name: "Facility actions" }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(
+      rows().every((row) => row.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
+  });
+
+  it("offers eligible bulk pause and resume actions without toggling the wrong state", async () => {
+    const game = fleet();
+    game.facilities[1].paused = true;
+    game.facilities[2].yearsToBuildLeft = 1;
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    fireEvent.contextMenu(rows()[1]);
+    const menu = screen.getByRole("menu", { name: "Facility actions" });
+    expect(menu).not.toHaveTextContent("facilities selected");
+    expect(menu).not.toHaveTextContent("Counts show eligible facilities");
+    expect(
+      within(menu).getByRole("menuitem", { name: "Resume (1)" }),
+    ).toBeInTheDocument();
+    await user.click(within(menu).getByRole("menuitem", { name: "Pause (1)" }));
+    expect(view.onPause).toHaveBeenCalledWith(1, "Plant 1");
+    expect(view.onPause).toHaveBeenCalledTimes(1);
+  });
+
+  it("right clicking an unselected row replaces the group and requires sale confirmation", async () => {
+    const view = renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    fireEvent.contextMenu(rows()[4]);
+    const menu = screen.getByRole("menu", { name: "Facility actions" });
+    expect(menu).toHaveTextContent("Plant 5");
+    expect(menu).not.toHaveTextContent("3 facilities selected");
+    await user.click(within(menu).getByRole("menuitem", { name: "Sell" }));
+    expect(view.onSell).not.toHaveBeenCalled();
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Sell",
+      }),
+    );
+    expect(view.onSell).toHaveBeenCalledWith(5);
+    expect(view.onSell).toHaveBeenCalledTimes(1);
+  });
+
+  it("separates construction cancellation, upgrade cancellation, and sale in a mixed selection", async () => {
+    const game = fleet();
+    game.facilities[1].yearsToBuildLeft = 1;
+    game.facilities[2].upgradeInProgress = {
+      upgrade: "coldWeatherPackage",
+      cost: 1e6,
+      startsMinute: game.date.minute,
+      completesMinute: game.date.minute + MINUTES_PER_MONTH,
+    };
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    fireEvent.contextMenu(rows()[0]);
+    const menu = screen.getByRole("menu", { name: "Facility actions" });
+    expect(
+      within(menu).getByRole("menuitem", { name: "Sell (2)" }),
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Cancel construction (1)" }),
+    ).toBeInTheDocument();
+    await user.click(
+      within(menu).getByRole("menuitem", { name: "Cancel upgrade (1)" }),
+    );
+    expect(view.onCancelRetrofit).toHaveBeenCalledWith(3);
+    expect(view.onSell).not.toHaveBeenCalled();
+    fireEvent.contextMenu(rows()[0]);
+    await user.click(
+      screen.getByRole("menuitem", { name: "Cancel construction (1)" }),
+    );
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Cancel construction",
+      }),
+    );
+    expect(view.onSell).toHaveBeenCalledWith(2);
+  });
+
+  it("starts a new range at the clicked row after its anchor leaves the fleet", () => {
+    const game = fleet();
+    renderFacilities(game, null);
+    fireEvent.click(rows()[1]);
+    game.facilities.splice(1, 1);
+    fireEvent.click(rows()[3], { shiftKey: true });
+    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "false",
+      "true",
+      "false",
+    ]);
+  });
+
+  it("does not expose mouse actions while the tutorial hides facility actions", () => {
+    const game = createGame({ scenarioId: 0 });
+    game.inGame = true;
+    game.tutorialStep = 0;
+    renderFacilities(game, null);
+    fireEvent.contextMenu(rows()[0]);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.queryByText(/Shift-click a range/)).toBeNull();
+  });
+
+  it("keeps touch-only devices on the existing inspection path", () => {
+    window.matchMedia = matchMedia;
+    const game = fleet();
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    expect(view.onSelect).toHaveBeenLastCalledWith(3);
+    fireEvent.contextMenu(rows()[0]);
+    expect(screen.queryByRole("menu")).toBeNull();
+    cleanup();
+  });
+
+  it("confirms the combined price of upgrades and blocks a cash shortfall", async () => {
+    const game = fleet();
+    game.facilities = game.facilities.slice(0, 2).map(
+      (f) =>
+        ({
+          ...f,
+          name: "Solar",
+          fuel: "Sun",
+          resilience: undefined,
+        }) as FacilityOperatingType,
+    );
+    const total = game.facilities.reduce(
+      (sum, f) => sum + retrofitCost(f, game, "hailResistant")!,
+      0,
+    );
+    getTimeFromTimeline(game.date.minute, game.timeline)!.cash = total - 1;
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[1], { shiftKey: true });
+    fireEvent.contextMenu(rows()[0]);
+    expect(
+      screen.getByRole("menuitem", {
+        name: /^Add hail-resistant panels \(2\)/,
+      }),
+    ).toHaveAttribute("aria-disabled", "true");
+    cleanup();
+    getTimeFromTimeline(game.date.minute, game.timeline)!.cash = total;
+    const utils = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[1], { shiftKey: true });
+    fireEvent.contextMenu(rows()[0]);
+    await user.click(
+      screen.getByRole("menuitem", {
+        name: /^Add hail-resistant panels \(2\)/,
+      }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Offline for one month");
+    expect(view.onRetrofit).not.toHaveBeenCalled();
+    await user.click(
+      within(dialog).getByRole("button", {
+        name: `Pay ${formatMoneyConcise(total)}`,
+      }),
+    );
+    expect(utils.onRetrofit.mock.calls).toEqual([
+      [{ facilityId: 1, upgrade: "hailResistant" }],
+      [{ facilityId: 2, upgrade: "hailResistant" }],
+    ]);
   });
 });

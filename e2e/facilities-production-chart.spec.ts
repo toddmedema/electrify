@@ -27,12 +27,7 @@ for (const theme of ["light", "dark"]) {
     await expect(ribbon).toBeVisible();
     await expect(ribbon).toHaveAttribute("aria-hidden", "true");
     await expect(ribbon).toHaveCSS("background-image", /linear-gradient/);
-    const weather = chart.getByLabel("Current weather");
-    await expect(weather).toContainText(/-?\d+°C/);
-    await expect(weather).toContainText(/Wind(?:y)? \d+ km\/h/);
-    expect(
-      await weather.evaluate((el) => el.scrollWidth - el.clientWidth),
-    ).toBeLessThanOrEqual(1);
+    await expect(chart.getByLabel("Current weather")).toHaveCount(0);
     await expect(ribbon.locator('[data-phase="day"] svg')).toHaveCount(1);
     await expect(ribbon.locator('[data-phase="night"] svg')).toHaveCount(2);
     await expect(chart.getByRole("button")).toHaveCount(0);
