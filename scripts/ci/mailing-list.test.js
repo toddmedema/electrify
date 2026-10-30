@@ -53,6 +53,22 @@ for (const [provider, email] of [["google.com", "Player@example.com"]]) {
   });
 }
 
+test("sends the signup timestamp as UTC seconds in Mailchimp's accepted format", async (t) => {
+  t.mock.timers.enable({
+    apis: ["Date"],
+    now: Date.UTC(2026, 9, 30, 12, 34, 56, 789),
+  });
+  const result = await subscribe(request(), {
+    apiKey: key,
+    fetch: async (_url, options) => {
+      const body = JSON.parse(options.body);
+      assert.equal(body.timestamp_signup, "2026-10-30 12:34:56");
+      return response(200, { status: "subscribed" });
+    },
+  });
+  assert.deepEqual(result, { status: "subscribed" });
+});
+
 for (const [name, mutate, code] of [
   ["anonymous caller", (r) => delete r.auth, "unauthenticated"],
   ["unchecked consent", (r) => (r.data.consent = false), "invalid-argument"],
