@@ -39,8 +39,6 @@ import {
 } from "./UtilityExpansionBalanceFixtures";
 
 jest.setTimeout(180000);
-const saveMonths = new Set([96, 143, 144, 191, 227, 239, 240]);
-const workerMonths = new Set([96, 144, 239]);
 
 function serialGame(game: GameType) {
   return JSON.parse(JSON.stringify(serializeSave(game))).game;
@@ -69,9 +67,25 @@ it.each(UTILITY_TARGETS)(
   "$name stays identical through reached saves, worker forecasts and a repeated seeded campaign",
   (target) => {
     const fixture = EXPANSION_BALANCE_CASES.find(
-      ({ id }) => id === `${target.id}-firm-loan`,
+      ({ id }) =>
+        id ===
+        `${target.id}-${target.id === "valley-electric" ? "firm-loan" : "mixed-cash"}`,
     )!;
     const scheduledActions = expansionBalanceActions(fixture, 12345);
+    const purchaseMonth = scheduledActions.find(
+      (action) => action.type === "acquire",
+    )!.month;
+    const saveMonths = new Set([
+      96,
+      purchaseMonth,
+      143,
+      144,
+      191,
+      227,
+      239,
+      240,
+    ]);
+    const workerMonths = new Set([96, purchaseMonth, 144, 239]);
     const settings = {
       difficulty: "Employee" as const,
       seed: 12345,
@@ -84,7 +98,10 @@ it.each(UTILITY_TARGETS)(
       116,
       {
         beforeTick(game) {
-          if (game.date.monthsElapsed !== 96 || game.date.minuteOfDay !== 0)
+          if (
+            game.date.monthsElapsed !== purchaseMonth ||
+            game.date.minuteOfDay !== 0
+          )
             return;
           expect(
             game.utilityExpansion!.acquisitions.map(({ targetId }) => targetId),

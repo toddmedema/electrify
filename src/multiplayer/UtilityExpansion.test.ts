@@ -1,5 +1,20 @@
+import cloneDeep from "lodash.clonedeep";
+import { isStorage } from "../Types";
+import { getTimeFromTimeline } from "../helpers/DateTime";
+import {
+  recordDispatchTarget,
+  prepareGeneratorCommitment,
+} from "../helpers/Commitment";
+import { getFuelPricesPerMBTU } from "../data/FuelPrices";
+import { checkTick, InvariantCollector } from "../testing/Invariants";
 import { store } from "../Store";
-import { YEARS_PER_TICK, TICK_MINUTES } from "../Constants";
+import {
+  YEARS_PER_TICK,
+  TICK_MINUTES,
+  TICKS_PER_HOUR,
+  GAME_TO_REAL_YEARS,
+  FUELS,
+} from "../Constants";
 import { loadSimData } from "../testing/SimData";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { acquisitionQuote } from "../helpers/Expansion";
@@ -173,3 +188,160 @@ it("host completes an owned-area plant without scheduling renderer notifications
     jest.useRealTimers();
   }
 });
+
+it.each([180e6, 280e6])(
+  "human exports burn native gas after owned transfers at %i W local demand instead of reselling contract rights",
+  (ownDemandW) => {
+    const world = ready();
+    const quote = acquisitionQuote(world.grids[0], "ridge-electric")!;
+    expect(
+      command(world, {
+        kind: "action",
+        name: "acquireUtility",
+        payload: {
+          targetId: quote.targetId,
+          financed: true,
+          quoteKey: quote.quoteKey,
+        },
+      }),
+    ).toBeUndefined();
+    expect(
+      command(world, {
+        kind: "action",
+        name: "buildFacility",
+        payload: {
+          facility: {
+            name: "Natural Gas CC",
+            peakW: 200e6,
+            gasCycle: "combined",
+          },
+          financed: true,
+        },
+      }),
+    ).toBeUndefined();
+    const seller = world.grids[0];
+    const gas = seller.facilities.find((f) => f.yearsToBuildLeft > 0)!;
+    expect(gas.fuel).toBe("Natural Gas");
+    gas.yearsToBuildLeft = 0;
+    gas.currentW = gas.peakW;
+    if (isStorage(gas)) throw new Error("Expected the commissioned gas plant");
+    gas.committed = true;
+    // The real commitment owner sees a known request on the next tick, so this running
+    // plant remains online even when contracts could cover this tick's own load.
+    recordDispatchTarget(
+      getTimeFromTimeline(2 * TICK_MINUTES, seller.timeline)!,
+      gas.id,
+      gas.peakW,
+    );
+    prepareGeneratorCommitment({
+      facilityId: gas.id,
+      forecast: seller.timeline,
+      minimumOperatingCost: () => 0,
+    });
+    for (const game of world.grids) {
+      for (const facility of game.facilities)
+        facility.paused = facility.id !== gas.id || game !== seller;
+      const next = getTimeFromTimeline(TICK_MINUTES, game.timeline)!;
+      const champlain = next.areaTicks!.champlain!;
+      champlain.demandW = game === seller ? ownDemandW : 800e6;
+      champlain.demandByType = {
+        Residential: champlain.demandW,
+        Commercial: 0,
+        Industrial: 0,
+      };
+      if (game === seller) {
+        const ridge = next.areaTicks!["ridge-electric"]!;
+        ridge.demandW = 200e6;
+        ridge.demandByType = {
+          Residential: ridge.demandW,
+          Commercial: 0,
+          Industrial: 0,
+        };
+      }
+    }
+    for (const seat of world.seats)
+      applyCommand(world, seat.id, {
+        matchId: world.matchId,
+        epoch: world.epoch,
+        sequence: (world.sequences[seat.id] || 0) + 1,
+        command: { kind: "ready" },
+      });
+    const isolated = cloneDeep(world);
+    for (const game of isolated.grids)
+      for (const line of game.transmission!.lines)
+        if (line.corridorId.startsWith("peer:")) line.paused = true;
+    const disconnected = cloneDeep(isolated);
+    disconnected.grids[0].transmission!.lines.find(
+      (line) => line.corridorId === "vt-champlain-ridge",
+    )!.paused = true;
+    const rightsOnly = cloneDeep(world);
+    for (const facility of rightsOnly.grids[0].facilities)
+      facility.paused = true;
+    const rightsFrame = getTimeFromTimeline(
+      TICK_MINUTES,
+      rightsOnly.grids[0].timeline,
+    )!;
+    rightsFrame.areaTicks!.champlain!.demandW = 50e6;
+    rightsFrame.areaTicks!["ridge-electric"]!.demandW = 10e6;
+    stepWorld(rightsOnly);
+    expect(rightsOnly.edges[0].flowW).toBe(0);
+    expect(currentTick(rightsOnly.grids[0])!.exportedW).toBe(0);
+    stepWorld(disconnected);
+    stepWorld(isolated);
+    stepWorld(world);
+    const sentW = world.edges[0].flowW;
+    expect(sentW).toBeGreaterThan(1e6);
+    const sold = currentTick(world.grids[0])!;
+    const alone = currentTick(isolated.grids[0])!;
+    const buyer = currentTick(world.grids[1])!;
+    const buyerAlone = currentTick(isolated.grids[1])!;
+    const deliveredGas = world.grids[0].facilities.find(
+      (f) => f.id === gas.id,
+    )!;
+    const isolatedGas = isolated.grids[0].facilities.find(
+      (f) => f.id === gas.id,
+    )!;
+    const disconnectedGas = disconnected.grids[0].facilities.find(
+      (f) => f.id === gas.id,
+    )!;
+    // One neighbor leaves unused rights; the other also consumes native headroom.
+    expect(isolatedGas.currentW - disconnectedGas.currentW > 1e6).toBe(
+      ownDemandW === 280e6,
+    );
+    expect(sold.entitlementImportedW).toBeCloseTo(
+      alone.entitlementImportedW!,
+      4,
+    );
+    expect(deliveredGas.currentW - isolatedGas.currentW).toBeCloseTo(sentW, 4);
+    const exportedBtu =
+      ((sentW * gas.btuPerWh!) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+    const kg = exportedBtu * FUELS["Natural Gas"]!.kgCO2ePerBtu;
+    const fuelPrice = getFuelPricesPerMBTU(
+      seller.date,
+      seller.seed,
+      seller.location,
+    )["Natural Gas"]!;
+    expect(sold.expensesFuel - alone.expensesFuel).toBeCloseTo(
+      (exportedBtu * fuelPrice) / 1e6,
+      4,
+    );
+    expect(sold.localKgco2e! - alone.localKgco2e!).toBeCloseTo(kg, 4);
+    expect(buyer.importedKgco2e! - buyerAlone.importedKgco2e!).toBeCloseTo(
+      kg,
+      4,
+    );
+    expect(sold.revenueExports).toBeGreaterThan(0);
+    const invariants = new InvariantCollector();
+    checkTick(
+      invariants,
+      world.grids[0],
+      null,
+      sold,
+      "native human export",
+      false,
+    );
+    expect(
+      invariants.getCountByRule()["a tick never imports and exports at once"],
+    ).toBeUndefined();
+  },
+);

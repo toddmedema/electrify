@@ -220,6 +220,7 @@ import {
   allocateIntertieFlows,
   intertieOfferLimits,
   clearTransmissionMarket,
+  supplyAtDemandBoundary,
   intertieContextForGame,
   intertieYear,
   intertieUpgradeQuote,
@@ -4751,13 +4752,8 @@ function* operatingAreasPhases(
   if (state.multiplayer && !simulated) {
     external = yield {
       ...phases[0].plan,
-      offerW: Math.max(
-        0,
-        remaining[0].offer -
-          Math.max(
-            0,
-            (phases[0].plan.restrictedOfferW ?? 0) - settlements[0].exportedW,
-          ),
+      ...phases[0].plan.externalPlanAfterOwnedExports?.(
+        settlements[0].exportedW,
       ),
       shortageW:
         remaining[0].need +
@@ -4788,6 +4784,7 @@ function* operatingAreasPhases(
         }
       }
       settlements[0].exportedW += external.exportedW;
+      settlements[0].externalExportW = external.exportedW;
     }
   }
   settlements.forEach((settlement) => {
@@ -5692,9 +5689,61 @@ function* supplyFacilitiesFinancesPhases(
     const reserveW = state.operatingAreaId
       ? 0
       : now.demandW * PEER_TRADE_RESERVE_FRACTION;
+    const nativeSurplusW = Math.max(0, supply - now.demandW - reserveW);
+    const unusedEntitlementW = entitlementCapacityW - entitlementDeliveredW;
+    const nativeHeadroomW = Math.max(
+      0,
+      peerHeadroom.reduce((sum, item) => sum + item.watts, 0) -
+        Math.max(0, now.demandW + reserveW - supply),
+    );
+    const intensity = (g: GeneratorOperatingType) =>
+      (g.btuPerWh || 0) * (FUELS[g.fuel]?.kgCO2ePerBtu || 0) * 1e6;
     peer = yield {
       ...(state.operatingAreaId
-        ? { restrictedOfferW: entitlementCapacityW - entitlementDeliveredW }
+        ? {
+            externalPlanAfterOwnedExports: (ownedExportW: number) => {
+              // Owned transfers consume surplus, then contracted rights, then native headroom.
+              // Human neighbors can buy only the native energy left after those transfers.
+              const surplusLeftW = Math.max(0, nativeSurplusW - ownedExportW);
+              const usedHeadroomW = Math.max(
+                0,
+                ownedExportW - nativeSurplusW - unusedEntitlementW,
+              );
+              const offerW =
+                supply < now.demandW
+                  ? 0
+                  : surplusLeftW + Math.max(0, nativeHeadroomW - usedHeadroomW);
+              return {
+                offerW,
+                emissionsAt: (exportedW: number) => {
+                  const nativeSupplyW = supply - entitlementDeliveredW;
+                  const nativeWeight = facilities.reduce(
+                    (sum, g) =>
+                      sum +
+                      (isStorage(g) || g.paused
+                        ? 0
+                        : g.currentW * intensity(g)),
+                    0,
+                  );
+                  const surplusW = Math.min(exportedW, surplusLeftW);
+                  let weighted =
+                    nativeSupplyW > 0
+                      ? (surplusW * nativeWeight) / nativeSupplyW
+                      : 0;
+                  let extraW = Math.max(0, exportedW - surplusW);
+                  let skippedW = usedHeadroomW;
+                  for (const item of peerHeadroom) {
+                    const usedW = Math.min(item.watts, skippedW);
+                    skippedW -= usedW;
+                    const deliveredW = Math.min(item.watts - usedW, extraW);
+                    extraW -= deliveredW;
+                    weighted += deliveredW * intensity(item.generator);
+                  }
+                  return exportedW > 0 ? weighted / exportedW : 0;
+                },
+              };
+            },
+          }
         : {}),
       offerW:
         (state.operatingAreaId
@@ -5711,8 +5760,6 @@ function* supplyFacilitiesFinancesPhases(
       temperatureC: now.temperatureC,
       solarIrradianceWM2: now.solarIrradianceWM2,
       emissionsAt: (exportedW) => {
-        const intensity = (g: GeneratorOperatingType) =>
-          (g.btuPerWh || 0) * (FUELS[g.fuel]?.kgCO2ePerBtu || 0) * 1e6;
         let watts = entitlementDeliveredW,
           weighted = 0;
         let boughtW = entitlementDeliveredW;
@@ -5754,8 +5801,10 @@ function* supplyFacilitiesFinancesPhases(
       0,
       (peer?.exportedW || 0) - Math.max(0, supply - now.demandW),
     );
+    const ownedExportW = (peer?.exportedW || 0) - (peer?.externalExportW || 0);
     const extraEntitlementW = Math.min(
       extra,
+      Math.max(0, ownedExportW - Math.max(0, supply - now.demandW)),
       entitlementCapacityW - entitlementDeliveredW,
     );
     entitlementDeliveredW += extraEntitlementW;
@@ -5861,8 +5910,13 @@ function* supplyFacilitiesFinancesPhases(
   }
   const grossLocalSupplyW =
     supply - (peer?.importedW || 0) + (peer?.exportedW || 0);
+  const localSupplyW = supply - charge - batteryAfter.gridChargeW;
   const clearing = clearTransmissionMarket({
-    localSupplyW: supply - charge - batteryAfter.gridChargeW,
+    // Owned settlement adds and subtracts separately computed flows. Normalize only its
+    // arithmetic boundary before deciding whether any native outside trade really exists.
+    localSupplyW: state.operatingAreaId
+      ? supplyAtDemandBoundary(localSupplyW, now.demandW)
+      : localSupplyW,
     demandW: now.demandW,
     capacityW: transmissionCapacity,
     importLimitW: marketImportLimitW,

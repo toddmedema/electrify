@@ -20,6 +20,7 @@ import {
   allocateIntertieFlows,
   archetypeMonth,
   clearTransmissionMarket,
+  supplyAtDemandBoundary,
   gridStress,
   importAvailabilityFraction,
   IntertieContext,
@@ -753,6 +754,32 @@ describe("intertie trading order", () => {
 });
 
 describe("market clearing", () => {
+  it.each([-1, 1])(
+    "clears owned-settlement arithmetic dust in direction %i while retaining a real one-watt trade",
+    (direction) => {
+      const demandW = 383091103.71095127;
+      const clear = (supplyW: number) =>
+        clearTransmissionMarket({
+          localSupplyW: supplyAtDemandBoundary(supplyW, demandW),
+          demandW,
+          capacityW: 100e6,
+          importLimitW: 100e6,
+          exportLimitW: 100e6,
+          policy: "BALANCED",
+        });
+      // Actual owned-transfer residue from Intern / seed 7, June 2013.
+      const dust = clear(demandW + direction * 5.960464477539063e-8);
+      expect(dust).toEqual({
+        importedW: 0,
+        exportedW: 0,
+        localAvailableSupplyW: demandW,
+      });
+      const real = clear(demandW + direction);
+      expect(real.importedW).toBe(direction < 0 ? 1 : 0);
+      expect(real.exportedW).toBe(direction > 0 ? 1 : 0);
+      expect(real.localAvailableSupplyW).toBe(demandW);
+    },
+  );
   it("does not sell floating-point residue after covering a shortage", () => {
     const result = clearTransmissionMarket({
       localSupplyW: -1000000000.1,

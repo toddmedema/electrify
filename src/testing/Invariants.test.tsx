@@ -198,3 +198,23 @@ it("rejects invented curtailment instead of hiding an energy imbalance", () => {
     ]),
   );
 });
+
+it.each([0, 5.960464477539063e-8, 1])(
+  "distinguishes source purchases from outside imports when exporting (%s W outside import)",
+  (outsideImportW) => {
+    const state = createGame({ scenarioId: 116, seed: 12345 });
+    tickState(state);
+    const now = cloneDeep(
+      getTimeFromTimeline(state.date.minute, state.timeline)!,
+    );
+    expect(now.entitlementImportedW).toBeGreaterThan(0);
+    now.importedW = now.entitlementImportedW! + outsideImportW;
+    now.exportedW = 1;
+    now.revenueExports = 1;
+    const collector = new InvariantCollector();
+    checkTick(collector, state, null, now, "outside direction", false);
+    expect(
+      collector.getCountByRule()["a tick never imports and exports at once"],
+    ).toBe(outsideImportW > 0 ? 1 : undefined);
+  },
+);

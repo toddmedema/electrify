@@ -71,6 +71,8 @@ export function expansionBalanceActions(
     { month: 180, type: "retire", assetId: "scenario-116-champlain-oil-a" },
   ];
   const prepared = fixture.portfolio !== "unprepared";
+  // Cash purchases reserve working capital for local generation before the 2016 shortage.
+  const purchaseMonth = fixture.financed ? 96 : 100;
   if (prepared)
     actions.push(
       {
@@ -95,7 +97,7 @@ export function expansionBalanceActions(
     );
   if (fixture.portfolio !== "line-only") {
     actions.push({
-      month: 96,
+      month: purchaseMonth,
       type: "acquire",
       targetId: target.id,
       financed: fixture.financed,
@@ -103,10 +105,10 @@ export function expansionBalanceActions(
     if (prepared)
       actions.push(
         {
-          month: 96,
+          month: purchaseMonth,
           type: "build",
           build: {
-            name: "Natural Gas CC",
+            name: fixture.financed ? "Natural Gas CC" : "Natural Gas Peaker",
             peakW: 150e6,
             financed: true,
             operatingAreaId: target.id,

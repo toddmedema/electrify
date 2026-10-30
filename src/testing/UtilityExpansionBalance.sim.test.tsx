@@ -23,6 +23,7 @@ const cases = fullMatrix
   : EXPANSION_BALANCE_CASES.filter(
       ({ id }) =>
         id === "valley-electric-firm-loan" ||
+        id === "valley-electric-mixed-cash" ||
         id === "ridge-electric-mixed-cash" ||
         id === "both-firm-loan",
     );
@@ -99,6 +100,19 @@ for (const difficulty of difficulties)
         (sum, month) => sum + month.supplyWh,
         0,
       );
+      const localMeters = Object.values(result.expansionAreaMetrics ?? {});
+      for (const [key, expected] of [
+        ["demandWh", demandWh],
+        ["supplyWh", supplyWh],
+      ] as const) {
+        const localTotal = localMeters.reduce(
+          (sum, area) => sum + area![key],
+          0,
+        );
+        expect(Math.abs(localTotal - expected)).toBeLessThanOrEqual(
+          Math.max(1, expected * 1e-12),
+        );
+      }
       evidence.push({
         difficulty,
         seed,
@@ -122,6 +136,15 @@ for (const difficulty of difficulties)
         ),
         acquisitions: result.finalUtilityExpansion?.acquisitions,
         builds: result.builds,
+        scheduledBuilds: scheduledActions.filter(
+          (action) => action.type === "build",
+        ),
+        scheduledAcquisitions: scheduledActions.filter(
+          (action) => action.type === "acquire",
+        ),
+        scheduledRetirements: scheduledActions.filter(
+          (action) => action.type === "retire",
+        ),
         demandWh,
         supplyWh,
         servedFraction: supplyWh / demandWh,

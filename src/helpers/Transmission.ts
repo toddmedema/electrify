@@ -593,6 +593,16 @@ export function allowsExports(policy: TradingPolicyType): boolean {
   return policy === "BALANCED" || policy === "SURPLUS_ONLY";
 }
 
+/** Normalize arithmetic dust at a fully served load boundary without hiding a real flow. */
+export function supplyAtDemandBoundary(
+  supplyW: number,
+  demandW: number,
+): number {
+  const roundingSlack =
+    Number.EPSILON * Math.max(1, Math.abs(supplyW), Math.abs(demandW)) * 8;
+  return Math.abs(supplyW - demandW) <= roundingSlack ? demandW : supplyW;
+}
+
 export function clearTransmissionMarket({
   localSupplyW,
   demandW,
@@ -621,16 +631,13 @@ export function clearTransmissionMarket({
         )
       : 0;
   const availableW = localSupplyW + importedW - exportedW;
-  const roundingSlack =
-    Number.EPSILON * Math.max(1, Math.abs(availableW), Math.abs(demandW)) * 8;
   return {
     importedW,
     exportedW,
     // Adding a computed deficit back to local supply can round a fraction of a watt
     // below demand and trigger a false blackout. Fully covered demand is exact;
     // capped imports retain the real shortage.
-    localAvailableSupplyW:
-      Math.abs(availableW - demandW) <= roundingSlack ? demandW : availableW,
+    localAvailableSupplyW: supplyAtDemandBoundary(availableW, demandW),
   };
 }
 

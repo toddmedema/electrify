@@ -65,11 +65,11 @@ end-use growth is frozen while fitting. Shape exponent is fitted to peak/mean;
 scale is fitted second to annual delivered energy, using the game's normal
 representative-day annualization. Account counts are never fitting parameters.
 
-| Area | Accounts / addressable pool | Demand exponent | Demand scale | Fitted annual MWh | Fitted peak MW |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Champlain | 90,000 / 180,000 | 1.1099837624991467 | 6.595735259684209 | 2,000,000 | 352 |
-| Valley | 159,000 / 318,000 | 1.1856851657201783 | 4.1378209720279155 | 2,200,000 | 406 |
-| Ridge | 50,000 / 100,000 | 0.9882172536490237 | 5.877229717601884 | 1,000,000 | 160 |
+| Area      | Accounts / addressable pool |    Demand exponent |       Demand scale | Fitted annual MWh | Fitted peak MW |
+| --------- | --------------------------: | -----------------: | -----------------: | ----------------: | -------------: |
+| Champlain |            90,000 / 180,000 | 1.1099837624991467 |  6.595735259684209 |         2,000,000 |            352 |
+| Valley    |           159,000 / 318,000 | 1.1856851657201783 | 4.1378209720279155 |         2,200,000 |            406 |
+| Ridge     |            50,000 / 100,000 | 0.9882172536490237 |  5.877229717601884 |         1,000,000 |            160 |
 
 `src/data/UtilityExpansion.test.ts` checks annual energy within 5% and peak within
 10%. Explicit sector mixes retain each sector's daily profile rather than being
@@ -88,7 +88,7 @@ activate at half full.
 ## Balance and regression evidence
 
 The reusable fixture is `src/testing/UtilityExpansionBalanceFixtures.ts`; the
-runner is `src/testing/UtilityExpansionBalance.sim.test.tsx`. Routine CI runs six
+runner is `src/testing/UtilityExpansionBalance.sim.test.tsx`. Routine CI runs eight
 representative full-term cases and audits residual values at all five
 difficulties. The full authoring matrix uses seeds 12345, 1 and 7 at every
 difficulty, covering 195 runs: a line-only control and unprepared financed
@@ -103,9 +103,13 @@ npm run test:once -- UtilityExpansionBalance --runInBand
 
 The identical annual tariff strategy follows the existing competitor benchmark
 from the initial $0.105/kWh for every case. Lines begin at month 0; the first
-purchase occurs at month 96 (January 2013). The firm portfolio adds 100 MW
+financed purchase occurs at month 96 (January 2013). Cash strategies buy at month
+100 (May 2013), reserving working capital for a cheaper 150 MW local gas peaker
+instead of the first CC unit. These are distinct purchase and construction plans,
+not an isolated comparison of borrowing costs. The firm portfolio adds 100 MW
 Champlain gas CC units at months 0, 60 and 144, plus 150 MW local gas CC units in
-the acquired area at months 96 and 156. The mixed portfolio replaces the month-60
+the acquired area at months 96 and 156 when financed; cash plans replace the
+month-96 CC with the month-100 peaker. The mixed portfolio replaces the month-60
 unit with 200 MW wind and the month-156 unit with 300 MW local wind. The both-target
 case also buys Ridge at month 108 and builds its local 150 MW CC units at months
 108 and 168. All construction follows ordinary financing and lead times. Original
@@ -120,3 +124,11 @@ internal support), emissions and the worst constrained margin. Consolidated
 imports remove internal transfers, while network and debt costs remain booked
 once. The report records its generated simulation compatibility ID and base
 revision; full matrices must be regenerated when relevant behavior changes.
+
+The initial CEO Valley cash plan at month 96 could not fund both acquisition and
+the first CC: it left $27.22–28.07M for firm portfolios against roughly $49.8M
+down, while mixed portfolios were $1.33–2.23M short of the acquisition itself.
+Waiting until January 2014 made both transactions affordable but left the new
+plant unfinished during 2016 shortages. The May 2013 cash/peaker plan clears
+both working-capital and construction constraints without changing source
+prices, difficulty, tariff strategy or reliability rules.

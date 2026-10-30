@@ -1214,8 +1214,10 @@ export interface PolicyChangeType {
 }
 /** One co-op grid's tick offer or need, planned before any grid settles the shared tick. */
 export interface PeerPlan {
-  /** Contract headroom may support owned areas, but cannot be offered for outside resale. */
-  restrictedOfferW?: number;
+  /** Native-only outside offer after owned transfers; never persisted or replicated. */
+  externalPlanAfterOwnedExports?: (
+    ownedExportW: number,
+  ) => Pick<PeerPlan, "offerW" | "emissionsAt">;
   offerW: number;
   shortageW: number;
   pricePerMWh: number;
@@ -1247,6 +1249,8 @@ export interface CompanyResultType extends CompanyOutcomeType {
 }
 /** What the shared market delivered to one grid this tick. */
 export interface PeerSettlement {
+  /** Outside-human portion of an operating area's exports, excluding owned transfers. */
+  externalExportW?: number;
   importedW: number;
   exportedW: number;
   importEmissionsKgPerMWh: number;

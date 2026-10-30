@@ -699,11 +699,13 @@ function checkTrade(
       `imported ${Math.round(externalImportW)}W + exported ${Math.round(exportedW)}W vs ${Math.round(capacityW)}W`,
     );
   }
-  if (importedW > 0 && exportedW > 0) {
+  // Bounded source rights can serve local load while native generation supplies a
+  // neighbor. Only outside market purchases and sales must remain one direction.
+  if (externalImportW > 0 && exportedW > 0) {
     collector.add(
       "a tick never imports and exports at once",
       when,
-      `imported ${importedW}W and exported ${exportedW}W`,
+      `outside imports ${externalImportW}W and exports ${exportedW}W`,
     );
   }
   const importsFlow = importedW > 0;
