@@ -135,6 +135,29 @@ for (const theme of ["light", "dark"] as const) {
           testInfo.project.use.hasTouch ? 44 : 40,
         );
       }
+      if ((testInfo.project.use.viewport?.width ?? 1280) <= 390) {
+        const [cancelBox, cashBox, loanBox] = await Promise.all([
+          dialog
+            .getByRole("button", { name: "Cancel", exact: true })
+            .boundingBox(),
+          dialog
+            .getByRole("button", { name: "Pay cash", exact: true })
+            .boundingBox(),
+          dialog
+            .getByRole("button", { name: "Take loan", exact: true })
+            .boundingBox(),
+        ]);
+        expect(Math.abs(cashBox!.y - loanBox!.y)).toBeLessThanOrEqual(1);
+        expect(Math.abs(cashBox!.width - loanBox!.width)).toBeLessThanOrEqual(
+          1,
+        );
+        expect(cancelBox!.y + cancelBox!.height).toBeLessThanOrEqual(
+          cashBox!.y + 1,
+        );
+        expect(cancelBox!.width).toBeGreaterThanOrEqual(
+          cashBox!.width + loanBox!.width,
+        );
+      }
       if (
         process.env.REVIEW_SCREENSHOT_DIR &&
         index === 0 &&
@@ -248,6 +271,7 @@ for (const theme of ["light", "dark"] as const) {
       testInfo.project.name === "mobile-390px" &&
       theme === "light"
     ) {
+      await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
       await page.mouse.move(0, 0);
       await page.screenshot({
         path: path.join(
