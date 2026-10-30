@@ -144,3 +144,13 @@ term. Cash, tariffs, construction/program modifiers and authored events remain
 customizable. Its four obligations are inherited unless the package replaces
 them. Importing only its official arc into another base adds no global shock:
 utility ownership and dated seller contracts belong to the expansion base.
+
+## Production bundle budget
+
+Compared with dependency commit `86850f16`, the frozen production build adds
+36.10 kB gzip across all JavaScript (2.30%), from 1566.29 to
+1602.39 kB. The increase is the operating-area engine, catalog, acquisition UI and
+save validator, including the existing simulation worker variants; it adds no npm
+dependencies. The total-JavaScript budget increases by exactly those 36,098 bytes
+to retain its existing headroom. Main JavaScript, CSS, tick-performance ceilings
+and the 10% bundle tolerance remain unchanged.
