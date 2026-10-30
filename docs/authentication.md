@@ -27,8 +27,9 @@ management or unsubscribe control.
 
 ## Production setup before merging
 
-1. Enable Firebase Functions billing (Blaze) and ensure the deployment service
-   account can deploy second-generation functions and access Secret Manager.
+1. Complete the [one-time Google Cloud setup](#one-time-google-cloud-setup) below.
+   API enablement and IAM grants persist across releases; they do not need to be
+   repeated on every deployment.
 2. Create a Mailchimp Marketing API key for the existing Electrify audience
    `8ccd05ccba`, then store it with
    `npx firebase-tools@15.32.1 functions:secrets:set MAILCHIMP_API_KEY --project electrify-game`.
@@ -55,3 +56,64 @@ management or unsubscribe control.
 Local tests mock Mailchimp and Firebase OAuth; they do not send emails. Live
 subscription and welcome delivery require the configuration above and were not
 exercised with production credentials.
+
+## One-time Google Cloud setup
+
+The first mailing-list deployment in [run 41004209464](https://github.com/toddmedema/electrify/actions/runs/41004209464)
+failed because `cloudbuild.googleapis.com` and `artifactregistry.googleapis.com`
+were disabled in `electrify-game`, and the `FIREBASE_SERVICE_ACCOUNT` credentials
+could not enable APIs. Firestore rules compiled successfully, but the combined
+Firebase deploy exited before the web build or AWS deployment started. This is a
+project provisioning failure; rebuilding the app or retrying unchanged cannot
+resolve it.
+
+A project owner should complete these steps before retrying:
+
+1. Confirm that `electrify-game` is on the [Blaze billing plan](https://console.firebase.google.com/project/electrify-game/usage/details).
+2. Enable [Cloud Build](https://console.cloud.google.com/apis/library/cloudbuild.googleapis.com?project=electrify-game)
+   and [Artifact Registry](https://console.cloud.google.com/apis/library/artifactregistry.googleapis.com?project=electrify-game).
+   Click **Enable** if offered; an already enabled API needs no change.
+   To provision the other second-generation function dependencies at the same
+   time, open [Google Cloud Shell](https://shell.cloud.google.com/?project=electrify-game)
+   as the owner and run:
+
+   ```sh
+   gcloud services enable \
+     cloudfunctions.googleapis.com \
+     cloudbuild.googleapis.com \
+     artifactregistry.googleapis.com \
+     run.googleapis.com \
+     eventarc.googleapis.com \
+     pubsub.googleapis.com \
+     storage.googleapis.com \
+     secretmanager.googleapis.com \
+     --project=electrify-game
+   ```
+
+   Enabling APIs requires `serviceusage.services.enable`, available through
+   Service Usage Admin or Owner. Use an owner for this one-time setup; the failed
+   run does not establish a need to grant API administration to the CI account.
+   See [Google's API enablement guidance](https://docs.cloud.google.com/docs/buildpacks/build-function).
+
+3. Confirm the Mailchimp secret and welcome automation in the production setup
+   above. In [Secret Manager](https://console.cloud.google.com/security/secret-manager?project=electrify-game),
+   `MAILCHIMP_API_KEY` must have an enabled version. Create it through the Firebase
+   CLI's interactive prompt if absent; never paste the key into a GitHub issue,
+   workflow log or client environment variable.
+4. Allow API enablement to propagate, then open the failed Actions run and choose
+   **Re-run all jobs**. Keep the backend deploy required before publishing the
+   client; skipping it would publish signup controls without their backend.
+
+The failed run stopped before checking all function prerequisites. If the next
+attempt reports a different permission error, inspect the principal represented
+by `FIREBASE_SERVICE_ACCOUNT` in the project's [IAM page](https://console.cloud.google.com/iam-admin/iam?project=electrify-game).
+Its existing Firestore permissions alone do not prove it can deploy functions.
+[Firebase's function deployment guidance](https://firebase.google.com/docs/projects/iam/permissions#functions)
+requires Cloud Functions Admin and Service Account User; the latter must cover
+this function's runtime service account. Secret access and build-service-account
+errors should be resolved for the principal and resource named in the error;
+see [Google's function deployment troubleshooting](https://docs.cloud.google.com/functions/docs/troubleshooting).
+Do not replace the CI credential with an owner key to bypass missing setup.
+
+After deployment succeeds, perform the live subscription checks above. A green
+infrastructure deploy does not verify Mailchimp welcome-email delivery.
