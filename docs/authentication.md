@@ -12,9 +12,10 @@ local to the sign-in screen and is not saved to the account or device.
 
 The client calls `subscribeMailingList` in `us-central1` without delaying login or
 cloud sync. The callable validates Firebase authentication, a verified Google
-email, the matching user ID and the consent version. It derives the email from the
-verified token, never from a client-supplied address. The Mailchimp API key remains
-in Firebase Secret Manager.
+email and explicit consent. It derives the email from the verified token, never from
+a client-supplied address. The Mailchimp API key remains in Firebase Secret Manager.
+Failures appear in the function's Cloud Logging entries as `Mailing-list signup
+failed`, with Mailchimp's status and error title but no address.
 
 New contacts are created with `status: subscribed` (single opt-in, no confirmation
 step), a signup timestamp and consent/source tags. Mailchimp's create endpoint
@@ -25,10 +26,12 @@ reports success or directs the player to About if signup fails, even after the
 sign-in dialog closes. This checkbox is an invitation to join, not a subscription
 management or unsubscribe control.
 
-## Production setup before merging
+## Production setup
 
-1. Enable Firebase Functions billing (Blaze) and ensure the deployment service
-   account can deploy second-generation functions and access Secret Manager.
+1. Enable Firebase Functions billing (Blaze). The `FIREBASE_SERVICE_ACCOUNT`
+   credential must be able to deploy second-generation functions and read their
+   secret, which Firebase Admin SDK keys usually can't do by default. A deploy that
+   stops at `Failed to list functions` most likely lacks this access or billing.
 2. Create a Mailchimp Marketing API key for the existing Electrify audience
    `8ccd05ccba`, then store it with
    `npx firebase-tools@15.32.1 functions:secrets:set MAILCHIMP_API_KEY --project electrify-game`.
@@ -45,7 +48,8 @@ management or unsubscribe control.
    deploy with
    `npx firebase-tools@15.32.1 deploy --only functions:mailing-list --project electrify-game`.
    The production workflow also installs and deploys this function before the web
-   bundle. Missing secrets or deployment permissions must be resolved first.
+   bundle. A failure there shows as a run warning and still releases the game, so
+   check that warning after changing the function.
 5. With a fresh Google test address, check the box and sign in. Verify exactly one
    subscribed contact in Mailchimp and one welcome notification, without any
    confirmation requirement. Test unchecked and cancelled sign-ins, repeat logins,

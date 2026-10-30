@@ -1,9 +1,10 @@
 const { createHash } = require("node:crypto");
 
 class SubscriptionError extends Error {
-  constructor(code) {
+  constructor(code, details = {}) {
     super(code);
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -11,11 +12,7 @@ class SubscriptionError extends Error {
 async function subscribe(request, { apiKey, fetch: send = fetch }) {
   const auth = request.auth;
   if (!auth) throw new SubscriptionError("unauthenticated");
-  if (
-    request.data?.consent !== true ||
-    request.data?.uid !== auth.uid ||
-    request.data?.consentVersion !== "electrify-updates-v1"
-  )
+  if (request.data?.consent !== true)
     throw new SubscriptionError("invalid-argument");
   const token = auth.token;
   if (
@@ -26,7 +23,8 @@ async function subscribe(request, { apiKey, fetch: send = fetch }) {
   )
     throw new SubscriptionError("failed-precondition");
   const datacenter = apiKey?.match(/-(us\d+)$/)?.[1];
-  if (!datacenter) throw new SubscriptionError("unavailable");
+  if (!datacenter)
+    throw new SubscriptionError("unavailable", { reason: "malformed-api-key" });
   // Same public audience as public/about.html. The credential stays in Secret Manager.
   const members = `https://${datacenter}.api.mailchimp.com/3.0/lists/8ccd05ccba/members`;
   const email = token.email.trim().toLowerCase();
@@ -48,11 +46,14 @@ async function subscribe(request, { apiKey, fetch: send = fetch }) {
   if (response.ok) {
     if ((await response.json()).status === "subscribed")
       return { status: "subscribed" };
-    throw new SubscriptionError("unavailable");
+    throw new SubscriptionError("unavailable", {
+      reason: "unexpected-member-status",
+    });
   }
+  let mailchimpTitle;
   if (response.status === 400) {
-    const error = await response.json();
-    if (error.title === "Member Exists") {
+    mailchimpTitle = (await response.json()).title;
+    if (mailchimpTitle === "Member Exists") {
       const hash = createHash("md5").update(email).digest("hex");
       const member = await send(`${members}/${hash}?fields=status`, {
         headers,
@@ -61,10 +62,25 @@ async function subscribe(request, { apiKey, fetch: send = fetch }) {
       if (member.ok && (await member.json()).status === "subscribed")
         return { status: "already-subscribed" };
       // Never overwrite an existing unsubscribe, pending confirmation or cleaned address.
-      throw new SubscriptionError("failed-precondition");
+      throw new SubscriptionError("failed-precondition", {
+        reason: "existing-member-not-subscribed",
+      });
     }
   }
-  throw new SubscriptionError("unavailable");
+  throw new SubscriptionError("unavailable", {
+    mailchimpStatus: response.status,
+    mailchimpTitle,
+  });
 }
 
-module.exports = { subscribe, SubscriptionError };
+/**
+ * Only fixed codes and Mailchimp's status and error title: its other error fields and
+ * exception messages can include addresses and account details.
+ */
+function describeFailure(error) {
+  return error instanceof SubscriptionError
+    ? { code: error.code, ...error.details }
+    : { code: "unavailable", reason: error?.name };
+}
+
+module.exports = { subscribe, describeFailure };

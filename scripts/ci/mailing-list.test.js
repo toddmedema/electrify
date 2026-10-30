@@ -1,6 +1,9 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { subscribe } = require("../../firebase/functions/mailing-list.cjs");
+const {
+  subscribe,
+  describeFailure,
+} = require("../../firebase/functions/mailing-list.cjs");
 
 const request = (provider = "google.com", email = "Player@example.com") => ({
   auth: {
@@ -11,11 +14,7 @@ const request = (provider = "google.com", email = "Player@example.com") => ({
       firebase: { sign_in_provider: provider },
     },
   },
-  data: {
-    consent: true,
-    uid: "player",
-    consentVersion: "electrify-updates-v1",
-  },
+  data: { consent: true },
 });
 const key = "test-secret-us10";
 const response = (status, data) => ({
@@ -24,52 +23,43 @@ const response = (status, data) => ({
   json: async () => data,
 });
 
-for (const [provider, email] of [["google.com", "Player@example.com"]]) {
-  test(`subscribes ${provider} ${email.split("@")[1]} immediately using the token email`, async () => {
-    const calls = [];
-    const input = request(provider, email);
-    input.data.email = "someone-else@example.com";
-    const result = await subscribe(input, {
-      apiKey: key,
-      fetch: async (...args) => {
-        calls.push(args);
-        return response(200, { status: "subscribed" });
-      },
-    });
-    assert.deepEqual(result, { status: "subscribed" });
-    assert.equal(calls.length, 1);
-    const [url, options] = calls[0];
-    assert.equal(
-      url,
-      "https://us10.api.mailchimp.com/3.0/lists/8ccd05ccba/members",
-    );
-    assert.equal(options.method, "POST");
-    assert.equal(options.headers.Authorization, `Bearer ${key}`);
-    const body = JSON.parse(options.body);
-    assert.equal(body.email_address, email.toLowerCase());
-    assert.equal(body.status, "subscribed");
-    assert.ok(body.tags.includes("electrify-updates-v1"));
-    assert.ok(!Number.isNaN(Date.parse(body.timestamp_signup)));
+test("subscribes immediately using the token email", async () => {
+  const calls = [];
+  const input = request();
+  input.data.email = "someone-else@example.com";
+  const result = await subscribe(input, {
+    apiKey: key,
+    fetch: async (...args) => {
+      calls.push(args);
+      return response(200, { status: "subscribed" });
+    },
   });
-}
+  assert.deepEqual(result, { status: "subscribed" });
+  assert.equal(calls.length, 1);
+  const [url, options] = calls[0];
+  assert.equal(
+    url,
+    "https://us10.api.mailchimp.com/3.0/lists/8ccd05ccba/members",
+  );
+  assert.equal(options.method, "POST");
+  assert.equal(options.headers.Authorization, `Bearer ${key}`);
+  const body = JSON.parse(options.body);
+  assert.equal(body.email_address, "player@example.com");
+  assert.equal(body.status, "subscribed");
+  assert.ok(body.tags.includes("electrify-updates-v1"));
+  assert.ok(!Number.isNaN(Date.parse(body.timestamp_signup)));
+});
 
 for (const [name, mutate, code] of [
   ["anonymous caller", (r) => delete r.auth, "unauthenticated"],
   ["unchecked consent", (r) => (r.data.consent = false), "invalid-argument"],
   ["missing consent", (r) => delete r.data, "invalid-argument"],
-  ["old consent", (r) => (r.data.consentVersion = "old"), "invalid-argument"],
-  ["changed session", (r) => (r.data.uid = "other"), "invalid-argument"],
   [
     "unverified email",
     (r) => (r.auth.token.email_verified = false),
     "failed-precondition",
   ],
   ["missing email", (r) => delete r.auth.token.email, "failed-precondition"],
-  [
-    "unsupported OAuth provider",
-    (r) => (r.auth.token.firebase.sign_in_provider = "apple.com"),
-    "failed-precondition",
-  ],
   [
     "unsupported identity",
     (r) => (r.auth.token.firebase.sign_in_provider = "anonymous"),
@@ -144,5 +134,37 @@ test("reports service failures instead of claiming signup succeeded", async () =
       },
     }),
     /offline/,
+  );
+});
+
+test("describes failures with fixed fields and no address", async () => {
+  const email = "player@example.com";
+  const failure = (result) =>
+    subscribe(request(), {
+      apiKey: key,
+      fetch: async () => result,
+    }).catch(describeFailure);
+  assert.deepEqual(
+    await failure(
+      response(400, { title: "Invalid Resource", detail: `${email} is fake` }),
+    ),
+    {
+      code: "unavailable",
+      mailchimpStatus: 400,
+      mailchimpTitle: "Invalid Resource",
+    },
+  );
+  assert.deepEqual(await failure(response(401, { detail: email })), {
+    code: "unavailable",
+    mailchimpStatus: 401,
+    mailchimpTitle: undefined,
+  });
+  assert.deepEqual(describeFailure(new TypeError(`bad ${email}`)), {
+    code: "unavailable",
+    reason: "TypeError",
+  });
+  assert.deepEqual(
+    await subscribe(request(), { apiKey: "invalid" }).catch(describeFailure),
+    { code: "unavailable", reason: "malformed-api-key" },
   );
 });

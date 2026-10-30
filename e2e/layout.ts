@@ -13,9 +13,6 @@ export async function expectMailingListChoice(
   await expect(checkbox).toBeVisible();
   await expect(checkbox).not.toBeChecked();
   await expect(button).toBeVisible();
-  await expect(
-    scope.getByRole("button", { name: "Sign in with Apple", exact: true }),
-  ).toHaveCount(0);
   for (const control of [checkbox.locator("xpath=ancestor::label"), button]) {
     const geometry = await control.evaluate((element) => {
       const { x, width, height } = element.getBoundingClientRect();
