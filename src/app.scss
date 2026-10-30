@@ -3912,9 +3912,9 @@ $pane_header_height: 48px;
   // and the only column they share is when they happened
   .eventLogList {
     display: grid;
-    gap: $space-2;
+    gap: 0;
     margin: 0;
-    padding: 0 $space-2 $space-2;
+    padding: 0 0 $space-2;
     list-style: none;
   }
 
@@ -6041,7 +6041,7 @@ $homeSmokeCycle: 5.6s;
 .decisionImpactFact > .conceptIcon {
   color: var(--font-color-faded);
 }
-.decisionImpactFact .MuiIconButton-root {
+.decisionImpactFact .manual-link {
   margin-block: -12px;
 }
 .MuiDialog-paper .MuiDialogActions-root {

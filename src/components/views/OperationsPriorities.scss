@@ -1,7 +1,7 @@
 .operationsPriorities {
   max-width: 480px;
   margin-inline: auto;
-  padding: 0 12px 12px;
+  padding: 0 0 12px;
   color: var(--font-color-primary);
 
   // Goal and event cards are the Events history's own; the pane already supplies the gutter.
@@ -21,6 +21,7 @@
 
 .operationsSectionHeader {
   min-height: var(--control-size);
+  padding-inline: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;

@@ -247,8 +247,10 @@
   .buildFacilities .cardList {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    grid-auto-rows: max-content;
     gap: 8px;
     align-items: start;
+    align-content: start;
     > :not(.buildOption) {
       grid-column: 1 / -1;
     }

@@ -753,14 +753,21 @@ function FacilitySupplyChart({
     const element = anchor.current;
     const stage = element?.closest(".gameStage");
     if (!element || !stage) return;
-    const bottom =
-      element.getBoundingClientRect().bottom -
-      stage.getBoundingClientRect().top;
-    document.documentElement.style.setProperty(
-      "--game-chart-block",
-      `${Math.round(bottom)}px`,
-    );
-  }, [anchor, height]);
+    const publish = () => {
+      const bottom =
+        element.getBoundingClientRect().bottom -
+        stage.getBoundingClientRect().top;
+      document.documentElement.style.setProperty(
+        "--game-chart-block",
+        `${Math.round(bottom)}px`,
+      );
+    };
+    publish();
+    // The chart mounts after this block, so its height arrives a frame later.
+    const observer = new ResizeObserver(publish);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [anchor]);
   return (
     <div
       ref={anchor}
