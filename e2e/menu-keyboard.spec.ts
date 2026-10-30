@@ -122,7 +122,9 @@ for (const { pointerTarget, deferPlayFocus } of [
     }
     await exitSettingsWithBodyArrow(page);
     await page.clock.runFor(1000);
-    await expect(settings).toBeFocused();
+    await expect(
+      page.getByRole("button", { name: "Play", exact: true }),
+    ).toBeFocused();
     expect(
       await page.evaluate(() => localStorage.getItem("soundEffectsVolume")),
     ).toBe("0");

@@ -23,7 +23,7 @@ import { achievementJournal } from "./Journal";
 import { useAchievements } from "./useAchievements";
 import { retryAchievementSync } from "./Runtime";
 import { useOnline } from "../components/base/OnlineStatus";
-import { useMenuKeys } from "../components/base/useMenuKeys";
+import { restoreMenuFocus, useMenuKeys } from "../components/base/useMenuKeys";
 import { useSwipeToDismiss } from "../components/base/SwipeDismiss";
 import MailingListCheckbox from "../components/base/MailingListCheckbox";
 
@@ -43,13 +43,7 @@ export function AchievementGallery(): React.JSX.Element {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
     dispatch(navigateBack());
-    window.setTimeout(
-      () =>
-        document
-          .querySelector<HTMLElement>("[data-achievements-trigger]")
-          ?.focus(),
-      350,
-    );
+    restoreMenuFocus("[data-achievements-trigger]");
   };
   const menuKeys = useMenuKeys(true, onBack);
   React.useEffect(() => {

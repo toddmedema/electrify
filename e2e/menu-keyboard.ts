@@ -118,24 +118,21 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
     name: "Play",
     exact: true,
   });
-  const settings = page.getByRole("button", { name: "Settings", exact: true });
   await expect(start).toBeVisible();
-  await expect(settings).toBeFocused();
-
-  await page.keyboard.press("ArrowUp");
-  const mods = page.getByRole("button", { name: "Mods", exact: true });
-  if (await mods.isVisible()) {
-    await expect(mods).toBeFocused();
-    await page.keyboard.press("ArrowUp");
+  await expect(start).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  const friends = page.getByRole("button", {
+    name: "Play with friends",
+    exact: true,
+  });
+  if (await friends.isVisible()) {
+    await expect(friends).toBeFocused();
+    await page.keyboard.press("ArrowDown");
   }
   await expect(
     page.getByRole("button", { name: "Manual", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("ArrowUp");
-  const friends = page.getByRole("button", {
-    name: "Play with friends",
-    exact: true,
-  });
   if (await friends.isVisible()) {
     await expect(friends).toBeFocused();
     await page.keyboard.press("ArrowUp");

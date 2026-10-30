@@ -298,7 +298,8 @@ const MainMenu = (props: Props): React.JSX.Element => {
             aria-label="Share Electrify"
             size="large"
           >
-            <ShareIcon />
+            {/* Share has one extra pixel of leading whitespace beside the other footer glyphs. */}
+            <ShareIcon sx={{ transform: "translateX(-1px)" }} />
           </IconButton>
         )}
       </footer>
