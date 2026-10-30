@@ -200,6 +200,8 @@ if (typeof window !== "undefined") {
  * bar folds its status row into the top bar so the window gains one row of game.
  */
 export const SIDE_LAYOUT_MIN_WIDTH = 1300;
+/** From here tools sit beside the fleet. Separate from the desktop bar and speed controls. */
+export const SIDE_TOOL_MIN_WIDTH = 1024;
 export const SIDE_LAYOUT_MEDIA = `(min-width:${SIDE_LAYOUT_MIN_WIDTH}px)`;
 
 export function isBigScreen(): boolean {
@@ -210,6 +212,10 @@ export function isBigScreen(): boolean {
  * Wide enough to show Facilities and Insights side by side without the bottom navigation.
  * Keep in sync with $desktop_breakpoint in app.scss.
  */
+export function isSideToolLayout(): boolean {
+  return getViewportWidth() >= SIDE_TOOL_MIN_WIDTH;
+}
+
 export function isDesktopScreen(): boolean {
   return getViewportWidth() >= SIDE_LAYOUT_MIN_WIDTH;
 }

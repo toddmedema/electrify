@@ -7,7 +7,7 @@ import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import { selectTutorialActions } from "../../reducers/Tutorial";
 import { CardNameType } from "../../Types";
-import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
+import { SIDE_TOOL_MIN_WIDTH } from "../../Globals";
 import GameAppBar from "./GameAppBar";
 import Navigation, {
   GAME_TOOLS,
@@ -34,20 +34,22 @@ const sideFor = (tool: GameTool): ToolSide =>
     : "intelligence";
 
 /** Below this, tools rise as one sheet over the fleet instead of taking their own columns. */
-export { SIDE_LAYOUT_MIN_WIDTH };
+export { SIDE_TOOL_MIN_WIDTH };
 /** The fleet never gets narrower than the widest common phone, so it stays fully usable. */
 export const MIN_FLEET_WIDTH = 430;
-const MIN_TOOL_WIDTH = 400;
+const MIN_TOOL_WIDTH = 360;
 const MAX_TOOL_WIDTH = 480;
 
-/** Matches --game-tool-width: clamp(400px, 28vw, 480px). */
+/** Sets --game-tool-width: 28vw within its limits, in whole pixels so text stays sharp. */
 export function toolWidth(width: number) {
-  return Math.min(MAX_TOOL_WIDTH, Math.max(MIN_TOOL_WIDTH, width * 0.28));
+  return Math.round(
+    Math.min(MAX_TOOL_WIDTH, Math.max(MIN_TOOL_WIDTH, width * 0.28)),
+  );
 }
 
 /** How many tools fit beside the fleet at this window width, keeping it at phone width or more. */
 export function maxOpenTools(width: number) {
-  if (width < SIDE_LAYOUT_MIN_WIDTH) return 1;
+  if (width < SIDE_TOOL_MIN_WIDTH) return 1;
   return Math.max(
     1,
     Math.min(
@@ -77,7 +79,7 @@ export default function GameWorkspace() {
   const memory = React.useRef(new Map<string, unknown>());
   const [programBack, setProgramBack] = React.useState<() => void>();
   const retainFocus = React.useRef(false);
-  const layout = width >= SIDE_LAYOUT_MIN_WIDTH ? "side" : "sheet";
+  const layout = width >= SIDE_TOOL_MIN_WIDTH ? "side" : "sheet";
   const capacity = maxOpenTools(width);
   // Derive the newly requested tool immediately; remembering it in an effect must not flash
   // the previous rail or unmount the fleet during navigation.
@@ -188,6 +190,7 @@ export default function GameWorkspace() {
             style={
               layout === "side" && visible.length
                 ? {
+                    ["--game-tool-width" as string]: `${toolWidth(width)}px`,
                     gridTemplateColumns: [
                       ...left.map(() => "var(--game-tool-width)"),
                       `minmax(${MIN_FLEET_WIDTH}px, 1fr)`,

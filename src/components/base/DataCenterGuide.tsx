@@ -16,7 +16,7 @@ import { formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import { setSpeed } from "../../reducers/Game";
 import { delta as uiDelta } from "../../reducers/UI";
-import { isDesktopScreen } from "../../Globals";
+import { isSideToolLayout } from "../../Globals";
 import TutorialHud from "./TutorialHud";
 import TutorialPrompt from "./TutorialPrompt";
 
@@ -246,7 +246,7 @@ export default function DataCenterGuide() {
   return (
     <div data-data-center-guide="true" style={{ display: "contents" }}>
       <TutorialHud
-        desktop={isDesktopScreen()}
+        desktop={isSideToolLayout()}
         step={steps[step]}
         stepIndex={step}
         totalSteps={steps.length}

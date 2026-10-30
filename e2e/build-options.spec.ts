@@ -530,7 +530,7 @@ for (const theme of ["light", "dark"] as const) {
       })
       .click();
     await expect(
-      ironAir.getByRole("row", { name: /Operating costs/ }),
+      ironAir.getByRole("row", { name: /Upkeep/ }),
     ).toBeVisible();
     await expect(
       ironAir.getByRole("row", { name: /Efficiency/ }),

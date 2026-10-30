@@ -48,7 +48,7 @@ for (const side of [false, true]) {
       ? 1300
       : info.project.use.hasTouch
         ? page.viewportSize()!.width
-        : 1299;
+        : 1023;
     await page.setViewportSize({ width, height: page.viewportSize()!.height });
     await startGame(page, "dark", 100);
     for (const [category, purchase] of [
@@ -359,8 +359,8 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   page,
 }) => {
   // One tool at a time: switching tools hides the other instead of opening beside it.
-  if (page.viewportSize()!.width >= 1300)
-    await page.setViewportSize({ width: 1280, height: 800 });
+  if (page.viewportSize()!.width >= 1024)
+    await page.setViewportSize({ width: 1023, height: 800 });
   await startGame(page, "dark");
   const build = page.getByRole("region", { name: "Build", exact: true });
   await page.locator("#insightsNav").click();
@@ -401,7 +401,7 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   await expect(size).toHaveValue(generatorSize);
   await expect
     .poll(() => list.evaluate((element) => element.scrollTop))
-    .toBe(240);
+    .toBe(left);
   await page.getByRole("tab", { name: "Storage", exact: true }).click();
   await expect(size).toHaveValue(storageSize);
 
@@ -548,7 +548,7 @@ async function expectSideRails(page: Page) {
       }),
     );
   for (const panel of panels) {
-    expect(panel.width).toBeGreaterThanOrEqual(400);
+    expect(panel.width).toBeGreaterThanOrEqual(360);
     expect(panel.width).toBeLessThanOrEqual(480);
     expect(
       panel.right <= fleet.x + 1 || panel.left >= fleet.x + fleet.width - 1,
@@ -1011,7 +1011,7 @@ test("wide screens keep several tools beside the fleet and remember them across 
   await expectSideRails(page);
 
   // A compact sheet reveals a remembered tool rather than closing an unseen one.
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize({ width: 1023, height: 900 });
   await expect(page.locator(".gameStage")).toHaveAttribute(
     "data-layout",
     "sheet",
@@ -1091,10 +1091,7 @@ for (const theme of ["light", "dark"] as const) {
       ]);
       expect(profitBox!.x).toBeGreaterThan(cashBox!.x + cashBox!.width);
       expect(dateBox!.x).toBeGreaterThan(profitBox!.x + profitBox!.width);
-      await expect(stage).toHaveAttribute(
-        "data-layout",
-        desktop ? "side" : "sheet",
-      );
+      await expect(stage).toHaveAttribute("data-layout", "side");
       if (desktop) {
         await expect(appbar).toHaveClass(/appbarSingleRow/);
         await expect(ultra).toBeInViewport();

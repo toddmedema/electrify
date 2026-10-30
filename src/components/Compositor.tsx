@@ -65,7 +65,7 @@ import {
   shouldDismissSwipe,
   SWIPE_DISMISS_EXIT_MS,
 } from "./base/SwipeDismiss";
-import { isDesktopScreen } from "../Globals";
+import { isDesktopScreen, isSideToolLayout } from "../Globals";
 import { store } from "../Store";
 
 const AchievementGallery = React.lazy(() =>
@@ -610,7 +610,7 @@ export default class Compositor extends React.Component<Props, {}> {
           this.props.card.name !== "MANUAL" &&
           !ui.manualHelpEntry && (
             <TutorialHud
-              desktop={isDesktopScreen()}
+              desktop={isSideToolLayout()}
               step={currentTutorialStep}
               stepIndex={tutorialStep}
               totalSteps={tutorialSteps.length}

@@ -6,7 +6,7 @@
 }
 
 .gameWorkspace {
-  --game-tool-width: clamp(400px, 28vw, 480px);
+  --game-tool-width: clamp(360px, 28vw, 480px);
   position: relative;
   display: flex;
   flex-direction: column;

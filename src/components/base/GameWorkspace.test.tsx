@@ -5,7 +5,7 @@ import { Provider } from "react-redux";
 import cardReducer, { initialCard } from "../../reducers/Card";
 import GameWorkspace, {
   MIN_FLEET_WIDTH,
-  SIDE_LAYOUT_MIN_WIDTH,
+  SIDE_TOOL_MIN_WIDTH,
   maxOpenTools,
   toolWidth,
 } from "./GameWorkspace";
@@ -186,7 +186,8 @@ it("keeps as many tools open as fit beside a phone-width fleet", async () => {
 });
 
 it.each([
-  [1299, 1],
+  [1023, 1],
+  [1024, 1],
   [1300, 2],
   [1512, 2],
   [1920, 3],
@@ -196,7 +197,7 @@ it.each([
   expect(maxOpenTools(width)).toBe(tools);
   // Sheets float over the fleet; columns must leave it at least phone width.
   expect(
-    width < SIDE_LAYOUT_MIN_WIDTH ||
+    width < SIDE_TOOL_MIN_WIDTH ||
       width - tools * toolWidth(width) >= MIN_FLEET_WIDTH,
   ).toBe(true);
 });
@@ -244,7 +245,7 @@ it("switches at layout boundaries without discarding the other open tool", async
   await user.click(action("Events"));
   await user.click(action("Programs"));
   expect(screen.getAllByRole("region")).toHaveLength(2);
-  resize(1299);
+  resize(1023);
   expect(screen.getAllByRole("region")).toHaveLength(1);
   expect(screen.getByRole("heading", { name: "Programs" })).toBeVisible();
   expect(screen.queryByRole("tablist", { name: "Decisions" })).toBeNull();
@@ -284,13 +285,13 @@ it("keeps Build and the opposite desktop rail open after a purchase", async () =
   expect(store.getState().card.name).toBe("BUILD_GENERATORS");
 });
 
-it.each([390, SIDE_LAYOUT_MIN_WIDTH - 1, SIDE_LAYOUT_MIN_WIDTH])(
+it.each([390, SIDE_TOOL_MIN_WIDTH - 1, SIDE_TOOL_MIN_WIDTH])(
   "only closes Build after a purchase when %ipx uses an overlay",
   async (width) => {
     const { user, action } = setup(width);
     await user.click(action("Build"));
     await user.click(screen.getByRole("button", { name: "Finish purchase" }));
-    const staysOpen = width >= SIDE_LAYOUT_MIN_WIDTH;
+    const staysOpen = width >= SIDE_TOOL_MIN_WIDTH;
     expect(screen.queryAllByRole("region", { name: "Build" })).toHaveLength(
       Number(staysOpen),
     );
