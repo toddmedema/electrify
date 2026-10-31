@@ -24,7 +24,7 @@ import {
   ManualGroupType,
   manualEntryText,
 } from "../base/ManualEntries";
-import { ManualEntryNavigation } from "../base/ManualEntryLink";
+import { ManualEntryNavigation, manualEntryId } from "../base/ManualEntryLink";
 
 export interface StateProps {
   // Set when the player arrived via a deep link from a term shown elsewhere in the game
@@ -82,10 +82,6 @@ let lastScrollTop = 0;
 export function clearManualMemory() {
   lastSearchTerm = "";
   lastScrollTop = 0;
-}
-
-function entryId(title: string): string {
-  return `manual-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 }
 
 // The list is the scroller, except on short windows where #gameCard takes over and the list
@@ -181,7 +177,7 @@ interface ManualItemProps {
 
 function ManualItem(props: ManualItemProps): React.JSX.Element {
   const { entry, searchTerm, expanded, onFollowLink } = props;
-  const id = entryId(entry.title);
+  const id = manualEntryId(entry.title);
   const followLink = React.useCallback(
     (to: ManualEntryTitleType) => onFollowLink(to, entry.title),
     [onFollowLink, entry.title],
@@ -217,9 +213,7 @@ function ManualItem(props: ManualItemProps): React.JSX.Element {
 }
 
 export default function Manual(props: Props): React.JSX.Element {
-  const { onBack, onFollowLink } = props;
-  const [focusEntry, setFocusEntry] = React.useState(props.focusEntry);
-  const [focusRequest, setFocusRequest] = React.useState(0);
+  const { onBack, onFollowLink, focusEntry, focusKey } = props;
   // A deep link is a fresh question, so it ignores (and clears) whatever the last visit left
   const [searchTerm, setSearchTerm] = React.useState<string>(
     focusEntry ? "" : lastSearchTerm,
@@ -229,6 +223,36 @@ export default function Manual(props: Props): React.JSX.Element {
   const [toggled, setToggled] = React.useState<Record<string, boolean>>({});
   const listRef = React.useRef<HTMLDivElement>(null);
   const focusRef = React.useRef<HTMLDivElement>(null);
+  // 0: idle, 1: focus the destination, 2: wait for its layout to settle.
+  const revealRequested = React.useRef<0 | 1 | 2>(0);
+  const revealFocusedEntry = React.useCallback(function reveal() {
+    requestAnimationFrame(() => {
+      const focused = focusRef.current;
+      if (!revealRequested.current || !focused) return;
+      if (
+        listRef.current?.querySelector(
+          ".MuiCollapse-root:not(.MuiCollapse-entered):not(.MuiCollapse-hidden)",
+        )
+      ) {
+        reveal();
+        return;
+      }
+      revealRequested.current = 0;
+      if (listRef.current) {
+        const scroller = scrollContainerOf(listRef.current);
+        const top =
+          scroller === document.documentElement
+            ? 0
+            : scroller.getBoundingClientRect().top;
+        const header = focused.classList.contains("manual-pinned")
+          ? 0
+          : GROUP_HEADER_HEIGHT;
+        // Apply the header offset before the browser clamps at the end of the list.
+        scroller.scrollTop +=
+          focused.getBoundingClientRect().top - top - header;
+      }
+    });
+  }, []);
 
   const term = searchTerm.trim().toLowerCase();
   const searching = term.length > 0;
@@ -241,18 +265,14 @@ export default function Manual(props: Props): React.JSX.Element {
     setToggled({});
   }
 
-  const openEntry = React.useCallback((title: string) => {
-    setSearchTerm("");
-    setToggled({ [title]: true });
-    setFocusEntry(title);
-    // Revisit requests matter even when the entry title has not changed:
-    // searching may have hidden it and moved keyboard focus elsewhere.
-    setFocusRequest((request) => request + 1);
-  }, []);
-
-  React.useEffect(() => {
-    if (props.focusEntry) openEntry(props.focusEntry);
-  }, [props.focusEntry, props.focusKey, openEntry]);
+  React.useLayoutEffect(() => {
+    if (focusEntry) {
+      setSearchTerm("");
+      setToggled({ [focusEntry]: true });
+      // focusKey also requests a revisit when search has hidden the same entry.
+      revealRequested.current = 1;
+    }
+  }, [focusEntry, focusKey]);
 
   React.useEffect(() => {
     lastSearchTerm = searchTerm;
@@ -266,27 +286,18 @@ export default function Manual(props: Props): React.JSX.Element {
     }
   }, [focusEntry]);
 
-  React.useEffect(() => {
-    const focused = focusRef.current;
-    // jsdom has no layout, and so no scrollIntoView
-    if (focusEntry && focused) {
-      focused.scrollIntoView?.({ block: "start" });
-      // scrollIntoView aligns the entry with the top of the list, where a grouped entry's
-      // title would sit under the pinned group header; nudge it down below that bar. Pinned
-      // entries have no header above them, so they stay flush with the top of the list.
-      const list = listRef.current;
-      if (list && !focused.classList.contains("manual-pinned")) {
-        const scroller = scrollContainerOf(list);
-        scroller.scrollTop = Math.max(
-          0,
-          scroller.scrollTop - GROUP_HEADER_HEIGHT,
-        );
-      }
-      focused
+  React.useLayoutEffect(() => {
+    if (revealRequested.current === 1 && focusRef.current) {
+      revealRequested.current = 2;
+      // Focus without the browser scrolling to an intermediate accordion height.
+      focusRef.current
         .querySelector<HTMLButtonElement>(".MuiAccordionSummary-root")
-        ?.focus();
+        ?.focus({ preventScroll: true });
+      // A link can both collapse earlier entries and expand its target. Align only once
+      // all those transitions finish, or the closing content moves the target again.
+      revealFocusedEntry();
     }
-  }, [focusEntry, focusRequest]);
+  });
 
   const matches = React.useMemo(
     () =>

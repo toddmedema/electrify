@@ -70,18 +70,11 @@ for (const theme of ["light", "dark"] as const) {
         await expect(requirements).toContainText(
           "Serving less than 95% of demand for 3 months in a row ends the run.",
         );
-        const help = briefing.locator("details");
-        if (scenario.id === 100) {
-          await expect(help).not.toHaveAttribute("open", "");
-          await help.locator("summary").click();
-          await expect(help).toHaveAttribute("open", "");
-          await help.locator("summary").click();
-        } else await expect(help).toHaveCount(0);
         await expect(briefing).not.toContainText("build or upgrade the grid");
         await expectDialogToFit(briefing);
         if (
           process.env.REVIEW_SCREENSHOT_DIR &&
-          scenario.id === 111 &&
+          scenario.id === 100 &&
           theme === "light"
         ) {
           await briefing

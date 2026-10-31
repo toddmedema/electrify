@@ -1950,9 +1950,9 @@ export const SCENARIOS: ScenarioType[] = [
       tone: "boom",
       fantasy: "Build Champlain Electric into a larger Vermont utility.",
       objective:
-        "Acquire Valley Electric or Ridge Electric by the end of 2014, then operate your expanded company through 2024.",
+        "Acquire Valley Electric or Ridge Electric by the end of 2014. Retire original Oil A by the end of 2020 and acquired original oil plants by the end of 2023. Retain 90% of your expanded customer base at the end of 2024.",
       threat:
-        "Choose between Valley's larger customer base and shrinking power contract, or Ridge's smaller industrial load and fuel exposure. Valley's nuclear purchase falls from 160 to 80 MW in January 2017.",
+        "Compare company terms before connecting. This fictional network-renewal plan raises opening upkeep to 1.5× in 2015 and 2× in 2020, before inflation and customer growth. Valley's nuclear purchase halves in 2017; Champlain's ends in 2020, when Québec and Ridge purchase limits also halve. Plan supply and working capital.",
     },
     ownership: "Investor",
     startingYear: 2005,

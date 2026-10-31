@@ -509,15 +509,17 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
         objective.targets.includes(receipt.targetId) &&
         receipt.minute < (objective.deadlineMonth + 1) * MINUTES_PER_MONTH,
     );
-    return acquired
-      ? {
-          ...result,
-          status: "completed" as const,
-          observed: 1,
-          observedMonths: 1,
-          reason: undefined,
-        }
-      : result;
+    if (!acquired) return result;
+    const completed: ObjectiveResult = {
+      ...result,
+      status: "completed",
+      observed: 1,
+      observedMonths: 1,
+    };
+    // A proven acquisition clears an earlier explanation. Omit the optional field:
+    // own undefined properties are not valid canonical JSON in a saved verdict.
+    delete completed.reason;
+    return completed;
   });
   resultCache.set(progress, {
     completedMonths: context.completedMonths,
