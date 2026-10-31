@@ -19,7 +19,7 @@ test("shows pricing and the market benchmark without a customer-program requirem
     /projected customers .* next month/i,
   );
   expect(within(pricing).getByText("Market")).toBeInTheDocument();
-  expect(within(pricing).getByText("Customers / mo")).toBeInTheDocument();
+  expect(within(pricing).getByText("Customers/mo")).toBeInTheDocument();
   expect(screen.getByRole("slider")).toBeVisible();
 });
 

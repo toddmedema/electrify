@@ -13,7 +13,7 @@ import {
   challengeComparison,
 } from "../../helpers/Challenge";
 import { logEvent, SignInOptions } from "../../Globals";
-import MailingListCheckbox from "./MailingListCheckbox";
+import GoogleSignIn from "./GoogleSignIn";
 import ShareIcon from "@mui/icons-material/Share";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
@@ -58,7 +58,6 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
   const { victory, loggedIn, onClose, onQuit, onLogin } = props;
   const [preview, setPreview] = React.useState(false);
   const [sharing, setSharing] = React.useState(false);
-  const [mailingList, setMailingList] = React.useState(false);
   const [rank, setRank] = React.useState<number | undefined>(undefined);
   const [rankFailed, setRankFailed] = React.useState(false);
 
@@ -233,19 +232,13 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               color="textSecondary"
               component="div"
             >
-              <MailingListCheckbox
-                checked={mailingList}
-                onChange={setMailingList}
-              />
-              <br />
-              <Button
-                color="primary"
-                onClick={() => onLogin({ mailingList })}
+              <GoogleSignIn
+                centered
+                label="Log in to join the leaderboard"
+                variant="text"
                 size="small"
-              >
-                Log in
-              </Button>
-              to join the leaderboard
+                onSignIn={onLogin}
+              />
             </Typography>
           )}
         {victory.outcome === "completed" &&

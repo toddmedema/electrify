@@ -106,6 +106,7 @@ import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
+import { temperatureUnit } from "../../helpers/Units";
 import { UnitsContext } from "../base/UnitsContext";
 import {
   HISTORY_METRIC_KEYS,
@@ -169,7 +170,7 @@ export interface InsightLayerDefinition {
 
 export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
-  { id: "spareCapacity", label: "Lowest spare capacity", group: "Grid" },
+  { id: "spareCapacity", label: "Lowest reserve", group: "Grid" },
   {
     id: "powerExchange",
     label: "Power exchange",
@@ -202,7 +203,7 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   },
   {
     id: "emissions",
-    label: "Emissions (CO2e)",
+    label: "Emissions (CO₂e)",
     group: "Environment",
   },
   {
@@ -1430,7 +1431,7 @@ export default class Insights extends React.Component<Props, State> {
           {iconButton(
             "Zoom out",
             <ZoomOutIcon />,
-            rangesEqual(scenarioRange, range),
+            full || rangesEqual(scenarioRange, range),
             () => setRange(scenarioRange),
           )}
           {iconButton("Fit full timeline", <FitScreenIcon />, full, () =>
@@ -1849,7 +1850,9 @@ export default class Insights extends React.Component<Props, State> {
       >
         <Toolbar className="insightsTrackHeader">
           <Typography variant="h6">
-            {definition.label}
+            {id === "weather"
+              ? `Temperature (${temperatureUnit(this.context as UnitSystemType)})`
+              : definition.label}
             {id === "powerExchange" && (
               <ManualLink entry={MANUAL_ENTRY.INTERTIES} />
             )}
@@ -1961,8 +1964,8 @@ export default class Insights extends React.Component<Props, State> {
         : presetDialog === "rename"
           ? "Give this preset a short, recognizable name."
           : presetDialog === "delete"
-            ? "The charts stay open as an unsaved view, but this named preset will be removed."
-            : "This replaces your saved changes with the original charts and order. Your custom presets are not affected.";
+            ? "Deletes this preset. The charts stay open, unsaved."
+            : "Restores the original charts and order. Custom presets stay.";
 
     return (
       <Dialog

@@ -10,7 +10,7 @@ jest.setTimeout(120000);
 
 describe("simulation economics", () => {
   ECONOMICS_SCENARIOS.forEach((scenario) => {
-    it(`validates the one-build balance playbook on Intern in "${scenario.name}"`, () => {
+    it(`validates the investment balance playbook on Intern in "${scenario.name}"`, () => {
       const passive = runSimulation({
         scenarioId: scenario.id,
         difficulty: "Intern",
@@ -29,9 +29,17 @@ describe("simulation economics", () => {
       });
       expectNoViolations(active);
       expect(active.meaningfulDecisionCount).toBe(
-        1 + baselineMeaningfulChoices(scenario.id, active),
+        scenario.id === 116
+          ? 10
+          : 1 + baselineMeaningfulChoices(scenario.id, active),
       );
-      expect(active.builds).toHaveLength(1);
+      expect(active.builds).toHaveLength(scenario.id === 116 ? 5 : 1);
+      expect(active.finalUtilityExpansion?.acquisitions ?? []).toHaveLength(
+        scenario.id === 116 ? 1 : 0,
+      );
+      expect(active.meaningfulDecisionCategories).toEqual(
+        scenario.id === 116 ? ["asset", "rate", "sale"] : expect.any(Array),
+      );
       expect(active.outcome).toBe("completed");
     });
   });

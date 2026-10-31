@@ -471,7 +471,7 @@ describe("retrofits", () => {
     expect(plant.upgradeInProgress).toBeUndefined();
     expect(plant.resilience?.coldWeatherPackage).toBeFalsy();
     expect(
-      cancelled.eventLog.some((e) => e.message.startsWith("Cancelled")),
+      cancelled.eventLog.some((e) => e.message.startsWith("Canceled")),
     ).toBe(true);
     // Cash ends where it would have been had the player never started it, give or take the
     // one tick of lost output

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button } from "@mui/material";
+import { Button, Typography } from "@mui/material";
 import DecisionDialog from "./DecisionDialog";
 import ConceptIcon from "./ConceptIcon";
 import ManualLink from "./ManualLink";
@@ -42,6 +42,8 @@ export interface PurchaseReviewDialogProps {
   title: React.ReactNode;
   cash: number;
   buildCost: number;
+  /** Transaction fees are paid in cash with either payment choice. */
+  cashOnlyFee?: number;
   interestRate: number;
   /** An existing loan balance rolled into the new one, as an intertie upgrade does */
   refinancedBalance?: number;
@@ -56,6 +58,11 @@ export interface PurchaseReviewDialogProps {
   leadingFacts?: DecisionImpactFactType[];
   /** Facts appended after the money, upkeep and timing facts */
   extraFacts?: DecisionImpactFactType[];
+  /** Complete payment summaries when a purchase also assumes debts or running costs. */
+  paymentSummary?: {
+    cash: Pick<DecisionImpactFactType, "value" | "detail">;
+    loan: Pick<DecisionImpactFactType, "value" | "detail">;
+  };
   upkeepPerMonth: number;
   /** When set, upkeep reads as a change from this monthly figure */
   upkeepBeforePerMonth?: number;
@@ -66,9 +73,11 @@ export interface PurchaseReviewDialogProps {
   onlineInLabel?: string;
   titleId?: string;
   loanButtonId?: string;
+  /** A visible cancel action in addition to the dialog close control. */
+  cancelLabel?: string;
   onClose: () => void;
-  /** Called at most once per opening, however quickly the buttons are clicked */
-  onPurchase: (financed: boolean) => void;
+  /** One submission at a time; resolving false unlocks a rejected purchase for retry. */
+  onPurchase: (financed: boolean) => void | boolean | Promise<void | boolean>;
 }
 
 /** Catalog quotes stay stable while this review reads the balance directly from the game. */
@@ -90,6 +99,7 @@ export default function PurchaseReviewDialog(
     open,
     cash,
     buildCost,
+    cashOnlyFee = 0,
     interestRate,
     refinancedBalance = 0,
     loanMonths = LOAN_MONTHS,
@@ -99,9 +109,11 @@ export default function PurchaseReviewDialog(
   // A double-click dispatches two click events before the closing dialog has necessarily
   // unmounted. The ref closes that window synchronously, and reopening rearms it.
   const purchaseSubmitted = React.useRef(false);
+  const [submitting, setSubmitting] = React.useState(false);
   React.useEffect(() => {
     if (open) {
       purchaseSubmitted.current = false;
+      setSubmitting(false);
     }
   }, [open]);
   const loan = purchaseTerms(
@@ -111,16 +123,24 @@ export default function PurchaseReviewDialog(
     refinancedBalance,
     loanMonths,
   );
-  const cashDisabled = !!props.cashDisabled || cash < buildCost;
-  const loanDisabled = !!props.loanDisabled || cash < loan.downpayment;
+  const cashDue = buildCost + cashOnlyFee;
+  const financedCashDue = loan.downpayment + cashOnlyFee;
+  const cashDisabled = submitting || !!props.cashDisabled || cash < cashDue;
+  const loanDisabled =
+    submitting || !!props.loanDisabled || cash < financedCashDue;
 
-  const submit = (financed: boolean, event: React.MouseEvent) => {
+  const submit = async (financed: boolean, event: React.MouseEvent) => {
     event.stopPropagation();
     if (purchaseSubmitted.current) {
       return;
     }
     purchaseSubmitted.current = true;
-    onPurchase(financed);
+    setSubmitting(true);
+    const result = await onPurchase(financed);
+    if (result === false) {
+      purchaseSubmitted.current = false;
+      setSubmitting(false);
+    }
   };
 
   const facts: DecisionImpactFactType[] = [
@@ -128,7 +148,10 @@ export default function PurchaseReviewDialog(
     {
       concept: "money",
       label: "Cash purchase",
-      value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - buildCost)}`,
+      value:
+        props.paymentSummary?.cash.value ??
+        `${formatMoneyConcise(cashDue)} now`,
+      detail: props.paymentSummary?.cash.detail,
     },
     {
       concept: "finances",
@@ -136,22 +159,36 @@ export default function PurchaseReviewDialog(
       help: (
         <ManualLink entry={MANUAL_ENTRY.INTEREST_RATES} label="interest rate" />
       ),
-      value: `${formatMoneyConcise(loan.downpayment)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo (${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years)`,
-      detail: `Payments start now.${
-        refinancedBalance > 0
-          ? ` Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
-          : ""
-      }`,
-    },
-    {
-      concept: "money",
-      label: props.upkeepLabel ?? "Estimated upkeep",
       value:
-        props.upkeepBeforePerMonth === undefined
-          ? `${formatMoneyConcise(props.upkeepPerMonth)}/mo`
-          : `${formatMoneyConcise(props.upkeepBeforePerMonth)} → ${formatMoneyConcise(props.upkeepPerMonth)}/mo`,
-      detail: props.upkeepDetail,
+        props.paymentSummary?.loan.value ??
+        `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo · ${(interestRate * 100).toFixed(2)}%, ${loanMonths / 12} yrs`,
+      detail:
+        props.paymentSummary?.loan.detail ??
+        ([
+          cashOnlyFee > 0
+            ? `Includes a ${formatMoneyConcise(cashOnlyFee)} cash-only transaction fee.`
+            : undefined,
+          refinancedBalance > 0
+            ? `Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
+            : undefined,
+        ]
+          .filter(Boolean)
+          .join(" ") ||
+          undefined),
     },
+    ...(props.paymentSummary !== undefined
+      ? []
+      : [
+          {
+            concept: "money" as const,
+            label: props.upkeepLabel ?? "Estimated upkeep",
+            value:
+              props.upkeepBeforePerMonth === undefined
+                ? `${formatMoneyConcise(props.upkeepPerMonth)}/mo`
+                : `${formatMoneyConcise(props.upkeepBeforePerMonth)} → ${formatMoneyConcise(props.upkeepPerMonth)}/mo`,
+            detail: props.upkeepDetail,
+          },
+        ]),
     ...(props.onlineInMonths === undefined
       ? []
       : [
@@ -167,15 +204,35 @@ export default function PurchaseReviewDialog(
   return (
     <DecisionDialog
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (!purchaseSubmitted.current) onClose();
+      }}
+      closeDisabled={submitting}
       fullWidth
       maxWidth="sm"
       titleId={props.titleId}
       title={props.title}
       closable
+      actionsClassName={props.cancelLabel ? "purchaseReviewActions" : undefined}
       contentClassName="noPadding"
       actions={
         <>
+          {submitting && (
+            <Typography role="status" variant="body2">
+              Submitting…
+            </Typography>
+          )}
+          {props.cancelLabel && (
+            <Button
+              className="purchaseReviewCancel"
+              disabled={submitting}
+              onClick={() => {
+                if (!purchaseSubmitted.current) onClose();
+              }}
+            >
+              {props.cancelLabel}
+            </Button>
+          )}
           <Button
             color="primary"
             variant="contained"

@@ -234,7 +234,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
           label: rateMarkLabel(
             marketRate,
             `${formatRateAxis(marketRate)} market`,
-            `market ${formatRateCompact(marketRate)}`,
+            `${formatRateCompact(marketRate)} market`,
           ),
         },
         {
@@ -297,7 +297,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
       </span>
       {investor ? (
         <span className="insightsRateMetric">
-          <span className="insightsRateMetricLabel">Customers / mo</span>
+          <span className="insightsRateMetricLabel">Customers/mo</span>
           <strong className="insightsRateMetricValue">
             {formattedCustomerChange}
           </strong>

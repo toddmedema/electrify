@@ -87,8 +87,7 @@ function supplyRule(points: number): ScoreRuleType {
     points,
     per: TWH,
     measure: ({ summary }) => summary.supplyWh,
-    text: (_context, rule) =>
-      `${earnOrLose(rule)} per terawatt-hour (TWh) of electricity supplied.`,
+    text: (_context, rule) => `${earnOrLose(rule)} per TWh supplied.`,
   };
 }
 
@@ -109,8 +108,7 @@ function blackoutsRule(points: number): ScoreRuleType {
     points,
     per: 1,
     measure: ({ blackoutsTWh }) => blackoutsTWh,
-    text: (_context, rule) =>
-      `${earnOrLose(rule)} per TWh of customer demand not served.`,
+    text: (_context, rule) => `${earnOrLose(rule)} per TWh of unmet demand.`,
   };
 }
 

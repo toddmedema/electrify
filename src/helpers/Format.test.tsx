@@ -242,6 +242,8 @@ describe("displayed negative zero", () => {
       "-0.00001",
     );
     expect(formatMoneyConcise(-0.001)).toBe("$0");
+    expect(formatMoneyConcise(-63800)).toBe("-$63.8k");
+    expect(formatMoneyStable(-63800)).toBe("-$63.8k");
     expect(formatWatts(-0.001)).toBe("0W");
     expect(formatScore(-0.001)).toBe("0");
   });

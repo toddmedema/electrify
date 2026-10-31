@@ -28,12 +28,12 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("option", { name: "Reliability", exact: true })
       .click();
     const track = insights.getByRole("region", {
-      name: "Lowest spare capacity evidence",
+      name: "Lowest reserve evidence",
     });
     await expect(track).toBeVisible();
     await expect(track.locator("canvas")).toBeVisible();
     const chart = track.getByRole("img", {
-      name: /Monthly lowest spare capacity/,
+      name: /Monthly lowest reserve/,
     });
     await chart.press("Home");
     await expect(track.getByRole("status")).toContainText(
@@ -43,9 +43,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(track.getByRole("status")).toContainText(
       "Projected monthly minimum",
     );
-    await expect(track.getByRole("status")).toContainText(
-      "Lowest spare capacity:",
-    );
+    await expect(track.getByRole("status")).toContainText("Lowest reserve:");
     await chart.press("Escape");
     expect(
       await insights.evaluate(
@@ -55,7 +53,7 @@ for (const theme of ["light", "dark"] as const) {
     await insights.getByRole("button", { name: /^Layers \(/ }).click();
     await expect(
       insights.getByRole("checkbox", {
-        name: "Lowest spare capacity",
+        name: "Lowest reserve",
         exact: true,
       }),
     ).toBeChecked();

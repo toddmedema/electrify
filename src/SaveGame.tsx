@@ -1,3 +1,4 @@
+import { validUtilityExpansion } from "./helpers/ExpansionValidation";
 import { validScenarioMod } from "./helpers/ScenarioMod";
 import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
 import { maxLoanAmount } from "./helpers/Financials";
@@ -642,6 +643,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
   // compilation can also reject unsupported saved setup; an import must return null, not throw.
   try {
     if (
+      !validUtilityExpansion(game as GameType) ||
       !validScenarioRuleState(game as GameType) ||
       !validGameObjectiveProgress(game as GameType)
     )

@@ -1,4 +1,20 @@
 import { ScheduledSimActionType, SimOptionsType } from "./Simulator";
+import {
+  EXPANSION_BALANCE_CASES,
+  expansionBalanceActions,
+} from "./UtilityExpansionBalanceFixtures";
+
+/** Expansion requires a connection, transfer and retirements in addition to generation. */
+export const expansionEconomicsPlay = (
+  seed = 12345,
+): Partial<SimOptionsType> => ({
+  scheduledActions: expansionBalanceActions(
+    EXPANSION_BALANCE_CASES.find(
+      ({ id }) => id === "valley-electric-firm-loan",
+    )!,
+    seed,
+  ),
+});
 
 const rate = (dollarsPerkWh: number): ScheduledSimActionType => ({
   month: 0,
@@ -36,11 +52,13 @@ const line = (
 
 /**
  * Reproducible CEO plans made from persistent, UI-legal commitments. Every plan contains exactly
- * ten material choices (including mandatory scenario responses) across at least four categories,
- * no more than one rate setting, and no inverse action. Capacity clears CEO's 95% three-month
+ * ten material choices (including mandatory scenario responses). Prior scenarios use at least four
+ * categories; expansion uses the required asset, rate and retirement commitments. There is
+ * no more than one lifetime rate lever, and no inverse action. Capacity clears CEO's 99.5% three-month
  * firing threshold. Late operating/program changes still remain in force through a settlement.
  */
 export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
+  116: expansionEconomicsPlay(),
   100: {
     initialBuild: {
       name: "Natural Gas Peaker",
@@ -48,19 +66,24 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       financed: true,
     },
     sellFacilityId: 2,
-    sellAtMonth: 37,
+    sellAtMonth: 61,
     scheduledActions: [
-      rate(0.1),
+      rate(0.12),
       ...line("california-north"),
-      ...dispatch([1, 3]),
-      { month: 36, type: "toggle", facilityId: 2 },
+      ...dispatch([1]),
+      {
+        month: 12,
+        type: "build",
+        build: { name: "Natural Gas Peaker", peakW: 600000000, financed: true },
+      },
+      { month: 60, type: "toggle", facilityId: 2 },
       ...programs(142),
     ],
   },
   101: {
     initialBuild: {
       name: "Natural Gas CC",
-      peakW: 600000000,
+      peakW: 900000000,
       financed: true,
     },
     sellFacilityId: 2,
@@ -91,7 +114,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       {
         month: 1,
         type: "build",
-        build: { name: "Natural Gas Peaker", peakW: 20000000, financed: true },
+        build: { name: "Natural Gas Peaker", peakW: 600000000, financed: true },
       },
       ...dispatch([1, 2, 3, 4], 3),
       { month: 38, type: "toggle", facilityId: 1 },
@@ -112,12 +135,12 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       {
         month: 1,
         type: "build",
-        build: { name: "Natural Gas Peaker", peakW: 10000000, financed: true },
+        build: { name: "Natural Gas Peaker", peakW: 300000000, financed: true },
       },
       {
         month: 2,
         type: "build",
-        build: { name: "Natural Gas Peaker", peakW: 10000000, financed: true },
+        build: { name: "Natural Gas Peaker", peakW: 300000000, financed: true },
       },
       ...dispatch([1, 2, 3, 4], 3),
       { month: 38, type: "toggle", facilityId: 1 },
@@ -132,16 +155,26 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     sellFacilityId: 1,
     sellAtMonth: 110,
     scheduledActions: [
-      rate(0.12),
-      ...dispatch([1, 2, 3, 4]),
+      rate(0.16),
+      ...dispatch([1, 2]),
+      {
+        month: 12,
+        type: "build",
+        build: { name: "Oil", peakW: 400000000, financed: true },
+      },
+      {
+        month: 24,
+        type: "build",
+        build: { name: "Natural Gas CC", peakW: 600000000, financed: true },
+      },
       { month: 109, type: "toggle", facilityId: 1 },
-      ...programs(238),
+      ...programs(1),
     ],
   },
   105: {
     // The gas replaces the island's oil as baseload, so it is a combined cycle: a peaker would
     // default below the oil plant and leave oil burning around the clock.
-    initialBuild: { name: "Natural Gas CC", peakW: 600000000, financed: true },
+    initialBuild: { name: "Natural Gas CC", peakW: 900000000, financed: true },
     sellFacilityId: 3,
     sellAtMonth: 39,
     scheduledActions: [
@@ -258,11 +291,12 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
   },
 };
 
-/** The single material commitment that teaches each Intern scenario's intended first lesson. */
+/** A single build teaches earlier scenarios; expansion also requires transfer and retirements. */
 export const INTERN_ONE_BUILD_PLAYS: Record<
   number,
-  Pick<SimOptionsType, "initialBuild">
+  Partial<Pick<SimOptionsType, "initialBuild" | "scheduledActions">>
 > = {
+  116: expansionEconomicsPlay(),
   100: {
     initialBuild: { name: "Geothermal", peakW: 500000000, financed: true },
   },

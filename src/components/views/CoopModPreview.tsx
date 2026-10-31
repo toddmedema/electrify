@@ -46,7 +46,7 @@ export function KeepModCopy({ scenario }: { scenario: ScenarioType }) {
               setMessage(
                 error instanceof Error
                   ? error.message
-                  : "Could not subscribe. Please try again.",
+                  : "Couldn't subscribe. Try again.",
               ),
             )
             .finally(() => setPending(false));

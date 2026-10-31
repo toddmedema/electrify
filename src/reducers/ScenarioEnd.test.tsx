@@ -9,7 +9,6 @@ import {
   hasChronicBlackouts,
   quit,
   resume,
-  scenarioObjectiveFailure,
   setSpeed,
   tick as tickAction,
   tickState,
@@ -17,7 +16,6 @@ import {
 import { TICK_MS } from "../Constants";
 import { GameType, MonthlyHistoryType, ScenarioType } from "../Types";
 import * as User from "./User";
-import { EMPTY_HISTORY } from "../helpers/DateTime";
 
 /**
  * The end of scenario triggers hand their dialogs off to setTimeout so that the autosave
@@ -139,7 +137,11 @@ describe("ending a scenario from inside the reducer", () => {
       (s: ScenarioType) => s.id === 100,
     ) as ScenarioType;
     const duration = scenario.durationMonths as number;
-    let state = createGame({ scenarioId: scenario.id });
+    let state = createGame({
+      scenarioId: scenario.id,
+      difficulty: "Intern",
+      initialBuild: { name: "Natural Gas CC", peakW: 500e6, financed: true },
+    });
     // Cheap up to the second to last month, then the store drives the one that ends the run
     while (state.date.monthsElapsed < duration - 1) {
       state = tick(state);
@@ -287,46 +289,6 @@ describe("ending a scenario from inside the reducer", () => {
     );
     expect(victory?.debrief?.finalCustomers).toEqual(expect.any(Number));
     expect(submitHighscore).not.toHaveBeenCalled();
-  });
-});
-
-describe("scenario reliability windows", () => {
-  it("requires every month in a multi-month event to meet the target", () => {
-    const heatwave = SCENARIOS.find((scenario) => scenario.id === 108)!;
-    const suppliedWindow = [8, 7, 6].map((month) => ({
-      ...EMPTY_HISTORY,
-      year: 2026,
-      month,
-      demandWh: 100,
-      supplyWh: 100,
-    }));
-    const failedAugust = suppliedWindow.map((month) =>
-      month.month === 8 ? { ...month, supplyWh: 99 } : month,
-    );
-    expect(scenarioObjectiveFailure(heatwave, failedAugust)).toMatch(
-      /You served 99\.00%.*2026 heatwave and drought.*99\.5%/,
-    );
-
-    const afterWindow = [
-      {
-        ...EMPTY_HISTORY,
-        year: 2026,
-        month: 9,
-        demandWh: 100,
-        supplyWh: 99,
-      },
-    ];
-    expect(scenarioObjectiveFailure(heatwave, afterWindow)).toMatch(
-      /unverifiable.*each of its 3 months/,
-    );
-    const complete = [...afterWindow, ...suppliedWindow];
-    expect(scenarioObjectiveFailure(heatwave, complete)).toBeUndefined();
-    expect(
-      scenarioObjectiveFailure(heatwave, suppliedWindow.slice(0, 2)),
-    ).toMatch(/unverifiable/);
-    expect(
-      scenarioObjectiveFailure(heatwave, [...complete, suppliedWindow[0]]),
-    ).toMatch(/unverifiable/);
   });
 });
 

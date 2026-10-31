@@ -125,14 +125,6 @@ function createModRecipes() {
     ...base("objective-recipes", "Measured objective recipes"),
     objectives: [
       {
-        id: "reliability",
-        label: "Serve monthly demand",
-        metric: "monthlyReliability",
-        fromMonth: 1,
-        throughMonth: 6,
-        minDemandServedShare: 0.5,
-      },
-      {
         id: "retention",
         label: "Retain customers",
         metric: "customerRetention",

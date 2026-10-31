@@ -48,7 +48,7 @@ export default function SavesDialog({
   const run = (action: () => Promise<unknown>) => {
     setFailure(undefined);
     return action().catch((error) =>
-      setFailure(error instanceof Error ? error.message : "Please try again."),
+      setFailure(error instanceof Error ? error.message : "Try again."),
     );
   };
   useEffect(() => {

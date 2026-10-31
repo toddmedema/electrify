@@ -69,3 +69,8 @@ export const cloudSavePromptVisible = createAction<boolean>(
 
 /** Player-acknowledged, tutorial-only stress exercise. */
 export const beginIntertieStress = createAction("game/beginIntertieStress");
+
+/** A dated acquisition quote, revalidated atomically at the host's tick boundary. */
+export const acquireUtility = createAction<
+  import("../Types").AcquireUtilityAction
+>("game/acquireUtility");

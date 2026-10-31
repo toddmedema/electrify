@@ -330,7 +330,7 @@ export async function createSharedSave(
     });
     if (created) return `https://electrifygame.com/?game=${id}`;
   }
-  throw new Error("Couldn't create a share link. Please try again.");
+  throw new Error("Couldn't create a share link. Try again.");
 }
 
 export async function loadSharedSave(id: string): Promise<SaveFileType> {

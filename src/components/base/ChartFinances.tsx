@@ -183,14 +183,9 @@ function buildOptions({
     plugins: [
       titlePlugin(() => getState().title, 7, fontScale),
       // The band plugin bails on an empty list, so charts without a note push nothing
-      bandsPlugin(() => getState().pastSpans, chartPalette().blackout, 0.3),
-      bandsPlugin(
-        () => getState().projectedSpans,
-        chartPalette().blackout,
-        // Forecast trouble is a warning about the future, not a fact about the record
-        0.15,
-      ),
-      bandsPlugin(() => getState().warningSpans, chartPalette().blackout, 0.3),
+      bandsPlugin(() => getState().pastSpans, chartPalette().blackout),
+      bandsPlugin(() => getState().projectedSpans, chartPalette().blackout),
+      bandsPlugin(() => getState().warningSpans, chartPalette().blackout),
     ],
   };
 }

@@ -15,7 +15,7 @@ const input = JSON.parse(
 );
 
 test.each(["maintain", "upgrade", "subsidize"])(
-  "the documented months 12–25 timeline executes its %s branch without changing its goal",
+  "the documented months 12–25 timeline executes its %s branch under the shared reliability rule",
   (optionId) => {
     const pack = validateMod(input);
     const location = getScenarioLocation(modResolvedSetup(pack));
@@ -34,14 +34,7 @@ test.each(["maintain", "upgrade", "subsidize"])(
     expect(result.violations).toEqual([]);
     expect(result.outcome).toBe("completed");
     expect(result.months).toHaveLength(25);
-    expect(result.objectiveResults).toContainEqual(
-      expect.objectContaining({
-        id: "reliable-year",
-        status: "completed",
-        observedMonths: 12,
-        requiredMonths: 12,
-      }),
-    );
+    expect(result.objectiveResults).toEqual([]);
     const choice = result.storyOccurrences.find(
       (event) => event.key === "mod:worked-timeline:grid-plan",
     );

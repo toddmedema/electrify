@@ -1,14 +1,18 @@
 import { Box, Typography } from "@mui/material";
-import numbro from "numbro";
 import { VictoryDebriefType, VictoryType } from "../../Types";
 import ConceptIcon from "./ConceptIcon";
-import { formatMoneyConcise, formatScore } from "../../helpers/Format";
+import {
+  formatCustomerCount,
+  formatMoneyConcise,
+  formatScore,
+} from "../../helpers/Format";
 import { scoreLabel } from "../../helpers/Scoring";
 import { formatLargeMass } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import {
+  finishedObjectiveStatusText,
+  objectiveDefinitionText,
   objectiveObservedText,
-  objectiveStatusText,
   objectiveTargetText,
 } from "../../helpers/ObjectivePresentation";
 
@@ -76,7 +80,7 @@ export function RunDebrief({
     {
       concept: "customers" as const,
       label: "customers",
-      value: numbro(debrief.finalCustomers).format({ average: true }),
+      value: formatCustomerCount(debrief.finalCustomers),
     },
     {
       concept: "danger" as const,
@@ -134,14 +138,14 @@ export function RunDebrief({
                   sx={{ fontWeight: 600 }}
                 >
                   {result.label} · {result.required ? "Required" : "Optional"} ·{" "}
-                  {objectiveStatusText[result.status]}
+                  {finishedObjectiveStatusText[result.status]}
                 </Typography>
                 <Typography
                   component="p"
                   variant="body2"
                   color="text.secondary"
                 >
-                  {result.definition}
+                  {objectiveDefinitionText(result)}
                 </Typography>
                 <Typography component="p" variant="body2">
                   {objectiveTargetText(result.objective)} ·{" "}

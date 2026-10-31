@@ -28,7 +28,7 @@ for (const layout of [
       await expect(page.getByRole("heading", { name: "Goals" })).toBeVisible();
       await expect(
         page.locator(".operationsGoals > .eventLogItem"),
-      ).toHaveCount(2);
+      ).toHaveCount(3);
       await page.locator(".eventHistory").scrollIntoViewIfNeeded();
       await expect(
         page.getByRole("button", { name: "Filter event history, All events" }),
@@ -87,7 +87,7 @@ for (const layout of [
         ).toBeGreaterThanOrEqual(0);
       }
       await expect(
-        page.getByRole("button", { name: /Keep the utility solvent/ }),
+        page.getByRole("button", { name: /Stay solvent/ }),
       ).toBeVisible();
       await expect(page.getByText(/^Calculating forecast/)).toHaveCount(0, {
         timeout: 45000,
@@ -98,9 +98,7 @@ for (const layout of [
           `operations-${layout.width}-${layout.theme}.png`,
         ),
       });
-      await page
-        .getByRole("button", { name: /Keep the utility solvent/ })
-        .click();
+      await page.getByRole("button", { name: /Stay solvent/ }).click();
       await expect(page.locator('[data-layer="financeDetails"]')).toBeVisible();
     } else {
       await expect(page.locator(".operationsPriorities")).toHaveCount(0);

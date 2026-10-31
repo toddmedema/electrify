@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openBuild, openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`Hydro site maxima and purchase details reflow in ${theme}`, async ({
@@ -90,7 +90,7 @@ for (const theme of ["light", "dark"] as const) {
       const dialog = page.getByRole("dialog");
       await expect(dialog).toContainText("Uses the whole site");
       await expect(dialog).toContainText(
-        "Only cancelling before completion frees it",
+        "Only canceling before completion frees it",
       );
       expect(
         await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -102,8 +102,9 @@ for (const theme of ["light", "dark"] as const) {
       await dialog
         .getByRole("button", { name: "Pay cash", exact: true })
         .click();
+      await expect(dialog).toBeHidden();
     }
-    await page.locator(".button-buildFacility").click();
+    await openBuild(page);
     await page.locator(".button-buildGenerator").click();
     await expect(hydro).toContainText(`${count - 1} sites left`);
     await expect(page.getByRole("region", { name: "About Hydro" })).toHaveCount(
@@ -122,13 +123,14 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Cancel construction of Hydro" })
       .click();
     await expect(page.getByRole("dialog")).toContainText(
-      "Cancelling frees this site",
+      "Canceling frees this site",
     );
     await page
       .getByRole("dialog")
       .getByRole("button", { name: "Cancel construction", exact: true })
       .click();
-    await page.locator(".button-buildFacility").click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await openBuild(page);
     await page.locator(".button-buildGenerator").click();
     await expect(hydro).toContainText(`${count} sites left`);
   });

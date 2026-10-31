@@ -137,10 +137,6 @@ type ObjectiveBase = { id: string; label: string; required?: boolean };
 type ObjectiveWindow = { fromMonth: number; throughMonth: number };
 export type RuleObjective = ObjectiveBase &
   (
-    | (ObjectiveWindow & {
-        metric: "monthlyReliability";
-        minDemandServedShare: number;
-      })
     | {
         metric: "customerRetention";
         minRetainedShare: number;
@@ -159,6 +155,8 @@ export type RuleObjective = ObjectiveBase &
         fuels: FuelNameType[];
         minShare: number;
       })
+    | { metric: "utilityOwnership"; targets: string[]; deadlineMonth: number }
+    | { metric: "assetRetirement"; assetIds: string[]; deadlineMonth: number }
     | { metric: "fuelRetirement"; fuel: FuelNameType; deadlineMonth: number }
     | (ObjectiveWindow & {
         metric: "monthlyBilledRate";
@@ -246,10 +244,6 @@ export type CompiledRuleObjective = ObjectiveBase & {
   required: boolean;
   inherited?: boolean;
 } & (
-    | (ObjectiveWindow & {
-        metric: "monthlyReliability";
-        minDemandServedShare: number;
-      })
     | {
         metric: "customerRetention";
         minRetainedShare: number;
@@ -265,6 +259,8 @@ export type CompiledRuleObjective = ObjectiveBase & {
         fuels: FuelNameType[];
         minShare: number;
       })
+    | { metric: "utilityOwnership"; targets: string[]; deadlineMonth: number }
+    | { metric: "assetRetirement"; assetIds: string[]; deadlineMonth: number }
     | { metric: "fuelRetirement"; fuel: FuelNameType; deadlineMonth: number }
     | (ObjectiveWindow & {
         metric: "monthlyBilledRate";

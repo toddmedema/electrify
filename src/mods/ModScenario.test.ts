@@ -168,9 +168,6 @@ test("base scenario existing industrial loads remain present when the era change
     baseScenarioId: 114,
     scenario: { startingYear: 2040 },
   });
-  expect(scenario.reliabilityObjective).toEqual(
-    expect.objectContaining({ year: 2044, month: 1 }),
-  );
   expect(scenario.loadAdditions).toEqual([
     expect.objectContaining({
       label: "Copperbelt mines",
@@ -344,27 +341,6 @@ test("D1 rejects every unavailable inherited asset before launch", () => {
   ).not.toThrow();
 });
 
-test("D2 rejects an inherited reliability window outside the term, including its final month", () => {
-  for (const durationMonths of [6, 59]) {
-    expect(() =>
-      modScenario({
-        ...fixture(),
-        baseScenarioId: 114,
-        officialArcs: [],
-        scenario: { durationMonths },
-      }),
-    ).toThrow(/inherited.*reliability/i);
-  }
-  expect(() =>
-    modScenario({
-      ...fixture(),
-      baseScenarioId: 114,
-      officialArcs: [],
-      scenario: { durationMonths: 60 },
-    }),
-  ).not.toThrow();
-});
-
 test("D4 rejects edited saved factors beyond the package bounds", () => {
   const save = roundTrip(moddedGame());
   save.game.customScenario.mod.facilities.Solar.buildCost = 1e308;
@@ -379,7 +355,7 @@ test("D4 rejects edited saved factors beyond the package bounds", () => {
   expect(parseSave(save)).not.toBeNull();
 });
 
-test("diagnostics retain every independently unavailable asset and objective path", () => {
+test("diagnostics retain every independently unavailable asset and event path", () => {
   const diagnostics = modValidationDiagnostics({
     ...fixture(),
     baseScenarioId: 108,
@@ -407,11 +383,6 @@ test("diagnostics retain every independently unavailable asset and objective pat
     ).toBe(true);
   expect(diagnostics).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({
-        code: "objective-outside-term",
-        path: "scenario.reliabilityObjective",
-        severity: "error",
-      }),
       expect.objectContaining({
         code: "outside-term",
         path: "events[0].startMonth",

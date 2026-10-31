@@ -9,7 +9,6 @@ export function maximumRulePackage(): ModPackage {
   const window = { fromMonth: 1, throughMonth: MOD_PERF_MONTHS };
   type Specification<T> = T extends unknown ? Omit<T, "id" | "label"> : never;
   const kinds: Specification<RuleObjective>[] = [
-    { ...window, metric: "monthlyReliability", minDemandServedShare: 0 },
     {
       metric: "customerRetention",
       minRetainedShare: 0,

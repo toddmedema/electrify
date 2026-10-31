@@ -160,7 +160,7 @@ for (const theme of ["light", "dark"] as const) {
         ).toContainText("At full power");
         await expect(
           metrics.locator(".buildOptionMetric").nth(4),
-        ).toContainText("Round-trip efficiency");
+        ).toContainText("Efficiency");
         for (const description of await cards
           .locator(".buildOptionDescription")
           .all()) {
@@ -207,12 +207,8 @@ for (const theme of ["light", "dark"] as const) {
           .getByRole("button", { name: /^Compare/ })
           .boundingBox())!;
         const reviewBox = (await review.boundingBox())!;
-        if (page.viewportSize()!.width >= 600) {
-          expect(compare.y).toBeCloseTo(reviewBox.y, 0);
-          expect(reviewBox.x - (compare.x + compare.width)).toBeCloseTo(4, 0);
-        } else {
-          expect(compare.y).toBeGreaterThan(reviewBox.y + reviewBox.height);
-        }
+        // Compare sits with Show details at every width; Review stays the header's one action.
+        expect(compare.y).toBeGreaterThan(reviewBox.y + reviewBox.height);
       }
       await reviewScreenshot(page, {
         path: testInfo.outputPath(`${kind}-${theme}.png`),
@@ -292,7 +288,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       if (kind === "Storage") {
         await expect(
-          properties.getByRole("row", { name: /Round-trip efficiency/ }),
+          properties.getByRole("row", { name: /Efficiency/ }),
         ).toHaveCount(0);
       }
       await expect(
@@ -330,6 +326,36 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.getByRole("dialog")).toBeVisible();
       const dialog = page.getByRole("dialog");
       await expectContinuousDialogSurface(dialog);
+      const cashValue = dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: /^Cash purchase/ })
+        .locator(".decisionImpactFactValue");
+      const loanFact = dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: /^Loan option/ });
+      const loanValue = loanFact.locator(".decisionImpactFactValue");
+      const help = loanFact.getByRole("button", {
+        name: "What is interest rate?",
+      });
+      await expect(cashValue).toHaveText(/^\$[\d,.]+[kMBT]? now$/);
+      await expect(dialog).not.toContainText("Payments start now");
+      await loanFact.scrollIntoViewIfNeeded();
+      const [labelBox, loanBox, cashBox, helpBox] = await Promise.all([
+        loanFact.locator(".decisionImpactFactLabel").boundingBox(),
+        loanValue.boundingBox(),
+        cashValue.boundingBox(),
+        help.boundingBox(),
+      ]);
+      expect(helpBox!.x).toBeGreaterThanOrEqual(
+        loanBox!.x + loanBox!.width - 1,
+      );
+      expect(helpBox!.height).toBeGreaterThanOrEqual(
+        testInfo.project.use.hasTouch ? 44 : 40,
+      );
+      if ((testInfo.project.use.viewport?.width ?? 1280) >= 600) {
+        expect(Math.abs(labelBox!.y - loanBox!.y)).toBeLessThanOrEqual(1);
+        expect(Math.abs(cashBox!.x - loanBox!.x)).toBeLessThanOrEqual(1);
+      }
       const title = dialog.locator(".closableDialogTitleText");
       const close = dialog.getByRole("button", { name: "close", exact: true });
       const titleBox = (await title.boundingBox())!;
@@ -360,6 +386,19 @@ for (const theme of ["light", "dark"] as const) {
           path: testInfo.outputPath(`Storage-purchase-${theme}.png`),
           animations: "disabled",
         });
+        if (
+          process.env.REVIEW_SCREENSHOT_DIR &&
+          theme === "dark" &&
+          testInfo.project.name === "desktop-chromium"
+        ) {
+          await page.screenshot({
+            path: path.join(
+              process.env.REVIEW_SCREENSHOT_DIR,
+              "build-loan-desktop-dark.png",
+            ),
+            animations: "disabled",
+          });
+        }
       }
       await page
         .getByRole("dialog")
@@ -411,7 +450,7 @@ for (const theme of ["light", "dark"] as const) {
         .locator(".buildOptionMetrics")
         .locator(".buildOptionMetric")
         .nth(4),
-    ).toHaveText("Round-trip efficiency85%");
+    ).toHaveText("Efficiency85%");
     expect(
       await battery.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
@@ -421,9 +460,9 @@ for (const theme of ["light", "dark"] as const) {
     await battery
       .getByRole("button", { name: "Show Lithium Battery details" })
       .click();
-    await expect(
-      battery.getByRole("row", { name: /Round-trip efficiency/ }),
-    ).toHaveCount(0);
+    await expect(battery.getByRole("row", { name: /Efficiency/ })).toHaveCount(
+      0,
+    );
     const lossHelp = battery
       .getByRole("row", { name: /Stored energy lost per hour/ })
       .getByRole("button");
@@ -522,7 +561,7 @@ for (const theme of ["light", "dark"] as const) {
         .locator(".buildOptionMetrics")
         .locator(".buildOptionMetric")
         .nth(4),
-    ).toHaveText("Round-trip efficiency43%");
+    ).toHaveText("Efficiency43%");
     await reviewScreenshot(page, {
       path: testInfo.outputPath(`Storage-iron-air-${theme}.png`),
       animations: "disabled",
@@ -533,12 +572,10 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       })
       .click();
-    await expect(
-      ironAir.getByRole("row", { name: /Operating costs/ }),
-    ).toBeVisible();
-    await expect(
-      ironAir.getByRole("row", { name: /Round-trip efficiency/ }),
-    ).toHaveCount(0);
+    await expect(ironAir.getByRole("row", { name: /Upkeep/ })).toBeVisible();
+    await expect(ironAir.getByRole("row", { name: /Efficiency/ })).toHaveCount(
+      0,
+    );
     expect(
       await ironAir.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);

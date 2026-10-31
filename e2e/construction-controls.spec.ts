@@ -63,7 +63,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     const operating = pane.locator(".facilityRow").first();
     await operating.locator(".facilityDisclosure").click();
-    await expect(operating).toContainText("Nameplate capacity");
+    await expect(operating).toContainText("Capacity");
     await expectExpandedActions(operating, !!testInfo.project.use.hasTouch);
     await page.screenshot({
       path: testInfo.outputPath("facility-operating.png"),
@@ -98,18 +98,18 @@ for (const theme of ["light", "dark"] as const) {
       });
       await row.locator(".facilityDisclosure").click();
       const construction = row.getByRole("region", { name: "Construction" });
-      await expect(construction).toContainText("Nameplate capacity");
-      await expect(construction).toContainText("Refund if cancelled");
+      await expect(construction).toContainText("Capacity");
+      await expect(construction).toContainText("Refund if canceled");
       if (name === "Battery") {
         await expect(construction).toContainText("Energy capacity");
-        await expect(construction).toContainText("After settling the loan");
+        await expect(construction).toContainText("After loan payoff");
       }
       await expectExpandedActions(row, !!testInfo.project.use.hasTouch);
       const refund = (
         await construction
           .locator(".facilityStat")
           .filter({
-            has: page.locator("dt", { hasText: "Refund if cancelled" }),
+            has: page.locator("dt", { hasText: "Refund if canceled" }),
           })
           .locator("dd")
           .innerText()
@@ -171,13 +171,13 @@ for (const theme of ["light", "dark"] as const) {
     await line.locator(".facilityDisclosure").click();
     const cancel = line.getByRole("button", { name: /Cancel construction of/ });
     await expect(cancel).toBeVisible();
-    await expect(line).toContainText("Refund if cancelled");
-    await expect(line).toContainText("After settling the loan");
+    await expect(line).toContainText("Refund if canceled");
+    await expect(line).toContainText("After loan payoff");
     await expectExpandedActions(line, !!testInfo.project.use.hasTouch);
     const refund = (
       await line
         .locator(".facilityStat")
-        .filter({ has: page.locator("dt", { hasText: "Refund if cancelled" }) })
+        .filter({ has: page.locator("dt", { hasText: "Refund if canceled" }) })
         .locator("dd")
         .innerText()
     ).split("\n")[0];
@@ -256,7 +256,7 @@ for (const theme of ["light", "dark"] as const) {
       "Export capacity",
       "Price now",
       "Import available now",
-      "Emissions (CO2e)",
+      "Emissions (CO₂e)",
       "Typical price",
       "Loan balance",
     ]);

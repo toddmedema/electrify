@@ -36,8 +36,8 @@ const compile = (
   patch: Partial<OfficialArcCompileParameters> = {},
 ) => compileOfficialArcEvents(params(patch), ids);
 
-test("all fourteen importable challenges compile detached JSON and data-center keeps its load-only arc", () => {
-  expect(challenges).toHaveLength(14);
+test("all fifteen importable challenges compile detached JSON and data-center keeps its load-only arc", () => {
+  expect(challenges).toHaveLength(15);
   const events = compile(challenges.map((scenario) => scenario.id));
   expect(events).toHaveLength(
     OFFICIAL_SCENARIO_RULES.reduce(
@@ -46,6 +46,7 @@ test("all fourteen importable challenges compile detached JSON and data-center k
     ),
   );
   expect(compile([106])).toEqual([]);
+  expect(compile([116])).toEqual([]);
   expect(JSON.parse(JSON.stringify(events))).toEqual(events);
   expect(new Set(events.map((event) => event.key)).size).toBe(events.length);
   for (const event of events) {

@@ -84,4 +84,8 @@ module.exports = {
     name: "Delhi Summer",
     durationMonths: 84,
   },
+  116: {
+    name: "Across the Valley",
+    durationMonths: 240,
+  },
 };

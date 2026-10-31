@@ -26,18 +26,14 @@ import {
   customEventContext,
   prepareCustomScenario,
 } from "../helpers/CustomScenarioEvents";
-import {
-  captureRuleReportObservation,
-  interpretScenarioRuleReport,
-} from "../helpers/ScenarioRuleRuntime";
+import { captureRuleReportObservation } from "../helpers/ScenarioRuleRuntime";
 import { scenarioRules, scenarioRulesIdentity } from "../helpers/ScenarioRules";
 import { validScenarioRuleState } from "../helpers/ScenarioRuleValidation";
 import { buildStorySnapshot } from "../helpers/Story";
 import { canonical, digest } from "../testing/CanonicalHash";
-import { STANDARD_BALANCE_PLAYS } from "../testing/BalancePlaybooks";
 import { parseSave } from "../SaveGame";
 import { expectSaveForgeries, roundTrip } from "../testing/SaveForgery";
-import { createGame, runSimulation } from "../testing/Simulator";
+import { createGame } from "../testing/Simulator";
 import type { ActiveWorldEventType, GameType } from "../Types";
 import { generateNewTimeline, tickState } from "./Game";
 
@@ -70,11 +66,7 @@ test.each(DIFFICULTY_IDS)(
     expect(
       rules.events.map((event) => event.startMonth).sort((a, b) => a - b),
     ).toEqual([30, 36, 48, 60, 72]);
-    expect(rules.objectives[0]).toMatchObject({
-      metric: "monthlyReliability",
-      fromMonth: 72,
-      throughMonth: 83,
-    });
+    expect(rules.objectives).toEqual([]);
   },
 );
 
@@ -383,6 +375,9 @@ test("rolling regional journal retention cannot discard declared official onset 
 test("report close captures capacity facts once and leaves history-only reliability receipts unchanged", () => {
   const game = createGame({ scenarioId: 113, seed: 12345 });
   const rules = cloneDeep(scenarioRules(getScenario(113), game)!);
+  rules.debriefReports = [
+    { id: "history", kind: "reliability", fromMonth: 72, throughMonth: 83 },
+  ];
   const probe = {
     ...context(game),
     rules,
@@ -424,47 +419,4 @@ test("report close captures capacity facts once and leaves history-only reliabil
   other.worldEvents.occurrences = [];
   captureRuleReportObservation(other, { ...probe, rules: storage });
   expect(other.worldEvents.occurrences).toHaveLength(1);
-});
-
-test("the completed official review uses all twelve 2022 months and treats a missing final observation as unavailable", () => {
-  const result = runSimulation({
-    ...STANDARD_BALANCE_PLAYS[113],
-    scenarioId: 113,
-    difficulty: "CEO",
-    seed: 1,
-  });
-  expect(result.outcome).toBe("completed");
-  expect(result.violations).toEqual([]);
-  expect(result.months).toHaveLength(84);
-  const rules = scenarioRules(getScenario(113), {
-    difficulty: "CEO",
-    seed: 1,
-  })!;
-  const report = rules.debriefReports[0];
-  const inputs = {
-    startingYear: rules.startingYear,
-    completedMonths: 84,
-    monthlyHistory: result.months,
-    occurrences: result.storyOccurrences,
-  };
-  const actual = interpretScenarioRuleReport(report, rules, inputs);
-  expect(actual.available).toBe(true);
-  expect(
-    actual.metrics.map((metric) => [metric.id, metric.unit, metric.available]),
-  ).toEqual([
-    ["reliability", "share", true],
-    ["unservedWh", "Wh", true],
-  ]);
-  expect(
-    interpretScenarioRuleReport(report, rules, {
-      ...inputs,
-      monthlyHistory: result.months.slice(72),
-    }),
-  ).toEqual(actual);
-  const missing = interpretScenarioRuleReport(report, rules, {
-    ...inputs,
-    monthlyHistory: result.months.slice(0, -1),
-  });
-  expect(missing.available).toBe(false);
-  expect(missing.message).toMatch(/unavailable/i);
 });

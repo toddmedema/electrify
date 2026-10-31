@@ -5,6 +5,7 @@ import { GENERATORS, STORAGE } from "../data/Facilities";
 import { getScenario } from "../data/Scenarios";
 import { copyCommitmentMetadata } from "../helpers/Commitment";
 import { currentTick } from "../helpers/GameSelectors";
+import { acquisitionQuote } from "../helpers/Expansion";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import gameReducer, {
@@ -22,6 +23,7 @@ import gameReducer, {
 } from "../reducers/Game";
 import {
   chooseScenarioResponse,
+  acquireUtility,
   schedulePolicy,
 } from "../reducers/GameActions";
 import type { DifficultyType, GameType } from "../Types";
@@ -84,6 +86,24 @@ function applyScheduled(
   action: ScheduledSimActionType,
 ): GameType {
   switch (action.type) {
+    case "acquire": {
+      const quote = acquisitionQuote(game, action.targetId);
+      if (!quote) throw new Error(`Unavailable utility: ${action.targetId}`);
+      return officialCommand(
+        game,
+        acquireUtility({
+          targetId: action.targetId,
+          financed: action.financed,
+          quoteKey: quote.quoteKey,
+        }),
+      );
+    }
+    case "retire": {
+      const facility = game.facilities.find(
+        (item) => item.startingAssetId === action.assetId,
+      );
+      return facility ? officialCommand(game, sellFacility(facility.id)) : game;
+    }
     case "rate":
       return officialCommand(
         game,

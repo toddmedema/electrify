@@ -12,9 +12,18 @@ const number = (
   const rounded = Number(value.toPrecision(6));
   const compared =
     comparison === undefined ? undefined : Number(comparison.toPrecision(6));
-  // Keep a measured value on its actual side of a nearby target. A rounded-up 100%
-  // beside a failed reliability verdict would contradict the recorded result.
+  // Keep a measured value on its actual side of a nearby target.
   const precise = comparison === undefined || rounded === compared;
+  // A reading beside a whole-percent target needs no decimals, unless they decide the verdict.
+  if (percent && comparison !== undefined && !precise) {
+    const whole = Math.round(value * 100);
+    const target = Number((comparison * 100).toPrecision(6));
+    const roundedMeets = whole >= target;
+    const actualMeets = value * 100 >= target;
+    const sameSide = roundedMeets === actualMeets;
+    if (Number.isInteger(target) && sameSide && whole !== target)
+      return formatNumber(whole / 100, { style: "percent" });
+  }
   return formatNumber(precise ? value : rounded, {
     maximumSignificantDigits: precise ? 21 : 6,
     ...(percent ? { style: "percent" } : {}),
@@ -27,7 +36,6 @@ export function objectiveValueText(
   comparison?: number,
 ): string {
   switch (objective.metric) {
-    case "monthlyReliability":
     case "customerRetention":
     case "localFuelShare":
       return number(value, comparison, true);
@@ -39,6 +47,10 @@ export function objectiveValueText(
       return `$${number(value, comparison)}/kWh`;
     case "monthEndDebt":
       return `$${number(value, comparison)} principal`;
+    case "utilityOwnership":
+      return `${number(value)} acquired ${value === 1 ? "utility" : "utilities"}`;
+    case "assetRetirement":
+      return `${number(value)} original oil ${value === 1 ? "asset" : "assets"}`;
     case "fuelRetirement":
       return `${number(value)} owned ${objective.fuel} ${value === 1 ? "asset" : "assets"}`;
   }
@@ -71,10 +83,12 @@ export function objectiveWindowText(
 export function objectiveTargetText(objective: CompiledRuleObjective): string {
   const target = objectiveValueText(objective, objectiveTarget(objective));
   switch (objective.metric) {
-    case "monthlyReliability":
-      return `≥${target} of demand monthly`;
     case "customerRetention":
-      return `Retain ≥${target} of starting customers`;
+      return `Keep ≥${target} of customer baseline`;
+    case "utilityOwnership":
+      return objective.label;
+    case "assetRetirement":
+      return objective.label;
     case "localFuelShare":
       return `≥${target} local delivery from ${objective.fuels.join(", ")}`;
     case "fuelRetirement":
@@ -88,25 +102,72 @@ export function objectiveTargetText(objective: CompiledRuleObjective): string {
   }
 }
 
+/** A single-month goal has no progress to count; "0/1 months" only reads as a failure. */
+function completedMonthsText(result: ObjectiveResult): string | undefined {
+  return result.requiredMonths === 1
+    ? undefined
+    : `${result.observedMonths}/${result.requiredMonths} months completed`;
+}
+
+/** A goal and its window as one line: a deadline reads as a date, a span as a period. */
+export function objectiveGoalText(
+  objective: CompiledRuleObjective,
+  startingYear: number,
+  durationMonths: number,
+): string {
+  const window = objectiveWindowText(objective, startingYear, durationMonths);
+  return objective.metric === "customerRetention"
+    ? `${objectiveTargetText(objective)} by ${window}`
+    : `${objectiveTargetText(objective)} · ${window}`;
+}
+
+/** The plain-language definition; the authored sentence stays canonical for saves and mods. */
+export function objectiveDefinitionText(
+  result: Pick<ObjectiveResult, "metric" | "definition">,
+): string {
+  return result.metric === "customerRetention"
+    ? "Customers kept, as a share of your recorded customer baseline."
+    : result.definition;
+}
+
 export function objectiveObservedText(result: ObjectiveResult): string {
+  if (result.metric === "utilityOwnership")
+    return result.observed === 1
+      ? "Utility acquired"
+      : result.status === "failed"
+        ? "No utility acquired by the deadline"
+        : "No utility acquired yet";
+  const months = completedMonthsText(result);
   if (result.observed === undefined)
-    return `${result.observedMonths}/${result.requiredMonths} months completed${result.status === "unverifiable" ? " · history incomplete, not verifiable" : ""}`;
+    return `${months ?? "Not measured yet"}${result.status === "unverifiable" ? " · history incomplete, not verifiable" : ""}`;
   const value = objectiveValueText(
     result.objective,
     result.observed,
     result.target,
   );
+  const live = result.status === "pending" || result.status === "inProgress";
+  if (result.metric === "customerRetention" && live) return `${value} now`;
   const label =
-    result.metric === "monthlyReliability"
-      ? "Lowest "
-      : result.metric === "customerRetention"
-        ? "Latest month close "
-        : result.metric === "monthlyBilledRate" ||
-            result.metric === "monthEndDebt"
-          ? "Highest "
-          : "";
-  return `${label}${value} · ${result.observedMonths}/${result.requiredMonths} months completed${result.status === "unverifiable" ? " · not verifiable" : ""}`;
+    result.metric === "customerRetention"
+      ? "Latest month close "
+      : result.metric === "monthlyBilledRate" ||
+          result.metric === "monthEndDebt"
+        ? "Highest "
+        : "";
+  return `${label}${value}${months ? ` · ${months}` : ""}${result.status === "unverifiable" ? " · not verifiable" : ""}`;
 }
+
+/** A finished run has no goal still under way: one that never closed simply was not reached. */
+export const finishedObjectiveStatusText: Record<
+  ObjectiveResult["status"],
+  string
+> = {
+  pending: "Not reached",
+  inProgress: "Not reached",
+  completed: "Met",
+  failed: "Failed",
+  unverifiable: "Unavailable",
+};
 
 export const objectiveStatusText: Record<ObjectiveResult["status"], string> = {
   pending: "Not started",

@@ -113,7 +113,7 @@ for (const theme of ["light", "dark"]) {
     await expect(idle.locator(".facilityStatus")).toContainText("idle");
     await expect(idle.locator(".MuiAvatar-root")).toHaveCSS(
       "opacity",
-      theme === "dark" ? "0.7" : "0.55",
+      theme === "dark" ? "0.85" : "0.55",
     );
     await expect(hydro.locator(".MuiAvatar-root")).toHaveCSS("opacity", "1");
     if (process.env.REVIEW_SCREENSHOT_DIR) {
