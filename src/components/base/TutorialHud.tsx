@@ -322,19 +322,12 @@ export default function TutorialHud({
   // thing on screen asking to be tapped
   const requiresNext =
     !isGatedStep(step) && !step.continueOn && !step.continueOnClick;
-  // Match both the step and its index so a new step hides the old cue immediately.
-  const [attention, setAttention] = React.useState<{
-    step: TutorialStepType;
-    index: number;
-  }>();
-  const attentionReady =
-    attention?.step === step && attention.index === stepIndex;
-  React.useEffect(() => {
+  // Clear before paint, including when Back returns to a previously highlighted step.
+  const [attentionReady, setAttentionReady] = React.useState(false);
+  React.useLayoutEffect(() => {
+    setAttentionReady(false);
     if (!requiresNext) return;
-    const timer = window.setTimeout(
-      () => setAttention({ step, index: stepIndex }),
-      6000,
-    );
+    const timer = window.setTimeout(() => setAttentionReady(true), 6000);
     return () => window.clearTimeout(timer);
   }, [step, stepIndex, requiresNext]);
   const showBarSweep = requiresNext && desktop && attentionReady;

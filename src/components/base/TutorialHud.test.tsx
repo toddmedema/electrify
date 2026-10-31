@@ -127,6 +127,13 @@ describe("TutorialHud", () => {
       expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
       act(() => jest.advanceTimersByTime(6000));
       expect(screen.getByTestId(cue)).toBeInTheDocument();
+      rerender(<TutorialHud {...hudProps} step={second} stepIndex={1} />);
+      rerender(<TutorialHud {...hudProps} stepIndex={2} />);
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(5999));
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(1));
+      expect(screen.getByTestId(cue)).toBeInTheDocument();
     },
   );
 

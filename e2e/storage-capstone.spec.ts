@@ -1,6 +1,5 @@
 import { expect, test } from "./fixtures";
-import { dragCoalAbovePumpedHydro } from "./layout";
-import { reviewScreenshot } from "./review-screenshot";
+import { dragCoalAbovePumpedHydro, waitForSettled } from "./layout";
 
 for (const theme of ["light", "dark"]) {
   test(`storage purchase fixes coal-only peak shortages in ${theme}`, async ({
@@ -27,14 +26,18 @@ for (const theme of ["light", "dark"]) {
       .getByRole("button", { name: "Start Storage", exact: true })
       .click();
     const hud = page.locator(".tutorialHud");
+    await expect(hud).toContainText("Tap Build");
     await page.evaluate(() =>
       window.dispatchEvent(new Event("beforeinstallprompt")),
     );
     await page.locator(".button-buildFacility").click();
     await page.getByRole("tab", { name: "Storage", exact: true }).click();
+    await waitForSettled(page, ".constructionCapacitySlider");
     await page
-      .getByRole("button", { name: /Review purchase of/ })
-      .first()
+      .getByRole("button", {
+        name: "Review purchase of Pumped Hydro",
+        exact: true,
+      })
       .click();
     await page.getByRole("button", { name: "Take loan", exact: true }).click();
     await expect(hud).toContainText("Check the storage bar");
@@ -45,13 +48,17 @@ for (const theme of ["light", "dark"]) {
     await expect(page.locator(".facilityRow")).toHaveCount(1);
     await page.locator(".button-buildFacility").click();
     await page.getByRole("tab", { name: "Storage", exact: true }).click();
+    await waitForSettled(page, ".constructionCapacitySlider");
     const size = page.locator(".constructionCapacitySlider input");
     // The practice purchase was 500 MWh. A 200 MWh battery can cover this grid's peaks.
     await size.press("ArrowLeft");
     await size.press("ArrowLeft");
     await size.press("ArrowLeft");
     await page
-      .getByRole("button", { name: "Review purchase of Battery", exact: true })
+      .getByRole("button", {
+        name: "Review purchase of Lithium Battery",
+        exact: true,
+      })
       .click();
     await page.getByRole("button", { name: "Take loan", exact: true }).click();
     await page.getByRole("button", { name: "fast speed", exact: true }).click();
@@ -74,7 +81,7 @@ for (const theme of ["light", "dark"]) {
         testInfo.project.name.startsWith("mobile") ? 44 : 40,
       );
     }
-    await reviewScreenshot(page, {
+    await page.screenshot({
       path: testInfo.outputPath(`storage-complete-${theme}.png`),
       animations: "disabled",
     });

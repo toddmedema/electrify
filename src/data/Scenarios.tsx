@@ -70,16 +70,16 @@ const latestMonthProfit = (state: AppStateType) => {
 };
 
 const storageCapstoneSucceeded = (state: AppStateType) => {
-  const storage = state.game.facilities.find(
-    (facility) => "currentWh" in facility,
-  );
-  // Authored storage starts empty, so delivered lifetime energy proves that it first charged from
-  // surplus and later discharged. Merely buying a battery cannot satisfy the objective.
-  return !!(
-    storage &&
-    storage.yearsToBuildLeft <= 0 &&
-    storage.lifetimeWh > 0 &&
-    (state.game.monthlyHistory[0]?.minimumSupplyMarginW ?? -1) >= 0
+  // Early peaks may black out during construction. A fully supplied day after storage
+  // has charged and discharged proves recovery, even if another purchase is still building.
+  return (
+    (state.game.monthlyHistory[0]?.minimumSupplyMarginW ?? -1) >= 0 &&
+    state.game.facilities.some(
+      (facility) =>
+        "currentWh" in facility &&
+        facility.yearsToBuildLeft <= 0 &&
+        facility.lifetimeWh > 0,
+    )
   );
 };
 

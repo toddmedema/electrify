@@ -1,5 +1,4 @@
 import { expect, test } from "./fixtures";
-import { reviewScreenshot } from "./review-screenshot";
 import { sortBuildCatalog } from "./layout";
 
 for (const theme of ["light", "dark"]) {
@@ -103,7 +102,7 @@ for (const theme of ["light", "dark"]) {
       .locator(".tutorialNextPreview")
       .boundingBox())!;
     expect(preview.y - (recap.y + recap.height)).toBeCloseTo(24, 0);
-    await reviewScreenshot(page, {
+    await page.screenshot({
       path: testInfo.outputPath(`mission-complete-${theme}.png`),
       animations: "disabled",
     });

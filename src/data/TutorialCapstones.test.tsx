@@ -17,7 +17,7 @@ import gameReducer, {
   tickState,
 } from "../reducers/Game";
 import { summarizeTimeline } from "../helpers/DateTime";
-import { GENERATORS } from "./Facilities";
+import { GENERATORS, STORAGE } from "./Facilities";
 import { createGame } from "../testing/Simulator";
 import { prepareStorageReorder } from "../reducers/GameActions";
 import { TUTORIALS } from "./Scenarios";
@@ -154,6 +154,24 @@ describe("authored tutorial capstones", () => {
     expect(objective.failure?.(appState(game))).toBe(false);
     // Blackouts before commissioning are the problem the player fixes, not an instant failure.
     expect(game.eventLog.some((e) => e.kind === "BLACKOUT")).toBe(true);
+    let mixed = gameReducer(
+      game,
+      buildFacility({
+        facility: STORAGE(game, 500000000).find(
+          (facility) => facility.name === "Pumped Hydro",
+        )!,
+        financed: true,
+      }),
+    );
+    const pending = mixed.facilities.findIndex(
+      (facility) => facility.name === "Pumped Hydro",
+    );
+    mixed = gameReducer(
+      mixed,
+      reprioritizeFacility({ spotInList: pending, delta: 1 - pending }),
+    );
+    expect(mixed.facilities[1].yearsToBuildLeft).toBeGreaterThan(0);
+    expect(objective.success(appState(mixed))).toBe(true);
   });
 
   it.each([undefined, 1000000])(

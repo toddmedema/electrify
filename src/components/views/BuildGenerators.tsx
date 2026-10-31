@@ -1,5 +1,3 @@
-import { useAppDispatch } from "../../Store";
-import { generatorSizeChanged } from "../../reducers/GameActions";
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
@@ -896,12 +894,12 @@ export interface DispatchProps {
     financed: boolean,
   ) => void;
   onBack: () => void;
+  onSizeChange?: () => void;
 }
 
 export type Props = StateProps & DispatchProps;
 
 function BuildGenerators(props: Props): React.JSX.Element {
-  const dispatch = useAppDispatch();
   const completeBuild = React.useContext(GameBuildCompleteContext);
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
@@ -1110,7 +1108,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
         onSliderChange={(value) => {
           setSliderTick(value);
           setExactSizes({});
-          if (value !== sliderTick) dispatch(generatorSizeChanged());
+          if (value !== sliderTick) props.onSizeChange?.();
         }}
         onSortChange={(value) => setSort(value as GeneratorSortKey)}
       />

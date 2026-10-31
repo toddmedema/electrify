@@ -180,9 +180,11 @@ export async function dragCoalAbovePumpedHydro(page: Page) {
   });
   const row = page.locator('.facilityRow[data-facility="Coal"]');
   await handle.scrollIntoViewIfNeeded();
+  await handle.click({ trial: true });
   const from = (await handle.boundingBox())!;
   const to = (await page
     .getByRole("button", { name: "Reorder Pumped Hydro", exact: true })
+    .first()
     .boundingBox())!;
   const x = from.x + from.width / 2;
   const y = from.y + from.height / 2;

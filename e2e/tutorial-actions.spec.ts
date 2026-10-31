@@ -93,9 +93,8 @@ for (const [index, mission] of missions.entries()) {
       await build.click();
       await sortBuildCatalog(page);
       await page
-        .locator(".tutorialHud")
-        .getByRole("button", { name: "Next", exact: true })
-        .click();
+        .locator(".constructionCapacitySlider input")
+        .press("ArrowLeft");
       const purchase = page
         .getByRole("button", { name: /Review purchase of/ })
         .first();

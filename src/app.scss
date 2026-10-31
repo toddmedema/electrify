@@ -4194,43 +4194,7 @@ $pane_header_height: 48px;
 
 @include styling();
 
-// One reading rhythm from the recap into the next mission, without spacer line breaks.
-.tutorialCompleteDialog {
-  .MuiDialog-paper {
-    width: 560px;
-    max-width: calc(100% - 24px);
-  }
-
-  .MuiDialogTitle-root {
-    padding: 24px 24px 12px;
-  }
-
-  .MuiDialogContent-root {
-    padding: 0 24px 24px;
-  }
-
-  .MuiDialogActions-root {
-    padding: 16px 24px;
-    border-top: 1px solid var(--border-subtle);
-    gap: 8px;
-
-    .MuiButton-root {
-      min-height: 40px;
-    }
-  }
-}
-
-.tutorialCompleteContent {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  line-height: 1.5;
-
-  p {
-    margin: 0;
-  }
-}
-
+// The recap's spacing is owned by the completion dialog; the preview has no spacer margin.
 .tutorialNextPreview {
   display: flex;
   flex-direction: column;
@@ -4238,21 +4202,6 @@ $pane_header_height: 48px;
 
   span {
     color: $font_color_faded;
-  }
-}
-
-@media (pointer: coarse) {
-  .tutorialCompleteDialog .MuiDialogActions-root .MuiButton-root {
-    min-height: 44px;
-  }
-}
-
-@media (max-width: 599px) {
-  .tutorialCompleteDialog .MuiDialogActions-root {
-    display: flex;
-    flex-direction: column-reverse;
-    align-items: stretch;
-    padding: 16px 24px max(16px, env(safe-area-inset-bottom));
   }
 }
 
