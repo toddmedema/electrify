@@ -1,6 +1,6 @@
 import { currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
-import { Button } from "@mui/material";
+import { Button, useMediaQuery } from "@mui/material";
 import { EvidenceTargetType, GameType } from "../../Types";
 import {
   getMissionStatus,
@@ -28,7 +28,6 @@ function readsProjection(risk: MissionRisk | undefined): boolean {
     risk &&
     (risk.id === "shortage" ||
       risk.id === "cash" ||
-      risk.id === "reliability" ||
       risk.id.startsWith("objective:"))
   );
 }
@@ -50,9 +49,7 @@ function earlyRiskDue(game: GameType, mission: MissionStatus): boolean {
   }
   return mission.requirements.some(
     (row) =>
-      row.status === "failed" &&
-      row.required !== false &&
-      (row.definition || row.id === "reliability"),
+      row.status === "failed" && row.required !== false && row.definition,
   );
 }
 
@@ -60,7 +57,7 @@ function earlyRiskDue(game: GameType, mission: MissionStatus): boolean {
  * selectMissionRisk, kept off the frame that invalidates the projection behind its runway check
  * (see DeferredProjection).
  *
- * The early risks (a shortage or negative cash now, a missed reliability window) are always
+ * The early risks (a shortage or negative cash now, a missed objective) are always
  * judged against the current state: when one is due,
  * selectMissionRisk runs as usual, since it returns before the runway check. Only when none is
  * due and the projection is stale does the previous risk stay up while the new projection is
@@ -123,6 +120,7 @@ export default function MissionSummary({
 }) {
   const mission = getMissionStatus(game);
   const risk = useMissionRisk(game, mission, upcoming);
+  const phone = useMediaQuery("(max-width:599px)", { noSsr: true });
   // The grid readout beside this already reports a shortage happening right now.
   const active = activeEvents[0];
   const shownRisk =
@@ -145,6 +143,10 @@ export default function MissionSummary({
     !shownRisk.id.startsWith("event:") &&
     !shownRisk.id.startsWith("active:");
   // The stable risk identity, not changing tick values, owns the polite announcement.
+  // Phones keep the room for the event's name.
+  const shortLabel = phone
+    ? shownRisk?.shortLabel.replace(/^Upcoming: /, "Next: ")
+    : shownRisk?.shortLabel;
   const announcement = React.useMemo(
     () => shownRisk?.label || "",
     [shownRisk?.id], // eslint-disable-line react-hooks/exhaustive-deps
@@ -177,9 +179,7 @@ export default function MissionSummary({
                   fontSize="small"
                 />
               </span>
-              <span className="missionRiskText statusLabel">
-                {shownRisk.shortLabel}
-              </span>
+              <span className="missionRiskText statusLabel">{shortLabel}</span>
             </Button>
           ) : (
             mission.headline &&

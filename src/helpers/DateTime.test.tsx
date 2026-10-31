@@ -31,10 +31,10 @@ import { createGame } from "../testing/Simulator";
 
 describe("formatMinuteOfDayChartAxis", () => {
   it("formats a day in twelve-hour time", () => {
-    expect(formatMinuteOfDayChartAxis(0)).toEqual("12am");
-    expect(formatMinuteOfDayChartAxis(12 * 60)).toEqual("12pm");
-    expect(formatMinuteOfDayChartAxis(19 * 60)).toEqual("7pm");
-    expect(formatMinuteOfDayChartAxis(5 * 1440 + 6 * 60)).toEqual("6am");
+    expect(formatMinuteOfDayChartAxis(0)).toEqual("12 AM");
+    expect(formatMinuteOfDayChartAxis(12 * 60)).toEqual("12 PM");
+    expect(formatMinuteOfDayChartAxis(19 * 60)).toEqual("7 PM");
+    expect(formatMinuteOfDayChartAxis(5 * 1440 + 6 * 60)).toEqual("6 AM");
   });
 });
 

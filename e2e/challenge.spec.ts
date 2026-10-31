@@ -126,7 +126,10 @@ for (const theme of ["light", "dark"] as const) {
       0,
     );
     await expect(
-      page.getByRole("button", { name: "Log in", exact: true }),
+      page.getByRole("button", {
+        name: "Log in to join the leaderboard",
+        exact: true,
+      }),
     ).toHaveCount(0);
     expect(await savedGame(page)).toBeUndefined();
     expect(

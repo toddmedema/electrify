@@ -47,14 +47,30 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       });
       if (method === "clipboard") {
         // A platform share sheet is its own confirmation; a silent clipboard write isn't
-        dispatch(snackbarOpen("Copied! Paste it wherever you like."));
+        dispatch(
+          snackbarOpen({
+            message: "Copied! Paste it wherever you like.",
+            open: true,
+            timeout: VICTORY_TOAST_MS,
+            overModal: true,
+          }),
+        );
       }
     },
     onShareFailed: () => {
-      dispatch(snackbarOpen("Couldn't share that from this browser."));
+      dispatch(
+        snackbarOpen({
+          message: "Couldn't share that from this browser.",
+          open: true,
+          timeout: VICTORY_TOAST_MS,
+          overModal: true,
+        }),
+      );
     },
   };
 };
+
+const VICTORY_TOAST_MS = 3500;
 
 const VictoryDialogContainer = connect(
   mapStateToProps,

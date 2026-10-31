@@ -172,7 +172,8 @@ claim about every possible strategy or tariff.
 | Small build + thermal protection |             $8.19M / $7.89M |          99.620% — completed |          99.308% — failed |
 | Small build + bulk retrofit      |           $82.59M / $82.29M |          99.990% — completed |       99.941% — completed |
 
-The required freeze demand-served share is 99.5%. All failed plans ended at
+These historical results used a scenario-specific 99.5% freeze requirement, since
+replaced by the shared difficulty-based three-month rule. All failed plans ended at
 month 50 because of that physical objective; completed plans reached month 84.
 All twelve runs recorded zero invariant violations. Every plan served 100% of
 January 2020 demand, so the staged installation did not introduce an installation-

@@ -5,7 +5,6 @@ import {
   Paper,
   Portal,
   Snackbar,
-  Stack,
   Typography,
 } from "@mui/material";
 import LinearProgress from "@mui/material/LinearProgress";
@@ -17,15 +16,15 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ScreenPage from "../components/base/ScreenPage";
 import { useAppDispatch, useAppSelector } from "../Store";
 import { navigate, navigateBack } from "../reducers/Card";
-import { firebaseAppAuth, login } from "../Globals";
+import { firebaseAppAuth, login, SignInOptions } from "../Globals";
 import { catalog } from "./Progress";
 import { achievementJournal } from "./Journal";
 import { useAchievements } from "./useAchievements";
 import { retryAchievementSync } from "./Runtime";
 import { useOnline } from "../components/base/OnlineStatus";
-import { useMenuKeys } from "../components/base/useMenuKeys";
+import { restoreMenuFocus, useMenuKeys } from "../components/base/useMenuKeys";
 import { useSwipeToDismiss } from "../components/base/SwipeDismiss";
-import MailingListCheckbox from "../components/base/MailingListCheckbox";
+import GoogleSignIn from "../components/base/GoogleSignIn";
 
 /** Long enough to read the name and requirement; hover or focus holds it on screen. */
 export const ACHIEVEMENT_TOAST_MS = 10_000;
@@ -38,18 +37,11 @@ export function AchievementGallery(): React.JSX.Element {
   const [filter, setFilter] = React.useState<Filter>("all");
   const [signingIn, setSigningIn] = React.useState(false);
   const [signInError, setSignInError] = React.useState(false);
-  const [mailingList, setMailingList] = React.useState(false);
   const onBack = () => {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
     dispatch(navigateBack());
-    window.setTimeout(
-      () =>
-        document
-          .querySelector<HTMLElement>("[data-achievements-trigger]")
-          ?.focus(),
-      350,
-    );
+    restoreMenuFocus("[data-achievements-trigger]");
   };
   const menuKeys = useMenuKeys(true, onBack);
   React.useEffect(() => {
@@ -95,11 +87,11 @@ export function AchievementGallery(): React.JSX.Element {
                 : state.sync === "failed"
                   ? "Saved on this device. Account sync couldn't finish."
                   : "Saved on this device. Syncing to your account…";
-  const signIn = async () => {
+  const signIn = async (options: SignInOptions) => {
     setSigningIn(true);
     setSignInError(false);
     try {
-      if (!(await login({ mailingList }))) setSignInError(true);
+      if (!(await login(options))) setSignInError(true);
     } catch {
       setSignInError(true);
     } finally {
@@ -138,25 +130,16 @@ export function AchievementGallery(): React.JSX.Element {
               )}
               {signInError && (
                 <Typography color="error" role="alert">
-                  Sign-in couldn't finish. Please try again.
+                  Couldn't finish sign-in. Try again.
                 </Typography>
               )}
             </div>
             {!state.uid && firebaseAppAuth && (
-              <Stack spacing={1} sx={{ flexShrink: 0, maxWidth: "100%" }}>
-                <MailingListCheckbox
-                  checked={mailingList}
-                  onChange={setMailingList}
-                  disabled={signingIn || !online}
-                />
-                <Button
-                  variant="outlined"
-                  disabled={signingIn || !online}
-                  onClick={() => void signIn()}
-                >
-                  {signingIn ? "Signing in…" : "Sign in with Google"}
-                </Button>
-              </Stack>
+              <GoogleSignIn
+                label={signingIn ? "Signing in…" : "Sign in with Google"}
+                disabled={signingIn || !online}
+                onSignIn={signIn}
+              />
             )}
             {account && state.sync === "failed" && online && (
               <Button variant="outlined" onClick={retryAchievementSync}>
@@ -247,7 +230,7 @@ export function AchievementGallery(): React.JSX.Element {
               <Typography color="text.secondary">
                 {filter === "unlocked"
                   ? "Complete Mission 1: Electricity to earn First Spark."
-                  : "You've earned all 35 achievements."}
+                  : `You've earned all ${catalog.length} achievements.`}
               </Typography>
               <Button onClick={() => setFilter("all")}>
                 Show all achievements

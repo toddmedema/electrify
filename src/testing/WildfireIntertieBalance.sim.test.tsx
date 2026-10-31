@@ -3,11 +3,10 @@ import { parseSave, serializeSave } from "../SaveGame";
 import { runMonths } from "./SimulationTestHelpers";
 import { createGame, runSimulation } from "./Simulator";
 import { expectNoViolations } from "./SimulationTestHelpers";
-import { scenarioObjectiveFailure } from "../reducers/Game";
 jest.setTimeout(120000);
 
 it.each(["Intern", "CEO"] as const)(
-  "wildfire requires preparation and permits distinct local supply plans on %s",
+  "wildfire shortages improve with distinct local supply plans on %s",
   (difficulty) => {
     for (const seed of [12345, 1, 7]) {
       const play = (name?: string, peakW?: number) =>
@@ -21,13 +20,16 @@ it.each(["Intern", "CEO"] as const)(
         });
       const neglected = play();
       expectNoViolations(neglected);
-      expect(neglected.outcome).toBe("fired");
-      expect(
-        scenarioObjectiveFailure(
-          neglected.scenario,
-          [...neglected.months].reverse(),
-        ),
-      ).toMatch(/intertie outage/);
+      expect(neglected.outcome).toBe("completed");
+      const shortage = (result: typeof neglected) =>
+        result.months
+          .filter((month) => month.year === 2025 && month.month <= 2)
+          .reduce(
+            (total, month) =>
+              total + Math.max(0, month.demandWh - month.supplyWh),
+            0,
+          );
+      expect(shortage(neglected)).toBeGreaterThan(0);
       for (const [name, peakW] of [
         ["Natural Gas Peaker", 20e6],
         ["Natural Gas CC", 30e6],
@@ -35,12 +37,7 @@ it.each(["Intern", "CEO"] as const)(
         const prepared = play(name, peakW);
         expectNoViolations(prepared);
         expect(prepared.outcome).toBe("completed");
-        expect(
-          scenarioObjectiveFailure(
-            prepared.scenario,
-            [...prepared.months].reverse(),
-          ),
-        ).toBeUndefined();
+        expect(shortage(prepared)).toBeLessThan(shortage(neglected));
       }
       const upgrades = runSimulation({
         scenarioId: 111,
@@ -54,12 +51,7 @@ it.each(["Intern", "CEO"] as const)(
         })),
       });
       expectNoViolations(upgrades);
-      expect(
-        scenarioObjectiveFailure(
-          upgrades.scenario,
-          [...upgrades.months].reverse(),
-        ),
-      ).toBeDefined();
+      expect(shortage(upgrades)).toBeGreaterThan(0);
     }
   },
 );

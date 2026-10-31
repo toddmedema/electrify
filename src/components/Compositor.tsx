@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  Snackbar,
   SnackbarContent,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
@@ -28,6 +27,8 @@ import AudioContainer from "./base/AudioContainer";
 import GameWorkspace from "./base/GameWorkspace";
 import { GAME_TOOLS, GameTool } from "./base/Navigation";
 import { restoreMenuFocus } from "./base/useMenuKeys";
+import DeferredSnackbar from "./base/DeferredSnackbar";
+import { isBlackoutToast } from "../helpers/BlackoutToast";
 import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
@@ -65,7 +66,7 @@ import {
   shouldDismissSwipe,
   SWIPE_DISMISS_EXIT_MS,
 } from "./base/SwipeDismiss";
-import { isDesktopScreen } from "../Globals";
+import { isDesktopScreen, isSideToolLayout } from "../Globals";
 import { store } from "../Store";
 
 const AchievementGallery = React.lazy(() =>
@@ -570,8 +571,15 @@ export default class Compositor extends React.Component<Props, {}> {
             key={transitionKey}
             nodeRef={transitionNodeRef}
             onEnter={() => {
-              if (transitionNodeRef.current)
-                transitionNodeRef.current.inert = false;
+              const screen = transitionNodeRef.current;
+              if (screen) {
+                screen.inert = false;
+                // A quick Back can reuse the still-mounted home screen. Reset on every
+                // entrance, including those that do not rerun its initial-focus effect.
+                screen
+                  .querySelector<HTMLElement>("#menuCard [data-main-action]")
+                  ?.focus({ preventScroll: true });
+              }
             }}
             onExit={() => {
               // The outgoing screen stays visible while fading, but can't receive input.
@@ -610,7 +618,7 @@ export default class Compositor extends React.Component<Props, {}> {
           this.props.card.name !== "MANUAL" &&
           !ui.manualHelpEntry && (
             <TutorialHud
-              desktop={isDesktopScreen()}
+              desktop={isSideToolLayout()}
               step={currentTutorialStep}
               stepIndex={tutorialStep}
               totalSteps={tutorialSteps.length}
@@ -702,8 +710,11 @@ export default class Compositor extends React.Component<Props, {}> {
             )}
           </DialogActions>
         </Dialog>
-        <Snackbar
-          className={`snackbar ${isGameCard(this.props.card.name) ? "snackbar-above-nav" : ""}`}
+        <DeferredSnackbar
+          // A blackout toast replacing another gets its own full timer.
+          key={isBlackoutToast(ui.snackbar.message) ? ui.snackbar.message : ""}
+          overModal={ui.snackbar.overModal}
+          className={`snackbar ${isGameCard(this.props.card.name) && !ui.snackbar.overModal ? "snackbar-above-nav" : ""}`}
           // Bottom left is the MUI default, which on a wide screen leaves the toast hanging
           // off the side of the centered app frame
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
@@ -745,7 +756,7 @@ export default class Compositor extends React.Component<Props, {}> {
               </>
             }
           />
-        </Snackbar>
+        </DeferredSnackbar>
         {/* Connected, so they still update when shouldComponentUpdate blocks this component --
             neither is driven by the current card, and both can open over any of them */}
         <VictoryDialogContainer />

@@ -110,7 +110,7 @@ describe("the event log", () => {
     const cancelled = cloneDeep(
       gameReducer(built, sellFacility(underConstruction!.id)),
     );
-    expect(messages(cancelled)[0]).toContain("Cancelled construction");
+    expect(messages(cancelled)[0]).toContain("Canceled construction");
 
     const operating = built.facilities.find(
       (f: FacilityOperatingType) => f.yearsToBuildLeft === 0,

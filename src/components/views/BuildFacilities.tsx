@@ -1,3 +1,4 @@
+import { intertieApprovedMessage } from "../../helpers/BuildConsequences";
 import * as React from "react";
 import { useToolScroll } from "../base/GameToolMemory";
 import { Tab, Tabs } from "@mui/material";
@@ -187,7 +188,7 @@ export default function BuildFacilities({
                 if (corridor)
                   dispatch(
                     snackbarOpen(
-                      `Intertie approved — power can flow in ${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}.`,
+                      intertieApprovedMessage(corridor.yearsToBuild),
                     ),
                   );
                 (completeBuild ?? close)();

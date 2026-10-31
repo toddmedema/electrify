@@ -56,12 +56,12 @@ const rules = (events: RuleEvent[] = [event()]): ScenarioRuleDefinitions => ({
   events,
   objectives: [
     {
-      id: "reliability",
-      label: "Serve demand",
-      metric: "monthlyReliability",
+      id: "affordability",
+      label: "Keep bills affordable",
+      metric: "monthlyBilledRate",
       fromMonth: 13,
       throughMonth: 24,
-      minDemandServedShare: 0.99,
+      maxDollarsPerKWh: 0.99,
     },
   ],
   debriefReports: [
@@ -186,7 +186,7 @@ test("reports, objects and choices share one namespace with scoped option IDs", 
   const definitions = rules();
   definitions.choices = [
     {
-      id: "reliability",
+      id: "affordability",
       title: "Choose",
       prompt: "Choose your plan.",
       dueMonth: 1,
@@ -209,7 +209,7 @@ test("reports, objects and choices share one namespace with scoped option IDs", 
     },
   ];
   expect(() => compileScenarioRules(definitions, params)).toThrow(
-    /repeats reliability/,
+    /repeats affordability/,
   );
   definitions.choices[0].id = "plan";
   expect(() => compileScenarioRules(definitions, params)).not.toThrow();
@@ -369,16 +369,16 @@ test("common official compilation attaches rules without assigning community pro
 test("objective intent explicitly inherits, adds, replaces or removes only scenario goals", () => {
   const inherit = modScenario({
     ...pack(),
-    baseScenarioId: 114,
+    baseScenarioId: 100,
   });
   expect(inherit.mod!.rules.objectives.map((o) => o.id)).toContain(
-    "base-114-reliability",
+    "base-100-retention",
   );
   const add = modScenario({
     ...pack(),
-    baseScenarioId: 114,
+    baseScenarioId: 100,
     objectives: [
-      ...inheritedModObjectives(SCENARIOS.find((s) => s.id === 114)!),
+      ...inheritedModObjectives(SCENARIOS.find((s) => s.id === 100)!),
       {
         id: "debt",
         label: "Limit debt",
@@ -394,17 +394,16 @@ test("objective intent explicitly inherits, adds, replaces or removes only scena
   );
   const none = modScenario({
     ...pack(),
-    baseScenarioId: 114,
+    baseScenarioId: 100,
     officialArcs: [],
     scenario: { durationMonths: 6 },
     objectives: [],
   });
-  expect(none.reliabilityObjective).toBeUndefined();
   expect(none.minimumCustomerRetention).toBeUndefined();
   expect(none.mod!.rules.objectives).toEqual([]);
   const replace = modScenario({
     ...pack(),
-    baseScenarioId: 114,
+    baseScenarioId: 100,
     officialArcs: [],
     scenario: { durationMonths: 6 },
     objectives: [

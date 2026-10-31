@@ -48,7 +48,7 @@ it("shows the score so far beside where the current pace ends it", () => {
   expect(outlook).toHaveTextContent("Projected final");
   expect(
     screen.getByRole("region", { name: "Score breakdown" }),
-  ).toHaveTextContent(/electricity supplied/i);
+  ).toHaveTextContent(/TWh supplied/i);
 });
 
 it("keeps one concise loss line under the score chart and removes redundant goal forecasts", () => {
@@ -57,14 +57,6 @@ it("keeps one concise loss line under the score chart and removes redundant goal
     status: "loss",
     through: "Dec 2026",
     requirements: [
-      {
-        id: "reliability",
-        label: "Serve demand",
-        required: true,
-        status: "at-risk",
-        failureMonth: 36,
-        detail: "Lowest demand served: 92% · Jan–Feb 2025.",
-      },
       {
         id: "cash",
         label: "Keep the utility solvent",
@@ -75,10 +67,11 @@ it("keeps one concise loss line under the score chart and removes redundant goal
       },
       {
         id: "survival",
-        label: "Avoid chronic blackouts",
+        label: "Keep power flowing",
         required: true,
-        status: "on-track",
-        detail: "No three-month blackout streak projected.",
+        status: "at-risk",
+        failureMonth: 36,
+        detail: "Three-month blackout streak projected.",
       },
     ],
   });
@@ -88,7 +81,7 @@ it("keeps one concise loss line under the score chart and removes redundant goal
     name: "Scenario forecast",
   });
   expect(status).toHaveTextContent(
-    "Projected loss: Cash below $0 at Jan 2022. Demand served <99.5% at Jan 2025.",
+    "Projected loss: Cash below $0 by Jan 2022. Under 95% of demand served for 3 months by Jan 2025.",
   );
   expect(
     screen.getByRole("img", { name: /Projected loss periods shaded/ }),
@@ -97,7 +90,7 @@ it("keeps one concise loss line under the score chart and removes redundant goal
   expect(status).toContainHTML("<strong>Projected loss:</strong>");
   expect(status).toHaveClass("insightsWarning");
   expect(within(status).getByTestId("WarningAmberIcon")).toBeInTheDocument();
-  const conditions = screen.getByRole("region", { name: "Victory conditions" });
+  const conditions = screen.getByRole("region", { name: "Goals" });
   expect(conditions).not.toHaveTextContent(
     /Projected miss|Projected to meet|Projected loss/,
   );
@@ -105,9 +98,8 @@ it("keeps one concise loss line under the score chart and removes redundant goal
     /Not started|Recorded:|months completed|Delivered customer electricity divided/,
   );
   expect(conditions).toHaveTextContent(
-    "Keep the lights on through the wildfire emergency",
+    "Serving less than 95% of demand for 3 months in a row ends the run.",
   );
-  expect(conditions).toHaveTextContent("≥99.5% of demand monthly");
   expect(
     outlook.compareDocumentPosition(conditions) &
       Node.DOCUMENT_POSITION_FOLLOWING,
