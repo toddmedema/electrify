@@ -5,7 +5,12 @@ import path from "path";
 import { expect, test, Page } from "./fixtures";
 import { getScenario } from "../src/data/Scenarios";
 import { resolveStoryAtDate } from "../src/data/WorldEvents";
-import { getDateFromMinute, summarizeTimeline } from "../src/helpers/DateTime";
+import {
+  EMPTY_HISTORY,
+  getDateFromMinute,
+  summarizeTimeline,
+  MINUTES_PER_MONTH,
+} from "../src/helpers/DateTime";
 import {
   initializeGameObjectiveProgress,
   recordGameObjectiveMonth,
@@ -428,6 +433,77 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
       path: path.join(
         process.env.REVIEW_SCREENSHOT_DIR,
         `retry-difficulty-${info.project.name}-${theme}.png`,
+      ),
+    });
+  }
+});
+
+test("shared reliability rule ends the run at the third completed month", async ({
+  page,
+}, info) => {
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem("audioEnabled", "false");
+    localStorage.setItem("theme", "light");
+  });
+  await page.goto("/?scenario=111");
+  await page.getByRole("button", { name: "Expert", exact: true }).click();
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
+  await editSavedGame(page, (save) => {
+    const game = save.game;
+    game.monthlyHistory = [2, 1].map((month) => ({
+      ...EMPTY_HISTORY,
+      year: game.startingYear,
+      month,
+      demandWh: 1000,
+      supplyWh: 980,
+      customers: game.customerMarketSize / 2,
+      cash: 1e9,
+      netWorth: 1e9,
+    }));
+    const offset = 2 * MINUTES_PER_MONTH - game.timeline[0].minute;
+    for (const tick of game.timeline) {
+      tick.minute += offset;
+      tick.supplyW = tick.demandW * 0.98;
+      tick.cash = 1e9;
+    }
+    game.date = getDateFromMinute(
+      3 * MINUTES_PER_MONTH - 15,
+      game.startingYear,
+    );
+    rebuildCompletionEvidence(game);
+    expect(parseSave(save)).not.toBeNull();
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page
+    .locator("#appbar:visible")
+    .getByRole("button", { name: "normal speed", exact: true })
+    .first()
+    .click();
+  const failure = page.getByRole("dialog", { name: "Fired!", exact: true });
+  await expect(failure).toBeVisible();
+  await expect(failure).toContainText(
+    "You served less than 99.5% of demand for 3 months in a row, so the utility board ended your term.",
+  );
+  await expect(failure).toContainText("You survived for 3 months");
+  await expect(failure).not.toContainText("Report unavailable");
+  await expect(
+    failure.getByRole("region", { name: "Objective results" }),
+  ).toHaveCount(0);
+  await expect(
+    failure.getByRole("region", { name: "Mission results" }),
+  ).toContainText("served");
+  await expectDialogToFit(failure);
+  if (process.env.REVIEW_SCREENSHOT_DIR) {
+    await expect(failure.locator("..")).toHaveCSS("opacity", "1");
+    await failure.screenshot({
+      animations: "disabled",
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        `end-game-${info.project.name}.png`,
       ),
     });
   }

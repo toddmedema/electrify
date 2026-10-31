@@ -1,3 +1,4 @@
+import type { UtilityEnergyShares } from "./UtilityExpansion";
 import {
   DateType,
   DemandByTypeType,
@@ -437,6 +438,12 @@ function calculateHourShapes(minuteOfDay: number): Readonly<DemandByTypeType> {
 const DAILY_SHAPES = Array.from({ length: TICKS_PER_DAY }, (_, i) =>
   calculateHourShapes(i * TICK_MINUTES),
 );
+const DAILY_MEAN_SHAPES = Object.fromEntries(
+  DEMAND_TYPES.map((type) => [
+    type,
+    DAILY_SHAPES.reduce((sum, row) => sum + row[type], 0) / DAILY_SHAPES.length,
+  ]),
+) as DemandByTypeType;
 
 function hourShapesAt(minuteOfDay: number): Readonly<DemandByTypeType> {
   const index = minuteOfDay / TICK_MINUTES;
@@ -458,8 +465,11 @@ export function demandByTypeAt(
   startingYear: number,
   location?: LocationType,
   loadAdditions: readonly ScenarioLoadAdditionType[] = [],
+  energyShares?: UtilityEnergyShares,
 ): DemandByTypeType {
-  const mix = REGION_MIX[location?.region || ""] || DEFAULT_MIX;
+  const mix = energyShares
+    ? { ...energyShares, Transportation: 0 }
+    : REGION_MIX[location?.region || ""] || DEFAULT_MIX;
   const growth = growthFor(location);
   const shapes = hourShapesAt(date.minuteOfDay);
   // An authored absolute schedule describes the whole scenario-specific data-center load. The
@@ -491,14 +501,24 @@ export function demandByTypeAt(
     // below as an absolute addition rather than as a share of the customer baseline.
     Mining: 0,
   } satisfies Record<DemandTypeNameType, number>;
-  const shapedStartingTotal = DEMAND_TYPES.reduce(
-    (sum, type) => sum + startingWeights[type] * shapes[type],
-    0,
-  );
+  const normalizedShapes = energyShares
+    ? (Object.fromEntries(
+        DEMAND_TYPES.map((type) => [
+          type,
+          shapes[type] / DAILY_MEAN_SHAPES[type],
+        ]),
+      ) as DemandByTypeType)
+    : shapes;
+  const shapedStartingTotal = energyShares
+    ? 1
+    : DEMAND_TYPES.reduce(
+        (sum, type) => sum + startingWeights[type] * shapes[type],
+        0,
+      );
 
   const result = {} as DemandByTypeType;
   DEMAND_TYPES.forEach((type) => {
-    const shape = shapes[type];
+    const shape = normalizedShapes[type];
     if (type === "Data Centers") {
       // When a game begins before 2000 there is no starting component to grow, so introduce the
       // later load directly. Otherwise scale the opening component along the measured curve.
@@ -523,7 +543,7 @@ export function demandByTypeAt(
         pow(1 + growth[type], years)) /
       shapedStartingTotal;
   });
-  if (years === 0) {
+  if (years === 0 && !energyShares) {
     const openingTotal = DEMAND_TYPES.reduce(
       (sum, type) => sum + result[type],
       0,

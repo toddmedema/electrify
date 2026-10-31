@@ -199,7 +199,7 @@ it("deduplicates storage purchase impact and shows loan terms inline", async () 
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).toHaveTextContent("Cash purchase");
   expect(impact).toHaveTextContent(
-    /Loan option.*now \+.*\/mo \(\d+\.\d+% for 30 years\)/,
+    /Loan option.* \+ .*\/mo · \d+\.\d+%, 30 yrs/,
   );
   expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
@@ -280,7 +280,7 @@ it("shows lithium and iron-air efficiency before opening details", () => {
   );
   const table = screen.getByRole("table", { name: "storage properties" });
   expect(
-    within(table).queryByRole("row", { name: /Round-trip efficiency/ }),
+    within(table).queryByRole("row", { name: /Efficiency/ }),
   ).not.toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),

@@ -98,7 +98,7 @@ export default function SavedGames(): React.JSX.Element {
       setError(
         failure instanceof Error
           ? failure.message
-          : "Couldn't complete this action. Please try again.",
+          : "Couldn't complete this action. Try again.",
       );
       return false;
     } finally {
@@ -362,7 +362,7 @@ export default function SavedGames(): React.JSX.Element {
                 variant="contained"
                 onClick={() => dispatch(navigate("NEW_GAME"))}
               >
-                Start a new game
+                New game
               </Button>
             </Paper>
           )}

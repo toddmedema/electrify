@@ -5,8 +5,9 @@ import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   for (const scenario of [
-    { id: 113, name: "Load Shedding", window: "2022" },
-    { id: 110, name: "Sudden Nuclear Shutdown", window: "Jul 2026–Dec 2027" },
+    { id: 113, name: "Load Shedding" },
+    { id: 110, name: "Sudden Nuclear Shutdown" },
+    { id: 111, name: "Wildfire Emergency" },
     { id: 100, name: "Carbon Fee" },
   ]) {
     test(`${scenario.name} victory requirements stay readable in ${theme} mode`, async ({
@@ -18,10 +19,36 @@ for (const theme of ["light", "dark"] as const) {
         localStorage.setItem("audioEnabled", "false");
       }, theme);
       await page.goto(`/?scenario=${scenario.id}`);
+      await expect(page.locator("#appStartup")).toHaveCount(0);
+      await page
+        .getByRole("heading", { name: scenario.name, exact: true })
+        .evaluate(async (heading) => {
+          await Promise.all(
+            heading
+              .getAnimations({ subtree: true })
+              .map((animation) => animation.finished),
+          );
+        });
+      await expect(
+        page.getByText(
+          /Serving less than 95% of demand for 3 months in a row ends the run./,
+        ),
+      ).toBeVisible();
+      await expect(page.locator("#menuCard")).toHaveCount(0);
+      if (
+        process.env.REVIEW_SCREENSHOT_DIR &&
+        scenario.id === 111 &&
+        theme === "light"
+      ) {
+        await page.locator(".scenarioDossier").screenshot({
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            `scenario-selection-${testInfo.project.name}.png`,
+          ),
+        });
+      }
       {
-        await page
-          .getByRole("button", { name: "Victory Conditions", exact: true })
-          .click();
+        await page.getByRole("button", { name: "Goals", exact: true }).click();
         const briefing = page.getByRole("dialog");
         await expect(briefing.locator("..")).toHaveCSS("opacity", "1");
         const requirements = briefing.getByRole("region", {
@@ -37,17 +64,26 @@ for (const theme of ["light", "dark"] as const) {
         await expect(requirements).not.toContainText("points");
         if (scenario.id === 100) {
           await expect(requirements).toContainText(
-            "Retain ≥80% of starting customers",
+            "Keep ≥80% of customer baseline",
           );
         }
+        await expect(requirements).toContainText(
+          "Serving less than 95% of demand for 3 months in a row ends the run.",
+        );
         const help = briefing.locator("details");
-        await expect(help).not.toHaveAttribute("open", "");
-        await help.locator("summary").click();
-        await expect(help).toHaveAttribute("open", "");
-        await help.locator("summary").click();
+        if (scenario.id === 100) {
+          await expect(help).not.toHaveAttribute("open", "");
+          await help.locator("summary").click();
+          await expect(help).toHaveAttribute("open", "");
+          await help.locator("summary").click();
+        } else await expect(help).toHaveCount(0);
         await expect(briefing).not.toContainText("build or upgrade the grid");
         await expectDialogToFit(briefing);
-        if (process.env.REVIEW_SCREENSHOT_DIR && scenario.id === 100) {
+        if (
+          process.env.REVIEW_SCREENSHOT_DIR &&
+          scenario.id === 111 &&
+          theme === "light"
+        ) {
           await briefing
             .locator(".MuiDialogContent-root")
             .evaluate((content) => {
@@ -104,35 +140,30 @@ for (const theme of ["light", "dark"] as const) {
       }
       if (scenario.id === 100) {
         await expect(dialog).toContainText(
-          "Retain ≥80% of starting customers · Dec 2031",
+          "Keep ≥80% of customer baseline by Dec 2031",
         );
         await expect(dialog).not.toContainText("Invest in the grid");
       }
-      if (scenario.window) {
-        const target = `≥99.5% of demand monthly · ${scenario.window}`;
-        const requirement = rows.find((descriptions) =>
-          descriptions.includes(target),
-        );
-        expect(requirement).toBeDefined();
-        expect(requirement).toEqual([target]);
-      }
+      await expect(dialog).toContainText(
+        "Serving less than 95% of demand for 3 months in a row ends the run.",
+      );
       await expect(
-        dialog.getByRole("region", { name: "Victory conditions" }),
+        dialog.getByRole("region", { name: "Goals" }),
       ).not.toContainText(
         /Not started|Recorded:|months completed|Delivered customer electricity divided/,
       );
       const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
-      if (
-        reviewDir &&
-        scenario.id === 113 &&
-        (testInfo.project.name === "desktop-chromium" ||
-          (theme === "dark" && testInfo.project.name === "mobile-390px"))
-      ) {
-        await page.waitForTimeout(400);
+      if (reviewDir && scenario.id === 111 && theme === "light") {
+        await expect(
+          dialog.getByRole("status", { name: "Scenario forecast" }),
+        ).toHaveAttribute("data-status", /^(win|loss|unknown)$/);
+        await dialog
+          .getByRole("region", { name: "Goals" })
+          .scrollIntoViewIfNeeded();
         await dialog.screenshot({
           path: path.join(
             reviewDir,
-            `victory-conditions-${testInfo.project.name}-${theme}.png`,
+            `scenario-details-${testInfo.project.name}.png`,
           ),
         });
       }

@@ -1,8 +1,12 @@
 // The fleet is centered within the stage. Desktop tools occupy their own tracks; compact tools rise above it.
-.gameWorkspace {
+// On the root, because toasts render outside the workspace and clear the same dock.
+:root {
   --game-dock-bottom: max(12px, env(safe-area-inset-bottom));
-  --game-dock-clearance: calc(72px + var(--game-dock-bottom));
-  --game-tool-width: clamp(400px, 28vw, 480px);
+  --game-dock-clearance: calc(80px + var(--game-dock-bottom));
+}
+
+.gameWorkspace {
+  --game-tool-width: clamp(360px, 28vw, 480px);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -37,11 +41,11 @@
 
   // The list scrolls below the dock instead of shortening the whole Facilities viewport.
   .unifiedFacilitiesList {
-    padding-bottom: var(--game-dock-clearance);
+    padding-bottom: calc(var(--game-dock-clearance) + 16px);
   }
   .facilitiesBody,
   .unifiedFacilitiesList {
-    scroll-padding-bottom: var(--game-dock-clearance);
+    scroll-padding-bottom: calc(var(--game-dock-clearance) + 16px);
   }
 }
 
@@ -52,34 +56,39 @@
   align-items: stretch;
   gap: 4px;
   bottom: var(--game-dock-bottom);
-  // Centered on the whole window so opening or closing a side tool never moves it.
-  left: 50%;
+  // Centered on the whole window so opening or closing a side tool never moves it, unless a
+  // narrow window would put it over that tool (see dockCenter).
+  left: var(--game-dock-left, 50%);
   transform: translateX(-50%);
   width: max-content;
   max-width: calc(100% - 16px);
-  padding: 8px;
+  padding: 4px;
   box-sizing: border-box;
-  border: 1px solid var(--border-strong);
-  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   background: var(--bg-raised);
   box-shadow: 0 4px 20px var(--shadow-ring);
+  // Hold-and-slide previews need the whole gesture, so the browser must not claim it.
   touch-action: none;
   user-select: none;
   -webkit-touch-callout: none;
 }
 
 .gameActionDock .gameDockAction.MuiButton-root {
-  min-width: 48px;
-  width: 48px;
-  min-height: 48px;
-  padding: 8px;
+  min-width: 72px;
+  width: 72px;
+  min-height: 56px;
+  padding: 4px;
   display: flex;
+  flex-direction: column;
+  gap: 2px;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   color: var(--interactive-strong);
   background: transparent;
   font-size: 12px;
   line-height: 16px;
+  text-transform: none;
 
   > .MuiBadge-root > svg {
     font-size: 24px;
@@ -119,12 +128,10 @@
   position: absolute;
   z-index: 5;
   bottom: 0;
-  left: max(16px, env(safe-area-inset-left));
-  right: max(16px, env(safe-area-inset-right));
+  left: 0;
+  right: 0;
   display: flex;
   height: min(72dvh, calc(100% - 8px));
-  max-width: 1120px;
-  margin-inline: auto;
   pointer-events: none;
 }
 
@@ -140,8 +147,10 @@
   flex-direction: column;
   overflow: hidden;
   pointer-events: auto;
-  border: 1px solid var(--border-strong);
-  border-radius: 16px 16px 0 0;
+  // Full bleed: side gutters would show fragments of the live fleet behind the sheet.
+  border-top: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
   background: var(--bg-primary);
   box-shadow: 0 4px 24px var(--shadow-ring);
   animation: gameToolRise 200ms ease-out;
@@ -191,11 +200,12 @@
   .MuiIconButton-root {
     width: var(--control-size);
     height: var(--control-size);
-    color: var(--interactive-strong);
+    color: var(--font-color-faded);
   }
 }
 
 .gameToolBody {
+  container: game-tool / inline-size;
   flex: 1 1 0;
   min-height: 0;
   min-width: 0;
@@ -221,6 +231,38 @@
   .insights {
     container-type: inline-size;
   }
+  // A sheet's content uses the sheet; a capped column reads as a page inside a page.
+  .screenCatalog,
+  .screenCatalog > .cardList,
+  .screenCatalog > .constructionHeader,
+  .screenCatalog > .MuiToolbar-root,
+  .screenCatalog > .generatorComparison,
+  .buildOption,
+  .insightsViewportToolbar,
+  .insightsTracks {
+    max-width: none;
+  }
+}
+
+@container game-tool (min-width: 700px) {
+  .buildFacilities .cardList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    grid-auto-rows: max-content;
+    gap: 8px;
+    align-items: start;
+    align-content: start;
+    > :not(.buildOption) {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+// Portrait tablets: the sheet's top meets the chart, so a decision never hides its evidence.
+@media (min-width: 700px) and (orientation: portrait) {
+  .gameStage[data-layout="sheet"] .gameToolTray {
+    height: calc(100% - var(--game-chart-block, 294px));
+  }
 }
 
 // Sheets, and a side tool the window-centered dock floats over, extend behind it. Only their
@@ -230,10 +272,13 @@
   .eventLog > .scrollable,
   .scenarioDetails > .scrollable,
   .buildFacilities .cardList,
-  .buildFacilities .constructionInterties,
-  .customerProgramsBody {
+  .buildFacilities .constructionInterties {
     padding-bottom: var(--game-dock-clearance);
     scroll-padding-bottom: var(--game-dock-clearance);
+  }
+  .customerProgramsBody {
+    padding-bottom: calc(var(--game-dock-clearance) + 16px);
+    scroll-padding-bottom: calc(var(--game-dock-clearance) + 16px);
   }
 
   // A program's commit controls stay above the dock while their surface continues behind it.
@@ -273,8 +318,15 @@
 .gameWorkspace .gameStatusBar .gridHealth {
   flex: 0 1 auto;
 }
+.gameDockLabel {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .app_container:has(.gameWorkspace) .snackbar-above-nav {
-  bottom: 96px !important;
+  bottom: calc(var(--game-dock-clearance) + 8px) !important;
 }
 [data-tutorial-hide~="nav"] .gameWorkspace #navfooter {
   display: flex !important;
@@ -302,25 +354,47 @@
   }
 }
 
-@media (max-width: 599px) {
-  .gameWorkspace {
-    --game-dock-bottom: max(8px, env(safe-area-inset-bottom));
+// Too narrow for a floating dock: a full-width tab bar, one equal column per tool.
+@media (max-width: 699px) {
+  :root {
+    --game-dock-bottom: 0px;
+    --game-dock-clearance: calc(56px + env(safe-area-inset-bottom));
   }
   .gameWorkspace #navfooter.gameActionDock {
-    padding: 4px;
-    border-radius: 16px;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    width: 100%;
+    max-width: none;
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+    border-width: 1px 0 0;
+    border-radius: 0;
+    box-shadow: none;
   }
-  // The phone dock leaves 4px around each button, which an outside ring would fill to the edge
+  .gameActionDock .gameDockAction.MuiButton-root {
+    min-width: 0;
+    width: 100%;
+    height: 56px;
+    gap: 0;
+    border-radius: 0;
+  }
+  .gameDockLabel {
+    font-size: 11px;
+  }
+  // The bar's buttons touch each other, which an outside ring would overlap
   .gameActionDock .gameDockAction.MuiButton-root:focus-visible {
     outline-offset: -2px;
   }
+}
+
+@media (max-width: 599px) {
   .gameToolTray {
-    left: max(4px, env(safe-area-inset-left));
-    right: max(4px, env(safe-area-inset-right));
     height: calc(100% - 8px);
-  }
-  .gameToolPanel {
-    border-radius: 12px 12px 0 0;
   }
 }
 

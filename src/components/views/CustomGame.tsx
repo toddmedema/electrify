@@ -61,6 +61,7 @@ import {
   formatWattHours,
   formatWatts,
   formatCount,
+  formatCustomerCount,
   formatFacilitySize,
 } from "../../helpers/Format";
 import { formatPricePerLargeMass, largeMassUnit } from "../../helpers/Units";
@@ -538,7 +539,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
                           getStartingCustomers(getScenarioLocation(scenario))
                         }
                         valueLabelDisplay="auto"
-                        valueLabelFormat={(value: number) => formatCount(value)}
+                        valueLabelFormat={(value: number) =>
+                          `${formatCustomerCount(value)} customers`
+                        }
                         onChange={(_event: Event, value: number | number[]) =>
                           changeStartingCustomers(
                             Array.isArray(value) ? value[0] : value,
@@ -609,7 +612,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                       Ownership&nbsp;
                       <IconButton
                         onClick={() => setVictoryDialogOpen(true)}
-                        aria-label="Victory conditions"
+                        aria-label="Goals"
                         color="primary"
                         size="small"
                       >
@@ -753,6 +756,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                       <DifficultyPicker
                         id="difficulty"
                         variant="select"
+                        showDescription
                         value={game.difficulty}
                         onChange={(difficulty) => onDelta({ difficulty })}
                         readOnly={guest}
@@ -889,8 +893,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                         variant="caption"
                         className="customSetupOutlookAssumption"
                       >
-                        Includes spare generation capacity. Assumes this fleet
-                        and rate stay unchanged.
+                        Includes reserve. Assumes the same plants and rate.
                       </Typography>
                     </>
                   )}
@@ -1031,7 +1034,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
       <VictoryConditionsDialog
         open={victoryDialogOpen}
         onClose={() => setVictoryDialogOpen(false)}
-        title={`Victory Conditions: ${scenario.ownership}-Owned`}
+        title={`Goals: ${scenario.ownership}-owned`}
         scenario={scenario}
         difficulty={game.difficulty}
       />

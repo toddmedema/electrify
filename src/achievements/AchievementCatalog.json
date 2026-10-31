@@ -213,9 +213,16 @@
     "scenarioId": 115
   },
   {
+    "id": "ACROSS_THE_VALLEY",
+    "name": "Across the Valley",
+    "description": "Successfully finish Across the Valley on any difficulty.",
+    "icon": "across-the-valley",
+    "scenarioId": 116
+  },
+  {
     "id": "MASTER_OF_THE_GRID",
     "name": "Master of the Grid",
-    "description": "Successfully finish all 14 official scenarios on CEO.",
+    "description": "Successfully finish all 15 official scenarios on CEO.",
     "icon": "achievement-master-of-the-grid"
   },
   {

@@ -48,7 +48,11 @@ export interface ProjectionView {
   /** Private forecast fleet/loan facts for objectives that monthly chart rows cannot measure. */
   objectiveAssets?: Pick<
     ObjectiveMonthFacts,
-    "month" | "debtPrincipal" | "ownedFuels"
+    | "month"
+    | "debtPrincipal"
+    | "ownedFuels"
+    | "ownedUtilities"
+    | "ownedAssetIds"
   >[];
   timeline: TickPresentFutureType[];
   sampled: TickPresentFutureType[];
@@ -156,6 +160,18 @@ export function projectionSignature(game: GameType): string {
     JSON.stringify(game.location),
     game.customerMarketSize,
     game.startingDemandScale,
+    JSON.stringify(
+      game.utilityExpansion && {
+        acquisitions: game.utilityExpansion.acquisitions,
+        networkAssets: game.utilityExpansion.networkAssets.map(
+          ({ targetId, activatedMinute, initialValue }) => ({
+            targetId,
+            activatedMinute,
+            initialValue,
+          }),
+        ),
+      },
+    ),
     game.creditPremium,
     JSON.stringify(game.loadAdditions),
     game.storyEffectsDisabled,
@@ -187,8 +203,13 @@ function buildProjection(
   const needsAssets = scenarioObjectiveDefinitions(
     getScenario(game.scenarioId, game.customScenario),
     game,
-  ).some(
-    ({ metric }) => metric === "monthEndDebt" || metric === "fuelRetirement",
+  ).some(({ metric }) =>
+    [
+      "monthEndDebt",
+      "fuelRetirement",
+      "utilityOwnership",
+      "assetRetirement",
+    ].includes(metric),
   );
   const objectiveAssets: NonNullable<ProjectionView["objectiveAssets"]> = [];
   const timeline = generateForecastTimeline(
@@ -217,7 +238,18 @@ function buildProjection(
             debtPrincipal: getTotalDebt([
               ...state.facilities,
               ...(state.transmission?.lines ?? []),
+              ...(state.utilityExpansion?.loans ?? []),
             ]),
+            ...(state.utilityExpansion
+              ? {
+                  ownedUtilities: state.utilityExpansion.acquisitions.map(
+                    (a) => a.targetId,
+                  ),
+                  ownedAssetIds: state.facilities.flatMap((f) =>
+                    f.startingAssetId ? [f.startingAssetId] : [],
+                  ),
+                }
+              : {}),
           });
         }
       : undefined,

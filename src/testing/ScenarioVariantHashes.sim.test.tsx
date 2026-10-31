@@ -4,6 +4,7 @@
  * selects every official arc. Rebaseline like GoldenOutputs, with `npm run perf:rebaseline`.
  */
 import { DIFFICULTY_IDS } from "../Constants";
+import { SCENARIOS } from "../data/Scenarios";
 import type { ScenarioType } from "../Types";
 import { digest } from "./CanonicalHash";
 import customScenario from "./fixtures/scenarios/all-official-arcs.json";
@@ -12,9 +13,9 @@ import { runSimulation, type SimOptionsType } from "./Simulator";
 
 jest.setTimeout(600000);
 
-const OFFICIAL_IDS = [
-  100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115,
-];
+const OFFICIAL_IDS = SCENARIOS.filter(
+  (scenario) => !scenario.tutorialSteps,
+).map(({ id }) => id);
 
 function runHash(options: SimOptionsType): string {
   const result = runSimulation(options);

@@ -1,3 +1,9 @@
+import {
+  isUtilityExpansionGame,
+  isUtilityExpansionScenario,
+} from "./ExpansionContext";
+import { expansionRetentionBaseline } from "./Expansion";
+import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { formatCount, formatNumber } from "./Format";
 import {
   DifficultyType,
@@ -18,6 +24,7 @@ import type {
   ObjectiveResult,
 } from "../data/ScenarioObjectives";
 import { getScenario } from "../data/Scenarios";
+import { UTILITY_EXPANSION_OBJECTIVES } from "../data/UtilityExpansionObjectives";
 import { scenarioRules } from "./ScenarioRules";
 import { ruleDigest, canonicalRuleJson } from "./RuleIdentity";
 import { MINUTES_PER_MONTH } from "./DateTime";
@@ -28,6 +35,7 @@ import {
   evaluateScenarioObjectives,
   validObjectiveProgress,
   objectiveMonthObservation,
+  rebaseObjectiveRetention,
 } from "./ScenarioObjectives";
 export { objectiveDefinition } from "./ScenarioObjectives";
 
@@ -35,23 +43,14 @@ export const absoluteMonth = (year: number, month: number): number =>
   year * 12 + month - 1;
 export const demandServed = (month: MonthlyHistoryType): number =>
   month.demandWh > 0 ? month.supplyWh / month.demandWh : 1;
-export function reliabilityMonths(
-  scenario: ScenarioType,
-  history: MonthlyHistoryType[],
-): MonthlyHistoryType[] {
-  const objective = scenario.reliabilityObjective;
-  if (!objective) return [];
-  const first = absoluteMonth(objective.year, objective.month);
-  return history.filter(
-    (month) =>
-      absoluteMonth(month.year, month.month) >= first &&
-      absoluteMonth(month.year, month.month) <
-        first + (objective.durationMonths || 1),
-  );
-}
 /** The same three completed-month firing rule used by the game and headless playtests. */
-export const blackoutFiringThreshold = (difficulty: DifficultyType): number =>
-  difficulty === "CEO" ? 0.95 : 0.9;
+export const reliabilityThreshold = (difficulty: DifficultyType): number =>
+  ({ Intern: 0.9, Employee: 0.95, Manager: 0.97, VP: 0.99, CEO: 0.995 })[
+    difficulty
+  ];
+
+export const reliabilityRuleText = (difficulty: DifficultyType): string =>
+  `Serving less than ${formatRequiredShare(reliabilityThreshold(difficulty))} of demand for 3 months in a row ends the run.`;
 
 export function hasChronicBlackouts(
   history: MonthlyHistoryType[],
@@ -62,8 +61,11 @@ export function hasChronicBlackouts(
     history
       .slice(0, 3)
       .every(
-        (month) =>
-          month.supplyWh < month.demandWh * blackoutFiringThreshold(difficulty),
+        (month, index, months) =>
+          month.supplyWh < month.demandWh * reliabilityThreshold(difficulty) &&
+          (index === 0 ||
+            absoluteMonth(months[index - 1].year, months[index - 1].month) ===
+              absoluteMonth(month.year, month.month) + 1),
       )
   );
 }
@@ -72,20 +74,6 @@ export function hasChronicBlackouts(
 export function formatRequiredShare(fraction: number): string {
   const percent = Math.round(fraction * 1000) / 10;
   return `${Number.isInteger(percent) ? percent : percent.toFixed(1)}%`;
-}
-
-/** The reliability objective's verdict on the completed months it has seen so far. */
-export function reliabilityFailure(
-  scenario: ScenarioType,
-  history: MonthlyHistoryType[],
-): string | undefined {
-  const result = historyObjectiveResults(scenario, history, {
-    completedMonths: latestCompletedMonth(scenario, history),
-  }).find(
-    (result) =>
-      result.metric === "monthlyReliability" && result.status === "failed",
-  );
-  return result?.reason;
 }
 
 /**
@@ -136,10 +124,8 @@ export function retentionUnreachable(
 }
 
 /**
- * A scenario objective that is already decided before the term ends. A reliability month that
- * fell short can never be un-missed, and customers that cannot grow back in the time left will
- * not be there at the end, so the run ends now instead of asking the player to fast-forward
- * through years with nothing at stake. Customer retention is otherwise evaluated at term end.
+ * An objective that is already decided before term end, such as a customer count that
+ * cannot recover in the time left. Customer retention is otherwise evaluated at term end.
  */
 export function decidedObjectiveFailure(
   scenario: ScenarioType,
@@ -176,11 +162,8 @@ export function scenarioObjectiveFailure(
 const definitionsCache = new WeakMap<
   ScenarioType,
   {
-    rules: ReturnType<typeof scenarioRules>;
-    reliability: ScenarioType["reliabilityObjective"];
     retention: number | undefined;
     duration: number;
-    startingYear: number;
     result: CompiledRuleObjective[];
   }
 >();
@@ -190,35 +173,18 @@ export function scenarioObjectiveDefinitions(
   parameters?: Pick<GameType, "difficulty" | "seed">,
 ): CompiledRuleObjective[] {
   if (!scenario || scenario.tutorialSteps) return [];
+  if (scenario.id === 116) return UTILITY_EXPANSION_OBJECTIVES;
   const compiled = scenarioRules(scenario, parameters);
   if (compiled && (scenario.id !== 999 || scenario.mod))
     return compiled.objectives;
   const cached = definitionsCache.get(scenario);
   if (
     cached &&
-    cached.reliability === scenario.reliabilityObjective &&
     cached.retention === scenario.minimumCustomerRetention &&
-    cached.duration === scenario.durationMonths &&
-    cached.startingYear === scenario.startingYear
+    cached.duration === scenario.durationMonths
   )
     return cached.result;
   const result: CompiledRuleObjective[] = [];
-  const reliability = scenario.reliabilityObjective;
-  if (reliability) {
-    const fromMonth =
-      absoluteMonth(reliability.year, reliability.month) -
-      absoluteMonth(scenario.startingYear, 1);
-    result.push({
-      id: "reliability",
-      label: reliability.goal ?? `Serve demand during the ${reliability.label}`,
-      metric: "monthlyReliability",
-      required: true,
-      inherited: true,
-      fromMonth,
-      throughMonth: fromMonth + (reliability.durationMonths || 1) - 1,
-      minDemandServedShare: reliability.minimumDemandServed,
-    });
-  }
   if (scenario.minimumCustomerRetention !== undefined)
     result.push({
       id: "retention",
@@ -230,29 +196,11 @@ export function scenarioObjectiveDefinitions(
       minRetainedShare: scenario.minimumCustomerRetention,
     });
   definitionsCache.set(scenario, {
-    rules: compiled,
-    reliability: scenario.reliabilityObjective,
     retention: scenario.minimumCustomerRetention,
     duration: scenario.durationMonths,
-    startingYear: scenario.startingYear,
     result,
   });
   return result;
-}
-
-function latestCompletedMonth(
-  scenario: ScenarioType,
-  history: readonly MonthlyHistoryType[],
-): number {
-  return Math.max(
-    0,
-    ...history.map(
-      (row) =>
-        absoluteMonth(row.year, row.month) -
-        absoluteMonth(scenario.startingYear, 1) +
-        1,
-    ),
-  );
 }
 
 const definitionIdentity = new WeakMap<
@@ -264,7 +212,7 @@ export function objectiveContextForGame(
     GameType,
     "seed" | "startingYear" | "date" | "customerMarketSize"
   > &
-    Partial<Pick<GameType, "difficulty">>,
+    Partial<Pick<GameType, "difficulty" | "utilityExpansion">>,
   scenario: ScenarioType,
 ): ObjectiveContext {
   const definitions = scenarioObjectiveDefinitions(scenario, {
@@ -293,6 +241,26 @@ export function objectiveContextForGame(
     startingYear: game.startingYear,
     durationMonths: scenario.durationMonths,
     ownership: scenario.ownership,
+    ...(isUtilityExpansionScenario(scenario)
+      ? {
+          retentionAtDeadlineOnly: true,
+          retentionBaselines: Object.fromEntries(
+            definitions.flatMap((objective) =>
+              objective.metric === "customerRetention"
+                ? [
+                    [
+                      objective.deadlineMonth,
+                      expansionRetentionBaseline(
+                        game,
+                        (objective.deadlineMonth + 1) * MINUTES_PER_MONTH,
+                      ),
+                    ],
+                  ]
+                : [],
+            ),
+          ),
+        }
+      : {}),
     completedMonths: Math.min(scenario.durationMonths, game.date.monthsElapsed),
     marketSize: customerMarketSizeAt(
       game.customerMarketSize,
@@ -329,7 +297,7 @@ function historyProgress(
   return progress;
 }
 
-/** Legacy phrasing is presentation of the shared verdict, never a second pass/fail calculation. */
+/** Present inherited retention results using the shared verdict. */
 function inheritedResultReasons(
   results: ObjectiveResult[],
   scenario: ScenarioType,
@@ -338,41 +306,6 @@ function inheritedResultReasons(
 ): ObjectiveResult[] {
   return results.map((result) => {
     if (!result.objective.inherited) return result;
-    const objective = scenario.reliabilityObjective;
-    if (result.objective.metric === "monthlyReliability" && objective) {
-      if (result.status === "failed") {
-        const failed = progress.entries
-          .find((entry) => entry.id === result.id)
-          ?.observations.slice()
-          .reverse()
-          .find(
-            ([, numerator, denominator]) =>
-              numerator !== null &&
-              denominator !== null &&
-              denominator > 0 &&
-              numerator / denominator < objective.minimumDemandServed,
-          );
-        const served =
-          failed && failed[1] !== null && failed[2]
-            ? failed[1] / failed[2]
-            : result.observed;
-        if (served !== undefined)
-          return {
-            ...result,
-            reason: `You served ${(Math.floor(served * 10000) / 100).toFixed(2)}% of demand during the ${objective.label}; this mission requires ${formatRequiredShare(objective.minimumDemandServed)}.`,
-          };
-      }
-      if (
-        result.status === "unverifiable" &&
-        context.completedMonths > result.objective.throughMonth
-      ) {
-        const required = objective.durationMonths || 1;
-        return {
-          ...result,
-          reason: `The ${objective.label} is unverifiable: exactly one completed record is required for each of its ${required} months (${objective.month}/${objective.year} through ${((objective.month - 1 + required - 1) % 12) + 1}/${objective.year + Math.floor((objective.month - 1 + required - 1) / 12)}).`,
-        };
-      }
-    }
     if (
       result.objective.metric === "customerRetention" &&
       result.status === "failed" &&
@@ -424,6 +357,9 @@ function historyObjectiveResults(
     seed: options.seed ?? scenario.seed ?? 0,
     durationMonths: scenario.durationMonths,
     ownership: scenario.ownership,
+    ...(isUtilityExpansionScenario(scenario)
+      ? { retentionAtDeadlineOnly: true }
+      : {}),
     completedMonths: options.completedMonths,
     marketSize: options.marketSize,
   };
@@ -475,9 +411,49 @@ function historyObjectiveResults(
   return inheritedResultReasons(results, scenario, progress, context);
 }
 
+/** The scored term freezes before any optional Keep playing acquisition. */
+function objectiveRetentionBaseline(
+  game: Pick<GameType, "customerMarketSize"> &
+    Partial<Pick<GameType, "utilityExpansion">>,
+  scenario: ScenarioType,
+): number {
+  return isUtilityExpansionScenario(scenario)
+    ? expansionRetentionBaseline(
+        game,
+        scenario.durationMonths * MINUTES_PER_MONTH,
+      )
+    : (retentionBaseline(scenario, game.customerMarketSize) ??
+        game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER);
+}
+
+/** Rebase evidence atomically after a purchase; completed-term observations stay final. */
+export function rebaseGameRetentionBaseline(
+  game: GameType,
+  baseline: number,
+): void {
+  const scenario = getScenario(game.scenarioId, game.customScenario);
+  if (
+    !scenario ||
+    !game.objectiveProgress ||
+    game.date.minute >= scenario.durationMonths * MINUTES_PER_MONTH
+  )
+    return;
+  game.objectiveProgress = rebaseObjectiveRetention(
+    game.objectiveProgress,
+    scenarioObjectiveDefinitions(scenario, game),
+    objectiveContextForGame(game, scenario),
+    baseline,
+  );
+}
+
 const resultCache = new WeakMap<
   ObjectiveProgress,
-  { completedMonths: number; rulesDigest: string; results: ObjectiveResult[] }
+  {
+    completedMonths: number;
+    rulesDigest: string;
+    acquisitionKey: string;
+    results: ObjectiveResult[];
+  }
 >();
 /** Shared recorded evidence; forecast callers extend a copy without changing the live run. */
 export function gameObjectiveProgress(
@@ -491,8 +467,7 @@ export function gameObjectiveProgress(
       scenarioObjectiveDefinitions(scenario, game),
       game.monthlyHistory,
       objectiveContextForGame(game, scenario),
-      retentionBaseline(scenario, game.customerMarketSize) ??
-        game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
+      objectiveRetentionBaseline(game, scenario),
     )
   );
 }
@@ -504,10 +479,15 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
   if (!objectives.length) return [];
   const context = objectiveContextForGame(game, scenario);
   const progress = gameObjectiveProgress(game)!;
+  const acquisitionKey =
+    game.utilityExpansion?.acquisitions
+      .map(({ targetId, minute }) => `${targetId}:${minute}`)
+      .join("|") ?? "";
   const cached = resultCache.get(progress);
   if (
     cached?.completedMonths === context.completedMonths &&
-    cached.rulesDigest === context.rulesDigest
+    cached.rulesDigest === context.rulesDigest &&
+    cached.acquisitionKey === acquisitionKey
   )
     return cached.results;
   const results = inheritedResultReasons(
@@ -515,10 +495,34 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
     scenario,
     progress,
     context,
-  );
+  ).map((result) => {
+    const objective = result.objective;
+    // An accepted, irreversible ownership receipt proves this obligation immediately.
+    // Month-close observations remain the authoritative deadline evidence.
+    if (
+      objective.metric !== "utilityOwnership" ||
+      context.completedMonths > objective.deadlineMonth
+    )
+      return result;
+    const acquired = game.utilityExpansion?.acquisitions.some(
+      (receipt) =>
+        objective.targets.includes(receipt.targetId) &&
+        receipt.minute < (objective.deadlineMonth + 1) * MINUTES_PER_MONTH,
+    );
+    return acquired
+      ? {
+          ...result,
+          status: "completed" as const,
+          observed: 1,
+          observedMonths: 1,
+          reason: undefined,
+        }
+      : result;
+  });
   resultCache.set(progress, {
     completedMonths: context.completedMonths,
     rulesDigest: context.rulesDigest,
+    acquisitionKey,
     results,
   });
   return results;
@@ -532,7 +536,9 @@ export function initializeGameObjectiveProgress(game: GameType): void {
       ? createObjectiveProgress(
           objectives,
           objectiveContextForGame(game, scenario),
-          game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
+          isUtilityExpansionGame(game)
+            ? objectiveRetentionBaseline(game, scenario)
+            : game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
         )
       : undefined;
 }
@@ -554,8 +560,7 @@ export function recordGameObjectiveMonth(
       objectives,
       game.monthlyHistory.filter((existing) => existing !== row),
       { ...context, completedMonths: month },
-      retentionBaseline(scenario, game.customerMarketSize) ??
-        game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
+      objectiveRetentionBaseline(game, scenario),
     );
   const needsDebt = objectives.some(
     (objective) => objective.metric === "monthEndDebt",
@@ -575,11 +580,22 @@ export function recordGameObjectiveMonth(
     {
       month,
       history: row,
+      ...(game.utilityExpansion
+        ? {
+            ownedUtilities: game.utilityExpansion.acquisitions.map(
+              ({ targetId }) => targetId,
+            ),
+            ownedAssetIds: game.facilities.flatMap((facility) =>
+              facility.startingAssetId ? [facility.startingAssetId] : [],
+            ),
+          }
+        : {}),
       ...(needsDebt
         ? {
             debtPrincipal: getTotalDebt([
               ...game.facilities,
               ...(game.transmission?.lines ?? []),
+              ...(game.utilityExpansion?.loans ?? []),
             ]),
           }
         : {}),
@@ -599,16 +615,45 @@ export function validGameObjectiveProgress(game: GameType): boolean {
   const progress = game.objectiveProgress;
   if (
     progress.retentionBaseline !==
-      game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER ||
+      (isUtilityExpansionGame(game)
+        ? objectiveRetentionBaseline(game, scenario)
+        : game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER) ||
     !validObjectiveProgress(progress, objectives, context)
   )
     return false;
   if (
     scenario.mod &&
-    game.customerMarketSize !==
+    (isUtilityExpansionGame(game)
+      ? game.customerMarketSize -
+        (game.utilityExpansion?.acquisitions.reduce(
+          (sum, receipt) =>
+            sum + UTILITY_AREAS[receipt.targetId].addressablePool,
+          0,
+        ) ?? 0)
+      : game.customerMarketSize) !==
       scenario.mod.parameters.startingCustomers * CUSTOMER_MARKET_MULTIPLIER
   )
     return false;
+  if (isUtilityExpansionGame(game)) {
+    const expansion = game.utilityExpansion;
+    if (!expansion) return false;
+    for (const objective of objectives) {
+      const evidence = progress.entries.find(
+        (entry) => entry.id === objective.id,
+      );
+      if (objective.metric === "utilityOwnership") {
+        for (const [month, numerator, denominator] of evidence?.observations ??
+          []) {
+          const atClose = expansion.acquisitions.some(
+            (acquisition) =>
+              objective.targets.includes(acquisition.targetId) &&
+              acquisition.minute < (month + 1) * MINUTES_PER_MONTH,
+          );
+          if (numerator !== Number(atClose) || denominator !== 1) return false;
+        }
+      }
+    }
+  }
   const observationsByObjective = new Map(
     progress.entries.map((entry) => [
       entry.id,
@@ -634,11 +679,17 @@ export function validGameObjectiveProgress(game: GameType): boolean {
       // their own recorded observations; never infer them from today's fleet.
       if (
         objective.metric === "monthEndDebt" ||
-        objective.metric === "fuelRetirement"
+        objective.metric === "fuelRetirement" ||
+        objective.metric === "utilityOwnership" ||
+        objective.metric === "assetRetirement"
       )
         continue;
       const first =
-        objective.metric === "customerRetention" ? 0 : objective.fromMonth;
+        objective.metric === "customerRetention"
+          ? context.retentionAtDeadlineOnly
+            ? objective.deadlineMonth
+            : 0
+          : objective.fromMonth;
       const last =
         objective.metric === "customerRetention"
           ? objective.deadlineMonth
@@ -681,6 +732,7 @@ export function runFailure(
         | "seed"
         | "startingYear"
         | "objectiveProgress"
+        | "utilityExpansion"
         | "scenarioId"
         | "customScenario"
         | "monthlyHistory"
@@ -699,6 +751,7 @@ export function runFailure(
       startingYear: game.startingYear ?? scenario.startingYear,
       date: game.date,
       customerMarketSize: game.customerMarketSize,
+      utilityExpansion: game.utilityExpansion,
     },
     scenario,
   );
@@ -713,8 +766,7 @@ export function runFailure(
       objectives,
       history,
       context,
-      retentionBaseline(scenario, game.customerMarketSize) ??
-        game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
+      objectiveRetentionBaseline(game, scenario),
     );
   const results = inheritedResultReasons(
     evaluateScenarioObjectives(objectives, progress, context),
@@ -736,8 +788,7 @@ export function runFailure(
     return {
       outcome: "fired",
       title: "Fired!",
-      reason:
-        "Blackouts continued for 3 months, so the utility board ended your term.",
+      reason: `You served less than ${formatRequiredShare(reliabilityThreshold(game.difficulty))} of demand for 3 months in a row, so the utility board ended your term.`,
     };
   if (objectiveFailure)
     return {

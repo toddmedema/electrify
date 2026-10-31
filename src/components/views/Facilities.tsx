@@ -36,8 +36,9 @@ import {
   activeScenario,
   currentGenerationW,
 } from "../../helpers/GameSelectors";
-import { chartPalette, facilityColor, withAlpha } from "../../Theme";
+import { chartPalette, facilityColor } from "../../Theme";
 import {
+  AcquireUtilityAction,
   FacilityOperatingType,
   isStorage,
   GameType,
@@ -56,6 +57,8 @@ import {
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import FlowBar from "../base/FlowBar";
+import { getStorageBoolean, setStorageKeyValue } from "../../LocalStorage";
+import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
@@ -73,6 +76,7 @@ import {
 } from "../../helpers/Hazards";
 import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
+import { facilityDisplayName } from "../base/FacilityLabels";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
@@ -244,7 +248,7 @@ function FacilityActions(props: {
           className="facilityCancelConstruction"
           variant="outlined"
           startIcon={<CancelIcon />}
-          aria-label={"Cancel upgrade of " + facility.name}
+          aria-label={"Cancel upgrade of " + facilityDisplayName(facility)}
           onClick={() => onCancelRetrofit(facility.id)}
         >
           <span className="facilityActionLabel">Cancel upgrade</span>
@@ -258,13 +262,13 @@ function FacilityActions(props: {
           }
           aria-label={
             facility.paused
-              ? "Resume " + facility.name
-              : "Pause " + facility.name
+              ? "Resume " + facilityDisplayName(facility)
+              : "Pause " + facilityDisplayName(facility)
           }
           onClick={() =>
             facility.paused
               ? onTogglePause(facility.id)
-              : onPause(facility.id, facility.name)
+              : onPause(facility.id, facilityDisplayName(facility))
           }
         >
           <span className="facilityActionLabel">
@@ -278,7 +282,7 @@ function FacilityActions(props: {
         startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
         aria-label={
           (underConstruction ? "Cancel construction of " : "Sell ") +
-          facility.name
+          facilityDisplayName(facility)
         }
         onClick={onOpenSell}
       >
@@ -447,6 +451,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
     reading = formatWattsOfPeak(facility.currentW, facility.peakW);
+    // A reservoir row's percentage would read as how full it is, which its gauge already shows.
+    if (!(fuel === "Hydro" && facility.reservoirCapacityWh))
+      reading += ` · ${Math.round(Math.abs(outputFraction) * 100)}%`;
     if (fuel === "Hydro" && facility.reservoirCapacityWh) {
       // Last-tick water balance stays meaningful on mount and selection. Paused turbines can
       // retain ramping currentW internally, so exclude their output from the water balance.
@@ -555,7 +562,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 type="button"
                 {...provided.dragHandleProps}
                 className="facilityDragHandle"
-                aria-label={"Reorder " + facility.name}
+                aria-label={"Reorder " + facilityDisplayName(facility)}
                 title="Drag to reorder"
                 onClick={(event) => {
                   if (event.shiftKey || event.ctrlKey || event.metaKey)
@@ -577,7 +584,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               type="button"
               className="facilityDisclosure"
               aria-label={
-                `Inspect ${facility.name}` +
+                `Inspect ${facilityDisplayName(facility)}` +
                 (hazardStatus && !underConstruction
                   ? `, ${hazardStatusText(hazardStatus).spoken}`
                   : "") +
@@ -597,7 +604,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     }}
                     primary={
                       <>
-                        <span className="facilityName">{facility.name}</span>
+                        <span className="facilityName">
+                          {facilityDisplayName(facility)}
+                        </span>
                         {ready && (
                           <span className="facilityReadyLabel">Ready</span>
                         )}
@@ -638,14 +647,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       className="constructionProgress"
                       data-paused={game.speed === "PAUSED"}
                       aria-hidden
-                      style={{ background: withAlpha(accentColor, 0.24) }}
                     >
                       <span
                         className="constructionProgressFill"
-                        style={{
-                          width: `${builtFraction * 100}%`,
-                          background: accentColor,
-                        }}
+                        style={{ width: `${builtFraction * 100}%` }}
                       />
                     </span>
                   )}
@@ -667,7 +672,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 checked={props.bulkSelected}
                 onClick={(event) => props.onToggleSelection(facility.id, event)}
                 slotProps={{
-                  input: { "aria-label": `Select ${facility.name}` },
+                  input: {
+                    "aria-label": `Select ${facilityDisplayName(facility)}`,
+                  },
                 }}
               />
             )}
@@ -681,7 +688,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               title={
                 <>
                   {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                  {formatFacilitySize(facility)} {facility.name.toLowerCase()}{" "}
+                  {formatFacilitySize(facility)}{" "}
+                  {facilityDisplayName(facility) === facility.name
+                    ? facility.name.toLowerCase()
+                    : facilityDisplayName(facility)}{" "}
                   facility?
                 </>
               }
@@ -696,7 +706,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               {facility.hydroSiteId && (
                 <DialogContentText>
                   {underConstruction
-                    ? "Cancelling frees this site."
+                    ? "Canceling frees this site."
                     : "Selling won't free this site."}
                 </DialogContentText>
               )}
@@ -749,6 +759,27 @@ function FacilitySupplyChart({
   anchor: React.RefObject<HTMLDivElement>;
 }) {
   const fuelOrder = getDispatchOrderedFuels(game.facilities);
+  const height = useFleetChartHeight();
+  // A portrait tablet's sheet starts where this block ends.
+  React.useLayoutEffect(() => {
+    const element = anchor.current;
+    const stage = element?.closest(".gameStage");
+    if (!element || !stage) return;
+    const publish = () => {
+      const bottom =
+        element.getBoundingClientRect().bottom -
+        stage.getBoundingClientRect().top;
+      document.documentElement.style.setProperty(
+        "--game-chart-block",
+        `${Math.round(bottom)}px`,
+      );
+    };
+    publish();
+    // The chart mounts after this block, so its height arrives a frame later.
+    const observer = new ResizeObserver(publish);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [anchor]);
   return (
     <div
       ref={anchor}
@@ -757,7 +788,8 @@ function FacilitySupplyChart({
       aria-label="Supply and demand"
     >
       <ChartSupplyDemand
-        height={180}
+        height={height}
+        exactHeight
         timeline={game.timeline}
         fuelOrder={fuelOrder}
         currentMinute={game.date.minute}
@@ -768,6 +800,29 @@ function FacilitySupplyChart({
       />
     </div>
   );
+}
+
+const HINT_MIN_FACILITIES = 4;
+const BULK_HINT_SEEN_KEY = "facilityBulkHintSeen";
+
+/** The fleet chart's height: taller where the window has room, never a letterbox. */
+export function fleetChartHeight(width: number, height: number): number {
+  const fit = (min: number, share: number, max: number) =>
+    Math.round(Math.max(min, Math.min(max, height * share)));
+  if (width >= SIDE_LAYOUT_MIN_WIDTH) return fit(180, 0.25, 260);
+  if (width < 600) return fit(200, 0.38, 420);
+  return width > height ? fit(180, 0.3, 260) : fit(180, 0.28, 340);
+}
+
+function useFleetChartHeight(): number {
+  const measure = () => fleetChartHeight(window.innerWidth, window.innerHeight);
+  const [height, setHeight] = React.useState(measure);
+  React.useEffect(() => {
+    const resize = () => setHeight(measure());
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
+  return height;
 }
 
 export interface StateProps {
@@ -805,6 +860,9 @@ export interface DispatchProps {
   onTransmissionCancel?: (id: number) => void;
   onTransmissionPause?: (id: number, name: string, paused: boolean) => void;
   onTransmissionUpgrade: (corridorId: string, financed: boolean) => void;
+  onUtilityAcquire?: (
+    payload: AcquireUtilityAction,
+  ) => boolean | Promise<boolean>;
   onTradingPolicy: (policy: TradingPolicyType) => void;
 }
 
@@ -1158,6 +1216,11 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   }
 
   public componentDidUpdate() {
+    if (
+      this.state.ids.length > 1 &&
+      !getStorageBoolean(BULK_HINT_SEEN_KEY, false)
+    )
+      setStorageKeyValue(BULK_HINT_SEEN_KEY, true);
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
   }
@@ -1319,10 +1382,19 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                     </div>
                   </>
                 ) : (
-                  <span>
-                    Shift-click a range · Ctrl/⌘-click to add · Right-click for
-                    actions
-                  </span>
+                  <>
+                    <span className="facilitySelectionTitle">
+                      Facilities ({game.facilities.length})
+                    </span>
+                    {game.facilities.length >= HINT_MIN_FACILITIES &&
+                      !activeScenario(game)?.tutorialSteps &&
+                      !getStorageBoolean(BULK_HINT_SEEN_KEY, false) && (
+                        <span>
+                          Shift-click a range · Ctrl/⌘-click to add ·
+                          Right-click for actions
+                        </span>
+                      )}
+                  </>
                 )}
               </div>
             )}
@@ -1400,6 +1472,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   game={game}
                   onBuild={onTransmissionBuild}
                   onUpgrade={onTransmissionUpgrade}
+                  onAcquire={this.props.onUtilityAcquire}
                   onCancel={this.props.onTransmissionCancel}
                   onPause={this.props.onTransmissionPause}
                   onPolicy={onTradingPolicy}

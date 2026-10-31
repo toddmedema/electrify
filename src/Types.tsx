@@ -424,6 +424,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     rooftopSolarW?: number;
     supplyByFuel: FuelProductionType;
     /** Positive gross flow into/out of the player's grid during this tick. */
+    entitlementImportedW?: number;
+    entitlementImportCapacityW?: number;
     importedW?: number;
     exportedW?: number;
     transmissionCapacityW?: number;
@@ -947,18 +949,6 @@ export interface ScenarioType {
   loadAdditions?: ScenarioLoadAdditionType[];
   /** Optional mission gate evaluated at the authored end date. */
   minimumCustomerRetention?: number;
-  /** Optional requirement to serve a specific month without falling below a reliability target. */
-  reliabilityObjective?: {
-    year: number;
-    month: number;
-    /** Consecutive calendar months that must each meet the target. Defaults to one. */
-    durationMonths?: number;
-    minimumDemandServed: number;
-    /** Noun phrase naming the event window, read inside sentences: "during the {label}". */
-    label: string;
-    /** Imperative pinned-goal heading in sentence case, e.g. "Keep the lights on through the freeze". */
-    goal?: string;
-  };
   dollarsPerkWh: number;
   durationMonths: number;
   endTitle?: string;
@@ -1254,7 +1244,43 @@ export interface PeerSettlement {
   exportedW: number;
   importEmissionsKgPerMWh: number;
 }
+export type UtilityId = "champlain" | "valley-electric" | "ridge-electric";
+export type UtilityTargetId = Exclude<UtilityId, "champlain">;
+export interface AcquisitionLoan {
+  id: string;
+  targetId: UtilityTargetId;
+  kind: "purchase" | "assumed";
+  principal: number;
+  loanAmountLeft: number;
+  loanMonthlyPayment: number;
+  interestRate: number;
+  months: number;
+  minuteCreated: number;
+}
+export interface UtilityNetworkAsset {
+  targetId: UtilityTargetId;
+  activatedMinute: number;
+  initialValue: number;
+  retentionLowWatermark: number;
+}
+export interface UtilityExpansionState {
+  networkAssets: UtilityNetworkAsset[];
+  loans: AcquisitionLoan[];
+  acquisitions: {
+    targetId: UtilityTargetId;
+    minute: number;
+    financed: boolean;
+    /** Immutable seller accounts transferred, not a separately simulated customer population. */
+    transferredCustomers: number;
+  }[];
+}
+export interface AcquireUtilityAction {
+  targetId: UtilityTargetId;
+  financed: boolean;
+  quoteKey: string;
+}
 export interface GameType {
+  utilityExpansion?: UtilityExpansionState;
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {
     seat: string;
@@ -1427,6 +1453,8 @@ export interface SnackbarType {
   open: boolean;
   message: string;
   timeout: number;
+  /** Feedback from the open dialog itself, which would otherwise wait for it to close. */
+  overModal?: boolean;
 }
 
 /**

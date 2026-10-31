@@ -1,4 +1,4 @@
-import { MAX_INTERTIE_UPGRADES } from "../Constants";
+import { INTERTIE_UPGRADE_STEP, MAX_INTERTIE_UPGRADES } from "../Constants";
 import {
   corridorById,
   adjacentMarketForCorridor,
@@ -24,6 +24,7 @@ import {
   neighborImportSupplyW,
   physicalNeighborImportSupplyW,
   intertieOfferLimits,
+  intertieDirectionalCapacities,
 } from "./Transmission";
 
 const mild = { temperatureC: 20, solarIrradianceWM2: 0 };
@@ -76,6 +77,30 @@ describe("authored utility transmission access", () => {
       }
     }
   });
+
+  it.each(["vt-champlain-valley", "vt-champlain-ridge"])(
+    "keeps %s purchased access at 40/60/80/100MW independently of its regional pool",
+    (corridorId) => {
+      const ctx = context(116);
+      expect(adjacentMarketForCorridor(corridorId)!.availableSupplyW).toBe(
+        600e6,
+      );
+      expect(effectiveMarket(corridorId, ctx)!.availableSupplyW).toBe(40e6);
+      let capacityW = 100e6;
+      for (const purchasedW of [40e6, 60e6, 80e6, 100e6]) {
+        expect(
+          effectiveMarket(corridorId, ctx, capacityW)!.availableSupplyW,
+        ).toBe(purchasedW);
+        expect(
+          intertieDirectionalCapacities(corridorId, ctx, capacityW),
+        ).toEqual({
+          importCapacityW: purchasedW,
+          exportCapacityW: 80e6,
+        });
+        capacityW *= INTERTIE_UPGRADE_STEP;
+      }
+    },
+  );
 
   it("quotes the player's share without modifying the regional corridor", () => {
     const access = effectiveCorridor("california-north", context(111))!;

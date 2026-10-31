@@ -1,3 +1,5 @@
+import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
+import { UTILITY_AREAS, UTILITY_TARGETS } from "./UtilityExpansion";
 import type { GameType, LocationType, ScenarioFacilityType } from "../Types";
 import { LOCATIONS } from "../Constants";
 import catalogue from "./HydroSiteCatalogue.json";
@@ -10,6 +12,8 @@ export interface HydroSite {
   lon: number;
 }
 export interface HydroInventory {
+  /** Inherited fictional equipment does not establish a new development site. */
+  newConstructionAllowed?: boolean;
   status: "researched" | "unresearched";
   siteIds: string[];
   researchDisposition: string;
@@ -34,6 +38,7 @@ type HydroState = Pick<
   | "commissionedHydroSiteIds"
   | "scenarioId"
   | "customScenario"
+  | "utilityExpansion"
 >;
 export function isConventionalHydro(facility: {
   fuel?: unknown;
@@ -142,7 +147,8 @@ export function getHydroAvailability(state: HydroState, peakW: number) {
     | "empty"
     | "exhausted"
     | "too-large" =
-    state.location.resources?.hydro === false
+    state.location.resources?.hydro === false ||
+    inventory?.newConstructionAllowed === false
       ? "prohibited"
       : !inventory || inventory.status === "unresearched"
         ? "unavailable"
@@ -238,6 +244,31 @@ export function resolveStartingHydroSites(
   return assignments;
 }
 export function validHydroClaims(state: HydroState): boolean {
+  if (state.utilityExpansion) {
+    if (
+      !isUtilityExpansionGame(state) ||
+      !Array.isArray(state.utilityExpansion.acquisitions) ||
+      !validHydroInventorySource(state) ||
+      !Array.isArray(state.commissionedHydroSiteIds)
+    )
+      return false;
+    const owned = new Set(
+      state.utilityExpansion.acquisitions.map(({ targetId }) => targetId),
+    );
+    const definitions = [
+      UTILITY_AREAS.champlain,
+      ...UTILITY_TARGETS.filter(({ id }) => owned.has(id)).map(
+        ({ id }) => UTILITY_AREAS[id],
+      ),
+    ];
+    const allowed = new Set(
+      definitions.flatMap(
+        (definition) =>
+          resolveHydroInventory(definition.location)?.siteIds ?? [],
+      ),
+    );
+    return validHydroClaimSet(state, allowed);
+  }
   if (
     !Array.isArray(state.commissionedHydroSiteIds) ||
     !validHydroInventorySource(state) ||
@@ -251,6 +282,14 @@ export function validHydroClaims(state: HydroState): boolean {
   const ids = new Set(
     inventory?.status === "researched" ? inventory.siteIds : [],
   );
+  return validHydroClaimSet(state, ids);
+}
+
+/** Inherited sites retain asset provenance while sharing one company's weather and dispatch. */
+function validHydroClaimSet(
+  state: HydroState,
+  ids: ReadonlySet<string>,
+): boolean {
   const history = new Set(state.commissionedHydroSiteIds);
   if (
     history.size !== state.commissionedHydroSiteIds.length ||

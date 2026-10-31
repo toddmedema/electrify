@@ -23,12 +23,14 @@ const smoke = [
   "operations-priorities.spec.ts",
 ];
 const layout = [
+  "build-generator-loading.spec.ts",
   "sign-in.spec.ts",
   "learning-pages.spec.ts",
   "ui-chart-build-polish.spec.ts",
   "multiline-text.spec.ts",
   "modal-layout.spec.ts",
   "wildfire-scenario.spec.ts",
+  "acquisitions.spec.ts",
 ];
 
 // Run the PR smoke matrix at 1280/390 px and layout checks at 1280/390/360 px.

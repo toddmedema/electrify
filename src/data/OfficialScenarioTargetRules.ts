@@ -144,7 +144,7 @@ export const END_OF_ERA_RULES: OfficialScenarioRuleDefinition = {
           "Operating coal plants at least 30 years old temporarily produce less power.",
         startMonth: 73,
         durationMonths: 24,
-        preview: "Aging coal plants producing less power.",
+        preview: "Aging coal plants will produce less power.",
         effects: {
           outputMultipliersBySelector: [
             {
@@ -178,7 +178,7 @@ export const END_OF_ERA_RULES: OfficialScenarioRuleDefinition = {
         title: "Aging slowdown ends",
         message: "Older coal plants return to full output.",
         startMonth: 97,
-        preview: "Temporary limits on older coal plants lifting.",
+        preview: "Temporary limits on older coal plants will lift.",
       },
       {
         id: "compliance",
@@ -186,7 +186,7 @@ export const END_OF_ERA_RULES: OfficialScenarioRuleDefinition = {
         message: "Coal running costs rise and output is limited.",
         startMonth: 181,
         durationMonths: 60,
-        preview: "Coal plants costing more to run and producing less power.",
+        preview: "Coal plants will cost more to run and produce less power.",
         effects: {
           operatingCostMultipliersByFuel: {
             Coal: byDifficulty(END_OF_ERA_BALANCE, (balance) => balance.coalOM),
@@ -205,7 +205,7 @@ export const END_OF_ERA_RULES: OfficialScenarioRuleDefinition = {
         message:
           "Review the grid's recorded results for the previous twelve months.",
         startMonth: 217,
-        preview: "Assessing the move away from coal.",
+        preview: "The move away from coal will be assessed.",
       },
     ],
     objectives: [
@@ -398,7 +398,7 @@ export const HURRICANE_RULES: OfficialScenarioRuleDefinition = {
         message:
           "Storm repairs finish. Affected generator output and oil prices return to normal.",
         startMonth: { from: 102, to: 107 },
-        preview: "Plant output and oil prices returning to normal.",
+        preview: "Plant output and oil prices will return to normal.",
         report: {
           id: "restoration-affected",
           kind: "affectedFacilities",
@@ -480,7 +480,6 @@ export const HURRICANE_RULES: OfficialScenarioRuleDefinition = {
 export const NUCLEAR_TRIP_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 110,
   arcId: "nuclear-trip",
-  reliabilityNoun: "reactor shutdown window and recovery",
   definitions: {
     events: [
       {
@@ -517,26 +516,7 @@ export const NUCLEAR_TRIP_RULES: OfficialScenarioRuleDefinition = {
         },
       },
     ],
-    objectives: [
-      {
-        id: "reliability",
-        label: "Keep the lights on through the reactor shutdown",
-        metric: "monthlyReliability",
-        fromMonth: 43,
-        throughMonth: 60,
-        minDemandServedShare: 0.995,
-      },
-    ],
-    debriefReports: [
-      {
-        id: "nuclear-shutdown-reliability",
-        label: "reactor shutdown window and recovery",
-        kind: "reliability",
-        fromMonth: 43,
-        throughMonth: 60,
-        minDemandServedShare: 0.995,
-      },
-    ],
+    objectives: [],
   },
   presentation: {
     "contingency-review": {
@@ -578,7 +558,6 @@ export const WILDFIRE_CORRIDOR_ID = "california-north";
 export const CALIFORNIA_WILDFIRE_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 111,
   arcId: "wildfire-intertie",
-  reliabilityNoun: "January and February 2025 intertie outage",
   definitions: {
     events: [
       {
@@ -611,26 +590,7 @@ export const CALIFORNIA_WILDFIRE_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 15,
       },
     ],
-    objectives: [
-      {
-        id: "reliability",
-        label: "Keep the lights on through the wildfire emergency",
-        metric: "monthlyReliability",
-        fromMonth: 37,
-        throughMonth: 38,
-        minDemandServedShare: 0.995,
-      },
-    ],
-    debriefReports: [
-      {
-        id: "wildfire-reliability",
-        label: "January and February 2025 intertie outage",
-        kind: "reliability",
-        fromMonth: 37,
-        throughMonth: 38,
-        minDemandServedShare: 0.995,
-      },
-    ],
+    objectives: [],
   },
   presentation: {
     readiness: {
