@@ -6060,6 +6060,9 @@ $homeSmokeCycle: 5.6s;
 .decisionImpactFactHelp {
   display: flex;
   align-items: flex-start;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
 }
 .decisionImpactFactContent {
   display: grid;
@@ -8472,6 +8475,7 @@ option {
     }
   }
 
+  .decisionImpactFactValue,
   .decisionImpactFactDetail {
     white-space: pre-line;
   }

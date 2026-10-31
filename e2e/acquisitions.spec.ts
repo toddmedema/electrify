@@ -126,10 +126,25 @@ for (const theme of ["light", "dark"] as const) {
         ).toContainText("current network costs included");
         await expect(
           payment.locator(".decisionImpactFactDetail"),
-        ).toContainText("Plant operations and purchased power vary");
+        ).not.toContainText("Plant operations and purchased power vary");
       }
       await expect(dialog).toContainText("Company supply margin");
-      await expect(dialog).toContainText("Projected month-end cash");
+      await expect(dialog).not.toContainText("Projected month-end cash");
+      await expect(dialog).not.toContainText("fee included");
+      await expect(dialog).not.toContainText(
+        "Acquire either utility by December 2014",
+      );
+      const plants = dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: /^Operating plants/ })
+        .locator(".decisionImpactFactValue");
+      await plants.scrollIntoViewIfNeeded();
+      const plantLines = (await plants.innerText()).split("\n");
+      expect(plantLines).toHaveLength(3);
+      const capacities = plantLines.map((line) =>
+        Number(line.match(/([\d.]+)MW/)![1]),
+      );
+      expect(capacities).toEqual([...capacities].sort((a, b) => b - a));
       await expect(dialog).toContainText("Operating plants");
       await expect(dialog).toContainText("Purchased power");
       await expect(dialog).not.toContainText(
@@ -139,6 +154,9 @@ for (const theme of ["light", "dark"] as const) {
         "This debt remains after selling plants",
       );
       await expect(dialog).not.toContainText("addressable accounts");
+      await dialog.locator(".MuiDialogContent-root").evaluate((element) => {
+        element.scrollTop = 0;
+      });
       const [titleBox, firstFactBox] = await Promise.all([
         dialog.locator(".closableDialogTitleText").boundingBox(),
         dialog.locator(".decisionImpactFactLabel").first().boundingBox(),

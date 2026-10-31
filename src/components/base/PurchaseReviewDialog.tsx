@@ -150,7 +150,7 @@ export default function PurchaseReviewDialog(
       label: "Cash purchase",
       value:
         props.paymentSummary?.cash.value ??
-        `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - cashDue)}`,
+        `${formatMoneyConcise(cashDue)} now`,
       detail: props.paymentSummary?.cash.detail,
     },
     {
@@ -161,18 +161,20 @@ export default function PurchaseReviewDialog(
       ),
       value:
         props.paymentSummary?.loan.value ??
-        `${formatMoneyConcise(financedCashDue)} + ${formatMoneyConcise(loan.monthlyPayment)}/mo · ${(interestRate * 100).toFixed(2)}%, ${loanMonths / 12} yrs`,
+        `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo · ${(interestRate * 100).toFixed(2)}%, ${loanMonths / 12} yrs`,
       detail:
         props.paymentSummary?.loan.detail ??
-        `Payments start now.${
+        ([
           cashOnlyFee > 0
-            ? ` Includes a ${formatMoneyConcise(cashOnlyFee)} cash-only transaction fee.`
-            : ""
-        }${
+            ? `Includes a ${formatMoneyConcise(cashOnlyFee)} cash-only transaction fee.`
+            : undefined,
           refinancedBalance > 0
-            ? ` Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
-            : ""
-        }`,
+            ? `Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
+            : undefined,
+        ]
+          .filter(Boolean)
+          .join(" ") ||
+          undefined),
     },
     ...(props.paymentSummary !== undefined
       ? []
