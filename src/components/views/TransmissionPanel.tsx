@@ -306,7 +306,6 @@ function IntertieBuildItem(props: {
       }}
       context={
         <>
-          {props.company && <span>Connect first · Acquire separately. </span>}
           <span className="nowrap">
             {corridor.routeType === "EXISTING"
               ? "Existing corridor"
@@ -521,7 +520,15 @@ function IntertieUpgradeControl(props: {
           buildCost={quote.buildCost}
           interestRate={interestRate}
           refinancedBalance={line.loanAmountLeft}
-          leadingFacts={[
+          upkeepLabel="Upkeep after upgrade"
+          upkeepBeforePerMonth={
+            (line.annualOperatingCost * props.costIndex) / 12
+          }
+          upkeepPerMonth={(quote.annualOperatingCost * props.costIndex) / 12}
+          upkeepDetail="Plus electricity purchases and loan payments."
+          onlineInLabel="Upgrade complete in"
+          onlineInMonths={months}
+          extraFacts={[
             {
               concept: "supply",
               label: "Import capacity",
@@ -539,16 +546,6 @@ function IntertieUpgradeControl(props: {
                 capacityAfter.exportCapacityW,
               ),
             },
-          ]}
-          upkeepLabel="Upkeep after upgrade"
-          upkeepBeforePerMonth={
-            (line.annualOperatingCost * props.costIndex) / 12
-          }
-          upkeepPerMonth={(quote.annualOperatingCost * props.costIndex) / 12}
-          upkeepDetail="Plus electricity purchases and loan payments."
-          onlineInLabel="Upgrade complete in"
-          onlineInMonths={months}
-          extraFacts={[
             {
               concept: "construction",
               label: "Construction emits",
@@ -1349,7 +1346,7 @@ export default function TransmissionPanel({
         </section>
       )}
 
-      {projectsOnly && (
+      {projectsOnly && !isUtilityExpansionGame(game) && (
         <Typography
           component="p"
           variant="body2"
@@ -1357,9 +1354,8 @@ export default function TransmissionPanel({
           className="transmissionIntro"
           sx={{ px: 1.5, pt: 1 }}
         >
-          {isUtilityExpansionGame(game)
-            ? "Compare company terms, build a connection, then review the separate acquisition. A connection alone does not buy the utility."
-            : "Connect to a neighboring grid to buy power when short and sell when you have spare."}
+          Connect to a neighboring grid to buy power when short and sell when
+          you have spare.
         </Typography>
       )}
       {projectsOnly && !unbuiltCorridors.length && (
@@ -1477,7 +1473,8 @@ export default function TransmissionPanel({
           interestRate={game.interestRate}
           cashDisabled={!now}
           loanDisabled={!now}
-          leadingFacts={[
+          onlineInMonths={Math.round(review.yearsToBuild * 12)}
+          extraFacts={[
             {
               concept: "supply",
               label: "Import capacity",
@@ -1492,24 +1489,16 @@ export default function TransmissionPanel({
             },
           ]}
           preface={
-            <Box sx={{ px: 2, pb: 1 }}>
-              <Typography variant="body2">
-                Ready in {Math.round(review.yearsToBuild * 12)} months.
+            game.date.monthsElapsed + review.yearsToBuild * 12 >=
+            (activeScenario(game)?.durationMonths ?? Infinity) ? (
+              <Typography
+                variant="body2"
+                color="warning.main"
+                sx={{ px: 2, pb: 1 }}
+              >
+                Won’t open before this mission ends.
               </Typography>
-              {isUtilityExpansionGame(game) &&
-                acquisitionTargetForCorridor(review.id) && (
-                  <Typography variant="body2" sx={{ mt: 1 }}>
-                    This buys the connection only. When it is ready, review and
-                    pay for the company separately.
-                  </Typography>
-                )}
-              {game.date.monthsElapsed + review.yearsToBuild * 12 >=
-                (activeScenario(game)?.durationMonths ?? Infinity) && (
-                <Typography variant="body2" color="warning.main">
-                  Won’t open before this mission ends.
-                </Typography>
-              )}
-            </Box>
+            ) : undefined
           }
           upkeepPerMonth={
             (review.annualOperatingCost *

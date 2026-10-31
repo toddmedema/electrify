@@ -466,7 +466,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   expect(impact).not.toHaveTextContent("What changes");
   expect(impact).toHaveTextContent("Cash purchase");
   expect(impact).toHaveTextContent(
-    /Loan option.* \+ .*\/mo · \d+\.\d+%, 30 yrs/,
+    /Loan option.* \+ .*\/mo \(\d+\.\d+% for 30 years\)/,
   );
   expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
