@@ -1,5 +1,7 @@
 import {
   ActiveSaveSession,
+  deleteSavedGame,
+  renameSavedGame,
   resumeSavedGame,
   failSaveLoading,
   getLoadingGeneration,
@@ -50,6 +52,8 @@ jest.mock("./SaveFile", () => ({ downloadSave: jest.fn() }));
 jest.mock("./SaveRepository", () => {
   const mockRepository = {
     prepareResume: jest.fn(),
+    delete: jest.fn().mockResolvedValue(undefined),
+    rename: jest.fn(),
     release: jest.fn().mockResolvedValue(undefined),
     markOpened: jest.fn(),
     renew: jest.fn(),
@@ -696,4 +700,124 @@ test("waking renews the same desktop writer without releasing or stealing its le
   );
   expect(store.getState().saves.saveState).toBe("failed");
   expect(repository.release).not.toHaveBeenCalled();
+});
+
+test("a committed deletion completes even if the library refresh never settles", async () => {
+  const repository = await openActive();
+  const refresh = deferred<SaveMetadata[]>();
+  repository.list.mockReturnValueOnce(refresh.promise);
+  try {
+    await deleteSavedGame("A");
+    expect(repository.delete).toHaveBeenCalledWith(
+      "A",
+      expect.objectContaining({ saveId: "A" }),
+      undefined,
+    );
+    expect(store.getState().saves.activeId).toBeUndefined();
+    expect(store.getState().game.inGame).toBe(false);
+  } finally {
+    refresh.resolve([]);
+    repository.list.mockResolvedValue([]);
+  }
+});
+
+test("canceling deletion while a writer is settling leaves it usable and never deletes late", async () => {
+  const repository = await openActive();
+  repository.delete.mockClear();
+  const settling = deferred<void>();
+  const settle = jest
+    .spyOn(ActiveSaveSession.prototype, "settle")
+    .mockReturnValueOnce(settling.promise);
+  const abort = new AbortController();
+  try {
+    const deleting = deleteSavedGame("A", abort.signal);
+    await eventually(() => settle.mock.calls.length > 0);
+    abort.abort();
+    await expect(deleting).rejects.toMatchObject({ name: "AbortError" });
+    settling.resolve();
+    await settling.promise;
+    expect(repository.delete).not.toHaveBeenCalled();
+    expect(store.getState().saves.activeId).toBe("A");
+    repository.writeSnapshot.mockClear();
+    store.dispatch(delta({ dollarsPerkWh: 0.19 }));
+    await snapshotSavedGame("A");
+    expect(repository.writeSnapshot).toHaveBeenCalled();
+  } finally {
+    settling.resolve();
+    settle.mockRestore();
+    await quitSavedGame();
+  }
+});
+
+test("a retry waits for canceled deletion cleanup before suspending the same writer", async () => {
+  const repository = await openActive();
+  repository.delete.mockClear();
+  const rollback = deferred<void>();
+  const retryCommit = deferred<void>();
+  repository.delete
+    .mockReturnValueOnce(rollback.promise)
+    .mockReturnValueOnce(retryCommit.promise);
+  const abort = new AbortController();
+  const first = deleteSavedGame("A", abort.signal);
+  await eventually(() => repository.delete.mock.calls.length === 1);
+  abort.abort();
+  const retry = deleteSavedGame("A");
+  try {
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(repository.delete).toHaveBeenCalledTimes(1);
+    rollback.reject(new DOMException("Canceled", "AbortError"));
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+    await eventually(() => repository.delete.mock.calls.length === 2);
+    repository.writeSnapshot.mockClear();
+    store.dispatch(delta({ dollarsPerkWh: 0.21 }));
+    await snapshotSavedGame("A");
+    expect(repository.writeSnapshot).not.toHaveBeenCalled();
+    retryCommit.resolve();
+    await retry;
+    expect(store.getState().saves.activeId).toBeUndefined();
+  } finally {
+    rollback.resolve();
+    retryCommit.resolve();
+    await first.catch(() => undefined);
+    await retry;
+    await quitSavedGame();
+  }
+});
+
+test("renaming waits for canceled deletion cleanup and keeps its writer suspended", async () => {
+  const repository = await openActive();
+  repository.delete.mockClear();
+  repository.rename.mockClear();
+  const rollback = deferred<void>();
+  const renamed = deferred<SaveMetadata>();
+  repository.delete.mockReturnValueOnce(rollback.promise);
+  repository.rename.mockReturnValueOnce(renamed.promise);
+  const abort = new AbortController();
+  const deleting = deleteSavedGame("A", abort.signal);
+  await eventually(() => repository.delete.mock.calls.length === 1);
+  abort.abort();
+  const renaming = renameSavedGame("A", "New name");
+  try {
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(repository.rename).not.toHaveBeenCalled();
+    rollback.reject(new DOMException("Canceled", "AbortError"));
+    await expect(deleting).rejects.toMatchObject({ name: "AbortError" });
+    await eventually(() => repository.rename.mock.calls.length === 1);
+    repository.writeSnapshot.mockClear();
+    store.dispatch(delta({ dollarsPerkWh: 0.22 }));
+    await snapshotSavedGame("A");
+    expect(repository.writeSnapshot).not.toHaveBeenCalled();
+    renamed.resolve({ ...metadata(2), name: "New name" });
+    await renaming;
+    expect(store.getState().saves.activeId).toBe("A");
+    expect(store.getState().saves.pendingName).toBe("New name");
+  } finally {
+    rollback.resolve();
+    renamed.resolve({ ...metadata(2), name: "New name" });
+    await deleting.catch(() => undefined);
+    await renaming;
+    await quitSavedGame();
+  }
 });

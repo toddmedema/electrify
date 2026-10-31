@@ -4,6 +4,7 @@ import { expect, test, Page } from "./fixtures";
 import { decodeSave } from "../src/SaveEncoding";
 import type { SaveGameType } from "../src/Types";
 import { copySavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
+import { SAVE_DATABASE_NAME } from "../src/SaveRepository";
 
 async function startGame(page: Page) {
   await page.goto("/?scenario=101");
@@ -321,4 +322,93 @@ test("the same tab can reload or navigate home and resume without waiting for le
     original.metadata.id,
   );
   expect(await readSaveRecords(page)).toHaveLength(1);
+});
+
+test("a blocked delete releases the dialog at six seconds and can be retried", async ({
+  page,
+}, info) => {
+  await page.addInitScript(
+    (theme) => localStorage.setItem("theme", theme),
+    info.project.name === "mobile-390px" ? "dark" : "light",
+  );
+  await startGame(page);
+  await openSavedGames(page);
+  const original = (await readSaveRecords(page))[0];
+  const row = page.locator(`[data-save-id="${original.metadata.id}"]`);
+  await row.getByRole("button", { name: /^Actions for/ }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  // A real conflicting IndexedDB transaction reproduces an unavailable storage
+  // operation without replacing the app's delete API or using the network.
+  await page.evaluate(
+    (databaseName) =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open(databaseName);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction(
+            ["saves", "payloads", "sessions", "sync"],
+            "readwrite",
+          );
+          const store = tx.objectStore("saves");
+          let blocking = true;
+          Object.assign(window, {
+            releaseDeleteBlocker: () => {
+              blocking = false;
+            },
+          });
+          tx.oncomplete = () => db.close();
+          tx.onabort = () => db.close();
+          const keepBusy = () => {
+            const pending = store.get("__delete_blocker__");
+            pending.onsuccess = () => {
+              if (blocking) keepBusy();
+            };
+          };
+          keepBusy();
+          resolve();
+        };
+      }),
+    SAVE_DATABASE_NAME,
+  );
+  const dialog = page.getByRole("dialog", { name: "Delete saved game?" });
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(
+    dialog.getByRole("button", { name: "Deleting…" }),
+  ).toBeDisabled();
+  const toast = page.getByText(
+    "Delete may have failed. Please try again later.",
+    { exact: true },
+  );
+  await expect(toast).toBeVisible({ timeout: 8000 });
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    row.getByRole("button", { name: "Load", exact: true }),
+  ).toBeEnabled();
+  if (
+    process.env.REVIEW_SCREENSHOT_DIR &&
+    ["desktop-chromium", "mobile-390px"].includes(info.project.name)
+  ) {
+    await page.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        `delete-timeout-${info.project.name}.png`,
+      ),
+      animations: "disabled",
+    });
+  }
+  await page.evaluate(() => {
+    (
+      window as unknown as { releaseDeleteBlocker: () => void }
+    ).releaseDeleteBlocker();
+  });
+  // An aborted queued delete must not run later when storage becomes available.
+  await expect.poll(async () => (await readSaveRecords(page)).length).toBe(1);
+  await row.getByRole("button", { name: /^Actions for/ }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "No saved games yet" }),
+  ).toBeVisible();
 });
