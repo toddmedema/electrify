@@ -24,7 +24,7 @@ import {
   ManualGroupType,
   manualEntryText,
 } from "../base/ManualEntries";
-import { ManualEntryNavigation } from "../base/ManualEntryLink";
+import { ManualEntryNavigation, manualEntryId } from "../base/ManualEntryLink";
 
 export interface StateProps {
   // Set when the player arrived via a deep link from a term shown elsewhere in the game
@@ -82,10 +82,6 @@ let lastScrollTop = 0;
 export function clearManualMemory() {
   lastSearchTerm = "";
   lastScrollTop = 0;
-}
-
-function entryId(title: string): string {
-  return `manual-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 }
 
 // The list is the scroller, except on short windows where #gameCard takes over and the list
@@ -176,19 +172,12 @@ interface ManualItemProps {
   expanded: boolean;
   onToggle: (title: string, expanded: boolean) => void;
   itemRef?: React.Ref<HTMLDivElement>;
-  onTransitionStart: (title: string) => void;
-  onTransitionEnd: (title: string) => void;
   onFollowLink: (to: ManualEntryTitleType, from: ManualEntryTitleType) => void;
 }
 
 function ManualItem(props: ManualItemProps): React.JSX.Element {
   const { entry, searchTerm, expanded, onFollowLink } = props;
-  const id = entryId(entry.title);
-  const { onTransitionEnd } = props;
-  React.useEffect(
-    () => () => onTransitionEnd(entry.title),
-    [entry.title, onTransitionEnd],
-  );
+  const id = manualEntryId(entry.title);
   const followLink = React.useCallback(
     (to: ManualEntryTitleType) => onFollowLink(to, entry.title),
     [onFollowLink, entry.title],
@@ -203,15 +192,7 @@ function ManualItem(props: ManualItemProps): React.JSX.Element {
       ref={props.itemRef}
       square
       disableGutters
-      slotProps={{
-        transition: {
-          unmountOnExit: true,
-          onEnter: () => props.onTransitionStart(entry.title),
-          onExit: () => props.onTransitionStart(entry.title),
-          onEntered: () => onTransitionEnd(entry.title),
-          onExited: () => onTransitionEnd(entry.title),
-        },
-      }}
+      slotProps={{ transition: { unmountOnExit: true } }}
     >
       <AccordionSummary
         expandIcon={<ChevronDownGlyph className="rowChevron" />}
@@ -232,9 +213,7 @@ function ManualItem(props: ManualItemProps): React.JSX.Element {
 }
 
 export default function Manual(props: Props): React.JSX.Element {
-  const { onBack, onFollowLink } = props;
-  const [focusEntry, setFocusEntry] = React.useState(props.focusEntry);
-  const [focusRequest, setFocusRequest] = React.useState(0);
+  const { onBack, onFollowLink, focusEntry, focusKey } = props;
   // A deep link is a fresh question, so it ignores (and clears) whatever the last visit left
   const [searchTerm, setSearchTerm] = React.useState<string>(
     focusEntry ? "" : lastSearchTerm,
@@ -244,18 +223,21 @@ export default function Manual(props: Props): React.JSX.Element {
   const [toggled, setToggled] = React.useState<Record<string, boolean>>({});
   const listRef = React.useRef<HTMLDivElement>(null);
   const focusRef = React.useRef<HTMLDivElement>(null);
-  const transitioning = React.useRef(new Set<string>());
-  const revealRequested = React.useRef(false);
-  const revealFrame = React.useRef(0);
-  React.useEffect(() => () => cancelAnimationFrame(revealFrame.current), []);
-  const revealFocusedEntry = React.useCallback(() => {
-    if (!revealRequested.current || transitioning.current.size) return;
-    cancelAnimationFrame(revealFrame.current);
-    revealFrame.current = requestAnimationFrame(() => {
+  // 0: idle, 1: focus the destination, 2: wait for its layout to settle.
+  const revealRequested = React.useRef<0 | 1 | 2>(0);
+  const revealFocusedEntry = React.useCallback(function reveal() {
+    requestAnimationFrame(() => {
       const focused = focusRef.current;
-      if (!revealRequested.current || transitioning.current.size || !focused)
+      if (!revealRequested.current || !focused) return;
+      if (
+        listRef.current?.querySelector(
+          ".MuiCollapse-root:not(.MuiCollapse-entered):not(.MuiCollapse-hidden)",
+        )
+      ) {
+        reveal();
         return;
-      revealRequested.current = false;
+      }
+      revealRequested.current = 0;
       if (listRef.current) {
         const scroller = scrollContainerOf(listRef.current);
         const top =
@@ -271,16 +253,6 @@ export default function Manual(props: Props): React.JSX.Element {
       }
     });
   }, []);
-  const onTransitionStart = React.useCallback((title: string) => {
-    transitioning.current.add(title);
-  }, []);
-  const onTransitionEnd = React.useCallback(
-    (title: string) => {
-      transitioning.current.delete(title);
-      revealFocusedEntry();
-    },
-    [revealFocusedEntry],
-  );
 
   const term = searchTerm.trim().toLowerCase();
   const searching = term.length > 0;
@@ -293,18 +265,14 @@ export default function Manual(props: Props): React.JSX.Element {
     setToggled({});
   }
 
-  const openEntry = React.useCallback((title: string) => {
-    setSearchTerm("");
-    setToggled({ [title]: true });
-    setFocusEntry(title);
-    // Revisit requests matter even when the entry title has not changed:
-    // searching may have hidden it and moved keyboard focus elsewhere.
-    setFocusRequest((request) => request + 1);
-  }, []);
-
-  React.useEffect(() => {
-    if (props.focusEntry) openEntry(props.focusEntry);
-  }, [props.focusEntry, props.focusKey, openEntry]);
+  React.useLayoutEffect(() => {
+    if (focusEntry) {
+      setSearchTerm("");
+      setToggled({ [focusEntry]: true });
+      // focusKey also requests a revisit when search has hidden the same entry.
+      revealRequested.current = 1;
+    }
+  }, [focusEntry, focusKey]);
 
   React.useEffect(() => {
     lastSearchTerm = searchTerm;
@@ -319,17 +287,17 @@ export default function Manual(props: Props): React.JSX.Element {
   }, [focusEntry]);
 
   React.useLayoutEffect(() => {
-    if (focusEntry && focusRef.current) {
+    if (revealRequested.current === 1 && focusRef.current) {
+      revealRequested.current = 2;
       // Focus without the browser scrolling to an intermediate accordion height.
       focusRef.current
         .querySelector<HTMLButtonElement>(".MuiAccordionSummary-root")
         ?.focus({ preventScroll: true });
-      revealRequested.current = true;
       // A link can both collapse earlier entries and expand its target. Align only once
       // all those transitions finish, or the closing content moves the target again.
       revealFocusedEntry();
     }
-  }, [focusEntry, focusRequest, revealFocusedEntry]);
+  });
 
   const matches = React.useMemo(
     () =>
@@ -358,8 +326,6 @@ export default function Manual(props: Props): React.JSX.Element {
         expanded={toggled[entry.title] ?? (searching || isFocused)}
         onToggle={onToggle}
         onFollowLink={onFollowLink}
-        onTransitionStart={onTransitionStart}
-        onTransitionEnd={onTransitionEnd}
         itemRef={isFocused ? focusRef : undefined}
       />
     );
