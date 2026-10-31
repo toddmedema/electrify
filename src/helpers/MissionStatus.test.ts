@@ -23,12 +23,13 @@ import { selectProjection } from "./Projection";
 import { selectUpcomingStoryEvents } from "../components/views/StoryEventSelectors";
 import { store } from "../Store";
 
+const wildfire = SCENARIOS.find((s) => s.id === 111)!;
+
 const createNextState = (
   game: GameType,
   recipe: (game: GameType) => void,
 ): GameType => produce(game, (draft) => recipe(draft as GameType));
 
-const wildfire = SCENARIOS.find((s) => s.id === 111)!;
 function fixture(month = 0): GameType {
   const game = createGame({ scenarioId: 111 });
   return createNextState(game, (draft) => {
@@ -65,93 +66,7 @@ const monthRow = (
 const requirement = (game: GameType, id: string) =>
   getMissionStatus(game).requirements.find((row) => row.id === id)!;
 
-test.each<[number, string]>([
-  [107, "Feb 2021"],
-  [108, "Jun–Aug 2026"],
-  [110, "Jul 2026–Dec 2027"],
-  [111, "Jan–Feb 2025"],
-  [113, "2022"],
-])(
-  "reliability copy names the full monthly window for scenario %s",
-  (id, window) => {
-    const game = createGame({ scenarioId: id });
-    const objective = SCENARIOS.find(
-      (scenario) => scenario.id === id,
-    )!.reliabilityObjective!;
-    expect(requirement(game, "reliability")).toMatchObject({
-      target: `≥99.5% of demand monthly · ${window}`,
-      current: `0/${objective.durationMonths || 1} months completed`,
-    });
-  },
-);
-
-test("the reliability requirement is headed by its imperative goal", () => {
-  expect(requirement(fixture(), "reliability").label).toBe(
-    "Keep the lights on through the wildfire emergency",
-  );
-});
-
-test("reliability progress never rounds a failed month up to its target", () => {
-  const game = createNextState(fixture(37), (g) => {
-    g.monthlyHistory = [monthRow(2025, 1, 99.499, 100)];
-  });
-  expect(requirement(game, "reliability")).toMatchObject({
-    status: "failed",
-    current: "Lowest 99.499% · 1/2 months completed",
-  });
-});
-
-test("wildfire window is pending, partial, complete or failed using completed months", () => {
-  expect(getMissionStatus(fixture(35)).headline?.id).toBe("reliability");
-  expect(requirement(fixture(35), "reliability").status).toBe("pending");
-  expect(requirement(fixture(36), "reliability").status).toBe("pending");
-  const partial = createNextState(fixture(37), (g) => {
-    g.monthlyHistory = [monthRow(2025, 2, 0), monthRow(2025, 1)];
-  });
-  expect(requirement(partial, "reliability").status).toBe("in-progress");
-  expect(requirement(partial, "reliability").current).toContain(
-    "1/2 months completed",
-  );
-  const completed = createNextState(fixture(38), (g) => {
-    g.monthlyHistory = [monthRow(2025, 2), monthRow(2025, 1)];
-  });
-  expect(requirement(completed, "reliability").status).toBe("completed");
-  const failed = createNextState(completed, (g) => {
-    g.monthlyHistory[0].supplyWh = 99;
-  });
-  expect(requirement(failed, "reliability").status).toBe("failed");
-  expect(getMissionStatus(failed).prominent?.id).toBe("reliability");
-  expect(getMissionStatus(failed).headline?.compact).toContain("(99%)");
-  expect(
-    GameModule.scenarioObjectiveFailure(wildfire, failed.monthlyHistory),
-  ).toContain("99.00%");
-});
-
-test("empty and partial required history show the canonical unavailable verdict", () => {
-  for (const months of [38, 60]) {
-    for (const rows of [[], [monthRow(2025, 1)]]) {
-      const game = createNextState(fixture(months), (g) => {
-        g.monthlyHistory = rows;
-      });
-      expect(requirement(game, "reliability").status).toBe("unknown");
-      expect(requirement(game, "reliability").current).toContain(
-        "not verifiable",
-      );
-      expect(getMissionStatus(game).headline?.compact).toContain(
-        "incomplete history",
-      );
-      expect(GameModule.scenarioObjectiveFailure(wildfire, rows)).toContain(
-        "unverifiable",
-      );
-    }
-  }
-  expect(getMissionStatus(fixture(60)).finalNote).toContain(
-    "recorded final outcome",
-  );
-  expect(getMissionStatus(fixture(60)).monthsRemaining).toBe(0);
-});
-
-test("zero demand is unverifiable and cannot invent blackout failure", () => {
+test("zero demand cannot invent blackout failure", () => {
   const game = createNextState(fixture(38), (g) => {
     g.monthlyHistory = [
       monthRow(2025, 2, 0, 0),
@@ -159,11 +74,7 @@ test("zero demand is unverifiable and cannot invent blackout failure", () => {
       monthRow(2024, 12, 0, 0),
     ];
   });
-  expect(requirement(game, "reliability").status).toBe("unknown");
   expect(requirement(game, "survival").status).toBe("in-progress");
-  expect(
-    GameModule.scenarioObjectiveFailure(wildfire, game.monthlyHistory),
-  ).toContain("unverifiable");
 });
 
 test("survival is chronological completed evidence and ignores current partial history", () => {
@@ -177,7 +88,7 @@ test("survival is chronological completed evidence and ignores current partial h
   });
   expect(requirement(game, "survival").status).toBe("failed");
   expect(requirement(game, "survival").compact).toBe(
-    "Avoid 3 consecutive months < 90% served (80%, 80%, 80%)",
+    "Avoid 3 consecutive months < 95% served (80%, 80%, 80%)",
   );
   expect(requirement(game, "cash").timing).toContain(
     "negative cash now is a warning",
@@ -197,7 +108,7 @@ test.each([
   [2_678_123_456, "$2.68B"],
   [2_600_000_000, "$2.60B"],
   [268_123_456, "$268M"],
-  [-2_678_123, "$-2.68M"],
+  [-2_678_123, "-$2.68M"],
 ])("solvency cash %s uses the header's rounded amount %s", (cash, amount) => {
   const game = createNextState(fixture(), (g) => {
     g.timeline[0].cash = cash;
@@ -208,7 +119,7 @@ test.each([
   });
 });
 
-test("Expert survival text and verdict use the 95% firing threshold", () => {
+test("CEO survival text and verdict use the 99.5% firing threshold", () => {
   const game = createNextState(fixture(29), (g) => {
     g.difficulty = "CEO";
     g.monthlyHistory = [
@@ -219,13 +130,14 @@ test("Expert survival text and verdict use the 95% firing threshold", () => {
   });
   expect(requirement(game, "survival")).toMatchObject({
     status: "failed",
-    target: "Avoid 3 consecutive months <95% served",
-    compact: "Avoid 3 consecutive months < 95% served (92%, 92%, 92%)",
+    target:
+      "Serving less than 99.5% of demand for 3 months in a row ends the run.",
+    compact: "Avoid 3 consecutive months < 99.5% served (92%, 92%, 92%)",
   });
   expect(
     requirement(
       createNextState(game, (g) => {
-        g.difficulty = "VP";
+        g.difficulty = "Intern";
       }),
       "survival",
     ).status,
@@ -252,11 +164,13 @@ test("retention shows completed-month customers against the final target while r
   expect(requirement(low, "retention").status).toBe("in-progress");
   expect(getMissionStatus(low).headline?.id).toBe("retention");
   expect(getMissionStatus(low).headline?.compact).toMatch(
-    /^Retain ≥.*% of starting customers/,
+    /^Keep ≥.*% of customer baseline/,
   );
-  expect(requirement(low, "retention").target).toContain("starting customers");
+  expect(requirement(low, "retention").target).toContain(
+    "Keep ≥90% of customer baseline",
+  );
   expect(requirement(low, "retention").definition).toContain(
-    "recorded starting customers",
+    "recorded customer baseline",
   );
 });
 
@@ -327,8 +241,12 @@ test("risk precedence distinguishes actual shortage, cash, required failure and 
   expect(
     selectMissionRisk(shortage, [event], getMissionStatus(shortage))?.id,
   ).toBe("shortage");
-  const failed = createNextState(fixture(38), (g) => {
-    g.monthlyHistory = [monthRow(2025, 2, 99), monthRow(2025, 1)];
+  const failed = createNextState(createGame({ scenarioId: 100 }), (g) => {
+    delete g.objectiveProgress;
+    g.date = getDateFromMinute(143 * MINUTES_PER_MONTH, g.startingYear);
+    g.monthlyHistory = [
+      { ...monthRow(g.date.year, g.date.monthNumber - 1), customers: 0 },
+    ];
     g.timeline.push(
       Object.assign({}, g.timeline[0], {
         minute: g.date.minute + 15,
@@ -336,7 +254,7 @@ test("risk precedence distinguishes actual shortage, cash, required failure and 
       }),
     );
   });
-  expect(selectMissionRisk(failed)?.id).toBe("reliability");
+  expect(selectMissionRisk(failed)?.id).toBe("objective:retention");
   expect(
     selectMissionRisk(fixture(), [event, { ...event, key: "a" }])?.id,
   ).toBe("event:a");
@@ -352,12 +270,16 @@ test("risk precedence distinguishes actual shortage, cash, required failure and 
 });
 
 test("reuses the current mission status without reading completed history again", () => {
-  const game = createNextState(fixture(38), (g) => {
-    g.monthlyHistory = [monthRow(2025, 2, 99), monthRow(2025, 1)];
+  const game = createNextState(createGame({ scenarioId: 100 }), (g) => {
+    delete g.objectiveProgress;
+    g.date = getDateFromMinute(143 * MINUTES_PER_MONTH, g.startingYear);
+    g.monthlyHistory = [
+      { ...monthRow(g.date.year, g.date.monthNumber - 1), customers: 0 },
+    ];
   });
   const mission = getMissionStatus(game);
   const expected = selectMissionRisk(game);
-  expect(expected?.id).toBe("reliability");
+  expect(expected?.id).toBe("objective:retention");
   const alreadySummarized = {
     ...game,
     get monthlyHistory(): MonthlyHistoryType[] {

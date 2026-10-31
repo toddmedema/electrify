@@ -22,7 +22,7 @@ export const initialUI: UIType = {
   snackbar: {
     message: "",
     open: false,
-    timeout: 6000,
+    timeout: 3500,
   },
   victory: null,
   selectedFacilityId: null,
@@ -90,6 +90,7 @@ export const uiSlice = createSlice({
             timeout: action.payload.timeout || initialUI.snackbar.timeout,
             action: action.payload.action,
             actionLabel: action.payload.actionLabel,
+            overModal: action.payload.overModal,
           },
         };
       }

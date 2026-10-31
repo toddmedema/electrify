@@ -305,19 +305,6 @@ const retention = (
   deadlineMonth,
   minRetainedShare,
 });
-const reliability = (
-  label: string,
-  fromMonth: number,
-  throughMonth: number,
-  minDemandServedShare = 0.995,
-): RuleObjective => ({
-  id: "reliability",
-  label,
-  metric: "monthlyReliability",
-  fromMonth,
-  throughMonth,
-  minDemandServedShare,
-});
 const reliabilityReport = (
   id: string,
   fromMonth: number,
@@ -352,7 +339,6 @@ export const DATA_CENTER_RULES: OfficialScenarioRuleDefinition = {
 export const DEEP_FREEZE_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 107,
   arcId: "texas-deep-freeze",
-  reliabilityNoun: "February 2021 freeze",
   definitions: {
     events: [
       {
@@ -362,7 +348,7 @@ export const DEEP_FREEZE_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 50,
         durationMonths: 1,
         visibility: "forecast",
-        preview: "Demand rising as plant output falls and gas prices climb.",
+        preview: "Demand will rise as plant output falls and gas prices climb.",
         effects: {
           temperatureOffsetC: -20,
           demandMultiplier: { byDifficulty: TEXAS_DEEP_FREEZE_DEMAND },
@@ -383,10 +369,10 @@ export const DEEP_FREEZE_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 51,
         visibility: "forecast",
         preview:
-          "Normal plant output and gas prices returning as the cold eases.",
+          "Normal plant output and gas prices will return as the cold eases.",
       },
     ],
-    objectives: [reliability("Keep the lights on through the freeze", 50, 50)],
+    objectives: [],
     debriefReports: [
       {
         id: "deep-freeze-review",
@@ -424,19 +410,19 @@ export const CARBON_FEE_RULES: OfficialScenarioRuleDefinition = {
     events: [
       {
         id: "published-ratchet",
-        title: "Higher pollution fee announced",
-        message: "The pollution fee rises in January 2024.",
+        title: "Higher carbon fee announced",
+        message: "The carbon fee rises in January 2024.",
         startMonth: 13,
         visibility: "forecast",
       },
       {
         id: "ratchet-onset",
-        title: "Higher pollution fee begins",
-        message: "The pollution fee raises coal and gas running costs.",
+        title: "Higher carbon fee begins",
+        message: "The carbon fee raises coal and gas running costs.",
         startMonth: 49,
         durationMonths: 96,
         visibility: "forecast",
-        preview: "Coal and gas costing more to run.",
+        preview: "Coal and gas will cost more to run.",
         effects: {
           carbonFeeDollarsPerTonneCO2e: { byDifficulty: CARBON_FEE_BALANCE },
         },
@@ -449,7 +435,7 @@ export const CARBON_FEE_RULES: OfficialScenarioRuleDefinition = {
       hidePreview: true,
       messageByDifficulty: byDifficulty(
         (difficulty) =>
-          `The pollution fee rises to $${CARBON_FEE_BALANCE[difficulty]} per ton in January 2024. Coal faces the biggest increase.`,
+          `The carbon fee rises to $${CARBON_FEE_BALANCE[difficulty]} per ton in January 2024. Coal faces the biggest increase.`,
       ),
       attributesByDifficulty: facts((difficulty) => ({
         feePerTon: CARBON_FEE_BALANCE[difficulty],
@@ -457,10 +443,10 @@ export const CARBON_FEE_RULES: OfficialScenarioRuleDefinition = {
       source: source("goal", "NOTABLE", GENERATOR_TARGET),
     },
     "ratchet-onset": {
-      previewTitle: "Pollution fees rising",
+      previewTitle: "Carbon fee rising",
       messageByDifficulty: byDifficulty(
         (difficulty) =>
-          `The pollution fee is now $${CARBON_FEE_BALANCE[difficulty]} per ton, raising coal and gas running costs.`,
+          `The carbon fee is now $${CARBON_FEE_BALANCE[difficulty]} per ton, raising coal and gas running costs.`,
       ),
       attributesByDifficulty: facts((difficulty) => ({
         feePerTon: CARBON_FEE_BALANCE[difficulty],
@@ -490,7 +476,7 @@ export const SHALE_BOOM_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 49,
         durationMonths: 74,
         visibility: "forecast",
-        preview: "Regional shale glut lowering local gas prices.",
+        preview: "A regional shale glut will lower local gas prices.",
         effects: {
           fuelPriceMultipliers: {
             "Natural Gas": values(
@@ -514,7 +500,7 @@ export const SHALE_BOOM_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 97,
         durationMonths: 3,
         visibility: "forecast",
-        preview: "Gas costs spiking and gas plants producing less.",
+        preview: "Gas costs will spike and gas plants will produce less.",
         effects: {
           fuelPriceMultipliers: {
             "Natural Gas": values(
@@ -534,7 +520,7 @@ export const SHALE_BOOM_RULES: OfficialScenarioRuleDefinition = {
         message: "Gas prices return to normal.",
         startMonth: 123,
         visibility: "forecast",
-        preview: "Natural gas prices returning to normal.",
+        preview: "Natural gas prices will return to normal.",
       },
       {
         id: "freeze-recovery",
@@ -543,7 +529,8 @@ export const SHALE_BOOM_RULES: OfficialScenarioRuleDefinition = {
           "Gas output is fully restored, and lower boom-era prices return.",
         startMonth: 100,
         visibility: "forecast",
-        preview: "Plant limits lifting and lower boom-era prices returning.",
+        preview:
+          "Plant limits will lift and lower boom-era prices will return.",
       },
     ],
     objectives: [retention(240)],
@@ -634,7 +621,7 @@ export const PARADISE_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 29,
         durationMonths: 18,
         visibility: "forecast",
-        preview: "More visitors increasing electricity use.",
+        preview: "More visitors will increase electricity use.",
         effects: {
           demandMultiplier: values(
             (difficulty) => PARADISE_BALANCE[difficulty].visitorDemand,
@@ -655,7 +642,7 @@ export const PARADISE_RULES: OfficialScenarioRuleDefinition = {
         message: "Visitor electricity use returns to normal.",
         startMonth: 47,
         visibility: "forecast",
-        preview: "Visitor electricity use returning to normal.",
+        preview: "Visitor electricity use will return to normal.",
       },
       {
         id: "oil-shock",
@@ -664,7 +651,7 @@ export const PARADISE_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 117,
         durationMonths: 3,
         visibility: "forecast",
-        preview: "Delayed fuel shipment raising oil prices.",
+        preview: "A delayed fuel shipment will raise oil prices.",
         effects: {
           fuelPriceMultipliers: {
             Oil: values((difficulty) => PARADISE_BALANCE[difficulty].oilShock),
@@ -677,7 +664,7 @@ export const PARADISE_RULES: OfficialScenarioRuleDefinition = {
         message: "Review last year's local power and reliability.",
         startMonth: 121,
         visibility: "forecast",
-        preview: "Assessing local generation and grid reliability.",
+        preview: "Local generation and grid reliability will be assessed.",
       },
       {
         id: "cargo-restored",
@@ -685,7 +672,7 @@ export const PARADISE_RULES: OfficialScenarioRuleDefinition = {
         message: "Oil deliveries and prices return to normal.",
         startMonth: 120,
         visibility: "forecast",
-        preview: "Oil deliveries and prices returning to normal.",
+        preview: "Oil deliveries and prices will return to normal.",
       },
     ],
     objectives: [retention(156)],
@@ -769,7 +756,7 @@ export const RENEWABLES_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 1,
         durationMonths: 144,
         visibility: "forecast",
-        preview: "New gas plants becoming cheaper to build.",
+        preview: "New gas plants will become cheaper to build.",
         effects: {
           constructionCostMultipliersByFuel: {
             "Natural Gas": values(
@@ -793,7 +780,8 @@ export const RENEWABLES_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 85,
         durationMonths: 60,
         visibility: "forecast",
-        preview: "New solar plants and wind farms becoming cheaper to build.",
+        preview:
+          "New solar plants and wind farms will become cheaper to build.",
         effects: {
           constructionCostMultipliersByFuel: {
             Sun: values(
@@ -820,7 +808,7 @@ export const RENEWABLES_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 121,
         durationMonths: 24,
         visibility: "forecast",
-        preview: "Factory growth increasing electricity use.",
+        preview: "Factory growth will increase electricity use.",
         effects: {
           demandMultiplier: values(
             (difficulty) => RENEWABLES_BALANCE[difficulty].demandLoad,
@@ -833,7 +821,7 @@ export const RENEWABLES_RULES: OfficialScenarioRuleDefinition = {
         message: "Review last year's clean power and backup capacity.",
         startMonth: 133,
         visibility: "forecast",
-        preview: "Assessing renewable generation and backup capacity.",
+        preview: "Renewable generation and backup capacity will be assessed.",
       },
     ],
     objectives: [retention(144)],
@@ -923,7 +911,6 @@ export const RENEWABLES_RULES: OfficialScenarioRuleDefinition = {
 export const HEATWAVE_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 108,
   arcId: "heatwave-drought",
-  reliabilityNoun: "2026 heatwave and drought",
   definitions: {
     events: [
       {
@@ -985,22 +972,10 @@ export const HEATWAVE_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
         startMonth: 33,
         visibility: "forecast",
         preview:
-          "Cooler weather lowering demand, with slower reservoir recovery.",
+          "Cooler weather will lower demand, with slower reservoir recovery.",
       },
     ],
-    objectives: [
-      reliability("Keep the lights on through the heatwave", 42, 44),
-    ],
-    debriefReports: [
-      {
-        id: "heatwave-drought-reliability",
-        label: "2026 heatwave and drought",
-        kind: "reliability",
-        fromMonth: 42,
-        throughMonth: 44,
-        minDemandServedShare: 0.995,
-      },
-    ],
+    objectives: [],
   },
   presentation: {
     "seasonal-warning": {
@@ -1043,7 +1018,6 @@ export const HEATWAVE_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
 export const KARIBA_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 114,
   arcId: "kariba-drought",
-  reliabilityNoun: "2016 drought",
   definitions: {
     events: [
       {
@@ -1068,10 +1042,10 @@ export const KARIBA_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
         visibility: "forecast" as const,
         preview:
           step === 3
-            ? "Better rains increasing inflow and helping hydro output recover."
+            ? "Better rains will increase inflow and help hydro output recover."
             : step === 0
-              ? "Poor rains reducing reservoir inflow and hydro output."
-              : "Reservoir inflow and hydro output decreasing further.",
+              ? "Poor rains will reduce reservoir inflow and hydro output."
+              : "Reservoir inflow and hydro output will decrease further.",
         effects: {
           hydroInflowMultiplier: values(
             (difficulty) =>
@@ -1086,19 +1060,7 @@ export const KARIBA_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
         },
       })),
     ],
-    objectives: [
-      reliability("Keep the grid running through the drought", 49, 60, 0.98),
-    ],
-    debriefReports: [
-      {
-        id: "kariba-drought-reliability",
-        label: "2016 drought",
-        kind: "reliability",
-        fromMonth: 49,
-        throughMonth: 60,
-        minDemandServedShare: 0.98,
-      },
-    ],
+    objectives: [],
   },
   presentation: {
     "poor-rains-forecast": {
@@ -1138,7 +1100,6 @@ export const KARIBA_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
 export const DELHI_SUMMER_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 115,
   arcId: "delhi-summer",
-  reliabilityNoun: "record summer of 2024",
   definitions: {
     events: [
       {
@@ -1163,8 +1124,8 @@ export const DELHI_SUMMER_RULES: OfficialScenarioRuleDefinition = {
         visibility: "forecast" as const,
         preview:
           step === 0
-            ? "Heat raising demand and reducing coal and gas output."
-            : "Summer demand rising further as heat tightens coal and gas output limits.",
+            ? "Heat will raise demand and reduce coal and gas output."
+            : "Summer demand will rise further as heat tightens coal and gas output limits.",
         effects: {
           temperatureOffsetC: values(
             (difficulty) =>
@@ -1187,19 +1148,7 @@ export const DELHI_SUMMER_RULES: OfficialScenarioRuleDefinition = {
         },
       })),
     ],
-    objectives: [
-      reliability("Keep the lights on through the record summer", 77, 79),
-    ],
-    debriefReports: [
-      {
-        id: "delhi-summer-reliability",
-        label: "record summer of 2024",
-        kind: "reliability",
-        fromMonth: 77,
-        throughMonth: 79,
-        minDemandServedShare: 0.995,
-      },
-    ],
+    objectives: [],
   },
   presentation: {
     "summer-outlook": {

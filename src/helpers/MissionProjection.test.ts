@@ -18,15 +18,15 @@ import {
   generateNewTimeline,
 } from "../reducers/Game";
 
-const reliability: RuleObjective = {
-  id: "reliable",
-  label: "Serve demand",
-  metric: "monthlyReliability",
+const bills: RuleObjective = {
+  id: "bills",
+  label: "Keep bills affordable",
+  metric: "monthlyBilledRate",
   fromMonth: 1,
   throughMonth: 3,
-  minDemandServedShare: 0.995,
+  maxDollarsPerKWh: 0.2,
 };
-function fixture(objectives: RuleObjective[] = [reliability]) {
+function fixture(objectives: RuleObjective[] = [bills]) {
   const game = cloneDeep(
     createGame({
       scenarioId: 999,
@@ -79,18 +79,20 @@ function fixture(objectives: RuleObjective[] = [reliability]) {
 const goal = (game: GameType, projection: ProjectionView, id: string) =>
   projectMission(game, projection).requirements.find((row) => row.id === id)!;
 
-it("flags a future reliability miss without changing recorded progress, then clears it after a new plan", () => {
+it("flags a future billed-rate miss without changing recorded progress, then clears it after a new plan", () => {
   const { game, projection } = fixture();
   const recorded = cloneDeep(game.objectiveProgress);
   expect(projectMission(game, projection).status).toBe("win");
   const risky = cloneDeep(projection);
-  risky.financeProjected[1].supplyWh *= 0.994999;
-  expect(goal(game, risky, "reliable")).toMatchObject({ status: "at-risk" });
-  expect(goal(game, risky, "reliable").detail).toContain("99.4999%");
+  risky.financeProjected[1].revenue = 200.0001;
+  expect(goal(game, risky, "bills")).toMatchObject({ status: "at-risk" });
+  expect(goal(game, risky, "bills").detail).toContain(
+    "$0.20000010000000001/kWh",
+  );
   expect(projectMission(game, risky).status).toBe("loss");
   const approximate = cloneDeep(projection);
-  approximate.financeProjected[1].supplyWh *= 0.765824;
-  expect(goal(game, approximate, "reliable").detail).toContain("76.6%");
+  approximate.financeProjected[1].revenue = 765.824;
+  expect(goal(game, approximate, "bills").detail).toContain("$0.766/kWh");
   expect(game.objectiveProgress).toEqual(recorded);
   expect(projectMission(game, projection).status).toBe("win");
 });
@@ -146,17 +148,17 @@ it("does not replace a recorded blackout failure with a healthy forecast", () =>
 });
 
 it("keeps optional misses out of the win verdict and preserves an irreversible recorded miss", () => {
-  const { game, projection } = fixture([{ ...reliability, required: false }]);
-  projection.financeProjected[0].supplyWh *= 0.99;
-  expect(goal(game, projection, "reliable").status).toBe("at-risk");
+  const { game, projection } = fixture([{ ...bills, required: false }]);
+  projection.financeProjected[0].revenue = 201;
+  expect(goal(game, projection, "bills").status).toBe("at-risk");
   expect(projectMission(game, projection).status).toBe("win");
   const required = fixture();
-  const missed = { ...required.projection.financeProjected[0], supplyWh: 0 };
+  const missed = { ...required.projection.financeProjected[0], revenue: 1000 };
   recordGameObjectiveMonth(required.game, missed);
   required.game.date = getDateFromMinute(MINUTES_PER_MONTH, 2020);
   required.game.monthlyHistory = [missed];
   required.projection.financeProjected.shift();
-  expect(goal(required.game, required.projection, "reliable").status).toBe(
+  expect(goal(required.game, required.projection, "bills").status).toBe(
     "failed",
   );
   expect(projectMission(required.game, required.projection).status).toBe(
@@ -194,8 +196,8 @@ it("still flags a known future miss when recorded history is incomplete", () => 
   game.date = getDateFromMinute(MINUTES_PER_MONTH, 2020);
   delete game.objectiveProgress;
   projection.financeProjected.shift();
-  projection.financeProjected[0].supplyWh *= 0.99;
-  expect(goal(game, projection, "reliable").status).toBe("at-risk");
+  projection.financeProjected[0].revenue = 201;
+  expect(goal(game, projection, "bills").status).toBe("at-risk");
   expect(projectMission(game, projection).status).toBe("loss");
 });
 

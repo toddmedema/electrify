@@ -1,4 +1,5 @@
 import path from "node:path";
+import catalog from "../src/achievements/AchievementCatalog.json";
 import { expect, test } from "./fixtures";
 
 test.use({ serviceWorkers: "block" });
@@ -47,7 +48,7 @@ test("a mission finishing its load cannot replace Achievements opened from a not
       page.getByRole("region", { name: "Step 1 of 9", exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByText("1 of 35 unlocked", { exact: true }),
+      page.getByText(`1 of ${catalog.length} unlocked`, { exact: true }),
     ).toBeVisible();
     if (process.env.REVIEW_SCREENSHOT_DIR)
       await page.screenshot({

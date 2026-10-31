@@ -17,6 +17,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import ScreenPage from "../base/ScreenPage";
 import {
   MANUAL_ENTRIES,
+  MANUAL_ENTRY,
   MANUAL_GROUPS,
   ManualEntryTitleType,
   ManualEntryType,
@@ -47,6 +48,12 @@ export interface Props extends StateProps, DispatchProps {}
 // scrolled into view must land below it, and its title pins at this offset while open. Keep
 // the two in sync.
 const GROUP_HEADER_HEIGHT = 32;
+
+/** A touch-only device has no keys to learn; a tablet with a keyboard reports a fine pointer. */
+const hideKeyboardEntry = (entry: ManualEntryType) =>
+  entry.title === MANUAL_ENTRY.KEYBOARD_SHORTCUTS &&
+  window.matchMedia("(hover: none) and (pointer: coarse)").matches &&
+  !window.matchMedia("(any-pointer: fine)").matches;
 
 // Pinned first, then by group in the order the groups are declared, then alphabetically. Sorted
 // once here rather than on every keystroke
@@ -287,7 +294,7 @@ export default function Manual(props: Props): React.JSX.Element {
         ? SORTED_ENTRIES.filter((entry: ManualEntryType) =>
             SEARCH_TEXT[entry.title].includes(term),
           )
-        : SORTED_ENTRIES,
+        : SORTED_ENTRIES.filter((entry) => !hideKeyboardEntry(entry)),
     [searching, term],
   );
 

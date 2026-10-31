@@ -11,16 +11,12 @@ export async function subscribeAfterSignIn(
     const { getFunctions, httpsCallable } = await import("firebase/functions");
     if (auth.currentUser?.uid !== user.uid) return;
     const subscribe = httpsCallable<
-      { consent: true; uid: string; consentVersion: string },
+      { consent: true },
       { status: "subscribed" | "already-subscribed" }
     >(getFunctions(auth.app, "us-central1"), "subscribeMailingList", {
       timeout: 20000,
     });
-    const { data } = await subscribe({
-      consent: true,
-      uid: user.uid,
-      consentVersion: "electrify-updates-v1",
-    });
+    const { data } = await subscribe({ consent: true });
     // A fresh signup needs no confirmation: the player just opted in. Only surface
     // outcomes that differ from what they expected.
     if (data.status === "already-subscribed") {

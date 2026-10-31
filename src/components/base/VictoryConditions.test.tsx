@@ -28,7 +28,7 @@ it("separates requirements from points and keeps measurement help secondary", ()
 });
 
 it.each(["Public", "Investor"] as const)(
-  "shows canonical required retention and reliability objectives for %s ownership",
+  "shows canonical required retention objectives for %s ownership",
   (ownership) => {
     render(
       <VictoryConditions
@@ -40,25 +40,12 @@ it.each(["Public", "Investor"] as const)(
           startingYear: 2020,
           minimumCustomerRetention: 0.9,
           startingCustomers: 16500,
-          reliabilityObjective: {
-            year: 2025,
-            month: 1,
-            minimumDemandServed: 0.99,
-            label: "winter emergency",
-            durationMonths: 2,
-          },
         }}
         difficulty="Manager"
       />,
     );
     expect(
-      screen.getByText(/Retain ≥90% of starting customers/),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/≥99% of demand monthly/)).toHaveTextContent(
-      "Jan–Feb 2025",
-    );
-    expect(
-      screen.getByText(objectiveDefinition("monthlyReliability")),
+      screen.getByText(/Keep ≥90% of customer baseline/),
     ).toBeInTheDocument();
     expect(
       screen.getByText(objectiveDefinition("customerRetention")),
@@ -121,19 +108,19 @@ it("keeps internal decision tracking out of player victory conditions", () => {
   expect(
     screen.queryByTestId("meaningful-decision-history"),
   ).not.toBeInTheDocument();
-  expect(screen.getByText(/Serve at least/)).toHaveTextContent(
-    "Serve at least 90% of demand. Three consecutive months below this end the run.",
+  expect(screen.getByText(/Serving less than/)).toHaveTextContent(
+    "Serving less than 97% of demand for 3 months in a row ends the run.",
   );
 });
 
-it("explains the stricter Expert blackout limit", () => {
+it("explains the CEO reliability limit", () => {
   render(
     <VictoryConditions
       scenario={SCENARIOS.find((scenario) => scenario.id === 100)!}
       difficulty="CEO"
     />,
   );
-  expect(screen.getByText(/Serve at least/)).toHaveTextContent(
-    "Serve at least 95% of demand. Three consecutive months below this end the run.",
+  expect(screen.getByText(/Serving less than/)).toHaveTextContent(
+    "Serving less than 99.5% of demand for 3 months in a row ends the run.",
   );
 });

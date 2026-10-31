@@ -58,14 +58,20 @@ export function formatMoneyStable(i: number): string {
   if (!Number.isFinite(i)) {
     return NO_ESTIMATE;
   }
-  return "$" + formatMoneyAmount(i, false);
+  return signedMoney(i, false);
 }
 
 export function formatMoneyConcise(i: number): string {
   if (!Number.isFinite(i)) {
     return NO_ESTIMATE;
   }
-  return "$" + formatMoneyAmount(i, true);
+  return signedMoney(i, true);
+}
+
+/** "-$63.8k": the sign leads the currency, and an amount that rounds to zero carries none. */
+function signedMoney(i: number, trimMantissa: boolean): string {
+  const amount = formatMoneyAmount(Math.abs(i), trimMantissa);
+  return (i < 0 && /[1-9]/.test(amount) ? "-$" : "$") + amount;
 }
 
 interface MoneyUnitType {

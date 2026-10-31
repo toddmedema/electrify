@@ -2,12 +2,13 @@ import * as React from "react";
 import { IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import { BuildForecastProvider } from "./BuildForecast";
 import { GameToolMemoryContext } from "./GameToolMemory";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import { selectTutorialActions } from "../../reducers/Tutorial";
 import { CardNameType } from "../../Types";
-import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
+import { SIDE_TOOL_MIN_WIDTH } from "../../Globals";
 import GameAppBar from "./GameAppBar";
 import Navigation, {
   GAME_TOOLS,
@@ -34,20 +35,43 @@ const sideFor = (tool: GameTool): ToolSide =>
     : "intelligence";
 
 /** Below this, tools rise as one sheet over the fleet instead of taking their own columns. */
-export { SIDE_LAYOUT_MIN_WIDTH };
+export { SIDE_TOOL_MIN_WIDTH };
 /** The fleet never gets narrower than the widest common phone, so it stays fully usable. */
 export const MIN_FLEET_WIDTH = 430;
-const MIN_TOOL_WIDTH = 400;
+const MIN_TOOL_WIDTH = 360;
 const MAX_TOOL_WIDTH = 480;
 
-/** Matches --game-tool-width: clamp(400px, 28vw, 480px). */
+/** Sets --game-tool-width: 28vw within its limits, in whole pixels so text stays sharp. */
 export function toolWidth(width: number) {
-  return Math.min(MAX_TOOL_WIDTH, Math.max(MIN_TOOL_WIDTH, width * 0.28));
+  return Math.round(
+    Math.min(MAX_TOOL_WIDTH, Math.max(MIN_TOOL_WIDTH, width * 0.28)),
+  );
+}
+
+/** Five 72px actions, their gaps, the dock's padding and border, and a margin each side. */
+const DOCK_CLEARANCE_WIDTH = 402;
+
+/**
+ * Where to centre the dock when the window centre would put it over a side tool: the middle of
+ * the free stage. Undefined when the window centre is clear.
+ */
+export function dockCenter(
+  width: number,
+  leftTools: number,
+  rightTools: number,
+  tool: number,
+): number | undefined {
+  const start = leftTools * tool;
+  const end = width - rightTools * tool;
+  const half = DOCK_CLEARANCE_WIDTH / 2;
+  return width / 2 - half >= start && width / 2 + half <= end
+    ? undefined
+    : (start + end) / 2;
 }
 
 /** How many tools fit beside the fleet at this window width, keeping it at phone width or more. */
 export function maxOpenTools(width: number) {
-  if (width < SIDE_LAYOUT_MIN_WIDTH) return 1;
+  if (width < SIDE_TOOL_MIN_WIDTH) return 1;
   return Math.max(
     1,
     Math.min(
@@ -64,6 +88,14 @@ export function maxOpenTools(width: number) {
  * another never moves the ones already open.
  */
 export default function GameWorkspace() {
+  return (
+    <BuildForecastProvider>
+      <Workspace />
+    </BuildForecastProvider>
+  );
+}
+
+function Workspace() {
   const dispatch = useAppDispatch();
   const card = useAppSelector((state) => state.card.name);
   const active = gameToolForCard(card);
@@ -77,7 +109,7 @@ export default function GameWorkspace() {
   const memory = React.useRef(new Map<string, unknown>());
   const [programBack, setProgramBack] = React.useState<() => void>();
   const retainFocus = React.useRef(false);
-  const layout = width >= SIDE_LAYOUT_MIN_WIDTH ? "side" : "sheet";
+  const layout = width >= SIDE_TOOL_MIN_WIDTH ? "side" : "sheet";
   const capacity = maxOpenTools(width);
   // Derive the newly requested tool immediately; remembering it in an effect must not flash
   // the previous rail or unmount the fleet during navigation.
@@ -92,8 +124,17 @@ export default function GameWorkspace() {
     ordered.filter((tool) => visible.includes(tool) && sideFor(tool) === side);
   const left = shownOnSide("decision");
   const right = shownOnSide("intelligence");
+  const dockLeft =
+    layout === "side"
+      ? dockCenter(width, left.length, right.length, toolWidth(width))
+      : undefined;
+  const resizeState = React.useRef({ active, tools, buildCategory });
+  React.useLayoutEffect(() => {
+    resizeState.current = { active, tools, buildCategory };
+  });
   React.useEffect(() => {
     const resize = () => {
+      const { active, tools, buildCategory } = resizeState.current;
       // Keep the rail the player is working in when columns collapse.
       const focused =
         document.activeElement?.closest<HTMLElement>("[data-game-tool]");
@@ -108,9 +149,11 @@ export default function GameWorkspace() {
       }
       setWidth(window.innerWidth);
     };
+    // An earlier resize listener can synchronously redraw the workspace. Keep this
+    // subscription in place so that redraw cannot remove it from the current event.
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  });
+  }, [dispatch]);
   React.useLayoutEffect(() => {
     // Keep focus in the active tool when the layout changes, without stealing it
     // from a retained pricing slider or chart.
@@ -179,7 +222,14 @@ export default function GameWorkspace() {
   return (
     <GameToolMemoryContext.Provider value={memory.current}>
       <GameWorkspaceContext.Provider value={true}>
-        <div className="gameWorkspace">
+        <div
+          className="gameWorkspace"
+          style={
+            dockLeft === undefined
+              ? undefined
+              : { ["--game-dock-left" as string]: `${dockLeft}px` }
+          }
+        >
           <GameAppBar />
           <div
             className="gameStage"
@@ -188,6 +238,7 @@ export default function GameWorkspace() {
             style={
               layout === "side" && visible.length
                 ? {
+                    ["--game-tool-width" as string]: `${toolWidth(width)}px`,
                     gridTemplateColumns: [
                       ...left.map(() => "var(--game-tool-width)"),
                       `minmax(${MIN_FLEET_WIDTH}px, 1fr)`,

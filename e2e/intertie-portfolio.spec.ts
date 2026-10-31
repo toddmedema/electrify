@@ -3,7 +3,6 @@ import { expectContinuousDialogSurface } from "./dialog-surface";
 import path from "path";
 import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
-import { readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
   test(`intertie purchase keeps forecasts in build details in ${theme}`, async ({
@@ -47,11 +46,24 @@ for (const theme of ["light", "dark"] as const) {
     expect(metricBoxes.every((cell) => cell.valueTop >= cell.labelBottom)).toBe(
       true,
     );
-    if (page.viewportSize()!.width >= 768) {
-      // The wide build sheet fits all five primary metrics on one row.
+    // Cells on one row never overlap, whatever the width.
+    for (const [index, cell] of metricBoxes.entries()) {
+      const next = metricBoxes[index + 1];
+      if (next?.y === cell.y) {
+        expect(cell.x + cell.width).toBeLessThanOrEqual(next.x);
+      }
+    }
+    if ((await card.boundingBox())!.width >= 700) {
+      // A wide card fits all five primary metrics on one row.
       expect(metricBoxes.every((cell) => cell.y === metricBoxes[0].y)).toBe(
         true,
       );
+    } else if (page.viewportSize()!.width >= 1024) {
+      // A side tool holds three metrics a row, then two.
+      expect(metricBoxes[1].y).toBe(metricBoxes[0].y);
+      expect(metricBoxes[2].y).toBe(metricBoxes[0].y);
+      expect(metricBoxes[3].y).toBeGreaterThan(metricBoxes[0].y);
+      expect(metricBoxes[4].y).toBe(metricBoxes[3].y);
     } else {
       expect(metricBoxes[0].y).toBe(metricBoxes[1].y);
       expect(metricBoxes[2].y).toBe(metricBoxes[3].y);
@@ -124,13 +136,7 @@ for (const theme of ["light", "dark"] as const) {
         animations: "disabled",
       });
     }
-    // Freeze the quote before checking its exact cash delta; navigation may have
-    // allowed a tick before the catalog opened.
     await page.getByRole("button", { name: "pause", exact: true }).click();
-    const game = (await readSavedGame(page))!;
-    const cash = game.timeline.find(
-      (tick) => tick.minute === game.date.minute,
-    )!.cash;
     await review.click();
     const dialog = page.getByRole("dialog");
     await expectContinuousDialogSurface(dialog);
@@ -143,14 +149,10 @@ for (const theme of ["light", "dark"] as const) {
     const cashFact = dialog
       .locator(".decisionImpactFact")
       .filter({ hasText: "Cash purchase" });
-    const quoted = (await cashFact.innerText()).match(
-      /\$([\d.]+)M → \$([\d.]+)M/,
+    await expect(cashFact.locator(".decisionImpactFactValue")).toHaveText(
+      "$14.4M now",
     );
-    expect(quoted).not.toBeNull();
-    // This scenario's balances are quoted in millions, rounded to one decimal.
-    expect(Number(quoted![1])).toBeCloseTo(cash / 1_000_000, 1);
-    expect(Number(quoted![2])).toBeCloseTo((cash - 14_400_000) / 1_000_000, 1);
-    await expect(dialog).toContainText("Payments start now");
+    await expect(dialog).not.toContainText("Payments start now");
     await expect(dialog).toContainText("$23.1k/mo");
     // Every purchase fact fits alongside both actions on desktop and a 390px phone; a shorter
     // phone scrolls the facts between the title and the pinned actions.

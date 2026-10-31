@@ -1,3 +1,4 @@
+import { weatherLocationIds } from "../helpers/WeatherLocations";
 import { DAYS_PER_MONTH, DAYS_PER_YEAR, EQUATOR_RADIANCE } from "../Constants";
 import { DateType, LocationType, RawWeatherType } from "../Types";
 import { normalAt, randomAt, RANDOM_STREAM } from "../helpers/Math";
@@ -55,9 +56,7 @@ export function selectWeatherLocation(id: string): void {
 }
 /** A menu forecast needs actual local and watershed records, never a dummy reading. */
 export function hasWeather(location: LocationType): boolean {
-  return [location.id, location.watershedId].every(
-    (id) => !id || weatherSeries.has(id),
-  );
+  return weatherLocationIds(location).every((id) => weatherSeries.has(id));
 }
 const DUMMY_WEATHER = {
   YEAR: 0,
@@ -348,9 +347,7 @@ export function initWeather(
     }
   };
   const localId = typeof location === "string" ? location : location.id;
-  const watershedId =
-    typeof location === "string" ? undefined : location.watershedId;
-  const ids = [...new Set([localId, watershedId].filter(Boolean))] as string[];
+  const ids = weatherLocationIds(location);
   if (ids.some((id) => !isValidLocationId(id))) {
     // A location id is now any string rather than a checked union, and it arrives here from a
     // saved game on its way into a URL

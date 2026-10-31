@@ -27,7 +27,7 @@ const input: ModPackage = {
   scenario: { cash: 1e9 },
 };
 
-test("current111 community rules have no choice and preserve the cap, goals and save", () => {
+test("current111 community rules have no choice and preserve the cap and save", () => {
   const scenario = modScenario(input, undefined, "Employee");
   const rules = scenario.mod!.rules;
   expect(validScenarioMod(scenario.mod, scenario)).toBe(true);
@@ -82,9 +82,7 @@ test("current111 community rules have no choice and preserve the cap, goals and 
   }
   for (const game of [original, resumed]) {
     advance(game, 60);
-    expect(gameObjectiveResults(game).map((result) => result.status)).toEqual([
-      "completed",
-    ]);
+    expect(gameObjectiveResults(game)).toEqual([]);
     expect(game.runIdentity).toBeUndefined();
     expect(game.customScenario!.mod!.source.id).toBe(input.id);
   }
@@ -95,13 +93,13 @@ test("current111 community rules have no choice and preserve the cap, goals and 
   expect(resumed.monthlyHistory).toEqual(original.monthlyHistory);
 });
 
-test("all fourteen current arc snapshots validate through ordinary compilation", () => {
+test("all fifteen current arc snapshots validate through ordinary compilation", () => {
   const groups = [
     [100, 101, 103, 105, 106],
     [102, 104, 110, 111],
     [107, 108],
     [113, 114],
-    [115],
+    [115, 116],
   ];
   for (const ids of groups) {
     const scenario = modScenario({

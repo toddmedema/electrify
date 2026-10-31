@@ -186,9 +186,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           You can meet growing demand by building more power plants, or by
           helping <EntryLink to={MANUAL_ENTRY.CUSTOMERS}>customers</EntryLink>{" "}
-          use less electricity. Set these programs in{" "}
-          <EntryLink to={MANUAL_ENTRY.FORECASTS}>Insights</EntryLink>; changes
-          start next month.
+          use less electricity. Set these in Programs; changes start next month.
         </p>
         <p>
           <strong>Efficiency and rooftop solar rebates:</strong> Each is a
@@ -257,12 +255,16 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           represents a month.
         </p>
         <p>
-          <strong>Insights:</strong> Manage finances,{" "}
-          <EntryLink to={MANUAL_ENTRY.RATES}>rates</EntryLink>,{" "}
+          <strong>Programs:</strong> Set{" "}
+          <EntryLink to={MANUAL_ENTRY.RATES}>rates</EntryLink> and{" "}
           <EntryLink to={MANUAL_ENTRY.CUSTOMER_PROGRAMS}>
             customer programs
-          </EntryLink>{" "}
-          and <EntryLink to={MANUAL_ENTRY.FORECASTS}>forecasts</EntryLink> here.
+          </EntryLink>
+          .
+        </p>
+        <p>
+          <strong>Insights:</strong> Track finances and{" "}
+          <EntryLink to={MANUAL_ENTRY.FORECASTS}>forecasts</EntryLink>.
         </p>
       </div>
     ),
@@ -827,8 +829,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           utility. Your <EntryLink to={MANUAL_ENTRY.SCORE}>score</EntryLink>{" "}
           rewards affordable power: a lifetime average rate below the scenario's
           target earns points; above it loses points. You still need enough
-          revenue to cover costs. Set your rate in Insights, or let it follow
-          inflation, which is the default.
+          revenue to cover costs. Set your rate in Programs, or let it follow
+          inflation (the default).
         </p>
       </div>
     ),
@@ -1040,9 +1042,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Your score tracks how you do as CEO. Check{" "}
-          <strong>Victory conditions</strong> for reliability and customer
-          goals; tutorial missions have their own objectives.
+          Your score tracks how you do as CEO. Check <strong>Goals</strong> for
+          reliability and customer targets; tutorial missions have their own
+          objectives.
         </p>
         <p>
           In every scenario, you fail if you go bankrupt or serve less than 90%

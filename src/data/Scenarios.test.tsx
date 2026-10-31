@@ -317,12 +317,6 @@ describe("authored starting fleets", () => {
       startingCustomers: 472_701,
       ownership: "Public",
       dollarsPerkWh: 0.09,
-      reliabilityObjective: {
-        year: 2021,
-        month: 2,
-        minimumDemandServed: 0.995,
-        label: "February 2021 freeze",
-      },
     });
     expect(austin.location).toMatchObject({
       id: "Austin",
@@ -380,12 +374,6 @@ describe("authored starting fleets", () => {
     const heatwave = getScenario(108)!;
     const trip = getScenario(110)!;
 
-    expect(heatwave.reliabilityObjective).toMatchObject({
-      year: 2026,
-      month: 6,
-      durationMonths: 3,
-      minimumDemandServed: 0.995,
-    });
     expect(heatwave).toMatchObject({
       name: "Heatwave + Drought",
       locationId: "Madrid",
@@ -397,11 +385,6 @@ describe("authored starting fleets", () => {
     ).toEqual(
       expect.arrayContaining(["Uranium", "Hydro", "Sun", "Wind", "Battery"]),
     );
-    expect(trip.reliabilityObjective).toMatchObject({
-      year: 2026,
-      month: 7,
-      durationMonths: 18,
-    });
     expect(trip).toMatchObject({
       name: "Sudden Nuclear Shutdown",
       icon: "sudden-nuclear-trip",
@@ -421,12 +404,6 @@ describe("authored starting fleets", () => {
       startingYear: 2022,
       startingInterties: ["california-north"],
       intertiesEnabled: true,
-      reliabilityObjective: {
-        year: 2025,
-        month: 1,
-        durationMonths: 2,
-        minimumDemandServed: 0.995,
-      },
     });
     expect(wildfire.briefing?.threat).toMatch(/intertie.*90%/i);
     expect(wildfire.facilities[0]).toMatchObject({
@@ -452,42 +429,10 @@ describe("briefing objectives", () => {
   it("describe the real win condition in the classic scenarios", () => {
     [100, 101, 103, 105].forEach((id) => {
       const scenario = getScenario(id)!;
-      expect(scenario.reliabilityObjective).toBeUndefined();
       expect([scenario.name, scenario.briefing!.objective]).toEqual([
         scenario.name,
         expect.stringMatching(/solvent/),
       ]);
-    });
-  });
-});
-
-describe("reliability objective copy", () => {
-  // The goal heads the pinned-goals list on its own; the label is read inside sentences such
-  // as "You served 99.40% of demand during the {label}".
-  const objectives = SCENARIOS.filter(
-    (scenario) => scenario.reliabilityObjective,
-  ).map((scenario) => ({
-    id: scenario.id,
-    ...scenario.reliabilityObjective!,
-  }));
-
-  it("gives every reliability objective a short imperative goal", () => {
-    expect(objectives.length).toBeGreaterThan(0);
-    objectives.forEach(({ id, goal }) => {
-      expect({ id, goal }).toEqual({
-        id,
-        goal: expect.stringMatching(/^(Keep|Serve|Hold|Avoid|Retain) /),
-      });
-      expect({ id, short: goal!.length <= 50 }).toEqual({ id, short: true });
-    });
-  });
-
-  it("keeps every label readable after 'during the'", () => {
-    objectives.forEach(({ id, label }) => {
-      expect({ id, label }).toEqual({
-        id,
-        label: expect.not.stringMatching(/^(the |\d{4},)/i),
-      });
     });
   });
 });

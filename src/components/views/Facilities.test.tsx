@@ -21,7 +21,7 @@ import gameReducer, {
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
-import Facilities from "./Facilities";
+import Facilities, { fleetChartHeight } from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
 import * as transmission from "../../helpers/Transmission";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
@@ -34,6 +34,7 @@ import {
 import { formatMoneyConcise } from "../../helpers/Format";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 import { purchaseTerms } from "../../helpers/Financials";
+import { modScenario } from "../../mods/ModScenario";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
@@ -424,6 +425,23 @@ describe("the fleet list", () => {
     expect(onPause).toHaveBeenCalledWith(facility.id, facility.name);
   });
 
+  it("names the original Oil A retirement target in its direct sale confirmation", async () => {
+    const expansion = createGame({ scenarioId: 116 });
+    const oil = expansion.facilities.find(
+      (facility) => facility.startingAssetId === "scenario-116-champlain-oil-a",
+    )!;
+    const { onSell } = renderFacilities(expansion, oil.id);
+    await user.click(
+      screen.getByRole("button", {
+        name: "Sell Oil A",
+      }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAccessibleName("Sell 40MW Oil A facility?");
+    await user.click(within(dialog).getByRole("button", { name: "Sell" }));
+    expect(onSell).toHaveBeenCalledWith(oil.id);
+  });
+
   it("can sell the only facility left in a fleet", async () => {
     const onePlant = createGame({ scenarioId: 5 });
     const { onSell } = renderFacilities(onePlant, onePlant.facilities[0].id);
@@ -446,11 +464,11 @@ describe("the fleet list", () => {
       facility.loanAmountLeft = loanAmountLeft;
       const { onSell } = renderFacilities(game, facility.id);
       const construction = screen.getByRole("region", { name: "Construction" });
-      expect(construction).toHaveTextContent("Nameplate capacity320MW");
+      expect(construction).toHaveTextContent("Capacity320MW");
       const refund = formatMoneyConcise(200e6 - loanAmountLeft);
-      expect(construction).toHaveTextContent(`Refund if cancelled${refund}`);
+      expect(construction).toHaveTextContent(`Refund if canceled${refund}`);
       expect(
-        within(construction).queryByText("After settling the loan") !== null,
+        within(construction).queryByText("After loan payoff") !== null,
       ).toBe(loanAmountLeft > 0);
       await user.click(
         screen.getByRole("button", {
@@ -726,7 +744,7 @@ describe("the interties view", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("$10.8M");
     expect(dialog).toHaveTextContent("Loan option");
-    expect(dialog).toHaveTextContent("Payments start now");
+    expect(dialog).not.toHaveTextContent("Payments start now");
   });
 
   it("tells the neighbours apart by kind, typical year, peak help and price", async () => {
@@ -907,7 +925,9 @@ describe("the interties view", () => {
     });
     await user.click(review);
     expect(onBuild).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).toHaveTextContent("Payments start now");
+    expect(screen.getByRole("dialog")).not.toHaveTextContent(
+      "Payments start now",
+    );
     await user.click(screen.getByRole("button", { name: "close" }));
     expect(onBuild).not.toHaveBeenCalled();
     await user.click(review);
@@ -1063,14 +1083,63 @@ describe("unified connections", () => {
     expect(building).toHaveTextContent("Import capacity180MW");
     expect(building).toHaveTextContent("Export capacity150MW");
     expect(building).toHaveTextContent(
-      `Refund if cancelled${formatMoneyConcise(game.transmission!.lines[1].buildCost - 1000)}`,
+      `Refund if canceled${formatMoneyConcise(game.transmission!.lines[1].buildCost - 1000)}`,
     );
-    expect(building).toHaveTextContent("After settling the loan");
+    expect(building).toHaveTextContent("After loan payoff");
     expect(building).toHaveTextContent("Emissions");
     expect(building).not.toHaveTextContent("Import available now");
     expect(building).toHaveTextContent("Typical price");
   });
 });
+
+it.each([false, true])(
+  "offers completed connection acquisition in a native or validated base-116 mod (mod: %s)",
+  async (mod) => {
+    const customScenario = mod
+      ? modScenario({
+          schemaVersion: 1,
+          gameApi: 1,
+          id: "community-valley",
+          title: "Community Valley",
+          creator: "Planner",
+          version: "1",
+          description: "Keep the regional utility supplied.",
+          baseScenarioId: 116,
+          seed: 12345,
+        })
+      : undefined;
+    const state = createGame({
+      scenarioId: customScenario?.id ?? 116,
+      scenario: customScenario,
+      seed: 12345,
+    });
+    const game = cloneDeep(
+      gameReducer(
+        state,
+        buildTransmissionLine({
+          corridorId: "vt-champlain-ridge",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    render(
+      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+        <TransmissionPanel
+          game={game}
+          onBuild={jest.fn()}
+          onUpgrade={jest.fn()}
+          onPolicy={jest.fn()}
+          onAcquire={jest.fn()}
+        />
+      </Provider>,
+    );
+    await user.click(screen.getByRole("button", { name: /^Inspect Ridge/ }));
+    expect(
+      screen.getByRole("button", { name: "Acquire Ridge Electric" }),
+    ).toBeVisible();
+  },
+);
 
 describe("the intertie upgrade control", () => {
   /** A California run whose northern intertie is open and carrying power. */
@@ -1123,7 +1192,7 @@ describe("the intertie upgrade control", () => {
     expect(handleUpgrade).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent(/Construction emits.*CO2e/);
-    expect(dialog).toHaveTextContent(/for 30 years/);
+    expect(dialog).toHaveTextContent(/30 yrs/);
     expect(dialog).toHaveTextContent("Upkeep after upgrade");
     expect(dialog).not.toHaveTextContent("Line capacity");
     expect(dialog).toHaveTextContent("Import capacity150MW → 210MW");
@@ -1720,5 +1789,17 @@ describe("mouse facility selection", () => {
       [{ facilityId: 1, upgrade: "hailResistant" }],
       [{ facilityId: 2, upgrade: "hailResistant" }],
     ]);
+  });
+});
+
+describe("fleetChartHeight", () => {
+  it.each([
+    [360, 640, 243],
+    [390, 844, 321],
+    [768, 1024, 287],
+    [1024, 768, 230],
+    [844, 390, 180],
+  ])("sizes a %ix%i window to %ipx", (width, height, expected) => {
+    expect(fleetChartHeight(width, height)).toBe(expected);
   });
 });

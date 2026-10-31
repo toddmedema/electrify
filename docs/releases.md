@@ -8,6 +8,9 @@ See the [contributor guide](../CONTRIBUTING.md) for development checks and the
 To release, install and authenticate the AWS CLI.
 
 Merging to `master` deploys prod through GitHub Actions (`.github/workflows/deploy-prod.yml`).
+The Firebase backend deploy must succeed before the web client is built and published.
+For first-time function provisioning or a missing Cloud Build/Artifact Registry API,
+follow the [one-time setup and deployment recovery guide](authentication.md#one-time-google-cloud-setup).
 To preview a change first, run `npm run deploy beta` and check that:
 
 - basic functionality works (app loads, game starts, music plays)
