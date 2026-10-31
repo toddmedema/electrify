@@ -46,11 +46,17 @@ const keysAre = (value: object, keys: readonly string[]) =>
 function observationWindow(
   objective: CompiledRuleObjective,
   term: number,
+  retentionAtDeadlineOnly = false,
 ): [number, number] {
   if (objective.metric === "customerRetention")
-    return [0, objective.deadlineMonth];
+    return [
+      retentionAtDeadlineOnly ? objective.deadlineMonth : 0,
+      objective.deadlineMonth,
+    ];
   if (objective.metric === "fuelRetirement")
     return [objective.deadlineMonth, term - 1];
+  if ("deadlineMonth" in objective)
+    return [objective.deadlineMonth, objective.deadlineMonth];
   return [objective.fromMonth, objective.throughMonth];
 }
 
@@ -67,6 +73,8 @@ export function objectiveTarget(objective: CompiledRuleObjective): number {
   switch (objective.metric) {
     case "customerRetention":
       return objective.minRetainedShare;
+    case "utilityOwnership":
+      return 1;
     case "emissionsBudget":
       return objective.budgetKgCO2e;
     case "emissionsPerDeliveredMWh":
@@ -74,6 +82,7 @@ export function objectiveTarget(objective: CompiledRuleObjective): number {
     case "localFuelShare":
       return objective.minShare;
     case "fuelRetirement":
+    case "assetRetirement":
       return 0;
     case "monthlyBilledRate":
       return objective.maxDollarsPerKWh;
@@ -89,7 +98,9 @@ export function objectiveTargetMet(
 ): boolean {
   if (!nonnegative(observed)) return false;
   const target = objectiveTarget(objective);
-  return ["customerRetention", "localFuelShare"].includes(objective.metric)
+  return ["customerRetention", "localFuelShare", "utilityOwnership"].includes(
+    objective.metric,
+  )
     ? observed >= target
     : observed <= target;
 }
@@ -107,6 +118,9 @@ function initialEvidenceDigest(
     durationMonths: context.durationMonths,
     ownership: context.ownership,
     retentionBaseline: baseline,
+    ...(context.retentionAtDeadlineOnly
+      ? { retentionAtDeadlineOnly: true }
+      : {}),
   });
 }
 
@@ -152,6 +166,52 @@ export function createObjectiveProgress(
   return { ...plain, checksum: progressChecksum(plain) };
 }
 
+/** A finished deadline keeps the customers admitted before that deadline, even after a merger. */
+function retentionBaselineFor(
+  objective: CompiledRuleObjective & { metric: "customerRetention" },
+  context: ObjectiveContext,
+  fallback: number,
+): number {
+  return context.retentionBaselines?.[objective.deadlineMonth] ?? fallback;
+}
+
+/** A transfer changes the aggregate baseline without rewriting completed monthly facts. */
+export function rebaseObjectiveRetention(
+  progress: ObjectiveProgress,
+  objectives: readonly CompiledRuleObjective[],
+  context: ObjectiveContext,
+  retentionBaseline: number,
+): ObjectiveProgress {
+  if (progress.retentionBaseline === retentionBaseline) return progress;
+  const definitions = new Map(
+    objectives.map((objective) => [objective.id, objective]),
+  );
+  const entries = progress.entries.map((entry) => {
+    const objective = definitions.get(entry.id)!;
+    const observations: ObjectiveObservation[] = entry.observations.map(
+      ([month, numerator, denominator]) => [
+        month,
+        numerator,
+        objective.metric === "customerRetention" &&
+        denominator !== null &&
+        !(
+          context.retentionAtDeadlineOnly &&
+          context.completedMonths > objective.deadlineMonth
+        )
+          ? retentionBaselineFor(objective, context, retentionBaseline)
+          : denominator,
+      ],
+    );
+    const digest = observations.reduce(
+      nextEvidenceDigest,
+      initialEvidenceDigest(objective, context, retentionBaseline),
+    );
+    return { ...entry, observations, digest };
+  });
+  const plain = { ...progress, retentionBaseline, entries };
+  return { ...plain, checksum: progressChecksum(plain) };
+}
+
 export function objectiveMonthObservation(
   objective: CompiledRuleObjective,
   facts: ObjectiveMonthFacts,
@@ -166,7 +226,7 @@ export function objectiveMonthObservation(
   switch (objective.metric) {
     case "customerRetention":
       numerator = row.customers;
-      denominator = baseline;
+      denominator = retentionBaselineFor(objective, context, baseline);
       break;
     case "emissionsBudget":
       numerator = row.kgco2e;
@@ -193,6 +253,24 @@ export function objectiveMonthObservation(
         numerator = undefined;
       break;
     }
+    case "utilityOwnership":
+      numerator =
+        facts.ownedUtilities === undefined
+          ? undefined
+          : Number(
+              objective.targets.some((target) =>
+                facts.ownedUtilities!.includes(target),
+              ),
+            );
+      break;
+    case "assetRetirement":
+      numerator =
+        facts.ownedAssetIds === undefined
+          ? undefined
+          : objective.assetIds.filter((asset) =>
+              facts.ownedAssetIds!.includes(asset),
+            ).length;
+      break;
     case "fuelRetirement":
       numerator =
         facts.ownedFuels === undefined
@@ -241,7 +319,11 @@ export function recordObjectiveMonth(
   const entries = progress.entries.map((entry) => {
     const objective = definitions.get(entry.id);
     if (!objective) return entry;
-    const [first, last] = observationWindow(objective, context.durationMonths);
+    const [first, last] = observationWindow(
+      objective,
+      context.durationMonths,
+      context.retentionAtDeadlineOnly,
+    );
     if (facts.month < first || facts.month > last) return entry;
     if (
       entry.observations.some((observation) => observation[0] === facts.month)
@@ -315,7 +397,10 @@ export function evaluateScenarioObjectives(
       requiredMonths,
       status:
         context.completedMonths <=
-        (objective.metric === "customerRetention" ? 0 : first)
+        (objective.metric === "customerRetention" &&
+        !context.retentionAtDeadlineOnly
+          ? 0
+          : first)
           ? "pending"
           : "inProgress",
     };
@@ -363,20 +448,22 @@ export function evaluateScenarioObjectives(
         if (
           latest?.[1] !== null &&
           latest?.[1] !== undefined &&
-          progress.retentionBaseline > 0
+          latest[2] !== null &&
+          latest[2] > 0
         ) {
-          result.observed = latest[1] / progress.retentionBaseline;
+          result.observed = latest[1] / latest[2];
           const remaining = Math.max(0, objective.deadlineMonth - latest[0]);
           failed =
             latest[0] === objective.deadlineMonth
               ? !objectiveTargetMet(objective, result.observed)
-              : bestReachableCustomers(
+              : !context.retentionAtDeadlineOnly &&
+                bestReachableCustomers(
                   latest[1],
                   remaining,
                   context.ownership,
                   context.marketSize,
                 ) <
-                progress.retentionBaseline * result.target;
+                  latest[2] * result.target;
         }
         break;
       }
@@ -402,6 +489,13 @@ export function evaluateScenarioObjectives(
           result.observed !== undefined &&
           !objectiveTargetMet(objective, result.observed);
         break;
+      case "utilityOwnership":
+        if (ratios.length) result.observed = Math.min(...ratios);
+        failed =
+          ended &&
+          ratios.some((value) => !objectiveTargetMet(objective, value));
+        break;
+      case "assetRetirement":
       case "fuelRetirement":
       case "monthlyBilledRate":
       case "monthEndDebt":
@@ -429,6 +523,10 @@ export function evaluateScenarioObjectives(
                 "At least one completed month billed more than the starting-year rate ceiling.",
               monthEndDebt:
                 "Loan principal at a completed month close exceeded the starting-year ceiling.",
+              utilityOwnership:
+                "No target utility was acquired by the deadline.",
+              assetRetirement:
+                "An original oil asset remained owned at the retirement deadline.",
             }[objective.metric];
     } else if (
       invalid ||
@@ -516,7 +614,7 @@ export function validObjectiveResult(value: unknown): value is ObjectiveResult {
     (result.objective.metric === "fuelRetirement"
       ? result.requiredMonths <= 1200 - result.objective.deadlineMonth
       : result.requiredMonths ===
-        (result.objective.metric === "customerRetention"
+        ("deadlineMonth" in result.objective
           ? 1
           : result.objective.throughMonth - result.objective.fromMonth + 1)) &&
     integer(result.observedMonths, 0, result.requiredMonths) &&
@@ -577,7 +675,11 @@ export function validObjectiveProgress(
       !/^sha256-[a-f0-9]{64}$/.test(entry.digest)
     )
       return false;
-    const [first, last] = observationWindow(objective, context.durationMonths);
+    const [first, last] = observationWindow(
+      objective,
+      context.durationMonths,
+      context.retentionAtDeadlineOnly,
+    );
     let previous = -1,
       digest = initialEvidenceDigest(
         objective,
@@ -610,12 +712,21 @@ export function validObjectiveProgress(
           !Number.isFinite(numeratorTotal) ||
           !Number.isFinite(denominatorTotal) ||
           (denominator > 0 && !Number.isFinite(numerator / denominator)) ||
-          (["emissionsBudget", "fuelRetirement", "monthEndDebt"].includes(
-            objective.metric,
-          ) &&
+          ([
+            "emissionsBudget",
+            "fuelRetirement",
+            "monthEndDebt",
+            "utilityOwnership",
+            "assetRetirement",
+          ].includes(objective.metric) &&
             denominator !== 1) ||
           (objective.metric === "customerRetention" &&
-            denominator !== progress.retentionBaseline) ||
+            denominator !==
+              retentionBaselineFor(
+                objective,
+                context,
+                progress.retentionBaseline,
+              )) ||
           (objective.metric === "fuelRetirement" &&
             !Number.isSafeInteger(numerator)) ||
           (objective.metric === "localFuelShare" &&

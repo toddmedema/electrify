@@ -20,7 +20,7 @@ const FACILITY_NAMES = [
 ];
 
 const RULE_SCENARIO_IDS = [
-  100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115,
+  100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115, 116,
 ];
 const FACILITY_MODIFIER_KEYS = [
   "buildCost",
@@ -75,6 +75,8 @@ const OBJECTIVE_METRICS = [
   "fuelRetirement",
   "monthlyBilledRate",
   "monthEndDebt",
+  "utilityOwnership",
+  "assetRetirement",
 ];
 /** Reject functions, accessors, cycles and nonfinite values before detaching JSON data. */
 function isRuleJson(value, ancestors = new Set(), depth = 0) {
@@ -558,6 +560,8 @@ function ruleDiagnostics(value, path = "") {
       emissionsPerDeliveredMWh: ["maxKgCO2ePerMWh"],
       localFuelShare: ["fuels", "minShare"],
       fuelRetirement: ["fuel", "deadlineMonth"],
+      utilityOwnership: ["targets", "deadlineMonth"],
+      assetRetirement: ["assetIds", "deadlineMonth"],
       monthlyBilledRate: ["maxDollarsPerKWh"],
       monthEndDebt: ["maxDebtDollars"],
     };
@@ -570,7 +574,12 @@ function ruleDiagnostics(value, path = "") {
         "label",
         "metric",
         "required",
-        ...(["customerRetention", "fuelRetirement"].includes(v?.metric)
+        ...([
+          "customerRetention",
+          "fuelRetirement",
+          "utilityOwnership",
+          "assetRetirement",
+        ].includes(v?.metric)
           ? []
           : ["fromMonth", "throughMonth"]),
         ...metricFields,
@@ -582,7 +591,14 @@ function ruleDiagnostics(value, path = "") {
     enumValue(v.metric, at(p, "metric"), OBJECTIVE_METRICS);
     if (v.required !== undefined && typeof v.required !== "boolean")
       add("invalid-value", at(p, "required"), "must be true or false.");
-    if (["customerRetention", "fuelRetirement"].includes(v.metric))
+    if (
+      [
+        "customerRetention",
+        "fuelRetirement",
+        "utilityOwnership",
+        "assetRetirement",
+      ].includes(v.metric)
+    )
       month(v.deadlineMonth, at(p, "deadlineMonth"));
     else window(v, p);
     for (const key of ["minDemandServedShare", "minRetainedShare", "minShare"])
@@ -596,6 +612,15 @@ function ruleDiagnostics(value, path = "") {
       if (metricFields.includes(key)) number(v[key], at(p, key), 0, max);
     if (v.metric === "localFuelShare") fuels(v.fuels, at(p, "fuels"));
     if (v.metric === "fuelRetirement") fuel(v.fuel, at(p, "fuel"));
+    for (const key of ["targets", "assetIds"]) {
+      if (metricFields.includes(key) && list(v[key], at(p, key), 16)) {
+        if (!v[key].length)
+          add("invalid-value", at(p, key), "must not be empty.");
+        v[key].forEach((value, i) => id(value, `${p}.${key}[${i}]`));
+        if (new Set(v[key]).size !== v[key].length)
+          add("invalid-value", at(p, key), "must contain unique identities.");
+      }
+    }
   };
   if (
     !object(value, path, [

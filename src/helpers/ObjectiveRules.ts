@@ -1,3 +1,9 @@
+import {
+  isUtilityExpansionGame,
+  isUtilityExpansionScenario,
+} from "./ExpansionContext";
+import { expansionRetentionBaseline } from "./Expansion";
+import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { formatCount, formatNumber } from "./Format";
 import {
   DifficultyType,
@@ -18,6 +24,7 @@ import type {
   ObjectiveResult,
 } from "../data/ScenarioObjectives";
 import { getScenario } from "../data/Scenarios";
+import { UTILITY_EXPANSION_OBJECTIVES } from "../data/UtilityExpansionObjectives";
 import { scenarioRules } from "./ScenarioRules";
 import { ruleDigest, canonicalRuleJson } from "./RuleIdentity";
 import { MINUTES_PER_MONTH } from "./DateTime";
@@ -28,6 +35,7 @@ import {
   evaluateScenarioObjectives,
   validObjectiveProgress,
   objectiveMonthObservation,
+  rebaseObjectiveRetention,
 } from "./ScenarioObjectives";
 export { objectiveDefinition } from "./ScenarioObjectives";
 
@@ -165,6 +173,7 @@ export function scenarioObjectiveDefinitions(
   parameters?: Pick<GameType, "difficulty" | "seed">,
 ): CompiledRuleObjective[] {
   if (!scenario || scenario.tutorialSteps) return [];
+  if (scenario.id === 116) return UTILITY_EXPANSION_OBJECTIVES;
   const compiled = scenarioRules(scenario, parameters);
   if (compiled && (scenario.id !== 999 || scenario.mod))
     return compiled.objectives;
@@ -203,7 +212,7 @@ export function objectiveContextForGame(
     GameType,
     "seed" | "startingYear" | "date" | "customerMarketSize"
   > &
-    Partial<Pick<GameType, "difficulty">>,
+    Partial<Pick<GameType, "difficulty" | "utilityExpansion">>,
   scenario: ScenarioType,
 ): ObjectiveContext {
   const definitions = scenarioObjectiveDefinitions(scenario, {
@@ -232,6 +241,26 @@ export function objectiveContextForGame(
     startingYear: game.startingYear,
     durationMonths: scenario.durationMonths,
     ownership: scenario.ownership,
+    ...(isUtilityExpansionScenario(scenario)
+      ? {
+          retentionAtDeadlineOnly: true,
+          retentionBaselines: Object.fromEntries(
+            definitions.flatMap((objective) =>
+              objective.metric === "customerRetention"
+                ? [
+                    [
+                      objective.deadlineMonth,
+                      expansionRetentionBaseline(
+                        game,
+                        (objective.deadlineMonth + 1) * MINUTES_PER_MONTH,
+                      ),
+                    ],
+                  ]
+                : [],
+            ),
+          ),
+        }
+      : {}),
     completedMonths: Math.min(scenario.durationMonths, game.date.monthsElapsed),
     marketSize: customerMarketSizeAt(
       game.customerMarketSize,
@@ -328,6 +357,9 @@ function historyObjectiveResults(
     seed: options.seed ?? scenario.seed ?? 0,
     durationMonths: scenario.durationMonths,
     ownership: scenario.ownership,
+    ...(isUtilityExpansionScenario(scenario)
+      ? { retentionAtDeadlineOnly: true }
+      : {}),
     completedMonths: options.completedMonths,
     marketSize: options.marketSize,
   };
@@ -379,9 +411,49 @@ function historyObjectiveResults(
   return inheritedResultReasons(results, scenario, progress, context);
 }
 
+/** The scored term freezes before any optional Keep playing acquisition. */
+function objectiveRetentionBaseline(
+  game: Pick<GameType, "customerMarketSize"> &
+    Partial<Pick<GameType, "utilityExpansion">>,
+  scenario: ScenarioType,
+): number {
+  return isUtilityExpansionScenario(scenario)
+    ? expansionRetentionBaseline(
+        game,
+        scenario.durationMonths * MINUTES_PER_MONTH,
+      )
+    : (retentionBaseline(scenario, game.customerMarketSize) ??
+        game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER);
+}
+
+/** Rebase evidence atomically after a purchase; completed-term observations stay final. */
+export function rebaseGameRetentionBaseline(
+  game: GameType,
+  baseline: number,
+): void {
+  const scenario = getScenario(game.scenarioId, game.customScenario);
+  if (
+    !scenario ||
+    !game.objectiveProgress ||
+    game.date.minute >= scenario.durationMonths * MINUTES_PER_MONTH
+  )
+    return;
+  game.objectiveProgress = rebaseObjectiveRetention(
+    game.objectiveProgress,
+    scenarioObjectiveDefinitions(scenario, game),
+    objectiveContextForGame(game, scenario),
+    baseline,
+  );
+}
+
 const resultCache = new WeakMap<
   ObjectiveProgress,
-  { completedMonths: number; rulesDigest: string; results: ObjectiveResult[] }
+  {
+    completedMonths: number;
+    rulesDigest: string;
+    acquisitionKey: string;
+    results: ObjectiveResult[];
+  }
 >();
 /** Shared recorded evidence; forecast callers extend a copy without changing the live run. */
 export function gameObjectiveProgress(
@@ -395,8 +467,7 @@ export function gameObjectiveProgress(
       scenarioObjectiveDefinitions(scenario, game),
       game.monthlyHistory,
       objectiveContextForGame(game, scenario),
-      retentionBaseline(scenario, game.customerMarketSize) ??
-        game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
+      objectiveRetentionBaseline(game, scenario),
     )
   );
 }
@@ -408,10 +479,15 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
   if (!objectives.length) return [];
   const context = objectiveContextForGame(game, scenario);
   const progress = gameObjectiveProgress(game)!;
+  const acquisitionKey =
+    game.utilityExpansion?.acquisitions
+      .map(({ targetId, minute }) => `${targetId}:${minute}`)
+      .join("|") ?? "";
   const cached = resultCache.get(progress);
   if (
     cached?.completedMonths === context.completedMonths &&
-    cached.rulesDigest === context.rulesDigest
+    cached.rulesDigest === context.rulesDigest &&
+    cached.acquisitionKey === acquisitionKey
   )
     return cached.results;
   const results = inheritedResultReasons(
@@ -419,10 +495,34 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
     scenario,
     progress,
     context,
-  );
+  ).map((result) => {
+    const objective = result.objective;
+    // An accepted, irreversible ownership receipt proves this obligation immediately.
+    // Month-close observations remain the authoritative deadline evidence.
+    if (
+      objective.metric !== "utilityOwnership" ||
+      context.completedMonths > objective.deadlineMonth
+    )
+      return result;
+    const acquired = game.utilityExpansion?.acquisitions.some(
+      (receipt) =>
+        objective.targets.includes(receipt.targetId) &&
+        receipt.minute < (objective.deadlineMonth + 1) * MINUTES_PER_MONTH,
+    );
+    return acquired
+      ? {
+          ...result,
+          status: "completed" as const,
+          observed: 1,
+          observedMonths: 1,
+          reason: undefined,
+        }
+      : result;
+  });
   resultCache.set(progress, {
     completedMonths: context.completedMonths,
     rulesDigest: context.rulesDigest,
+    acquisitionKey,
     results,
   });
   return results;
@@ -436,7 +536,9 @@ export function initializeGameObjectiveProgress(game: GameType): void {
       ? createObjectiveProgress(
           objectives,
           objectiveContextForGame(game, scenario),
-          game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
+          isUtilityExpansionGame(game)
+            ? objectiveRetentionBaseline(game, scenario)
+            : game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
         )
       : undefined;
 }
@@ -458,8 +560,7 @@ export function recordGameObjectiveMonth(
       objectives,
       game.monthlyHistory.filter((existing) => existing !== row),
       { ...context, completedMonths: month },
-      retentionBaseline(scenario, game.customerMarketSize) ??
-        game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
+      objectiveRetentionBaseline(game, scenario),
     );
   const needsDebt = objectives.some(
     (objective) => objective.metric === "monthEndDebt",
@@ -479,11 +580,22 @@ export function recordGameObjectiveMonth(
     {
       month,
       history: row,
+      ...(game.utilityExpansion
+        ? {
+            ownedUtilities: game.utilityExpansion.acquisitions.map(
+              ({ targetId }) => targetId,
+            ),
+            ownedAssetIds: game.facilities.flatMap((facility) =>
+              facility.startingAssetId ? [facility.startingAssetId] : [],
+            ),
+          }
+        : {}),
       ...(needsDebt
         ? {
             debtPrincipal: getTotalDebt([
               ...game.facilities,
               ...(game.transmission?.lines ?? []),
+              ...(game.utilityExpansion?.loans ?? []),
             ]),
           }
         : {}),
@@ -503,16 +615,45 @@ export function validGameObjectiveProgress(game: GameType): boolean {
   const progress = game.objectiveProgress;
   if (
     progress.retentionBaseline !==
-      game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER ||
+      (isUtilityExpansionGame(game)
+        ? objectiveRetentionBaseline(game, scenario)
+        : game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER) ||
     !validObjectiveProgress(progress, objectives, context)
   )
     return false;
   if (
     scenario.mod &&
-    game.customerMarketSize !==
+    (isUtilityExpansionGame(game)
+      ? game.customerMarketSize -
+        (game.utilityExpansion?.acquisitions.reduce(
+          (sum, receipt) =>
+            sum + UTILITY_AREAS[receipt.targetId].addressablePool,
+          0,
+        ) ?? 0)
+      : game.customerMarketSize) !==
       scenario.mod.parameters.startingCustomers * CUSTOMER_MARKET_MULTIPLIER
   )
     return false;
+  if (isUtilityExpansionGame(game)) {
+    const expansion = game.utilityExpansion;
+    if (!expansion) return false;
+    for (const objective of objectives) {
+      const evidence = progress.entries.find(
+        (entry) => entry.id === objective.id,
+      );
+      if (objective.metric === "utilityOwnership") {
+        for (const [month, numerator, denominator] of evidence?.observations ??
+          []) {
+          const atClose = expansion.acquisitions.some(
+            (acquisition) =>
+              objective.targets.includes(acquisition.targetId) &&
+              acquisition.minute < (month + 1) * MINUTES_PER_MONTH,
+          );
+          if (numerator !== Number(atClose) || denominator !== 1) return false;
+        }
+      }
+    }
+  }
   const observationsByObjective = new Map(
     progress.entries.map((entry) => [
       entry.id,
@@ -538,11 +679,17 @@ export function validGameObjectiveProgress(game: GameType): boolean {
       // their own recorded observations; never infer them from today's fleet.
       if (
         objective.metric === "monthEndDebt" ||
-        objective.metric === "fuelRetirement"
+        objective.metric === "fuelRetirement" ||
+        objective.metric === "utilityOwnership" ||
+        objective.metric === "assetRetirement"
       )
         continue;
       const first =
-        objective.metric === "customerRetention" ? 0 : objective.fromMonth;
+        objective.metric === "customerRetention"
+          ? context.retentionAtDeadlineOnly
+            ? objective.deadlineMonth
+            : 0
+          : objective.fromMonth;
       const last =
         objective.metric === "customerRetention"
           ? objective.deadlineMonth
@@ -585,6 +732,7 @@ export function runFailure(
         | "seed"
         | "startingYear"
         | "objectiveProgress"
+        | "utilityExpansion"
         | "scenarioId"
         | "customScenario"
         | "monthlyHistory"
@@ -603,6 +751,7 @@ export function runFailure(
       startingYear: game.startingYear ?? scenario.startingYear,
       date: game.date,
       customerMarketSize: game.customerMarketSize,
+      utilityExpansion: game.utilityExpansion,
     },
     scenario,
   );
@@ -617,8 +766,7 @@ export function runFailure(
       objectives,
       history,
       context,
-      retentionBaseline(scenario, game.customerMarketSize) ??
-        game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
+      objectiveRetentionBaseline(game, scenario),
     );
   const results = inheritedResultReasons(
     evaluateScenarioObjectives(objectives, progress, context),

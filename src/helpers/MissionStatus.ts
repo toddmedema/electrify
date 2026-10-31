@@ -179,13 +179,17 @@ export function getMissionStatus(game: GameType) {
         a.item.deadline - b.item.deadline ||
         a.index - b.index,
     )[0]?.item;
+  const authored = requirements.filter(
+    (item) => item.required && item.definition,
+  );
+  const nextAuthored = authored
+    .filter((item) => item.status !== "completed" && item.status !== "waived")
+    .sort((a, b) => a.deadline - b.deadline)[0];
   return {
     label: scenario?.name || "Custom game",
     requirements,
     prominent,
-    headline:
-      requirements.find((item) => item.required && item.definition) ||
-      prominent,
+    headline: nextAuthored || authored[0] || prominent,
     monthsRemaining,
     finalNote:
       monthsRemaining === 0

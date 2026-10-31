@@ -38,6 +38,7 @@ import {
 } from "../../helpers/GameSelectors";
 import { chartPalette, facilityColor } from "../../Theme";
 import {
+  AcquireUtilityAction,
   FacilityOperatingType,
   isStorage,
   GameType,
@@ -75,6 +76,7 @@ import {
 } from "../../helpers/Hazards";
 import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
+import { facilityDisplayName } from "../base/FacilityLabels";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
@@ -246,7 +248,7 @@ function FacilityActions(props: {
           className="facilityCancelConstruction"
           variant="outlined"
           startIcon={<CancelIcon />}
-          aria-label={"Cancel upgrade of " + facility.name}
+          aria-label={"Cancel upgrade of " + facilityDisplayName(facility)}
           onClick={() => onCancelRetrofit(facility.id)}
         >
           <span className="facilityActionLabel">Cancel upgrade</span>
@@ -260,13 +262,13 @@ function FacilityActions(props: {
           }
           aria-label={
             facility.paused
-              ? "Resume " + facility.name
-              : "Pause " + facility.name
+              ? "Resume " + facilityDisplayName(facility)
+              : "Pause " + facilityDisplayName(facility)
           }
           onClick={() =>
             facility.paused
               ? onTogglePause(facility.id)
-              : onPause(facility.id, facility.name)
+              : onPause(facility.id, facilityDisplayName(facility))
           }
         >
           <span className="facilityActionLabel">
@@ -280,7 +282,7 @@ function FacilityActions(props: {
         startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
         aria-label={
           (underConstruction ? "Cancel construction of " : "Sell ") +
-          facility.name
+          facilityDisplayName(facility)
         }
         onClick={onOpenSell}
       >
@@ -560,7 +562,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 type="button"
                 {...provided.dragHandleProps}
                 className="facilityDragHandle"
-                aria-label={"Reorder " + facility.name}
+                aria-label={"Reorder " + facilityDisplayName(facility)}
                 title="Drag to reorder"
                 onClick={(event) => {
                   if (event.shiftKey || event.ctrlKey || event.metaKey)
@@ -582,7 +584,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               type="button"
               className="facilityDisclosure"
               aria-label={
-                `Inspect ${facility.name}` +
+                `Inspect ${facilityDisplayName(facility)}` +
                 (hazardStatus && !underConstruction
                   ? `, ${hazardStatusText(hazardStatus).spoken}`
                   : "") +
@@ -602,7 +604,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     }}
                     primary={
                       <>
-                        <span className="facilityName">{facility.name}</span>
+                        <span className="facilityName">
+                          {facilityDisplayName(facility)}
+                        </span>
                         {ready && (
                           <span className="facilityReadyLabel">Ready</span>
                         )}
@@ -668,7 +672,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 checked={props.bulkSelected}
                 onClick={(event) => props.onToggleSelection(facility.id, event)}
                 slotProps={{
-                  input: { "aria-label": `Select ${facility.name}` },
+                  input: {
+                    "aria-label": `Select ${facilityDisplayName(facility)}`,
+                  },
                 }}
               />
             )}
@@ -682,7 +688,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               title={
                 <>
                   {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                  {formatFacilitySize(facility)} {facility.name.toLowerCase()}{" "}
+                  {formatFacilitySize(facility)}{" "}
+                  {facilityDisplayName(facility) === facility.name
+                    ? facility.name.toLowerCase()
+                    : facilityDisplayName(facility)}{" "}
                   facility?
                 </>
               }
@@ -851,6 +860,9 @@ export interface DispatchProps {
   onTransmissionCancel?: (id: number) => void;
   onTransmissionPause?: (id: number, name: string, paused: boolean) => void;
   onTransmissionUpgrade: (corridorId: string, financed: boolean) => void;
+  onUtilityAcquire?: (
+    payload: AcquireUtilityAction,
+  ) => boolean | Promise<boolean>;
   onTradingPolicy: (policy: TradingPolicyType) => void;
 }
 
@@ -1460,6 +1472,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   game={game}
                   onBuild={onTransmissionBuild}
                   onUpgrade={onTransmissionUpgrade}
+                  onAcquire={this.props.onUtilityAcquire}
                   onCancel={this.props.onTransmissionCancel}
                   onPause={this.props.onTransmissionPause}
                   onPolicy={onTradingPolicy}

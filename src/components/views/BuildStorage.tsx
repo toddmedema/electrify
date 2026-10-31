@@ -333,6 +333,11 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
         }}
         onSortChange={(value) => setSort(value as StorageSortKey)}
       />
+      {storage.length === 0 && (
+        <Typography role="status" sx={{ px: 2, py: 2 }}>
+          No storage projects are available in {game.date.year}.
+        </Typography>
+      )}
       <List ref={listRef} dense className="scrollable cardList">
         {storage.map((g: StorageShoppingType) => (
           <StorageBuildItem

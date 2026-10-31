@@ -875,16 +875,14 @@ export function ProgramsScreen({
             : (title ?? "Programs")
         }
       >
+        {!selected && pricing}
         {!selected ? (
-          <>
-            {pricing}
-            <ProgramList
-              game={game}
-              programs={programs}
-              policiesOn={policiesOn}
-              onOpen={open}
-            />
-          </>
+          <ProgramList
+            game={game}
+            programs={programs}
+            policiesOn={policiesOn}
+            onOpen={open}
+          />
         ) : (
           <Box className="customerProgramDetail">
             <Box className="customerProgramHeading">

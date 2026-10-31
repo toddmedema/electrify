@@ -1,3 +1,12 @@
+import {
+  UTILITY_AREAS,
+  UTILITY_TARGETS,
+  utilityEntitlementsAt,
+} from "../data/UtilityExpansion";
+import {
+  acquisitionTargetForCorridor,
+  ownedUtility,
+} from "../helpers/Expansion";
 import { validHydroClaims } from "../data/HydroSites";
 import {
   GAME_TO_REAL_YEARS,
@@ -20,7 +29,7 @@ import {
   HAIL_DEFINITION_ID,
   isWeatherHazardEligible,
 } from "../helpers/Hazards";
-import { MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { POLICIES } from "../data/Policies";
 import { getSolarOutputFactor } from "../helpers/Energy";
 import { programCustomers } from "../helpers/Policies";
@@ -452,7 +461,15 @@ export function checkTick(
             ? line.loanMonthlyPayment / TICKS_PER_MONTH
             : 0),
         0,
-      );
+      ) +
+      (state.utilityExpansion?.loans.reduce(
+        (sum, loan) =>
+          sum +
+          (loan.loanAmountLeft > 0
+            ? loan.loanMonthlyPayment / TICKS_PER_MONTH
+            : 0),
+        0,
+      ) ?? 0);
     const upperBound = prev.cash + now.revenue - expenses;
     const lowerBound = upperBound - maxPrincipal;
     if (
@@ -602,18 +619,70 @@ function checkTrade(
   const importedW = now.importedW || 0;
   const exportedW = now.exportedW || 0;
   const capacityW = now.transmissionCapacityW || 0;
-  if (importedW + exportedW > capacityW * (1 + RELATIVE_TOLERANCE) + 1) {
+  const entitlementW = now.entitlementImportedW ?? 0;
+  const entitlementCapacityW = now.entitlementImportCapacityW ?? 0;
+  const externalImportW = importedW - entitlementW;
+  if (
+    !Number.isFinite(entitlementW) ||
+    !Number.isFinite(entitlementCapacityW) ||
+    entitlementW < 0 ||
+    entitlementCapacityW < 0 ||
+    entitlementW > entitlementCapacityW * (1 + RELATIVE_TOLERANCE) + 1 ||
+    externalImportW < -1
+  ) {
+    collector.add(
+      "purchased entitlements remain within source interfaces",
+      when,
+      `purchased ${entitlementW}W of ${entitlementCapacityW}W, total imports ${importedW}W`,
+    );
+  }
+  if (state.utilityExpansion) {
+    const owned = new Set(
+      state.utilityExpansion.acquisitions
+        .filter((receipt) => receipt.minute <= now.minute)
+        .map(({ targetId }) => targetId),
+    );
+    const definitions = [
+      UTILITY_AREAS.champlain,
+      ...UTILITY_TARGETS.filter(({ id }) => owned.has(id)).map(
+        ({ id }) => UTILITY_AREAS[id],
+      ),
+    ];
+    const year = getDateFromMinute(now.minute, state.startingYear).year;
+    const maximum = definitions.reduce(
+      (sum, definition) =>
+        sum +
+        Math.min(
+          definition.sourceInterfaceW,
+          utilityEntitlementsAt(definition.id, year).reduce(
+            (rights, source) =>
+              rights + source.nominalW * source.deliverability,
+            0,
+          ),
+        ),
+      0,
+    );
+    if (entitlementCapacityW > maximum + 1)
+      collector.add(
+        "company purchases respect owned dated source rights",
+        when,
+        `${entitlementW}/${entitlementCapacityW}W, maximum ${maximum}W`,
+      );
+  }
+  if (externalImportW + exportedW > capacityW * (1 + RELATIVE_TOLERANCE) + 1) {
     collector.add(
       "trade stays within transmission capacity",
       when,
-      `imported ${Math.round(importedW)}W + exported ${Math.round(exportedW)}W vs ${Math.round(capacityW)}W`,
+      `imported ${Math.round(externalImportW)}W + exported ${Math.round(exportedW)}W vs ${Math.round(capacityW)}W`,
     );
   }
-  if (importedW > 0 && exportedW > 0) {
+  // Bounded source rights can serve local load while native generation supplies a
+  // neighbor. Only outside market purchases and sales must remain one direction.
+  if (externalImportW > 0 && exportedW > 0) {
     collector.add(
       "a tick never imports and exports at once",
       when,
-      `imported ${importedW}W and exported ${exportedW}W`,
+      `outside imports ${externalImportW}W and exports ${exportedW}W`,
     );
   }
   const importsFlow = importedW > 0;
@@ -647,6 +716,22 @@ function checkTrade(
     for (const line of state.transmission.lines.filter(
       (l) => l.yearsToBuildLeft <= 0,
     )) {
+      const ownedTarget = acquisitionTargetForCorridor(line.corridorId);
+      if (
+        ownedTarget &&
+        state.utilityExpansion?.acquisitions.some(
+          (receipt) =>
+            receipt.targetId === ownedTarget.id && receipt.minute <= now.minute,
+        )
+      ) {
+        if ((line.currentFlowW ?? 0) !== 0)
+          collector.add(
+            "acquired corridors carry no external trades",
+            when,
+            `${line.corridorId}: ${line.currentFlowW}W`,
+          );
+        continue;
+      }
       const market = effectiveMarket(line.corridorId, context, line.capacityW);
       if (!market) continue;
       const limits = intertieOfferLimits(line, context, now.minute, conditions);
@@ -689,14 +774,25 @@ function checkTrade(
         );
     }
   }
-  if (importedW > 0 && state.transmission && now.temperatureC !== undefined) {
+  if (
+    externalImportW > 0 &&
+    state.transmission &&
+    now.temperatureC !== undefined
+  ) {
     const context = intertieContextForGame(state);
     const conditions = {
       temperatureC: now.temperatureC,
       solarIrradianceWM2: now.solarIrradianceWM2 || 0,
     };
     const offers = state.transmission.lines
-      .filter(({ yearsToBuildLeft }) => yearsToBuildLeft <= 0)
+      .filter(
+        ({ yearsToBuildLeft, corridorId }) =>
+          yearsToBuildLeft <= 0 &&
+          !ownedUtility(
+            state,
+            acquisitionTargetForCorridor(corridorId)?.id ?? "",
+          ),
+      )
       .map((line) => ({
         ...intertieOfferLimits(line, context, now.minute, conditions),
         exportLimitW: 0,
@@ -707,11 +803,11 @@ function checkTrade(
       Infinity,
       0,
     ).importedW.reduce((sum, w) => sum + w, 0);
-    if (importedW > neighbourLimitW * (1 + RELATIVE_TOLERANCE) + 1) {
+    if (externalImportW > neighbourLimitW * (1 + RELATIVE_TOLERANCE) + 1) {
       collector.add(
         "imports stay within what neighbours can spare",
         when,
-        `imported ${Math.round(importedW)}W vs ${Math.round(neighbourLimitW)}W available`,
+        `imported ${Math.round(externalImportW)}W vs ${Math.round(neighbourLimitW)}W available`,
       );
     }
   }

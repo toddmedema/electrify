@@ -79,7 +79,9 @@ export const multiplayerMiddleware: Middleware<object, AppStateType> =
         : state.ui.facilityDragActive
           ? "Reordering facilities"
           : state.game.policyPause
-            ? "Choosing a policy"
+            ? state.game.policyPause.token.startsWith("acquisition:")
+              ? "Reviewing an acquisition"
+              : "Choosing a policy"
             : BLOCKING.has(state.card.name)
               ? state.card.name.startsWith("BUILD_")
                 ? "Building capacity"

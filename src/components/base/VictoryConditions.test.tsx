@@ -45,7 +45,7 @@ it.each(["Public", "Investor"] as const)(
       />,
     );
     expect(
-      screen.getByText(/Keep ≥90% of starting customers/),
+      screen.getByText(/Keep ≥90% of customer baseline/),
     ).toBeInTheDocument();
     expect(
       screen.getByText(objectiveDefinition("customerRetention")),

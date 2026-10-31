@@ -1,3 +1,4 @@
+import { UTILITY_AREAS } from "./UtilityExpansion";
 import { officialRetentionMetadata } from "./OfficialScenarioRules";
 import { beginIntertieStress } from "../reducers/GameActions";
 import * as React from "react";
@@ -1923,6 +1924,37 @@ export const SCENARIOS: ScenarioType[] = [
     endTitle: "The monsoon finally arrived",
     endMessage:
       "Four summers pushed demand higher and higher. See how your grid handled the peak, and what it cost.",
+  },
+  {
+    id: 116,
+    name: "Across the Valley",
+    icon: "across-the-valley",
+    locationId: "BurlingtonVT",
+    location: UTILITY_AREAS.champlain.location,
+    summary:
+      "Connect to your neighbors, acquire a utility, and keep your larger company supplied.",
+    themes: ["Rapid growth"],
+    briefing: {
+      tone: "boom",
+      fantasy: "Build Champlain Electric into a larger Vermont utility.",
+      objective:
+        "Acquire Valley Electric or Ridge Electric by the end of 2014, then operate your expanded company through 2024.",
+      threat:
+        "Choose between Valley's larger customer base and shrinking power contract, or Ridge's smaller industrial load and fuel exposure. Valley's nuclear purchase falls from 160 to 80 MW in January 2017.",
+    },
+    ownership: "Investor",
+    startingYear: 2005,
+    durationMonths: 240,
+    startingCustomers: UTILITY_AREAS.champlain.customers,
+    startingDemandScale: UTILITY_AREAS.champlain.demandScale,
+    demandShapeExponent: UTILITY_AREAS.champlain.demandShapeExponent,
+    dollarsPerkWh: 0.105,
+    cash: 120e6,
+    feePerKgCO2e: 0,
+    facilities: UTILITY_AREAS.champlain.facilities,
+    endTitle: "A company across the valley",
+    endMessage:
+      "See what expansion cost and how your larger company performed.",
   },
 ];
 

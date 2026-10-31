@@ -92,6 +92,12 @@ export function scenarioLossSummary(
         case "monthlyBilledRate":
           phrase = `Billed rate >${target}`;
           break;
+        case "utilityOwnership":
+          phrase = "No utility acquired by the deadline";
+          break;
+        case "assetRetirement":
+          phrase = "An original oil asset is still owned";
+          break;
         case "monthEndDebt":
           phrase = `Debt >${target}`;
           break;

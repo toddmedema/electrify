@@ -424,6 +424,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     rooftopSolarW?: number;
     supplyByFuel: FuelProductionType;
     /** Positive gross flow into/out of the player's grid during this tick. */
+    entitlementImportedW?: number;
+    entitlementImportCapacityW?: number;
     importedW?: number;
     exportedW?: number;
     transmissionCapacityW?: number;
@@ -1242,7 +1244,43 @@ export interface PeerSettlement {
   exportedW: number;
   importEmissionsKgPerMWh: number;
 }
+export type UtilityId = "champlain" | "valley-electric" | "ridge-electric";
+export type UtilityTargetId = Exclude<UtilityId, "champlain">;
+export interface AcquisitionLoan {
+  id: string;
+  targetId: UtilityTargetId;
+  kind: "purchase" | "assumed";
+  principal: number;
+  loanAmountLeft: number;
+  loanMonthlyPayment: number;
+  interestRate: number;
+  months: number;
+  minuteCreated: number;
+}
+export interface UtilityNetworkAsset {
+  targetId: UtilityTargetId;
+  activatedMinute: number;
+  initialValue: number;
+  retentionLowWatermark: number;
+}
+export interface UtilityExpansionState {
+  networkAssets: UtilityNetworkAsset[];
+  loans: AcquisitionLoan[];
+  acquisitions: {
+    targetId: UtilityTargetId;
+    minute: number;
+    financed: boolean;
+    /** Immutable seller accounts transferred, not a separately simulated customer population. */
+    transferredCustomers: number;
+  }[];
+}
+export interface AcquireUtilityAction {
+  targetId: UtilityTargetId;
+  financed: boolean;
+  quoteKey: string;
+}
 export interface GameType {
+  utilityExpansion?: UtilityExpansionState;
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {
     seat: string;

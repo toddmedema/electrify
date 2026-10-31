@@ -1,3 +1,7 @@
+import {
+  validUtilityExpansionParameters,
+  validUtilityExpansionSetup,
+} from "./ExpansionContext";
 import type {
   FacilityModifierType,
   GameType,
@@ -411,6 +415,12 @@ export function validScenarioMod(
       !number(params.seed, 0, 4294967295, true) ||
       !number(params.startingCustomers, 1, 1e8, true) ||
       !number(params.startingDemandScale, 0.01, 100)
+    )
+      return false;
+    if (
+      params.baseScenarioId === 116 &&
+      (!validUtilityExpansionParameters(params) ||
+        (scenario && !validUtilityExpansionSetup(scenario)))
     )
       return false;
     if (!validCompiledScenarioRules(value.rules)) return false;

@@ -1,4 +1,5 @@
 import path from "node:path";
+import catalog from "../src/achievements/AchievementCatalog.json";
 import { expect, Page, test, TestInfo } from "./fixtures";
 
 const STORAGE_KEY = "electrify-achievements-v1";
@@ -63,9 +64,17 @@ test("gallery lists all requirements, filters earned awards, restores keyboard f
     page.getByRole("button", { name: "Back", exact: true }),
   ).toBeFocused();
   await expect(
-    page.getByText("2 of 35 unlocked", { exact: true }),
+    page.getByText(`2 of ${catalog.length} unlocked`, { exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".achievementRow")).toHaveCount(35);
+  await expect(page.locator(".achievementRow")).toHaveCount(catalog.length);
+  await expect(
+    page.getByRole("heading", { name: "Across the Valley", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Successfully finish Across the Valley on any difficulty.", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(
     page
       .locator(".achievementRow")
@@ -107,7 +116,10 @@ test("gallery lists all requirements, filters earned awards, restores keyboard f
   await expect(page.locator(".achievementToastPanel")).toBeHidden();
   await assertLayout(page);
   await screenshot(page, info, "gallery-light");
-  const all = page.getByRole("tab", { name: "All (35)", exact: true });
+  const all = page.getByRole("tab", {
+    name: `All (${catalog.length})`,
+    exact: true,
+  });
   await all.focus();
   await page.keyboard.press("ArrowRight");
   await expect(
@@ -128,8 +140,10 @@ test("gallery lists all requirements, filters earned awards, restores keyboard f
   await assertLayout(page);
   await screenshot(page, info, "gallery-dark");
   await expect(page.locator(".achievementToastPanel")).toBeHidden();
-  await page.getByRole("tab", { name: "Locked (33)", exact: true }).click();
-  await expect(page.locator(".achievementRow")).toHaveCount(33);
+  await page
+    .getByRole("tab", { name: `Locked (${catalog.length - 2})`, exact: true })
+    .click();
+  await expect(page.locator(".achievementRow")).toHaveCount(catalog.length - 2);
   await expect(page.locator(".achievementRow.isUnlocked")).toHaveCount(0);
 });
 
@@ -203,7 +217,7 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
     .getByRole("button", { name: "View achievements", exact: true })
     .click();
   await expect(
-    page.getByText("1 of 35 unlocked", { exact: true }),
+    page.getByText(`1 of ${catalog.length} unlocked`, { exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(
@@ -213,7 +227,7 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
   await page.reload();
   await openGallery(page);
   await expect(
-    page.getByText("1 of 35 unlocked", { exact: true }),
+    page.getByText(`1 of ${catalog.length} unlocked`, { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".achievementToastPanel")).toBeHidden();
 });
@@ -243,6 +257,6 @@ test("empty earned view explains the next achievement and offline sign-in is dis
   await page
     .getByRole("button", { name: "Show all achievements", exact: true })
     .click();
-  await expect(page.locator(".achievementRow")).toHaveCount(35);
+  await expect(page.locator(".achievementRow")).toHaveCount(catalog.length);
   await assertLayout(page);
 });

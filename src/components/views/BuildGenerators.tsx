@@ -1202,12 +1202,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
                   withResilienceOptions(g, game, selection)
                 }
                 onBuild={(financed, selection) => {
-                  props.onBuildGenerator(
+                  const selected =
                     selection === undefined
                       ? g
-                      : withResilienceOptions(g, game, selection),
-                    financed,
-                  );
+                      : withResilienceOptions(g, game, selection);
+                  props.onBuildGenerator(selected, financed);
                   (completeBuild ?? onBack)();
                 }}
               />

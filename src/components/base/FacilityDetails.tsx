@@ -1,3 +1,4 @@
+import { facilityDisplayName } from "./FacilityLabels";
 import GasConversion from "./GasConversion";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import { currentCash } from "../../helpers/GameSelectors";
@@ -252,7 +253,7 @@ function WeatherResilienceSection(props: {
         <ConfirmDialog
           open
           isolateClicks
-          title={`${actionLabel} to ${facility.name}?`}
+          title={`${actionLabel} to ${facilityDisplayName(facility)}?`}
           contentClassName="facilityRetrofitDialog"
           confirmLabel={`Pay ${formatMoneyConcise(cost)}`}
           confirmDisabled={shortfall > 0}

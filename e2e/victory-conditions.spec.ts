@@ -64,7 +64,7 @@ for (const theme of ["light", "dark"] as const) {
         await expect(requirements).not.toContainText("points");
         if (scenario.id === 100) {
           await expect(requirements).toContainText(
-            "Keep ≥80% of starting customers",
+            "Keep ≥80% of customer baseline",
           );
         }
         await expect(requirements).toContainText(
@@ -140,7 +140,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       if (scenario.id === 100) {
         await expect(dialog).toContainText(
-          "Keep ≥80% of starting customers by Dec 2031",
+          "Keep ≥80% of customer baseline by Dec 2031",
         );
         await expect(dialog).not.toContainText("Invest in the grid");
       }

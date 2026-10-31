@@ -92,7 +92,11 @@ export async function waitForSettled(
  */
 export async function openBuild(page: Page): Promise<Locator> {
   const build = page.getByRole("region", { name: "Build", exact: true });
-  if (!(await build.isVisible())) await page.locator("#buildNav").click();
+  const navButton = page.getByRole("button", { name: "Build", exact: true });
+  // A purchase dialog temporarily hides the workspace from the accessibility tree.
+  // Wait for it to return before deciding whether the dock would open or close Build.
+  await waitForPaneOrNav(build, navButton);
+  if (!(await build.isVisible())) await navButton.click();
   await expect(build).toBeVisible();
   return build;
 }

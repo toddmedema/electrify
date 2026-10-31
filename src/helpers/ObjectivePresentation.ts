@@ -47,6 +47,10 @@ export function objectiveValueText(
       return `$${number(value, comparison)}/kWh`;
     case "monthEndDebt":
       return `$${number(value, comparison)} principal`;
+    case "utilityOwnership":
+      return `${number(value)} acquired ${value === 1 ? "utility" : "utilities"}`;
+    case "assetRetirement":
+      return `${number(value)} original oil ${value === 1 ? "asset" : "assets"}`;
     case "fuelRetirement":
       return `${number(value)} owned ${objective.fuel} ${value === 1 ? "asset" : "assets"}`;
   }
@@ -80,7 +84,11 @@ export function objectiveTargetText(objective: CompiledRuleObjective): string {
   const target = objectiveValueText(objective, objectiveTarget(objective));
   switch (objective.metric) {
     case "customerRetention":
-      return `Keep ≥${target} of starting customers`;
+      return `Keep ≥${target} of customer baseline`;
+    case "utilityOwnership":
+      return objective.label;
+    case "assetRetirement":
+      return objective.label;
     case "localFuelShare":
       return `≥${target} local delivery from ${objective.fuels.join(", ")}`;
     case "fuelRetirement":
@@ -118,11 +126,17 @@ export function objectiveDefinitionText(
   result: Pick<ObjectiveResult, "metric" | "definition">,
 ): string {
   return result.metric === "customerRetention"
-    ? "Customers kept, as a share of your starting customers."
+    ? "Customers kept, as a share of your recorded customer baseline."
     : result.definition;
 }
 
 export function objectiveObservedText(result: ObjectiveResult): string {
+  if (result.metric === "utilityOwnership")
+    return result.observed === 1
+      ? "Utility acquired"
+      : result.status === "failed"
+        ? "No utility acquired by the deadline"
+        : "No utility acquired yet";
   const months = completedMonthsText(result);
   if (result.observed === undefined)
     return `${months ?? "Not measured yet"}${result.status === "unverifiable" ? " · history incomplete, not verifiable" : ""}`;

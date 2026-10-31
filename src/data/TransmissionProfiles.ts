@@ -62,6 +62,16 @@ export const TRANSMISSION_PROFILE_DATA = {
       ["ny-pjm-new","ny-pjm-new-market","PJM market connection","NEW",750000000,675000000,10100000,4,30,0.012,0.04]
     ]
   ],
+  "us-vermont-expansion": [
+    [
+      ["vt-valley-pool","Valley Electric","Connect to Valley Electric near Rutland. A completed connection unlocks acquisition.",60,600000000,600000000,"PEAK_SHARING"],
+      ["vt-ridge-pool","Ridge Electric","Connect to Ridge Electric near White River Junction. A completed connection unlocks acquisition.",60,600000000,600000000,"PEAK_SHARING"]
+    ],
+    [
+      ["vt-champlain-valley","vt-valley-pool","Valley Electric intertie","EXISTING",100000000,60000000,1200000,2,28,0.01,0.03],
+      ["vt-champlain-ridge","vt-ridge-pool","Ridge Electric intertie","EXISTING",100000000,70000000,1400000,2.5,28,0.01,0.03]
+    ]
+  ],
   "us-isone": [
     [
       ["newengland-quebec-upgrade-market","Québec hydro market","Stored water can supply steady power during cold snaps and summer peaks.",40,2100000000,800000000,"RESERVOIR_HYDRO"],
@@ -1628,6 +1638,7 @@ export const TRANSMISSION_PROFILE_LOCATION_IDS = {
   "us-pjm": ["PIT","Philadelphia","Manassas","Columbus","Baltimore","Cleveland","Chicago","AlleghenyUpper"],
   "us-nyiso": ["NewYork","Buffalo"],
   "us-isone": ["Boston"],
+  "us-vermont-expansion": ["BurlingtonVT","RutlandVT","WhiteRiverJunctionVT"],
   "us-miso-north": ["Indianapolis","Detroit","Milwaukee","Minneapolis","StLouis"],
   "us-miso-south": ["NewOrleans"],
   "us-spp": ["KansasCity"],

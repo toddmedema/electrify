@@ -97,3 +97,46 @@ describe("generator commitment optimization", () => {
     expect(JSON.stringify(forecast)).not.toContain("dispatchTarget");
   });
 });
+
+test("one company's prepared generator decisions survive copy and JSON save", () => {
+  const {
+    copyCommitmentMetadata,
+    serializeCommitmentMetadata,
+    restoreCommitmentMetadata,
+    validCommitmentMetadata,
+  } = jest.requireActual<typeof import("./Commitment")>("./Commitment");
+  const timeline = [tick(0), tick(0), tick(1)];
+  timeline.forEach((frame, i) =>
+    recordDispatchTarget(frame, 8, i === 2 ? 2 : 0),
+  );
+  for (const facilityId of [7, 8])
+    prepareGeneratorCommitment({
+      facilityId,
+      forecast: timeline,
+      minimumOperatingCost: () => 20,
+    });
+  const saved = JSON.parse(
+    JSON.stringify(serializeCommitmentMetadata(timeline)),
+  );
+  expect(validCommitmentMetadata(saved, 3)).toBe(true);
+  const restored = JSON.parse(
+    JSON.stringify(timeline),
+  ) as TickPresentFutureType[];
+  restoreCommitmentMetadata(restored, saved);
+  for (const facilityId of [7, 8])
+    expect(
+      shouldKeepGeneratorCommitted({
+        facilityId,
+        forecast: restored,
+        fromIndex: 0,
+        startCost: 50,
+        minimumOperatingCost: () => 1000,
+      }),
+    ).toBe(true);
+  const copied = timeline.map((frame) => ({ ...frame }));
+  timeline.forEach((frame, i) => copyCommitmentMetadata(frame, copied[i]));
+  expect(serializeCommitmentMetadata(copied)).toEqual(saved);
+  const bad = JSON.parse(JSON.stringify(saved));
+  bad[0].runningCostToNextDispatch[7] = -1;
+  expect(validCommitmentMetadata(bad, 3)).toBe(false);
+});

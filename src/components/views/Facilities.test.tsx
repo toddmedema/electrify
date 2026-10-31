@@ -34,6 +34,7 @@ import {
 import { formatMoneyConcise } from "../../helpers/Format";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 import { purchaseTerms } from "../../helpers/Financials";
+import { modScenario } from "../../mods/ModScenario";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
@@ -424,6 +425,23 @@ describe("the fleet list", () => {
     expect(onPause).toHaveBeenCalledWith(facility.id, facility.name);
   });
 
+  it("names the original Oil A retirement target in its direct sale confirmation", async () => {
+    const expansion = createGame({ scenarioId: 116 });
+    const oil = expansion.facilities.find(
+      (facility) => facility.startingAssetId === "scenario-116-champlain-oil-a",
+    )!;
+    const { onSell } = renderFacilities(expansion, oil.id);
+    await user.click(
+      screen.getByRole("button", {
+        name: "Sell Oil A",
+      }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAccessibleName("Sell 40MW Oil A facility?");
+    await user.click(within(dialog).getByRole("button", { name: "Sell" }));
+    expect(onSell).toHaveBeenCalledWith(oil.id);
+  });
+
   it("can sell the only facility left in a fleet", async () => {
     const onePlant = createGame({ scenarioId: 5 });
     const { onSell } = renderFacilities(onePlant, onePlant.facilities[0].id);
@@ -726,7 +744,7 @@ describe("the interties view", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("$10.8M");
     expect(dialog).toHaveTextContent("Loan option");
-    expect(dialog).toHaveTextContent("Payments start now");
+    expect(dialog).not.toHaveTextContent("Payments start now");
   });
 
   it("tells the neighbours apart by kind, typical year, peak help and price", async () => {
@@ -907,7 +925,9 @@ describe("the interties view", () => {
     });
     await user.click(review);
     expect(onBuild).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).toHaveTextContent("Payments start now");
+    expect(screen.getByRole("dialog")).not.toHaveTextContent(
+      "Payments start now",
+    );
     await user.click(screen.getByRole("button", { name: "close" }));
     expect(onBuild).not.toHaveBeenCalled();
     await user.click(review);
@@ -1071,6 +1091,55 @@ describe("unified connections", () => {
     expect(building).toHaveTextContent("Typical price");
   });
 });
+
+it.each([false, true])(
+  "offers completed connection acquisition in a native or validated base-116 mod (mod: %s)",
+  async (mod) => {
+    const customScenario = mod
+      ? modScenario({
+          schemaVersion: 1,
+          gameApi: 1,
+          id: "community-valley",
+          title: "Community Valley",
+          creator: "Planner",
+          version: "1",
+          description: "Keep the regional utility supplied.",
+          baseScenarioId: 116,
+          seed: 12345,
+        })
+      : undefined;
+    const state = createGame({
+      scenarioId: customScenario?.id ?? 116,
+      scenario: customScenario,
+      seed: 12345,
+    });
+    const game = cloneDeep(
+      gameReducer(
+        state,
+        buildTransmissionLine({
+          corridorId: "vt-champlain-ridge",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    render(
+      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+        <TransmissionPanel
+          game={game}
+          onBuild={jest.fn()}
+          onUpgrade={jest.fn()}
+          onPolicy={jest.fn()}
+          onAcquire={jest.fn()}
+        />
+      </Provider>,
+    );
+    await user.click(screen.getByRole("button", { name: /^Inspect Ridge/ }));
+    expect(
+      screen.getByRole("button", { name: "Acquire Ridge Electric" }),
+    ).toBeVisible();
+  },
+);
 
 describe("the intertie upgrade control", () => {
   /** A California run whose northern intertie is open and carrying power. */

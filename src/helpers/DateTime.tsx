@@ -161,7 +161,7 @@ function accumulateTick(
     const sample = Object.fromEntries(
       Object.entries(t),
     ) as TickPresentFutureType;
-    // Recovery batches belong to resumable ticks, not averaged chart history.
+    // Local resumable frames and recovery batches are not numeric averaged chart history.
     delete sample.deferredResidential;
     delete sample.deferredResidentialStart;
     delete sample.deferredThermal;
