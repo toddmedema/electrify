@@ -19,6 +19,8 @@ import {
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate, navigateBack } from "../../reducers/Card";
+import { snackbarOpen } from "../../reducers/UI";
+import { reportSaveDeleteFailure } from "../../SaveDiagnostics";
 import { isResumableStatus, sortSaves } from "../../SaveModel";
 import {
   deleteSavedGame,
@@ -73,6 +75,14 @@ export default function SavedGames(): React.JSX.Element {
     {},
   );
   const deleteCancel = React.useRef<HTMLButtonElement>(null);
+  const deleteAttempt = React.useRef<AbortController>();
+  React.useEffect(
+    () => () => {
+      deleteAttempt.current?.abort();
+      deleteAttempt.current = undefined;
+    },
+    [],
+  );
   React.useEffect(() => {
     void refreshSavedGames();
   }, []);
@@ -93,6 +103,67 @@ export default function SavedGames(): React.JSX.Element {
       return false;
     } finally {
       setBusy(false);
+    }
+  };
+  const deleteGame = async () => {
+    if (!deleting || busy || deleteAttempt.current) return;
+    const controller = new AbortController();
+    deleteAttempt.current = controller;
+    const started = performance.now();
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    setBusy(true);
+    setError("");
+    try {
+      // Race the UI deadline as well as aborting storage: an unavailable browser API
+      // must never keep this dialog modal, even if it ignores cancellation.
+      const deadline = new Promise<never>((_, reject) => {
+        controller.signal.addEventListener(
+          "abort",
+          () => reject(new DOMException("Delete cancelled", "AbortError")),
+          { once: true },
+        );
+        timer = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+        }, 6000);
+      });
+      await Promise.race([
+        deleteSavedGame(deleting.id, controller.signal),
+        deadline,
+      ]);
+      if (deleteAttempt.current === controller) setDeleting(undefined);
+    } catch (failure) {
+      // Unmount cancels this view's work without reporting a failure or changing a
+      // newer view. Promise.race also consumes any late storage rejection.
+      if (controller.signal.aborted && !timedOut) return;
+      reportSaveDeleteFailure(failure, {
+        timedOut,
+        elapsedMs: Math.round(performance.now() - started),
+        saveCount: saves.entries.length,
+        activeSave: deleting.id === saves.activeId,
+        pendingSave: !!deleting.pending,
+        saveState: saves.saveState,
+        cloudState: saves.cloudState,
+      });
+      if (timedOut) {
+        setDeleting(undefined);
+        dispatch(
+          snackbarOpen("Delete may have failed. Please try again later."),
+        );
+      } else {
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Couldn't delete this saved game. Please try again.",
+        );
+      }
+    } finally {
+      clearTimeout(timer);
+      if (deleteAttempt.current === controller) {
+        deleteAttempt.current = undefined;
+        setBusy(false);
+      }
     }
   };
   const viewResult = (save: SaveMetadata) => {
@@ -512,14 +583,7 @@ export default function SavedGames(): React.JSX.Element {
             color="primary"
             variant="contained"
             disabled={busy}
-            onClick={() => {
-              if (deleting)
-                void perform(() => deleteSavedGame(deleting.id)).then(
-                  (success) => {
-                    if (success) setDeleting(undefined);
-                  },
-                );
-            }}
+            onClick={() => void deleteGame()}
           >
             {busy
               ? "Deleting…"

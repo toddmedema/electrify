@@ -1,4 +1,5 @@
 import { encodeSave } from "./SaveEncoding";
+import { saveOperationAborted, waitForSaveOperation } from "./SaveOperation";
 import {
   assertSupportedSaveSchema,
   isResumableStatus,
@@ -214,8 +215,10 @@ export class SaveRepository {
       ) => void,
       fail: (error: unknown) => void,
     ) => void,
+    signal?: AbortSignal,
   ): Promise<T> {
-    await this.initialize();
+    await waitForSaveOperation(this.initialize(), signal);
+    if (signal?.aborted) throw saveOperationAborted();
     return new Promise<T>((resolve, reject) => {
       let transaction: IDBTransaction;
       try {
@@ -231,12 +234,31 @@ export class SaveRepository {
         try {
           transaction.abort();
         } catch (_error) {
+          cleanup();
           reject(failure);
         }
       };
-      transaction.oncomplete = () => resolve(result);
-      transaction.onabort = () =>
-        reject(failure || databaseError(transaction.error));
+      const abort = () => {
+        try {
+          transaction.abort();
+        } catch {
+          // A committed transaction must still report success, even if cancellation arrived late.
+        }
+      };
+      const cleanup = () => signal?.removeEventListener("abort", abort);
+      transaction.oncomplete = () => {
+        cleanup();
+        resolve(result);
+      };
+      transaction.onabort = () => {
+        cleanup();
+        reject(
+          signal?.aborted
+            ? saveOperationAborted()
+            : failure || databaseError(transaction.error),
+        );
+      };
+      signal?.addEventListener("abort", abort, { once: true });
       transaction.onerror = () => {
         /* onabort reports request failures after rollback. */
       };
@@ -705,6 +727,7 @@ export class SaveRepository {
     id: string,
     lease: SaveLease | undefined,
     mutation: (tx: IDBTransaction, metadata: SaveMetadata) => T,
+    signal?: AbortSignal,
   ): Promise<T> {
     return this.transaction<T>(
       ["saves", "payloads", "sessions", "sync"],
@@ -721,6 +744,7 @@ export class SaveRepository {
           },
         );
       },
+      signal,
     );
   }
 
@@ -947,23 +971,32 @@ export class SaveRepository {
     return metadata;
   }
 
-  async delete(id: string, lease?: SaveLease): Promise<void> {
-    await this.mutate(id, lease, (tx, metadata) => {
-      if (metadata.cloud) {
-        const { uid, id: cloudId, version, writerDeviceId } = metadata.cloud;
-        tx.objectStore("sync").put({
-          key: `${uid}:${cloudId}`,
-          uid,
-          id: cloudId,
-          version,
-          writerDeviceId,
-          writerLocalId: metadata.id,
-        });
-      }
-      tx.objectStore("saves").delete(id);
-      tx.objectStore("payloads").delete(id);
-      tx.objectStore("sessions").delete(id);
-    });
+  async delete(
+    id: string,
+    lease?: SaveLease,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await this.mutate(
+      id,
+      lease,
+      (tx, metadata) => {
+        if (metadata.cloud) {
+          const { uid, id: cloudId, version, writerDeviceId } = metadata.cloud;
+          tx.objectStore("sync").put({
+            key: `${uid}:${cloudId}`,
+            uid,
+            id: cloudId,
+            version,
+            writerDeviceId,
+            writerLocalId: metadata.id,
+          });
+        }
+        tx.objectStore("saves").delete(id);
+        tx.objectStore("payloads").delete(id);
+        tx.objectStore("sessions").delete(id);
+      },
+      signal,
+    );
     this.changed();
   }
 

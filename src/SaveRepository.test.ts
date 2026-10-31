@@ -1,9 +1,10 @@
 import "fake-indexeddb/auto";
 import { deserialize, serialize } from "v8";
+import { webcrypto } from "crypto";
 import { SaveRepository } from "./SaveRepository";
 import { parseSave, serializeSave } from "./SaveGame";
 import { fakeSaveGame, fakeSavedResult } from "./testing/SaveTestHelpers";
-import type { SaveLease, VictoryType } from "./Types";
+import type { SaveLease, SaveMetadata, VictoryType } from "./Types";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
 import { createGame } from "./testing/Simulator";
 import { runMonths } from "./testing/SimulationTestHelpers";
@@ -31,6 +32,11 @@ if (typeof structuredClone === "undefined") {
     value: <T>(value: T): T => currentRealm(deserialize(serialize(value))) as T,
   });
 }
+
+Object.defineProperty(globalThis, "crypto", {
+  configurable: true,
+  value: webcrypto,
+});
 
 describe("SaveRepository", () => {
   let now: number;
@@ -498,5 +504,78 @@ describe("SaveRepository", () => {
     unsubscribe();
     await repository.rename("first", "Renamed", lease());
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("rolls back a canceled delete, including its queued cloud tombstone", async () => {
+    await create();
+    await repository.release(lease());
+    await repository.bindCloud("first", "user");
+    const abort = new AbortController();
+    const remove = IDBObjectStore.prototype.delete;
+    jest.spyOn(IDBObjectStore.prototype, "delete").mockImplementation(function (
+      this: IDBObjectStore,
+      key: IDBValidKey | IDBKeyRange,
+    ) {
+      const request = remove.call(this, key);
+      if (this.name === "sessions") abort.abort();
+      return request;
+    });
+    await expect(
+      repository.delete("first", undefined, abort.signal),
+    ).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect((await repository.read("first")).metadata.id).toBe("first");
+    expect(await repository.pendingCloudDeletes("user")).toEqual([]);
+  });
+
+  it("cancels a queued delete before it can acquire the database", async () => {
+    await create();
+    const abort = new AbortController();
+    abort.abort();
+    await expect(
+      repository.delete("first", lease(), abort.signal),
+    ).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect((await repository.read("first")).metadata.id).toBe("first");
+  });
+
+  it("uses only indexed point operations to delete from a 10,000-save library", async () => {
+    const first = await create();
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(databaseName);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(
+          ["saves", "payloads"],
+          "readwrite",
+        );
+        for (let index = 1; index < 10000; index++) {
+          const id = `save-${index.toString().padStart(5, "0")}`;
+          transaction
+            .objectStore("saves")
+            .put({ ...first.metadata, id } satisfies SaveMetadata);
+          transaction.objectStore("payloads").put({ id, save: first.save });
+        }
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(transaction.error);
+      });
+      const get = jest.spyOn(IDBObjectStore.prototype, "get");
+      const getAll = jest.spyOn(IDBObjectStore.prototype, "getAll");
+      const cursor = jest.spyOn(IDBObjectStore.prototype, "openCursor");
+      const remove = jest.spyOn(IDBObjectStore.prototype, "delete");
+      await repository.delete("first", lease());
+      expect(get.mock.calls).toEqual([["first"], ["first"]]);
+      expect(remove.mock.calls).toEqual([["first"], ["first"], ["first"]]);
+      expect(getAll).not.toHaveBeenCalled();
+      expect(cursor).not.toHaveBeenCalled();
+    } finally {
+      database.close();
+    }
+    expect(await repository.list()).toHaveLength(9999);
   });
 });
