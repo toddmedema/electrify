@@ -2,6 +2,7 @@ import * as React from "react";
 import { IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import { BuildForecastProvider } from "./BuildForecast";
 import { GameToolMemoryContext } from "./GameToolMemory";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
@@ -87,6 +88,14 @@ export function maxOpenTools(width: number) {
  * another never moves the ones already open.
  */
 export default function GameWorkspace() {
+  return (
+    <BuildForecastProvider>
+      <Workspace />
+    </BuildForecastProvider>
+  );
+}
+
+function Workspace() {
   const dispatch = useAppDispatch();
   const card = useAppSelector((state) => state.card.name);
   const active = gameToolForCard(card);

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { flushSync } from "react-dom";
 import cardReducer, { initialCard } from "../../reducers/Card";
+import gameReducer from "../../reducers/Game";
 import GameWorkspace, {
   MIN_FLEET_WIDTH,
   dockCenter,
@@ -74,9 +75,9 @@ function setup(width = 390) {
     reducer: {
       card: cardReducer,
       game: () => ({
-        eventLog: [],
-        eventLogReadThroughId: 0,
-        worldEvents: { active: [] },
+        ...gameReducer(undefined, { type: "workspace-test/init" }),
+        inGame: true,
+        scenarioId: 100,
       }),
     },
     preloadedState: {

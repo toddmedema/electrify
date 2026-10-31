@@ -105,7 +105,29 @@ it.each([false, true])(
   },
 );
 
-it("focuses requested evidence after background quotes arrive", () => {
+it("waits for a timeline before reporting evidence ready", () => {
+  const game = {
+    ...createGame({ scenarioId: 103, seed: 12345 }),
+    timeline: [],
+  };
+  const ready = jest.fn();
+  render(
+    <BuildGenerators
+      game={game}
+      onBack={jest.fn()}
+      onBuildGenerator={jest.fn()}
+      evidenceRequest={{
+        id: 1,
+        runId: 0,
+        target: { card: "FACILITIES", view: "BUILD_GENERATORS" },
+      }}
+      onEvidenceReady={ready}
+    />,
+  );
+  expect(ready).not.toHaveBeenCalled();
+});
+
+it("shows build options and focuses evidence before background quotes arrive", () => {
   const game = createGame({ scenarioId: 103, seed: 12345 });
   const result = computeOutlook("build", game);
   const originalWorker = global.Worker;
@@ -138,8 +160,22 @@ it("focuses requested evidence after background quotes arrive", () => {
         onEvidenceReady={ready}
       />,
     );
-    expect(screen.getByRole("status")).toHaveTextContent("Calculating quotes");
-    expect(ready).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Calculating output and energy costs",
+    );
+    expect(screen.getByRole("slider")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Review purchase of Natural Gas Peaker",
+      }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Review purchase of Solar" }),
+    ).toBeDisabled();
+    expect(ready).toHaveBeenCalledWith(
+      request,
+      screen.getByLabelText("Generator build options"),
+    );
     act(() => jest.runAllTimers());
     const { requestId } = worker.postMessage.mock.calls[0][0];
     act(() =>
@@ -152,6 +188,10 @@ it("focuses requested evidence after background quotes arrive", () => {
       request,
       screen.getByLabelText("Generator build options"),
     );
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Review purchase of Solar" }),
+    ).toBeEnabled();
     view.unmount();
   } finally {
     factory.mockRestore();
