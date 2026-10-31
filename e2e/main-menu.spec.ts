@@ -362,3 +362,98 @@ for (const theme of ["light", "dark"]) {
     }
   });
 }
+
+for (const theme of ["light", "dark"]) {
+  for (const reducedMotion of ["reduce", "no-preference"] as const) {
+    test(`home touch feedback releases cleanly in ${theme}, motion ${reducedMotion}`, async ({
+      page,
+      context,
+    }, testInfo) => {
+      test.skip(!testInfo.project.use.hasTouch);
+      await page.emulateMedia({ reducedMotion });
+      await page.addInitScript(
+        (value) => localStorage.setItem("theme", value),
+        theme,
+      );
+      await page.goto("/");
+      await expect(page.locator("#appStartup")).toHaveCount(0);
+      const play = page.getByRole("button", { name: "Play", exact: true });
+      const manual = page.getByRole("button", { name: "Manual", exact: true });
+      const settings = page.getByRole("button", {
+        name: "Settings",
+        exact: true,
+      });
+      const sound = page.getByRole("button", { name: "Turn on sound" });
+      await expect(sound).toHaveCSS("opacity", "1");
+      const clear = "rgba(0, 0, 0, 0)";
+      await expect(play).not.toHaveCSS("background-color", clear);
+      await expect(manual).toHaveCSS("background-color", clear);
+
+      const touch = await context.newCDPSession(page);
+      const bounds = (await manual.boundingBox())!;
+      const point = {
+        x: bounds.x + bounds.width / 2,
+        y: bounds.y + bounds.height / 2,
+      };
+      try {
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [point],
+        });
+        await expect(manual).not.toHaveCSS("background-color", clear);
+        await expect(manual.locator(".MuiTouchRipple-root")).toBeHidden();
+        if (reducedMotion === "reduce") {
+          await expect(manual).toHaveCSS("transform", "none");
+          expect(
+            await manual.evaluate((element) =>
+              getComputedStyle(element)
+                .transitionDuration.split(",")
+                .every((duration) => parseFloat(duration) <= 0.001),
+            ),
+          ).toBe(true);
+        } else {
+          await expect(manual).not.toHaveCSS("transform", "none");
+        }
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: point.x + 3, y: point.y }],
+        });
+        await expect(play).toBeFocused();
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: bounds.x - 20, y: point.y }],
+        });
+        await expect(manual).toHaveCSS("background-color", clear);
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchCancel",
+          touchPoints: [],
+        });
+        await expect(manual).toHaveCSS("background-color", clear);
+        await expect(manual).toHaveCSS("transform", "none");
+        await expect(play).not.toHaveCSS("background-color", clear);
+      } finally {
+        await touch.detach();
+      }
+
+      await settings.tap();
+      await expect(
+        page.getByRole("heading", { name: "Settings", exact: true }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: "Back", exact: true }).tap();
+      await expect(settings).toBeFocused();
+      await expect(settings).toHaveCSS("background-color", clear);
+      await expect(play).not.toHaveCSS("background-color", clear);
+
+      // A physical keyboard on a touch device immediately restores selection feedback.
+      await page.keyboard.press("ArrowUp");
+      await expect(manual).toBeFocused();
+      await expect(manual).not.toHaveCSS("background-color", clear);
+      await expect(play).toHaveCSS("background-color", clear);
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("Enter");
+      await expect(
+        page.getByRole("heading", { name: "Settings", exact: true }),
+      ).toBeVisible();
+    });
+  }
+}
