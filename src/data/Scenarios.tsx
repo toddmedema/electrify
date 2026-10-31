@@ -180,7 +180,7 @@ export const SCENARIOS: ScenarioType[] = [
             )?.id,
         action: "Tap your coal plant",
         content: (
-          <TutorialPrompt text="These two plants keep San Francisco’s lights on. The bar shows how hard each is working." />
+          <TutorialPrompt text="These two plants keep your lights on. The bar’s background shows how hard each is working." />
         ),
       },
       {
