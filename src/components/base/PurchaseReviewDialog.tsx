@@ -163,7 +163,7 @@ export default function PurchaseReviewDialog(
       ),
       value:
         props.paymentSummary?.loan.value ??
-        `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo · ${(interestRate * 100).toFixed(2)}%, ${loanMonths / 12} yrs`,
+        `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo (${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years)`,
       detail:
         props.paymentSummary?.loan.detail ??
         ([

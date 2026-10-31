@@ -783,7 +783,7 @@ describe("the interties view", () => {
       }),
     );
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("Ready in 36 months.");
+    expect(dialog).toHaveTextContent("Online in36 months");
     expect(dialog).not.toHaveTextContent("Portfolio outlook");
     expect(dialog).not.toHaveTextContent("Typical price");
     expect(dialog).not.toHaveTextContent("backup is not guaranteed");
@@ -1192,7 +1192,7 @@ describe("the intertie upgrade control", () => {
     expect(handleUpgrade).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent(/Construction emits.*CO2e/);
-    expect(dialog).toHaveTextContent(/30 yrs/);
+    expect(dialog).toHaveTextContent(/\(\d+\.\d+% for 30 years\)/);
     expect(dialog).toHaveTextContent("Upkeep after upgrade");
     expect(dialog).not.toHaveTextContent("Line capacity");
     expect(dialog).toHaveTextContent("Import capacity150MW → 210MW");

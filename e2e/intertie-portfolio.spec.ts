@@ -142,7 +142,26 @@ for (const theme of ["light", "dark"] as const) {
     await expectContinuousDialogSurface(dialog);
     await expect(dialog).not.toContainText("Portfolio outlook");
     await expect(dialog).not.toContainText("Shortfall covered");
-    await expect(dialog).toContainText("Ready in 12 months.");
+    await expect(dialog.locator(".decisionImpactFactLabel")).toHaveText([
+      "Cash purchase",
+      "Loan option",
+      "Estimated upkeep",
+      "Online in",
+      "Import capacity",
+      "Export capacity",
+    ]);
+    const online = dialog
+      .locator(".decisionImpactFact")
+      .filter({ hasText: /^Online in/ });
+    await expect(online.locator(".decisionImpactFactValue")).toHaveText(
+      "12 months",
+    );
+    await expect(
+      dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: /^Loan option/ })
+        .locator(".decisionImpactFactValue"),
+    ).toHaveText(/\/mo \(\d+\.\d+% for 30 years\)$/);
     await expect(dialog).not.toContainText("Line capacity");
     await expect(dialog).toContainText(/Import capacity\s*40MW/);
     await expect(dialog).toContainText(/Export capacity\s*5MW/);
@@ -154,11 +173,9 @@ for (const theme of ["light", "dark"] as const) {
     );
     await expect(dialog).not.toContainText("Payments start now");
     await expect(dialog).toContainText("$23.1k/mo");
-    // Every purchase fact fits alongside both actions on desktop and a 390px phone; a shorter
-    // phone scrolls the facts between the title and the pinned actions.
-    const short = testInfo.project.use.viewport!.height < 600;
+    // Every row remains reachable between the title and pinned actions on short phones.
     for (const fact of await dialog.locator(".decisionImpactFact").all()) {
-      if (short) await fact.scrollIntoViewIfNeeded();
+      await fact.scrollIntoViewIfNeeded();
       await expect(fact).toBeInViewport();
     }
     await expect(dialog).not.toContainText(/NaN|Infinity/);
@@ -193,7 +210,13 @@ for (const theme of ["light", "dark"] as const) {
         name: "Review purchase of Desert Southwest intertie",
       })
       .click();
-    await expect(page.getByRole("dialog")).toContainText("Ready in 36 months");
+    await expect(
+      page
+        .getByRole("dialog")
+        .locator(".decisionImpactFact")
+        .filter({ hasText: /^Online in/ })
+        .locator(".decisionImpactFactValue"),
+    ).toHaveText("36 months");
     await expect(page.getByRole("dialog")).not.toContainText(
       "Won’t open before this mission ends",
     );
