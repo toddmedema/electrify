@@ -271,7 +271,7 @@ it("keeps Valley's 2017 reduction dated and notices once, without resetting it o
     }).find((source) => source.id === "valley-nuclear")!.capacityW;
   expect(nuclear(143) - nuclear(144)).toBe(76e6);
   expect(capacity(240)).toBe(0);
-  for (const month of [120, 120, 144, 144]) {
+  for (const month of [96, 96, 144, 144]) {
     game.date = getDateFromMinute(month * MINUTES_PER_MONTH, 2005);
     recordExpansionMilestones(game);
   }

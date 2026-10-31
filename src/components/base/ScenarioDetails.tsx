@@ -19,6 +19,7 @@ import {
 import { useUnits } from "./UnitsContext";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
+import UtilitySupplyPlan from "./UtilitySupplyPlan";
 import { formatScore } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
 import { ScoreProjectionType } from "../../helpers/ScoreProjection";
@@ -299,6 +300,7 @@ export function ScenarioDetailsContent({
       >
         {scenario.name}
       </Typography>
+      <UtilitySupplyPlan game={game} forecast={forecast} />
       <ScoreOutlook
         projection={projection}
         history={history}

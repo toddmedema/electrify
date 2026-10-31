@@ -7,6 +7,13 @@ import type {
 
 /** Fictional 2005-dollar portfolios; the historical reference years are not a reconstruction. */
 export const EXPANSION_SCENARIO_ID = 116;
+/** Authored legacy-contract renewal date, announced from the opening briefing. */
+export const UTILITY_CONTRACT_RENEWAL_YEAR = 2020;
+/** Fictional renewal work, separate from customer growth and inflation. */
+export const UTILITY_NETWORK_RENEWAL_STAGES = [
+  { year: 2015, multiplier: 1.5 },
+  { year: 2020, multiplier: 2 },
+] as const;
 /** Existing Ridge package, quoted by winterizationPrice for 100 MW in January 2005 dollars.
  * Freeze inherited book cost so import validation does not depend on economy loading.
  * New construction continues to use the dated winterization owner.
@@ -137,6 +144,8 @@ export const UTILITY_AREAS: Readonly<Record<UtilityId, UtilityAreaDefinition>> =
       entitlements: [
         {
           id: "champlain-nuclear",
+          reductionYear: UTILITY_CONTRACT_RENEWAL_YEAR,
+          reducedNominalW: 0,
           name: "Regional nuclear",
           nominalW: 100e6,
           deliverability: 0.95,
@@ -149,6 +158,8 @@ export const UTILITY_AREAS: Readonly<Record<UtilityId, UtilityAreaDefinition>> =
           nominalW: 120e6,
           deliverability: 0.95,
           pricePerMWh: 60,
+          reductionYear: UTILITY_CONTRACT_RENEWAL_YEAR,
+          reducedNominalW: 60e6,
           marketId: "newengland-quebec-upgrade-market",
         },
       ],
@@ -205,6 +216,8 @@ export const UTILITY_AREAS: Readonly<Record<UtilityId, UtilityAreaDefinition>> =
           nominalW: 120e6,
           deliverability: 0.95,
           pricePerMWh: 60,
+          reductionYear: UTILITY_CONTRACT_RENEWAL_YEAR,
+          reducedNominalW: 60e6,
           marketId: "newengland-quebec-upgrade-market",
         },
         {
@@ -264,6 +277,8 @@ export const UTILITY_AREAS: Readonly<Record<UtilityId, UtilityAreaDefinition>> =
           nominalW: 40e6,
           deliverability: 0.95,
           pricePerMWh: 55,
+          reductionYear: UTILITY_CONTRACT_RENEWAL_YEAR,
+          reducedNominalW: 20e6,
           marketId: VERMONT_REGIONAL_MARKET_ID,
         },
       ],
@@ -308,4 +323,26 @@ export function utilityEntitlementsAt(
         ? (source.reducedNominalW ?? source.nominalW)
         : source.nominalW,
   }));
+}
+
+/** One pooled company funds the service network for its actual customer count. */
+export function utilityNetworkAnnualOM(
+  utilities: readonly UtilityId[],
+  customers: number,
+  year = 2005,
+): number {
+  const base = utilities.reduce(
+    (sum, id) => sum + UTILITY_AREAS[id].annualNetworkOM,
+    0,
+  );
+  const accounts = utilities.reduce(
+    (sum, id) => sum + UTILITY_AREAS[id].customers,
+    0,
+  );
+  // The inherited network remains in service when customers leave. Growth adds operating work.
+  const renewal =
+    [...UTILITY_NETWORK_RENEWAL_STAGES]
+      .reverse()
+      .find((stage) => year >= stage.year)?.multiplier ?? 1;
+  return base * Math.max(1, customers / accounts) * renewal;
 }

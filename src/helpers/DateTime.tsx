@@ -159,7 +159,9 @@ function accumulateTick(
   if (!summary.chartAverage) {
     // Runtime dispatch metadata uses symbol keys and must never enter a persisted chart record.
     const sample = Object.fromEntries(
-      Object.entries(t),
+      // Optional inactive meters may be explicitly undefined in live browser frames. Keep
+      // the persisted numeric chart record identical before and after JSON/IndexedDB encoding.
+      Object.entries(t).filter(([, value]) => value !== undefined),
     ) as TickPresentFutureType;
     // Local resumable frames and recovery batches are not numeric averaged chart history.
     delete sample.deferredResidential;
