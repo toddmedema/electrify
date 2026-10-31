@@ -629,6 +629,9 @@ export default class Compositor extends React.Component<Props, {}> {
         />
         <Dialog
           open={ui.dialog.open}
+          className={
+            ui.dialog.tutorialComplete ? "tutorialCompleteDialog" : undefined
+          }
           aria-labelledby="app-dialog-title"
           slotProps={{
             transition: {
@@ -659,7 +662,16 @@ export default class Compositor extends React.Component<Props, {}> {
               <InstallAppButton label="Install for later" afterMilestone />
             )}
             {ui.dialog.secondaryAction && (
-              <Button color="primary" onClick={ui.dialog.secondaryAction}>
+              <Button
+                color="primary"
+                onClick={ui.dialog.secondaryAction}
+                variant={
+                  ui.dialog.tutorialComplete && !ui.dialog.action
+                    ? "contained"
+                    : "text"
+                }
+                autoFocus={ui.dialog.tutorialComplete && !ui.dialog.action}
+              >
                 {ui.dialog.secondaryLabel || "Close"}
               </Button>
             )}
@@ -682,6 +694,7 @@ export default class Compositor extends React.Component<Props, {}> {
               <Button
                 color="primary"
                 variant="contained"
+                autoFocus={ui.dialog.tutorialComplete}
                 onClick={ui.dialog.action}
               >
                 {ui.dialog.actionLabel || "OK"}

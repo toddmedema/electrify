@@ -68,4 +68,7 @@ export const cloudSavePromptVisible = createAction<boolean>(
 );
 
 /** Player-acknowledged, tutorial-only stress exercise. */
+export const generatorSizeChanged = createAction("game/generatorSizeChanged");
+export const prepareStorageReorder = createAction("game/prepareStorageReorder");
+
 export const beginIntertieStress = createAction("game/beginIntertieStress");

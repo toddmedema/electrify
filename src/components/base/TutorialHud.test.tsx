@@ -69,11 +69,13 @@ describe("TutorialHud", () => {
   ] as [string, Partial<TutorialStepType>, boolean][])(
     "reserves the desktop background sweep for manual steps (%s)",
     (_name, overrides, manual) => {
+      jest.useFakeTimers();
       render(
         <TutorialHud
           {...props({ desktop: true, step: objective(overrides) })}
         />,
       );
+      act(() => jest.advanceTimersByTime(6000));
       const sweep = screen.queryByTestId("tutorial-hud-sweep");
       expect(sweep !== null).toBe(manual);
       expect(screen.queryByText(/when you’re ready\./)).not.toBeInTheDocument();
@@ -86,11 +88,13 @@ describe("TutorialHud", () => {
   it.each(["Next", "Start final challenge"])(
     "keeps the %s button pulse in sheet mode without a background sweep or extra text",
     (nextLabel) => {
+      jest.useFakeTimers();
       render(<TutorialHud {...props({ step: objective({ nextLabel }) })} />);
       expect(screen.queryByText(/when you’re ready\./)).not.toBeInTheDocument();
       expect(
         screen.queryByTestId("tutorial-hud-sweep"),
       ).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(6000));
       expect(screen.getByTestId("tutorial-next-pulse")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: nextLabel })).toHaveClass(
         "MuiButton-contained",
@@ -98,6 +102,31 @@ describe("TutorialHud", () => {
       expect(
         screen.getByRole("button", { name: nextLabel }),
       ).toHaveAccessibleDescription("");
+    },
+  );
+
+  it.each([true, false])(
+    "waits six seconds and resets attention on every new step (desktop=%s)",
+    (desktop) => {
+      jest.useFakeTimers();
+      const cue = desktop ? "tutorial-hud-sweep" : "tutorial-next-pulse";
+      const first = objective();
+      const second = objective();
+      const hudProps = props({ desktop, step: first });
+      const { rerender } = render(<TutorialHud {...hudProps} />);
+      act(() => jest.advanceTimersByTime(5999));
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      rerender(<TutorialHud {...hudProps} step={second} stepIndex={1} />);
+      act(() => jest.advanceTimersByTime(1));
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(5998));
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(1));
+      expect(screen.getByTestId(cue)).toBeInTheDocument();
+      rerender(<TutorialHud {...hudProps} stepIndex={2} />);
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(6000));
+      expect(screen.getByTestId(cue)).toBeInTheDocument();
     },
   );
 
@@ -158,7 +187,7 @@ describe("TutorialHud", () => {
     expect(
       screen.getByRole("button", { name: "Start final challenge" }),
     ).toHaveAccessibleDescription("");
-    expect(screen.getByTestId("tutorial-hud-sweep")).toBeInTheDocument();
+    expect(screen.queryByTestId("tutorial-hud-sweep")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "1×" }));
     expect(hudProps.onNext).not.toHaveBeenCalled();
     await user.click(

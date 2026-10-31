@@ -66,10 +66,12 @@ for (const theme of ["light", "dark"]) {
       path: testInfo.outputPath(`size-${theme}.png`),
       animations: "disabled",
     });
-    await page
-      .locator(".tutorialHud")
-      .getByRole("button", { name: "Next", exact: true })
-      .click();
+    await expect(
+      page
+        .locator(".tutorialHud")
+        .getByRole("button", { name: "Next", exact: true }),
+    ).toHaveCount(0);
+    await page.locator(".constructionCapacitySlider input").press("ArrowLeft");
     await expect(page.locator(".tutorialHud")).toContainText("Compare cost");
     await expect(
       page.getByRole("tablist", { name: "Build categories" }),

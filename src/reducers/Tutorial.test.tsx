@@ -15,7 +15,7 @@ import {
   TUTORIALS,
 } from "../data/Scenarios";
 import cardReducer from "./Card";
-import gameReducer from "./Game";
+import gameReducer, { tutorialCompleteDialog } from "./Game";
 import settingsReducer from "./Settings";
 import {
   recordTutorialExited,
@@ -145,7 +145,7 @@ function tutorialStore(
 }
 
 describe("tutorialGateMiddleware", () => {
-  it.each([2, 5])(
+  it.each([5])(
     "keeps mission %s on its reset disclosure even while time runs",
     (id) => {
       const steps = getScenario(id)!.tutorialSteps!;
@@ -287,8 +287,8 @@ describe("tutorialGateMiddleware", () => {
       expect.objectContaining({
         open: true,
         notCancellable: true,
-        offerInstall: true,
-        secondaryLabel: "Back to main menu",
+        offerInstall: false,
+        secondaryLabel: "Main menu",
       }),
     );
   });
@@ -529,3 +529,13 @@ describe("selectTutorialHiddenUi", () => {
     expect(selectTutorialHiddenUi(state)).toEqual([]);
   });
 });
+
+it.each(TUTORIALS.map((scenario, index) => [scenario.id, index >= 2] as const))(
+  "offers installation only from the third tutorial onward (id=%s)",
+  (scenarioId, eligible) => {
+    expect(
+      tutorialCompleteDialog({ scenarioId, title: "Complete" }).payload
+        .offerInstall,
+    ).toBe(eligible);
+  },
+);

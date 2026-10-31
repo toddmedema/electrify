@@ -24,46 +24,19 @@ test("tapping 1x carries a running clock into Mission 1's final step", async ({
   ).toHaveAttribute("aria-pressed", "true");
 });
 
-// Regression test. The snackbar's swipe handler captured every press, so neither of its buttons
-// ever received a click, and leaving Mission 1 early never counted it - which sent Play
-// straight back into it
-test("closing a walkthrough offers a working way to the missions", async ({
+test("Exit returns directly to the main menu and remembers the tutorial visit", async ({
   page,
 }) => {
   await reachStartTimeStep(page);
   await page
     .locator(".tutorialHud")
-    .getByRole("button", { name: "Exit" })
+    .getByRole("button", { name: "Exit", exact: true })
     .click();
-
   await expect(page.locator(".tutorialHud")).toBeHidden();
-  // Free practice keeps this mission's taught controls; later tools and score stay for later.
-  await expect(page.locator("#navfooter")).toHaveCount(0);
-  await expect(page.locator("#scenarioNav")).toHaveCount(0);
-
-  const snackbar = page.locator(".snackbarContent");
-  await expect(snackbar).toContainText("Walkthrough closed");
-  const missions = snackbar.getByRole("button", { name: "Missions" });
-  // The close button only shows on wide screens; narrower ones swipe the snackbar away
-  const close = snackbar.getByRole("button", {
-    name: "Dismiss notification",
-  });
-  if (await close.isVisible()) {
-    const [missionsBox, closeBox] = await Promise.all([
-      missions.boundingBox(),
-      close.boundingBox(),
-    ]);
-    expect(missionsBox!.x + missionsBox!.width).toBeLessThanOrEqual(
-      closeBox!.x,
-    );
-  }
-
-  await missions.click();
   await expect(
-    page.getByRole("heading", { name: "Choose a game" }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeVisible();
-
-  await page.getByRole("button", { name: "back" }).click();
+  await expect(page.locator(".snackbarContent")).toBeHidden();
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Choose a game" }),
@@ -89,10 +62,12 @@ for (const explicitlyExit of [false, true]) {
         .click();
       await expect(page.locator(".tutorialHud")).toBeHidden();
     }
-    await page.getByRole("button", { name: "menu", exact: true }).click();
-    await page
-      .getByRole("menuitem", { name: "Main menu", exact: true })
-      .click();
+    if (!explicitlyExit) {
+      await page.getByRole("button", { name: "menu", exact: true }).click();
+      await page
+        .getByRole("menuitem", { name: "Main menu", exact: true })
+        .click();
+    }
     await page.getByRole("button", { name: "Play", exact: true }).click();
     if (explicitlyExit) {
       await expect(

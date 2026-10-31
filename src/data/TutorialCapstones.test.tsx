@@ -12,12 +12,14 @@ import gameReducer, {
   buildTransmissionLine,
   delta,
   initGame,
+  reprioritizeFacility,
   start,
   tickState,
 } from "../reducers/Game";
 import { summarizeTimeline } from "../helpers/DateTime";
 import { GENERATORS } from "./Facilities";
 import { createGame } from "../testing/Simulator";
+import { prepareStorageReorder } from "../reducers/GameActions";
 import { TUTORIALS } from "./Scenarios";
 
 function tutorial(id: number): ScenarioType {
@@ -110,22 +112,69 @@ describe("authored tutorial capstones", () => {
     expect(capstone(1).success(appState(game))).toBe(false);
   });
 
-  it("cycles storage through charge and discharge before Mission 3's deadline", () => {
+  it("requires Coal to move above Pumped Hydro, and rejects unrelated actions and the wrong order", () => {
+    const step = tutorial(2).tutorialSteps![5];
+    let game = createGame({ scenarioId: 2 });
+    const originalOrder = game.facilities.map((f) => f.id);
+    game = gameReducer(game, prepareStorageReorder());
+    expect(game.facilities.map((f) => f.id)).toEqual(originalOrder);
+    game = gameReducer(game, delta({ tutorialStep: 4 }));
+    game = gameReducer(game, prepareStorageReorder());
+    expect(game.facilities.map((f) => f.name)).toEqual([
+      "Pumped Hydro",
+      "Coal",
+    ]);
+    expect(step.advanceOn!(appState(game))).toBe(false);
+    game = gameReducer(
+      game,
+      reprioritizeFacility({ spotInList: 1, delta: -1 }),
+    );
+    expect(step.advanceOn!(appState(game))).toBe(true);
+  });
+
+  it("starts the storage challenge with only coal and rewards a battery that covers the peaks", () => {
     const scenario = {
       ...tutorial(2),
       id: 9998,
       facilities: capstone(2).checkpoint!.facilities!,
     };
-    const game = createGame({ scenarioId: scenario.id, scenario });
     const objective = capstone(2);
-
-    expect(tickUntil(game, objective.success, 192)).toBe(true);
+    const game = createGame({
+      scenarioId: scenario.id,
+      scenario,
+      initialBuild: { name: "Battery", peakWh: 200000000, financed: true },
+    });
+    expect(
+      game.facilities
+        .filter((f) => f.yearsToBuildLeft === 0)
+        .map((f) => f.name),
+    ).toEqual(["Coal"]);
+    expect(objective.success(appState(game))).toBe(false);
+    expect(tickUntil(game, objective.success, 2400)).toBe(true);
     expect(objective.failure?.(appState(game))).toBe(false);
-    const storage = game.facilities.find(
-      (facility) => "currentWh" in facility,
-    )!;
-    expect(storage.lifetimeWh).toBeGreaterThan(0);
+    // Blackouts before commissioning are the problem the player fixes, not an instant failure.
+    expect(game.eventLog.some((e) => e.kind === "BLACKOUT")).toBe(true);
   });
+
+  it.each([undefined, 1000000])(
+    "rejects missing or undersized storage (%s)",
+    (peakWh) => {
+      const scenario = {
+        ...tutorial(2),
+        id: 9998,
+        facilities: capstone(2).checkpoint!.facilities!,
+      };
+      const game = createGame({
+        scenarioId: scenario.id,
+        scenario,
+        ...(peakWh
+          ? { initialBuild: { name: "Battery", peakWh, financed: true } }
+          : {}),
+      });
+      expect(tickUntil(game, capstone(2).failure!, 2400)).toBe(true);
+      expect(capstone(2).success(appState(game))).toBe(false);
+    },
+  );
 
   it("starts Mission 4's capstone from its authored loss-making checkpoint", () => {
     const scenario = tutorial(4);

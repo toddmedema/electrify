@@ -1,5 +1,10 @@
 import { expect, Page, test } from "./fixtures";
-import { isPaneLayout, openPane, waitForSettled } from "./layout";
+import {
+  dragCoalAbovePumpedHydro,
+  isPaneLayout,
+  openPane,
+  waitForSettled,
+} from "./layout";
 
 async function startLesson(page: Page, name: string) {
   await page.addInitScript(
@@ -128,7 +133,7 @@ test("Pricing reveals customers once and keeps the chosen rate when 1x starts it
   ).toHaveAttribute("aria-pressed", "true");
 });
 
-test("Storage names its fresh challenge, keeps practice until approval, and leaves HUD actions reachable", async ({
+test("Storage requires a drag, then resets to the coal-only purchase challenge", async ({
   page,
 }) => {
   await startLesson(page, "Storage");
@@ -141,35 +146,16 @@ test("Storage names its fresh challenge, keeps practice until approval, and leav
   await page.getByRole("button", { name: "Take loan", exact: true }).click();
   await expect(page.locator(".facilityRowHeader")).toHaveCount(3);
   await next(page);
-  await expect(page.locator(".tutorialHud")).toContainText(
-    "Check generation comes before storage",
-  );
-  const start = page.getByRole("button", {
-    name: "Start final challenge",
-    exact: true,
-  });
-  await expect(start).toBeVisible();
+  const hud = page.locator(".tutorialHud");
+  await expect(hud).toContainText("Drag Coal above Pumped Hydro");
+  await expect(
+    hud.getByRole("button", { name: "Next", exact: true }),
+  ).toHaveCount(0);
   await expect(page.locator(".tutorialHudVisuallyHidden")).toHaveText("6 of 7");
   await captureTutorial(page, "storage-challenge-handoff.png");
-  await page.getByRole("button", { name: "slow speed", exact: true }).click();
-  await expect(start).toBeVisible();
-  await expect(page.locator(".facilityRowHeader")).toHaveCount(3);
-  for (const control of [
-    start,
-    page
-      .locator(".tutorialHud")
-      .getByRole("button", { name: "Exit", exact: true }),
-  ]) {
-    const box = await control.boundingBox();
-    const hud = await page.locator(".tutorialHud").boundingBox();
-    expect(box!.y).toBeGreaterThanOrEqual(hud!.y);
-    expect(box!.y + box!.height).toBeLessThanOrEqual(hud!.y + hud!.height);
-  }
-  await start.click();
-  await expect(page.locator(".tutorialHud")).toContainText(
-    "Supply the evening peak",
-  );
-  await expect(page.locator(".facilityRowHeader")).toHaveCount(2);
+  await dragCoalAbovePumpedHydro(page);
+  await expect(hud).toContainText("Build storage to cover peak demand");
+  await expect(page.locator(".facilityRowHeader")).toHaveCount(1);
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");

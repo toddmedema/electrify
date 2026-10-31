@@ -38,7 +38,11 @@ import {
   GAS_CONVERSION_MINUTES,
 } from "../helpers/GasConversion";
 import { accessContextForGame, corridorsForGame } from "../data/IntertieAccess";
-import { beginIntertieStress, cloudSavePromptVisible } from "./GameActions";
+import {
+  beginIntertieStress,
+  cloudSavePromptVisible,
+  prepareStorageReorder,
+} from "./GameActions";
 import {
   getHydroAvailability,
   getHydroInventoryKey,
@@ -2010,6 +2014,26 @@ export const gameSlice = createSlice({
         inGame: true,
       };
     });
+    builder.addCase(prepareStorageReorder, (state) => {
+      if (
+        state.scenarioId !== 2 ||
+        state.customScenario ||
+        getTutorialStep(state)?.phase !== "STORAGE_ORDER_PREPARE"
+      )
+        return;
+      state.speed = "PAUSED";
+      const coal = state.facilities.findIndex(
+        (f) => f.startingAssetId === "scenario-2-coal",
+      );
+      const hydro = state.facilities.findIndex(
+        (f) => f.startingAssetId === "scenario-2-pumped-hydro",
+      );
+      if (coal >= 0 && hydro >= 0 && coal < hydro)
+        applyReprioritizeFacility(state, {
+          spotInList: coal,
+          delta: hydro - coal,
+        });
+    });
     builder.addCase(beginIntertieStress, (state) => {
       if (
         state.scenarioId !== 112 ||
@@ -3300,7 +3324,9 @@ export function tutorialCompleteDialog({
   title,
   message,
   nextTutorial,
+  scenarioId,
 }: {
+  scenarioId: number;
   title: string;
   message?: string;
   nextTutorial?: ScenarioType;
@@ -3314,14 +3340,8 @@ export function tutorialCompleteDialog({
   return dialogOpen({
     title: `🎉 ${title}`,
     message: (
-      <div>
-        {message && (
-          <span>
-            {message}
-            <br />
-            <br />
-          </span>
-        )}
+      <div className="tutorialCompleteContent">
+        {message && <p>{message}</p>}
         {nextTutorial && (
           <div className="tutorialNextPreview">
             <strong>Up next: {nextName}</strong>
@@ -3333,8 +3353,10 @@ export function tutorialCompleteDialog({
     open: true,
     // Both buttons lead somewhere; dismissing would strand the player in a finished scenario
     notCancellable: true,
-    offerInstall: true,
-    secondaryLabel: "Back to main menu",
+    tutorialComplete: true,
+    offerInstall:
+      TUTORIALS.findIndex((tutorial) => tutorial.id === scenarioId) >= 2,
+    secondaryLabel: "Main menu",
     secondaryAction: () => getStore().dispatch(quit()),
     actionLabel: nextTutorial ? "Next tutorial" : undefined,
     action: nextTutorial
@@ -3873,6 +3895,7 @@ export function* tickStatePhases(
             setTimeout(() => {
               return getStore().dispatch(
                 tutorialCompleteDialog({
+                  scenarioId: scoredScenarioId,
                   title: endTitle || "Mission complete!",
                   message: endMessage,
                   nextTutorial,
