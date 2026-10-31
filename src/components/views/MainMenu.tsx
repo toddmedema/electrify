@@ -52,21 +52,54 @@ const DiscordIcon = () => (
   </SvgIcon>
 );
 
-// The home menu's text buttons are plain until one is active. The active button carries the
-// primary fill (its focus indicator) and follows both pointer and keyboard/controller focus,
-// so moving the pointer over a control focuses it; Enter/Space/A then activate that button.
-// Boundary events alone can come from the entrance moving beneath a stationary pointer.
+// Mouse movement shares selection with keyboard/controller focus. A touch drag is scrolling,
+// not hover selection. Boundary events alone can also come from the entrance moving beneath
+// a stationary pointer.
 const HOME_MENU_BUTTONS =
   ".mainActions button, .resourceActions button, .discoveryActions button";
 function focusHomeButton(event: React.PointerEvent) {
+  if (event.pointerType !== "mouse") return;
   const target = event.target as HTMLElement;
   const button = target.closest<HTMLElement>(HOME_MENU_BUTTONS);
-  if (button && button !== document.activeElement)
-    button.focus({ preventScroll: true });
+  if (button) {
+    delete document.documentElement.dataset.touchInput;
+    if (button !== document.activeElement)
+      button.focus({ preventScroll: true });
+  }
 }
 
 const MainMenu = (props: Props): React.JSX.Element => {
   const menuKeys = useMenuKeys();
+  // Native :active can wait until touch release. Track contact without delaying the click
+  // or taking over the browser's scrolling and pointer-cancellation behavior.
+  const pressedButton = React.useRef<HTMLElement | null>(null);
+  const clearTouchPress = () => {
+    pressedButton.current?.removeAttribute("data-touch-pressed");
+    pressedButton.current = null;
+  };
+  const onTouchPress = (event: React.PointerEvent) => {
+    if (event.pointerType !== "touch" || !event.isPrimary) return;
+    clearTouchPress();
+    const button = (event.target as HTMLElement).closest<HTMLElement>(
+      "button,a[href]",
+    );
+    if (button && !button.matches(":disabled,[aria-disabled=true]")) {
+      pressedButton.current = button;
+      button.setAttribute("data-touch-pressed", "");
+    }
+  };
+  const onTouchMove = (event: React.PointerEvent) => {
+    if (!pressedButton.current) return;
+    const { left, right, top, bottom } =
+      pressedButton.current.getBoundingClientRect();
+    if (
+      event.clientX < left ||
+      event.clientX > right ||
+      event.clientY < top ||
+      event.clientY > bottom
+    )
+      clearTouchPress();
+  };
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
   // The desktop game bundles no website pages, so those open in the player's browser.
   const sitePage = (path: string) =>
@@ -93,7 +126,14 @@ const MainMenu = (props: Props): React.JSX.Element => {
   };
 
   return (
-    <div id="menuCard">
+    <div
+      id="menuCard"
+      onPointerDown={onTouchPress}
+      onPointerMove={onTouchMove}
+      onPointerUp={clearTouchPress}
+      onPointerCancel={clearTouchPress}
+      onPointerLeave={clearTouchPress}
+    >
       <div id="logo">
         <div className="homeLogo">
           <img

@@ -403,28 +403,69 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
 .keyboardMenu .MuiTouchRipple-ripplePulsate {
   display: none;
 }
-// The home menu's text buttons are plain until one is active. The active button carries the
-// primary fill as its focus indicator, so it drops the separate ring from .keyboardMenu :focus.
-// Hovering a control moves real focus to it (MainMenu.focusHomeButton), so :focus alone tracks
-// the pointer as well as keyboard and controller navigation.
+// The home menu shares one selection between mouse, keyboard and controller. Touch has
+// transient press feedback instead: focus restored after navigation must not look selected.
 #centeredMenu
   :is(.mainActions, .resourceActions, .discoveryActions)
   .MuiButton-root {
-  // This fill is a cursor, so cross-fading it leaves the previous selection painted.
+  // Selection changes immediately; cross-fading leaves the previous cursor painted.
   transition: none;
 
-  @media (hover: hover) and (pointer: fine) {
+  &:hover {
+    background-color: transparent;
+  }
+}
+html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
+  #centeredMenu
+  :is(.mainActions, .resourceActions, .discoveryActions)
+  .MuiButton-root:focus {
+  background-color: var(--interactive-strong);
+  color: var(--interactive-contrast);
+  // The fill carries selection, including when a controller moves real focus.
+  outline: none !important;
+}
+
+// A single, quiet surface response replaces the expanding Material ripple on the home menu.
+#menuCard .MuiTouchRipple-root {
+  display: none;
+}
+html[data-touch-input="true"]:not([data-controller-input="true"]) #menuCard {
+  .MuiButtonBase-root {
+    transition:
+      background-color 160ms ease-out,
+      transform 160ms ease-out;
+
     &:hover {
-      background-color: transparent; // keep the inactive state borderless and unfilled
+      background-color: transparent;
+    }
+
+    &[data-touch-pressed] {
+      background-color: color-mix(
+        in srgb,
+        var(--interactive-blue) 12%,
+        transparent
+      );
+      transform: scale(0.98);
+      transition-duration: 60ms;
+
+      @media (prefers-reduced-motion: reduce) {
+        transform: none;
+      }
     }
   }
 
-  &:focus {
+  // Keep the next action prominent while tapping resources or returning from another screen.
+  #centeredMenu .mainActions .MuiButton-root:first-child {
     background-color: var(--interactive-strong);
     color: var(--interactive-contrast);
-    // The fill is the focus indicator here, so drop both the global :focus-visible ring
-    // (which is !important) and the .keyboardMenu :focus ring for these controls.
-    outline: none !important;
+
+    &[data-touch-pressed] {
+      background-color: color-mix(
+        in srgb,
+        var(--interactive-strong) 88%,
+        var(--font-color-primary)
+      );
+    }
   }
 }
 html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
@@ -3005,10 +3046,6 @@ $pane_header_height: 48px;
       .discoveryActions {
         align-items: center;
         width: 100%;
-
-        .MuiButton-root {
-          width: min(100%, 260px);
-        }
       }
 
       .mainActions {
@@ -3036,20 +3073,9 @@ $pane_header_height: 48px;
         }
       }
 
-      button {
+      .MuiButton-root {
         margin: 0;
-      }
-    }
-
-    .MuiButton-root,
-    .MuiIconButton-root {
-      min-height: 40px;
-    }
-
-    @media (pointer: coarse) {
-      .MuiButton-root,
-      .MuiIconButton-root {
-        min-height: 44px;
+        width: min(100%, 260px);
       }
     }
   }
