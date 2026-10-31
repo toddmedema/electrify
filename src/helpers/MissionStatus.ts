@@ -19,6 +19,9 @@ import type { UpcomingStoryEventType } from "../components/views/StoryEventSelec
 import { TICK_MINUTES } from "../Constants";
 import { formatMoneyStable } from "./Format";
 import { selectProjection } from "./Projection";
+import { isUtilityExpansionGame } from "./ExpansionContext";
+import { MONTHS } from "../Constants";
+import { utilityServiceGap } from "./UtilityPlanning";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import {
   objectiveDefinitionText,
@@ -301,13 +304,33 @@ export function selectMissionRisk(
   // A shortage later in today's operating sample is reported by the grid readout beside this
   // (see getGridHealth), the same way a shortage happening now is.
   const runway = cashRunwayMonths(game);
-  if (runway !== undefined) {
+  const gap =
+    isUtilityExpansionGame(game) && now
+      ? utilityServiceGap(game, selectProjection(game, now))
+      : undefined;
+  const gapMonth = gap
+    ? (gap.year - game.startingYear) * 12 + gap.month - 1
+    : undefined;
+  if (
+    runway !== undefined &&
+    (gapMonth === undefined || runway <= gapMonth - game.date.monthsElapsed)
+  ) {
     const months = Math.max(1, Math.round(runway));
     return {
       id: "cash-runway",
       label: `Projected cash runs out in about ${months} ${months === 1 ? "month" : "months"} · Check finances`,
       shortLabel: `Cash out in ~${months} mo`,
       target: "finances",
+    };
+  }
+  if (gapMonth !== undefined) {
+    const month = gapMonth;
+    const when = `${MONTHS[month % 12]} ${game.startingYear + Math.floor(month / 12)}`;
+    return {
+      id: `supply-plan:${month}`,
+      shortLabel: `Supply risk: ${when}`,
+      label: `Monthly service is projected below ${formatRequiredShare(reliabilityThreshold(game.difficulty))} from ${when} at current rates and policies. Review customer growth, contract changes and project lead times in Scenario.`,
+      target: "mission-details",
     };
   }
   const event = upcoming

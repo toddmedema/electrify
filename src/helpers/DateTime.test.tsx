@@ -210,6 +210,8 @@ describe("summarizeTimeline", () => {
       tick.windAirborneKph = 0;
       tick.solarIrradianceWM2 = 0;
       tick.storedWh = index * 1000;
+      tick.customerBatteryWh = undefined;
+      tick.customerBatteryLossWh = 0;
     });
     const original = JSON.stringify(timeline);
     const average = summarizeTimeline(timeline, 2020).chartAverage!;
@@ -217,6 +219,8 @@ describe("summarizeTimeline", () => {
     expect(average.demandByType["Data Centers"]).toBe(100);
     expect(average.supplyByFuel.Coal).toBe(65);
     expect(average.storedWh).toBe(500);
+    expect(average).not.toHaveProperty("customerBatteryWh");
+    expect(average.customerBatteryLossWh).toBe(0);
     expect(average.windKph).toBe(50);
     expect(average.renewableCapacityFactors!.Wind).toBeGreaterThanOrEqual(0);
     expect(JSON.stringify(timeline)).toBe(original);

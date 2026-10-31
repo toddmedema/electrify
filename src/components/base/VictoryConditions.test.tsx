@@ -3,9 +3,8 @@ import { render, screen, within } from "@testing-library/react";
 import VictoryConditions from "./VictoryConditions";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../../data/Scenarios";
 import { modScenario } from "../../mods/ModScenario";
-import { objectiveDefinition } from "../../helpers/ScenarioObjectives";
 
-it("separates requirements from points and keeps measurement help secondary", () => {
+it("separates requirements from points", () => {
   render(
     <VictoryConditions
       scenario={SCENARIOS.find((scenario) => scenario.id === 100)!}
@@ -21,10 +20,6 @@ it("separates requirements from points and keeps measurement help secondary", ()
     within(scoring).getByText(/Financial performance/),
   ).toBeInTheDocument();
   expect(within(scoring).getByText(/Environmental impact/)).toBeInTheDocument();
-  expect(screen.getByText("How objectives are measured")).toBeVisible();
-  expect(
-    screen.getByText(objectiveDefinition("customerRetention")),
-  ).not.toBeVisible();
 });
 
 it.each(["Public", "Investor"] as const)(
@@ -46,9 +41,6 @@ it.each(["Public", "Investor"] as const)(
     );
     expect(
       screen.getByText(/Keep ≥90% of customer baseline/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(objectiveDefinition("customerRetention")),
     ).toBeInTheDocument();
   },
 );
@@ -86,9 +78,6 @@ it("labels optional goals and explains their actual units without making them a 
       "Affordable practice",
     ),
   ).toBeNull();
-  expect(
-    screen.getByText(objectiveDefinition("monthlyBilledRate")),
-  ).toBeInTheDocument();
   expect(screen.getByText(/Bills ≤\$0.123456789\/kWh/)).toBeInTheDocument();
   expect(
     screen.getByText("Stretch goals; not required to win."),

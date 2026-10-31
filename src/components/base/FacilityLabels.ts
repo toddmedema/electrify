@@ -8,5 +8,8 @@ export function facilityDisplayName(facility: LabeledFacility): string {
     return "Oil A";
   if (facility.startingAssetId === "scenario-116-champlain-oil-b")
     return "Oil B";
+  if (facility.startingAssetId === "scenario-116-valley-oil")
+    return "Valley Oil";
+  if (facility.startingAssetId === "scenario-116-ridge-oil") return "Ridge Oil";
   return facility.name;
 }

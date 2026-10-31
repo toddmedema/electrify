@@ -4,14 +4,32 @@ import { webcrypto } from "crypto";
 import { SaveRepository } from "./SaveRepository";
 import { parseSave, serializeSave } from "./SaveGame";
 import { fakeSaveGame, fakeSavedResult } from "./testing/SaveTestHelpers";
-import type { SaveLease, SaveMetadata } from "./Types";
+import type { SaveLease, SaveMetadata, VictoryType } from "./Types";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
+import { createGame } from "./testing/Simulator";
+import { runMonths } from "./testing/SimulationTestHelpers";
+import reducer, { buildTransmissionLine, tickState } from "./reducers/Game";
+import { acquireUtility } from "./reducers/GameActions";
+import { acquisitionQuote } from "./helpers/Expansion";
+import { copyOfficialGame } from "./testing/OfficialScenarioExecutionFixtures";
+import { savedRunResult, parseSavedRunResult } from "./SaveModel";
+
+// v8 creates Node-realm objects. Re-home containers in jsdom without JSON, retaining
+// own undefined properties and non-finite values for the strict parser to inspect.
+function currentRealm(value: unknown): unknown {
+  if (Array.isArray(value)) return Array.from(value, currentRealm);
+  if (value !== null && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value).map(([key, child]) => [key, currentRealm(child)]),
+    );
+  return value;
+}
 
 // jsdom omits Node's native structuredClone; IndexedDB still needs a real structured clone.
 if (typeof structuredClone === "undefined") {
   Object.defineProperty(globalThis, "structuredClone", {
     configurable: true,
-    value: <T>(value: T): T => deserialize(serialize(value)),
+    value: <T>(value: T): T => currentRealm(deserialize(serialize(value))) as T,
   });
 }
 
@@ -56,6 +74,129 @@ describe("SaveRepository", () => {
       writerToken,
     });
   }
+
+  it("persists and reopens a raw first-year rollover with inactive battery meters", async () => {
+    const game = createGame({
+      scenarioId: 116,
+      difficulty: "Employee",
+      seed: 3857637116,
+    });
+    for (const tick of game.timeline) {
+      tick.customerBatteryWh = undefined;
+      tick.customerBatteryWhStart = undefined;
+      tick.customerBatteryLossWh = undefined;
+    }
+    await repository.create({
+      id: "first",
+      name: "Valley",
+      save: serializeSave(game),
+      scenarioName: "Across the Valley",
+      writerToken: "tab-one",
+    });
+    runMonths(game, 12);
+    const written = await repository.writeSnapshot(
+      lease(),
+      serializeSave(game),
+      "Across the Valley",
+    );
+    await repository.release(lease("first", written.revision));
+    repository.close();
+    const restored = await other.read("first");
+    expect(restored.save.game.date.monthsElapsed).toBe(12);
+    expect(restored.save.game.monthlyHistory).toHaveLength(12);
+    expect(
+      restored.save.game.monthlyHistory[0].chartAverage,
+    ).not.toHaveProperty("customerBatteryWh");
+    expect(restored.save.game.monthlyHistory[0].chartAverage?.cash).toBe(
+      game.monthlyHistory[0].chartAverage?.cash,
+    );
+  });
+
+  it("persists the natural terminal result after an acquisition before its deadline", async () => {
+    let game = createGame({
+      scenarioId: 116,
+      difficulty: "Employee",
+      seed: 12345,
+      storyEffectsEnabled: true,
+      weatherHazardsEnabled: true,
+    });
+    await repository.create({
+      id: "first",
+      name: "Valley",
+      save: serializeSave(game),
+      scenarioName: "Across the Valley",
+      writerToken: "tab-one",
+    });
+    let terminal: VictoryType | undefined;
+    jest.useFakeTimers();
+    try {
+      game = copyOfficialGame(
+        reducer(
+          game,
+          buildTransmissionLine({
+            corridorId: "vt-champlain-valley",
+            financed: false,
+          }),
+        ),
+      );
+      while (game.date.monthsElapsed < 25) tickState(game);
+      const quote = acquisitionQuote(game, "valley-electric")!;
+      expect(quote).toBeDefined();
+      game = copyOfficialGame(
+        reducer(
+          game,
+          acquireUtility({
+            targetId: "valley-electric",
+            financed: true,
+            quoteKey: quote.quoteKey,
+          }),
+        ),
+      );
+      const effects = {
+        outcome: (victory: VictoryType, message?: () => string) => {
+          terminal = {
+            ...victory,
+            endMessage: message?.() || victory.endMessage,
+          };
+        },
+      };
+      while (!terminal && game.date.monthsElapsed < 120)
+        tickState(game, effects);
+    } finally {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    }
+    expect(terminal?.outcome).toBe("fired");
+    expect(game.date.monthsElapsed).toBeLessThan(120);
+    const ownership = terminal!.debrief!.objectiveResults!.find(
+      (result) => result.metric === "utilityOwnership",
+    )!;
+    expect(ownership.status).toBe("completed");
+    const result = savedRunResult(terminal!);
+    expect(ownership).not.toHaveProperty("reason");
+    // Invalid untrusted neighbors still fail; the producer must emit canonical data.
+    expect(
+      parseSavedRunResult({
+        ...result,
+        debrief: {
+          ...result.debrief,
+          objectiveResults: [{ ...ownership, reason: undefined }],
+        },
+      }),
+    ).toBeNull();
+    const ended = await repository.recordOutcome(
+      lease(),
+      serializeSave(game),
+      "Across the Valley",
+      result,
+    );
+    expect(ended.status).toBe("fired");
+    repository.close();
+    const reopened = await other.read("first");
+    expect(reopened.metadata.status).toBe("fired");
+    expect(reopened.result).toEqual(result);
+    expect(reopened.save.game.date.monthsElapsed).toBe(game.date.monthsElapsed);
+  }, 30000);
 
   function lease(
     id = "first",

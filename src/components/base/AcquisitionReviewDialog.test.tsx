@@ -7,13 +7,18 @@ import { currentTick } from "../../helpers/GameSelectors";
 import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
 import { copyOfficialGame } from "../../testing/OfficialScenarioExecutionFixtures";
 import { createGame } from "../../testing/Simulator";
-import { buildTransmissionLine } from "../../reducers/Game";
+import {
+  buildTransmissionLine,
+  generateForecastTimeline,
+} from "../../reducers/Game";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import reducer from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { UtilityTargetId } from "../../Types";
 import AcquisitionReviewDialog from "./AcquisitionReviewDialog";
+import { facilityDisplayName } from "./FacilityLabels";
 
-function review(targetId: UtilityTargetId) {
+function review(targetId: UtilityTargetId, year = 2005) {
   const initial = createGame({
     scenarioId: 116,
     seed: 12345,
@@ -31,6 +36,13 @@ function review(targetId: UtilityTargetId) {
     ),
   );
   game.transmission!.lines[0].yearsToBuildLeft = 0;
+  if (year !== 2005) {
+    game.date = getDateFromMinute(
+      (year - game.startingYear) * 12 * MINUTES_PER_MONTH,
+      game.startingYear,
+    );
+    game.timeline = generateForecastTimeline(game, 2e9, 90000, 2);
+  }
   const quote = acquisitionQuote(game, targetId)!;
   const store = configureStore({
     reducer: { game: () => game, ui: uiReducer },
@@ -82,7 +94,7 @@ it.each(["valley-electric", "ridge-electric"] as const)(
         .sort((a, b) => b.peakW - a.peakW)
         .map(
           (plant) =>
-            `${plant.name} ${formatWatts(plant.peakW)} · ${plant.ageYears.toFixed(1)} years old`,
+            `${facilityDisplayName(plant)} ${formatWatts(plant.peakW)} · ${plant.ageYears.toFixed(1)} years old`,
         ),
     );
     expect(screen.queryByText("Seller equity price")).not.toBeInTheDocument();
@@ -104,4 +116,33 @@ it("keeps Valley's dated supply reduction with acquisition obligations", () => {
     "152MW to 76MW deliverable",
   );
   expect(screen.queryByText(/Plan replacement supply/)).not.toBeInTheDocument();
+});
+
+it.each([2017, 2024])(
+  "uses the dated company offer for active Valley nuclear supply in %i",
+  (year) => {
+    review("valley-electric", year);
+    expect(
+      within(fact("Acquisition obligations")).getByText(
+        /nuclear contract is now/,
+      ),
+    ).toHaveTextContent("80MW (76MW deliverable)");
+  },
+);
+
+it("describes Valley nuclear rights as expired after 2024", () => {
+  const quote = review("valley-electric", 2025);
+  expect(quote.contracts).toEqual([]);
+  const obligations = within(fact("Acquisition obligations"));
+  expect(
+    obligations.getByText(/nuclear purchase has expired/),
+  ).toBeInTheDocument();
+  expect(
+    obligations.queryByText(/nuclear contract is now/),
+  ).not.toBeInTheDocument();
+  expect(
+    within(fact("Purchased power")).getByText(
+      "No inherited purchased-power rights remain.",
+    ),
+  ).toBeInTheDocument();
 });

@@ -2,7 +2,7 @@ import * as React from "react";
 import { chartPalette, withAlpha } from "../../Theme";
 
 /**
- * The 4px meter on a fleet row's bottom edge saying how hard the thing is working, signed so that power moving
+ * The tint behind a fleet row saying how hard the thing is working, signed so that power moving
  * the other way -- a battery charging, an intertie selling to a neighbour -- is as visible as
  * power moving out. Both directions fill from the left edge at |flow| / rating, which keeps one
  * bar grammar across generator, storage and intertie rows and keeps full resolution at 360px.
@@ -30,8 +30,8 @@ export default function FlowBar(props: {
   const reverse = props.fraction < 0;
   const magnitude = Math.min(1, Math.abs(props.fraction) || 0);
   // Reverse flow borrows the battery blue, which already means "storing" on the capacity bar
-  // Forward flow takes the stylesheet's neutral --flow-meter
-  const tint = withAlpha(chartPalette().storage, 0.7);
+  // Forward flow takes the stylesheet's neutral --flow-fill
+  const tint = withAlpha(chartPalette().storage, 0.18);
   return (
     <div
       className={`outputProgressBar${reverse ? " reverseFlow" : ""}`}
