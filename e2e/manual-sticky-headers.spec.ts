@@ -1,3 +1,4 @@
+import path from "node:path";
 import { expect, test } from "./fixtures";
 
 async function openManual(page: import("@playwright/test").Page) {
@@ -183,3 +184,94 @@ test("a deep-linked entry lands below the pinned group header", async ({
   // ...and never above the scroller's top edge, where it would be clipped or hidden
   expect(summaryTop).toBeGreaterThanOrEqual(scrollerTop - 1);
 });
+
+// Navigation must finish after both the old entry's collapse and the target's expansion.
+// Measuring the card itself avoids a sticky heading masking a missed scroll target.
+for (const shortWindow of [false, true]) {
+  test(`inline links align the entry after expansion, collapse and search${shortWindow ? " in a short window" : ""}`, async ({
+    page,
+  }, testInfo) => {
+    await page.emulateMedia({
+      reducedMotion: "no-preference",
+      colorScheme: shortWindow ? "dark" : "light",
+    });
+    if (shortWindow) {
+      await page.setViewportSize({
+        width: Math.min(page.viewportSize()!.width, 768),
+        height: 500,
+      });
+    }
+    await openManual(page);
+    const howToPlay = page.locator("#manual-how-to-play-header");
+    await howToPlay.click();
+    await waitForEntrySettled(page, ".manual-pinned");
+    await page
+      .locator(".manual-pinned")
+      .getByRole("link", { name: "forecasts", exact: true })
+      .click();
+
+    async function expectEntryAtTop(id: string) {
+      const heading = page.locator(`#manual-${id}-header`);
+      await expect(heading).toHaveAttribute("aria-expanded", "true");
+      await expect(heading).toBeFocused();
+      await expect(
+        page.locator(
+          "#manual .MuiCollapse-root:not(.MuiCollapse-entered):not(.MuiCollapse-hidden)",
+        ),
+      ).toHaveCount(0);
+      await expect
+        .poll(() =>
+          heading.evaluate((element) => {
+            const entry = element.closest(".manual-entry")!;
+            let scroller = entry.parentElement!;
+            while (!/(auto|scroll)/.test(getComputedStyle(scroller).overflowY))
+              scroller = scroller.parentElement!;
+            const offset =
+              entry.getBoundingClientRect().top -
+              scroller.getBoundingClientRect().top;
+            const remaining =
+              scroller.scrollHeight -
+              scroller.clientHeight -
+              scroller.scrollTop;
+            // Near the end of the list, the browser may reach its scroll limit before
+            // the title can align with the group label. It must still be fully below it.
+            return {
+              offset,
+              remaining,
+              aligned:
+                offset >= 31 && (Math.abs(offset - 32) <= 1 || remaining <= 1),
+            };
+          }),
+        )
+        .toMatchObject({ aligned: true });
+    }
+
+    await expectEntryAtTop("insights-data-layers");
+    await page
+      .locator("#manual-insights-data-layers-content")
+      .getByRole("link", {
+        name: "energy and the largest power shortage",
+        exact: true,
+      })
+      .click();
+    await expectEntryAtTop("power-and-energy");
+    await page
+      .locator("#manual-power-and-energy-content")
+      .getByRole("link", { name: "Insights", exact: true })
+      .click();
+    await expectEntryAtTop("insights-data-layers");
+    await page
+      .getByRole("textbox", { name: "Search the manual" })
+      .fill("round-trip");
+    await page.getByRole("link", { name: "power rating", exact: true }).click();
+    await expectEntryAtTop("power-and-energy");
+    if (process.env.REVIEW_SCREENSHOT_DIR && !shortWindow) {
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `manual-link-${testInfo.project.name}.png`,
+        ),
+      });
+    }
+  });
+}
