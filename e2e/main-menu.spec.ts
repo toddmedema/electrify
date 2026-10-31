@@ -521,12 +521,16 @@ for (const theme of ["light", "dark"]) {
       });
       const sound = page.getByRole("button", { name: "Turn on sound" });
       await expect(sound).toHaveCSS("opacity", "1");
+      // Establish the keyboard selection before checking that a touch drag leaves it alone.
+      await play.focus();
+      await expect(play).toBeFocused();
       const clear = "rgba(0, 0, 0, 0)";
       await expect(play).not.toHaveCSS("background-color", clear);
       await expect(manual).toHaveCSS("background-color", clear);
 
       const touch = await context.newCDPSession(page);
       const bounds = (await manual.boundingBox())!;
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
       const point = {
         x: bounds.x + bounds.width / 2,
         y: bounds.y + bounds.height / 2,

@@ -426,21 +426,18 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
 }
 
 // A single, quiet surface response replaces the expanding Material ripple on the home menu.
-#menuCard {
-  .MuiTouchRipple-root {
-    display: none;
-  }
-
-  .MuiButtonBase-root {
-    -webkit-tap-highlight-color: transparent;
-  }
+#menuCard .MuiTouchRipple-root {
+  display: none;
 }
 html[data-touch-input="true"]:not([data-controller-input="true"]) #menuCard {
-  #centeredMenu .MuiButton-root,
-  .mainMenuFooter .MuiIconButton-root {
+  .MuiButtonBase-root {
     transition:
       background-color 160ms ease-out,
       transform 160ms ease-out;
+
+    &:hover {
+      background-color: transparent;
+    }
 
     &[data-touch-pressed] {
       background-color: color-mix(
@@ -450,6 +447,10 @@ html[data-touch-input="true"]:not([data-controller-input="true"]) #menuCard {
       );
       transform: scale(0.98);
       transition-duration: 60ms;
+
+      @media (prefers-reduced-motion: reduce) {
+        transform: none;
+      }
     }
   }
 
@@ -464,21 +465,6 @@ html[data-touch-input="true"]:not([data-controller-input="true"]) #menuCard {
         var(--interactive-strong) 88%,
         var(--font-color-primary)
       );
-    }
-  }
-
-  .mainMenuFooter .MuiIconButton-root:hover:not([data-touch-pressed]) {
-    background-color: transparent;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    #centeredMenu .MuiButton-root,
-    .mainMenuFooter .MuiIconButton-root {
-      &,
-      &[data-touch-pressed] {
-        transition: none;
-        transform: none;
-      }
     }
   }
 }
@@ -3073,10 +3059,6 @@ $pane_header_height: 48px;
       .discoveryActions {
         align-items: center;
         width: 100%;
-
-        .MuiButton-root {
-          width: min(100%, 260px);
-        }
       }
 
       .mainActions {
@@ -3104,20 +3086,9 @@ $pane_header_height: 48px;
         }
       }
 
-      button {
+      .MuiButton-root {
         margin: 0;
-      }
-    }
-
-    .MuiButton-root,
-    .MuiIconButton-root {
-      min-height: 40px;
-    }
-
-    @media (pointer: coarse) {
-      .MuiButton-root,
-      .MuiIconButton-root {
-        min-height: 44px;
+        width: min(100%, 260px);
       }
     }
   }
