@@ -287,13 +287,12 @@ async function confirmDelete() {
     screen.getByRole("button", { name: "Actions for Wind experiment" }),
   );
   fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
-  await act(async () => {
-    fireEvent.click(
-      within(
-        screen.getByRole("dialog", { name: "Delete saved game?" }),
-      ).getByRole("button", { name: "Delete", exact: true }),
-    );
-  });
+  fireEvent.click(
+    within(
+      screen.getByRole("dialog", { name: "Delete saved game?" }),
+    ).getByRole("button", { name: "Delete" }),
+  );
+  await act(async () => undefined);
 }
 
 it("releases a hung deletion at six seconds, reports it and permits a fresh retry", async () => {
@@ -369,7 +368,7 @@ it("keeps delete failures actionable and clears the deadline after success or fa
     expect.objectContaining({ timedOut: false }),
   );
   (deleteSavedGame as jest.Mock).mockResolvedValueOnce(undefined);
-  fireEvent.click(screen.getByRole("button", { name: "Delete", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
   await act(async () => undefined);
   await act(async () => {
     jest.advanceTimersByTime(300);
