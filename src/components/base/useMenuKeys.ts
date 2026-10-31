@@ -1,4 +1,4 @@
-import { KeyboardEvent, useEffect, useRef } from "react";
+import { KeyboardEvent, useLayoutEffect, useRef } from "react";
 import { CARD_TRANSITION_ANIMATION_MS } from "../../Constants";
 
 const selector = "button,a[href],input,select,textarea,[role=button]";
@@ -80,7 +80,7 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
             .map(controls)
             .filter((items) => items.length)
         : [controls(ref.current)];
-  useEffect(() => {
+  useLayoutEffect(() => {
     const active = document.activeElement;
     if (
       !document.querySelector(popup) &&

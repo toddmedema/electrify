@@ -176,12 +176,19 @@ interface ManualItemProps {
   expanded: boolean;
   onToggle: (title: string, expanded: boolean) => void;
   itemRef?: React.Ref<HTMLDivElement>;
+  onTransitionStart: (title: string) => void;
+  onTransitionEnd: (title: string) => void;
   onFollowLink: (to: ManualEntryTitleType, from: ManualEntryTitleType) => void;
 }
 
 function ManualItem(props: ManualItemProps): React.JSX.Element {
   const { entry, searchTerm, expanded, onFollowLink } = props;
   const id = entryId(entry.title);
+  const { onTransitionEnd } = props;
+  React.useEffect(
+    () => () => onTransitionEnd(entry.title),
+    [entry.title, onTransitionEnd],
+  );
   const followLink = React.useCallback(
     (to: ManualEntryTitleType) => onFollowLink(to, entry.title),
     [onFollowLink, entry.title],
@@ -196,7 +203,15 @@ function ManualItem(props: ManualItemProps): React.JSX.Element {
       ref={props.itemRef}
       square
       disableGutters
-      slotProps={{ transition: { unmountOnExit: true } }}
+      slotProps={{
+        transition: {
+          unmountOnExit: true,
+          onEnter: () => props.onTransitionStart(entry.title),
+          onExit: () => props.onTransitionStart(entry.title),
+          onEntered: () => onTransitionEnd(entry.title),
+          onExited: () => onTransitionEnd(entry.title),
+        },
+      }}
     >
       <AccordionSummary
         expandIcon={<ChevronDownGlyph className="rowChevron" />}
@@ -229,6 +244,43 @@ export default function Manual(props: Props): React.JSX.Element {
   const [toggled, setToggled] = React.useState<Record<string, boolean>>({});
   const listRef = React.useRef<HTMLDivElement>(null);
   const focusRef = React.useRef<HTMLDivElement>(null);
+  const transitioning = React.useRef(new Set<string>());
+  const revealRequested = React.useRef(false);
+  const revealFrame = React.useRef(0);
+  React.useEffect(() => () => cancelAnimationFrame(revealFrame.current), []);
+  const revealFocusedEntry = React.useCallback(() => {
+    if (!revealRequested.current || transitioning.current.size) return;
+    cancelAnimationFrame(revealFrame.current);
+    revealFrame.current = requestAnimationFrame(() => {
+      const focused = focusRef.current;
+      if (!revealRequested.current || transitioning.current.size || !focused)
+        return;
+      revealRequested.current = false;
+      if (listRef.current) {
+        const scroller = scrollContainerOf(listRef.current);
+        const top =
+          scroller === document.documentElement
+            ? 0
+            : scroller.getBoundingClientRect().top;
+        const header = focused.classList.contains("manual-pinned")
+          ? 0
+          : GROUP_HEADER_HEIGHT;
+        // Apply the header offset before the browser clamps at the end of the list.
+        scroller.scrollTop +=
+          focused.getBoundingClientRect().top - top - header;
+      }
+    });
+  }, []);
+  const onTransitionStart = React.useCallback((title: string) => {
+    transitioning.current.add(title);
+  }, []);
+  const onTransitionEnd = React.useCallback(
+    (title: string) => {
+      transitioning.current.delete(title);
+      revealFocusedEntry();
+    },
+    [revealFocusedEntry],
+  );
 
   const term = searchTerm.trim().toLowerCase();
   const searching = term.length > 0;
@@ -266,27 +318,18 @@ export default function Manual(props: Props): React.JSX.Element {
     }
   }, [focusEntry]);
 
-  React.useEffect(() => {
-    const focused = focusRef.current;
-    // jsdom has no layout, and so no scrollIntoView
-    if (focusEntry && focused) {
-      focused.scrollIntoView?.({ block: "start" });
-      // scrollIntoView aligns the entry with the top of the list, where a grouped entry's
-      // title would sit under the pinned group header; nudge it down below that bar. Pinned
-      // entries have no header above them, so they stay flush with the top of the list.
-      const list = listRef.current;
-      if (list && !focused.classList.contains("manual-pinned")) {
-        const scroller = scrollContainerOf(list);
-        scroller.scrollTop = Math.max(
-          0,
-          scroller.scrollTop - GROUP_HEADER_HEIGHT,
-        );
-      }
-      focused
+  React.useLayoutEffect(() => {
+    if (focusEntry && focusRef.current) {
+      // Focus without the browser scrolling to an intermediate accordion height.
+      focusRef.current
         .querySelector<HTMLButtonElement>(".MuiAccordionSummary-root")
-        ?.focus();
+        ?.focus({ preventScroll: true });
+      revealRequested.current = true;
+      // A link can both collapse earlier entries and expand its target. Align only once
+      // all those transitions finish, or the closing content moves the target again.
+      revealFocusedEntry();
     }
-  }, [focusEntry, focusRequest]);
+  }, [focusEntry, focusRequest, revealFocusedEntry]);
 
   const matches = React.useMemo(
     () =>
@@ -315,6 +358,8 @@ export default function Manual(props: Props): React.JSX.Element {
         expanded={toggled[entry.title] ?? (searching || isFocused)}
         onToggle={onToggle}
         onFollowLink={onFollowLink}
+        onTransitionStart={onTransitionStart}
+        onTransitionEnd={onTransitionEnd}
         itemRef={isFocused ? focusRef : undefined}
       />
     );

@@ -1,7 +1,6 @@
 import * as React from "react";
 import { DifficultyType, ScenarioType } from "../../Types";
 import { Box, Typography } from "@mui/material";
-import { objectiveDefinition } from "../../helpers/ScenarioObjectives";
 import { objectiveGoalText } from "../../helpers/ObjectivePresentation";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
@@ -16,7 +15,7 @@ export interface Props {
   difficulty: DifficultyType;
 }
 
-/** Requirements lead; canonical scoring rules and measurement help stay separate. */
+/** Requirements lead, followed by optional goals and canonical scoring rules. */
 export default function VictoryConditions({
   scenario,
   difficulty,
@@ -112,20 +111,6 @@ export default function VictoryConditions({
           ))}
         </dl>
       </Box>
-
-      {objectives.length > 0 && (
-        <details className="victoryMeasurementHelp">
-          <summary>How objectives are measured</summary>
-          <dl>
-            {objectives.map((objective) => (
-              <div key={objective.id}>
-                <dt>{objective.label}</dt>
-                <dd>{objectiveDefinition(objective.metric)}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
-      )}
     </div>
   );
 }

@@ -2601,19 +2601,6 @@ $pane_header_height: 48px;
   border-top: 1px solid var(--border-subtle);
 }
 
-.victoryMeasurementHelp {
-  margin-top: 16px;
-
-  summary {
-    display: list-item;
-    align-content: center;
-    min-height: var(--control-size);
-    color: $interactive_blue;
-    cursor: pointer;
-    font-size: var(--font-size-body2);
-  }
-}
-
 .resultLeaderboard {
   margin-top: 16px;
   padding-top: 12px;

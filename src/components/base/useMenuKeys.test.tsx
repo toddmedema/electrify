@@ -6,7 +6,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ReactNode } from "react";
+import { ReactNode, useLayoutEffect } from "react";
 import { restoreMenuFocus, useMenuKeys } from "./useMenuKeys";
 
 function Menu(props: {
@@ -24,6 +24,22 @@ beforeEach(() => {
     .mockReturnValue([{}] as unknown as DOMRectList);
 });
 afterEach(() => jest.restoreAllMocks());
+
+it("selects the first action before the menu can paint", () => {
+  function ReturningMenu() {
+    const menu = useMenuKeys();
+    useLayoutEffect(() => {
+      expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+    }, []);
+    return (
+      <div {...menu}>
+        <button>Play</button>
+        <button>Manual</button>
+      </div>
+    );
+  }
+  render(<ReturningMenu />);
+});
 
 it("starts at the first usable action, wraps arrows, and uses native Enter activation once", async () => {
   const select = jest.fn();
