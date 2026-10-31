@@ -42,8 +42,8 @@ import {
   FuelNameType,
   LocationType,
 } from "../../Types";
-import { useOutlookWorker } from "../base/useOutlookWorker";
-import { signature } from "../base/DeferredProjection";
+import { useBuildForecast } from "../base/BuildForecast";
+import type { BuildForecast } from "../base/OutlookForecast";
 import {
   sameBuildQuote,
   useBuildAffordability,
@@ -122,12 +122,20 @@ export function sharedOutputCeiling(
   return Math.min(1, Math.max(0.1, Math.ceil(highest * 10 - 1e-9) / 10));
 }
 
+const EMPTY_FORECAST: BuildForecast = {
+  timeline: [],
+  windSpeeds: [],
+  offshoreWindSpeeds: [],
+  airborneWindSpeeds: [],
+  solarIrradiances: [],
+};
+
 function ExpectedOutputMetric(props: {
   shape?: ExpectedOutputShape;
   ceiling: number;
 }): React.JSX.Element {
   const { shape, ceiling } = props;
-  let caption = "";
+  let caption = shape ? "" : "Calculating output…";
   let chart: React.ReactNode = null;
   if (shape && shape.kind === "on-demand") {
     caption = "On demand";
@@ -203,6 +211,7 @@ interface GeneratorBuildItemProps {
   /** Typical-year output; computed from the generator alone when omitted (on-demand plants only) */
   outputShape?: ExpectedOutputShape;
   outputCeiling?: number;
+  forecastPending?: boolean;
   compared?: boolean;
   compareDisabled?: boolean;
   onCompare?: () => void;
@@ -274,7 +283,11 @@ export function GeneratorBuildItem(
   const shortfall = !affordable ? (
     <BuildCashWarning cash={cash} downpayment={downpayment} />
   ) : undefined;
-  const canBuild = buildable && !shortfall;
+  const outputPending =
+    props.forecastPending &&
+    (generator.fuel === "Hydro" ||
+      WEATHER_DEPENDENT_FUELS.includes(generator.fuel));
+  const canBuild = buildable && !shortfall && !outputPending;
   const buildSubtitle = (buildable && shortfall) || secondaryText;
   const offerAffordableSize =
     !!shortfall &&
@@ -513,7 +526,7 @@ export function GeneratorBuildItem(
           {props.secondaryMetric === "lcWh" && (
             <BuildMetric
               label="Cost per MWh"
-              value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}`}
+              value={`${fuelPrices[generator.fuel] ? "~" : ""}${outputPending ? "Calculating…" : formatMoneyConcise(generator.lcWh * 1000000)}`}
             />
           )}
         </>
@@ -548,7 +561,12 @@ export function GeneratorBuildItem(
             {props.secondaryMetric !== "lcWh" && (
               <BuildDetailRow
                 label="Lifetime cost"
-                value={formatMoneyConcise(generator.lcWh * 1000000) + "/MWh"}
+                value={
+                  (outputPending
+                    ? "Calculating…"
+                    : formatMoneyConcise(generator.lcWh * 1000000)) +
+                  (outputPending ? "" : "/MWh")
+                }
                 entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
               />
             )}
@@ -559,7 +577,11 @@ export function GeneratorBuildItem(
                   ? "Capacity factor, this forecast"
                   : "Expected capacity factor"
               }
-              value={percent(capacityFactor)}
+              value={
+                props.forecastPending && !outputShape
+                  ? "Calculating…"
+                  : percent(capacityFactor)
+              }
               entry={MANUAL_ENTRY.CAPACITY_FACTOR}
             />
             {generator.minimumStableOutput !== undefined && (
@@ -788,6 +810,7 @@ export function GeneratorBuildItem(
 }
 
 function GeneratorComparison(props: {
+  forecastPending?: boolean;
   generators: GeneratorShoppingType[];
   outputShapes: Map<string, ExpectedOutputShape | undefined>;
   onClear: () => void;
@@ -830,14 +853,9 @@ function GeneratorComparison(props: {
               {formatBuildMonths(generator.yearsToBuild)}
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              {formatWatts(
-                generator.peakW *
-                  typicalCapacityFactor(
-                    generator,
-                    props.outputShapes.get(generator.name),
-                  ),
-              )}{" "}
-              typical · {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
+              {props.forecastPending && !props.outputShapes.get(generator.name)
+                ? "Calculating output and energy costs…"
+                : `${formatWatts(generator.peakW * typicalCapacityFactor(generator, props.outputShapes.get(generator.name)))} typical · ${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
             </Typography>
           </div>
         ))}
@@ -911,22 +929,13 @@ function BuildGenerators(props: Props): React.JSX.Element {
     [],
   );
   const [primerVisible, dismissPrimer] = useHydroPrimer();
-  // Typical-year weather should settle while time runs. Month/fleet/rate/story decisions
-  // refresh it in the existing outlook worker; live cash below still controls affordability.
-  const forecastKey =
-    signature(game) +
-    (game.speed === "PAUSED"
-      ? `/${game.date.minute}/${now?.cash}/${now?.customers}`
-      : "");
-  const forecast = useOutlookWorker(
-    "build",
-    now ? forecastKey : undefined,
-    game,
-  );
+  // The workspace warms this before opening Build; an immediate listing never waits for it.
+  const forecast = useBuildForecast(game);
+  const hasNow = Boolean(now);
   React.useEffect(() => {
     const request = evidenceRequest;
     if (
-      forecast &&
+      hasNow &&
       request &&
       typeof request.target === "object" &&
       request.target.card === "FACILITIES" &&
@@ -935,19 +944,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
     ) {
       onEvidenceReady?.(request, evidenceAnchor.current);
     }
-  }, [forecast, evidenceRequest, facilityDragActive, onEvidenceReady]);
+  }, [hasNow, evidenceRequest, facilityDragActive, onEvidenceReady]);
 
   if (!now) {
     return <span />;
   }
-  if (!forecast) {
-    return (
-      <Typography role="status" sx={{ padding: 2 }}>
-        Calculating quotes…
-      </Typography>
-    );
-  }
-
   const cash = now.cash;
   const {
     timeline: forecastedTimeline,
@@ -955,7 +956,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
     offshoreWindSpeeds,
     airborneWindSpeeds,
     solarIrradiances,
-  } = forecast;
+  } = forecast ?? EMPTY_FORECAST;
   const hydroAvailability = getHydroAvailability(
     game,
     exactSizes.Hydro ?? sliderTickToW(sliderTick),
@@ -1109,9 +1110,15 @@ function BuildGenerators(props: Props): React.JSX.Element {
         }}
         onSortChange={(value) => setSort(value as GeneratorSortKey)}
       />
+      {!forecast && (
+        <Typography role="status" variant="caption" sx={{ px: 2, py: 1 }}>
+          Calculating output and energy costs…
+        </Typography>
+      )}
       <GeneratorComparison
         generators={comparedGenerators}
         outputShapes={outputShapes}
+        forecastPending={!forecast}
         onClear={() => setComparedNames([])}
         onRemove={toggleCompare}
       />
@@ -1120,7 +1127,9 @@ function BuildGenerators(props: Props): React.JSX.Element {
           const advantages = [
             g.buildCost === lowestBuildCost ? "Lowest upfront cost" : undefined,
             g.yearsToBuild === fastestBuild ? "Fastest online" : undefined,
-            g.lcWh === lowestEnergyCost ? "Lowest lifetime cost" : undefined,
+            forecast && g.lcWh === lowestEnergyCost
+              ? "Lowest lifetime cost"
+              : undefined,
             g.btuPerWh === 0 ? "No direct emissions" : undefined,
           ].filter((value): value is string => Boolean(value));
           const compared = comparedNames.includes(g.name);
@@ -1184,6 +1193,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
                 advantages={advantages.slice(0, 2)}
                 outputShape={outputShapes.get(g.name)}
                 outputCeiling={outputCeiling}
+                forecastPending={!forecast}
                 compared={compared}
                 compareDisabled={comparedNames.length >= 3}
                 onCompare={() => toggleCompare(g.name)}
