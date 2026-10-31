@@ -22,7 +22,7 @@ for (const theme of ["light", "dark"] as const) {
     await first.getByRole("button", { name: /Review purchase of/ }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText("Loan option");
-    await expect(dialog).toContainText("Payments start now");
+    await expect(dialog).not.toContainText("Payments start now");
     await expect(dialog).toContainText("Estimated upkeep");
     expect(
       await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),

@@ -1114,19 +1114,19 @@ describe("weather hardening in the purchase dialog", () => {
       name: "Expected impact",
     });
     expect(impact).toHaveTextContent(
-      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * packaged.buildCost)} +`,
+      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * packaged.buildCost)} now +`,
     );
     expect(impact).toHaveTextContent(
-      `→ ${formatMoneyConcise(cash - packaged.buildCost)}`,
+      `${formatMoneyConcise(packaged.buildCost)} now`,
     );
     fireEvent.click(
       within(dialog).getByRole("checkbox", { name: /^Cold-weather package/ }),
     );
     expect(impact).toHaveTextContent(
-      `→ ${formatMoneyConcise(cash - plain.buildCost)}`,
+      `${formatMoneyConcise(plain.buildCost)} now`,
     );
     expect(impact).toHaveTextContent(
-      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * plain.buildCost)} +`,
+      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * plain.buildCost)} now +`,
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Take loan" }));
     expect(onBuild).toHaveBeenCalledWith(true, {

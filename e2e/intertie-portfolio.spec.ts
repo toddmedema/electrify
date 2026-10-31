@@ -3,7 +3,6 @@ import { expectContinuousDialogSurface } from "./dialog-surface";
 import path from "path";
 import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
-import { readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
   test(`intertie purchase keeps forecasts in build details in ${theme}`, async ({
@@ -137,13 +136,7 @@ for (const theme of ["light", "dark"] as const) {
         animations: "disabled",
       });
     }
-    // Freeze the quote before checking its exact cash delta; navigation may have
-    // allowed a tick before the catalog opened.
     await page.getByRole("button", { name: "pause", exact: true }).click();
-    const game = (await readSavedGame(page))!;
-    const cash = game.timeline.find(
-      (tick) => tick.minute === game.date.minute,
-    )!.cash;
     await review.click();
     const dialog = page.getByRole("dialog");
     await expectContinuousDialogSurface(dialog);
@@ -156,14 +149,10 @@ for (const theme of ["light", "dark"] as const) {
     const cashFact = dialog
       .locator(".decisionImpactFact")
       .filter({ hasText: "Cash purchase" });
-    const quoted = (await cashFact.innerText()).match(
-      /\$([\d.]+)M → \$([\d.]+)M/,
+    await expect(cashFact.locator(".decisionImpactFactValue")).toHaveText(
+      "$14.4M now",
     );
-    expect(quoted).not.toBeNull();
-    // This scenario's balances are quoted in millions, rounded to one decimal.
-    expect(Number(quoted![1])).toBeCloseTo(cash / 1_000_000, 1);
-    expect(Number(quoted![2])).toBeCloseTo((cash - 14_400_000) / 1_000_000, 1);
-    await expect(dialog).toContainText("Payments start now");
+    await expect(dialog).not.toContainText("Payments start now");
     await expect(dialog).toContainText("$23.1k/mo");
     // Every purchase fact fits alongside both actions on desktop and a 390px phone; a shorter
     // phone scrolls the facts between the title and the pinned actions.

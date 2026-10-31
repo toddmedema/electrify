@@ -4,7 +4,7 @@ import { Provider } from "react-redux";
 import { UTILITY_TARGETS } from "../../data/UtilityExpansion";
 import { acquisitionQuote } from "../../helpers/Expansion";
 import { currentTick } from "../../helpers/GameSelectors";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
 import { copyOfficialGame } from "../../testing/OfficialScenarioExecutionFixtures";
 import { createGame } from "../../testing/Simulator";
 import {
@@ -16,6 +16,7 @@ import reducer from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { UtilityTargetId } from "../../Types";
 import AcquisitionReviewDialog from "./AcquisitionReviewDialog";
+import { facilityDisplayName } from "./FacilityLabels";
 
 function review(targetId: UtilityTargetId, year = 2005) {
   const initial = createGame({
@@ -77,12 +78,25 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     );
     expect(cash.getByText(/assumed debt/)).toHaveTextContent("5% for 20 years");
     expect(loan.getByText(/New loan/)).toHaveTextContent("30 years");
+    expect(screen.queryByText(/fee included/)).not.toBeInTheDocument();
     expect(
-      cash.getByText(/Plant operations and purchased power vary/),
-    ).toBeInTheDocument();
+      screen.queryByText(/Plant operations and purchased power vary/),
+    ).not.toBeInTheDocument();
     expect(
-      loan.getByText(/Plant operations and purchased power vary/),
-    ).toBeInTheDocument();
+      screen.queryByText(/Acquire either utility by December 2014/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Projected month-end cash with financing"),
+    ).not.toBeInTheDocument();
+    const plants = within(fact("Operating plants")).getByText(/years old/);
+    expect(plants.textContent?.split("\n")).toEqual(
+      [...quote.facilities]
+        .sort((a, b) => b.peakW - a.peakW)
+        .map(
+          (plant) =>
+            `${facilityDisplayName(plant)} ${formatWatts(plant.peakW)} · ${plant.ageYears.toFixed(1)} years old`,
+        ),
+    );
     expect(screen.queryByText("Seller equity price")).not.toBeInTheDocument();
     expect(screen.queryByText("Assumed debt")).not.toBeInTheDocument();
     expect(screen.queryByText("Service-network costs")).not.toBeInTheDocument();

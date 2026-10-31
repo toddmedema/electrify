@@ -70,7 +70,7 @@ export default function AcquisitionReviewDialog({
   const nuclear = quote.contracts.find(
     (contract) => contract.name === "Regional nuclear",
   );
-  const sharedCosts = `${formatMoneyConcise(quote.assumedDebt)} assumed debt at 5% for 20 years and current network costs included; network costs grow with customers. Plant operations and purchased power vary.`;
+  const sharedCosts = `${formatMoneyConcise(quote.assumedDebt)} assumed debt at 5% for 20 years and current network costs included.`;
   const contractChange = valley
     ? !nuclear
       ? "Valley’s inherited nuclear purchase has expired."
@@ -93,11 +93,11 @@ export default function AcquisitionReviewDialog({
       paymentSummary={{
         cash: {
           value: `${formatMoneyConcise(quote.cashDue)} upfront + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
-          detail: `${formatMoneyConcise(quote.fee)} fee included. ${sharedCosts}`,
+          detail: sharedCosts,
         },
         loan: {
           value: `${formatMoneyConcise(quote.financedCashDue)} upfront + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
-          detail: `${formatMoneyConcise(quote.fee)} fee included. New loan: ${(game.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years. ${sharedCosts}`,
+          detail: `New loan: ${(game.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years. ${sharedCosts}`,
         },
       }}
       preface={
@@ -129,8 +129,8 @@ export default function AcquisitionReviewDialog({
         {
           concept: "goal",
           label: "Acquisition obligations",
-          value: "Acquire either utility by December 2014.",
-          detail: `Retire acquired original oil plants by December 2023 and retain 90% of your expanded customer base at the end of 2024. Acquisitions after 2023 exclude the original oil plant.${contractChange ? `\n\n${contractChange}` : ""}`,
+          value: "Retire acquired original oil plants by December 2023.",
+          detail: `Retain 90% of your expanded customer base at the end of 2024. Acquisitions after 2023 exclude the original oil plant.${contractChange ? `\n\n${contractChange}` : ""}`,
         },
         {
           concept: "supply",
@@ -140,27 +140,15 @@ export default function AcquisitionReviewDialog({
             : "Forecast unavailable",
         },
         {
-          concept: "money",
-          label: "Projected month-end cash with financing",
-          value: preview
-            ? `${formatMoneyConcise(preview.beforeMonthlyCash)} → ${formatMoneyConcise(preview.afterMonthlyCash)}`
-            : "Forecast unavailable",
-        },
-        {
           concept: "supply",
           label: "Operating plants",
-          value: quote.facilities
+          value: [...quote.facilities]
+            .sort((a, b) => b.peakW - a.peakW)
             .map(
               (facility) =>
-                `${facilityDisplayName(facility)} ${formatWatts(facility.peakW)}`,
+                `${facilityDisplayName(facility)} ${formatWatts(facility.peakW)} · ${facility.ageYears.toFixed(1)} years old`,
             )
-            .join(" · "),
-          detail: quote.facilities
-            .map(
-              (facility) =>
-                `${facilityDisplayName(facility)}: ${facility.ageYears.toFixed(1)} years old`,
-            )
-            .join(" · "),
+            .join("\n"),
         },
         {
           concept: "supply",

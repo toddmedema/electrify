@@ -326,6 +326,36 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.getByRole("dialog")).toBeVisible();
       const dialog = page.getByRole("dialog");
       await expectContinuousDialogSurface(dialog);
+      const cashValue = dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: /^Cash purchase/ })
+        .locator(".decisionImpactFactValue");
+      const loanFact = dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: /^Loan option/ });
+      const loanValue = loanFact.locator(".decisionImpactFactValue");
+      const help = loanFact.getByRole("button", {
+        name: "What is interest rate?",
+      });
+      await expect(cashValue).toHaveText(/^\$[\d,.]+[kMBT]? now$/);
+      await expect(dialog).not.toContainText("Payments start now");
+      await loanFact.scrollIntoViewIfNeeded();
+      const [labelBox, loanBox, cashBox, helpBox] = await Promise.all([
+        loanFact.locator(".decisionImpactFactLabel").boundingBox(),
+        loanValue.boundingBox(),
+        cashValue.boundingBox(),
+        help.boundingBox(),
+      ]);
+      expect(helpBox!.x).toBeGreaterThanOrEqual(
+        loanBox!.x + loanBox!.width - 1,
+      );
+      expect(helpBox!.height).toBeGreaterThanOrEqual(
+        testInfo.project.use.hasTouch ? 44 : 40,
+      );
+      if ((testInfo.project.use.viewport?.width ?? 1280) >= 600) {
+        expect(Math.abs(labelBox!.y - loanBox!.y)).toBeLessThanOrEqual(1);
+        expect(Math.abs(cashBox!.x - loanBox!.x)).toBeLessThanOrEqual(1);
+      }
       const title = dialog.locator(".closableDialogTitleText");
       const close = dialog.getByRole("button", { name: "close", exact: true });
       const titleBox = (await title.boundingBox())!;
@@ -356,6 +386,19 @@ for (const theme of ["light", "dark"] as const) {
           path: testInfo.outputPath(`Storage-purchase-${theme}.png`),
           animations: "disabled",
         });
+        if (
+          process.env.REVIEW_SCREENSHOT_DIR &&
+          theme === "dark" &&
+          testInfo.project.name === "desktop-chromium"
+        ) {
+          await page.screenshot({
+            path: path.join(
+              process.env.REVIEW_SCREENSHOT_DIR,
+              "build-loan-desktop-dark.png",
+            ),
+            animations: "disabled",
+          });
+        }
       }
       await page
         .getByRole("dialog")

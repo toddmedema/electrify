@@ -2124,31 +2124,9 @@ $pane_header_height: 48px;
 }
 
 .decisionImpact {
-  padding: 12px 16px 12px;
-  border-bottom: 1px solid var(--border-selected);
-  background: transparent;
-
   & > .MuiTypography-overline {
     font-weight: 600;
   }
-}
-
-.decisionImpactFacts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.decisionImpactFact {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: start;
-  gap: 8px;
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--border-tile);
-  border-radius: var(--radius-md);
-  background: var(--bg-primary);
 }
 
 // Optional weather hardening in the build dialog: one checkbox, its price in the label, and a
@@ -2248,12 +2226,6 @@ $pane_header_height: 48px;
 
   .MuiTypography-root {
     min-width: 0;
-  }
-}
-
-@media (max-width: ($phone_width - 1px)) {
-  .decisionImpactFacts {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -6046,20 +6018,24 @@ $homeSmokeCycle: 5.6s;
   gap: 0;
 }
 .decisionImpactFact {
+  display: grid;
+  align-items: start;
+  min-width: 0;
   padding: 12px 0;
   border: 0;
   border-top: 1px solid var(--border-subtle);
   border-radius: 0;
   background: transparent;
   gap: 12px;
-}
-.decisionImpactFact {
   // Keep each value column aligned even when only one row has a manual help target.
   grid-template-columns: auto minmax(0, 1fr) var(--control-size);
 }
 .decisionImpactFactHelp {
   display: flex;
   align-items: flex-start;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
 }
 .decisionImpactFactContent {
   display: grid;
@@ -8472,6 +8448,7 @@ option {
     }
   }
 
+  .decisionImpactFactValue,
   .decisionImpactFactDetail {
     white-space: pre-line;
   }

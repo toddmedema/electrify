@@ -744,7 +744,7 @@ describe("the interties view", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("$10.8M");
     expect(dialog).toHaveTextContent("Loan option");
-    expect(dialog).toHaveTextContent("Payments start now");
+    expect(dialog).not.toHaveTextContent("Payments start now");
   });
 
   it("tells the neighbours apart by kind, typical year, peak help and price", async () => {
@@ -925,7 +925,9 @@ describe("the interties view", () => {
     });
     await user.click(review);
     expect(onBuild).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).toHaveTextContent("Payments start now");
+    expect(screen.getByRole("dialog")).not.toHaveTextContent(
+      "Payments start now",
+    );
     await user.click(screen.getByRole("button", { name: "close" }));
     expect(onBuild).not.toHaveBeenCalled();
     await user.click(review);

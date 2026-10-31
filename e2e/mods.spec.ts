@@ -1136,8 +1136,9 @@ for (const [theme, requiredBills] of [
       "Modded run · not ranked and no achievements.",
     );
     expect(await page.evaluate(() => window.__mods.scores)).toBe(0);
-    const toast = page.locator(".snackbarContent");
-    if (await toast.isVisible()) await dismissToast(page);
+    // Ordinary notices defer behind the result dialog; wait for their exit
+    // transition instead of swiping a toast that is already disappearing.
+    await expect(page.locator(".snackbarContent")).toBeHidden();
     const goal = evidence
       .getByText("Keep bills affordable", { exact: false })
       .first();
