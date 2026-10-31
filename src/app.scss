@@ -56,7 +56,7 @@
      band below the text rather than painted across the whole fill. */
   --flow-hatch: rgba(0, 132, 248, 0.8);
   // Forward flow behind every fleet row: one neutral tint, so rows read as one system
-  --flow-meter: color-mix(in srgb, var(--font-color-primary) 55%, transparent);
+  --flow-fill: color-mix(in srgb, var(--font-color-primary) 7%, transparent);
   --border-strong: #a4b0bd;
   --border-tile: #d5dde6;
   --font-color-primary: #172334;
@@ -4070,12 +4070,9 @@ $pane_header_height: 48px;
 
   .outputProgressBar {
     // One neutral tint for forward flow on every row; reverse flow sets its own inline
-    background-color: var(--flow-meter);
+    background-color: var(--flow-fill);
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 4px;
+    inset: 0;
     pointer-events: none;
     transform-origin: left center;
     // Keep a hint of motion without leaving the utilization display several simulation frames
@@ -5845,22 +5842,13 @@ $homeSmokeCycle: 5.6s;
   flex-direction: column;
   min-width: 0;
 }
-// Output and construction share one 4px meter on the row's bottom edge, so rows keep one height.
+// Anchor the construction meter to the whole header, including the grip.
 .base_main .facilityRowHeader > .facilityDisclosure,
 .base_main .facilityDisclosure .facility {
   position: static;
 }
-.base_main .facilityRowHeader:has(> .outputProgressBar)::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 4px;
-  background: var(--border-subtle);
-  pointer-events: none;
-}
-.base_main .facilityRowHeader > .outputProgressBar {
+// Keep every row control and its contents above the full-height utilization fill.
+.base_main .facilityRowHeader > :not(.outputProgressBar) {
   z-index: 1;
 }
 .facilityDisclosure .constructionProgress {
