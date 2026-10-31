@@ -725,6 +725,7 @@ export interface TutorialStepType {
   // Runtime restrictions follow authored phases rather than positions in the walkthrough.
   phase?:
     | "GENERATOR_CHOICES"
+    | "STORAGE_ORDER_PREPARE"
     | "INTERTIE_STRESS_PREPARE"
     | "INTERTIE_STRESS_INSPECT"
     | "INTERTIE_STRESS_SUPPLY";
@@ -1444,6 +1445,7 @@ export interface DialogType {
   closeText?: string;
   // A milestone worth celebrating, where offering to install the app lands well
   offerInstall?: boolean;
+  tutorialComplete?: boolean;
   open: boolean;
 }
 

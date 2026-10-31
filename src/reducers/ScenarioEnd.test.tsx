@@ -338,7 +338,7 @@ describe("finishing a tutorial", () => {
         open: true,
         notCancellable: true,
         actionLabel: "Next tutorial",
-        secondaryLabel: "Back to main menu",
+        secondaryLabel: "Main menu",
       }),
     );
     expect(completed.ui.snackbar.open).toBe(false);

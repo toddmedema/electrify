@@ -1,6 +1,7 @@
 import { expect, test } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
 import {
+  dragCoalAbovePumpedHydro,
   isPaneLayout,
   sortBuildCatalog,
   waitForPaneOrNav,
@@ -90,10 +91,12 @@ for (const mission of [
         await slider.press("ArrowLeft");
         await expect(cost).not.toHaveText(beforeCost);
         await expect(time).not.toHaveText(beforeTime);
-        await hud.getByRole("button", { name: "Next", exact: true }).click();
+        await expect(hud).toContainText("Review a generator purchase");
       }
       await expect(hud).toContainText(
-        mission === "Generators" ? "Review a generator" : "Review a storage",
+        mission === "Generators"
+          ? "Review a generator"
+          : "Purchase a storage facility",
       );
       // These steps advance from the review control; Next remains an optional fallback.
       await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(0);
@@ -267,6 +270,9 @@ for (const mission of [
       await expect(progress).not.toHaveAttribute("aria-valuenow", "0");
       expect((await progress.boundingBox())!.width).toBe(initialBox!.width);
       const next = hud.getByRole("button", { name: "Next", exact: true });
+      await expect(
+        hud.locator(".tutorialHudSweep, .tutorialHudNextPulse"),
+      ).toHaveCount(1);
       if (testInfo.project.name === "desktop-chromium") {
         // The background sweep follows side-panel mode, including resizes at its exact boundary.
         for (const width of [1023, 1024, 1023, 1024]) {
@@ -379,43 +385,14 @@ for (const mission of [
     }
     if (mission === "Storage") {
       await hud.getByRole("button", { name: "Next", exact: true }).click();
-      await expect(hud).toContainText("Check generation comes before storage");
-      const start = hud.getByRole("button", {
-        name: "Start final challenge",
-        exact: true,
-      });
-      if (testInfo.project.name === "desktop-chromium") {
-        await page.setViewportSize({ width: 1300, height: 800 });
-        await expect(page.locator(".gameStage")).toHaveAttribute(
-          "data-layout",
-          "side",
-        );
-      }
-      const sideLayout =
-        (await page.locator(".gameStage").getAttribute("data-layout")) ===
-        "side";
-      await expect(start).toHaveAccessibleDescription("");
-      await expect(hud.getByText(/when you’re ready/)).toHaveCount(0);
-      await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(
-        sideLayout ? 1 : 0,
-      );
-      await expect(start.locator(".tutorialHudNextPulse")).toHaveCount(
-        sideLayout ? 0 : 1,
-      );
-      await page.mouse.move(0, 0);
-      await expect(page.getByRole("tooltip")).toBeHidden();
-      if (process.env.REVIEW_SCREENSHOT_DIR) {
-        await expect(page.locator(".MuiSnackbar-root")).toBeHidden();
-      }
-      await reviewScreenshot(page, {
-        path: testInfo.outputPath("manual-challenge.png"),
-        animations: "disabled",
-      });
-      await start.click();
-      await expect(hud).toContainText(
-        "Supply the evening peak with stored energy",
-      );
+      await expect(hud).toContainText("Drag Coal above Pumped Hydro");
+      await expect(
+        hud.getByRole("button", { name: "Next", exact: true }),
+      ).toHaveCount(0);
       await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(0);
+      await dragCoalAbovePumpedHydro(page);
+      await expect(hud).toContainText("Build storage to cover peak demand");
+      await expect(page.locator(".facilityRowHeader")).toHaveCount(1);
     }
   });
 }

@@ -4204,13 +4204,11 @@ $pane_header_height: 48px;
 
 @include styling();
 
-// The completion dialog's "Up next" preview: the mission name as a label with its summary
-// below, so the player knows what the next tutorial covers before committing to it.
+// The recap's spacing is owned by the completion dialog; the preview has no spacer margin.
 .tutorialNextPreview {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 12px;
 
   span {
     color: $font_color_faded;
@@ -4358,7 +4356,7 @@ $pane_header_height: 48px;
   flex: 1 1 auto;
 }
 
-// Narrow layouts draw attention to Next on entry, then repeat a double glow every four seconds.
+// The HUD mounts this cue after six seconds, then repeats a double glow every four seconds.
 .tutorialHudNextPulse {
   position: absolute;
   inset: 0;

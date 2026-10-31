@@ -894,6 +894,7 @@ export interface DispatchProps {
     financed: boolean,
   ) => void;
   onBack: () => void;
+  onSizeChange?: () => void;
 }
 
 export type Props = StateProps & DispatchProps;
@@ -1107,6 +1108,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
         onSliderChange={(value) => {
           setSliderTick(value);
           setExactSizes({});
+          if (value !== sliderTick) props.onSizeChange?.();
         }}
         onSortChange={(value) => setSort(value as GeneratorSortKey)}
       />

@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
 
 test("guided objective reaches a retryable capstone and succeeds", async ({
@@ -122,6 +123,13 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await expect(
     page.getByRole("heading", { name: /Mission complete!/ }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Install for later" }),
+  ).toHaveCount(0);
+  await reviewScreenshot(page, {
+    path: testInfo.outputPath("mission-complete.png"),
+    animations: "disabled",
+  });
   // The handoff names the next mission, its place in the sequence, and what it covers
   const completionDialog = page.getByRole("dialog");
   await expect(
@@ -133,7 +141,5 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await expect(
     page.getByRole("button", { name: "Next tutorial" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Back to main menu" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Main menu" })).toBeVisible();
 });

@@ -171,3 +171,48 @@ export async function sortBuildCatalog(
     );
   }
 }
+
+/** Move the generator ahead of storage using the same grip and drag sensors as a player. */
+export async function dragCoalAbovePumpedHydro(page: Page) {
+  const handle = page.getByRole("button", {
+    name: "Reorder Coal",
+    exact: true,
+  });
+  const row = page.locator('.facilityRow[data-facility="Coal"]');
+  await handle.scrollIntoViewIfNeeded();
+  await handle.click({ trial: true });
+  const from = (await handle.boundingBox())!;
+  const to = (await page
+    .getByRole("button", { name: "Reorder Pumped Hydro", exact: true })
+    .first()
+    .boundingBox())!;
+  const x = from.x + from.width / 2;
+  const y = from.y + from.height / 2;
+  const destination = to.y + to.height / 2;
+  if (await page.evaluate(() => matchMedia("(pointer: coarse)").matches)) {
+    const session = await page.context().newCDPSession(page);
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x, y }],
+    });
+    await expect(row).toHaveClass(/dragging/);
+    for (let step = 1; step <= 10; step++) {
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x, y: y + ((destination - y) * step) / 10 }],
+      });
+    }
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await session.detach();
+  } else {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y - 8, { steps: 2 });
+    await expect(row).toHaveClass(/dragging/);
+    await page.mouse.move(x, destination, { steps: 10 });
+    await page.mouse.up();
+  }
+}

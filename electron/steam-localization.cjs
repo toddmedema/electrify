@@ -10,7 +10,7 @@ module.exports = {
   },
   2: {
     name: "Mission 3: Storage",
-    durationMonths: 6,
+    durationMonths: 24,
   },
   3: {
     name: "Mission 5: Pricing",

@@ -322,7 +322,15 @@ export default function TutorialHud({
   // thing on screen asking to be tapped
   const requiresNext =
     !isGatedStep(step) && !step.continueOn && !step.continueOnClick;
-  const showBarSweep = requiresNext && desktop;
+  // Clear before paint, including when Back returns to a previously highlighted step.
+  const [attentionReady, setAttentionReady] = React.useState(false);
+  React.useLayoutEffect(() => {
+    setAttentionReady(false);
+    if (!requiresNext) return;
+    const timer = window.setTimeout(() => setAttentionReady(true), 6000);
+    return () => window.clearTimeout(timer);
+  }, [step, stepIndex, requiresNext]);
+  const showBarSweep = requiresNext && desktop && attentionReady;
   const nextLabel = step.nextLabel || "Next";
   const progressText = `${stepIndex + 1} of ${totalSteps}`;
   const advanceOnClick = onAutoAdvance ?? onNext;
@@ -561,7 +569,7 @@ export default function TutorialHud({
             onClick={onNext}
           >
             {/* Restart the cue each step while the button keeps keyboard focus. */}
-            {requiresNext && !desktop && (
+            {requiresNext && !desktop && attentionReady && (
               <span
                 key={stepIndex}
                 className="tutorialHudNextPulse"
