@@ -27,7 +27,7 @@ beforeEach(() => {
 });
 
 it.each(["subscribed", "already-subscribed"])(
-  "reports %s and submits only the captured identity and consent",
+  "submits only the captured identity and consent for %s",
   async (status) => {
     submit.mockResolvedValue({ data: { status } });
     await subscribeAfterSignIn(auth, user);
@@ -42,15 +42,24 @@ it.each(["subscribed", "already-subscribed"])(
       consent: true,
       consentVersion: "electrify-updates-v1",
     });
-    expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        payload: expect.stringContaining(
-          status === "subscribed" ? "You're subscribed" : "already on",
-        ),
-      }),
-    );
   },
 );
+
+it("confirms an existing subscription", async () => {
+  submit.mockResolvedValue({ data: { status: "already-subscribed" } });
+  await subscribeAfterSignIn(auth, user);
+  expect(dispatch).toHaveBeenCalledWith(
+    expect.objectContaining({
+      payload: "You're already on the Electrify mailing list.",
+    }),
+  );
+});
+
+it("stays silent after a fresh signup", async () => {
+  submit.mockResolvedValue({ data: { status: "subscribed" } });
+  await subscribeAfterSignIn(auth, user);
+  expect(dispatch).not.toHaveBeenCalled();
+});
 
 it("reports signup failure without claiming authentication failed", async () => {
   submit.mockRejectedValue(new Error("offline"));
@@ -74,7 +83,7 @@ it("does not start a signup after the account changes", async () => {
 it("does not show a prior account's result in a different session", async () => {
   submit.mockImplementation(async () => {
     Object.assign(auth, { currentUser: null });
-    return { data: { status: "subscribed" } };
+    return { data: { status: "already-subscribed" } };
   });
   await subscribeAfterSignIn(auth, user);
   expect(dispatch).not.toHaveBeenCalled();
