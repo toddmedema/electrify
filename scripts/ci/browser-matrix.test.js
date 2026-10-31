@@ -57,6 +57,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
     ]),
     ...list([
       "--config=e2e/playwright.config.ts",
+      "build-generator-loading.spec.ts",
       "sign-in.spec.ts",
       "multiline-text.spec.ts",
       "learning-pages.spec.ts",

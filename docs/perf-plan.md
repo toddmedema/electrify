@@ -787,3 +787,35 @@ Raw reports and compressed traces are local under
 `.tmp/chart-motion/qa/v22-final-nine-traced` and
 `.tmp/chart-motion/qa/v22-final-nine-untraced`; the rejected continuous control is
 under `.tmp/chart-motion/qa/final-budget-negative-control`.
+
+## Build catalog first opening (2026-10-30)
+
+Build now starts its existing outlook worker after the game paints and retains it for the
+workspace lifetime. Opening or reopening the catalog shares that work. Before the first result,
+the catalog shows generator choices, real build prices, construction times, sizing and sorting;
+weather-derived output and energy costs fill in asynchronously. Resource-dependent purchases wait
+for a valid estimate. New saved runs clear the warmed result through the worker's existing scope
+check. No metric or simulation formula was removed.
+
+A temporary Jest profiler measured scenario 103, seed 12345, at its opening date on the M5 Max
+with Node 24.22.2. After one warmup, six samples separated the three-year forecast, both catalog
+quote passes (selected size and minimum size), and output-shape aggregation:
+
+| Stage                                      |  Median | Sample range |
+| ------------------------------------------ | ------: | -----------: |
+| Three-year forecast                        | 55.2 ms | 51.5–62.0 ms |
+| Both generator quote passes                | 0.82 ms | 0.75–1.21 ms |
+| Lifetime-cost formulas within those passes | 0.55 ms | 0.50–0.71 ms |
+| Seasonal output charts                     | 0.57 ms | 0.52–0.65 ms |
+| Initial quotes without forecast arrays     | 0.63 ms | 0.59–0.86 ms |
+
+These are calculation timings, not browser paint timings; cold worker startup and data loading
+add latency. The seasonal output chart/capacity factor and renewable cost per MWh share the
+expensive forecast. Cutting only the lifetime-cost formula would save little. The catalog no
+longer waits for either metric, even when opened before the warmup completes.
+
+`e2e/build-generator-loading.spec.ts` deliberately holds build-worker requests after a fresh game
+starts. It checks prewarming before navigation, usable prices and sizing before any response,
+valid estimates arriving in the same listing, and reopening with the warmed result. Component
+coverage also pins immediate evidence focus, sharing pending work, worker lifetime, and clearing
+estimates when another saved run replaces the current one.
