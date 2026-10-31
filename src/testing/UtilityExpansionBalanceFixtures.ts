@@ -71,8 +71,8 @@ export function expansionBalanceActions(
     { month: 180, type: "retire", assetId: "scenario-116-champlain-oil-a" },
   ];
   const prepared = fixture.portfolio !== "unprepared";
-  // Cash purchases reserve working capital for local generation before the 2016 shortage.
-  const purchaseMonth = fixture.financed ? 96 : 100;
+  // Cash buyers save through 2013 so the company purchase preserves a generation down payment.
+  const purchaseMonth = fixture.financed ? 96 : 108;
   if (prepared)
     actions.push(
       {
@@ -95,6 +95,18 @@ export function expansionBalanceActions(
         build: { name: "Natural Gas CC", peakW: 100e6, financed: true },
       },
     );
+  if (fixture.portfolio === "mixed")
+    actions.push({
+      month: 132,
+      type: "build",
+      build: { name: "Natural Gas Peaker", peakW: 200e6, financed: true },
+    });
+  if (fixture.portfolio === "firm" || fixture.portfolio === "both")
+    actions.push({
+      month: 132,
+      type: "build",
+      build: { name: "Natural Gas CC", peakW: 100e6, financed: true },
+    });
   if (fixture.portfolio !== "line-only") {
     actions.push({
       month: purchaseMonth,
@@ -105,7 +117,7 @@ export function expansionBalanceActions(
     if (prepared)
       actions.push(
         {
-          month: purchaseMonth,
+          month: fixture.financed ? purchaseMonth : 84,
           type: "build",
           build: {
             name: fixture.financed ? "Natural Gas CC" : "Natural Gas Peaker",

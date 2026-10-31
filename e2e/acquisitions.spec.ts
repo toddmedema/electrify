@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { expectContinuousDialogSurface } from "./dialog-surface";
-import { editSavedGame, readSavedGame } from "./save-fixture";
+import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
   test(`completed Tier 1 connections acquire either utility in ${theme}`, async ({
@@ -48,6 +48,50 @@ for (const theme of ["light", "dark"] as const) {
     for (const target of ["Valley Electric", "Ridge Electric"]) {
       await openBuild(page);
       await page.getByRole("tab", { name: "Interties", exact: true }).click();
+      await page
+        .getByRole("button", { name: `Review ${target} company`, exact: true })
+        .click();
+      const terms = page.getByRole("dialog", {
+        name: `${target} company terms`,
+        exact: true,
+      });
+      await expectDialogToFit(terms);
+      for (const text of [
+        "Equity price + fee",
+        "Assumed debt",
+        "Customers joining today",
+        "Seller load reference · January 2005",
+        "Cash purchase",
+        "Financed cash due",
+        "Your cash",
+        "Debt payments with financing",
+        "Debt payments after cash purchase",
+        "Operating plants",
+        "Purchased power",
+        "Scenario obligations",
+        "Champlain Electric, January 2020",
+        "opening upkeep from January 2015",
+      ])
+        await expect(terms).toContainText(text);
+      if (target === "Valley Electric")
+        await expect(terms).toContainText("January 2017");
+      await expect(terms).toContainText(
+        target === "Valley Electric"
+          ? "2.2TWh annual delivered energy · 406MW peak demand"
+          : "1TWh annual delivered energy · 160MW peak demand",
+      );
+      await expect(
+        terms.getByRole("button", { name: /Pay cash|Take loan|Acquire / }),
+      ).toHaveCount(0);
+      const back = terms.getByRole("button", {
+        name: "Back to connections",
+        exact: true,
+      });
+      await expect(back).toBeInViewport();
+      expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(
+        testInfo.project.use.hasTouch ? 44 : 40,
+      );
+      await back.click();
       const review = page.getByRole("button", {
         name: new RegExp(`Review purchase of .*${target}`),
       });
@@ -90,14 +134,12 @@ for (const theme of ["light", "dark"] as const) {
       const line = facilities
         .locator(".transmissionLine")
         .filter({ hasText: target });
-      const inspect = line.getByRole("button", { name: /^Inspect / });
-      if ((await inspect.getAttribute("aria-expanded")) !== "true")
-        await inspect.click();
       const acquire = line.getByRole("button", {
         name: `Acquire ${target}`,
         exact: true,
       });
       await expect(acquire).toBeVisible();
+      // The ready action is visible without expanding Inspect.
       expect((await acquire.boundingBox())!.height).toBeGreaterThanOrEqual(
         testInfo.project.use.hasTouch ? 44 : 40,
       );
@@ -280,6 +322,9 @@ for (const theme of ["light", "dark"] as const) {
       await page.keyboard.press("Enter");
       await expect(dialog).toHaveCount(0);
       await expect(line).toContainText(`Owned · ${target}`);
+      const inspectOwned = line.getByRole("button", { name: /^Inspect / });
+      if ((await inspectOwned.getAttribute("aria-expanded")) !== "true")
+        await inspectOwned.click();
       await expect(line).toContainText("Connection upkeep");
       await expect(
         line.getByRole("button", {
@@ -287,12 +332,43 @@ for (const theme of ["light", "dark"] as const) {
         }),
       ).toHaveCount(0);
       await expect(line).not.toContainText("Transfer capacity");
+      const scenario = page.getByRole("region", {
+        name: "Scenario",
+        exact: true,
+      });
+      await openPane(
+        scenario,
+        page.getByRole("button", { name: "Scenario", exact: true }),
+      );
+      const goals = scenario.locator(".missionRequirements");
       await expect(
-        page.locator(".missionSummaryHeadline:visible"),
-      ).toContainText("Retire Champlain's original Oil A");
+        goals.getByText("Retire Champlain's original Oil A", { exact: true }),
+      ).toBeVisible();
       await expect(
-        page.locator(".missionSummaryHeadline:visible"),
-      ).not.toContainText("Acquire");
+        goals.getByText("Acquire Valley Electric or Ridge Electric", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      const plan = scenario.getByRole("region", {
+        name: "Supply plan",
+        exact: true,
+      });
+      await expect(plan).toContainText("Retire original Valley Oil");
+      if (index === 1)
+        await expect(plan).toContainText("Retire original Ridge Oil");
+      await scenario
+        .getByRole("button", { name: "Close Scenario", exact: true })
+        .click();
+      await openPane(
+        facilities,
+        page.getByRole("button", { name: "Facilities", exact: true }),
+      );
+      await expect(
+        facilities.getByRole("button", {
+          name: `Inspect ${index === 0 ? "Valley" : "Ridge"} Oil`,
+          exact: true,
+        }),
+      ).toBeVisible();
       await expect(
         line.getByRole("button", { name: `Acquire ${target}`, exact: true }),
       ).toHaveCount(0);
@@ -392,3 +468,45 @@ for (const theme of ["light", "dark"] as const) {
     expect(errors).toEqual([]);
   });
 }
+
+test("normal valley play saves across the first year and resumes from IndexedDB", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await openBuild(page);
+  await page.getByRole("tab", { name: "Interties", exact: true }).click();
+  await page
+    .getByRole("button", { name: /Review purchase of .*Valley Electric/ })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Pay cash", exact: true })
+    .click();
+  for (const close of await page
+    .locator('.gameToolHeader button[aria-label^="Close "]')
+    .all())
+    if (await close.isVisible()) await close.click();
+  await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  await expect
+    .poll(async () => (await readSavedGame(page))?.date.monthsElapsed ?? 0, {
+      timeout: 60000,
+    })
+    .toBeGreaterThanOrEqual(13);
+  await page.getByRole("button", { name: "pause", exact: true }).click();
+  const before = (await readSavedGame(page))!;
+  const state = page.locator("#appbar:visible [data-save-state]").first();
+  await expect(state).toHaveAttribute("data-save-state", "saved");
+  expect(before.monthlyHistory.length).toBeGreaterThanOrEqual(12);
+  expect((await readSaveRecords(page))[0].metadata.status).toBe("inProgress");
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const after = (await readSavedGame(page))!;
+  expect(after.date.minute).toBeGreaterThanOrEqual(before.date.minute);
+  expect(after.monthlyHistory).toEqual(before.monthlyHistory);
+  expect(after.transmission?.lines).toEqual(before.transmission?.lines);
+  await expect(state).toHaveAttribute("data-save-state", "saved");
+  await expect(page.getByText("Save failed", { exact: true })).toHaveCount(0);
+});

@@ -4,7 +4,7 @@ import {
   ownedUtilityConnection,
 } from "../helpers/ExpansionContext";
 import { areaBaselineDemand } from "../helpers/AreaDemand";
-import { UTILITY_AREAS } from "../data/UtilityExpansion";
+import { utilityNetworkAnnualOM } from "../data/UtilityExpansion";
 import { acquireUtility } from "./GameActions";
 import {
   acquisitionQuote,
@@ -2302,13 +2302,8 @@ export default gameSlice.reducer;
 
 /** Calendar-owned notices; cap changes themselves remain a pure dated entitlement lookup. */
 export function recordExpansionMilestones(state: GameType): void {
-  if (
-    !isUtilityExpansionGame(state) ||
-    !ownedUtility(state, "valley-electric") ||
-    state.date.monthNumber !== 1
-  )
-    return;
-  if (state.date.year === 2015)
+  if (!isUtilityExpansionGame(state) || state.date.monthNumber !== 1) return;
+  if (state.date.year === 2013 && ownedUtility(state, "valley-electric"))
     logGameEvent(
       state,
       "WORLD_EVENT",
@@ -2316,11 +2311,11 @@ export function recordExpansionMilestones(state: GameType): void {
       {
         title: "Valley supply reduction ahead",
         importance: "NOTABLE",
-        reportedKey: "scenario-116-valley-supply-reminder-2015",
+        reportedKey: "scenario-116-valley-supply-reminder-2013",
         actionTarget: { card: "FACILITIES", view: "FLEET" },
       },
     );
-  if (state.date.year === 2017)
+  if (state.date.year === 2017 && ownedUtility(state, "valley-electric"))
     logGameEvent(
       state,
       "WORLD_EVENT",
@@ -2330,6 +2325,30 @@ export function recordExpansionMilestones(state: GameType): void {
         importance: "CRITICAL",
         reportedKey: "scenario-116-valley-supply-reduction-2017",
         actionTarget: { card: "FACILITIES", view: "FLEET" },
+      },
+    );
+  if (state.date.year === 2016)
+    logGameEvent(
+      state,
+      "WORLD_EVENT",
+      "Champlain’s nuclear purchase ends in January 2020. Québec and Ridge purchase limits also halve. Review the supply plan and allow time for replacement projects.",
+      {
+        title: "Legacy power contracts change in 2020",
+        importance: "NOTABLE",
+        reportedKey: "scenario-116-contract-reminder-2016",
+        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+      },
+    );
+  if (state.date.year === 2020)
+    logGameEvent(
+      state,
+      "WORLD_EVENT",
+      "Champlain’s nuclear purchase has ended. Québec purchase limits are down to 60 MW; Ridge’s firm purchase is down to 20 MW if acquired.",
+      {
+        title: "Legacy power purchases reduced",
+        importance: "CRITICAL",
+        reportedKey: "scenario-116-contract-change-2020",
+        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
       },
     );
 }
@@ -5661,12 +5680,16 @@ function* supplyFacilitiesFinancesPhases(
       }
       expensesInterest += interest;
     }
-    const annualNetworkOM =
-      UTILITY_AREAS.champlain.annualNetworkOM +
-      state.utilityExpansion.networkAssets.reduce(
-        (sum, asset) => sum + UTILITY_AREAS[asset.targetId].annualNetworkOM,
-        0,
-      );
+    const annualNetworkOM = utilityNetworkAnnualOM(
+      [
+        "champlain",
+        ...state.utilityExpansion.acquisitions
+          .filter((receipt) => receipt.minute <= now.minute)
+          .map((receipt) => receipt.targetId),
+      ],
+      prev.customers,
+      tickDate.year,
+    );
     expensesOM +=
       (annualNetworkOM * costIndexNow * difficulty.expensesOM) /
       (12 * ticksPerMonth);

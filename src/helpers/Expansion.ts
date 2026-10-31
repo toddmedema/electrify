@@ -23,6 +23,7 @@ import {
   UTILITY_AREAS,
   UTILITY_TARGETS,
   utilityEntitlementsAt,
+  utilityNetworkAnnualOM,
 } from "../data/UtilityExpansion";
 import {
   facilityCashBack,
@@ -189,7 +190,12 @@ export interface AcquisitionQuote {
   cashMonthlyDebtService: number;
   networkOMPerMonth: number;
   networkInitialValue: number;
-  facilities: { name: string; peakW: number; ageYears: number }[];
+  facilities: {
+    name: FacilityOperatingType["name"];
+    startingAssetId?: string;
+    peakW: number;
+    ageYears: number;
+  }[];
   contracts: {
     balancing?: boolean;
     name: string;
@@ -198,11 +204,11 @@ export interface AcquisitionQuote {
     pricePerMWh: number;
   }[];
 }
-/** Every transaction boundary and execution path uses this bounded catalog lookup. */
-export function acquisitionQuote(
+/** Read-only dated terms are visible before the player commits to a connection. */
+export function utilityOffer(
   game: GameType,
   targetId: string,
-): AcquisitionQuote | undefined {
+): Omit<AcquisitionQuote, "quoteKey"> | undefined {
   const target = UTILITY_TARGETS.find((entry) => entry.id === targetId);
   const expansion = game.utilityExpansion;
   if (
@@ -212,11 +218,6 @@ export function acquisitionQuote(
     ownedUtility(game, targetId)
   )
     return undefined;
-  const line = game.transmission?.lines.find(
-    (entry) =>
-      entry.corridorId === target.corridorId && entry.yearsToBuildLeft <= 0,
-  );
-  if (!line) return undefined;
   const assets = acquisitionAssets(game, target.id);
   if (!assets) return undefined;
   const index = hasEconomy()
@@ -239,19 +240,28 @@ export function acquisitionQuote(
   );
   const assumedPayment = getMonthlyPayment(assumedDebt, 0.05, 240);
   const definition = UTILITY_AREAS[target.id];
+  const currentCustomers = getTimeFromTimeline(
+    game.date.minute,
+    game.timeline,
+  )?.customers;
+  if (currentCustomers === undefined) return undefined;
+  const acquiredCustomers = sellerCustomers(target.id, game.date.minute);
+  const owned: UtilityId[] = [
+    "champlain",
+    ...expansion.acquisitions
+      .filter((receipt) => receipt.minute <= game.date.minute)
+      .map((receipt) => receipt.targetId),
+  ];
+  const addedNetworkOM =
+    utilityNetworkAnnualOM(
+      [...owned, target.id],
+      currentCustomers + acquiredCustomers,
+      game.date.year,
+    ) - utilityNetworkAnnualOM(owned, currentCustomers, game.date.year);
   return {
     targetId: target.id,
     name: target.name,
-    quoteKey: JSON.stringify([
-      target.id,
-      game.date.minute,
-      line.id,
-      game.interestRate,
-      equityPrice,
-      fee,
-      assumedDebt,
-    ]),
-    customers: sellerCustomers(target.id, game.date.minute),
+    customers: acquiredCustomers,
     addressablePool: customerMarketSizeAt(
       definition.addressablePool,
       game.date.minute,
@@ -265,13 +275,11 @@ export function acquisitionQuote(
     monthlyDebtService: financed.monthlyPayment + assumedPayment,
     cashMonthlyDebtService: assumedPayment,
     networkOMPerMonth:
-      (definition.annualNetworkOM *
-        index *
-        DIFFICULTIES[game.difficulty].expensesOM) /
-      12,
+      (addedNetworkOM * index * DIFFICULTIES[game.difficulty].expensesOM) / 12,
     networkInitialValue: equityPrice + assumedDebt - generatorValue,
     facilities: assets.map((asset) => ({
       name: asset.name,
+      startingAssetId: asset.startingAssetId,
       peakW: asset.peakW,
       ageYears:
         game.date.monthsElapsed / 12 -
@@ -286,6 +294,32 @@ export function acquisitionQuote(
         pricePerMWh: source.pricePerMWh * index,
       }),
     ),
+  };
+}
+/** Only a completed connection can turn public terms into an executable quote. */
+export function acquisitionQuote(
+  game: GameType,
+  targetId: string,
+): AcquisitionQuote | undefined {
+  const target = UTILITY_TARGETS.find((entry) => entry.id === targetId);
+  const line = game.transmission?.lines.find(
+    (entry) =>
+      entry.corridorId === target?.corridorId && entry.yearsToBuildLeft <= 0,
+  );
+  if (!line) return undefined;
+  const offer = utilityOffer(game, targetId);
+  if (!offer) return undefined;
+  return {
+    ...offer,
+    quoteKey: JSON.stringify([
+      offer.targetId,
+      game.date.minute,
+      line.id,
+      game.interestRate,
+      offer.equityPrice,
+      offer.fee,
+      offer.assumedDebt,
+    ]),
   };
 }
 export function validAcquisitionAction(

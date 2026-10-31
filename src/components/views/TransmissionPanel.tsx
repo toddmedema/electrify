@@ -112,10 +112,12 @@ import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
+import UtilityOfferDialog from "../base/UtilityOfferDialog";
 import { isUtilityExpansionGame } from "../../helpers/ExpansionContext";
 import {
   acquisitionTargetForCorridor,
   ownedUtility,
+  utilityOffer,
 } from "../../helpers/Expansion";
 
 type IntertieSortKey = "yearsToBuild" | "buildCost" | "emissions";
@@ -263,6 +265,8 @@ function IntertieBuildItem(props: {
   exportCapacityW: number;
   constructionKgco2eTotal: number;
   year: number;
+  company?: ReturnType<typeof utilityOffer>;
+  onCompanyReview?: () => void;
 }): React.JSX.Element {
   const { cash, corridor, outlook, units } = props;
   const market = adjacentMarketForCorridor(corridor.id);
@@ -302,6 +306,7 @@ function IntertieBuildItem(props: {
       }}
       context={
         <>
+          {props.company && <span>Connect first · Acquire separately. </span>}
           <span className="nowrap">
             {corridor.routeType === "EXISTING"
               ? "Existing corridor"
@@ -346,7 +351,34 @@ function IntertieBuildItem(props: {
               value={`${formatMass(importEmissionsKgco2ePerMWh(market.id, props.year), units)}/MWh`}
             />
           )}
+          {props.company && (
+            <>
+              <BuildMetric
+                label="Company equity price"
+                value={formatMoneyConcise(props.company.equityPrice)}
+              />
+              <BuildMetric
+                label="Assumed debt"
+                value={formatMoneyConcise(props.company.assumedDebt)}
+              />
+              <BuildMetric
+                label="Company customers"
+                value={Math.round(props.company.customers).toLocaleString()}
+              />
+            </>
+          )}
         </>
+      }
+      footerActions={
+        props.onCompanyReview && (
+          <Button
+            size="small"
+            onClick={props.onCompanyReview}
+            aria-label={`Review ${name} company`}
+          >
+            Company terms
+          </Button>
+        )
       }
       details={
         <>
@@ -616,6 +648,9 @@ export default function TransmissionPanel({
   const [acquisitionTargetId, setAcquisitionTargetId] = React.useState<
     string | null
   >(null);
+  const [companyTargetId, setCompanyTargetId] = React.useState<string | null>(
+    null,
+  );
   const [cancelLine, setCancelLine] =
     React.useState<TransmissionLineOperatingType | null>(null);
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
@@ -1021,6 +1056,28 @@ export default function TransmissionPanel({
                                 />
                               </button>
                             </div>
+                            {availableAcquisition && onAcquire && (
+                              <div className="transmissionAcquisition">
+                                <Button
+                                  variant="contained"
+                                  onClick={() => {
+                                    setAcquisitionTargetId(
+                                      acquisitionTarget.id,
+                                    );
+                                  }}
+                                >
+                                  Acquire {acquisitionTarget.name}
+                                </Button>
+                                <Typography
+                                  variant="caption"
+                                  color="textSecondary"
+                                >
+                                  Review the company terms and choose payment.
+                                  The connection is complete; upgrades are
+                                  optional.
+                                </Typography>
+                              </div>
+                            )}
                             {selectedLine === line.id && (
                               <div className="transmissionLineDetails">
                                 {cancelLine?.id === line.id && (
@@ -1207,27 +1264,6 @@ export default function TransmissionPanel({
                                   </Typography>
                                 )}
                                 {outlook && <IntertieYear outlook={outlook} />}
-                                {availableAcquisition && onAcquire && (
-                                  <div className="transmissionAcquisition">
-                                    <Button
-                                      variant="contained"
-                                      onClick={() => {
-                                        setAcquisitionTargetId(
-                                          acquisitionTarget.id,
-                                        );
-                                      }}
-                                    >
-                                      Acquire {acquisitionTarget.name}
-                                    </Button>
-                                    <Typography
-                                      variant="caption"
-                                      color="textSecondary"
-                                    >
-                                      Completed connection qualifies. Upgrades
-                                      increase transfer capacity.
-                                    </Typography>
-                                  </div>
-                                )}
                                 {!building && !utilityOwned && (
                                   <>
                                     {peer?.upgradeRequestedBy && (
@@ -1321,8 +1357,9 @@ export default function TransmissionPanel({
           className="transmissionIntro"
           sx={{ px: 1.5, pt: 1 }}
         >
-          Connect to a neighboring grid to buy power when short and sell when
-          you have spare.
+          {isUtilityExpansionGame(game)
+            ? "Compare company terms, build a connection, then review the separate acquisition. A connection alone does not buy the utility."
+            : "Connect to a neighboring grid to buy power when short and sell when you have spare."}
         </Typography>
       )}
       {projectsOnly && !unbuiltCorridors.length && (
@@ -1354,6 +1391,10 @@ export default function TransmissionPanel({
             className="cardList transmissionProjects"
           >
             {projects.map(({ quote: corridor }) => {
+              const company = acquisitionTargetForCorridor(corridor.id);
+              const offer = company
+                ? utilityOffer(game, company.id)
+                : undefined;
               const affordableTier =
                 now &&
                 purchaseTerms(corridor.buildCost, true, game.interestRate)
@@ -1383,6 +1424,10 @@ export default function TransmissionPanel({
                   interestRate={game.interestRate}
                   outlook={outlookFor(corridor.id, corridor.capacityW)}
                   units={units}
+                  company={offer}
+                  onCompanyReview={
+                    offer ? () => setCompanyTargetId(offer.targetId) : undefined
+                  }
                   onReview={() => setReviewId(corridor.id)}
                   onUseMaxSize={
                     affordableTier === undefined
@@ -1451,6 +1496,13 @@ export default function TransmissionPanel({
               <Typography variant="body2">
                 Ready in {Math.round(review.yearsToBuild * 12)} months.
               </Typography>
+              {isUtilityExpansionGame(game) &&
+                acquisitionTargetForCorridor(review.id) && (
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    This buys the connection only. When it is ready, review and
+                    pay for the company separately.
+                  </Typography>
+                )}
               {game.date.monthsElapsed + review.yearsToBuild * 12 >=
                 (activeScenario(game)?.durationMonths ?? Infinity) && (
                 <Typography variant="body2" color="warning.main">
@@ -1466,6 +1518,13 @@ export default function TransmissionPanel({
           }
           upkeepDetail="Plus electricity purchases and loan payments."
           onPurchase={approve}
+        />
+      )}
+      {companyTargetId && (
+        <UtilityOfferDialog
+          game={game}
+          targetId={companyTargetId}
+          onClose={() => setCompanyTargetId(null)}
         />
       )}
     </div>

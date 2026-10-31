@@ -58,6 +58,8 @@ export interface PurchaseReviewDialogProps {
   leadingFacts?: DecisionImpactFactType[];
   /** Facts appended after the money, upkeep and timing facts */
   extraFacts?: DecisionImpactFactType[];
+  /** Dated planning context after the payment and portfolio facts. */
+  afterFacts?: React.ReactNode;
   /** Complete payment summaries when a purchase also assumes debts or running costs. */
   paymentSummary?: {
     cash: Pick<DecisionImpactFactType, "value" | "detail">;
@@ -255,6 +257,7 @@ export default function PurchaseReviewDialog(
     >
       {props.preface}
       <DecisionImpactPreview facts={facts} />
+      {props.afterFacts}
     </DecisionDialog>
   );
 }

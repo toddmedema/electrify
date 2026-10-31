@@ -120,6 +120,40 @@ quoted by the normal winterization owner for 100 MW in January 2005. This author
 book component keeps offline save validation exact; new construction and
 retrofits continue to use current dated quotes.
 
+## Renewal and replacement decisions
+
+The service network has an inherited cost floor. Its annual operating cost scales
+with the combined customer's count relative to the acquired portfolios' authored
+opening accounts, with no discount below that opening cost. A fictional renewal
+plan increases opening upkeep to 1.5× in January 2015 and 2× in January 2020;
+normal customer growth and monetary inflation apply separately. These are authored
+game assumptions, not estimates of historical Vermont utility spending. The live
+simulation, forecasts and company offers use the same `utilityNetworkAnnualOM`
+owner. Offers show the incremental combined-company cost, which can differ from
+the seller's standalone cost.
+
+The fictional purchased-power changes are visible before buying a connection:
+Valley's nuclear right falls from 160 to 80 MW in January 2017 (152 to 76 MW
+deliverable). In January 2020, Champlain's 100 MW nuclear right ends, both Québec
+rights fall from 120 to 60 MW (114 to 57 MW deliverable), and Ridge's firm pool
+falls from 40 to 20 MW (38 to 19 MW deliverable). Prices stay unchanged. This
+withdraws capacity rather than forcing players to buy repriced power while their
+own cheaper plants sit idle. The Valley reminder arrives in 2013, and the common
+2020 change is announced in 2016.
+
+Both companies' read-only terms can be inspected before the connection purchase.
+They show a dated offer, the existing company's and seller's future contract
+changes, and the separate acquisition obligation. Finishing the connection makes
+the acquisition review action directly visible. Only the existing owning purchase
+API can transfer a company, with a completed line and a fresh executable quote.
+
+Scenario's Supply plan shares the existing tariff-sensitive projection. It shows
+the next year's customer count and peak demand, the first projected month below
+the difficulty's service threshold, original-asset retirement dates and future
+contract limits. Preparation dates use the real dated, difficulty-scaled quote
+for a reference 150 MW combined-cycle plant. Other projects and demand programs
+remain choices; the reference does not claim to cover the whole forecast gap.
+
 Community mods can use Across the Valley as a base while keeping its 2005
 Burlington opening, 90,000 customers, demand profile, starting fleet and 240-month
 term. Cash, tariffs, construction/program modifiers and authored events remain
@@ -146,12 +180,51 @@ transactions, timed obligations and outcomes. Early losses are not evidence abou
 later events. Current-format saves persist the aggregate customer and market
 totals, transaction and financial ledgers, and one forecast timeline.
 
+The renewal revision passes all 195 cases in the full matrix, including 135
+prepared plans, plus 24 explicit pressure and acquisition-window cases in
+`UtilityExpansionPressure.sim.test.tsx`. At Employee difficulty, inherited supply
+alone now loses both target routes in month 183 on all three seeds. Ridge's
+inherited-only route previously completed. At CEO, both mixed cash routes complete
+with acquisitions in January, March or May 2014 on all three seeds, with lowest
+month-end cash of $33–69M for Valley and $76M for Ridge. These plans make an
+additional reserve investment in 2016 before the 2020 supply withdrawal.
+
+For seed 12345, the original and revised prepared fixtures compare as follows.
+The changes include the additional investment and a later cash acquisition, so
+these are complete strategy outcomes rather than an isolated cost sensitivity.
+
+| CEO prepared route     | Original ending cash | Revised ending cash | Original / revised builds |
+| ---------------------- | -------------------: | ------------------: | ------------------------: |
+| Valley, firm, financed |              $3.531B |             $2.121B |                     5 / 6 |
+| Valley, mixed, cash    |              $2.860B |             $1.391B |                     5 / 6 |
+| Ridge, mixed, cash     |              $2.488B |             $1.391B |                     5 / 6 |
+| Both, firm, financed   |              $3.873B |             $2.225B |                     7 / 8 |
+
+Prepared companies still earn comfortable late profits: the two CEO mixed cash
+plans add $124–184M annually during 2020–24. The design rewards preparation; it
+does not impose a terminal cash cap or a universal construction quota. Ridge
+remains a lower-risk alternative when enough supply is built early. The pressure
+checks assert outcomes for inherited-only controls and viable neighboring cash
+purchase dates, rather than treating lower final cash as the balance criterion.
+
+The save regression uses a normal first-year rollover with inactive optional
+customer-battery meters, raw validation before JSON normalization, and a full
+IndexedDB write/read/reopen. Chart accumulation omits absent optional meters while
+preserving zero values. Malformed untrusted chart records remain rejected. This
+catches the annual autosave failure that JSON-only round trips had hidden.
+An additional regression plays a natural early acquisition through a terminal
+reliability loss, then writes and reopens its raw result in IndexedDB. The immediate
+ownership verdict omits a cleared optional reason instead of retaining an own
+undefined value; strict untrusted-result validation remains unchanged.
+
 ## Production performance
 
 The combined-company model uses the original tick and bundle budgets from
-`master`, with the existing 10% bundle tolerance. The final production build is
-991.86 kB gzip for main JavaScript and 1590.47 kB across all JavaScript. No npm
-dependencies are added. Scenario 116's economic outputs reflect the combined
+`master`, with the existing 10% bundle tolerance. Current production measurements
+are reported with the integrated PR checks. No npm dependencies are added.
+Web and desktop production builds use two Terser compression passes while
+preserving CRA's other compiler and profiling options and the existing bundle ceilings.
+Scenario 116's economic outputs reflect the combined
 model; earlier scenarios retain their seeded economic outputs. Six variant
 result hashes also reflect the clarified retention-definition text. Restoring
 only that sentence in memory reproduces all six earlier hashes exactly.

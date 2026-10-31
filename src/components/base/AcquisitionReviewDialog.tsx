@@ -14,6 +14,8 @@ import { currentTick } from "../../helpers/GameSelectors";
 import PurchaseReviewDialog from "./PurchaseReviewDialog";
 import { useBuildCash } from "./useBuildCash";
 import { LOAN_MONTHS } from "../../Constants";
+import UtilityContractSchedule from "./UtilityContractSchedule";
+import { facilityDisplayName } from "./FacilityLabels";
 
 interface Props {
   game: GameType;
@@ -65,11 +67,16 @@ export default function AcquisitionReviewDialog({
       </DecisionDialog>
     );
   const valley = quote.targetId === "valley-electric";
-  const sharedCosts = `${formatMoneyConcise(quote.assumedDebt)} assumed debt at 5% for 20 years and current network costs included. Plant operations and purchased power vary.`;
+  const nuclear = quote.contracts.find(
+    (contract) => contract.name === "Regional nuclear",
+  );
+  const sharedCosts = `${formatMoneyConcise(quote.assumedDebt)} assumed debt at 5% for 20 years and current network costs included; network costs grow with customers. Plant operations and purchased power vary.`;
   const contractChange = valley
-    ? game.date.year >= 2017
-      ? "Valley’s nuclear contract is now 80MW (76MW deliverable), reduced in January 2017."
-      : "Valley’s nuclear contract falls from 160MW to 80MW in January 2017 (152MW to 76MW deliverable)."
+    ? !nuclear
+      ? "Valley’s inherited nuclear purchase has expired."
+      : game.date.year >= 2017
+        ? `Valley’s nuclear contract is now ${formatWatts(nuclear.nominalW)} (${formatWatts(nuclear.deliverableW)} deliverable), reduced in January 2017.`
+        : "Valley’s nuclear contract falls from 160MW to 80MW in January 2017 (152MW to 76MW deliverable)."
     : "";
 
   return (
@@ -110,6 +117,9 @@ export default function AcquisitionReviewDialog({
           </div>
         ) : undefined
       }
+      afterFacts={
+        <UtilityContractSchedule game={game} targetId={quote.targetId} />
+      }
       extraFacts={[
         {
           concept: "customers",
@@ -141,25 +151,27 @@ export default function AcquisitionReviewDialog({
           label: "Operating plants",
           value: quote.facilities
             .map(
-              (facility) => `${facility.name} ${formatWatts(facility.peakW)}`,
+              (facility) =>
+                `${facilityDisplayName(facility)} ${formatWatts(facility.peakW)}`,
             )
             .join(" · "),
           detail: quote.facilities
             .map(
               (facility) =>
-                `${facility.name}: ${facility.ageYears.toFixed(1)} years old`,
+                `${facilityDisplayName(facility)}: ${facility.ageYears.toFixed(1)} years old`,
             )
             .join(" · "),
         },
         {
           concept: "supply",
           label: "Purchased power",
-          value: quote.contracts
-            .map(
-              (contract) =>
-                `${contract.name}: ${contract.balancing ? "up to " : ""}${formatWatts(contract.deliverableW)}${contract.balancing ? " · variable availability" : ""}`,
-            )
-            .join(" · "),
+          value:
+            quote.contracts
+              .map(
+                (contract) =>
+                  `${contract.name}: ${contract.balancing ? "up to " : ""}${formatWatts(contract.deliverableW)}${contract.balancing ? " · variable availability" : ""}`,
+              )
+              .join(" · ") || "No inherited purchased-power rights remain.",
           detail: quote.contracts
             .map(
               (contract) =>
