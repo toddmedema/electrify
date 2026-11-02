@@ -267,6 +267,23 @@ describe("NewGame", () => {
     );
   });
 
+  it("marks completed lessons with a solid white check", () => {
+    recordPlayed(TUTORIALS[0].id);
+    /* eslint-disable testing-library/no-container, testing-library/no-node-access --
+       The badge's painted tick is the behaviour under test; SVG paths carry no accessible text */
+    const { container } = render(<NewGame {...props()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: viewAllTutorialsName }));
+    const badge = container.querySelector(
+      `[data-testid="mission-complete-${TUTORIALS[0].id}"]`,
+    )!;
+    const [disc, tick] = badge.querySelectorAll("path");
+    /* eslint-enable testing-library/no-container, testing-library/no-node-access */
+    // The disc keeps the badge's primary colour; the tick is painted, not cut out of it
+    expect(disc).not.toHaveAttribute("fill");
+    expect(tick).toHaveAttribute("fill", "#fff");
+  });
+
   it("starts the recommended tutorial and opens challenge and custom details", () => {
     const onTutorial = jest.fn();
     const onDetails = jest.fn();

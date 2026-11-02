@@ -61,6 +61,12 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible({ timeout: 1000 });
     await expect(ongoing).toContainText("Through Feb 2025");
     await expect(ongoing).toContainText("10% capacity through February");
+    // Clear the pause toast before entering the narrow Facilities pane. Hovering
+    // it while trying to click Inspect would otherwise suspend its auto-hide.
+    await expect(paused).toBeVisible();
+    await page.mouse.move(0, 0);
+    await page.clock.fastForward(10000);
+    await expect(page.locator(".snackbarContent")).toBeHidden();
     const screenshotDir = process.env.REVIEW_SCREENSHOT_DIR;
     if (screenshotDir && theme === "light") {
       await page.mouse.move(0, 0);
