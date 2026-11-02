@@ -1968,13 +1968,26 @@ for (const count of [2, 4]) {
       room.dropped.add(dropped);
       await room.event(room.host, { kind: "disconnected", sender: dropped });
       await room.publish();
+      // A lost peer channel notifies both native endpoints, including the guest's host link.
+      await room.event(buyerId, { kind: "disconnected", sender: room.host });
       await expect(clock(pages[0])).toHaveAttribute(
         "data-active-speed",
         "PAUSED",
       );
-      await buyer.evaluate(() =>
-        window.electrifyDesktop!.multiplayerRequest!({ kind: "reconnect" }),
-      );
+      // Reconnect through the notification action: the raw bridge call leaves its
+      // blocking dialog open and keeps this player's activity at Reading notification.
+      const disconnected = buyer.getByRole("dialog", {
+        name: "Multiplayer",
+        exact: true,
+      });
+      await expect(disconnected).toBeVisible();
+      await disconnected
+        .getByRole("button", { name: "Reconnect", exact: true })
+        .click();
+      await expect(disconnected).toBeHidden();
+      await expect
+        .poll(() => room.state(buyerId).connected)
+        .toEqual([room.host]);
       for (const page of pages) await ready(page);
       if (count === 4) {
         await buyer.setViewportSize({ width: 360, height: 844 });
