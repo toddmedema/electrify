@@ -1303,59 +1303,64 @@ async function startSharedGame(browser: Browser, count: number) {
 }
 
 async function expectClockInViewport(page: Page) {
-  const bounds = await page
-    .locator(".speedToggles:visible")
-    .last()
-    .evaluate((element) => {
-      const rect = element.getBoundingClientRect();
-      return {
-        left: rect.left,
-        right: rect.right,
-        width: innerWidth,
-        overflow: document.documentElement.scrollWidth - innerWidth,
-      };
-    });
-  expect(bounds.left).toBeGreaterThanOrEqual(0);
-  expect(bounds.right).toBeLessThanOrEqual(bounds.width + 1);
-  expect(bounds.overflow).toBeLessThanOrEqual(1);
   await expect(
     page.getByRole("button", { name: /Player speeds;/ }),
   ).toHaveCount(0);
-  const icons = await clock(page)
-    .locator(".multiplayerSpeedPeers svg")
-    .evaluateAll((elements) =>
-      elements.map((element) => {
-        const icon = element.getBoundingClientRect();
-        const button = element.closest("button")!.getBoundingClientRect();
-        return {
-          left: icon.left - button.left,
-          right: button.right - icon.right,
-          top: icon.top - button.top,
-          bottom: button.bottom - icon.bottom,
-          buttonHeight: button.height,
-          glyph: element.querySelector("path")?.getAttribute("d"),
-          tone: `${element.closest("button")!.getAttribute("aria-pressed")} ${getComputedStyle(element).color}`,
-        };
-      }),
-    );
-  expect(new Set(icons.map((icon) => icon.glyph)).size).toBe(
-    icons.length ? 1 : 0,
-  );
-  // One neutral tone per surface: who chose a speed is in the description, not in colour.
-  for (const pressed of ["true", "false"])
-    expect(
-      new Set(
-        icons
-          .filter((icon) => icon.tone.startsWith(pressed))
-          .map((icon) => icon.tone),
-      ).size,
-    ).toBeLessThanOrEqual(1);
-  for (const { buttonHeight, glyph: _glyph, tone: _tone, ...icon } of icons) {
-    for (const inset of Object.values(icon))
-      expect(inset).toBeGreaterThanOrEqual(0);
-    expect(icon.top).toBeGreaterThanOrEqual(buttonHeight / 2);
-    expect(icon.bottom).toBeLessThanOrEqual(3);
-  }
+  // Responsive renders can replace markers between Playwright calls. Query and measure
+  // the current group and its descendants together, including their live ownership.
+  await expect(async () => {
+    const { attached, bounds, icons } = await clock(page).evaluate((root) => {
+      const rect = root.getBoundingClientRect();
+      return {
+        attached: root.isConnected,
+        bounds: {
+          left: rect.left,
+          right: rect.right,
+          width: innerWidth,
+          overflow: document.documentElement.scrollWidth - innerWidth,
+        },
+        icons: Array.from(
+          root.querySelectorAll(".multiplayerSpeedPeers svg"),
+        ).map((element) => {
+          const owner = element.closest("button");
+          if (!element.isConnected || !owner || !root.contains(owner))
+            throw new Error("A speed peer marker has no live owning button");
+          const icon = element.getBoundingClientRect();
+          const button = owner.getBoundingClientRect();
+          return {
+            left: icon.left - button.left,
+            right: button.right - icon.right,
+            top: icon.top - button.top,
+            bottom: button.bottom - icon.bottom,
+            buttonHeight: button.height,
+            glyph: element.querySelector("path")?.getAttribute("d"),
+            tone: `${owner.getAttribute("aria-pressed")} ${getComputedStyle(element).color}`,
+          };
+        }),
+      };
+    });
+    expect(attached).toBe(true);
+    expect(bounds.left).toBeGreaterThanOrEqual(0);
+    expect(bounds.right).toBeLessThanOrEqual(bounds.width + 1);
+    expect(bounds.overflow).toBeLessThanOrEqual(1);
+    expect(icons.length).toBeGreaterThan(0);
+    expect(new Set(icons.map((icon) => icon.glyph)).size).toBe(1);
+    // One neutral tone per surface: who chose a speed is in the description, not in colour.
+    for (const pressed of ["true", "false"])
+      expect(
+        new Set(
+          icons
+            .filter((icon) => icon.tone.startsWith(pressed))
+            .map((icon) => icon.tone),
+        ).size,
+      ).toBeLessThanOrEqual(1);
+    for (const { buttonHeight, glyph: _glyph, tone: _tone, ...icon } of icons) {
+      for (const inset of Object.values(icon))
+        expect(inset).toBeGreaterThanOrEqual(0);
+      expect(icon.top).toBeGreaterThanOrEqual(buttonHeight / 2);
+      expect(icon.bottom).toBeLessThanOrEqual(3);
+    }
+  }).toPass({ timeout: 20000 });
 }
 
 async function expectClockMeaning(
