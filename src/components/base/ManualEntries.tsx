@@ -641,7 +641,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.FORECASTS,
     group: "Gameplay",
     keywords:
-      "projection supply demand fuel prices weather peak shortage layers presets temperature",
+      "projection supply demand fuel prices weather peak shortage layers presets temperature power exchange imports exports profit revenue expenses cash",
     entry: (
       <div>
         <p>
@@ -672,6 +672,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             charging and exports.
           </li>
           <li>
+            <strong>Power exchange:</strong> Imports plot above zero and exports
+            below. Quiet stretches mean you neither fell short nor had extra to
+            sell.
+          </li>
+          <li>
             <strong>Stored Energy:</strong> What's left in batteries and{" "}
             <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>reservoirs</EntryLink>.
             Power ratings limit how quickly you can use it.
@@ -679,6 +684,20 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <li>
             <strong>Fuel Prices:</strong> History and estimates. Prices can
             jump, so check before building fuel-burning plants.
+          </li>
+          <li>
+            <strong>Profit, Revenue, Expenses and Cash:</strong> Recorded
+            months, then estimates. Your{" "}
+            <EntryLink to={MANUAL_ENTRY.RATES}>rate</EntryLink> sets revenue;{" "}
+            <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>
+              operating costs
+            </EntryLink>
+            , <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>fuel</EntryLink>,{" "}
+            <EntryLink to={MANUAL_ENTRY.CARBON_FEE}>carbon fees</EntryLink> and{" "}
+            <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>
+              loan payments
+            </EntryLink>{" "}
+            make up expenses.
           </li>
           <li>
             <strong>Temperature</strong> and{" "}

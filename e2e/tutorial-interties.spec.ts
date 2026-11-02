@@ -144,6 +144,14 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await expect(exchange).toContainText("Power flowing");
   await expect(exchange).toContainText("Available capacity");
   await expect(exchange).toContainText("Neighbor price");
+  // The step says to find imports on the chart: the layer plots them over time, not just now
+  await expect(exchange.getByText("Imports above 0")).toBeVisible();
+  await expect(
+    exchange.locator("#chartForecastPowerExchange .uplot"),
+  ).toBeVisible();
+  await expect(
+    exchange.getByRole("button", { name: "Expand Power exchange chart" }),
+  ).toBeVisible();
   await expect(
     exchange.getByRole("button", { name: "What is Interties?" }),
   ).toBeVisible();

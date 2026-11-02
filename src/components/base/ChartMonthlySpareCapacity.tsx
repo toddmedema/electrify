@@ -15,6 +15,7 @@ import {
   spansBelow,
   splitPastProjected,
   yAxis,
+  zeroLinePlugin,
 } from "./UPlotHelpers";
 
 interface Props {
@@ -103,23 +104,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     ],
     plugins: [
       bandsPlugin(() => getState().negativeSpans, palette.blackout),
-      {
-        hooks: {
-          draw: (plot) => {
-            const { ctx, bbox } = plot;
-            const y = plot.valToPos(0, "y", true);
-            ctx.save();
-            ctx.strokeStyle = palette.axis;
-            ctx.lineWidth = uPlot.pxRatio;
-            ctx.setLineDash([]);
-            ctx.beginPath();
-            ctx.moveTo(bbox.left, y);
-            ctx.lineTo(bbox.left + bbox.width, y);
-            ctx.stroke();
-            ctx.restore();
-          },
-        },
-      },
+      zeroLinePlugin(palette.axis),
     ],
   };
 }

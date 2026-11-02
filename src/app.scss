@@ -1497,12 +1497,12 @@ $pane_header_height: 48px;
 .powerExchangeHero {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 
   img {
-    width: 48px;
-    height: 48px;
-    flex: 0 0 48px;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
   }
 }
 
@@ -1618,11 +1618,13 @@ $pane_header_height: 48px;
   height: 40px;
 }
 
+// The reading of what is flowing now, sitting above the chart of what flowed and will flow. Kept
+// compact so the chart stays what the layer shows.
 .powerExchangeSummary {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px 16px 16px;
+  gap: 8px;
+  padding: 0 16px 8px;
 }
 
 // Touch keeps the full 44px Build target, which the 52px touch header holds with 4px either side
@@ -8180,6 +8182,13 @@ option {
   color: var(--interactive-strong);
   flex-shrink: 0;
 }
+// The (?) follows the expand control straight away, left-aligned in the header with it; only the
+// layer-editing actions are pushed to the trailing edge
+.insightsTrackHeader .manual-link {
+  flex-shrink: 0;
+  margin-left: 4px;
+  color: var(--interactive-strong);
+}
 .fuelPriceFilter {
   display: flex;
   align-items: center;
@@ -8242,6 +8251,16 @@ option {
     }
     .MuiIconButton-root {
       flex-shrink: 0;
+    }
+  }
+  // The title and its (?) stay together at the leading edge; the close button keeps the other
+  .expandedChartHeading {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    .manual-link {
+      flex-shrink: 0;
+      color: var(--interactive-strong);
     }
   }
   .insightsViewportToolbar {
@@ -8335,6 +8354,12 @@ option {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+// With the layer editor open the header also carries the move and remove actions. Where title,
+// expand, help and actions don't share a row, the actions drop to their own rather than the title
+// being cut to a stub; each control keeps its full touch target.
+.insights .MuiToolbar-root.insightsTrackHeader:has(> .insightsTrackActions) {
+  flex-wrap: wrap !important;
 }
 
 // Mouse selection remains separate from the one expanded inspection row.

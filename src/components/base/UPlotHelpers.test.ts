@@ -10,6 +10,8 @@ import {
   xAxis,
   yAxis,
   niceSplits,
+  patternFill,
+  zeroLinePlugin,
 } from "./UPlotHelpers";
 import { applyTextSize } from "../../TextSize";
 
@@ -124,6 +126,93 @@ it("draws the baseline solid after a dashed forecast across the whole plot", () 
   expect(ctx.moveTo).toHaveBeenCalledWith(20, expect.any(Number));
   expect(ctx.lineTo).toHaveBeenCalledWith(320, expect.any(Number));
   expect(ctx.stroke).toHaveBeenCalledTimes(1);
+});
+
+it("draws the zero rule solid across the plot, clipped to it", () => {
+  let dash = [8, 4];
+  const ctx = {
+    save: jest.fn(),
+    restore: jest.fn(),
+    beginPath: jest.fn(),
+    rect: jest.fn(),
+    clip: jest.fn(),
+    setLineDash: (value: number[]) => {
+      dash = value;
+    },
+    moveTo: jest.fn(),
+    lineTo: jest.fn(),
+    stroke: jest.fn(() => expect(dash).toEqual([])),
+  };
+  const plot = {
+    bbox: { left: 20, top: 10, width: 300, height: 100 },
+    ctx,
+    valToPos: (value: number, scale: string, canvas: boolean) => {
+      expect([value, scale, canvas]).toEqual([0, "y", true]);
+      return 40;
+    },
+  } as unknown as uPlot;
+  (zeroLinePlugin("black").hooks!.draw as (plot: uPlot) => void)(plot);
+  expect(ctx.rect).toHaveBeenCalledWith(20, 10, 300, 100);
+  expect(ctx.moveTo).toHaveBeenCalledWith(20, 40);
+  expect(ctx.lineTo).toHaveBeenCalledWith(320, 40);
+  expect(ctx.stroke).toHaveBeenCalledTimes(1);
+});
+
+describe("patternFill", () => {
+  const strokes: Array<Array<[number, number]>> = [];
+  const originalCreate = document.createElement.bind(document);
+  beforeEach(() => {
+    strokes.length = 0;
+    jest.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      if (tag !== "canvas") return originalCreate(tag);
+      let path: Array<[number, number]> = [];
+      const ctx = {
+        scale: jest.fn(),
+        fillRect: jest.fn(),
+        beginPath: jest.fn(() => (path = [])),
+        moveTo: (x: number, y: number) => path.push([x, y]),
+        lineTo: (x: number, y: number) => path.push([x, y]),
+        stroke: () => strokes.push(path),
+      };
+      return {
+        getContext: () => ctx,
+      } as unknown as HTMLCanvasElement;
+    });
+  });
+  afterEach(() => jest.restoreAllMocks());
+  const draw = (kind: "hatch" | "vertical") => {
+    const pattern = {} as CanvasPattern;
+    const createPattern = jest.fn(() => pattern);
+    const fill = patternFill(kind) as (u: uPlot) => unknown;
+    const u = { ctx: { createPattern } } as unknown as uPlot;
+    return { result: fill(u), again: fill(u), createPattern, pattern };
+  };
+
+  it("tells a vertical rule from a diagonal one, and builds each tile once", () => {
+    const vertical = draw("vertical");
+    expect(vertical.result).toBe(vertical.pattern);
+    expect(vertical.again).toBe(vertical.pattern);
+    expect(vertical.createPattern).toHaveBeenCalledTimes(1);
+    expect(strokes[0]).toEqual([
+      [8.5, 0],
+      [8.5, 16],
+    ]);
+
+    strokes.length = 0;
+    draw("hatch");
+    expect(strokes[0]).toEqual([
+      [-8, 16],
+      [16, -8],
+      [8, 16],
+      [16, 8],
+    ]);
+  });
+
+  it("falls back to the flat wash when the canvas can't make a pattern", () => {
+    const fill = patternFill("vertical") as (u: uPlot) => unknown;
+    const u = { ctx: { createPattern: () => null } } as unknown as uPlot;
+    expect(typeof fill(u)).toBe("string");
+  });
 });
 
 describe("eventMarkersPlugin", () => {
