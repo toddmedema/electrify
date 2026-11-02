@@ -1,5 +1,5 @@
 // Keep CRA's production compiler and compatibility settings; allow its compressor
-// a second pass so the same renderer fits the existing shipped-JavaScript budget.
+// four passes so the same renderer fits the existing shipped-JavaScript budget.
 const path = require("node:path");
 const configPath = require.resolve("react-scripts/config/webpack.config");
 const TerserPlugin = require(
@@ -34,7 +34,7 @@ function productionCompression(
                   warnings: false,
                   comparisons: false,
                   inline: 2,
-                  passes: 2,
+                  passes: 4,
                 },
                 mangle: { safari10: true },
                 keep_classnames: profile,
