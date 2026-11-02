@@ -101,10 +101,19 @@ const pricingCapstoneSucceeded = (state: AppStateType) => {
   );
 };
 
+// Mission 6 pauses its coal plant, which stands beside a small solar plant that keeps the
+// supply forecast above zero. The lesson's steps follow the coal plant, not any paused facility.
+const coalPaused = (state: AppStateType) =>
+  state.game.facilities.some(
+    (facility) =>
+      "fuel" in facility && facility.fuel === "Coal" && !!facility.paused,
+  );
+
 const forecastingCapstoneSucceeded = (state: AppStateType) => {
+  // The starting coal and solar plants don't count: the player has to add a generator.
   const addedGenerator = state.game.facilities.some(
     (facility) =>
-      facility.id > 1 &&
+      facility.startingAssetId === undefined &&
       !("currentWh" in facility) &&
       facility.yearsToBuildLeft <= 0,
   );
@@ -704,11 +713,26 @@ export const SCENARIOS: ScenarioType[] = [
     endMessage:
       "You learned how to use forecasts to build capacity before a shortage.",
     facilities: [
+      // Trimmed from 450 MW, which fell about 8 MW short on August's heat-wave afternoon, the
+      // summer shortage the final challenge teaches. With the solar plant below that shortfall
+      // would vanish, so 410 MW keeps it: about 10 MW short in the early evening of that day,
+      // with every earlier month still covered.
       {
         assetId: "scenario-5-coal",
         fuel: "Coal",
-        peakW: 450000000,
+        peakW: 410000000,
         initialAgeYears: 20,
+      },
+      // Keeps the supply forecast above zero while the lesson pauses coal. At 100 MW the daytime
+      // curve peaks at 45-65 MW against 350-430 MW of demand: visible, yet far short, so the
+      // paused grid still shows a predicted blackout and blacks out at once. A 10 MW plant would
+      // keep August's shortfall but is about 1% of demand, too flat to read, and 25 MW already
+      // covers that shortfall, which is why the coal plant above is trimmed instead.
+      {
+        assetId: "scenario-5-sun",
+        fuel: "Sun",
+        peakW: 100000000,
+        initialAgeYears: 5,
       },
     ],
     tutorialSteps: [
@@ -727,8 +751,7 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "FACILITIES",
         target: '[aria-label="Pause Coal"]',
-        advanceOn: (s: AppStateType) =>
-          s.game.facilities.some((facility) => facility.paused),
+        advanceOn: coalPaused,
         action: "Tap Pause",
         content: (
           <TutorialPrompt text="Pausing a plant changes the supply forecast." />
@@ -794,8 +817,7 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "FACILITIES",
         target: '[aria-label="Resume Coal"]',
-        advanceOn: (s: AppStateType) =>
-          s.game.facilities.every((f) => !f.paused),
+        advanceOn: (s: AppStateType) => !coalPaused(s),
         action: "Tap Resume",
         content: <TutorialPrompt text="Bring your plant back online." />,
       },

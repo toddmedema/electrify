@@ -413,8 +413,18 @@ describe("the fleet list", () => {
     ).toBe(true);
   });
 
+  // Mission 6 pairs its coal plant with a small solar plant, so keep just the coal plant
+  function onePlantFleet(): GameType {
+    const game = createGame({ scenarioId: 5 });
+    game.facilities = game.facilities.filter(
+      (facility) => facility.fuel === "Coal",
+    );
+    expect(game.facilities).toHaveLength(1);
+    return game;
+  }
+
   it("can pause the only facility in a fleet", async () => {
-    const onePlant = createGame({ scenarioId: 5 });
+    const onePlant = onePlantFleet();
     const { onPause } = renderFacilities(onePlant, null);
     const facility = onePlant.facilities[0];
     await user.click(
@@ -443,7 +453,7 @@ describe("the fleet list", () => {
   });
 
   it("can sell the only facility left in a fleet", async () => {
-    const onePlant = createGame({ scenarioId: 5 });
+    const onePlant = onePlantFleet();
     const { onSell } = renderFacilities(onePlant, onePlant.facilities[0].id);
     const facility = onePlant.facilities[0];
 

@@ -135,6 +135,36 @@ describe("tutorial mission metadata", () => {
     expect(interties.tutorialSteps).toHaveLength(18);
   });
 
+  it("starts Forecasting with a small solar plant beside its coal plant", () => {
+    const [coal, solar, ...others] = getScenario(5)!.facilities;
+    expect(coal).toMatchObject({ fuel: "Coal" });
+    expect(solar).toMatchObject({ fuel: "Sun" });
+    expect(others).toEqual([]);
+    expect(solar.peakW!).toBeLessThan(coal.peakW!);
+  });
+
+  it("follows Forecasting's coal plant, not the solar plant, through its pause and resume steps", () => {
+    const steps = getScenario(5)!.tutorialSteps!;
+    const pause = steps.find((s) => s.target === '[aria-label="Pause Coal"]')!;
+    const resume = steps.find(
+      (s) => s.target === '[aria-label="Resume Coal"]',
+    )!;
+    const paused = (coal: boolean, solar: boolean) =>
+      ({
+        game: {
+          facilities: [
+            { fuel: "Sun", paused: solar },
+            { fuel: "Coal", paused: coal },
+          ],
+        },
+      }) as unknown as AppStateType;
+
+    expect(pause.advanceOn!(paused(false, true))).toBe(false);
+    expect(pause.advanceOn!(paused(true, false))).toBe(true);
+    expect(resume.advanceOn!(paused(true, false))).toBe(false);
+    expect(resume.advanceOn!(paused(false, true))).toBe(true);
+  });
+
   it("keeps interties out of earlier tutorials without disabling ordinary California games", () => {
     for (const tutorial of TUTORIALS.filter(({ id }) => id !== 112)) {
       expect(
