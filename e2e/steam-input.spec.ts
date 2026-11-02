@@ -842,6 +842,8 @@ test("controller advances the first tutorial through inspection, chart and clock
   await input(page, "confirm");
   const hud = page.locator(".tutorialHud");
   await expect(hud).toBeVisible();
+  await select(page, hud.getByRole("button", { name: "Next", exact: true }));
+  await input(page, "confirm");
   await select(
     page,
     page.getByRole("button", { name: "Inspect Coal", exact: true }),

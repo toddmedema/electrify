@@ -154,6 +154,7 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
   await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
   await page.goto("/");
   await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "normal speed", exact: true }).click();

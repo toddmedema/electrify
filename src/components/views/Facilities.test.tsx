@@ -900,17 +900,19 @@ describe("the interties view", () => {
     renderProjects(game, onBuild);
     const north = screen.getByTestId("transmission-project-california-north");
     const slider = screen.getByRole("slider");
+    expect(slider).toHaveAttribute("aria-valuetext", "Tier I");
     expect(north).toHaveTextContent("Import capacity40MW");
     expect(north).toHaveTextContent("Export capacity5MW");
     fireEvent.change(slider, { target: { value: 3 } });
     expect(slider).toHaveAttribute("aria-valuenow", "3");
+    expect(slider).toHaveAttribute("aria-valuetext", "Tier III");
     expect(north).not.toHaveTextContent("Line capacity");
     expect(north).toHaveTextContent("Import capacity50MW");
     expect(north).toHaveTextContent("Export capacity5MW");
     await user.click(
       within(north).getByRole("button", { name: /Review purchase/ }),
     );
-    expect(screen.getByRole("dialog")).toHaveTextContent("Tier 3");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Tier III");
     expect(screen.getByRole("dialog")).toHaveTextContent("Import capacity50MW");
     expect(screen.getByRole("dialog")).toHaveTextContent("Export capacity5MW");
     await user.click(screen.getByRole("button", { name: "Pay cash" }));
@@ -1794,11 +1796,12 @@ describe("mouse facility selection", () => {
 
 describe("fleetChartHeight", () => {
   it.each([
-    [360, 640, 243],
-    [390, 844, 321],
-    [768, 1024, 287],
-    [1024, 768, 230],
-    [844, 390, 180],
+    [360, 640, 207],
+    [390, 844, 273],
+    [768, 1024, 244],
+    [1024, 768, 196],
+    [844, 390, 153],
+    [1440, 900, 225],
   ])("sizes a %ix%i window to %ipx", (width, height, expected) => {
     expect(fleetChartHeight(width, height)).toBe(expected);
   });
