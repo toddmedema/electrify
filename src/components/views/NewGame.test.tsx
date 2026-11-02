@@ -136,6 +136,20 @@ describe("NewGame", () => {
     );
   });
 
+  it("describes each challenge with the one sentence its details screen shows", () => {
+    render(<NewGame {...props()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
+    SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
+      (scenario) => {
+        expect([
+          scenario.name,
+          screen.getByTestId(`mission-row-${scenario.id}`).textContent,
+        ]).toEqual([scenario.name, expect.stringContaining(scenario.summary!)]);
+      },
+    );
+  });
+
   it("filters the full challenge catalog by player-facing themes", () => {
     render(<NewGame {...props()} />);
 

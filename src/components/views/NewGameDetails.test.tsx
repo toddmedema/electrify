@@ -2,6 +2,11 @@ import * as React from "react";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GameType } from "../../Types";
+import {
+  CUSTOM_SCENARIO_ID,
+  DEFAULT_CUSTOM_SCENARIO,
+  getScenario,
+} from "../../data/Scenarios";
 import NewGameDetails, { Props } from "./NewGameDetails";
 import { login } from "../../Globals";
 import { DesktopBridge } from "../../Desktop";
@@ -53,6 +58,87 @@ function props(overrides: Partial<Props> = {}): Props {
     ...overrides,
   };
 }
+
+describe("NewGameDetails briefing", () => {
+  beforeEach(() => {
+    mockGetDocs.mockResolvedValue({ docs: [] });
+  });
+  // Lets the leaderboard request settle so no state update lands after the test
+  const boardLoaded = () =>
+    screen.findByText("Complete this mission to join the leaderboard");
+
+  it("describes the scenario once, flags its one risk and keeps goals a tap away", async () => {
+    const scenario = getScenario(110)!;
+    render(
+      <NewGameDetails
+        {...props({
+          game: { scenarioId: 110, difficulty: "Employee" } as GameType,
+        })}
+      />,
+    );
+
+    await boardLoaded();
+    expect(
+      screen.getByRole("heading", { name: scenario.name }),
+    ).toBeInTheDocument();
+    // The same sentence the scenario list shows, and no second goal blurb beside it
+    expect(screen.getAllByText(scenario.summary!)).toHaveLength(1);
+    expect(screen.queryByText("Your goal")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Goals" })).toBeNull();
+    const watchOut = screen.getByRole("note");
+    expect(watchOut).toHaveTextContent(`Watch out${scenario.threat}`);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Goals and scoring" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Goals" });
+    expect(
+      within(dialog).getByRole("region", { name: "Requirements" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("region", { name: "Scoring" }),
+    ).toBeInTheDocument();
+  });
+
+  it("invents no warning for a mission that authors none", async () => {
+    const tutorial = getScenario(0)!;
+    expect(tutorial.threat).toBeUndefined();
+    render(
+      <NewGameDetails
+        {...props({
+          game: { scenarioId: 0, difficulty: "Employee" } as GameType,
+        })}
+      />,
+    );
+
+    await boardLoaded();
+    expect(screen.getByText(tutorial.summary!)).toBeInTheDocument();
+    expect(screen.queryByRole("note")).toBeNull();
+    expect(screen.queryByText("Watch out")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Goals and scoring" }),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves the subtitle out rather than repeating the title when there is no description", async () => {
+    const { summary: _summary, ...undescribed } = DEFAULT_CUSTOM_SCENARIO;
+    render(
+      <NewGameDetails
+        {...props({
+          game: {
+            scenarioId: CUSTOM_SCENARIO_ID,
+            customScenario: undescribed,
+            difficulty: "Employee",
+          } as GameType,
+        })}
+      />,
+    );
+
+    await boardLoaded();
+    expect(screen.getAllByText(undescribed.name)).toHaveLength(1);
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+});
 
 describe("NewGameDetails leaderboard", () => {
   it.each([false, true])(

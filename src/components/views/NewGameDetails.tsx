@@ -10,7 +10,6 @@ import {
 } from "firebase/firestore";
 import {
   Button,
-  IconButton,
   Table,
   TableBody,
   TableCell,
@@ -21,10 +20,10 @@ import {
   ToggleButtonGroup,
 } from "@mui/material";
 import ScreenPage from "../base/ScreenPage";
-import InfoIcon from "@mui/icons-material/Info";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
-import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
+import ConceptIcon from "../base/ConceptIcon";
 import {
   DIFFICULTY_IDS,
   DIFFICULTY_LABELS,
@@ -161,26 +160,6 @@ interface State {
 }
 
 export interface Props extends StateProps, DispatchProps {}
-
-function BriefingFact(props: {
-  concept: ConceptNameType;
-  label: string;
-  children: React.ReactNode;
-  action?: React.ReactNode;
-}): React.JSX.Element {
-  return (
-    <div className="scenarioBriefingFact">
-      <ConceptIcon concept={props.concept} fontSize="small" />
-      <div>
-        <Typography variant="overline" component="div">
-          {props.label}
-        </Typography>
-        <Typography variant="body2">{props.children}</Typography>
-      </div>
-      {props.action}
-    </div>
-  );
-}
 
 export default class NewGameDetails extends React.Component<Props, State> {
   // Per difficulty, so that retrying one board can't strand the others
@@ -462,11 +441,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
       );
     }
 
-    const briefing = scenario.briefing || {
-      fantasy: scenario.summary || scenario.name,
-      objective: "Keep the lights on and finish the term.",
-      threat: "Blackouts and insolvency can end the run early.",
-    };
     const endYear =
       scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
     // The selected difficulty's board and best come straight from what was read up front
@@ -511,29 +485,29 @@ export default class NewGameDetails extends React.Component<Props, State> {
               <Typography variant="overline" component="div">
                 {location.name} · {scenario.startingYear}–{endYear}
               </Typography>
-              <Typography variant="body1" color="textSecondary">
-                {briefing.fantasy}
-              </Typography>
-              <div className="scenarioBriefingFacts">
-                <BriefingFact
-                  concept="goal"
-                  label="Your goal"
-                  action={
-                    <IconButton
-                      onClick={toggleVictoryDialog}
-                      aria-label="Goals"
-                      color="primary"
-                      size="small"
-                    >
-                      <InfoIcon />
-                    </IconButton>
-                  }
+              {scenario.summary && (
+                <Typography variant="body1" color="textSecondary">
+                  {scenario.summary}
+                </Typography>
+              )}
+              <div className="scenarioBriefing">
+                <Button
+                  startIcon={<InfoOutlinedIcon />}
+                  onClick={toggleVictoryDialog}
                 >
-                  {briefing.objective}
-                </BriefingFact>
-                <BriefingFact concept="danger" label="Watch out">
-                  {briefing.threat}
-                </BriefingFact>
+                  Goals and scoring
+                </Button>
+                {scenario.threat && (
+                  <div className="scenarioWatchOut" role="note">
+                    <ConceptIcon concept="danger" fontSize="small" />
+                    <div>
+                      <Typography variant="overline" component="div">
+                        Watch out
+                      </Typography>
+                      <Typography variant="body2">{scenario.threat}</Typography>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="scenarioStartControls">
                 {challenge ? (

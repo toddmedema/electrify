@@ -2507,30 +2507,43 @@ $pane_header_height: 48px;
   text-align: center;
 }
 
-.scenarioBriefingFacts {
-  display: grid;
-  gap: 0;
-  margin-top: 4px;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-  text-align: left;
+// The description's two companions, both quieter than the Start action below: the way into the
+// goals (a text button, blue for interaction) and the one risk to watch for (amber for warning).
+.scenarioBriefing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.scenarioBriefingFact {
+// A tinted note rather than a filled alert: the amber is soft enough that the text keeps the
+// page's full contrast, while the label and icon carry the deeper amber on their own.
+.scenarioWatchOut {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   gap: 12px;
-  padding: 12px 2px;
-  border-top: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 560px;
+  padding: 12px 16px;
+  border: 1px solid
+    color-mix(in srgb, var(--warning-dot) 55%, var(--bg-primary));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning-fill) 28%, var(--bg-primary));
+  text-align: left;
 
-  &:first-child {
-    border-top: 0;
+  .conceptIcon {
+    color: var(--warning-icon);
+    // Lines the glyph up with the label's first line
+    margin-top: -2px;
   }
 
   .MuiTypography-overline {
+    color: var(--warning-icon);
     font-weight: 600;
     line-height: 1.2;
+    margin-bottom: 4px;
   }
 }
 
