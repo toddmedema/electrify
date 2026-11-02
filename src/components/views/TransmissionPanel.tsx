@@ -121,6 +121,8 @@ import {
 } from "../../helpers/Expansion";
 
 type IntertieSortKey = "yearsToBuild" | "buildCost" | "emissions";
+const intertieTierLabel = (tier: number) =>
+  `Tier ${["I", "II", "III", "IV"][tier - 1]}`;
 const sortOptions: ReadonlyArray<readonly [IntertieSortKey, string]> = [
   ["buildCost", "Build cost"],
   ["yearsToBuild", "Build time"],
@@ -1346,18 +1348,6 @@ export default function TransmissionPanel({
         </section>
       )}
 
-      {projectsOnly && !isUtilityExpansionGame(game) && (
-        <Typography
-          component="p"
-          variant="body2"
-          color="textSecondary"
-          className="transmissionIntro"
-          sx={{ px: 1.5, pt: 1 }}
-        >
-          Connect to a neighboring grid to buy power when short and sell when
-          you have spare.
-        </Typography>
-      )}
       {projectsOnly && !unbuiltCorridors.length && (
         <Typography sx={{ px: 1.5, pt: 1 }}>
           {corridors.length
@@ -1369,12 +1359,12 @@ export default function TransmissionPanel({
         <section aria-label="Connection projects">
           <ConstructionBuildHeader
             capacityLabel="Construction tier"
-            capacity={`Tier ${tier}`}
+            capacity={intertieTierLabel(tier)}
             sliderValue={tier}
             sliderMin={1}
             sliderMax={maxTier}
             sliderDisabled={maxTier === 1}
-            sliderValueText={(value) => `Tier ${value}`}
+            sliderValueText={intertieTierLabel}
             onSliderChange={setTier}
             sort={sort}
             sortOptions={sortOptions}
@@ -1467,7 +1457,7 @@ export default function TransmissionPanel({
           onClose={() => setReviewId(null)}
           titleId="intertie-review-title"
           loanButtonId={`approve-intertie-${review.id}`}
-          title={`Build ${reviewMarket?.name} · Tier ${tier}?`}
+          title={`Build ${reviewMarket?.name} · ${intertieTierLabel(tier)}?`}
           cash={now?.cash ?? 0}
           buildCost={review.buildCost}
           interestRate={game.interestRate}

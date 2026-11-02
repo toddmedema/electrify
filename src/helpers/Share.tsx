@@ -1,4 +1,4 @@
-import numbro from "numbro";
+import { formatScore } from "./Format";
 import { SCENARIOS } from "../data/Scenarios";
 
 // Sharing a score, which is the whole point of putting a name and a rank on the board. Kept out
@@ -29,10 +29,7 @@ export function buildShareText({
   scenarioName,
   difficulty,
 }: ShareScoreType): string {
-  const formatted = numbro(score).format({
-    thousandSeparated: true,
-    mantissa: 0,
-  });
+  const formatted = formatScore(score);
   return `I scored ${formatted} running ${scenarioName} at ${difficulty} difficulty on Electrify - electrifygame.com`;
 }
 

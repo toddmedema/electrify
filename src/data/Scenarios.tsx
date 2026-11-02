@@ -175,6 +175,14 @@ export const SCENARIOS: ScenarioType[] = [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
+        hideUi: MISSION_ONE_FIRST_LOOK,
+        action: "Welcome to Electrify",
+        content: (
+          <TutorialPrompt text="You are the CEO of an electricity generation company, and your goal is to keep the lights on without going bankrupt." />
+        ),
+      },
+      {
+        card: "FACILITIES",
         target: '[data-fuel="Coal"] .facilityRowHeader',
         hideUi: MISSION_ONE_FIRST_LOOK,
         advanceOn: (s: AppStateType) =>
@@ -192,7 +200,7 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         target: "#chartSupplyDemand",
         hideUi: MISSION_ONE_FIRST_LOOK,
-        // Every Mission 1 step moves on from a tap on the thing it teaches; reading the chart
+        // Hands-on Mission 1 steps move on from a tap on the thing they teach; reading the chart
         // is the deed here, so touching it (which also shows that moment's readings) continues.
         continueOnClick: "#chartSupplyDemand",
         action: "Tap the supply and demand chart",

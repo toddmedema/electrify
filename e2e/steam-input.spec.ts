@@ -306,6 +306,14 @@ test("menu movement under a stationary pointer preserves keyboard navigation", a
   page,
 }) => {
   await page.goto("/");
+  await expect(page.locator("#appStartup")).toHaveCount(0);
+  await page.locator("#centeredMenu").evaluate(async (menu) => {
+    await Promise.all(
+      menu
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished),
+    );
+  });
   const play = page.getByRole("button", { name: "Play", exact: true });
   const friends = page.getByRole("button", {
     name: "Play with friends",
@@ -321,19 +329,32 @@ test("menu movement under a stationary pointer preserves keyboard navigation", a
   await expect(manual).toBeFocused();
 
   // Like the desktop entrance, move controls away and back beneath an unmoved mouse.
-  await page.locator("#centeredMenu").evaluate((menu) => {
-    menu.style.transform = "translateX(10000px)";
+  await friends.evaluate((button) => {
+    button.addEventListener(
+      "pointerout",
+      () => {
+        button.dataset.pointerBoundary = "left";
+      },
+      { once: true },
+    );
+    button.addEventListener(
+      "pointerover",
+      () => {
+        button.dataset.pointerBoundary = "returned";
+      },
+      { once: true },
+    );
+    document.getElementById("centeredMenu")!.style.transform =
+      "translateX(10000px)";
   });
+  // Observe both boundary events on the target button. A menu-wide :hover
+  // check alone does not establish that this button will receive pointerover.
+  await expect(friends).toHaveAttribute("data-pointer-boundary", "left");
   await expect(page.locator("#centeredMenu:hover")).toHaveCount(0);
-  // Chromium usually reports the control arriving beneath the mouse, but doesn't promise to.
-  await friends.evaluate(
-    (button) =>
-      new Promise<void>((resolve) => {
-        button.addEventListener("pointerover", () => resolve(), { once: true });
-        document.getElementById("centeredMenu")!.style.transform = "none";
-        window.setTimeout(resolve, 2000);
-      }),
-  );
+  await page.locator("#centeredMenu").evaluate((menu) => {
+    menu.style.transform = "none";
+  });
+  await expect(friends).toHaveAttribute("data-pointer-boundary", "returned");
   await expect(manual).toBeFocused();
   await page.keyboard.press("ArrowUp");
   await expect(friends).toBeFocused();
@@ -844,6 +865,8 @@ test("controller advances the first tutorial through inspection, chart and clock
   await input(page, "confirm");
   const hud = page.locator(".tutorialHud");
   await expect(hud).toBeVisible();
+  await select(page, hud.getByRole("button", { name: "Next", exact: true }));
+  await input(page, "confirm");
   await select(
     page,
     page.getByRole("button", { name: "Inspect Coal", exact: true }),

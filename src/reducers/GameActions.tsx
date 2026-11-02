@@ -2,6 +2,26 @@ import type { RunIdentity, ChallengeInvitation } from "../Types";
 import { createAction } from "@reduxjs/toolkit";
 import type { GameType, PolicyChangeType } from "../Types";
 
+// UI actions observed by the game are dependency-free: importing the forecasting
+// reducer must not initialize navigation, account services or browser storage.
+export const navigate = createAction<
+  import("../Types").CardNameType | import("../Types").NavigateActionType
+>("card/navigate");
+export const navigateBack = createAction<
+  import("../Types").CardNameType | undefined
+>("card/navigateBack");
+export const manualHelpOpen = createAction<string>("ui/manualHelpOpen");
+export const manualHelpClose = createAction("ui/manualHelpClose");
+export const dialogOpen =
+  createAction<import("../Types").DialogType>("ui/dialogOpen");
+export const dialogClose = createAction("ui/dialogClose");
+export const snackbarOpen = createAction<
+  string | import("../Types").SnackbarType
+>("ui/snackbarOpen");
+export const victoryOpen =
+  createAction<import("../Types").VictoryType>("ui/victoryOpen");
+export const victoryClose = createAction("ui/victoryClose");
+
 export const schedulePolicy = createAction<PolicyChangeType>(
   "game/schedulePolicy",
 );
