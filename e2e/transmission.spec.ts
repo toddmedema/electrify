@@ -61,7 +61,9 @@ test("California players can build and understand an intertie", async ({
     })
     .first()
     .click();
-  await expect(page.getByRole("dialog")).toContainText("$13.5M + ");
+  await expect(page.getByRole("dialog")).toContainText(
+    /\$13\.5M now \+ \$\d+k\/mo/,
+  );
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Take loan" })
