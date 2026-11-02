@@ -1,3 +1,6 @@
+import "../Store";
+import { getStore } from "../StoreRegistry";
+import type { RunSaveEffects } from "../SaveEffects";
 import { encodeSave } from "../SaveEncoding";
 import { GENERATORS } from "../data/Facilities";
 import { hasEconomy, initEconomyFromCsv } from "../data/Economy";
@@ -33,7 +36,7 @@ import {
   closingCompany,
 } from "../testing/LegacyCampaignProtocolFixtures";
 import { validLegacyCampaign } from "./LegacyCampaign";
-import type { GameType, SaveGameType } from "../Types";
+import type { GameType, SaveGameType, VictoryType } from "../Types";
 
 /** Continue validates the wire save before Loading downloads simulation data. */
 function expectColdImport(save: SaveGameType): void {
@@ -195,7 +198,10 @@ test("a resumed later generation does not mistake missing presentation history f
 });
 
 /** Evidence fixtures isolate the handover protocol; full economics use the headless campaigns. */
-function closeProtocolGeneration(opening: GameType): GameType {
+function closeProtocolGeneration(
+  opening: GameType,
+  saveEffects?: RunSaveEffects,
+): GameType {
   const game = cloneDeep(opening);
   const campaign = game.campaign!;
   const customers = campaign.openingCustomers;
@@ -251,7 +257,7 @@ function closeProtocolGeneration(opening: GameType): GameType {
     (campaign.termStartMonth + 240) * MINUTES_PER_MONTH - TICK_MINUTES,
     1882,
   );
-  tickState(game);
+  tickState(game, saveEffects);
   return game;
 }
 
@@ -259,9 +265,13 @@ test("all nine generations retain bounded, verifiable saves past 1200 global mon
   jest.useFakeTimers();
   try {
     let game = firstCompany();
+    const outcomes: VictoryType[] = [];
+    const saveEffects: RunSaveEffects = {
+      outcome: (victory) => outcomes.push(victory),
+    };
     const handovers: { before: GameType; after: GameType }[] = [];
     for (let index = 0; index < 9; index++) {
-      game = closeProtocolGeneration(game);
+      game = closeProtocolGeneration(game, saveEffects);
       expect(game.date.monthsElapsed).toBe((index + 1) * 240);
       expect(game.campaign?.completedTerms).toHaveLength(index + 1);
       expect(game.objectiveProgress?.completedMonths).toBe(240);
@@ -305,6 +315,20 @@ test("all nine generations retain bounded, verifiable saves past 1200 global mon
     }
     expect(game.date.year).toBe(2062);
     expect(game.runIdentity).toBeUndefined();
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].outcome).toBe("completed");
+    expect(game.campaign?.openingCash).not.toBe(LEGACY_SCENARIOS[8].cash);
+    expect(outcomes[0].debrief?.startingCash).toBe(game.campaign?.openingCash);
+    expect(outcomes[0].debrief?.startingFleet).toEqual(
+      game.campaign?.openingFleet,
+    );
+    jest.advanceTimersByTime(1);
+    expect(getStore().getState().ui.victory?.debrief?.startingCash).toBe(
+      game.campaign?.openingCash,
+    );
+    expect(getStore().getState().ui.victory?.debrief?.startingFleet).toEqual(
+      game.campaign?.openingFleet,
+    );
     for (let tick = 0; tick < MINUTES_PER_MONTH / TICK_MINUTES; tick++)
       tickState(game);
     expect(game.date.monthsElapsed).toBe(2161);
@@ -336,6 +360,30 @@ test("campaign purchases reject unavailable, undersized, oversized, and wrong-er
     reducer(game, buildFacility({ facility: quote, financed: true }))
       .facilities,
   ).toHaveLength(game.facilities.length + 1);
+});
+
+test("a campaign failure debrief keeps the actual CEO opening company", () => {
+  jest.useFakeTimers();
+  try {
+    const game = firstCompany();
+    const outcomes: VictoryType[] = [];
+    game.timeline = generateNewTimeline(game, -1e12, 100);
+    for (let tick = 0; tick < TICKS_PER_MONTH; tick++)
+      tickState(game, { outcome: (victory) => outcomes.push(victory) });
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].outcome).toBe("bankrupt");
+    expect(outcomes[0].debrief?.startingCash).toBe(game.campaign?.openingCash);
+    expect(outcomes[0].debrief?.startingFleet).toEqual(
+      game.campaign?.openingFleet,
+    );
+    jest.advanceTimersByTime(1);
+    expect(getStore().getState().ui.victory?.debrief?.startingCash).toBe(
+      game.campaign?.openingCash,
+    );
+  } finally {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  }
 });
 
 test("monthly campaign pre-rolls cannot make extra loan payments", () => {

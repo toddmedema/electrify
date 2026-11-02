@@ -18,14 +18,33 @@ export function isLegacyEraGame(game: LegacyContext): boolean {
 }
 
 export function getLegacyBuildBounds(
-  game: LegacyContext,
+  game: LegacyContext & {
+    campaign?: Pick<NonNullable<GameType["campaign"]>, "peakMW">;
+  },
 ): { minW: number; defaultW: number; maxW: number } | undefined {
   if (!isLegacyEraGame(game)) return undefined;
   if (game.date.year < 1902)
     return { minW: 50000, defaultW: 100000, maxW: 500000 };
   if (game.date.year < 1942)
     return { minW: 50000, defaultW: 500000, maxW: 5000000 };
-  return undefined;
+  const minW = 1000000;
+  // Match the ordinary slider ceiling; the individual technology/site still owns its cap.
+  const maxW = 8000000000;
+  const peakMW = game.campaign?.peakMW;
+  const targetW =
+    peakMW !== undefined && Number.isFinite(peakMW) && peakMW > 0
+      ? Math.max(minW, Math.min(maxW, peakMW * 1000000))
+      : game.date.year < 1982
+        ? 1000000
+        : 5000000;
+  let magnitudeW = minW;
+  while (magnitudeW * 10 < targetW) magnitudeW *= 10;
+  const defaultW = Math.min(
+    maxW,
+    [1, 2, 5, 10].find((leading) => leading * magnitudeW >= targetW)! *
+      magnitudeW,
+  );
+  return { minW, defaultW, maxW };
 }
 
 /**

@@ -417,6 +417,7 @@ export function getWeather(
   seed: number,
   _cumulativeMegatons = 0,
   seriesId?: string,
+  modeledPast = false,
 ): RawWeatherType {
   // A custom location generally has no separate basin, so callers may request its own id. If a
   // curated watershed was not loaded, falling back to the primary series is safer than returning
@@ -426,6 +427,9 @@ export function getWeather(
     return DUMMY_WEATHER;
   }
   const beforeRecord = date.year < STARTING_YEAR;
+  // Ordinary 1980 hydrology reads a two-year lookback; preserve its empty pre-record history.
+  // Only a trusted campaign caller opts into the modeled nineteenth-century climate.
+  if (beforeRecord && !modeledPast) return DUMMY_WEATHER;
   const weather = beforeRecord ? series.recordedRows : series.weather;
   const minuteOfHour = date.minuteOfDay % 60;
   // Bootstrap one complete recorded year for each early synthetic year. The same seed/year draw

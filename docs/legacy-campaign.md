@@ -71,7 +71,8 @@ operating asset retains its purchased vintage. The catalog's normal modern path 
   steam heat-rate benchmarks. Gas combined cycle, geothermal, wind, solar, nuclear ordering,
   and storage retain explicit regional availability dates.
 - Before 1980, seeded weather resamples complete recorded 1980–2019 years with city/basin
-  coherence. Before 1975, fuel prices use the first available receipts scaled by modeled CPI;
+  coherence. Native campaign calls explicitly opt into this historical model. Before 1975,
+  fuel prices use the first available receipts scaled by modeled CPI;
   the 1973–74 oil transition is authored. The recorded 1979 and 2000–01 shocks are not doubled
   by event multipliers. Pre-1913 CPI is held flat and early prime is modeled at 6%.
 - Efficiency and curtailment open in 1973, time-of-use in 1982, solar/thermal programs in 2000,

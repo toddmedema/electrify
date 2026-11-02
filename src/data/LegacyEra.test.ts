@@ -69,6 +69,26 @@ it("keeps modern catalogs and custom copies outside trusted era privileges", () 
   expect(isLegacyEraGame(copy)).toBe(false);
 });
 
+it("opens later campaign construction near inherited demand without narrowing legal project sizes", () => {
+  const boundsAt = (year: number, peakMW?: number) =>
+    getLegacyBuildBounds({
+      ...gameAt(year),
+      campaign: peakMW === undefined ? undefined : { peakMW },
+    });
+  expect(boundsAt(1942, 0.5)).toEqual({
+    minW: 1000000,
+    defaultW: 1000000,
+    maxW: 8000000000,
+  });
+  expect(boundsAt(1962, 1.2)?.defaultW).toBe(2000000);
+  expect(boundsAt(1982, 2.1)?.defaultW).toBe(5000000);
+  expect(boundsAt(2042, 7)?.defaultW).toBe(10000000);
+  expect(boundsAt(2042, 8000)?.defaultW).toBe(8000000000);
+  expect(boundsAt(1942)?.defaultW).toBe(1000000);
+  expect(boundsAt(1982)?.defaultW).toBe(5000000);
+  expect(boundsAt(1982, NaN)?.defaultW).toBe(5000000);
+});
+
 it("gates regional equipment dates and closes new nuclear orders without changing built assets", () => {
   const names = (year: number) =>
     GENERATORS(gameAt(year), 10000000, [], []).map(({ name }) => name);

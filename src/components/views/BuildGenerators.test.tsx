@@ -98,6 +98,65 @@ it("buys the early 750 kW hydro site without expanding the steam size range", ()
   );
 });
 
+it("discards an early site shortcut at the later minimum and hides sites below it", () => {
+  const game = createGame({ scenarioId: 117, seed: 611 });
+  const memory = new Map<string, unknown>();
+  const onBuild = jest.fn();
+  const catalog = () => (
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        onBack={jest.fn()}
+        onBuildGenerator={onBuild}
+      />
+    </GameToolMemoryContext.Provider>
+  );
+  const moveTo = (year: number) => {
+    const minute = (year - game.startingYear) * 12 * MINUTES_PER_MONTH;
+    game.timeline = game.timeline.map((tick) => ({
+      ...tick,
+      minute: tick.minute - game.date.minute + minute,
+      cash: 1e9,
+    }));
+    game.date = getDateFromMinute(minute, game.startingYear);
+  };
+  moveTo(1895);
+  const { unmount: unmountEarly } = render(catalog());
+  fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
+  unmountEarly();
+  moveTo(1942);
+  game.scenarioId = 120;
+  const { unmount: unmountLater } = render(catalog());
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Hydro" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(onBuild).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Hydro", peakW: 1000000 }),
+    false,
+  );
+  unmountLater();
+  game.commissionedHydroSiteIds = [
+    "legacy-sierra-upper-river",
+    "legacy-sierra-valley-reservoir",
+    "legacy-sierra-regional-reservoir",
+  ];
+  expect(getHydroAvailability(game, 1000000).largest?.maxPeakW).toBe(750000);
+  render(catalog());
+  const hydro = screen.getByText(
+    (_text, element) => element?.getAttribute("data-build-option") === "Hydro",
+  );
+  expect(
+    within(hydro).queryByRole("button", { name: "Use site maximum" }),
+  ).toBeNull();
+  expect(
+    within(hydro).queryByRole("button", { name: "Use max size" }),
+  ).toBeNull();
+  expect(
+    within(hydro).getByRole("button", { name: "Review purchase of Hydro" }),
+  ).toBeDisabled();
+});
+
 it.each([false, true])(
   "resizes an unaffordable generator to the largest affordable slider size (live cash: %s)",
   (live) => {
@@ -1273,6 +1332,38 @@ it("opens at the fleet average and remembers the player's chosen generator size"
   view.unmount();
   render(catalog());
   expect(screen.getByRole("slider")).toHaveAccessibleName(/300MW/);
+});
+
+it("opens late campaign construction near inherited demand and remembers later size choices", () => {
+  const game = createGame({ scenarioId: 117, seed: 611 });
+  const offset = (1962 - 1882) * 12 * MINUTES_PER_MONTH;
+  game.scenarioId = 121;
+  game.date = getDateFromMinute(offset, game.startingYear);
+  game.campaign!.peakMW = 1.2;
+  game.timeline = game.timeline.map((tick) => ({
+    ...tick,
+    minute: tick.minute + offset,
+    cash: 1e9,
+  }));
+  const memory = new Map<string, unknown>();
+  const catalog = () => (
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        onBack={jest.fn()}
+        onBuildGenerator={jest.fn()}
+      />
+    </GameToolMemoryContext.Provider>
+  );
+  const view = render(catalog());
+  const slider = screen.getByRole("slider");
+  expect(slider).toHaveAttribute("aria-valuetext", "2MW");
+  expect(slider).toHaveAttribute("min", "0");
+  expect(slider).toHaveAttribute("max", "34");
+  fireEvent.keyDown(slider, { key: "ArrowRight" });
+  view.unmount();
+  render(catalog());
+  expect(screen.getByRole("slider")).toHaveAttribute("aria-valuetext", "3MW");
 });
 
 it.each([undefined, "Natural Gas"] as const)(

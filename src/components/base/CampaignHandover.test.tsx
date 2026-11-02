@@ -1,7 +1,28 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Provider } from "react-redux";
+import { store } from "../../Store";
+import { delta, quit } from "../../reducers/Game";
+import { dialogClose, dialogOpen } from "../../reducers/UI";
+import { navigate } from "../../reducers/Card";
+import { sessionChanged } from "../../SaveLibrary";
+import { createGame } from "../../testing/Simulator";
 import { LegacyCampaignTermType } from "../../Types";
 import CampaignHandover from "./CampaignHandover";
+import CampaignHandoverContainer from "./CampaignHandoverContainer";
+
+jest.mock("../../SaveSession", () => ({
+  saveSessionMiddleware:
+    () => (next: (action: unknown) => unknown) => (action: unknown) =>
+      next(action),
+  quitSavedGame: jest.fn(),
+}));
+
+afterEach(() => {
+  store.dispatch(dialogClose());
+  store.dispatch(sessionChanged({ transitioning: false }));
+  store.dispatch(quit());
+});
 
 const term: LegacyCampaignTermType = {
   generationIndex: 0,
@@ -73,4 +94,52 @@ it("reviews the real inherited company and requires an explicit handover", async
   expect(onContinue).toHaveBeenCalledTimes(1);
   await userEvent.click(screen.getByRole("button", { name: "Save and exit" }));
   expect(onExit).toHaveBeenCalledTimes(1);
+});
+
+it("yields to the save recovery dialog and returns after recovery closes", () => {
+  const game = createGame({ scenarioId: 117, seed: 611 });
+  store.dispatch(
+    delta({
+      ...game,
+      inGame: true,
+      campaign: {
+        ...game.campaign!,
+        pendingHandover: true,
+        completedTerms: [term],
+      },
+    }),
+  );
+  store.dispatch(navigate("FACILITIES"));
+  render(
+    <Provider store={store}>
+      <CampaignHandoverContainer />
+    </Provider>,
+  );
+  expect(
+    screen.getByRole("dialog", { name: "Generation 1 complete" }),
+  ).toBeVisible();
+  act(() => {
+    store.dispatch(sessionChanged({ transitioning: true }));
+  });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  act(() => {
+    store.dispatch(
+      dialogOpen({
+        open: true,
+        title: "Save failed",
+        message: "Retry saving before leaving this company.",
+      }),
+    );
+    store.dispatch(sessionChanged({ transitioning: false }));
+  });
+  expect(store.getState().ui.dialog.title).toBe("Save failed");
+  expect(
+    screen.queryByRole("dialog", { name: "Generation 1 complete" }),
+  ).not.toBeInTheDocument();
+  act(() => {
+    store.dispatch(dialogClose());
+  });
+  expect(
+    screen.getByRole("dialog", { name: "Generation 1 complete" }),
+  ).toBeVisible();
 });

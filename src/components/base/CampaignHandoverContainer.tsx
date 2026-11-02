@@ -12,6 +12,7 @@ export default function CampaignHandoverContainer(): React.JSX.Element | null {
     (state) =>
       state.game.inGame &&
       !state.saves.transitioning &&
+      !state.ui.dialog.open &&
       (NAV_CARDS.includes(state.card.name) ||
         state.card.name.startsWith("BUILD_")),
   );

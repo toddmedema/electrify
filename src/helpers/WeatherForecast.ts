@@ -60,9 +60,11 @@ export function createWeatherForecast(
   issuedAt: DateType,
   seed: number,
   seriesId?: string,
+  modeledPast = false,
 ): (date: DateType) => RawWeatherType {
   const rows = getRecordedWeatherRows(seriesId);
-  if (!rows.length) return (date) => getWeather(date, seed, 0, seriesId);
+  if (!rows.length)
+    return (date) => getWeather(date, seed, 0, seriesId, modeledPast);
   const normals = hourlyNormals(rows);
   const fields =
     rows[0].WIND_OFFSHORE_KPH === undefined
@@ -81,12 +83,13 @@ export function createWeatherForecast(
     });
     return normal;
   };
-  const observation = getWeather(issuedAt, seed, 0, seriesId);
+  const observation = getWeather(issuedAt, seed, 0, seriesId, modeledPast);
   const observedNormal = normalAt(issuedAt);
   const issuedMinute = calendarMinute(issuedAt);
   return (date) => {
     const leadMinutes = calendarMinute(date) - issuedMinute;
-    if (leadMinutes <= 0) return getWeather(date, seed, 0, seriesId);
+    if (leadMinutes <= 0)
+      return getWeather(date, seed, 0, seriesId, modeledPast);
     const estimate = normalAt(date);
     const persistence = Math.max(
       0,

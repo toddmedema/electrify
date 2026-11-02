@@ -919,9 +919,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
     () =>
       clampSizeTick(
         wToSliderTick(
-          game.facilities.length
-            ? averageBuildSize(game.facilities, false)
-            : (legacyBounds?.defaultW ??
+          legacyBounds && game.date.year >= 1942
+            ? legacyBounds.defaultW
+            : game.facilities.length
+              ? averageBuildSize(game.facilities, false)
+              : (legacyBounds?.defaultW ??
                 averageBuildSize(game.facilities, false)),
         ),
       ),
@@ -933,6 +935,18 @@ function BuildGenerators(props: Props): React.JSX.Element {
     "generators.exactSizes",
     {},
   );
+  // A remembered site/technology shortcut can outlive the era's minimum project size.
+  // Hydro may exceed the global slider maximum because its physical site owns that limit.
+  const shownExactSizes = legacyBounds
+    ? Object.fromEntries(
+        Object.entries(exactSizes).filter(
+          ([name, size]) =>
+            Number.isFinite(size) &&
+            size >= legacyBounds.minW &&
+            (name === "Hydro" || size <= legacyBounds.maxW),
+        ),
+      )
+    : exactSizes;
   const [sort, setSort] = useToolState<GeneratorSortKey>(
     "generators.sort",
     "buildCost",
@@ -972,8 +986,14 @@ function BuildGenerators(props: Props): React.JSX.Element {
   } = forecast ?? EMPTY_FORECAST;
   const hydroAvailability = getHydroAvailability(
     game,
-    exactSizes.Hydro ?? sliderTickToW(shownSliderTick),
+    shownExactSizes.Hydro ?? sliderTickToW(shownSliderTick),
   );
+  const hydroSiteMaximum =
+    hydroAvailability.selected ?? hydroAvailability.largest;
+  const canUseSiteMaximum =
+    !legacyBounds ||
+    !hydroSiteMaximum ||
+    hydroSiteMaximum.maxPeakW >= legacyBounds.minW;
   const minimumGenerators = GENERATORS(
     game,
     sliderTickToW(minTick),
@@ -991,10 +1011,10 @@ function BuildGenerators(props: Props): React.JSX.Element {
     airborneWindSpeeds,
   )
     .map((generator) =>
-      exactSizes[generator.name] !== undefined
+      shownExactSizes[generator.name] !== undefined
         ? GENERATORS(
             game,
-            exactSizes[generator.name],
+            shownExactSizes[generator.name],
             windSpeeds,
             solarIrradiances,
             offshoreWindSpeeds,
@@ -1157,40 +1177,51 @@ function BuildGenerators(props: Props): React.JSX.Element {
                 hydroAvailability={
                   g.name === "Hydro" ? hydroAvailability : undefined
                 }
-                onUseSiteMaximum={(peakW) => {
-                  revealResizedRow(g.name);
-                  setSliderTick(clampSizeTick(wToSliderTick(peakW)));
-                  setExactSizes((sizes) => ({ ...sizes, Hydro: peakW }));
-                }}
-                onUseMaxSize={(peakW) => {
-                  const limit =
-                    g.name === "Hydro"
-                      ? Math.min(
-                          peakW,
-                          hydroAvailability.largest?.maxPeakW ?? peakW,
-                        )
-                      : peakW;
-                  const size =
-                    largestAffordableBuildSize(
-                      buildSizeOptions(minTick, maxTick, limit),
-                      readCash(),
-                      (capacity) => {
-                        const candidate = GENERATORS(
-                          game,
-                          capacity,
-                          windSpeeds,
-                          solarIrradiances,
-                          offshoreWindSpeeds,
-                          airborneWindSpeeds,
-                        ).find((item) => item.name === g.name)!;
-                        return withResilienceOptions(candidate, game, {})
-                          .buildCost;
-                      },
-                    ) ?? limit;
-                  revealResizedRow(g.name);
-                  setSliderTick(clampSizeTick(wToSliderTick(size)));
-                  setExactSizes((sizes) => ({ ...sizes, [g.name]: size }));
-                }}
+                onUseSiteMaximum={
+                  canUseSiteMaximum
+                    ? (peakW) => {
+                        revealResizedRow(g.name);
+                        setSliderTick(clampSizeTick(wToSliderTick(peakW)));
+                        setExactSizes((sizes) => ({ ...sizes, Hydro: peakW }));
+                      }
+                    : undefined
+                }
+                onUseMaxSize={
+                  legacyBounds && g.maxPeakW < legacyBounds.minW
+                    ? undefined
+                    : (peakW) => {
+                        const limit =
+                          g.name === "Hydro"
+                            ? Math.min(
+                                peakW,
+                                hydroAvailability.largest?.maxPeakW ?? peakW,
+                              )
+                            : peakW;
+                        const size =
+                          largestAffordableBuildSize(
+                            buildSizeOptions(minTick, maxTick, limit),
+                            readCash(),
+                            (capacity) => {
+                              const candidate = GENERATORS(
+                                game,
+                                capacity,
+                                windSpeeds,
+                                solarIrradiances,
+                                offshoreWindSpeeds,
+                                airborneWindSpeeds,
+                              ).find((item) => item.name === g.name)!;
+                              return withResilienceOptions(candidate, game, {})
+                                .buildCost;
+                            },
+                          ) ?? limit;
+                        revealResizedRow(g.name);
+                        setSliderTick(clampSizeTick(wToSliderTick(size)));
+                        setExactSizes((sizes) => ({
+                          ...sizes,
+                          [g.name]: size,
+                        }));
+                      }
+                }
                 date={game.date}
                 seed={game.seed}
                 location={game.location}

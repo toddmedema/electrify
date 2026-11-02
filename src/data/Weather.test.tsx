@@ -292,23 +292,49 @@ describe("getWeather", () => {
   // reading rather than reaching into the arrays at a negative index.
   it("survives a date before the data starts", () => {
     const before = getWeather(dateAt(-24, 8), SEED, 100);
-    expect(Number.isFinite(before.TEMP_C)).toBe(true);
-    expect(Number.isFinite(before.CLOUD_PCT)).toBe(true);
-    expect(Number.isFinite(before.WIND_KPH)).toBe(true);
+    expect(before).toEqual({
+      YEAR: 0,
+      MONTH: 0,
+      TEMP_C: 0,
+      CLOUD_PCT: 0,
+      WIND_KPH: 10,
+      PRECIP_MM: 0,
+    });
+  });
+
+  it("requires modeled-past provenance even when an ordinary hydrology lookback has a positive minute", () => {
+    const recordedDate = getDateFromMinute(8 * 60, 1980);
+    const lookback = { ...recordedDate, year: 1979, monthNumber: 12 };
+    expect(lookback.minute).toBeGreaterThan(0);
+    expect(getWeather(lookback, SEED).YEAR).toBe(0);
+    const campaignDate = getDateFromMinute((1979 - 1882) * 12 * 1440, 1882);
+    expect(campaignDate.minute).toBeGreaterThan(0);
+    expect(getWeather(campaignDate, SEED, 0, undefined, true).YEAR).toBe(1979);
+    expect(getWeather(campaignDate, SEED).YEAR).toBe(0);
+    expect(getWeather(recordedDate, SEED, 0, undefined, true)).toEqual(
+      getWeather(recordedDate, SEED),
+    );
   });
 
   it("bootstraps early climate identically after reload without altering recorded weather", () => {
     const date = getDateFromMinute(6 * 1440 + 13 * 60 + 30, 1882);
-    const historical = getWeather(dateAt(0, 8), SEED);
-    const early = getWeather(date, SEED);
+    const recordedDate = getDateFromMinute(8 * 60, 1980);
+    const historical = getWeather(recordedDate, SEED);
+    const early = getWeather(date, SEED, 0, undefined, true);
     expect(early.YEAR).toBe(1882);
     expect(early.MONTH).toBe(7);
     expect(early.TEMP_C).toBeGreaterThan(0);
     expect(early.WIND_KPH).toBeGreaterThan(0);
-    getWeather(getDateFromMinute(11 * 1440 + 23 * 60 + 30, 1979), SEED);
-    expect(getWeather(dateAt(0, 8), SEED)).toEqual(historical);
+    getWeather(
+      getDateFromMinute(11 * 1440 + 23 * 60 + 30, 1979),
+      SEED,
+      0,
+      undefined,
+      true,
+    );
+    expect(getWeather(recordedDate, SEED)).toEqual(historical);
     initWeatherFromRows("PIT", fixtureRows());
-    expect(getWeather(date, SEED)).toEqual(early);
+    expect(getWeather(date, SEED, 0, undefined, true)).toEqual(early);
   });
 
   it("uses the same early year draw for a city and its watershed", () => {
@@ -318,8 +344,8 @@ describe("getWeather", () => {
       true,
     );
     const date = getDateFromMinute(2 * 1440 + 10 * 60 + 30, 1882);
-    const city = getWeather(date, SEED, 0, "PIT");
-    const basin = getWeather(date, SEED, 0, "basin");
+    const city = getWeather(date, SEED, 0, "PIT", true);
+    const basin = getWeather(date, SEED, 0, "basin", true);
     expect(basin.TEMP_C - city.TEMP_C).toBeCloseTo(5, 10);
     expect(basin.PRECIP_MM).toBe(city.PRECIP_MM);
     expect(basin.WIND_KPH).toBe(city.WIND_KPH);

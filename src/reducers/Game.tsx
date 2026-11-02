@@ -1,4 +1,4 @@
-import { getLegacyBuildBounds } from "../data/LegacyEra";
+import { getLegacyBuildBounds, isLegacyEraGame } from "../data/LegacyEra";
 import {
   LEGACY_CAMPAIGN_ID,
   LEGACY_GENERATION_MONTHS,
@@ -1019,6 +1019,7 @@ function recordColdSnap(
     state.date,
     state.seed,
     storyEffectsAt(state.date, state).temperatureOffsetC || 0,
+    isLegacyEraGame(state),
   );
   const impact = resolveColdImpact({ game: state, key, minTempC });
   if (!impact) return false;
@@ -4113,6 +4114,10 @@ export function* tickStatePhases(
           state.worldEvents.occurrences,
           gameObjectiveResults(state),
         );
+        if (state.campaign) {
+          debrief.startingCash = state.campaign.openingCash;
+          debrief.startingFleet = cloneDeep(state.campaign.openingFleet);
+        }
         debrief.scenarioMetrics = [
           {
             concept: "money",
@@ -4532,9 +4537,16 @@ function reforecastWeatherAndPrices(
   state: GameType,
   forecastWeather = false,
 ): TickPresentFutureType[] {
+  const modeledPast = isLegacyEraGame(state);
   const weatherAt = forecastWeather
-    ? createWeatherForecast(state.date, state.seed, state.location.id)
-    : (date: DateType) => getWeather(date, state.seed);
+    ? createWeatherForecast(
+        state.date,
+        state.seed,
+        state.location.id,
+        modeledPast,
+      )
+    : (date: DateType) =>
+        getWeather(date, state.seed, 0, undefined, modeledPast);
   // Resource forecasts are also shown before the player builds a hydro plant.
   const hasHydro =
     (getViableLocationCount(state.location, "Hydro") || 0) > 0 ||
@@ -4542,8 +4554,11 @@ function reforecastWeatherAndPrices(
   const watershedId = state.location.watershedId || state.location.id;
   const watershedWeatherAt =
     forecastWeather && hasHydro
-      ? createWeatherForecast(state.date, state.seed, watershedId)
-      : undefined;
+      ? createWeatherForecast(state.date, state.seed, watershedId, modeledPast)
+      : modeledPast && hasHydro
+        ? (date: DateType) =>
+            getWeather(date, state.seed, 0, watershedId, modeledPast)
+        : undefined;
   const hydrologyByMonth = new Map<
     string,
     ReturnType<typeof getHydroConditions>
