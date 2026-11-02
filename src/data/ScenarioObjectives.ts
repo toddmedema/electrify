@@ -24,6 +24,8 @@ export interface ObjectiveResult {
 export interface ObjectiveContext {
   rulesDigest: string;
   startingYear: number;
+  /** Calendar months before this bounded campaign generation. */
+  monthOffset?: number;
   seed: number;
   durationMonths: number;
   ownership: "Investor" | "Public";

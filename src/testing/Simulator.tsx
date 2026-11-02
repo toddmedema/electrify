@@ -34,7 +34,7 @@ import gameReducer, {
 } from "../reducers/Game";
 import { DIFFICULTIES, GAME_TO_REAL_YEARS, TICK_MINUTES } from "../Constants";
 import { GENERATORS, STORAGE } from "../data/Facilities";
-import { SCENARIOS } from "../data/Scenarios";
+import { SCENARIOS, getScenario } from "../data/Scenarios";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
@@ -61,6 +61,7 @@ import {
   ViolationType,
 } from "./Invariants";
 import { loadSimData } from "./SimData";
+import { isLegacyCampaignScenario } from "../data/LegacyCampaign";
 
 export type StrategyType = "none" | "keepUp";
 
@@ -239,9 +240,7 @@ function formatWhen(state: GameType): string {
  */
 export function createGame(options: SimOptionsType): GameType {
   const scenario =
-    options.scenario ||
-    SCENARIOS.find((s: ScenarioType) => s.id === options.scenarioId) ||
-    SCENARIOS[0];
+    options.scenario || getScenario(options.scenarioId) || SCENARIOS[0];
   loadSimData(scenarioLocation(scenario));
   return setUpGame(scenario, resolveOptions(scenario, options));
 }
@@ -283,11 +282,18 @@ function setUpGame(
     state,
     delta({
       difficulty: options.difficulty,
+      // Later generation definitions are headless balance fixtures. The public start action
+      // always opens 1882; only this test harness deliberately initializes a standalone term.
+      ...(isLegacyCampaignScenario(scenario.id) && scenario.id !== 117
+        ? { scenarioId: scenario.id }
+        : {}),
       // A scenario that isn't in SCENARIOS can only be found again through the slice, which is
       // exactly what the custom game screen does before it starts a game
-      customScenario: SCENARIOS.some((s: ScenarioType) => s.id === scenario.id)
-        ? undefined
-        : scenario,
+      customScenario:
+        SCENARIOS.some((s: ScenarioType) => s.id === scenario.id) ||
+        isLegacyCampaignScenario(scenario.id)
+          ? undefined
+          : scenario,
     }),
   );
   state = gameReducer(
@@ -464,9 +470,7 @@ function shoppingFacility(
 
 export function runSimulation(options: SimOptionsType): SimResultType {
   const scenario =
-    options.scenario ||
-    SCENARIOS.find((s: ScenarioType) => s.id === options.scenarioId) ||
-    SCENARIOS[0];
+    options.scenario || getScenario(options.scenarioId) || SCENARIOS[0];
   const resolved = resolveOptions(scenario, options);
 
   loadSimData(scenarioLocation(scenario));

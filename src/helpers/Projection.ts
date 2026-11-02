@@ -12,6 +12,7 @@ import { GameType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
 import type { ObjectiveMonthFacts } from "../data/ScenarioObjectives";
 import { scenarioObjectiveDefinitions } from "./ObjectiveRules";
 import { getTotalDebt } from "./Financials";
+import { legacyMonthOffset } from "./LegacyCampaign";
 
 /**
  * The one long-range projection a game has.
@@ -34,7 +35,10 @@ export function cashRunwayHorizon(game: GameType): number {
   return duration !== undefined && Number.isFinite(duration) && duration > 0
     ? Math.min(
         MAX_FORECAST_YEARS * 12,
-        Math.max(0, duration - game.date.monthsElapsed),
+        Math.max(
+          0,
+          duration + legacyMonthOffset(game) - game.date.monthsElapsed,
+        ),
       )
     : 12;
 }
@@ -160,6 +164,19 @@ export function projectionSignature(game: GameType): string {
     JSON.stringify(game.location),
     game.customerMarketSize,
     game.startingDemandScale,
+    game.campaign
+      ? JSON.stringify([
+          game.campaign.generationIndex,
+          game.campaign.termStartMonth,
+          game.campaign.openingCustomers,
+          game.campaign.referenceRate,
+          game.campaign.inheritedDemandMultiplier,
+          game.campaign.peakMW,
+          game.campaign.northCapacityMW,
+          game.campaign.debtAllowance,
+          game.campaign.emissionsBudgetTonnes,
+        ])
+      : "",
     JSON.stringify(
       game.utilityExpansion && {
         acquisitions: game.utilityExpansion.acquisitions,

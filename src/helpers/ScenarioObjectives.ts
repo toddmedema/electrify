@@ -114,6 +114,9 @@ function initialEvidenceDigest(
     objective,
     rulesDigest: context.rulesDigest,
     startingYear: context.startingYear,
+    ...(context.monthOffset !== undefined
+      ? { monthOffset: context.monthOffset }
+      : {}),
     seed: context.seed,
     durationMonths: context.durationMonths,
     ownership: context.ownership,
@@ -219,7 +222,10 @@ export function objectiveMonthObservation(
   baseline: number,
 ): ObjectiveObservation {
   const row = facts.history;
-  if (row.year * 12 + row.month - 1 !== context.startingYear * 12 + facts.month)
+  if (
+    row.year * 12 + row.month - 1 !==
+    context.startingYear * 12 + (context.monthOffset ?? 0) + facts.month
+  )
     return [facts.month, null, null];
   let numerator: number | undefined;
   let denominator: number | undefined = 1;

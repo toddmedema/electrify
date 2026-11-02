@@ -21,6 +21,7 @@ import {
   objectiveWindowText,
 } from "./ObjectivePresentation";
 import type { ProjectionView } from "./Projection";
+import { legacyMonthOffset } from "./LegacyCampaign";
 import {
   evaluateScenarioObjectives,
   objectiveTargetMet,
@@ -113,12 +114,13 @@ function projectedObjectives(
     projection.objectiveAssets?.map((row) => [row.month, row]),
   );
   for (const row of months) {
-    const month = monthIndex(row, game);
+    const absolute = monthIndex(row, game);
+    const month = absolute - legacyMonthOffset(game);
     progress = recordObjectiveMonth(
       progress,
       definitions,
       {
-        ...assets.get(month),
+        ...assets.get(absolute),
         month,
         history: row,
       },
@@ -129,11 +131,16 @@ function projectedObjectives(
     ...context,
     completedMonths: Math.max(
       context.completedMonths,
-      ...months.map((row) => monthIndex(row, game) + 1),
+      ...months.map(
+        (row) => monthIndex(row, game) - legacyMonthOffset(game) + 1,
+      ),
     ),
   }).map((result) => ({
     ...result,
-    failureMonth: firstFailureMonth(result, progress),
+    failureMonth:
+      firstFailureMonth(result, progress) === undefined
+        ? undefined
+        : firstFailureMonth(result, progress)! + legacyMonthOffset(game),
   }));
   objectiveCache.set(projection, {
     progress: game.objectiveProgress,
@@ -161,7 +168,7 @@ function objectiveDetail(result: ObjectiveResult, game: GameType): string {
     objectiveTargetMet(result.objective, result.observed)
       ? rounded
       : result.observed;
-  return `${prefix}: ${objectiveValueText(result.objective, shown, result.target)} · ${objectiveWindowText(result.objective, game.startingYear, activeScenario(game)!.durationMonths)}.`;
+  return `${prefix}: ${objectiveValueText(result.objective, shown, result.target)} · ${objectiveWindowText(result.objective, game.startingYear + legacyMonthOffset(game) / 12, activeScenario(game)!.durationMonths)}.`;
 }
 
 /** All required goals plus month-end bankruptcy and the rolling three-month blackout rule. */
@@ -171,7 +178,7 @@ export function projectMission(
 ): MissionProjection {
   const scenario = activeScenario(game)!;
   const elapsed = game.date.monthsElapsed;
-  const end = scenario.durationMonths;
+  const end = scenario.durationMonths + legacyMonthOffset(game);
   // The last hourly bucket can end partway through a calendar month. Never treat it as a close.
   const lastTick = projection.forecast.at(-1);
   const completeThrough = lastTick

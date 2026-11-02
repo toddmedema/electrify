@@ -30,6 +30,12 @@ export const offerLowCashWarning = (): AppThunk => (dispatch, getState) => {
     return;
 
   const quote = lowCashRateQuote(game);
+  // The opening utility is far smaller than modern scenarios. Its cash balance can
+  // stay below the modern warning threshold while comfortably paying its bills.
+  if (game.campaign && quote.projectedCash >= 0) {
+    dispatch(delta({ lowCashWarningMonth: game.date.monthsElapsed }));
+    return;
+  }
   const rate = quote.dollarsPerkWh;
   const increase =
     rate !== null && game.dollarsPerkWh > 0

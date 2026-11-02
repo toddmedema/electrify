@@ -26,6 +26,8 @@ import { isDesktopApp } from "../../Desktop";
 import { SCENARIOS } from "../../data/Scenarios";
 import ResultLeaderboard from "./ResultLeaderboard";
 import { SCORE_VERSION } from "../../helpers/Scoring";
+import { isLegacyCampaignScenario } from "../../data/LegacyCampaign";
+import CampaignGoalBasis from "./CampaignGoalBasis";
 
 export interface StateProps {
   victory: VictoryType | null;
@@ -64,7 +66,10 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
   // Identity rather than the object, so re-renders while the dialog is open don't refetch
   const scenarioId = victory?.scenarioId;
   const score = victory?.score;
-  const ranked = Boolean(victory?.ranked && victory?.outcome === "completed");
+  const campaign = isLegacyCampaignScenario(victory?.scenarioId);
+  const ranked = Boolean(
+    !campaign && victory?.ranked && victory?.outcome === "completed",
+  );
   const difficulty = victory?.difficulty;
 
   React.useEffect(() => {
@@ -173,6 +178,15 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             {endMessage}
           </Typography>
         )}
+        {campaign && failed && (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ textAlign: "center", mb: 2 }}
+          >
+            Restarting begins a new campaign in 1882.
+          </Typography>
+        )}
         <ResultScore result={victory} />
         {comparison && (
           <Typography role="status" sx={{ mt: 2 }}>
@@ -241,7 +255,8 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               />
             </Typography>
           )}
-        {victory.outcome === "completed" &&
+        {!campaign &&
+          victory.outcome === "completed" &&
           victory.scoreVersion === SCORE_VERSION &&
           !victory.modded &&
           SCENARIOS.some(
@@ -258,6 +273,10 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             />
           )}
         {victory.debrief && <RunDebrief debrief={victory.debrief} />}
+        <CampaignGoalBasis
+          scenarioId={victory.scenarioId}
+          results={victory.debrief?.objectiveResults}
+        />
       </DialogContent>
       <DialogActions
         className="victoryDialogActions"
@@ -286,14 +305,22 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             variant={failed ? "text" : "outlined"}
             onClick={failed ? onQuit : () => props.onRetry(victory)}
           >
-            {failed ? "New game" : "Play again"}
+            {failed
+              ? "New game"
+              : campaign
+                ? "Play campaign again"
+                : "Play again"}
           </Button>
           <Button
             color="primary"
             variant="contained"
             onClick={failed ? () => props.onRetry(victory) : onQuit}
           >
-            {failed ? "Try again" : "New game"}
+            {failed
+              ? campaign
+                ? "Restart campaign"
+                : "Try again"
+              : "New game"}
           </Button>
         </div>
       </DialogActions>

@@ -19,6 +19,28 @@ afterEach(() => {
   store.dispatch(uiDelta({ previewDifficulty: undefined }));
 });
 
+it("restarts a later failed CEO term at the beginning of the campaign with its original difficulty", () => {
+  const victory: VictoryType = {
+    scenarioId: 122,
+    scenarioName: "The Price of Power",
+    difficulty: "CEO",
+    score: 0,
+    breakdown: {},
+    ranked: false,
+    outcome: "bankrupt",
+  };
+  store.dispatch(
+    delta({ difficulty: "Employee", inGame: true, scenarioId: 122 }),
+  );
+  store.dispatch(victoryOpen(victory));
+  mapDispatchToProps(store.dispatch).onRetry(victory);
+  expect(store.getState().game.scenarioId).toBe(117);
+  expect(store.getState().game.difficulty).toBe("CEO");
+  expect(store.getState().game.date.monthsElapsed).toBe(0);
+  expect(store.getState().card.name).toBe("LOADING");
+  expect(store.getState().ui.victory).toBeNull();
+});
+
 // Retry does not branch on outcome: cover each difficulty and all terminal outcomes
 // without repeating the same assertions for their full cross product.
 it.each([

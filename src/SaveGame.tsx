@@ -1,3 +1,6 @@
+import { POLICY_IDS } from "./data/Policies";
+import { validLegacyCampaign } from "./helpers/LegacyCampaign";
+import { validLegacyCampaignEvidence } from "./helpers/ObjectiveRules";
 import { validUtilityExpansion } from "./helpers/ExpansionValidation";
 import { validScenarioMod } from "./helpers/ScenarioMod";
 import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
@@ -15,7 +18,11 @@ import {
   normalizedInputs,
 } from "./helpers/RunIdentity";
 import { validInvitation } from "./helpers/Challenge";
-import { validPolicies, validDeferredResidential } from "./helpers/Policies";
+import {
+  validPolicies,
+  validDeferredResidential,
+  policyAllowedForGame,
+} from "./helpers/Policies";
 import { validDeferredThermal } from "./helpers/ThermalFlexibility";
 import {
   restoreCommitmentMetadata,
@@ -597,6 +604,24 @@ export function parseSave(raw: unknown): SaveGameType | null {
     )
   )
     return null;
+  if (
+    game.campaign &&
+    game.policies &&
+    POLICY_IDS.some((id) => {
+      const program = game.policies!.programs[id];
+      return (
+        (!policyAllowedForGame(game as GameType, id) &&
+          (program.tier === "On" ||
+            program.adoption > 0 ||
+            program.spent > 0 ||
+            program.spending > 0 ||
+            (program.installs?.length ?? 0) > 0)) ||
+        (program.pending?.tier === "On" &&
+          !policyAllowedForGame(game as GameType, id, program.pending.month))
+      );
+    })
+  )
+    return null;
   const exercise = game.tutorialIntertieStress;
   if (
     exercise !== undefined &&
@@ -643,6 +668,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
   // compilation can also reject unsupported saved setup; an import must return null, not throw.
   try {
     if (
+      !validLegacyCampaign(game as GameType) ||
+      !validLegacyCampaignEvidence(game as GameType) ||
       !validUtilityExpansion(game as GameType) ||
       !validScenarioRuleState(game as GameType) ||
       !validGameObjectiveProgress(game as GameType)

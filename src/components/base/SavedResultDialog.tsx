@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import { SavedRunResult } from "../../Types";
 import { ResultScore, resultTitle, RunDebrief } from "./RunResult";
+import CampaignGoalBasis from "./CampaignGoalBasis";
 
 /** A historical result never dispatches game actions or enriches leaderboard state. */
 export default function SavedResultDialog(props: {
@@ -39,6 +40,10 @@ export default function SavedResultDialog(props: {
             {result.endMessage && <Typography>{result.endMessage}</Typography>}
             <ResultScore result={result} />
             {result.debrief && <RunDebrief debrief={result.debrief} />}
+            <CampaignGoalBasis
+              scenarioId={result.scenarioId}
+              results={result.debrief?.objectiveResults}
+            />
           </DialogContent>
           <DialogActions>
             <Button autoFocus variant="contained" onClick={props.onClose}>

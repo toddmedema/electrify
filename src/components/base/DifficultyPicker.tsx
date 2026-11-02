@@ -63,7 +63,7 @@ export default function DifficultyPicker({
           }}
         >
           {DIFFICULTY_IDS.map((d) => (
-            <MenuItem value={d} key={d}>
+            <MenuItem value={d} key={d} aria-label={DIFFICULTY_LABELS[d]}>
               <Tooltip
                 title={`${DIFFICULTY_DESCRIPTIONS[d]} ${reliabilityRuleText(d)}`}
                 placement="right"

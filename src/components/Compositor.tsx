@@ -46,6 +46,8 @@ import ManualHelpPopover from "./base/ManualHelpPopover";
 import ManualContainer from "./views/ManualContainer";
 import NewGameContainer from "./views/NewGameContainer";
 import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
+import CampaignSetupContainer from "./views/CampaignSetupContainer";
+import CampaignHandoverContainer from "./base/CampaignHandoverContainer";
 import SettingsContainer from "./views/SettingsContainer";
 import SavedGames from "./views/SavedGames";
 import { navigate, navigateBack } from "../reducers/Card";
@@ -512,6 +514,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <NewGameContainer />;
       case "NEW_GAME_DETAILS":
         return <NewGameDetailsContainer />;
+      case "CAMPAIGN":
+        return <CampaignSetupContainer />;
       case "CHALLENGE":
         return <ChallengeLanding />;
       case "CUSTOM_GAME":
@@ -801,6 +805,7 @@ export default class Compositor extends React.Component<Props, {}> {
         {/* Connected, so they still update when shouldComponentUpdate blocks this component --
             neither is driven by the current card, and both can open over any of them */}
         <VictoryDialogContainer />
+        <CampaignHandoverContainer />
         <SaveTransitionDialog />
         <DisplayNameDialogContainer />
         <AudioContainer />

@@ -18,7 +18,11 @@ import { createGame } from "../../testing/Simulator";
 import * as ExpectedOutput from "../../helpers/ExpectedOutput";
 import * as GameReducer from "../../reducers/Game";
 import * as Facilities from "../../data/Facilities";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
+import {
+  getTimeFromTimeline,
+  getDateFromMinute,
+  MINUTES_PER_MONTH,
+} from "../../helpers/DateTime";
 import { SCENARIOS } from "../../data/Scenarios";
 import { formatMoneyConcise } from "../../helpers/Format";
 import {
@@ -30,8 +34,69 @@ import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
 import { purchaseTerms } from "../../helpers/Financials";
 import { computeOutlook } from "../base/OutlookForecast";
 import type { EvidenceRequestType } from "../../Types";
+import { LEGACY_SCENARIOS } from "../../data/LegacyCampaign";
 
 jest.mock("../base/ManualLink", () => () => null);
+
+it("buys a sub-megawatt generator through the campaign's ordinary size and loan controls", () => {
+  const game = createGame({
+    scenarioId: 117,
+    scenario: LEGACY_SCENARIOS[0],
+    seed: 611,
+  });
+  game.timeline = game.timeline.map((tick) => ({ ...tick, cash: 1000000 }));
+  const onBuildGenerator = jest.fn();
+  render(
+    <BuildGenerators
+      game={game}
+      onBack={jest.fn()}
+      onBuildGenerator={onBuildGenerator}
+    />,
+  );
+  const slider = screen.getByRole("slider");
+  expect(slider).toHaveAttribute("min", "-14");
+  expect(slider).toHaveAttribute("max", "-5");
+  fireEvent.change(slider, { target: { value: "-14" } });
+  expect(slider).toHaveAttribute("aria-valuetext", "50kW");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Coal" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Take loan" }));
+  expect(onBuildGenerator.mock.calls[0][0].peakW).toBe(50000);
+  expect(onBuildGenerator.mock.calls[0][1]).toBe(true);
+});
+
+it("buys the early 750 kW hydro site without expanding the steam size range", () => {
+  const game = createGame({ scenarioId: 117, seed: 611 });
+  const offset = 13 * 12 * MINUTES_PER_MONTH;
+  game.date = getDateFromMinute(offset, game.startingYear);
+  game.timeline = game.timeline.map((tick) => ({
+    ...tick,
+    minute: tick.minute + offset,
+    cash: 1e9,
+  }));
+  expect(getHydroAvailability(game, 100000).selected?.maxPeakW).toBe(750000);
+  const onBuild = jest.fn();
+  render(
+    <BuildGenerators
+      game={game}
+      onBack={jest.fn()}
+      onBuildGenerator={onBuild}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
+  const slider = screen.getByRole("slider");
+  expect(slider).toHaveAttribute("max", "-5");
+  expect(slider).toHaveAttribute("aria-valuetext", "500kW");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Hydro" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(onBuild).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Hydro", peakW: 750000 }),
+    false,
+  );
+});
 
 it.each([false, true])(
   "resizes an unaffordable generator to the largest affordable slider size (live cash: %s)",

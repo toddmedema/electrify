@@ -1,4 +1,5 @@
 import { UTILITY_AREAS } from "./UtilityExpansion";
+import { LEGACY_SCENARIOS } from "./LegacyCampaign";
 import { officialRetentionMetadata } from "./OfficialScenarioRules";
 import {
   beginIntertieStress,
@@ -2003,7 +2004,10 @@ export function getScenario(
   if (scenarioId === CUSTOM_SCENARIO_ID) {
     return custom;
   }
-  return SCENARIOS.find((s: ScenarioType) => s.id === scenarioId);
+  return (
+    SCENARIOS.find((s: ScenarioType) => s.id === scenarioId) ??
+    LEGACY_SCENARIOS.find((s: ScenarioType) => s.id === scenarioId)
+  );
 }
 
 /** Resolve the authored behavior of the current step without coupling callers to its index. */

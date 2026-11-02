@@ -329,6 +329,7 @@ interface State {
   viewport: ChartViewportRange;
   // The game month the viewport was last advanced to
   viewportMonth: number;
+  viewportTermStartMonth: number;
   viewportAnnouncement: string;
 }
 
@@ -337,7 +338,9 @@ const VIEWPORT_PAN_FRACTION = 0.25;
 
 function scenarioEndMinute(game: GameType): number | undefined {
   const months = activeScenario(game)?.durationMonths;
-  return months ? months * MINUTES_PER_MONTH : undefined;
+  return months
+    ? (months + (game.campaign?.termStartMonth ?? 0)) * MINUTES_PER_MONTH
+    : undefined;
 }
 
 // Begin with the scenario's planning horizon; unbounded games use twenty years.
@@ -690,6 +693,7 @@ export default class Insights extends React.Component<Props, State> {
         ? this.restoredViewport(props.savedViewport)
         : initialViewport(props.game),
       viewportMonth: props.game.date.monthsElapsed,
+      viewportTermStartMonth: props.game.campaign?.termStartMonth ?? 0,
       viewportAnnouncement: "",
     };
   }
@@ -707,6 +711,21 @@ export default class Insights extends React.Component<Props, State> {
     state: State,
   ): Partial<State> | null {
     const month = props.game.date.monthsElapsed;
+    const termStart = props.game.campaign?.termStartMonth ?? 0;
+    if (termStart !== state.viewportTermStartMonth) {
+      const duration = activeScenario(props.game)?.durationMonths ?? 240;
+      const previousEnd =
+        (state.viewportTermStartMonth + duration) * MINUTES_PER_MONTH;
+      const viewport: ChartViewportRange =
+        state.viewport[1] === previousEnd
+          ? [state.viewport[0], scenarioEndMinute(props.game)!]
+          : state.viewport;
+      return {
+        viewport,
+        viewportMonth: month,
+        viewportTermStartMonth: termStart,
+      };
+    }
     if (month === state.viewportMonth) return null;
     const advanced = advanceViewport(
       props.game,
@@ -831,9 +850,14 @@ export default class Insights extends React.Component<Props, State> {
   }
 
   private restoredViewport(origin: SavedViewport): ChartViewportRange {
+    const termStart = this.props.game.campaign?.termStartMonth ?? 0;
+    const viewport: ChartViewportRange =
+      termStart > 0 && origin.viewport[1] === termStart * MINUTES_PER_MONTH
+        ? [origin.viewport[0], scenarioEndMinute(this.props.game)!]
+        : origin.viewport;
     return advanceViewport(
       this.props.game,
-      origin.viewport,
+      viewport,
       this.props.game.date.monthsElapsed - origin.month,
     );
   }

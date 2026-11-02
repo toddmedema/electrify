@@ -25,6 +25,7 @@ const smoke = [
 ];
 const layout = [
   "build-generator-loading.spec.ts",
+  "campaign.spec.ts",
   "sign-in.spec.ts",
   "learning-pages.spec.ts",
   "ui-chart-build-polish.spec.ts",

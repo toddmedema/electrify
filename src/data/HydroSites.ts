@@ -3,6 +3,11 @@ import { UTILITY_AREAS, UTILITY_TARGETS } from "./UtilityExpansion";
 import type { GameType, LocationType, ScenarioFacilityType } from "../Types";
 import { LOCATIONS } from "../Constants";
 import catalogue from "./HydroSiteCatalogue.json";
+import {
+  isLegacyCampaignScenarioId,
+  LEGACY_HYDRO_INVENTORY_KEY,
+  LEGACY_HYDRO_SITES,
+} from "./LegacyEra";
 
 export interface HydroSite {
   id: string;
@@ -10,6 +15,8 @@ export interface HydroSite {
   maxPeakW: number;
   lat: number;
   lon: number;
+  /** Trusted campaign construction date; physical claims remain valid after commissioning. */
+  availableFromYear?: number;
 }
 export interface HydroInventory {
   /** Inherited fictional equipment does not establish a new development site. */
@@ -23,11 +30,19 @@ export interface HydroInventory {
   locationLong?: number;
 }
 export const HYDRO_SITES: Readonly<Record<string, HydroSite>> =
-  Object.fromEntries(catalogue.sites.map((site) => [site.id, site]));
-export const HYDRO_INVENTORIES = catalogue.inventories as Record<
-  string,
-  HydroInventory
->;
+  Object.fromEntries(
+    [...catalogue.sites, ...LEGACY_HYDRO_SITES].map((site) => [site.id, site]),
+  );
+export const HYDRO_INVENTORIES: Record<string, HydroInventory> = {
+  ...(catalogue.inventories as Record<string, HydroInventory>),
+  [LEGACY_HYDRO_INVENTORY_KEY]: {
+    status: "researched",
+    locationId: "SF",
+    siteIds: LEGACY_HYDRO_SITES.map(({ id }) => id),
+    researchDisposition:
+      "Fictional campaign sites with dated construction access; Folsom's 1895 units provide only an early scale reference.",
+  },
+};
 const authoredInventories = Object.entries(HYDRO_INVENTORIES).filter(
   ([, inventory]) => inventory.authoredScenarioId !== undefined,
 );
@@ -39,7 +54,7 @@ type HydroState = Pick<
   | "scenarioId"
   | "customScenario"
   | "utilityExpansion"
->;
+> & { date?: Pick<GameType["date"], "year"> };
 export function isConventionalHydro(facility: {
   fuel?: unknown;
   peakWh?: unknown;
@@ -91,6 +106,12 @@ export function validHydroInventorySource(state: HydroContext): boolean {
 }
 export function getHydroInventoryKey(state: HydroContext): string | undefined {
   if (!canonicalLocation(state.location)) return undefined;
+  if (
+    isLegacyCampaignScenarioId(state.scenarioId) &&
+    !state.customScenario &&
+    state.location.id === "SF"
+  )
+    return LEGACY_HYDRO_INVENTORY_KEY;
   const custom = state.customScenario;
   if (!custom || (custom.mod && validHydroInventorySource(state))) {
     const exception = authoredInventoryKey(
@@ -135,7 +156,12 @@ export function getHydroAvailability(state: HydroState, peakW: number) {
   const sites =
     inventory?.siteIds.map((id) => HYDRO_SITES[id]).filter(Boolean) || [];
   const remaining = sites
-    .filter((site) => !used.has(site.id))
+    .filter(
+      (site) =>
+        !used.has(site.id) &&
+        (site.availableFromYear === undefined ||
+          (state.date?.year ?? Infinity) >= site.availableFromYear),
+    )
     .sort(compareHydroSites);
   const eligible = validHydroCapacity(peakW)
     ? remaining.filter((site) => site.maxPeakW >= peakW)
@@ -293,7 +319,13 @@ function validHydroClaimSet(
   const history = new Set(state.commissionedHydroSiteIds);
   if (
     history.size !== state.commissionedHydroSiteIds.length ||
-    [...history].some((id) => typeof id !== "string" || !ids.has(id))
+    [...history].some(
+      (id) =>
+        typeof id !== "string" ||
+        !ids.has(id) ||
+        (HYDRO_SITES[id].availableFromYear ?? -Infinity) >
+          (state.date?.year ?? Infinity),
+    )
   )
     return false;
   const current = new Set<string>();
@@ -307,6 +339,8 @@ function validHydroClaimSet(
     if (
       typeof id !== "string" ||
       !ids.has(id) ||
+      (HYDRO_SITES[id].availableFromYear ?? -Infinity) >
+        (state.date?.year ?? Infinity) ||
       current.has(id) ||
       !validHydroCapacity(f.peakW) ||
       f.peakW > HYDRO_SITES[id].maxPeakW ||

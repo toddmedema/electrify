@@ -10,6 +10,7 @@ import { regionalizeFuelPrices } from "./LocationProfiles";
 import { pow } from "../helpers/Pow";
 import { BASE_INFLATION } from "./Economy";
 import { exp, log } from "../helpers/Libm";
+import { legacyFuelPrices } from "./LegacyEra";
 
 // Sources: every column is nominal (that month's own dollars) per million Btu delivered to the
 // generator, so a fuel's price times a plant's heat rate is its fuel cost per MWh.
@@ -33,8 +34,7 @@ import { exp, log } from "../helpers/Libm";
 // added. 2019 lands at $0.62/MMBtu, ~$6.6/MWh at the game's heat rate, against EIA Electric Power
 // Annual Table 8.4's ~5-7 mills/kWh nuclear fuel expense.
 
-// The first year in FuelPricesRaw.csv. Asking for a year before this means the CSV was never
-// loaded, rather than that the game is being played in the 1970s.
+// The first recorded year; earlier campaign dates use a labeled proxy anchored to its January.
 const EARLIEST_DATA_YEAR = 1975;
 
 // The last year in it. Mirrored as a constant rather than read off the loaded table for the same
@@ -467,6 +467,18 @@ export function getFuelPricesPerMBTU(
   seed: number,
   location?: LocationType,
 ): FuelPricesType {
+  if (date.year < EARLIEST_DATA_YEAR) {
+    // Load readiness remains mandatory. An early quote must not silently invent its seam.
+    const reference = fuelPrices[EARLIEST_DATA_YEAR]?.[1];
+    if (!reference)
+      throw new Error(
+        `No fuel prices loaded for the early campaign baseline. Call initFuelPrices first.`,
+      );
+    return regionalizeFuelPrices(
+      legacyFuelPrices(date.year, date.monthNumber, reference),
+      location,
+    );
+  }
   if (fuelPrices[date.year] === undefined) {
     // Prices only run from EARLIEST_DATA_YEAR, so anything before that means nothing was
     // loaded. Without the floor this walks backwards forever and hangs whatever called it.

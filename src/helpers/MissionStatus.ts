@@ -22,6 +22,7 @@ import { selectProjection } from "./Projection";
 import { isUtilityExpansionGame } from "./ExpansionContext";
 import { MONTHS } from "../Constants";
 import { utilityServiceGap } from "./UtilityPlanning";
+import { legacyCompletedMonths, legacyMonthOffset } from "./LegacyCampaign";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import {
   objectiveDefinitionText,
@@ -67,6 +68,7 @@ function objectiveRequirement(
   result: ObjectiveResult,
   startingYear: number,
   durationMonths: number,
+  dollarBasisYear?: number,
 ): MissionRequirement {
   const objective = result.objective;
   const last =
@@ -91,15 +93,21 @@ function objectiveRequirement(
       ? "pending"
       : objectiveValueText(objective, result.observed, result.target);
   const compact = `${target} (${observed})`;
+  const basis =
+    dollarBasisYear !== undefined &&
+    (objective.metric === "monthlyBilledRate" ||
+      objective.metric === "monthEndDebt")
+      ? ` · ${dollarBasisYear} dollars`
+      : "";
   return {
     id: result.id,
     label: result.label,
     definition: objectiveDefinitionText(result),
     required: result.required,
     reason: result.reason,
-    current,
-    target: objectiveGoalText(objective, startingYear, durationMonths),
-    compact: `${result.required ? "" : "Optional · "}${compact}${result.status === "unverifiable" ? " · incomplete history" : ""}`,
+    current: current + basis,
+    target: objectiveGoalText(objective, startingYear, durationMonths) + basis,
+    compact: `${result.required ? "" : "Optional · "}${compact}${basis}${result.status === "unverifiable" ? " · incomplete history" : ""}`,
     timing: `Completed months ${(first % 12) + 1}/${startingYear + Math.floor(first / 12)}–${(last % 12) + 1}/${startingYear + Math.floor(last / 12)}${result.required ? "" : "; optional, does not end the run"}`,
     status: statuses[result.status],
     deadline: startingYear * 12 + last + 1,
@@ -110,12 +118,19 @@ function objectiveRequirement(
 export function getMissionStatus(game: GameType) {
   const scenario = activeScenario(game);
   const duration = scenario?.durationMonths || 240;
-  const monthsRemaining = Math.max(0, duration - game.date.monthsElapsed);
+  const monthsRemaining = Math.max(0, duration - legacyCompletedMonths(game));
+  const termStartingYear = game.startingYear + legacyMonthOffset(game) / 12;
   const currentMonth = absoluteMonth(game.date.year, game.date.monthNumber);
   const history = completedMissionHistory(game);
   const now = currentTick(game);
   const requirements: MissionRequirement[] = gameObjectiveResults(game).map(
-    (result) => objectiveRequirement(result, game.startingYear, duration),
+    (result) =>
+      objectiveRequirement(
+        result,
+        termStartingYear,
+        duration,
+        game.campaign ? game.startingYear : undefined,
+      ),
   );
   requirements.push({
     id: "cash",

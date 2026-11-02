@@ -220,3 +220,23 @@ it("carries table-dollar upkeep through historical deflation and subsequent infl
     10,
   );
 });
+
+it("gives early generations an explicit price basis and stable modeled borrowing rates", () => {
+  initEconomyFromCsv(fixtureCsv());
+  const early = getDateFromMinute(0, 1882);
+  expect(getPrimeRate(early, SEED)).toBe(0.06);
+  expect(getInflationRate(early, SEED)).toBe(0);
+  expect(getCostTableDeflator(1882)).toBeCloseTo(9.9 / 304.702, 12);
+  const depression = getDateFromMinute(0, 1930);
+  expect(getInflationRate(depression, SEED)).toBeLessThan(0);
+  expect(getCostTableDeflator(1942)).toBeCloseTo(16.3 / 304.702, 12);
+  const index = getInflationIndex(
+    getDateFromMinute(100 * 1440, 1882),
+    1882,
+    SEED,
+  );
+  initEconomyFromCsv(fixtureCsv());
+  expect(
+    getInflationIndex(getDateFromMinute(100 * 1440, 1882), 1882, SEED),
+  ).toBe(index);
+});

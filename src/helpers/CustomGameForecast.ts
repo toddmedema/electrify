@@ -1,3 +1,4 @@
+import { isLegacyCampaignScenario } from "../data/LegacyCampaign";
 import { TICKS_PER_YEAR } from "../Constants";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { CUSTOM_SCENARIO_ID } from "../data/Scenarios";
@@ -77,11 +78,18 @@ export function forecastCustomGameTimeline(
   }
   const customers =
     scenario.startingCustomers || getStartingCustomers(location);
-  let game = gameReducer(undefined, start(CUSTOM_SCENARIO_ID));
+  let game = gameReducer(
+    undefined,
+    start(
+      isLegacyCampaignScenario(scenario.id) ? scenario.id : CUSTOM_SCENARIO_ID,
+    ),
+  );
   game = gameReducer(
     game,
     delta({
-      customScenario: scenario,
+      ...(isLegacyCampaignScenario(scenario.id)
+        ? { scenarioId: scenario.id, customScenario: undefined }
+        : { customScenario: scenario }),
       difficulty,
     }),
   );

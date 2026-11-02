@@ -297,6 +297,34 @@ describe("getWeather", () => {
     expect(Number.isFinite(before.WIND_KPH)).toBe(true);
   });
 
+  it("bootstraps early climate identically after reload without altering recorded weather", () => {
+    const date = getDateFromMinute(6 * 1440 + 13 * 60 + 30, 1882);
+    const historical = getWeather(dateAt(0, 8), SEED);
+    const early = getWeather(date, SEED);
+    expect(early.YEAR).toBe(1882);
+    expect(early.MONTH).toBe(7);
+    expect(early.TEMP_C).toBeGreaterThan(0);
+    expect(early.WIND_KPH).toBeGreaterThan(0);
+    getWeather(getDateFromMinute(11 * 1440 + 23 * 60 + 30, 1979), SEED);
+    expect(getWeather(dateAt(0, 8), SEED)).toEqual(historical);
+    initWeatherFromRows("PIT", fixtureRows());
+    expect(getWeather(date, SEED)).toEqual(early);
+  });
+
+  it("uses the same early year draw for a city and its watershed", () => {
+    initWeatherFromRows(
+      "basin",
+      fixtureRows().map((row) => ({ ...row, TEMP_C: row.TEMP_C + 5 })),
+      true,
+    );
+    const date = getDateFromMinute(2 * 1440 + 10 * 60 + 30, 1882);
+    const city = getWeather(date, SEED, 0, "PIT");
+    const basin = getWeather(date, SEED, 0, "basin");
+    expect(basin.TEMP_C - city.TEMP_C).toBeCloseTo(5, 10);
+    expect(basin.PRECIP_MM).toBe(city.PRECIP_MM);
+    expect(basin.WIND_KPH).toBe(city.WIND_KPH);
+  });
+
   // The bug this replaced: forecasting filled a single day per cache miss, so a lookup years past
   // the data fell through to DUMMY_WEATHER and stayed there for as many calls as there were
   // missing days. A loaded save jumps straight to its own date, with nothing in between.

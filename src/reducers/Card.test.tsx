@@ -74,6 +74,13 @@ describe("card reducer", () => {
     expect(cardReducer(custom, navigateBack()).name).toBe("NEW_GAME");
   });
 
+  it("returns from campaign setup to the game picker", () => {
+    const list = cardReducer(undefined, navigate("NEW_GAME"));
+    const setup = cardReducer(list, navigate("CAMPAIGN"));
+    expect(setup.name).toBe("CAMPAIGN");
+    expect(cardReducer(setup, navigateBack()).name).toBe("NEW_GAME");
+  });
+
   it("returns to the title screen on a plain quit", () => {
     const state = cardReducer(undefined, quit());
     expect(state.name).toBe("MAIN_MENU");

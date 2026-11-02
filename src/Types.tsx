@@ -194,6 +194,7 @@ export interface DifficultyMultipliersType {
 }
 
 export type CardNameType =
+  | "CAMPAIGN"
   | "BUILD_GENERATORS"
   | "BUILD_STORAGE"
   | "BUILD_INTERTIES"
@@ -1280,6 +1281,43 @@ export interface AcquireUtilityAction {
   financed: boolean;
   quoteKey: string;
 }
+/** One bounded CEO generation, retaining its own verifiable completed-month evidence. */
+export interface LegacyCampaignTermType {
+  generationIndex: number;
+  scenarioId: number;
+  openingCustomers: number;
+  referenceRate: number;
+  peakMW: number;
+  northCapacityMW: number;
+  debtAllowance: number;
+  emissionsBudgetTonnes: number;
+  inheritedDemandMultiplier: number;
+  closingCash: number;
+  closingCustomers: number;
+  closingDebt: number;
+  objectiveProgress: ObjectiveProgress;
+  objectiveResults: ObjectiveResult[];
+  debrief: VictoryDebriefType;
+}
+
+/** The physical simulation clock remains continuous; only CEO evidence uses local months. */
+export interface LegacyCampaignType {
+  version: 1;
+  generationIndex: number;
+  termStartMonth: number;
+  openingCustomers: number;
+  referenceRate: number;
+  peakMW: number;
+  northCapacityMW: number;
+  debtAllowance: number;
+  emissionsBudgetTonnes: number;
+  inheritedDemandMultiplier: number;
+  openingCash: number;
+  openingFleet: VictoryFleetCapacityType[];
+  completedTerms: LegacyCampaignTermType[];
+  pendingHandover: boolean;
+}
+
 export interface GameType {
   utilityExpansion?: UtilityExpansionState;
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
@@ -1331,6 +1369,7 @@ export interface GameType {
   // The scenario the player assembled on the custom game screen. Authored scenarios live in
   // SCENARIOS, this one only ever exists here, so every lookup has to go through getScenario()
   customScenario?: ScenarioType;
+  campaign?: LegacyCampaignType;
   location: LocationType;
   speed: SpeedType;
   inGame: boolean;

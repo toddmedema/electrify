@@ -13,7 +13,11 @@ import cloneDeep from "lodash.clonedeep";
 import * as React from "react";
 import { flushSync } from "react-dom";
 import { Provider } from "react-redux";
-import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import {
+  EMPTY_HISTORY,
+  MINUTES_PER_MONTH,
+  getDateFromMinute,
+} from "../../helpers/DateTime";
 import { CUSTOM_SCENARIO_ID, getScenario } from "../../data/Scenarios";
 import * as GameModule from "../../reducers/Game";
 import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
@@ -63,6 +67,34 @@ let mockSupplyDemandPaints = 0;
 // Restore real timers even when a test that fakes them fails partway
 afterEach(() => {
   jest.useRealTimers();
+});
+
+it("extends the full planning horizon when a successor takes over, including restored views", () => {
+  const first = createGame({ scenarioId: 117 });
+  const props = {
+    game: first,
+    selectedFacilityId: null,
+    facilityDragActive: false,
+  };
+  const initial = new Insights(props);
+  const offset = 240 * MINUTES_PER_MONTH;
+  const game = {
+    ...first,
+    scenarioId: 118,
+    date: getDateFromMinute(offset, first.startingYear),
+    campaign: { ...first.campaign!, generationIndex: 1, termStartMonth: 240 },
+  };
+  const next = { ...props, game };
+  const successor = new Insights(next);
+  expect(successor.state.viewport[1]).toBe(480 * MINUTES_PER_MONTH);
+  expect(
+    Insights.getDerivedStateFromProps(next, initial.state)?.viewport?.[1],
+  ).toBe(480 * MINUTES_PER_MONTH);
+  const restored = new Insights({
+    ...next,
+    savedViewport: { month: 240, viewport: [0, offset] },
+  });
+  expect(restored.state.viewport[1]).toBe(480 * MINUTES_PER_MONTH);
 });
 
 it("keeps first worker startup and long worker recovery out of the Insights render", () => {
