@@ -7,6 +7,7 @@ const smoke = [
   "contextual-learning.spec.ts",
   "escape-close.spec.ts",
   "game-workspace.spec.ts",
+  "insights-policy-projection.spec.ts",
   "mission-evidence.spec.ts",
   "tutorial-exit.spec.ts",
   "tutorial-actions.spec.ts",
