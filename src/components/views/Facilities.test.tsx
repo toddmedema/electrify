@@ -1102,6 +1102,66 @@ describe("unified connections", () => {
     expect(building).not.toHaveTextContent("Import available now");
     expect(building).toHaveTextContent("Typical price");
   });
+
+  it.each([
+    ["PAUSED", "true"],
+    ["FAST", "false"],
+  ] as const)(
+    "draws an intertie under construction with the same row anatomy as a plant (clock %s)",
+    (speed, paused) => {
+      const game = connectedGame();
+      game.speed = speed;
+      const plant = game.facilities[0];
+      plant.yearsToBuild = 2;
+      plant.yearsToBuildLeft = 1;
+      // Half built, with a year to go: the same reading as the plant above
+      game.transmission!.lines[1].minuteCreated -= 12 * MINUTES_PER_MONTH;
+      renderFacilities(game, null);
+      /* eslint-disable testing-library/no-node-access */
+      const plantRow = document.querySelector(
+        `.facilityRow[data-facility="${plant.name}"]`,
+      )!;
+      const lineRow = document.querySelectorAll(".transmissionLine")[1];
+      const parts = (row: Element) => ({
+        header: row.querySelector(".facilityRowHeader")!,
+        text: row.querySelector(".facilityText")!,
+        status: row.querySelector(".facilityStatus")!,
+        detail: row.querySelector(".facilityStatusDetail")!,
+        bar: row.querySelector(".constructionProgress")!,
+        fill: row.querySelector(".constructionProgressFill")!,
+        badge: row.querySelector(
+          '.facilityActivity [data-concept="construction"]',
+        ),
+      });
+      const [plantParts, lineParts] = [parts(plantRow), parts(lineRow)];
+
+      // Same words, in the same two pieces: the reading, then the time left
+      expect(plantParts.status).toHaveTextContent("Building 50%");
+      expect(lineParts.status).toHaveTextContent("Building 50%");
+      expect(plantParts.detail).toHaveTextContent("· 12 months left");
+      expect(lineParts.detail).toHaveTextContent("· 12 months left");
+
+      // The meter is the same decorative element, a child of the row's text, so one rule can
+      // pin it across the foot of the whole header whatever kind of row it is in
+      for (const row of [plantParts, lineParts]) {
+        expect(row.bar.parentElement).toBe(row.text);
+        expect(row.header).toContainElement(row.bar as HTMLElement);
+        expect(row.bar).toHaveAttribute("aria-hidden", "true");
+        expect(row.bar).toHaveAttribute("data-paused", paused);
+        // Sized only: colour comes from the stylesheet, not from the row
+        expect(row.fill.getAttribute("style")).toBe("width: 50%;");
+        expect(row.badge).not.toBeNull();
+      }
+
+      // And so is everything around it, element for element and class for class
+      const skeleton = (element: Element) =>
+        Array.from(element.querySelectorAll("*"))
+          .map((node) => `${node.tagName}.${node.getAttribute("class")}`)
+          .join(" ");
+      expect(skeleton(lineParts.text)).toBe(skeleton(plantParts.text));
+      /* eslint-enable testing-library/no-node-access */
+    },
+  );
 });
 
 it.each([false, true])(

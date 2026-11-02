@@ -235,11 +235,15 @@ for (const theme of ["light", "dark"] as const) {
     expect(
       await line.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
+    // The icon and its construction badge dim together, as a plant's avatar does
     expect(
       await line
-        .locator(".transmissionListIcon")
+        .locator(".transmissionIcon")
         .evaluate((el) => Number(getComputedStyle(el).opacity)),
     ).toBeLessThan(1);
+    await expect(
+      line.locator('.transmissionIcon [data-concept="construction"]'),
+    ).toBeAttached();
     await line.scrollIntoViewIfNeeded();
     await page.screenshot({
       path: testInfo.outputPath(`intertie-${theme}.png`),

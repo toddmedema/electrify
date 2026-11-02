@@ -8,7 +8,6 @@ import {
   List,
   ListItem,
   ListItemAvatar,
-  ListItemText,
   Typography,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
@@ -57,6 +56,8 @@ import {
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import FlowBar from "../base/FlowBar";
+import FacilityRowText from "../base/FacilityRowText";
+import { constructionStatus } from "../base/ConstructionProgress";
 import { getStorageBoolean, setStorageKeyValue } from "../../LocalStorage";
 import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import FacilityDetails from "../base/FacilityDetails";
@@ -427,10 +428,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   let reading = "";
   let detail: React.ReactNode = null;
   if (underConstruction) {
-    const monthsLeft = Math.ceil(props.facility.yearsToBuildLeft * 12);
-    const percentBuilt = Math.round(builtFraction * 100);
-    reading = `Building ${percentBuilt}%`;
-    detail = `${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
+    ({ reading, detail } = constructionStatus(
+      builtFraction,
+      facility.yearsToBuildLeft,
+    ));
   } else if (upgrading) {
     const daysLeft = upgradeDaysLeft(installing!, game.date.minute);
     reading = partialUpgrade
@@ -596,65 +597,39 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             >
               <ListItem className="facility" component="span">
                 {reorderDisabled && icon}
-                <span className="facilityText">
-                  <ListItemText
-                    slotProps={{
-                      primary: { component: "span" },
-                      secondary: { component: "span" },
-                    }}
-                    primary={
-                      <>
-                        <span className="facilityName">
-                          {facilityDisplayName(facility)}
-                        </span>
-                        {ready && (
-                          <span className="facilityReadyLabel">Ready</span>
-                        )}
-                        {storyOutputMultiplier < 1 && (
-                          <Chip
-                            className="storyDerateBadge"
-                            color="warning"
-                            size="small"
-                            label={`${Math.round(storyOutputMultiplier * 100)}% limit`}
-                            aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
-                          />
-                        )}
-                      </>
-                    }
-                    secondary={
-                      <>
-                        {hazardStatus && !underConstruction && (
-                          <HazardStatusLead status={hazardStatus} />
-                        )}
-                        <span className="facilityStatus">{status}</span>
-                        {detail && (
-                          <span className="facilityStatusDetail">
-                            <span
-                              className="facilityStatusSeparator"
-                              aria-hidden="true"
-                            >
-                              {" · "}
-                            </span>
-                            {detail}
-                          </span>
-                        )}
-                      </>
-                    }
-                  />
-                  {/* The percentage is already in the text; this only makes it glanceable */}
-                  {(underConstruction || upgrading) && (
-                    <span
-                      className="constructionProgress"
-                      data-paused={game.speed === "PAUSED"}
-                      aria-hidden
-                    >
-                      <span
-                        className="constructionProgressFill"
-                        style={{ width: `${builtFraction * 100}%` }}
-                      />
-                    </span>
-                  )}
-                </span>
+                <FacilityRowText
+                  name={
+                    <>
+                      <span className="facilityName">
+                        {facilityDisplayName(facility)}
+                      </span>
+                      {ready && (
+                        <span className="facilityReadyLabel">Ready</span>
+                      )}
+                      {storyOutputMultiplier < 1 && (
+                        <Chip
+                          className="storyDerateBadge"
+                          color="warning"
+                          size="small"
+                          label={`${Math.round(storyOutputMultiplier * 100)}% limit`}
+                          aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
+                        />
+                      )}
+                    </>
+                  }
+                  lead={
+                    hazardStatus && !underConstruction ? (
+                      <HazardStatusLead status={hazardStatus} />
+                    ) : undefined
+                  }
+                  status={status}
+                  detail={detail}
+                  progress={
+                    underConstruction || upgrading
+                      ? { builtFraction, paused: game.speed === "PAUSED" }
+                      : undefined
+                  }
+                />
                 {props.selectionEnabled && (
                   <span className="facilitySelectionSlot" aria-hidden>
                     {props.bulkSelected && !props.showCheckboxes && (

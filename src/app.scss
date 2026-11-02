@@ -5472,13 +5472,6 @@ $homeSmokeCycle: 5.6s;
   &[open] > summary::after {
     content: "−";
   }
-  .transmissionLineText {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-width: 0;
-    gap: 4px;
-  }
 }
 .transmissionLineDetails {
   padding: 0 16px 16px 68px;
@@ -5490,9 +5483,6 @@ $homeSmokeCycle: 5.6s;
     gap: 8px;
     padding: 12px;
     flex-wrap: wrap;
-  }
-  .transmissionLine .transmissionLineText {
-    flex-basis: calc(100% - 64px);
   }
   .transmissionLineDetails {
     padding: 0 12px 12px;
@@ -5899,27 +5889,9 @@ $homeSmokeCycle: 5.6s;
 .transmissionFleet {
   margin-top: 0;
 }
-.transmissionLine > .facilityRowHeader > .facilityDisclosure {
-  gap: 8px;
-  padding: 12px 16px;
-}
-.transmissionLine .facilityDragHandle + .facilityDisclosure {
-  padding-left: 8px;
-}
+// A row without a grip carries its icon inside the disclosure, as a plant row does.
 .transmissionLine .facilityDisclosure .transmissionListIcon {
   margin-right: 8px;
-}
-.transmissionLine .transmissionLineName {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  white-space: nowrap;
-  font-size: var(--font-size-subtitle);
-  font-weight: 600;
-}
-.transmissionLine .MuiChip-root {
-  margin: 0;
 }
 .transmissionLine .transmissionLineDetails {
   padding: 0 16px 16px;
@@ -6466,15 +6438,6 @@ $programs_column: 800px;
   .decisionImpactFactDetail {
     grid-column: 1;
   }
-  .transmissionLine > .facilityRowHeader > .facilityDisclosure {
-    flex-wrap: wrap;
-  }
-  .transmissionLine .transmissionLineText {
-    flex-basis: calc(100% - 80px);
-  }
-  .transmissionLine .facilityChevron {
-    margin-left: auto;
-  }
   .insights .insightsRateMetric {
     padding: 0 8px;
   }
@@ -6495,40 +6458,6 @@ $programs_column: 800px;
 .facilitySectionFlow {
   min-width: 0;
   font-variant-numeric: tabular-nums;
-}
-.transmissionLine > .facilityRowHeader > .facilityDisclosure {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 20px;
-  align-items: center;
-  gap: 8px;
-  // The flow bar is painted behind the row, so everything on top of it needs a stacking
-  // context of its own -- the same lift facility rows give their text and actions.
-  position: relative;
-  overflow: hidden;
-  > *:not(.outputProgressBar) {
-    position: relative;
-    z-index: 1;
-  }
-}
-.transmissionLine
-  > .facilityRowHeader
-  > .facilityDragHandle
-  + .facilityDisclosure {
-  // The icon is already inside the reorder target, leaving text and the chevron.
-  grid-template-columns: minmax(0, 1fr) 20px;
-}
-// Reading and rating share one unit, so the pair shouldn't jitter as the flow moves
-.transmissionLineFlow {
-  font-variant-numeric: tabular-nums;
-}
-.transmissionLine .transmissionLineText {
-  min-width: 0;
-}
-.transmissionLine .transmissionLineText > .MuiTypography-body2 {
-  font-size: var(--font-size-caption);
-}
-.transmissionLine .facilityChevron {
-  margin-left: 0;
 }
 
 @media (pointer: coarse) {
@@ -8513,6 +8442,7 @@ option {
 
 .utilityAcquisitionHint {
   display: block;
+  margin-top: 4px;
 }
 
 @media (max-width: 390px) {
