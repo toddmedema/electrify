@@ -819,3 +819,46 @@ starts. It checks prewarming before navigation, usable prices and sizing before 
 valid estimates arriving in the same listing, and reopening with the warmed result. Component
 coverage also pins immediate evidence focus, sharing pending work, worker lifetime, and clearing
 estimates when another saved run replaces the current one.
+
+## November 2 CSS audit implementation
+
+The CSS follow-up to [PR #704](https://github.com/toddmedema/electrify/pull/704)
+keeps the existing stylesheet and size maps. `styling()` emits its static rules once;
+`scaledStyling()` owns all 11 declarations that use `size()` and the catalog's
+zero-padding exception. Replaying that exception matters: the catalog shares
+`.cardList`, whose scaled `!important` padding would otherwise win at wider sizes.
+The cleanup also removes transmission selectors for the retired native
+`details`/`summary` markup, combines the identical global spoken-only helpers,
+and consolidates the tutorial HUD's winning wide-screen grid declarations.
+
+Production CSS on Node 24.22.2, gzip level 9:
+
+| Metric                    |        Before |         After |            Reduction |
+| ------------------------- | ------------: | ------------: | -------------------: |
+| Main CSS, minified        | 204,032 bytes | 159,680 bytes | 44,352 bytes (21.7%) |
+| Main CSS, gzip            |  29,159 bytes |  28,262 bytes |     897 bytes (3.1%) |
+| Sass-emitted rules        |         1,710 |         1,326 |                  384 |
+| Sass-emitted declarations |         4,751 |         3,685 |                1,066 |
+
+The before artifact's source map contains the exact pre-change `app.scss` from
+`4c207dbb`; the after artifact is a fresh production build. Existing bundle ceilings
+and simulation baselines are unchanged. Removing repeated static rules primarily
+reduces parsing and maintenance work; this is not a measured frame-time improvement.
+
+A temporary headless browser comparison substituted the original and optimized CSS
+at the same stylesheet position on the real menu, catalog, tutorial, facilities and
+expanded intertie screens. It compared computed styles (including pseudo-elements)
+and element bounds in both palettes at 360/390 px, 699/700 px, 768 px, 1024 px,
+1299/1300 px and 1440 px, plus portrait heights 1024/1025 px. All 110 screen/viewport
+comparisons passed. The sole normalized difference is the retired footer grid
+placement: its four grid-position longhands have no effect while both versions use
+`display: contents`; display and descendant styles and geometry remain compared.
+
+The permanent regression in the CI-selected `main-menu.spec.ts` checks the catalog's
+zero gutter across both size-map boundaries and the portrait-height boundary, and
+positively checks the Manual's first content gutter at phone, intermediate and desktop
+scales. All 30 focused production journeys passed at desktop, 390 px and 360 px.
+Deliberately removing the two emitted catalog scale overrides makes that guard fail
+at 700 px with an unwanted 12.8125 px top gutter; the original artifact was restored.
+The independent code review found no remaining actionable defects; its suggestion
+to cover positive scaling as well as the catalog exception is included.

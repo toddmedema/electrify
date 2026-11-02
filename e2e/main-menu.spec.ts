@@ -598,3 +598,58 @@ for (const theme of ["light", "dark"]) {
     });
   }
 }
+
+// The catalog shares cardList, whose responsive padding must not add a gutter here.
+test("catalog and manual preserve spacing across responsive scales", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem(
+      "plays",
+      JSON.stringify({
+        plays: [{ scenarioId: 0, timesPlayed: 1, date: "2026-11-02" }],
+      }),
+    );
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Choose a game" }),
+  ).toBeVisible();
+  // The catalog stays flush while the general card spacing scales with the viewport.
+  const originalViewport = page.viewportSize()!;
+  for (const viewport of [
+    { width: 360, height: 640 },
+    { width: 699, height: 900 },
+    { width: 700, height: 900 },
+    { width: 1299, height: 900 },
+    { width: 1300, height: 900 },
+    { width: 1440, height: 900 },
+    { width: 390, height: 1024 },
+    { width: 390, height: 1025 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await expect(page.locator(".missionList")).toHaveCSS("padding-top", "0px");
+    await page
+      .getByRole("button", { name: "Start Generators" })
+      .click({ trial: true });
+  }
+  await page.setViewportSize(originalViewport);
+
+  // The Manual keeps its root flush and scales the first content gutter instead.
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.getByRole("button", { name: "Manual", exact: true }).click();
+  for (const [width, height, margin] of [
+    [360, 640, "7.2px"],
+    [700, 900, "12.8125px"],
+    [1440, 900, "8px"],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await expect(page.locator("#manual")).toHaveCSS("padding-top", "0px");
+    await expect(page.locator("#manual > :first-child")).toHaveCSS(
+      "margin-top",
+      margin,
+    );
+  }
+});
