@@ -85,8 +85,9 @@ test("loading hands off to a smooth logo rise and individually staggered control
   }
   for (const control of await controls.all())
     await expect(control).toHaveCSS("opacity", "1");
+  await expect(controls.first()).toHaveCSS("width", "208px");
   if (process.env.PR_SCREENSHOTS)
-    await page.screenshot({
+    await page.locator("#menuCard").screenshot({
       path: `.tmp/pr-startup-${testInfo.project.name}.png`,
     });
   await expect(

@@ -161,6 +161,6 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   await page.keyboard.press("Enter");
   await expect(page.locator(".facilities:visible")).toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Step 1 of 4", exact: true }),
+    page.getByRole("region", { name: "Step 1 of 5", exact: true }),
   ).toBeVisible();
 }

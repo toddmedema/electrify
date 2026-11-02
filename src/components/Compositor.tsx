@@ -327,14 +327,13 @@ const tutorialCompletionSx = {
   "& .MuiDialogContent-root": { padding: "0 24px 24px" },
   "& .MuiDialogActions-root": {
     padding: "16px 24px",
+    flexWrap: "nowrap",
     borderTop: "1px solid var(--border-subtle)",
     "& .MuiButton-root": {
       minHeight: 40,
       "@media (pointer: coarse)": { minHeight: 44 },
     },
     "@media (max-width: 599px)": {
-      flexDirection: "column-reverse",
-      alignItems: "stretch",
       paddingBottom: "max(16px, env(safe-area-inset-bottom))",
     },
   },
