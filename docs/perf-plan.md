@@ -883,21 +883,21 @@ Production CSS on Node 24.22.2, gzip level 9:
 | Metric                    |        Before |         After |            Reduction |
 | ------------------------- | ------------: | ------------: | -------------------: |
 | Main CSS, minified        | 204,032 bytes | 159,680 bytes | 44,352 bytes (21.7%) |
-| Main CSS, gzip            |  29,159 bytes |  28,262 bytes |     897 bytes (3.1%) |
+| Main CSS, gzip            |  29,160 bytes |  28,261 bytes |     899 bytes (3.1%) |
 | Sass-emitted rules        |         1,710 |         1,326 |                  384 |
 | Sass-emitted declarations |         4,751 |         3,685 |                1,066 |
 
-The before artifact's source map contains the exact pre-change `app.scss` from
-`4c207dbb`; the after artifact is a fresh production build. Existing bundle ceilings
-and simulation baselines are unchanged. Removing repeated static rules primarily
+Both artifacts are fresh production builds on the merged `520bcaad` base. Their
+source maps contain the exact baseline and optimized `app.scss`, respectively.
+Existing bundle ceilings and simulation baselines are unchanged. Removing repeated static rules primarily
 reduces parsing and maintenance work; this is not a measured frame-time improvement.
 
 A temporary headless browser comparison substituted the original and optimized CSS
 at the same stylesheet position on the real menu, catalog, tutorial, facilities and
 expanded intertie screens. It compared computed styles (including pseudo-elements)
 and element bounds in both palettes at 360/390 px, 699/700 px, 768 px, 1024 px,
-1299/1300 px and 1440 px, plus portrait heights 1024/1025 px. All 110 screen/viewport
-comparisons passed. The sole normalized difference is the retired footer grid
+1299/1300 px and 1440 px, plus portrait heights 1024/1025 px. All 220 screen/viewport
+comparisons passed across desktop-pointer and touch contexts. The sole normalized difference is the retired footer grid
 placement: its four grid-position longhands have no effect while both versions use
 `display: contents`; display and descendant styles and geometry remain compared.
 
