@@ -62,7 +62,9 @@ test("California players can build and understand an intertie", async ({
     })
     .first()
     .click();
-  await expect(page.getByRole("dialog")).toContainText("$13.5M + ");
+  const review = page.getByRole("dialog");
+  await expect(review).toContainText("$13.5M now + ");
+  await expect(review.getByText(/^\$13\.5M now \+ /)).toContainText("/mo");
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Take loan" })
@@ -142,6 +144,9 @@ test("California players can build and understand an intertie", async ({
     .click();
   await expect(buying).toContainText("Charge storage");
   await expect(selling).toContainText("Profitable");
+  if (process.env.REVIEW_SCREENSHOT_DIR) {
+    await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+  }
   await reviewScreenshot(facilities, {
     path: testInfo.outputPath("intertie-trading-rules.png"),
     animations: "disabled",
@@ -285,6 +290,15 @@ for (const theme of ["light", "dark"] as const) {
     ]);
     expect(Math.abs(buyingBox!.y - sellingBox!.y)).toBeLessThanOrEqual(1);
     expect(sellingBox!.x).toBeGreaterThan(buyingBox!.x);
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole("tooltip")).toHaveCount(0);
+      await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+    }
+    await reviewScreenshot(facilities.locator(".transmissionFleet"), {
+      path: testInfo.outputPath(`intertie-controls-${theme}.png`),
+      animations: "disabled",
+    });
     await line.getByRole("button", { name: /^Inspect/ }).click();
     await expect(line).toContainText(/Building \d+% · \d+ months? left/);
     await expect(line.locator(".constructionProgress")).toBeVisible();

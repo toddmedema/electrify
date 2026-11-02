@@ -683,6 +683,53 @@ test("co-op forecasts charge storage from surplus like any grid", () => {
   expect(forecast.at(-1)!.storedWh).toBeGreaterThan(0);
 });
 
+test("native co-op charging adds reachable reserve beyond the same paused store", () => {
+  const world = create(2);
+  expect(
+    command(world, 0, {
+      kind: "action",
+      name: "buildFacility",
+      payload: { facility: { name: "Battery", peakWh: 50e6 }, financed: false },
+    }),
+  ).toBeUndefined();
+  world.seats.forEach((_seat, i) => {
+    expect(
+      command(world, i, {
+        kind: "action",
+        name: "setSellingRule",
+        payload: "NONE",
+      }),
+    ).toBeUndefined();
+    command(world, i, { kind: "ready" });
+  });
+  const owner = world.grids[0];
+  const generator = owner.facilities.find(
+    (facility) => facility.fuel === "Natural Gas",
+  )!;
+  const battery = owner.facilities.find(
+    (facility) => facility.name === "Battery",
+  )!;
+  generator.currentW = generator.peakW;
+  generator.spinMinutes = 60;
+  generator.minimumStableOutput = 0;
+  battery.yearsToBuildLeft = 0;
+  battery.currentW = 0;
+  battery.currentWh = 0;
+  owner.facilities = [generator, battery];
+  const paused = cloneDeep(world);
+  paused.grids[0].facilities[1].paused = true;
+  stepWorld(paused);
+  stepWorld(world);
+  const charged = currentTick(world.grids[0])!;
+  const uncharged = currentTick(paused.grids[0])!;
+  expect(charged.storageChargeW).toBeGreaterThan(0);
+  expect(charged.importedW).toBe(0);
+  expect(charged.exportedW).toBe(0);
+  expect(charged.supplyByFuel).toEqual(uncharged.supplyByFuel);
+  expect(charged.storedWh).toBeGreaterThan(uncharged.storedWh);
+  expect(charged.reserveW).toBeGreaterThan(uncharged.reserveW || 0);
+});
+
 test("co-op commands preserve all independent rules through shared saves", () => {
   const world = create(2);
   expect(world.grids[0].transmission).toMatchObject({
