@@ -41,10 +41,16 @@ export async function readDesktopCompetitiveBests(
   return bests;
 }
 
+/**
+ * `topRows` asks Steam for only the first ranks (at most 100, its page size) of a global board,
+ * which is all that a compact board shows. Friends and personal boards are small already, and
+ * Steam can't range them.
+ */
 export async function desktopScores(
   scenarioId: number,
   difficulty: DifficultyType | undefined,
   scope: "global" | "friends" | "player",
+  topRows?: number,
 ): Promise<ScoreType[]> {
   const desktop = getDesktop();
   if (!desktop) return [];
@@ -52,6 +58,9 @@ export async function desktopScores(
     scenarioId,
     difficulty,
     scope,
+    ...(scope === "global" && topRows !== undefined
+      ? { startRank: 1, endRank: topRows }
+      : {}),
     challengeId: manifest.compatibilityId,
     scoreVersion: SCORE_VERSION,
   });
