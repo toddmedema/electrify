@@ -366,11 +366,11 @@ test("the normal catalog supports storage and host prices override forged client
   expect(
     command(world, 0, {
       kind: "action",
-      name: "setTradingPolicy",
-      payload: "CLOSED",
+      name: "setBuyingRule",
+      payload: "NONE",
     }),
   ).toBeUndefined();
-  expect(world.grids[0].transmission!.tradingPolicy).toBe("CLOSED");
+  expect(world.grids[0].transmission!.buyingRule).toBe("NONE");
   expect(
     command(world, 0, {
       kind: "action",
@@ -668,18 +668,121 @@ test("co-op forecasts charge storage from surplus like any grid", () => {
   battery.yearsToBuildLeft = 0;
   battery.currentWh = 0;
   // A trading rule change reforecasts the rest of the month as a simulated pass.
-  for (const policy of ["SURPLUS_ONLY", "BALANCED"])
+  for (const rule of ["SURPLUS", "PROFITABLE"])
     expect(
       command(world, 0, {
         kind: "action",
-        name: "setTradingPolicy",
-        payload: policy,
+        name: "setSellingRule",
+        payload: rule,
       }),
     ).toBeUndefined();
   const grid = world.grids[0];
   const forecast = grid.timeline.filter((t) => t.minute > grid.date.minute);
   expect(forecast.some((t) => (t.storageChargeW || 0) > 0)).toBe(true);
   expect(forecast.at(-1)!.storedWh).toBeGreaterThan(0);
+});
+
+test("co-op commands preserve all independent rules through shared saves", () => {
+  const world = create(2);
+  expect(world.grids[0].transmission).toMatchObject({
+    buyingRule: "SHORTAGES",
+    sellingRule: "PROFITABLE",
+  });
+  for (const buyingRule of ["NONE", "SHORTAGES", "SHORTAGES_AND_STORAGE"]) {
+    for (const sellingRule of ["NONE", "SURPLUS", "PROFITABLE"]) {
+      expect(
+        command(world, 0, {
+          kind: "action",
+          name: "setBuyingRule",
+          payload: buyingRule,
+        }),
+      ).toBeUndefined();
+      expect(
+        command(world, 0, {
+          kind: "action",
+          name: "setSellingRule",
+          payload: sellingRule,
+        }),
+      ).toBeUndefined();
+      expect(world.grids[0].transmission).toMatchObject({
+        buyingRule,
+        sellingRule,
+      });
+    }
+  }
+  for (const name of ["setBuyingRule", "setSellingRule"] as const) {
+    expect(
+      command(world, 0, { kind: "action", name, payload: "INVALID" }),
+    ).toMatch(/valid/);
+  }
+  const restored = restoreWorld(checkpointWorld(world), "restored");
+  expect(restored.grids[0].transmission).toMatchObject({
+    buyingRule: "SHORTAGES_AND_STORAGE",
+    sellingRule: "PROFITABLE",
+  });
+});
+
+test("a shared tick imports paid charging energy after customer service and resumes deterministically", () => {
+  const world = create(2);
+  expect(
+    command(world, 1, {
+      kind: "action",
+      name: "buildFacility",
+      payload: { facility: { name: "Battery", peakWh: 50e6 }, financed: false },
+    }),
+  ).toBeUndefined();
+  const buyer = world.grids[1];
+  const battery = buyer.facilities.at(-1)!;
+  battery.yearsToBuildLeft = 0;
+  battery.currentWh = 0;
+  buyer.facilities = [battery];
+  const seller = world.grids[0];
+  const generator = seller.facilities.find(
+    (facility) => facility.fuel === "Natural Gas",
+  )!;
+  generator.peakW = 1e9;
+  generator.currentW = 1e9;
+  generator.spinMinutes = 1;
+  generator.btuPerWh = 1;
+  generator.variableOperatingCostPerMWh = 0;
+  seller.facilities = [generator];
+  expect(
+    command(world, 1, {
+      kind: "action",
+      name: "setBuyingRule",
+      payload: "SHORTAGES_AND_STORAGE",
+    }),
+  ).toBeUndefined();
+  const expectedDemand = buyer.timeline.find(
+    (tick) => tick.minute > buyer.date.minute,
+  )!.demandW;
+  world.seats.forEach((_seat, i) => command(world, i, { kind: "ready" }));
+  stepWorld(world);
+  const now = currentTick(buyer)!;
+  expect(now.demandW).toBe(expectedDemand);
+  expect(now.supplyW).toBe(now.demandW);
+  expect(now.storageImportedW).toBeGreaterThan(0);
+  expect(battery.currentWh).toBeCloseTo(
+    ((now.storageImportedW || 0) * (battery.roundTripEfficiency || 0)) / 4,
+    5,
+  );
+  expect(now.importedW).toBeCloseTo(
+    now.demandW + (now.storageImportedW || 0),
+    3,
+  );
+  expect(now.expensesImports).toBeGreaterThan(0);
+  expect(now.importedKgco2e).toBeGreaterThan(0);
+  expect(now.exportedW).toBe(0);
+  const restored = restoreWorld(checkpointWorld(world), "continued");
+  restored.seats.forEach((_seat, i) => command(restored, i, { kind: "ready" }));
+  stepWorld(world);
+  stepWorld(restored);
+  expect(currentTick(restored.grids[1])!.cash).toBe(
+    currentTick(world.grids[1])!.cash,
+  );
+  expect(restored.grids[1].facilities[0].currentWh).toBe(
+    world.grids[1].facilities[0].currentWh,
+  );
 });
 
 test("only the other owner is asked to approve a requested link upgrade", () => {

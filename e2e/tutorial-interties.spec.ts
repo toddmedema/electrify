@@ -103,8 +103,8 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     page.getByRole("heading", { name: "Step 7 of 18" }),
   ).toBeVisible();
 
-  await page.getByLabel("Trading rule").click();
-  await page.getByRole("option", { name: "Buy for shortages only" }).click();
+  await page.getByLabel("Selling").click();
+  await page.getByRole("option", { name: "None", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Step 8 of 18" }),
   ).toBeVisible();
@@ -191,8 +191,8 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   ).toBeVisible();
 
   const facilities = page.locator(".facilities:visible");
-  await facilities.getByLabel("Trading rule").click();
-  await page.getByRole("option", { name: "No trading" }).click();
+  await facilities.getByLabel("Selling").click();
+  await page.getByRole("option", { name: "None", exact: true }).click();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(page.locator(".gameStatus")).toContainText("Apr 2020", {
     timeout: 15000,
@@ -202,10 +202,8 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     page.getByRole("heading", { name: "Your turn 14 of 18" }),
   ).toBeVisible();
 
-  await facilities.getByLabel("Trading rule").click();
-  await page
-    .getByRole("option", { name: "Buy for shortages, sell extra" })
-    .click();
+  await facilities.getByLabel("Selling").click();
+  await page.getByRole("option", { name: "Surplus only", exact: true }).click();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(
     page.getByRole("heading", { name: "Step 15 of 18" }),

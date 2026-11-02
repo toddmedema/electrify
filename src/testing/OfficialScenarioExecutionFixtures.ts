@@ -16,7 +16,8 @@ import gameReducer, {
   reprioritizeFacility,
   sellFacility,
   retrofitFacility,
-  setTradingPolicy,
+  setBuyingRule,
+  setSellingRule,
   tickState,
   togglePauseFacility,
   upgradeTransmissionLine,
@@ -147,8 +148,10 @@ function applyScheduled(
           month: action.month + 1,
         }),
       );
-    case "trading":
-      return officialCommand(game, setTradingPolicy(action.policy));
+    case "buying":
+      return officialCommand(game, setBuyingRule(action.rule));
+    case "selling":
+      return officialCommand(game, setSellingRule(action.rule));
     case "intertie":
       return officialCommand(
         game,

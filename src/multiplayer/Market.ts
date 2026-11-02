@@ -63,13 +63,51 @@ export function clearPeerMarket(
   plans: PeerPlan[],
   edges: Edge[],
 ): PeerSettlement[] {
+  const customerPlans = plans.map((plan) => ({
+    ...plan,
+    offerW: (plan.storageChargeW || 0) > EPS ? 0 : plan.offerW,
+  }));
+  const customers = clearFairPeerMarket(ids, customerPlans, edges);
+  if (!plans.some((plan) => (plan.storageChargeW || 0) > EPS)) return customers;
+  const protectedImports = customers.map((settlement) => settlement.importedW);
+  const chargingPlans = customerPlans.map((plan, i) => ({
+    ...plan,
+    shortageW:
+      customers[i].exportedW === 0 &&
+      protectedImports[i] + EPS >= plan.shortageW
+        ? Math.max(0, plan.storageChargeW || 0)
+        : 0,
+  }));
+  // Lock delivered customer quantities, not routes: the circulation can move A→C to B→C
+  // while using A's newly freed link for charging, without taking any customer's power away.
+  const settled = clearFairPeerMarket(
+    ids,
+    chargingPlans,
+    edges,
+    protectedImports,
+  );
+  settled.forEach((settlement, i) => {
+    settlement.storageImportedW = Math.min(
+      chargingPlans[i].shortageW,
+      Math.max(0, settlement.importedW - protectedImports[i]),
+    );
+  });
+  return settled;
+}
+
+function clearFairPeerMarket(
+  ids: string[],
+  plans: PeerPlan[],
+  edges: Edge[],
+  protectedImports: number[] = ids.map(() => 0),
+): PeerSettlement[] {
   const n = ids.length;
   const source = n * 2,
     sink = source + 1,
     superSource = sink + 1,
     superSink = superSource + 1;
-  const offers = plans.map((p) =>
-    p.shortageW > EPS ? 0 : Math.max(0, p.offerW),
+  const offers = plans.map((p, i) =>
+    p.shortageW > EPS || protectedImports[i] > EPS ? 0 : Math.max(0, p.offerW),
   );
   const demands = plans.map((p) => Math.max(0, p.shortageW));
   const ratings = edges.map((edge) => {
@@ -83,6 +121,7 @@ export function clearPeerMarket(
     minimum: number[],
     exact: Map<number, number>,
     total?: number,
+    ignoreProtected = false,
   ) => {
     const net = network(superSink + 1);
     const balance = Array(superSink + 1).fill(0) as number[];
@@ -104,8 +143,9 @@ export function clearPeerMarket(
         bounded(
           i + n,
           sink,
-          exact.get(i) ?? minimum[i],
-          exact.get(i) ?? demands[i],
+          (ignoreProtected ? 0 : protectedImports[i]) +
+            (exact.get(i) ?? minimum[i]),
+          protectedImports[i] + (exact.get(i) ?? demands[i]),
         ),
       );
     }
@@ -135,7 +175,7 @@ export function clearPeerMarket(
     };
   };
   const zeros = Array(n).fill(0) as number[];
-  const total = create(zeros, new Map()).total;
+  const total = create(zeros, new Map(), undefined, true).total;
   const fixed = new Map<number, number>();
   let minimum = [...zeros];
   for (
@@ -162,7 +202,10 @@ export function clearPeerMarket(
       trial[i] += Math.max(0.1, demands[i] * 1e-6);
       if (trial[i] > demands[i] || create(trial, fixed, total).total < 0) {
         const { arc, lower } = witness.buyers[i];
-        fixed.set(i, arc.initial - arc.left + lower);
+        fixed.set(
+          i,
+          Math.max(0, arc.initial - arc.left + lower - protectedImports[i]),
+        );
         froze = true;
       }
     }
@@ -172,8 +215,8 @@ export function clearPeerMarket(
   // final assignment, deliver the plain maximum flow: it still respects every offer, shortage
   // and line rating, and a fairness rounding miss must not stop the whole match.
   const fair = create(minimum, fixed, total);
-  const result = fair.total >= 0 ? fair : create(zeros, new Map());
-  const settlements = ids.map(() => ({
+  const result = fair.total >= 0 ? fair : create(zeros, new Map(), total);
+  const settlements: PeerSettlement[] = ids.map(() => ({
     importedW: 0,
     exportedW: 0,
     importEmissionsKgPerMWh: 0,

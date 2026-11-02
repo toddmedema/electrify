@@ -194,7 +194,8 @@ export function intertieForecastKey(game: GameType): string {
     game.storyEffectsDisabled,
     game.policies,
     game.tutorialIntertieStress?.active,
-    game.transmission?.tradingPolicy,
+    game.transmission?.buyingRule,
+    game.transmission?.sellingRule,
     game.facilities.map((f) => [
       f.id,
       f.peakW,

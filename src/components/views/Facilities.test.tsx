@@ -23,6 +23,7 @@ import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
 import Facilities, { fleetChartHeight } from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
+
 import * as transmission from "../../helpers/Transmission";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
 import { SCENARIOS } from "../../data/Scenarios";
@@ -36,6 +37,41 @@ import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 import { purchaseTerms } from "../../helpers/Financials";
 import { modScenario } from "../../mods/ModScenario";
 
+test("intertie flow distinguishes customer purchases from storage charging", () => {
+  const initial = createGame({ scenarioId: 100, seed: 61 });
+  getTimeFromTimeline(initial.date.minute, initial.timeline)!.cash = 1e9;
+  const game = cloneDeep(
+    gameReducer(
+      initial,
+      buildTransmissionLine({ corridorId: "california-north", financed: true }),
+    ),
+  );
+  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  game.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+  const tick = getTimeFromTimeline(game.date.minute, game.timeline)!;
+  tick.importedW = 60e6;
+  tick.storageImportedW = 20e6;
+  render(
+    <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+      <TransmissionPanel
+        game={game}
+        onBuild={jest.fn()}
+        onUpgrade={jest.fn()}
+        onBuyingRule={jest.fn()}
+        onSellingRule={jest.fn()}
+      />
+    </Provider>,
+  );
+  expect(screen.getByRole("combobox", { name: "Buying" })).toHaveTextContent(
+    "Charge storage",
+  );
+  expect(screen.getByTestId("import-uses")).toHaveTextContent(
+    "40MW for customers",
+  );
+  expect(screen.getByTestId("import-uses")).toHaveTextContent(
+    "20MW for storage",
+  );
+});
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
 jest.setTimeout(30000);
@@ -96,7 +132,8 @@ function renderFacilities(
         onTransmissionUpgrade={() => undefined}
         onStorageBuild={() => undefined}
         onTransmissionBuild={() => undefined}
-        onTradingPolicy={() => undefined}
+        onBuyingRule={() => undefined}
+        onSellingRule={() => undefined}
         onSell={handlers.onSell}
         onTogglePause={handlers.onTogglePause}
         onPause={handlers.onPause}
@@ -286,7 +323,8 @@ describe("the fleet list", () => {
       onStorageBuild: noop,
       onTransmissionBuild: noop,
       onTransmissionUpgrade: noop,
-      onTradingPolicy: noop,
+      onBuyingRule: noop,
+      onSellingRule: noop,
       onSell: noop,
       onTogglePause: noop,
       onPause: noop,
@@ -363,7 +401,8 @@ describe("the fleet list", () => {
       onStorageBuild: () => undefined,
       onTransmissionBuild: () => undefined,
       onTransmissionUpgrade: () => undefined,
-      onTradingPolicy: () => undefined,
+      onBuyingRule: () => undefined,
+      onSellingRule: () => undefined,
       onSell: () => undefined,
       onTogglePause: () => undefined,
       onPause: () => undefined,
@@ -493,7 +532,8 @@ function renderProjects(game: GameType, onBuild = jest.fn()) {
         projectsOnly
         onBuild={onBuild}
         onUpgrade={jest.fn()}
-        onPolicy={jest.fn()}
+        onBuyingRule={jest.fn()}
+        onSellingRule={jest.fn()}
       />
     </Provider>,
   );
@@ -728,7 +768,7 @@ describe("the interties view", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Connection projects")).not.toBeInTheDocument();
     expect(screen.getByText("Pacific Northwest")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Trading rule")).toBeNull();
+    expect(screen.queryByLabelText("Buying")).toBeNull();
     expect(
       screen.getAllByRole("button", { name: /Review purchase of .* intertie/ }),
     ).not.toHaveLength(0);
@@ -1129,7 +1169,8 @@ it.each([false, true])(
           game={game}
           onBuild={jest.fn()}
           onUpgrade={jest.fn()}
-          onPolicy={jest.fn()}
+          onBuyingRule={jest.fn()}
+          onSellingRule={jest.fn()}
           onAcquire={jest.fn()}
         />
       </Provider>,
@@ -1169,7 +1210,8 @@ describe("the intertie upgrade control", () => {
           game={game}
           onBuild={jest.fn()}
           onUpgrade={handleUpgrade}
-          onPolicy={jest.fn()}
+          onBuyingRule={jest.fn()}
+          onSellingRule={jest.fn()}
         />
       </Provider>,
     );

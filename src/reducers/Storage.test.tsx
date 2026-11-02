@@ -16,7 +16,11 @@ import { generateNewTimeline, tickState } from "./Game";
 
 function fixture() {
   const game = createGame({ scenarioId: 103, seed: 44 });
-  game.transmission = { lines: [], tradingPolicy: "BALANCED" };
+  game.transmission = {
+    lines: [],
+    buyingRule: "SHORTAGES",
+    sellingRule: "SURPLUS",
+  };
   game.timeline.forEach((t) => {
     t.demandW = 100;
   });

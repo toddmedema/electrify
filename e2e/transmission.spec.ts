@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
 
@@ -31,7 +32,7 @@ test("California players can build and understand an intertie", async ({
   await expect(
     projects.getByRole("heading", { name: "Pacific Northwest", exact: true }),
   ).toBeVisible();
-  await expect(projects.getByLabel("Trading rule")).toHaveCount(0);
+  await expect(projects.getByLabel("Buying")).toHaveCount(0);
   await expect(projects.getByText("Total cost").first()).toBeVisible();
   const northernProject = projects.getByTestId(
     "transmission-project-california-north",
@@ -86,9 +87,65 @@ test("California players can build and understand an intertie", async ({
       rowBox!.y + rowBox!.height / 2 - (chevronBox!.y + chevronBox!.height / 2),
     ),
   ).toBeLessThanOrEqual(1);
-  await expect(facilities.getByLabel("Trading rule")).toContainText(
-    "Buy for shortages, sell extra",
-  );
+  const buying = facilities.getByRole("combobox", {
+    name: "Buying",
+    exact: true,
+  });
+  const selling = facilities.getByRole("combobox", {
+    name: "Selling",
+    exact: true,
+  });
+  await expect(buying).toContainText("Shortages");
+  await expect(selling).toContainText("Surplus");
+  const [buyBox, sellBox] = await Promise.all([
+    buying.boundingBox(),
+    selling.boundingBox(),
+  ]);
+  expect(Math.abs(buyBox!.y - sellBox!.y)).toBeLessThanOrEqual(1);
+  expect(sellBox!.x).toBeGreaterThan(buyBox!.x);
+  await buying.click();
+  const buyingOptions = page.getByRole("option");
+  await expect(buyingOptions).toHaveText([
+    "None",
+    "Shortages only",
+    "Demand and storage",
+  ]);
+  expect(
+    (await buyingOptions.allTextContents()).every(
+      (text) => text.trim().split(/\s+/).length <= 3,
+    ),
+  ).toBe(true);
+  await page
+    .getByRole("option", { name: "Demand and storage", exact: true })
+    .click();
+  await expect(buying).toContainText("Charge storage");
+  await expect(selling).toContainText("Surplus");
+  await expect(
+    facilities.getByText(
+      "Cover shortages, then buy at current prices to charge storage.",
+    ),
+  ).toBeVisible();
+  await selling.click();
+  const sellingOptions = page.getByRole("option");
+  await expect(sellingOptions).toHaveText([
+    "None",
+    "Surplus only",
+    "Profitable generation",
+  ]);
+  expect(
+    (await sellingOptions.allTextContents()).every(
+      (text) => text.trim().split(/\s+/).length <= 3,
+    ),
+  ).toBe(true);
+  await page
+    .getByRole("option", { name: "Profitable generation", exact: true })
+    .click();
+  await expect(buying).toContainText("Charge storage");
+  await expect(selling).toContainText("Profitable");
+  await reviewScreenshot(facilities, {
+    path: testInfo.outputPath("intertie-trading-rules.png"),
+    animations: "disabled",
+  });
   await expect(
     facilities.getByText("Northern intertie", { exact: true }),
   ).toHaveCount(1);
@@ -214,6 +271,20 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Take loan" })
       .click();
     const line = facilities.locator(".transmissionLine").first();
+    const buying = facilities.getByRole("combobox", {
+      name: "Buying",
+      exact: true,
+    });
+    const selling = facilities.getByRole("combobox", {
+      name: "Selling",
+      exact: true,
+    });
+    const [buyingBox, sellingBox] = await Promise.all([
+      buying.boundingBox(),
+      selling.boundingBox(),
+    ]);
+    expect(Math.abs(buyingBox!.y - sellingBox!.y)).toBeLessThanOrEqual(1);
+    expect(sellingBox!.x).toBeGreaterThan(buyingBox!.x);
     await line.getByRole("button", { name: /^Inspect/ }).click();
     await expect(line).toContainText(/Building \d+% · \d+ months? left/);
     await expect(line.locator(".constructionProgress")).toBeVisible();

@@ -45,8 +45,8 @@ const line = (
   { month: buildMonth, type: "intertie", corridorId, financed: true },
   {
     month: tradingMonth,
-    type: "trading",
-    policy: "RELIABILITY_FIRST",
+    type: "selling",
+    rule: "NONE",
   },
 ];
 

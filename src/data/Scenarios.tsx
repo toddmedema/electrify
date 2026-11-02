@@ -131,7 +131,8 @@ const tutorialSawSafeExport = (state: AppStateType) =>
 const intertiesCapstoneSucceeded = (state: AppStateType) =>
   state.game.date.monthsElapsed >= 14 &&
   tutorialNorthernIntertie(state)?.yearsToBuildLeft === 0 &&
-  state.game.transmission?.tradingPolicy === "BALANCED" &&
+  state.game.transmission?.buyingRule === "SHORTAGES" &&
+  state.game.transmission?.sellingRule === "SURPLUS" &&
   tutorialSawImports(state) &&
   tutorialSawSafeExport(state);
 
@@ -938,12 +939,13 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FACILITIES",
-        target: ".tradingPolicy",
+        target: ".tradingRuleFields",
         advanceOn: (s: AppStateType) =>
-          s.game.transmission?.tradingPolicy === "RELIABILITY_FIRST",
-        action: "Choose “Buy for shortages only”",
+          s.game.transmission?.buyingRule === "SHORTAGES" &&
+          s.game.transmission?.sellingRule === "NONE",
+        action: "Choose “None” for Selling",
         content: (
-          <TutorialPrompt text="This uses the neighboring grid as backup." />
+          <TutorialPrompt text="Keep Buying on “Shortages only” and set Selling to “None” to use the neighboring grid as backup." />
         ),
       },
       {
@@ -1013,7 +1015,7 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         action: "Supply your grid while selling surplus solar power",
         content: (
-          <TutorialPrompt text="Choose “Buy for shortages, sell extra” and keep Solar on. Exports use surplus after local demand and storage charging." />
+          <TutorialPrompt text="Choose “Shortages only” for Buying and “Surplus only” for Selling, and keep Solar on. Exports use surplus after local demand and storage charging." />
         ),
         capstone: {
           preserveProgress: true,
@@ -1021,7 +1023,7 @@ export const SCENARIOS: ScenarioType[] = [
           successMessage:
             "You learned how to buy backup power and sell surplus electricity through interties.",
           failureMessage:
-            "The grid has not safely used both directions yet. Choose the balanced rule, keep Solar on, and run time.",
+            "The grid has not safely used both directions yet. Choose “Shortages only” for Buying and “Surplus only” for Selling, keep Solar on, and run time.",
         },
       },
       {

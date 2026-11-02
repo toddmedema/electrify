@@ -18,6 +18,7 @@ import {
 import {
   adjacentMarketPricePerMWh,
   allocateIntertieFlows,
+  allocateProfitableExports,
   archetypeMonth,
   clearTransmissionMarket,
   supplyAtDemandBoundary,
@@ -756,6 +757,70 @@ describe("intertie trading order", () => {
 });
 
 describe("market clearing", () => {
+  it.each(["NONE", "SHORTAGES", "SHORTAGES_AND_STORAGE"] as const)(
+    "keeps storage purchases below customer service with buying %s",
+    (buyingRule) => {
+      for (const sellingRule of ["NONE", "SURPLUS", "PROFITABLE"] as const) {
+        const clear = (capacityW: number) =>
+          clearTransmissionMarket({
+            localSupplyW: 50,
+            demandW: 100,
+            capacityW,
+            importLimitW: capacityW,
+            exportLimitW: capacityW,
+            buyingRule,
+            sellingRule,
+            storageChargeW: 100,
+          });
+        const constrained = clear(25);
+        expect(constrained.storageImportedW).toBe(0);
+        expect(constrained.importedW).toBe(buyingRule === "NONE" ? 0 : 25);
+        const enough = clear(125);
+        expect(enough.storageImportedW).toBe(
+          buyingRule === "SHORTAGES_AND_STORAGE" ? 75 : 0,
+        );
+        expect(enough.localAvailableSupplyW).toBe(
+          buyingRule === "NONE" ? 50 : 100,
+        );
+        expect(enough.exportedW).toBe(0);
+      }
+    },
+  );
+
+  it("retains a profitable match on a later line rather than reallocating its total", () => {
+    const offer = (pricePerMWh: number) => ({
+      pricePerMWh,
+      importLimitW: 100,
+      exportLimitW: 100,
+    });
+    expect(
+      allocateProfitableExports([offer(20), offer(80)], 0, [
+        { watts: 100, costPerMWh: 50 },
+      ]),
+    ).toEqual({
+      exportedW: [0, 100],
+      generationW: [100],
+    });
+    expect(
+      allocateProfitableExports([offer(50), offer(20)], 0, [
+        { watts: 100, costPerMWh: 50 },
+      ]),
+    ).toEqual({
+      exportedW: [0, 0],
+      generationW: [0],
+    });
+    const shared = [offer(80), offer(90)].map((o) => ({
+      ...o,
+      marketId: "one",
+      marketExportLimitW: 120,
+    }));
+    expect(
+      allocateProfitableExports(shared, 40, [{ watts: 200, costPerMWh: 50 }]),
+    ).toEqual({
+      exportedW: [100, 20],
+      generationW: [80],
+    });
+  });
   it.each([-1, 1])(
     "clears owned-settlement arithmetic dust in direction %i while retaining a real one-watt trade",
     (direction) => {
@@ -767,12 +832,14 @@ describe("market clearing", () => {
           capacityW: 100e6,
           importLimitW: 100e6,
           exportLimitW: 100e6,
-          policy: "BALANCED",
+          buyingRule: "SHORTAGES",
+          sellingRule: "SURPLUS",
         });
       // Actual owned-transfer residue from Intern / seed 7, June 2013.
       const dust = clear(demandW + direction * 5.960464477539063e-8);
       expect(dust).toEqual({
         importedW: 0,
+        storageImportedW: 0,
         exportedW: 0,
         localAvailableSupplyW: demandW,
       });
@@ -789,7 +856,8 @@ describe("market clearing", () => {
       capacityW: 2e9,
       importLimitW: 2e9,
       exportLimitW: 2e9,
-      policy: "BALANCED",
+      buyingRule: "SHORTAGES",
+      sellingRule: "SURPLUS",
     });
     expect(result.importedW).toBeGreaterThan(0);
     expect(result.exportedW).toBe(0);
@@ -803,9 +871,15 @@ describe("market clearing", () => {
         capacityW: 200,
         importLimitW: 500,
         exportLimitW: 500,
-        policy: "BALANCED",
+        buyingRule: "SHORTAGES",
+        sellingRule: "SURPLUS",
       }),
-    ).toEqual({ importedW: 200, exportedW: 0, localAvailableSupplyW: 900 });
+    ).toEqual({
+      storageImportedW: 0,
+      importedW: 200,
+      exportedW: 0,
+      localAvailableSupplyW: 900,
+    });
   });
 
   it("exports actual surplus without burning an energy reserve", () => {
@@ -816,9 +890,15 @@ describe("market clearing", () => {
         capacityW: 500,
         importLimitW: 500,
         exportLimitW: 500,
-        policy: "SURPLUS_ONLY",
+        buyingRule: "NONE",
+        sellingRule: "SURPLUS",
       }),
-    ).toEqual({ importedW: 0, exportedW: 400, localAvailableSupplyW: 1000 });
+    ).toEqual({
+      storageImportedW: 0,
+      importedW: 0,
+      exportedW: 400,
+      localAvailableSupplyW: 1000,
+    });
   });
 
   it("keeps the line idle when trading is closed", () => {
@@ -829,9 +909,15 @@ describe("market clearing", () => {
         capacityW: 500,
         importLimitW: 500,
         exportLimitW: 500,
-        policy: "CLOSED",
+        buyingRule: "NONE",
+        sellingRule: "NONE",
       }),
-    ).toEqual({ importedW: 0, exportedW: 0, localAvailableSupplyW: 500 });
+    ).toEqual({
+      storageImportedW: 0,
+      importedW: 0,
+      exportedW: 0,
+      localAvailableSupplyW: 500,
+    });
   });
   it("covers the exact demand when fractional imports completely fill a shortage", () => {
     const request = {
@@ -840,7 +926,8 @@ describe("market clearing", () => {
       capacityW: 500000000,
       importLimitW: 500000000,
       exportLimitW: 500000000,
-      policy: "RELIABILITY_FIRST" as const,
+      buyingRule: "SHORTAGES" as const,
+      sellingRule: "NONE" as const,
     };
     expect(clearTransmissionMarket(request).localAvailableSupplyW).toBe(
       request.demandW,

@@ -275,7 +275,8 @@ function uiForecasts(game: GameType): { name: string; run: () => unknown }[] {
             ...game,
             facilities: game.facilities.filter((f) => f.yearsToBuildLeft <= 0),
             transmission: {
-              tradingPolicy: game.transmission?.tradingPolicy || "BALANCED",
+              buyingRule: game.transmission?.buyingRule || "SHORTAGES",
+              sellingRule: game.transmission?.sellingRule || "SURPLUS",
               lines: (game.transmission?.lines || [])
                 .filter((l) => l.yearsToBuildLeft <= 0)
                 .map((l) => ({ ...l, upgrade: undefined })),
