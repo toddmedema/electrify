@@ -948,6 +948,18 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "FACILITIES",
         target: ".tradingRuleFields",
+        action: "Compare Buying and Selling",
+        content: (
+          <div>
+            <TutorialPrompt text="Buying: “Shortages only” covers customer shortages; “Shortages + Charging” also charges storage after customers are supplied." />
+            <TutorialPrompt text="Selling: “Surplus only” sells leftover power; “All profitable” also increases running plants when prices exceed added costs." />
+            <TutorialPrompt text="“None” turns off either direction." />
+          </div>
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: ".tradingRuleFields",
         advanceOn: (s: AppStateType) =>
           s.game.transmission?.buyingRule === "SHORTAGES" &&
           s.game.transmission?.sellingRule === "NONE",

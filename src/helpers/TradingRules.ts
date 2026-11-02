@@ -11,12 +11,12 @@ import { feeableKgCO2ePerBtu } from "../Constants";
 export const BUYING_LABELS: Record<BuyingRuleType, string> = {
   NONE: "None",
   SHORTAGES: "Shortages only",
-  SHORTAGES_AND_STORAGE: "Demand and storage",
+  SHORTAGES_AND_STORAGE: "Shortages + Charging",
 };
 export const SELLING_LABELS: Record<SellingRuleType, string> = {
   NONE: "None",
   SURPLUS: "Surplus only",
-  PROFITABLE: "Profitable generation",
+  PROFITABLE: "All profitable",
 };
 
 export function isBuyingRule(value: unknown): value is BuyingRuleType {

@@ -5441,7 +5441,12 @@ $homeSmokeCycle: 5.6s;
   gap: 8px;
 
   .MuiInputBase-root {
+    height: 100%;
     min-height: 40px;
+  }
+  .MuiSelect-select {
+    white-space: normal;
+    text-overflow: clip;
   }
   .MuiFormControl-root {
     min-width: 0;

@@ -940,24 +940,24 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           Interties connect neighboring grids. Set Buying and Selling
-          independently. Shortages only buys for unmet customer demand. Demand
-          and storage also buys at current prices to charge utility storage
-          after customer demand is met. None disables optional purchases;
-          contracted utility supply stays separate.
+          independently. Shortages only buys for unmet customer demand.
+          Shortages + Charging also buys at current prices to charge utility
+          storage after customer demand is met. None disables optional
+          purchases; contracted utility supply stays separate.
         </p>
         <p>
           Surplus only sells leftover electricity after serving customers and
           charging{" "}
           <EntryLink to={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}>storage</EntryLink>
-          . Profitable generation also increases running plants when current
-          prices exceed added fuel, variable operating and carbon costs. It does
-          not start plants for export or sell stored water or electricity. Later
+          . All profitable also increases running plants when current prices
+          exceed added fuel, variable operating and carbon costs. It does not
+          start plants for export or sell stored water or electricity. Later
           ramp-down costs can still occur when prices fall. None disables
           exports.
         </p>
         <p>
-          Co-op normally trades before charging utility storage; Demand and
-          storage gives local charging priority and requests any remaining
+          Co-op normally trades before charging utility storage; Shortages +
+          Charging gives local charging priority and requests any remaining
           charge below other players' customer shortages. Exports you could
           redirect count toward your{" "}
           <EntryLink to={MANUAL_ENTRY.RESERVE_CAPACITY}>reserve</EntryLink>.

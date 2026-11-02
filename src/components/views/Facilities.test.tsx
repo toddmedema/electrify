@@ -63,7 +63,7 @@ test("intertie flow distinguishes customer purchases from storage charging", () 
     </Provider>,
   );
   expect(screen.getByRole("combobox", { name: "Buying" })).toHaveTextContent(
-    "Charge storage",
+    "Shortages + Charging",
   );
   expect(screen.getByTestId("import-uses")).toHaveTextContent(
     "40MW for customers",

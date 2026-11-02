@@ -97,8 +97,8 @@ test("California players can build and understand an intertie", async ({
     name: "Selling",
     exact: true,
   });
-  await expect(buying).toContainText("Shortages");
-  await expect(selling).toContainText("Surplus");
+  await expect(buying).toContainText("Shortages only");
+  await expect(selling).toContainText("Surplus only");
   const [buyBox, sellBox] = await Promise.all([
     buying.boundingBox(),
     selling.boundingBox(),
@@ -110,7 +110,7 @@ test("California players can build and understand an intertie", async ({
   await expect(buyingOptions).toHaveText([
     "None",
     "Shortages only",
-    "Demand and storage",
+    "Shortages + Charging",
   ]);
   expect(
     (await buyingOptions.allTextContents()).every(
@@ -118,21 +118,16 @@ test("California players can build and understand an intertie", async ({
     ),
   ).toBe(true);
   await page
-    .getByRole("option", { name: "Demand and storage", exact: true })
+    .getByRole("option", { name: "Shortages + Charging", exact: true })
     .click();
-  await expect(buying).toContainText("Charge storage");
-  await expect(selling).toContainText("Surplus");
-  await expect(
-    facilities.getByText(
-      "Cover shortages, then buy at current prices to charge storage.",
-    ),
-  ).toBeVisible();
+  await expect(buying).toContainText("Shortages + Charging");
+  await expect(selling).toContainText("Surplus only");
   await selling.click();
   const sellingOptions = page.getByRole("option");
   await expect(sellingOptions).toHaveText([
     "None",
     "Surplus only",
-    "Profitable generation",
+    "All profitable",
   ]);
   expect(
     (await sellingOptions.allTextContents()).every(
@@ -140,12 +135,23 @@ test("California players can build and understand an intertie", async ({
     ),
   ).toBe(true);
   await page
-    .getByRole("option", { name: "Profitable generation", exact: true })
+    .getByRole("option", { name: "All profitable", exact: true })
     .click();
-  await expect(buying).toContainText("Charge storage");
-  await expect(selling).toContainText("Profitable");
+  await expect(buying).toContainText("Shortages + Charging");
+  await expect(selling).toContainText("All profitable");
+  for (const select of [buying, selling]) {
+    expect(
+      await select.evaluate(
+        (element) =>
+          element.scrollWidth <= element.clientWidth + 1 &&
+          element.scrollHeight <= element.clientHeight + 1,
+      ),
+    ).toBe(true);
+  }
   if (process.env.REVIEW_SCREENSHOT_DIR) {
+    await page.mouse.move(0, 0);
     await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
   }
   await reviewScreenshot(facilities, {
     path: testInfo.outputPath("intertie-trading-rules.png"),

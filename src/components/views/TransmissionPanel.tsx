@@ -613,13 +613,6 @@ function TradingControls({
             labelId={`${id}-buying`}
             label="Buying"
             value={state.buyingRule}
-            renderValue={(value) =>
-              value === "SHORTAGES_AND_STORAGE"
-                ? "Charge storage"
-                : value === "SHORTAGES"
-                  ? "Shortages"
-                  : "None"
-            }
             onChange={(event) =>
               onBuyingRule(event.target.value as BuyingRuleType)
             }
@@ -637,13 +630,6 @@ function TradingControls({
             labelId={`${id}-selling`}
             label="Selling"
             value={state.sellingRule}
-            renderValue={(value) =>
-              value === "PROFITABLE"
-                ? "Profitable"
-                : value === "SURPLUS"
-                  ? "Surplus"
-                  : "None"
-            }
             onChange={(event) =>
               onSellingRule(event.target.value as SellingRuleType)
             }
@@ -656,22 +642,6 @@ function TradingControls({
           </Select>
         </FormControl>
       </div>
-      {state.buyingRule === "SHORTAGES_AND_STORAGE" && (
-        <Typography variant="caption" color="textSecondary">
-          Cover shortages, then buy at current prices to charge storage.
-        </Typography>
-      )}
-      {state.sellingRule === "PROFITABLE" && (
-        <Typography variant="caption" color="textSecondary">
-          Sell surplus and increase running plants when current prices exceed
-          added running costs.
-        </Typography>
-      )}
-      {game.utilityExpansion && (
-        <Typography variant="caption" color="textSecondary">
-          Contracted utility supply is separate from optional trading.
-        </Typography>
-      )}
     </div>
   );
 }
