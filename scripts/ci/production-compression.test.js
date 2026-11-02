@@ -28,7 +28,7 @@ for (const profile of [false, true]) {
             ...before.options.minimizer.options,
             compress: {
               ...before.options.minimizer.options.compress,
-              passes: 2,
+              passes: 4,
             },
           },
         },
