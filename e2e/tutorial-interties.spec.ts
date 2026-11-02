@@ -273,7 +273,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     page.getByRole("heading", { name: "Mission complete!" }),
   ).toBeVisible({ timeout: 20000 });
   await expect(
-    page.getByText(/kept demand supplied through a regional shortage/i),
+    page.getByText(/keep local backup ready for regional shortages/i),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Next tutorial" })).toHaveCount(
     0,
