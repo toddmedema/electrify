@@ -1,8 +1,33 @@
 import { reviewScreenshot } from "./review-screenshot";
 import path from "path";
-import { expect, test } from "./fixtures";
+import { expect, Page, test } from "./fixtures";
+import { TICK_MS } from "../src/Constants";
 import { openPane, openBuild } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
+
+async function advanceWithinFirstDay(page: Page) {
+  // Let pending layout settle, then drive actual reducer frames on one controlled clock.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 200);
+  const speed = page.locator("#appbar:visible");
+  await speed
+    .getByRole("button", { name: "normal speed", exact: true })
+    .first()
+    .click();
+  await page.clock.runFor(60 * TICK_MS.NORMAL);
+  await speed
+    .getByRole("button", { name: "pause", exact: true })
+    .first()
+    .click();
+  // A single flushed read avoids pausing/resuming gameplay on every progress poll.
+  const game = (await readSavedGame(page))!;
+  expect(game.seed).toBe(0.25 * 2 ** 32);
+  expect(game.date.monthsElapsed).toBe(0);
+  expect(game.date.minute).toBeGreaterThanOrEqual(720);
+  expect(game.date.minute).toBeLessThan(1440);
+  // Gameplay is paused; let UI timers such as toast dismissal run normally again.
+  await page.clock.resume();
+  return game;
+}
 
 for (const theme of ["light", "dark"]) {
   test(`day and night follow the plot's time axis in ${theme}`, async ({
@@ -97,8 +122,11 @@ for (const theme of ["light", "dark"]) {
   test(`storage and complete demand remain compact and inspectable in ${theme}`, async ({
     page,
   }, info) => {
+    await page.clock.install();
     await page.addInitScript((mode) => {
       localStorage.clear();
+      // Pin the new run before any timeline is generated.
+      Math.random = () => 0.25;
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);
@@ -138,21 +166,8 @@ for (const theme of ["light", "dark"]) {
     await pane
       .getByRole("button", { name: "Inspect Natural Gas CC", exact: true })
       .click();
+    const game = await advanceWithinFirstDay(page);
     const speed = page.locator("#appbar:visible");
-    await speed
-      .getByRole("button", { name: "normal speed", exact: true })
-      .first()
-      .click();
-    await expect
-      .poll(async () => (await readSavedGame(page))?.date.minute || 0, {
-        timeout: 30000,
-      })
-      .toBeGreaterThanOrEqual(720);
-    await speed
-      .getByRole("button", { name: "pause", exact: true })
-      .first()
-      .click();
-    const game = (await readSavedGame(page))!;
     const charging = game.timeline.findIndex(
       (tick) => (tick.storageChargeW || 0) > 0,
     );
@@ -359,8 +374,11 @@ for (const theme of ["light", "dark"]) {
   test(`daily fuel production is readable in ${theme}`, async ({
     page,
   }, info) => {
+    await page.clock.install();
     await page.addInitScript((mode) => {
       localStorage.clear();
+      // Pin the new run before any timeline is generated.
+      Math.random = () => 0.25;
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);
@@ -408,21 +426,7 @@ for (const theme of ["light", "dark"]) {
       );
     }
     // The stack must retain its shape and accessible values as records replace forecasts.
-    await page
-      .locator("#appbar:visible")
-      .getByRole("button", { name: "normal speed", exact: true })
-      .first()
-      .click();
-    await expect
-      .poll(async () => (await readSavedGame(page))?.date.minute || 0, {
-        timeout: 30000,
-      })
-      .toBeGreaterThanOrEqual(720);
-    await page
-      .locator("#appbar:visible")
-      .getByRole("button", { name: "pause", exact: true })
-      .first()
-      .click();
+    await advanceWithinFirstDay(page);
     await expect(chart.getByRole("img")).toHaveAccessibleName(
       /Total supply: latest .*Total load: latest/,
     );
