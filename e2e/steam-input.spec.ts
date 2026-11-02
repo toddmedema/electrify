@@ -325,11 +325,13 @@ test("menu movement under a stationary pointer preserves keyboard navigation", a
     menu.style.transform = "translateX(10000px)";
   });
   await expect(page.locator("#centeredMenu:hover")).toHaveCount(0);
+  // Chromium usually reports the control arriving beneath the mouse, but doesn't promise to.
   await friends.evaluate(
     (button) =>
       new Promise<void>((resolve) => {
         button.addEventListener("pointerover", () => resolve(), { once: true });
         document.getElementById("centeredMenu")!.style.transform = "none";
+        window.setTimeout(resolve, 2000);
       }),
   );
   await expect(manual).toBeFocused();

@@ -31,7 +31,7 @@ function isMouse(event: React.PointerEvent): boolean {
 // A term the game already shows, turned into a way into the manual. Without these the search
 // box only helps players who already know the term exists, which is the wrong way round.
 //
-// With a mouse, resting on the term previews its entry and moving away dismisses it, the way a
+// With a mouse, moving onto the term and resting there previews its entry and moving away dismisses it, the way a
 // link preview does on Wikipedia. The preview leaves the game running and the rest of the screen
 // usable; clicking (or tapping, where there is no hover) pins the entry open instead.
 export default function ManualLink(props: Props): React.JSX.Element {
@@ -45,6 +45,9 @@ export default function ManualLink(props: Props): React.JSX.Element {
   // hasn't moved, which the browser reports as entering the (?) again; the preview waits until
   // the mouse has actually left instead of popping straight back up
   const suppressed = React.useRef(false);
+  // Set once a moving mouse has asked for the preview. Boundary events alone can't do that: a
+  // dialog can open with its (?) beneath a mouse that hasn't moved, which still reports entering.
+  const hovering = React.useRef(false);
   const pinnedRef = React.useRef(pinned);
   pinnedRef.current = pinned;
 
@@ -89,13 +92,15 @@ export default function ManualLink(props: Props): React.JSX.Element {
         ref={anchorRef}
         className={props.text ? "manual-link manual-link-text" : "manual-link"}
         aria-label={props.text || `What is ${label}?`}
-        onPointerEnter={(event: React.PointerEvent) => {
-          if (isMouse(event) && !suppressed.current) {
+        onPointerMove={(event: React.PointerEvent) => {
+          if (isMouse(event) && !suppressed.current && !hovering.current) {
+            hovering.current = true;
             schedule(true, HOVER_OPEN_MS);
           }
         }}
         onPointerLeave={(event: React.PointerEvent) => {
           if (!isMouse(event)) return;
+          hovering.current = false;
           // The pinned entry's backdrop arriving counts as leaving too, and doesn't end it
           if (!pinnedRef.current) suppressed.current = false;
           schedule(false, HOVER_CLOSE_MS);

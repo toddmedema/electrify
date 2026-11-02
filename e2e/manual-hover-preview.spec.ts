@@ -14,6 +14,15 @@ async function openWorkspaceHelp(page: Page) {
   await option.getByRole("button", { name: /^Show .* details$/ }).click();
   const help = option.getByRole("button", { name: /^What is / }).first();
   await expect(help).toBeVisible();
+  // Expanding details slides the (?) out from under a mouse that has just arrived, which ends
+  // the hover until the mouse next moves.
+  await expect
+    .poll(() =>
+      option.evaluate(
+        (element) => element.getAnimations({ subtree: true }).length,
+      ),
+    )
+    .toBe(0);
   return { build, help };
 }
 

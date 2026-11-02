@@ -70,7 +70,9 @@ jobs:
     name: ${{ matrix.label }} build
     needs: build
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    # Time spent queued for a hosted macOS runner counts against this limit, so packaging has its
+    # own, tighter one below.
+    timeout-minutes: 60
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.tmp/electron-cache
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.tmp/electron-builder-cache
@@ -123,6 +125,7 @@ jobs:
         with:
           name: desktop-renderer
       - name: Package and verify native depot
+        timeout-minutes: 15
         run: npm run desktop:pack:offline -- --skip-build --platform ${{ matrix.platform }} --arch ${{ matrix.platform == 'darwin' && 'universal' || matrix.arch }}
       - name: Save native packaging downloads
         if: "!cancelled() && steps.native-cache.outputs.cache-hit != 'true'"
