@@ -1897,7 +1897,7 @@ export const SCENARIOS: ScenarioType[] = [
     summary:
       "Connect to your neighbors, acquire a utility, and keep your larger company supplied.",
     threat:
-      "Compare company terms before connecting. This fictional network-renewal plan raises opening upkeep to 1.5× in 2015 and 2× in 2020, before inflation and customer growth. Valley's nuclear purchase halves in 2017; Champlain's ends in 2020, when Québec and Ridge purchase limits also halve. Plan supply and working capital.",
+      "Network upkeep rises in 2015 and 2020, and power purchase limits shrink from 2017. Compare company terms before connecting.",
     themes: ["Rapid growth"],
     ownership: "Investor",
     startingYear: 2005,
