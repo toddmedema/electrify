@@ -15,6 +15,8 @@ async function startGame(
     localStorage.clear();
     localStorage.setItem("theme", mode);
     localStorage.setItem("audioEnabled", "false");
+    // Layout assertions need the same weather and risk headline on every visit.
+    Math.random = () => 0.25;
   }, theme);
   await page.goto(`/?scenario=${scenarioId}`);
   await page.getByRole("button", { name: "Start game", exact: true }).click();

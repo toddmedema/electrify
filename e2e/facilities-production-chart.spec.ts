@@ -4,6 +4,7 @@ import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { getDateFromMinute } from "../src/helpers/DateTime";
+import { TICK_MINUTES, TICK_MS } from "../src/Constants";
 
 declare global {
   interface Window {
@@ -211,10 +212,12 @@ for (const theme of ["light", "dark"]) {
   test(`storage and complete demand remain compact and inspectable in ${theme}`, async ({
     page,
   }, info) => {
+    await page.clock.install();
     await page.addInitScript((mode) => {
       localStorage.clear();
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
+      Math.random = () => 0.25;
     }, theme);
     await page.goto("/?scenario=108");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
@@ -253,20 +256,21 @@ for (const theme of ["light", "dark"]) {
       .getByRole("button", { name: "Inspect Natural Gas CC", exact: true })
       .click();
     const speed = page.locator("#appbar:visible");
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
     await speed
       .getByRole("button", { name: "normal speed", exact: true })
       .first()
       .click();
-    await expect
-      .poll(async () => (await readSavedGame(page))?.date.minute || 0, {
-        timeout: 30000,
-      })
-      .toBeGreaterThanOrEqual(720);
+    // Drive the real RAF/reducer clock without repeatedly sending pagehide to flush saves:
+    // every such poll pauses/resumes the game and resets its accumulated tick time.
+    await page.clock.runFor((720 / TICK_MINUTES + 2) * TICK_MS.NORMAL);
     await speed
       .getByRole("button", { name: "pause", exact: true })
       .first()
       .click();
     const game = (await readSavedGame(page))!;
+    expect(game.date.minute).toBeGreaterThanOrEqual(720);
+    await page.clock.resume();
     const charging = game.timeline.findIndex(
       (tick) => (tick.storageChargeW || 0) > 0,
     );
@@ -300,8 +304,11 @@ for (const theme of ["light", "dark"]) {
     await expect(chart.locator(".chartPointDetails")).toHaveCount(0);
     await image.focus();
     const selectPoint = async (index: number) => {
-      await image.press("Home");
-      for (let i = 0; i < index; i++) await image.press("ArrowRight");
+      const fromEnd = index > (game.timeline.length - 1) / 2;
+      await image.press(fromEnd ? "End" : "Home");
+      const steps = fromEnd ? game.timeline.length - 1 - index : index;
+      for (let i = 0; i < steps; i++)
+        await image.press(fromEnd ? "ArrowLeft" : "ArrowRight");
     };
     await selectPoint(charging);
     const details = chart.locator(".chartTooltip");
