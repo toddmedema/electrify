@@ -19,6 +19,9 @@ function productionCompression(
     ...config,
     optimization: {
       ...config.optimization,
+      // Workers have separate runtimes, but can load the same emitted module
+      // chunks. Include the page entry so those modules are not shipped twice.
+      splitChunks: { ...config.optimization.splitChunks, chunks: "all" },
       minimizer: minimizers.map((plugin) =>
         plugin instanceof TerserPlugin
           ? new TerserPlugin({

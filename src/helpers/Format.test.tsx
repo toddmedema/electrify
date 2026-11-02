@@ -14,6 +14,8 @@ import {
   withoutNegativeZero,
   formatFixed,
   formatNumber,
+  formatDecimalNumber,
+  formatAbbreviatedNumber,
   formatPricePerMWh,
   formatFacilitySize,
   formatBuildMonths,
@@ -246,5 +248,57 @@ describe("displayed negative zero", () => {
     expect(formatMoneyStable(-63800)).toBe("-$63.8k");
     expect(formatWatts(-0.001)).toBe("0W");
     expect(formatScore(-0.001)).toBe("0");
+  });
+});
+
+describe("decimal display precision", () => {
+  it.each([
+    [1.005, "1.01"],
+    [2.675, "2.68"],
+    [-1.005, "-1.00"],
+    [-2.675, "-2.67"],
+    [-0.005, "0.00"],
+  ])(
+    "rounds decimal ties toward positive infinity for %s",
+    (value, expected) => {
+      expect(formatDecimalNumber(value, { digits: 2 })).toBe(expected);
+    },
+  );
+
+  it("keeps grouping, trailing zeroes and non-finite labels", () => {
+    expect(formatDecimalNumber(1234.5, { digits: 2 })).toBe("1,234.50");
+    expect(formatDecimalNumber(1234.5, { digits: 2, trim: true })).toBe(
+      "1,234.5",
+    );
+    expect(formatDecimalNumber(-0.5)).toBe("0");
+    expect(formatDecimalNumber(-1.5)).toBe("-1");
+    expect(formatDecimalNumber(Infinity)).toBe("Infinity");
+    expect(formatDecimalNumber(-Infinity)).toBe("-Infinity");
+    expect(formatDecimalNumber(NaN)).toBe("NaN");
+    expect(formatDecimalNumber(1e21)).toBe("1,000,000,000,000,000,000,000");
+    expect(formatWatts(9.99e-7, 6)).toBe("0W");
+  });
+});
+
+describe("historical quantity abbreviations", () => {
+  it.each([
+    [499, "499"],
+    [500, "1k"],
+    [999, "1k"],
+    [499999, "500k"],
+    [500000, "1m"],
+    [-500000, "0m"],
+    [1e9, "1b"],
+    [1e12, "1t"],
+  ])("preserves whole-number abbreviations for %s", (value, expected) => {
+    expect(formatAbbreviatedNumber(value)).toBe(expected);
+  });
+
+  it("keeps useful decimals for changes and short mass labels", () => {
+    expect(formatAbbreviatedNumber(9900, { digits: 1 })).toBe("9.9k");
+    expect(formatAbbreviatedNumber(1234, { totalDigits: 3 })).toBe("1.23k");
+    expect(formatAbbreviatedNumber(12340, { totalDigits: 3 })).toBe("12.3k");
+    expect(formatAbbreviatedNumber(123400, { totalDigits: 3 })).toBe("123k");
+    expect(formatAbbreviatedNumber(999999, { totalDigits: 3 })).toBe("1m");
   });
 });

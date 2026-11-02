@@ -1,4 +1,3 @@
-import numbro from "numbro";
 import { pow } from "./Pow";
 import { log10 } from "./Libm";
 
@@ -16,6 +15,63 @@ export function formatNumber(
   options?: Intl.NumberFormatOptions,
 ): string {
   return withoutNegativeZero(value.toLocaleString("en-US", options));
+}
+
+const decimalFormats = new Map<string, Intl.NumberFormat>();
+
+/** Decimal display rounding follows Math.round, including negative ties rounding toward zero. */
+export function formatDecimalNumber(
+  value: number,
+  { digits = 0, trim = false, group = true } = {},
+): string {
+  if (!Number.isFinite(value)) return String(value);
+  // Shift the decimal text rather than multiplying: 1.005 * 100 is just below 100.5.
+  const [decimal, exponent] = value.toString().split("e");
+  const shifted = Number(`${decimal}e${Number(exponent || 0) + digits}`);
+  // Keep the existing truncation of tiny exponential values and avoid overflowing large ones.
+  const rounded =
+    exponent && Number(exponent) > 0
+      ? value
+      : (exponent ? Math.trunc(shifted) : Math.round(shifted)) /
+        pow(10, digits);
+  const key = `${digits}:${trim}:${group}`;
+  let formatter = decimalFormats.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: trim ? 0 : digits,
+      maximumFractionDigits: digits,
+      useGrouping: group,
+    });
+    decimalFormats.set(key, formatter);
+  }
+  return withoutNegativeZero(formatter.format(rounded));
+}
+
+const ABBREVIATIONS = [
+  { divisor: 1e12, suffix: "t" },
+  { divisor: 1e9, suffix: "b" },
+  { divisor: 1e6, suffix: "m" },
+  { divisor: 1e3, suffix: "k" },
+];
+
+/** Compact historical quantities promote a unit from its halfway point, as before. */
+export function formatAbbreviatedNumber(
+  value: number,
+  { digits = 0, totalDigits = 0 } = {},
+): string {
+  if (!Number.isFinite(value)) return String(value);
+  const unit = ABBREVIATIONS.find(
+    ({ divisor }) => Math.abs(value) >= divisor / 2,
+  );
+  const scaled = unit ? value / unit.divisor : value;
+  const integerDigits = Math.abs(scaled).toString().split(".")[0].length;
+  return (
+    formatDecimalNumber(scaled, {
+      digits: totalDigits ? Math.max(totalDigits - integerDigits, 0) : digits,
+      trim: true,
+      group: false,
+    }) + (unit?.suffix ?? "")
+  );
 }
 
 /** Fixed decimals for display, preserving genuine negative values and trailing zeroes. */
@@ -49,7 +105,7 @@ export function formatWattHours(i: number, mantissa?: number): string {
 }
 
 // Costs are derived from division, so a zero denominator reaches the formatters as Infinity or
-// NaN. numbro renders those literally -- "$INFINITY/MWh" was showing up on the build screen for a
+// NaN. Rendering those literally put "$INFINITY/MWh" on the build screen for a
 // generator whose estimated output was zero -- and a dash reads as the "no estimate" it means.
 const NO_ESTIMATE = "—";
 
@@ -107,10 +163,10 @@ function formatMoneyAmount(i: number, trimMantissa: boolean): string {
   const displayAbs = Math.abs(scaled);
   const mantissa = displayAbs < 10 ? 2 : displayAbs < 100 ? 1 : 0;
   return (
-    numbro(scaled).format({
-      mantissa,
-      trimMantissa,
-      thousandSeparated: false,
+    formatDecimalNumber(scaled, {
+      digits: mantissa,
+      trim: trimMantissa,
+      group: false,
     }) + unit.suffix
   );
 }
@@ -152,10 +208,9 @@ export function formatWattsInUnit(
   // asks for; the rounding check uses that precision so 9.96 at one decimal becomes "10", not "10.0"
   const whole = Math.abs(Number(scaled.toFixed(requested))) >= 10;
   return (
-    numbro(scaled).format({
-      thousandSeparated: true,
-      trimMantissa: true,
-      mantissa: whole ? 0 : requested,
+    formatDecimalNumber(scaled, {
+      digits: whole ? 0 : requested,
+      trim: true,
     }) +
     unit.suffix +
     "W"
@@ -227,7 +282,7 @@ export function formatBuildMonths(
 
 /** A game score as a whole number with thousands separators. */
 export function formatScore(score: number): string {
-  return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
+  return formatDecimalNumber(score);
 }
 
 /** Compact customer counts, with separate precision for chart axes and inspection. */

@@ -1,6 +1,9 @@
-import numbro from "numbro";
 import { UnitSystemType } from "../Types";
-import { formatCount } from "./Format";
+import {
+  formatAbbreviatedNumber,
+  formatCount,
+  formatDecimalNumber,
+} from "./Format";
 
 /**
  * Everything the player reads is converted from metric at the last moment; nothing upstream of
@@ -84,9 +87,8 @@ export function formatLargeMassValue(
   units: UnitSystemType,
   mantissa = 0,
 ): string {
-  return numbro(toDisplayLargeMass(kg, units)).format({
-    thousandSeparated: true,
-    mantissa,
+  return formatDecimalNumber(toDisplayLargeMass(kg, units), {
+    digits: mantissa,
   });
 }
 
@@ -99,9 +101,9 @@ export function formatLargeMassValueConcise(
   kg: number,
   units: UnitSystemType,
 ): string {
-  return numbro(toDisplayLargeMass(kg, units))
-    .format({ average: true, totalLength: 3, trimMantissa: true })
-    .toUpperCase();
+  return formatAbbreviatedNumber(toDisplayLargeMass(kg, units), {
+    totalDigits: 3,
+  }).toUpperCase();
 }
 
 export function formatLargeMass(kg: number, units: UnitSystemType): string {
@@ -118,7 +120,7 @@ export function formatLargeMassApprox(
   units: UnitSystemType,
 ): string {
   const value = toDisplayLargeMass(kg, units);
-  return `${numbro(value).format({ average: true, totalLength: 2, trimMantissa: true }).toUpperCase()} ${largeMassUnit(units)}`;
+  return `${formatAbbreviatedNumber(value, { totalDigits: 2 }).toUpperCase()} ${largeMassUnit(units)}`;
 }
 
 /**
