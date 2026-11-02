@@ -95,11 +95,11 @@ for (const theme of ["light", "dark"] as const) {
       await review.click({ trial: true });
       await review.click();
       const loan = page
-        .getByRole("dialog")
+        .getByRole("dialog", { name: /^Build / })
         .getByRole("button", { name: "Take loan", exact: true });
       await expect(loan).toBeEnabled();
       await page
-        .getByRole("dialog")
+        .getByRole("dialog", { name: /^Build / })
         .getByRole("button", { name: "close", exact: true })
         .click();
       await slider.focus();
@@ -323,8 +323,8 @@ for (const theme of ["light", "dark"] as const) {
         });
       }
       await detailReview.click();
-      await expect(page.getByRole("dialog")).toBeVisible();
-      const dialog = page.getByRole("dialog");
+      await expect(page.getByRole("dialog", { name: /^Build / })).toBeVisible();
+      const dialog = page.getByRole("dialog", { name: /^Build / });
       await expectContinuousDialogSurface(dialog);
       const cashValue = dialog
         .locator(".decisionImpactFact")
@@ -400,11 +400,14 @@ for (const theme of ["light", "dark"] as const) {
           });
         }
       }
-      await page
-        .getByRole("dialog")
-        .getByRole("button", { name: "close" })
-        .click();
-      await expect(page.getByRole("dialog")).not.toBeVisible();
+      // Keep the hover preview open while closing the purchase review. Both
+      // expose role=dialog, including during their independent exit transitions.
+      await help.hover();
+      await expect(
+        page.getByRole("dialog", { name: "Manual preview", exact: true }),
+      ).toBeVisible();
+      await dialog.getByRole("button", { name: "close", exact: true }).click();
+      await expect(dialog).not.toBeVisible();
       await page
         .getByRole("button", { name: "Close Build", exact: true })
         .click();
@@ -585,7 +588,7 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       })
       .click();
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("dialog", { name: /^Build / });
     await expect(dialog).toContainText("Iron-Air Battery");
     await dialog.getByRole("button", { name: "Pay cash", exact: true }).click();
     await expect(dialog).not.toBeVisible();
