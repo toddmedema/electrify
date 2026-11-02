@@ -834,14 +834,15 @@ compared 44,784 outputs against the original dependency with no differences. Bou
 retain representative contracts after removing the dependency.
 
 Both builds below are measured with Node 24.22.2 and gzip level 9. The before build is
-`c382b5ee`; the after build includes all three changes. The smaller main chunk alone is not
-the startup saving: the initial-JavaScript row also counts its shared entrypoint chunks.
+`c382b5ee`; the after build includes all three changes and the merged `4c207dbb` base update.
+The smaller main chunk alone is not the startup saving: the initial-JavaScript row also counts
+its shared entrypoint chunks.
 
 | Metric | Before | After | Reduction |
 | --- | ---: | ---: | ---: |
-| Main JavaScript | 995.125 kB | 386.864 kB | 608.261 kB |
-| Initial JavaScript | 995.125 kB | 979.952 kB | 15.173 kB |
-| All JavaScript | 1592.948 kB | 1216.436 kB | 376.512 kB |
+| Main JavaScript | 995.125 kB | 386.962 kB | 608.163 kB |
+| Initial JavaScript | 995.125 kB | 979.798 kB | 15.327 kB |
+| All JavaScript | 1592.948 kB | 1216.201 kB | 376.747 kB |
 | Main CSS | 29.159 kB | 29.159 kB | unchanged |
 
 The existing bundle ceilings remain unchanged. A compiler fixture checks that a shared module
