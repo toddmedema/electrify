@@ -221,9 +221,18 @@ describe("tutorial step actions", () => {
     });
   });
 
-  it("moves every guided first-mission step on from a tap on its target", () => {
+  it("opens the first mission with a manual introduction before hands-on steps", () => {
+    const [intro] = TUTORIALS[0].tutorialSteps!;
+    expect(isGatedStep(intro)).toBe(false);
+    expect(intro.target).toBeUndefined();
+    expect(intro.continueOn).toBeUndefined();
+    expect(intro.continueOnClick).toBeUndefined();
+  });
+
+  it("moves the hands-on first-mission steps on from a tap on their targets", () => {
     TUTORIALS[0]
-      .tutorialSteps!.filter((step) => !step.capstone)
+      .tutorialSteps!.slice(1)
+      .filter((step) => !step.capstone)
       .forEach((step, index) => {
         expect({
           index,

@@ -15,10 +15,22 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await page.getByRole("button", { name: "Play", exact: true }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Step 1 of 4" }),
+    page.getByRole("heading", { name: "Step 1 of 5" }),
+  ).toBeVisible();
+  await expect(page.locator(".tutorialHud")).toContainText(
+    "You are the CEO of an electricity generation company, and your goal is to keep the lights on without going bankrupt.",
+  );
+  await expect(page.locator(".tutorialTargetRing")).toHaveCount(0);
+  await reviewScreenshot(page, {
+    path: testInfo.outputPath("introduction.png"),
+    animations: "disabled",
+  });
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Step 2 of 5" }),
   ).toBeVisible();
   await expect(page.getByText("Tap your coal plant")).toBeVisible();
-  // The first step is a new player's first look at the game, so everything it doesn't use
+  // The first hands-on step keeps everything it doesn't use
   // stays out of the way until a later step needs it
   await expect(page.locator("#navfooter")).toBeHidden();
   await expect(page.locator(".button-buildFacility")).toBeHidden();
@@ -126,7 +138,7 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await expect(
     page.getByRole("button", { name: "Install for later" }),
   ).toHaveCount(0);
-  await reviewScreenshot(page, {
+  await reviewScreenshot(page.getByRole("dialog"), {
     path: testInfo.outputPath("mission-complete.png"),
     animations: "disabled",
   });
@@ -142,4 +154,17 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
     page.getByRole("button", { name: "Next tutorial" }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Main menu" })).toBeVisible();
+  const primary = page.getByRole("button", { name: "Next tutorial" });
+  const secondary = page.getByRole("button", { name: "Main menu" });
+  const primaryBox = (await primary.boundingBox())!;
+  const secondaryBox = (await secondary.boundingBox())!;
+  expect(primaryBox.y).toBeCloseTo(secondaryBox.y, 0);
+  expect(primaryBox.x).toBeGreaterThanOrEqual(
+    secondaryBox.x + secondaryBox.width,
+  );
+  await expect(primary).toBeFocused();
+  await primary.click();
+  await expect(
+    page.getByRole("region", { name: "Step 1 of 9", exact: true }),
+  ).toBeVisible();
 });

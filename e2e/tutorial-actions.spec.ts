@@ -75,6 +75,8 @@ for (const [index, mission] of missions.entries()) {
       await page.keyboard.press("s");
     }
     await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+    if (mission.name === "Electricity")
+      await page.getByRole("button", { name: "Next", exact: true }).click();
     const target = page.locator(".tutorialTarget").first();
     await expect(target).toBeInViewport();
     await target.click({ trial: true });
