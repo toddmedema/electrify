@@ -2,9 +2,8 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { store } from "../../Store";
-import { delta, quit } from "../../reducers/Game";
+import { loaded, quit, resume } from "../../reducers/Game";
 import { dialogClose, dialogOpen } from "../../reducers/UI";
-import { navigate } from "../../reducers/Card";
 import { sessionChanged } from "../../SaveLibrary";
 import { createGame } from "../../testing/Simulator";
 import { LegacyCampaignTermType } from "../../Types";
@@ -99,9 +98,8 @@ it("reviews the real inherited company and requires an explicit handover", async
 it("yields to the save recovery dialog and returns after recovery closes", () => {
   const game = createGame({ scenarioId: 117, seed: 611 });
   store.dispatch(
-    delta({
+    resume({
       ...game,
-      inGame: true,
       campaign: {
         ...game.campaign!,
         pendingHandover: true,
@@ -109,7 +107,7 @@ it("yields to the save recovery dialog and returns after recovery closes", () =>
       },
     }),
   );
-  store.dispatch(navigate("FACILITIES"));
+  store.dispatch(loaded());
   render(
     <Provider store={store}>
       <CampaignHandoverContainer />
