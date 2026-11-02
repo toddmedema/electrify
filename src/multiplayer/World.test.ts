@@ -1,4 +1,5 @@
 import "../Store";
+import cloneDeep from "lodash.clonedeep";
 import { loadSimData } from "../testing/SimData";
 import { currentTick } from "../helpers/GameSelectors";
 import {
@@ -732,10 +733,17 @@ test("a shared tick imports paid charging energy after customer service and resu
     }),
   ).toBeUndefined();
   const buyer = world.grids[1];
+  const customerGenerator = buyer.facilities.find(
+    (facility) => facility.fuel === "Natural Gas",
+  )!;
+  customerGenerator.peakW = 30e6;
+  customerGenerator.currentW = 30e6;
+  customerGenerator.spinMinutes = 1;
+  customerGenerator.minimumStableOutput = 0;
   const battery = buyer.facilities.at(-1)!;
   battery.yearsToBuildLeft = 0;
   battery.currentWh = 0;
-  buyer.facilities = [battery];
+  buyer.facilities = [customerGenerator, battery];
   const seller = world.grids[0];
   const generator = seller.facilities.find(
     (facility) => facility.fuel === "Natural Gas",
@@ -753,21 +761,28 @@ test("a shared tick imports paid charging energy after customer service and resu
       payload: "SHORTAGES_AND_STORAGE",
     }),
   ).toBeUndefined();
-  const expectedDemand = buyer.timeline.find(
-    (tick) => tick.minute > buyer.date.minute,
-  )!.demandW;
   world.seats.forEach((_seat, i) => command(world, i, { kind: "ready" }));
+  const baseline = cloneDeep(world);
+  baseline.grids[1].transmission!.buyingRule = "SHORTAGES";
+  stepWorld(baseline);
   stepWorld(world);
-  const now = currentTick(buyer)!;
-  expect(now.demandW).toBe(expectedDemand);
+  // Commands replace their grid with a detached reducer result; inspect the active grid.
+  const now = currentTick(world.grids[1])!;
+  const chargedBattery = world.grids[1].facilities.find(
+    (facility) => facility.name === "Battery",
+  )!;
+  expect(now.demandW).toBe(currentTick(baseline.grids[1])!.demandW);
   expect(now.supplyW).toBe(now.demandW);
   expect(now.storageImportedW).toBeGreaterThan(0);
-  expect(battery.currentWh).toBeCloseTo(
-    ((now.storageImportedW || 0) * (battery.roundTripEfficiency || 0)) / 4,
+  expect(chargedBattery.currentWh).toBeCloseTo(
+    ((now.storageImportedW || 0) * (chargedBattery.roundTripEfficiency || 0)) /
+      4,
     5,
   );
   expect(now.importedW).toBeCloseTo(
-    now.demandW + (now.storageImportedW || 0),
+    now.demandW -
+      (now.supplyByFuel["Natural Gas"] || 0) +
+      (now.storageImportedW || 0),
     3,
   );
   expect(now.expensesImports).toBeGreaterThan(0);
@@ -780,8 +795,13 @@ test("a shared tick imports paid charging energy after customer service and resu
   expect(currentTick(restored.grids[1])!.cash).toBe(
     currentTick(world.grids[1])!.cash,
   );
-  expect(restored.grids[1].facilities[0].currentWh).toBe(
-    world.grids[1].facilities[0].currentWh,
+  expect(
+    restored.grids[1].facilities.find(
+      (facility) => facility.name === "Battery",
+    )!.currentWh,
+  ).toBe(
+    world.grids[1].facilities.find((facility) => facility.name === "Battery")!
+      .currentWh,
   );
 });
 
