@@ -1,6 +1,7 @@
-import numbro from "numbro";
 import { DerivedHistoryType, UnitSystemType } from "../Types";
 import {
+  formatAbbreviatedNumber,
+  formatDecimalNumber,
   formatMoneyConcise,
   formatPercent,
   formatFixed,
@@ -97,7 +98,7 @@ export function historyMetrics(
     customers: {
       label: "Customers",
       higherIsBetter: true,
-      format: (n: number) => numbro(n).format({ average: true }),
+      format: formatAbbreviatedNumber,
       nesting: 1,
     },
     expenses: { label: "Expenses", higherIsBetter: false, ...money },
@@ -148,11 +149,7 @@ export function historyMetrics(
     kgco2ePerMWh: {
       label: "Emissions per MWh",
       higherIsBetter: false,
-      format: (n: number) =>
-        numbro(toDisplayMass(n, units)).format({
-          thousandSeparated: true,
-          mantissa: 0,
-        }),
+      format: (n: number) => formatDecimalNumber(toDisplayMass(n, units)),
       suffix: `${massUnit(units)}/MWh`,
       nesting: 2,
     },
@@ -178,10 +175,8 @@ export function formatCustomerChange(
   change: number,
   customers: number,
 ): string {
-  const formattedChange = numbro(Math.abs(change)).format({
-    average: true,
-    mantissa: 1,
-    trimMantissa: true,
+  const formattedChange = formatAbbreviatedNumber(Math.abs(change), {
+    digits: 1,
   });
   const sign = change >= 0 ? "+" : "-";
   const percent =

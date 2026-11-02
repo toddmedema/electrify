@@ -8,7 +8,9 @@ import gameReducer from "./reducers/Game";
 import settingsReducer from "./reducers/Settings";
 import { tutorialGateMiddleware } from "./reducers/Tutorial";
 import uiReducer from "./reducers/UI";
-import userReducer from "./reducers/User";
+import userReducer, { submitHighscore } from "./reducers/User";
+import { logEvent } from "./Globals";
+import { recordScenarioPlayed } from "./LocalStorage";
 import { multiplayerMiddleware } from "./multiplayer/Registry";
 
 export const store = configureStore({
@@ -61,7 +63,13 @@ export const store = configureStore({
 export type AppStore = typeof store;
 
 // Lets the game reducer dispatch follow-up actions without importing this module back
-registerStore(store);
+registerStore(store, {
+  logEvent,
+  recordScenarioPlayed,
+  submitHighscore: (submission) => {
+    void store.dispatch(submitHighscore(submission));
+  },
+});
 
 // Use throughout your app instead of plain `useDispatch` and `useSelector`
 export const useAppDispatch = () => useDispatch<AppDispatch>();
