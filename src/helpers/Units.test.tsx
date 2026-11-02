@@ -1,6 +1,8 @@
 import {
   formatLargeMass,
   formatLargeMassApprox,
+  formatLargeMassValue,
+  formatLargeMassValueConcise,
   formatMass,
   formatPricePerLargeMass,
   formatTemperature,
@@ -56,4 +58,12 @@ describe("Units", () => {
 it("does not show negative zero for a per-ton price rounded to zero", () => {
   expect(formatPricePerLargeMass(-0.00001, "metric")).toBe("$0/tonne");
   expect(formatPricePerLargeMass(-0.001, "metric")).toBe("$-1/tonne");
+});
+
+it("preserves mass precision and compact unit thresholds in both systems", () => {
+  expect(formatLargeMassValue(1234500, "metric", 2)).toBe("1,234.50");
+  expect(formatLargeMassValue(-1005, "metric", 2)).toBe("-1.00");
+  expect(formatLargeMassValueConcise(499000, "metric")).toBe("499");
+  expect(formatLargeMassValueConcise(500000, "metric")).toBe("0.5K");
+  expect(formatLargeMassValueConcise(1111111111, "imperial")).toBe("1.22M");
 });

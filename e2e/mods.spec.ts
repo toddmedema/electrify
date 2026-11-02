@@ -77,6 +77,12 @@ async function mockDesktop(
 ) {
   await page.addInitScript(
     ({ entries: initial, steamOnline, theme }) => {
+      // These journeys mock Steam independently of browser connectivity. Keep
+      // Workshop checks independent of the host machine's network status too.
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        get: () => true,
+      });
       localStorage.clear();
       localStorage.setItem("audioEnabled", "false");
       localStorage.setItem("musicVolume", "0.5");

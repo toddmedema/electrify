@@ -149,7 +149,6 @@ import {
   original,
   PayloadAction,
 } from "@reduxjs/toolkit";
-import { submitHighscore } from "./User";
 import {
   getDateFromMinute,
   getMonthYearFromMinute,
@@ -276,8 +275,8 @@ import {
   snackbarOpen,
   victoryOpen,
   victoryClose,
-} from "./UI";
-import { navigate, navigateBack } from "./Card";
+} from "./GameActions";
+import { navigate, navigateBack } from "./GameActions";
 import {
   DAYS_PER_YEAR,
   DIFFICULTIES,
@@ -310,8 +309,6 @@ import {
   shouldKeepGeneratorCommitted,
 } from "../helpers/Commitment";
 import { getViableLocationsRemaining } from "../data/FacilitySites";
-import { logEvent } from "../Globals";
-import { recordScenarioPlayed } from "../LocalStorage";
 import {
   CUSTOM_SCENARIO_ID,
   getNextTutorial,
@@ -320,7 +317,7 @@ import {
   SCENARIOS,
   TUTORIALS,
 } from "../data/Scenarios";
-import { getStore } from "../StoreRegistry";
+import { getStore, getGameEffects } from "../StoreRegistry";
 import {
   start,
   loaded,
@@ -3938,7 +3935,7 @@ export function* tickStatePhases(
           ...(debrief.scenarioMetrics ?? []),
         ];
 
-        logEvent("scenario_end", {
+        getGameEffects().logEvent("scenario_end", {
           id: scoredScenarioId,
           type:
             outcome === "completed"
@@ -3950,7 +3947,7 @@ export function* tickStatePhases(
           score: finalScore,
         });
         if (challenge)
-          logEvent("challenge_complete", {
+          getGameEffects().logEvent("challenge_complete", {
             scenarioId: scoredScenarioId,
             outcome,
           });
@@ -4003,15 +4000,13 @@ export function* tickStatePhases(
             }),
           );
           if (submitsScore) {
-            getStore().dispatch(
-              submitHighscore({
-                outcome,
-                score: finalScore,
-                scoreBreakdown: score, // For analytics purposes only
-                scenarioId: scoredScenarioId,
-                difficulty,
-              }),
-            );
+            getGameEffects().submitHighscore({
+              outcome,
+              score: finalScore,
+              scoreBreakdown: score, // For analytics purposes only
+              scenarioId: scoredScenarioId,
+              difficulty,
+            });
           }
         }, 1);
       };
@@ -4044,7 +4039,7 @@ export function* tickStatePhases(
         // Tutorials are intentionally unscored even when completed, so retain their guided
         // failure dialog rather than putting one tutorial attempt on the global leaderboard.
         if (isTutorial) {
-          logEvent("scenario_end", {
+          getGameEffects().logEvent("scenario_end", {
             id: scenarioId,
             type: failure.outcome === "fired" ? "blackouts" : "bankrupt",
             difficulty: state.difficulty,
@@ -4079,7 +4074,7 @@ export function* tickStatePhases(
         // a scenario nobody authored. Tutorials are recorded only when their final objective is
         // satisfied, so merely letting their scenario clock expire cannot bypass a capstone.
         if (ranked && !isTutorial) {
-          recordScenarioPlayed(scenarioId);
+          getGameEffects().recordScenarioPlayed(scenarioId);
         }
 
         const summary = summarizeHistory(history);
@@ -4101,7 +4096,7 @@ export function* tickStatePhases(
             const { id: scoredScenarioId, endTitle, endMessage } = scenario;
             const difficulty = state.difficulty;
             const nextTutorial = getNextTutorial(scoredScenarioId);
-            logEvent("scenario_end", {
+            getGameEffects().logEvent("scenario_end", {
               id: scoredScenarioId,
               type: "win",
               difficulty,

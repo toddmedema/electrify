@@ -37,9 +37,11 @@ for (const profile of [false, true]) {
       assert.equal(after.options.minimizer.options.keep_classnames, profile);
       assert.equal(after.options.minimizer.options.keep_fnames, profile);
       assert.deepEqual(remainingMinimizers, otherMinimizers);
+      const { splitChunks, ...otherOptimization } = optimized.optimization;
+      assert.deepEqual(splitChunks, { chunks: "all" });
       assert.deepEqual(
         {
-          ...optimized.optimization,
+          ...otherOptimization,
           minimizer: original.optimization.minimizer,
         },
         original.optimization,
