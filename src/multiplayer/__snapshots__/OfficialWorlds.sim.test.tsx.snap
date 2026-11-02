@@ -2,7 +2,7 @@
 
 exports[`two real official companies keep their exact World state in scenario 110 1`] = `
 Object {
-  "final": "2caa217eeb038bffda68f183154b5415386092b2f55008ee8adc93c3f0a8ce3e",
+  "final": "04be94c5f5db20ed25fed6b035b86bafe1a464b29263071c7d3daf0f9d5950d0",
   "initial": "1a68f143a47058ad0698c6d78d2bac9a5e208832722f9f107d8f25d5ed847c69",
   "outcomes": Object {
     "0": Object {

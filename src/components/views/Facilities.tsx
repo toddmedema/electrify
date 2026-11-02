@@ -749,8 +749,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
 }
 
 // Always drawn rather than behind a phone-only disclosure: on a phone the chart scrolls away
-// with the rest of the pane (see .facilitiesBody), the way Insights does, instead of pinning
-// 180px above the fleet or making the player open it first
+// with the rest of the pane (see .facilitiesBody), the way Insights does
 function FacilitySupplyChart({
   game,
   anchor,
@@ -805,13 +804,18 @@ function FacilitySupplyChart({
 const HINT_MIN_FACILITIES = 4;
 const BULK_HINT_SEEN_KEY = "facilityBulkHintSeen";
 
-/** The fleet chart's height: taller where the window has room, never a letterbox. */
+/** The fleet chart grows with the window; single-pane layouts keep it 15% shorter. */
 export function fleetChartHeight(width: number, height: number): number {
   const fit = (min: number, share: number, max: number) =>
     Math.round(Math.max(min, Math.min(max, height * share)));
   if (width >= SIDE_LAYOUT_MIN_WIDTH) return fit(180, 0.25, 260);
-  if (width < 600) return fit(200, 0.38, 420);
-  return width > height ? fit(180, 0.3, 260) : fit(180, 0.28, 340);
+  const compactHeight =
+    width < 600
+      ? fit(200, 0.38, 420)
+      : width > height
+        ? fit(180, 0.3, 260)
+        : fit(180, 0.28, 340);
+  return Math.round(compactHeight * 0.85);
 }
 
 function useFleetChartHeight(): number {

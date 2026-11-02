@@ -12,6 +12,7 @@ test("a mission finishing its load cannot replace Achievements opened from a not
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "normal speed", exact: true }).click();

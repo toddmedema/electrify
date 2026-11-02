@@ -3,6 +3,120 @@ import path from "path";
 import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
+import { getDateFromMinute } from "../src/helpers/DateTime";
+
+declare global {
+  interface Window {
+    __surplusLabels?: Array<{ x: number; y: number; width: number }>;
+  }
+}
+
+for (const theme of ["light", "dark"]) {
+  test(`unused surplus stays unfilled and directly labeled in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+      window.__surplusLabels = [];
+      const fillText = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (
+        text,
+        x,
+        y,
+        maxWidth,
+      ) {
+        if (
+          text === "Unused surplus" &&
+          this.canvas.closest("#chartSupplyDemand")
+        ) {
+          window.__surplusLabels!.push({
+            x,
+            y,
+            width: this.measureText(text).width,
+          });
+        }
+        if (maxWidth === undefined) fillText.call(this, text, x, y);
+        else fillText.call(this, text, x, y, maxWidth);
+      };
+    }, theme);
+    await page.goto("/?scenario=108");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await expect.poll(async () => !!(await readSavedGame(page))).toBe(true);
+    // A broad daytime surplus fits its label even at 360 px. Its complete load includes
+    // both charging and exports, and the 3 PM boundary exercises history and forecast.
+    await editSavedGame(page, (save) => {
+      save.game.speed = "PAUSED";
+      save.game.date = getDateFromMinute(900, save.game.startingYear);
+      save.game.timeline.forEach((tick) => {
+        const hour = (tick.minute % 1440) / 60;
+        const solar = Math.max(0, 1 - Math.abs(hour - 12) / 9) * 350e6;
+        tick.supplyByFuel = { Sun: solar, Coal: 600e6 };
+        tick.storageDischargeW = 0;
+        tick.importedW = 0;
+        tick.demandW = 300e6;
+        tick.storageChargeW = 25e6;
+        tick.exportedW = 75e6;
+        tick.supplyW = solar + 500e6;
+      });
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const pane = page.locator(".facilities:visible");
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    const chart = pane.locator("#chartSupplyDemand");
+    await expect(chart.getByRole("img")).toHaveAccessibleName(
+      /Unfilled gaps .* unused surplus/,
+    );
+    await page.evaluate(() => document.fonts.ready);
+    await expect
+      .poll(() => page.evaluate(() => window.__surplusLabels!.length))
+      .toBeGreaterThan(0);
+    const pixels = await chart.evaluate((element) => {
+      const canvas = element.querySelector("canvas")!;
+      const plot = element.querySelector(".u-over")!.getBoundingClientRect();
+      const bounds = canvas.getBoundingClientRect();
+      const scale = canvas.width / bounds.width;
+      const sample = (fractionY: number) => {
+        const x = Math.round(
+          (plot.left - bounds.left + plot.width * 0.25) * scale,
+        );
+        const y = Math.round(
+          (plot.top - bounds.top + plot.height * fractionY) * scale,
+        );
+        const data = canvas
+          .getContext("2d")!
+          .getImageData(x - 3, y - 3, 7, 7).data;
+        let painted = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i] > 0) painted++;
+        return painted / 49;
+      };
+      return {
+        surplus: sample(0.45),
+        allocation: sample(0.64),
+        generation: sample(0.82),
+      };
+    });
+    // These interior samples avoid all boundaries and label text. Sparse grid pixels may
+    // remain in the gap; the source tint and allocation patterns stay filled below load.
+    expect(pixels.surplus).toBeLessThan(0.3);
+    expect(pixels.allocation).toBeGreaterThan(0.9);
+    expect(pixels.generation).toBeGreaterThan(0.9);
+    await page.mouse.move(0, 0);
+    await chart.scrollIntoViewIfNeeded();
+    await expect(page.getByText("Starting your mission…")).toHaveCount(0);
+    await expect(
+      page.locator('[class*="-exit-active"], [class*="-enter-active"]'),
+    ).toHaveCount(0);
+    await reviewScreenshot(chart, {
+      path: info.outputPath(`surplus-${theme}.png`),
+    });
+  });
+}
 
 for (const theme of ["light", "dark"]) {
   test(`day and night follow the plot's time axis in ${theme}`, async ({

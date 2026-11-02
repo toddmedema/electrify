@@ -486,7 +486,7 @@ export const NUCLEAR_TRIP_RULES: OfficialScenarioRuleDefinition = {
         id: "contingency-review",
         title: "Backup-power review",
         message:
-          "Your largest reactor may shut down between July 2026 and January 2027. Build backup power.",
+          "Your largest reactor may shut down between July 2026 and January 2027. Simulate and prepare for the impact by pausing the nuclear generator while the game is paused.",
         startMonth: 2,
         visibility: "forecast",
       },
@@ -524,8 +524,8 @@ export const NUCLEAR_TRIP_RULES: OfficialScenarioRuleDefinition = {
       hidePreview: true,
       messageByDifficulty: copyByDifficulty(
         HURRICANE_BALANCE,
-        (_balance, difficulty) =>
-          `Your largest reactor may shut down between July 2026 and January 2027. Build backup power. ${buildLeadTimeHint(difficulty)}`,
+        () =>
+          "Your largest reactor may shut down between July 2026 and January 2027. Simulate and prepare for the impact by pausing the nuclear generator while the game is paused.",
       ),
       source: {
         kind: "WORLD_EVENT",
