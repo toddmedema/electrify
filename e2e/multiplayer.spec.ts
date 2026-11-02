@@ -12,6 +12,7 @@ import type {
   NativeEvent,
   NativeRequest,
   SharedSaveLibrary,
+  WireMessage,
 } from "../src/multiplayer/Native";
 import type { RoomView, World } from "../src/multiplayer/Types";
 import { verifyMenuKeyboard } from "./menu-keyboard";
@@ -229,6 +230,29 @@ class SteamRoom {
   >();
   members: LobbyState["members"] = [];
   checkpoint?: World;
+  private saveResults = new Map<
+    string,
+    Extract<WireMessage, { kind: "save-result" }>
+  >();
+  async saveCheckpoint(sender: string) {
+    const requestId = crypto.randomUUID();
+    try {
+      await this.request(sender, {
+        kind: "send",
+        to: this.host,
+        payload: { kind: "save-request", requestId },
+      });
+      // The real host worker and bridge persist the world before this correlated reply.
+      await expect
+        .poll(() => this.saveResults.get(requestId))
+        .toEqual({
+          kind: "save-result",
+          requestId,
+        });
+    } finally {
+      this.saveResults.delete(requestId);
+    }
+  }
   campaignName = "Friends campaign";
   campaignCloudState: SharedSaveLibrary["cloudState"] = "ready";
   campaignWarning?: string;
@@ -363,11 +387,16 @@ class SteamRoom {
         sender: id,
         payload: input.payload,
       });
+      if (input.payload.kind === "save-result")
+        this.saveResults.set(input.payload.requestId, input.payload);
       return;
     }
     if (input.kind === "checkpoint") {
       this.checkpoint = input.world;
-      await this.publish();
+      // Native persistence returns before renderer notifications finish decoding.
+      // Slow delivery must not block the session's queue of locally durable saves.
+      // deliver() records live transport failures and ignores normal closed-page teardown.
+      void this.publish().catch(() => undefined);
       return this.state(id);
     }
     if (input.kind === "read-checkpoint") return this.checkpoint;
@@ -2534,13 +2563,20 @@ async function buyNativeBackup(page: Page, peakW: number, rate: number) {
       exact: true,
     })
     .click();
-  await page
-    .getByRole("dialog")
+  const purchase = page.getByRole("dialog", { name: /^Build / });
+  await purchase
     .getByRole("button", { name: "Take loan", exact: true })
     .click();
-  await expect(
-    page.getByRole("region", { name: "Build", exact: true }),
-  ).toHaveCount(0);
+  await expect(purchase).toBeHidden();
+  const build = page.getByRole("region", { name: "Build", exact: true });
+  // Desktop rails support repeated purchases; compact sheets close after a purchase.
+  if (page.viewportSize()!.width >= 1024) {
+    await expect(build).toBeVisible();
+    await build
+      .getByRole("button", { name: "Close Build", exact: true })
+      .click();
+  }
+  await expect(build).toHaveCount(0);
   const programs = page.getByRole("region", { name: "Programs", exact: true });
   await openPane(
     programs,
@@ -2736,6 +2772,8 @@ for (const scenarioId of [106, 107] as const) {
       await expect
         .poll(() => room.views.get(guestId)?.game?.date.monthsElapsed)
         .toBe(dueMonth);
+      // Inspect a completed save, rather than waiting for the periodic autosave timer.
+      await room.saveCheckpoint(guestId);
       await expect
         .poll(() =>
           room.checkpoint?.grids.map((game) => game.date.monthsElapsed),
@@ -2862,6 +2900,7 @@ for (const scenarioId of [106, 107] as const) {
         await expect(chart).toHaveAttribute("aria-label", /demand|supply/i);
         await page.keyboard.press("Escape");
       }
+      await room.saveCheckpoint(guestId);
       await expect
         .poll(() =>
           room.checkpoint?.grids.map(

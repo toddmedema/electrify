@@ -149,9 +149,11 @@ for (const theme of ["light", "dark"] as const) {
             exact: true,
           })
           .click();
-        const dialog = page.getByRole("dialog");
+        const dialog = page.getByRole("dialog", { name: /^Build / });
         await expect(dialog).toBeVisible();
-        await expect(page.locator(".MuiDialog-root")).toHaveCSS("opacity", "1");
+        await expect(
+          page.locator(".MuiDialog-root").filter({ has: dialog }),
+        ).toHaveCSS("opacity", "1");
         await expectDialogToFit(dialog);
         const content = dialog.locator(".MuiDialogContent-root");
         expect(
