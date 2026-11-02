@@ -646,7 +646,6 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
                 : undefined,
             })),
           ]}
-          note="Dashed = forecast · Red = shortage"
         />
       )}
       <UPlotChart<State>
