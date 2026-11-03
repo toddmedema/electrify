@@ -38,7 +38,6 @@ import DataCenterGuide from "./base/DataCenterGuide";
 import LowCashWarning from "./base/LowCashWarning";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
 import SaveTransitionDialog from "./base/SaveTransitionDialog";
-import CustomGameContainer from "./views/CustomGameContainer";
 import DataCenterSetupContainer from "./views/DataCenterSetupContainer";
 import LoadingContainer from "./views/LoadingContainer";
 import MainMenuContainer from "./views/MainMenuContainer";
@@ -70,6 +69,11 @@ import {
 } from "./base/SwipeDismiss";
 import { isDesktopScreen, isSideToolLayout } from "../Globals";
 import { store } from "../Store";
+
+const CustomGameContainer = React.lazy(
+  () =>
+    import(/* webpackChunkName: "custom-game" */ "./views/CustomGameContainer"),
+);
 
 const AchievementGallery = React.lazy(() =>
   import(
@@ -518,7 +522,11 @@ export default class Compositor extends React.Component<Props, {}> {
       case "CHALLENGE":
         return <ChallengeLanding />;
       case "CUSTOM_GAME":
-        return <CustomGameContainer />;
+        return (
+          <React.Suspense fallback={<p role="status">Loading custom game…</p>}>
+            <CustomGameContainer />
+          </React.Suspense>
+        );
       case "DATA_CENTER_SETUP":
         return <DataCenterSetupContainer />;
       default:

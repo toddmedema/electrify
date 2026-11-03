@@ -38,14 +38,14 @@ const selectedDifficulty = () =>
 // Co-op guests follow the host's selection.
 const coopRole = () => store.getState().ui.coop?.role;
 
+// An explicit second parameter lets connect observe synced unlock changes.
 export const mapStateToProps = (
   state: AppStateType,
-  ownProps: { unlockedThrough: DifficultyType } = {
-    unlockedThrough: unlockedDifficulty(
-      achievementJournal.getSnapshot().progress,
-    ),
-  },
+  ownProps?: { unlockedThrough: DifficultyType },
 ): StateProps => {
+  const unlockedThrough =
+    ownProps?.unlockedThrough ??
+    unlockedDifficulty(achievementJournal.getSnapshot().progress);
   const coop = state.ui.coop;
   // A co-op guest sees the host's setup rather than the one it played last.
   // A modded run is not a setup to tweak: its rules belong to the mod, so fall back to the
@@ -60,7 +60,7 @@ export const mapStateToProps = (
   const eventId = customEventFromSearch(window.location.search);
   return {
     coop,
-    unlockedThrough: ownProps.unlockedThrough,
+    unlockedThrough,
     game: {
       ...state.game,
       difficulty:
@@ -68,7 +68,7 @@ export const mapStateToProps = (
           ? (state.ui.previewDifficulty ?? state.game.difficulty)
           : playableDifficulty(
               state.ui.previewDifficulty ?? state.game.difficulty,
-              ownProps.unlockedThrough,
+              unlockedThrough,
             ),
     },
     // The game the player set up last time, so tweaking one setting and starting again doesn't mean

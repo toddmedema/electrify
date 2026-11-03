@@ -1,3 +1,5 @@
+import { achievementJournal } from "../../achievements/Journal";
+import { recordIntent } from "../../achievements/Progress";
 import * as React from "react";
 import {
   act,
@@ -109,6 +111,18 @@ function setup(
     </Provider>,
   );
   return { requests, mods, store };
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  achievementJournal.refresh();
+});
+
+function unlockHard() {
+  for (const difficulty of ["Intern", "Employee", "Manager"] as const)
+    achievementJournal.merge(
+      recordIntent({ earned: [], completion: { scenarioId: 100, difficulty } }),
+    );
 }
 
 afterEach(() => {
@@ -381,6 +395,7 @@ test.each([false, true])(
 );
 
 test("Play asks for a difficulty and launches through the shared custom launcher", async () => {
+  unlockHard();
   setup([local()]);
   await userEvent.click(await screen.findByLabelText("Play Community Grid"));
   expect(await screen.findByText("Play Community Grid")).toBeInTheDocument();
@@ -541,6 +556,7 @@ test("the author report resolves setup and timeline for the inspected difficulty
 });
 
 test("inspecting a report difficulty leaves the Play difficulty unchanged", async () => {
+  unlockHard();
   const dialog = await openDifficultyReport();
   expect(within(dialog).getByText(/^Validation passed\./)).toBeVisible();
   await userEvent.click(within(dialog).getByText("Difficulty validation"));
@@ -844,4 +860,31 @@ test("unrelated imports and browsing do not dismiss unresolved Workshop actions 
   expect(
     screen.getByText("Skipped Workshop item 123: truncated download."),
   ).toBeVisible();
+});
+
+test("fresh mod play keeps a remembered locked level from entering the compiled run", async () => {
+  setup([local()]);
+  await userEvent.click(await screen.findByLabelText("Play Community Grid"));
+  const dialog = screen.getByRole("dialog");
+  const beginner = within(dialog).getByRole("button", {
+    name: "Beginner",
+    exact: true,
+  });
+  expect(beginner).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(
+    within(dialog).getByRole("button", { name: "Expert, locked" }),
+  );
+  expect(beginner).toHaveAttribute("aria-pressed", "true");
+  await userEvent.click(
+    within(dialog).getByRole("button", { name: "Start", exact: true }),
+  );
+  expect(launchCustomScenario).toHaveBeenCalledWith(
+    expect.any(Function),
+    expect.objectContaining({
+      mod: expect.objectContaining({
+        parameters: expect.objectContaining({ difficulty: "Intern" }),
+      }),
+    }),
+    "Intern",
+  );
 });

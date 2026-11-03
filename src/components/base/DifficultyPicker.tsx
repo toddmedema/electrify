@@ -105,7 +105,7 @@ export default function DifficultyPicker({
             <MenuItem
               value={d}
               key={d}
-              aria-disabled={!!lockReason(d)}
+              aria-disabled={!!readOnly || !!lockReason(d)}
               aria-describedby={
                 lockReason(d) ? `${descriptionId}-${d}` : undefined
               }
@@ -184,7 +184,7 @@ export default function DifficultyPicker({
                 ? `${DIFFICULTY_LABELS[d]}, locked`
                 : DIFFICULTY_LABELS[d]
             }
-            aria-disabled={!!lockReason(d)}
+            aria-disabled={!!readOnly || !!lockReason(d)}
             aria-describedby={lockReason(d) ? descriptionId : undefined}
             onClick={() => {
               if (lockReason(d)) setInspected(d);

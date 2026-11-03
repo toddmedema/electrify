@@ -139,5 +139,9 @@ it("shows the host's read-only choice without claiming the guest must unlock it"
     />,
   );
   expect(screen.getByRole("button", { name: "Expert" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Expert" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });

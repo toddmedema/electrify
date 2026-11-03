@@ -68,12 +68,23 @@ for (const theme of ["light", "dark"]) {
         page.viewportSize()!.width + 1,
       );
     }
+    const warningBounds = (await page.getByRole("note").boundingBox())!;
+    const controlBounds = (await page
+      .locator(".scenarioStartControls")
+      .boundingBox())!;
+    expect(warningBounds.y + warningBounds.height).toBeLessThanOrEqual(
+      controlBounds.y,
+    );
     if (process.env.REVIEW_SCREENSHOT_DIR) {
       await page.locator(".leaderboard").getByRole("table").waitFor();
       await expect(page.locator(".leaderboard")).not.toContainText(
         "Loading...",
       );
-      await beginner.focus();
+      await page.locator("#listCard > .scrollable").evaluate((element) => {
+        element.scrollTop = 0;
+      });
+      await page.locator(".screenHeaderTitle").click();
+      await expect(picker.locator(".MuiTouchRipple-ripple")).toHaveCount(0);
       await page.mouse.move(0, 0);
       await page.screenshot({
         path: path.join(
@@ -143,9 +154,9 @@ test("a locked friend challenge keeps its advertised rules and explains why it c
   await expect(
     page.getByRole("button", { name: "Start challenge", exact: true }),
   ).toBeDisabled();
-  await expect(page.getByRole("status")).toContainText(
-    "on Hard to unlock Expert",
-  );
+  await expect(
+    page.locator(".scenarioStartControls").getByRole("status"),
+  ).toContainText("on Hard to unlock Expert");
   await expect(
     page.getByRole("group", { name: "Difficulty", exact: true }),
   ).toHaveCount(0);

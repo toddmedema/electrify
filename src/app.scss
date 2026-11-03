@@ -2571,18 +2571,6 @@ $pane_header_height: 48px;
   width: 100%;
 }
 
-// A short phone keeps the one action in reach above the long briefing.
-@media (max-width: 599px) and (max-height: 700px) {
-  .scenarioStartControls {
-    position: sticky;
-    bottom: 0;
-    z-index: 2;
-    padding-block: 8px;
-    background: var(--bg-primary);
-    border-top: 1px solid var(--border-subtle);
-  }
-}
-
 .difficultyPicker {
   min-width: 0;
 

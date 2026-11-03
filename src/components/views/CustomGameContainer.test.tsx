@@ -1,10 +1,25 @@
+import { recordIntent } from "../../achievements/Progress";
+import * as React from "react";
+import { act, render, screen } from "@testing-library/react";
+import { Provider } from "react-redux";
+import { configureStore } from "@reduxjs/toolkit";
+import type { StateProps } from "./CustomGame";
 import { achievementJournal } from "../../achievements/Journal";
 import { modScenario } from "../../mods/ModScenario";
 import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
 import { getCustomScenario, recordCustomScenario } from "../../LocalStorage";
 import { launchCustomScenario } from "../../reducers/Game";
 import type { AppStateType, ScenarioType } from "../../Types";
-import { mapDispatchToProps, mapStateToProps } from "./CustomGameContainer";
+import CustomGameContainer, {
+  mapDispatchToProps,
+  mapStateToProps,
+} from "./CustomGameContainer";
+
+jest.mock("./CustomGame", () => ({
+  __esModule: true,
+  default: ({ game, unlockedThrough }: StateProps) =>
+    `${game.difficulty}/${unlockedThrough}`,
+}));
 
 jest.mock("./StartGame", () => ({
   startWithSaveGuard: (_dispatch: unknown, start: () => void) => start(),
@@ -64,4 +79,23 @@ test("starting or remembering a custom game strips any mod effects", () => {
   // Stored mod snapshots are stripped from ordinary custom setup on read.
   localStorage.setItem("customGame", JSON.stringify(modded));
   expect(getCustomScenario(DEFAULT_CUSTOM_SCENARIO).mod).toBeUndefined();
+});
+
+it("updates the connected picker immediately when synced wins unlock another level", () => {
+  const appStore = configureStore({ reducer: () => state() });
+  render(
+    <Provider store={appStore}>
+      <CustomGameContainer />
+    </Provider>,
+  );
+  expect(screen.getByText("Intern/Intern")).toBeInTheDocument();
+  act(() => {
+    achievementJournal.merge(
+      recordIntent({
+        earned: [],
+        completion: { scenarioId: 100, difficulty: "Intern" },
+      }),
+    );
+  });
+  expect(screen.getByText("Employee/Employee")).toBeInTheDocument();
 });

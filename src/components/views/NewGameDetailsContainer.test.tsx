@@ -1,8 +1,22 @@
+import * as React from "react";
+import { act, render, screen } from "@testing-library/react";
+import { Provider } from "react-redux";
+import { configureStore } from "@reduxjs/toolkit";
+import type { StateProps } from "./NewGameDetails";
 import { achievementJournal } from "../../achievements/Journal";
 import { recordIntent } from "../../achievements/Progress";
 import type { AppStateType } from "../../Types";
-import { mapDispatchToProps, mapStateToProps } from "./NewGameDetailsContainer";
+import NewGameDetailsContainer, {
+  mapDispatchToProps,
+  mapStateToProps,
+} from "./NewGameDetailsContainer";
 import { store } from "../../Store";
+
+jest.mock("./NewGameDetails", () => ({
+  __esModule: true,
+  default: ({ game, unlockedThrough }: StateProps) =>
+    `${game.difficulty}/${unlockedThrough}`,
+}));
 
 jest.mock("./StartGame", () => ({
   startWithSaveGuard: (_dispatch: unknown, start: () => void) => start(),
@@ -64,4 +78,23 @@ it("shows a co-op guest the host's difficulty", () => {
     ui: { coop: { role: "guest" }, previewDifficulty: "VP" },
   } as AppStateType;
   expect(mapStateToProps(guest).game.difficulty).toBe("VP");
+});
+
+it("updates the connected picker immediately when synced wins unlock another level", () => {
+  const appStore = configureStore({ reducer: () => state });
+  render(
+    <Provider store={appStore}>
+      <NewGameDetailsContainer />
+    </Provider>,
+  );
+  expect(screen.getByText("Intern/Intern")).toBeInTheDocument();
+  act(() => {
+    achievementJournal.merge(
+      recordIntent({
+        earned: [],
+        completion: { scenarioId: 100, difficulty: "Intern" },
+      }),
+    );
+  });
+  expect(screen.getByText("Employee/Employee")).toBeInTheDocument();
 });

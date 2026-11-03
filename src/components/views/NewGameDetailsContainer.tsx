@@ -31,14 +31,14 @@ const selectedDifficulty = () =>
 // Co-op guests follow the host's selection.
 const coopRole = () => store.getState().ui.coop?.role;
 
+// An explicit second parameter lets connect observe synced unlock changes.
 export const mapStateToProps = (
   state: AppStateType,
-  ownProps: { unlockedThrough: DifficultyType } = {
-    unlockedThrough: unlockedDifficulty(
-      achievementJournal.getSnapshot().progress,
-    ),
-  },
+  ownProps?: { unlockedThrough: DifficultyType },
 ): StateProps => {
+  const unlockedThrough =
+    ownProps?.unlockedThrough ??
+    unlockedDifficulty(achievementJournal.getSnapshot().progress);
   return {
     game: {
       ...state.game,
@@ -48,12 +48,12 @@ export const mapStateToProps = (
           ? (state.ui.previewDifficulty ?? state.game.difficulty)
           : playableDifficulty(
               state.ui.previewDifficulty ?? state.game.difficulty,
-              ownProps.unlockedThrough,
+              unlockedThrough,
             ),
     },
     uid: state.user.uid,
     coop: state.ui.coop,
-    unlockedThrough: ownProps.unlockedThrough,
+    unlockedThrough,
   };
 };
 
