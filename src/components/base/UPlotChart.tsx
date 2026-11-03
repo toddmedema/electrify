@@ -104,6 +104,12 @@ function tooltipPlugin<S>(
   let context: HTMLDivElement;
   let columns: Array<{ total: HTMLElement; rows: HTMLDivElement }>;
   let dismiss: (event: KeyboardEvent) => void;
+  let touchStart: (event: TouchEvent) => void;
+  let touchMove: (event: TouchEvent) => void;
+  let touchEnd: (event: TouchEvent) => void;
+  let outsidePointer: (event: PointerEvent) => void;
+  let touchId: number | undefined;
+  let touchingPlot = false;
   // A synced chart moves its cursor when a neighbour is hovered, which is the point -- but it
   // should not also open a tooltip over data the pointer isn't anywhere near
   let hovering = !hoverOnly;
@@ -144,6 +150,58 @@ function tooltipPlugin<S>(
           };
           document.addEventListener("keydown", dismiss);
         }
+        const inspectTouch = (touch: Touch) => {
+          hovering = true;
+          const bounds = u.over.getBoundingClientRect();
+          u.setCursor({
+            left: Math.max(
+              0,
+              Math.min(bounds.width - 1, touch.clientX - bounds.left),
+            ),
+            top: Math.max(
+              0,
+              Math.min(bounds.height - 1, touch.clientY - bounds.top),
+            ),
+          });
+        };
+        touchStart = (event) => {
+          if (event.touches.length !== 1) {
+            touchId = undefined;
+            return;
+          }
+          // A new gesture inside the breakdown scrolls its contents instead of moving it.
+          touchingPlot = !el?.contains(event.target as Node);
+          if (!touchingPlot) return;
+          touchId = event.touches[0].identifier;
+          inspectTouch(event.touches[0]);
+        };
+        touchMove = (event) => {
+          if (!touchingPlot) return;
+          // Keep native scrolling from cancelling inspection or the viewport's pinch gesture.
+          event.preventDefault();
+          if (event.touches.length !== 1 || touchId === undefined) return;
+          const touch = Array.from(event.touches).find(
+            (touch) => touch.identifier === touchId,
+          );
+          if (touch) inspectTouch(touch);
+        };
+        touchEnd = (event) => {
+          if (!event.touches.length) touchingPlot = false;
+          touchId = undefined;
+        };
+        outsidePointer = (event) => {
+          if (
+            el?.style.display === "block" &&
+            !u.over.contains(event.target as Node)
+          ) {
+            dismissDetails();
+          }
+        };
+        document.addEventListener("pointerdown", outsidePointer, true);
+        u.over.addEventListener("touchstart", touchStart, { passive: true });
+        u.over.addEventListener("touchmove", touchMove, { passive: false });
+        u.over.addEventListener("touchend", touchEnd);
+        u.over.addEventListener("touchcancel", touchEnd);
         if (hoverOnly) {
           u.over.addEventListener("mouseenter", () => {
             hovering = true;
@@ -198,7 +256,12 @@ function tooltipPlugin<S>(
         el.style.left = `${Math.max(0, Math.min(u.over.clientWidth - el.offsetWidth, flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET))}px`;
         el.style.top = `${Math.max(0, Math.min(u.over.clientHeight - el.offsetHeight, flipY ? top - TOOLTIP_OFFSET - el.offsetHeight : top + TOOLTIP_OFFSET))}px`;
       },
-      destroy: () => {
+      destroy: (u: uPlot) => {
+        document.removeEventListener("pointerdown", outsidePointer, true);
+        u.over.removeEventListener("touchstart", touchStart);
+        u.over.removeEventListener("touchmove", touchMove);
+        u.over.removeEventListener("touchend", touchEnd);
+        u.over.removeEventListener("touchcancel", touchEnd);
         if (dismiss) document.removeEventListener("keydown", dismiss);
       },
     },
@@ -616,9 +679,7 @@ export default function UPlotChart<S>(
     let pending: ChartViewportRange | undefined;
     let wheelTimer: ReturnType<typeof setTimeout> | undefined;
     const pointers = new Map<number, { x: number; y: number }>();
-    let drag:
-      | { id: number; x: number; y: number; active: boolean; touch: boolean }
-      | undefined;
+    let drag: { id: number; x: number } | undefined;
     let pinchDistance: number | undefined;
 
     const schedule = (range: ChartViewportRange) => {
@@ -703,14 +764,13 @@ export default function UPlotChart<S>(
         event.preventDefault();
         return;
       }
+      // One finger inspects the tooltip. Mouse drags pan; two fingers still pinch to zoom.
+      if (event.pointerType === "touch") return;
       drag = {
         id: event.pointerId,
         x: event.clientX,
-        y: event.clientY,
-        active: event.pointerType !== "touch",
-        touch: event.pointerType === "touch",
       };
-      if (!drag.touch) over.setPointerCapture?.(event.pointerId);
+      over.setPointerCapture?.(event.pointerId);
     };
     const onPointerMove = (event: PointerEvent) => {
       if (pointers.has(event.pointerId)) {
@@ -738,18 +798,9 @@ export default function UPlotChart<S>(
       }
       if (!drag || drag.id !== event.pointerId) return;
       const deltaX = event.clientX - drag.x;
-      const deltaY = event.clientY - drag.y;
-      if (!drag.active) {
-        if (Math.abs(deltaY) >= Math.abs(deltaX) || Math.abs(deltaX) < 8) {
-          return;
-        }
-        drag.active = true;
-        over.setPointerCapture?.(event.pointerId);
-      }
       if (rangesEqual(value.bounds, liveRange)) return;
       event.preventDefault();
       drag.x = event.clientX;
-      drag.y = event.clientY;
       schedule(
         panChartViewport(
           value.bounds,
@@ -761,7 +812,7 @@ export default function UPlotChart<S>(
       );
     };
     const onPointerEnd = (event: PointerEvent) => {
-      const interacted = pinchDistance !== undefined || !!drag?.active;
+      const interacted = pinchDistance !== undefined || !!drag;
       pointers.delete(event.pointerId);
       if (pointers.size < 2) pinchDistance = undefined;
       if (drag?.id === event.pointerId) drag = undefined;

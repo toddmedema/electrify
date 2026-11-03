@@ -46,6 +46,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "cloud-saves.spec.ts",
       "menu-keyboard.spec.ts",
       "music.spec.ts",
+      "pwa-sound.spec.ts",
       "achievements.spec.ts",
       "browser-environment.spec.ts",
       "loading-navigation.spec.ts",
@@ -59,6 +60,8 @@ test("production browser shards run the complete PR matrix exactly once", () => 
     ]),
     ...list([
       "--config=e2e/playwright.config.ts",
+      "chart-touch.spec.ts",
+      "insights-expanded-chart.spec.ts",
       "build-generator-loading.spec.ts",
       "sign-in.spec.ts",
       "multiline-text.spec.ts",

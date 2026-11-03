@@ -58,6 +58,10 @@ function newSaveToken(): string {
   );
 }
 function rememberWriter(session: ActiveSaveSession): void {
+  if (session.terminal && !session.created) {
+    forgetWriter();
+    return;
+  }
   try {
     sessionStorage.setItem(
       RELOAD_BINDING_KEY,
@@ -188,13 +192,13 @@ export class ActiveSaveSession {
     this.latest = game;
     this.result = result;
     this.outcomePending = true;
-    this.terminal = result.outcome !== "completed";
+    this.terminal = true;
     this.pending = game;
     void this.flush().catch(() => undefined);
   }
 
   public async flush(): Promise<void> {
-    if (this.suspended) return;
+    if (this.suspended || (this.terminal && !this.outcomePending)) return;
     if (this.latest !== this.saved || this.outcomePending)
       this.pending = this.latest;
     if (this.running) {
@@ -220,6 +224,23 @@ export class ActiveSaveSession {
       const outcome = this.outcomePending;
       this.notify("saving");
       try {
+        if (outcome) {
+          // Finish any earlier write before deleting its record. Keep the result in memory
+          // for the score screen, but never recreate a finished run on a later checkpoint.
+          if (this.created) {
+            await this.repository.renew(this.lease);
+            await this.repository.delete(this.id, this.lease);
+            this.created = false;
+          }
+          this.saved = game;
+          this.pending = undefined;
+          await this.releaseWriterLock();
+          this.outcomePending = false;
+          this.failure = undefined;
+          this.notify("saved");
+          requestCloudSave(this.id);
+          continue;
+        }
         if (!this.writerLock && supportsSaveWriterLocks()) {
           this.writerLock = await acquireSaveWriterLock(this.lease.writerToken);
         }
@@ -243,19 +264,11 @@ export class ActiveSaveSession {
           savedAt = record.metadata.savedAt;
         } else {
           await this.repository.renew(this.lease);
-          const metadata =
-            outcome && result
-              ? await this.repository.recordOutcome(
-                  this.lease,
-                  save,
-                  scenarioName,
-                  result,
-                )
-              : await this.repository.writeSnapshot(
-                  this.lease,
-                  save,
-                  scenarioName,
-                );
+          const metadata = await this.repository.writeSnapshot(
+            this.lease,
+            save,
+            scenarioName,
+          );
           this.lease.revision = metadata.revision;
           savedAt = metadata.savedAt;
         }
