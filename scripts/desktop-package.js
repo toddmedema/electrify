@@ -6,10 +6,10 @@ const {
   verifyBuild,
   verifyPackaged,
   verifySignedMacPackage,
+  macArm64Bytes,
 } = require("./desktop-verify");
 const { verifyEditionBundle } = require("./verify-edition-bundle");
 const { preserveRuntimeNotices } = require("./runtime-notices");
-const { prepareMacArm64Package } = require("./mac-arm64");
 
 async function signMacAdHoc(options) {
   return require("@electron/osx-sign").signAsync({
@@ -156,7 +156,21 @@ async function desktopPackage() {
           platform,
         ),
         afterPack: (context) => {
-          prepareMacArm64Package(context);
+          if (mac) {
+            const sdk = path.join(
+              context.appOutDir,
+              "Electrify.app",
+              "Contents",
+              "Resources",
+              "app.asar.unpacked",
+              "node_modules",
+              "steamworks.js",
+              "dist",
+              "osx",
+              "libsteam_api.dylib",
+            );
+            fs.writeFileSync(sdk, macArm64Bytes(sdk));
+          }
           // Check every asset and exact native SDK/FFI byte before a signer can update
           // Mach-O signatures, including ad-hoc signatures in macOS offline QA builds.
           verifyPackaged(context.appOutDir);

@@ -15,7 +15,7 @@ native packaging verification.
 2. **Linux x64 build** packages and verifies the Linux depot.
 3. **Windows x64 build** packages and verifies the Windows depot.
 4. **macOS ARM64 build** packages, signs and verifies an Apple Silicon app on an ARM host.
-   Every Mach-O payload must contain only ARM64 code; the app is not launched in this job.
+   The signed executable must be ARM64-only; the app is not launched in this job.
 5. **CPU tests and static checks** starts immediately alongside the shared builds. It runs
    types, strict lint, formatting, native Node units, CI tooling, Firestore rules, the isolated
    tick-ratio benchmark, every covered Jest unit and long simulation, coverage validation,

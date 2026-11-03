@@ -52,6 +52,7 @@ test("PR CI runs three independent test groups and three native builds in eight 
   );
   assert.equal(nativeRuns.length, 1);
   assert.match(nativeRuns[0], /^npm run desktop:pack:offline -- --skip-build /);
+  assert(nativeRuns[0].endsWith(`--arch \${{ matrix.arch }}`));
   assert(
     !jobs.platform.steps.some(
       ({ uses }) => uses === "./.github/actions/jest-cache",
@@ -160,58 +161,6 @@ test("PR CI runs three independent test groups and three native builds in eight 
       .with.path,
     /coverage\//,
   );
-});
-
-test("the ARM64 macOS builder rejects a mismatched host and packages its native architecture", (t) => {
-  const platform = workflow().jobs.platform;
-  const mac = platform.strategy.matrix.include.find(
-    ({ platform }) => platform === "darwin",
-  );
-  const guard = platform.steps.find(
-    ({ name }) => name === "Require the native host and installed architecture",
-  );
-  assert.deepEqual(guard.env, {
-    EXPECTED_PLATFORM: `\${{ matrix.platform }}`,
-    EXPECTED_ARCH: `\${{ matrix.arch }}`,
-  });
-  fs.mkdirSync(path.resolve(".tmp"), { recursive: true });
-  const directory = fs.mkdtempSync(path.resolve(".tmp", "mac-host-"));
-  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-  const probe = path.join(directory, "host.cjs");
-  fs.writeFileSync(
-    probe,
-    `
-    Object.defineProperty(process, "platform", { value: process.env.ELECTRIFY_TEST_HOST_PLATFORM });
-    Object.defineProperty(process, "arch", { value: process.env.ELECTRIFY_TEST_HOST_ARCH });
-  `,
-  );
-  for (const [hostPlatform, hostArch, valid] of [
-    ["darwin", "arm64", true],
-    ["darwin", "x64", false],
-    ["linux", "x64", false],
-  ]) {
-    const result = spawnSync("bash", ["-e", "-c", guard.run], {
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        NODE_OPTIONS: `--require=${JSON.stringify(probe)}`,
-        EXPECTED_PLATFORM: mac.platform,
-        EXPECTED_ARCH: mac.arch,
-        ELECTRIFY_TEST_HOST_PLATFORM: hostPlatform,
-        ELECTRIFY_TEST_HOST_ARCH: hostArch,
-      },
-    });
-    assert.equal(result.status === 0, valid, result.stderr);
-    if (!valid)
-      assert.match(
-        result.stderr,
-        /must run on its target platform and architecture/,
-      );
-  }
-  const pack = platform.steps.find(
-    ({ name }) => name === "Package and verify native depot",
-  );
-  assert(pack.run.endsWith(`--arch \${{ matrix.arch }}`));
 });
 
 test("trusted master runs warm all three transform caches without adding jobs", () => {

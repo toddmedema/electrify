@@ -1,10 +1,33 @@
 /** Verify that the downloadable build contains every authored offline asset, with real LFS bytes. */
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
 const crypto = require("node:crypto");
-const { spawnSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 const { verifyRuntimeNotices } = require("./runtime-notices");
-const { arm64Slice, verifyMacArm64Package } = require("./mac-arm64");
+
+function macArchitectures(file) {
+  return execFileSync("/usr/bin/lipo", ["-archs", file], {
+    encoding: "utf8",
+  }).trim();
+}
+
+function macArm64Bytes(file) {
+  if (macArchitectures(file) === "arm64") return fs.readFileSync(file);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "electrify-arm64-"));
+  try {
+    const target = path.join(directory, "runtime");
+    execFileSync("/usr/bin/lipo", [file, "-thin", "arm64", "-output", target]);
+    return fs.readFileSync(target);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+function verifyMacArm64Binary(file) {
+  if (macArchitectures(file) !== "arm64")
+    throw new Error(`macOS binary must be ARM64-only: ${file}`);
+}
 
 function files(root, prefix = "") {
   return fs
@@ -137,39 +160,37 @@ function verifyPackaged(directory) {
     );
     const actual = fs.readFileSync(unpacked);
     assertAsset(actual, name);
-    const source = fs.readFileSync(path.join("node_modules", name));
+    const source = path.join("node_modules", name);
     const expected =
       platform === "darwin" && name.endsWith("libsteam_api.dylib")
-        ? arm64Slice(source)
-        : source;
+        ? macArm64Bytes(source)
+        : fs.readFileSync(source);
     if (digest(actual) !== digest(expected))
       throw new Error(`Packaged native runtime mismatch: ${name}`);
   }
-  for (const arch of [process.arch]) {
-    const koffiRoot = path.join("@koromix", `koffi-${platform}-${arch}`);
-    const koffiFiles = files(
-      path.join(resources, "app.asar.unpacked", "node_modules", koffiRoot),
+  const koffiRoot = path.join("@koromix", `koffi-${platform}-${process.arch}`);
+  const koffiFiles = files(
+    path.join(resources, "app.asar.unpacked", "node_modules", koffiRoot),
+  );
+  if (!koffiFiles.some((name) => name.endsWith(".node")))
+    throw new Error(
+      `The packaged native Steam bridge is missing: ${process.arch}`,
     );
-    if (!koffiFiles.some((name) => name.endsWith(".node")))
-      throw new Error(`The packaged native Steam bridge is missing: ${arch}`);
-    for (const name of koffiFiles) {
-      const source = fs.readFileSync(
-        path.join("node_modules", koffiRoot, name),
-      );
-      const packed = fs.readFileSync(
-        path.join(
-          resources,
-          "app.asar.unpacked",
-          "node_modules",
-          koffiRoot,
-          name,
-        ),
-      );
-      if (digest(source) !== digest(packed))
-        throw new Error(`Packaged native Steam bridge mismatch: ${name}`);
-    }
+  for (const name of koffiFiles) {
+    const source = fs.readFileSync(path.join("node_modules", koffiRoot, name));
+    const packed = fs.readFileSync(
+      path.join(
+        resources,
+        "app.asar.unpacked",
+        "node_modules",
+        koffiRoot,
+        name,
+      ),
+    );
+    if (digest(source) !== digest(packed))
+      throw new Error(`Packaged native Steam bridge mismatch: ${name}`);
   }
-  if (platform === "darwin") verifyMacArm64Package(directory);
+
   return count;
 }
 
@@ -188,7 +209,9 @@ function verifySignedMacPackage(directory) {
       result.error ||
       new Error(`The signed macOS app failed verification: ${result.stderr}`)
     );
-  verifyMacArm64Package(directory);
+  verifyMacArm64Binary(
+    path.join(application, "Contents", "MacOS", "Electrify"),
+  );
   verifyInputResources(path.join(application, "Contents", "Resources"));
   verifyRuntimeNotices(path.join(application, "Contents", "Resources"));
   return verifyArchiveAssets(
@@ -213,6 +236,8 @@ if (require.main === module) {
   }
 }
 module.exports = {
+  macArm64Bytes,
+  verifyMacArm64Binary,
   files,
   digest,
   assertAsset,

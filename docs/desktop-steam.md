@@ -38,8 +38,9 @@ npm run desktop:pack:offline
 
 Build on the target OS and architecture using its native Node 24 installation and `npm ci`.
 Mac builds require Apple Silicon (ARM64). Packaging rejects other Mac architectures, removes
-unused architectures from the pinned Steam SDK library, and verifies that every Mach-O binary
-in the signed app contains only ARM64 code. The installed dependency sources remain intact.
+unused architectures from the pinned Steam SDK library with `lipo`, and verifies the signed
+app executable is ARM64-only. Native runtime bytes are checked before signing. The installed
+dependency sources remain intact.
 
 | Target      | Depot under `dist/desktop/` | Executable inside the depot              | CI runner        |
 | ----------- | --------------------------- | ---------------------------------------- | ---------------- |

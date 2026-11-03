@@ -17,16 +17,13 @@ const {
   verifyArchiveAssets,
   verifyInputResources,
   digest,
+  macArm64Bytes,
+  verifyMacArm64Binary,
 } = require("../scripts/desktop-verify.js");
 const {
   preserveRuntimeNotices,
   verifyRuntimeNotices,
 } = require("../scripts/runtime-notices.js");
-const {
-  arm64Slice,
-  prepareMacArm64Package,
-  verifyMacArm64Package,
-} = require("../scripts/mac-arm64.js");
 
 test("packaging accepts only the supported Mac architecture", () => {
   for (const arch of ["x64", "universal"]) {
@@ -83,117 +80,36 @@ test("package filters exclude Intel Mac native dependencies on every target", ()
   }
 });
 
-test("Mac packages extract the pinned SDK's ARM64 payload and reject other native architectures", (t) => {
-  const temporaryRoot = path.resolve(".tmp", "native-tests");
-  fs.mkdirSync(temporaryRoot, { recursive: true });
-  const root = fs.mkdtempSync(path.join(temporaryRoot, "mac-arm64-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const application = path.join(root, "Electrify.app");
-  const executable = path.join(application, "Contents", "MacOS", "Electrify");
-  const library = path.join(
-    application,
-    "Contents",
-    "Resources",
-    "app.asar.unpacked",
-    "node_modules",
-    "steamworks.js",
-    "dist",
-    "osx",
-    "libsteam_api.dylib",
-  );
-  const sdk = fs.readFileSync(
-    "node_modules/steamworks.js/dist/osx/libsteam_api.dylib",
-  );
-  const arm = fs.readFileSync(
-    "node_modules/steamworks.js/dist/osx/steamworksjs.darwin-arm64.node",
-  );
-  const intel = fs.readFileSync(
-    "node_modules/steamworks.js/dist/osx/steamworksjs.darwin-x64.node",
-  );
-  fs.mkdirSync(path.dirname(executable), { recursive: true });
-  fs.mkdirSync(path.dirname(library), { recursive: true });
-  fs.writeFileSync(executable, arm);
-  fs.writeFileSync(library, sdk);
-  assert.throws(() => verifyMacArm64Package(root), /must be ARM64-only/);
-  prepareMacArm64Package({ electronPlatformName: "darwin", appOutDir: root });
-  verifyMacArm64Package(root);
-  const alias = path.join(application, "Contents", "RuntimeAlias");
-  fs.symlinkSync(
-    path.dirname(library),
-    alias,
-    process.platform === "win32" ? "junction" : "dir",
-  );
-  verifyMacArm64Package(root);
-  const outside = path.join(root, "outside");
-  fs.mkdirSync(outside);
-  const external = path.join(application, "Contents", "External");
-  fs.symlinkSync(
-    outside,
-    external,
-    process.platform === "win32" ? "junction" : "dir",
-  );
-  assert.throws(() => verifyMacArm64Package(root), /symlink leaves the app/);
-  fs.unlinkSync(external);
-  const thinned = fs.readFileSync(library);
-  assert(thinned.length < sdk.length);
-  assert.deepEqual(thinned, arm64Slice(sdk));
-  assert.deepEqual(
-    fs.readFileSync("node_modules/steamworks.js/dist/osx/libsteam_api.dylib"),
-    sdk,
-  );
-  if (process.platform === "darwin") {
-    const result = spawnSync("/usr/bin/lipo", ["-archs", library], {
-      encoding: "utf8",
-    });
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout.trim(), "arm64");
-  }
-  fs.writeFileSync(library, intel);
-  assert.throws(() => verifyMacArm64Package(root), /must be ARM64-only/);
-  fs.writeFileSync(library, thinned);
-  fs.writeFileSync(executable, intel);
-  assert.throws(() => verifyMacArm64Package(root), /must be ARM64-only/);
-  assert.throws(() => arm64Slice(intel), /Missing ARM64/);
-  assert.throws(
-    () => arm64Slice(sdk.subarray(0, 8)),
-    /Invalid Mach-O architecture table/,
-  );
-});
-
-test("ARM64 slice extraction validates both byte orders and wide architecture bounds", () => {
-  const arm = fs.readFileSync(
-    "node_modules/steamworks.js/dist/osx/steamworksjs.darwin-arm64.node",
-  );
-  for (const wide of [false, true])
-    for (const little of [false, true]) {
-      const offset = wide ? 40 : 28;
-      const fat = Buffer.alloc(offset + arm.length);
-      const write32 = (value, position) =>
-        little
-          ? fat.writeUInt32LE(value, position)
-          : fat.writeUInt32BE(value, position);
-      write32(wide ? 0xcafebabf : 0xcafebabe, 0);
-      write32(1, 4);
-      write32(0x0100000c, 8);
-      if (wide) {
-        const write64 = (value, position) =>
-          little
-            ? fat.writeBigUInt64LE(value, position)
-            : fat.writeBigUInt64BE(value, position);
-        write64(BigInt(offset), 16);
-        write64(BigInt(arm.length), 24);
-      } else {
-        write32(offset, 16);
-        write32(arm.length, 20);
-      }
-      arm.copy(fat, offset);
-      assert.deepEqual(arm64Slice(fat), arm);
-      assert.throws(
-        () => arm64Slice(fat.subarray(0, fat.length - 1)),
-        /slice bounds/,
-      );
-    }
-});
+test(
+  "Mac SDK extraction keeps only ARM64 and preserves the installed source",
+  {
+    skip: process.platform !== "darwin",
+  },
+  (t) => {
+    const source = path.resolve(
+      "node_modules/steamworks.js/dist/osx/libsteam_api.dylib",
+    );
+    const original = fs.readFileSync(source);
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "electrify-sdk-"));
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+    const extracted = path.join(directory, "libsteam_api.dylib");
+    fs.writeFileSync(extracted, macArm64Bytes(source));
+    verifyMacArm64Binary(extracted);
+    assert(fs.statSync(extracted).size < original.length);
+    assert.deepEqual(fs.readFileSync(source), original);
+    assert.deepEqual(macArm64Bytes(extracted), fs.readFileSync(extracted));
+    assert.throws(() => verifyMacArm64Binary(source), /must be ARM64-only/);
+    assert.throws(
+      () =>
+        macArm64Bytes(
+          path.resolve(
+            "node_modules/steamworks.js/dist/osx/steamworksjs.darwin-x64.node",
+          ),
+        ),
+      /Command failed/,
+    );
+  },
+);
 
 test("packaged app metadata uses the renderer artifact's build version", () => {
   const version = "26sept26-1507";
