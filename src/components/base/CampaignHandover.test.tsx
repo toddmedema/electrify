@@ -86,10 +86,8 @@ it("shows concise term results and requires an explicit handover", async () => {
   render(
     <CampaignHandover term={term} onContinue={onContinue} onExit={onExit} />,
   );
-  expect(
-    screen.getByRole("dialog", { name: "Generation 1 complete" }),
-  ).toBeVisible();
-  expect(screen.getByText("First Light (1882–1901)")).toBeVisible();
+  expect(screen.getByRole("dialog", { name: "Term 1 complete" })).toBeVisible();
+  expect(screen.queryByText("First Light (1882–1901)")).not.toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Met" })).toBeVisible();
   expect(screen.getByText("Retain 90% of customers")).toBeVisible();
   expect(screen.queryByText("Objectives")).not.toBeInTheDocument();
@@ -105,10 +103,10 @@ it("shows concise term results and requires an explicit handover", async () => {
   expect(onContinue).not.toHaveBeenCalled();
   expect(onExit).not.toHaveBeenCalled();
   await userEvent.click(
-    screen.getByRole("button", { name: "Begin next CEO term" }),
+    screen.getByRole("button", { name: "Begin next term" }),
   );
   expect(onContinue).toHaveBeenCalledTimes(1);
-  await userEvent.click(screen.getByRole("button", { name: "Save and exit" }));
+  await userEvent.click(screen.getByRole("button", { name: "Save & exit" }));
   expect(onExit).toHaveBeenCalledTimes(1);
 });
 
@@ -145,9 +143,7 @@ it("yields to the save recovery dialog and returns after recovery closes", () =>
       <CampaignHandoverContainer />
     </Provider>,
   );
-  expect(
-    screen.getByRole("dialog", { name: "Generation 1 complete" }),
-  ).toBeVisible();
+  expect(screen.getByRole("dialog", { name: "Term 1 complete" })).toBeVisible();
   act(() => {
     store.dispatch(sessionChanged({ transitioning: true }));
   });
@@ -164,12 +160,10 @@ it("yields to the save recovery dialog and returns after recovery closes", () =>
   });
   expect(store.getState().ui.dialog.title).toBe("Save failed");
   expect(
-    screen.queryByRole("dialog", { name: "Generation 1 complete" }),
+    screen.queryByRole("dialog", { name: "Term 1 complete" }),
   ).not.toBeInTheDocument();
   act(() => {
     store.dispatch(dialogClose());
   });
-  expect(
-    screen.getByRole("dialog", { name: "Generation 1 complete" }),
-  ).toBeVisible();
+  expect(screen.getByRole("dialog", { name: "Term 1 complete" })).toBeVisible();
 });

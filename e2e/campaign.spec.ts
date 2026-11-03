@@ -92,6 +92,13 @@ for (const theme of ["light", "dark"] as const) {
       page.getByText("A Different Kind of Growth (2042–2061)", { exact: true }),
     ).toBeVisible();
     await expect(page.getByText(/Your first grid:/)).toHaveCount(0);
+    await expect(page.getByText(/The game pauses/)).toHaveCount(0);
+    await expect(page.getByText(/Northern California ·/)).toHaveCount(0);
+    await expect(
+      page.getByText("Inspired by Northern California history.", {
+        exact: false,
+      }),
+    ).toBeVisible();
     const difficulty = page.getByRole("group", {
       name: "Difficulty",
       exact: true,
@@ -225,7 +232,7 @@ for (const theme of ["light", "dark"] as const) {
       .first()
       .click();
     const handover = page.getByRole("dialog", {
-      name: "Generation 1 complete",
+      name: "Term 1 complete",
     });
     await expect(handover).toBeVisible();
     await expect(handover.locator("..")).toHaveCSS("opacity", "1");
@@ -236,6 +243,9 @@ for (const theme of ["light", "dark"] as const) {
       }),
     ).toBeVisible();
     await expect(handover.getByRole("img", { name: "Met" })).toHaveCount(1);
+    await expect(
+      handover.getByText("First Light (1882–1901)", { exact: true }),
+    ).toHaveCount(0);
     await expect(
       handover.getByText("Retain 90% of customers", { exact: true }),
     ).toBeVisible();
@@ -251,6 +261,27 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       handover.getByText("Demand not met", { exact: true }),
     ).toHaveCount(0);
+    const goal = handover.getByText("Retain 90% of customers", { exact: true });
+    const [checkBox, goalBox, beginBox, exitBox] = await Promise.all([
+      handover.getByRole("img", { name: "Met" }).boundingBox(),
+      goal.boundingBox(),
+      handover
+        .getByRole("button", { name: "Begin next term", exact: true })
+        .boundingBox(),
+      handover
+        .getByRole("button", { name: "Save & exit", exact: true })
+        .boundingBox(),
+    ]);
+    expect(
+      Math.abs(
+        checkBox!.y + checkBox!.height / 2 - goalBox!.y - goalBox!.height / 2,
+      ),
+    ).toBeLessThanOrEqual(1);
+    expect(Math.abs(beginBox!.y - exitBox!.y)).toBeLessThanOrEqual(1);
+    await expect(handover.locator(".campaignHandoverActions")).toHaveCSS(
+      "border-top-width",
+      "0px",
+    );
     if (
       process.env.REVIEW_SCREENSHOT_DIR &&
       theme === "dark" &&
@@ -270,7 +301,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(closed?.campaign?.pendingHandover).toBe(true);
     expect(closed?.date.monthsElapsed).toBe(240);
     await handover
-      .getByRole("button", { name: "Save and exit", exact: true })
+      .getByRole("button", { name: "Save & exit", exact: true })
       .click();
     await expect(
       page.getByRole("button", { name: "Continue", exact: true }),
@@ -279,7 +310,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await expect(handover).toBeVisible();
     await handover
-      .getByRole("button", { name: "Begin next CEO term", exact: true })
+      .getByRole("button", { name: "Begin next term", exact: true })
       .click();
     await expect(handover).toHaveCount(0);
     const successor = await readSavedGame(page);

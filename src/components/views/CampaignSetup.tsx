@@ -35,14 +35,12 @@ export default function CampaignSetup({
       <Box className="scrollable" sx={{ flex: 1, minHeight: 0 }}>
         <Stack className="campaignSetupContent" spacing={3} sx={{ py: 2 }}>
           <Box>
-            <Typography variant="overline" color="text.secondary">
-              Northern California · 1882–2061
-            </Typography>
-            <Typography component="h2" variant="h5" sx={{ mt: 0.5, mb: 1 }}>
+            <Typography component="h2" variant="h5" sx={{ mb: 1 }}>
               One utility. Nine generations.
             </Typography>
             <Typography>
-              Lead one utility through nine 20-year CEO terms.
+              Lead one utility through nine 20-year CEO terms. Inspired by
+              Northern California history.
             </Typography>
           </Box>
           <Box
@@ -86,11 +84,6 @@ export default function CampaignSetup({
               ))}
             </Box>
           </Box>
-          <Typography variant="body2" color="text.secondary">
-            The game pauses at each CEO handover. This fictional utility is
-            inspired by Northern California history; early weather and prices
-            are modeled, and future decades use scenario assumptions.
-          </Typography>
         </Stack>
       </Box>
       <Stack

@@ -31,7 +31,6 @@ export default function CampaignHandover({
   onContinue,
   onExit,
 }: CampaignHandoverProps): React.JSX.Element {
-  const generation = LEGACY_GENERATIONS[term.generationIndex];
   const next = LEGACY_GENERATIONS[term.generationIndex + 1];
   return (
     <Dialog
@@ -50,16 +49,13 @@ export default function CampaignHandover({
       }}
     >
       <DialogTitle id="campaign-handover-title" sx={{ p: 2, pb: 1 }}>
-        Generation {term.generationIndex + 1} complete
+        Term {term.generationIndex + 1} complete
       </DialogTitle>
       <DialogContent sx={{ px: 2, pb: 3 }}>
-        <Typography color="text.secondary">
-          {legacyGenerationTitle(generation)}
-        </Typography>
         <Box
           component="ul"
           aria-label="Term results"
-          sx={{ listStyle: "none", p: 0, my: 3, display: "grid", gap: 1.5 }}
+          sx={{ listStyle: "none", p: 0, my: 2, display: "grid", gap: 1.5 }}
         >
           {term.objectiveResults.map((result) => {
             const StatusIcon =
@@ -72,7 +68,7 @@ export default function CampaignHandover({
               <Box
                 component="li"
                 key={result.id}
-                sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}
+                sx={{ display: "flex", alignItems: "center", gap: 1 }}
               >
                 <StatusIcon
                   titleAccess={finishedObjectiveStatusText[result.status]}
@@ -83,7 +79,7 @@ export default function CampaignHandover({
                         ? "error"
                         : "disabled"
                   }
-                  sx={{ fontSize: 20, mt: 0.25, flexShrink: 0 }}
+                  sx={{ fontSize: 20, flexShrink: 0 }}
                 />
                 <Typography>
                   {result.metric === "customerRetention"
@@ -99,21 +95,19 @@ export default function CampaignHandover({
         </Typography>
       </DialogContent>
       <DialogActions
+        className="campaignHandoverActions"
         sx={{
           p: 2,
           gap: 1,
-          borderTop: 1,
-          borderColor: "divider",
-          flexDirection: { xs: "column-reverse", sm: "row" },
           "& button": {
             m: "0 !important",
             minHeight: 44,
-            width: { xs: "100%", sm: "auto" },
+            whiteSpace: "nowrap",
           },
         }}
       >
         <Button disabled={busy} onClick={onExit}>
-          Save and exit
+          Save &amp; exit
         </Button>
         <Button
           variant="contained"
@@ -121,7 +115,7 @@ export default function CampaignHandover({
           onClick={onContinue}
           autoFocus
         >
-          Begin next CEO term
+          Begin next term
         </Button>
       </DialogActions>
     </Dialog>
