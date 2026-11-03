@@ -264,22 +264,22 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         disableSpacing
         sx={{ px: { xs: 2, sm: 3 }, pb: 2 }}
       >
-        <div className="victoryUtilityActions">
-          {canShare() && (
-            <Button
-              color="primary"
-              startIcon={<ShareIcon />}
-              onClick={() => setPreview(true)}
-            >
-              {shared.challenge ? "Challenge a friend" : "Share result"}
-            </Button>
-          )}
-          {!failed && (
+        {!failed && (
+          <div className="victoryUtilityActions">
+            {victory.outcome === "completed" && canShare() && (
+              <Button
+                color="primary"
+                startIcon={<ShareIcon />}
+                onClick={() => setPreview(true)}
+              >
+                {shared.challenge ? "Challenge a friend" : "Share result"}
+              </Button>
+            )}
             <Button color="primary" onClick={onClose}>
               Keep playing
             </Button>
-          )}
-        </div>
+          </div>
+        )}
         <div className="victoryNextActions">
           <Button
             color="primary"

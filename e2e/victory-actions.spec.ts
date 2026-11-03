@@ -427,6 +427,9 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
     .click();
   const failure = page.getByRole("dialog", { name: "Bankrupt!" });
   await expect(failure).toBeVisible();
+  await expect(
+    failure.getByRole("button", { name: /Share result|Challenge a friend/ }),
+  ).toHaveCount(0);
   await expect(failure).toContainText(
     "Complete the mission to join the leaderboard and set a personal best.",
   );
@@ -507,6 +510,9 @@ test("shared reliability rule ends the run at the third completed month", async 
     .click();
   const failure = page.getByRole("dialog", { name: "Fired!", exact: true });
   await expect(failure).toBeVisible();
+  await expect(
+    failure.getByRole("button", { name: /Share result|Challenge a friend/ }),
+  ).toHaveCount(0);
   await expect(failure).toContainText(
     "You served less than 99.5% of demand for 3 months in a row, so the utility board ended your term.",
   );
