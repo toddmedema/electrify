@@ -66,7 +66,7 @@ export interface DispatchProps {
   onStart: (scenarioId: number) => void;
 }
 
-/** One difficulty's compact board. */
+/** One difficulty's board. */
 interface BoardType {
   scores: ScoreType[];
   // Tells "nobody has played this yet" apart from "the board couldn't be read"
@@ -74,10 +74,11 @@ interface BoardType {
 }
 
 /**
- * The compact board shows only this many rows (the expanded view has its own query), so this is
- * all that is read for each of the difficulties prefetched below.
+ * How many rows each difficulty's board reads and shows (the all-levels view has its own query).
+ * Every difficulty is read up front so that switching is instant, so on opening this is the most
+ * that is read per difficulty, alongside the player's own best.
  */
-const COMPACT_BOARD_ROWS = 3;
+const BOARD_ROWS = 10;
 
 type SteamScope = "global" | "friends";
 
@@ -103,7 +104,7 @@ async function fetchBoard(
 ): Promise<ScoreType[]> {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
     const { desktopScores } = await import("../../DesktopScores");
-    return desktopScores(scenarioId, difficulty, scope, COMPACT_BOARD_ROWS);
+    return desktopScores(scenarioId, difficulty, scope, BOARD_ROWS);
   }
   const querySnapshot = await getDocs(
     query(
@@ -113,7 +114,7 @@ async function fetchBoard(
       where("scenarioId", "==", scenarioId),
       where("difficulty", "==", difficulty),
       orderBy("score", "desc"),
-      limit(COMPACT_BOARD_ROWS),
+      limit(BOARD_ROWS),
     ),
   );
   return querySnapshot.docs.map((doc) => doc.data() as ScoreType);
@@ -201,7 +202,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
    */
   private loadBoards() {
     if (!this.showsBoard() || !this.state.scenario) return;
-    // Keep the compact board's space while the boards reload or have fewer scores.
+    // Keep the board's space while the boards reload or have fewer scores.
     // Collapsing it briefly clamps the scroller and moves the difficulty buttons above it.
     const leaderboardMinHeight = this.state.leaderboardExpanded
       ? this.state.leaderboardMinHeight
@@ -353,7 +354,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
   }
 
   /**
-   * The compact board's height just before a difficulty switch swaps its rows: afterwards the
+   * The board's height just before a difficulty switch swaps its rows: afterwards the
    * DOM already shows the new difficulty, which may have fewer scores.
    */
   public getSnapshotBeforeUpdate(prevProps: Props): number | null {
@@ -449,7 +450,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
     const myTopScore = myBests[game.difficulty];
     const visibleScores = leaderboardExpanded
       ? allScores
-      : scores?.slice(0, COMPACT_BOARD_ROWS);
+      : scores?.slice(0, BOARD_ROWS);
     // Steam boards use the signed-in Steam account.
     const desktopApp =
       process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
@@ -694,7 +695,9 @@ export default class NewGameDetails extends React.Component<Props, State> {
               {scores !== undefined && (
                 <div className="leaderboardToggle">
                   <Button size="small" onClick={() => this.toggleLeaderboard()}>
-                    {leaderboardExpanded ? "Show top 3" : "View all scores"}
+                    {leaderboardExpanded
+                      ? "Show this level"
+                      : "View all scores"}
                   </Button>
                 </div>
               )}

@@ -258,7 +258,7 @@ describe("NewGameDetails leaderboard", () => {
             scoreRow("Beginner Player", 800, { difficulty: "Intern" }),
           ]
         : difficulty === "Employee"
-          ? Array.from({ length: 5 }, (_, index) =>
+          ? Array.from({ length: 12 }, (_, index) =>
               scoreRow(`Player ${index + 1}`, 500 - index, {
                 difficulty: "Employee",
               }),
@@ -267,8 +267,9 @@ describe("NewGameDetails leaderboard", () => {
     );
     render(<NewGameDetails {...props()} />);
 
-    await screen.findByText("Player 3");
-    expect(screen.queryByText("Player 4")).toBeNull();
+    // A difficulty's board shows its top ten, and no more even if the source returned extra
+    await screen.findByText("Player 10");
+    expect(screen.queryByText("Player 11")).toBeNull();
     expect(screen.queryByRole("columnheader", { name: "Level" })).toBeNull();
     await userEvent.click(
       screen.getByRole("button", { name: "View all scores" }),
@@ -371,8 +372,8 @@ describe("NewGameDetails reads every difficulty up front", () => {
       [...DIFFICULTY_IDS].sort(),
     );
     for (const ask of asks) {
-      // The compact board shows three rows, so three is all each difficulty reads
-      expect(ask).toMatchObject({ scenarioId: 100, limit: 3, uid: undefined });
+      // Each difficulty's board shows its top ten, so ten is all it reads
+      expect(ask).toMatchObject({ scenarioId: 100, limit: 10, uid: undefined });
       expect(ask.fields).toEqual([
         "scoreVersion",
         "outcome",
@@ -569,9 +570,9 @@ describe("NewGameDetails reads every difficulty up front", () => {
         .filter((call) => call[2] === scope)
         .map(([, difficulty, , rows]) => ({ difficulty, rows }));
 
-    // Steam is asked for just the rows the compact board shows
+    // Steam is asked for just the top ten each board shows
     expect(reads("global")).toHaveLength(DIFFICULTY_IDS.length);
-    expect(reads("global").every(({ rows }) => rows === 3)).toBe(true);
+    expect(reads("global").every(({ rows }) => rows === 10)).toBe(true);
     expect(reads("player")).toHaveLength(DIFFICULTY_IDS.length);
     rerender(
       <NewGameDetails {...props({ uid: "steam:1", game: game("VP") })} />,
@@ -682,7 +683,9 @@ describe("NewGameDetails reads every difficulty up front", () => {
       limit: 50,
     });
 
-    await userEvent.click(screen.getByRole("button", { name: "Show top 3" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Show this level" }),
+    );
     expect(screen.getByText("Top Employee")).toBeInTheDocument();
     expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length + 1);
   });
