@@ -33,6 +33,15 @@ test.setTimeout(90000);
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
+    // Render the native graph against a silent sink. The real audio clock still runs,
+    // including suspend/resume, without depending on the host's physical output device.
+    const BrowserAudioContext = window.AudioContext;
+    window.AudioContext = class extends BrowserAudioContext {
+      constructor(options?: AudioContextOptions) {
+        const silentOptions = { ...options, sinkId: { type: "none" } };
+        super(silentOptions);
+      }
+    };
     localStorage.clear();
     localStorage.setItem("audioEnabled", "true");
     localStorage.setItem(
