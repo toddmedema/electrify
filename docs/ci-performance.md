@@ -14,8 +14,8 @@ native packaging verification.
    lint plugin is disabled.
 2. **Linux x64 build** packages and verifies the Linux depot.
 3. **Windows x64 build** packages and verifies the Windows depot.
-4. **macOS universal build** packages, signs and verifies one app containing both Intel and
-   Apple Silicon slices. Neither slice is launched in this job.
+4. **macOS ARM64 build** packages, signs and verifies an Apple Silicon app on an ARM host.
+   Every Mach-O payload must contain only ARM64 code; the app is not launched in this job.
 5. **CPU tests and static checks** starts immediately alongside the shared builds. It runs
    types, strict lint, formatting, native Node units, CI tooling, Firestore rules, the isolated
    tick-ratio benchmark, every covered Jest unit and long simulation, coverage validation,
@@ -58,7 +58,7 @@ cached dependencies, but production compilation stays in the shared build job. O
 install the locked Chromium headless shell; only desktop integration installs Xvfb and Openbox.
 Unit/simulation transform caches belong to CPU checks, and the world-advance transform cache
 belongs to desktop integration. All three native package workers retain the lean locked
-profile and verify shared assets, native binaries and, on Mac, both slices and the signature.
+profile and verify shared assets, native binaries and, on Mac, ARM64-only binaries and the signature.
 
 The workers upload separate `diagnostics-cpu`, `diagnostics-browser` and `diagnostics-desktop`
 artifacts even if a phase fails. CPU diagnostics include coverage and suite manifests; UI

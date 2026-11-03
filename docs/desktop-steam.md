@@ -36,18 +36,16 @@ account or App ID:
 npm run desktop:pack:offline
 ```
 
-Build on the target OS using its native Node 24 installation and `npm ci`. Windows and Linux
-packaging rejects cross-host or cross-architecture builds: Koffi installs a native package for
-the host, and each depot must contain the correct Steam SDK and Electron binaries. On macOS,
-either an Apple Silicon or an Intel Mac builds one universal app containing both architectures.
-Packaging installs the other architecture's locked Koffi package before it merges the two
-builds, and checks that the signed executable contains both `arm64` and `x86_64` slices.
+Build on the target OS and architecture using its native Node 24 installation and `npm ci`.
+Mac builds require Apple Silicon (ARM64). Packaging rejects other Mac architectures, removes
+unused architectures from the pinned Steam SDK library, and verifies that every Mach-O binary
+in the signed app contains only ARM64 code. The installed dependency sources remain intact.
 
-| Target            | Depot under `dist/desktop/` | Executable inside the depot              | CI runner        |
-| ----------------- | --------------------------- | ---------------------------------------- | ---------------- |
-| Windows x64       | `win-unpacked/`             | `Electrify.exe`                          | `windows-latest` |
-| Linux x64         | `linux-unpacked/`           | `Electrify`                              | `ubuntu-22.04`   |
-| macOS (universal) | `mac-universal/`            | `Electrify.app/Contents/MacOS/Electrify` | `macos-15`       |
+| Target      | Depot under `dist/desktop/` | Executable inside the depot              | CI runner        |
+| ----------- | --------------------------- | ---------------------------------------- | ---------------- |
+| Windows x64 | `win-unpacked/`             | `Electrify.exe`                          | `windows-latest` |
+| Linux x64   | `linux-unpacked/`           | `Electrify`                              | `ubuntu-22.04`   |
+| macOS ARM64 | `mac-arm64/`                | `Electrify.app/Contents/MacOS/Electrify` | `macos-15`       |
 
 On macOS, open `Electrify.app`; on Linux, run `./Electrify` from the depot. Ship the **entire
 directory or app bundle**, including native libraries and Chromium resources. Copying only the
@@ -116,33 +114,23 @@ Remove-Item Env:STEAM_APP_ID
 
 The same command works on each native host; in POSIX shells use
 `STEAM_APP_ID=YOUR_ELECTRIFY_APP_ID npm run desktop:pack`. It refuses a missing App ID. Create
-separate Windows, Linux and macOS depots with matching launch settings. Steam has one macOS
-platform and does not choose depots by CPU architecture, so the single universal app serves
-both Intel and Apple Silicon Macs. Set Windows to `Electrify.exe`, Linux to `Electrify`, and
+separate Windows, Linux and Apple Silicon macOS depots with matching launch settings.
+Set Windows to `Electrify.exe`, Linux to `Electrify`, and
 macOS to `Electrify.app`. Publish the Steamworks changes and assign the build to a private
 testing branch. This repository does not publish a Steam depot or configure your partner account.
 
 ### macOS compatibility metadata
 
-Steam's "Your current macOS version is unable to run 32-bit games" warning can appear even
-when the installed app is universal. Steam uses published partner metadata to identify
-64-bit Mac support; packaging or uploading a new depot does not set that metadata.
+The macOS desktop build supports Apple Silicon on macOS 13 Ventura or later. Publish that
+same requirement in the Steam store page and the application's supported-platform settings;
+Intel Mac compatibility must not be advertised. Rebuilding or uploading a depot does not
+update the published compatibility metadata.
 
-In Electrify's **Edit Steamworks Settings → Application → General → Supported Operating
-Systems**, enable **macOS** and **64 Bit Binaries Included** (or **64 Bit (Intel) Binaries
-Included**, depending on the label). Enable **Apple Silicon Binaries Included** when offered:
-the universal app contains both `x86_64` and `arm64`. Save and publish the Steamworks changes.
-See [Valve's macOS platform guidance](https://partner.steamgames.com/doc/store/application/platforms).
-
-Keep the macOS launch option pointed at `Electrify.app` and the universal Mac depot included
-in the testing account's package and selected branch. After Steam receives the published
-settings, confirm that the library warning has disappeared and launch the installed build
-on an Apple Silicon Mac. Check an Intel Mac before release as well. A warning disappearing
-confirms the compatibility metadata; launching the installed game verifies the depot.
-
-Rebuilding the app alone cannot clear this warning. The packaging verifier already requires
-both 64-bit executable slices and their native Steam dependencies. If launch still fails
-after the metadata correction, investigate that failure separately.
+Keep the macOS launch option pointed at `Electrify.app` and include the ARM64 Mac depot in the
+testing account's package and selected branch. Confirm that the available Apple Silicon
+compatibility settings match the uploaded build, then test a fresh Steam install on an Apple
+Silicon Mac. See [Valve's platform setup guidance](https://partner.steamgames.com/doc/store/application/platforms)
+for publishing platform settings, depots and system requirements.
 
 ### macOS signing and notarization
 
@@ -155,7 +143,7 @@ SDK/overlay injection required by Valve, and omit Apple's app-sandbox entitlemen
 renderer sandbox remains enabled. Packaging checks native bytes before signing, then verifies
 the signed app with `codesign --verify --deep --strict` and checks every game asset again. Before
 uploading, confirm notarization and its offline ticket with `xcrun stapler validate Electrify.app`,
-and test a fresh Steam install on both an Apple Silicon and an Intel Mac. Windows signing uses
+and test a fresh Steam install on an Apple Silicon Mac. Windows signing uses
 the configured release certificate or signing provider; offline CI does not sign the executable.
 
 Steam has to be installed and logged in at least once to establish a player's ownership and

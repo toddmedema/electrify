@@ -4,6 +4,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { verifyRuntimeNotices } = require("./runtime-notices");
+const { arm64Slice, verifyMacArm64Package } = require("./mac-arm64");
 
 function files(root, prefix = "") {
   return fs
@@ -126,7 +127,6 @@ function verifyPackaged(directory) {
         : [
             "steamworks.js/dist/osx/libsteam_api.dylib",
             "steamworks.js/dist/osx/steamworksjs.darwin-arm64.node",
-            "steamworks.js/dist/osx/steamworksjs.darwin-x64.node",
           ];
   for (const name of native) {
     const unpacked = path.join(
@@ -137,16 +137,15 @@ function verifyPackaged(directory) {
     );
     const actual = fs.readFileSync(unpacked);
     assertAsset(actual, name);
-    if (
-      digest(actual) !==
-      digest(fs.readFileSync(path.join("node_modules", name)))
-    )
+    const source = fs.readFileSync(path.join("node_modules", name));
+    const expected =
+      platform === "darwin" && name.endsWith("libsteam_api.dylib")
+        ? arm64Slice(source)
+        : source;
+    if (digest(actual) !== digest(expected))
       throw new Error(`Packaged native runtime mismatch: ${name}`);
   }
-  // The universal Mac app carries both Koffi slices; Koffi loads the one matching the CPU.
-  const koffiArchitectures =
-    platform === "darwin" ? ["arm64", "x64"] : [process.arch];
-  for (const arch of koffiArchitectures) {
+  for (const arch of [process.arch]) {
     const koffiRoot = path.join("@koromix", `koffi-${platform}-${arch}`);
     const koffiFiles = files(
       path.join(resources, "app.asar.unpacked", "node_modules", koffiRoot),
@@ -170,6 +169,7 @@ function verifyPackaged(directory) {
         throw new Error(`Packaged native Steam bridge mismatch: ${name}`);
     }
   }
+  if (platform === "darwin") verifyMacArm64Package(directory);
   return count;
 }
 
@@ -188,18 +188,7 @@ function verifySignedMacPackage(directory) {
       result.error ||
       new Error(`The signed macOS app failed verification: ${result.stderr}`)
     );
-  const lipo = spawnSync(
-    "/usr/bin/lipo",
-    ["-archs", path.join(application, "Contents", "MacOS", "Electrify")],
-    { encoding: "utf8" },
-  );
-  if (lipo.error || lipo.status !== 0)
-    throw lipo.error || new Error(lipo.stderr);
-  const slices = lipo.stdout.trim().split(/\s+/);
-  if (!["arm64", "x86_64"].every((arch) => slices.includes(arch)))
-    throw new Error(
-      `The macOS app is not universal: ${lipo.stdout.trim() || "no slices"}`,
-    );
+  verifyMacArm64Package(directory);
   verifyInputResources(path.join(application, "Contents", "Resources"));
   verifyRuntimeNotices(path.join(application, "Contents", "Resources"));
   return verifyArchiveAssets(

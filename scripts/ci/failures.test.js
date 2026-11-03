@@ -10,19 +10,19 @@ test("history groups recurring journeys across viewports, branches and shifted l
   const log = (project, lineNumber) =>
     summarize(
       [
-        line("macOS universal tests", "1 flaky"),
+        line("macOS ARM64 tests", "1 flaky"),
         line(
-          "macOS universal tests",
+          "macOS ARM64 tests",
           `[${project}] › e2e/steam-input.spec.ts:${lineNumber}:5 › invite entry`,
         ),
-        line("macOS universal tests", "Controller journeys: FAILED"),
+        line("macOS ARM64 tests", "Controller journeys: FAILED"),
         line("check", "##[error]Process completed with exit code 1."),
       ].join("\n"),
     );
   const first = log("deck-720-dark", 637);
   first.set(
     "another viewport",
-    log("mobile-390px", 637).get("macOS universal tests"),
+    log("mobile-390px", 637).get("macOS ARM64 tests"),
   );
   const result = summarizeHistory([
     {
@@ -77,7 +77,7 @@ test("history retains unclassified build/setup failures instead of silently drop
 });
 
 test("native test timeouts retain the original failure before secondary teardown errors", () => {
-  const job = "macOS universal tests";
+  const job = "macOS ARM64 tests";
   const errors = summarize(
     [
       line(job, "Test timeout of 120000ms exceeded."),
@@ -96,7 +96,7 @@ test("native test timeouts retain the original failure before secondary teardown
 });
 
 test("summaries list failed gates, tests, flakes and assertion excerpts per job", () => {
-  const mac = "macOS universal tests";
+  const mac = "macOS ARM64 tests";
   const log = [
     line(mac, "Types: passed"),
     line(
@@ -300,7 +300,7 @@ const failedRun = (jobs, extra = {}) => ({
 });
 const job = (conclusion, extra = {}) => ({
   databaseId: 42,
-  name: "macOS universal build",
+  name: "macOS ARM64 build",
   status: "completed",
   conclusion,
   steps: [],
@@ -338,7 +338,7 @@ test("the command reports cancelled unassigned workers and deduplicates paginate
     },
   });
   assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stdout, /CANCELLED macOS universal build/);
+  assert.match(result.stdout, /CANCELLED macOS ARM64 build/);
   assert.match(result.stdout, /Runner: not assigned.*macos-15/);
   assert.match(result.stdout, /not acquired by Runner/);
   assert.equal(result.stdout.split(capacity).length - 1, 1);
@@ -392,9 +392,7 @@ test("non-successful completed jobs retain their actual outcomes even when runne
     const result = report({ run: failedRun([job(conclusion)]) });
     assert.equal(result.status, 1, result.stderr);
     assert(
-      result.stdout.includes(
-        `${conclusion.toUpperCase()} macOS universal build`,
-      ),
+      result.stdout.includes(`${conclusion.toUpperCase()} macOS ARM64 build`),
     );
     assert.match(
       result.stdout,
@@ -432,6 +430,6 @@ test("successful runs and pending workers retain their existing exit semantics w
     }),
   });
   assert.equal(pending.status, 2, pending.stderr);
-  assert.match(pending.stdout, /Still running: macOS universal build/);
+  assert.match(pending.stdout, /Still running: macOS ARM64 build/);
   assert(!pending.stdout.includes("CANCELLED"));
 });

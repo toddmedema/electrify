@@ -30,14 +30,14 @@ test("PR CI runs three independent test groups and three native builds in eight 
   const workers = jobs.platform.strategy.matrix.include;
   assert.equal(workers.length + Object.keys(jobs).length - 1, 8);
   assert.deepEqual(workers.map(({ depot }) => depot).sort(), [
-    "darwin-universal",
+    "darwin-arm64",
     "linux-x64",
     "win32-x64",
   ]);
   const mac = workers.find(({ platform }) => platform === "darwin");
-  assert.equal(mac.runner, "macos-15-intel");
-  assert.equal(mac.arch, "x64");
-  assert.equal(mac.directory, "mac-universal");
+  assert.equal(mac.runner, "macos-15");
+  assert.equal(mac.arch, "arm64");
+  assert.equal(mac.directory, "mac-arm64");
   assert.equal(jobs.build.needs, undefined);
   assert.equal(jobs.cpu.needs, undefined);
   assert.equal(jobs.platform.needs, "build");
@@ -162,7 +162,7 @@ test("PR CI runs three independent test groups and three native builds in eight 
   );
 });
 
-test("the Intel macOS builder rejects a mismatched host while keeping the universal target", (t) => {
+test("the ARM64 macOS builder rejects a mismatched host and packages its native architecture", (t) => {
   const platform = workflow().jobs.platform;
   const mac = platform.strategy.matrix.include.find(
     ({ platform }) => platform === "darwin",
@@ -186,8 +186,8 @@ test("the Intel macOS builder rejects a mismatched host while keeping the univer
   `,
   );
   for (const [hostPlatform, hostArch, valid] of [
-    ["darwin", "x64", true],
-    ["darwin", "arm64", false],
+    ["darwin", "arm64", true],
+    ["darwin", "x64", false],
     ["linux", "x64", false],
   ]) {
     const result = spawnSync("bash", ["-e", "-c", guard.run], {
@@ -211,11 +211,7 @@ test("the Intel macOS builder rejects a mismatched host while keeping the univer
   const pack = platform.steps.find(
     ({ name }) => name === "Package and verify native depot",
   );
-  assert(
-    pack.run.endsWith(
-      `--arch \${{ matrix.platform == 'darwin' && 'universal' || matrix.arch }}`,
-    ),
-  );
+  assert(pack.run.endsWith(`--arch \${{ matrix.arch }}`));
 });
 
 test("trusted master runs warm all three transform caches without adding jobs", () => {

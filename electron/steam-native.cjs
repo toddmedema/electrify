@@ -63,7 +63,6 @@ function nativeLibraryPath(platform = process.platform, arch = process.arch) {
   const location = {
     "win32:x64": "dist/win64/steam_api64.dll",
     "linux:x64": "dist/linux64/libsteam_api.so",
-    "darwin:x64": "dist/osx/libsteam_api.dylib",
     "darwin:arm64": "dist/osx/libsteam_api.dylib",
   }[`${platform}:${arch}`];
   if (!location)
@@ -78,7 +77,6 @@ function nativeBindingPath(platform = process.platform, arch = process.arch) {
   const location = {
     "win32:x64": "dist/win64/steamworksjs.win32-x64-msvc.node",
     "linux:x64": "dist/linux64/steamworksjs.linux-x64-gnu.node",
-    "darwin:x64": "dist/osx/steamworksjs.darwin-x64.node",
     "darwin:arm64": "dist/osx/steamworksjs.darwin-arm64.node",
   }[`${platform}:${arch}`];
   if (!location)
