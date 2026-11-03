@@ -882,12 +882,12 @@ Production CSS on Node 24.22.2, gzip level 9:
 
 | Metric                    |        Before |         After |            Reduction |
 | ------------------------- | ------------: | ------------: | -------------------: |
-| Main CSS, minified        | 204,032 bytes | 159,680 bytes | 44,352 bytes (21.7%) |
-| Main CSS, gzip            |  29,160 bytes |  28,261 bytes |     899 bytes (3.1%) |
-| Sass-emitted rules        |         1,710 |         1,326 |                  384 |
-| Sass-emitted declarations |         4,751 |         3,685 |                1,066 |
+| Main CSS, minified        | 204,367 bytes | 160,015 bytes | 44,352 bytes (21.7%) |
+| Main CSS, gzip            |  29,223 bytes |  28,319 bytes |     904 bytes (3.1%) |
+| Sass-emitted rules        |         1,713 |         1,329 |                  384 |
+| Sass-emitted declarations |         4,760 |         3,694 |                1,066 |
 
-Both artifacts are fresh production builds on the merged `520bcaad` base. Their
+Both artifacts are fresh production builds on the merged `f136b247` base. Their
 source maps contain the exact baseline and optimized `app.scss`, respectively.
 Existing bundle ceilings and simulation baselines are unchanged. Removing repeated static rules primarily
 reduces parsing and maintenance work; this is not a measured frame-time improvement.
