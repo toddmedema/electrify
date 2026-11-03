@@ -868,16 +868,13 @@ test("fresh mod play keeps a remembered locked level from entering the compiled 
   const dialog = screen.getByRole("dialog");
   const beginner = within(dialog).getByRole("button", {
     name: "Beginner",
-    exact: true,
   });
   expect(beginner).toHaveAttribute("aria-pressed", "true");
   fireEvent.click(
     within(dialog).getByRole("button", { name: "Expert, locked" }),
   );
   expect(beginner).toHaveAttribute("aria-pressed", "true");
-  await userEvent.click(
-    within(dialog).getByRole("button", { name: "Start", exact: true }),
-  );
+  await userEvent.click(within(dialog).getByRole("button", { name: "Start" }));
   expect(launchCustomScenario).toHaveBeenCalledWith(
     expect.any(Function),
     expect.objectContaining({
