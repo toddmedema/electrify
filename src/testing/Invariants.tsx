@@ -127,6 +127,7 @@ const NON_NEGATIVE_TICK_FIELDS: TickFieldType[] = [
   // A lender can quote any rate it likes, but never a negative one
   "interestRate",
   "importedW",
+  "storageImportedW",
   "exportedW",
   "transmissionCapacityW",
   "marketPricePerMWh",
@@ -642,6 +643,21 @@ function checkTrade(
   const entitlementW = now.entitlementImportedW ?? 0;
   const entitlementCapacityW = now.entitlementImportCapacityW ?? 0;
   const externalImportW = importedW - entitlementW;
+  const storageImportedW = now.storageImportedW ?? 0;
+  if (
+    !Number.isFinite(storageImportedW) ||
+    storageImportedW < 0 ||
+    storageImportedW > externalImportW + 1 ||
+    storageImportedW > (now.storageChargeW ?? 0) + 1 ||
+    (storageImportedW > 0 &&
+      (exportedW > 0 || (now.storageDischargeW ?? 0) > 0))
+  ) {
+    collector.add(
+      "storage imports are consumed once by eligible charging",
+      when,
+      `${storageImportedW}W charging imports, ${now.storageChargeW}W charge, ${now.storageDischargeW}W discharge`,
+    );
+  }
   if (
     !Number.isFinite(entitlementW) ||
     !Number.isFinite(entitlementCapacityW) ||

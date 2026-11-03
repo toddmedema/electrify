@@ -14,7 +14,8 @@ import type {
   MeaningfulDecisionKindType,
   PolicyId,
   PolicyTier,
-  TradingPolicyType,
+  BuyingRuleType,
+  SellingRuleType,
 } from "../Types";
 import "../Store";
 import gameReducer, {
@@ -25,7 +26,8 @@ import gameReducer, {
   initGame,
   hasChronicBlackouts,
   reprioritizeFacility,
-  setTradingPolicy,
+  setBuyingRule,
+  setSellingRule,
   start,
   sellFacility,
   retrofitFacility,
@@ -94,7 +96,8 @@ export type ScheduledSimActionType =
   | { month: number; type: "toggle"; facilityId: number }
   | { month: number; type: "reprioritize"; facilityId: number }
   | { month: number; type: "policy"; id: PolicyId; tier: PolicyTier }
-  | { month: number; type: "trading"; policy: TradingPolicyType }
+  | { month: number; type: "buying"; rule: BuyingRuleType }
+  | { month: number; type: "selling"; rule: SellingRuleType }
   | {
       month: number;
       type: "intertie";
@@ -618,10 +621,11 @@ export function runSimulation(options: SimOptionsType): SimResultType {
               ),
             );
             break;
-          case "trading":
-            state = cloneDeep(
-              gameReducer(state, setTradingPolicy(action.policy)),
-            );
+          case "buying":
+            state = cloneDeep(gameReducer(state, setBuyingRule(action.rule)));
+            break;
+          case "selling":
+            state = cloneDeep(gameReducer(state, setSellingRule(action.rule)));
             break;
           case "intertie-upgrade":
             state = cloneDeep(

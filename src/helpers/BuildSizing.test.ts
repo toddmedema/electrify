@@ -87,7 +87,11 @@ it("ignores zero and invalid sizes in the starting average", () => {
 
 it("starts small grids at the base intertie tier and scales large grids within available limits", () => {
   const game = createGame({ scenarioId: 100 });
-  game.transmission = { tradingPolicy: "BALANCED", lines: [] };
+  game.transmission = {
+    buyingRule: "SHORTAGES",
+    sellingRule: "SURPLUS",
+    lines: [],
+  };
   game.facilities = [{ ...game.facilities[0], peakW: 10e6 }];
   expect(initialIntertieBuildTier(game)).toBe(1);
   game.facilities[0].peakW = 10e9;

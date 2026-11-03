@@ -939,10 +939,27 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Interties connect neighboring grids. Your trading rule buys during
-          shortages and sells surplus after serving customers and charging{" "}
+          Interties connect neighboring grids. Set Buying and Selling
+          independently. Shortages only buys for unmet customer demand.
+          Shortages + Charging also buys at current prices to charge utility
+          storage after customer demand is met. None disables optional
+          purchases; contracted utility supply stays separate.
+        </p>
+        <p>
+          Surplus only sells leftover electricity after serving customers and
+          charging{" "}
           <EntryLink to={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}>storage</EntryLink>
-          . Exports you could redirect count toward your{" "}
+          . All profitable also increases running plants when current prices
+          exceed added fuel, variable operating and carbon costs. It does not
+          start plants for export or sell stored water or electricity. Later
+          ramp-down costs can still occur when prices fall. None disables
+          exports.
+        </p>
+        <p>
+          Co-op normally trades before charging utility storage; Shortages +
+          Charging gives local charging priority and requests any remaining
+          charge below other players' customer shortages. Exports you could
+          redirect count toward your{" "}
           <EntryLink to={MANUAL_ENTRY.RESERVE_CAPACITY}>reserve</EntryLink>.
         </p>
         <p>

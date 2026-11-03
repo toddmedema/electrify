@@ -231,6 +231,11 @@ test.each([113, 111, 110])(
   "two real official companies keep their exact World state in scenario %i",
   (scenarioId) => {
     const { initial, world } = playWorld(scenarioId);
+    for (const game of initial.grids)
+      expect(game.transmission).toMatchObject({
+        buyingRule: "SHORTAGES",
+        sellingRule: "PROFITABLE",
+      });
     expect(Object.keys(world.outcomes)).toHaveLength(2);
     const { rules: _initialRules, ...initialState } = initial;
     const { rules: _finalRules, ...finalState } = world;

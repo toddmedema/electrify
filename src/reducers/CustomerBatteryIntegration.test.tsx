@@ -41,7 +41,11 @@ function fixture(minute = MINUTES_PER_MONTH + 12 * 60, scenarioId = 100) {
     spent: 0,
     installs: [[1, 0.5]],
   };
-  game.transmission = { lines: [], tradingPolicy: "BALANCED" };
+  game.transmission = {
+    lines: [],
+    buyingRule: "SHORTAGES",
+    sellingRule: "SURPLUS",
+  };
   const source = game.timeline[0];
   game.timeline = Array.from({ length: 8 }, (_, index) => ({
     ...cloneDeep(source),

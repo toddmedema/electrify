@@ -1,6 +1,7 @@
 import { POLICY_IDS } from "./data/Policies";
 import { validLegacyCampaign } from "./helpers/LegacyCampaign";
 import { validLegacyCampaignEvidence } from "./helpers/ObjectiveRules";
+import { isBuyingRule, isSellingRule } from "./helpers/TradingRules";
 import { validUtilityExpansion } from "./helpers/ExpansionValidation";
 import { validScenarioMod } from "./helpers/ScenarioMod";
 import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
@@ -55,6 +56,7 @@ import {
 import {
   corridorConstructionKgco2e,
   intertieUpgradeQuote,
+  supplyAtDemandBoundary,
 } from "./helpers/Transmission";
 import {
   GameType,
@@ -500,6 +502,16 @@ export function parseSave(raw: unknown): SaveGameType | null {
     game.timeline.some(
       (tick) =>
         !validEmissions(tick) ||
+        (tick.storageImportedW !== undefined &&
+          (typeof tick.storageImportedW !== "number" ||
+            !Number.isFinite(tick.storageImportedW) ||
+            tick.storageImportedW < 0 ||
+            supplyAtDemandBoundary(tick.storageImportedW, tick.importedW || 0) >
+              (tick.importedW || 0) ||
+            supplyAtDemandBoundary(
+              tick.storageImportedW,
+              tick.storageChargeW || 0,
+            ) > (tick.storageChargeW || 0))) ||
         (tick.transmissionCapacityLimitsWByCorridor !== undefined &&
           !validTransmissionCapacityLimits(
             tick.transmissionCapacityLimitsWByCorridor,
@@ -686,9 +698,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
     transmission !== undefined &&
     (typeof transmission !== "object" ||
       transmission === null ||
-      !["BALANCED", "RELIABILITY_FIRST", "SURPLUS_ONLY", "CLOSED"].includes(
-        transmission.tradingPolicy,
-      ) ||
+      !isBuyingRule(transmission.buyingRule) ||
+      !isSellingRule(transmission.sellingRule) ||
       !Array.isArray(transmission.lines) ||
       transmission.lines.some(
         (line) =>

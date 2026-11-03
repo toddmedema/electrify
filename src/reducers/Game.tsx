@@ -11,6 +11,11 @@ import {
   legacyCompletedMonths,
   legacyMarketReferenceRate,
 } from "../helpers/LegacyCampaign";
+import {
+  isBuyingRule,
+  isSellingRule,
+  incrementalGenerationCostPerMWh,
+} from "../helpers/TradingRules";
 import { combinedUtilityDemandProfile } from "../helpers/CombinedUtilityDemand";
 import {
   isUtilityExpansionGame,
@@ -241,6 +246,7 @@ import { importEmissionsKgco2ePerMWh } from "../data/ImportEmissions";
 import {
   adjacentMarketPricePerMWh,
   allocateIntertieFlows,
+  allocateProfitableExports,
   intertieOfferLimits,
   clearTransmissionMarket,
   supplyAtDemandBoundary,
@@ -367,7 +373,8 @@ import {
   FuelProductionType,
   FacilityUpgradeType,
   RetrofitFacilityAction,
-  TradingPolicyType,
+  BuyingRuleType,
+  SellingRuleType,
   TransmissionLineOperatingType,
   VictoryType,
   WorldEventEffectsType,
@@ -2077,8 +2084,11 @@ export const gameSlice = createSlice({
     ) => {
       applyUpgradeTransmissionLine(state, action.payload);
     },
-    setTradingPolicy: (state, action: PayloadAction<TradingPolicyType>) => {
-      applyTradingPolicy(state, action.payload);
+    setBuyingRule: (state, action: PayloadAction<BuyingRuleType>) => {
+      applyTradingRule(state, "buyingRule", action.payload);
+    },
+    setSellingRule: (state, action: PayloadAction<SellingRuleType>) => {
+      applyTradingRule(state, "sellingRule", action.payload);
     },
     sellFacility: (state, action: PayloadAction<number>) => {
       applySellFacility(state, action.payload);
@@ -2440,7 +2450,8 @@ export const {
   reprioritizeFacility,
   retrofitFacility,
   cancelRetrofit,
-  setTradingPolicy,
+  setBuyingRule,
+  setSellingRule,
   setSpeed,
   markEventsRead,
 } = gameSlice.actions;
@@ -2817,13 +2828,6 @@ function applyReprioritizeFacility(
   return true;
 }
 
-const TRADING_POLICIES: readonly TradingPolicyType[] = [
-  "BALANCED",
-  "RELIABILITY_FIRST",
-  "SURPLUS_ONLY",
-  "CLOSED",
-];
-
 function applyReprioritizeTransmissionLine(
   state: GameType,
   payload: ReprioritizeAction,
@@ -2855,20 +2859,30 @@ function applyReprioritizeTransmissionLine(
   return true;
 }
 
-function applyTradingPolicy(state: GameType, policy: unknown): boolean {
-  if (!TRADING_POLICIES.includes(policy as TradingPolicyType)) return false;
-  if (!state.transmission) return false;
-  // A trading rule is only an actionable grid choice once there is a corridor to govern.
-  if (state.transmission.lines.length === 0) return false;
-  if (state.transmission.tradingPolicy === policy) return false;
-  const before = state.transmission.tradingPolicy;
-  state.transmission.tradingPolicy = policy as TradingPolicyType;
+function applyTradingRule(
+  state: GameType,
+  direction: "buyingRule" | "sellingRule",
+  value: unknown,
+): boolean {
+  if (direction === "buyingRule" ? !isBuyingRule(value) : !isSellingRule(value))
+    return false;
+  const transmission = state.transmission;
+  if (!transmission?.lines.length || transmission[direction] === value)
+    return false;
+  const before = transmission[direction];
+  if (direction === "buyingRule" && isBuyingRule(value))
+    transmission.buyingRule = value;
+  if (direction === "sellingRule" && isSellingRule(value))
+    transmission.sellingRule = value;
   recordMeaningfulDecision(state, {
-    lever: "trading",
-    label: "Set the regional trading rule",
+    lever: direction === "buyingRule" ? "trading:buying" : "trading:selling",
+    label:
+      direction === "buyingRule"
+        ? "Set the buying rule"
+        : "Set the selling rule",
     kind: "trading",
     before,
-    after: policy as TradingPolicyType,
+    after: String(value),
   });
   state.timeline = reforecastSupply(state, true);
   return true;
@@ -4790,7 +4804,8 @@ function* supplyFacilitiesFinancesPhases(
   const { facilities } = state;
   const noElapsed =
     (state.utilityExpansion ||
-      (isLegacyCampaignScenario(state.scenarioId) && !state.customScenario)) &&
+      (isLegacyCampaignScenario(state.scenarioId) && !state.customScenario) ||
+      state.transmission?.buyingRule === "SHORTAGES_AND_STORAGE") &&
     (preRoll || !advanceConstruction)
       ? {
           frame: { ...now },
@@ -5029,6 +5044,7 @@ function* supplyFacilitiesFinancesPhases(
   let supply = entitlementDeliveredW;
   let spareGenerationW = 0;
   let reachableHeadroomW = 0;
+  const storageHeadroom = new Map<number, { peakW: number; watts: number }>();
   const supplyByFuel: FuelProductionType = {};
   let charge = 0;
   let dischargedW = 0;
@@ -5038,8 +5054,11 @@ function* supplyFacilitiesFinancesPhases(
   let hydroReservoirCapacityWh = 0;
   let hydroSpillWh = 0;
   let hydroMandatedReleaseW = 0;
-  const peerHeadroom: { generator: GeneratorOperatingType; watts: number }[] =
-    [];
+  const peerHeadroom: {
+    generator: GeneratorOperatingType;
+    watts: number;
+    costPerMWh: number;
+  }[] = [];
   const startedFacilityIds = new Set<number>();
   const tickStoryEffects = storyEffectsAt(tickDate, state);
   if (tickStoryEffects.transmissionCapacityLimitsWByCorridor)
@@ -5049,11 +5068,12 @@ function* supplyFacilitiesFinancesPhases(
   const carbonFee = tickStoryEffects.carbonFeePerKgCO2e ?? state.feePerKgCO2e;
   // Read once per tick, and only when a live co-op grid prices its spare output.
   let peerTickFuelPrices: FuelPricesType | undefined;
+  const tradeFuelDate = now.minute < state.date.minute ? state.date : tickDate;
   const peerFuelPrices = () =>
     (peerTickFuelPrices ??= getEffectiveFuelPrices(
-      tickDate,
+      tradeFuelDate,
       state,
-      tickStoryEffects,
+      tradeFuelDate.minute === now.minute ? tickStoryEffects : undefined,
     ));
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     const previousW = g.currentW;
@@ -5251,30 +5271,33 @@ function* supplyFacilitiesFinancesPhases(
             break;
         }
         if (
-          peerSettlement &&
+          transmission.sellingRule === "PROFITABLE" &&
           !hydro &&
           !WEATHER_DEPENDENT_FUELS.includes(g.fuel) &&
+          previousW > 0 &&
           g.currentW > 0 &&
-          (hasMinimumStableOutput ? generator?.committed : true)
+          (hasMinimumStableOutput
+            ? generator?.committed
+            : requiredTargetW > 0 ||
+              (i < indexOfLastUnchargedBattery && totalChargeNeeded > 0))
         ) {
-          const cost =
-            (g.variableOperatingCostPerMWh || 0) *
-              operatingCostEscalation(state, g, tickDate) *
-              (tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel] || 1) +
-            (g.btuPerWh || 0) *
-              ((peerFuelPrices()[g.fuel] || 0) +
-                feeableKgCO2ePerBtu(g.fuel) * carbonFee * 1e6);
-          if (cost <= peerTradePrice(state, now))
-            peerHeadroom.push({
-              generator: g,
-              watts: Math.max(
-                0,
-                Math.min(
-                  dispatchPeakW,
-                  previousW + (g.peakW * stepMinutes) / g.spinMinutes,
-                ) - g.currentW,
-              ),
-            });
+          peerHeadroom.push({
+            generator: g,
+            costPerMWh: incrementalGenerationCostPerMWh(
+              g,
+              peerFuelPrices(),
+              carbonFee,
+              operatingCostEscalation(state, g, tickDate),
+              tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel] || 1,
+            ),
+            watts: Math.max(
+              0,
+              Math.min(
+                dispatchPeakW,
+                previousW + (g.peakW * stepMinutes) / g.spinMinutes,
+              ) - g.currentW,
+            ),
+          });
         }
         supply += g.currentW;
         supplyByFuel[g.fuel] = (supplyByFuel[g.fuel] || 0) + g.currentW;
@@ -5346,7 +5369,9 @@ function* supplyFacilitiesFinancesPhases(
         );
         const currentGridW =
           g.currentW < 0 ? g.currentW / g.roundTripEfficiency : g.currentW;
-        reachableHeadroomW += Math.max(0, dischargeW - currentGridW);
+        const watts = Math.max(0, dischargeW - currentGridW);
+        reachableHeadroomW += watts;
+        storageHeadroom.set(g.id, { peakW: availablePeakW, watts });
       } else if (!WEATHER_DEPENDENT_FUELS.includes(g.fuel)) {
         const energyLimitedPeakW = hydro
           ? Math.min(
@@ -5381,20 +5406,106 @@ function* supplyFacilitiesFinancesPhases(
   );
   entitlementDeliveredW -= redundantEntitlementW;
   supply -= redundantEntitlementW;
+  // One charge budget spans native surplus, peer purchases and external markets.
+  const chargeCapacityW = () =>
+    dischargedW > 0
+      ? 0
+      : facilities.reduce((sum, battery) => {
+          if (
+            !isStorage(battery) ||
+            battery.paused ||
+            battery.yearsToBuildLeft > 0 ||
+            battery.currentW > 0
+          )
+            return sum;
+          const alreadyChargingW = Math.max(
+            0,
+            -battery.currentW / battery.roundTripEfficiency,
+          );
+          return (
+            sum +
+            Math.max(
+              0,
+              Math.min(
+                battery.peakW - alreadyChargingW,
+                ((battery.peakWh - battery.currentWh) * ticksPerHour) /
+                  battery.roundTripEfficiency,
+              ),
+            )
+          );
+        }, 0);
+  const chargeStorage = (availableW: number) => {
+    if (dischargedW > 0) return;
+    let remaining = availableW;
+    for (const battery of facilities) {
+      if (
+        !isStorage(battery) ||
+        battery.paused ||
+        battery.yearsToBuildLeft > 0 ||
+        battery.currentW > 0
+      )
+        continue;
+      const alreadyChargingW = Math.max(
+        0,
+        -battery.currentW / battery.roundTripEfficiency,
+      );
+      const draw = Math.max(
+        0,
+        Math.min(
+          remaining,
+          battery.peakW - alreadyChargingW,
+          ((battery.peakWh - battery.currentWh) * ticksPerHour) /
+            battery.roundTripEfficiency,
+        ),
+      );
+      battery.currentW -= draw * battery.roundTripEfficiency;
+      battery.currentWh = Math.min(
+        battery.peakWh,
+        battery.currentWh + (draw * battery.roundTripEfficiency) / ticksPerHour,
+      );
+      const headroom = storageHeadroom.get(battery.id);
+      if (headroom) {
+        const watts = Math.max(
+          0,
+          Math.min(headroom.peakW, battery.currentWh * TICKS_PER_HOUR) -
+            battery.currentW / battery.roundTripEfficiency,
+        );
+        reachableHeadroomW += watts - headroom.watts;
+        headroom.watts = watts;
+      }
+      storedWh += (draw * battery.roundTripEfficiency) / ticksPerHour;
+      charge += draw;
+      storageLossWh +=
+        (draw * (1 - battery.roundTripEfficiency)) / ticksPerHour;
+      remaining -= draw;
+    }
+  };
+  if (peerSettlement && transmission.buyingRule === "SHORTAGES_AND_STORAGE")
+    chargeStorage(Math.max(0, supply - charge - now.demandW));
   let peer: PeerSettlement | undefined;
   if (peerSettlement) {
+    const peerExportHeadroom = peerHeadroom.filter(
+      (item) => peerTradePrice(state, now) > item.costPerMWh,
+    );
+    const storageChargeW =
+      transmission.buyingRule === "SHORTAGES_AND_STORAGE"
+        ? chargeCapacityW()
+        : 0;
     const reserveW = now.demandW * PEER_TRADE_RESERVE_FRACTION;
     const intensity = (g: GeneratorOperatingType) =>
       (g.btuPerWh || 0) * (FUELS[g.fuel]?.kgCO2ePerBtu || 0) * 1e6;
     peer = yield {
+      storageChargeW,
       offerW:
-        Math.max(0, supply - now.demandW - reserveW) +
-        Math.max(
-          0,
-          peerHeadroom.reduce((sum, item) => sum + item.watts, 0) -
-            Math.max(0, now.demandW + reserveW - supply),
-        ),
-      shortageW: Math.max(0, now.demandW - supply),
+        storageChargeW > 0
+          ? 0
+          : Math.max(0, supply - charge - now.demandW - reserveW) +
+            Math.max(
+              0,
+              peerExportHeadroom.reduce((sum, item) => sum + item.watts, 0) -
+                Math.max(0, now.demandW + reserveW + charge - supply),
+            ),
+      shortageW: Math.max(0, now.demandW + charge - supply),
       pricePerMWh: peerTradePrice(state, now),
       temperatureC: now.temperatureC,
       solarIrradianceWM2: now.solarIrradianceWM2,
@@ -5402,7 +5513,7 @@ function* supplyFacilitiesFinancesPhases(
         if (state.utilityExpansion) {
           const surplusW = Math.min(
             exportedW,
-            Math.max(0, supply - now.demandW - reserveW),
+            Math.max(0, supply - charge - now.demandW - reserveW),
           );
           const nativeSupplyW = supply - entitlementDeliveredW;
           const nativeWeight = facilities.reduce(
@@ -5416,7 +5527,7 @@ function* supplyFacilitiesFinancesPhases(
           let weighted =
             nativeSupplyW > 0 ? (surplusW * nativeWeight) / nativeSupplyW : 0;
           let extraW = Math.max(0, exportedW - surplusW);
-          for (const item of peerHeadroom) {
+          for (const item of peerExportHeadroom) {
             const deliveredW = Math.min(item.watts, extraW);
             extraW -= deliveredW;
             weighted += deliveredW * intensity(item.generator);
@@ -5436,7 +5547,10 @@ function* supplyFacilitiesFinancesPhases(
           watts += g.currentW;
           weighted += g.currentW * intensity(g);
         }
-        let extra = Math.max(0, exportedW - Math.max(0, supply - now.demandW));
+        let extra = Math.max(
+          0,
+          exportedW - Math.max(0, supply - charge - now.demandW),
+        );
         let additionalBoughtW = Math.min(
           extra,
           entitlementCapacityW - entitlementDeliveredW,
@@ -5451,7 +5565,7 @@ function* supplyFacilitiesFinancesPhases(
           watts += amount;
           weighted += amount * source.emissionsKgPerMWh;
         }
-        for (const item of peerHeadroom) {
+        for (const item of peerExportHeadroom) {
           const delivered = Math.min(item.watts, extra);
           watts += delivered;
           weighted += delivered * intensity(item.generator);
@@ -5462,10 +5576,12 @@ function* supplyFacilitiesFinancesPhases(
     };
     let extra = Math.max(
       0,
-      (peer?.exportedW || 0) - Math.max(0, supply - now.demandW),
+      (peer?.exportedW || 0) - Math.max(0, supply - charge - now.demandW),
     );
-    for (const { generator, watts } of peerHeadroom) {
+    for (const item of peerExportHeadroom) {
+      const { generator, watts } = item;
       const delivered = Math.min(watts, extra);
+      item.watts -= delivered;
       generator.currentW += delivered;
       supply += delivered;
       supplyByFuel[generator.fuel] =
@@ -5475,29 +5591,10 @@ function* supplyFacilitiesFinancesPhases(
       extra -= delivered;
     }
     supply += (peer?.importedW || 0) - (peer?.exportedW || 0);
-    let leftovers = Math.max(0, supply - now.demandW - (peer?.importedW || 0));
-    for (const battery of facilities) {
-      if (
-        !isStorage(battery) ||
-        battery.paused ||
-        battery.yearsToBuildLeft > 0 ||
-        battery.currentW > 0
-      )
-        continue;
-      const draw = Math.min(
-        leftovers,
-        battery.peakW,
-        ((battery.peakWh - battery.currentWh) * ticksPerHour) /
-          battery.roundTripEfficiency,
+    if (transmission.buyingRule !== "SHORTAGES_AND_STORAGE")
+      chargeStorage(
+        Math.max(0, supply - charge - now.demandW - (peer?.importedW || 0)),
       );
-      battery.currentW = -draw * battery.roundTripEfficiency;
-      battery.currentWh += (draw * battery.roundTripEfficiency) / ticksPerHour;
-      storedWh += (draw * battery.roundTripEfficiency) / ticksPerHour;
-      charge += draw;
-      storageLossWh +=
-        (draw * (1 - battery.roundTripEfficiency)) / ticksPerHour;
-      leftovers -= draw;
-    }
   }
   transmission.lines.forEach((line) => {
     if (ownedUtilityConnection(state, line.corridorId)) line.currentFlowW = 0;
@@ -5562,9 +5659,11 @@ function* supplyFacilitiesFinancesPhases(
     now.customerBatteryGridChargeW = batteryAfter.gridChargeW;
     now.customerBatteryLossWh = batteryBefore.lossWh + batteryAfter.lossWh;
   }
-  const grossLocalSupplyW =
+  let grossLocalSupplyW =
     supply - (peer?.importedW || 0) + (peer?.exportedW || 0);
-  const localSupplyW = supply - charge - batteryAfter.gridChargeW;
+  const peerStorageImportedW = peer?.storageImportedW || 0;
+  const localSupplyW =
+    supply - charge - peerStorageImportedW - batteryAfter.gridChargeW;
   const clearing = clearTransmissionMarket({
     // Contract/load arithmetic may leave a few ULPs at the served-load boundary.
     localSupplyW: state.utilityExpansion
@@ -5574,17 +5673,50 @@ function* supplyFacilitiesFinancesPhases(
     capacityW: transmissionCapacity,
     importLimitW: marketImportLimitW,
     exportLimitW: marketExportLimitW,
-    policy: transmission.tradingPolicy,
+    buyingRule: (peer?.exportedW || 0) > 0 ? "NONE" : transmission.buyingRule,
+    sellingRule: (peer?.importedW || 0) > 0 ? "NONE" : transmission.sellingRule,
+    storageChargeW: Math.max(0, chargeCapacityW() - peerStorageImportedW),
   });
   const importedW =
     clearing.importedW + (peer?.importedW || 0) + entitlementDeliveredW;
-  const exportedW = clearing.exportedW + (peer?.exportedW || 0);
-  // The player gives earlier interties the first chance to import or export.
+  const storageImportedW = clearing.storageImportedW + peerStorageImportedW;
   const flows = allocateIntertieFlows(
     offers,
     clearing.importedW,
     clearing.exportedW,
   );
+  let additionalExportW = 0;
+  if (
+    transmission.sellingRule === "PROFITABLE" &&
+    importedW - entitlementDeliveredW === 0 &&
+    localSupplyW >= now.demandW
+  ) {
+    const matched = allocateProfitableExports(
+      offers,
+      clearing.exportedW,
+      peerHeadroom,
+    );
+    flows.exportedW = matched.exportedW;
+    matched.generationW.forEach((watts, i) => {
+      const { generator } = peerHeadroom[i];
+      generator.currentW += watts;
+      supplyByFuel[generator.fuel] =
+        (supplyByFuel[generator.fuel] || 0) + watts;
+      spareGenerationW -= watts;
+      reachableHeadroomW = Math.max(0, reachableHeadroomW - watts);
+      additionalExportW += watts;
+    });
+    grossLocalSupplyW += additionalExportW;
+  }
+  const exportedW =
+    clearing.exportedW + additionalExportW + (peer?.exportedW || 0);
+  chargeStorage(storageImportedW);
+  if (
+    transmission.buyingRule === "SHORTAGES_AND_STORAGE" ||
+    storageImportedW > 0
+  )
+    now.storageImportedW = storageImportedW;
+  else delete now.storageImportedW;
   // Keep the row readings aligned with the aggregate flow written to this tick, including
   // month-boundary pre-rolls: those replace the live current tick with the new weather frame.
   // Forecasts dispatch cloned lines; only their current-tick readings are copied back below.
@@ -5789,7 +5921,7 @@ function* supplyFacilitiesFinancesPhases(
   // Attribute sales proportionally to gross local output and imports. Using net supply
   // after charging or exports would credit local facilities with more than the company earned.
   // The imported share remains outside local facility lifetime revenue.
-  const revenueBasisW = grossLocalSupplyW + importedW;
+  const revenueBasisW = grossLocalSupplyW + importedW - storageImportedW;
   const revenuePerSuppliedW =
     revenueBasisW > 0 ? (customerRevenue + revenueExports) / revenueBasisW : 0;
   // Non-fuel operating costs were quoted in each facility's purchase-month dollars and escalate
