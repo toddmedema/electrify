@@ -34,10 +34,10 @@ test("PR CI runs three independent test groups and three native builds in eight 
     "linux-x64",
     "win32-x64",
   ]);
-  assert.equal(
-    workers.find(({ platform }) => platform === "darwin").arch,
-    "arm64",
-  );
+  const mac = workers.find(({ platform }) => platform === "darwin");
+  assert.equal(mac.runner, "macos-15-intel");
+  assert.equal(mac.arch, "x64");
+  assert.equal(mac.directory, "mac-universal");
   assert.equal(jobs.build.needs, undefined);
   assert.equal(jobs.cpu.needs, undefined);
   assert.equal(jobs.platform.needs, "build");
@@ -162,6 +162,62 @@ test("PR CI runs three independent test groups and three native builds in eight 
   );
 });
 
+test("the Intel macOS builder rejects a mismatched host while keeping the universal target", (t) => {
+  const platform = workflow().jobs.platform;
+  const mac = platform.strategy.matrix.include.find(
+    ({ platform }) => platform === "darwin",
+  );
+  const guard = platform.steps.find(
+    ({ name }) => name === "Require the native host and installed architecture",
+  );
+  assert.deepEqual(guard.env, {
+    EXPECTED_PLATFORM: `\${{ matrix.platform }}`,
+    EXPECTED_ARCH: `\${{ matrix.arch }}`,
+  });
+  fs.mkdirSync(path.resolve(".tmp"), { recursive: true });
+  const directory = fs.mkdtempSync(path.resolve(".tmp", "mac-host-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const probe = path.join(directory, "host.cjs");
+  fs.writeFileSync(
+    probe,
+    `
+    Object.defineProperty(process, "platform", { value: process.env.ELECTRIFY_TEST_HOST_PLATFORM });
+    Object.defineProperty(process, "arch", { value: process.env.ELECTRIFY_TEST_HOST_ARCH });
+  `,
+  );
+  for (const [hostPlatform, hostArch, valid] of [
+    ["darwin", "x64", true],
+    ["darwin", "arm64", false],
+    ["linux", "x64", false],
+  ]) {
+    const result = spawnSync("bash", ["-e", "-c", guard.run], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NODE_OPTIONS: `--require=${JSON.stringify(probe)}`,
+        EXPECTED_PLATFORM: mac.platform,
+        EXPECTED_ARCH: mac.arch,
+        ELECTRIFY_TEST_HOST_PLATFORM: hostPlatform,
+        ELECTRIFY_TEST_HOST_ARCH: hostArch,
+      },
+    });
+    assert.equal(result.status === 0, valid, result.stderr);
+    if (!valid)
+      assert.match(
+        result.stderr,
+        /must run on its target platform and architecture/,
+      );
+  }
+  const pack = platform.steps.find(
+    ({ name }) => name === "Package and verify native depot",
+  );
+  assert(
+    pack.run.endsWith(
+      `--arch \${{ matrix.platform == 'darwin' && 'universal' || matrix.arch }}`,
+    ),
+  );
+});
+
 test("trusted master runs warm all three transform caches without adding jobs", () => {
   const config = workflow();
   assert.deepEqual(config.on.push.branches, ["master"]);
@@ -221,7 +277,14 @@ test("the required gate rejects every failed, skipped, cancelled or timed-out de
     });
   assert.equal(run(successful).status, 0);
   for (const dependency of Object.keys(successful))
-    for (const result of ["failure", "skipped", "cancelled", "timed_out", ""]) {
+    for (const result of [
+      "failure",
+      "skipped",
+      "cancelled",
+      "timed_out",
+      "abandoned",
+      "",
+    ]) {
       assert.notEqual(
         run({ ...successful, [dependency]: result }).status,
         0,

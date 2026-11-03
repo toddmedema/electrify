@@ -92,12 +92,12 @@ jobs:
             arch: x64
             depot: win32-x64
             directory: win-unpacked
-          # One universal app serves Intel and Apple Silicon Macs. This Apple Silicon host
-          # packages and verifies both slices.
+          # The universal app still contains both slices. Use the supported Intel pool after
+          # repeated ARM runner acquisition failures; packaging verifies Intel and Apple Silicon.
           - label: macOS universal
-            runner: macos-15
+            runner: macos-15-intel
             platform: darwin
-            arch: arm64
+            arch: x64
             depot: darwin-universal
             directory: mac-universal
     steps:
