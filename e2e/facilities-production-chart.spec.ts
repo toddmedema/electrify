@@ -578,8 +578,10 @@ for (const theme of ["light", "dark"]) {
 test("blackout periods remain visible when imports supplement fuel production", async ({
   page,
 }, info) => {
+  await page.clock.install();
   await page.addInitScript(() => {
     localStorage.clear();
+    Math.random = () => 0.25;
     localStorage.setItem("theme", "dark");
     localStorage.setItem("audioEnabled", "false");
   });
@@ -590,6 +592,10 @@ test("blackout periods remain visible when imports supplement fuel production", 
     name: "Facilities",
     exact: true,
   });
+  const speed = page.locator("#appbar:visible");
+  await expect(
+    speed.getByRole("button", { name: "pause", exact: true }).first(),
+  ).toHaveAttribute("aria-pressed", "true");
   await openPane(pane, navigation);
   await openBuild(page);
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
@@ -606,15 +612,13 @@ test("blackout periods remain visible when imports supplement fuel production", 
   // Complete a real purchased line without waiting a game year for construction.
   await editSavedGame(page, (save) => {
     save.game.transmission!.lines[0].yearsToBuildLeft = 0;
+    save.game.speed = "PAUSED";
   });
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  const speed = page.locator("#appbar:visible");
-  // Freeze fixture setup, then explicitly advance the real reducer for a shortage sample.
-  await speed
-    .getByRole("button", { name: "pause", exact: true })
-    .first()
-    .click();
+  await expect(
+    speed.getByRole("button", { name: "pause", exact: true }).first(),
+  ).toHaveAttribute("aria-pressed", "true");
   await openPane(pane, navigation);
   for (const name of ["Natural Gas CC", "Nuclear"]) {
     await pane
@@ -633,20 +637,17 @@ test("blackout periods remain visible when imports supplement fuel production", 
     chart.getByText("Supply to customers", { exact: true }),
   ).toHaveCount(0);
   await expect(chart.getByText("Blackout", { exact: true })).toHaveCount(0);
-  await speed
-    .getByRole("button", { name: "normal speed", exact: true })
-    .first()
-    .click();
+  // Keep the fixture in its first month: incidental month-end achievements must not
+  // turn chart verification into a wait for a separate notification queue.
+  const game = await advanceWithinFirstDay(page);
   await expect(chart.getByRole("img")).toHaveAccessibleName(
     /blackout periods? shaded/,
   );
-  await speed
-    .getByRole("button", { name: "pause", exact: true })
-    .first()
-    .click();
-  const game = (await readSavedGame(page))!;
   const shortage = game.timeline.findIndex(
-    (tick) => tick.demandW > tick.supplyW && (tick.importedW || 0) > 0,
+    (tick) =>
+      tick.minute <= game.date.minute &&
+      tick.demandW > tick.supplyW &&
+      (tick.importedW || 0) > 0,
   );
   expect(shortage).toBeGreaterThanOrEqual(0);
   // The last sample maps to the plot's excluded right edge. Select the actual point through
