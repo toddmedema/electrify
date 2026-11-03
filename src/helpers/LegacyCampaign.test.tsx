@@ -119,6 +119,24 @@ test("only the scheduled 20-year boundary pauses for a CEO handover and continua
   ).toMatchObject({ deadlineMonth: 239 });
 });
 
+test("a paused handover preserves customers and price memory before forecasting future ticks", () => {
+  const game = closingCompany();
+  const closing = game.timeline[0];
+  closing.customerRate = 0.3;
+  closing.customerBillingRate = 0.24;
+
+  const next = reducer(game, continueLegacyCampaign());
+
+  expect(next.date.minute).toBe(game.date.minute);
+  expect(next.timeline[0].customers).toBe(closing.customers);
+  expect(next.timeline[0].customerRate).toBe(closing.customerRate);
+  expect(next.timeline[0].customerBillingRate).toBe(
+    closing.customerBillingRate,
+  );
+  expect(next.timeline[1].customers).not.toBe(closing.customers);
+  expect(next.timeline[1].customerRate).toBeLessThan(closing.customerRate);
+});
+
 test("archived completion is checked against evidence and loading resumes the same next tick", () => {
   const game = reducer(closingCompany(), continueLegacyCampaign());
   const original = cloneDeep(serializeSave(game));

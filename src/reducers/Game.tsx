@@ -4432,7 +4432,10 @@ function getDemandW(
     tickScale,
   });
   // A current-frame reforecast is not another customer-growth interval.
-  if (game.utilityExpansion && now.minute === game.date.minute) {
+  if (
+    (game.utilityExpansion || game.campaign) &&
+    now.minute === game.date.minute
+  ) {
     const current = getTimeFromTimeline(game.date.minute, game.timeline);
     now.customers = current?.customers ?? prev.customers;
     now.customerRate = current?.customerRate ?? prev.customerRate;
