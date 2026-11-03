@@ -52,8 +52,19 @@ export const EMPTY_HISTORY: MonthlyHistoryType = {
   inflationRate: 0,
 };
 
-function emptyHistory(): MonthlyHistoryType {
-  return { ...EMPTY_HISTORY, deliveredWhByFuel: {} };
+function emptyHistory(campaignMeters = false): MonthlyHistoryType {
+  return {
+    ...EMPTY_HISTORY,
+    deliveredWhByFuel: {},
+    ...(campaignMeters
+      ? {
+          efficiencySavedWh: 0,
+          efficiencyEligibleWh: 0,
+          eveningDemandWh: 0,
+          eveningUnservedWh: 0,
+        }
+      : {}),
+  };
 }
 
 // edits acc in place to avoid making tons of extra objects
@@ -144,6 +155,7 @@ function accumulateTick(
   t: TickPresentFutureType,
   startingYear: number,
   tickScale: number,
+  campaignMeters = false,
 ) {
   const date = getMonthYearFromMinute(t.minute, startingYear);
   const weight = summary.chartTickWeight || 0;
@@ -222,6 +234,27 @@ function accumulateTick(
     tickScale;
   summary.demandWh +=
     (t.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS * tickScale;
+  if (campaignMeters) {
+    const representedHours = (GAME_TO_REAL_YEARS * tickScale) / TICKS_PER_HOUR;
+    if (t.rebateEligibleW === undefined || t.efficiencySavedW === undefined) {
+      // An imported old timeline cannot reconstruct its pre-program counterfactual. Once any
+      // tick is missing, keep the whole month's efficiency observation absent.
+      delete summary.efficiencySavedWh;
+      delete summary.efficiencyEligibleWh;
+    } else if (
+      summary.efficiencySavedWh !== undefined &&
+      summary.efficiencyEligibleWh !== undefined
+    ) {
+      summary.efficiencySavedWh += t.efficiencySavedW * representedHours;
+      summary.efficiencyEligibleWh += t.rebateEligibleW * representedHours;
+    }
+    const minuteOfDay = ((t.minute % 1440) + 1440) % 1440;
+    if (minuteOfDay >= 17 * 60 && minuteOfDay < 21 * 60) {
+      summary.eveningDemandWh! += t.demandW * representedHours;
+      summary.eveningUnservedWh! +=
+        Math.max(0, t.demandW - t.supplyW) * representedHours;
+    }
+  }
   // Dispatch can briefly oversupply while a minimum-load plant ramps. Attribute only the share
   // that demand accepted, so fuel totals describe delivered energy and never claim the curtailed
   // excess. Storage is deliberately absent because it is not a fuel.
@@ -285,8 +318,9 @@ export function summarizeTimeline(
   timeline: TickPresentFutureType[],
   startingYear: number,
   filter?: (t: TickPresentFutureType) => boolean,
+  campaignMeters = false,
 ): MonthlyHistoryType {
-  const summary = emptyHistory();
+  const summary = emptyHistory(campaignMeters);
   const tickScale =
     timeline.length > 1
       ? Math.max(1, (timeline[1].minute - timeline[0].minute) / TICK_MINUTES)
@@ -297,7 +331,7 @@ export function summarizeTimeline(
   for (let i = 0; i < timeline.length; i++) {
     const t = timeline[i];
     if (!filter || filter(t)) {
-      accumulateTick(summary, t, startingYear, tickScale);
+      accumulateTick(summary, t, startingYear, tickScale, campaignMeters);
     }
   }
   return summary;
@@ -315,6 +349,7 @@ export function summarizeTimeline(
 export function summarizeTimelineByMonth(
   timeline: TickPresentFutureType[],
   startingYear: number,
+  campaignMeters = false,
 ): MonthlyHistoryType[] {
   const byMonth = new Map<number, MonthlyHistoryType>();
   const tickScale =
@@ -331,10 +366,10 @@ export function summarizeTimelineByMonth(
     const month = Math.floor(t.minute / MINUTES_PER_MONTH);
     let summary = byMonth.get(month);
     if (!summary) {
-      summary = emptyHistory();
+      summary = emptyHistory(campaignMeters);
       byMonth.set(month, summary);
     }
-    accumulateTick(summary, t, startingYear, tickScale);
+    accumulateTick(summary, t, startingYear, tickScale, campaignMeters);
   }
   return [...byMonth.keys()]
     .sort((a, b) => a - b)

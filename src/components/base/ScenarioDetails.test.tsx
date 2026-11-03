@@ -8,6 +8,42 @@ import * as DeferredProjection from "./DeferredProjection";
 
 afterEach(() => jest.restoreAllMocks());
 
+it("keeps the successor's scenario forecast open after the first 240 months", () => {
+  const first = createGame({ scenarioId: 117 });
+  const offset = 240 * DateTime.MINUTES_PER_MONTH;
+  const game = {
+    ...first,
+    scenarioId: 118,
+    date: DateTime.getDateFromMinute(offset, first.startingYear),
+    campaign: { ...first.campaign!, generationIndex: 1, termStartMonth: 240 },
+    timeline: first.timeline.map((tick) => ({
+      ...tick,
+      minute: tick.minute + offset,
+    })),
+    monthlyHistory: [],
+  };
+  const originalWorker = global.Worker;
+  global.Worker = jest.fn() as unknown as typeof Worker;
+  jest.spyOn(DeferredProjection, "projectionReady").mockReturnValue(false);
+  jest
+    .spyOn(DeferredProjection, "requestProjection")
+    .mockImplementation(() => undefined);
+  try {
+    renderDetails(game);
+    const outlook = screen.getByRole("region", { name: "Score outlook" });
+    expect(outlook).toHaveTextContent("Score now");
+    expect(outlook).toHaveTextContent("Projected final");
+    expect(
+      screen.getByRole("status", { name: "Scenario forecast" }),
+    ).toHaveTextContent("Updating forecast");
+    expect(screen.getByRole("region", { name: "Goals" })).toHaveTextContent(
+      "1921",
+    );
+  } finally {
+    global.Worker = originalWorker;
+  }
+});
+
 function renderDetails(game = createGame({ scenarioId: 103 })) {
   return render(
     <ScenarioDetailsContent game={game} scenario={activeScenario(game)!} />,

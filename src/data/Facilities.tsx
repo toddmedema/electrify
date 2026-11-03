@@ -14,6 +14,7 @@ import { getCostTableDeflator, getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
 import { costBetween } from "../helpers/Math";
 import { facilityModifier, modScaledValue } from "../helpers/ScenarioMod";
+import { applyLegacyGeneratorEra, applyLegacyStorageEra } from "./LegacyEra";
 import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
 import {
   getAirborneWindCapacityFactor,
@@ -810,6 +811,7 @@ export function GENERATORS(
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
   generators = generators.filter((g: GeneratorShoppingType) => {
+    applyLegacyGeneratorEra(state, g);
     const mod = facilityModifier(state, g.name);
     g.buildCost = modScaledValue(
       g.buildCost,
@@ -981,6 +983,7 @@ export function STORAGE(state: GameType, peakWh: number) {
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
   storage = storage.filter((g: StorageShoppingType) => {
+    applyLegacyStorageEra(state, g);
     const mod = facilityModifier(state, g.name);
     g.buildCost = modScaledValue(
       g.buildCost,

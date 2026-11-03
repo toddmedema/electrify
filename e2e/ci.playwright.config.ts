@@ -30,6 +30,7 @@ const layout = [
   "chart-touch.spec.ts",
   "insights-expanded-chart.spec.ts",
   "build-generator-loading.spec.ts",
+  "campaign.spec.ts",
   "sign-in.spec.ts",
   "learning-pages.spec.ts",
   "ui-chart-build-polish.spec.ts",

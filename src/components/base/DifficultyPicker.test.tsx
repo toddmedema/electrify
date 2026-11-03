@@ -52,6 +52,20 @@ describe("DifficultyPicker", () => {
     expect(screen.getByText("Hard")).toBeInTheDocument();
     expect(screen.queryByText("VP")).not.toBeInTheDocument();
   });
+
+  it("exposes each selectable option by its visible difficulty label", () => {
+    const onChange = jest.fn();
+    render(
+      <DifficultyPicker
+        variant="select"
+        value="Employee"
+        onChange={onChange}
+      />,
+    );
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "Difficulty" }));
+    fireEvent.click(screen.getByRole("option", { name: "Medium" }));
+    expect(onChange).toHaveBeenCalledWith("Manager");
+  });
 });
 
 it("explains tapped and focused locks without selecting them, then reacts to an unlock", () => {

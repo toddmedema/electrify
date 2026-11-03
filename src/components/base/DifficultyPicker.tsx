@@ -106,6 +106,9 @@ export default function DifficultyPicker({
               value={d}
               key={d}
               aria-disabled={!!lockReason(d)}
+              aria-describedby={
+                lockReason(d) ? `${descriptionId}-${d}` : undefined
+              }
               aria-label={
                 lockReason(d)
                   ? `${DIFFICULTY_LABELS[d]}, locked`

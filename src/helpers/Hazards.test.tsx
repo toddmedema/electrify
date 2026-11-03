@@ -14,6 +14,7 @@ import {
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { randomAt, RANDOM_STREAM } from "./Math";
 import { storyHash } from "../data/WorldEvents";
+import { getWeather, initWeatherFromRows } from "../data/Weather";
 import {
   applyDefaultResilience,
   COLD_DEFINITION_ID,
@@ -239,6 +240,39 @@ describe("representativeMinTempC", () => {
     const date = getDateFromMinute(0, 2020);
     const base = representativeMinTempC(date, 1);
     expect(representativeMinTempC(date, 1, -6)).toBeCloseTo(base - 6, 9);
+  });
+
+  it("uses modeled weather only when the campaign opts in", () => {
+    initWeatherFromRows(
+      "cold-campaign",
+      Array.from({ length: 40 * 12 * 24 }, (_, index) => ({
+        YEAR: 1980 + Math.floor(index / (12 * 24)),
+        MONTH: (Math.floor(index / 24) % 12) + 1,
+        TEMP_C: -10 - (index % 24),
+        CLOUD_PCT: 50,
+        WIND_KPH: 12,
+        PRECIP_MM: 1,
+      })),
+    );
+    const date = getDateFromMinute(
+      (1979 - 1882) * 12 * MINUTES_PER_MONTH,
+      1882,
+    );
+    const coldest = Math.min(
+      ...Array.from(
+        { length: 24 },
+        (_, hour) =>
+          getWeather(
+            { ...date, hourOfDay: hour, minuteOfDay: hour * 60 },
+            1,
+            0,
+            undefined,
+            true,
+          ).TEMP_C,
+      ),
+    );
+    expect(representativeMinTempC(date, 1)).toBe(0);
+    expect(representativeMinTempC(date, 1, -6, true)).toBe(coldest - 6);
   });
 });
 

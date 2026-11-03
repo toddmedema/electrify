@@ -4,7 +4,7 @@ import { startTutorial } from "../../reducers/Game";
 import { quitSavedGame, runSaveTransition } from "../../SaveSession";
 import { delta as uiDelta } from "../../reducers/UI";
 import { navigate } from "../../reducers/Card";
-import { scenarioDetailsUrl } from "../../ScenarioUrl";
+import { campaignSetupUrl, scenarioDetailsUrl } from "../../ScenarioUrl";
 import { AppStateType, GameType } from "../../Types";
 import NewGame, { DispatchProps, StateProps } from "./NewGame";
 import { coopControls } from "../../multiplayer/Registry";
@@ -30,6 +30,10 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onCustomGame: () => {
       if (!guest()) dispatch(navigate("CUSTOM_GAME"));
+    },
+    onCampaign: () => {
+      if (!coop())
+        dispatch(navigate({ name: "CAMPAIGN", url: campaignSetupUrl() }));
     },
     onCommunityScenarios:
       process.env.REACT_APP_DESKTOP === "true" && getDesktop()?.mods

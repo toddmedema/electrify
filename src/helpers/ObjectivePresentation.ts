@@ -1,58 +1,64 @@
-import { formatNumber } from "./Format";
+import { formatNumber, getWattUnit } from "./Format";
+import { roundToSignificantDigits } from "./Math";
 import type { CompiledRuleObjective } from "../data/ScenarioRules";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import { MONTHS } from "../Constants";
 import { objectiveTarget } from "./ScenarioObjectives";
 
-const number = (
-  value: number,
-  comparison?: number,
-  percent = false,
-): string => {
-  const rounded = Number(value.toPrecision(6));
-  const compared =
-    comparison === undefined ? undefined : Number(comparison.toPrecision(6));
-  // Keep a measured value on its actual side of a nearby target.
-  const precise = comparison === undefined || rounded === compared;
-  // A reading beside a whole-percent target needs no decimals, unless they decide the verdict.
-  if (percent && comparison !== undefined && !precise) {
-    const whole = Math.round(value * 100);
-    const target = Number((comparison * 100).toPrecision(6));
-    const roundedMeets = whole >= target;
-    const actualMeets = value * 100 >= target;
-    const sameSide = roundedMeets === actualMeets;
-    if (Number.isInteger(target) && sameSide && whole !== target)
-      return formatNumber(whole / 100, { style: "percent" });
-  }
-  return formatNumber(precise ? value : rounded, {
-    maximumSignificantDigits: precise ? 21 : 6,
-    ...(percent ? { style: "percent" } : {}),
-  });
-};
+const number = (value: number, percent = false): string =>
+  formatNumber(roundToSignificantDigits(value, 3), {
+    notation: "compact",
+    maximumSignificantDigits: 3,
+    useGrouping: false,
+    ...(percent ? { style: "percent" as const } : {}),
+  }).replace(/K\b/g, "k");
 
+/** Keep close readings honest without exposing hidden decimal precision. */
 export function objectiveValueText(
   objective: CompiledRuleObjective,
   value: number,
   comparison?: number,
 ): string {
+  const text = objectiveAmountText(objective, value);
+  return comparison !== undefined &&
+    value !== comparison &&
+    text === objectiveAmountText(objective, comparison)
+    ? `${text} (${value < comparison ? "below" : "above"} goal)`
+    : text;
+}
+
+function objectiveAmountText(
+  objective: CompiledRuleObjective,
+  value: number,
+): string {
   switch (objective.metric) {
     case "customerRetention":
     case "localFuelShare":
-      return number(value, comparison, true);
+    case "efficiencySavings":
+    case "demandServedShare":
+      return number(value, true);
+    case "financialCoverage":
+      return `${number(value)}× operating costs`;
+    case "customerCount":
+      return `${number(value)} customers`;
+    case "reserveMargin": {
+      const unit = getWattUnit(roundToSignificantDigits(value, 3));
+      return `${number(value / unit.divisor)}${unit.suffix}W reserve`;
+    }
     case "emissionsBudget":
-      return `${number(value / 1000, comparison === undefined ? undefined : comparison / 1000)} tonnes CO₂e`;
+      return `${number(value / 1000)} tonnes CO₂e`;
     case "emissionsPerDeliveredMWh":
-      return `${number(value, comparison)} kg CO₂e / delivered MWh`;
+      return `${number(value)} kg CO₂e/MWh`;
     case "monthlyBilledRate":
-      return `$${number(value, comparison)}/kWh`;
+      return `$${number(value)}/kWh`;
     case "monthEndDebt":
-      return `$${number(value, comparison)} principal`;
+      return `$${number(value)}`;
     case "utilityOwnership":
       return `${number(value)} acquired ${value === 1 ? "utility" : "utilities"}`;
     case "assetRetirement":
       return `${number(value)} original oil ${value === 1 ? "asset" : "assets"}`;
     case "fuelRetirement":
-      return `${number(value)} owned ${objective.fuel} ${value === 1 ? "asset" : "assets"}`;
+      return `${number(value)} owned ${objective.fuel} ${value === 1 ? "asset" : "assets"}${objective.commissionedBeforeYear === undefined ? "" : ` commissioned before ${objective.commissionedBeforeYear}`}`;
   }
 }
 
@@ -75,6 +81,8 @@ export function objectiveWindowText(
   if (first === last) return monthText(first, startingYear);
   if (first % 12 === 0 && last === first + 11)
     return `${startingYear + Math.floor(first / 12)}`;
+  if (first % 12 === 0 && last % 12 === 11)
+    return `${startingYear + Math.floor(first / 12)}–${startingYear + Math.floor(last / 12)}`;
   if (Math.floor(first / 12) === Math.floor(last / 12))
     return `${MONTHS[first % 12]}–${MONTHS[last % 12]} ${startingYear + Math.floor(first / 12)}`;
   return `${monthText(first, startingYear)}–${monthText(last, startingYear)}`;
@@ -97,6 +105,18 @@ export function objectiveTargetText(objective: CompiledRuleObjective): string {
       return `Bills ≤${target} each month`;
     case "monthEndDebt":
       return `Month-close debt ≤${target}`;
+    case "financialCoverage":
+      return objective.basis === "cash"
+        ? `Closing cash ≥${target} each month`
+        : `Revenue ≥${target} over the window`;
+    case "customerCount":
+      return `Reach ≥${target}`;
+    case "reserveMargin":
+      return `Keep ≥${target} each month`;
+    case "efficiencySavings":
+      return `Save ≥${target} of eligible energy`;
+    case "demandServedShare":
+      return `Serve ≥${target} of demand each month${objective.hours ? " · 17:00–21:00" : ""}`;
     default:
       return `≤${target}`;
   }
@@ -116,7 +136,8 @@ export function objectiveGoalText(
   durationMonths: number,
 ): string {
   const window = objectiveWindowText(objective, startingYear, durationMonths);
-  return objective.metric === "customerRetention"
+  return objective.metric === "customerRetention" ||
+    objective.metric === "customerCount"
     ? `${objectiveTargetText(objective)} by ${window}`
     : `${objectiveTargetText(objective)} · ${window}`;
 }
@@ -127,7 +148,9 @@ export function objectiveDefinitionText(
 ): string {
   return result.metric === "customerRetention"
     ? "Customers kept, as a share of your recorded customer baseline."
-    : result.definition;
+    : result.metric === "emissionsPerDeliveredMWh"
+      ? "Emissions, including imports, exports and construction, per MWh."
+      : result.definition;
 }
 
 export function objectiveObservedText(result: ObjectiveResult): string {
@@ -146,14 +169,24 @@ export function objectiveObservedText(result: ObjectiveResult): string {
     result.target,
   );
   const live = result.status === "pending" || result.status === "inProgress";
-  if (result.metric === "customerRetention" && live) return `${value} now`;
+  if (
+    (result.metric === "customerRetention" ||
+      result.metric === "customerCount") &&
+    live
+  )
+    return `${value} now`;
   const label =
-    result.metric === "customerRetention"
+    result.metric === "customerRetention" || result.metric === "customerCount"
       ? "Latest month close "
       : result.metric === "monthlyBilledRate" ||
           result.metric === "monthEndDebt"
         ? "Highest "
-        : "";
+        : result.metric === "reserveMargin" ||
+            result.metric === "demandServedShare" ||
+            (result.objective.metric === "financialCoverage" &&
+              result.objective.basis === "cash")
+          ? "Lowest "
+          : "";
   return `${label}${value}${months ? ` · ${months}` : ""}${result.status === "unverifiable" ? " · not verifiable" : ""}`;
 }
 

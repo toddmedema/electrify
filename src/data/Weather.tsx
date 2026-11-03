@@ -9,9 +9,8 @@ import { simulationDataRequest } from "../helpers/SimulationDataIntegrity";
 import { pow } from "../helpers/Pow";
 import { exp } from "../helpers/Libm";
 
-// The first year any location has data for, Jan 1st. Everything after the recorded years is
-// forecast indefinitely, but nothing exists to run backwards from, so this is the floor on when a
-// game may start -- which is why the custom game screen builds its year list off it.
+// The first recorded year. Ordinary custom games still build their year list from this floor.
+// Earlier trusted campaign dates use a labeled seeded bootstrap of the recorded climate below.
 export const WEATHER_STARTING_YEAR = 1980;
 const STARTING_YEAR = WEATHER_STARTING_YEAR; // assumed to be the same for all locations
 // Keep the simulation's calibrated historical window stable even when shipped binaries include
@@ -418,6 +417,7 @@ export function getWeather(
   seed: number,
   _cumulativeMegatons = 0,
   seriesId?: string,
+  modeledPast = false,
 ): RawWeatherType {
   // A custom location generally has no separate basin, so callers may request its own id. If a
   // curated watershed was not loaded, falling back to the primary series is safer than returning
@@ -426,16 +426,32 @@ export function getWeather(
   if (!series) {
     return DUMMY_WEATHER;
   }
-  const weather = series.weather;
+  const beforeRecord = date.year < STARTING_YEAR;
+  // Ordinary 1980 hydrology reads a two-year lookback; preserve its empty pre-record history.
+  // Only a trusted campaign caller opts into the modeled nineteenth-century climate.
+  if (beforeRecord && !modeledPast) return DUMMY_WEATHER;
+  const weather = beforeRecord ? series.recordedRows : series.weather;
   const minuteOfHour = date.minuteOfDay % 60;
+  // Bootstrap one complete recorded year for each early synthetic year. The same seed/year draw
+  // is used for city and watershed, retaining geographical and wet/dry-year coherence. Negative
+  // weatherShape coordinates are disjoint from the existing future day's nonnegative draws.
+  // This is a climate proxy, not a reconstruction of weather in 1882–1979.
+  const weatherYear = beforeRecord
+    ? STARTING_YEAR +
+      Math.floor(
+        randomAt(seed, RANDOM_STREAM.weatherShape, date.year - STARTING_YEAR) *
+          Math.floor(series.recordedRows.length / ROWS_PER_YEAR),
+      )
+    : date.year;
   const dayIndex =
-    (date.year - STARTING_YEAR) * DAYS_PER_YEAR +
+    (weatherYear - STARTING_YEAR) * DAYS_PER_YEAR +
     (date.monthNumber - 1) * DAYS_PER_MONTH; // Only one day per month is simulated
   const row = dayIndex * ROWS_PER_DAY + date.hourOfDay;
-  const nextRow = row + 1;
+  const nextRow = beforeRecord ? (row + 1) % weather.length : row + 1;
 
   // Forecast whatever is missing, including the next row's day when blending across midnight
-  forecastThroughDay(series, seed, Math.floor(nextRow / ROWS_PER_DAY));
+  if (!beforeRecord)
+    forecastThroughDay(series, seed, Math.floor(nextRow / ROWS_PER_DAY));
 
   if (!weather[row] || !weather[nextRow]) {
     return weather[row] || DUMMY_WEATHER;
@@ -450,7 +466,7 @@ export function getWeather(
   const prevPerc = 1 - nextPerc;
   const blended: RawWeatherType = {
     // The blended reading is stamped with the hour it starts in, not the one it is heading towards
-    YEAR: prev.YEAR,
+    YEAR: beforeRecord ? date.year : prev.YEAR,
     MONTH: prev.MONTH,
     TEMP_C: prev.TEMP_C * prevPerc + next.TEMP_C * nextPerc,
     CLOUD_PCT: prev.CLOUD_PCT * prevPerc + next.CLOUD_PCT * nextPerc,

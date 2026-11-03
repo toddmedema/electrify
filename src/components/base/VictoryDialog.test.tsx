@@ -73,6 +73,26 @@ beforeEach(() => {
 });
 
 describe("VictoryDialog", () => {
+  it("makes a campaign restart explicit and keeps it outside the leaderboard", async () => {
+    const onRetry = jest.fn();
+    const victory = aVictory({
+      scenarioId: 122,
+      scenarioName: "The Price of Power",
+      outcome: "bankrupt",
+    });
+    renderDialog({ victory, onRetry });
+    expect(
+      screen.getByText("Restarting begins a new campaign in 1882."),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "Result leaderboard" }),
+    ).not.toBeInTheDocument();
+    expect(mockFetchGlobalRank).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Restart campaign" }),
+    );
+    expect(onRetry).toHaveBeenCalledWith(victory);
+  });
   it.each([
     ["completed", true],
     ["bankrupt", false],

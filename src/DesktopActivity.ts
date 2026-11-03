@@ -4,7 +4,8 @@ import type {
   DesktopBridge,
   DesktopTimelineEvent,
 } from "./Desktop";
-import { SCENARIOS } from "./data/Scenarios";
+import { getScenario } from "./data/Scenarios";
+import { legacyCompletedMonths } from "./helpers/LegacyCampaign";
 import type { GameEventType } from "./Types";
 
 type ActivityStore = Pick<AppStore, "getState" | "subscribe">;
@@ -23,12 +24,12 @@ export function desktopActivity(state: RootState): DesktopActivity {
     : !game.inGame || card.name === "MAIN_MENU"
       ? "menu"
       : game.speed === "PAUSED" ||
-          ["SETTINGS", "MANUAL", "MODS"].includes(card.name)
+          ["SETTINGS", "MANUAL", "MODS", "CAMPAIGN"].includes(card.name)
         ? "paused"
         : "playing";
   if (phase === "menu") return { phase, timelineEnabled };
   const scenarioId = ui.victory?.scenarioId ?? game.scenarioId;
-  const scenario = SCENARIOS.find(({ id }) => id === scenarioId);
+  const scenario = getScenario(scenarioId, game.customScenario);
   const durationMonths =
     scenario?.durationMonths ?? game.customScenario?.durationMonths ?? 12;
   const totalYears = Math.min(
@@ -43,7 +44,7 @@ export function desktopActivity(state: RootState): DesktopActivity {
     Math.max(
       1,
       Number.isFinite(game.date.monthsElapsed)
-        ? Math.floor(game.date.monthsElapsed / 12) + 1
+        ? Math.floor(legacyCompletedMonths(game) / 12) + 1
         : 1,
     ),
   );
