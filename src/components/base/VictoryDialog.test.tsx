@@ -73,6 +73,22 @@ beforeEach(() => {
 });
 
 describe("VictoryDialog", () => {
+  it.each([
+    ["completed", true],
+    ["bankrupt", false],
+    ["fired", false],
+    [undefined, false],
+  ] as const)(
+    "only offers result sharing after a win (%s)",
+    (outcome, shareExpected) => {
+      renderDialog({ victory: aVictory({ outcome }) });
+      const share = screen.queryByRole("button", {
+        name: /Share result|Challenge a friend/,
+      });
+      expect(share !== null).toBe(shareExpected);
+    },
+  );
+
   it.each([false, true])(
     "passes mailing-list choice %s from the result invitation",
     async (mailingList) => {

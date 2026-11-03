@@ -110,6 +110,11 @@ describe("ending a scenario from inside the reducer", () => {
     expect(victory?.scenarioName).toBe("A Test Run");
     expect(state.meaningfulDecisions).toEqual([]);
     expect(victory?.outcome).toBe("completed");
+    expect(victory?.debrief?.scenarioMetrics).toContainEqual({
+      concept: "time",
+      label: "tenure",
+      value: "2 months",
+    });
     expect(Object.keys(victory?.breakdown || {}).length).toBeGreaterThan(0);
     expect(victory?.debrief).toEqual(
       expect.objectContaining({
@@ -214,6 +219,12 @@ describe("ending a scenario from inside the reducer", () => {
       }),
     );
     expect(victory?.debrief?.finalCustomers).toEqual(expect.any(Number));
+    expect(victory?.debrief?.scenarioMetrics).toContainEqual({
+      concept: "time",
+      label: "tenure",
+      value: "1 month",
+    });
+    expect(victory?.endMessage).not.toContain("You survived");
     expect(submitHighscore).not.toHaveBeenCalled();
   });
 
