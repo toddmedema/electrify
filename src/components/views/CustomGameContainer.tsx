@@ -1,3 +1,10 @@
+import { useUnlockedDifficulty } from "../../achievements/useAchievements";
+import { achievementJournal } from "../../achievements/Journal";
+import {
+  playableDifficulty,
+  unlockedDifficulty,
+} from "../../achievements/DifficultyUnlocks";
+import type { DifficultyType } from "../../Types";
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import {
@@ -17,9 +24,28 @@ import { AppStateType, GameType, ScenarioType } from "../../Types";
 import CustomGame, { DispatchProps, StateProps } from "./CustomGame";
 import { coopControls } from "../../multiplayer/Registry";
 
+const difficultyAllowed = (difficulty: DifficultyType) =>
+  playableDifficulty(
+    difficulty,
+    unlockedDifficulty(achievementJournal.getSnapshot().progress),
+  ) === difficulty;
+const selectedDifficulty = () =>
+  playableDifficulty(
+    store.getState().ui.previewDifficulty ?? store.getState().game.difficulty,
+    unlockedDifficulty(achievementJournal.getSnapshot().progress),
+  );
+
+// Co-op guests follow the host's selection.
 const coopRole = () => store.getState().ui.coop?.role;
 
-export const mapStateToProps = (state: AppStateType): StateProps => {
+export const mapStateToProps = (
+  state: AppStateType,
+  ownProps: { unlockedThrough: DifficultyType } = {
+    unlockedThrough: unlockedDifficulty(
+      achievementJournal.getSnapshot().progress,
+    ),
+  },
+): StateProps => {
   const coop = state.ui.coop;
   // A co-op guest sees the host's setup rather than the one it played last.
   // A modded run is not a setup to tweak: its rules belong to the mod, so fall back to the
@@ -34,9 +60,16 @@ export const mapStateToProps = (state: AppStateType): StateProps => {
   const eventId = customEventFromSearch(window.location.search);
   return {
     coop,
+    unlockedThrough: ownProps.unlockedThrough,
     game: {
       ...state.game,
-      difficulty: state.ui.previewDifficulty ?? state.game.difficulty,
+      difficulty:
+        state.ui.coop?.role === "guest"
+          ? (state.ui.previewDifficulty ?? state.game.difficulty)
+          : playableDifficulty(
+              state.ui.previewDifficulty ?? state.game.difficulty,
+              ownProps.unlockedThrough,
+            ),
     },
     // The game the player set up last time, so tweaking one setting and starting again doesn't mean
     // re-entering all of them
@@ -62,6 +95,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onDelta: (d: Partial<GameType>) => {
       if (coopRole() === "guest") return;
+      if (d.difficulty && !difficultyAllowed(d.difficulty)) return;
       dispatch(uiDelta({ previewDifficulty: d.difficulty }));
     },
     onScenarioChange: (custom: ScenarioType) => {
@@ -77,9 +111,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           recordCustomScenario(scenario);
           coopControls()?.start({
             scenarioId: CUSTOM_SCENARIO_ID,
-            difficulty:
-              store.getState().ui.previewDifficulty ??
-              store.getState().game.difficulty,
+            difficulty: selectedDifficulty(),
             customScenario: scenario,
           });
         }
@@ -90,18 +122,19 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         if (customEventFromSearch(window.location.search) !== undefined) {
           getHistoryApi().replaceState(null, "", scenarioListUrl());
         }
-        const difficulty =
-          store.getState().ui.previewDifficulty ??
-          store.getState().game.difficulty;
+        const difficulty = selectedDifficulty();
         launchCustomScenario(dispatch, scenario, difficulty);
       });
     },
   };
 };
 
-const CustomGameContainer = connect(
+const ConnectedCustomGame = connect(
   mapStateToProps,
   mapDispatchToProps,
 )(CustomGame);
 
-export default CustomGameContainer;
+export default function CustomGameContainer() {
+  const unlockedThrough = useUnlockedDifficulty();
+  return <ConnectedCustomGame unlockedThrough={unlockedThrough} />;
+}

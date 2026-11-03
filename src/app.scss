@@ -2594,9 +2594,15 @@ $pane_header_height: 48px;
   .MuiToggleButton-root {
     min-width: 0;
     flex: 1;
+    gap: 4px;
     padding: 4px 8px;
     font-size: var(--font-size-caption);
     line-height: 1.25;
+  }
+
+  .difficultyLocked.MuiToggleButton-root {
+    color: var(--font-color-faded);
+    background: var(--bg-raised);
   }
 
   .difficultyDescription {
@@ -2723,6 +2729,7 @@ $pane_header_height: 48px;
   }
 
   .difficultyPicker .MuiToggleButton-root {
+    flex-direction: column;
     padding-inline: 2px;
   }
 }

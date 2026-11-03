@@ -1,3 +1,4 @@
+import { unlockAllDifficulties } from "./difficulty-fixture";
 import path from "path";
 import { expect, test, Page } from "./fixtures";
 import manifest from "../src/data/RunCompatibility.json";
@@ -26,6 +27,7 @@ async function savedGame(page: Page) {
   return (await readSavedGame(page))!;
 }
 test.beforeEach(async ({ page }) => {
+  await unlockAllDifficulties(page);
   await page.addInitScript(() => {
     localStorage.setItem("audioEnabled", "false");
   });

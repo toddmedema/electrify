@@ -1,3 +1,5 @@
+import { useUnlockedDifficulty } from "../../achievements/useAchievements";
+import { playableDifficulty } from "../../achievements/DifficultyUnlocks";
 import * as React from "react";
 import {
   Alert,
@@ -100,8 +102,12 @@ export default function Mods(): React.JSX.Element {
 function ModsLibrary(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const coop = useAppSelector((state) => state.ui.coop);
-  const chosenDifficulty = useAppSelector(
-    (state) => state.ui.previewDifficulty ?? state.game.difficulty,
+  const unlockedThrough = useUnlockedDifficulty();
+  const chosenDifficulty = playableDifficulty(
+    useAppSelector(
+      (state) => state.ui.previewDifficulty ?? state.game.difficulty,
+    ),
+    unlockedThrough,
   );
   const steam = useDesktopState()?.steam;
   const steamOnline = !!steam?.online;
@@ -132,8 +138,9 @@ function ModsLibrary(): React.JSX.Element {
   const [authoring, setAuthoring] = React.useState<InstalledMod>();
   const [authorDifficulty, setAuthorDifficulty] =
     React.useState<DifficultyType>("Employee");
-  const [difficulty, setDifficulty] =
+  const [requestedDifficulty, setDifficulty] =
     React.useState<DifficultyType>(chosenDifficulty);
+  const difficulty = playableDifficulty(requestedDifficulty, unlockedThrough);
   const [focusTarget, setFocusTarget] = React.useState<string>();
   const removeCancel = React.useRef<HTMLButtonElement>(null);
   const publishCancel = React.useRef<HTMLButtonElement>(null);
@@ -1081,6 +1088,7 @@ function ModsLibrary(): React.JSX.Element {
               variant="toggle"
               value={difficulty}
               onChange={setDifficulty}
+              unlockedThrough={unlockedThrough}
               showDescription
             />
           </Box>

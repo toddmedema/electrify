@@ -1,3 +1,4 @@
+import { achievementJournal } from "../../achievements/Journal";
 import { modScenario } from "../../mods/ModScenario";
 import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
 import { getCustomScenario, recordCustomScenario } from "../../LocalStorage";
@@ -37,7 +38,10 @@ const state = (customScenario?: ScenarioType) =>
     game: { difficulty: "Manager", customScenario },
   }) as unknown as AppStateType;
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  achievementJournal.refresh();
+});
 
 test("a running mod never seeds or leaks into the custom game setup", () => {
   recordCustomScenario(setup);
@@ -55,7 +59,7 @@ test("starting or remembering a custom game strips any mod effects", () => {
     .calls[0];
   expect(started.mod).toBeUndefined();
   expect(started.name).toBe("Community Grid");
-  expect(difficulty).toBe("Manager");
+  expect(difficulty).toBe("Intern");
   expect(getCustomScenario(DEFAULT_CUSTOM_SCENARIO).mod).toBeUndefined();
   // Stored mod snapshots are stripped from ordinary custom setup on read.
   localStorage.setItem("customGame", JSON.stringify(modded));

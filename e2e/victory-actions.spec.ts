@@ -1,3 +1,4 @@
+import { unlockAllDifficulties } from "./difficulty-fixture";
 import { openPane } from "./layout";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
@@ -560,4 +561,8 @@ test("shared reliability rule ends the run at the third completed month", async 
   await expect(
     page.getByRole("button", { name: "Continue", exact: true }),
   ).toHaveCount(0);
+});
+
+test.beforeEach(async ({ page }) => {
+  await unlockAllDifficulties(page);
 });

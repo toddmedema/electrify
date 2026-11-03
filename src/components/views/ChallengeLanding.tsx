@@ -1,3 +1,9 @@
+import { useUnlockedDifficulty } from "../../achievements/useAchievements";
+import {
+  unlockedDifficulty,
+  difficultyLockReason,
+} from "../../achievements/DifficultyUnlocks";
+import { achievementJournal } from "../../achievements/Journal";
 import { Button, Stack, Typography } from "@mui/material";
 import ScreenPage from "../base/ScreenPage";
 import { store, useAppSelector } from "../../Store";
@@ -14,6 +20,7 @@ import { startWithSaveGuard } from "./StartGame";
 import NewGameDetails from "./NewGameDetails";
 
 export default function ChallengeLanding() {
+  const unlockedThrough = useUnlockedDifficulty();
   const href = useAppSelector((s) => s.ui.challengeHref);
   const game = useAppSelector((s) => s.game);
   const route = parseChallengeUrl(href || window.location.href);
@@ -84,11 +91,19 @@ export default function ChallengeLanding() {
         difficulty: invitation.run.difficulty,
       }}
       challenge={invitation}
+      unlockedThrough={unlockedThrough}
       onContinue={saved || game.inGame ? continueGame : undefined}
       onBack={leave}
       onDelta={() => undefined}
       onStart={() =>
         startWithSaveGuard(store.dispatch, () => {
+          if (
+            difficultyLockReason(
+              invitation.run.difficulty,
+              unlockedDifficulty(achievementJournal.getSnapshot().progress),
+            )
+          )
+            return;
           const identity = expandAuthoredRunReference(invitation.run);
           if (!identity) return;
           logEvent("challenge_accept", { scenarioId: identity.scenarioId });

@@ -1,3 +1,4 @@
+import { unlockedDifficulty } from "./DifficultyUnlocks";
 import cloneDeep from "lodash.clonedeep";
 import { store, RootState } from "../Store";
 import { createGame } from "../testing/Simulator";
@@ -236,5 +237,27 @@ test("awards earned during an upload drain afterward; a failed upload offers a r
   expect(merge).toHaveBeenCalledTimes(3);
   expect(f.journal.getSnapshot().progress.earned).toEqual(["OUT_OF_JUICE"]);
   expect(f.journal.getSnapshot().sync).toBe("synced");
+  stop();
+});
+
+test("only a live completed scenario unlocks the next difficulty and keeps it after restart", () => {
+  const f = fixture();
+  const stop = startAchievementServices(f.observer, f.journal);
+  f.publish({ inGame: true });
+  const progress = f.game().desktopAchievements!;
+  f.publish({ desktopAchievements: { ...progress, earned: ["OUT_OF_JUICE"] } });
+  expect(unlockedDifficulty(f.journal.getSnapshot().progress)).toBe("Intern");
+  f.publish({
+    desktopAchievements: {
+      ...progress,
+      completion: { scenarioId: 101, difficulty: "Intern" },
+    },
+  });
+  expect(unlockedDifficulty(f.journal.getSnapshot().progress)).toBe("Employee");
+  expect(
+    unlockedDifficulty(
+      new AchievementJournal(f.storage).getSnapshot().progress,
+    ),
+  ).toBe("Employee");
   stop();
 });

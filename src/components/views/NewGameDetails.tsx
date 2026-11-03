@@ -1,3 +1,5 @@
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import { difficultyLockReason } from "../../achievements/DifficultyUnlocks";
 import { activeScenario } from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
@@ -55,6 +57,7 @@ export interface StateProps {
   challenge?: ChallengeInvitation;
   onContinue?: () => void;
   game: GameType;
+  unlockedThrough?: DifficultyType;
   uid?: string;
   /** Choosing with a co-op lobby: the host starts for everyone; guests mark Ready. */
   coop?: CoopSelectionType;
@@ -442,6 +445,10 @@ export default class NewGameDetails extends React.Component<Props, State> {
       );
     }
 
+    const challengeLock =
+      challenge && this.props.unlockedThrough
+        ? difficultyLockReason(game.difficulty, this.props.unlockedThrough)
+        : undefined;
     const endYear =
       scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
     // The selected difficulty's board and best come straight from what was read up front
@@ -530,8 +537,22 @@ export default class NewGameDetails extends React.Component<Props, State> {
                       value={game.difficulty}
                       onChange={(difficulty) => onDelta({ difficulty })}
                       readOnly={coop?.role === "guest"}
+                      unlockedThrough={this.props.unlockedThrough}
                     />
                   </div>
+                )}
+                {challengeLock && (
+                  <Typography
+                    role="status"
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    <LockOutlinedIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", mr: 0.5 }}
+                    />
+                    {challengeLock}
+                  </Typography>
                 )}
                 {this.props.challenge && (
                   <Typography variant="body2" color="text.secondary">
@@ -551,7 +572,10 @@ export default class NewGameDetails extends React.Component<Props, State> {
                     variant="contained"
                     color="primary"
                     onClick={() => onStart(scenario.id)}
-                    startIcon={<PlayCircleIcon />}
+                    disabled={!!challengeLock}
+                    startIcon={
+                      challengeLock ? <LockOutlinedIcon /> : <PlayCircleIcon />
+                    }
                   >
                     {challenge ? "Start challenge" : "Start game"}
                   </Button>

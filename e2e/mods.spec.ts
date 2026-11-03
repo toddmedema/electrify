@@ -1,3 +1,4 @@
+import { unlockAllDifficulties } from "./difficulty-fixture";
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -2013,3 +2014,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(report).toBeHidden();
   });
 }
+
+test.beforeEach(async ({ page }) => {
+  await unlockAllDifficulties(page);
+});
