@@ -257,7 +257,8 @@ for (const { theme, native, currentRank } of [
     const popup = page.locator(".achievementToastPanel");
     if (!nativeBoard) {
       await expect(popup).toBeVisible();
-      await expect(popup).toContainText("Staying Power");
+      // Prerequisite wins already earned Staying Power; this run earns Four Nines.
+      await expect(popup).toContainText("Four Nines");
       await expect
         .poll(() =>
           popup.evaluate((el) => {
