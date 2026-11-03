@@ -173,10 +173,10 @@ test.each<{ difficulty: DifficultyType; steamFirst: boolean }>([
       // Commission the second future project before demand rises again in 2052.
       builds.set(1998, {
         name: "Enhanced Geothermal",
-        peakW: 20000000,
+        peakW: 10000000,
         financed: true,
       });
-      builds.set(2052, {
+      builds.set(2040, {
         name: "Battery",
         peakWh: 200000000,
         financed: true,
