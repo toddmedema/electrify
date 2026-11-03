@@ -10,6 +10,7 @@ import {
 import { Firestore, getFirestore } from "firebase/firestore";
 import { isDesktopApp } from "./Desktop";
 import { APP_VERSION } from "./AppVersion";
+import { subscribeAfterSignIn } from "./MailingList";
 
 const firebaseApp =
   process.env.REACT_APP_DESKTOP === "true" &&
@@ -33,7 +34,15 @@ const firebaseApp =
 export const firebaseAppAuth = firebaseApp ? getAuth(firebaseApp) : undefined;
 export type SignInProvider = "google" | "apple";
 
-export function login(provider: SignInProvider = "google"): Promise<boolean> {
+export interface SignInOptions {
+  provider?: SignInProvider;
+  mailingList?: boolean;
+}
+
+export function login({
+  provider = "google",
+  mailingList = false,
+}: SignInOptions = {}): Promise<boolean> {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp())
     return Promise.resolve(false);
   const authProvider =
@@ -41,7 +50,14 @@ export function login(provider: SignInProvider = "google"): Promise<boolean> {
       ? new OAuthProvider("apple.com")
       : new GoogleAuthProvider();
   return signInWithPopup(firebaseAppAuth!, authProvider)
-    .then(() => {
+    .then((credential) => {
+      if (mailingList) {
+        // Auth listeners can close the dialog before signup finishes.
+        // Keep signup independent of login and cloud sync.
+        void subscribeAfterSignIn(firebaseAppAuth!, credential.user).catch(
+          () => undefined,
+        );
+      }
       // The signed in user reaches the app through firebaseAppAuth.onAuthStateChanged
       // (see App.tsx); nothing is needed here. Do not log the credential -- it carries an
       // access token, and the console is readable by anything running on the page.
@@ -189,18 +205,25 @@ if (typeof window !== "undefined") {
 }
 
 /**
- * From this width the game workspace opens tools in side columns beside the fleet, and the app
- * bar folds its status row into the top bar so the window gains one row of game.
+ * From this width the app bar folds its status row into the top bar, so the window gains one row
+ * of game, and the desktop-only speed appears.
  */
 export const SIDE_LAYOUT_MIN_WIDTH = 1300;
+/** From this width the game workspace opens tools in side columns beside the fleet. */
+export const SIDE_TOOL_MIN_WIDTH = 1024;
 export const SIDE_LAYOUT_MEDIA = `(min-width:${SIDE_LAYOUT_MIN_WIDTH}px)`;
 
 export function isBigScreen(): boolean {
   return getViewportWidth() >= 700;
 }
 
+/** Wide enough for a tool to sit beside the fleet instead of rising over it as a sheet. */
+export function isSideToolLayout(): boolean {
+  return getViewportWidth() >= SIDE_TOOL_MIN_WIDTH;
+}
+
 /**
- * Wide enough to show Facilities and Insights side by side without the bottom navigation.
+ * Wide enough for the single-row app bar and the fastest speed.
  * Keep in sync with $desktop_breakpoint in app.scss.
  */
 export function isDesktopScreen(): boolean {

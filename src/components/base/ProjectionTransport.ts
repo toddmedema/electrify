@@ -33,7 +33,9 @@ type DictionaryKey = {
     ? K
     : never;
 }[ObjectTickKey];
-type QueueKey = Exclude<ObjectTickKey, DictionaryKey>;
+type QueueKey = {
+  [K in ObjectTickKey]: (typeof objectFields)[K] extends "queue" ? K : never;
+}[ObjectTickKey];
 const dictionaryKeys = Object.keys(objectFields).filter(
   (key) => objectFields[key as ObjectTickKey] === "dictionary",
 ) as DictionaryKey[];

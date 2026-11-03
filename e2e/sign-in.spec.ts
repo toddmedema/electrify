@@ -16,6 +16,12 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/");
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await expectSignInButtonsToFit(page);
+    const mailingList = page.getByRole("checkbox", {
+      name: "Join the Electrify mailing list",
+    });
+    await mailingList.check();
+    await expect(mailingList).toBeChecked();
+    await mailingList.uncheck();
     if (
       process.env.REVIEW_SCREENSHOT_DIR &&
       ((theme === "light" && info.project.name === "desktop-chromium") ||
@@ -34,12 +40,16 @@ for (const theme of ["light", "dark"]) {
       });
     }
     await page.getByRole("button", { name: "Back", exact: true }).click();
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await expect(mailingList).not.toBeChecked();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
     await page
       .getByRole("button", { name: "Achievements", exact: true })
       .click();
     const gallery = page.locator(".achievementCard");
     await expectSignInButtonsToFit(gallery);
     await context.setOffline(true);
+    await expect(gallery.getByRole("checkbox")).toBeDisabled();
     for (const name of ["Google", "Apple"]) {
       await expect(
         gallery.getByRole("button", {

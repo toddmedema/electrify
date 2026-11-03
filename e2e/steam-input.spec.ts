@@ -8,7 +8,7 @@ import type {
 } from "../src/Desktop";
 import type { InstalledMod } from "../src/mods/Types";
 import type { LobbyState } from "../src/multiplayer/Native";
-import { readSaveRecords } from "./save-fixture";
+import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
 const glyphs: InputFrame["glyphs"] = {
   up: { label: "D-pad up" },
@@ -67,7 +67,7 @@ async function select(
   const group = control.locator("..");
   if (
     (await control.getAttribute("tabindex")) === "-1" &&
-    (await group.getAttribute("role")) === "group"
+    ["group", "tablist"].includes((await group.getAttribute("role")) ?? "")
   ) {
     // Roving groups expose one vertical tab stop. Enter it before moving within
     // the group, just as a player does with the D-pad.
@@ -259,6 +259,109 @@ test.beforeEach(async ({ page }) => {
       },
     };
   }, glyphs);
+});
+
+test("desktop home buttons share a width and Escape returns from menu pages", async ({
+  page,
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  await expect(play).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Achievements", exact: true }),
+  ).toHaveCount(0);
+  const bounds = (await play.boundingBox())!;
+  for (const button of await page.locator("#centeredMenu button").all()) {
+    const box = (await button.boundingBox())!;
+    expect(box.width, await button.innerText()).toBeCloseTo(bounds.width, 0);
+    expect(box.x, await button.innerText()).toBeCloseTo(bounds.x, 0);
+  }
+  if (
+    process.env.REVIEW_SCREENSHOT_DIR &&
+    testInfo.project.name === "deck-800-light"
+  ) {
+    await page.getByRole("button", { name: "Manual", exact: true }).focus();
+    await page.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        "menu-steam-desktop.png",
+      ),
+      animations: "disabled",
+    });
+  }
+  for (const title of ["Manual", "Settings", "Mods"]) {
+    await page.getByRole("button", { name: title, exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: title, exact: true }),
+    ).toBeVisible();
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    await page.keyboard.press("Escape");
+    await expect(play).toBeVisible();
+    await expect(page.locator(".screenPage")).toHaveCount(0);
+  }
+});
+
+test("menu movement under a stationary pointer preserves keyboard navigation", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator("#appStartup")).toHaveCount(0);
+  await page.locator("#centeredMenu").evaluate(async (menu) => {
+    await Promise.all(
+      menu
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished),
+    );
+  });
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  const friends = page.getByRole("button", {
+    name: "Play with friends",
+    exact: true,
+  });
+  const manual = page.getByRole("button", { name: "Manual", exact: true });
+  await friends.hover();
+  await expect(friends).toBeFocused();
+  await play.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(friends).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(manual).toBeFocused();
+
+  // Like the desktop entrance, move controls away and back beneath an unmoved mouse.
+  await friends.evaluate((button) => {
+    button.addEventListener(
+      "pointerout",
+      () => {
+        button.dataset.pointerBoundary = "left";
+      },
+      { once: true },
+    );
+    button.addEventListener(
+      "pointerover",
+      () => {
+        button.dataset.pointerBoundary = "returned";
+      },
+      { once: true },
+    );
+    document.getElementById("centeredMenu")!.style.transform =
+      "translateX(10000px)";
+  });
+  // Observe both boundary events on the target button. A menu-wide :hover
+  // check alone does not establish that this button will receive pointerover.
+  await expect(friends).toHaveAttribute("data-pointer-boundary", "left");
+  await expect(page.locator("#centeredMenu:hover")).toHaveCount(0);
+  await page.locator("#centeredMenu").evaluate((menu) => {
+    menu.style.transform = "none";
+  });
+  await expect(friends).toHaveAttribute("data-pointer-boundary", "returned");
+  await expect(manual).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(friends).toBeFocused();
+
+  // Moving the mouse intentionally still selects the hovered control.
+  await manual.hover();
+  await expect(manual).toBeFocused();
 });
 
 test("controller text entry searches the manual, cancels and restores field focus", async ({
@@ -762,6 +865,8 @@ test("controller advances the first tutorial through inspection, chart and clock
   await input(page, "confirm");
   const hud = page.locator(".tutorialHud");
   await expect(hud).toBeVisible();
+  await select(page, hud.getByRole("button", { name: "Next", exact: true }));
+  await input(page, "confirm");
   await select(
     page,
     page.getByRole("button", { name: "Inspect Coal", exact: true }),
@@ -783,4 +888,73 @@ test("controller advances the first tutorial through inspection, chart and clock
   // Tutorial-hidden actions must stay unavailable through controller shortcuts too.
   await input(page, "build");
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+});
+
+test("controller reviews, cancels and confirms a utility acquisition", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=116");
+  const start = page.getByRole("button", { name: "Start game", exact: true });
+  await select(page, start);
+  await input(page, "confirm");
+  await expect(page.locator("#appbar:visible")).toBeVisible();
+  await input(page, "build");
+  const build = page.getByRole("region", { name: "Build", exact: true });
+  await select(
+    page,
+    build.getByRole("tab", { name: "Interties", exact: true }),
+  );
+  await input(page, "confirm");
+  await select(
+    page,
+    build.getByRole("button", { name: /Review purchase of .*Ridge Electric/ }),
+  );
+  await input(page, "confirm");
+  const dialog = page.getByRole("dialog");
+  await select(
+    page,
+    dialog.getByRole("button", { name: "Take loan", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(dialog).toHaveCount(0);
+  // Fixture advances only construction; the acquisition still uses its real owning action.
+  await editSavedGame(page, ({ game }) => {
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    for (const tick of game.timeline) tick.cash = 1e9;
+  });
+  await page.goto("/");
+  await select(
+    page,
+    page.getByRole("button", { name: "Continue", exact: true }),
+  );
+  await input(page, "confirm");
+  const line = page
+    .locator(".facilities:visible .transmissionLine")
+    .filter({ hasText: "Ridge Electric" });
+  await select(page, line.getByRole("button", { name: /^Inspect / }));
+  await input(page, "confirm");
+  const acquire = line.getByRole("button", {
+    name: "Acquire Ridge Electric",
+    exact: true,
+  });
+  await select(page, acquire);
+  await input(page, "confirm");
+  await expect(dialog).toHaveAccessibleName("Acquire Ridge Electric?");
+  await input(page, "back");
+  await expect(dialog).toHaveCount(0);
+  await expect(acquire).toBeFocused();
+  await input(page, "confirm");
+  await select(
+    page,
+    dialog.getByRole("button", { name: "Take loan", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(dialog).toHaveCount(0);
+  await expect(line).toContainText("Owned · Ridge Electric");
+  const saved = await readSavedGame(page);
+  expect(
+    saved?.utilityExpansion?.acquisitions.some(
+      (receipt) => receipt.targetId === "ridge-electric",
+    ),
+  ).toBe(true);
 });

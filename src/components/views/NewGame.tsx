@@ -12,6 +12,7 @@ import {
   ListSubheader,
   Menu,
   MenuItem,
+  SvgIcon,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -115,6 +116,17 @@ function MissionSectionHeader(
   );
 }
 
+// MUI's filled CheckCircle cuts its tick out of the disc, so whatever sits behind the badge
+// shows through it. A solid white tick reads as "done" on every avatar, in both palettes.
+function CompletedCheckIcon(props: React.ComponentProps<typeof SvgIcon>) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+      <path d="M10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8z" fill="#fff" />
+    </SvgIcon>
+  );
+}
+
 // One row for everything: tutorial missions, scenarios, and the custom game all share the
 // list now - the only differences are the action control and what the subheader shows
 function MissionListItem(props: MissionListItemProps): React.JSX.Element {
@@ -164,7 +176,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
           anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
           badgeContent={
             completed ? (
-              <CheckCircleIcon
+              <CompletedCheckIcon
                 data-testid={`mission-complete-${s.id}`}
                 className="tutorialComplete"
                 color="primary"

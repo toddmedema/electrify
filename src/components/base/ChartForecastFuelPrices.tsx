@@ -12,11 +12,12 @@ import {
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { formatMoneyConcise, formatMoneyStable } from "../../helpers/Format";
 import { PRICED_FUELS } from "../../Constants";
-import { TickPresentFutureType } from "../../Types";
+import { TickPresentFutureType, PricedFuelNameType } from "../../Types";
 import { fuelColors, fuelDashArrays } from "../../Theme";
 
 export interface Props {
   height?: number;
+  selectedFuel?: PricedFuelNameType;
   timeline: TickPresentFutureType[];
   domain: { x: [number, number] };
   startingYear: number;
@@ -29,13 +30,17 @@ export interface Props {
 
 interface State {
   prices: number[][];
+  fuels: readonly PricedFuelNameType[];
   minutes: number[];
   domain: Props["domain"];
   startingYear: number;
   multiyear: boolean;
 }
 
-function buildOptions(showXLabels: boolean) {
+function buildOptions(
+  showXLabels: boolean,
+  fuels: readonly PricedFuelNameType[],
+) {
   return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0, // set by UPlotChart
     height: 0,
@@ -61,7 +66,7 @@ function buildOptions(showXLabels: boolean) {
     ],
     series: [
       {},
-      ...PRICED_FUELS.map((f) => ({
+      ...fuels.map((f) => ({
         stroke: fuelColors()[f],
         width: 1.5,
         // Five overlapping lines are more than color alone can separate, so each
@@ -81,7 +86,7 @@ function tooltip(idx: number, state: State): string {
   );
   return [
     header,
-    ...PRICED_FUELS.map(
+    ...state.fuels.map(
       (f, i) => `${f}: ${formatMoneyStable(state.prices[i][idx])}`,
     ),
   ].join("\n");
@@ -101,15 +106,17 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
       multiyear,
       showXLabels,
       syncKey,
+      selectedFuel,
     } = this.props;
+    const fuels = selectedFuel ? [selectedFuel] : PRICED_FUELS;
 
     const minutes = new Array<number>(timeline.length);
     // Every tick carries all five prices; the fallback is only here because the fuel prices
     // are optional on the tick type
-    const prices = PRICED_FUELS.map(() => new Array<number>(timeline.length));
+    const prices = fuels.map(() => new Array<number>(timeline.length));
     timeline.forEach((t: TickPresentFutureType, i: number) => {
       minutes[i] = t.minute;
-      PRICED_FUELS.forEach((f, fi) => {
+      fuels.forEach((f, fi) => {
         prices[fi][i] = t[f] ?? 0;
       });
     });
@@ -120,11 +127,11 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
           ariaLabel="Chart of predicted fuel prices"
           formatSummaryValue={formatMoneyStable}
           height={height}
-          state={{ prices, minutes, domain, startingYear, multiyear }}
+          state={{ prices, fuels, minutes, domain, startingYear, multiyear }}
           data={[minutes, ...prices]}
-          seriesLabels={PRICED_FUELS}
-          buildOptions={buildOptions(showXLabels !== false)}
-          structureKey={String(showXLabels !== false)}
+          seriesLabels={fuels}
+          buildOptions={buildOptions(showXLabels !== false, fuels)}
+          structureKey={`${String(showXLabels !== false)}:${fuels.join(",")}`}
           syncKey={syncKey}
           tooltip={tooltip}
         />

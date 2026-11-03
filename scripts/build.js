@@ -1,4 +1,5 @@
 const { spawnSync } = require("node:child_process");
+const path = require("node:path");
 const { buildVersion, writeBuildVersion } = require("./build-version");
 const { verifyEditionBundle } = require("./verify-edition-bundle");
 
@@ -6,7 +7,7 @@ const version = buildVersion();
 const output = process.env.BUILD_PATH || "build";
 const result = spawnSync(
   process.execPath,
-  [require.resolve("react-scripts/bin/react-scripts"), "build"],
+  [path.join(__dirname, "production-build.js")],
   {
     stdio: "inherit",
     env: { ...process.env, REACT_APP_VERSION: version },

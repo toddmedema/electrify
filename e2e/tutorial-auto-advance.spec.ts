@@ -1,6 +1,7 @@
 import { expect, test } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
 import {
+  dragCoalAbovePumpedHydro,
   isPaneLayout,
   sortBuildCatalog,
   waitForPaneOrNav,
@@ -90,11 +91,19 @@ for (const mission of [
         await slider.press("ArrowLeft");
         await expect(cost).not.toHaveText(beforeCost);
         await expect(time).not.toHaveText(beforeTime);
-        await hud.getByRole("button", { name: "Next", exact: true }).click();
+        await expect(hud).toContainText("Review a generator purchase");
       }
       await expect(hud).toContainText(
-        mission === "Generators" ? "Review a generator" : "Review a storage",
+        mission === "Generators"
+          ? "Review a generator"
+          : "Purchase a storage facility",
       );
+      // These steps advance from the review control; Next remains an optional fallback.
+      await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(0);
+      await expect(hud.locator(".tutorialHudNextPulse")).toHaveCount(0);
+      await expect(
+        hud.getByRole("button", { name: "Next", exact: true }),
+      ).not.toHaveClass(/MuiButton-contained/);
       await page
         .getByRole("button", { name: /Review purchase of/ })
         .first()
@@ -110,7 +119,7 @@ for (const mission of [
       await expect(hud).toContainText(
         mission === "Generators"
           ? "Construction started"
-          : "vertical bar shows how much energy is stored",
+          : "vertical bar shows energy stored",
       );
     } else if (mission === "Forecasting") {
       await page.locator(".facilityRow .facilityDisclosure").first().click();
@@ -223,7 +232,9 @@ for (const mission of [
       });
     }
     if (mission === "Generators") {
-      const progress = page.getByRole("progressbar", { name: "Year progress" });
+      const progress = page.getByRole("progressbar", {
+        name: /^Year \d+: \d+% elapsed$/,
+      });
       await expect(progress).toHaveAttribute("aria-valuenow", "0");
       const initialBox = await progress.boundingBox();
       expect(initialBox!.width).toBeGreaterThan(300);
@@ -246,41 +257,142 @@ for (const mission of [
       });
       await expect(fastSpeed).toHaveClass(/tutorialTarget/);
       await fastSpeed.click();
-      await expect(hud).toContainText("Watch the year bar advance");
+      await expect(hud).toContainText("Read the year progress bar");
       await expect(progress).toHaveClass(/tutorialTarget/);
-      await expect(page.locator(".tutorialTargetRing")).toBeVisible();
+      const ring = page.locator(".tutorialTargetRing");
+      await expect(ring).toBeVisible();
+      await expect(ring).toHaveCSS("animation-name", "none");
+      expect(
+        await ring.evaluate(
+          (element) => getComputedStyle(element, "::before").display,
+        ),
+      ).toBe("none");
       await expect(progress).not.toHaveAttribute("aria-valuenow", "0");
       expect((await progress.boundingBox())!.width).toBe(initialBox!.width);
-      // Seek the browser's animation timeline to check the reminders without waiting 12s.
       const next = hud.getByRole("button", { name: "Next", exact: true });
+      await expect(
+        hud.locator(".tutorialHudSweep, .tutorialHudNextPulse"),
+      ).toHaveCount(1);
+      if (testInfo.project.name === "desktop-chromium") {
+        // The background sweep follows side-panel mode, including resizes at its exact boundary.
+        for (const width of [1023, 1024, 1023, 1024]) {
+          await page.setViewportSize({ width, height: 800 });
+          await expect(page.locator(".gameStage")).toHaveAttribute(
+            "data-layout",
+            width === 1024 ? "side" : "sheet",
+          );
+          await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(
+            width === 1024 ? 1 : 0,
+          );
+          await expect(next).toBeVisible();
+        }
+      }
+      const sideLayout =
+        (await page.locator(".gameStage").getAttribute("data-layout")) ===
+        "side";
+      await expect(next).toHaveAccessibleDescription("");
+      await expect(hud.getByText(/when you’re ready/)).toHaveCount(0);
       const cue = next.locator(".tutorialHudNextPulse");
-      const reminders = await cue.evaluate((element) => {
-        const animation = element
-          .getAnimations()
-          .find(
-            (candidate) =>
-              candidate instanceof CSSAnimation &&
-              candidate.animationName === "tutorialNextPulse",
-          )!;
-        animation.pause();
-        return [5999, 6480, 7200, 12480].map((time) => {
-          animation.currentTime = time;
-          const transform = getComputedStyle(element).transform;
-          return transform === "none" ? 1 : new DOMMatrixReadOnly(transform).a;
+      const sweep = hud.getByTestId("tutorial-hud-sweep");
+      if (sideLayout) {
+        await expect(cue).toHaveCount(0);
+        // Seek the real pseudo-element animation: left to right, then a quiet pause and repeat.
+        const positions = await sweep.evaluate((element) => {
+          const animation = element
+            .getAnimations({ subtree: true })
+            .find(
+              (candidate) =>
+                candidate instanceof CSSAnimation &&
+                candidate.animationName === "tutorialBarSweep",
+            )!;
+          animation.pause();
+          return [0, 800, 1600, 4000, 8000, 8800].map((time) => {
+            animation.currentTime = time;
+            return new DOMMatrixReadOnly(
+              getComputedStyle(element, "::before").transform,
+            ).m41;
+          });
         });
-      });
-      expect(reminders[0]).toBe(reminders[2]);
-      expect(reminders[1]).not.toBe(reminders[0]);
-      expect(reminders[3]).toBe(reminders[1]);
+        expect(positions[0]).toBeLessThan(positions[1]);
+        expect(positions[1]).toBeLessThan(positions[2]);
+        expect(positions[2]).toBe(positions[3]);
+        expect(positions[0]).toBe(positions[4]);
+        expect(positions[1]).toBe(positions[5]);
+      } else {
+        await expect(sweep).toHaveCount(0);
+        await expect(cue).toHaveCSS("animation-delay", "0s, 4s");
+        const reminders = await cue.evaluate((element) => {
+          const animation = element
+            .getAnimations()
+            .find(
+              (candidate) =>
+                candidate instanceof CSSAnimation &&
+                candidate.animationName === "tutorialNextPulse",
+            )!;
+          animation.pause();
+          return [4000, 4320, 4640, 4960, 8320].map((time) => {
+            animation.currentTime = time;
+            const transform = getComputedStyle(element).transform;
+            return transform === "none"
+              ? 1
+              : new DOMMatrixReadOnly(transform).a;
+          });
+        });
+        expect(reminders[0]).toBe(reminders[2]);
+        expect(reminders[1]).not.toBe(reminders[0]);
+        expect(reminders[3]).toBe(reminders[1]);
+        expect(reminders[4]).toBe(reminders[1]);
+      }
       await page.emulateMedia({ reducedMotion: "reduce" });
-      await expect(cue).toHaveCSS("animation-name", "none");
+      if (sideLayout) {
+        expect(
+          await sweep.evaluate(
+            (element) => getComputedStyle(element, "::before").animationName,
+          ),
+        ).toBe("none");
+        await expect(sweep).not.toHaveCSS(
+          "background-color",
+          "rgba(0, 0, 0, 0)",
+        );
+      } else {
+        await expect(cue).toHaveCSS("animation-name", "none");
+      }
+      await expect(next).toHaveClass(/MuiButton-contained/);
+      await reviewScreenshot(page, {
+        path: testInfo.outputPath("manual-next-reduced.png"),
+        animations: "disabled",
+      });
       await page.emulateMedia({ reducedMotion: "no-preference" });
-      await page.screenshot({ path: testInfo.outputPath("year-progress.png") });
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole("tooltip")).toBeHidden();
+      if (process.env.REVIEW_SCREENSHOT_DIR) {
+        await expect(page.locator(".MuiSnackbar-root")).toBeHidden();
+      }
+      await reviewScreenshot(page, {
+        path: testInfo.outputPath("manual-next.png"),
+        animations: "disabled",
+      });
       await hud.getByRole("button", { name: "Next" }).click();
       await expect(hud).toContainText(
         "Order a second generator of a different type",
       );
       await expect(progress).not.toHaveClass(/tutorialTarget/);
+      await expect(sweep).toHaveCount(0);
+      await expect(hud.locator(".tutorialHudNextPulse")).toHaveCount(0);
+      await expect(
+        hud.getByRole("button", { name: "Next", exact: true }),
+      ).toHaveCount(0);
+    }
+    if (mission === "Storage") {
+      await hud.getByRole("button", { name: "Next", exact: true }).click();
+      await expect(hud).toContainText("Drag Coal above Pumped Hydro");
+      await expect(
+        hud.getByRole("button", { name: "Next", exact: true }),
+      ).toHaveCount(0);
+      await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(0);
+      await dragCoalAbovePumpedHydro(page);
+      await expect(hud).toContainText("Build storage to cover peak demand");
+      await expect(page.locator(".facilityRowHeader")).toHaveCount(1);
     }
   });
 }

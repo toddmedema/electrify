@@ -15,7 +15,9 @@ interface DecisionDialogProps {
   onClose: () => void;
   children?: React.ReactNode;
   actions: React.ReactNode;
+  actionsClassName?: string;
   closable?: boolean;
+  closeDisabled?: boolean;
   isolateClicks?: boolean;
   contentClassName?: string;
   fullWidth?: boolean;
@@ -29,7 +31,9 @@ export default function DecisionDialog({
   onClose,
   children,
   actions,
+  actionsClassName,
   closable,
+  closeDisabled,
   isolateClicks,
   contentClassName,
   ...props
@@ -39,12 +43,24 @@ export default function DecisionDialog({
   return (
     <Dialog
       {...props}
-      onClose={onClose}
+      onClose={() => {
+        if (!closeDisabled) onClose();
+      }}
+      onKeyDown={(event) => {
+        if (closeDisabled && event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
       aria-labelledby={headingId}
       onClick={isolateClicks ? (event) => event.stopPropagation() : undefined}
     >
       {closable ? (
-        <ClosableDialogTitle id={headingId} onClose={onClose}>
+        <ClosableDialogTitle
+          id={headingId}
+          onClose={onClose}
+          closeDisabled={closeDisabled}
+        >
           {title}
         </ClosableDialogTitle>
       ) : (
@@ -53,7 +69,7 @@ export default function DecisionDialog({
       {children && (
         <DialogContent className={contentClassName}>{children}</DialogContent>
       )}
-      <DialogActions>{actions}</DialogActions>
+      <DialogActions className={actionsClassName}>{actions}</DialogActions>
     </Dialog>
   );
 }

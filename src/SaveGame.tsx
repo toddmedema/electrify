@@ -1,3 +1,5 @@
+import { isBuyingRule, isSellingRule } from "./helpers/TradingRules";
+import { validUtilityExpansion } from "./helpers/ExpansionValidation";
 import { validScenarioMod } from "./helpers/ScenarioMod";
 import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
 import { maxLoanAmount } from "./helpers/Financials";
@@ -47,6 +49,7 @@ import {
 import {
   corridorConstructionKgco2e,
   intertieUpgradeQuote,
+  supplyAtDemandBoundary,
 } from "./helpers/Transmission";
 import {
   GameType,
@@ -390,8 +393,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
     typeof game.customerRate !== "number" ||
     !Number.isFinite(game.customerRate) ||
     game.customerRate < 0 ||
-    (game.rateFollowsTarget !== undefined &&
-      typeof game.rateFollowsTarget !== "boolean") ||
+    (game.rateFollowsInflation !== undefined &&
+      typeof game.rateFollowsInflation !== "boolean") ||
     // Check the full location rather than trusting an imported object: the
     // location's id becomes the path of the weather file the loading screen fetches, and its
     // lat/long and time zone drive the sun model. A save is hand-editable too
@@ -492,6 +495,16 @@ export function parseSave(raw: unknown): SaveGameType | null {
     game.timeline.some(
       (tick) =>
         !validEmissions(tick) ||
+        (tick.storageImportedW !== undefined &&
+          (typeof tick.storageImportedW !== "number" ||
+            !Number.isFinite(tick.storageImportedW) ||
+            tick.storageImportedW < 0 ||
+            supplyAtDemandBoundary(tick.storageImportedW, tick.importedW || 0) >
+              (tick.importedW || 0) ||
+            supplyAtDemandBoundary(
+              tick.storageImportedW,
+              tick.storageChargeW || 0,
+            ) > (tick.storageChargeW || 0))) ||
         (tick.transmissionCapacityLimitsWByCorridor !== undefined &&
           !validTransmissionCapacityLimits(
             tick.transmissionCapacityLimitsWByCorridor,
@@ -642,6 +655,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
   // compilation can also reject unsupported saved setup; an import must return null, not throw.
   try {
     if (
+      !validUtilityExpansion(game as GameType) ||
       !validScenarioRuleState(game as GameType) ||
       !validGameObjectiveProgress(game as GameType)
     )
@@ -657,9 +671,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
     transmission !== undefined &&
     (typeof transmission !== "object" ||
       transmission === null ||
-      !["BALANCED", "RELIABILITY_FIRST", "SURPLUS_ONLY", "CLOSED"].includes(
-        transmission.tradingPolicy,
-      ) ||
+      !isBuyingRule(transmission.buyingRule) ||
+      !isSellingRule(transmission.sellingRule) ||
       !Array.isArray(transmission.lines) ||
       transmission.lines.some(
         (line) =>

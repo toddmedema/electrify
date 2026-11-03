@@ -15,7 +15,7 @@ export const POLICY_TIERS: PolicyTier[] = ["Off", "On"];
 // historical scenarios and introductory tutorials deliberately have no program entry. Rooftop
 // solar prices follow the year, so the early-2000s scenarios pay the era's much higher cost.
 export const POLICY_SCENARIOS = [
-  100, 101, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115, 999,
+  100, 101, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115, 116, 999,
 ];
 // Both rebate programs are one-time projects: they install a fixed pool of upgrades, then stop.
 // Leading U.S. efficiency programs save roughly 2-3% of sales a year (ACEEE state scorecards), so
@@ -58,7 +58,7 @@ export const POLICIES = {
   efficiency: {
     name: "Efficiency rebates",
     description:
-      "Reduce home and business demand especially heating and cooling. Savings start to fade after ten years.",
+      "Reduce home and business demand, especially heating and cooling. Savings start to fade after ten years.",
     // At full adoption: lighting and appliance upgrades cut all home and business use, while
     // insulation, sealing and efficient heat pumps cut the weather-driven part of it much more.
     // DOE's Weatherization Assistance Program evaluations report heating and cooling savings of

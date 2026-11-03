@@ -1,7 +1,7 @@
 # Steam achievement icons
 
 `uploads/` contains an achieved color icon and an unachieved grayscale icon for
-every entry in `src/achievements/AchievementCatalog.json` (35 achievements, 70 PNGs).
+every entry in `src/achievements/AchievementCatalog.json` (36 achievements, 72 PNGs).
 `upload-map.json` maps stable Steam API names to both files, English display copy,
 the original SVG and its SHA-256 digest. These reuse the game's existing artwork.
 

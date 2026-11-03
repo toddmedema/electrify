@@ -16,7 +16,7 @@ const {
 const { ruleDigest, utf8Bytes } = require("../helpers/RuleIdentity");
 const MOD_API_VERSION = 1;
 const MOD_SCENARIO_IDS = [
-  100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115,
+  100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115, 116,
 ];
 const MAX_MOD_BYTES = 256 * 1024;
 const PACKAGE_KEYS = [

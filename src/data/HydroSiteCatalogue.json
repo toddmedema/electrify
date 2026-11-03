@@ -71,6 +71,34 @@
   },
   "sites": [
     {
+      "id": "scenario-116-champlain-hydro-site",
+      "name": "Champlain inherited hydro",
+      "maxPeakW": 40000000,
+      "lat": 44.4759,
+      "lon": -73.2121,
+      "source": "Issue 683 authored fictional utility portfolio",
+      "sourceUrl": "https://github.com/toddmedema/electrify/issues/683",
+      "accessed": "2026-10-30",
+      "datasetVersion": "Issue 683 initial portfolio",
+      "originalValue": 40,
+      "originalUnit": "MW",
+      "notes": "Fictional inherited portfolio claim, not a researched physical development site. Only the authored operating asset can claim this inventory; new hydro is prohibited."
+    },
+    {
+      "id": "scenario-116-valley-hydro-site",
+      "name": "Valley inherited hydro",
+      "maxPeakW": 50000000,
+      "lat": 43.6106,
+      "lon": -72.9726,
+      "source": "Issue 683 authored fictional utility portfolio",
+      "sourceUrl": "https://github.com/toddmedema/electrify/issues/683",
+      "accessed": "2026-10-30",
+      "datasetVersion": "Issue 683 initial portfolio",
+      "originalValue": 50,
+      "originalUnit": "MW",
+      "notes": "Fictional inherited portfolio claim, not a researched physical development site. Only the authored operating asset can claim this inventory; new hydro is prohibited."
+    },
+    {
       "id": "99-islands-us",
       "name": "99 Islands",
       "maxPeakW": 10000000,
@@ -10446,6 +10474,29 @@
     }
   ],
   "inventories": {
+    "BurlingtonVT": {
+      "status": "researched",
+      "newConstructionAllowed": false,
+      "locationLat": 44.4759,
+      "locationLong": -73.2121,
+      "siteIds": ["scenario-116-champlain-hydro-site"],
+      "researchDisposition": "Issue 683 fictional inherited utility portfolio only. No additional conventional hydro, pumped hydro or geothermal sites have been researched or permitted for this scenario."
+    },
+    "RutlandVT": {
+      "status": "researched",
+      "newConstructionAllowed": false,
+      "locationLat": 43.6106,
+      "locationLong": -72.9726,
+      "siteIds": ["scenario-116-valley-hydro-site"],
+      "researchDisposition": "Issue 683 fictional inherited utility portfolio only. No additional conventional hydro, pumped hydro or geothermal sites have been researched or permitted for this scenario."
+    },
+    "WhiteRiverJunctionVT": {
+      "status": "unresearched",
+      "locationLat": 43.6489,
+      "locationLong": -72.3193,
+      "siteIds": [],
+      "researchDisposition": "Issue 683 fictional inherited utility portfolio only. No additional conventional hydro, pumped hydro or geothermal sites have been researched or permitted for this scenario."
+    },
     "PIT": {
       "status": "researched",
       "locationLat": 40.4406,

@@ -4,7 +4,7 @@ import {
   reservoirOutlook,
   ReservoirOutlookPoint,
 } from "../../helpers/HydroOutlook";
-import { generateNewTimeline } from "../../reducers/Game";
+import { generateForecastTimeline } from "../../reducers/Game";
 import type { GameType, TickPresentFutureType } from "../../Types";
 import type { OutputWeatherTick } from "../../helpers/ExpectedOutput";
 
@@ -70,7 +70,7 @@ export function computeOutlook<K extends OutlookKind>(
   if (kind === "build") {
     let result = buildForecasts.get(game);
     if (!result) {
-      const timeline = generateNewTimeline(
+      const timeline = generateForecastTimeline(
         game,
         now.cash,
         now.customers,
@@ -111,16 +111,17 @@ export function computeOutlook<K extends OutlookKind>(
   if (kind === "hydro") {
     return reservoirOutlook(
       now,
-      generateNewTimeline(game, now.cash, now.customers, TICKS_PER_YEAR),
+      generateForecastTimeline(game, now.cash, now.customers, TICKS_PER_YEAR),
       game.startingYear,
     ) as OutlookResults[K];
   }
-  const hourly = generateNewTimeline(
+  const hourly = generateForecastTimeline(
     {
       ...game,
       facilities: game.facilities.filter((f) => f.yearsToBuildLeft <= 0),
       transmission: {
-        tradingPolicy: game.transmission?.tradingPolicy || "BALANCED",
+        buyingRule: game.transmission?.buyingRule || "SHORTAGES",
+        sellingRule: game.transmission?.sellingRule || "SURPLUS",
         lines: (game.transmission?.lines || [])
           .filter((l) => l.yearsToBuildLeft <= 0)
           .map((l) => ({ ...l, upgrade: undefined })),

@@ -27,6 +27,7 @@ import gameReducer, {
 import { chooseScenarioResponse } from "../reducers/GameActions";
 import { GameType } from "../Types";
 import { createGame } from "./Simulator";
+import { counterbalancedSamples } from "./CounterbalancedSamples";
 
 jest.setTimeout(600000);
 
@@ -200,17 +201,25 @@ function play(
 }
 
 function runOnce(months: number, immerFirst = false): RunType {
-  // Reverse the order between pairs instead of consistently charging later process effects
-  // (JIT, temperature and memory pressure) to the draft path.
-  const first = play(months, immerFirst);
-  const second = play(months, !immerFirst);
-  const plain = immerFirst ? second : first;
-  const immer = immerFirst ? first : second;
-  if (plain.samples.length !== immer.samples.length) {
-    throw new Error(
-      `Plain and Immer paths diverged: ${plain.samples.length} vs ${immer.samples.length} ticks`,
-    );
-  }
+  // Each measured group includes both orders (ABBA or BAAB). Alternating only between
+  // three groups gives one order a majority and can turn timing drift into a false regression.
+  const runs = counterbalancedSamples(
+    (immer) => play(months, immer),
+    immerFirst,
+  );
+  const ticks = runs.plain[0].samples.length;
+  for (const run of [...runs.plain, ...runs.immer])
+    if (run.samples.length !== ticks)
+      throw new Error(
+        `Plain and Immer paths diverged: ${ticks} vs ${run.samples.length} ticks`,
+      );
+  const combine = (plays: ReturnType<typeof play>[]) => ({
+    ...plays[0],
+    totalMs: plays.reduce((total, run) => total + run.totalMs, 0),
+    samples: plays.flatMap((run) => run.samples),
+  });
+  const plain = combine(runs.plain);
+  const immer = combine(runs.immer);
   const ordinary = immer.samples.filter((s) => !s.rollover).map((s) => s.ms);
   const rollovers = immer.samples.filter((s) => s.rollover).map((s) => s.ms);
   const januaries = immer.samples.filter((s) => s.january).map((s) => s.ms);
@@ -219,7 +228,7 @@ function runOnce(months: number, immerFirst = false): RunType {
   return {
     plainMsPerTick: plain.totalMs / plain.samples.length,
     immerMsPerTick: immer.totalMs / immer.samples.length,
-    ticks: immer.samples.length,
+    ticks,
     monthsPlayed: immer.monthsPlayed,
     endedEarly: immer.endedEarly,
     medianOrdinaryMs: median(ordinary),
@@ -275,7 +284,8 @@ function uiForecasts(game: GameType): { name: string; run: () => unknown }[] {
             ...game,
             facilities: game.facilities.filter((f) => f.yearsToBuildLeft <= 0),
             transmission: {
-              tradingPolicy: game.transmission?.tradingPolicy || "BALANCED",
+              buyingRule: game.transmission?.buyingRule || "SHORTAGES",
+              sellingRule: game.transmission?.sellingRule || "SURPLUS",
               lines: (game.transmission?.lines || [])
                 .filter((l) => l.yearsToBuildLeft <= 0)
                 .map((l) => ({ ...l, upgrade: undefined })),
@@ -367,6 +377,7 @@ it("perf bench", () => {
   const result = {
     workload: { ...WORKLOAD, months },
     runs,
+    playsPerPathPerRun: 2,
     ticks: measured[0].ticks,
     monthsPlayed: measured[0].monthsPlayed,
     endedEarly: measured[0].endedEarly,
@@ -415,7 +426,7 @@ it("perf bench", () => {
   write("");
   write(
     `  Scenario ${WORKLOAD.scenarioId}, seed ${WORKLOAD.seed}, ${months} months ` +
-      `(${result.ticks} ticks), ${runs} warmed runs + a ${months}-month warmup`,
+      `(${result.ticks} ticks/play), ${runs} warmed counterbalanced runs (2 plays/path) + a ${months}-month warmup`,
   );
   if (result.endedEarly) {
     write(`  WARNING: workload ended early (${result.endedEarly})`);

@@ -2,6 +2,7 @@ import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import { productionChartMotion } from "./ProductionChartMotion";
+import { productionChartSurplus } from "./ProductionChartSurplus";
 import {
   productionChartStrokes,
   ProductionStroke,
@@ -55,6 +56,7 @@ type ChartData = Pick<
   | "demandW"
   | "supplyByFuel"
   | "storageChargeW"
+  | "customerBatteryGridChargeW"
   | "storageDischargeW"
   | "importedW"
   | "exportedW"
@@ -71,6 +73,8 @@ export interface Props {
   location: LocationType;
   height?: number;
   legend?: boolean;
+  /** Treat `height` as measured pixels. */
+  exactHeight?: boolean;
   timeline: ChartData[];
   startingYear: number;
   /** Individual fuel details follow the dispatch order in the facility list. */
@@ -108,6 +112,13 @@ const SUPPLY_FORECAST_DASH = [2, 3];
 const DEMAND_FORECAST_DASH = [8, 4];
 type SupplySource = "Variable" | "Dispatchable" | "Storage" | "Interties";
 
+const SOURCE_LEGEND: Record<SupplySource, string> = {
+  Variable: "Variable (solar, wind)",
+  Dispatchable: "Dispatchable (coal, gas…)",
+  Storage: "Storage",
+  Interties: "Interties",
+};
+
 function sourcePattern(source: SupplySource): LegendItemType["pattern"] {
   if (source === "Storage") return "hatch";
   if (source === "Interties") return "vertical";
@@ -144,6 +155,10 @@ export function productionStack(
   return { fuels, byFuel, stacked, production };
 }
 
+function storageChargingW(tick: ChartData): number {
+  return (tick.storageChargeW || 0) + (tick.customerBatteryGridChargeW || 0);
+}
+
 export function supplyDemandStack(
   timeline: ChartData[],
   fuelOrder: FuelNameType[],
@@ -174,7 +189,7 @@ export function supplyDemandStack(
   flows.forEach(([source, values]) => {
     const outward = timeline.some((tick) =>
       source === "Storage"
-        ? (tick.storageChargeW || 0) > 0
+        ? storageChargingW(tick) > 0
         : (tick.exportedW || 0) > 0,
     );
     if (!outward && !values.some((value) => value > 0)) return;
@@ -185,12 +200,13 @@ export function supplyDemandStack(
   });
   // Charging is the power drawn from the grid, before storage conversion losses. Stored Wh
   // and those losses must not be added again to this power balance.
+  const storageCharging = timeline.map(storageChargingW);
   const totalDemand = timeline.map(
-    (tick) => tick.demandW + (tick.storageChargeW || 0) + (tick.exportedW || 0),
+    (tick, i) => tick.demandW + storageCharging[i] + (tick.exportedW || 0),
   );
   const loadStack = [
     timeline.map((tick) => tick.demandW),
-    timeline.map((tick) => tick.demandW + (tick.storageChargeW || 0)),
+    timeline.map((tick, i) => tick.demandW + storageCharging[i]),
     totalDemand,
   ];
   return {
@@ -200,6 +216,7 @@ export function supplyDemandStack(
     supply,
     totalDemand,
     loadStack,
+    storageCharging,
     fuels,
     byFuel,
   };
@@ -256,6 +273,7 @@ function buildOptions({
   const { sources } = getState();
   const motion = productionChartMotion(getState);
   const loadBaseStart = sources.length + 1;
+  const surplus = productionChartSurplus(sources.length, loadBaseStart + 2);
   const fuelLineStart = loadBaseStart + 3;
   const chargingLineStart = fuelLineStart + sources.length * 2;
   const loadLineStart = chargingLineStart + 2;
@@ -293,7 +311,7 @@ function buildOptions({
     width: 0, // set by UPlotChart
     height: 0,
     pxAlign: 1,
-    padding: [18 * scale, 5 * scale, 24 * getTextScale(), 0],
+    padding: [18 * scale, 16, 24 * getTextScale(), 0],
     cursor: {
       x: true,
       y: false,
@@ -319,6 +337,7 @@ function buildOptions({
       {},
       ...sources.map((source) => ({
         fill: sourceFill(source),
+        paths: surplus.paths(linear),
         width: 0,
         points: { show: false },
       })),
@@ -366,8 +385,9 @@ function buildOptions({
     ],
     plugins: [
       dayNightRibbonPlugin(getState),
-      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.2),
+      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout),
       baselinePlugin(chartPalette().axis),
+      surplus.plugin,
       cache.plugin,
       motion.plugin,
       verticalLinePlugin(
@@ -384,7 +404,10 @@ function buildOptions({
             const ratio = uPlot.pxRatio;
             u.ctx.save();
             u.ctx.font = chartFont(ratio);
-            u.ctx.fillStyle = tickLabelFill();
+            u.ctx.fillStyle =
+              getComputedStyle(document.documentElement).getPropertyValue(
+                "--cursor-line",
+              ) || tickLabelFill();
             u.ctx.textAlign = "center";
             u.ctx.textBaseline = "alphabetic";
             const halfWidth = u.ctx.measureText("Now").width / 2;
@@ -441,7 +464,7 @@ export function formatProductionTooltip(
   const time = formatClockTime(date.minuteOfDay);
   const weather = productionWeather(d, state.units ?? "metric");
   const loads: Array<[string, number | undefined]> = [
-    ["Storage charging", d.storageChargeW],
+    ["Storage charging", storageChargingW(d)],
     ["Interties", d.exportedW],
   ];
   return [
@@ -485,6 +508,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     supply,
     totalDemand,
     loadStack,
+    storageCharging,
     fuels,
     byFuel,
   } = supplyDemandStack(timeline, fuelOrder);
@@ -572,9 +596,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   });
   const charging = splitPastProjected(
     loadStack[1].map((value, i) =>
-      (timeline[i].storageChargeW || 0) > 0 && (timeline[i].exportedW || 0) > 0
-        ? value
-        : null,
+      storageCharging[i] > 0 && (timeline[i].exportedW || 0) > 0 ? value : null,
     ),
     isForecast,
     { bridgeEnd: true },
@@ -616,10 +638,6 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     startingYear,
     units,
   };
-  const currentWeather = productionWeather(
-    timeline.findLast((tick) => tick.minute <= currentMinute) ?? timeline[0],
-    units,
-  );
 
   return (
     <div id="chartSupplyDemand" className="dailyProductionChart">
@@ -628,7 +646,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           items={[
             { name: "Demand", color: chartPalette().demand, dash: "8,4" },
             ...sources.map((source) => ({
-              name: source,
+              name: SOURCE_LEGEND[source],
               color: sourcePattern(source)
                 ? chartPalette().powerFlowPattern
                 : sourceColor(source),
@@ -641,7 +659,8 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         />
       )}
       <UPlotChart<State>
-        ariaLabel={`Chart of electricity supply and demand over the day. Day/night ribbon: ${describeDayNight(dayNight)}. Generation is grouped as Variable and Dispatchable. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
+        exactHeight={props.exactHeight}
+        ariaLabel={`Chart of electricity supply and demand over the day. Day/night ribbon: ${describeDayNight(dayNight)}. Generation is grouped as Variable and Dispatchable. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. Unfilled gaps between total load and supply show unused surplus. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
         interactiveTooltip
         formatSummaryValue={formatWatts}
         height={height}
@@ -664,7 +683,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           ...byFuel,
           supply,
           timeline.map((tick) => tick.demandW),
-          timeline.map((tick) => tick.storageChargeW || 0),
+          storageCharging,
           timeline.map((tick) => tick.exportedW || 0),
           totalDemand,
         ]}
@@ -687,13 +706,6 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         structureKey={sources.join(",")}
         tooltip={formatProductionTooltip}
       />
-      {currentWeather.length > 0 && (
-        <div className="productionWeather" aria-label="Current weather">
-          {currentWeather.map((condition) => (
-            <span key={condition}>{condition}</span>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

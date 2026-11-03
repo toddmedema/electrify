@@ -304,19 +304,20 @@ describe("The Shale Boom pilot arc", () => {
     expect(upcoming.map(({ title, message }) => ({ title, message }))).toEqual([
       {
         title: "Gas prices falling",
-        message: "Regional shale glut lowering local gas prices.",
+        message: "A regional shale glut will lower local gas prices.",
       },
       {
         title: "Winter freeze approaching",
-        message: "Gas costs spiking and gas plants producing less.",
+        message: "Gas costs will spike and gas plants will produce less.",
       },
       {
         title: "Gas output recovering",
-        message: "Plant limits lifting and lower boom-era prices returning.",
+        message:
+          "Plant limits will lift and lower boom-era prices will return.",
       },
       {
         title: "Gas boom ending",
-        message: "Natural gas prices returning to normal.",
+        message: "Natural gas prices will return to normal.",
       },
     ]);
     expect(resolveStoryAtDate(shaleContext(47)).effects).toEqual({});
@@ -447,8 +448,8 @@ describe("authored upcoming-event previews", () => {
     const start = { ...context(0, 113), difficulty: "Employee" as const };
     const forecasts = upcomingStoryPhases(start);
     expect(forecasts.map((event) => event.message)).toEqual([
-      "Coal output decreasing.",
-      ...Array(3).fill("Coal output decreasing further."),
+      "Coal output will decrease.",
+      ...Array(3).fill("Coal output will decrease further."),
     ]);
     const live = resolveStoryAtDate({
       ...start,

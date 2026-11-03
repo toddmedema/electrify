@@ -7,7 +7,11 @@ import reducer, {
   upgradeTransmissionLine,
 } from "../reducers/Game";
 import * as GameModule from "../reducers/Game";
-import { chooseScenarioResponse } from "../reducers/GameActions";
+import {
+  chooseScenarioResponse,
+  acquireUtility,
+} from "../reducers/GameActions";
+import { acquisitionQuote } from "./Expansion";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { DATA_CENTER_DECISION_KEY } from "../data/ScenarioChoices";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
@@ -21,9 +25,9 @@ import { cashRunwayMonths } from "./MissionStatus";
 let generate: jest.SpyInstance;
 let generatedForecast: ProjectionView["forecast"];
 beforeEach(() => {
-  const realGenerate = GameModule.generateNewTimeline;
+  const realGenerate = GameModule.generateForecastTimeline;
   generate = jest
-    .spyOn(GameModule, "generateNewTimeline")
+    .spyOn(GameModule, "generateForecastTimeline")
     .mockImplementation((...args) => {
       const timeline = realGenerate(...args);
       // Detach before buildProjection can transform anything: an in-place mutation
@@ -48,6 +52,7 @@ function expectGeneratedForecast(
     game.timeline[0].customers,
     projection.forecast.length,
     projection.projectionStepMinutes,
+    undefined,
   );
   expect(projection.forecast).toEqual(generatedForecast);
 }
@@ -67,7 +72,7 @@ it("adopts worker results with the original history identity without recalculati
 it("does not count ordinary within-month cash burn twice", () => {
   const game = createGame({ scenarioId: 111, seed: 7 });
   game.dollarsPerkWh = 0;
-  game.rateFollowsTarget = false;
+  game.rateFollowsInflation = false;
   game.timeline = generateNewTimeline(
     game,
     5_000_000,
@@ -144,6 +149,7 @@ it("caps a 100-year custom game at 20 years of cash and chart simulation", () =>
     game.timeline[0].customers,
     20 * 12 * 24,
     60,
+    undefined,
   );
   expect(projection.cashProjected).toHaveLength(240);
   expect(projection.financeProjected).toHaveLength(240);
@@ -188,4 +194,77 @@ it("refreshes projections when an intertie upgrade starts and completes", () => 
   const after = selectProjection(completed, completed.timeline[0]);
   expect(after).not.toBe(during);
   expectGeneratedForecast(completed, after);
+});
+
+it("forecasts weather and its demand effects instead of revealing the future record", () => {
+  const game = createGame({ scenarioId: 103, seed: 7 });
+  const before = JSON.stringify(game);
+  const projection = selectProjection(game, game.timeline[0]);
+  const predicted = projection.forecast.find(
+    (tick) => tick.minute === 12 * 60,
+  )!;
+  const actual = game.timeline.find(
+    (tick) => tick.minute === predicted.minute,
+  )!;
+  expect(predicted.temperatureC).not.toBe(actual.temperatureC);
+  expect(predicted.windKph).not.toBe(actual.windKph);
+  expect(predicted.solarIrradianceWM2).not.toBe(actual.solarIrradianceWM2);
+  expect(predicted.demandByType.Residential).not.toBe(
+    actual.demandByType.Residential,
+  );
+  expect(JSON.stringify(game)).toBe(before);
+});
+
+function acquiredGame(seed = 12345) {
+  let game = cloneDeep(createGame({ scenarioId: 116, seed }));
+  game.timeline[0].cash = 1e9;
+  game = cloneDeep(
+    reducer(
+      game,
+      buildTransmissionLine({
+        corridorId: "vt-champlain-ridge",
+        financed: true,
+      }),
+    ),
+  );
+  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  const quote = acquisitionQuote(game, "ridge-electric")!;
+  game = cloneDeep(
+    reducer(
+      game,
+      acquireUtility({
+        targetId: "ridge-electric",
+        financed: true,
+        quoteKey: quote.quoteKey,
+      }),
+    ),
+  );
+  return game;
+}
+
+it("projects acquisition obligations and corporate debt from the combined company", () => {
+  const game = acquiredGame();
+  const before = JSON.stringify(game);
+  const projection = selectProjection(game, game.timeline[0]);
+  expect(projection.forecast[0].customers).toBe(game.timeline[0].customers);
+  expect(projection.objectiveAssets!.length).toBeGreaterThan(0);
+  const opening = projection.objectiveAssets![0];
+  expect(opening.ownedUtilities).toEqual(["ridge-electric"]);
+  expect(opening.ownedAssetIds).toContain("scenario-116-champlain-oil-a");
+  expect(opening.debtPrincipal).toBeGreaterThan(250e6);
+  expect(JSON.stringify(game)).toBe(before);
+});
+
+it("reuses a running company forecast between decisions and month rollovers", () => {
+  const game = acquiredGame(7);
+  const initial = selectProjection(game, game.timeline[0]);
+  expect(generate).toHaveBeenCalledTimes(1);
+  game.date = getDateFromMinute(15, game.startingYear);
+  game.timeline[0].customers -= 1;
+  game.utilityExpansion!.networkAssets[0].retentionLowWatermark = 0.999;
+  expect(selectProjection(game, game.timeline[0])).toBe(initial);
+  expect(generate).toHaveBeenCalledTimes(1);
+  game.date = getDateFromMinute(MINUTES_PER_MONTH, game.startingYear);
+  expect(selectProjection(game, game.timeline[0])).not.toBe(initial);
+  expect(generate).toHaveBeenCalledTimes(2);
 });

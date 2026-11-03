@@ -425,6 +425,28 @@ describe("retrofits", () => {
     expect(peakW).toBeGreaterThan(0);
   });
 
+  it("completes staged winterization without reporting a return to service", () => {
+    const state = game(DENVER, HAIL.seed);
+    tickToMonth(state, 1);
+    const gas = state.facilities.find((f) => f.fuel === "Natural Gas")!;
+    gas.resilience = { coldWeatherPackage: false, designMinTempC: -8 };
+    const next = dispatch(
+      state,
+      retrofitFacility({ facilityId: gas.id, upgrade: "coldWeatherPackage" }),
+    );
+    tickToMinute(next, next.date.minute + MINUTES_PER_MONTH + TICK_MINUTES);
+    expect(
+      next.facilities.find((f) => f.id === gas.id)!.resilience
+        ?.coldWeatherPackage,
+    ).toBe(true);
+    const completed = next.eventLog.filter((e) =>
+      e.message.startsWith("Upgrade complete:"),
+    );
+    expect(completed.map((e) => e.message)).toEqual([
+      `Upgrade complete: ${gas.name} now has a cold-weather package`,
+    ]);
+  });
+
   it("cancels for a full refund and returns the plant to service at once", () => {
     const state = game(DENVER, HAIL.seed);
     tickToMonth(state, 1);
@@ -449,7 +471,7 @@ describe("retrofits", () => {
     expect(plant.upgradeInProgress).toBeUndefined();
     expect(plant.resilience?.coldWeatherPackage).toBeFalsy();
     expect(
-      cancelled.eventLog.some((e) => e.message.startsWith("Cancelled")),
+      cancelled.eventLog.some((e) => e.message.startsWith("Canceled")),
     ).toBe(true);
     // Cash ends where it would have been had the player never started it, give or take the
     // one tick of lost output

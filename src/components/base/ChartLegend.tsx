@@ -27,6 +27,8 @@ export interface LegendItemType {
 export interface Props {
   items: LegendItemType[];
   inline?: boolean;
+  /** Plain text that explains the chart's line and shading conventions. */
+  note?: string;
 }
 
 export default function ChartLegend(props: Props): React.JSX.Element {
@@ -76,6 +78,7 @@ export default function ChartLegend(props: Props): React.JSX.Element {
           {item.name}
         </span>
       ))}
+      {props.note && <span className="chartLegendNote">{props.note}</span>}
     </div>
   );
 }

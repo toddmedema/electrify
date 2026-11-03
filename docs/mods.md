@@ -108,17 +108,21 @@ effects, asset availability and byte limits.
 ### Goals
 
 Omit `objectives` to keep the normal/base goals. Supply a plain list to use your
-own goals; `[]` means survival only. No mode field is needed:
+own goals; `[]` means survival only. All scenarios end after 3 months in a row
+below the difficulty's demand-served threshold: Intern 90%, Employee 95%, Manager
+97%, VP 99%, CEO 99.5%. Authors cannot override this rule.
+
+No mode field is needed:
 
 ```json
 "objectives": [
   {
-    "id": "service",
-    "label": "Keep customers supplied",
-    "metric": "monthlyReliability",
+    "id": "bills",
+    "label": "Keep bills affordable",
+    "metric": "monthlyBilledRate",
     "fromMonth": 1,
     "throughMonth": 24,
-    "minDemandServedShare": 0.995
+    "maxDollarsPerKWh": 0.2
   }
 ]
 ```
@@ -130,7 +134,6 @@ without ending the company.
 
 | Metric                     | Measurement and boundary                                                                                                                            |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `monthlyReliability`       | Customer electricity delivered / customer demand in **every** completed month of the inclusive window; target `minDemandServedShare`.               |
 | `customerRetention`        | Customers / recorded starting customers at `deadlineMonth`; target `minRetainedShare`. Earlier losses can be recovered before the deadline.         |
 | `emissionsBudget`          | Cumulative electricity and construction tonnes CO₂e in the window, including imports and exports; target `budgetTonnesCO2e`.                        |
 | `emissionsPerDeliveredMWh` | Total kg CO₂e / delivered customer MWh over the entire window; target `maxKgCO2ePerMWh`.                                                            |
@@ -277,16 +280,16 @@ The [worked package](mods/worked-timeline.json) starts in January 2020, runs
   upgrade, or accept a grant. The latter two options enable `new-demand` in that
   same opening.
 - A conditional `demandMultiplier: 1.1` from month 13, with `durationMonths: "untilEnd"`.
-- A required reliability goal observing months 13–24, inclusive.
+- The shared difficulty reliability rule throughout the run.
 
-| Playable month | Calendar               | Active rules and accounting                                                                                                                                                                         | Objective observation                                                                        |
-| -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| 12             | December 2020          | Maintenance expense applies; the choice and conditional demand are still future.                                                                                                                    | Outside the goal window.                                                                     |
-| 13, opening    | January 2021           | Maintenance has expired. `grid-plan` blocks before any tick. Upgrading or accepting support activates the 1.1× demand factor immediately; maintaining does not. The option transfer is booked once. | First goal month begins after the decision.                                                  |
-| 13, close      | January 2021           | The chosen branch remains active.                                                                                                                                                                   | Judge completed month 13, never a forecast or a partial month.                               |
-| 14–23          | February–November 2021 | The 1.1× factor continues on its two enabled branches; no new option payments.                                                                                                                      | Judge each completed month separately.                                                       |
-| 24             | December 2021          | The factor still applies.                                                                                                                                                                           | Judge the twelfth and final observation at close; all months 13–24 must satisfy reliability. |
-| 25             | January 2022           | `untilEnd` still applies through this final playable month.                                                                                                                                         | Month 25 is outside this goal window; ordinary game failures still apply until the run ends. |
+| Playable month | Calendar               | Active rules and accounting                                                                                                                                                                         | Objective observation                                         |
+| -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 12             | December 2020          | Maintenance expense applies; the choice and conditional demand are still future.                                                                                                                    | Shared reliability rule applies.                              |
+| 13, opening    | January 2021           | Maintenance has expired. `grid-plan` blocks before any tick. Upgrading or accepting support activates the 1.1× demand factor immediately; maintaining does not. The option transfer is booked once. | Shared reliability rule applies after the decision.           |
+| 13, close      | January 2021           | The chosen branch remains active.                                                                                                                                                                   | Judge the completed month, never a forecast or partial month. |
+| 14–23          | February–November 2021 | The 1.1× factor continues on its two enabled branches; no new option payments.                                                                                                                      | Track consecutive months below the difficulty threshold.      |
+| 24             | December 2021          | The factor still applies.                                                                                                                                                                           | A third consecutive month below the threshold ends the run.   |
+| 25             | January 2022           | `untilEnd` still applies through this final playable month.                                                                                                                                         | Ordinary game failures still apply until the run ends.        |
 
 Months are one-based. An effect starting in month 13 for two months expires at
 the opening of month 15. `untilEnd` includes the final month, even if a goal's

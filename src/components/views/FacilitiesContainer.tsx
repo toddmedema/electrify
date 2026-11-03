@@ -1,6 +1,12 @@
 import type { AppDispatch } from "../../Store";
+import { acquireUtility } from "../../reducers/GameActions";
+import { ownedUtility } from "../../helpers/Expansion";
 import { connectToStore } from "../base/ConnectToStore";
 import { navigate } from "../../reducers/Card";
+import {
+  INTERTIE_UPGRADE_APPROVED,
+  intertieApprovedMessage,
+} from "../../helpers/BuildConsequences";
 import {
   sellFacility,
   setSpeed,
@@ -13,7 +19,8 @@ import {
   upgradeTransmissionLine,
   cancelTransmissionLine,
   togglePauseTransmissionLine,
-  setTradingPolicy,
+  setBuyingRule,
+  setSellingRule,
 } from "../../reducers/Game";
 import {
   selectFacility,
@@ -111,11 +118,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         ({ id }) => id === corridorId,
       );
       if (corridor) {
-        dispatch(
-          snackbarOpen(
-            `Intertie approved — power can flow in ${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}.`,
-          ),
-        );
+        dispatch(snackbarOpen(intertieApprovedMessage(corridor.yearsToBuild)));
       }
     },
     onTransmissionCancel: (id) => {
@@ -134,16 +137,30 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           }),
         );
     },
+    onUtilityAcquire: async (payload) => {
+      const multiplayer = multiplayerRuntime();
+      if (multiplayer) {
+        await multiplayer.submit({
+          kind: "action",
+          name: "acquireUtility",
+          payload,
+        });
+        return true;
+      }
+      return dispatch((dispatch, getState) => {
+        dispatch(acquireUtility(payload));
+        return ownedUtility(getState().game, payload.targetId);
+      });
+    },
     onTransmissionUpgrade: (corridorId, financed) => {
       dispatch(upgradeTransmissionLine({ corridorId, financed }));
-      dispatch(
-        snackbarOpen(
-          "Upgrade approved. The line stays operational during construction.",
-        ),
-      );
+      dispatch(snackbarOpen(INTERTIE_UPGRADE_APPROVED));
     },
-    onTradingPolicy: (policy) => {
-      dispatch(setTradingPolicy(policy));
+    onBuyingRule: (rule) => {
+      dispatch(setBuyingRule(rule));
+    },
+    onSellingRule: (rule) => {
+      dispatch(setSellingRule(rule));
     },
   };
 };

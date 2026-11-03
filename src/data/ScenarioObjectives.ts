@@ -29,6 +29,10 @@ export interface ObjectiveContext {
   ownership: "Investor" | "Public";
   completedMonths: number;
   marketSize?: number;
+  /** Acquisitions use one aggregate baseline and are judged only at their deadline. */
+  retentionAtDeadlineOnly?: boolean;
+  /** Derived from immutable transfer receipts; never persisted as customer state. */
+  retentionBaselines?: Readonly<Record<number, number>>;
 }
 
 export interface ObjectiveMonthFacts {
@@ -39,6 +43,9 @@ export interface ObjectiveMonthFacts {
   debtPrincipal?: number;
   /** Counts every owned asset, including paused and unfinished facilities. */
   ownedFuels?: Partial<Record<FuelNameType, number>>;
+  ownedUtilities?: string[];
+  /** Stable original equipment identities still owned at this month close. */
+  ownedAssetIds?: string[];
 }
 
 /** Missing/invalid observations are explicit nulls, never zero or a passing ratio. */

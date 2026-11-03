@@ -5,6 +5,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Stack,
   Typography,
 } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
@@ -62,33 +63,29 @@ export default function CloudSavePrompt(): React.JSX.Element {
       aria-labelledby="cloud-prompt-title"
       aria-describedby="cloud-prompt-description"
     >
-      <DialogTitle id="cloud-prompt-title">
+      <DialogTitle id="cloud-prompt-title" sx={{ pb: 1 }}>
         Back up your saves to the cloud
       </DialogTitle>
-      <DialogContent>
-        <Typography id="cloud-prompt-description">
-          Sign in with Google or Apple to keep a private cloud backup and
-          continue on another device. Your games still save and load on this
-          device, even offline.
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          You can also sign in later from Saved games.
-        </Typography>
+      <DialogContent sx={{ pb: 0 }}>
+        <Stack spacing={1.5} useFlexGap>
+          <Typography id="cloud-prompt-description">
+            Sign in to keep a private cloud backup and continue on another
+            device. Your games still save and load on this device, even offline.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            You can also sign in later from Saved games.
+          </Typography>
+        </Stack>
       </DialogContent>
       <DialogActions
-        sx={{
-          flexDirection: "column",
-          gap: 1,
-          px: 3,
-          pb: 2,
-          "& > :not(style) ~ :not(style)": { ml: 0 },
-        }}
+        sx={{ flexDirection: "column", alignItems: "stretch", pt: 1, gap: 1 }}
       >
         <SignInButtons
-          onSignIn={async (provider) => {
+          variant="contained"
+          onSignIn={async (options) => {
             setBusy(true);
             try {
-              const ok = await login(provider);
+              const ok = await login(options);
               if (ok) setOpen(false);
               return ok;
             } finally {

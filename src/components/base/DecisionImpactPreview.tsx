@@ -22,22 +22,39 @@ export default function DecisionImpactPreview({
     <section className="decisionImpact" aria-label="Expected impact">
       <div className="decisionImpactFacts">
         {facts.map((fact) => (
-          <div className="decisionImpactFact" key={fact.label}>
+          <div
+            className={`decisionImpactFact${fact.help ? " decisionImpactFactWithHelp" : ""}`}
+            key={fact.label}
+          >
             <ConceptIcon concept={fact.concept} fontSize="small" />
-            <div>
-              <Typography variant="caption" component="div">
+            <div className="decisionImpactFactContent">
+              <Typography
+                className="decisionImpactFactLabel"
+                variant="caption"
+                component="div"
+              >
                 {fact.label}
-                {fact.help}
               </Typography>
-              <Typography variant="body2" component="div">
+              <Typography
+                className="decisionImpactFactValue"
+                variant="body2"
+                component="div"
+              >
                 <strong>{fact.value}</strong>
               </Typography>
               {fact.detail && (
-                <Typography variant="caption" color="textSecondary">
+                <Typography
+                  className="decisionImpactFactDetail"
+                  variant="caption"
+                  color="textSecondary"
+                >
                   {fact.detail}
                 </Typography>
               )}
             </div>
+            {fact.help && (
+              <div className="decisionImpactFactHelp">{fact.help}</div>
+            )}
           </div>
         ))}
       </div>

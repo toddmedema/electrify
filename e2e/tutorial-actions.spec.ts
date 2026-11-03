@@ -75,6 +75,8 @@ for (const [index, mission] of missions.entries()) {
       await page.keyboard.press("s");
     }
     await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+    if (mission.name === "Electricity")
+      await page.getByRole("button", { name: "Next", exact: true }).click();
     const target = page.locator(".tutorialTarget").first();
     await expect(target).toBeInViewport();
     await target.click({ trial: true });
@@ -93,9 +95,8 @@ for (const [index, mission] of missions.entries()) {
       await build.click();
       await sortBuildCatalog(page);
       await page
-        .locator(".tutorialHud")
-        .getByRole("button", { name: "Next", exact: true })
-        .click();
+        .locator(".constructionCapacitySlider input")
+        .press("ArrowLeft");
       const purchase = page
         .getByRole("button", { name: /Review purchase of/ })
         .first();

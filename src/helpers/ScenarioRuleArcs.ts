@@ -216,7 +216,7 @@ const only = (value: Record<string, unknown>, keys: readonly string[]) =>
 const identifier = (value: unknown): value is string =>
   typeof value === "string" && /^[a-z][a-z0-9-]{0,79}$/.test(value);
 const IMPORTABLE_ARCS = [
-  100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115,
+  100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115, 116,
 ];
 
 function validActionTarget(value: unknown): boolean {

@@ -39,12 +39,12 @@ const packageData = (): ModPackage =>
     },
     objectives: [
       {
-        id: "reliable",
-        label: "Serve demand",
-        metric: "monthlyReliability",
+        id: "affordable",
+        label: "Keep bills affordable",
+        metric: "monthlyBilledRate",
         fromMonth: 1,
         throughMonth: 6,
-        minDemandServedShare: 1,
+        maxDollarsPerKWh: 1,
       },
       {
         id: "free-bills",
@@ -260,7 +260,7 @@ test("pending and answered co-op saves retain their frozen rules after the packa
       expect(gameObjectiveResults(game)).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            id: "reliable",
+            id: "affordable",
             required: true,
             status: "completed",
           }),

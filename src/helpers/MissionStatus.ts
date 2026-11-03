@@ -11,19 +11,24 @@ import {
   demandServed,
   formatRequiredShare,
   hasChronicBlackouts,
-  blackoutFiringThreshold,
+  reliabilityThreshold,
+  reliabilityRuleText,
   gameObjectiveResults,
 } from "./ObjectiveRules";
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
 import { TICK_MINUTES } from "../Constants";
 import { formatMoneyStable } from "./Format";
 import { selectProjection } from "./Projection";
+import { isUtilityExpansionGame } from "./ExpansionContext";
+import { MONTHS } from "../Constants";
+import { utilityServiceGap } from "./UtilityPlanning";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import {
+  objectiveDefinitionText,
+  objectiveGoalText,
   objectiveObservedText,
   objectiveTargetText,
   objectiveValueText,
-  objectiveWindowText,
 } from "./ObjectivePresentation";
 
 export interface MissionRequirement {
@@ -41,9 +46,7 @@ export interface MissionRequirement {
   reason?: string;
 }
 
-// A month that fell a hair short must never print as a whole "100%": the reliability
-// objective can require exactly 100% served, and a rounded-up reading would contradict the
-// FAILED chip beside it. Rounding down keeps the number on the honest side of the threshold.
+// Keep displayed monthly service on the honest side of the failure threshold.
 function formatServed(fraction: number): string {
   const floored = Math.floor(fraction * 1000) / 10;
   return Number.isInteger(floored) ? `${floored}%` : `${floored.toFixed(1)}%`;
@@ -83,23 +86,19 @@ function objectiveRequirement(
   } as const;
   const target = objectiveTargetText(objective);
   const current = objectiveObservedText(result);
-  const window = objectiveWindowText(objective, startingYear, durationMonths);
   const observed =
     result.observed === undefined
       ? "pending"
       : objectiveValueText(objective, result.observed, result.target);
-  const compact =
-    objective.metric === "monthlyReliability"
-      ? `Demand served ≥ ${objectiveValueText(objective, result.target)} (${observed})`
-      : `${target} (${observed})`;
+  const compact = `${target} (${observed})`;
   return {
     id: result.id,
     label: result.label,
-    definition: result.definition,
+    definition: objectiveDefinitionText(result),
     required: result.required,
     reason: result.reason,
     current,
-    target: `${target} · ${window}`,
+    target: objectiveGoalText(objective, startingYear, durationMonths),
     compact: `${result.required ? "" : "Optional · "}${compact}${result.status === "unverifiable" ? " · incomplete history" : ""}`,
     timing: `Completed months ${(first % 12) + 1}/${startingYear + Math.floor(first / 12)}–${(last % 12) + 1}/${startingYear + Math.floor(last / 12)}${result.required ? "" : "; optional, does not end the run"}`,
     status: statuses[result.status],
@@ -120,12 +119,12 @@ export function getMissionStatus(game: GameType) {
   );
   requirements.push({
     id: "cash",
-    label: "Keep the utility solvent",
+    label: "Stay solvent",
     compact: `Cash ≥ $0 (${now ? formatMoneyStable(now.cash) : "unavailable"})`,
     current: now
       ? `${formatMoneyStable(now.cash)} now`
       : "Current cash unavailable",
-    target: "Cash ≥$0 at every month-end",
+    target: "Cash ≥ $0 at each month-end",
     timing:
       "Checked at month end; negative cash now is a warning, not a final outcome",
     status: "in-progress",
@@ -133,7 +132,7 @@ export function getMissionStatus(game: GameType) {
   });
   const latest = history.slice(0, 3);
   const firingThreshold = formatRequiredShare(
-    blackoutFiringThreshold(game.difficulty),
+    reliabilityThreshold(game.difficulty),
   );
   const consecutive =
     latest.length === 3 &&
@@ -143,7 +142,7 @@ export function getMissionStatus(game: GameType) {
     );
   requirements.push({
     id: "survival",
-    label: "Avoid chronic blackouts",
+    label: "Keep power flowing",
     compact: `Avoid 3 consecutive months < ${firingThreshold} served (${
       latest.length
         ? latest
@@ -160,7 +159,7 @@ export function getMissionStatus(game: GameType) {
           .map((row) => formatServed(demandServed(row)))
           .join(" · ")}`
       : "No completed months",
-    target: `Avoid 3 consecutive months <${firingThreshold} served`,
+    target: reliabilityRuleText(game.difficulty),
     timing:
       "Checked at month end; current ticks are not completed-month results",
     status: consecutive
@@ -183,13 +182,17 @@ export function getMissionStatus(game: GameType) {
         a.item.deadline - b.item.deadline ||
         a.index - b.index,
     )[0]?.item;
+  const authored = requirements.filter(
+    (item) => item.required && item.definition,
+  );
+  const nextAuthored = authored
+    .filter((item) => item.status !== "completed" && item.status !== "waived")
+    .sort((a, b) => a.deadline - b.deadline)[0];
   return {
     label: scenario?.name || "Custom game",
     requirements,
     prominent,
-    headline:
-      requirements.find((item) => item.required && item.definition) ||
-      prominent,
+    headline: nextAuthored || authored[0] || prominent,
     monthsRemaining,
     finalNote:
       monthsRemaining === 0
@@ -289,29 +292,45 @@ export function selectMissionRisk(
   const mission = suppliedStatus ?? getMissionStatus(game);
   const missed = mission.requirements.find(
     (row) =>
-      row.required !== false &&
-      row.status === "failed" &&
-      (row.definition || row.id === "reliability"),
+      row.required !== false && row.status === "failed" && row.definition,
   );
   if (missed)
     return {
-      id:
-        missed.id === "reliability" ? "reliability" : `objective:${missed.id}`,
+      id: `objective:${missed.id}`,
       label: `${missed.label} missed · Scenario`,
-      shortLabel:
-        missed.id === "reliability" ? "Reliability missed" : "Objective missed",
+      shortLabel: "Objective missed",
       target: "mission-details",
     };
   // A shortage later in today's operating sample is reported by the grid readout beside this
   // (see getGridHealth), the same way a shortage happening now is.
   const runway = cashRunwayMonths(game);
-  if (runway !== undefined) {
+  const gap =
+    isUtilityExpansionGame(game) && now
+      ? utilityServiceGap(game, selectProjection(game, now))
+      : undefined;
+  const gapMonth = gap
+    ? (gap.year - game.startingYear) * 12 + gap.month - 1
+    : undefined;
+  if (
+    runway !== undefined &&
+    (gapMonth === undefined || runway <= gapMonth - game.date.monthsElapsed)
+  ) {
     const months = Math.max(1, Math.round(runway));
     return {
       id: "cash-runway",
       label: `Projected cash runs out in about ${months} ${months === 1 ? "month" : "months"} · Check finances`,
       shortLabel: `Cash out in ~${months} mo`,
       target: "finances",
+    };
+  }
+  if (gapMonth !== undefined) {
+    const month = gapMonth;
+    const when = `${MONTHS[month % 12]} ${game.startingYear + Math.floor(month / 12)}`;
+    return {
+      id: `supply-plan:${month}`,
+      shortLabel: `Supply risk: ${when}`,
+      label: `Monthly service is projected below ${formatRequiredShare(reliabilityThreshold(game.difficulty))} from ${when} at current rates and policies. Review customer growth, contract changes and project lead times in Scenario.`,
+      target: "mission-details",
     };
   }
   const event = upcoming

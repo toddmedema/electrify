@@ -442,7 +442,9 @@ export default function Settings(props: Props): React.JSX.Element {
                       width: { xs: "100%", sm: "auto" },
                       flexWrap: "wrap",
                       "& .MuiButton-root": {
-                        flex: { xs: "1 1 140px", sm: "0 0 auto" },
+                        flex: props.loggedIn
+                          ? { xs: "1 1 140px", sm: "0 0 auto" }
+                          : "0 0 auto",
                       },
                     }}
                   >
@@ -491,14 +493,9 @@ export default function Settings(props: Props): React.JSX.Element {
                   id="keyboard-shortcuts-summary"
                   sx={{ minHeight: 56, px: 2 }}
                 >
-                  <Box>
-                    <Typography sx={{ fontWeight: 600 }}>
-                      Keys for faster play
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      View {SHORTCUTS.length} shortcuts
-                    </Typography>
-                  </Box>
+                  <Typography sx={{ fontWeight: 600 }}>
+                    View {SHORTCUTS.length} shortcuts
+                  </Typography>
                 </AccordionSummary>
                 <AccordionDetails
                   id="keyboard-shortcuts-content"

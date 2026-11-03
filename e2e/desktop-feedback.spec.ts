@@ -285,7 +285,7 @@ test("fresh desktop sound is on, local menu cues require user input, and saved m
   ).not.toBeChecked();
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("button", { name: "Settings", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("ArrowUp");
   await settleInput(page);
@@ -581,7 +581,7 @@ test("zero Effects volume silences cached menu cues and persists independently o
   const before = (await menuSources()).length;
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("button", { name: "Settings", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("ArrowUp");
   await settleInput(page);
@@ -668,7 +668,7 @@ test("an arrow immediately after leaving Settings cannot change the exiting volu
   expect(audit.volume).toBe("0");
   await page.clock.runFor(1000);
   await expect(
-    page.getByRole("button", { name: "Settings", exact: true }),
+    page.getByRole("button", { name: "Play", exact: true }),
   ).toBeFocused();
   await page.clock.resume();
   await page.reload();

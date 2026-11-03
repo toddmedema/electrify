@@ -3,9 +3,8 @@ import { render, screen, within } from "@testing-library/react";
 import VictoryConditions from "./VictoryConditions";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../../data/Scenarios";
 import { modScenario } from "../../mods/ModScenario";
-import { objectiveDefinition } from "../../helpers/ScenarioObjectives";
 
-it("separates requirements from points and keeps measurement help secondary", () => {
+it("separates requirements from points", () => {
   render(
     <VictoryConditions
       scenario={SCENARIOS.find((scenario) => scenario.id === 100)!}
@@ -21,14 +20,10 @@ it("separates requirements from points and keeps measurement help secondary", ()
     within(scoring).getByText(/Financial performance/),
   ).toBeInTheDocument();
   expect(within(scoring).getByText(/Environmental impact/)).toBeInTheDocument();
-  expect(screen.getByText("How objectives are measured")).toBeVisible();
-  expect(
-    screen.getByText(objectiveDefinition("customerRetention")),
-  ).not.toBeVisible();
 });
 
 it.each(["Public", "Investor"] as const)(
-  "shows canonical required retention and reliability objectives for %s ownership",
+  "shows canonical required retention objectives for %s ownership",
   (ownership) => {
     render(
       <VictoryConditions
@@ -40,28 +35,12 @@ it.each(["Public", "Investor"] as const)(
           startingYear: 2020,
           minimumCustomerRetention: 0.9,
           startingCustomers: 16500,
-          reliabilityObjective: {
-            year: 2025,
-            month: 1,
-            minimumDemandServed: 0.99,
-            label: "winter emergency",
-            durationMonths: 2,
-          },
         }}
         difficulty="Manager"
       />,
     );
     expect(
-      screen.getByText(/Retain ≥90% of starting customers/),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/≥99% of demand monthly/)).toHaveTextContent(
-      "Jan–Feb 2025",
-    );
-    expect(
-      screen.getByText(objectiveDefinition("monthlyReliability")),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(objectiveDefinition("customerRetention")),
+      screen.getByText(/Keep ≥90% of customer baseline/),
     ).toBeInTheDocument();
   },
 );
@@ -99,9 +78,6 @@ it("labels optional goals and explains their actual units without making them a 
       "Affordable practice",
     ),
   ).toBeNull();
-  expect(
-    screen.getByText(objectiveDefinition("monthlyBilledRate")),
-  ).toBeInTheDocument();
   expect(screen.getByText(/Bills ≤\$0.123456789\/kWh/)).toBeInTheDocument();
   expect(
     screen.getByText("Stretch goals; not required to win."),
@@ -121,19 +97,19 @@ it("keeps internal decision tracking out of player victory conditions", () => {
   expect(
     screen.queryByTestId("meaningful-decision-history"),
   ).not.toBeInTheDocument();
-  expect(screen.getByText(/Serve at least/)).toHaveTextContent(
-    "Serve at least 90% of demand. Three consecutive months below this end the run.",
+  expect(screen.getByText(/Serving less than/)).toHaveTextContent(
+    "Serving less than 97% of demand for 3 months in a row ends the run.",
   );
 });
 
-it("explains the stricter Expert blackout limit", () => {
+it("explains the CEO reliability limit", () => {
   render(
     <VictoryConditions
       scenario={SCENARIOS.find((scenario) => scenario.id === 100)!}
       difficulty="CEO"
     />,
   );
-  expect(screen.getByText(/Serve at least/)).toHaveTextContent(
-    "Serve at least 95% of demand. Three consecutive months below this end the run.",
+  expect(screen.getByText(/Serving less than/)).toHaveTextContent(
+    "Serving less than 99.5% of demand for 3 months in a row ends the run.",
   );
 });

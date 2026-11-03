@@ -1,10 +1,9 @@
 import { activeScenario } from "../helpers/GameSelectors";
 import type { AppDispatch } from "../Store";
 import { connect } from "react-redux";
-import { delta } from "../reducers/Game";
-import { quitSavedGame } from "../SaveSession";
+import { quit } from "../reducers/Game";
 import { changeTutorialStep, recordTutorialExited } from "../reducers/Tutorial";
-import { dialogClose, snackbarClose, snackbarOpen } from "../reducers/UI";
+import { dialogClose, snackbarClose } from "../reducers/UI";
 import {
   AppStateType,
   ScenarioType,
@@ -56,23 +55,9 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       // identical side effects
       changeTutorialStep(dispatch, change);
     },
-    onTutorialEnd(tutorialSteps: TutorialStepType[] | undefined): void {
+    onTutorialEnd(_tutorialSteps: TutorialStepType[] | undefined): void {
       dispatch((_dispatch, getState) => recordTutorialExited(getState().game));
-      // Past the last step, which is how a finished walkthrough is represented too
-      dispatch(delta({ tutorialStep: (tutorialSteps || []).length }));
-      // On its own, closing just makes the overlay vanish and leaves the player sitting in
-      // a paused scenario with no idea what happened - so say so, and offer the way out
-      dispatch(
-        snackbarOpen({
-          message: "Walkthrough closed - keep playing, or pick another mission",
-          actionLabel: "Missions",
-          action: () => {
-            void quitSavedGame({ toScenarioList: true });
-          },
-          open: true,
-          timeout: 6000,
-        }),
-      );
+      dispatch(quit());
     },
   };
 };

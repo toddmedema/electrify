@@ -23,8 +23,9 @@ are retained for saved runs, achievements and links.
 
 ## Player contract
 
-Prepare replacement supply before the outage and supply at least 99.5% of demand during
-the two emergency months. Buying more capacity on the affected route retains its 90%
+Prepare replacement supply before the outage. The shared difficulty rule applies:
+three months in a row below 90%, 95%, 97%, 99% or 99.5% demand served ends the run,
+from Intern through CEO. Buying more capacity on the affected route retains its 90%
 restriction. Local generation, storage, demand programs and independent connections use
 the ordinary construction and dispatch systems; there is no preparedness purchase.
 

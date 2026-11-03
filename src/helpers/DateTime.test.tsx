@@ -31,10 +31,10 @@ import { createGame } from "../testing/Simulator";
 
 describe("formatMinuteOfDayChartAxis", () => {
   it("formats a day in twelve-hour time", () => {
-    expect(formatMinuteOfDayChartAxis(0)).toEqual("12am");
-    expect(formatMinuteOfDayChartAxis(12 * 60)).toEqual("12pm");
-    expect(formatMinuteOfDayChartAxis(19 * 60)).toEqual("7pm");
-    expect(formatMinuteOfDayChartAxis(5 * 1440 + 6 * 60)).toEqual("6am");
+    expect(formatMinuteOfDayChartAxis(0)).toEqual("12 AM");
+    expect(formatMinuteOfDayChartAxis(12 * 60)).toEqual("12 PM");
+    expect(formatMinuteOfDayChartAxis(19 * 60)).toEqual("7 PM");
+    expect(formatMinuteOfDayChartAxis(5 * 1440 + 6 * 60)).toEqual("6 AM");
   });
 });
 
@@ -210,6 +210,8 @@ describe("summarizeTimeline", () => {
       tick.windAirborneKph = 0;
       tick.solarIrradianceWM2 = 0;
       tick.storedWh = index * 1000;
+      tick.customerBatteryWh = undefined;
+      tick.customerBatteryLossWh = 0;
     });
     const original = JSON.stringify(timeline);
     const average = summarizeTimeline(timeline, 2020).chartAverage!;
@@ -217,6 +219,8 @@ describe("summarizeTimeline", () => {
     expect(average.demandByType["Data Centers"]).toBe(100);
     expect(average.supplyByFuel.Coal).toBe(65);
     expect(average.storedWh).toBe(500);
+    expect(average).not.toHaveProperty("customerBatteryWh");
+    expect(average.customerBatteryLossWh).toBe(0);
     expect(average.windKph).toBe(50);
     expect(average.renewableCapacityFactors!.Wind).toBeGreaterThanOrEqual(0);
     expect(JSON.stringify(timeline)).toBe(original);

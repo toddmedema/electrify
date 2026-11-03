@@ -159,9 +159,11 @@ function accumulateTick(
   if (!summary.chartAverage) {
     // Runtime dispatch metadata uses symbol keys and must never enter a persisted chart record.
     const sample = Object.fromEntries(
-      Object.entries(t),
+      // Optional inactive meters may be explicitly undefined in live browser frames. Keep
+      // the persisted numeric chart record identical before and after JSON/IndexedDB encoding.
+      Object.entries(t).filter(([, value]) => value !== undefined),
     ) as TickPresentFutureType;
-    // Recovery batches belong to resumable ticks, not averaged chart history.
+    // Local resumable frames and recovery batches are not numeric averaged chart history.
     delete sample.deferredResidential;
     delete sample.deferredResidentialStart;
     delete sample.deferredThermal;
@@ -229,7 +231,8 @@ function accumulateTick(
       0,
     ) +
     (t.storageDischargeW || 0) +
-    (t.importedW || 0);
+    (t.importedW || 0) -
+    (t.storageImportedW || 0);
   const deliveredShare =
     grossSourcesW > 0 ? Math.min(t.demandW, t.supplyW) / grossSourcesW : 0;
   (Object.entries(t.supplyByFuel) as [FuelNameType, number][]).forEach(
@@ -573,12 +576,12 @@ export function getDateFromMinute(
   };
 }
 
-// eg "4am", "12pm" - a bare clock time for chart axes, where the day and month are already known
+// eg "4 AM", "12 PM" - a bare clock time for chart axes, where the day and month are already known
 export function formatMinuteOfDayChartAxis(minute: number): string {
   const hourOfDay = Math.floor((minute % 1440) / 60);
   return (
     (hourOfDay % 12 === 0 ? 12 : hourOfDay % 12) +
-    (hourOfDay < 12 ? "am" : "pm")
+    (hourOfDay < 12 ? " AM" : " PM")
   );
 }
 

@@ -77,6 +77,12 @@ async function mockDesktop(
 ) {
   await page.addInitScript(
     ({ entries: initial, steamOnline, theme }) => {
+      // These journeys mock Steam independently of browser connectivity. Keep
+      // Workshop checks independent of the host machine's network status too.
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        get: () => true,
+      });
       localStorage.clear();
       localStorage.setItem("audioEnabled", "false");
       localStorage.setItem("musicVolume", "0.5");
@@ -316,7 +322,9 @@ for (const [theme, winning] of [
     await easy.focus();
     await page.keyboard.press("Enter");
     await expect(easy).toHaveAttribute("aria-pressed", "true");
-    await expect(launch).toContainText("Serve the connected city");
+    await expect(launch).toContainText(
+      "Serving less than 95% of demand for 3 months in a row ends the run.",
+    );
     await expect(launch).toContainText("Retain your starting customers");
     await expect(launch).toContainText(
       "Modded run · unranked · no achievements",
@@ -494,36 +502,30 @@ for (const [theme, winning] of [
         page.getByRole("button", { name: "Scenario", exact: true }),
       );
       await expect(
-        scenario.getByRole("region", { name: "Victory conditions" }),
-      ).toContainText("1/36 months completed");
-      expect(
-        (await readSavedGame(page))!.objectiveProgress?.completedMonths,
-      ).toBe(73);
+        scenario.getByRole("region", { name: "Goals" }),
+      ).toContainText(
+        "Serving less than 95% of demand for 3 months in a row ends the run.",
+      );
+      await expect(
+        scenario.getByRole("region", { name: "Goals" }),
+      ).not.toContainText(/months completed|Not started/);
       await page.keyboard.press("Escape");
       await appbar
         .getByRole("button", { name: "fast speed", exact: true })
         .click();
     }
     const result = page.getByRole("dialog", {
-      name: winning
-        ? "A bigger city, a bigger grid"
-        : "Mission objective missed",
+      name: winning ? "A bigger city, a bigger grid" : "Fired!",
       exact: true,
     });
     await advanceExampleTo(page, result);
-    const evidence = result.getByRole("region", {
-      name: "Objective results",
-    });
-    await expect(evidence).toContainText(
-      `Serve the connected city · Required · ${winning ? "Met" : "Failed"}`,
-    );
-    await expect(evidence).toContainText("Months 73–108");
-    await expect(evidence).toContainText(
-      winning ? "36/36 months completed" : "1/36 months completed",
-    );
+    const evidence = result.getByRole("region", { name: "Mission results" });
+    await expect(
+      result.getByRole("region", { name: "Objective results" }),
+    ).toContainText("Retain your starting customers");
     if (!winning)
-      await expect(evidence).toContainText(
-        "At least one completed month supplied less than the required share of customer demand.",
+      await expect(result).toContainText(
+        "You served less than 95% of demand for 3 months in a row",
       );
     await expect(result).toContainText(
       "Modded run · not ranked and no achievements.",
@@ -533,9 +535,7 @@ for (const [theme, winning] of [
       page.locator("iframe#webpack-dev-server-client-overlay"),
     ).toHaveCount(0);
     expect(await noHorizontalScroll(page)).toBe(true);
-    const goal = evidence
-      .getByText("Serve the connected city", { exact: false })
-      .first();
+    const goal = evidence.getByText("served", { exact: true }).first();
     await scrollEvidenceIntoView(goal);
     await expect(goal).toBeInViewport({ ratio: 1 });
     // The evidence scrolls inside the dialog while its action footer stays usable.
@@ -564,7 +564,7 @@ for (const [theme, winning] of [
       "aria-pressed",
       "true",
     );
-    await expect(appbar).toContainText(winning ? "Jan 2029" : "Feb 2026");
+    await expect(appbar).toContainText(winning ? "Jan 2029" : "Apr 2026");
     if (winning && page.viewportSize()!.width === 1280) {
       // The flow above is checked at 1280×800. A taller normal desktop capture
       // fits the complete intro and results without a clipped scroll seam.
@@ -1026,11 +1026,11 @@ for (const [theme, requiredBills] of [
         objectives: [
           {
             id: "supply",
-            label: "Keep demand supplied",
-            metric: "monthlyReliability",
+            label: "Limit bills",
+            metric: "monthlyBilledRate",
             fromMonth: 1,
             throughMonth: 2,
-            minDemandServedShare: 0,
+            maxDollarsPerKWh: 1,
           },
           {
             id: "bills",
@@ -1056,19 +1056,19 @@ for (const [theme, requiredBills] of [
       exact: true,
     });
     await openPane(panel, scenarioButton);
-    const rules = panel.getByRole("region", { name: "Victory conditions" });
+    const rules = panel.getByRole("region", { name: "Goals" });
     await expect(
       rules.getByText("Keep bills affordable", { exact: true }),
     ).toBeVisible();
-    await expect(rules).toContainText(
+    await expect(rules).not.toContainText(
       "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
     );
     await expect(rules).toContainText(
       "Bills ≤$0/kWh each month · Jan–Feb 2020",
     );
-    await expect(
-      rules.getByText("0/2 months completed", { exact: true }),
-    ).toHaveCount(2);
+    await expect(rules).not.toContainText(
+      /Recorded:|months completed|Not started/,
+    );
     await expect(rules.getByText("Optional", { exact: true })).toHaveCount(
       requiredBills ? 0 : 1,
     );
@@ -1085,9 +1085,11 @@ for (const [theme, requiredBills] of [
       await expect(appbar).toContainText("Feb 2020", { timeout: 30000 });
       await appbar.getByRole("button", { name: "pause", exact: true }).click();
       await openPane(panel, scenarioButton);
-      await expect(rules).toContainText("1/2 months completed");
+      await expect(rules).not.toContainText(
+        /months completed|At least one completed month/,
+      );
       await expect(rules).toContainText(
-        "At least one completed month billed more than the starting-year rate ceiling.",
+        "Bills ≤$0/kWh each month · Jan–Feb 2020",
       );
       await expect(rules.getByText("Optional", { exact: true })).toBeVisible();
       await expect(
@@ -1102,10 +1104,9 @@ for (const [theme, requiredBills] of [
       await scrollEvidenceIntoView(goal);
       await expect(goal).toBeInViewport({ ratio: 1 });
       await expect(
-        rules.getByText(
-          "At least one completed month billed more than the starting-year rate ceiling.",
-          { exact: true },
-        ),
+        rules.getByText("Bills ≤$0/kWh each month · Jan–Feb 2020", {
+          exact: true,
+        }),
       ).toBeInViewport({ ratio: 1 });
       await screenshot(
         page,
@@ -1141,8 +1142,9 @@ for (const [theme, requiredBills] of [
       "Modded run · not ranked and no achievements.",
     );
     expect(await page.evaluate(() => window.__mods.scores)).toBe(0);
-    const toast = page.locator(".snackbarContent");
-    if (await toast.isVisible()) await dismissToast(page);
+    // Ordinary notices defer behind the result dialog; wait for their exit
+    // transition instead of swiping a toast that is already disappearing.
+    await expect(page.locator(".snackbarContent")).toBeHidden();
     const goal = evidence
       .getByText("Keep bills affordable", { exact: false })
       .first();
@@ -1344,7 +1346,7 @@ for (const layout of [
     await mockDesktop(page, false, layout.theme);
     await page.goto("/");
     await page
-      .getByRole("button", { name: "Start a new game", exact: true })
+      .getByRole("button", { name: "New game", exact: true })
       .or(page.getByRole("button", { name: "Play", exact: true }))
       .click();
     await page.getByLabel("Open community scenarios").click();
@@ -1427,7 +1429,9 @@ test("empty mod library offers Workshop first and template results in the shared
   await dismissToast(page);
   expect(await noHorizontalScroll(page)).toBe(true);
   await page.getByRole("button", { name: "Back", exact: true }).click();
-  await expect(mods).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true }),
+  ).toBeFocused();
 });
 
 test("an empty library finishes its first Workshop subscription on overlay return", async ({
@@ -1525,12 +1529,12 @@ test("mod details distinguish player rules from the complete author report", asy
       facilities: { Solar: { buildCost: 0.8 } },
       objectives: [
         {
-          id: "serve-demand",
-          label: "Keep your grid reliable",
-          metric: "monthlyReliability",
+          id: "affordable",
+          label: "Keep bills affordable",
+          metric: "monthlyBilledRate",
           fromMonth: 1,
           throughMonth: 6,
-          minDemandServedShare: 0.9,
+          maxDollarsPerKWh: 1,
         },
       ],
       choices: [
@@ -1685,7 +1689,7 @@ test("mod details distinguish player rules from the complete author report", asy
   ).not.toContainText("Preparing baseline forecast");
   await expect(
     details.getByRole("region", { name: "Scenario objectives" }),
-  ).toContainText("Keep your grid reliable");
+  ).toContainText("Keep bills affordable");
   const timeline = details.getByRole("region", {
     name: "Announced timeline",
   });
@@ -1722,7 +1726,7 @@ test("mod details distinguish player rules from the complete author report", asy
   await expect(
     page.locator("iframe#webpack-dev-server-client-overlay"),
   ).toHaveCount(0);
-  const goal = details.getByText("Keep your grid reliable", { exact: true });
+  const goal = details.getByText("Keep bills affordable", { exact: true });
   await scrollEvidenceIntoView(goal);
   await expect(goal).toBeInViewport({ ratio: 1 });
   await expect(

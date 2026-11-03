@@ -120,6 +120,11 @@ it.each(["google", "apple"] as const)(
         }),
       ).toBeEnabled(),
     );
+    const checkbox = within(sharing).getByRole("checkbox", {
+      name: "Join the Electrify mailing list",
+    });
+    expect(checkbox).not.toBeChecked();
+    await user.click(checkbox);
     expect(mockSnapshot).toHaveBeenCalledTimes(1);
     expect(mockSnapshot).toHaveBeenCalledWith("local-save");
     expect(mockCreate).not.toHaveBeenCalled();
@@ -132,7 +137,7 @@ it.each(["google", "apple"] as const)(
         name: `Sign in with ${provider === "google" ? "Google" : "Apple"}`,
       }),
     );
-    expect(mockLogin).toHaveBeenCalledWith(provider);
+    expect(mockLogin).toHaveBeenCalledWith({ provider, mailingList: true });
     expect(mockCreate).toHaveBeenCalledWith("account", snapshot);
     const link = await within(sharing).findByRole("textbox", {
       name: "Share link",
@@ -202,7 +207,7 @@ it("does not publish after a cancelled sign-in", async () => {
     screen.getByRole("button", { name: "Sign in with Google" }),
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Sign-in didn't finish",
+    "Couldn't finish sign-in",
   );
   expect(mockCreate).not.toHaveBeenCalled();
 });
@@ -548,22 +553,32 @@ it("offers optional cloud sign-in only once after Save & Quit", async () => {
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
-it.each(["google", "apple"] as const)(
-  "keeps the cloud invitation available after a cancelled %s sign-in",
-  async (provider) => {
+it.each([
+  ["google", false],
+  ["google", true],
+  ["apple", false],
+  ["apple", true],
+] as const)(
+  "keeps the cloud invitation available after cancelled %s sign-in with consent %s",
+  async (provider, mailingList) => {
     renderWithSaves(<CloudSavePrompt />, {
       cloudState: "signedOut",
       entries: [existingSave],
       cloudPromptRequested: true,
     });
+    const checkbox = screen.getByRole("checkbox", {
+      name: "Join the Electrify mailing list",
+    });
+    expect(checkbox).not.toBeChecked();
+    if (mailingList) await userEvent.click(checkbox);
     await userEvent.click(
       screen.getByRole("button", {
         name: `Sign in with ${provider === "google" ? "Google" : "Apple"}`,
       }),
     );
-    expect(mockLogin).toHaveBeenCalledWith(provider);
+    expect(mockLogin).toHaveBeenCalledWith({ provider, mailingList });
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Sign-in didn't finish",
+      "Couldn't finish sign-in",
     );
     expect(
       screen.getByRole("button", { name: "Continue without syncing" }),
@@ -581,3 +596,19 @@ it("does not interrupt shared links with the cloud invitation", () => {
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(localStorage.getItem(CLOUD_PROMPT_KEY)).toBeNull();
 });
+
+it.each([false, true])(
+  "passes mailing-list choice %s from Saved games",
+  async (mailingList) => {
+    renderWithSaves(<CloudSaveStatus />, { cloudState: "signedOut" });
+    const checkbox = screen.getByRole("checkbox", {
+      name: "Join the Electrify mailing list",
+    });
+    expect(checkbox).not.toBeChecked();
+    if (mailingList) await userEvent.click(checkbox);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sign in with Google" }),
+    );
+    expect(mockLogin).toHaveBeenCalledWith({ provider: "google", mailingList });
+  },
+);

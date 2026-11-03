@@ -92,7 +92,7 @@ test("the author's report includes the same hidden rule that player facts exclud
 
 test("an edited replacement claim cannot relabel inherited goal definitions", () => {
   const input = pack();
-  input.baseScenarioId = 114;
+  input.baseScenarioId = 100;
   input.scenario = { cash: 1e9 };
   delete input.objectives;
   const valid = prepared(input);
@@ -114,15 +114,17 @@ test("omitted goals inherit defaults and an explicit empty list clears them", ()
     const section = modPlayerFacts(scenario).sections.find(
       (candidate) => candidate.id === "objectives",
     );
-    expect(section?.rows[0].label).toBe("Objective intent");
-    return section!.rows[0].value;
+    const intent = section!.rows.find(
+      (row) => row.label === "Objective intent",
+    )!;
+    return intent.value;
   });
   expect(new Set(objectiveRows).size).toBe(2);
 });
 
 test("reported inherited goals are valid replacement JSON with the same resolved measurements", () => {
   const input = pack();
-  input.baseScenarioId = 114;
+  input.baseScenarioId = 100;
   input.scenario = { startingYear: 2040, cash: 1e9 };
   delete input.objectives;
   const inherited = prepared(input);

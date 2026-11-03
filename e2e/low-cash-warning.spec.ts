@@ -3,7 +3,7 @@ import { expect, Page, test } from "./fixtures";
 import { expectDialogToFit } from "./dialog-layout";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
-const TITLE = "You're about to run out of cash - raise your rates?";
+const TITLE = "Low on cash. Raise rates?";
 
 async function prepareLowCash(page: Page) {
   await page.goto("/?scenario=100");
@@ -31,9 +31,9 @@ for (const theme of ["light", "dark"] as const) {
     await expectDialogToFit(dialog);
     const message = await dialog.locator(".MuiDialogContent-root").innerText();
     expect(message).toMatch(
-      /You must raise your rates to [\d.]+c\/kWh \(a \d+% increase\) to avoid bankruptcy this month\./,
+      /Raise rates to [\d.]+¢\/kWh \(\+\d+%\) to avoid bankruptcy this month\./,
     );
-    const rate = Number(message.match(/to ([\d.]+)c\/kWh/)![1]) / 100;
+    const rate = Number(message.match(/to ([\d.]+)¢\/kWh/)![1]) / 100;
     for (const button of await dialog.getByRole("button").all()) {
       expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(
         info.project.use.hasTouch ? 44 : 40,

@@ -15,6 +15,8 @@ async function startGame(
     localStorage.clear();
     localStorage.setItem("theme", mode);
     localStorage.setItem("audioEnabled", "false");
+    // Layout assertions need the same weather and risk headline on every visit.
+    Math.random = () => 0.25;
   }, theme);
   await page.goto(`/?scenario=${scenarioId}`);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
@@ -48,7 +50,7 @@ for (const side of [false, true]) {
       ? 1300
       : info.project.use.hasTouch
         ? page.viewportSize()!.width
-        : 1299;
+        : 1023;
     await page.setViewportSize({ width, height: page.viewportSize()!.height });
     await startGame(page, "dark", 100);
     for (const [category, purchase] of [
@@ -359,8 +361,8 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   page,
 }) => {
   // One tool at a time: switching tools hides the other instead of opening beside it.
-  if (page.viewportSize()!.width >= 1300)
-    await page.setViewportSize({ width: 1280, height: 800 });
+  if (page.viewportSize()!.width >= 1024)
+    await page.setViewportSize({ width: 1023, height: 800 });
   await startGame(page, "dark");
   const build = page.getByRole("region", { name: "Build", exact: true });
   await page.locator("#insightsNav").click();
@@ -370,12 +372,14 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   await size.press("ArrowRight");
   const generatorSize = await size.inputValue();
   const list = build.locator(".cardList");
-  await list.evaluate((element) => {
-    element.scrollTop = 240;
+  const left = await list.evaluate((element) => {
+    element.scrollTop = Math.min(
+      240,
+      element.scrollHeight - element.clientHeight,
+    );
+    return element.scrollTop;
   });
-  await expect
-    .poll(() => list.evaluate((element) => element.scrollTop))
-    .toBe(240);
+  expect(left).toBeGreaterThan(0);
   await page.getByRole("tab", { name: "Storage", exact: true }).click();
   await size.focus();
   await size.press("ArrowRight");
@@ -399,7 +403,7 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   await expect(size).toHaveValue(generatorSize);
   await expect
     .poll(() => list.evaluate((element) => element.scrollTop))
-    .toBe(240);
+    .toBe(left);
   await page.getByRole("tab", { name: "Storage", exact: true }).click();
   await expect(size).toHaveValue(storageSize);
 
@@ -475,7 +479,7 @@ test("Insights and Events reopen at the scroll position the player left", async 
   // only the upcoming card and an empty history at the start of a run.
   await page.setViewportSize({
     width: page.viewportSize()!.width,
-    height: 480,
+    height: 400,
   });
   await startGame(page, "light");
   for (const [nav, pane] of [
@@ -515,22 +519,46 @@ test("Insights and Events reopen at the scroll position the player left", async 
 });
 
 async function expectFloatingDock(page: Page) {
-  const [stage, facilities, dock, width] = await Promise.all([
-    page.locator(".gameStage").boundingBox(),
-    page.locator(".gameStage .facilities").boundingBox(),
-    page.locator("#navfooter").boundingBox(),
-    page.evaluate(() => window.innerWidth),
-  ]);
-  // The dock overlays the full-height fleet instead of reserving a blank footer band.
-  expect(
-    Math.abs(facilities!.y + facilities!.height - stage!.y - stage!.height),
-  ).toBeLessThanOrEqual(1);
-  expect(dock!.y).toBeLessThan(facilities!.y + facilities!.height);
-  expect(dock!.y + dock!.height).toBeLessThanOrEqual(stage!.y + stage!.height);
-  // Centered on the window, so opening or closing a side tool never moves it.
-  expect(Math.abs(dock!.x + dock!.width / 2 - width / 2)).toBeLessThanOrEqual(
-    1,
-  );
+  await expect(async () => {
+    // Read one layout snapshot after navigation instead of mixing animation frames
+    // across separate boundingBox requests.
+    const { stage, facilities, fleet, dock, width } = await page.evaluate(
+      () => {
+        const box = (selector: string) => {
+          const element = document.querySelector(selector);
+          if (!element) throw new Error(`Missing layout element: ${selector}`);
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return { x, y, width, height };
+        };
+        return {
+          stage: box(".gameStage"),
+          facilities: box(".gameStage .facilities"),
+          fleet: box(".gameFleet"),
+          dock: box("#navfooter"),
+          width: window.innerWidth,
+        };
+      },
+    );
+    expect(facilities.height).toBeGreaterThan(0);
+    expect(dock.height).toBeGreaterThan(0);
+    // The dock overlays the full-height fleet instead of reserving a blank footer band.
+    expect(
+      Math.abs(facilities.y + facilities.height - stage.y - stage.height),
+    ).toBeLessThanOrEqual(1);
+    expect(dock.y).toBeLessThan(facilities.y + facilities.height);
+    expect(dock.y + dock.height).toBeLessThanOrEqual(stage.y + stage.height);
+    // Centered on the window, so opening a side tool doesn't move it, unless that would cover
+    // the tool: then it centres on the free stage. Either way it stays clear of side tools.
+    const center = dock.x + dock.width / 2;
+    expect(
+      Math.min(
+        Math.abs(center - width / 2),
+        Math.abs(center - (fleet.x + fleet.width / 2)),
+      ),
+    ).toBeLessThanOrEqual(1);
+    expect(dock.x).toBeGreaterThanOrEqual(fleet.x);
+    expect(dock.x + dock.width).toBeLessThanOrEqual(fleet.x + fleet.width);
+  }).toPass({ timeout: 12000 });
 }
 
 async function expectSideRails(page: Page) {
@@ -546,7 +574,7 @@ async function expectSideRails(page: Page) {
       }),
     );
   for (const panel of panels) {
-    expect(panel.width).toBeGreaterThanOrEqual(400);
+    expect(panel.width).toBeGreaterThanOrEqual(360);
     expect(panel.width).toBeLessThanOrEqual(480);
     expect(
       panel.right <= fleet.x + 1 || panel.left >= fleet.x + fleet.width - 1,
@@ -565,7 +593,7 @@ for (const theme of ["light", "dark"] as const) {
     for (const label of ["Build", "Programs", "Insights", "Events"]) {
       const action = dock.getByRole("button", { name: label, exact: true });
       await expect(action).toBeVisible();
-      await expect(action).not.toContainText(label);
+      await expect(action).toContainText(label);
       await expect(action).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       const box = (await action.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(
@@ -673,7 +701,7 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
   if (page.viewportSize()!.width < 700) {
     // Phones shrink a stable grid to a checked bolt; the readout is a tap away.
     const summary =
-      /^Stable, \d.* [kMGT]?W demand met with \d.* [kMGT]?W reserve$/;
+      /^Stable, \d.*[kMGT]?W demand met with \d.*[kMGT]?W reserve$/;
     const bolt = status.getByRole("button", {
       name: /^Current grid status: Stable, /,
     });
@@ -691,7 +719,7 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
     await expect(page.getByRole("tooltip", { name: summary })).toHaveCount(0);
   } else {
     await expect(status.locator(".gridHealthMetric")).toHaveText(
-      /^Stable, \d.* [kMGT]?W$/,
+      /^Stable, \d.*[kMGT]?W reserve$/,
     );
     await expect(status.locator(".gridHealthMetric")).toHaveCSS(
       "text-align",
@@ -1009,7 +1037,7 @@ test("wide screens keep several tools beside the fleet and remember them across 
   await expectSideRails(page);
 
   // A compact sheet reveals a remembered tool rather than closing an unseen one.
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize({ width: 1023, height: 900 });
   await expect(page.locator(".gameStage")).toHaveAttribute(
     "data-layout",
     "sheet",
@@ -1089,10 +1117,7 @@ for (const theme of ["light", "dark"] as const) {
       ]);
       expect(profitBox!.x).toBeGreaterThan(cashBox!.x + cashBox!.width);
       expect(dateBox!.x).toBeGreaterThan(profitBox!.x + profitBox!.width);
-      await expect(stage).toHaveAttribute(
-        "data-layout",
-        desktop ? "side" : "sheet",
-      );
+      await expect(stage).toHaveAttribute("data-layout", "side");
       if (desktop) {
         await expect(appbar).toHaveClass(/appbarSingleRow/);
         await expect(ultra).toBeInViewport();
@@ -1127,10 +1152,10 @@ for (const theme of ["light", "dark"] as const) {
         ),
       });
     }
-    for (const width of [1024, 1023, 390, 360]) {
+    for (const width of [700, 699, 390, 360]) {
       await page.setViewportSize({ width, height: 800 });
       const profit = appbar.getByLabel(/^Monthly profit forecast/);
-      if (width >= 1024) await expect(profit).toBeVisible();
+      if (width >= 700) await expect(profit).toBeVisible();
       else await expect(profit).toHaveCount(0);
       expect(
         await appbar.evaluate(

@@ -46,7 +46,10 @@ jobs:
       #
       # The secret is the JSON from Firebase Console -> Project settings ->
       # Service accounts -> Generate new private key, pasted whole.
-      - name: Deploy Firestore rules and indexes
+      - name: Install mailing-list function dependencies
+        run: npm ci --prefix firebase/functions
+
+      - name: Deploy Firestore and mailing-list function
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
@@ -61,7 +64,7 @@ jobs:
           trap 'rm -f "$key"' EXIT
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$key"
           GOOGLE_APPLICATION_CREDENTIALS="$key" \
-            npx --yes firebase-tools@15 deploy --only firestore --non-interactive
+            npx --yes firebase-tools@15 deploy --only firestore,functions:mailing-list --non-interactive
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6

@@ -1,0 +1,13 @@
+{
+  "name": "electrify-mailing-list",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.cjs",
+  "engines": {
+    "node": "24"
+  },
+  "dependencies": {
+    "firebase-admin": "14.5.0",
+    "firebase-functions": "7.4.0"
+  }
+}

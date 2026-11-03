@@ -76,12 +76,23 @@
   // The bright head of the glint that circles the tutorial ring
   --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 64%, white);
   --tutorial-glow: color-mix(in srgb, var(--interactive-blue) 60%, transparent);
+  --tutorial-sweep-fill: color-mix(
+    in srgb,
+    var(--interactive-blue) 12%,
+    transparent
+  );
   // The interaction blue: focus is an interaction, and purple or amber would read as a new
   // state (amber already means warning)
   --focus-ring: var(--interactive-blue);
   --blackout-red: #c62828; /* red800 - matches blackoutColor in Theme.tsx */
   --blackout-tint: rgba(198, 40, 40, 0.07);
-  --blackout-glow: rgba(229, 57, 53, 0.7);
+  --blackout-on-tint: #b71c1c; /* red900 */
+  --blackout-glow: rgba(
+    229,
+    57,
+    53,
+    0.3
+  ); /* app-bar text stays 4.5:1 at the pulse's peak */
   // The two directions a number can move in. Both are the darker end of their ramp so they
   // clear 4.5:1 on the page as text, since the arrow beside them is decoration rather than the
   // message -- red/green alone would leave a colourblind reader with only the arrow
@@ -90,6 +101,8 @@
   // A warning fills its row rather than tinting text, so the label keeps full body contrast
   // (16:1) and the glyph carries the amber: 6:1 on the fill, well past 3:1 for an icon
   --warning-fill: #ffe082; /* amber200 */
+  --warning-on-fill: #5c3d00;
+  --dialog-paper: #ffffff;
   --warning-icon: #7a4500; /* deep amber */
   --mark-bg: #ffe082; /* amber200 - the manual's search highlight */
   // A badge too small to carry text: yellow for the warning, rimmed in deep amber so it still
@@ -142,18 +155,31 @@
   --interactive-tint: rgba(98, 155, 225, 0.24);
   --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 34%, white);
   --tutorial-glow: color-mix(in srgb, var(--interactive-blue) 45%, transparent);
+  --tutorial-sweep-fill: color-mix(
+    in srgb,
+    var(--interactive-blue) 16%,
+    transparent
+  );
   --blackout-red: #ef5350; /* red400 */
   --blackout-tint: rgba(239, 83, 80, 0.16);
-  --blackout-glow: rgba(244, 67, 54, 0.75);
+  --blackout-on-tint: #ffb4ab; /* above 4.5:1 on the tint at every width */
+  --blackout-glow: rgba(
+    244,
+    67,
+    54,
+    0.35
+  ); /* app-bar text stays 4.5:1 at the pulse's peak */
   --delta-good: #66bb6a; /* green400 */
   --delta-bad: #ef5350; /* red400 */
   --warning-fill: #6d4c00; /* text 6.6:1 */
+  --warning-on-fill: #ffe0a3;
+  --dialog-paper: #111820;
   --warning-icon: #ffd54f; /* amber300 - 5.5:1 on the fill */
   --mark-bg: #6d4c00;
   --warning-dot: #ffd54f;
   --warning-dot-rim: #ffd54f;
   --capacity-bar: #e0e0e0;
-  --facility-idle-opacity: 0.7;
+  --facility-idle-opacity: 0.85;
   --shadow-ring: rgba(0, 0, 0, 0.72);
   --tooltip-border: rgba(148, 163, 184, 0.24);
   --tooltip-bg: #111820;
@@ -377,23 +403,69 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
 .keyboardMenu .MuiTouchRipple-ripplePulsate {
   display: none;
 }
-// The home menu's text buttons are plain until one is active. The active button carries the
-// primary fill as its focus indicator, so it drops the separate ring from .keyboardMenu :focus.
-// Hovering a control moves real focus to it (MainMenu.focusHomeButton), so :focus alone tracks
-// the pointer as well as keyboard and controller navigation.
+// The home menu shares one selection between mouse, keyboard and controller. Touch has
+// transient press feedback instead: focus restored after navigation must not look selected.
 #centeredMenu
   :is(.mainActions, .resourceActions, .discoveryActions)
   .MuiButton-root {
+  // Selection changes immediately; cross-fading leaves the previous cursor painted.
+  transition: none;
+
   &:hover {
-    background-color: transparent; // keep the inactive state borderless and unfilled
+    background-color: transparent;
+  }
+}
+html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
+  #centeredMenu
+  :is(.mainActions, .resourceActions, .discoveryActions)
+  .MuiButton-root:focus {
+  background-color: var(--interactive-strong);
+  color: var(--interactive-contrast);
+  // The fill carries selection, including when a controller moves real focus.
+  outline: none !important;
+}
+
+// A single, quiet surface response replaces the expanding Material ripple on the home menu.
+#menuCard .MuiTouchRipple-root {
+  display: none;
+}
+html[data-touch-input="true"]:not([data-controller-input="true"]) #menuCard {
+  .MuiButtonBase-root {
+    transition:
+      background-color 160ms ease-out,
+      transform 160ms ease-out;
+
+    &:hover {
+      background-color: transparent;
+    }
+
+    &[data-touch-pressed] {
+      background-color: color-mix(
+        in srgb,
+        var(--interactive-blue) 12%,
+        transparent
+      );
+      transform: scale(0.98);
+      transition-duration: 60ms;
+
+      @media (prefers-reduced-motion: reduce) {
+        transform: none;
+      }
+    }
   }
 
-  &:focus {
+  // Keep the next action prominent while tapping resources or returning from another screen.
+  #centeredMenu .mainActions .MuiButton-root:first-child {
     background-color: var(--interactive-strong);
     color: var(--interactive-contrast);
-    // The fill is the focus indicator here, so drop both the global :focus-visible ring
-    // (which is !important) and the .keyboardMenu :focus ring for these controls.
-    outline: none !important;
+
+    &[data-touch-pressed] {
+      background-color: color-mix(
+        in srgb,
+        var(--interactive-strong) 88%,
+        var(--font-color-primary)
+      );
+    }
   }
 }
 html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
@@ -462,6 +534,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     position: relative;
+    flex-wrap: nowrap;
     touch-action: none;
     transition: transform 120ms ease-out;
   }
@@ -477,13 +550,17 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   margin-left: 4px !important;
 }
 
-@media screen and (max-width: ($desktop_breakpoint - 1px)) {
+@media (pointer: coarse) {
+  .snackbarClose {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+// Phones dismiss a toast by swiping it; tablets keep the visible close button.
+@media screen and (max-width: 599px) {
   .snackbarClose {
     display: none !important;
-  }
-
-  .snackbar-above-nav {
-    bottom: calc(56px + env(safe-area-inset-bottom) + 8px) !important;
   }
 }
 
@@ -1133,7 +1210,7 @@ $topbar_height: 56px;
 
   &.gridHealth-blackout {
     background: var(--blackout-tint);
-    color: var(--delta-bad);
+    color: var(--blackout-on-tint);
   }
 }
 
@@ -1167,7 +1244,7 @@ $topbar_height: 56px;
 // "Cash out in ~5 mo" read as the same kind of alert. Comes after both rows' own backgrounds.
 .statusWarning {
   background: var(--warning-fill);
-  color: $font_color_primary;
+  color: var(--warning-on-fill);
 
   .conceptIcon {
     color: var(--warning-icon);
@@ -1179,6 +1256,17 @@ $topbar_height: 56px;
   display: flex;
   align-items: center;
   line-height: 0;
+}
+
+@media (pointer: coarse) {
+  .MuiSlider-thumb {
+    width: 28px;
+    height: 28px;
+    &::after {
+      width: 44px;
+      height: 44px;
+    }
+  }
 }
 
 .statusLabel {
@@ -1311,6 +1399,17 @@ $topbar_height: 56px;
   }
 }
 
+.gameCashNegative {
+  color: var(--delta-bad);
+}
+
+// Phones read "136 mo left": the event beside it needs the room.
+@media (max-width: 599px) {
+  .missionSummaryMonthsTail {
+    display: none;
+  }
+}
+
 // Abbreviate the months and hour together before the wide bar gets crowded.
 @container appbar (max-width: 1365px) {
   .missionSummaryMonthsTail,
@@ -1407,7 +1506,8 @@ $pane_header_height: 48px;
   }
 }
 
-.tradingPolicy,
+.buyingRule,
+.sellingRule,
 .transmissionLine,
 .powerExchangeSummary {
   background: var(--bg-primary);
@@ -2021,8 +2121,18 @@ $pane_header_height: 48px;
     pointer-events: none;
     z-index: 100;
 
+    // A permanent track, so the bar reads as elapsed time rather than a stray rule.
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 4px 0;
+      height: 1px;
+      background: var(--border-subtle);
+    }
+
     .yearProgressFill {
-      height: 2px;
+      position: relative;
+      height: 1px;
       background: $font_color_faded;
     }
   }
@@ -2056,31 +2166,9 @@ $pane_header_height: 48px;
 }
 
 .decisionImpact {
-  padding: 12px 16px 12px;
-  border-bottom: 1px solid var(--border-selected);
-  background: transparent;
-
   & > .MuiTypography-overline {
     font-weight: 600;
   }
-}
-
-.decisionImpactFacts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.decisionImpactFact {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: start;
-  gap: 8px;
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--border-tile);
-  border-radius: var(--radius-md);
-  background: var(--bg-primary);
 }
 
 // Optional weather hardening in the build dialog: one checkbox, its price in the label, and a
@@ -2141,6 +2229,27 @@ $pane_header_height: 48px;
   gap: 8px;
 }
 
+.generatorComparisonRemove.MuiIconButton-root {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  color: var(--font-color-faded);
+}
+
+// A phone keeps the catalog in view: the tray is one short swipeable row.
+@media (max-width: 599px) {
+  .generatorComparisonChoices {
+    display: flex;
+    overflow-x: auto;
+  }
+  .generatorComparisonChoice {
+    flex: 0 0 200px;
+  }
+  .generatorComparisonChoice .MuiTypography-caption:last-child {
+    display: none;
+  }
+}
+
 .generatorComparisonChoice {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -2159,13 +2268,6 @@ $pane_header_height: 48px;
 
   .MuiTypography-root {
     min-width: 0;
-  }
-}
-
-@media (max-width: ($phone_width - 1px)) {
-  .decisionImpactFacts,
-  .generatorComparisonChoices {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -2320,6 +2422,16 @@ $pane_header_height: 48px;
   justify-content: flex-end;
 }
 
+.chartLegendNote {
+  font-weight: 400;
+}
+
+// The date is a quiet reference beside the money.
+#topbar .gameStatusValue.weak {
+  font-size: 14px;
+  font-weight: 400;
+}
+
 .chartLegendItem {
   display: inline-flex;
   align-items: center;
@@ -2434,9 +2546,25 @@ $pane_header_height: 48px;
 
 .scenarioStartButton.MuiButton-root {
   justify-self: center;
-  min-width: 190px;
+  min-width: 320px;
   min-height: 52px;
   padding-inline: 28px;
+}
+
+.leaderboard {
+  width: 100%;
+}
+
+// A short phone keeps the one action in reach above the long briefing.
+@media (max-width: 599px) and (max-height: 700px) {
+  .scenarioStartControls {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding-block: 8px;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-subtle);
+  }
 }
 
 .difficultyPicker {
@@ -2515,19 +2643,6 @@ $pane_header_height: 48px;
   border-top: 1px solid var(--border-subtle);
 }
 
-.victoryMeasurementHelp {
-  margin-top: 16px;
-
-  summary {
-    display: list-item;
-    align-content: center;
-    min-height: var(--control-size);
-    color: $interactive_blue;
-    cursor: pointer;
-    font-size: var(--font-size-body2);
-  }
-}
-
 .resultLeaderboard {
   margin-top: 16px;
   padding-top: 12px;
@@ -2588,6 +2703,7 @@ $pane_header_height: 48px;
   .scenarioStartButton.MuiButton-root {
     justify-self: stretch;
     width: 100%;
+    min-width: 0;
   }
 
   .difficultyPicker .MuiToggleButton-root {
@@ -2926,17 +3042,18 @@ $pane_header_height: 48px;
       padding-top: 24px;
       padding-bottom: 24px;
 
-      .mainActions {
+      .mainActions,
+      .resourceActions,
+      .discoveryActions {
         align-items: center;
-        margin-bottom: $space-2;
+        width: 100%;
+      }
 
-        .MuiButton-root {
-          width: min(100%, 260px);
-        }
+      .mainActions {
+        margin-bottom: $space-2;
       }
 
       .resourceActions {
-        max-width: 440px;
         margin: 0 auto;
       }
 
@@ -2957,20 +3074,9 @@ $pane_header_height: 48px;
         }
       }
 
-      button {
+      .MuiButton-root {
         margin: 0;
-      }
-    }
-
-    .MuiButton-root,
-    .MuiIconButton-root {
-      min-height: 40px;
-    }
-
-    @media (pointer: coarse) {
-      .MuiButton-root,
-      .MuiIconButton-root {
-        min-height: 44px;
+        width: min(100%, 208px);
       }
     }
   }
@@ -3094,8 +3200,10 @@ $pane_header_height: 48px;
       border-top-left-radius: var(--radius-md);
       border-top-right-radius: var(--radius-md);
 
-      &:hover {
-        background: var(--bg-raised);
+      @media (hover: hover) and (pointer: fine) {
+        &:hover {
+          background: var(--bg-raised);
+        }
       }
 
       // WCAG 2.4.7: keyboard users need to see which entry they're on
@@ -3488,6 +3596,10 @@ $pane_header_height: 48px;
 
   .facilityRow.selected,
   .transmissionLine.selected {
+    background: var(--bg-raised);
+  }
+  .facilityRow.selected > .facilityRowHeader,
+  .transmissionLine.selected > .facilityRowHeader {
     background: var(--bg-selected);
   }
 
@@ -3702,8 +3814,10 @@ $pane_header_height: 48px;
         background: var(--bg-selected);
         color: var(--interactive-strong);
 
-        &:hover {
-          background: var(--bg-selected);
+        @media (hover: hover) and (pointer: fine) {
+          &:hover {
+            background: var(--bg-selected);
+          }
         }
       }
 
@@ -3792,9 +3906,9 @@ $pane_header_height: 48px;
   // and the only column they share is when they happened
   .eventLogList {
     display: grid;
-    gap: $space-2;
+    gap: 0;
     margin: 0;
-    padding: 0 $space-2 $space-2;
+    padding: 0 0 $space-2;
     list-style: none;
   }
 
@@ -3818,10 +3932,6 @@ $pane_header_height: 48px;
     padding-top: $space-2;
     margin-top: -$space-2;
     background: var(--bg-primary);
-  }
-
-  .upcomingEvents > .eventLogSectionHeader {
-    background: var(--bg-sunken);
   }
 
   .eventHistoryFilterButton {
@@ -3865,15 +3975,30 @@ $pane_header_height: 48px;
     }
   }
 
+  // In a sheet, upcoming events share the list's one surface.
+  @media (max-width: 1023px) {
+    .upcomingEvents {
+      background: transparent;
+
+      .eventLogItem,
+      .eventLogItem.importance-NOTABLE,
+      .eventLogItem.importance-CRITICAL {
+        border-left: 0;
+        background: transparent;
+      }
+    }
+  }
+
   .eventLogItem {
     display: grid;
     grid-template-columns: 20px 1fr;
     gap: 0 12px;
     align-items: start;
-    padding: 12px;
-    border: 1px solid var(--border-tile);
-    border-radius: var(--radius-md);
-    background: var(--bg-raised);
+    padding: 12px 16px;
+    border: 0;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: 0;
+    background: transparent;
 
     &.actionable {
       cursor: pointer;
@@ -3890,10 +4015,6 @@ $pane_header_height: 48px;
       &:focus-visible {
         outline-offset: -2px;
       }
-    }
-
-    &.importance-NOTABLE {
-      border-left: 4px solid var(--border-strong);
     }
 
     &.importance-CRITICAL {
@@ -4084,6 +4205,17 @@ $pane_header_height: 48px;
 
 @include styling();
 
+// The recap's spacing is owned by the completion dialog; the preview has no spacer margin.
+.tutorialNextPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  span {
+    color: $font_color_faded;
+  }
+}
+
 // A tutorial step is game chrome, not a modal. It occupies its own row above the active card,
 // so its instructions never cover the control they name and the whole grid remains interactive.
 .tutorialHud {
@@ -4180,6 +4312,41 @@ $pane_header_height: 48px;
   padding-left: 28px;
 }
 
+// A separate clipped layer keeps the sweep behind the HUD without changing its scrolling.
+.tutorialHudSweep {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: 50%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--tutorial-sweep-fill),
+      transparent
+    );
+    animation: tutorialBarSweep 8s ease-out infinite;
+  }
+}
+
+// Travel toward Next for 1.6 seconds, then leave the bar quiet until the next pass.
+@keyframes tutorialBarSweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  20%,
+  100% {
+    transform: translateX(200%);
+  }
+}
+
 .tutorialHudFooter {
   display: flex;
   align-items: center;
@@ -4190,25 +4357,41 @@ $pane_header_height: 48px;
   flex: 1 1 auto;
 }
 
-// A brief reminder after six seconds, repeated while the player stays on this step.
+// The HUD mounts this cue after six seconds, then repeats a double glow every four seconds.
 .tutorialHudNextPulse {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  animation: tutorialNextPulse 6s ease-in-out 6s infinite;
+  animation:
+    tutorialNextIntro 600ms ease-out,
+    tutorialNextPulse 4s ease-in-out 4s infinite;
+}
+
+@keyframes tutorialNextIntro {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--tutorial-glow);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 4px var(--tutorial-glow);
+  }
 }
 
 @keyframes tutorialNextPulse {
   0%,
   16%,
+  32%,
   100% {
     transform: scale(1);
     box-shadow: 0 0 0 0 var(--tutorial-glow);
   }
-  8% {
-    transform: scale(1.04);
-    box-shadow: 0 0 0 4px var(--tutorial-glow);
+  8%,
+  24% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 6px var(--tutorial-glow);
   }
 }
 
@@ -4472,6 +4655,14 @@ $pane_header_height: 48px;
   }
 }
 
+// Reading targets stay still while the HUD or Next button points out how to continue.
+.tutorialTargetRing-static {
+  &::before,
+  &::after {
+    display: none;
+  }
+}
+
 .tutorialTargetRingPulse {
   animation: tutorialTargetPulse 10s ease-in-out infinite;
 }
@@ -4509,6 +4700,15 @@ $pane_header_height: 48px;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .tutorialHudSweep {
+    background: var(--tutorial-sweep-fill);
+
+    &::before {
+      display: none;
+      animation: none;
+    }
+  }
+
   .tutorialTargetRingPulse,
   .tutorialTargetRingIntro,
   .tutorialHudNextPulse {
@@ -5162,8 +5362,10 @@ $homeSmokeCycle: 5.6s;
     border-radius: 3px;
     transition: text-decoration-color 120ms ease-out;
 
-    &:hover {
-      text-decoration-color: currentColor;
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        text-decoration-color: currentColor;
+      }
     }
 
     &:focus-visible {
@@ -5230,6 +5432,25 @@ $homeSmokeCycle: 5.6s;
 }
 .tradingControls {
   padding: 0 16px 12px;
+  display: grid;
+  gap: 8px;
+}
+.tradingRuleFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+
+  .MuiInputBase-root {
+    height: 100%;
+    min-height: 40px;
+  }
+  .MuiSelect-select {
+    white-space: normal;
+    text-overflow: clip;
+  }
+  .MuiFormControl-root {
+    min-width: 0;
+  }
 }
 @media (pointer: coarse) {
   .tradingControls .MuiInputBase-root {
@@ -5330,20 +5551,8 @@ $homeSmokeCycle: 5.6s;
     color: var(--night-ink);
   }
 }
-.productionWeather {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin: 4px 12px 0;
-  color: var(--font-color-faded);
-  font-size: var(--font-size-caption-sm);
-  line-height: 16px;
-  > span {
-    white-space: nowrap;
-  }
-}
 .dailyProductionChart .chartLegend {
-  padding: 8px 12px 0;
+  padding: 8px 16px 0;
   gap: 4px 8px;
 }
 .chartLegendSwatch-pattern {
@@ -5391,7 +5600,9 @@ $homeSmokeCycle: 5.6s;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px 16px 8px;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 8px 16px;
   font-size: var(--font-size-body2);
   font-weight: 600;
   text-transform: none;
@@ -5409,8 +5620,10 @@ $homeSmokeCycle: 5.6s;
   align-items: stretch;
   border-top: 1px solid var(--border-subtle);
   // One surface spans the grip and disclosure; details are a separate interaction area.
-  &:hover {
-    background: var(--bg-raised);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--bg-raised);
+    }
   }
   > .facilityDisclosure {
     position: relative; // above the shared output fill, alongside the grip
@@ -5466,8 +5679,10 @@ $homeSmokeCycle: 5.6s;
   min-width: 48px;
 }
 .facilityRowIcon .facilityIconIdle {
-  // Only quiet the illustration; reserve levels and state labels stay legible.
+  // Only quiet the illustration; reserve levels and state labels stay legible. The ring keeps
+  // a dark outline from dissolving into the dark page.
   opacity: var(--facility-idle-opacity);
+  box-shadow: 0 0 0 1px var(--border-strong);
 }
 .facilityDisclosure .MuiListItemText-root {
   margin: 0;
@@ -5633,7 +5848,8 @@ $homeSmokeCycle: 5.6s;
   background: transparent;
   color: var(--font-color-faded);
   cursor: grab;
-  touch-action: none;
+  // Vertical swipes scroll the list; the drag library takes over after its long press.
+  touch-action: pan-y;
 
   > .MuiSvgIcon-root {
     flex-shrink: 0;
@@ -5657,42 +5873,33 @@ $homeSmokeCycle: 5.6s;
   flex-direction: column;
   min-width: 0;
 }
+// Anchor the construction meter to the whole header, including the grip.
+.base_main .facilityRowHeader > .facilityDisclosure,
+.base_main .facilityDisclosure .facility {
+  position: static;
+}
+// Keep every row control and its contents above the full-height utilization fill.
+.base_main .facilityRowHeader > :not(.outputProgressBar) {
+  z-index: 1;
+}
 .facilityDisclosure .constructionProgress {
   display: block;
-  position: relative;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   height: 4px;
-  margin-top: 8px;
-  border-radius: var(--radius-sm);
-  background: var(--border-subtle); /* fallback; the fuel tint is set inline */
+  background: var(--border-subtle);
 }
+// Neutral at every fuel: identity stays in the icon, and the fill reads as one progress grammar.
 .facilityDisclosure .constructionProgressFill {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
   border-radius: inherit;
+  background: var(--font-color-faded);
   transition: width 200ms linear;
-}
-// The glow is its own head on the leading edge rather than a shadow on the whole fill: a 4px
-// bar clips a shadow away vertically, and at 100% there is no edge left for it to escape past,
-// so the mark disappears exactly when the build is most worth noticing. A dot that overhangs
-// the end stays visible at every width. The blue is fixed on purpose — "under construction"
-// should read the same whatever the fuel accent is. The dot's core is the page background
-// rather than an accent-derived colour because the fixed blue glow is byte-identical to the
-// storage fill (--interactive-blue and chartPalette().storage are the same hue), which would
-// otherwise swallow the head on every battery build; a pinhole of page background contrasts
-// against blue, amber and brown alike, and flips light/dark with the theme.
-.facilityDisclosure .constructionProgressFill::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 0;
-  width: 2px;
-  height: 2px;
-  transform: translate(50%, -50%);
-  border-radius: 50%;
-  background: var(--bg-primary);
-  box-shadow: 0 0 6px 3px var(--tutorial-glow);
 }
 .transmissionFleet {
   margin-top: 0;
@@ -5830,21 +6037,124 @@ $homeSmokeCycle: 5.6s;
   gap: 0;
 }
 .decisionImpactFact {
+  display: grid;
+  align-items: start;
+  min-width: 0;
   padding: 12px 0;
   border: 0;
   border-top: 1px solid var(--border-subtle);
   border-radius: 0;
   background: transparent;
   gap: 12px;
+  // Keep each value column aligned even when only one row has a manual help target.
+  grid-template-columns: auto minmax(0, 1fr) var(--control-size);
 }
-.decisionImpactFact > div {
+.decisionImpactFactHelp {
+  display: flex;
+  align-items: flex-start;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+.decisionImpactFactContent {
   display: grid;
   grid-template-columns: minmax(100px, 0.7fr) minmax(0, 1.3fr);
+  align-items: baseline;
   gap: 4px 12px;
 }
-.decisionImpactFact
-  > div
-  > .MuiTypography-caption:last-child:not(:first-child) {
+// Neutral: green is kept for favorable deltas, and the help target adds no row height.
+.decisionImpactFact > .conceptIcon {
+  color: var(--font-color-faded);
+}
+.decisionImpactFact .manual-link {
+  margin-block: -12px;
+}
+.MuiDialog-paper {
+  timeline-scope: --dialog-scroll;
+}
+.MuiDialog-paper .MuiDialogContent-root {
+  scroll-timeline: --dialog-scroll block;
+}
+.MuiDialog-paper .MuiDialogActions-root {
+  position: relative;
+  border-top: 1px solid var(--border-subtle);
+}
+// A fade says there is more above the sticky actions. It follows the content's scroll timeline,
+// which is inactive when nothing scrolls, so a dialog that fits shows none.
+.MuiDialog-paper .MuiDialogContent-root + .MuiDialogActions-root::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 16px;
+  opacity: 0;
+  background: linear-gradient(to top, var(--dialog-paper), transparent);
+  pointer-events: none;
+  animation: dialogMoreBelow linear both;
+  animation-timeline: --dialog-scroll;
+}
+@keyframes dialogMoreBelow {
+  from {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+// MUI's menu sets its own item height above the small breakpoint.
+.MuiMenu-paper .MuiMenuItem-root {
+  min-height: 40px;
+}
+@media (pointer: coarse) {
+  .MuiMenu-paper .MuiMenuItem-root {
+    min-height: 44px;
+  }
+}
+@media (max-height: 720px) {
+  .decisionImpactFact {
+    padding-block: 8px;
+  }
+}
+@media (max-width: 399px) {
+  .buildOptionMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  // Every row fills the card: a lone last metric takes the whole row.
+  .buildOptionMetric:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+  .insightsLayerPanel {
+    grid-template-columns: 1fr;
+  }
+}
+// A narrow side tool holds three metrics a row; six tracks let a short last row still fill it.
+@media (min-width: 1024px) {
+  @container game-tool (max-width: 479px) {
+    .buildOptionMetrics {
+      grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    }
+    .buildOptionMetric {
+      grid-column: span 2;
+    }
+    .buildOptionMetric:last-child:nth-child(3n + 1) {
+      grid-column: span 6;
+    }
+    .buildOptionMetric:last-child:nth-child(3n + 2),
+    .buildOptionMetric:nth-last-child(2):nth-child(3n + 1) {
+      grid-column: span 3;
+    }
+  }
+}
+.buildOption .MuiCardHeader-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.decisionImpactFactDetail {
   grid-column: 2;
 }
 .MuiDialog-paper .noPadding > .decisionImpact {
@@ -6151,12 +6461,14 @@ $programs_column: 800px;
   padding-bottom: 4px;
 }
 @media (max-width: ($phone_width - 1px)) {
-  .decisionImpactFact > div {
+  .decisionImpactFactContent {
     grid-template-columns: 1fr;
   }
-  .decisionImpactFact
-    > div
-    > .MuiTypography-caption:last-child:not(:first-child) {
+  .decisionImpactFact:not(.decisionImpactFactWithHelp)
+    .decisionImpactFactContent {
+    grid-column: 2 / -1;
+  }
+  .decisionImpactFactDetail {
     grid-column: 1;
   }
   .transmissionLine > .facilityRowHeader > .facilityDisclosure {
@@ -6271,7 +6583,9 @@ $programs_column: 800px;
 .buildDetails {
   table-layout: fixed;
   .MuiTableCell-root {
-    height: 48px;
+    // Include both cell padding and the divider around the help control. Two-line labels
+    // must fit this same row instead of stretching it by a font-dependent fraction.
+    height: calc(var(--control-size) + 12px);
     box-sizing: border-box;
     padding: 4px 12px;
     vertical-align: middle;
@@ -6296,18 +6610,18 @@ $programs_column: 800px;
     justify-content: center;
   }
 }
+// Leave enough room for complete cost/unit values beside the help target.
+.gameToolPanel .buildDetails .buildDetailLabel {
+  width: 44%;
+}
 @media (max-width: ($phone_width - 1px)) {
   .buildDetails .buildDetailLabel {
-    // Leave enough room for complete cost/unit values beside the help target.
     width: 44%;
   }
 }
 @media (pointer: coarse) {
   .buildDetails .buildDetailHelp {
     width: 52px;
-  }
-  .buildDetails .MuiTableCell-root {
-    height: 52px;
   }
 }
 
@@ -6410,8 +6724,7 @@ $programs_column: 800px;
   }
 }
 
-// Two lines per requirement: the rule, then its progress and any meaningful status.
-// Missing-history warnings can wrap so the evidence is never clipped.
+// Victory conditions pair each goal with its target; long date windows can wrap.
 .missionRequirements {
   margin: 0;
 
@@ -6425,31 +6738,17 @@ $programs_column: 800px;
   }
 }
 
-.missionRequirementStatus {
-  flex: 0 0 auto;
-  padding: 1px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  background: var(--bg-raised);
+.scenarioOutcome {
+  margin: $space-2 0 0;
+  overflow-wrap: anywhere;
   color: $font_color_faded;
-  font-size: var(--font-size-caption-sm);
-  line-height: 1.25;
-  font-weight: 600;
-  white-space: nowrap;
 
-  // The word carries the state on its own; the colour is a second, faster read of it
-  &[data-status="failed"] {
-    border-color: var(--delta-bad);
-    color: var(--delta-bad);
-  }
-
-  &[data-status="completed"] {
-    border-color: var(--delta-good);
+  &[data-status="win"] {
     color: var(--delta-good);
   }
 }
 
-// The Scenario tool: the scenario at a glance, then its score, then what it takes to win
+// The Scenario tool: the scenario at a glance, its score and loss outlook, then conditions
 .scenarioDetailsBody {
   display: flex;
   flex-direction: column;
@@ -6927,10 +7226,99 @@ img[src$="/transmission.svg"] {
   }
 }
 
+.gameMonthlyProfitButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+// The controls stay text-sized in the bar; a transparent target gives them full height.
+.gameMonthlyProfitButton,
+.gridHealthHelp {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 40px;
+    transform: translateY(-50%);
+  }
+}
+@media (pointer: coarse) {
+  .gameMonthlyProfitButton,
+  .gridHealthHelp {
+    &::after {
+      height: 44px;
+    }
+  }
+}
+.scenarioOutlook {
+  display: flex;
+  flex-direction: column;
+}
+.scenarioBuildNothing {
+  display: block;
+  color: var(--font-color-faded);
+}
+// Phones lead with the outcome, directly under the section title.
+@media (max-width: 599px) {
+  .scenarioOutlook > [aria-label="Scenario forecast"] {
+    order: -1;
+  }
+  .scenarioOutlook > h3 {
+    order: -2;
+  }
+}
+// The grid readout opens its manual entry, without looking like a second primary control.
+.gridHealthHelp {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+// Tablets have room for words, so the readout sits beside the mission instead of icon-only.
+@media (min-width: 600px) and (max-width: 1023px) {
+  .gameStatusBar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+  .gameStatusBar .gridHealth {
+    flex: 0 0 auto;
+    padding-right: 16px;
+  }
+  .gameStatusBar .missionSummary,
+  .gameStatusBar .missionSummary:has(.missionRiskButton) {
+    flex: 1 1 0;
+    min-width: 0;
+    border-top: 0;
+  }
+}
+
+.gridHealthStatusWord {
+  margin-inline-start: 4px;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  color: var(--font-color-primary);
+  white-space: nowrap;
+}
+.gridHealthStatusButton:has(.gridHealthStatusWord) {
+  width: auto;
+  padding-inline: 8px;
+}
+
 .gridHealthStatusButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 44px;
   width: 44px;
   height: 44px;
   padding: 0;
@@ -7183,8 +7571,10 @@ img[src$="/transmission.svg"] {
       padding-right: calc(var(--space-4) + var(--space-5));
     }
 
-    > summary:hover {
-      background: var(--bg-selected);
+    @media (hover: hover) and (pointer: fine) {
+      > summary:hover {
+        background: var(--bg-selected);
+      }
     }
 
     > summary::-webkit-details-marker {
@@ -7787,4 +8177,341 @@ select:not(:disabled) {
 option {
   color: var(--font-color-primary);
   background: var(--bg-primary);
+}
+
+// Chart inspection uses the full viewport while retaining the shared chart surface.
+.insightsExpandChart.MuiIconButton-root {
+  min-width: var(--control-size);
+  min-height: var(--control-size);
+  margin-left: 4px;
+  color: var(--interactive-strong);
+  flex-shrink: 0;
+}
+.fuelPriceFilter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 16px 8px;
+  font-size: var(--font-size-body2);
+  container-type: inline-size;
+  container-name: fuel-prices;
+  .fuelPriceFilterLabel {
+    margin-right: 4px;
+    color: var(--font-color-faded);
+  }
+  .fuelPriceFilterOptions {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    min-width: 0;
+    gap: 4px;
+  }
+  .MuiButton-root {
+    gap: 8px;
+    padding: 4px 8px;
+    min-height: var(--control-size);
+    border: 1px solid transparent;
+    color: var(--font-color-primary);
+    &[aria-pressed="true"] {
+      border-color: var(--interactive-strong);
+      background: var(--bg-selected);
+      font-weight: 700;
+    }
+    svg {
+      width: 40px;
+      height: 6px;
+      flex-shrink: 0;
+    }
+  }
+}
+.insightsChartDialog {
+  .MuiDialog-paper.MuiDialog-paperFullScreen {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  .MuiDialog-paper {
+    background: var(--chart-surface);
+  }
+  .expandedChartTitle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    > span {
+      min-width: 0;
+    }
+    .MuiIconButton-root {
+      flex-shrink: 0;
+    }
+  }
+  .insightsViewportToolbar {
+    flex-shrink: 0;
+    max-width: none;
+  }
+  .insightsViewportButtons {
+    .insightsViewportButton,
+    .MuiIconButton-root {
+      width: var(--control-size);
+      height: var(--control-size);
+      flex-basis: var(--control-size);
+    }
+  }
+  .expandedChartContent {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0 16px;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .expandedChartBody {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    > * {
+      flex-shrink: 0;
+    }
+  }
+  .fuelPriceFilter .MuiButton-root {
+    font-size: var(--font-size-body1);
+  }
+  .chartLegend,
+  .chartTooltip {
+    font-size: var(--font-size-body1);
+  }
+  .chartLegend {
+    padding: 8px 16px;
+  }
+  .chartLegendSwatch-line {
+    width: 32px;
+  }
+}
+
+// Three named controls per row keep the fuel key to two rows on phones and narrow panes.
+// The sample sits above its name so the dash pattern stays long enough to recognize.
+@container fuel-prices (max-width: 568px) {
+  .fuelPriceFilterLabel {
+    display: none;
+  }
+  .fuelPriceFilter .fuelPriceFilterOptions {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr));
+    .MuiButton-root {
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
+      padding: 4px;
+      font-size: var(--font-size-body2);
+      line-height: 1.25;
+      white-space: normal;
+      svg {
+        width: 32px;
+      }
+    }
+  }
+}
+
+@media (max-width: 600px) {
+  .insightsChartDialog .insightsViewportToolbar {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 8px 16px;
+    .insightsViewportDate {
+      flex: 1 0 100%;
+      white-space: normal;
+    }
+  }
+}
+
+.insights .MuiToolbar-root.insightsTrackHeader {
+  flex-flow: row nowrap !important;
+  > h6 {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+// Mouse selection remains separate from the one expanded inspection row.
+.facilitySelectionBar {
+  display: none;
+}
+@media (any-pointer: fine) {
+  .facilitySelectionBar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 8px;
+    padding: 0 16px;
+    min-height: 40px;
+    color: var(--font-color-faded);
+    font-size: var(--font-size-caption);
+    .MuiButton-root {
+      min-height: 40px;
+      text-transform: none;
+    }
+  }
+}
+.facilitySelectionTitle {
+  color: var(--font-color-primary);
+  font-size: var(--font-size-body2);
+  font-weight: 600;
+}
+.base_main .facilityRow.bulkSelected {
+  background: var(--bg-selected);
+}
+// The expanded row's detail keeps its own raised surface when the row is also bulk-selected.
+.base_main .facilityRow.selected.bulkSelected {
+  background: var(--bg-raised);
+}
+.base_main .facilityRow.bulkSelected > .facilityRowHeader {
+  background: var(--bg-selected);
+}
+.unifiedFacilitiesList[data-group-dragging="true"]
+  .bulkSelected:not(.dragging) {
+  opacity: 0.4;
+}
+.facilityDragCount {
+  position: absolute;
+  top: 0;
+  left: 8px;
+  z-index: 1;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  background: var(--interactive-strong);
+  color: var(--interactive-contrast);
+  font-size: var(--font-size-caption);
+}
+.facilityMenuHint.MuiListSubheader-root {
+  max-width: 320px;
+  white-space: normal;
+  line-height: 20px;
+  padding-bottom: 8px;
+  font-size: var(--font-size-caption);
+}
+
+.facilitySelectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.facilitySelectionSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 20px;
+  color: var(--interactive-strong);
+}
+.facilityRowHeader > .facilitySelectionCheckbox.MuiCheckbox-root {
+  position: absolute;
+  right: 44px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  padding: 10px;
+  color: var(--font-color-faded);
+  &.Mui-checked {
+    color: var(--interactive-strong);
+  }
+}
+.facilityContextMenu .MuiMenuItem-root {
+  min-height: 40px;
+  max-width: min(360px, calc(100vw - 32px));
+  white-space: normal;
+}
+
+@media (pointer: coarse) {
+  .facilityRowHeader > .facilitySelectionCheckbox.MuiCheckbox-root {
+    width: 44px;
+    height: 44px;
+    right: 42px;
+  }
+  .facilitySelectionBar .MuiButton-root,
+  .facilityContextMenu .MuiMenuItem-root {
+    min-height: 44px;
+  }
+}
+
+.facilityContextMenu .MuiListSubheader-root {
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 8px 16px;
+  line-height: 20px;
+  white-space: normal;
+}
+
+#utility-acquisition-title-heading + .MuiDialogContent-root {
+  > .decisionImpact {
+    padding-top: 0;
+
+    .decisionImpactFact:first-child {
+      padding-top: 0;
+      border-top: 0;
+    }
+  }
+
+  .decisionImpactFactValue,
+  .decisionImpactFactDetail {
+    white-space: pre-line;
+  }
+}
+
+.acquisitionReviewIntro {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.transmissionAcquisition {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding-block: 8px;
+
+  .MuiButton-root {
+    min-height: 40px;
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
+}
+
+.utilityAcquisitionHint {
+  display: block;
+}
+
+@media (max-width: 390px) {
+  .MuiDialogActions-root.purchaseReviewActions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+
+    .purchaseReviewCancel,
+    [role="status"] {
+      grid-column: 1 / -1;
+    }
+
+    .MuiButton-root {
+      min-width: 0;
+      min-height: 44px;
+      white-space: nowrap;
+    }
+  }
 }

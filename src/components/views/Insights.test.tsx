@@ -1,6 +1,8 @@
 import { configureStore, createNextState } from "@reduxjs/toolkit";
 import {
   act,
+  fireEvent,
+  waitFor,
   isInaccessible,
   render as renderUI,
   screen,
@@ -27,6 +29,7 @@ import {
 import { GameType, TickPresentFutureType } from "../../Types";
 import Insights, {
   INSIGHT_PRESETS,
+  INSIGHT_LAYERS,
   MAX_CUSTOM_INSIGHT_PRESETS,
   withRequiredLayers,
 } from "./Insights";
@@ -41,6 +44,7 @@ jest.mock("../base/GameCard", () => ({
 
 interface ChartMockProps {
   currentMinute?: number;
+  selectedFuel?: string;
   title?: string;
   hideTitle?: boolean;
   format?: (value: number) => number | string;
@@ -74,7 +78,7 @@ it("keeps first worker startup and long worker recovery out of the Insights rend
     getProjection: (now: TickPresentFutureType) => unknown;
   };
   const originalWorker = global.Worker;
-  const generate = jest.spyOn(GameModule, "generateNewTimeline");
+  const generate = jest.spyOn(GameModule, "generateForecastTimeline");
   global.Worker = jest.fn() as unknown as typeof Worker;
   try {
     expect(internals.getProjection(game.timeline[0])).toBeUndefined();
@@ -213,8 +217,14 @@ jest.mock("../base/ChartFinances", () => ({
 jest.mock("../base/ChartForecastFuelPrices", () => ({
   __esModule: true,
   PRICED_FUELS: [],
-  default: ({ syncKey }: ChartMockProps) => (
-    <div role="img" data-chart="fuel-prices" data-sync-key={syncKey} />
+  default: ({ syncKey, selectedFuel }: ChartMockProps) => (
+    <div
+      role="img"
+      aria-label="Fuel price inspection"
+      data-chart="fuel-prices"
+      data-sync-key={syncKey}
+      data-fuel={selectedFuel || "all"}
+    />
   ),
 }));
 jest.mock("../base/ChartForecastDemandByType", () => ({
@@ -544,6 +554,72 @@ describe("Insights layers", () => {
     cacheProjection(overviewGame, overviewProjection);
   });
 
+  it("offers chart expansion beside plotted layers, never summaries", () => {
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(INSIGHT_LAYERS.map((layer) => layer.id)),
+    );
+    renderInsights();
+    const tracks = screen.getAllByRole("region", { name: / evidence$/ });
+    for (const track of tracks) {
+      const name = track.getAttribute("aria-label")!.replace(/ evidence$/, "");
+      const expand = within(track).queryByRole("button", {
+        name: `Expand ${name} chart`,
+      });
+      expect(expand !== null).toBe(
+        !["Power exchange", "Finance details"].includes(name),
+      );
+    }
+  });
+
+  it("keeps fuel selection and time zoom when expanding and closing a chart", async () => {
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(["fuelPrices", "cash"]),
+    );
+    renderInsights();
+    const layers = localStorage.getItem("insightsLayers");
+    fireEvent.click(screen.getByRole("button", { name: "Coal" }));
+    expect(
+      screen.getByRole("img", { name: "Fuel price inspection" }),
+    ).toHaveAttribute("data-fuel", "Coal");
+    const expand = screen.getByRole("button", {
+      name: "Expand Fuel Prices chart",
+    });
+    act(() => expand.focus());
+    fireEvent.click(expand);
+    const dialog = screen.getByRole("dialog", { name: "Fuel Prices" });
+    expect(
+      within(dialog).getByRole("button", { name: "Coal" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const chart = within(dialog).getByRole("img", {
+      name: "Fuel price inspection",
+    });
+    expect(chart).toHaveAttribute("data-fuel", "Coal");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Zoom in" }));
+    const date = within(dialog).getByLabelText(
+      /^Displayed date range:/,
+    ).textContent;
+    fireEvent.click(within(dialog).getByRole("button", { name: "All fuels" }));
+    expect(
+      within(dialog).getByRole("img", { name: "Fuel price inspection" }),
+    ).toHaveAttribute("data-fuel", "all");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(expand).toHaveFocus();
+    expect(screen.getByLabelText(/^Displayed date range:/)).toHaveTextContent(
+      date!,
+    );
+    expect(localStorage.getItem("insightsLayers")).toBe(layers);
+    expect(screen.getByRole("button", { name: "All fuels" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
   it("shows expanded finance rows and both rate graphs", () => {
     localStorage.setItem(
       "insightsLayers",
@@ -587,7 +663,7 @@ describe("Insights layers", () => {
       "Insights",
       "Supply & Demand",
       "Cash",
-      "Emissions (CO2e)",
+      "Emissions (CO₂e)",
     ];
     expect(headings).toHaveLength(expected.length);
     expected.forEach((label, index) =>
@@ -610,22 +686,22 @@ describe("Insights layers", () => {
     renderInsights();
     await choosePreset("Reliability");
     const track = screen.getByRole("region", {
-      name: "Lowest spare capacity evidence",
+      name: "Lowest reserve evidence",
     });
     expect(
-      within(track).getByRole("img", { name: /Monthly lowest spare capacity/ }),
+      within(track).getByRole("img", { name: /Monthly lowest reserve/ }),
     ).toBeInTheDocument();
     const headings = screen.getAllByRole("heading", { level: 6 });
     expect(headings[1]).toHaveTextContent("Supply & Demand");
-    expect(headings[2]).toHaveTextContent("Lowest spare capacity");
+    expect(headings[2]).toHaveTextContent("Lowest reserve");
     await user.click(labelledButton(/Layers/));
     await user.click(
       screen.getByRole("checkbox", {
-        name: "Lowest spare capacity",
+        name: "Lowest reserve",
       }),
     );
     expect(
-      screen.queryByRole("region", { name: "Lowest spare capacity evidence" }),
+      screen.queryByRole("region", { name: "Lowest reserve evidence" }),
     ).not.toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("insightsLayers")!)).not.toContain(
       "spareCapacity",
@@ -641,7 +717,7 @@ describe("Insights layers", () => {
       initialBuild: { name: "Wind", peakW: 100000000, financed: true },
     });
     expect(game.facilities.some((f) => f.yearsToBuildLeft > 0)).toBe(true);
-    const generate = jest.spyOn(GameModule, "generateNewTimeline");
+    const generate = jest.spyOn(GameModule, "generateForecastTimeline");
     const props = {
       selectedFacilityId: null,
       facilityDragActive: false,
@@ -670,7 +746,7 @@ describe("Insights layers", () => {
         startsMinute: 6 * MINUTES_PER_MONTH,
         endsMinute: 7 * MINUTES_PER_MONTH,
         label: "Expected Jul 2023",
-        title: "Higher pollution fee begins",
+        title: "Higher carbon fee begins",
         message: "Polluting plants become more expensive to run.",
       },
       {
@@ -687,9 +763,9 @@ describe("Insights layers", () => {
       name: "Upcoming scenario events",
     });
     expect(region).toHaveTextContent("Jul 2023");
-    expect(region).toHaveTextContent("Higher pollution fee begins");
+    expect(region).toHaveTextContent("Higher carbon fee begins");
     const event = within(region).getByRole("button", {
-      name: "Expected Jul 2023: Higher pollution fee begins",
+      name: "Expected Jul 2023: Higher carbon fee begins",
     });
     expect(event).toHaveAttribute("aria-expanded", "false");
     await user.click(event);
@@ -769,6 +845,8 @@ describe("Insights layers", () => {
     expect(
       screen.getByLabelText("Displayed date range: 2020–39"),
     ).toBeVisible();
+    // Already wider than the scenario: nothing further out to go to.
+    expect(labelledButton("Zoom out")).toBeDisabled();
   });
 
   it.each([1, 12, 60, 192, 0])(
@@ -1057,6 +1135,46 @@ describe("Insights layers", () => {
     );
   });
 
+  it("scrolls the power exchange into view on the phone step that points to it", () => {
+    jest.useFakeTimers();
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 112 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    game.tutorialStep = getScenario(112)!.tutorialSteps!.findIndex(
+      (step) => step.target === '[data-layer="powerExchange"]',
+    );
+    expect(game.tutorialStep).toBeGreaterThan(0);
+    const width = window.innerWidth;
+    const scrolled: Element[] = [];
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this);
+    };
+    try {
+      renderInsights(112, game);
+      act(() => jest.runOnlyPendingTimers());
+      expect(scrolled).toHaveLength(1);
+      expect(scrolled[0]).toHaveAttribute("data-layer", "powerExchange");
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+      Object.defineProperty(window, "innerWidth", {
+        configurable: true,
+        value: width,
+      });
+    }
+  });
+
   it("gives the customer chart two significant digits on axes and three on inspection", () => {
     localStorage.setItem("insightsLayers", JSON.stringify(["customers"]));
     renderInsights();
@@ -1096,7 +1214,7 @@ describe("Insights layers", () => {
       .getAllByRole("heading", { level: 6 })
       .map((heading) => heading.textContent);
     expect(headings.indexOf("Revenue")).toBeLessThan(
-      headings.indexOf("Emissions (CO2e)"),
+      headings.indexOf("Emissions (CO₂e)"),
     );
 
     await user.click(labelledButton("Preset actions"));

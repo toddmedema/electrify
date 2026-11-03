@@ -1,12 +1,14 @@
-import { activeScenario } from "../../helpers/GameSelectors";
+import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { Box, Typography, useMediaQuery } from "@mui/material";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { GameType, ScenarioType, ScoreCategoryType } from "../../Types";
 import { DIFFICULTY_LABELS } from "../../Constants";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
   deriveExpandedSummary,
   summarizeHistory,
+  MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import {
   computeScoreBreakdown,
@@ -17,32 +19,42 @@ import {
 import { useUnits } from "./UnitsContext";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
+import UtilitySupplyPlan from "./UtilitySupplyPlan";
 import { formatScore } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
-import type { MissionRequirement } from "../../helpers/MissionStatus";
-import {
-  projectScore,
-  ScoreProjectionType,
-} from "../../helpers/ScoreProjection";
+import { ScoreProjectionType } from "../../helpers/ScoreProjection";
 import { useAppSelector } from "../../Store";
 import { GameCard } from "./GameCard";
 import ChartFinances from "./ChartFinances";
+import type { ProjectionView } from "../../helpers/Projection";
+import {
+  scenarioLossSummary,
+  scenarioScoreProjection,
+} from "./ScenarioOutlook";
+import {
+  projectMission,
+  MissionProjection,
+} from "../../helpers/MissionProjection";
+import {
+  projectionReady,
+  readProjection,
+  requestProjection,
+  subscribeProjection,
+} from "./DeferredProjection";
 
-const STATUS_LABELS: Record<MissionRequirement["status"], string> = {
-  pending: "Not started",
-  "in-progress": "In progress",
-  completed: "Met",
-  failed: "Failed",
-  unknown: "Unknown",
-  waived: "Waived",
-};
-
-function statusLabel(requirement: MissionRequirement): string {
-  if (requirement.definition && requirement.status === "unknown")
-    return "Unavailable";
-  return requirement.id === "retention" && requirement.status === "failed"
-    ? "Out of reach"
-    : STATUS_LABELS[requirement.status];
+function useScenarioForecast(game: GameType): ProjectionView | undefined {
+  const [, refresh] = React.useReducer((count: number) => count + 1, 0);
+  React.useEffect(() => subscribeProjection(refresh), []);
+  const now = currentTick(game);
+  const ended =
+    game.date.monthsElapsed >= (activeScenario(game)?.durationMonths ?? 0);
+  const ready = projectionReady(game);
+  React.useEffect(() => {
+    if (now && !ended && !ready) requestProjection(game, now);
+  }, [game, now, ended, ready]);
+  if (!now || ended || (!ready && typeof Worker !== "undefined"))
+    return undefined;
+  return readProjection(game, now);
 }
 
 /**
@@ -53,13 +65,28 @@ function statusLabel(requirement: MissionRequirement): string {
 function ScoreOutlook({
   projection,
   history,
+  game,
+  outlook,
 }: {
-  projection: ScoreProjectionType;
+  projection: ScoreProjectionType | null;
   history: GameType["monthlyHistory"];
+  game: GameType;
+  outlook: MissionProjection | undefined;
 }): React.JSX.Element {
   const timeline = React.useMemo(() => {
+    if (!projection)
+      return [
+        {
+          month: game.startingYear * 12,
+          year: game.startingYear - 1,
+          value: 0,
+          projected: false,
+        },
+      ];
     const last = history[0];
-    const first = last.year * 12 + last.month - projection.actual.length + 1;
+    const first = last
+      ? last.year * 12 + last.month - projection.actual.length + 1
+      : game.startingYear * 12;
     const point = (index: number, value: number, projected: boolean) => {
       const month = first + index;
       return { month, year: Math.floor((month - 1) / 12), value, projected };
@@ -70,10 +97,23 @@ function ScoreOutlook({
         point(projection.actual.length + i, value, true),
       ),
     ];
-  }, [projection, history]);
-  const current = projection.actual[projection.actual.length - 1];
-  const change = projection.final - current;
-  const ended = projection.projected.length === 0;
+  }, [projection, history, game.startingYear]);
+  const current = projection?.actual.at(-1) ?? 0;
+  const change = projection ? projection.final - current : 0;
+  const duration = activeScenario(game)!.durationMonths;
+  const ended = game.date.monthsElapsed >= duration;
+  const loss = scenarioLossSummary(game, outlook);
+  const warningSpans = React.useMemo<Array<[number, number]>>(
+    () =>
+      loss.firstMonth === undefined
+        ? []
+        : [[loss.firstMonth * MINUTES_PER_MONTH, duration * MINUTES_PER_MONTH]],
+    [loss.firstMonth, duration],
+  );
+  const domain = React.useMemo<[number, number]>(
+    () => [0, (duration - 1) * MINUTES_PER_MONTH],
+    [duration],
+  );
   // The chart's height scales with its width, so a phone needs more to keep its axis readable
   const phone = useMediaQuery("(max-width: 599px)");
   return (
@@ -84,7 +124,7 @@ function ScoreOutlook({
     >
       <Typography
         id="scenario-outlook-title"
-        variant="h6"
+        variant="subtitle1"
         component="h3"
         sx={{ fontWeight: 600 }}
       >
@@ -99,11 +139,17 @@ function ScoreOutlook({
           <div>
             <dt>Projected final</dt>
             <dd>
-              {formatScore(projection.final)}
+              {projection ? formatScore(projection.final) : "—"}
               {change !== 0 && (
                 <span
                   className="scenarioOutlookChange"
-                  data-direction={change > 0 ? "up" : "down"}
+                  data-direction={
+                    outlook?.status === "loss"
+                      ? "neutral"
+                      : change > 0
+                        ? "up"
+                        : "down"
+                  }
                 >
                   {change > 0 ? "+" : "−"}
                   {formatScore(Math.abs(change))}
@@ -122,14 +168,52 @@ function ScoreOutlook({
         title="score"
         format={formatScore}
         projectedNote="Projected"
+        startingYear={game.startingYear}
+        domain={domain}
+        warningSpans={warningSpans}
+        warningNote="Projected loss"
       />
+      {!ended && (
+        <Typography
+          component="p"
+          variant="body2"
+          role="status"
+          aria-label="Scenario forecast"
+          className={
+            outlook?.status === "loss" ? "insightsWarning" : "scenarioOutcome"
+          }
+          data-status={outlook?.status ?? "loading"}
+        >
+          {outlook?.status === "loss" ? (
+            <>
+              <WarningAmberIcon fontSize="small" aria-hidden="true" />
+              <span>
+                <strong>Projected loss:</strong> {loss.text}
+                {outlook.shortageFrom && (
+                  <span className="scenarioBuildNothing">
+                    If you build nothing: shortages from {outlook.shortageFrom}.
+                  </span>
+                )}
+              </span>
+            </>
+          ) : (
+            <>
+              {loss.text}
+              {outlook?.shortageFrom && (
+                <span className="scenarioBuildNothing">
+                  If you build nothing: shortages from {outlook.shortageFrom}.
+                </span>
+              )}
+            </>
+          )}
+        </Typography>
+      )}
     </Box>
   );
 }
 
 /**
- * The scenario's goals and score, in the game's tool panel like Insights and Events: the outlook
- * leads, its breakdown follows directly, then what the term requires to win.
+ * The score chart leads, with loss periods and their causes directly beneath it.
  */
 export default function ScenarioDetails(): React.JSX.Element | null {
   const game = useAppSelector((state) => state.game);
@@ -161,6 +245,10 @@ export function ScenarioDetailsContent({
   const units = useUnits();
   const location = getScenarioLocation(scenario);
   const mission = getMissionStatus(game);
+  const forecast = useScenarioForecast(game);
+  const missionProjection = forecast
+    ? projectMission(game, forecast)
+    : undefined;
   const history = game.monthlyHistory;
   // Both read only the completed months, which change once a month rather than every tick
   const breakdown = React.useMemo(
@@ -175,8 +263,17 @@ export function ScenarioDetailsContent({
     [scenario, history, game.startingYear, game.seed],
   );
   const projection = React.useMemo(
-    () => projectScore(scenario, history, game.startingYear, game.seed),
-    [scenario, history, game.startingYear, game.seed],
+    () =>
+      scenarioScoreProjection(
+        {
+          monthlyHistory: history,
+          startingYear: game.startingYear,
+          seed: game.seed,
+        },
+        scenario,
+        forecast,
+      ),
+    [history, game.startingYear, game.seed, scenario, forecast],
   );
   const rules = scoreRuleText(
     scenario.ownership,
@@ -203,6 +300,13 @@ export function ScenarioDetailsContent({
       >
         {scenario.name}
       </Typography>
+      <UtilitySupplyPlan game={game} forecast={forecast} />
+      <ScoreOutlook
+        projection={projection}
+        history={history}
+        game={game}
+        outlook={missionProjection}
+      />
       <Box component="dl" className="scenarioFacts">
         {facts.map(({ label, value }) => (
           <div key={label}>
@@ -211,7 +315,6 @@ export function ScenarioDetailsContent({
           </div>
         ))}
       </Box>
-      {projection && <ScoreOutlook projection={projection} history={history} />}
       <Box
         component="section"
         aria-labelledby="scenario-score-title"
@@ -219,7 +322,7 @@ export function ScenarioDetailsContent({
       >
         <Typography
           id="scenario-score-title"
-          variant="h6"
+          variant="subtitle1"
           component="h3"
           sx={{ fontWeight: 600 }}
         >
@@ -286,83 +389,53 @@ export function ScenarioDetailsContent({
           </Box>
         ) : (
           <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
-            Score appears after your first month.
+            Breakdown appears after your first month.
           </Typography>
         )}
       </Box>
       <Box component="section" aria-labelledby="scenario-rules-title">
         <Typography
           id="scenario-rules-title"
-          variant="h6"
+          variant="subtitle1"
           component="h3"
           sx={{ fontWeight: 600 }}
         >
-          Victory conditions
+          Goals
         </Typography>
         {scenario.id === 3 && <CustomerGrowthChallenge />}
-        {mission.finalNote && (
-          <Typography variant="body2">{mission.finalNote}</Typography>
-        )}
         <Box component="dl" className="missionRequirements">
-          {mission.requirements.map((requirement) => (
-            <React.Fragment key={requirement.id}>
-              <Typography
-                component="dt"
-                variant="body2"
-                sx={{ mt: 2, fontWeight: 600, overflowWrap: "anywhere" }}
-              >
-                <span>
-                  {requirement.definition
-                    ? requirement.label
-                    : requirement.target}
-                </span>
-                {requirement.required === false && (
-                  <Typography
-                    component="span"
-                    variant="body2"
-                    sx={{ ml: 1, color: "text.secondary" }}
-                  >
-                    Optional
-                  </Typography>
-                )}
-              </Typography>
-              {requirement.definition && (
+          {[...mission.requirements]
+            .sort(
+              (a, b) =>
+                Number(a.required === false) - Number(b.required === false),
+            )
+            .map((requirement) => (
+              <React.Fragment key={requirement.id}>
+                <Typography
+                  component="dt"
+                  variant="body2"
+                  sx={{ mt: 2, fontWeight: 600, overflowWrap: "anywhere" }}
+                >
+                  <span>{requirement.label}</span>
+                  {requirement.required === false && (
+                    <Typography
+                      component="span"
+                      variant="body2"
+                      sx={{ ml: 1, color: "text.secondary" }}
+                    >
+                      Optional
+                    </Typography>
+                  )}
+                </Typography>
                 <Typography
                   component="dd"
                   variant="body2"
-                  sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                  sx={{ overflowWrap: "anywhere" }}
                 >
-                  {requirement.definition}
-                </Typography>
-              )}
-              {requirement.definition && (
-                <Typography component="dd" variant="body2">
                   {requirement.target}
                 </Typography>
-              )}
-              <Typography component="dd" variant="body2">
-                {(requirement.status !== "unknown" || requirement.definition) &&
-                  requirement.status !== "in-progress" && (
-                    <span
-                      className="missionRequirementStatus"
-                      data-status={requirement.status}
-                    >
-                      {statusLabel(requirement)}
-                    </span>
-                  )}{" "}
-                <span>{requirement.current}</span>
-              </Typography>
-              {requirement.reason && (
-                <Typography
-                  component="dd"
-                  variant="body2"
-                  sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
-                >
-                  {requirement.reason}
-                </Typography>
-              )}
-            </React.Fragment>
-          ))}
+              </React.Fragment>
+            ))}
         </Box>
       </Box>
     </div>

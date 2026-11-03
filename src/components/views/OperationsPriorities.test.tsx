@@ -30,12 +30,10 @@ test("a current shortage never replaces the two pinned requirements or repeats t
   });
   render(<OperationsPriorities {...props(game)} />);
   expect(screen.getByRole("heading", { name: "Goals" })).toBeVisible();
-  expect(
-    screen.getByRole("button", { name: /Keep the utility solvent/ }),
-  ).toBeVisible();
+  expect(screen.getByRole("button", { name: /Stay solvent/ })).toBeVisible();
   expect(
     screen.getByRole("button", {
-      name: /Keep the lights on through the wildfire emergency/,
+      name: /Keep power flowing/,
     }),
   ).toBeVisible();
   expect(screen.queryByText("Blackout")).not.toBeInTheDocument();
@@ -43,31 +41,26 @@ test("a current shortage never replaces the two pinned requirements or repeats t
 
 test("players can choose concurrent goals and their choices survive remount", async () => {
   const user = userEvent.setup();
-  const passed = props();
+  const passed = props(createGame({ scenarioId: 100 }));
   const view = render(<OperationsPriorities {...passed} />);
   await user.click(screen.getByRole("button", { name: "Choose pinned goals" }));
   await user.click(
-    screen.getByRole("menuitemcheckbox", { name: "Avoid chronic blackouts" }),
-  );
-  await user.click(
     screen.getByRole("menuitemcheckbox", {
-      name: /Keep the lights on through the wildfire emergency/,
+      name: /Retain the community/,
     }),
   );
   await user.keyboard("{Escape}");
   view.unmount();
   render(<OperationsPriorities {...passed} />);
   expect(
-    screen.getByRole("button", { name: /Avoid chronic blackouts/ }),
+    screen.getByRole("button", { name: /Keep power flowing/ }),
   ).toBeVisible();
   expect(
     screen.queryByRole("button", {
-      name: /Keep the lights on through the wildfire emergency/,
+      name: /Retain the community/,
     }),
   ).not.toBeInTheDocument();
-  await user.click(
-    screen.getByRole("button", { name: /Keep the utility solvent/ }),
-  );
+  await user.click(screen.getByRole("button", { name: /Stay solvent/ }));
   expect(passed.onEvidence).toHaveBeenCalledWith("finances");
 });
 

@@ -440,10 +440,9 @@ test("mechanical durations are whole months and meaningful zeros retain their sc
   );
 });
 
-test("all eight objective metrics accept their own fields and reject another metric's target", () => {
+test("all seven objective metrics accept their own fields and reject another metric's target", () => {
   const window = { fromMonth: 1, throughMonth: 12 };
   const objectives = [
-    { metric: "monthlyReliability", ...window, minDemandServedShare: 1 },
     { metric: "customerRetention", deadlineMonth: 12, minRetainedShare: 0.9 },
     { metric: "emissionsBudget", ...window, budgetTonnesCO2e: 0 },
     { metric: "emissionsPerDeliveredMWh", ...window, maxKgCO2ePerMWh: 500 },
@@ -500,5 +499,28 @@ test.each([
 ])("unsafe authored text %s is rejected in the owning field", (title) => {
   expect(ruleDiagnostics({ events: [{ ...event(), title }] })).toContainEqual(
     expect.objectContaining({ code: "unsafe-text", path: "events[0].title" }),
+  );
+});
+
+test("rejects scenario-authored reliability requirements", () => {
+  const diagnostics = ruleDiagnostics({
+    objectives: [
+      {
+        id: "service",
+        label: "Override service",
+        metric: "monthlyReliability",
+        fromMonth: 1,
+        throughMonth: 3,
+        minDemandServedShare: 0.99,
+      },
+    ],
+  });
+  expect(diagnostics).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        path: "objectives[0].metric",
+        severity: "error",
+      }),
+    ]),
   );
 });

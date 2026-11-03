@@ -223,7 +223,7 @@ for (const theme of ["light", "dark"] as const) {
     await eventButton.click();
     await expect(eventButton).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("dialog")).toContainText(
-      "Regional shale glut lowering local gas prices.",
+      "A regional shale glut will lower local gas prices.",
     );
     await eventButton.click();
     await expect(eventButton).toHaveAttribute("aria-expanded", "false");

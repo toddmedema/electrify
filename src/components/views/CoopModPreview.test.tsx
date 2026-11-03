@@ -38,12 +38,12 @@ const pack: ModPackage = {
   scenario: { durationMonths: 6 },
   objectives: [
     {
-      id: "reliable",
+      id: "affordable",
       label: "Serve your customers",
-      metric: "monthlyReliability",
+      metric: "monthlyBilledRate",
       fromMonth: 1,
       throughMonth: 6,
-      minDemandServedShare: 0.99,
+      maxDollarsPerKWh: 0.99,
     },
     {
       id: "bills",

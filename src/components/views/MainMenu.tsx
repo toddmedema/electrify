@@ -12,7 +12,6 @@ import {
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
 import ShareIcon from "@mui/icons-material/Share";
-import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import {
   buildGameShareContent,
   canShare,
@@ -20,7 +19,6 @@ import {
 } from "../../helpers/Share";
 import InstallAppButton from "../base/InstallAppButton";
 import { getDesktop, isDesktopApp } from "../../Desktop";
-import { useDesktopState } from "../../DesktopState";
 import { useMenuKeys } from "../base/useMenuKeys";
 // Keep Steam's co-op UI and authoritative worker out of the browser edition entirely.
 const MultiplayerButton =
@@ -54,22 +52,55 @@ const DiscordIcon = () => (
   </SvgIcon>
 );
 
-// The home menu's text buttons are plain until one is active. The active button carries the
-// primary fill (its focus indicator) and follows both pointer and keyboard/controller focus,
-// so hovering a control moves real focus to it; Enter/Space/A then activate that button.
+// Mouse movement shares selection with keyboard/controller focus. A touch drag is scrolling,
+// not hover selection. Boundary events alone can also come from the entrance moving beneath
+// a stationary pointer.
 const HOME_MENU_BUTTONS =
   ".mainActions button, .resourceActions button, .discoveryActions button";
 function focusHomeButton(event: React.PointerEvent) {
+  if (event.pointerType !== "mouse") return;
   const target = event.target as HTMLElement;
   const button = target.closest<HTMLElement>(HOME_MENU_BUTTONS);
-  if (button && button !== document.activeElement)
-    button.focus({ preventScroll: true });
+  if (button) {
+    delete document.documentElement.dataset.touchInput;
+    if (button !== document.activeElement)
+      button.focus({ preventScroll: true });
+  }
 }
 
 const MainMenu = (props: Props): React.JSX.Element => {
   const menuKeys = useMenuKeys();
+  // Native :active can wait until touch release. Track contact without delaying the click
+  // or taking over the browser's scrolling and pointer-cancellation behavior.
+  const pressedButton = React.useRef<HTMLElement | null>(null);
+  const clearTouchPress = () => {
+    pressedButton.current?.removeAttribute("data-touch-pressed");
+    pressedButton.current = null;
+  };
+  const onTouchPress = (event: React.PointerEvent) => {
+    if (event.pointerType !== "touch" || !event.isPrimary) return;
+    clearTouchPress();
+    const button = (event.target as HTMLElement).closest<HTMLElement>(
+      "button,a[href]",
+    );
+    if (button && !button.matches(":disabled,[aria-disabled=true]")) {
+      pressedButton.current = button;
+      button.setAttribute("data-touch-pressed", "");
+    }
+  };
+  const onTouchMove = (event: React.PointerEvent) => {
+    if (!pressedButton.current) return;
+    const { left, right, top, bottom } =
+      pressedButton.current.getBoundingClientRect();
+    if (
+      event.clientX < left ||
+      event.clientX > right ||
+      event.clientY < top ||
+      event.clientY > bottom
+    )
+      clearTouchPress();
+  };
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
-  const steamAvailable = useDesktopState()?.steam.available;
   // The desktop game bundles no website pages, so those open in the player's browser.
   const sitePage = (path: string) =>
     desktopApp
@@ -79,7 +110,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           rel: "noopener noreferrer",
         }
       : { href: path };
-  const startLabel = props.hasSavedGame ? "Start a new game" : "Play";
+  const startLabel = props.hasSavedGame ? "New game" : "Play";
   const [shareStatus, setShareStatus] = React.useState("");
   // An <img> can't read the page's custom properties, so dark swaps in a copy of the logo painted
   // in dark's desaturated blue; the overlaid pulse and smoke follow --interactive-blue on their own
@@ -95,7 +126,14 @@ const MainMenu = (props: Props): React.JSX.Element => {
   };
 
   return (
-    <div id="menuCard">
+    <div
+      id="menuCard"
+      onPointerDown={onTouchPress}
+      onPointerMove={onTouchMove}
+      onPointerUp={clearTouchPress}
+      onPointerCancel={clearTouchPress}
+      onPointerLeave={clearTouchPress}
+    >
       <div id="logo">
         <div className="homeLogo">
           <img
@@ -137,7 +175,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
         id="centeredMenu"
         className="keyboardMenu"
         {...menuKeys}
-        onPointerOver={focusHomeButton}
+        onPointerMove={focusHomeButton}
         sx={{ px: 3 }}
       >
         <Stack
@@ -193,7 +231,22 @@ const MainMenu = (props: Props): React.JSX.Element => {
             justifyContent: "center",
           }}
         >
-          <Button variant="text" color="primary" onClick={props.onManual}>
+          {!desktopApp && (
+            <Button
+              data-achievements-trigger
+              variant="text"
+              color="primary"
+              onClick={props.onAchievements}
+            >
+              Achievements
+            </Button>
+          )}
+          <Button
+            data-manual-trigger
+            variant="text"
+            color="primary"
+            onClick={props.onManual}
+          >
             Manual
           </Button>
           {desktopApp && getDesktop()?.mods && (
@@ -214,16 +267,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
           >
             Settings
           </Button>
-          {!steamAvailable && (
-            <Button
-              data-achievements-trigger
-              variant="text"
-              color="primary"
-              onClick={props.onAchievements}
-            >
-              Achievements
-            </Button>
-          )}
           {desktopApp && (
             <Button
               variant="text"
@@ -247,13 +290,9 @@ const MainMenu = (props: Props): React.JSX.Element => {
               justifyContent: "center",
             }}
           >
-            {!desktopApp && <InstallAppButton />}
+            {!desktopApp && <InstallAppButton showIcon={false} />}
             {props.audioEnabled === undefined && !desktopApp && (
-              <Button
-                color="primary"
-                startIcon={<VolumeUpIcon />}
-                onClick={() => props.onAudioChange(true)}
-              >
+              <Button color="primary" onClick={() => props.onAudioChange(true)}>
                 Turn on sound
               </Button>
             )}
@@ -299,7 +338,8 @@ const MainMenu = (props: Props): React.JSX.Element => {
             aria-label="Share Electrify"
             size="large"
           >
-            <ShareIcon />
+            {/* Share has one extra pixel of leading whitespace beside the other footer glyphs. */}
+            <ShareIcon sx={{ transform: "translateX(-1px)" }} />
           </IconButton>
         )}
       </footer>

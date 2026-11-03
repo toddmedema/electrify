@@ -161,7 +161,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
             value={`${Number((storage.peakWh / storage.peakW).toFixed(1))} hr`}
           />
           <BuildMetric
-            label="Round-trip efficiency"
+            label="Efficiency"
             value={`${Math.round(storage.roundTripEfficiency * 100)}%`}
           />
         </>
@@ -169,7 +169,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
       details={
         <BuildDetails label="storage properties">
           <BuildDetailRow
-            label="Operating costs"
+            label="Upkeep"
             value={`${formatMoneyConcise(storage.annualOperatingCost)}/yr`}
             entry={MANUAL_ENTRY.OPERATING_COSTS}
           />
@@ -236,7 +236,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           },
           {
             concept: "supply",
-            label: "Round-trip efficiency",
+            label: "Efficiency",
             value: `${Math.round(storage.roundTripEfficiency * 100)}%`,
           },
           ...(sites
@@ -333,6 +333,11 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
         }}
         onSortChange={(value) => setSort(value as StorageSortKey)}
       />
+      {storage.length === 0 && (
+        <Typography role="status" sx={{ px: 2, py: 2 }}>
+          No storage projects are available in {game.date.year}.
+        </Typography>
+      )}
       <List ref={listRef} dense className="scrollable cardList">
         {storage.map((g: StorageShoppingType) => (
           <StorageBuildItem

@@ -2,6 +2,7 @@ import { expect, Locator, Page } from "@playwright/test";
 
 /** Both providers must remain equal, usable columns at every supported width. */
 export async function expectSignInButtonsToFit(scope: Page | Locator) {
+  await expectMailingListChoice(scope);
   const google = scope.getByRole("button", {
     name: "Sign in with Google",
     exact: true,
@@ -48,6 +49,38 @@ export async function expectSignInButtonsToFit(scope: Page | Locator) {
   expect(b.x + b.width).toBeLessThanOrEqual(layout.viewportWidth + 1);
   for (const button of layout.buttons)
     expect(button.overflow).toBeLessThanOrEqual(1);
+}
+
+/** Optional consent remains unchecked, aligned and usable beside either provider. */
+export async function expectMailingListChoice(
+  scope: Page | Locator,
+  buttonName = "Sign in with Google",
+) {
+  const checkbox = scope.getByRole("checkbox", {
+    name: "Join the Electrify mailing list",
+  });
+  const button = scope.getByRole("button", { name: buttonName, exact: true });
+  await expect(checkbox).toHaveCount(1);
+  await expect(checkbox).toBeVisible();
+  await expect(checkbox).not.toBeChecked();
+  await expect(button).toBeVisible();
+  for (const control of [checkbox.locator("xpath=ancestor::label"), button]) {
+    const geometry = await control.evaluate((element) => {
+      const { x, width, height } = element.getBoundingClientRect();
+      return {
+        x,
+        width,
+        height,
+        viewportWidth: window.innerWidth,
+        minimumHeight: matchMedia("(pointer: coarse)").matches ? 44 : 40,
+      };
+    });
+    expect(geometry.x).toBeGreaterThanOrEqual(0);
+    expect(geometry.x + geometry.width).toBeLessThanOrEqual(
+      geometry.viewportWidth + 1,
+    );
+    expect(geometry.height).toBeGreaterThanOrEqual(geometry.minimumHeight);
+  }
 }
 
 /**
@@ -110,7 +143,11 @@ export async function waitForSettled(
  */
 export async function openBuild(page: Page): Promise<Locator> {
   const build = page.getByRole("region", { name: "Build", exact: true });
-  if (!(await build.isVisible())) await page.locator("#buildNav").click();
+  const navButton = page.getByRole("button", { name: "Build", exact: true });
+  // A purchase dialog temporarily hides the workspace from the accessibility tree.
+  // Wait for it to return before deciding whether the dock would open or close Build.
+  await waitForPaneOrNav(build, navButton);
+  if (!(await build.isVisible())) await navButton.click();
   await expect(build).toBeVisible();
   return build;
 }
@@ -183,5 +220,50 @@ export async function sortBuildCatalog(
       "aria-label",
       `Sort facilities: ${order}`,
     );
+  }
+}
+
+/** Move the generator ahead of storage using the same grip and drag sensors as a player. */
+export async function dragCoalAbovePumpedHydro(page: Page) {
+  const handle = page.getByRole("button", {
+    name: "Reorder Coal",
+    exact: true,
+  });
+  const row = page.locator('.facilityRow[data-facility="Coal"]');
+  await handle.scrollIntoViewIfNeeded();
+  await handle.click({ trial: true });
+  const from = (await handle.boundingBox())!;
+  const to = (await page
+    .getByRole("button", { name: "Reorder Pumped Hydro", exact: true })
+    .first()
+    .boundingBox())!;
+  const x = from.x + from.width / 2;
+  const y = from.y + from.height / 2;
+  const destination = to.y + to.height / 2;
+  if (await page.evaluate(() => matchMedia("(pointer: coarse)").matches)) {
+    const session = await page.context().newCDPSession(page);
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x, y }],
+    });
+    await expect(row).toHaveClass(/dragging/);
+    for (let step = 1; step <= 10; step++) {
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x, y: y + ((destination - y) * step) / 10 }],
+      });
+    }
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await session.detach();
+  } else {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y - 8, { steps: 2 });
+    await expect(row).toHaveClass(/dragging/);
+    await page.mouse.move(x, destination, { steps: 10 });
+    await page.mouse.up();
   }
 }

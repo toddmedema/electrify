@@ -1,14 +1,15 @@
-import { SCENARIOS } from "../data/Scenarios";
-import { runSimulation } from "../testing/Simulator";
+import { DEFAULT_CUSTOM_SCENARIO, SCENARIOS } from "../data/Scenarios";
 import { MonthlyHistoryType, ScenarioType } from "../Types";
 import { bestReachableCustomers, nextCustomerCount } from "./Customers";
-import { DIFFICULTY_IDS, TICKS_PER_MONTH } from "../Constants";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
+import { TICKS_PER_MONTH } from "../Constants";
 import {
   decidedObjectiveFailure,
   formatRequiredShare,
   hasChronicBlackouts,
   retentionBaseline,
   scenarioObjectiveFailure,
+  runFailure,
 } from "./ObjectiveRules";
 
 const scenario = (id: number): ScenarioType =>
@@ -27,17 +28,37 @@ const row = (
     customers,
   }) as MonthlyHistoryType;
 
-it.each(DIFFICULTY_IDS)(
+it.each([
+  ["Intern", 0.9],
+  ["Employee", 0.95],
+  ["Manager", 0.97],
+  ["VP", 0.99],
+  ["CEO", 0.995],
+] as const)(
   "fires below the completed-month threshold on %s",
-  (difficulty) => {
-    const threshold = difficulty === "CEO" ? 0.95 : 0.9;
+  (difficulty, threshold) => {
     const rows = (served: number) =>
       [3, 2, 1].map((month) => row(2026, month, served));
     expect(hasChronicBlackouts(rows(threshold - 0.001), difficulty)).toBe(true);
     expect(hasChronicBlackouts(rows(threshold), difficulty)).toBe(false);
-    expect(hasChronicBlackouts(rows(0.92), difficulty)).toBe(
-      difficulty === "CEO",
-    );
+    expect(
+      hasChronicBlackouts(
+        [rows(0.8)[0], row(2026, 2, threshold), rows(0.8)[2]],
+        difficulty,
+      ),
+    ).toBe(false);
+    expect(
+      hasChronicBlackouts(
+        [row(2026, 4, 0.8), row(2026, 2, 0.8), row(2026, 1, 0.8)],
+        difficulty,
+      ),
+    ).toBe(false);
+    expect(
+      hasChronicBlackouts(
+        [row(2026, 1, 0.8), row(2025, 12, 0.8), row(2025, 11, 0.8)],
+        difficulty,
+      ),
+    ).toBe(true);
     expect(hasChronicBlackouts(rows(0.8).slice(0, 2), difficulty)).toBe(false);
     expect(
       hasChronicBlackouts([row(2026, 4, 1), ...rows(0.8)], difficulty),
@@ -77,22 +98,6 @@ describe("best reachable customers", () => {
 });
 
 describe("decided objectives", () => {
-  it("ends a run as soon as a reliability month falls short", () => {
-    const heatwave = scenario(108);
-    const failedJuly = [row(2026, 7, 0.9)];
-    const progress = { monthsRemaining: 5 };
-    expect(decidedObjectiveFailure(heatwave, failedJuly, progress)).toBe(
-      scenarioObjectiveFailure(heatwave, failedJuly),
-    );
-    expect(
-      decidedObjectiveFailure(heatwave, [row(2026, 7, 1)], progress),
-    ).toBeUndefined();
-    // Months outside the window never decide anything
-    expect(
-      decidedObjectiveFailure(heatwave, [row(2026, 5, 0.5)], progress),
-    ).toBeUndefined();
-  });
-
   it("fails retention once even best-case public growth cannot reach it", () => {
     const dataCenters = scenario(106);
     const start = dataCenters.startingCustomers!;
@@ -147,32 +152,6 @@ describe("retention baseline", () => {
   });
 });
 
-describe("ending a run once its objective is decided", () => {
-  it("ends a passive Deep Freeze right after the missed freeze month", () => {
-    const passive = runSimulation({ scenarioId: 107, difficulty: "Employee" });
-    expect(passive.outcome).toBe("fired");
-    // February 2021 is month 49; its row completes at the month-50 rollover, not month 84
-    expect(passive.firedAtMonth).toBe(50);
-  }, 120000);
-});
-
-describe("tolerant full-demand objectives", () => {
-  it("accepts a hair's shortfall but not a real one", () => {
-    const heatwave = scenario(108);
-    expect(heatwave.reliabilityObjective?.minimumDemandServed).toBe(0.995);
-    expect(
-      scenarioObjectiveFailure(heatwave, [
-        row(2026, 6, 1),
-        row(2026, 7, 0.9996),
-        row(2026, 8, 1),
-      ]),
-    ).toBeUndefined();
-    expect(scenarioObjectiveFailure(heatwave, [row(2026, 7, 0.99)])).toMatch(
-      /served 99\.00% .* requires 99\.5%\.$/,
-    );
-  });
-});
-
 describe("required share formatting", () => {
   it("keeps a decimal only when the requirement has one", () => {
     expect(formatRequiredShare(1)).toBe("100%");
@@ -208,27 +187,41 @@ it("does not declare attainable public retention impossible", () => {
   ).toBeUndefined();
 });
 
-describe("complete reliability evidence", () => {
-  it.each(SCENARIOS.filter((s) => s.reliabilityObjective))(
-    "requires every exact month once for $name",
-    (target) => {
-      const objective = target.reliabilityObjective!;
-      const first = objective.year * 12 + objective.month - 1;
-      const rows = Array.from(
-        { length: objective.durationMonths || 1 },
-        (_, i) => row(Math.floor((first + i) / 12), ((first + i) % 12) + 1, 1),
+it.each([
+  ["Intern", 0.9],
+  ["Employee", 0.95],
+  ["Manager", 0.97],
+  ["VP", 0.99],
+  ["CEO", 0.995],
+] as const)(
+  "applies the %s rule throughout every scenario",
+  (difficulty, threshold) => {
+    for (const target of [...SCENARIOS, DEFAULT_CUSTOM_SCENARIO]) {
+      const history = [3, 2, 1].map((month) =>
+        row(target.startingYear, month, threshold - 0.001, 1e6),
       );
-      expect(scenarioObjectiveFailure(target, rows)).toBeUndefined();
-      expect(scenarioObjectiveFailure(target, [])).toMatch(/unverifiable/i);
-      expect(scenarioObjectiveFailure(target, [...rows, rows[0]])).toMatch(
-        /unverifiable/i,
-      );
-      expect(scenarioObjectiveFailure(target, rows.slice(1))).toMatch(
-        /unverifiable/i,
-      );
-      expect(scenarioObjectiveFailure(target, rows.slice(0, -1))).toMatch(
-        /unverifiable/i,
-      );
-    },
-  );
-});
+      const game = {
+        difficulty,
+        customerMarketSize: 2e6,
+        date: getDateFromMinute(3 * MINUTES_PER_MONTH, target.startingYear),
+      };
+      const now = { cash: 1e9, minute: game.date.minute };
+      const failure = (months: MonthlyHistoryType[]) =>
+        runFailure(game, target, months, now, !!target.tutorialSteps);
+      expect(failure(history)).toMatchObject({
+        outcome: "fired",
+        title: "Fired!",
+        reason: expect.stringContaining(`${threshold * 100}%`),
+      });
+      expect(failure(history.slice(0, 2))).toBeUndefined();
+      expect(
+        failure(
+          history.map((month) => ({
+            ...month,
+            supplyWh: month.demandWh * threshold,
+          })),
+        ),
+      ).toBeUndefined();
+    }
+  },
+);

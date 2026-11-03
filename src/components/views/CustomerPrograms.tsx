@@ -86,7 +86,7 @@ import {
 import PolicyDemandChart, {
   PolicyDemandChartPlaceholder,
 } from "../base/PolicyDemandChart";
-import { generateNewTimeline } from "../../reducers/Game";
+import { generateForecastTimeline } from "../../reducers/Game";
 import { HOURS_PER_YEAR_REAL, TICKS_PER_YEAR } from "../../Constants";
 import { getSolarOutputFactor } from "../../helpers/Energy";
 import {
@@ -277,7 +277,7 @@ function BuildoutSummary({
     const now = currentTick(snapshot);
     if (id !== "solar" || !now) return undefined;
     // A full year avoids presenting a single sunny or dark month as annual production.
-    const ticks = generateNewTimeline(
+    const ticks = generateForecastTimeline(
       snapshot,
       now.cash,
       now.customers,
@@ -439,8 +439,8 @@ function useEstimate<T>(
     return {
       error:
         state.reason === "startup"
-          ? "Could not start the preview. Reopen the program to retry."
-          : "Could not estimate this change. Reopen the program to retry.",
+          ? "Couldn't start the preview. Reopen the program to retry."
+          : "Couldn't estimate this change. Reopen the program to retry.",
     };
   }
   return {};
@@ -875,16 +875,14 @@ export function ProgramsScreen({
             : (title ?? "Programs")
         }
       >
+        {!selected && pricing}
         {!selected ? (
-          <>
-            {pricing}
-            <ProgramList
-              game={game}
-              programs={programs}
-              policiesOn={policiesOn}
-              onOpen={open}
-            />
-          </>
+          <ProgramList
+            game={game}
+            programs={programs}
+            policiesOn={policiesOn}
+            onOpen={open}
+          />
         ) : (
           <Box className="customerProgramDetail">
             <Box className="customerProgramHeading">

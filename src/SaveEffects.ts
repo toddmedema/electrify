@@ -24,7 +24,14 @@ export function withRunSaveEffects<T>(
 const cloudSaveListeners = new Set<(id?: string) => void>();
 /** Explicit save interactions bypass the automatic cloud backup cadence. */
 export function requestCloudSave(id?: string): void {
-  cloudSaveListeners.forEach((listener) => listener(id));
+  cloudSaveListeners.forEach((listener) => {
+    try {
+      listener(id);
+    } catch {
+      // Backup requests are hints after local commits. A broken subscriber cannot
+      // fail that completed operation or keep other backup providers from hearing it.
+    }
+  });
 }
 export function subscribeCloudSaveRequests(
   listener: (id?: string) => void,

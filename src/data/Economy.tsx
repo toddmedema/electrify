@@ -12,15 +12,6 @@ export interface MonthRefType {
   monthNumber: number; // 1-12
 }
 
-/** Historical national rates versus the game's authored cyclical extrapolation. */
-export function getEconomyProvenance(
-  date: MonthRefType,
-): "historical" | "modeled" {
-  return recordedMonths.has(absoluteMonth(date.year, date.monthNumber))
-    ? "historical"
-    : "modeled";
-}
-
 // GOOGLE SHEET: none - built by scripts from the two sources below
 // Sources:
 

@@ -787,3 +787,82 @@ Raw reports and compressed traces are local under
 `.tmp/chart-motion/qa/v22-final-nine-traced` and
 `.tmp/chart-motion/qa/v22-final-nine-untraced`; the rejected continuous control is
 under `.tmp/chart-motion/qa/final-budget-negative-control`.
+
+## Build catalog first opening (2026-10-30)
+
+Build now starts its existing outlook worker after the game paints and retains it for the
+workspace lifetime. Opening or reopening the catalog shares that work. Before the first result,
+the catalog shows generator choices, real build prices, construction times, sizing and sorting;
+weather-derived output and energy costs fill in asynchronously. Resource-dependent purchases wait
+for a valid estimate. New saved runs clear the warmed result through the worker's existing scope
+check. No metric or simulation formula was removed.
+
+A temporary Jest profiler measured scenario 103, seed 12345, at its opening date on the M5 Max
+with Node 24.22.2. After one warmup, six samples separated the three-year forecast, both catalog
+quote passes (selected size and minimum size), and output-shape aggregation:
+
+| Stage                                      |  Median | Sample range |
+| ------------------------------------------ | ------: | -----------: |
+| Three-year forecast                        | 55.2 ms | 51.5–62.0 ms |
+| Both generator quote passes                | 0.82 ms | 0.75–1.21 ms |
+| Lifetime-cost formulas within those passes | 0.55 ms | 0.50–0.71 ms |
+| Seasonal output charts                     | 0.57 ms | 0.52–0.65 ms |
+| Initial quotes without forecast arrays     | 0.63 ms | 0.59–0.86 ms |
+
+These are calculation timings, not browser paint timings; cold worker startup and data loading
+add latency. The seasonal output chart/capacity factor and renewable cost per MWh share the
+expensive forecast. Cutting only the lifetime-cost formula would save little. The catalog no
+longer waits for either metric, even when opened before the warmup completes.
+
+`e2e/build-generator-loading.spec.ts` deliberately holds build-worker requests after a fresh game
+starts. It checks prewarming before navigation, usable prices and sizing before any response,
+valid estimates arriving in the same listing, and reopening with the warmed result. Component
+coverage also pins immediate evidence focus, sharing pending work, worker lifetime, and clearing
+estimates when another saved run replaces the current one.
+
+## Shared production chunks and worker boundaries (2026-11-01)
+
+Production compilation now shares modules between the page and worker runtimes by including
+initial chunks in webpack's existing split-chunk policy. Forecast workers import the game's
+shared action creators without importing the browser reducers. The live store registers
+telemetry, played-history and score callbacks through `StoreRegistry`; forecast workers keep
+those effects inert. Simulation formulas and action type strings are unchanged.
+
+The number-formatting helpers replace `numbro` while preserving its decimal tie rounding,
+unit thresholds, trailing zeroes and negative-zero handling. A temporary differential check
+compared 44,784 outputs against the original dependency with no differences. Boundary tests
+retain representative contracts after removing the dependency.
+
+Both builds below are measured with Node 24.22.2 and gzip level 9. The before build is
+`c382b5ee`; the after build includes all three changes and the merged `4c207dbb` base update.
+The smaller main chunk alone is not the startup saving: the initial-JavaScript row also counts
+its shared entrypoint chunks.
+
+| Metric | Before | After | Reduction |
+| --- | ---: | ---: | ---: |
+| Main JavaScript | 995.125 kB | 386.962 kB | 608.163 kB |
+| Initial JavaScript | 995.125 kB | 979.798 kB | 15.327 kB |
+| All JavaScript | 1592.948 kB | 1216.201 kB | 376.747 kB |
+| Main CSS | 29.159 kB | 29.159 kB | unchanged |
+
+The existing bundle ceilings remain unchanged. A compiler fixture checks that a shared module
+is emitted once and executes the emitted page and worker, including the worker's shared-chunk
+loader. Restoring asynchronous-only splitting fails its duplication assertion. Worker import
+guards cover all six forecast entry points; deliberately importing browser services fails the
+guard. The emitted startup graphs for all five workers present in the web build contain no
+Firebase, account, browser-storage or navigation reducers.
+
+### CSS audit follow-ups
+
+The separate styling review recommends changes within the existing files:
+
+- Remove transmission selectors for obsolete `details`/`summary` markup.
+- Consolidate superseded tutorial HUD grid declarations and identical visually-hidden rules.
+- Emit the static portion of `styling()` once, with scaling overrides limited to the 11
+  declarations that use `size()`. Its three inclusions currently replay many static rules;
+  audit cascade order before changing them.
+
+The last option has a large parsing and maintenance benefit but a modest transfer benefit:
+a scratch app.scss-only Sass/PostCSS experiment removed 328 static replay rules, reducing
+minified CSS by about 30.2 kB and gzip by 263 bytes. This is diagnostic evidence, not a
+cascade-validated production change. This patch leaves styles unchanged.

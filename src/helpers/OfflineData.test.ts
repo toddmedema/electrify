@@ -32,6 +32,19 @@ describe("prefetchScenarioData", () => {
     });
   });
 
+  it("caches every Vermont service area's record before an offline expansion run", async () => {
+    const postMessage = jest.fn();
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: { ready: Promise.resolve({ active: { postMessage } }) },
+    });
+    await prefetchScenarioData({ id: "BurlingtonVT" } as LocationType);
+    expect(postMessage).toHaveBeenCalledWith({
+      type: "CACHE_SCENARIO_DATA",
+      locationIds: ["BurlingtonVT"],
+    });
+  });
+
   it("does nothing when no worker controls the app", async () => {
     const postMessage = jest.fn();
     Object.defineProperty(navigator, "serviceWorker", {

@@ -11,7 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 import { createSharedSave } from "../../CloudSaveTransport";
-import { firebaseAppAuth, login, SignInProvider } from "../../Globals";
+import { firebaseAppAuth, login, SignInOptions } from "../../Globals";
 import SignInButtons from "./SignInButtons";
 import { snapshotSavedGame } from "../../SaveSession";
 import type { SaveFileType } from "../../Types";
@@ -72,13 +72,13 @@ export default function ShareSaveDialog({
       request.current = generation + 1;
     };
   }, [id]);
-  const signInAndShare = async (provider: SignInProvider = "google") => {
+  const signInAndShare = async (options: SignInOptions = {}) => {
     if (!file) return false;
     const generation = request.current;
     setError("");
     setBusy(true);
     try {
-      if (!firebaseAppAuth?.currentUser && !(await login(provider)))
+      if (!firebaseAppAuth?.currentUser && !(await login(options)))
         return false;
       if (generation === request.current) await create(file, generation);
       return true;

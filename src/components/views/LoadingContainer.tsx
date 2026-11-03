@@ -178,7 +178,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         reportError(
           error instanceof Error
             ? error.message
-            : "Could not load game data. Check your connection and retry.",
+            : "Couldn't load game data. Check your connection and try again.",
         );
       } finally {
         if (loadingGeneration === request) {

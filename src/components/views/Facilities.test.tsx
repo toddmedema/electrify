@@ -1,9 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -19,8 +21,9 @@ import gameReducer, {
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
-import Facilities from "./Facilities";
+import Facilities, { fleetChartHeight } from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
+
 import * as transmission from "../../helpers/Transmission";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
 import { SCENARIOS } from "../../data/Scenarios";
@@ -32,7 +35,43 @@ import {
 import { formatMoneyConcise } from "../../helpers/Format";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 import { purchaseTerms } from "../../helpers/Financials";
+import { modScenario } from "../../mods/ModScenario";
 
+test("intertie flow distinguishes customer purchases from storage charging", () => {
+  const initial = createGame({ scenarioId: 100, seed: 61 });
+  getTimeFromTimeline(initial.date.minute, initial.timeline)!.cash = 1e9;
+  const game = cloneDeep(
+    gameReducer(
+      initial,
+      buildTransmissionLine({ corridorId: "california-north", financed: true }),
+    ),
+  );
+  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  game.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+  const tick = getTimeFromTimeline(game.date.minute, game.timeline)!;
+  tick.importedW = 60e6;
+  tick.storageImportedW = 20e6;
+  render(
+    <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+      <TransmissionPanel
+        game={game}
+        onBuild={jest.fn()}
+        onUpgrade={jest.fn()}
+        onBuyingRule={jest.fn()}
+        onSellingRule={jest.fn()}
+      />
+    </Provider>,
+  );
+  expect(screen.getByRole("combobox", { name: "Buying" })).toHaveTextContent(
+    "Shortages + Charging",
+  );
+  expect(screen.getByTestId("import-uses")).toHaveTextContent(
+    "40MW for customers",
+  );
+  expect(screen.getByTestId("import-uses")).toHaveTextContent(
+    "20MW for storage",
+  );
+});
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
 jest.setTimeout(30000);
@@ -59,6 +98,7 @@ function playedGame(ticks: number): GameType {
 }
 
 interface Handlers {
+  onTogglePause: jest.Mock;
   onPause: jest.Mock;
   onSelect: jest.Mock;
   onReprioritize: jest.Mock;
@@ -70,8 +110,10 @@ interface Handlers {
 function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
+  ref?: React.RefObject<Facilities>,
 ): Handlers {
   const handlers: Handlers = {
+    onTogglePause: jest.fn(),
     onPause: jest.fn(),
     onSelect: jest.fn(),
     onReprioritize: jest.fn(),
@@ -84,14 +126,16 @@ function renderFacilities(
     const [selected, setSelected] = React.useState(selectedFacilityId);
     return (
       <Facilities
+        ref={ref}
         game={game}
         selectedFacilityId={selected}
         onTransmissionUpgrade={() => undefined}
         onStorageBuild={() => undefined}
         onTransmissionBuild={() => undefined}
-        onTradingPolicy={() => undefined}
+        onBuyingRule={() => undefined}
+        onSellingRule={() => undefined}
         onSell={handlers.onSell}
-        onTogglePause={() => undefined}
+        onTogglePause={handlers.onTogglePause}
         onPause={handlers.onPause}
         onReprioritize={handlers.onReprioritize}
         onRetrofit={handlers.onRetrofit}
@@ -279,7 +323,8 @@ describe("the fleet list", () => {
       onStorageBuild: noop,
       onTransmissionBuild: noop,
       onTransmissionUpgrade: noop,
-      onTradingPolicy: noop,
+      onBuyingRule: noop,
+      onSellingRule: noop,
       onSell: noop,
       onTogglePause: noop,
       onPause: noop,
@@ -356,7 +401,8 @@ describe("the fleet list", () => {
       onStorageBuild: () => undefined,
       onTransmissionBuild: () => undefined,
       onTransmissionUpgrade: () => undefined,
-      onTradingPolicy: () => undefined,
+      onBuyingRule: () => undefined,
+      onSellingRule: () => undefined,
       onSell: () => undefined,
       onTogglePause: () => undefined,
       onPause: () => undefined,
@@ -371,29 +417,39 @@ describe("the fleet list", () => {
       </Provider>,
     );
 
-    ref.current!.onBeforeDragStart();
+    act(() => ref.current!.onBeforeDragStart());
     expect(onFacilityDragStart).toHaveBeenCalledWith("FAST");
     expect(
-      ref.current!.shouldComponentUpdate({
-        ...props,
-        game: {
-          ...fast,
-          date: { ...fast.date, minute: fast.date.minute + 1_000 },
+      ref.current!.shouldComponentUpdate(
+        {
+          ...props,
+          game: {
+            ...fast,
+            date: { ...fast.date, minute: fast.date.minute + 1_000 },
+          },
         },
-      }),
+        ref.current!.state,
+      ),
     ).toBe(false);
 
-    ref.current!.onDragEnd({
-      draggableId: `f${fast.facilities[0].id}`,
-      type: "DEFAULT",
-      source: { droppableId: "droppable", index: 0 },
-      destination: null,
-      reason: "CANCEL",
-      mode: "FLUID",
-      combine: null,
-    });
+    act(() =>
+      ref.current!.onDragEnd({
+        draggableId: `f${fast.facilities[0].id}`,
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        destination: null,
+        reason: "CANCEL",
+        mode: "FLUID",
+        combine: null,
+      }),
+    );
     expect(onFacilityDragEnd).toHaveBeenCalledWith(0, null, "FAST");
-    expect(ref.current!.shouldComponentUpdate({ ...props, game })).toBe(true);
+    expect(
+      ref.current!.shouldComponentUpdate(
+        { ...props, game },
+        ref.current!.state,
+      ),
+    ).toBe(true);
   });
 
   it("can pause the only facility in a fleet", async () => {
@@ -406,6 +462,23 @@ describe("the fleet list", () => {
 
     await user.click(screen.getByLabelText(`Pause ${facility.name}`));
     expect(onPause).toHaveBeenCalledWith(facility.id, facility.name);
+  });
+
+  it("names the original Oil A retirement target in its direct sale confirmation", async () => {
+    const expansion = createGame({ scenarioId: 116 });
+    const oil = expansion.facilities.find(
+      (facility) => facility.startingAssetId === "scenario-116-champlain-oil-a",
+    )!;
+    const { onSell } = renderFacilities(expansion, oil.id);
+    await user.click(
+      screen.getByRole("button", {
+        name: "Sell Oil A",
+      }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAccessibleName("Sell 40MW Oil A facility?");
+    await user.click(within(dialog).getByRole("button", { name: "Sell" }));
+    expect(onSell).toHaveBeenCalledWith(oil.id);
   });
 
   it("can sell the only facility left in a fleet", async () => {
@@ -430,11 +503,11 @@ describe("the fleet list", () => {
       facility.loanAmountLeft = loanAmountLeft;
       const { onSell } = renderFacilities(game, facility.id);
       const construction = screen.getByRole("region", { name: "Construction" });
-      expect(construction).toHaveTextContent("Nameplate capacity320MW");
+      expect(construction).toHaveTextContent("Capacity320MW");
       const refund = formatMoneyConcise(200e6 - loanAmountLeft);
-      expect(construction).toHaveTextContent(`Refund if cancelled${refund}`);
+      expect(construction).toHaveTextContent(`Refund if canceled${refund}`);
       expect(
-        within(construction).queryByText("After settling the loan") !== null,
+        within(construction).queryByText("After loan payoff") !== null,
       ).toBe(loanAmountLeft > 0);
       await user.click(
         screen.getByRole("button", {
@@ -459,7 +532,8 @@ function renderProjects(game: GameType, onBuild = jest.fn()) {
         projectsOnly
         onBuild={onBuild}
         onUpgrade={jest.fn()}
-        onPolicy={jest.fn()}
+        onBuyingRule={jest.fn()}
+        onSellingRule={jest.fn()}
       />
     </Provider>,
   );
@@ -694,7 +768,7 @@ describe("the interties view", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Connection projects")).not.toBeInTheDocument();
     expect(screen.getByText("Pacific Northwest")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Trading rule")).toBeNull();
+    expect(screen.queryByLabelText("Buying")).toBeNull();
     expect(
       screen.getAllByRole("button", { name: /Review purchase of .* intertie/ }),
     ).not.toHaveLength(0);
@@ -710,7 +784,7 @@ describe("the interties view", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("$10.8M");
     expect(dialog).toHaveTextContent("Loan option");
-    expect(dialog).toHaveTextContent("Payments start now");
+    expect(dialog).not.toHaveTextContent("Payments start now");
   });
 
   it("tells the neighbours apart by kind, typical year, peak help and price", async () => {
@@ -749,7 +823,7 @@ describe("the interties view", () => {
       }),
     );
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("Ready in 36 months.");
+    expect(dialog).toHaveTextContent("Online in36 months");
     expect(dialog).not.toHaveTextContent("Portfolio outlook");
     expect(dialog).not.toHaveTextContent("Typical price");
     expect(dialog).not.toHaveTextContent("backup is not guaranteed");
@@ -866,17 +940,19 @@ describe("the interties view", () => {
     renderProjects(game, onBuild);
     const north = screen.getByTestId("transmission-project-california-north");
     const slider = screen.getByRole("slider");
+    expect(slider).toHaveAttribute("aria-valuetext", "Tier I");
     expect(north).toHaveTextContent("Import capacity40MW");
     expect(north).toHaveTextContent("Export capacity5MW");
     fireEvent.change(slider, { target: { value: 3 } });
     expect(slider).toHaveAttribute("aria-valuenow", "3");
+    expect(slider).toHaveAttribute("aria-valuetext", "Tier III");
     expect(north).not.toHaveTextContent("Line capacity");
     expect(north).toHaveTextContent("Import capacity50MW");
     expect(north).toHaveTextContent("Export capacity5MW");
     await user.click(
       within(north).getByRole("button", { name: /Review purchase/ }),
     );
-    expect(screen.getByRole("dialog")).toHaveTextContent("Tier 3");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Tier III");
     expect(screen.getByRole("dialog")).toHaveTextContent("Import capacity50MW");
     expect(screen.getByRole("dialog")).toHaveTextContent("Export capacity5MW");
     await user.click(screen.getByRole("button", { name: "Pay cash" }));
@@ -891,7 +967,9 @@ describe("the interties view", () => {
     });
     await user.click(review);
     expect(onBuild).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).toHaveTextContent("Payments start now");
+    expect(screen.getByRole("dialog")).not.toHaveTextContent(
+      "Payments start now",
+    );
     await user.click(screen.getByRole("button", { name: "close" }));
     expect(onBuild).not.toHaveBeenCalled();
     await user.click(review);
@@ -1047,14 +1125,64 @@ describe("unified connections", () => {
     expect(building).toHaveTextContent("Import capacity180MW");
     expect(building).toHaveTextContent("Export capacity150MW");
     expect(building).toHaveTextContent(
-      `Refund if cancelled${formatMoneyConcise(game.transmission!.lines[1].buildCost - 1000)}`,
+      `Refund if canceled${formatMoneyConcise(game.transmission!.lines[1].buildCost - 1000)}`,
     );
-    expect(building).toHaveTextContent("After settling the loan");
+    expect(building).toHaveTextContent("After loan payoff");
     expect(building).toHaveTextContent("Emissions");
     expect(building).not.toHaveTextContent("Import available now");
     expect(building).toHaveTextContent("Typical price");
   });
 });
+
+it.each([false, true])(
+  "offers completed connection acquisition in a native or validated base-116 mod (mod: %s)",
+  async (mod) => {
+    const customScenario = mod
+      ? modScenario({
+          schemaVersion: 1,
+          gameApi: 1,
+          id: "community-valley",
+          title: "Community Valley",
+          creator: "Planner",
+          version: "1",
+          description: "Keep the regional utility supplied.",
+          baseScenarioId: 116,
+          seed: 12345,
+        })
+      : undefined;
+    const state = createGame({
+      scenarioId: customScenario?.id ?? 116,
+      scenario: customScenario,
+      seed: 12345,
+    });
+    const game = cloneDeep(
+      gameReducer(
+        state,
+        buildTransmissionLine({
+          corridorId: "vt-champlain-ridge",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    render(
+      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+        <TransmissionPanel
+          game={game}
+          onBuild={jest.fn()}
+          onUpgrade={jest.fn()}
+          onBuyingRule={jest.fn()}
+          onSellingRule={jest.fn()}
+          onAcquire={jest.fn()}
+        />
+      </Provider>,
+    );
+    await user.click(screen.getByRole("button", { name: /^Inspect Ridge/ }));
+    expect(
+      screen.getByRole("button", { name: "Acquire Ridge Electric" }),
+    ).toBeVisible();
+  },
+);
 
 describe("the intertie upgrade control", () => {
   /** A California run whose northern intertie is open and carrying power. */
@@ -1084,7 +1212,8 @@ describe("the intertie upgrade control", () => {
           game={game}
           onBuild={jest.fn()}
           onUpgrade={handleUpgrade}
-          onPolicy={jest.fn()}
+          onBuyingRule={jest.fn()}
+          onSellingRule={jest.fn()}
         />
       </Provider>,
     );
@@ -1107,7 +1236,7 @@ describe("the intertie upgrade control", () => {
     expect(handleUpgrade).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent(/Construction emits.*CO2e/);
-    expect(dialog).toHaveTextContent(/for 30 years/);
+    expect(dialog).toHaveTextContent(/\(\d+\.\d+% for 30 years\)/);
     expect(dialog).toHaveTextContent("Upkeep after upgrade");
     expect(dialog).not.toHaveTextContent("Line capacity");
     expect(dialog).toHaveTextContent("Import capacity150MW → 210MW");
@@ -1218,5 +1347,504 @@ describe("the intertie upgrade control", () => {
       screen.getByLabelText(`Inspect ${line.name}`, { exact: false }),
     );
     expect(screen.getByText(/Corridor full/)).toBeInTheDocument();
+  });
+});
+
+describe("mouse facility selection", () => {
+  const matchMedia = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = (query) => ({
+      ...matchMedia(query),
+      matches: query === "(any-pointer: fine)",
+    });
+  });
+  afterEach(() => {
+    window.matchMedia = matchMedia;
+  });
+
+  function fleet(): GameType {
+    const game = createGame({ scenarioId: 100 });
+    game.facilities = Array.from({ length: 5 }, (_, i) => ({
+      ...cloneDeep(game.facilities[i % 2]),
+      id: i + 1,
+      name: `Plant ${i + 1}`,
+    }));
+    return game;
+  }
+
+  it.each([
+    ["Shift", "shiftKey"],
+    ["Meta", "metaKey"],
+    ["Control", "ctrlKey"],
+  ])("previews selection checkboxes only while %s is held", (key, flag) => {
+    renderFacilities(fleet(), null);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.keyDown(document.body, { key, [flag]: true });
+    expect(screen.getAllByRole("checkbox")).toHaveLength(5);
+    expect(
+      screen
+        .getAllByRole("checkbox")
+        .every((box) => !(box as HTMLInputElement).checked),
+    ).toBe(true);
+    fireEvent.keyUp(document.body, { key });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Actions" })).toBeNull();
+  });
+
+  it("keeps checkboxes after a deliberate selection and separates toggling from inspection", async () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.click(rows()[2], { metaKey: true });
+    fireEvent.keyUp(document.body, { key: "Meta" });
+    expect(screen.getAllByRole("checkbox")).toHaveLength(5);
+    expect(
+      screen.getByRole("checkbox", { name: "Select Plant 1" }),
+    ).toBeChecked();
+    await user.click(screen.getByRole("checkbox", { name: "Select Plant 2" }));
+    expect(
+      screen.getByRole("status", { name: "Facility selection" }),
+    ).toHaveTextContent("3 facilities selected");
+    fireEvent.click(rows()[4]);
+    expect(rows()[4]).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("checkbox", { name: "Select Plant 5" }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("status", { name: "Facility selection" }),
+    ).toHaveTextContent("3 facilities selected");
+    await user.click(screen.getByRole("button", { name: "Clear selection" }));
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("opens the existing eligible actions from the selection bar without a context click", async () => {
+    const game = fleet();
+    game.facilities[1].paused = true;
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0], { ctrlKey: true });
+    fireEvent.click(rows()[1], { ctrlKey: true });
+    const actions = screen.getByRole("button", { name: "Actions" });
+    expect(actions).toHaveAttribute("aria-haspopup", "menu");
+    await user.click(actions);
+    const menu = screen.getByRole("menu", { name: "Facility actions" });
+    expect(
+      within(menu).getByRole("menuitem", { name: "Resume (1)" }),
+    ).toBeInTheDocument();
+    await user.click(within(menu).getByRole("menuitem", { name: "Pause (1)" }));
+    expect(view.onPause).toHaveBeenCalledWith(1, "Plant 1");
+    await user.click(actions);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(rows()[0]).toHaveFocus());
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("clears a deliberate single selection and an empty selection mode with Escape", async () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0], { metaKey: true });
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.click(rows()[0], { metaKey: true });
+    await user.click(screen.getByRole("checkbox", { name: "Select Plant 1" }));
+    expect(screen.getAllByRole("checkbox")).toHaveLength(5);
+    expect(screen.getByRole("button", { name: "Actions" })).toBeDisabled();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("clears a deliberate single selection when Escape cancels a keyboard drag", () => {
+    const ref = React.createRef<Facilities>();
+    renderFacilities(fleet(), null, ref);
+    fireEvent.click(rows()[0], { metaKey: true });
+    act(() =>
+      ref.current!.onBeforeDragStart({
+        draggableId: "f1",
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        mode: "SNAP",
+      }),
+    );
+    act(() =>
+      ref.current!.onDragEnd({
+        draggableId: "f1",
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        destination: null,
+        reason: "CANCEL",
+        mode: "SNAP",
+        combine: null,
+      }),
+    );
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Actions" })).toBeNull();
+    expect(rows()[0]).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("resets modifier previews on blur and ignores modifiers while editing or behind a dialog", () => {
+    renderFacilities(fleet(), null);
+    fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
+    fireEvent.blur(window);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    const input = document.createElement("input");
+    document.body.append(input);
+    fireEvent.keyDown(input, { key: "Control", ctrlKey: true });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    input.remove();
+    fireEvent.contextMenu(rows()[0]);
+    fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
+    expect(screen.queryByRole("checkbox", { hidden: true })).toBeNull();
+  });
+
+  it("returns focus to inspection when releasing a modifier hides a focused preview checkbox", () => {
+    renderFacilities(fleet(), null);
+    fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
+    const checkbox = screen.getByRole("checkbox", { name: "Select Plant 2" });
+    act(() => checkbox.focus());
+    fireEvent.keyUp(checkbox, { key: "Shift" });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(rows()[1]).toHaveFocus();
+  });
+
+  it("restores preview focus when returning to the window without stealing a later focus choice", () => {
+    renderFacilities(fleet(), null);
+    fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
+    act(() => screen.getByRole("checkbox", { name: "Select Plant 2" }).focus());
+    fireEvent.blur(window);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.focus(window);
+    expect(rows()[1]).toHaveFocus();
+    fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
+    act(() => screen.getByRole("checkbox", { name: "Select Plant 2" }).focus());
+    fireEvent.blur(window);
+    act(() => rows()[3].focus());
+    fireEvent.focus(window);
+    expect(rows()[3]).toHaveFocus();
+  });
+
+  it("supports ranges from the checkbox as well as the inspection target", async () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[1], { metaKey: true });
+    await user.keyboard("{Shift>}");
+    await user.click(screen.getByRole("checkbox", { name: "Select Plant 4" }));
+    await user.keyboard("{/Shift}");
+    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "true",
+      "true",
+      "true",
+      "false",
+    ]);
+  });
+
+  it("selects anchored ranges in either direction and toggles nonadjacent facilities with Ctrl or Cmd", () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[1]);
+    fireEvent.click(rows()[4], { shiftKey: true });
+    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "true",
+      "true",
+      "true",
+      "true",
+    ]);
+    fireEvent.click(rows()[0], { shiftKey: true });
+    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual([
+      "true",
+      "true",
+      "false",
+      "false",
+      "false",
+    ]);
+    fireEvent.click(rows()[3], { ctrlKey: true });
+    fireEvent.click(rows()[1], { metaKey: true });
+    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual([
+      "true",
+      "false",
+      "false",
+      "true",
+      "false",
+    ]);
+    fireEvent.contextMenu(rows()[1], { button: 0, ctrlKey: true });
+    expect(rows()[1]).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("menu")).toBeNull();
+    fireEvent.keyDown(rows()[0], { key: "Escape" });
+    expect(
+      rows().every((row) => row.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
+  });
+
+  it("clears multi-select with Escape when focus is outside the fleet", () => {
+    const view = renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    expect(
+      rows().filter((row) => row.getAttribute("aria-pressed") === "true"),
+    ).toHaveLength(3);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(
+      rows().every((row) => row.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    const calls = view.onSelect.mock.calls.length;
+    cleanup();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("keeps single inspection intact outside the fleet and clears it locally", () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(rows()[0], { key: "Escape" });
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "false");
+    expect(rows()[0]).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("leaves Escape to the incoming screen while the fleet is inert", () => {
+    const view = renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    // Compositor marks the outgoing screen inert until its exit animation unmounts it.
+    // eslint-disable-next-line testing-library/no-node-access
+    const surface = rows()[0].closest(".facilitiesBody")!;
+    surface.setAttribute("inert", "");
+    const calls = view.onSelect.mock.calls.length;
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("keeps Escape available after selected facilities leave the fleet", () => {
+    const game = fleet();
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    game.facilities = [];
+    const calls = view.onSelect.mock.calls.length;
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("preserves keyboard inspection when a canceled drag only has stale mouse IDs", () => {
+    const game = fleet();
+    const ref = React.createRef<Facilities>();
+    const view = renderFacilities(game, null, ref);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    game.facilities = game.facilities.slice(3);
+    act(() => ref.current!.props.onSelect(game.facilities[0].id));
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    const calls = view.onSelect.mock.calls.length;
+    act(() =>
+      ref.current!.onBeforeDragStart({
+        draggableId: "f4",
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        mode: "SNAP",
+      }),
+    );
+    act(() =>
+      ref.current!.onDragEnd({
+        draggableId: "f4",
+        type: "DEFAULT",
+        source: { droppableId: "droppable", index: 0 },
+        destination: null,
+        reason: "CANCEL",
+        mode: "SNAP",
+        combine: null,
+      }),
+    );
+    expect(rows()[0]).toHaveAttribute("aria-expanded", "true");
+    expect(view.onSelect).toHaveBeenCalledTimes(calls);
+  });
+
+  it("clears multi-select when Escape closes its context menu", async () => {
+    renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    fireEvent.contextMenu(rows()[1]);
+    expect(
+      screen.getByRole("menu", { name: "Facility actions" }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(
+      rows().every((row) => row.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
+    await waitFor(() => expect(rows()[1]).toHaveFocus());
+  });
+
+  it("offers eligible bulk pause and resume actions without toggling the wrong state", async () => {
+    const game = fleet();
+    game.facilities[1].paused = true;
+    game.facilities[2].yearsToBuildLeft = 1;
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    fireEvent.contextMenu(rows()[1]);
+    const menu = screen.getByRole("menu", { name: "Facility actions" });
+    expect(menu).not.toHaveTextContent("facilities selected");
+    expect(menu).not.toHaveTextContent("Counts show eligible facilities");
+    expect(
+      within(menu).getByRole("menuitem", { name: "Resume (1)" }),
+    ).toBeInTheDocument();
+    await user.click(within(menu).getByRole("menuitem", { name: "Pause (1)" }));
+    expect(view.onPause).toHaveBeenCalledWith(1, "Plant 1");
+    expect(view.onPause).toHaveBeenCalledTimes(1);
+  });
+
+  it("right clicking an unselected row replaces the group and requires sale confirmation", async () => {
+    const view = renderFacilities(fleet(), null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    fireEvent.contextMenu(rows()[4]);
+    const menu = screen.getByRole("menu", { name: "Facility actions" });
+    expect(menu).toHaveTextContent("Plant 5");
+    expect(menu).not.toHaveTextContent("3 facilities selected");
+    await user.click(within(menu).getByRole("menuitem", { name: "Sell" }));
+    expect(view.onSell).not.toHaveBeenCalled();
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Sell",
+      }),
+    );
+    expect(view.onSell).toHaveBeenCalledWith(5);
+    expect(view.onSell).toHaveBeenCalledTimes(1);
+  });
+
+  it("separates construction cancellation, upgrade cancellation, and sale in a mixed selection", async () => {
+    const game = fleet();
+    game.facilities[1].yearsToBuildLeft = 1;
+    game.facilities[2].upgradeInProgress = {
+      upgrade: "coldWeatherPackage",
+      cost: 1e6,
+      startsMinute: game.date.minute,
+      completesMinute: game.date.minute + MINUTES_PER_MONTH,
+    };
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    fireEvent.contextMenu(rows()[0]);
+    const menu = screen.getByRole("menu", { name: "Facility actions" });
+    expect(
+      within(menu).getByRole("menuitem", { name: "Sell (2)" }),
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Cancel construction (1)" }),
+    ).toBeInTheDocument();
+    await user.click(
+      within(menu).getByRole("menuitem", { name: "Cancel upgrade (1)" }),
+    );
+    expect(view.onCancelRetrofit).toHaveBeenCalledWith(3);
+    expect(view.onSell).not.toHaveBeenCalled();
+    fireEvent.contextMenu(rows()[0]);
+    await user.click(
+      screen.getByRole("menuitem", { name: "Cancel construction (1)" }),
+    );
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Cancel construction",
+      }),
+    );
+    expect(view.onSell).toHaveBeenCalledWith(2);
+  });
+
+  it("starts a new range at the clicked row after its anchor leaves the fleet", () => {
+    const game = fleet();
+    renderFacilities(game, null);
+    fireEvent.click(rows()[1]);
+    game.facilities.splice(1, 1);
+    fireEvent.click(rows()[3], { shiftKey: true });
+    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "false",
+      "true",
+      "false",
+    ]);
+  });
+
+  it("does not expose mouse actions while the tutorial hides facility actions", () => {
+    const game = createGame({ scenarioId: 0 });
+    game.inGame = true;
+    game.tutorialStep = 0;
+    renderFacilities(game, null);
+    fireEvent.contextMenu(rows()[0]);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.queryByText(/Shift-click a range/)).toBeNull();
+  });
+
+  it("keeps touch-only devices on the existing inspection path", () => {
+    window.matchMedia = matchMedia;
+    const game = fleet();
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2], { shiftKey: true });
+    expect(view.onSelect).toHaveBeenLastCalledWith(3);
+    fireEvent.contextMenu(rows()[0]);
+    expect(screen.queryByRole("menu")).toBeNull();
+    cleanup();
+  });
+
+  it("confirms the combined price of upgrades and blocks a cash shortfall", async () => {
+    const game = fleet();
+    game.facilities = game.facilities.slice(0, 2).map(
+      (f) =>
+        ({
+          ...f,
+          name: "Solar",
+          fuel: "Sun",
+          resilience: undefined,
+        }) as FacilityOperatingType,
+    );
+    const total = game.facilities.reduce(
+      (sum, f) => sum + retrofitCost(f, game, "hailResistant")!,
+      0,
+    );
+    getTimeFromTimeline(game.date.minute, game.timeline)!.cash = total - 1;
+    const view = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[1], { shiftKey: true });
+    fireEvent.contextMenu(rows()[0]);
+    expect(
+      screen.getByRole("menuitem", {
+        name: /^Add hail-resistant panels \(2\)/,
+      }),
+    ).toHaveAttribute("aria-disabled", "true");
+    cleanup();
+    getTimeFromTimeline(game.date.minute, game.timeline)!.cash = total;
+    const utils = renderFacilities(game, null);
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[1], { shiftKey: true });
+    fireEvent.contextMenu(rows()[0]);
+    await user.click(
+      screen.getByRole("menuitem", {
+        name: /^Add hail-resistant panels \(2\)/,
+      }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Offline for one month");
+    expect(view.onRetrofit).not.toHaveBeenCalled();
+    await user.click(
+      within(dialog).getByRole("button", {
+        name: `Pay ${formatMoneyConcise(total)}`,
+      }),
+    );
+    expect(utils.onRetrofit.mock.calls).toEqual([
+      [{ facilityId: 1, upgrade: "hailResistant" }],
+      [{ facilityId: 2, upgrade: "hailResistant" }],
+    ]);
+  });
+});
+
+describe("fleetChartHeight", () => {
+  it.each([
+    [360, 640, 207],
+    [390, 844, 273],
+    [768, 1024, 244],
+    [1024, 768, 196],
+    [844, 390, 153],
+    [1440, 900, 225],
+  ])("sizes a %ix%i window to %ipx", (width, height, expected) => {
+    expect(fleetChartHeight(width, height)).toBe(expected);
   });
 });

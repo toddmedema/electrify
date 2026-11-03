@@ -1735,3 +1735,41 @@ test("a host treats a guest sleep save request as a safety stop requiring fresh 
   });
   f.session.dispose();
 });
+
+test("build submission uses the company fleet in its authoritative wire command", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  deliver(f, { grids: ownGrid() });
+  const submitted = f.session.submit({
+    kind: "action",
+    name: "buildFacility",
+    payload: {
+      facility: { name: "Wind", peakW: 50e6, buildCost: 1 },
+      financed: true,
+    },
+  });
+  expect(sentCommands(f)).toEqual([
+    {
+      kind: "action",
+      name: "buildFacility",
+      payload: {
+        facility: {
+          name: "Wind",
+          peakW: 50e6,
+          peakWh: undefined,
+          gasCycle: undefined,
+          resilience: undefined,
+        },
+        financed: true,
+      },
+    },
+  ]);
+  deliver(f, {
+    revision: 2,
+    lastSequence: 1,
+    receipt: { sequence: 1 },
+    grids: ownGrid(),
+  });
+  await submitted;
+  f.session.dispose();
+});

@@ -135,9 +135,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       { series: [7, 5], fill: withAlpha(palette.demand, 0.06) },
       { series: [8, 6], fill: withAlpha(palette.demand, 0.06) },
     ],
-    plugins: [
-      bandsPlugin(() => getState().blackoutSpans, palette.blackout, 0.3),
-    ],
+    plugins: [bandsPlugin(() => getState().blackoutSpans, palette.blackout)],
   };
 }
 

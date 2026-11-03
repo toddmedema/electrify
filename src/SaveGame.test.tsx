@@ -82,11 +82,11 @@ describe("SaveGame", () => {
 
   it.each(["false", 0, 1, null, {}])(
     "rejects an invalid saved rate-follow setting %p",
-    (rateFollowsTarget) => {
+    (rateFollowsInflation) => {
       expect(
         parseSave({
           ...serializeSave(game),
-          game: { ...game, rateFollowsTarget },
+          game: { ...game, rateFollowsInflation },
         }),
       ).toBeNull();
     },
@@ -94,13 +94,13 @@ describe("SaveGame", () => {
 
   it.each([true, false, undefined])(
     "accepts a saved rate-follow setting %p",
-    (rateFollowsTarget) => {
+    (rateFollowsInflation) => {
       expect(
         parseSave({
           ...serializeSave(game),
-          game: { ...game, rateFollowsTarget },
-        })?.game.rateFollowsTarget,
-      ).toBe(rateFollowsTarget);
+          game: { ...game, rateFollowsInflation },
+        })?.game.rateFollowsInflation,
+      ).toBe(rateFollowsInflation);
     },
   );
 
@@ -322,7 +322,11 @@ describe("SaveGame", () => {
   it("rejects transmission state in a tutorial without intertie access", () => {
     const tutorial = createGame({ scenarioId: 0, seed: 249001 });
     const save = JSON.parse(JSON.stringify(serializeSave(tutorial)));
-    save.game.transmission = { tradingPolicy: "BALANCED", lines: [] };
+    save.game.transmission = {
+      buyingRule: "SHORTAGES",
+      sellingRule: "SURPLUS",
+      lines: [],
+    };
 
     expect(parseSave(save)).toBeNull();
 
@@ -341,6 +345,44 @@ describe("SaveGame", () => {
       interestRate: 0,
     });
     expect(parseSave(save)).toBeNull();
+  });
+
+  it("round trips all independent trading rules and rejects old or malformed shapes", () => {
+    for (const buyingRule of [
+      "NONE",
+      "SHORTAGES",
+      "SHORTAGES_AND_STORAGE",
+    ] as const) {
+      for (const sellingRule of ["NONE", "SURPLUS", "PROFITABLE"] as const) {
+        const current = createGame({ scenarioId: 100, seed: 61 });
+        Object.assign(current.transmission!, { buyingRule, sellingRule });
+        expect(
+          parseSave(serializeSave(current))!.game.transmission,
+        ).toMatchObject({ buyingRule, sellingRule });
+      }
+    }
+    const save = JSON.parse(
+      JSON.stringify(serializeSave(createGame({ scenarioId: 100, seed: 61 }))),
+    );
+    save.game.transmission.buyingRule = "INVALID";
+    expect(parseSave(save)).toBeNull();
+    delete save.game.transmission.buyingRule;
+    save.game.transmission.tradingPolicy = "BALANCED";
+    expect(parseSave(save)).toBeNull();
+  });
+
+  it("accepts split charging arithmetic dust but rejects a real unconsumed charging import", () => {
+    const current = createGame({ scenarioId: 100, seed: 61 });
+    current.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+    const tick = current.timeline[0];
+    tick.storageImportedW = 1714285.7142857143;
+    const firstStore = 384615.3846153846;
+    tick.storageChargeW = firstStore + (tick.storageImportedW - firstStore);
+    tick.importedW = tick.storageImportedW;
+    expect(parseSave(serializeSave(current))).not.toBeNull();
+    tick.storageImportedW += 1;
+    tick.importedW = tick.storageImportedW;
+    expect(parseSave(serializeSave(current))).toBeNull();
   });
 
   it("rejects missing current transmission and decision settings", () => {

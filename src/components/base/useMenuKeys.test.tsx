@@ -1,7 +1,13 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ReactNode } from "react";
-import { useMenuKeys } from "./useMenuKeys";
+import { ReactNode, useLayoutEffect } from "react";
+import { restoreMenuFocus, useMenuKeys } from "./useMenuKeys";
 
 function Menu(props: {
   children: ReactNode;
@@ -18,6 +24,22 @@ beforeEach(() => {
     .mockReturnValue([{}] as unknown as DOMRectList);
 });
 afterEach(() => jest.restoreAllMocks());
+
+it("selects the first action before the menu can paint", () => {
+  function ReturningMenu() {
+    const menu = useMenuKeys();
+    useLayoutEffect(() => {
+      expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+    }, []);
+    return (
+      <div {...menu}>
+        <button>Play</button>
+        <button>Manual</button>
+      </div>
+    );
+  }
+  render(<ReturningMenu />);
+});
 
 it("starts at the first usable action, wraps arrows, and uses native Enter activation once", async () => {
   const select = jest.fn();
@@ -178,4 +200,23 @@ it("does not steal footer or dialog focus when the catalog updates", async () =>
   );
   expect(dialog).toHaveFocus();
   dialog.remove();
+});
+
+it("keeps the main menu at the top when a screen requests focus on its old trigger", () => {
+  jest.useFakeTimers();
+  try {
+    render(
+      <div id="menuCard">
+        <Menu>
+          <button data-main-action>Play</button>
+          <button data-settings-trigger>Settings</button>
+        </Menu>
+      </div>,
+    );
+    restoreMenuFocus("[data-settings-trigger]");
+    act(() => jest.advanceTimersByTime(350));
+    expect(screen.getByText("Play")).toHaveFocus();
+  } finally {
+    jest.useRealTimers();
+  }
 });

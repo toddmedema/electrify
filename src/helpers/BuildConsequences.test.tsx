@@ -14,7 +14,7 @@ const generator = {
 
 it("names the new plant and its construction time", () => {
   expect(buildConsequenceMessage({ ...generator, name: "Solar" })).toBe(
-    "Construction started: new solar plant will be online in 12 months",
+    "Construction started: solar plant online in 12 months",
   );
 });
 

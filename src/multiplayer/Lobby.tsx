@@ -62,7 +62,7 @@ export default function Lobby({
   const run = (action: () => Promise<unknown>) => {
     setFailure(undefined);
     void action().catch((error) =>
-      setFailure(error instanceof Error ? error.message : "Please try again."),
+      setFailure(error instanceof Error ? error.message : "Try again."),
     );
   };
   const notice = failure || error || lobby.error;
@@ -249,7 +249,7 @@ function CampaignSlots({
   const run = (action: () => Promise<unknown>) => {
     onFailure(undefined);
     void action().catch((error) =>
-      onFailure(error instanceof Error ? error.message : "Please try again."),
+      onFailure(error instanceof Error ? error.message : "Try again."),
     );
   };
   return (

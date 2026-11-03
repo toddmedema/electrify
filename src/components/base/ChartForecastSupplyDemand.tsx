@@ -106,7 +106,7 @@ function buildOptions(showXLabels: boolean) {
       },
     ],
     plugins: [
-      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.3),
+      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout),
     ],
   });
 }

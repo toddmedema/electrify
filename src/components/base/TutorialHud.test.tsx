@@ -49,6 +49,94 @@ function props(overrides: Partial<TutorialHudProps> = {}): TutorialHudProps {
 }
 
 describe("TutorialHud", () => {
+  it.each([
+    ["manual", {}, true],
+    ["optional state advance", { continueOn: () => false }, false],
+    ["optional control advance", { continueOnClick: "#tool" }, false],
+    ["required state action", { advanceOn: () => false }, false],
+    ["required dispatched action", { advanceOnAction: "game/setSpeed" }, false],
+    [
+      "capstone",
+      {
+        capstone: {
+          success: () => false,
+          successMessage: "Complete.",
+          failureMessage: "Try again.",
+        },
+      },
+      false,
+    ],
+  ] as [string, Partial<TutorialStepType>, boolean][])(
+    "reserves the desktop background sweep for manual steps (%s)",
+    (_name, overrides, manual) => {
+      jest.useFakeTimers();
+      render(
+        <TutorialHud
+          {...props({ desktop: true, step: objective(overrides) })}
+        />,
+      );
+      act(() => jest.advanceTimersByTime(6000));
+      const sweep = screen.queryByTestId("tutorial-hud-sweep");
+      expect(sweep !== null).toBe(manual);
+      expect(screen.queryByText(/when you’re ready\./)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("tutorial-next-pulse"),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(["Next", "Start final challenge"])(
+    "keeps the %s button pulse in sheet mode without a background sweep or extra text",
+    (nextLabel) => {
+      jest.useFakeTimers();
+      render(<TutorialHud {...props({ step: objective({ nextLabel }) })} />);
+      expect(screen.queryByText(/when you’re ready\./)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("tutorial-hud-sweep"),
+      ).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(6000));
+      expect(screen.getByTestId("tutorial-next-pulse")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: nextLabel })).toHaveClass(
+        "MuiButton-contained",
+      );
+      expect(
+        screen.getByRole("button", { name: nextLabel }),
+      ).toHaveAccessibleDescription("");
+    },
+  );
+
+  it.each([true, false])(
+    "waits six seconds and resets attention on every new step (desktop=%s)",
+    (desktop) => {
+      jest.useFakeTimers();
+      const cue = desktop ? "tutorial-hud-sweep" : "tutorial-next-pulse";
+      const first = objective();
+      const second = objective();
+      const hudProps = props({ desktop, step: first });
+      const { rerender } = render(<TutorialHud {...hudProps} />);
+      act(() => jest.advanceTimersByTime(5999));
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      rerender(<TutorialHud {...hudProps} step={second} stepIndex={1} />);
+      act(() => jest.advanceTimersByTime(1));
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(5998));
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(1));
+      expect(screen.getByTestId(cue)).toBeInTheDocument();
+      rerender(<TutorialHud {...hudProps} stepIndex={2} />);
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(6000));
+      expect(screen.getByTestId(cue)).toBeInTheDocument();
+      rerender(<TutorialHud {...hudProps} step={second} stepIndex={1} />);
+      rerender(<TutorialHud {...hudProps} stepIndex={2} />);
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(5999));
+      expect(screen.queryByTestId(cue)).not.toBeInTheDocument();
+      act(() => jest.advanceTimersByTime(1));
+      expect(screen.getByTestId(cue)).toBeInTheDocument();
+    },
+  );
+
   it("uses controller wording in the objective and its teaching prompt", () => {
     act(() => updateInputPresentation({ active: true, connected: true }));
     render(
@@ -94,6 +182,7 @@ describe("TutorialHud", () => {
   it("names a deliberate challenge transition without advancing from unrelated controls", async () => {
     const user = userEvent.setup();
     const hudProps = props({
+      desktop: true,
       step: objective({ nextLabel: "Start final challenge" }),
     });
     render(
@@ -102,6 +191,10 @@ describe("TutorialHud", () => {
         <TutorialHud {...hudProps} />
       </>,
     );
+    expect(
+      screen.getByRole("button", { name: "Start final challenge" }),
+    ).toHaveAccessibleDescription("");
+    expect(screen.queryByTestId("tutorial-hud-sweep")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "1×" }));
     expect(hudProps.onNext).not.toHaveBeenCalled();
     await user.click(
@@ -203,7 +296,7 @@ describe("TutorialHud", () => {
 
   it("exposes the current step, progress and ordinary navigation", async () => {
     const user = userEvent.setup();
-    const hudProps = props({ canGoBack: true, stepIndex: 1 });
+    const hudProps = props({ desktop: true, canGoBack: true, stepIndex: 1 });
     const { rerender } = render(<TutorialHud {...hudProps} />);
 
     expect(
@@ -218,6 +311,9 @@ describe("TutorialHud", () => {
     expect(screen.getByRole("button", { name: "Next" })).toHaveClass(
       "MuiButton-contained",
     );
+    expect(
+      screen.getByRole("button", { name: "Next" }),
+    ).toHaveAccessibleDescription("");
     await user.click(screen.getByRole("button", { name: "Back" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
     rerender(<TutorialHud {...hudProps} stepIndex={2} />);
@@ -251,7 +347,7 @@ describe("TutorialHud", () => {
     target.id = "tutorial-target";
     attach(target);
 
-    const hudProps = props();
+    const hudProps = props({ step: objective({ advanceOn: () => false }) });
     const { rerender, unmount } = render(<TutorialHud {...hudProps} />);
     expect(target).toHaveClass("tutorialTarget");
     expect(target).not.toHaveClass("tutorialTargetReminder");
@@ -285,6 +381,22 @@ describe("TutorialHud", () => {
       screen.getByRole("region", { name: /Your turn/ }),
     ).toBeInTheDocument();
 
+    unmount();
+  });
+
+  it("keeps a manual step’s reading target static while Next asks for action", () => {
+    jest.useFakeTimers();
+    const target = document.createElement("div");
+    target.id = "tutorial-target";
+    attach(target);
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    expect(target).toHaveClass("tutorialTarget");
+    expect(ring).toHaveClass("tutorialTargetRing-static");
+    expect(ring).not.toHaveClass("tutorialTargetRingIntro");
+    act(() => jest.advanceTimersByTime(10_000));
+    expect(target).not.toHaveClass("tutorialTargetReminder");
+    expect(ring).not.toHaveClass("tutorialTargetRingPulse");
     unmount();
   });
 
@@ -483,7 +595,11 @@ describe("TutorialHud", () => {
     target.id = "tutorial-target";
     stubRect(target, 200, 150, 400, 250);
     attach(target);
-    const { unmount } = render(<TutorialHud {...props()} />);
+    const { unmount } = render(
+      <TutorialHud
+        {...props({ step: objective({ advanceOn: () => false }) })}
+      />,
+    );
     const ring = screen.getByTestId("tutorial-target-ring");
     target.className = "facilityRowHeader ready";
     act(() => jest.advanceTimersByTime(20));
@@ -576,7 +692,11 @@ describe("TutorialHud", () => {
   });
   it("follows a target that mounts late or is replaced during the step", () => {
     jest.useFakeTimers();
-    const { unmount } = render(<TutorialHud {...props()} />);
+    const { unmount } = render(
+      <TutorialHud
+        {...props({ step: objective({ advanceOn: () => false }) })}
+      />,
+    );
     expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
 
     // The control mounts after the step starts, like a list that is still loading.

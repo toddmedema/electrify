@@ -66,15 +66,6 @@ beforeEach(() => economy());
 
 const objectives: CompiledRuleObjective[] = [
   {
-    id: "reliable",
-    label: "Serve demand",
-    required: true,
-    metric: "monthlyReliability",
-    fromMonth: 0,
-    throughMonth: 1,
-    minDemandServedShare: 0.9,
-  },
-  {
     id: "retain",
     label: "Retain customers",
     required: true,
@@ -160,8 +151,6 @@ function evidence(
 function valueRows(objective: CompiledRuleObjective, value: number) {
   return [0, 1, 2].map((month) => {
     switch (objective.metric) {
-      case "monthlyReliability":
-        return facts(month, { supplyWh: 1e6 * value });
       case "customerRetention":
         return facts(month, { customers: 1000 * value });
       case "emissionsBudget":
@@ -183,10 +172,10 @@ function valueRows(objective: CompiledRuleObjective, value: number) {
     }
   });
 }
-const thresholds = [0.9, 0.8, 100, 100, 0.5, 0, 0.2, 100];
-const passing = [0.91, 0.81, 99.99, 99.99, 0.51, 0, 0.1999, 99.99];
+const thresholds = [0.8, 100, 100, 0.5, 0, 0.2, 100];
+const passing = [0.81, 99.99, 99.99, 0.51, 0, 0.1999, 99.99];
 const failing = [
-  0.89999, 0.79999, 100.00001, 100.00001, 0.49999, 1, 0.200001, 100.00001,
+  0.79999, 100.00001, 100.00001, 0.49999, 1, 0.200001, 100.00001,
 ];
 
 it.each(
@@ -237,8 +226,8 @@ it.each(objectives)(
 );
 
 it("leaves recoverable average and share windows in progress, then uses weighted totals", () => {
-  const intensity = objectives[3],
-    share = objectives[4];
+  const intensity = objectives[2],
+    share = objectives[3];
   expect(
     evidence(intensity, [facts(0, { kgco2e: 1000 })], 1).result.status,
   ).toBe("inProgress");
@@ -262,7 +251,7 @@ it("leaves recoverable average and share windows in progress, then uses weighted
   expect(evidence(share, [rows[1]], 3).result.status).toBe("unverifiable");
 });
 
-it.each([objectives[0], objectives[3], objectives[4], objectives[6]])(
+it.each([objectives[2], objectives[3], objectives[5]])(
   "$metric makes an empty denominator unavailable",
   (objective) => {
     const rows = [
@@ -276,38 +265,38 @@ it.each([objectives[0], objectives[3], objectives[4], objectives[6]])(
 it("allows a zero-delivery month in a window ratio when the summed denominator is known and positive", () => {
   const empty = facts(0, { kgco2e: 50, supplyWh: 0, deliveredWhByFuel: {} });
   const delivered = facts(1, { kgco2e: 50 });
-  expect(evidence(objectives[3], [empty, delivered]).result).toMatchObject({
+  expect(evidence(objectives[2], [empty, delivered]).result).toMatchObject({
     status: "completed",
     observed: 100,
   });
-  expect(evidence(objectives[4], [empty, delivered]).result).toMatchObject({
+  expect(evidence(objectives[3], [empty, delivered]).result).toMatchObject({
     status: "completed",
     observed: 1,
   });
 });
 
-it("fails irrevocable reliability, expense, principal, budget and retirement violations before term end", () => {
-  for (const index of [0, 2, 6, 7]) {
+it("fails irrevocable expense, principal, budget and retirement violations before term end", () => {
+  for (const index of [1, 5, 6]) {
     const objective = objectives[index];
     const rows = valueRows(objective, failing[index]);
     if (objective.metric === "emissionsBudget") rows[0].history.kgco2e = 101;
     expect(evidence(objective, [rows[0]], 1).result.status).toBe("failed");
   }
   expect(
-    evidence(objectives[5], [facts(0, {}, { ownedFuels: { Coal: 5 } })], 1)
+    evidence(objectives[4], [facts(0, {}, { ownedFuels: { Coal: 5 } })], 1)
       .result.status,
   ).toBe("pending");
   expect(
-    evidence(objectives[5], [facts(1, {}, { ownedFuels: { Coal: 1 } })], 2)
+    evidence(objectives[4], [facts(1, {}, { ownedFuels: { Coal: 1 } })], 2)
       .result.status,
   ).toBe("failed");
-  expect(evidence(objectives[5], [facts(1)], 2).result.status).toBe(
+  expect(evidence(objectives[4], [facts(1)], 2).result.status).toBe(
     "inProgress",
   );
 });
 
 it("keeps retirement obligations after the deadline and never infers missing ownership facts", () => {
-  const objective = objectives[5];
+  const objective = objectives[4];
   expect(
     evidence(objective, [facts(1), facts(2, {}, { ownedFuels: { Coal: 1 } })])
       .result.status,
@@ -320,7 +309,7 @@ it("keeps retirement obligations after the deadline and never infers missing own
 
 it("uses completed customers and the ownership-aware upper bound before the retention deadline", () => {
   const retention: CompiledRuleObjective = {
-    ...objectives[1],
+    ...objectives[0],
     deadlineMonth: 23,
   } as CompiledRuleObjective;
   const investor = evidence(retention, [facts(0, { customers: 100 })], 1, {
@@ -372,11 +361,11 @@ it("counts total emissions once and uses customer sales rather than grants, expo
       revenueExports: 100000,
     }),
   );
-  expect(evidence(objectives[2], rows).result).toMatchObject({
+  expect(evidence(objectives[1], rows).result).toMatchObject({
     status: "completed",
     observed: 100,
   });
-  expect(evidence(objectives[6], rows).result).toMatchObject({
+  expect(evidence(objectives[5], rows).result).toMatchObject({
     status: "completed",
     observed: 0.2,
   });
@@ -385,12 +374,12 @@ it("counts total emissions once and uses customer sales rather than grants, expo
 it("deflates bills with the billing-year index and principal with monthly CPI, including future years", () => {
   economy(0.12);
   const billed: CompiledRuleObjective = {
-    ...objectives[6],
+    ...objectives[5],
     fromMonth: 13,
     throughMonth: 13,
   } as CompiledRuleObjective;
   const debt: CompiledRuleObjective = {
-    ...objectives[7],
+    ...objectives[6],
     fromMonth: 13,
     throughMonth: 13,
   } as CompiledRuleObjective;
@@ -421,7 +410,7 @@ it("deflates bills with the billing-year index and principal with monthly CPI, i
 
 it("retains 1200 months in bounded compact facts after all original monthly rows are discarded", () => {
   const objective: CompiledRuleObjective = {
-    ...objectives[0],
+    ...objectives[5],
     throughMonth: 1199,
   } as CompiledRuleObjective;
   const config = context({ durationMonths: 1200 });
@@ -444,8 +433,8 @@ it("retains 1200 months in bounded compact facts after all original monthly rows
 });
 
 it("binds progress to the resolved definitions and rejects altered facts, counters, baseline, checksum or metadata", () => {
-  const objective = objectives[0];
-  const { progress, config } = evidence(objective, valueRows(objective, 1));
+  const objective = objectives[5];
+  const { progress, config } = evidence(objective, valueRows(objective, 0.1));
   const mutations: ((value: ObjectiveProgress) => void)[] = [
     (value) => {
       value.entries[0].observations[0][1] = 1;
@@ -480,7 +469,7 @@ it("binds progress to the resolved definitions and rejects altered facts, counte
   expect(
     validObjectiveProgress(
       progress,
-      [{ ...objective, minDemandServedShare: 0.99 } as CompiledRuleObjective],
+      [{ ...objective, maxDollarsPerKWh: 0.99 } as CompiledRuleObjective],
       config,
     ),
   ).toBe(false);
@@ -494,7 +483,7 @@ it("binds progress to the resolved definitions and rejects altered facts, counte
 });
 
 it("validates result identity, units, generated definitions and safe metadata without trusting author text", () => {
-  const objective = { ...objectives[6], required: false };
+  const objective = { ...objectives[5], required: false };
   const { result } = evidence(objective, valueRows(objective, 0.2));
   expect(result.required).toBe(false);
   expect(result.definition).toBe(objectiveDefinition("monthlyBilledRate"));
@@ -516,7 +505,7 @@ it("validates result identity, units, generated definitions and safe metadata wi
 });
 
 it("treats a misplaced calendar row as unavailable and ignores forecast-month evidence", () => {
-  const objective = objectives[0];
+  const objective = objectives[5];
   const wrong = facts(0, { month: 2 });
   expect(evidence(objective, [wrong, facts(1)]).result.status).toBe(
     "unverifiable",
@@ -536,29 +525,26 @@ it("rejects overflowing saved facts and keeps nonfinite derived readings unavail
     facts(0, { kgco2e: Number.MAX_VALUE }),
     facts(1, { kgco2e: Number.MAX_VALUE }),
   ];
-  const budget = evidence(objectives[2], rows, 2);
+  const budget = evidence(objectives[1], rows, 2);
   expect(budget.result).toMatchObject({ status: "unverifiable" });
   expect(budget.result.observed).toBeUndefined();
   expect(
-    validObjectiveProgress(budget.progress, [objectives[2]], budget.config),
+    validObjectiveProgress(budget.progress, [objectives[1]], budget.config),
   ).toBe(false);
   const ratio = evidence(
-    objectives[0],
-    [
-      facts(0, { supplyWh: Number.MAX_VALUE, demandWh: Number.MIN_VALUE }),
-      facts(1),
-    ],
+    objectives[5],
+    [facts(0, { revenue: Number.MAX_VALUE, supplyWh: 1e-300 }), facts(1)],
     2,
   );
   expect(ratio.result.status).toBe("unverifiable");
-  expect(ratio.result.observed).toBe(1);
+  expect(ratio.result.observed).toBe(0.2);
   expect(
-    validObjectiveProgress(ratio.progress, [objectives[0]], ratio.config),
+    validObjectiveProgress(ratio.progress, [objectives[5]], ratio.config),
   ).toBe(false);
 });
 
 it("rejects a forged completed result below a minimum or above a ceiling while retaining valid neighbors", () => {
-  for (const index of [0, 1, 2, 3, 4, 5, 6, 7]) {
+  for (const index of [0, 1, 2, 3, 4, 5, 6]) {
     const objective = objectives[index];
     const completed = evidence(
       objective,

@@ -152,6 +152,7 @@ export function changeTutorialStep(
   dispatch({ type: "game/completeTutorial" });
   dispatch(
     tutorialCompleteDialog({
+      scenarioId,
       title: scenario?.endTitle || "Tutorial complete!",
       message:
         leaving?.capstone?.successMessage ||
@@ -240,8 +241,7 @@ export const tutorialGateMiddleware: Middleware =
               open: true,
               notCancellable: true,
               secondaryLabel: "Exit tutorial",
-              secondaryAction: () =>
-                (api.dispatch as AppDispatch)(quit({ toScenarioList: true })),
+              secondaryAction: () => (api.dispatch as AppDispatch)(quit()),
               actionLabel: "Retry final challenge",
               action: () =>
                 restartTutorialAtStep(

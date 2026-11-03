@@ -85,8 +85,9 @@ test("loading hands off to a smooth logo rise and individually staggered control
   }
   for (const control of await controls.all())
     await expect(control).toHaveCSS("opacity", "1");
+  await expect(controls.first()).toHaveCSS("width", "208px");
   if (process.env.PR_SCREENSHOTS)
-    await page.screenshot({
+    await page.locator("#menuCard").screenshot({
       path: `.tmp/pr-startup-${testInfo.project.name}.png`,
     });
   await expect(
@@ -155,7 +156,7 @@ test("keyboard and pointer actions work during the entrance", async ({
   await expect(page.locator("#appStartup")).toHaveCount(0);
   await page.keyboard.press("ArrowDown");
   await expect(
-    page.getByRole("button", { name: "Manual", exact: true }),
+    page.getByRole("button", { name: "Achievements", exact: true }),
   ).toBeFocused();
   await expect(
     page.getByRole("button", { name: "Settings", exact: true }),
@@ -172,12 +173,146 @@ test("hovering a home control makes it the active button, and keyboard continues
   await page.emulateMedia({ reducedMotion: "reduce" }); // skip the entrance stagger
   await page.goto("/");
   const play = page.getByRole("button", { name: "Play", exact: true });
-  const manual = page.getByRole("button", { name: "Manual", exact: true });
+  const achievements = page.getByRole("button", {
+    name: "Achievements",
+    exact: true,
+  });
   await expect(page.locator("#appStartup")).toHaveCount(0); // the menu is revealed
-  await manual.hover();
-  await expect(manual).toBeFocused(); // the pointer moved the active button to Manual
+  await achievements.hover();
+  await expect(achievements).toBeFocused(); // the pointer moved the active button to Achievements
   await page.keyboard.press("ArrowUp");
   await expect(play).toBeFocused(); // keyboard continues from the hovered control
+});
+
+for (const theme of ["light", "dark"]) {
+  test(`arrow selection paints only the current item on the next frame in ${theme}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.addInitScript(
+      (value) => localStorage.setItem("theme", value),
+      theme,
+    );
+    await page.goto("/");
+    await expect(page.locator("#appStartup")).toHaveCount(0);
+    // Finish the entrance, then exercise the selection with normal motion enabled.
+    await page.keyboard.press("ArrowDown");
+    await page.locator("#centeredMenu").evaluate(async (menu) => {
+      for (const animation of menu.getAnimations({ subtree: true }))
+        animation.finish();
+      await new Promise(requestAnimationFrame);
+    });
+    const frames = await page
+      .locator("#centeredMenu")
+      .evaluate(async (menu) => {
+        const buttons = Array.from(menu.querySelectorAll("button"));
+        const frames: { selected: string; painted: string[] }[] = [];
+        for (const key of [
+          "ArrowDown",
+          "ArrowDown",
+          "ArrowUp",
+          "ArrowUp",
+          "ArrowDown",
+        ]) {
+          document.activeElement!.dispatchEvent(
+            new KeyboardEvent("keydown", {
+              key,
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+          await new Promise(requestAnimationFrame);
+          frames.push({
+            selected: document.activeElement!.textContent!,
+            painted: buttons
+              .filter(
+                (button) =>
+                  getComputedStyle(button).backgroundColor !==
+                  "rgba(0, 0, 0, 0)",
+              )
+              .map((button) => button.textContent!),
+          });
+        }
+        return frames;
+      });
+    for (const frame of frames) expect(frame.painted).toEqual([frame.selected]);
+  });
+}
+
+for (const exit of ["Back", "Escape"]) {
+  test(`returning home with ${exit} resets to the first action without a delayed jump`, async ({
+    page,
+  }) => {
+    await page.clock.install();
+    await page.goto("/");
+    const play = page.getByRole("button", { name: "Play", exact: true });
+    await expect(play).toBeFocused();
+    for (const destination of ["Manual", "Settings", "Achievements"]) {
+      await page
+        .getByRole("button", { name: destination, exact: true })
+        .click();
+      await expect(
+        page.getByRole("heading", { name: destination, exact: true }),
+      ).toBeVisible();
+      if (exit === "Back")
+        await page.getByRole("button", { name: "Back", exact: true }).click();
+      else await page.keyboard.press("Escape");
+      await expect(play).toBeFocused();
+      await page.clock.runFor(1000);
+      await expect(play).toBeFocused();
+      // A fresh return must also leave subsequent navigation alone.
+      await page.keyboard.press("ArrowDown");
+      const firstResource = page.getByRole("button", {
+        name: "Achievements",
+        exact: true,
+      });
+      await expect(firstResource).toBeFocused();
+      await page.clock.runFor(1000);
+      await expect(firstResource).toBeFocused();
+    }
+  });
+}
+
+test("loading and returning from Saved games select Continue at the top", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.goto("/?scenario=103");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
+  await page.goto("/");
+  const first = page.getByRole("button", { name: "Continue", exact: true });
+  await expect(first).toBeFocused();
+  await page.getByRole("button", { name: "Saved games", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Saved games", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(first).toBeFocused();
+  await page.clock.runFor(1000);
+  await expect(first).toBeFocused();
+});
+
+test("footer icons have equal optical gaps beside Share", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("#appStartup")).toHaveCount(0);
+  const edges = await page.locator(".mainMenuFooter svg").evaluateAll((icons) =>
+    icons.slice(1).map((icon) => {
+      const svg = icon as SVGSVGElement;
+      const bounds = svg.getBBox();
+      const matrix = svg.getScreenCTM()!;
+      return {
+        left: new DOMPoint(bounds.x, 0).matrixTransform(matrix).x,
+        right: new DOMPoint(bounds.x + bounds.width, 0).matrixTransform(matrix)
+          .x,
+      };
+    }),
+  );
+  expect(edges).toHaveLength(3);
+  expect(edges[2].left - edges[1].right).toBeCloseTo(
+    edges[1].left - edges[0].right,
+    1,
+  );
 });
 
 test("a failed load can be retried", async ({ page }) => {
@@ -247,6 +382,8 @@ for (const theme of ["light", "dark"]) {
       );
     });
     await expect(install).toBeVisible();
+    await expect(install.locator("svg")).toHaveCount(0);
+    await expect(sound.locator("svg")).toHaveCount(0);
     await sound.click();
     await expect(sound).toBeHidden();
     await expect(install).toBeVisible();
@@ -303,3 +440,162 @@ test("home actions and resources remain reachable at low height with and without
     ).toBeLessThanOrEqual(1);
   }
 });
+
+for (const theme of ["light", "dark"]) {
+  test(`all home menu buttons share the primary action width in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript(
+      (value) => localStorage.setItem("theme", value),
+      theme,
+    );
+    for (const hasSave of [false, true]) {
+      if (hasSave) {
+        await page.goto("/?scenario=103");
+        await page
+          .getByRole("button", { name: "Start game", exact: true })
+          .click();
+        await expect
+          .poll(async () => Boolean(await readSavedGame(page)))
+          .toBe(true);
+      }
+      await page.goto("/");
+      const primary = page.getByRole("button", {
+        name: hasSave ? "New game" : "Play",
+        exact: true,
+      });
+      await expect(primary).toBeVisible();
+      await page.evaluate(() =>
+        window.dispatchEvent(
+          new Event("beforeinstallprompt", { cancelable: true }),
+        ),
+      );
+      await expect(
+        page.getByRole("button", { name: "Install app" }),
+      ).toBeVisible();
+      const bounds = (await primary.boundingBox())!;
+      for (const button of await page.locator("#centeredMenu button").all()) {
+        const box = (await button.boundingBox())!;
+        expect(box.width, await button.innerText()).toBeCloseTo(
+          bounds.width,
+          0,
+        );
+        expect(box.x, await button.innerText()).toBeCloseTo(bounds.x, 0);
+      }
+      if (
+        hasSave &&
+        process.env.REVIEW_SCREENSHOT_DIR &&
+        ((theme === "light" && testInfo.project.name === "desktop-chromium") ||
+          (theme === "dark" && testInfo.project.name === "mobile-390px"))
+      ) {
+        await page.mouse.move(0, 0);
+        await page.getByRole("button", { name: "Manual", exact: true }).focus();
+        await page.screenshot({
+          path: `${process.env.REVIEW_SCREENSHOT_DIR}/menu-${theme}-${testInfo.project.name}.png`,
+          animations: "disabled",
+        });
+      }
+    }
+  });
+}
+
+for (const theme of ["light", "dark"]) {
+  for (const reducedMotion of ["reduce", "no-preference"] as const) {
+    test(`home touch feedback releases cleanly in ${theme}, motion ${reducedMotion}`, async ({
+      page,
+      context,
+    }, testInfo) => {
+      test.skip(!testInfo.project.use.hasTouch);
+      await page.emulateMedia({ reducedMotion });
+      await page.addInitScript(
+        (value) => localStorage.setItem("theme", value),
+        theme,
+      );
+      await page.goto("/");
+      await expect(page.locator("#appStartup")).toHaveCount(0);
+      const play = page.getByRole("button", { name: "Play", exact: true });
+      const manual = page.getByRole("button", { name: "Manual", exact: true });
+      const settings = page.getByRole("button", {
+        name: "Settings",
+        exact: true,
+      });
+      const sound = page.getByRole("button", { name: "Turn on sound" });
+      await expect(sound).toHaveCSS("opacity", "1");
+      // Establish the keyboard selection before checking that a touch drag leaves it alone.
+      await play.focus();
+      await expect(play).toBeFocused();
+      const clear = "rgba(0, 0, 0, 0)";
+      await expect(play).not.toHaveCSS("background-color", clear);
+      await expect(manual).toHaveCSS("background-color", clear);
+
+      const touch = await context.newCDPSession(page);
+      const bounds = (await manual.boundingBox())!;
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
+      const point = {
+        x: bounds.x + bounds.width / 2,
+        y: bounds.y + bounds.height / 2,
+      };
+      try {
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [point],
+        });
+        await expect(manual).not.toHaveCSS("background-color", clear);
+        await expect(manual.locator(".MuiTouchRipple-root")).toBeHidden();
+        if (reducedMotion === "reduce") {
+          await expect(manual).toHaveCSS("transform", "none");
+          expect(
+            await manual.evaluate((element) =>
+              getComputedStyle(element)
+                .transitionDuration.split(",")
+                .every((duration) => parseFloat(duration) <= 0.001),
+            ),
+          ).toBe(true);
+        } else {
+          await expect(manual).not.toHaveCSS("transform", "none");
+        }
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: point.x + 3, y: point.y }],
+        });
+        await expect(play).toBeFocused();
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: bounds.x - 20, y: point.y }],
+        });
+        await expect(manual).toHaveCSS("background-color", clear);
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchCancel",
+          touchPoints: [],
+        });
+        await expect(manual).toHaveCSS("background-color", clear);
+        await expect(manual).toHaveCSS("transform", "none");
+        await expect(play).not.toHaveCSS("background-color", clear);
+      } finally {
+        await touch.detach();
+      }
+
+      await settings.tap();
+      await expect(
+        page.getByRole("heading", { name: "Settings", exact: true }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: "Back", exact: true }).tap();
+      await expect(play).toBeFocused();
+      await expect(settings).toHaveCSS("background-color", clear);
+      await expect(play).not.toHaveCSS("background-color", clear);
+
+      // A physical keyboard on a touch device immediately restores selection feedback.
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("ArrowDown");
+      await expect(manual).toBeFocused();
+      await expect(manual).not.toHaveCSS("background-color", clear);
+      await expect(play).toHaveCSS("background-color", clear);
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("Enter");
+      await expect(
+        page.getByRole("heading", { name: "Settings", exact: true }),
+      ).toBeVisible();
+    });
+  }
+}

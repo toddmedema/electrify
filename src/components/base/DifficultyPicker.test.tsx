@@ -31,7 +31,9 @@ describe("DifficultyPicker", () => {
       />,
     );
     expect(
-      screen.getByText(DIFFICULTY_DESCRIPTIONS.Manager),
+      screen.getByText(
+        `${DIFFICULTY_DESCRIPTIONS.Manager} Serving less than 97% of demand for 3 months in a row ends the run.`,
+      ),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByText(DIFFICULTY_LABELS.Manager));
     expect(onChange).not.toHaveBeenCalled();

@@ -18,7 +18,7 @@ it("draws storage/intertie dividers above the fills in both history and forecast
       supplyByFuel: { Sun: 20, Coal: 80 },
       storageDischargeW: 10,
       importedW: 20,
-      storageChargeW: 20,
+      customerBatteryGridChargeW: 20,
       exportedW: 10,
     },
     {
@@ -28,7 +28,8 @@ it("draws storage/intertie dividers above the fills in both history and forecast
       supplyByFuel: { Sun: 30, Coal: 70 },
       storageDischargeW: 20,
       importedW: 30,
-      storageChargeW: 25,
+      storageChargeW: 10,
+      customerBatteryGridChargeW: 15,
       exportedW: 15,
     },
     {

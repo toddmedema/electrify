@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  Snackbar,
   SnackbarContent,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
@@ -28,6 +27,8 @@ import AudioContainer from "./base/AudioContainer";
 import GameWorkspace from "./base/GameWorkspace";
 import { GAME_TOOLS, GameTool } from "./base/Navigation";
 import { restoreMenuFocus } from "./base/useMenuKeys";
+import DeferredSnackbar from "./base/DeferredSnackbar";
+import { isBlackoutToast } from "../helpers/BlackoutToast";
 import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
@@ -65,7 +66,7 @@ import {
   shouldDismissSwipe,
   SWIPE_DISMISS_EXIT_MS,
 } from "./base/SwipeDismiss";
-import { isDesktopScreen } from "../Globals";
+import { isDesktopScreen, isSideToolLayout } from "../Globals";
 import { store } from "../Store";
 
 const AchievementGallery = React.lazy(() =>
@@ -266,8 +267,12 @@ const shortcutHandlers = {
   // The workspace handles tool dismissal, allowing nested controls to consume Escape first.
   // Full-screen destinations follow their Back button through history.
   ESCAPE: () => {
-    const { card, game } = store.getState();
-    if (game.inGame && !isGameCard(card.name)) {
+    const { card } = store.getState();
+    if (
+      card.name !== "MAIN_MENU" &&
+      card.name !== "LOADING" &&
+      !isGameCard(card.name)
+    ) {
       store.dispatch(navigateBack());
       // Escape may arrive before the gallery's entry focus settles.
       if (card.name === "ACHIEVEMENTS")
@@ -313,11 +318,38 @@ export function isGameCard(name: CardNameType) {
   return isNavCard(name) || name.startsWith("BUILD_");
 }
 
+// Completion layout belongs to this dialog, including its phone action order.
+const tutorialCompletionSx = {
+  "& .MuiDialog-paper": { width: 560, maxWidth: "calc(100% - 24px)" },
+  "& .MuiDialogTitle-root": { padding: "24px 24px 12px" },
+  "& .MuiDialogContent-root": { padding: "0 24px 24px" },
+  "& .MuiDialogActions-root": {
+    padding: "16px 24px",
+    flexWrap: "nowrap",
+    borderTop: "1px solid var(--border-subtle)",
+    "& .MuiButton-root": {
+      minHeight: 40,
+      "@media (pointer: coarse)": { minHeight: 44 },
+    },
+    "@media (max-width: 599px)": {
+      paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+    },
+  },
+  "& .tutorialCompleteContent": {
+    display: "flex",
+    flexDirection: "column",
+    gap: "24px",
+    lineHeight: 1.5,
+    "& p": { margin: 0 },
+  },
+} as const;
+
 export default class Compositor extends React.Component<Props, {}> {
   private removeShortcuts?: () => void;
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
   private snackbarContentRef = React.createRef<HTMLDivElement>();
   private dialogCancelRef = React.createRef<HTMLButtonElement>();
+  private tutorialPrimaryRef = React.createRef<HTMLButtonElement>();
   private snackbarDrag?: { x: number; y: number; pointerId: number };
   private snackbarDismissTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -566,8 +598,15 @@ export default class Compositor extends React.Component<Props, {}> {
             key={transitionKey}
             nodeRef={transitionNodeRef}
             onEnter={() => {
-              if (transitionNodeRef.current)
-                transitionNodeRef.current.inert = false;
+              const screen = transitionNodeRef.current;
+              if (screen) {
+                screen.inert = false;
+                // A quick Back can reuse the still-mounted home screen. Reset on every
+                // entrance, including those that do not rerun its initial-focus effect.
+                screen
+                  .querySelector<HTMLElement>("#menuCard [data-main-action]")
+                  ?.focus({ preventScroll: true });
+              }
             }}
             onExit={() => {
               // The outgoing screen stays visible while fading, but can't receive input.
@@ -606,7 +645,7 @@ export default class Compositor extends React.Component<Props, {}> {
           this.props.card.name !== "MANUAL" &&
           !ui.manualHelpEntry && (
             <TutorialHud
-              desktop={isDesktopScreen()}
+              desktop={isSideToolLayout()}
               step={currentTutorialStep}
               stepIndex={tutorialStep}
               totalSteps={tutorialSteps.length}
@@ -625,6 +664,10 @@ export default class Compositor extends React.Component<Props, {}> {
         />
         <Dialog
           open={ui.dialog.open}
+          sx={ui.dialog.tutorialComplete ? tutorialCompletionSx : undefined}
+          className={
+            ui.dialog.tutorialComplete ? "tutorialCompleteDialog" : undefined
+          }
           aria-labelledby="app-dialog-title"
           slotProps={{
             transition: {
@@ -634,6 +677,8 @@ export default class Compositor extends React.Component<Props, {}> {
                   this.props.ui.dialog.focusCancel
                 )
                   this.dialogCancelRef.current?.focus();
+                else if (this.props.ui.dialog.tutorialComplete)
+                  this.tutorialPrimaryRef.current?.focus();
               },
             },
           }}
@@ -655,7 +700,21 @@ export default class Compositor extends React.Component<Props, {}> {
               <InstallAppButton label="Install for later" afterMilestone />
             )}
             {ui.dialog.secondaryAction && (
-              <Button color="primary" onClick={ui.dialog.secondaryAction}>
+              <Button
+                color="primary"
+                onClick={ui.dialog.secondaryAction}
+                variant={
+                  ui.dialog.tutorialComplete && !ui.dialog.action
+                    ? "contained"
+                    : "text"
+                }
+                autoFocus={ui.dialog.tutorialComplete && !ui.dialog.action}
+                ref={
+                  ui.dialog.tutorialComplete && !ui.dialog.action
+                    ? this.tutorialPrimaryRef
+                    : undefined
+                }
+              >
                 {ui.dialog.secondaryLabel || "Close"}
               </Button>
             )}
@@ -678,6 +737,12 @@ export default class Compositor extends React.Component<Props, {}> {
               <Button
                 color="primary"
                 variant="contained"
+                autoFocus={ui.dialog.tutorialComplete}
+                ref={
+                  ui.dialog.tutorialComplete
+                    ? this.tutorialPrimaryRef
+                    : undefined
+                }
                 onClick={ui.dialog.action}
               >
                 {ui.dialog.actionLabel || "OK"}
@@ -685,8 +750,11 @@ export default class Compositor extends React.Component<Props, {}> {
             )}
           </DialogActions>
         </Dialog>
-        <Snackbar
-          className={`snackbar ${isGameCard(this.props.card.name) ? "snackbar-above-nav" : ""}`}
+        <DeferredSnackbar
+          // A blackout toast replacing another gets its own full timer.
+          key={isBlackoutToast(ui.snackbar.message) ? ui.snackbar.message : ""}
+          overModal={ui.snackbar.overModal}
+          className={`snackbar ${isGameCard(this.props.card.name) && !ui.snackbar.overModal ? "snackbar-above-nav" : ""}`}
           // Bottom left is the MUI default, which on a wide screen leaves the toast hanging
           // off the side of the centered app frame
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
@@ -728,7 +796,7 @@ export default class Compositor extends React.Component<Props, {}> {
               </>
             }
           />
-        </Snackbar>
+        </DeferredSnackbar>
         {/* Connected, so they still update when shouldComponentUpdate blocks this component --
             neither is driven by the current card, and both can open over any of them */}
         <VictoryDialogContainer />

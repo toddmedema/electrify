@@ -42,7 +42,7 @@ it("plots measured monthly minima, preserving missing records, zero and negative
   ]);
   expect(chart.tooltip(1, chart.state)).toContain("Not recorded");
   expect(chart.tooltip(3, chart.state)).toContain(
-    "Projected monthly minimum\nLowest spare capacity: -8MW",
+    "Projected monthly minimum\nLowest reserve: -8MW",
   );
   const options = chart.buildOptions({ getState: () => chart.state, scale: 1 });
   const [min, max] = options.scales.y.range();

@@ -1,10 +1,33 @@
 import type { AppStore } from "./Store";
+import type { HighscoreSubmissionType } from "./reducers/User";
+
+/** Browser effects are registered by Store; worker forecasts have no browser services. */
+export interface GameEffects {
+  logEvent: (eventName: string, args?: object) => void;
+  recordScenarioPlayed: (scenarioId: number) => void;
+  submitHighscore: (submission: HighscoreSubmissionType) => void;
+}
+
+const noEffects: GameEffects = {
+  logEvent: () => undefined,
+  recordScenarioPlayed: () => undefined,
+  submitHighscore: () => undefined,
+};
 
 let registered: AppStore | null = null;
+let effects = noEffects;
 
 /** Called by Store as soon as it has been created. */
-export function registerStore(store: AppStore) {
+export function registerStore(
+  store: AppStore,
+  gameEffects: GameEffects = noEffects,
+) {
   registered = store;
+  effects = gameEffects;
+}
+
+export function getGameEffects(): GameEffects {
+  return effects;
 }
 
 /**

@@ -95,16 +95,7 @@
       }
     }
   ],
-  "objectives": [
-    {
-      "id": "reliable-year",
-      "label": "Keep the declared year reliable",
-      "metric": "monthlyReliability",
-      "fromMonth": 13,
-      "throughMonth": 24,
-      "minDemandServedShare": 0.99
-    }
-  ],
+  "objectives": [],
   "debriefReports": [
     {
       "id": "year-review",

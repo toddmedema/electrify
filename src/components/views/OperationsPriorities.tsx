@@ -45,14 +45,8 @@ export default function OperationsPriorities({
   const mission = getMissionStatus(game);
   const preferenceKey = `operationsGoals:${game.scenarioId}`;
   const [pinned, setPinned] = React.useState<string[]>(() => {
-    const initial = Array.from(
-      new Set([
-        mission.headline?.id === "cash"
-          ? "survival"
-          : mission.headline?.id || "survival",
-        "cash",
-      ]),
-    );
+    // Every goal shows until the player chooses otherwise; a hidden one can still end the run.
+    const initial = mission.requirements.map((goal) => goal.id);
     const stored = getStorageJson<unknown[]>(preferenceKey, initial);
     return Array.isArray(stored)
       ? mission.requirements
@@ -162,7 +156,7 @@ export default function OperationsPriorities({
         className="operationsSection"
       >
         <header className="operationsSectionHeader">
-          <h3 id="operationsNextTitle">Coming up</h3>
+          <h3 id="operationsNextTitle">Upcoming</h3>
         </header>
         {next ? (
           <ul className="eventLogList">

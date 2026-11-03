@@ -163,3 +163,7 @@ Preparation lead: 36 months.
 | `summer-peak-2`  | 52               | 53             | 3 months               |
 | `summer-peak-3`  | 64               | 65             | 3 months               |
 | `summer-peak-4`  | 76               | 77             | 3 months               |
+
+## 116 · Across the Valley
+
+This arc adds no global shocks. Use Across the Valley as the base to retain operating areas, utility portfolios and acquisition contracts.

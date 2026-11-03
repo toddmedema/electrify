@@ -143,3 +143,82 @@ describe("weather hazard checks", () => {
     ).toContain("hail only damages operating solar");
   });
 });
+
+it("accepts actual entitlement purchases and rejects a forged source-interface claim", () => {
+  const state = createGame({ scenarioId: 116, seed: 12345 });
+  tickState(state);
+  const before = cloneDeep(
+    getTimeFromTimeline(state.date.minute, state.timeline)!,
+  );
+  tickState(state);
+  const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+  expect(now.entitlementImportedW).toBeGreaterThan(0);
+  const valid = new InvariantCollector();
+  checkTick(valid, state, before, now, "utility tick", false);
+  expect(valid.getViolations()).toEqual([]);
+
+  const corrupted = cloneDeep(now);
+  corrupted.entitlementImportedW =
+    (corrupted.entitlementImportCapacityW ?? 0) + 1e6;
+  const invalid = new InvariantCollector();
+  checkTick(invalid, state, before, corrupted, "corrupt purchase", false);
+  expect(invalid.getViolations()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        rule: "purchased entitlements remain within source interfaces",
+      }),
+    ]),
+  );
+
+  const forgedRights = cloneDeep(now);
+  forgedRights.entitlementImportCapacityW = 1e12;
+  const invalidRights = new InvariantCollector();
+  checkTick(
+    invalidRights,
+    state,
+    before,
+    forgedRights,
+    "corrupt interface",
+    false,
+  );
+  expect(invalidRights.getViolations()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        rule: "company purchases respect owned dated source rights",
+      }),
+    ]),
+  );
+});
+
+it("rejects invented supply in the shared company energy balance", () => {
+  const collector = inspect((tick) => {
+    tick.supplyW += 1e9;
+  });
+  expect(collector.getViolations()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        rule: "generation, storage and trade balance supply",
+      }),
+    ]),
+  );
+});
+
+it.each([0, 5.960464477539063e-8, 1])(
+  "distinguishes source purchases from outside imports when exporting (%s W outside import)",
+  (outsideImportW) => {
+    const state = createGame({ scenarioId: 116, seed: 12345 });
+    tickState(state);
+    const now = cloneDeep(
+      getTimeFromTimeline(state.date.minute, state.timeline)!,
+    );
+    expect(now.entitlementImportedW).toBeGreaterThan(0);
+    now.importedW = now.entitlementImportedW! + outsideImportW;
+    now.exportedW = 1;
+    now.revenueExports = 1;
+    const collector = new InvariantCollector();
+    checkTick(collector, state, null, now, "outside direction", false);
+    expect(
+      collector.getCountByRule()["a tick never imports and exports at once"],
+    ).toBe(outsideImportW > 0 ? 1 : undefined);
+  },
+);

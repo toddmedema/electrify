@@ -1830,6 +1830,11 @@ for (const count of [2, 4]) {
       await expect
         .poll(() => room.views.get(buyerId)?.game?.facilities.length)
         .toBe(fleetBefore + 1);
+      // A side panel stays open after a purchase, and holds the clock until it closes.
+      if (buyer.viewportSize()!.width >= 1024)
+        await buyer
+          .getByRole("button", { name: "Close Build", exact: true })
+          .click();
       await expect(buyer.locator(".facilities:visible")).toBeVisible();
       for (const page of pages)
         await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
@@ -2043,10 +2048,10 @@ const cooperativeMod = (published: boolean): InstalledMod => ({
     },
     objectives: [
       {
-        id: "serve-customers",
-        label: "Keep your grid reliable",
-        metric: "monthlyReliability",
-        minDemandServedShare: 0.5,
+        id: "affordable",
+        label: "Keep bills affordable",
+        metric: "monthlyBilledRate",
+        maxDollarsPerKWh: 1,
         fromMonth: 1,
         throughMonth: 6,
       },
@@ -2216,9 +2221,9 @@ for (const width of [1280, 390, 360]) {
       await expect(preview).toContainText(
         "Modded · Unranked · No achievements",
       );
-      await expect(preview).toContainText("Keep your grid reliable");
+      await expect(preview).toContainText("Keep bills affordable");
       await expect(preview).toContainText(
-        "Delivered customer electricity divided by customer demand each completed month.",
+        "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
       );
       await expect(preview).toContainText("Grid funding");
       await expect(preview).not.toContainText("Private surprise");
@@ -2391,7 +2396,7 @@ for (const width of [1280, 390, 360]) {
       scenarioPanel,
       guest.getByRole("button", { name: "Scenario", exact: true }),
     );
-    await expect(scenarioPanel).toContainText("Keep your grid reliable");
+    await expect(scenarioPanel).toContainText("Keep bills affordable");
     await guest.keyboard.press("Escape");
     await saveAndQuit(guest);
     await saveAndQuit(host);
@@ -2635,9 +2640,11 @@ for (const scenarioId of [106, 107] as const) {
         });
       };
       const goal =
+        scenarioId === 106 ? "Retain the community" : "Keep power flowing";
+      const target =
         scenarioId === 106
-          ? "Retain the community"
-          : "Keep the lights on through the freeze";
+          ? "Keep ≥90% of customer baseline by Dec 2035"
+          : "Serving less than 95% of demand for 3 months in a row ends the run.";
       const scenarioPanel = (page: Page) =>
         page.getByRole("region", { name: "Scenario", exact: true });
       const showGoal = async (page: Page) => {
@@ -2648,6 +2655,13 @@ for (const scenarioId of [106, 107] as const) {
         );
         await expect(panel).toContainText(goal);
         await expect(panel).not.toContainText("Modded");
+        const conditions = panel.getByRole("region", {
+          name: "Goals",
+        });
+        await expect(conditions).toContainText(target);
+        await expect(conditions).not.toContainText(
+          /months completed|Not started|Recorded:/,
+        );
         return panel;
       };
       await hostGame(host);
@@ -2699,9 +2713,7 @@ for (const scenarioId of [106, 107] as const) {
           scenarioId === 106 ? 50e6 : 2e9,
           scenarioId === 106 ? 0.12 : 0.1,
         );
-        await expect(await showGoal(page)).toContainText(
-          "0/1 months completed",
-        );
+        await showGoal(page);
         await page.keyboard.press("Escape");
       }
       const dueMonth = scenarioId === 106 ? 48 : 36;
@@ -2905,29 +2917,22 @@ for (const scenarioId of [106, 107] as const) {
         });
         if (await keepWatching.isVisible()) await keepWatching.click();
         for (const page of pages) {
-          const panel = await showGoal(page);
-          await expect(panel).toContainText("1/1 months completed");
-          await expect(panel.getByText("Met", { exact: true })).toBeVisible();
+          await showGoal(page);
           await page.keyboard.press("Escape");
         }
         if (width === 390) {
           const panel = await showGoal(guest);
           const title = panel.getByText(goal, { exact: true });
-          const observed = panel.getByText(/1\/1 months completed/);
+          const goalTarget = panel.getByText(target, { exact: true });
           await title.scrollIntoViewIfNeeded();
-          await observed.scrollIntoViewIfNeeded();
+          await goalTarget.scrollIntoViewIfNeeded();
           await expect(title).toBeInViewport();
-          await expect(observed).toBeInViewport();
-          await expect(
-            panel.getByText("Met", { exact: true }),
-          ).toBeInViewport();
+          await expect(goalTarget).toBeInViewport();
           await capture("native-107-390-goal-dark.png", guest);
           await guest.keyboard.press("Escape");
         }
       } else {
-        await expect(await showGoal(guest)).toContainText(
-          "0/1 months completed",
-        );
+        await showGoal(guest);
         await guest.keyboard.press("Escape");
       }
       await saveAndQuit(guest);
@@ -2940,11 +2945,6 @@ for (const scenarioId of [106, 107] as const) {
           )!;
           expect(february).toBeDefined();
           expect(february.demandWh).toBeGreaterThan(0);
-          expect(
-            game.objectiveProgress!.entries.find(
-              (entry) => entry.id === "reliability",
-            )!.observations,
-          ).toEqual([[49, february.supplyWh, february.demandWh]]);
         }
       const facts = (game: GameType) => ({
         date: game.date,

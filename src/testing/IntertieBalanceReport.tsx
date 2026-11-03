@@ -222,24 +222,6 @@ it("reports actual import, domestic, and mixed outcomes separately from decision
             (sum, month) => sum + month.supplyWh,
             0,
           );
-          const objective = scenario.reliabilityObjective;
-          const objectiveMonths = objective
-            ? result.months.filter((month) => {
-                const offset =
-                  (month.year - objective.year) * 12 +
-                  month.month -
-                  objective.month;
-                return offset >= 0 && offset < (objective.durationMonths || 1);
-              })
-            : [];
-          const objectiveDemandWh = objectiveMonths.reduce(
-            (sum, month) => sum + month.demandWh,
-            0,
-          );
-          const objectiveSupplyWh = objectiveMonths.reduce(
-            (sum, month) => sum + month.supplyWh,
-            0,
-          );
           const firstCustomers = result.months[0]?.customers || 0;
           const lastCustomers =
             result.months[result.months.length - 1]?.customers || 0;
@@ -265,10 +247,6 @@ it("reports actual import, domestic, and mixed outcomes separately from decision
             })),
             finalNetWorth: result.finalNetWorth,
             servedFraction: demandWh ? suppliedWh / demandWh : null,
-            objectiveServedFraction: objectiveDemandWh
-              ? objectiveSupplyWh / objectiveDemandWh
-              : null,
-            objectiveMonthsObserved: objectiveMonths.length,
             customerRetentionFromFirstMonth: firstCustomers
               ? lastCustomers / firstCustomers
               : null,

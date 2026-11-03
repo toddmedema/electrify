@@ -1,3 +1,8 @@
+import { isBuyingRule, isSellingRule } from "../helpers/TradingRules";
+import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
+import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
+import { UTILITY_TARGETS } from "../data/UtilityExpansion";
+import { currentTick } from "../helpers/GameSelectors";
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import {
   validRetrofitFacility,
@@ -7,11 +12,7 @@ import { withResilienceOptions } from "../helpers/Hazards";
 import { validPolicyChange } from "../helpers/Policies";
 import { validScenarioResponse } from "../helpers/ScenarioChoices";
 import { isStorage } from "../Types";
-import type {
-  FacilityShoppingType,
-  GameType,
-  TradingPolicyType,
-} from "../Types";
+import type { FacilityShoppingType, GameType } from "../Types";
 import type { gameSlice } from "../reducers/Game";
 import type * as GameActions from "../reducers/GameActions";
 
@@ -19,13 +20,6 @@ import type * as GameActions from "../reducers/GameActions";
 type GameActionName = keyof typeof gameSlice.actions | keyof typeof GameActions;
 type Validation = { error: string } | { payload: unknown };
 type Validator = (game: GameType, payload: unknown) => Validation;
-
-const TRADING_POLICIES: TradingPolicyType[] = [
-  "BALANCED",
-  "RELIABILITY_FIRST",
-  "SURPLUS_ONLY",
-  "CLOSED",
-];
 
 const facility: Validator = (game, payload) =>
   Number.isSafeInteger(payload) && game.facilities.some((f) => f.id === payload)
@@ -57,8 +51,12 @@ const dispatchPosition =
 const peerLine: Validator = (game, payload) => {
   const target = payload as { corridorId?: string; financed?: boolean };
   return !target ||
-    !game.multiplayer?.peers?.some(
-      (p) => p.corridor.id === target.corridorId,
+    !(
+      game.multiplayer?.peers?.some(
+        (p) => p.corridor.id === target.corridorId,
+      ) ||
+      (isUtilityExpansionGame(game) &&
+        UTILITY_TARGETS.some((t) => t.corridorId === target.corridorId))
     ) ||
     typeof target.financed !== "boolean"
     ? { error: "Choose another player's intertie" }
@@ -88,6 +86,10 @@ const buildFacility: Validator = (game, payload) => {
   };
   if (!build || !build.facility || typeof build.financed !== "boolean")
     return { error: "That build is unavailable" };
+  if (Object.prototype.hasOwnProperty.call(build, "operatingAreaId"))
+    return {
+      error: "Build for the company without an operating-area destination",
+    };
   const requested = build.facility;
   const size = requested.peakWh ?? requested.peakW;
   if (
@@ -119,11 +121,27 @@ const buildFacility: Validator = (game, payload) => {
     return { error: "Choose valid facility options" };
   if (!isStorage(quote) && requested.resilience)
     quote = withResilienceOptions(quote, game, requested.resilience);
-  return { payload: { facility: quote, financed: build.financed } };
+  return {
+    payload: {
+      facility: quote,
+      financed: build.financed,
+    },
+  };
 };
 
 /** The co-op allowlist: every game action a player may send, with its payload check. */
 const GAME_COMMAND_VALIDATORS = {
+  acquireUtility: (game, payload) => {
+    if (!validAcquisitionAction(payload))
+      return { error: "Choose a valid acquisition" };
+    const quote = acquisitionQuote(game, payload.targetId);
+    if (!quote || quote.quoteKey !== payload.quoteKey)
+      return { error: "This acquisition quote has changed. Review it again." };
+    const due = payload.financed ? quote.financedCashDue : quote.cashDue;
+    return (currentTick(game)?.cash ?? -1) >= due
+      ? { payload }
+      : { error: "Not enough cash for this acquisition" };
+  },
   buildFacility,
   sellFacility: facility,
   togglePauseFacility: facility,
@@ -140,10 +158,14 @@ const GAME_COMMAND_VALIDATORS = {
   reprioritizeTransmissionLine: dispatchPosition(
     (game) => game.transmission?.lines.length ?? 0,
   ),
-  setTradingPolicy: (_game, payload) =>
-    TRADING_POLICIES.includes(String(payload) as TradingPolicyType)
+  setBuyingRule: (_game, payload) =>
+    isBuyingRule(payload)
       ? { payload }
-      : { error: "Choose a valid trading policy" },
+      : { error: "Choose a valid buying rule" },
+  setSellingRule: (_game, payload) =>
+    isSellingRule(payload)
+      ? { payload }
+      : { error: "Choose a valid selling rule" },
   schedulePolicy: policy,
   cancelPolicy: policy,
   chooseScenarioResponse: (_game, payload) =>

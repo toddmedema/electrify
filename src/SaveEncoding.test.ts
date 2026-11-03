@@ -33,6 +33,32 @@ it("preserves every JSON value and the commitment forecast without mutating live
   expect(JSON.stringify(save)).toBe(before);
 });
 
+it("keeps normal year-one rollover saves valid before JSON drops absent battery values", () => {
+  const valley = createGame({
+    scenarioId: 116,
+    difficulty: "Employee",
+    seed: 3857637116,
+  });
+  // Inactive customer batteries have explicitly absent optional meters in normal browser play.
+  for (const frame of valley.timeline) {
+    frame.customerBatteryWh = undefined;
+    frame.customerBatteryWhStart = undefined;
+    frame.customerBatteryLossWh = undefined;
+  }
+  runMonths(valley, 12);
+  const save = serializeSave(valley);
+  expect(parseSave(JSON.parse(JSON.stringify(save)))).not.toBeNull();
+  expect(parseSave(save)).not.toBeNull();
+  expect(parseSave(encodeSave(save))).not.toBeNull();
+  const chart = save.game.monthlyHistory[0].chartAverage!;
+  chart.customerBatteryWh = 0;
+  expect(parseSave(save)).not.toBeNull();
+  chart.customerBatteryWh = undefined;
+  expect(parseSave(save)).toBeNull();
+  chart.customerBatteryWh = Infinity;
+  expect(parseSave(save)).toBeNull();
+});
+
 it("distinguishes null, absent fields, empty objects, and nested arrays", () => {
   const save = serializeSave(game);
   const sample = {

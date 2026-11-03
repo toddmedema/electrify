@@ -2,6 +2,26 @@ import type { RunIdentity, ChallengeInvitation } from "../Types";
 import { createAction } from "@reduxjs/toolkit";
 import type { GameType, PolicyChangeType } from "../Types";
 
+// UI actions observed by the game are dependency-free: importing the forecasting
+// reducer must not initialize navigation, account services or browser storage.
+export const navigate = createAction<
+  import("../Types").CardNameType | import("../Types").NavigateActionType
+>("card/navigate");
+export const navigateBack = createAction<
+  import("../Types").CardNameType | undefined
+>("card/navigateBack");
+export const manualHelpOpen = createAction<string>("ui/manualHelpOpen");
+export const manualHelpClose = createAction("ui/manualHelpClose");
+export const dialogOpen =
+  createAction<import("../Types").DialogType>("ui/dialogOpen");
+export const dialogClose = createAction("ui/dialogClose");
+export const snackbarOpen = createAction<
+  string | import("../Types").SnackbarType
+>("ui/snackbarOpen");
+export const victoryOpen =
+  createAction<import("../Types").VictoryType>("ui/victoryOpen");
+export const victoryClose = createAction("ui/victoryClose");
+
 export const schedulePolicy = createAction<PolicyChangeType>(
   "game/schedulePolicy",
 );
@@ -68,4 +88,12 @@ export const cloudSavePromptVisible = createAction<boolean>(
 );
 
 /** Player-acknowledged, tutorial-only stress exercise. */
+export const generatorSizeChanged = createAction("game/generatorSizeChanged");
+export const prepareStorageReorder = createAction("game/prepareStorageReorder");
+
 export const beginIntertieStress = createAction("game/beginIntertieStress");
+
+/** A dated acquisition quote, revalidated atomically at the host's tick boundary. */
+export const acquireUtility = createAction<
+  import("../Types").AcquireUtilityAction
+>("game/acquireUtility");

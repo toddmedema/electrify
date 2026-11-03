@@ -29,12 +29,7 @@ import {
   formatNumber,
 } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
-import {
-  isBigScreen,
-  isPaneLayout,
-  openWindow,
-  SIDE_LAYOUT_MEDIA,
-} from "../../Globals";
+import { isBigScreen, openWindow, SIDE_LAYOUT_MEDIA } from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { setSpeed, startTutorial } from "../../reducers/Game";
 import { quitSavedGame, runSaveTransition } from "../../SaveSession";
@@ -50,7 +45,8 @@ import { useOnline } from "./OnlineStatus";
 import { buildSpeedOptions, sharedClockSpeedProps } from "./SpeedControls";
 import MissionSummary from "./MissionSummary";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
-import { acknowledgeEvidence } from "../../reducers/UI";
+import { acknowledgeEvidence, manualHelpOpen } from "../../reducers/UI";
+import { MANUAL_ENTRY } from "./ManualEntries";
 import { openEvidence } from "../../helpers/Evidence";
 import {
   ActiveEventGroupType,
@@ -93,6 +89,7 @@ export interface DispatchProps {
   onEvidence?: (target: EvidenceTargetType) => void;
   onEvidenceAcknowledged?: (request: EvidenceRequestType) => void;
   onManual: () => void;
+  onReserveHelp?: () => void;
   onSettings: () => void;
   onAchievements?: () => void;
   onSavedGames?: () => void;
@@ -104,9 +101,16 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 const LOW_RESERVE_RATIO = 0.1;
+const MINUTES_PER_DAY = 1440;
+/** From 6 PM a same-day blackout reads as "tonight". */
+const EVENING_MINUTE = 18 * 60;
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 /** Status row controls that keep keyboard focus when the row moves into or out of the top bar. */
-const RESTORABLE_STATUS_FOCUS = [".missionRiskButton", ".missionSummaryMonths"];
+const RESTORABLE_STATUS_FOCUS = [
+  ".gridHealthHelp",
+  ".missionRiskButton",
+  ".missionSummaryMonths",
+];
 
 type GridHealthState =
   "stable" | "low-reserve" | "at-limit" | "blackout-ahead" | "blackout";
@@ -146,11 +150,16 @@ export function getGridHealth(
 
   const ahead = projectedShortfall(game.timeline, game.date.minute);
   if (ahead) {
-    const at = formatHour(getDateFromMinute(ahead.minute, game.startingYear));
+    const when = getDateFromMinute(ahead.minute, game.startingYear);
+    const at = formatHour(when);
+    const sameDay =
+      Math.floor(ahead.minute / MINUTES_PER_DAY) ===
+      Math.floor(game.date.minute / MINUTES_PER_DAY);
+    const day = when.minuteOfDay >= EVENING_MINUTE ? "tonight" : "today";
     return {
       state: "blackout-ahead",
-      label: "Blackout ahead",
-      metric: `${formatWatts(ahead.demandW - ahead.supplyW)} short at ${at}`,
+      label: sameDay ? `Blackout ${day} at ${at}` : `Blackout ahead at ${at}`,
+      metric: `${formatWatts(ahead.demandW - ahead.supplyW)} short`,
       announcement: `Blackout expected at ${at}. Demand will be higher than supply.`,
     };
   }
@@ -171,7 +180,7 @@ export function getGridHealth(
     return {
       state: "low-reserve",
       label: "Low reserve",
-      metric: `${formatWatts(reserveW)} reserve (${reservePercent}%)`,
+      metric: `${formatWatts(reserveW)} (${reservePercent}%)`,
       announcement: "Low reserve.",
     };
   }
@@ -184,22 +193,25 @@ export function getGridHealth(
   };
 }
 
-/** "72MW" -> "72 MW", the spacing the status row reads with. */
-function spacedWatts(watts: number): string {
-  return formatWatts(watts).replace(/([kMGT]?W)$/, " $1");
-}
-
 /** The full stable readout, which phones keep behind the icon's tooltip. */
 export function stableGridSummary(
   game: GameType,
   now: TickPresentFutureType,
 ): string {
-  return `Stable, ${spacedWatts(now.demandW)} demand met with ${spacedWatts(
+  return `Stable, ${formatWatts(now.demandW)} demand met with ${formatWatts(
     Math.max(0, reserveCapacityW(game, now)),
   )} reserve`;
 }
 
 const STATUS_TOOLTIP_MS = 2500;
+
+/** Never color or an icon alone: every state that needs attention has a word, even on a phone. */
+const STATUS_WORD: Record<Exclude<GridHealthState, "stable">, string> = {
+  "low-reserve": "Low",
+  "at-limit": "Limit",
+  "blackout-ahead": "Soon",
+  blackout: "Blackout",
+};
 
 /**
  * Grid health on a phone: a fixed-size icon whose tooltip carries the full readout. Hover and
@@ -270,6 +282,11 @@ function CompactGridStatus({
                 />
               )}
             </span>
+            {health.state !== "stable" && (
+              <span className="gridHealthStatusWord">
+                {STATUS_WORD[health.state]}
+              </span>
+            )}
           </button>
         </Tooltip>
       </ClickAwayListener>
@@ -285,8 +302,15 @@ export function GameAppBar(props: Props) {
     onEvidence,
     onEvidenceAcknowledged,
   } = props;
-  const { game, onManual, onNextTutorial, onQuit, onSettings, onSpeedChange } =
-    props;
+  const {
+    game,
+    onManual,
+    onNextTutorial,
+    onQuit,
+    onReserveHelp,
+    onSettings,
+    onSpeedChange,
+  } = props;
   const date = game.date;
   const now = getTimeFromTimeline(date.minute, game.timeline);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<HTMLElement | null>(
@@ -304,7 +328,8 @@ export function GameAppBar(props: Props) {
   const bigScreen = isBigScreen();
   // Tracks resizes even while paused, when the bar otherwise has no reason to re-render.
   const singleRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
-  const showProfit = useMediaQuery("(min-width:1024px)", { noSsr: true });
+  const showProfit = useMediaQuery("(min-width:700px)", { noSsr: true });
+  const roomForStatusText = useMediaQuery("(min-width:600px)", { noSsr: true });
   const monthlyProfit = React.useMemo(
     () =>
       showProfit
@@ -396,6 +421,7 @@ export function GameAppBar(props: Props) {
           data-settings-trigger
           data-saves-trigger
           data-achievements-trigger
+          data-manual-trigger
           className="gameMenuButton"
           onClick={handleMenuClick}
           aria-label="menu"
@@ -496,13 +522,14 @@ export function GameAppBar(props: Props) {
   // Tutorials have no mission row, so the readout would be too short to hold a full-size control;
   // their HUD tells the story instead.
   const activeEvents = (!isTutorial && props.activeEvents) || NO_ACTIVE_EVENTS;
-  // Every phone status uses the same space; changing reserve must not resize the header.
-  const compactStatus = !isPaneLayout();
+  // Phones keep a fixed icon, plus one word whenever the grid needs attention.
+  const compactStatus = !roomForStatusText;
   const summary =
     gridHealth.state === "stable"
       ? stableGridSummary(game, now)
       : `${gridHealth.label}, ${gridHealth.metric}`;
 
+  const yearProgress = `Year ${date.year}: ${Math.round(date.percentOfYear * 100)}% elapsed`;
   const statusRow = (
     <div className="gameStatusBar">
       {compactStatus ? (
@@ -517,7 +544,12 @@ export function GameAppBar(props: Props) {
           role="group"
           aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
         >
-          <div className="gridHealthSummary">
+          <button
+            type="button"
+            className="gridHealthSummary gridHealthHelp"
+            aria-label={`${gridHealth.label}, ${gridHealth.metric}. Open the Reserve manual entry`}
+            onClick={() => onReserveHelp?.()}
+          >
             <span className="statusIcon" aria-hidden="true">
               <ConceptIcon
                 concept={
@@ -531,12 +563,9 @@ export function GameAppBar(props: Props) {
               />
             </span>
             <strong className="gridHealthMetric">
-              {gridHealth.label},{" "}
-              {gridHealth.state === "stable"
-                ? spacedWatts(reserveCapacityW(game, now))
-                : gridHealth.metric}
+              {gridHealth.label}, {gridHealth.metric}
             </strong>
-          </div>
+          </button>
         </div>
       )}
       {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
@@ -558,14 +587,23 @@ export function GameAppBar(props: Props) {
         <Toolbar className={inBlackout ? "blackout-pulsing" : ""}>
           {menu}
           <Typography variant="h6" className="gameStatus">
-            <span className="gameStatusValue">
+            <span
+              className={`gameStatusValue${now.cash < 0 ? " gameCashNegative" : ""}`}
+            >
               {formatMoneyStable(now.cash)}
             </span>
             {showProfit && (
               <Tooltip title="Current month forecast: revenue minus operating expenses, including interest and imports.">
                 <Typography
-                  component="span"
-                  className="gameMonthlyProfit"
+                  // Tutorials lock navigation, so the figure opens nothing there.
+                  {...(isTutorial
+                    ? { component: "span" }
+                    : {
+                        component: "button",
+                        type: "button",
+                        onClick: () => props.onEvidence?.("finances"),
+                      })}
+                  className={`gameMonthlyProfit${isTutorial ? "" : " gameMonthlyProfitButton"}`}
                   color={
                     monthlyProfit < 0
                       ? "error"
@@ -644,7 +682,7 @@ export function GameAppBar(props: Props) {
       <div
         id="yearProgressBar"
         role="progressbar"
-        aria-label="Year progress"
+        aria-label={yearProgress}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(date.percentOfYear * 100)}
@@ -690,6 +728,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onManual: () => {
       dispatch(navigate("MANUAL"));
+    },
+    onReserveHelp: () => {
+      dispatch(manualHelpOpen(MANUAL_ENTRY.RESERVE_CAPACITY));
     },
     onSettings: () => {
       dispatch(navigate("SETTINGS"));

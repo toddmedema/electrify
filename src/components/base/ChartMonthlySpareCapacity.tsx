@@ -102,7 +102,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       },
     ],
     plugins: [
-      bandsPlugin(() => getState().negativeSpans, palette.blackout, 0.15),
+      bandsPlugin(() => getState().negativeSpans, palette.blackout),
       {
         hooks: {
           draw: (plot) => {
@@ -127,7 +127,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
 function tooltip(index: number, state: State): string {
   const point = state.points[index];
   const date = getDateFromMinute(point.minute, state.startingYear);
-  return `${date.month} ${date.year} · ${point.projected ? "Projected" : "Recorded"} monthly minimum\nLowest spare capacity: ${point.value === null ? "Not recorded" : formatWatts(point.value)}`;
+  return `${date.month} ${date.year} · ${point.projected ? "Projected" : "Recorded"} monthly minimum\nLowest reserve: ${point.value === null ? "Not recorded" : formatWatts(point.value)}`;
 }
 
 export default function ChartMonthlySpareCapacity(props: Props) {
@@ -149,7 +149,7 @@ export default function ChartMonthlySpareCapacity(props: Props) {
   return (
     <UPlotChart<State>
       id="chartMonthlySpareCapacity"
-      ariaLabel="Monthly lowest spare capacity. Negative values mean a reserve deficit; positive reserve does not rule out a blackout"
+      ariaLabel="Monthly lowest reserve. Negative values mean a reserve deficit; positive reserve does not rule out a blackout"
       formatSummaryValue={formatWatts}
       interactiveTooltip
       height={props.height}

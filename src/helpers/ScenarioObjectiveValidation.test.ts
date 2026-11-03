@@ -101,34 +101,6 @@ test("keeps overlapping fuel sets and distinct windows separate instead of assum
   ).not.toThrow();
 });
 
-test("required reliability and a stricter optional stretch goal may share an observation window", () => {
-  const required: RuleObjective = {
-    id: "service",
-    label: "Meet service",
-    metric: "monthlyReliability",
-    fromMonth: 1,
-    throughMonth: 12,
-    minDemandServedShare: 0.95,
-  };
-  expect(() =>
-    compileScenarioRules(
-      {
-        objectives: [
-          required,
-          {
-            ...required,
-            id: "stretch",
-            label: "Perfect service",
-            required: false,
-            minDemandServedShare: 1,
-          },
-        ],
-      },
-      parameters,
-    ),
-  ).not.toThrow();
-});
-
 test("reports independent invalid objective windows and rejects metric scope mismatches", () => {
   const late: RuleObjective[] = [
     {

@@ -1,4 +1,4 @@
-import { KeyboardEvent, useEffect, useRef } from "react";
+import { KeyboardEvent, useLayoutEffect, useRef } from "react";
 import { CARD_TRANSITION_ANIMATION_MS } from "../../Constants";
 
 const selector = "button,a[href],input,select,textarea,[role=button]";
@@ -40,7 +40,14 @@ export function restoreMenuFocus(returnSelector: string): void {
   };
   const timer = window.setTimeout(() => {
     cancel();
-    const target = document.querySelector<HTMLElement>(returnSelector);
+    const trigger = document.querySelector<HTMLElement>(returnSelector);
+    const home = trigger?.closest("#menuCard");
+    // Home always starts at the top. Its own menu hook may already have focused that
+    // action (or the player may have moved on), so never overwrite focus within it.
+    if (home?.contains(document.activeElement)) return;
+    const target = home
+      ? home.querySelector<HTMLElement>("[data-main-action]")
+      : trigger;
     if (
       target &&
       !target.closest(unavailable) &&
@@ -73,7 +80,7 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
             .map(controls)
             .filter((items) => items.length)
         : [controls(ref.current)];
-  useEffect(() => {
+  useLayoutEffect(() => {
     const active = document.activeElement;
     if (
       !document.querySelector(popup) &&

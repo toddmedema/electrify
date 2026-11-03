@@ -1,5 +1,6 @@
 import type { AppDispatch } from "../../Store";
 import { connectToStore } from "../base/ConnectToStore";
+import { generatorSizeChanged } from "../../reducers/GameActions";
 import { navigate } from "../../reducers/Card";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
 import { AppStateType, GeneratorShoppingType } from "../../Types";
@@ -20,6 +21,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
+    onSizeChange: () => dispatch(generatorSizeChanged()),
     onEvidenceReady: (request, element) => {
       dispatch(focusEvidence(request, element));
     },

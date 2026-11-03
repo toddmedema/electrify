@@ -54,14 +54,6 @@
   },
   "objectives": [
     {
-      "id": "drought-reliability",
-      "label": "Keep Lusaka supplied",
-      "metric": "monthlyReliability",
-      "fromMonth": 13,
-      "throughMonth": 36,
-      "minDemandServedShare": 0.98
-    },
-    {
       "id": "drought-emissions",
       "label": "Limit drought emissions",
       "metric": "emissionsBudget",

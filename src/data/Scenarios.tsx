@@ -1,8 +1,10 @@
+import { UTILITY_AREAS } from "./UtilityExpansion";
+import { officialRetentionMetadata } from "./OfficialScenarioRules";
 import {
-  officialReliabilityMetadata,
-  officialRetentionMetadata,
-} from "./OfficialScenarioRules";
-import { beginIntertieStress } from "../reducers/GameActions";
+  beginIntertieStress,
+  generatorSizeChanged,
+  prepareStorageReorder,
+} from "../reducers/GameActions";
 import * as React from "react";
 import CustomerGrowthChallenge from "../components/base/CustomerGrowthChallenge";
 
@@ -68,16 +70,16 @@ const latestMonthProfit = (state: AppStateType) => {
 };
 
 const storageCapstoneSucceeded = (state: AppStateType) => {
-  const storage = state.game.facilities.find(
-    (facility) => "currentWh" in facility,
-  );
-  // Authored storage starts empty, so delivered lifetime energy proves that it first charged from
-  // surplus and later discharged. Merely buying a battery cannot satisfy the objective.
-  return !!(
-    storage &&
-    state.game.date.minute >= 1440 &&
-    storage.lifetimeWh > 0 &&
-    !hasBlackout(state)
+  // Early peaks may black out during construction. A fully supplied day after storage
+  // has charged and discharged proves recovery, even if another purchase is still building.
+  return (
+    (state.game.monthlyHistory[0]?.minimumSupplyMarginW ?? -1) >= 0 &&
+    state.game.facilities.some(
+      (facility) =>
+        "currentWh" in facility &&
+        facility.yearsToBuildLeft <= 0 &&
+        facility.lifetimeWh > 0,
+    )
   );
 };
 
@@ -129,7 +131,8 @@ const tutorialSawSafeExport = (state: AppStateType) =>
 const intertiesCapstoneSucceeded = (state: AppStateType) =>
   state.game.date.monthsElapsed >= 14 &&
   tutorialNorthernIntertie(state)?.yearsToBuildLeft === 0 &&
-  state.game.transmission?.tradingPolicy === "BALANCED" &&
+  state.game.transmission?.buyingRule === "SHORTAGES" &&
+  state.game.transmission?.sellingRule === "SURPLUS" &&
   tutorialSawImports(state) &&
   tutorialSawSafeExport(state);
 
@@ -150,7 +153,8 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.07,
     durationMonths: 1,
     endTitle: "Mission complete!",
-    endMessage: "You kept the lights on for a full day.",
+    endMessage:
+      "You learned how to keep electricity supply above demand as the day changes.",
     facilities: [
       // Coal rather than gas: it cannot turn down below its minimum output, so the midday sun
       // pushes supply visibly above demand instead of hiding the supply line under it. Sized so
@@ -172,6 +176,14 @@ export const SCENARIOS: ScenarioType[] = [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
+        hideUi: MISSION_ONE_FIRST_LOOK,
+        action: "Welcome to Electrify",
+        content: (
+          <TutorialPrompt text="You are the CEO of an electricity generation company, and your goal is to keep the lights on without going bankrupt." />
+        ),
+      },
+      {
+        card: "FACILITIES",
         target: '[data-fuel="Coal"] .facilityRowHeader',
         hideUi: MISSION_ONE_FIRST_LOOK,
         advanceOn: (s: AppStateType) =>
@@ -182,14 +194,14 @@ export const SCENARIOS: ScenarioType[] = [
             )?.id,
         action: "Tap your coal plant",
         content: (
-          <TutorialPrompt text="These two plants keep San Francisco’s lights on. The bar shows how hard each is working." />
+          <TutorialPrompt text="These two plants keep your lights on. The bar’s background shows how hard each is working." />
         ),
       },
       {
         card: "FACILITIES",
         target: "#chartSupplyDemand",
         hideUi: MISSION_ONE_FIRST_LOOK,
-        // Every Mission 1 step moves on from a tap on the thing it teaches; reading the chart
+        // Hands-on Mission 1 steps move on from a tap on the thing they teach; reading the chart
         // is the deed here, so touching it (which also shows that moment's readings) continues.
         continueOnClick: "#chartSupplyDemand",
         action: "Tap the supply and demand chart",
@@ -211,7 +223,7 @@ export const SCENARIOS: ScenarioType[] = [
         hideUi: MISSION_ONE_CAPSTONE,
         action: "Reach midnight without a blackout",
         content: (
-          <TutorialPrompt text="Watch coal output climb slowly as sunlight fades." />
+          <TutorialPrompt text="Watch coal output climb slowly as sunlight fades. Reserve is spare power you could add within 15 minutes. Low reserve is a warning, not a blackout." />
         ),
         capstone: {
           // The step before is tapping 1x, so the player arrives with the clock already running.
@@ -222,7 +234,7 @@ export const SCENARIOS: ScenarioType[] = [
             s.game.date.minute >= 1440 && !hasBlackout(s),
           failure: hasBlackout,
           successMessage:
-            "You kept electricity supply above demand for the full day.",
+            "You learned how to keep electricity supply above demand as the day changes.",
           failureMessage:
             "Demand exceeded available supply. Check each plant’s output and the supply chart before you retry.",
         },
@@ -243,7 +255,8 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.07,
     durationMonths: 12,
     endTitle: "Mission complete!",
-    endMessage: "You built your first generator and put it to work.",
+    endMessage:
+      "You learned how to select and build generators that complement your grid’s needs.",
     facilities: [
       {
         assetId: "scenario-1-coal",
@@ -279,6 +292,7 @@ export const SCENARIOS: ScenarioType[] = [
         hideUi: EARLY_MISSION_HIDDEN,
         target: ".constructionCapacitySlider",
         phase: "GENERATOR_CHOICES",
+        advanceOnAction: generatorSizeChanged.type,
         action: "Choose a plant size",
         content: (
           <TutorialPrompt text="Use the size slider to change both cost and build time. Smaller plants cost less and can be built faster." />
@@ -293,7 +307,7 @@ export const SCENARIOS: ScenarioType[] = [
         continueOnClick: '[aria-label^="Review purchase of"]',
         action: "Review a generator purchase",
         content: (
-          <TutorialPrompt text="Compare cost, build time and role to choose a plant for the shortage. Starts and ramping are automatic." />
+          <TutorialPrompt text="Compare cost, build time and role to choose a plant for the shortage." />
         ),
       },
       {
@@ -331,7 +345,7 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
         target: "#yearProgressBar",
-        action: "Watch the year bar advance",
+        action: "Read the year progress bar",
         content: (
           <TutorialPrompt text="This bar tracks the year. Each simulated day represents one month." />
         ),
@@ -347,7 +361,7 @@ export const SCENARIOS: ScenarioType[] = [
           preserveProgress: true,
           success: generatorCapstoneSucceeded,
           successMessage:
-            "Final challenge complete—you ordered two different generator types. Their output and running costs will shape your grid.",
+            "You learned how to select and build generators that complement your grid’s needs.",
           failureMessage:
             "Order a different generator type from your first purchase. Your starting coal plant does not count.",
         },
@@ -366,10 +380,10 @@ export const SCENARIOS: ScenarioType[] = [
     cash: 220000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
-    durationMonths: 6,
+    durationMonths: 24,
     endTitle: "Mission complete!",
     endMessage:
-      "You stored extra energy and put it to work when customers needed it.",
+      "You learned how to store spare electricity and use it to cover peak demand.",
     facilities: [
       {
         assetId: "scenario-2-pumped-hydro",
@@ -410,9 +424,9 @@ export const SCENARIOS: ScenarioType[] = [
         target: '[aria-label^="Review purchase of"]',
         continueOn: (s: AppStateType) => s.game.facilities.length >= 3,
         continueOnClick: '[aria-label^="Review purchase of"]',
-        action: "Review a storage purchase",
+        action: "Purchase a storage facility",
         content: (
-          <TutorialPrompt text="Each storage option has a cash price and loan payments. Charging electricity costs extra." />
+          <TutorialPrompt text="Remember that you still have to provide the electricity to charge it." />
         ),
       },
       {
@@ -430,47 +444,51 @@ export const SCENARIOS: ScenarioType[] = [
         hideUi: EARLY_MISSION_HIDDEN,
         target:
           '.facilityRowHeader[data-storage="true"]:has(.capacityProgressBar)',
+        phase: "STORAGE_ORDER_PREPARE",
+        onNext: () => prepareStorageReorder(),
         action: "Check the storage bar",
         content: (
-          <TutorialPrompt text="The vertical bar shows how much energy is stored (MW hours). The horizontal bar shows you how much energy the plant is currently charging or discharging (MW)." />
+          <TutorialPrompt text="The vertical bar shows energy stored (MWh). The horizontal bar shows charging or discharging (MW)." />
         ),
       },
       {
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
         target: '[aria-label="Reorder Coal"]',
-        nextLabel: "Start final challenge",
-        action: "Check generation comes before storage",
+        advanceOn: (s: AppStateType) => {
+          const coal = s.game.facilities.findIndex(
+            (f) => f.startingAssetId === "scenario-2-coal",
+          );
+          const hydro = s.game.facilities.findIndex(
+            (f) => f.startingAssetId === "scenario-2-pumped-hydro",
+          );
+          return coal >= 0 && hydro >= 0 && coal < hydro;
+        },
+        action: "Drag Coal above Pumped Hydro",
         content: (
-          <TutorialPrompt text="Spare power charges storage only when generation comes first. Charging loses some energy. The challenge clears your practice purchase and restarts with a smaller coal plant." />
+          <TutorialPrompt text="Drag Coal’s handle above Pumped Hydro so spare generation can charge it. Then try a new grid with only a coal plant." />
         ),
       },
       {
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
-        action: "Supply the evening peak with stored energy",
+        action: "Build storage to cover peak demand",
         content: (
-          <TutorialPrompt text="Put Coal above storage to charge from spare generation, then supply the evening peak within two simulated days." />
+          <TutorialPrompt text="Your coal plant cannot cover the peaks. Choose storage that can be ready within two years, then supply a full day without a blackout." />
         ),
         capstone: {
           checkpoint: {
             facilities: [
-              {
-                name: "Pumped Hydro",
-                peakWh: 500000000,
-                initialAgeYears: 35,
-              },
               { fuel: "Coal", peakW: 390000000, initialAgeYears: 25 },
             ],
           },
           success: storageCapstoneSucceeded,
           failure: (s: AppStateType) =>
-            hasBlackout(s) ||
-            (s.game.date.minute >= 2880 && !storageCapstoneSucceeded(s)),
+            s.game.date.monthsElapsed >= 24 && !storageCapstoneSucceeded(s),
           successMessage:
-            "Final challenge complete—the storage charged with extra energy, then supplied the grid during peak demand without a blackout.",
+            "You learned how to store spare electricity and use it to cover peak demand.",
           failureMessage:
-            "The storage did not fill and empty before the deadline, or demand exceeded supply. Check how full it is and the facility order before retrying.",
+            "The grid still has peak shortages after two years. Try faster-building storage with enough output and stored energy to cover the peaks.",
         },
       },
     ],
@@ -490,7 +508,7 @@ export const SCENARIOS: ScenarioType[] = [
     durationMonths: 1,
     endTitle: "Mission complete!",
     endMessage:
-      "You raised enough revenue to cover costs and keep the lights on.",
+      "You learned how to balance revenue and costs to keep your grid profitable.",
     facilities: [
       {
         assetId: "scenario-4-pumped-hydro",
@@ -577,7 +595,7 @@ export const SCENARIOS: ScenarioType[] = [
           failure: (s: AppStateType) =>
             s.game.date.monthsElapsed >= 1 && !financesCapstoneSucceeded(s),
           successMessage:
-            "Final challenge complete—revenue covered fuel and operating costs, leaving a monthly profit while the grid stayed reliable.",
+            "You learned how to balance revenue and costs to keep your grid profitable.",
           failureMessage:
             "Revenue did not cover fuel, operating, and loan costs, or demand exceeded supply. Use the financial layers to set a workable rate before retrying.",
         },
@@ -598,7 +616,8 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.07,
     durationMonths: 12,
     endTitle: "Mission complete!",
-    endMessage: "You won more customers while keeping the business profitable.",
+    endMessage:
+      "You learned how to price electricity to attract customers while covering your costs.",
     facilities: [
       {
         assetId: "scenario-3-pumped-hydro",
@@ -662,7 +681,7 @@ export const SCENARIOS: ScenarioType[] = [
             hasBlackout(s) ||
             (s.game.date.monthsElapsed >= 6 && !pricingCapstoneSucceeded(s)),
           successMessage:
-            "Final challenge complete—the lower rate grew the customer base by 5% while monthly revenue covered costs and supply met demand.",
+            "You learned how to price electricity to attract customers while covering your costs.",
           failureMessage:
             "You need six months of target customer numbers, positive monthly profit and reliable supply. Balance growth and costs before retrying.",
         },
@@ -684,7 +703,7 @@ export const SCENARIOS: ScenarioType[] = [
     durationMonths: 12,
     endTitle: "Mission complete!",
     endMessage:
-      "You used the forecast to prevent a blackout. Time to run your own grid!",
+      "You learned how to use forecasts to build capacity before a shortage.",
     facilities: [
       {
         assetId: "scenario-5-coal",
@@ -731,7 +750,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#chartForecastSupplyDemand",
         action: "Find the predicted blackout",
         content: (
-          <TutorialPrompt text="The chart shows one representative day per month." />
+          <TutorialPrompt text="The chart shows one representative day per month. Supply and demand are estimates, so leave room for forecast error." />
         ),
       },
       {
@@ -741,7 +760,7 @@ export const SCENARIOS: ScenarioType[] = [
           s.game.eventLog.some((event) => event.kind === "BLACKOUT"),
         action: "Tap 1× to observe the blackout",
         content: (
-          <TutorialPrompt text="See what a forecast blackout looks like when it arrives." />
+          <TutorialPrompt text="Insights shows the forecast blackout." />
         ),
       },
       {
@@ -786,16 +805,14 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#insightsNav",
         advanceOn: onInsights,
         action: "Tap Insights",
-        content: (
-          <TutorialPrompt text="Possible fuel costs live in the Insights forecast." />
-        ),
+        content: <TutorialPrompt text="Insights forecasts fuel costs." />,
       },
       {
         card: "INSIGHTS",
         target: "#chartForecastFuelPrices",
         action: "Compare future fuel prices",
         content: (
-          <TutorialPrompt text="Compare possible fuel costs in five years. These examples do not change your game." />
+          <TutorialPrompt text="Compare each fuel’s predicted prices before choosing what to build." />
         ),
       },
       {
@@ -803,7 +820,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#chartForecastWeather",
         action: "Compare weather with demand",
         content: (
-          <TutorialPrompt text="Weather drives demand and renewable output. In this game, emissions affect your score and any carbon fee, not local weather." />
+          <TutorialPrompt text="Weather drives demand and renewable output. Forecasts use seasonal averages farther ahead, while actual weather varies between years. Emissions affect your score and carbon fees, not local weather." />
         ),
       },
       {
@@ -827,7 +844,7 @@ export const SCENARIOS: ScenarioType[] = [
             (s.game.date.monthsElapsed >= 7 &&
               !forecastingCapstoneSucceeded(s)),
           successMessage:
-            "Final challenge complete—construction finished before peak demand, and the added generator prevented the predicted summer shortage.",
+            "You learned how to use forecasts to build capacity before a shortage.",
           failureMessage:
             "Demand exceeded available supply before the new generator was ready. Recheck the forecast shortage and start construction sooner.",
         },
@@ -850,7 +867,7 @@ export const SCENARIOS: ScenarioType[] = [
     intertiesEnabled: true,
     endTitle: "Mission complete!",
     endMessage:
-      "You bought power when you needed it and sold extra without leaving customers short.",
+      "You learned how to trade electricity through interties and keep local backup ready for regional shortages.",
     facilities: [
       // Slightly above the design sketch's 650 MW calibration: the fixed weather seed needs this
       // much nameplate to create observable daytime surplus after customer demand.
@@ -930,12 +947,25 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FACILITIES",
-        target: ".tradingPolicy",
-        advanceOn: (s: AppStateType) =>
-          s.game.transmission?.tradingPolicy === "RELIABILITY_FIRST",
-        action: "Choose “Buy for shortages only”",
+        target: ".tradingRuleFields",
+        action: "Compare Buying and Selling",
         content: (
-          <TutorialPrompt text="This uses the neighboring grid as backup." />
+          <div>
+            <TutorialPrompt text="Buying: “Shortages only” covers customer shortages; “Shortages + Charging” also charges storage after customers are supplied." />
+            <TutorialPrompt text="Selling: “Surplus only” sells leftover power; “All profitable” also increases running plants when prices exceed added costs." />
+            <TutorialPrompt text="“None” turns off either direction." />
+          </div>
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: ".tradingRuleFields",
+        advanceOn: (s: AppStateType) =>
+          s.game.transmission?.buyingRule === "SHORTAGES" &&
+          s.game.transmission?.sellingRule === "NONE",
+        action: "Choose “None” for Selling",
+        content: (
+          <TutorialPrompt text="Keep Buying on “Shortages only” and set Selling to “None” to use the neighboring grid as backup." />
         ),
       },
       {
@@ -998,22 +1028,22 @@ export const SCENARIOS: ScenarioType[] = [
         target: '[data-layer="powerExchange"]',
         action: "Find imports on the chart",
         content: (
-          <TutorialPrompt text="Imports appear alongside your shortage. Line and neighbor limits constrain backup; purchased emissions count in your total." />
+          <TutorialPrompt text="Imports appear alongside your shortage. Line and neighbor limits apply. Purchased emissions count in your total." />
         ),
       },
       {
         card: "FACILITIES",
         action: "Supply your grid while selling surplus solar power",
         content: (
-          <TutorialPrompt text="Choose “Buy for shortages, sell extra” and keep Solar on. Exports use surplus after local demand and storage charging." />
+          <TutorialPrompt text="Choose “Shortages only” for Buying and “Surplus only” for Selling, and keep Solar on. Exports use surplus after local demand and storage charging." />
         ),
         capstone: {
           preserveProgress: true,
           success: intertiesCapstoneSucceeded,
           successMessage:
-            "You bought power at night and sold extra solar by day, while keeping your own grid safe.",
+            "You learned how to buy backup power and sell surplus electricity through interties.",
           failureMessage:
-            "The grid has not safely used both directions yet. Choose the balanced rule, keep Solar on, and run time.",
+            "The grid has not safely used both directions yet. Choose “Shortages only” for Buying and “Surplus only” for Selling, keep Solar on, and run time.",
         },
       },
       {
@@ -1060,7 +1090,7 @@ export const SCENARIOS: ScenarioType[] = [
           success: (s: AppStateType) =>
             s.game.tutorialIntertieStress?.completed === true,
           successMessage:
-            "You kept demand supplied through a regional shortage. The neighbor’s normal supply is restored; imports work best with a prepared local fleet.",
+            "You learned how to trade electricity through interties and keep local backup ready for regional shortages.",
           failureMessage:
             "Keep local backup and Solar available, then run a full supplied month.",
         },
@@ -1395,7 +1425,7 @@ export const SCENARIOS: ScenarioType[] = [
       tone: "storm",
       fantasy: "Keep Austin powered through a brutal winter storm.",
       objective:
-        "Strengthen the grid and keep every customer supplied during the February 2021 freeze.",
+        "Strengthen the grid to supply customers through the February 2021 freeze.",
       threat: "Heating demand surges as equipment freezes.",
     },
     ownership: "Public",
@@ -1410,7 +1440,6 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.09,
     cash: 335000000,
     feePerKgCO2e: 0,
-    reliabilityObjective: officialReliabilityMetadata(107, 2017),
     // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. To keep the
     // starting fleet legible, the sub-5% biomass share is grouped with coal and the sub-5% solar
     // share with wind; the published 3,827 MW total is unchanged.
@@ -1473,7 +1502,7 @@ export const SCENARIOS: ScenarioType[] = [
       tone: "storm",
       fantasy: "Keep Spain powered through a hot, dry summer.",
       objective:
-        "Serve every customer through three months of rising cooling demand and shrinking water supplies.",
+        "Keep power flowing as cooling demand rises and water supplies shrink.",
       threat:
         "Drought leaves less water for hydro. Hot river water also limits reactor cooling, cutting nuclear output.",
     },
@@ -1487,7 +1516,6 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.24,
     cash: 180000000,
     feePerKgCO2e: 50 / 1000,
-    reliabilityObjective: officialReliabilityMetadata(108, 2023),
     // A 1%-scale model of Spain's 2024 national fleet: 32.043GW solar PV, 32.007GW
     // wind, 20.4% combined cycle, 13.3% hydro, 5.5% nuclear, and 3.356GW storage.
     // https://www.ree.es/sites/default/files/2025-02/EN_0402_NP_Solar_FV_kuder_potencia_instalada.pdf
@@ -1568,9 +1596,6 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.14,
     cash: 180000000,
     feePerKgCO2e: 50 / 1000,
-    // The trip can occur from July 2026 through January 2027. Requiring the whole window and
-    // its aftermath keeps the hidden seeded month out of the objective text.
-    reliabilityObjective: officialReliabilityMetadata(110, 2023),
     facilities: [
       {
         assetId: "scenario-110-grand-nuclear-unit",
@@ -1623,7 +1648,7 @@ export const SCENARIOS: ScenarioType[] = [
       fantasy:
         "Keep Los Angeles supplied when wildfire cuts your northern intertie.",
       objective:
-        "Supply at least 99.5% of demand during the January and February 2025 intertie outage.",
+        "Replace lost imports during the January and February 2025 intertie outage.",
       threat: "Your existing northern intertie will lose 90% of its capacity.",
     },
     ownership: "Public",
@@ -1636,7 +1661,6 @@ export const SCENARIOS: ScenarioType[] = [
     feePerKgCO2e: 50 / 1000,
     intertiesEnabled: true,
     startingInterties: ["california-north"],
-    reliabilityObjective: officialReliabilityMetadata(111, 2022),
     // A deliberately import-dependent utility, not LADWP's historical generation portfolio.
     facilities: [
       {
@@ -1709,7 +1733,6 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.07,
     cash: 140000000,
     feePerKgCO2e: 0,
-    reliabilityObjective: officialReliabilityMetadata(113, 2016),
     // One percent of Eskom's 2018 nominal capacity: 38.5GW coal, 1.86GW nuclear at Koeberg,
     // 2.4GW of open-cycle diesel peakers, and the wind and solar the renewable independent power
     // producer programme had delivered by then. https://www.eskom.co.za/dataportal/supply-side/
@@ -1816,13 +1839,6 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.05,
     cash: 90000000,
     feePerKgCO2e: 0,
-    // The only objective in the set that is not a flat 100%. Every other scenario asks the
-    // player to prevent a shortage; this one asks them to hold a grid together through one,
-    // on a fleet whose fuel arrives as rain. A plan good enough to get through the worst of
-    // Kariba still trims a fraction of a percent in the pre-rains months, and failing it for
-    // that is grading the weather rather than the decisions. Passive play sheds 86% in the
-    // October of this year, so this stays a long way from a formality.
-    reliabilityObjective: officialReliabilityMetadata(114, 2012),
     // Twenty percent of Zambia's 2014 fleet: Kariba North Bank at 1,080MW after its extension,
     // Kafue Gorge at 990MW, Victoria Falls at 108MW, and a little emergency diesel. Maamba's
     // coal units had not yet been commissioned, which is what leaves the grid with no reserve.
@@ -1902,7 +1918,6 @@ export const SCENARIOS: ScenarioType[] = [
     cash: 120000000,
     feePerKgCO2e: 0,
     // Delhi set an all-time peak of 8,656MW on 19 June 2024 after weeks above 45C.
-    reliabilityObjective: officialReliabilityMetadata(115, 2018),
     // Ten percent of the capacity tied to Delhi in 2021: its share of central coal stations,
     // the Bawana and Pragati gas plants, allocated Rajasthan and Gujarat wind, and the rooftop
     // and allocated solar that had been built by then.
@@ -1943,6 +1958,37 @@ export const SCENARIOS: ScenarioType[] = [
     endTitle: "The monsoon finally arrived",
     endMessage:
       "Four summers pushed demand higher and higher. See how your grid handled the peak, and what it cost.",
+  },
+  {
+    id: 116,
+    name: "Across the Valley",
+    icon: "across-the-valley",
+    locationId: "BurlingtonVT",
+    location: UTILITY_AREAS.champlain.location,
+    summary:
+      "Connect to your neighbors, acquire a utility, and keep your larger company supplied.",
+    themes: ["Rapid growth"],
+    briefing: {
+      tone: "boom",
+      fantasy: "Build Champlain Electric into a larger Vermont utility.",
+      objective:
+        "Acquire Valley Electric or Ridge Electric by the end of 2014. Retire original Oil A by the end of 2020 and acquired original oil plants by the end of 2023. Retain 90% of your expanded customer base at the end of 2024.",
+      threat:
+        "Compare company terms before connecting. This fictional network-renewal plan raises opening upkeep to 1.5× in 2015 and 2× in 2020, before inflation and customer growth. Valley's nuclear purchase halves in 2017; Champlain's ends in 2020, when Québec and Ridge purchase limits also halve. Plan supply and working capital.",
+    },
+    ownership: "Investor",
+    startingYear: 2005,
+    durationMonths: 240,
+    startingCustomers: UTILITY_AREAS.champlain.customers,
+    startingDemandScale: UTILITY_AREAS.champlain.demandScale,
+    demandShapeExponent: UTILITY_AREAS.champlain.demandShapeExponent,
+    dollarsPerkWh: 0.105,
+    cash: 120e6,
+    feePerKgCO2e: 0,
+    facilities: UTILITY_AREAS.champlain.facilities,
+    endTitle: "A company across the valley",
+    endMessage:
+      "See what expansion cost and how your larger company performed.",
   },
 ];
 

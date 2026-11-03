@@ -23,7 +23,7 @@ import { achievementJournal } from "./Journal";
 import { useAchievements } from "./useAchievements";
 import { retryAchievementSync } from "./Runtime";
 import { useOnline } from "../components/base/OnlineStatus";
-import { useMenuKeys } from "../components/base/useMenuKeys";
+import { restoreMenuFocus, useMenuKeys } from "../components/base/useMenuKeys";
 import { useSwipeToDismiss } from "../components/base/SwipeDismiss";
 
 /** Long enough to read the name and requirement; hover or focus holds it on screen. */
@@ -39,13 +39,7 @@ export function AchievementGallery(): React.JSX.Element {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
     dispatch(navigateBack());
-    window.setTimeout(
-      () =>
-        document
-          .querySelector<HTMLElement>("[data-achievements-trigger]")
-          ?.focus(),
-      350,
-    );
+    restoreMenuFocus("[data-achievements-trigger]");
   };
   const menuKeys = useMenuKeys(true, onBack);
   React.useEffect(() => {
@@ -214,7 +208,7 @@ export function AchievementGallery(): React.JSX.Element {
               <Typography color="text.secondary">
                 {filter === "unlocked"
                   ? "Complete Mission 1: Electricity to earn First Spark."
-                  : "You've earned all 35 achievements."}
+                  : `You've earned all ${catalog.length} achievements.`}
               </Typography>
               <Button onClick={() => setFilter("all")}>
                 Show all achievements

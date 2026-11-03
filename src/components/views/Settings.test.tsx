@@ -1,3 +1,4 @@
+import { login } from "../../Globals";
 import * as React from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -8,6 +9,11 @@ import { clearAppCache } from "../../helpers/Cache";
 import settingsReducer from "../../reducers/Settings";
 import type { DesktopBridge } from "../../Desktop";
 import { updateInputPresentation } from "../../desktop/InputPresentation";
+
+jest.mock("../../Globals", () => ({
+  ...jest.requireActual("../../Globals"),
+  login: jest.fn(async () => true),
+}));
 
 jest.mock("../../AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
@@ -62,6 +68,40 @@ afterEach(() => {
 });
 
 describe("Settings", () => {
+  it("passes only the current mailing-list choice to Google sign-in", async () => {
+    const onLogin = login as jest.Mock;
+    const view = renderSettings();
+    const checkbox = screen.getByRole("checkbox", {
+      name: "Join the Electrify mailing list",
+    });
+    const signIn = screen.getByRole("button", { name: "Sign in with Google" });
+    expect(checkbox).not.toBeChecked();
+    await userEvent.click(signIn);
+    expect(onLogin).toHaveBeenLastCalledWith({
+      provider: "google",
+      mailingList: false,
+    });
+    await userEvent.click(checkbox);
+    await userEvent.click(signIn);
+    expect(onLogin).toHaveBeenLastCalledWith({
+      provider: "google",
+      mailingList: true,
+    });
+    await userEvent.click(checkbox);
+    await userEvent.click(signIn);
+    expect(onLogin).toHaveBeenLastCalledWith({
+      provider: "google",
+      mailingList: false,
+    });
+    view.unmount();
+    renderSettings();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "Join the Electrify mailing list",
+      }),
+    ).not.toBeChecked();
+  });
+
   afterEach(() => {
     act(() => updateInputPresentation({ active: false }));
     delete window.electrifyDesktop;

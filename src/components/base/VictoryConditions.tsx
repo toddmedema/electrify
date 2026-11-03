@@ -1,17 +1,12 @@
 import * as React from "react";
 import { DifficultyType, ScenarioType } from "../../Types";
 import { Box, Typography } from "@mui/material";
-import { objectiveDefinition } from "../../helpers/ScenarioObjectives";
-import {
-  objectiveTargetText,
-  objectiveWindowText,
-} from "../../helpers/ObjectivePresentation";
+import { objectiveGoalText } from "../../helpers/ObjectivePresentation";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import { scoreLabel, scoreRuleText } from "../../helpers/Scoring";
 import {
-  blackoutFiringThreshold,
-  formatRequiredShare,
+  reliabilityRuleText,
   scenarioObjectiveDefinitions,
 } from "../../helpers/ObjectiveRules";
 
@@ -20,7 +15,7 @@ export interface Props {
   difficulty: DifficultyType;
 }
 
-/** Requirements lead; canonical scoring rules and measurement help stay separate. */
+/** Requirements lead, followed by optional goals and canonical scoring rules. */
 export default function VictoryConditions({
   scenario,
   difficulty,
@@ -45,8 +40,7 @@ export default function VictoryConditions({
             {objective.label}
           </Typography>
           <Typography component="p" variant="body2" color="textSecondary">
-            {objectiveTargetText(objective)} ·{" "}
-            {objectiveWindowText(
+            {objectiveGoalText(
               objective,
               scenario.startingYear,
               scenario.durationMonths,
@@ -70,11 +64,7 @@ export default function VictoryConditions({
         </Typography>
         <ul className="victorySurvivalList">
           <li>Finish the term without bankruptcy.</li>
-          <li>
-            Serve at least{" "}
-            {formatRequiredShare(blackoutFiringThreshold(difficulty))} of
-            demand. Three consecutive months below this end the run.
-          </li>
+          <li>{reliabilityRuleText(difficulty)}</li>
         </ul>
         {required.length > 0 && objectiveRows(required)}
       </Box>
@@ -121,20 +111,6 @@ export default function VictoryConditions({
           ))}
         </dl>
       </Box>
-
-      {objectives.length > 0 && (
-        <details className="victoryMeasurementHelp">
-          <summary>How objectives are measured</summary>
-          <dl>
-            {objectives.map((objective) => (
-              <div key={objective.id}>
-                <dt>{objective.label}</dt>
-                <dd>{objectiveDefinition(objective.metric)}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
-      )}
     </div>
   );
 }

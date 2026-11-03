@@ -1,3 +1,4 @@
+import { weatherLocationIds } from "../helpers/WeatherLocations";
 import * as fs from "fs";
 import * as path from "path";
 import { LOCATIONS } from "../Constants";
@@ -71,12 +72,7 @@ export function hasSimWeather(
   }
   const location =
     typeof locationOrId === "string" ? getSimLocation(id) : locationOrId;
-  return [
-    id,
-    ...(location?.watershedId && location.watershedId !== id
-      ? [location.watershedId]
-      : []),
-  ].every((weatherId) =>
+  return weatherLocationIds(location ?? id).every((weatherId) =>
     fs.existsSync(path.join(WEATHER_DIR, `${weatherId}.bin`)),
   );
 }
@@ -99,12 +95,7 @@ export function loadSimData(locationOrId: LocationIdType | LocationType) {
     typeof locationOrId === "string"
       ? getSimLocation(locationId)
       : locationOrId;
-  const weatherIds = [
-    locationId,
-    ...(location?.watershedId && location.watershedId !== locationId
-      ? [location.watershedId]
-      : []),
-  ];
+  const weatherIds = weatherLocationIds(location ?? locationId);
   weatherIds.forEach((id, index) => {
     const file = path.join(DATA_DIR, "weather", `${id}.bin`);
     if (!fs.existsSync(file)) {

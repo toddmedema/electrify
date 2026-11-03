@@ -204,7 +204,7 @@ export const saveDisplayName = createAsyncThunk<
     );
   } catch (err) {
     console.warn("Couldn't save the name: ", err);
-    return rejectWithValue("Couldn't save that name. Please try again.");
+    return rejectWithValue("Couldn't save that name. Try again.");
   }
   // Deliberately not awaited: the name is the player's the moment the profile write completes, and
   // refreshing their old rows is cosmetic

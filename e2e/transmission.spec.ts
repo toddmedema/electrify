@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
 
@@ -31,7 +32,7 @@ test("California players can build and understand an intertie", async ({
   await expect(
     projects.getByRole("heading", { name: "Pacific Northwest", exact: true }),
   ).toBeVisible();
-  await expect(projects.getByLabel("Trading rule")).toHaveCount(0);
+  await expect(projects.getByLabel("Buying")).toHaveCount(0);
   await expect(projects.getByText("Total cost").first()).toBeVisible();
   const northernProject = projects.getByTestId(
     "transmission-project-california-north",
@@ -61,13 +62,15 @@ test("California players can build and understand an intertie", async ({
     })
     .first()
     .click();
-  await expect(page.getByRole("dialog")).toContainText("$10.8M now");
+  const review = page.getByRole("dialog");
+  await expect(review).toContainText("$13.5M now + ");
+  await expect(review.getByText(/^\$13\.5M now \+ /)).toContainText("/mo");
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Take loan" })
     .click();
   await expect(
-    page.getByText("Intertie approved — power can flow in 1 year."),
+    page.getByText("Intertie approved. Online in 17 months."),
   ).toBeVisible();
   await expect(
     facilities.locator("#your-interties-title", { hasText: "Interties" }),
@@ -86,9 +89,74 @@ test("California players can build and understand an intertie", async ({
       rowBox!.y + rowBox!.height / 2 - (chevronBox!.y + chevronBox!.height / 2),
     ),
   ).toBeLessThanOrEqual(1);
-  await expect(facilities.getByLabel("Trading rule")).toContainText(
-    "Buy for shortages, sell extra",
-  );
+  const buying = facilities.getByRole("combobox", {
+    name: "Buying",
+    exact: true,
+  });
+  const selling = facilities.getByRole("combobox", {
+    name: "Selling",
+    exact: true,
+  });
+  await expect(buying).toContainText("Shortages only");
+  await expect(selling).toContainText("Surplus only");
+  const [buyBox, sellBox] = await Promise.all([
+    buying.boundingBox(),
+    selling.boundingBox(),
+  ]);
+  expect(Math.abs(buyBox!.y - sellBox!.y)).toBeLessThanOrEqual(1);
+  expect(sellBox!.x).toBeGreaterThan(buyBox!.x);
+  await buying.click();
+  const buyingOptions = page.getByRole("option");
+  await expect(buyingOptions).toHaveText([
+    "None",
+    "Shortages only",
+    "Shortages + Charging",
+  ]);
+  expect(
+    (await buyingOptions.allTextContents()).every(
+      (text) => text.trim().split(/\s+/).length <= 3,
+    ),
+  ).toBe(true);
+  await page
+    .getByRole("option", { name: "Shortages + Charging", exact: true })
+    .click();
+  await expect(buying).toContainText("Shortages + Charging");
+  await expect(selling).toContainText("Surplus only");
+  await selling.click();
+  const sellingOptions = page.getByRole("option");
+  await expect(sellingOptions).toHaveText([
+    "None",
+    "Surplus only",
+    "All profitable",
+  ]);
+  expect(
+    (await sellingOptions.allTextContents()).every(
+      (text) => text.trim().split(/\s+/).length <= 3,
+    ),
+  ).toBe(true);
+  await page
+    .getByRole("option", { name: "All profitable", exact: true })
+    .click();
+  await expect(buying).toContainText("Shortages + Charging");
+  await expect(selling).toContainText("All profitable");
+  for (const select of [buying, selling]) {
+    expect(
+      await select.evaluate(
+        (element) =>
+          element.scrollWidth <= element.clientWidth + 1 &&
+          element.scrollHeight <= element.clientHeight + 1,
+      ),
+    ).toBe(true);
+  }
+  if (process.env.REVIEW_SCREENSHOT_DIR) {
+    await page.mouse.move(0, 0);
+    await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+  }
+  await reviewScreenshot(facilities, {
+    path: testInfo.outputPath("intertie-trading-rules.png"),
+    animations: "disabled",
+  });
   await expect(
     facilities.getByText("Northern intertie", { exact: true }),
   ).toHaveCount(1);
@@ -214,6 +282,29 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Take loan" })
       .click();
     const line = facilities.locator(".transmissionLine").first();
+    const buying = facilities.getByRole("combobox", {
+      name: "Buying",
+      exact: true,
+    });
+    const selling = facilities.getByRole("combobox", {
+      name: "Selling",
+      exact: true,
+    });
+    const [buyingBox, sellingBox] = await Promise.all([
+      buying.boundingBox(),
+      selling.boundingBox(),
+    ]);
+    expect(Math.abs(buyingBox!.y - sellingBox!.y)).toBeLessThanOrEqual(1);
+    expect(sellingBox!.x).toBeGreaterThan(buyingBox!.x);
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole("tooltip")).toHaveCount(0);
+      await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+    }
+    await reviewScreenshot(facilities.locator(".transmissionFleet"), {
+      path: testInfo.outputPath(`intertie-controls-${theme}.png`),
+      animations: "disabled",
+    });
     await line.getByRole("button", { name: /^Inspect/ }).click();
     await expect(line).toContainText(/Building \d+% · \d+ months? left/);
     await expect(line.locator(".constructionProgress")).toBeVisible();

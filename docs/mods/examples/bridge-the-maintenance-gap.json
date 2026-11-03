@@ -42,14 +42,6 @@
   },
   "objectives": [
     {
-      "id": "maintenance-service",
-      "label": "Keep Manassas supplied",
-      "metric": "monthlyReliability",
-      "fromMonth": 13,
-      "throughMonth": 24,
-      "minDemandServedShare": 0.995
-    },
-    {
       "id": "maintenance-bills",
       "label": "Keep bills affordable",
       "metric": "monthlyBilledRate",

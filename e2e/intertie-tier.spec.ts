@@ -34,7 +34,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     expect(await controlGeometry()).toEqual(generatorGeometry);
     await expect(page.locator(".constructionCapacity strong")).toHaveText(
-      "Tier 1",
+      "Tier I",
     );
     const card = page.getByTestId("transmission-project-california-north");
     const importAccess = card
@@ -60,6 +60,7 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     const slider = page.getByRole("slider");
     await expect(slider).toHaveCount(1);
+    await expect(slider).toHaveAttribute("aria-valuetext", "Tier I");
     const desktop = testInfo.project.use.viewport!.width >= 600;
     const sortControl = () =>
       desktop
@@ -122,6 +123,7 @@ for (const theme of ["light", "dark"] as const) {
     await slider.focus();
     await slider.press("End");
     await expect(slider).toHaveAttribute("aria-valuenow", "4");
+    await expect(slider).toHaveAttribute("aria-valuetext", "Tier IV");
     await expect(card).not.toContainText("Line capacity");
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
@@ -151,7 +153,7 @@ for (const theme of ["light", "dark"] as const) {
       })
       .click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog).toContainText("Tier 4");
+    await expect(dialog).toContainText("Tier IV");
     await expect(dialog).not.toContainText("Line capacity");
     await expect(
       dialog

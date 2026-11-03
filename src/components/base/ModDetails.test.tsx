@@ -20,12 +20,12 @@ const pack: ModPackage = {
   scenario: { durationMonths: 6, startingYear: 2020 },
   objectives: [
     {
-      id: "serve-demand",
-      label: "Serve demand",
-      metric: "monthlyReliability",
+      id: "bills",
+      label: "Keep bills affordable",
+      metric: "monthlyBilledRate",
       fromMonth: 1,
       throughMonth: 6,
-      minDemandServedShare: 0.99,
+      maxDollarsPerKWh: 0.99,
     },
   ],
   facilities: { Solar: { buildCost: 0.8 } },
@@ -61,9 +61,9 @@ test("player details separate author claims from engine facts and hide surprise 
   );
   const goals = screen.getByLabelText("Scenario objectives");
   expect(goals).toBeVisible();
-  expect(goals).toHaveTextContent("Serve demand");
+  expect(goals).toHaveTextContent("Keep bills affordable");
   expect(goals).toHaveTextContent(
-    "Delivered customer electricity divided by customer demand each completed month.",
+    "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
   );
   const timeline = screen.getByLabelText("Announced timeline");
   expect(timeline).toBeVisible();

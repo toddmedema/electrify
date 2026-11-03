@@ -15,6 +15,7 @@ import { refreshToUpdate } from "./helpers/Cache";
 import { getScenario } from "./data/Scenarios";
 import { parseSave, serializeSave } from "./SaveGame";
 import { SaveRepository } from "./SaveRepository";
+import { saveOperationAborted, waitForSaveOperation } from "./SaveOperation";
 import {
   acquireSaveWriterLock,
   supportsSaveWriterLocks,
@@ -510,7 +511,11 @@ export async function releaseDesktopSaveWriter(): Promise<void> {
   // an immediate relaunch can resume; failed native writes leave the live writer intact.
   await active?.release();
 }
-export async function renameSavedGame(id: string, name: string): Promise<void> {
+export function renameSavedGame(id: string, name: string): Promise<void> {
+  return queueSaveMutation(id, () => renameSavedGameNow(id, name));
+}
+
+async function renameSavedGameNow(id: string, name: string): Promise<void> {
   const current = active?.id === id ? active : undefined;
   if (current) {
     current.suspended = true;
@@ -894,35 +899,77 @@ export async function failSaveLoading(
   }
 }
 
-export async function deleteSavedGame(id: string): Promise<void> {
+const saveMutationTails = new Map<string, Promise<void>>();
+
+/** A retry or rename waits for the previous mutation's rollback and writer cleanup. */
+function queueSaveMutation(
+  id: string,
+  operation: () => Promise<void>,
+): Promise<void> {
+  const previous = saveMutationTails.get(id) || Promise.resolve();
+  const mutation = previous.catch(() => undefined).then(operation);
+  saveMutationTails.set(id, mutation);
+  const cleanup = () => {
+    if (saveMutationTails.get(id) === mutation) saveMutationTails.delete(id);
+  };
+  void mutation.then(cleanup, cleanup);
+  return mutation;
+}
+
+export function deleteSavedGame(
+  id: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  return queueSaveMutation(id, () => deleteSavedGameNow(id, signal));
+}
+
+async function deleteSavedGameNow(
+  id: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (signal?.aborted) throw saveOperationAborted();
   const current = active?.id === id ? active : undefined;
   if (current) {
     current.suspended = true;
     try {
-      await current.settle();
-    } catch {
-      /* Delete also covers an unsaved pending run. */
-    }
-    try {
-      if (current.created) await repository.delete(id, current.mutationLease);
+      try {
+        await waitForSaveOperation(current.settle(), signal);
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        /* Delete also covers an unsaved pending run or a failed snapshot. */
+      }
+      if (signal?.aborted) throw saveOperationAborted();
+      if (active !== current)
+        throw new SaveRepositoryError(
+          "conflict",
+          "The current game changed. Try deleting this save again.",
+        );
+      if (current.created)
+        await repository.delete(id, current.mutationLease, signal);
     } catch (error) {
       current.suspended = false;
-      current.capture(getStore().getState().game);
+      if (active === current) current.capture(getStore().getState().game);
       throw error;
     }
-    await current.releaseWriterLock();
-    active = undefined;
-    forgetWriter();
-    showActive();
-    replacing = true;
-    try {
-      getStore().dispatch(quit());
-      getStore().dispatch(navigate("SAVED_GAMES"));
-    } finally {
-      replacing = false;
+    // Once deletion commits, retire this writer immediately. Cleanup cannot keep the dialog
+    // busy or later close a different game started after the UI's deadline.
+    void current.releaseWriterLock().catch(() => undefined);
+    if (active === current) {
+      active = undefined;
+      forgetWriter();
+      showActive();
+      replacing = true;
+      try {
+        getStore().dispatch(quit());
+        getStore().dispatch(navigate("SAVED_GAMES"));
+      } finally {
+        replacing = false;
+      }
     }
-  } else await repository.delete(id);
-  await refreshSavedGames();
+  } else await repository.delete(id, undefined, signal);
+  // Catalogue reads and cloud cleanup are refresh work, not part of the indexed delete.
+  // Awaiting getAll here could leave a committed deletion stuck on "Deleting…" indefinitely.
+  void refreshSavedGames();
   requestCloudSave(id);
 }
 

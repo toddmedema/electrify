@@ -1,6 +1,7 @@
 import { UnknownAction } from "@reduxjs/toolkit";
 import { SCENARIOS } from "../data/Scenarios";
 import { reprioritizeFacility, togglePauseFacility } from "../reducers/Game";
+import { generatorSizeChanged } from "../reducers/GameActions";
 import type { AppDispatch } from "../Store";
 import { CardNameType, NavigateActionType, TutorialStepType } from "../Types";
 import { mapDispatchToProps } from "./CompositorContainer";
@@ -217,6 +218,7 @@ describe("onTutorialStep", () => {
 describe("walkthrough steps", () => {
   const tutorials = SCENARIOS.filter((s) => s.tutorialSteps);
   const actionGateTypes = new Set<string>([
+    generatorSizeChanged.type,
     reprioritizeFacility.type,
     togglePauseFacility.type,
   ]);

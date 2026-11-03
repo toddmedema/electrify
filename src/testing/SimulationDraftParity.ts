@@ -7,17 +7,19 @@ import { runSimulation, SimOptionsType } from "./Simulator";
 export function expectDraftParity(options: SimOptionsType) {
   const expected = runSimulation(options);
   const tickState = Game.tickState;
-  const spy = jest.spyOn(Game, "tickState").mockImplementation((state) => {
-    const next = createNextState(state, (draft: GameType) => {
-      tickState(draft);
+  const spy = jest
+    .spyOn(Game, "tickState")
+    .mockImplementation((state, saveEffects, onCompletedMonth) => {
+      const next = createNextState(state, (draft: GameType) => {
+        tickState(draft, saveEffects, onCompletedMonth);
+      });
+      // The harness holds its mutable outer object between ticks. Its nested outputs are the
+      // frozen reducer result, so each later draft must correctly isolate its mutation too.
+      Object.keys(state).forEach((key) => {
+        if (!(key in next)) Reflect.deleteProperty(state, key);
+      });
+      Object.assign(state, next);
     });
-    // The harness holds its mutable outer object between ticks. Its nested outputs are the
-    // frozen reducer result, so each later draft must correctly isolate its mutation too.
-    Object.keys(state).forEach((key) => {
-      if (!(key in next)) Reflect.deleteProperty(state, key);
-    });
-    Object.assign(state, next);
-  });
   try {
     const actual = runSimulation(options);
     expect(spy).toHaveBeenCalled();

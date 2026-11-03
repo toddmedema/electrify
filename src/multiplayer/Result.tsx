@@ -16,8 +16,8 @@ import { useAppSelector } from "../Store";
 import { formatMoneyConcise, formatPercent } from "../helpers/Format";
 import { formatLargeMassValueConcise, largeMassUnit } from "../helpers/Units";
 import {
+  finishedObjectiveStatusText,
   objectiveObservedText,
-  objectiveStatusText,
   objectiveTargetText,
   objectiveWindowText,
 } from "../helpers/ObjectivePresentation";
@@ -147,7 +147,7 @@ export default function CoopResult({
                 >
                   <Typography variant="subtitle2">
                     {result.label} · {result.required ? "Required" : "Optional"}{" "}
-                    · {objectiveStatusText[result.status]}
+                    · {finishedObjectiveStatusText[result.status]}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {result.definition}

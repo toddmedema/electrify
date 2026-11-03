@@ -1,3 +1,4 @@
+import { login } from "../../Globals";
 import { captureRunIdentity } from "../../helpers/RunIdentity";
 import { SCENARIOS } from "../../data/Scenarios";
 import * as React from "react";
@@ -5,6 +6,11 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import VictoryDialog, { Props } from "./VictoryDialog";
 import { VictoryType } from "../../Types";
+
+jest.mock("../../Globals", () => ({
+  ...jest.requireActual("../../Globals"),
+  login: jest.fn(async () => true),
+}));
 
 const mockFetchGlobalRank = jest.fn();
 jest.mock("./ResultLeaderboard", () => ({
@@ -72,6 +78,23 @@ beforeEach(() => {
 });
 
 describe("VictoryDialog", () => {
+  it.each([false, true])(
+    "passes mailing-list choice %s from the result invitation",
+    async (mailingList) => {
+      const onLogin = login as jest.Mock;
+      renderDialog({ loggedIn: false });
+      const checkbox = screen.getByRole("checkbox", {
+        name: "Join the Electrify mailing list",
+      });
+      expect(checkbox).not.toBeChecked();
+      if (mailingList) await userEvent.click(checkbox);
+      await userEvent.click(
+        screen.getByRole("button", { name: "Sign in with Google" }),
+      );
+      expect(onLogin).toHaveBeenCalledWith({ provider: "google", mailingList });
+    },
+  );
+
   it("shows the played scenario and difficulty's board to guests after completion", () => {
     renderDialog({ loggedIn: false, victory: aVictory({ ranked: false }) });
     expect(

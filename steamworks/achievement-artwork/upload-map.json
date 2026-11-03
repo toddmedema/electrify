@@ -297,9 +297,18 @@
     "unachieved": "uploads/BEAT_THE_HEAT_UNACHIEVED.png"
   },
   {
+    "apiName": "ACROSS_THE_VALLEY",
+    "name": "Across the Valley",
+    "description": "Successfully finish Across the Valley on any difficulty.",
+    "source": "public/images/across-the-valley.svg",
+    "sourceSha256": "4e427ef5e03c8e011df05d3ea774b2848552cc90c3dea464b2aa785631e0ce95",
+    "achieved": "uploads/ACROSS_THE_VALLEY_ACHIEVED.png",
+    "unachieved": "uploads/ACROSS_THE_VALLEY_UNACHIEVED.png"
+  },
+  {
     "apiName": "MASTER_OF_THE_GRID",
     "name": "Master of the Grid",
-    "description": "Successfully finish all 14 official scenarios on CEO.",
+    "description": "Successfully finish all 15 official scenarios on CEO.",
     "source": "public/images/achievement-master-of-the-grid.svg",
     "sourceSha256": "37683077455b2a2c08ab6412b964514000ece40b08c4b297fe10c7fdd8981606",
     "achieved": "uploads/MASTER_OF_THE_GRID_ACHIEVED.png",

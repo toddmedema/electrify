@@ -35,7 +35,8 @@ import { normalAt, randomAt, RANDOM_STREAM } from "./Math";
 import {
   AdjacentMarketDefinitionType,
   GameType,
-  TradingPolicyType,
+  BuyingRuleType,
+  SellingRuleType,
   TransmissionCorridorDefinitionType,
   TransmissionLineOperatingType,
 } from "../Types";
@@ -145,6 +146,7 @@ export function intertieContextForGame(
         | "tutorialIntertieStress"
         | "startingYear"
         | "multiplayer"
+        | "utilityExpansion"
       >
     >,
 ): IntertieContext {
@@ -155,6 +157,7 @@ export function intertieContextForGame(
       location: game.location,
       customScenario: game.customScenario,
       multiplayer: game.multiplayer,
+      utilityExpansion: game.utilityExpansion,
     }),
     tutorialSupplyLimitW: game.tutorialIntertieStress?.active
       ? 150e6
@@ -585,12 +588,22 @@ export function allocateIntertieFlows(
   return { importedW: imports, exportedW: exports };
 }
 
-export function allowsImports(policy: TradingPolicyType): boolean {
-  return policy === "BALANCED" || policy === "RELIABILITY_FIRST";
+export function allowsImports(rule: BuyingRuleType): boolean {
+  return rule !== "NONE";
 }
 
-export function allowsExports(policy: TradingPolicyType): boolean {
-  return policy === "BALANCED" || policy === "SURPLUS_ONLY";
+export function allowsExports(rule: SellingRuleType): boolean {
+  return rule !== "NONE";
+}
+
+/** Normalize arithmetic dust at a fully served load boundary without hiding a real flow. */
+export function supplyAtDemandBoundary(
+  supplyW: number,
+  demandW: number,
+): number {
+  const roundingSlack =
+    Number.EPSILON * Math.max(1, Math.abs(supplyW), Math.abs(demandW)) * 8;
+  return Math.abs(supplyW - demandW) <= roundingSlack ? demandW : supplyW;
 }
 
 export function clearTransmissionMarket({
@@ -599,39 +612,112 @@ export function clearTransmissionMarket({
   capacityW,
   importLimitW,
   exportLimitW,
-  policy,
+  buyingRule,
+  sellingRule,
+  storageChargeW = 0,
 }: {
   localSupplyW: number;
   demandW: number;
   capacityW: number;
   importLimitW: number;
   exportLimitW: number;
-  policy: TradingPolicyType;
-}): { importedW: number; exportedW: number; localAvailableSupplyW: number } {
+  buyingRule: BuyingRuleType;
+  sellingRule: SellingRuleType;
+  storageChargeW?: number;
+}): {
+  importedW: number;
+  storageImportedW: number;
+  exportedW: number;
+  localAvailableSupplyW: number;
+} {
   const shortageW = Math.max(0, demandW - localSupplyW);
-  const importedW = allowsImports(policy)
+  const customerImportedW = allowsImports(buyingRule)
     ? Math.min(shortageW, capacityW, importLimitW)
     : 0;
+  const storageImportedW =
+    buyingRule === "SHORTAGES_AND_STORAGE" && customerImportedW >= shortageW
+      ? Math.min(
+          Math.max(0, storageChargeW),
+          Math.max(0, capacityW - customerImportedW),
+          Math.max(0, importLimitW - customerImportedW),
+        )
+      : 0;
+  const importedW = customerImportedW + storageImportedW;
   const exportedW =
-    importedW === 0 && allowsExports(policy)
+    importedW === 0 && allowsExports(sellingRule)
       ? Math.min(
           Math.max(0, localSupplyW + importedW - demandW),
           capacityW - importedW,
           exportLimitW,
         )
       : 0;
-  const availableW = localSupplyW + importedW - exportedW;
-  const roundingSlack =
-    Number.EPSILON * Math.max(1, Math.abs(availableW), Math.abs(demandW)) * 8;
+  const availableW = localSupplyW + customerImportedW - exportedW;
   return {
     importedW,
+    storageImportedW,
     exportedW,
     // Adding a computed deficit back to local supply can round a fraction of a watt
     // below demand and trigger a false blackout. Fully covered demand is exact;
     // capped imports retain the real shortage.
-    localAvailableSupplyW:
-      Math.abs(availableW - demandW) <= roundingSlack ? demandW : availableW,
+    localAvailableSupplyW: supplyAtDemandBoundary(availableW, demandW),
   };
+}
+
+/** Preserve the exact line match: a skipped low-paying line must not receive the cleared total. */
+export function allocateProfitableExports(
+  offers: readonly IntertieOffer[],
+  surplusW: number,
+  generators: readonly { watts: number; costPerMWh: number }[],
+): { exportedW: number[]; generationW: number[] } {
+  const exportedW = allocateIntertieFlows(offers, 0, surplusW).exportedW;
+  const generationW = generators.map(() => 0);
+  const marketUsed = new Map<string, number>();
+  const accessUsed = new Map<string, number>();
+  offers.forEach((offer, i) => {
+    if (offer.marketId)
+      marketUsed.set(
+        offer.marketId,
+        (marketUsed.get(offer.marketId) || 0) + exportedW[i],
+      );
+    if (offer.accessId)
+      accessUsed.set(
+        offer.accessId,
+        (accessUsed.get(offer.accessId) || 0) + exportedW[i],
+      );
+  });
+  offers.forEach((offer, i) => {
+    let room = Math.max(
+      0,
+      Math.min(
+        offer.exportLimitW - exportedW[i],
+        (offer.marketExportLimitW ?? Infinity) -
+          (offer.marketId ? marketUsed.get(offer.marketId) || 0 : 0),
+        (offer.accessExportLimitW ?? Infinity) -
+          (offer.accessId ? accessUsed.get(offer.accessId) || 0 : 0),
+      ),
+    );
+    generators.forEach((generator, g) => {
+      if (!(offer.pricePerMWh > generator.costPerMWh)) return;
+      const watts = Math.min(
+        room,
+        Math.max(0, generator.watts - generationW[g]),
+      );
+      room -= watts;
+      exportedW[i] += watts;
+      generationW[g] += watts;
+      if (offer.marketId)
+        marketUsed.set(
+          offer.marketId,
+          (marketUsed.get(offer.marketId) || 0) + watts,
+        );
+      if (offer.accessId)
+        accessUsed.set(
+          offer.accessId,
+          (accessUsed.get(offer.accessId) || 0) + watts,
+        );
+    });
+  });
+  return { exportedW, generationW };
 }
 
 /**
@@ -746,6 +832,8 @@ export function intertieUpgradeQuote(
   buildTimeMultiplier = 1,
   context?: IntertieAccessContext,
 ): IntertieUpgradeQuote | undefined {
+  if (context?.ownedUtilityCorridors?.includes(line.corridorId))
+    return undefined;
   const corridor = effectiveCorridor(line.corridorId, context);
   if (!corridor) return undefined;
   const step = intertieUpgradeCount(line, context);

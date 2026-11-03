@@ -35,12 +35,20 @@ export const purchaseFacility =
         .submit({
           kind: "action",
           name: "buildFacility",
-          payload: { facility, financed },
+          payload: {
+            facility,
+            financed,
+          },
         })
         .then(acknowledge)
         .catch(() => undefined);
     } else {
-      dispatch(buildFacility({ facility, financed }));
+      dispatch(
+        buildFacility({
+          facility,
+          financed,
+        }),
+      );
       acknowledge();
     }
   };

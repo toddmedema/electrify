@@ -50,13 +50,6 @@ const pack = (items: RuleObjective[] = []): ModPackage =>
 const window = { fromMonth: 1, throughMonth: 6 };
 const goals: RuleObjective[] = [
   {
-    id: "reliable",
-    label: "Serve demand",
-    metric: "monthlyReliability",
-    ...window,
-    minDemandServedShare: 1,
-  },
-  {
     id: "retained",
     label: "Retain customers",
     metric: "customerRetention",
@@ -122,7 +115,7 @@ const restore = (state: GameType) => {
 const now = (state: GameType) =>
   getTimeFromTimeline(state.date.minute, state.timeline)!;
 
-test("all eight objectives observe real completed months and survive save/resume with trimmed presentation history", () => {
+test("all seven objectives observe real completed months and survive save/resume with trimmed presentation history", () => {
   const full = game();
   const resumed = restore(full);
   expect(
@@ -365,7 +358,7 @@ test("save validation rejects missing, edited, mismatched and contradictory obje
 });
 
 test("a self-consistent forged progress chain cannot contradict retained accounting facts", () => {
-  const state = game(pack([goals[6]]));
+  const state = game(pack([goals[5]]));
   runMonths(state, 1);
   const scenario = state.customScenario!,
     objectives = scenarioObjectiveDefinitions(scenario),
@@ -389,7 +382,7 @@ test("a self-consistent forged progress chain cannot contradict retained account
 });
 
 test("absent-fuel retirement is a warning that never blocks launching", () => {
-  const input = pack([goals[5]]);
+  const input = pack([goals[4]]);
   expect(modValidationDiagnostics(input)).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
@@ -412,7 +405,7 @@ test("generic UI deltas cannot replace authoritative objective progress", () => 
 });
 
 test("save validation rejects a consistent progress chain omitting a known retained month", () => {
-  const state = game(pack([goals[6]]));
+  const state = game(pack([goals[5]]));
   runMonths(state, 2);
   const scenario = state.customScenario!,
     objectives = scenarioObjectiveDefinitions(scenario),

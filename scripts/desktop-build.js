@@ -15,12 +15,9 @@ function desktopBuild() {
     "scripts/generate-icon-manifest.js",
     "scripts/generate-steam-localization.js",
     "scripts/generate-achievements.js",
-    "node_modules/react-scripts/bin/react-scripts.js",
+    "scripts/production-build.js",
   ]) {
-    const arguments_ = script.includes("react-scripts")
-      ? [script, "build"]
-      : [script];
-    const result = spawnSync(process.execPath, arguments_, {
+    const result = spawnSync(process.execPath, [script], {
       stdio: "inherit",
       env: {
         ...process.env,

@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import {
@@ -249,9 +255,11 @@ it("refocuses and scrolls to the entry already in focus after search hid it", as
   clearManualMemory();
   renderManual(MANUAL_ENTRY.POWER_AND_ENERGY);
   search("round-trip");
-  const scrollIntoView = jest.fn();
-  const original = HTMLElement.prototype.scrollIntoView;
-  HTMLElement.prototype.scrollIntoView = scrollIntoView;
+  const originalScrollTop = document.documentElement.scrollTop;
+  document.documentElement.scrollTop = 500;
+  const geometry = jest
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockReturnValue({ top: 400 } as DOMRect);
   try {
     await userEvent.click(screen.getByRole("link", { name: "power rating" }));
     expect(screen.getByLabelText("Search the manual")).toHaveValue("");
@@ -260,8 +268,9 @@ it("refocuses and scrolls to the entry already in focus after search hid it", as
       expanded: true,
     });
     expect(heading).toHaveFocus();
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+    await waitFor(() => expect(document.documentElement.scrollTop).toBe(868));
   } finally {
-    HTMLElement.prototype.scrollIntoView = original;
+    geometry.mockRestore();
+    document.documentElement.scrollTop = originalScrollTop;
   }
 });

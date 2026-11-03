@@ -4,6 +4,7 @@ import {
   feeableKgCO2ePerBtu,
   HOURS_PER_YEAR_REAL,
   LOAN_MONTHS,
+  TICKS_PER_MONTH,
 } from "../Constants";
 import {
   DateType,
@@ -117,6 +118,21 @@ export function getPaymentInterest(
 ): number {
   const monthlyRate = interestRate / 12;
   return balance * monthlyRate;
+}
+
+/** Reachable balance of the live tick-amortized loan owner; there is no corporate prepayment action. */
+export function loanBalanceAfterTicks(
+  principal: number,
+  monthlyPayment: number,
+  interestRate: number,
+  ticks: number,
+): number {
+  if (!(ticks > 0)) return principal;
+  const rate = interestRate / (12 * TICKS_PER_MONTH);
+  const payment = monthlyPayment / TICKS_PER_MONTH;
+  if (rate === 0) return Math.max(0, principal - payment * ticks);
+  const factor = pow(1 + rate, ticks);
+  return Math.max(0, principal * factor - (payment * (factor - 1)) / rate);
 }
 
 // What a lender looks at, and roughly what it is looking for. A company clearing all four pays

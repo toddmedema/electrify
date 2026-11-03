@@ -1,5 +1,6 @@
 import { createGame, runSimulation } from "./Simulator";
 import { SCENARIOS } from "../data/Scenarios";
+import { hasChronicBlackouts } from "../helpers/ObjectiveRules";
 import { expectNoViolations } from "./SimulationTestHelpers";
 import reducer, { buildFacility, sellFacility } from "../reducers/Game";
 import { GENERATORS } from "../data/Facilities";
@@ -42,7 +43,7 @@ it.each(classics)(
   },
 );
 
-it("allows a solvent price-only plan that retains its customers", () => {
+it("a solvent price-only plan can still fail the shared reliability rule", () => {
   const run = runSimulation({
     scenarioId: 100,
     difficulty: "Employee",
@@ -50,5 +51,7 @@ it("allows a solvent price-only plan that retains its customers", () => {
     waiveDecisionGate: true,
   });
   expectNoViolations(run);
-  expect(run.outcome).toBe("completed");
+  expect(run.outcome).toBe("fired");
+  expect(run.finalCash).toBeGreaterThan(0);
+  expect(hasChronicBlackouts([...run.months].reverse(), "Employee")).toBe(true);
 });

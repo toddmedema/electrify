@@ -27,9 +27,15 @@ export type MonthType =
 export type DifficultyType = "Intern" | "Employee" | "Manager" | "VP" | "CEO";
 export type SpeedType = "PAUSED" | "SLOW" | "NORMAL" | "FAST" | "ULTRA";
 
-/** How an intertie may trade with neighbouring electricity markets. */
-export type TradingPolicyType =
-  "BALANCED" | "RELIABILITY_FIRST" | "SURPLUS_ONLY" | "CLOSED";
+/** Independent permissions for optional market and peer trading. */
+export const BUYING_RULES = [
+  "NONE",
+  "SHORTAGES",
+  "SHORTAGES_AND_STORAGE",
+] as const;
+export type BuyingRuleType = (typeof BUYING_RULES)[number];
+export const SELLING_RULES = ["NONE", "SURPLUS", "PROFITABLE"] as const;
+export type SellingRuleType = (typeof SELLING_RULES)[number];
 
 /** Authored facts about a neighbouring wholesale electricity market. */
 export interface AdjacentMarketDefinitionType {
@@ -113,7 +119,8 @@ export interface IntertieUpgradeType {
 }
 
 export interface TransmissionStateType {
-  tradingPolicy: TradingPolicyType;
+  buyingRule: BuyingRuleType;
+  sellingRule: SellingRuleType;
   lines: TransmissionLineOperatingType[];
 }
 
@@ -424,7 +431,10 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     rooftopSolarW?: number;
     supplyByFuel: FuelProductionType;
     /** Positive gross flow into/out of the player's grid during this tick. */
+    entitlementImportedW?: number;
+    entitlementImportCapacityW?: number;
     importedW?: number;
+    storageImportedW?: number; // Subset of imports consumed by utility storage, not customers.
     exportedW?: number;
     transmissionCapacityW?: number;
     /** Resolved route restrictions shared by dispatch and intertie forecasts. */
@@ -723,6 +733,7 @@ export interface TutorialStepType {
   // Runtime restrictions follow authored phases rather than positions in the walkthrough.
   phase?:
     | "GENERATOR_CHOICES"
+    | "STORAGE_ORDER_PREPARE"
     | "INTERTIE_STRESS_PREPARE"
     | "INTERTIE_STRESS_INSPECT"
     | "INTERTIE_STRESS_SUPPLY";
@@ -947,18 +958,6 @@ export interface ScenarioType {
   loadAdditions?: ScenarioLoadAdditionType[];
   /** Optional mission gate evaluated at the authored end date. */
   minimumCustomerRetention?: number;
-  /** Optional requirement to serve a specific month without falling below a reliability target. */
-  reliabilityObjective?: {
-    year: number;
-    month: number;
-    /** Consecutive calendar months that must each meet the target. Defaults to one. */
-    durationMonths?: number;
-    minimumDemandServed: number;
-    /** Noun phrase naming the event window, read inside sentences: "during the {label}". */
-    label: string;
-    /** Imperative pinned-goal heading in sentence case, e.g. "Keep the lights on through the freeze". */
-    goal?: string;
-  };
   dollarsPerkWh: number;
   durationMonths: number;
   endTitle?: string;
@@ -1221,6 +1220,8 @@ export interface PolicyChangeType {
 export interface PeerPlan {
   offerW: number;
   shortageW: number;
+  /** Optional utility-storage charging, always subordinate to customer shortages. */
+  storageChargeW?: number;
   pricePerMWh: number;
   temperatureC: number;
   solarIrradianceWM2: number;
@@ -1251,10 +1252,48 @@ export interface CompanyResultType extends CompanyOutcomeType {
 /** What the shared market delivered to one grid this tick. */
 export interface PeerSettlement {
   importedW: number;
+  /** The part of importedW consumed by utility storage rather than customers. */
+  storageImportedW?: number;
   exportedW: number;
   importEmissionsKgPerMWh: number;
 }
+export type UtilityId = "champlain" | "valley-electric" | "ridge-electric";
+export type UtilityTargetId = Exclude<UtilityId, "champlain">;
+export interface AcquisitionLoan {
+  id: string;
+  targetId: UtilityTargetId;
+  kind: "purchase" | "assumed";
+  principal: number;
+  loanAmountLeft: number;
+  loanMonthlyPayment: number;
+  interestRate: number;
+  months: number;
+  minuteCreated: number;
+}
+export interface UtilityNetworkAsset {
+  targetId: UtilityTargetId;
+  activatedMinute: number;
+  initialValue: number;
+  retentionLowWatermark: number;
+}
+export interface UtilityExpansionState {
+  networkAssets: UtilityNetworkAsset[];
+  loans: AcquisitionLoan[];
+  acquisitions: {
+    targetId: UtilityTargetId;
+    minute: number;
+    financed: boolean;
+    /** Immutable seller accounts transferred, not a separately simulated customer population. */
+    transferredCustomers: number;
+  }[];
+}
+export interface AcquireUtilityAction {
+  targetId: UtilityTargetId;
+  financed: boolean;
+  quoteKey: string;
+}
 export interface GameType {
+  utilityExpansion?: UtilityExpansionState;
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {
     seat: string;
@@ -1310,10 +1349,10 @@ export interface GameType {
   feePerKgCO2e: number;
   dollarsPerkWh: number;
   /**
-   * A public utility's rate tracks its inflating target each month until the player sets one.
-   * Absent in saves from before the option existed, which keep the rate they chose.
+   * A public utility's rate follows inflation, stepping up each January until the player sets
+   * one by hand. Absent in saves from before the option existed, which keep the rate they chose.
    */
-  rateFollowsTarget?: boolean;
+  rateFollowsInflation?: boolean;
   // Customer price competition starts from the scenario's rate and half of this addressable pool.
   /** The last month offered a cash warning; persisted so reloading cannot repeat it. */
   lowCashWarningMonth?: number;
@@ -1418,6 +1457,7 @@ export interface DialogType {
   closeText?: string;
   // A milestone worth celebrating, where offering to install the app lands well
   offerInstall?: boolean;
+  tutorialComplete?: boolean;
   open: boolean;
 }
 
@@ -1427,6 +1467,8 @@ export interface SnackbarType {
   open: boolean;
   message: string;
   timeout: number;
+  /** Feedback from the open dialog itself, which would otherwise wait for it to close. */
+  overModal?: boolean;
 }
 
 /**

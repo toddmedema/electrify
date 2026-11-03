@@ -8,6 +8,15 @@ import {
   EvidenceRequestType,
 } from "../Types";
 import { launchRun, quit, start, resume, loaded } from "./GameActions";
+import {
+  manualHelpOpen,
+  manualHelpClose,
+  dialogOpen,
+  dialogClose,
+  snackbarOpen,
+  victoryOpen,
+  victoryClose,
+} from "./GameActions";
 import { navigate, navigateBack } from "./Card";
 
 // Re-evaluate layout-dependent tutorial gates even while the simulation is paused.
@@ -22,7 +31,7 @@ export const initialUI: UIType = {
   snackbar: {
     message: "",
     open: false,
-    timeout: 6000,
+    timeout: 3500,
   },
   victory: null,
   selectedFacilityId: null,
@@ -62,55 +71,11 @@ export const uiSlice = createSlice({
         delete state.evidenceRequest;
       }
     },
-    manualHelpOpen: (state, action: PayloadAction<string>) => {
-      state.manualHelpEntry = action.payload;
-    },
-    manualHelpClose: (state) => {
-      delete state.manualHelpEntry;
-    },
     delta: (state, action: PayloadAction<Partial<UIType>>) => {
       return { ...state, ...action.payload };
     },
-    snackbarOpen: (state, action: PayloadAction<string | SnackbarType>) => {
-      if (typeof action.payload === "string") {
-        return {
-          ...state,
-          snackbar: {
-            message: action.payload,
-            open: true,
-            timeout: initialUI.snackbar.timeout,
-          },
-        };
-      } else if (action.payload.message && action.payload.message !== "") {
-        return {
-          ...state,
-          snackbar: {
-            message: action.payload.message,
-            open: true,
-            timeout: action.payload.timeout || initialUI.snackbar.timeout,
-            action: action.payload.action,
-            actionLabel: action.payload.actionLabel,
-          },
-        };
-      }
-    },
     snackbarClose: (state) => {
       state.snackbar = { ...initialUI.snackbar };
-    },
-    dialogOpen: (state, action: PayloadAction<DialogType>) => {
-      state.dialog = { ...action.payload };
-    },
-    dialogClose: (state) => {
-      state.dialog = { ...initialUI.dialog };
-    },
-    // The score screen for a run that just ended. Separate from dialogOpen because the victory
-    // dialog is a component rather than a title and a message: it fills in the personal best and
-    // the global rank as those resolve, which a snapshot of JSX cannot do
-    victoryOpen: (state, action: PayloadAction<VictoryType>) => {
-      state.victory = { ...action.payload };
-    },
-    victoryClose: (state) => {
-      state.victory = null;
     },
     // Null deselects. Clicking the row that's already selected sends null rather than its own id,
     // so the pane doesn't need a second action to close itself
@@ -122,6 +87,54 @@ export const uiSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    builder.addCase(manualHelpOpen, (state, action: PayloadAction<string>) => {
+      state.manualHelpEntry = action.payload;
+    });
+    builder.addCase(manualHelpClose, (state) => {
+      delete state.manualHelpEntry;
+    });
+    builder.addCase(
+      snackbarOpen,
+      (state, action: PayloadAction<string | SnackbarType>) => {
+        if (typeof action.payload === "string") {
+          return {
+            ...state,
+            snackbar: {
+              message: action.payload,
+              open: true,
+              timeout: initialUI.snackbar.timeout,
+            },
+          };
+        } else if (action.payload.message && action.payload.message !== "") {
+          return {
+            ...state,
+            snackbar: {
+              message: action.payload.message,
+              open: true,
+              timeout: action.payload.timeout || initialUI.snackbar.timeout,
+              action: action.payload.action,
+              actionLabel: action.payload.actionLabel,
+              overModal: action.payload.overModal,
+            },
+          };
+        }
+      },
+    );
+    builder.addCase(dialogOpen, (state, action: PayloadAction<DialogType>) => {
+      state.dialog = { ...action.payload };
+    });
+    builder.addCase(dialogClose, (state) => {
+      state.dialog = { ...initialUI.dialog };
+    });
+    builder.addCase(
+      victoryOpen,
+      (state, action: PayloadAction<VictoryType>) => {
+        state.victory = { ...action.payload };
+      },
+    );
+    builder.addCase(victoryClose, (state) => {
+      state.victory = null;
+    });
     builder.addCase(quit, (state) => {
       delete state.dataCenterGuideRequested;
       delete state.arrivingFacilityId;
@@ -168,20 +181,22 @@ export const uiSlice = createSlice({
   },
 });
 
+export {
+  manualHelpOpen,
+  manualHelpClose,
+  dialogOpen,
+  dialogClose,
+  snackbarOpen,
+  victoryOpen,
+  victoryClose,
+} from "./GameActions";
 export const {
   facilityPurchased,
   acknowledgeFacilityArrival,
   requestEvidence,
   acknowledgeEvidence,
-  manualHelpOpen,
-  manualHelpClose,
   delta,
-  snackbarOpen,
   snackbarClose,
-  dialogOpen,
-  dialogClose,
-  victoryOpen,
-  victoryClose,
   selectFacility,
   setFacilityDragActive,
 } = uiSlice.actions;

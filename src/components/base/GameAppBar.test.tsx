@@ -54,9 +54,10 @@ beforeEach(() => {
   window.matchMedia = (query: string) => ({
     ...originalMatchMedia(query),
     matches:
-      (query.includes("min-width:1300px") ||
-        query.includes("min-width:1024px")) &&
-      mockDesktop,
+      ((query.includes("min-width:1300px") ||
+        query.includes("min-width:700px")) &&
+        mockDesktop) ||
+      (query.includes("min-width:600px") && mockPaneLayout),
   });
 });
 afterEach(() => {
@@ -424,7 +425,9 @@ describe("GameAppBar", () => {
     }));
     expect(reserveCapacityW(game, now)).toBe(now.reserveW);
     renderAppBar({ game: { ...game, inGame: true } });
-    expect(screen.getByText(/^Stable, \d.* [kMGT]?W$/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/^Stable, \d.*[kMGT]?W reserve$/),
+    ).toBeInTheDocument();
     expect(
       screen.getByLabelText(/Current grid status: Stable, .* reserve/),
     ).toBeVisible();
@@ -439,17 +442,17 @@ describe("GameAppBar", () => {
       now.demandW = 72e6;
       now.reserveW = 10e6;
       expect(stableGridSummary(game, now)).toBe(
-        "Stable, 72 MW demand met with 10 MW reserve",
+        "Stable, 72MW demand met with 10MW reserve",
       );
       renderAppBar({ game: { ...game, inGame: true } });
       expect(screen.queryByText(/^Stable, /)).not.toBeInTheDocument();
       const status = screen.getByRole("button", {
-        name: "Current grid status: Stable, 72 MW demand met with 10 MW reserve",
+        name: "Current grid status: Stable, 72MW demand met with 10MW reserve",
       });
       fireEvent.mouseOver(status);
       expect(
         await screen.findByRole("tooltip", {
-          name: "Stable, 72 MW demand met with 10 MW reserve",
+          name: "Stable, 72MW demand met with 10MW reserve",
         }),
       ).toBeVisible();
     } finally {
@@ -478,7 +481,7 @@ describe("GameAppBar", () => {
         const status = screen.getByRole("button", {
           name: `Current grid status: ${summary}`,
         });
-        expect(status).toHaveTextContent(/^$/);
+        expect(status).toHaveTextContent(/^(Low|Limit|Soon|Blackout)$/);
         expect(screen.queryByText(summary)).not.toBeInTheDocument();
         fireEvent.click(status);
         expect(
@@ -501,7 +504,7 @@ describe("GameAppBar", () => {
     now.reserveW = now.demandW * 0.05;
     expect(getGridHealth(game, now)).toMatchObject({
       state: "low-reserve",
-      metric: expect.stringMatching(/reserve \(5%\)/),
+      metric: expect.stringMatching(/\(5%\)/),
     });
     renderAppBar({ game: { ...game, inGame: true } });
     expect(
@@ -543,8 +546,8 @@ describe("GameAppBar", () => {
     later.demandW = later.supplyW + 120_000_000;
     expect(getGridHealth(game, now)).toMatchObject({
       state: "blackout-ahead",
-      label: "Blackout ahead",
-      metric: expect.stringMatching(/^120MW short at \d+ [AP]M$/),
+      label: expect.stringMatching(/^Blackout (today|tonight) at \d+ [AP]M$/),
+      metric: "120MW short",
     });
     // A blackout happening now still outranks the one expected later.
     expect(
@@ -555,7 +558,7 @@ describe("GameAppBar", () => {
     ).toBe("blackout");
     renderAppBar({ game: { ...game, inGame: true } });
     const readout = screen.getByLabelText(
-      /Current grid status: Blackout ahead, 120MW short at/,
+      /Current grid status: Blackout (today|tonight) at \d+ [AP]M, 120MW short/,
     );
     expect(readout).toHaveClass("statusWarning");
     expect(screen.queryByText(/^Stable/)).toBeNull();

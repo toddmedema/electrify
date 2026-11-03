@@ -44,7 +44,9 @@ export function modArcReferences(): ArcReference[] {
       description: "Resolve the current bundled arc for the author reference.",
       seed: 12345,
       baseScenarioId: scenarioId,
-      scenario: { durationMonths: 1200 },
+      scenario: {
+        durationMonths: scenarioId === 116 ? source.durationMonths : 1200,
+      },
       objectives: [],
       officialArcs: [{ scenarioId, includeChoices: true }],
     });
@@ -157,7 +159,9 @@ export function formatModArcReference(arcs: ArcReference[]): string {
               ),
             ]
           : [
-              "This arc has no timed phases; its load and decision are listed below.",
+              arc.id === 116
+                ? "This arc adds no global shocks. Use Across the Valley as the base to retain operating areas, utility portfolios and acquisition contracts."
+                : "This arc has no timed phases; its load and decision are listed below.",
             ],
         ...(arc.choices.length
           ? [

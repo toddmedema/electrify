@@ -9,6 +9,10 @@ export const ManualEntryNavigation = React.createContext<
   ((title: ManualEntryTitleType) => void) | undefined
 >(undefined);
 
+export function manualEntryId(title: string): string {
+  return `manual-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+}
+
 interface Props {
   to: ManualEntryTitleType;
   children: React.ReactNode;
@@ -29,7 +33,7 @@ export default function ManualEntryLink({
   return (
     <a
       className="manual-entry-link"
-      href={`#manual-${to.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+      href={`#${manualEntryId(to)}`}
       onClick={(event: React.MouseEvent<HTMLAnchorElement>) => {
         event.preventDefault();
         // Entries sit inside rows and popovers that react to clicks of their own

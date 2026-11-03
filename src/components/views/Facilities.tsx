@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   Avatar,
   Button,
+  Checkbox,
   Chip,
   DialogContentText,
   List,
@@ -10,6 +11,7 @@ import {
   ListItemText,
   Typography,
 } from "@mui/material";
+import CheckIcon from "@mui/icons-material/Check";
 import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
@@ -24,15 +26,19 @@ import {
   DraggingStyle,
   Droppable,
   DropResult,
+  DragStart,
   NotDraggingStyle,
 } from "@hello-pangea/dnd";
+import FacilityContextMenu, { FacilityMenuTarget } from "./FacilityContextMenu";
+import { facilityGroupMoves } from "./FacilitySelection";
 import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   activeScenario,
   currentGenerationW,
 } from "../../helpers/GameSelectors";
-import { chartPalette, facilityColor, withAlpha } from "../../Theme";
+import { chartPalette, facilityColor } from "../../Theme";
 import {
+  AcquireUtilityAction,
   FacilityOperatingType,
   isStorage,
   GameType,
@@ -51,6 +57,8 @@ import {
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import FlowBar from "../base/FlowBar";
+import { getStorageBoolean, setStorageKeyValue } from "../../LocalStorage";
+import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
@@ -68,7 +76,8 @@ import {
 } from "../../helpers/Hazards";
 import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
-import { TradingPolicyType } from "../../Types";
+import { facilityDisplayName } from "../base/FacilityLabels";
+import { BuyingRuleType, SellingRuleType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 
@@ -79,9 +88,15 @@ interface FacilityListItemProps {
   spotInList: number;
   game: GameType;
   selected: boolean;
+  bulkSelected: boolean;
+  selectionEnabled: boolean;
+  showCheckboxes: boolean;
+  selectionCount: number;
+  onToggleSelection: (id: number, event: React.MouseEvent) => void;
+  onRowClick: (id: number, event: React.MouseEvent) => void;
+  onContextMenu: (id: number, event: React.MouseEvent) => void;
   storyOutputMultiplier: number;
   hazardStatus?: FacilityHazardStatusType;
-  onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onTogglePause: DispatchProps["onTogglePause"];
   onPause: DispatchProps["onPause"];
   onSell: DispatchProps["onSell"];
@@ -233,7 +248,7 @@ function FacilityActions(props: {
           className="facilityCancelConstruction"
           variant="outlined"
           startIcon={<CancelIcon />}
-          aria-label={"Cancel upgrade of " + facility.name}
+          aria-label={"Cancel upgrade of " + facilityDisplayName(facility)}
           onClick={() => onCancelRetrofit(facility.id)}
         >
           <span className="facilityActionLabel">Cancel upgrade</span>
@@ -247,13 +262,13 @@ function FacilityActions(props: {
           }
           aria-label={
             facility.paused
-              ? "Resume " + facility.name
-              : "Pause " + facility.name
+              ? "Resume " + facilityDisplayName(facility)
+              : "Pause " + facilityDisplayName(facility)
           }
           onClick={() =>
             facility.paused
               ? onTogglePause(facility.id)
-              : onPause(facility.id, facility.name)
+              : onPause(facility.id, facilityDisplayName(facility))
           }
         >
           <span className="facilityActionLabel">
@@ -267,7 +282,7 @@ function FacilityActions(props: {
         startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
         aria-label={
           (underConstruction ? "Cancel construction of " : "Sell ") +
-          facility.name
+          facilityDisplayName(facility)
         }
         onClick={onOpenSell}
       >
@@ -309,7 +324,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     game,
     onTogglePause,
     onPause,
-    onSelect,
     selected,
     storyOutputMultiplier,
     hazardStatus,
@@ -437,6 +451,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
     reading = formatWattsOfPeak(facility.currentW, facility.peakW);
+    // A reservoir row's percentage would read as how full it is, which its gauge already shows.
+    if (!(fuel === "Hydro" && facility.reservoirCapacityWh))
+      reading += ` · ${Math.round(Math.abs(outputFraction) * 100)}%`;
     if (fuel === "Hydro" && facility.reservoirCapacityWh) {
       // Last-tick water balance stays meaningful on mount and selection. Paused turbines can
       // retain ramping currentW internally, so exclude their output from the water balance.
@@ -523,7 +540,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`facilityRow${selected ? " selected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
+          className={`facilityRow${selected ? " selected" : ""}${props.bulkSelected ? " bulkSelected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
+          onContextMenu={(event) => props.onContextMenu(facility.id, event)}
           data-fuel={fuel}
           data-facility={facility.name}
           style={getDraggableStyle(provided.draggableProps.style)}
@@ -544,25 +562,37 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 type="button"
                 {...provided.dragHandleProps}
                 className="facilityDragHandle"
-                aria-label={"Reorder " + facility.name}
+                aria-label={"Reorder " + facilityDisplayName(facility)}
                 title="Drag to reorder"
+                onClick={(event) => {
+                  if (event.shiftKey || event.ctrlKey || event.metaKey)
+                    props.onRowClick(facility.id, event);
+                }}
               >
                 <DragIndicatorIcon aria-hidden />
                 {icon}
+                {snapshot.isDragging &&
+                  props.bulkSelected &&
+                  props.selectionCount > 1 && (
+                    <span className="facilityDragCount">
+                      {props.selectionCount} facilities
+                    </span>
+                  )}
               </button>
             )}
             <button
               type="button"
               className="facilityDisclosure"
               aria-label={
-                `Inspect ${facility.name}` +
+                `Inspect ${facilityDisplayName(facility)}` +
                 (hazardStatus && !underConstruction
                   ? `, ${hazardStatusText(hazardStatus).spoken}`
                   : "") +
                 (storage ? `, ${status}` : "")
               }
               aria-expanded={selected}
-              onClick={() => onSelect(selected ? null : facility.id)}
+              aria-pressed={props.bulkSelected}
+              onClick={(event) => props.onRowClick(facility.id, event)}
             >
               <ListItem className="facility" component="span">
                 {reorderDisabled && icon}
@@ -574,7 +604,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     }}
                     primary={
                       <>
-                        <span className="facilityName">{facility.name}</span>
+                        <span className="facilityName">
+                          {facilityDisplayName(facility)}
+                        </span>
                         {ready && (
                           <span className="facilityReadyLabel">Ready</span>
                         )}
@@ -615,21 +647,37 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       className="constructionProgress"
                       data-paused={game.speed === "PAUSED"}
                       aria-hidden
-                      style={{ background: withAlpha(accentColor, 0.24) }}
                     >
                       <span
                         className="constructionProgressFill"
-                        style={{
-                          width: `${builtFraction * 100}%`,
-                          background: accentColor,
-                        }}
+                        style={{ width: `${builtFraction * 100}%` }}
                       />
                     </span>
                   )}
                 </span>
+                {props.selectionEnabled && (
+                  <span className="facilitySelectionSlot" aria-hidden>
+                    {props.bulkSelected && !props.showCheckboxes && (
+                      <CheckIcon fontSize="small" />
+                    )}
+                  </span>
+                )}
                 <ChevronDownGlyph className="facilityChevron" aria-hidden />
               </ListItem>
             </button>
+            {props.showCheckboxes && (
+              <Checkbox
+                className="facilitySelectionCheckbox"
+                size="small"
+                checked={props.bulkSelected}
+                onClick={(event) => props.onToggleSelection(facility.id, event)}
+                slotProps={{
+                  input: {
+                    "aria-label": `Select ${facilityDisplayName(facility)}`,
+                  },
+                }}
+              />
+            )}
           </div>
           {open && (
             // Inside the row, so isolateClicks keeps every click in the confirmation dialog
@@ -640,7 +688,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               title={
                 <>
                   {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                  {formatFacilitySize(facility)} {facility.name.toLowerCase()}{" "}
+                  {formatFacilitySize(facility)}{" "}
+                  {facilityDisplayName(facility) === facility.name
+                    ? facility.name.toLowerCase()
+                    : facilityDisplayName(facility)}{" "}
                   facility?
                 </>
               }
@@ -655,7 +706,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               {facility.hydroSiteId && (
                 <DialogContentText>
                   {underConstruction
-                    ? "Cancelling frees this site."
+                    ? "Canceling frees this site."
                     : "Selling won't free this site."}
                 </DialogContentText>
               )}
@@ -698,8 +749,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
 }
 
 // Always drawn rather than behind a phone-only disclosure: on a phone the chart scrolls away
-// with the rest of the pane (see .facilitiesBody), the way Insights does, instead of pinning
-// 180px above the fleet or making the player open it first
+// with the rest of the pane (see .facilitiesBody), the way Insights does
 function FacilitySupplyChart({
   game,
   anchor,
@@ -708,6 +758,27 @@ function FacilitySupplyChart({
   anchor: React.RefObject<HTMLDivElement>;
 }) {
   const fuelOrder = getDispatchOrderedFuels(game.facilities);
+  const height = useFleetChartHeight();
+  // A portrait tablet's sheet starts where this block ends.
+  React.useLayoutEffect(() => {
+    const element = anchor.current;
+    const stage = element?.closest(".gameStage");
+    if (!element || !stage) return;
+    const publish = () => {
+      const bottom =
+        element.getBoundingClientRect().bottom -
+        stage.getBoundingClientRect().top;
+      document.documentElement.style.setProperty(
+        "--game-chart-block",
+        `${Math.round(bottom)}px`,
+      );
+    };
+    publish();
+    // The chart mounts after this block, so its height arrives a frame later.
+    const observer = new ResizeObserver(publish);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [anchor]);
   return (
     <div
       ref={anchor}
@@ -716,7 +787,8 @@ function FacilitySupplyChart({
       aria-label="Supply and demand"
     >
       <ChartSupplyDemand
-        height={180}
+        height={height}
+        exactHeight
         timeline={game.timeline}
         fuelOrder={fuelOrder}
         currentMinute={game.date.minute}
@@ -727,6 +799,34 @@ function FacilitySupplyChart({
       />
     </div>
   );
+}
+
+const HINT_MIN_FACILITIES = 4;
+const BULK_HINT_SEEN_KEY = "facilityBulkHintSeen";
+
+/** The fleet chart grows with the window; single-pane layouts keep it 15% shorter. */
+export function fleetChartHeight(width: number, height: number): number {
+  const fit = (min: number, share: number, max: number) =>
+    Math.round(Math.max(min, Math.min(max, height * share)));
+  if (width >= SIDE_LAYOUT_MIN_WIDTH) return fit(180, 0.25, 260);
+  const compactHeight =
+    width < 600
+      ? fit(200, 0.38, 420)
+      : width > height
+        ? fit(180, 0.3, 260)
+        : fit(180, 0.28, 340);
+  return Math.round(compactHeight * 0.85);
+}
+
+function useFleetChartHeight(): number {
+  const measure = () => fleetChartHeight(window.innerWidth, window.innerHeight);
+  const [height, setHeight] = React.useState(measure);
+  React.useEffect(() => {
+    const resize = () => setHeight(measure());
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
+  return height;
 }
 
 export interface StateProps {
@@ -764,12 +864,264 @@ export interface DispatchProps {
   onTransmissionCancel?: (id: number) => void;
   onTransmissionPause?: (id: number, name: string, paused: boolean) => void;
   onTransmissionUpgrade: (corridorId: string, financed: boolean) => void;
-  onTradingPolicy: (policy: TradingPolicyType) => void;
+  onUtilityAcquire?: (
+    payload: AcquireUtilityAction,
+  ) => boolean | Promise<boolean>;
+  onBuyingRule: (rule: BuyingRuleType) => void;
+  onSellingRule: (rule: SellingRuleType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default class Facilities extends React.Component<Props> {
+interface SelectionState {
+  ids: number[];
+  anchor: number | null;
+  menu: FacilityMenuTarget | null;
+  groupDragging: boolean;
+  selectionMode: boolean;
+  modifierHeld: boolean;
+}
+
+export default class Facilities extends React.Component<Props, SelectionState> {
+  public state: SelectionState = {
+    ids: [],
+    anchor: null,
+    menu: null,
+    groupDragging: false,
+    selectionMode: false,
+    modifierHeld: false,
+  };
+  private draggedIds: number[] = [];
+  private selectionFocus: HTMLButtonElement | null = null;
+  private previewFocus: HTMLButtonElement | null = null;
+  private menuFocus: HTMLButtonElement | null = null;
+
+  private mouseEnabled = () =>
+    window.matchMedia("(any-pointer: fine)").matches &&
+    !(
+      this.props.game.inGame &&
+      activeScenario(this.props.game)?.tutorialSteps?.[
+        this.props.game.tutorialStep
+      ]?.hideUi?.includes("facilityActions")
+    );
+
+  private onRowClick = (
+    id: number,
+    event: React.MouseEvent,
+    toggle = false,
+  ) => {
+    if (!this.mouseEnabled()) {
+      this.props.onSelect(this.props.selectedFacilityId === id ? null : id);
+      return;
+    }
+    const ids = this.props.game.facilities.map((f) => f.id);
+    const current = this.state.ids.filter((selected) => ids.includes(selected));
+    if (event.shiftKey) {
+      const candidate = this.state.anchor ?? this.props.selectedFacilityId;
+      const anchor =
+        candidate !== null && ids.includes(candidate) ? candidate : id;
+      const from = ids.indexOf(anchor);
+      const to = ids.indexOf(id);
+      const range = ids.slice(Math.min(from, to), Math.max(from, to) + 1);
+      this.setState({
+        ids:
+          event.ctrlKey || event.metaKey
+            ? [...new Set([...current, ...range])]
+            : range,
+        anchor,
+        selectionMode: true,
+      });
+      this.props.onSelect(null);
+    } else if (toggle || event.ctrlKey || event.metaKey) {
+      this.setState({
+        ids: current.includes(id)
+          ? current.filter((selected) => selected !== id)
+          : [...current, id],
+        anchor: id,
+        selectionMode: true,
+      });
+      if (!toggle) this.props.onSelect(null);
+    } else {
+      if (!this.selectionModeActive()) this.setState({ ids: [id], anchor: id });
+      this.props.onSelect(this.props.selectedFacilityId === id ? null : id);
+    }
+  };
+
+  private onToggleSelection = (id: number, event: React.MouseEvent) =>
+    this.onRowClick(id, event, true);
+
+  private onContextMenu = (id: number, event: React.MouseEvent) => {
+    if (!this.mouseEnabled()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    // macOS emits contextmenu with button 0 for Ctrl-click, with no click afterward.
+    if (event.ctrlKey && event.button === 0) {
+      this.onRowClick(id, event);
+      return;
+    }
+    const button = event.currentTarget.querySelector<HTMLButtonElement>(
+      ".facilityDisclosure",
+    );
+    this.menuFocus = button;
+    button?.focus();
+    const bounds = button?.getBoundingClientRect();
+    const ids = this.state.ids.includes(id) ? this.state.ids : [id];
+    this.setState({
+      ids,
+      modifierHeld: false,
+      anchor: this.state.ids.includes(id) ? this.state.anchor : id,
+      menu: {
+        ids,
+        top: event.clientY || bounds?.top || 0,
+        left: event.clientX || bounds?.left || 0,
+      },
+    });
+  };
+
+  private closeMenu = () => this.setState({ menu: null });
+
+  private openActions = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    this.menuFocus =
+      this.scrollBody?.querySelector<HTMLButtonElement>(
+        ".bulkSelected .facilityDisclosure",
+      ) ?? null;
+    this.setState({
+      modifierHeld: false,
+      menu: {
+        ids: this.props.game.facilities
+          .filter((facility) => this.state.ids.includes(facility.id))
+          .map((facility) => facility.id),
+        top: bounds.bottom,
+        left: bounds.left,
+      },
+    });
+  };
+
+  private liveSelectionCount = () =>
+    this.props.game.facilities.filter((facility) =>
+      this.state.ids.includes(facility.id),
+    ).length;
+
+  // Empty checkbox selections remain editable until explicitly cleared. Stale IDs from
+  // departed facilities must still leave Escape to the active screen.
+  private selectionModeActive = () =>
+    this.state.selectionMode &&
+    (!this.state.ids.length || this.liveSelectionCount() > 0);
+
+  private modalOpen = () =>
+    !!document.querySelector(
+      '.MuiModal-root:not(.MuiModal-hidden), [data-manual-help="true"], [data-scenario-choice="true"], [data-data-center-guide="true"]',
+    );
+
+  private updateModifierPreview = (event: KeyboardEvent) => {
+    const target = event.target;
+    const editing =
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        !!target.closest(
+          'input:not([type="checkbox"]), textarea, select, [contenteditable="true"]',
+        ));
+    const modifierHeld =
+      (event.shiftKey || event.ctrlKey || event.metaKey) &&
+      event.key !== "Escape" &&
+      this.mouseEnabled() &&
+      !!this.scrollBody &&
+      !this.scrollBody.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      !editing &&
+      !this.modalOpen();
+    if (modifierHeld !== this.state.modifierHeld) {
+      const focus = !modifierHeld ? this.focusedPreviewDisclosure() : null;
+      this.setState({ modifierHeld }, () => {
+        if (!this.selectionModeActive() && !this.modalOpen()) focus?.focus();
+      });
+    }
+  };
+
+  private focusedPreviewDisclosure = () =>
+    document.activeElement
+      ?.closest(".facilitySelectionCheckbox")
+      ?.closest(".facilityRowHeader")
+      ?.querySelector<HTMLButtonElement>(".facilityDisclosure") ?? null;
+
+  private resetModifierPreview = () => {
+    if (this.state.modifierHeld) {
+      if (!this.selectionModeActive())
+        this.previewFocus = this.focusedPreviewDisclosure();
+      this.setState({ modifierHeld: false });
+    }
+  };
+
+  private restorePreviewFocus = () => {
+    if (
+      document.activeElement === document.body &&
+      this.previewFocus?.isConnected &&
+      !this.previewFocus.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      !this.modalOpen()
+    )
+      this.previewFocus.focus();
+    this.previewFocus = null;
+  };
+
+  private onGlobalSelectionKeyDown = (event: KeyboardEvent) => {
+    this.updateModifierPreview(event);
+    this.onSelectionKeyDown(event, true);
+  };
+
+  private onSelectionKeyDown = (
+    event: KeyboardEvent | React.KeyboardEvent,
+    multiOnly = false,
+  ) => {
+    if (
+      event.key === "Escape" &&
+      !event.defaultPrevented &&
+      !this.dragging &&
+      !this.scrollBody?.closest("[inert]") &&
+      (this.liveSelectionCount() > (multiOnly ? 1 : 0) ||
+        this.selectionModeActive())
+    ) {
+      const modal = this.modalOpen();
+      this.clearSelection();
+      // A modal also owns Escape: let it dismiss normally as the group clears behind it.
+      if (!modal) event.preventDefault();
+    }
+  };
+
+  private clearSelection = () => {
+    const active = document.activeElement;
+    const focus =
+      active
+        ?.closest(".facilityRow")
+        ?.querySelector<HTMLButtonElement>(".facilityDisclosure") ??
+      (this.state.menu ? this.menuFocus : null) ??
+      (active?.closest(".facilitySelectionBar")
+        ? this.scrollBody?.querySelector<HTMLButtonElement>(
+            ".facilityDisclosure",
+          )
+        : null);
+    const menuOpen = !!this.state.menu;
+    // The menu's focus trap must finish exiting before a removed toolbar trigger can be
+    // replaced with a row target. Otherwise it immediately pulls focus back into the menu.
+    if (menuOpen) this.selectionFocus = focus ?? null;
+    this.setState(
+      {
+        ids: [],
+        anchor: null,
+        menu: null,
+        selectionMode: false,
+        modifierHeld: false,
+      },
+      () => {
+        if (!menuOpen) focus?.focus();
+      },
+    );
+    this.props.onSelect(null);
+  };
+
+  private restoreSelectionFocus = () => {
+    if (this.selectionFocus?.isConnected) this.selectionFocus.focus();
+    this.selectionFocus = null;
+  };
   constructor(props: Props) {
     super(props);
     this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
@@ -842,7 +1194,11 @@ export default class Facilities extends React.Component<Props> {
 
   // Keep 1x presentation unchanged, but cap FAST's 100 simulation ticks/sec to 25 visual
   // refreshes/sec. Intermediate simulation ticks still run; the pane simply presents the newest.
-  public shouldComponentUpdate(nextProps: Props) {
+  public shouldComponentUpdate(
+    nextProps: Props,
+    nextState: Readonly<SelectionState>,
+  ) {
+    if (nextState !== this.state) return true;
     if (this.dragging) {
       return false;
     }
@@ -865,12 +1221,32 @@ export default class Facilities extends React.Component<Props> {
   }
 
   public componentDidUpdate() {
+    if (
+      this.state.ids.length > 1 &&
+      !getStorageBoolean(BULK_HINT_SEEN_KEY, false)
+    )
+      setStorageKeyValue(BULK_HINT_SEEN_KEY, true);
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
   }
 
   public componentDidMount() {
     this.resolveEvidence();
+    document.addEventListener("keydown", this.onGlobalSelectionKeyDown, true);
+    document.addEventListener("keyup", this.updateModifierPreview, true);
+    window.addEventListener("blur", this.resetModifierPreview);
+    window.addEventListener("focus", this.restorePreviewFocus);
+  }
+
+  public componentWillUnmount() {
+    document.removeEventListener(
+      "keydown",
+      this.onGlobalSelectionKeyDown,
+      true,
+    );
+    document.removeEventListener("keyup", this.updateModifierPreview, true);
+    window.removeEventListener("blur", this.resetModifierPreview);
+    window.removeEventListener("focus", this.restorePreviewFocus);
   }
 
   private evidenceAnchor = React.createRef<HTMLDivElement>();
@@ -890,7 +1266,15 @@ export default class Facilities extends React.Component<Props> {
     this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
   }
 
-  public onBeforeDragStart() {
+  public onBeforeDragStart(start?: DragStart) {
+    const id = start?.draggableId.startsWith("f")
+      ? Number(start.draggableId.slice(1))
+      : undefined;
+    this.draggedIds =
+      id !== undefined && this.mouseEnabled() && this.state.ids.includes(id)
+        ? [...this.state.ids]
+        : [];
+    this.setState({ groupDragging: this.draggedIds.length > 1 });
     this.dragging = true;
     this.speedBeforeDrag = this.props.game.speed;
     this.props.onFacilityDragStart(this.speedBeforeDrag);
@@ -898,6 +1282,12 @@ export default class Facilities extends React.Component<Props> {
 
   public onDragEnd(result: DropResult) {
     this.dragging = false;
+    this.setState({ groupDragging: false });
+    if (
+      result.reason === "CANCEL" &&
+      (this.liveSelectionCount() > 1 || this.selectionModeActive())
+    )
+      this.clearSelection();
     if (result.source.droppableId === "interties") {
       this.props.onFacilityDragEnd(
         result.source.index,
@@ -907,9 +1297,21 @@ export default class Facilities extends React.Component<Props> {
       );
       return;
     }
+    const bulk = this.draggedIds.length > 1;
+    if (bulk && result.destination) {
+      for (const move of facilityGroupMoves(
+        this.props.game.facilities.map((f) => f.id),
+        this.draggedIds,
+        result.source.index,
+        result.destination.index,
+      )) {
+        this.props.onReprioritize(move.spotInList, move.delta);
+      }
+    }
+    this.draggedIds = [];
     this.props.onFacilityDragEnd(
       result.source.index,
-      result.destination?.index ?? null,
+      bulk ? null : (result.destination?.index ?? null),
       this.speedBeforeDrag,
     );
   }
@@ -920,12 +1322,19 @@ export default class Facilities extends React.Component<Props> {
       onSell,
       onTogglePause,
       onPause,
-      onSelect,
       onTransmissionBuild,
       onTransmissionUpgrade,
-      onTradingPolicy,
+      onBuyingRule,
+      onSellingRule,
       selectedFacilityId,
     } = this.props;
+    const selection = game.facilities.filter((f) =>
+      this.state.ids.includes(f.id),
+    );
+    const selectionEnabled = this.mouseEnabled();
+    const selectionMode = this.selectionModeActive();
+    const showCheckboxes =
+      selectionEnabled && (this.state.modifierHeld || selectionMode);
     const facilitiesCount = game.facilities.length;
     const intertiesAvailable = !!(
       game.transmission &&
@@ -945,7 +1354,62 @@ export default class Facilities extends React.Component<Props> {
         <>
           <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
             <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
-            <List dense className="scrollable unifiedFacilitiesList">
+            {!(
+              game.inGame &&
+              activeScenario(game)?.tutorialSteps?.[
+                game.tutorialStep
+              ]?.hideUi?.includes("facilityActions")
+            ) && (
+              <div
+                className="facilitySelectionBar"
+                onKeyDown={this.onSelectionKeyDown}
+              >
+                {selectionMode || selection.length > 1 ? (
+                  <>
+                    <span role="status" aria-label="Facility selection">
+                      {selection.length}{" "}
+                      {selection.length === 1 ? "facility" : "facilities"}{" "}
+                      selected
+                    </span>
+                    <div className="facilitySelectionActions">
+                      <Button
+                        size="small"
+                        endIcon={<ChevronDownGlyph />}
+                        aria-haspopup="menu"
+                        aria-expanded={!!this.state.menu}
+                        disabled={!selection.length}
+                        onClick={this.openActions}
+                      >
+                        Actions
+                      </Button>
+                      <Button size="small" onClick={this.clearSelection}>
+                        Clear selection
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="facilitySelectionTitle">
+                      Facilities ({game.facilities.length})
+                    </span>
+                    {game.facilities.length >= HINT_MIN_FACILITIES &&
+                      !activeScenario(game)?.tutorialSteps &&
+                      !getStorageBoolean(BULK_HINT_SEEN_KEY, false) && (
+                        <span>
+                          Shift-click a range · Ctrl/⌘-click to add ·
+                          Right-click for actions
+                        </span>
+                      )}
+                  </>
+                )}
+              </div>
+            )}
+            <List
+              dense
+              className="scrollable unifiedFacilitiesList"
+              data-group-dragging={this.state.groupDragging || undefined}
+              onKeyDown={this.onSelectionKeyDown}
+            >
               {intertiesAvailable && !!game.transmission?.lines.length && (
                 <Typography
                   id="dispatch-order"
@@ -978,7 +1442,13 @@ export default class Facilities extends React.Component<Props> {
                             onPause={onPause}
                             onRetrofit={this.props.onRetrofit}
                             onCancelRetrofit={this.props.onCancelRetrofit}
-                            onSelect={onSelect}
+                            onRowClick={this.onRowClick}
+                            onContextMenu={this.onContextMenu}
+                            bulkSelected={selection.some((f) => f.id === g.id)}
+                            selectionEnabled={selectionEnabled}
+                            showCheckboxes={showCheckboxes}
+                            onToggleSelection={this.onToggleSelection}
+                            selectionCount={selection.length}
                             selected={selectedFacilityId === g.id}
                             storyOutputMultiplier={storyOutputMultiplier(
                               g,
@@ -1008,15 +1478,28 @@ export default class Facilities extends React.Component<Props> {
                   game={game}
                   onBuild={onTransmissionBuild}
                   onUpgrade={onTransmissionUpgrade}
+                  onAcquire={this.props.onUtilityAcquire}
                   onCancel={this.props.onTransmissionCancel}
                   onPause={this.props.onTransmissionPause}
-                  onPolicy={onTradingPolicy}
+                  onBuyingRule={onBuyingRule}
+                  onSellingRule={onSellingRule}
                   onBeforeDragStart={this.onBeforeDragStart}
                   onDragEnd={this.onDragEnd}
                 />
               )}
             </List>
           </div>
+          <FacilityContextMenu
+            game={game}
+            target={this.state.menu}
+            onClose={this.closeMenu}
+            onMenuExited={this.restoreSelectionFocus}
+            onSell={onSell}
+            onPause={onPause}
+            onTogglePause={onTogglePause}
+            onRetrofit={this.props.onRetrofit}
+            onCancelRetrofit={this.props.onCancelRetrofit}
+          />
         </>
       </GameCard>
     );

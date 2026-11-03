@@ -33,22 +33,22 @@ export const offerLowCashWarning = (): AppThunk => (dispatch, getState) => {
   const rate = quote.dollarsPerkWh;
   const increase =
     rate !== null && game.dollarsPerkWh > 0
-      ? `${Math.round((rate / game.dollarsPerkWh - 1) * 100)}%`
+      ? `+${Math.round((rate / game.dollarsPerkWh - 1) * 100)}%`
       : undefined;
-  const price = rate !== null ? `${(rate * 100).toFixed(2)}c/kWh` : "";
+  const price = rate !== null ? `${(rate * 100).toFixed(2)}¢/kWh` : "";
   const message =
     rate === null
       ? quote.projectedCash >= 0
-        ? "Your current rates are projected to cover this month's costs. The utility board's rate cap prevents a further increase."
-        : `Rates alone cannot prevent bankruptcy this month.${quote.capped ? " Even the utility board's maximum rate is too low to cover your costs." : " There is not enough electricity revenue to cover your costs."}`
+        ? "Current rates cover this month's costs. The utility board's rate cap prevents a further increase."
+        : `Rates can't prevent bankruptcy this month. ${quote.capped ? "Even the maximum rate won't cover your costs." : "Electricity revenue won't cover your costs."}`
       : quote.projectedCash < 0
-        ? `You must raise your rates to ${price}${increase ? ` (a ${increase} increase)` : ""} to avoid bankruptcy this month.`
-        : `Raise your rates to ${price}${increase ? ` (a ${increase} increase)` : ""} to build your cash buffer this month. Your current rates are projected to cover this month's costs.`;
+        ? `Raise rates to ${price}${increase ? ` (${increase})` : ""} to avoid bankruptcy this month.`
+        : `Current rates cover this month's costs. Raise to ${price}${increase ? ` (${increase})` : ""} to build a cash buffer.`;
   dispatch(delta({ lowCashWarningMonth: game.date.monthsElapsed }));
   dispatch(
     dialogOpen({
       open: true,
-      title: "You're about to run out of cash - raise your rates?",
+      title: "Low on cash. Raise rates?",
       message,
       notCancellable: true,
       actionLabel: rate !== null ? "Raise rates" : undefined,

@@ -1,3 +1,4 @@
+import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import {
   MULTIPLAYER_LINK_BUDGET_FRACTION,
   MULTIPLAYER_LINK_BUILD_COST_PER_W,
@@ -150,6 +151,14 @@ function commandResult(before: GameType, after: GameType): GameType {
   // shared tick's energy and settlement intact; immediate company transfers still book here.
   if (recorded && updated) {
     const { cash, netWorth } = updated;
+    const ownership =
+      before.utilityExpansion?.acquisitions.length !==
+      after.utilityExpansion?.acquisitions.length
+        ? {
+            entitlementImportCapacityW: updated.entitlementImportCapacityW,
+            customers: updated.customers,
+          }
+        : {};
     const previousReceipts = new Set(
       before.worldEvents.occurrences.map((event) => event.key),
     );
@@ -178,6 +187,7 @@ function commandResult(before: GameType, after: GameType): GameType {
       revenue: recorded.revenue + transfers.grant,
       revenueGrants: (recorded.revenueGrants ?? 0) + transfers.grant,
       expensesOM: recorded.expensesOM + transfers.cost,
+      ...ownership,
     });
   }
   result.transmission?.lines.forEach((line) => {
@@ -253,7 +263,8 @@ export function createWorld(
     const result = cloneGrid(game);
     // Keep explicitly authored existing assets; player links replace optional outside markets.
     result.transmission = {
-      tradingPolicy: "BALANCED",
+      buyingRule: "SHORTAGES",
+      sellingRule: "PROFITABLE",
       lines: (result.transmission?.lines || []).filter((line) =>
         scenario.startingInterties?.includes(line.corridorId),
       ),
@@ -578,9 +589,11 @@ export function stepWorld(world: World): void {
     if (planned.done)
       throw new Error("A grid could not prepare its shared tick");
     const plan = { ...planned.value };
-    const policy = g.transmission?.tradingPolicy;
-    if (policy === "CLOSED" || policy === "RELIABILITY_FIRST") plan.offerW = 0;
-    if (policy === "CLOSED" || policy === "SURPLUS_ONLY") plan.shortageW = 0;
+    if (g.transmission?.sellingRule === "NONE") plan.offerW = 0;
+    if (g.transmission?.buyingRule === "NONE") {
+      plan.shortageW = 0;
+      plan.storageChargeW = 0;
+    }
     return { phase, plan };
   });
   // Construction advances during planning, so completed upgrades apply to this settlement.
@@ -880,14 +893,23 @@ function validGrid(world: World, initial: World, i: number) {
   const g = world.grids[i];
   const scenario = getScenario(g.scenarioId, g.customScenario)!;
   const expectedConnections = initial.grids[i].transmission!.lines;
-  const lineCount = expectedConnections.length;
+  const nativeLines = isUtilityExpansionGame(g)
+    ? (g.transmission?.lines ?? []).filter((line) =>
+        ["vt-champlain-valley", "vt-champlain-ridge"].includes(line.corridorId),
+      )
+    : [];
+  const lineCount = expectedConnections.length + nativeLines.length;
   return (
     !!parseSave(
       serializeSave({
         ...g,
         multiplayer: undefined,
         transmission: intertiesEnabledForScenario(scenario, g.location)
-          ? { tradingPolicy: g.transmission!.tradingPolicy, lines: [] }
+          ? {
+              buyingRule: g.transmission!.buyingRule,
+              sellingRule: g.transmission!.sellingRule,
+              lines: nativeLines,
+            }
           : undefined,
       }),
     ) &&
@@ -924,9 +946,11 @@ function validGrid(world: World, initial: World, i: number) {
     }) &&
     g.transmission.lines.every(
       (line) =>
-        expectedConnections.some(
+        (expectedConnections.some(
           (expected) => expected.corridorId === line.corridorId,
-        ) && validTransmissionLine(line, g.date.year, accessContextForGame(g)),
+        ) ||
+          nativeLines.includes(line)) &&
+        validTransmissionLine(line, g.date.year, accessContextForGame(g)),
     )
   );
 }

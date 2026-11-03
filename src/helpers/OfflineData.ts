@@ -1,3 +1,4 @@
+import { weatherLocationIds } from "./WeatherLocations";
 import { LocationType } from "../Types";
 import { isDesktopApp } from "../Desktop";
 
@@ -18,7 +19,7 @@ export async function prefetchScenarioData(
     const registration = await navigator.serviceWorker.ready;
     registration.active?.postMessage({
       type: "CACHE_SCENARIO_DATA",
-      locationIds: [location.id, location.watershedId].filter(Boolean),
+      locationIds: weatherLocationIds(location),
     });
   } catch {
     // Prefetching is only an optimization. The loading screen owns errors and retries when the

@@ -5,7 +5,6 @@ import ChartSupplyDemand, {
   supplyDemandStack,
   Props,
 } from "./ChartSupplyDemand";
-import { UnitsContext } from "./UnitsContext";
 import { LOCATIONS } from "../../Constants";
 
 const timeline: Props["timeline"] = [
@@ -81,6 +80,75 @@ it("handles records without optional flow fields and omits unused source keys", 
   expect(stack.sources).toEqual(["Dispatchable"]);
   expect(stack.supply).toEqual([50, 0]);
   expect(stack.totalDemand).toEqual([40, 40]);
+});
+
+it("counts customer grid battery charging in the existing storage load and accessible summary", () => {
+  const ticks: Props["timeline"] = [
+    {
+      minute: 0,
+      supplyW: 80,
+      demandW: 80,
+      supplyByFuel: { Sun: 100 },
+      customerBatteryGridChargeW: 20,
+    },
+  ];
+  const stack = supplyDemandStack(ticks, []);
+  expect(stack.storageCharging).toEqual([20]);
+  expect(stack.totalDemand).toEqual([100]);
+  expect(stack.supply[0] - stack.totalDemand[0]).toBe(0);
+  expect(stack.loadStack).toEqual([[80], [100], [100]]);
+  expect(stack.sources).toContain("Storage");
+  expect(
+    formatProductionTooltip(0, {
+      ...stack,
+      timeline: ticks,
+      startingYear: 2020,
+    }),
+  ).toContain("Storage charging: 20W");
+  render(
+    <ChartSupplyDemand
+      timeline={ticks}
+      currentMinute={0}
+      location={LOCATIONS.SF}
+      startingYear={2020}
+    />,
+  );
+  expect(screen.getByRole("img")).toHaveAccessibleName(
+    /Storage charging: latest 20W/,
+  );
+});
+
+it("combines utility and customer grid charging while excluding rooftop-only battery charging", () => {
+  const ticks = [
+    {
+      minute: 0,
+      supplyW: 100,
+      demandW: 100,
+      supplyByFuel: { Coal: 140 },
+      storageChargeW: 10,
+      customerBatteryGridChargeW: 20,
+      exportedW: 10,
+      customerBatteryChargeW: 60,
+      rooftopSurplusW: 40,
+    },
+    {
+      minute: 60,
+      supplyW: 100,
+      demandW: 80,
+      supplyByFuel: { Sun: 100 },
+      customerBatteryGridChargeW: 0,
+      customerBatteryChargeW: 20,
+      rooftopSurplusW: 20,
+    },
+  ];
+  const stack = supplyDemandStack(ticks, []);
+  expect(stack.storageCharging).toEqual([30, 0]);
+  expect(stack.totalDemand).toEqual([140, 80]);
+  ticks.forEach((tick, i) =>
+    expect(stack.supply[i] - stack.totalDemand[i]).toBe(
+      tick.supplyW - tick.demandW,
+    ),
+  );
 });
 
 it("breaks supply into the four legend groups and keeps the full demand breakdown", () => {
@@ -286,43 +354,35 @@ it("keeps daylight times out of the supply and demand tooltip", () => {
   expect(tooltip).not.toMatch(/sunrise|solar noon|sunset/i);
 });
 
-it("shows the current weather rather than the end of the forecast, and follows unit changes", () => {
+it("keeps weather in the chart tooltip without a separate weather strip", () => {
   const ticks = [
     { ...timeline[0], temperatureC: -2, windKph: 32 },
     { ...timeline[1], temperatureC: 35, windKph: 8 },
   ];
-  const chart = (units: "metric" | "imperial", minute: number) => (
-    <UnitsContext.Provider value={units}>
-      <ChartSupplyDemand
-        timeline={ticks}
-        currentMinute={minute}
-        location={LOCATIONS.SF}
-        startingYear={2020}
-      />
-    </UnitsContext.Provider>
+  render(
+    <ChartSupplyDemand
+      timeline={ticks}
+      currentMinute={30}
+      location={LOCATIONS.SF}
+      startingYear={2020}
+    />,
   );
-  const { rerender } = render(chart("metric", 30));
-  expect(screen.getByLabelText("Current weather")).toHaveTextContent(
-    "Cold -2°CWindy 32 km/h",
+  expect(screen.queryByLabelText("Current weather")).not.toBeInTheDocument();
+  const state = {
+    timeline: ticks,
+    ...supplyDemandStack(ticks, []),
+    startingYear: 2020,
+  };
+  expect(formatProductionTooltip(0, { ...state, units: "metric" })).toContain(
+    "Weather: Cold -2°C · Windy 32 km/h",
   );
-  expect(screen.getByLabelText("Current weather")).not.toHaveTextContent("Hot");
-  rerender(chart("imperial", 30));
-  expect(screen.getByLabelText("Current weather")).toHaveTextContent(
-    "Cold 28°F",
+  expect(formatProductionTooltip(0, { ...state, units: "imperial" })).toContain(
+    "Weather: Cold 28°F · Windy 20 mph",
   );
-  expect(screen.getByLabelText("Current weather")).toHaveTextContent(
-    "Windy 20 mph",
+  expect(formatProductionTooltip(1, { ...state, units: "metric" })).toContain(
+    "Weather: Hot 35°C · Wind 8 km/h",
   );
-  rerender(chart("metric", 60));
-  expect(screen.getByLabelText("Current weather")).toHaveTextContent(
-    "Hot 35°CWind 8 km/h",
+  expect(formatProductionTooltip(1, { ...state, units: "imperial" })).toContain(
+    "Weather: Hot 95°F · Wind 5 mph",
   );
-  expect(
-    formatProductionTooltip(1, {
-      timeline: ticks,
-      ...supplyDemandStack(ticks, []),
-      startingYear: 2020,
-      units: "imperial",
-    }),
-  ).toContain("Weather: Hot 95°F · Wind 5 mph");
 });

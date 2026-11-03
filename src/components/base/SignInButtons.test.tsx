@@ -23,9 +23,10 @@ it.each(["google", "apple"] as const)(
         name: `Sign in with ${provider === "google" ? "Google" : "Apple"}`,
       }),
     );
-    expect(mockLogin).toHaveBeenCalledWith(provider);
+    expect(mockLogin).toHaveBeenCalledWith({ provider, mailingList: false });
     for (const button of screen.getAllByRole("button"))
       expect(button).toBeDisabled();
+    expect(screen.getByRole("checkbox")).toBeDisabled();
     expect(screen.getByRole("group", { name: "Sign in" })).toHaveAttribute(
       "aria-busy",
       "true",
@@ -47,7 +48,7 @@ it("allows switching providers after cancellation or failure", async () => {
     screen.getByRole("button", { name: "Sign in with Apple" }),
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Sign-in didn't finish",
+    "Couldn't finish sign-in",
   );
   await userEvent.click(
     screen.getByRole("button", { name: "Sign in with Google" }),
@@ -57,7 +58,11 @@ it("allows switching providers after cancellation or failure", async () => {
     screen.getByRole("button", { name: "Sign in with Apple" }),
   );
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  expect(mockLogin.mock.calls).toEqual([["apple"], ["google"], ["apple"]]);
+  expect(mockLogin.mock.calls).toEqual([
+    [{ provider: "apple", mailingList: false }],
+    [{ provider: "google", mailingList: false }],
+    [{ provider: "apple", mailingList: false }],
+  ]);
 });
 
 it("disables both providers when sign-in is unavailable", () => {
@@ -65,3 +70,35 @@ it("disables both providers when sign-in is unavailable", () => {
   for (const button of screen.getAllByRole("button"))
     expect(button).toBeDisabled();
 });
+
+it.each(["google", "apple"] as const)(
+  "uses the current explicit consent for %s and resets on remount",
+  async (provider) => {
+    mockLogin.mockResolvedValue(true);
+    const view = render(<SignInButtons />);
+    const checkbox = screen.getByRole("checkbox", {
+      name: "Join the Electrify mailing list",
+    });
+    const button = screen.getByRole("button", {
+      name: `Sign in with ${provider === "google" ? "Google" : "Apple"}`,
+    });
+    expect(checkbox).not.toBeChecked();
+    await userEvent.click(button);
+    expect(mockLogin).toHaveBeenLastCalledWith({
+      provider,
+      mailingList: false,
+    });
+    await userEvent.click(checkbox);
+    await userEvent.click(button);
+    expect(mockLogin).toHaveBeenLastCalledWith({ provider, mailingList: true });
+    await userEvent.click(checkbox);
+    await userEvent.click(button);
+    expect(mockLogin).toHaveBeenLastCalledWith({
+      provider,
+      mailingList: false,
+    });
+    view.unmount();
+    render(<SignInButtons />);
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+  },
+);

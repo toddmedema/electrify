@@ -12,17 +12,28 @@ export default function ClosableDialogTitle({
   children,
   onClose,
   className,
+  id,
+  closeDisabled,
   ...props
 }: DialogTitleProps & {
   onClose: IconButtonProps["onClick"];
+  closeDisabled?: boolean;
 }): React.JSX.Element {
   return (
     <DialogTitle
       {...props}
+      id={id ? `${id}-heading` : undefined}
       className={["closableDialogTitle", className].filter(Boolean).join(" ")}
     >
-      <span className="closableDialogTitleText">{children}</span>
-      <IconButton aria-label="close" onClick={onClose} size="large">
+      <span id={id} className="closableDialogTitleText">
+        {children}
+      </span>
+      <IconButton
+        aria-label="close"
+        onClick={onClose}
+        disabled={closeDisabled}
+        size="large"
+      >
         <CloseIcon />
       </IconButton>
     </DialogTitle>

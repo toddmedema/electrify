@@ -6,6 +6,8 @@ import { NAVIGATION_DEBOUNCE_MS } from "../Constants";
 import { isDataCenterSetupSearch } from "../DataCenterUrl";
 import { CardNameType, CardType, NavigateActionType } from "../Types";
 import {
+  navigate,
+  navigateBack,
   launchRun,
   start,
   loaded,
@@ -49,77 +51,6 @@ export const cardSlice = createSlice({
   name: "card",
   initialState: startupCard,
   reducers: {
-    navigate: (
-      state,
-      action: PayloadAction<CardNameType | NavigateActionType>,
-    ) => {
-      const a =
-        typeof action.payload === "string"
-          ? { name: action.payload }
-          : action.payload;
-      const now = Date.now();
-      if (
-        !a.replaceCurrentCard &&
-        a.name === state.name &&
-        a.entry === state.entry &&
-        JSON.stringify(a.storyTarget) === JSON.stringify(state.storyTarget) &&
-        a.url === state.url &&
-        now - state.ts < NAVIGATION_DEBOUNCE_MS
-      ) {
-        return state;
-      }
-      if (!a.skipBrowserHistory) {
-        getHistoryApi().pushState(null, "", a.url || "#");
-      }
-      // Following a link between manual entries is a step within the manual, like a wiki's: Back
-      // (browser, device or Esc) retraces it, while the card history stays one manual visit deep
-      if (a.fromEntry !== undefined && state.name === "MANUAL") {
-        return {
-          ...state,
-          ts: now,
-          entry: a.entry,
-          manualTrail: [a.fromEntry, ...(state.manualTrail || [])],
-        };
-      }
-      logEvent("card_view", { card: a.name });
-      // TODO better implementation for don't remember, right now it still makes an entry!
-      return {
-        ...state,
-        name: a.name,
-        ts: now,
-        url: a.url,
-        // Cleared rather than carried over, so a plain visit to the manual doesn't reopen
-        // whichever entry the last deep link pointed at
-        entry: a.entry,
-        manualTrail: undefined,
-        storyTarget: a.storyTarget,
-        history: [
-          a.dontRemember ? state.name : a.name,
-          ...(a.replaceCurrentCard
-            ? (state.history || []).slice(1)
-            : state.history || []),
-        ],
-        toPrevious: false,
-      };
-    },
-    navigateBack: (state, _action: PayloadAction<CardNameType | undefined>) => {
-      const [previousEntry, ...trail] = state.manualTrail || [];
-      if (state.name === "MANUAL" && previousEntry !== undefined) {
-        return {
-          ...state,
-          ts: Date.now(),
-          entry: previousEntry,
-          manualTrail: trail,
-          toPrevious: true,
-        };
-      }
-      return {
-        name: (state.history || [])[1] || "MAIN_MENU", // Look 2 back since first is current card
-        ts: Date.now(),
-        history: (state.history || []).slice(1),
-        toPrevious: true,
-      };
-    },
     // The manual header's back button leaves the manual outright, however many entries deep
     // the player followed links
     manualTrailCleared: (state) => {
@@ -127,6 +58,80 @@ export const cardSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    builder.addCase(
+      navigate,
+      (state, action: PayloadAction<CardNameType | NavigateActionType>) => {
+        const a =
+          typeof action.payload === "string"
+            ? { name: action.payload }
+            : action.payload;
+        const now = Date.now();
+        if (
+          !a.replaceCurrentCard &&
+          a.name === state.name &&
+          a.entry === state.entry &&
+          JSON.stringify(a.storyTarget) === JSON.stringify(state.storyTarget) &&
+          a.url === state.url &&
+          now - state.ts < NAVIGATION_DEBOUNCE_MS
+        ) {
+          return state;
+        }
+        if (!a.skipBrowserHistory) {
+          getHistoryApi().pushState(null, "", a.url || "#");
+        }
+        // Following a link between manual entries is a step within the manual, like a wiki's: Back
+        // (browser, device or Esc) retraces it, while the card history stays one manual visit deep
+        if (a.fromEntry !== undefined && state.name === "MANUAL") {
+          return {
+            ...state,
+            ts: now,
+            entry: a.entry,
+            manualTrail: [a.fromEntry, ...(state.manualTrail || [])],
+          };
+        }
+        logEvent("card_view", { card: a.name });
+        // TODO better implementation for don't remember, right now it still makes an entry!
+        return {
+          ...state,
+          name: a.name,
+          ts: now,
+          url: a.url,
+          // Cleared rather than carried over, so a plain visit to the manual doesn't reopen
+          // whichever entry the last deep link pointed at
+          entry: a.entry,
+          manualTrail: undefined,
+          storyTarget: a.storyTarget,
+          history: [
+            a.dontRemember ? state.name : a.name,
+            ...(a.replaceCurrentCard
+              ? (state.history || []).slice(1)
+              : state.history || []),
+          ],
+          toPrevious: false,
+        };
+      },
+    );
+    builder.addCase(
+      navigateBack,
+      (state, _action: PayloadAction<CardNameType | undefined>) => {
+        const [previousEntry, ...trail] = state.manualTrail || [];
+        if (state.name === "MANUAL" && previousEntry !== undefined) {
+          return {
+            ...state,
+            ts: Date.now(),
+            entry: previousEntry,
+            manualTrail: trail,
+            toPrevious: true,
+          };
+        }
+        return {
+          name: (state.history || [])[1] || "MAIN_MENU", // Look 2 back since first is current card
+          ts: Date.now(),
+          history: (state.history || []).slice(1),
+          toPrevious: true,
+        };
+      },
+    );
     builder.addCase(multiplayerSnapshot, (state) => {
       // A co-op match starts from the lobby or the screens its players chose it on together.
       if (
@@ -200,7 +205,8 @@ export const cardSlice = createSlice({
   },
 });
 
-export const { navigate, navigateBack, manualTrailCleared } = cardSlice.actions;
+export { navigate, navigateBack } from "./GameActions";
+export const { manualTrailCleared } = cardSlice.actions;
 
 export const selectCardName = (state: RootState) => state.card.name;
 

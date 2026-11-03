@@ -56,8 +56,9 @@ describe("EventLog", () => {
     expect(
       screen
         .getByText("Ongoing events")
-        .compareDocumentPosition(screen.getByText("Coming up")) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+        .compareDocumentPosition(
+          screen.getByRole("heading", { name: "Upcoming" }),
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     const request = { id: 1, runId: 0, target: { card: "EVENTS" as const } };
     view.rerender(<EventLog {...passed} evidenceRequest={request} />);

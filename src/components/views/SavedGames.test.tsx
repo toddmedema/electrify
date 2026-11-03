@@ -1,6 +1,13 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
-import { act, render, screen, within, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import savesReducer, {
   initialSaveLibrary,
@@ -16,6 +23,12 @@ import {
   exportSaveRecovery,
 } from "../../SaveSession";
 import SavedGames from "./SavedGames";
+import uiReducer from "../../reducers/UI";
+import { reportSaveDeleteFailure } from "../../SaveDiagnostics";
+
+jest.mock("../../SaveDiagnostics", () => ({
+  reportSaveDeleteFailure: jest.fn(),
+}));
 
 jest.mock("../../SaveSession", () => ({
   saveSessionMiddleware:
@@ -52,7 +65,11 @@ function entry(overrides: Partial<SaveMetadata> = {}): SaveMetadata {
 }
 function renderLibrary(overrides: Partial<SaveLibraryState> = {}) {
   const testStore = configureStore({
-    reducer: { saves: savesReducer, game: () => ({ inGame: true }) },
+    reducer: {
+      saves: savesReducer,
+      game: () => ({ inGame: true }),
+      ui: uiReducer,
+    },
     preloadedState: {
       saves: {
         ...initialSaveLibrary,
@@ -263,4 +280,122 @@ it("keeps a corrupt entry visible with recovery and deletion while healthy games
   );
   expect(exportSaveRecovery).toHaveBeenCalledWith("wind");
   expect(resumeSavedGame).not.toHaveBeenCalled();
+});
+
+async function confirmDelete() {
+  fireEvent.click(
+    screen.getByRole("button", { name: "Actions for Wind experiment" }),
+  );
+  fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+  fireEvent.click(
+    within(
+      screen.getByRole("dialog", { name: "Delete saved game?" }),
+    ).getByRole("button", { name: "Delete" }),
+  );
+  await act(async () => undefined);
+}
+
+it("releases a hung deletion at six seconds, reports it and permits a fresh retry", async () => {
+  jest.useFakeTimers();
+  let finish!: () => void;
+  (deleteSavedGame as jest.Mock).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const { testStore } = renderLibrary();
+  await confirmDelete();
+  const signal = (deleteSavedGame as jest.Mock).mock.calls[0][1] as AbortSignal;
+  await act(async () => {
+    jest.advanceTimersByTime(5999);
+  });
+  expect(screen.getByRole("button", { name: "Deleting…" })).toBeDisabled();
+  expect(testStore.getState().ui.snackbar.open).toBe(false);
+  await act(async () => {
+    jest.advanceTimersByTime(1);
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(300);
+  });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(signal.aborted).toBe(true);
+  expect(screen.getByRole("button", { name: "Load" })).toBeEnabled();
+  expect(testStore.getState().ui.snackbar.message).toBe(
+    "Delete may have failed. Please try again later.",
+  );
+  expect(reportSaveDeleteFailure).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      timedOut: true,
+      saveCount: 1,
+      pendingSave: false,
+    }),
+  );
+  let retryFinish!: () => void;
+  (deleteSavedGame as jest.Mock).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        retryFinish = resolve;
+      }),
+  );
+  await confirmDelete();
+  expect(deleteSavedGame).toHaveBeenCalledTimes(2);
+  // The old completion must not close or unlock this newer deletion.
+  await act(async () => {
+    finish();
+  });
+  expect(screen.getByRole("button", { name: "Deleting…" })).toBeDisabled();
+  await act(async () => {
+    retryFinish();
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(300);
+  });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("keeps delete failures actionable and clears the deadline after success or failure", async () => {
+  jest.useFakeTimers();
+  const failure = new Error("Storage unavailable");
+  (deleteSavedGame as jest.Mock).mockRejectedValueOnce(failure);
+  const { testStore } = renderLibrary();
+  await confirmDelete();
+  expect(screen.getByText("Storage unavailable")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  expect(reportSaveDeleteFailure).toHaveBeenCalledWith(
+    failure,
+    expect.objectContaining({ timedOut: false }),
+  );
+  (deleteSavedGame as jest.Mock).mockResolvedValueOnce(undefined);
+  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+  await act(async () => undefined);
+  await act(async () => {
+    jest.advanceTimersByTime(300);
+  });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  await act(async () => {
+    jest.advanceTimersByTime(6000);
+  });
+  expect(testStore.getState().ui.snackbar.open).toBe(false);
+});
+
+it("cancels deletion on unmount without reporting or a late toast", async () => {
+  let reject!: (error: Error) => void;
+  (deleteSavedGame as jest.Mock).mockImplementationOnce(
+    () =>
+      new Promise<void>((_, no) => {
+        reject = no;
+      }),
+  );
+  const { unmount, testStore } = renderLibrary();
+  await confirmDelete();
+  const signal = (deleteSavedGame as jest.Mock).mock.calls[0][1] as AbortSignal;
+  unmount();
+  expect(signal.aborted).toBe(true);
+  await act(async () => {
+    reject(new Error("Late rejection"));
+  });
+  expect(reportSaveDeleteFailure).not.toHaveBeenCalled();
+  expect(testStore.getState().ui.snackbar.open).toBe(false);
 });

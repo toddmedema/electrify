@@ -23,7 +23,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       if (saveDisplayName.rejected.match(result)) {
         // rejectWithValue carries the reason the player can act on; anything else means the thunk
         // itself threw, which it is not supposed to
-        return result.payload || "Couldn't save that name. Please try again.";
+        return result.payload || "Couldn't save that name. Try again.";
       }
       dispatch(snackbarOpen(`You're on the board as ${result.payload}.`));
       return undefined;

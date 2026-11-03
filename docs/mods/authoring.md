@@ -36,9 +36,8 @@ When adapting a recipe:
 - Use `requiresChoice` to enable an event for named options. Add `arc` when
   referring to an imported choice. Replace or cancel a load before it starts;
   `with: []` cancels it.
-- Match goal and report windows to the event. Monthly reliability goals must pass
-  in every month of their window. The [goal reference](../mods.md#goals)
-  explains each metric.
+- Match goal and report windows to the event. The [goal reference](../mods.md#goals)
+  explains each metric and the shared difficulty-based reliability rule.
 - Transmission caps affect an operating connection; they do not build a line or
   grant access to imports.
 

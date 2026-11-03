@@ -266,9 +266,11 @@ describe("weather resilience details", () => {
     };
     showDetails(game, solar);
     expect(section()).toHaveTextContent(
-      "Solar trackersMore morning and evening power.",
+      "Solar trackersAbout 20% more morning and evening power.",
     );
-    expect(section()).toHaveTextContent("Trackers stow ahead of hail.");
+    expect(section()).toHaveTextContent(
+      "About 20% more morning and evening power.",
+    );
   });
 
   it("offers no retrofit while a plant is under construction", () => {
@@ -358,7 +360,7 @@ describe("weather resilience details", () => {
 
     const operation = screen.getByRole("region", { name: "Operation" });
     const stats = within(operation).getAllByRole("term");
-    expect(stats[0]).toHaveTextContent("Nameplate capacity");
+    expect(stats[0]).toHaveTextContent("Capacity");
     expect(stats[1]).toHaveTextContent("Current max output");
     expect(within(operation).getAllByRole("definition")[1]).toHaveTextContent(
       "161MW (54%)",

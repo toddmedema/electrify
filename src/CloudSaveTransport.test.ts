@@ -248,7 +248,7 @@ describe("CloudSaveTransport", () => {
   it("fails after bounded collision retries", async () => {
     reads.mockResolvedValue(snapshot({ chunks: [BLOB_ID] }));
     await expect(createSharedSave("creator", fakeSaveFile())).rejects.toThrow(
-      "try again",
+      "Try again",
     );
     expect(runTransaction).toHaveBeenCalledTimes(5);
     expect(commits.every((writes) => writes.length === 0)).toBe(true);

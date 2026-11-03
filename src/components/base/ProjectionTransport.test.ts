@@ -87,6 +87,9 @@ function fixture() {
     { cash: 200 },
   ] as MonthlyHistoryType[];
   const projection: ProjectionView = {
+    objectiveAssets: [
+      { month: 1, debtPrincipal: 123, ownedFuels: { Coal: 2 } },
+    ],
     forecast,
     timeline: [historicalChart, ...forecast],
     sampled: [historicalChart, forecast[0], forecast[2]],

@@ -33,13 +33,11 @@ it("pauses, quotes the exact accepted rate, and resumes", () => {
   store.dispatch(offerLowCashWarning());
   const { dialog } = store.getState().ui;
   expect(store.getState().game.speed).toBe("PAUSED");
-  expect(dialog.title).toBe(
-    "You're about to run out of cash - raise your rates?",
-  );
+  expect(dialog.title).toBe("Low on cash. Raise rates?");
   expect(dialog.secondaryLabel).toBe("Go bankrupt");
   expect(dialog.actionLabel).toBe("Raise rates");
   expect(dialog.notCancellable).toBe(true);
-  const price = Number(String(dialog.message).match(/to ([\d.]+)c\/kWh/)![1]);
+  const price = Number(String(dialog.message).match(/to ([\d.]+)¢\/kWh/)![1]);
   expect(dialog.message).toContain("to avoid bankruptcy this month.");
   store.dispatch(setSpeed("FAST"));
   expect(store.getState().game.speed).toBe("PAUSED");
@@ -109,8 +107,8 @@ it("explains the board cap instead of offering a price that cannot be applied", 
   store.dispatch(offerLowCashWarning());
   const dialog = store.getState().ui.dialog;
   expect(dialog.message).toContain(
-    "Rates alone cannot prevent bankruptcy this month.",
+    "Rates can't prevent bankruptcy this month.",
   );
-  expect(dialog.message).toContain("utility board's maximum rate");
+  expect(dialog.message).toContain("Even the maximum rate");
   expect(dialog.action).toBeUndefined();
 });

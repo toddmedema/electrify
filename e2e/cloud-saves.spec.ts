@@ -265,9 +265,11 @@ for (const theme of ["light", "dark"]) {
     await expect(invitation).toContainText("even offline");
     await expect(invitation).toContainText("sign in later from Saved games");
     await checkDialogLayout(page, "Back up your saves to the cloud", info);
-    if (theme === "light" && info.project.name === "mobile-390px") {
-      await screenshot(page, info, "cloud-invitation-mobile-light.png");
-    }
+    await screenshot(
+      page,
+      info,
+      `cloud-invitation-${info.project.name}-${theme}.png`,
+    );
     await invitation
       .getByRole("button", { name: "Continue without syncing", exact: true })
       .click();
@@ -276,7 +278,7 @@ for (const theme of ["light", "dark"]) {
     const primary = page.getByRole("region", { name: "Primary actions" });
     await expect(primary.getByRole("button")).toHaveText([
       "Continue",
-      "Start a new game",
+      "New game",
       "Saved games",
     ]);
     await expect(

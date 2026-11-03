@@ -1,3 +1,4 @@
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import TouchAppOutlinedIcon from "@mui/icons-material/TouchAppOutlined";
 import { Button, Typography } from "@mui/material";
 import * as React from "react";
@@ -319,7 +320,18 @@ export default function TutorialHud({
   // Next is the step's main button only when it's the only way forward. A step that also
   // advances on an in-game deed keeps it as a quiet fallback, so the ringed control is the one
   // thing on screen asking to be tapped
-  const nextIsPrimary = !step.continueOn && !step.continueOnClick;
+  const requiresNext =
+    !isGatedStep(step) && !step.continueOn && !step.continueOnClick;
+  // Clear before paint, including when Back returns to a previously highlighted step.
+  const [attentionReady, setAttentionReady] = React.useState(false);
+  React.useLayoutEffect(() => {
+    setAttentionReady(false);
+    if (!requiresNext) return;
+    const timer = window.setTimeout(() => setAttentionReady(true), 6000);
+    return () => window.clearTimeout(timer);
+  }, [step, stepIndex, requiresNext]);
+  const showBarSweep = requiresNext && desktop && attentionReady;
+  const nextLabel = step.nextLabel || "Next";
   const progressText = `${stepIndex + 1} of ${totalSteps}`;
   const advanceOnClick = onAutoAdvance ?? onNext;
 
@@ -402,7 +414,9 @@ export default function TutorialHud({
         ring.className = "tutorialTargetRing";
         ring.setAttribute("aria-hidden", "true");
         ring.setAttribute("data-testid", "tutorial-target-ring");
-        if (reminding) {
+        if (requiresNext) {
+          ring.classList.add("tutorialTargetRing-static");
+        } else if (reminding) {
           ring.classList.add("tutorialTargetRingPulse");
         } else {
           // One pulse the moment the step starts draws the eye to where the action is
@@ -467,14 +481,17 @@ export default function TutorialHud({
       frame = window.requestAnimationFrame(tick);
     }
 
-    const reminder = window.setTimeout(() => {
-      reminding = true;
-      rings.forEach((ring, element) => {
-        element.classList.add("tutorialTargetReminder");
-        ring.classList.remove("tutorialTargetRingIntro");
-        ring.classList.add("tutorialTargetRingPulse");
-      });
-    }, 10_000);
+    // A manual step's ring identifies what to read; only Next asks for action.
+    const reminder = requiresNext
+      ? undefined
+      : window.setTimeout(() => {
+          reminding = true;
+          rings.forEach((ring, element) => {
+            element.classList.add("tutorialTargetReminder");
+            ring.classList.remove("tutorialTargetRingIntro");
+            ring.classList.add("tutorialTargetRingPulse");
+          });
+        }, 10_000);
 
     return () => {
       window.clearTimeout(reminder);
@@ -484,13 +501,21 @@ export default function TutorialHud({
       }
       rings.forEach((ring, element) => release(element, ring));
     };
-  }, [step, target]);
+  }, [step, target, requiresNext]);
 
   return (
     <section
       className={`tutorialHud${step.capstone ? " tutorialHud-capstone" : ""}${step.nextLabel ? " tutorialHud-namedAction" : ""}`}
       aria-labelledby="tutorial-step-title"
     >
+      {showBarSweep && (
+        <span
+          key={stepIndex}
+          className="tutorialHudSweep"
+          data-testid="tutorial-hud-sweep"
+          aria-hidden
+        />
+      )}
       <div className="tutorialHudHeader">
         <Typography id="tutorial-step-title" component="h2" variant="subtitle2">
           {step.capstone ? "Your turn" : "Step"}{" "}
@@ -539,16 +564,20 @@ export default function TutorialHud({
             className="tutorialHudNav"
             color="primary"
             size="small"
-            variant={nextIsPrimary ? "contained" : "text"}
+            variant={requiresNext ? "contained" : "text"}
+            endIcon={requiresNext ? <ArrowForwardIcon /> : undefined}
             onClick={onNext}
           >
             {/* Restart the cue each step while the button keeps keyboard focus. */}
-            <span
-              key={stepIndex}
-              className="tutorialHudNextPulse"
-              aria-hidden
-            />
-            {step.nextLabel || "Next"}
+            {requiresNext && !desktop && attentionReady && (
+              <span
+                key={stepIndex}
+                className="tutorialHudNextPulse"
+                data-testid="tutorial-next-pulse"
+                aria-hidden
+              />
+            )}
+            {nextLabel}
           </Button>
         )}
       </div>

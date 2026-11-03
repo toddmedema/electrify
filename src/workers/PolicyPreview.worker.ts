@@ -26,7 +26,7 @@ worker.onmessage = async (
   } catch (_error) {
     worker.postMessage({
       error:
-        "Could not estimate this change. Try another choice or reopen the program.",
+        "Couldn't estimate this change. Try another choice or reopen the program.",
     });
   }
 };
