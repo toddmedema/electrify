@@ -132,7 +132,7 @@ describe("tutorial mission metadata", () => {
         peakW: 500000000,
       }),
     ]);
-    expect(interties.tutorialSteps).toHaveLength(18);
+    expect(interties.tutorialSteps).toHaveLength(19);
   });
 
   it("starts Forecasting with a small solar plant beside its coal plant", () => {

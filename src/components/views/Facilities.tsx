@@ -78,7 +78,7 @@ import {
 import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
 import { facilityDisplayName } from "../base/FacilityLabels";
-import { TradingPolicyType } from "../../Types";
+import { BuyingRuleType, SellingRuleType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 
@@ -842,7 +842,8 @@ export interface DispatchProps {
   onUtilityAcquire?: (
     payload: AcquireUtilityAction,
   ) => boolean | Promise<boolean>;
-  onTradingPolicy: (policy: TradingPolicyType) => void;
+  onBuyingRule: (rule: BuyingRuleType) => void;
+  onSellingRule: (rule: SellingRuleType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -1298,7 +1299,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       onPause,
       onTransmissionBuild,
       onTransmissionUpgrade,
-      onTradingPolicy,
+      onBuyingRule,
+      onSellingRule,
       selectedFacilityId,
     } = this.props;
     const selection = game.facilities.filter((f) =>
@@ -1454,7 +1456,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   onAcquire={this.props.onUtilityAcquire}
                   onCancel={this.props.onTransmissionCancel}
                   onPause={this.props.onTransmissionPause}
-                  onPolicy={onTradingPolicy}
+                  onBuyingRule={onBuyingRule}
+                  onSellingRule={onSellingRule}
                   onBeforeDragStart={this.onBeforeDragStart}
                   onDragEnd={this.onDragEnd}
                 />

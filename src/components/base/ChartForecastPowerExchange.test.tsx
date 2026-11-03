@@ -187,12 +187,33 @@ describe("ChartForecastPowerExchange", () => {
         {...common}
         domain={week}
         timeline={[]}
-        tradingPolicy="CLOSED"
+        transmission={{ buyingRule: "NONE", sellingRule: "NONE" }}
       />,
     );
     expect(UPlotChart).not.toHaveBeenCalled();
     expect(screen.getByRole("note")).toHaveTextContent("trading is turned off");
   });
+
+  it.each([
+    { buyingRule: "NONE", sellingRule: "SURPLUS" },
+    { buyingRule: "SHORTAGES", sellingRule: "NONE" },
+  ] as const)(
+    "does not report trading off when one direction is enabled: $buyingRule / $sellingRule",
+    (transmission) => {
+      render(
+        <ChartForecastPowerExchange
+          {...common}
+          domain={week}
+          timeline={[]}
+          transmission={transmission}
+        />,
+      );
+      expect(UPlotChart).not.toHaveBeenCalled();
+      expect(screen.getByRole("note")).toHaveTextContent(
+        "No imports or exports in this period.",
+      );
+    },
+  );
 
   it("plots a multi-year view as monthly averages", () => {
     const month = MINUTES_PER_MONTH;

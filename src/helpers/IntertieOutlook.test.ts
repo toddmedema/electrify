@@ -29,6 +29,16 @@ const ceo: IntertieContext = {
   peakSharingImportLoss: DIFFICULTIES.CEO.peakSharingImportLoss,
 };
 
+test("both independent rules invalidate the intertie forecast", () => {
+  const game = createGame({ scenarioId: 100, seed: 61 });
+  const initial = intertieForecastKey(game);
+  game.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+  const charging = intertieForecastKey(game);
+  expect(charging).not.toBe(initial);
+  game.transmission!.sellingRule = "PROFITABLE";
+  expect(intertieForecastKey(game)).not.toBe(charging);
+});
+
 /** Hourly ticks for a year; demand and heat both peak at 6pm */
 function year(options: { peakTemperatureC?: number; months?: number } = {}) {
   const { peakTemperatureC = 20, months = 12 } = options;

@@ -1,6 +1,7 @@
 import { beginIntertieStress } from "./GameActions";
 import { parseSave, serializeSave } from "../SaveGame";
 import cloneDeep from "lodash.clonedeep";
+import * as transmissionHelpers from "../helpers/Transmission";
 import {
   TICKS_PER_YEAR,
   TICKS_PER_MONTH,
@@ -11,6 +12,8 @@ import {
 } from "../Constants";
 import {
   getTimeFromTimeline,
+  getDateFromMinute,
+  MINUTES_PER_MONTH,
   summarizeTimeline,
   summarizeHistory,
 } from "../helpers/DateTime";
@@ -18,8 +21,11 @@ import { createGame } from "../testing/Simulator";
 import gameReducer, {
   buildTransmissionLine,
   generateNewTimeline,
-  setTradingPolicy,
+  generateForecastTimeline,
+  setBuyingRule,
+  setSellingRule,
   tickState,
+  tickStatePhases,
   togglePauseFacility,
   setSpeed,
 } from "./Game";
@@ -28,6 +34,8 @@ import {
   DifficultyType,
   GameType,
   TickPresentFutureType,
+  GeneratorOperatingType,
+  StorageOperatingType,
 } from "../Types";
 import { getScenario } from "../data/Scenarios";
 import { getCostTableDeflator } from "../data/Economy";
@@ -128,6 +136,355 @@ function nextTick(state: GameType) {
   };
 }
 
+function tradingFixture(withGenerator = false) {
+  const state = buildNorthernIntertie();
+  state.transmission!.lines[0].yearsToBuildLeft = 0;
+  const base = state.facilities.find(
+    (facility) => facility.fuel === "Natural Gas",
+  )!;
+  const generator = {
+    ...base,
+    id: 1,
+    peakW: 100,
+    currentW: 100,
+    yearsToBuildLeft: 0,
+    spinMinutes: 1,
+    minimumStableOutput: 0,
+    tracksStarts: false,
+    btuPerWh: 0,
+    variableOperatingCostPerMWh: 0,
+    annualOperatingCost: 0,
+    paused: false,
+  } as GeneratorOperatingType;
+  const battery: StorageOperatingType = {
+    ...base,
+    id: 2,
+    name: "Battery",
+    peakW: 100,
+    peakWh: 1000,
+    maxPeakWh: 1000,
+    currentW: 0,
+    currentWh: 0,
+    yearsToBuildLeft: 0,
+    paused: false,
+    roundTripEfficiency: 0.8,
+    hourlyLoss: 0,
+    spinMinutes: 1,
+  };
+  Object.assign(battery, { fuel: undefined });
+  state.facilities = withGenerator ? [generator, battery] : [battery];
+  state.timeline.forEach((tick) => {
+    tick.demandW = 100;
+  });
+  return { state, generator, battery };
+}
+
+describe("independent trading rules", () => {
+  it.each(["fuel", "carbon", "inflation", "story"] as const)(
+    "rejects extra generation when added %s costs cross the export price",
+    (cost) => {
+      const price = jest
+        .spyOn(transmissionHelpers, "adjacentMarketPricePerMWh")
+        .mockReturnValue(100);
+      try {
+        const make = () => {
+          const { state, generator } = tradingFixture(true);
+          state.facilities = [generator];
+          generator.peakW = 200;
+          generator.btuPerWh = 1;
+          generator.variableOperatingCostPerMWh = 20;
+          state.feePerKgCO2e = 0;
+          state.transmission!.sellingRule = "PROFITABLE";
+          return { state, generator };
+        };
+        const cheap = make(),
+          expensive = make();
+        if (cost === "fuel") expensive.generator.btuPerWh = 1000;
+        if (cost === "carbon") expensive.state.feePerKgCO2e = 1000;
+        if (cost === "inflation") expensive.generator.costIndexAtBuild = 0.01;
+        if (cost === "story")
+          expensive.state.worldEvents.active.push({
+            key: "trading-operating-cost",
+            definitionId: "trading-operating-cost",
+            startsMinute: 0,
+            endsMinute: 1440,
+            attributes: {},
+            effects: { operatingCostMultipliersByFuel: { "Natural Gas": 10 } },
+          });
+        tickState(cheap.state);
+        tickState(expensive.state);
+        expect(
+          getTimeFromTimeline(cheap.state.date.minute, cheap.state.timeline)!
+            .exportedW,
+        ).toBe(100);
+        expect(
+          getTimeFromTimeline(
+            expensive.state.date.minute,
+            expensive.state.timeline,
+          )!.exportedW,
+        ).toBe(0);
+        expect(expensive.generator.currentW).toBe(100);
+      } finally {
+        price.mockRestore();
+      }
+    },
+  );
+
+  it("shares one generator ramp allowance across peer and external export settlement", () => {
+    const price = jest
+      .spyOn(transmissionHelpers, "adjacentMarketPricePerMWh")
+      .mockReturnValue(100);
+    try {
+      const { state, generator } = tradingFixture(true);
+      state.facilities = [generator];
+      state.multiplayer = { seat: "seller", pricePerMWh: 100 };
+      state.transmission!.sellingRule = "PROFITABLE";
+      generator.peakW = 200;
+      generator.spinMinutes = 60;
+      const phases = tickStatePhases(state);
+      const planned = phases.next();
+      expect(planned.done).toBe(false);
+      expect(planned.value).toMatchObject({ shortageW: 0 });
+      expect(
+        phases.next({ importedW: 0, exportedW: 20, importEmissionsKgPerMWh: 0 })
+          .done,
+      ).toBe(true);
+      const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+      expect(generator.currentW).toBe(150);
+      expect(now.exportedW).toBe(50);
+      expect(state.transmission!.lines[0].currentFlowW).toBe(-30);
+    } finally {
+      price.mockRestore();
+    }
+  });
+  it.each(["NONE", "SHORTAGES", "SHORTAGES_AND_STORAGE"] as const)(
+    "covers customer demand before importing for storage with buying %s",
+    (buyingRule) => {
+      for (const sellingRule of ["NONE", "SURPLUS", "PROFITABLE"] as const) {
+        const { state, battery } = tradingFixture();
+        Object.assign(state.transmission!, { buyingRule, sellingRule });
+        tickState(state);
+        const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+        expect(now.supplyW).toBe(buyingRule === "NONE" ? 0 : 100);
+        expect(now.storageImportedW || 0).toBe(
+          buyingRule === "SHORTAGES_AND_STORAGE" ? 100 : 0,
+        );
+        expect(now.importedW).toBe(
+          buyingRule === "NONE"
+            ? 0
+            : buyingRule === "SHORTAGES_AND_STORAGE"
+              ? 200
+              : 100,
+        );
+        expect(now.exportedW).toBe(0);
+        expect(now.demandW).toBe(100);
+        expect(battery.currentWh).toBeCloseTo(
+          buyingRule === "SHORTAGES_AND_STORAGE" ? 20 : 0,
+        );
+        expect(now.storageLossWh).toBeCloseTo(
+          buyingRule === "SHORTAGES_AND_STORAGE" ? 5 : 0,
+        );
+      }
+    },
+  );
+
+  it("keeps paid storage imports out of customer revenue and native lifetime attribution", () => {
+    const baseline = tradingFixture(true);
+    const buying = cloneDeep(baseline.state);
+    buying.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+    tickState(baseline.state);
+    tickState(buying);
+    const before = getTimeFromTimeline(
+      baseline.state.date.minute,
+      baseline.state.timeline,
+    )!;
+    const after = getTimeFromTimeline(buying.date.minute, buying.timeline)!;
+    expect(after.storageImportedW).toBe(100);
+    expect(after.revenue).toBe(before.revenue);
+    expect(buying.facilities[0].lifetimeRevenue).toBe(
+      baseline.state.facilities[0].lifetimeRevenue,
+    );
+    expect(after.expensesImports).toBeGreaterThan(before.expensesImports);
+    expect(after.importedKgco2e).toBeGreaterThan(before.importedKgco2e || 0);
+    expect(after.storageChargeW).toBe(100);
+    expect(after.reserveW).toBeCloseTo((before.reserveW || 0) + 180);
+  });
+
+  it.each([{ paused: true }, { yearsToBuildLeft: 1 }, { currentWh: 1000 }])(
+    "does not import into unavailable storage %p",
+    (overrides) => {
+      const { state, battery } = tradingFixture();
+      Object.assign(battery, overrides);
+      state.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+      tickState(state);
+      expect(
+        getTimeFromTimeline(state.date.minute, state.timeline)!
+          .storageImportedW,
+      ).toBe(0);
+    },
+  );
+
+  it("does not buy to refill a store that is discharging in the same tick", () => {
+    const { state, battery } = tradingFixture();
+    battery.currentWh = 100;
+    state.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.storageDischargeW).toBe(100);
+    expect(now.storageImportedW).toBe(0);
+    expect(now.storageChargeW).toBe(0);
+  });
+
+  it("changes each rule independently and removes only its own reverted decision", () => {
+    let state = buildNorthernIntertie();
+    state = cloneDeep(
+      gameReducer(state, setBuyingRule("SHORTAGES_AND_STORAGE")),
+    );
+    state = cloneDeep(gameReducer(state, setSellingRule("NONE")));
+    expect(state.transmission).toMatchObject({
+      buyingRule: "SHORTAGES_AND_STORAGE",
+      sellingRule: "NONE",
+    });
+    expect(state.meaningfulDecisions.map((d) => d.key)).toEqual(
+      expect.arrayContaining(["trading:buying", "trading:selling"]),
+    );
+    state = cloneDeep(gameReducer(state, setBuyingRule("SHORTAGES")));
+    expect(
+      state.meaningfulDecisions.some((d) => d.key === "trading:buying"),
+    ).toBe(false);
+    expect(
+      state.meaningfulDecisions.some((d) => d.key === "trading:selling"),
+    ).toBe(true);
+    expect(state.transmission!.sellingRule).toBe("NONE");
+    expect(
+      gameReducer(state, { type: setBuyingRule.type, payload: "BAD" }),
+    ).toEqual(state);
+    expect(
+      gameReducer(state, { type: setSellingRule.type, payload: "BAD" }),
+    ).toEqual(state);
+  });
+
+  it("dispatches profitable output onto the actual paying line and books its added costs", () => {
+    const price = jest
+      .spyOn(transmissionHelpers, "adjacentMarketPricePerMWh")
+      .mockImplementation((id) => (id === "california-north" ? 20 : 80));
+    try {
+      const { state, generator } = tradingFixture(true);
+      state.facilities = [generator];
+      generator.peakW = 200;
+      generator.variableOperatingCostPerMWh = 50;
+      state.transmission!.sellingRule = "PROFITABLE";
+      state.transmission!.lines.push({
+        ...state.transmission!.lines[0],
+        id: 3,
+        corridorId: "california-south",
+      });
+      const baseline = cloneDeep(state);
+      baseline.transmission!.sellingRule = "SURPLUS";
+      tickState(baseline);
+      tickState(state);
+      const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+      const previous = getTimeFromTimeline(
+        baseline.date.minute,
+        baseline.timeline,
+      )!;
+      expect(
+        state.transmission!.lines.map((line) => line.currentFlowW),
+      ).toEqual([0, -100]);
+      expect(generator.currentW).toBe(200);
+      expect(now.revenueExports - previous.revenueExports).toBeGreaterThan(
+        now.expensesOM - previous.expensesOM,
+      );
+      expect(now.importedW).toBe(0);
+      // A price collapse forbids a new discretionary increment; ordinary output still ramps down.
+      price.mockReturnValue(5);
+      generator.spinMinutes = 60;
+      tickState(state);
+      expect(generator.currentW).toBe(150);
+      expect(
+        getTimeFromTimeline(state.date.minute, state.timeline)!.exportedW,
+      ).toBe(50);
+    } finally {
+      price.mockRestore();
+    }
+  });
+
+  it("does not start an offline plant solely to sell profitable output", () => {
+    const { state, generator } = tradingFixture(true);
+    state.facilities = [generator];
+    generator.currentW = 0;
+    generator.peakW = 200;
+    state.transmission!.sellingRule = "PROFITABLE";
+    tickState(state);
+    expect(generator.currentW).toBe(100);
+    expect(
+      getTimeFromTimeline(state.date.minute, state.timeline)!.exportedW,
+    ).toBe(0);
+  });
+
+  it("forecasts hourly storage purchases repeatedly without mutating or recharging the live fleet", () => {
+    const { state } = tradingFixture();
+    state.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+    state.startingDemandScale = 1e-6;
+    const original = JSON.stringify(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    const first = generateForecastTimeline(
+      state,
+      now.cash,
+      now.customers,
+      4,
+      60,
+    );
+    const second = generateForecastTimeline(
+      state,
+      now.cash,
+      now.customers,
+      4,
+      60,
+    );
+    expect(first).toEqual(second);
+    expect(first.some((tick) => (tick.storageImportedW || 0) > 0)).toBe(true);
+    expect(JSON.stringify(state)).toBe(original);
+    expect(first.every((tick) => tick.storedWh <= 1000)).toBe(true);
+  });
+
+  it("charges purchased storage energy only once across the month-boundary pre-rolls", () => {
+    const { state, battery } = tradingFixture();
+    state.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+    state.startingDemandScale = 1e-6;
+    state.date = getDateFromMinute(MINUTES_PER_MONTH - 15, state.startingYear);
+    tickState(state);
+    expect(state.date.monthsElapsed).toBe(1);
+    expect(battery.currentWh).toBeCloseTo(20);
+    expect(
+      getTimeFromTimeline(state.date.minute, state.timeline)!.storedWh,
+    ).toBeCloseTo(20);
+  });
+
+  it("gives native and imported charging the same reachable storage reserve", () => {
+    const native = tradingFixture(true);
+    const imported = tradingFixture(true);
+    native.generator.peakW = 150;
+    native.generator.currentW = 150;
+    native.battery.peakW = 50;
+    imported.battery.peakW = 50;
+    imported.state.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+    tickState(native.state);
+    tickState(imported.state);
+    const a = getTimeFromTimeline(
+      native.state.date.minute,
+      native.state.timeline,
+    )!;
+    const b = getTimeFromTimeline(
+      imported.state.date.minute,
+      imported.state.timeline,
+    )!;
+    expect(a.storageChargeW).toBe(b.storageChargeW);
+    expect(a.storedWh).toBe(b.storedWh);
+    expect(a.reserveW).toBeCloseTo(b.reserveW || 0);
+  });
+});
+
 describe("transmission actions", () => {
   it("cannot enable transmission inside earlier tutorials", () => {
     for (const scenarioId of [0, 1, 2, 4, 3, 5]) {
@@ -143,7 +500,7 @@ describe("transmission actions", () => {
         ).transmission,
       ).toBeUndefined();
       expect(
-        gameReducer(game, setTradingPolicy("RELIABILITY_FIRST")).transmission,
+        gameReducer(game, setSellingRule("NONE")).transmission,
       ).toBeUndefined();
     }
   });
@@ -181,23 +538,20 @@ describe("transmission actions", () => {
 
   it("rejects an ineffective trading rule until an intertie exists", () => {
     const game = createGame({ scenarioId: 100, seed: 61 });
-    const next = gameReducer(game, setTradingPolicy("RELIABILITY_FIRST"));
-    expect(next.transmission?.tradingPolicy).toBe("BALANCED");
+    const next = gameReducer(game, setSellingRule("NONE"));
+    expect(next.transmission?.sellingRule).toBe("SURPLUS");
     expect(next.meaningfulDecisions).toEqual([]);
   });
 
   it("updates and records the trading rule once it governs an intertie", () => {
-    const next = gameReducer(
-      buildNorthernIntertie(),
-      setTradingPolicy("RELIABILITY_FIRST"),
-    );
-    expect(next.transmission?.tradingPolicy).toBe("RELIABILITY_FIRST");
+    const next = gameReducer(buildNorthernIntertie(), setSellingRule("NONE"));
+    expect(next.transmission?.sellingRule).toBe("NONE");
     expect(next.meaningfulDecisions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          key: "trading",
+          key: "trading:selling",
           kind: "trading",
-          label: "Set the regional trading rule",
+          label: "Set the selling rule",
         }),
       ]),
     );
@@ -329,7 +683,8 @@ describe("transmission actions", () => {
       let state = createGame({ scenarioId: 112 });
       const appState = () => ({ game: state }) as AppStateType;
       expect(state.transmission).toEqual({
-        tradingPolicy: "BALANCED",
+        buyingRule: "SHORTAGES",
+        sellingRule: "SURPLUS",
         lines: [],
       });
       expect(state.facilities.map(({ fuel }) => fuel)).toEqual([
@@ -385,14 +740,12 @@ describe("transmission actions", () => {
           .advanceOn?.(appState()),
       ).toBe(true);
 
-      state = cloneDeep(
-        gameReducer(state, setTradingPolicy("RELIABILITY_FIRST")),
-      );
+      state = cloneDeep(gameReducer(state, setSellingRule("NONE")));
       const gas = state.facilities.find(({ fuel }) => fuel === "Natural Gas")!;
       state = cloneDeep(gameReducer(state, togglePauseFacility(gas.id)));
       expect(
         steps
-          .find((step) => step.action === "Choose “Buy for shortages only”")!
+          .find((step) => step.action === "Choose “None” for Selling")!
           .advanceOn?.(appState()),
       ).toBe(true);
       expect(
@@ -431,7 +784,7 @@ describe("transmission actions", () => {
       );
 
       const capstone = steps.find((step) => step.capstone)!.capstone!;
-      state = cloneDeep(gameReducer(state, setTradingPolicy("CLOSED")));
+      state = cloneDeep(gameReducer(state, setBuyingRule("NONE")));
       const solar = state.facilities.find(({ fuel }) => fuel === "Sun")!;
       state = cloneDeep(gameReducer(state, togglePauseFacility(solar.id)));
       state.eventLog.push({
@@ -444,7 +797,12 @@ describe("transmission actions", () => {
       while (state.date.monthsElapsed < 14) tickState(state);
       expect(capstone.success(appState())).toBe(false);
 
-      state = cloneDeep(gameReducer(state, setTradingPolicy("BALANCED")));
+      state = cloneDeep(
+        gameReducer(
+          gameReducer(state, setBuyingRule("SHORTAGES")),
+          setSellingRule("SURPLUS"),
+        ),
+      );
       state = cloneDeep(gameReducer(state, togglePauseFacility(solar.id)));
       while (state.date.monthsElapsed < 15) {
         tickState(state);
@@ -682,9 +1040,9 @@ describe("transmission actions", () => {
     // Every policy decision is made with the clock stopped, so there is no next real tick to
     // correct a stale reading: the section header says "No power flowing" while the row still
     // shows the megawatts the line was carrying a moment ago.
-    const after = cloneDeep(gameReducer(state, setTradingPolicy("CLOSED")));
+    const after = cloneDeep(gameReducer(state, setBuyingRule("NONE")));
 
-    expect(after.transmission!.tradingPolicy).toBe("CLOSED");
+    expect(after.transmission!.buyingRule).toBe("NONE");
     after.transmission!.lines.forEach((line) =>
       expect(line.currentFlowW).toBe(0),
     );

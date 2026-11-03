@@ -1701,7 +1701,7 @@ export default class Insights extends React.Component<Props, State> {
                 multiyear={multiyear}
                 syncKey={syncKey}
                 currentMinute={projection.forecast[0]?.minute}
-                tradingPolicy={game.transmission?.tradingPolicy}
+                transmission={game.transmission}
               />
             </>
           );

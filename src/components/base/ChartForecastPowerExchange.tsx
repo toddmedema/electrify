@@ -12,7 +12,7 @@ import {
   yAxis,
   zeroLinePlugin,
 } from "./UPlotHelpers";
-import { TickPresentFutureType, TradingPolicyType } from "../../Types";
+import { TickPresentFutureType, TransmissionStateType } from "../../Types";
 import {
   formatMinuteAsTooltipHeader,
   getDateFromMinute,
@@ -37,8 +37,8 @@ export interface Props {
   syncKey?: string;
   /** Where recorded history ends and the forecast begins, marked with a line */
   currentMinute?: number;
-  /** With trading closed the empty chart says so, rather than blaming balanced supply */
-  tradingPolicy?: TradingPolicyType;
+  /** With both directions disabled the empty chart says so, rather than blaming balanced supply */
+  transmission?: Pick<TransmissionStateType, "buyingRule" | "sellingRule">;
 }
 
 /** What crossed the interties at one moment, or on average across a month. */
@@ -265,7 +265,7 @@ export default class ChartForecastPowerExchange extends React.PureComponent<
       showXLabels,
       syncKey,
       currentMinute,
-      tradingPolicy,
+      transmission,
     } = this.props;
     const monthly = domain.x[1] - domain.x[0] > MONTHLY_ABOVE_MINUTES;
     const points = exchangePoints(timeline, monthly);
@@ -296,7 +296,8 @@ export default class ChartForecastPowerExchange extends React.PureComponent<
           color="text.secondary"
           sx={{ mx: 2, my: 1 }}
         >
-          {tradingPolicy === "CLOSED"
+          {transmission?.buyingRule === "NONE" &&
+          transmission.sellingRule === "NONE"
             ? "No power is crossing your interties because trading is turned off."
             : "No imports or exports in this period. Your interties only trade when you fall short or have surplus to sell."}
         </Typography>

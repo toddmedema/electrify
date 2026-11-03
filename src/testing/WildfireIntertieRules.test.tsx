@@ -29,6 +29,10 @@ test.each(DIFFICULTY_IDS)(
       [],
     );
     const game = createGame({ scenarioId: 111, difficulty, seed: 12345 });
+    expect(game.transmission).toMatchObject({
+      buyingRule: "SHORTAGES",
+      sellingRule: "SURPLUS",
+    });
     expect(game.customScenario).toBeUndefined();
     expect(pendingScenarioChoice(game)).toBeUndefined();
     const rules = rulesFor(difficulty);

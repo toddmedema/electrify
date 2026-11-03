@@ -1506,7 +1506,8 @@ $pane_header_height: 48px;
   }
 }
 
-.tradingPolicy,
+.buyingRule,
+.sellingRule,
 .transmissionLine,
 .powerExchangeSummary {
   background: var(--bg-primary);
@@ -5446,6 +5447,25 @@ $homeSmokeCycle: 5.6s;
 }
 .tradingControls {
   padding: 0 16px 12px;
+  display: grid;
+  gap: 8px;
+}
+.tradingRuleFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+
+  .MuiInputBase-root {
+    height: 100%;
+    min-height: 40px;
+  }
+  .MuiSelect-select {
+    white-space: normal;
+    text-overflow: clip;
+  }
+  .MuiFormControl-root {
+    min-width: 0;
+  }
 }
 @media (pointer: coarse) {
   .tradingControls .MuiInputBase-root {

@@ -27,9 +27,15 @@ export type MonthType =
 export type DifficultyType = "Intern" | "Employee" | "Manager" | "VP" | "CEO";
 export type SpeedType = "PAUSED" | "SLOW" | "NORMAL" | "FAST" | "ULTRA";
 
-/** How an intertie may trade with neighbouring electricity markets. */
-export type TradingPolicyType =
-  "BALANCED" | "RELIABILITY_FIRST" | "SURPLUS_ONLY" | "CLOSED";
+/** Independent permissions for optional market and peer trading. */
+export const BUYING_RULES = [
+  "NONE",
+  "SHORTAGES",
+  "SHORTAGES_AND_STORAGE",
+] as const;
+export type BuyingRuleType = (typeof BUYING_RULES)[number];
+export const SELLING_RULES = ["NONE", "SURPLUS", "PROFITABLE"] as const;
+export type SellingRuleType = (typeof SELLING_RULES)[number];
 
 /** Authored facts about a neighbouring wholesale electricity market. */
 export interface AdjacentMarketDefinitionType {
@@ -113,7 +119,8 @@ export interface IntertieUpgradeType {
 }
 
 export interface TransmissionStateType {
-  tradingPolicy: TradingPolicyType;
+  buyingRule: BuyingRuleType;
+  sellingRule: SellingRuleType;
   lines: TransmissionLineOperatingType[];
 }
 
@@ -427,6 +434,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     entitlementImportedW?: number;
     entitlementImportCapacityW?: number;
     importedW?: number;
+    storageImportedW?: number; // Subset of imports consumed by utility storage, not customers.
     exportedW?: number;
     transmissionCapacityW?: number;
     /** Resolved route restrictions shared by dispatch and intertie forecasts. */
@@ -1200,6 +1208,8 @@ export interface PolicyChangeType {
 export interface PeerPlan {
   offerW: number;
   shortageW: number;
+  /** Optional utility-storage charging, always subordinate to customer shortages. */
+  storageChargeW?: number;
   pricePerMWh: number;
   temperatureC: number;
   solarIrradianceWM2: number;
@@ -1230,6 +1240,8 @@ export interface CompanyResultType extends CompanyOutcomeType {
 /** What the shared market delivered to one grid this tick. */
 export interface PeerSettlement {
   importedW: number;
+  /** The part of importedW consumed by utility storage rather than customers. */
+  storageImportedW?: number;
   exportedW: number;
   importEmissionsKgPerMWh: number;
 }

@@ -1,3 +1,4 @@
+import { isBuyingRule, isSellingRule } from "../helpers/TradingRules";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
 import { UTILITY_TARGETS } from "../data/UtilityExpansion";
@@ -11,11 +12,7 @@ import { withResilienceOptions } from "../helpers/Hazards";
 import { validPolicyChange } from "../helpers/Policies";
 import { validScenarioResponse } from "../helpers/ScenarioChoices";
 import { isStorage } from "../Types";
-import type {
-  FacilityShoppingType,
-  GameType,
-  TradingPolicyType,
-} from "../Types";
+import type { FacilityShoppingType, GameType } from "../Types";
 import type { gameSlice } from "../reducers/Game";
 import type * as GameActions from "../reducers/GameActions";
 
@@ -23,13 +20,6 @@ import type * as GameActions from "../reducers/GameActions";
 type GameActionName = keyof typeof gameSlice.actions | keyof typeof GameActions;
 type Validation = { error: string } | { payload: unknown };
 type Validator = (game: GameType, payload: unknown) => Validation;
-
-const TRADING_POLICIES: TradingPolicyType[] = [
-  "BALANCED",
-  "RELIABILITY_FIRST",
-  "SURPLUS_ONLY",
-  "CLOSED",
-];
 
 const facility: Validator = (game, payload) =>
   Number.isSafeInteger(payload) && game.facilities.some((f) => f.id === payload)
@@ -168,10 +158,14 @@ const GAME_COMMAND_VALIDATORS = {
   reprioritizeTransmissionLine: dispatchPosition(
     (game) => game.transmission?.lines.length ?? 0,
   ),
-  setTradingPolicy: (_game, payload) =>
-    TRADING_POLICIES.includes(String(payload) as TradingPolicyType)
+  setBuyingRule: (_game, payload) =>
+    isBuyingRule(payload)
       ? { payload }
-      : { error: "Choose a valid trading policy" },
+      : { error: "Choose a valid buying rule" },
+  setSellingRule: (_game, payload) =>
+    isSellingRule(payload)
+      ? { payload }
+      : { error: "Choose a valid selling rule" },
   schedulePolicy: policy,
   cancelPolicy: policy,
   chooseScenarioResponse: (_game, payload) =>
