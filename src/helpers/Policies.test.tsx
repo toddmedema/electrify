@@ -35,6 +35,8 @@ import { pendingScenarioChoice } from "./ScenarioChoices";
 import { parseSave, serializeSave } from "../SaveGame";
 import { TICK_MINUTES, TICKS_PER_MONTH, TICKS_PER_YEAR } from "../Constants";
 import { GameType } from "../Types";
+import { modScenario } from "../mods/ModScenario";
+import { modPackage } from "../testing/ModFixtures";
 
 function month(game: GameType) {
   const target = game.date.monthsElapsed + 1;
@@ -215,6 +217,126 @@ test("solar affects only eligible daylight load after efficiency; neutral demand
     original.demandByType["Data Centers"],
   );
   expect(tick.demandByType.Industrial).toBe(original.demandByType.Industrial);
+});
+
+test("campaign months meter gross eligible demand and zero savings even with programs off", () => {
+  const game = createGame({ scenarioId: 117, seed: 611 });
+  const opening = game.timeline[0];
+  expect(opening.efficiencySavedW).toBe(0);
+  expect(opening.rebateEligibleW).toBeCloseTo(
+    opening.demandByType.Residential + opening.demandByType.Commercial,
+  );
+  month(game);
+  const row = game.monthlyHistory[0];
+  expect(row.efficiencySavedWh).toBe(0);
+  expect(row.efficiencyEligibleWh).toBeGreaterThan(0);
+  expect(row.eveningDemandWh).toBeGreaterThan(0);
+  expect(row.eveningUnservedWh).toBeGreaterThanOrEqual(0);
+});
+
+test.each([121, 123])(
+  "standalone native scenario %s records its first month's objective meters without campaign context",
+  (scenarioId) => {
+    const game = createGame({ scenarioId, seed: 611 });
+    expect(game.scenarioId).toBe(scenarioId);
+    expect(game.campaign).toBeUndefined();
+    expect(game.timeline[0].efficiencySavedW).toBe(0);
+    expect(game.timeline[0].rebateEligibleW).toBeCloseTo(
+      game.timeline[0].demandByType.Residential +
+        game.timeline[0].demandByType.Commercial,
+    );
+    month(game);
+    expect(game.monthlyHistory).toHaveLength(1);
+    const row = game.monthlyHistory[0];
+    expect(row.efficiencySavedWh).toBe(0);
+    expect(row.efficiencyEligibleWh).toBeGreaterThan(0);
+    expect(row.eveningDemandWh).toBeGreaterThan(0);
+    expect(row.eveningUnservedWh).toBeGreaterThanOrEqual(0);
+    expect(row.eveningUnservedWh).toBeLessThanOrEqual(row.eveningDemandWh!);
+  },
+);
+
+test("community efficiency and evening goals meter actual completed months with programs off", () => {
+  const game = createGame({
+    scenarioId: 999,
+    scenario: modScenario(
+      modPackage({
+        officialArcs: [],
+        objectives: [
+          {
+            id: "save-electricity",
+            label: "Save eligible electricity",
+            metric: "efficiencySavings",
+            minShare: 0.05,
+            fromMonth: 1,
+            throughMonth: 3,
+          },
+          {
+            id: "serve-evenings",
+            label: "Serve evening demand",
+            metric: "demandServedShare",
+            hours: [17, 21],
+            minShare: 0.995,
+            fromMonth: 1,
+            throughMonth: 3,
+          },
+        ],
+        scenario: {
+          durationMonths: 6,
+          startingYear: 2020,
+          startingCustomers: 1000,
+          cash: 1e9,
+        },
+      }),
+      undefined,
+      "Employee",
+    ),
+  });
+  expect(game.campaign).toBeUndefined();
+  expect(game.timeline[0].efficiencySavedW).toBe(0);
+  expect(game.timeline[0].rebateEligibleW).toBeGreaterThan(0);
+  month(game);
+  expect(game.monthlyHistory).toHaveLength(1);
+  const row = game.monthlyHistory[0];
+  expect(row.efficiencySavedWh).toBe(0);
+  expect(row.efficiencyEligibleWh).toBeGreaterThan(0);
+  expect(row.eveningDemandWh).toBeGreaterThan(0);
+  expect(row.eveningUnservedWh).toBeGreaterThanOrEqual(0);
+  expect(row.eveningUnservedWh).toBeLessThanOrEqual(row.eveningDemandWh!);
+  expect(parseSave(serializeSave(game))).not.toBeNull();
+});
+
+test("optional campaign meters round trip, keep old observations absent, and reject invalid values", () => {
+  const game = createGame({ scenarioId: 106 });
+  month(game);
+  const old = JSON.parse(JSON.stringify(serializeSave(game)));
+  expect(parseSave(old)?.game.monthlyHistory[0]).not.toHaveProperty(
+    "efficiencySavedWh",
+  );
+  const meters = {
+    efficiencySavedWh: 10,
+    efficiencyEligibleWh: 100,
+    eveningDemandWh: 100,
+    eveningUnservedWh: 1,
+  };
+  Object.assign(old.game.monthlyHistory[0], meters);
+  expect(parseSave(old)?.game.monthlyHistory[0]).toMatchObject(meters);
+  for (const field of Object.keys(meters)) {
+    for (const invalid of [-1, NaN, Infinity, "bad", null]) {
+      const corrupted = JSON.parse(JSON.stringify(old));
+      corrupted.game.monthlyHistory[0][field] = invalid;
+      expect(parseSave(corrupted)).toBeNull();
+    }
+  }
+  for (const [numerator, denominator] of [
+    ["efficiencySavedWh", "efficiencyEligibleWh"],
+    ["eveningUnservedWh", "eveningDemandWh"],
+  ]) {
+    const corrupted = JSON.parse(JSON.stringify(old));
+    corrupted.game.monthlyHistory[0][numerator] =
+      corrupted.game.monthlyHistory[0][denominator] + 1;
+    expect(parseSave(corrupted)).toBeNull();
+  }
 });
 
 test("preview is isolated, matches the estimated forecast and monthly costs reach cash/history", () => {

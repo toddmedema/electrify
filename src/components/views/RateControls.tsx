@@ -13,6 +13,7 @@ import {
   currentTick,
 } from "../../helpers/GameSelectors";
 import { getRateInflationIndex } from "../../data/Economy";
+import { legacyMarketReferenceRate } from "../../helpers/LegacyCampaign";
 import { getDateFromMinute, summarizeHistory } from "../../helpers/DateTime";
 import {
   customerMarketSizeAt,
@@ -153,8 +154,9 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
   }, [game, now, investorOwned]);
   if (!now) return null;
   const scenario = activeScenarioOrDefault(game);
+  const referenceRate = legacyMarketReferenceRate(game, scenario);
   const marketRate = getMarketRate(
-    scenario.dollarsPerkWh,
+    referenceRate,
     game.date,
     game.startingYear,
     game.seed,
@@ -165,7 +167,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     currentRate: game.dollarsPerkWh,
     marketRateAt: (tick) =>
       getMarketRate(
-        scenario.dollarsPerkWh,
+        referenceRate,
         getDateFromMinute(
           game.date.minute + tick * TICK_MINUTES,
           game.startingYear,
@@ -191,7 +193,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     game.seed,
   );
   const targetRate = publicTargetRate(
-    scenario.dollarsPerkWh,
+    referenceRate,
     game.date,
     game.startingYear,
     game.seed,
@@ -201,7 +203,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
   const canFollow = !investor && !scenario.tutorialSteps && !game.multiplayer;
   const following = canFollow && !!game.rateFollowsInflation;
   const max = publicRateCap(
-    scenario.dollarsPerkWh,
+    referenceRate,
     game.date,
     game.startingYear,
     game.seed,
@@ -217,7 +219,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
   const hasEstimate = nextSupplyWh !== undefined;
   const rateScore = (rate: number) =>
     publicRateYearContribution(
-      scenario.dollarsPerkWh,
+      referenceRate,
       pastTotals,
       { supplyWh: nextSupplyWh ?? 0 },
       rate,

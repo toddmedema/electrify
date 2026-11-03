@@ -1,3 +1,4 @@
+import { needsObjectiveEnergyMeters } from "./ScenarioRules";
 import { GAME_TO_REAL_YEARS, TICK_MINUTES, TICKS_PER_YEAR } from "../Constants";
 import { getScenario } from "../data/Scenarios";
 import {
@@ -10,8 +11,12 @@ import { sampleForecastTimeline } from "./ForecastSampling";
 import { generateForecastTimeline } from "../reducers/Game";
 import { GameType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
 import type { ObjectiveMonthFacts } from "../data/ScenarioObjectives";
-import { scenarioObjectiveDefinitions } from "./ObjectiveRules";
+import {
+  objectiveOwnedVintageFuels,
+  scenarioObjectiveDefinitions,
+} from "./ObjectiveRules";
 import { getTotalDebt } from "./Financials";
+import { legacyMonthOffset } from "./LegacyCampaign";
 
 /**
  * The one long-range projection a game has.
@@ -34,7 +39,10 @@ export function cashRunwayHorizon(game: GameType): number {
   return duration !== undefined && Number.isFinite(duration) && duration > 0
     ? Math.min(
         MAX_FORECAST_YEARS * 12,
-        Math.max(0, duration - game.date.monthsElapsed),
+        Math.max(
+          0,
+          duration + legacyMonthOffset(game) - game.date.monthsElapsed,
+        ),
       )
     : 12;
 }
@@ -51,6 +59,7 @@ export interface ProjectionView {
     | "month"
     | "debtPrincipal"
     | "ownedFuels"
+    | "ownedVintageFuels"
     | "ownedUtilities"
     | "ownedAssetIds"
   >[];
@@ -160,6 +169,19 @@ export function projectionSignature(game: GameType): string {
     JSON.stringify(game.location),
     game.customerMarketSize,
     game.startingDemandScale,
+    game.campaign
+      ? JSON.stringify([
+          game.campaign.generationIndex,
+          game.campaign.termStartMonth,
+          game.campaign.openingCustomers,
+          game.campaign.referenceRate,
+          game.campaign.inheritedDemandMultiplier,
+          game.campaign.peakMW,
+          game.campaign.northCapacityMW,
+          game.campaign.debtAllowance,
+          game.campaign.emissionsBudgetTonnes,
+        ])
+      : "",
     JSON.stringify(
       game.utilityExpansion && {
         acquisitions: game.utilityExpansion.acquisitions,
@@ -200,10 +222,11 @@ function buildProjection(
 
   // Cash risk and charts share one simulation, never longer than 20 years.
   const cashMonths = cashRunwayHorizon(game);
-  const needsAssets = scenarioObjectiveDefinitions(
+  const objectives = scenarioObjectiveDefinitions(
     getScenario(game.scenarioId, game.customScenario),
     game,
-  ).some(({ metric }) =>
+  );
+  const needsAssets = objectives.some(({ metric }) =>
     [
       "monthEndDebt",
       "fuelRetirement",
@@ -232,9 +255,14 @@ function buildProjection(
             if (facility.fuel)
               ownedFuels[facility.fuel] = (ownedFuels[facility.fuel] ?? 0) + 1;
           }
+          const ownedVintageFuels = objectiveOwnedVintageFuels(
+            state,
+            objectives,
+          );
           objectiveAssets.push({
             month,
             ownedFuels,
+            ...(ownedVintageFuels.length ? { ownedVintageFuels } : {}),
             debtPrincipal: getTotalDebt([
               ...state.facilities,
               ...(state.transmission?.lines ?? []),
@@ -291,10 +319,16 @@ function buildProjection(
   blackouts.unshift({ minute: rangeMin, value: 0 });
   const sampled = sampleForecastTimeline(timeline, 240 * MAX_FORECAST_YEARS);
 
-  const currentMonth = summarizeTimeline(game.timeline, game.startingYear);
+  const currentMonth = summarizeTimeline(
+    game.timeline,
+    game.startingYear,
+    undefined,
+    needsObjectiveEnergyMeters(game),
+  );
   const projectedMonths = summarizeTimelineByMonth(
     timeline,
     game.startingYear,
+    needsObjectiveEnergyMeters(game),
   ).slice(1);
   return {
     ...(needsAssets ? { objectiveAssets } : {}),

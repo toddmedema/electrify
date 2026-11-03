@@ -160,12 +160,16 @@ export function representativeMinTempC(
   date: DateType,
   seed: number,
   temperatureOffsetC = 0,
+  modeledPast = false,
 ): number {
   let min = Infinity;
   for (let hour = 0; hour < 24; hour++) {
     const reading = getWeather(
       { ...date, hourOfDay: hour, minuteOfDay: hour * 60 },
       seed,
+      0,
+      undefined,
+      modeledPast,
     );
     min = Math.min(min, reading.TEMP_C);
   }

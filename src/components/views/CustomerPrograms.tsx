@@ -58,6 +58,7 @@ import {
   buildoutMonthsDone,
   emptyPolicies,
   policyAvailable,
+  policyAllowedForGame,
   policyBudget,
   policyTotalCost,
   programCustomers,
@@ -530,14 +531,16 @@ function ProgramList({
       {policiesOn &&
         section(
           "Reduce overall demand",
-          BUILDOUT_IDS.filter((id) => !finished(id)).map(choice),
+          BUILDOUT_IDS.filter(
+            (id) => policyAllowedForGame(game, id) && !finished(id),
+          ).map(choice),
         )}
       {policiesOn &&
         section(
           "Offset peak demand",
-          [...POLICY_IDS.filter(isOperatingPolicy), ...FLEXIBILITY_IDS].map(
-            choice,
-          ),
+          [...POLICY_IDS.filter(isOperatingPolicy), ...FLEXIBILITY_IDS]
+            .filter((id) => policyAllowedForGame(game, id))
+            .map(choice),
         )}
       {policiesOn &&
         section("Completed", POLICY_IDS.filter(finished).map(choice))}

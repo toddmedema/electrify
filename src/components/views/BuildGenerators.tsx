@@ -97,6 +97,7 @@ import { getScenario, getTutorialStep } from "../../data/Scenarios";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import useBuildRowReveal from "../base/useBuildRowReveal";
+import { getLegacyBuildBounds } from "../../data/LegacyEra";
 import Sparkline from "../base/Sparkline";
 
 function percent(fraction: number): string {
@@ -904,6 +905,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
   const { game, onBack } = props;
+  const legacyBounds = getLegacyBuildBounds(game);
+  const minTick = legacyBounds ? wToSliderTick(legacyBounds.minW) : 0;
+  const maxTick = legacyBounds ? wToSliderTick(legacyBounds.maxW) : 34;
+  const clampSizeTick = (tick: number) =>
+    Math.max(minTick, Math.min(maxTick, tick));
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readCash = useBuildCashReader(now?.cash ?? 0);
   const listRef = useToolScroll<HTMLUListElement>("generators.scroll");
@@ -911,16 +917,36 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const [sliderTick, setSliderTick] = useToolState<number>(
     "generators.size",
     () =>
-      Math.max(
-        0,
-        Math.min(34, wToSliderTick(averageBuildSize(game.facilities, false))),
+      clampSizeTick(
+        wToSliderTick(
+          legacyBounds && game.date.year >= 1942
+            ? legacyBounds.defaultW
+            : game.facilities.length
+              ? averageBuildSize(game.facilities, false)
+              : (legacyBounds?.defaultW ??
+                averageBuildSize(game.facilities, false)),
+        ),
       ),
   );
+  // A generation change can keep this tool's saved choice outside the next era's range.
+  const shownSliderTick = clampSizeTick(sliderTick);
   // Sizes between slider ticks, chosen per generator: hydro's site maximum or a technology's cap
   const [exactSizes, setExactSizes] = useToolState<Record<string, number>>(
     "generators.exactSizes",
     {},
   );
+  // A remembered site/technology shortcut can outlive the era's minimum project size.
+  // Hydro may exceed the global slider maximum because its physical site owns that limit.
+  const shownExactSizes = legacyBounds
+    ? Object.fromEntries(
+        Object.entries(exactSizes).filter(
+          ([name, size]) =>
+            Number.isFinite(size) &&
+            size >= legacyBounds.minW &&
+            (name === "Hydro" || size <= legacyBounds.maxW),
+        ),
+      )
+    : exactSizes;
   const [sort, setSort] = useToolState<GeneratorSortKey>(
     "generators.sort",
     "buildCost",
@@ -960,11 +986,17 @@ function BuildGenerators(props: Props): React.JSX.Element {
   } = forecast ?? EMPTY_FORECAST;
   const hydroAvailability = getHydroAvailability(
     game,
-    exactSizes.Hydro ?? sliderTickToW(sliderTick),
+    shownExactSizes.Hydro ?? sliderTickToW(shownSliderTick),
   );
+  const hydroSiteMaximum =
+    hydroAvailability.selected ?? hydroAvailability.largest;
+  const canUseSiteMaximum =
+    !legacyBounds ||
+    !hydroSiteMaximum ||
+    hydroSiteMaximum.maxPeakW >= legacyBounds.minW;
   const minimumGenerators = GENERATORS(
     game,
-    sliderTickToW(0),
+    sliderTickToW(minTick),
     windSpeeds,
     solarIrradiances,
     offshoreWindSpeeds,
@@ -972,17 +1004,17 @@ function BuildGenerators(props: Props): React.JSX.Element {
   );
   const shownGenerators = GENERATORS(
     game,
-    sliderTickToW(sliderTick),
+    sliderTickToW(shownSliderTick),
     windSpeeds,
     solarIrradiances,
     offshoreWindSpeeds,
     airborneWindSpeeds,
   )
     .map((generator) =>
-      exactSizes[generator.name] !== undefined
+      shownExactSizes[generator.name] !== undefined
         ? GENERATORS(
             game,
-            exactSizes[generator.name],
+            shownExactSizes[generator.name],
             windSpeeds,
             solarIrradiances,
             offshoreWindSpeeds,
@@ -1099,10 +1131,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
           </Typography>
         )}
       <ConstructionBuildHeader
-        capacity={valueLabelFormat(sliderTick)}
-        sliderValue={sliderTick}
-        sliderMin={0}
-        sliderMax={34}
+        capacity={valueLabelFormat(shownSliderTick)}
+        sliderValue={shownSliderTick}
+        sliderValueText={valueLabelFormat}
+        sliderMin={minTick}
+        sliderMax={maxTick}
         sort={sort}
         sortOptions={sortOptions}
         onSliderChange={(value) => {
@@ -1144,40 +1177,51 @@ function BuildGenerators(props: Props): React.JSX.Element {
                 hydroAvailability={
                   g.name === "Hydro" ? hydroAvailability : undefined
                 }
-                onUseSiteMaximum={(peakW) => {
-                  revealResizedRow(g.name);
-                  setSliderTick(wToSliderTick(peakW));
-                  setExactSizes((sizes) => ({ ...sizes, Hydro: peakW }));
-                }}
-                onUseMaxSize={(peakW) => {
-                  const limit =
-                    g.name === "Hydro"
-                      ? Math.min(
-                          peakW,
-                          hydroAvailability.largest?.maxPeakW ?? peakW,
-                        )
-                      : peakW;
-                  const size =
-                    largestAffordableBuildSize(
-                      buildSizeOptions(0, 34, limit),
-                      readCash(),
-                      (capacity) => {
-                        const candidate = GENERATORS(
-                          game,
-                          capacity,
-                          windSpeeds,
-                          solarIrradiances,
-                          offshoreWindSpeeds,
-                          airborneWindSpeeds,
-                        ).find((item) => item.name === g.name)!;
-                        return withResilienceOptions(candidate, game, {})
-                          .buildCost;
-                      },
-                    ) ?? limit;
-                  revealResizedRow(g.name);
-                  setSliderTick(Math.max(0, wToSliderTick(size)));
-                  setExactSizes((sizes) => ({ ...sizes, [g.name]: size }));
-                }}
+                onUseSiteMaximum={
+                  canUseSiteMaximum
+                    ? (peakW) => {
+                        revealResizedRow(g.name);
+                        setSliderTick(clampSizeTick(wToSliderTick(peakW)));
+                        setExactSizes((sizes) => ({ ...sizes, Hydro: peakW }));
+                      }
+                    : undefined
+                }
+                onUseMaxSize={
+                  legacyBounds && g.maxPeakW < legacyBounds.minW
+                    ? undefined
+                    : (peakW) => {
+                        const limit =
+                          g.name === "Hydro"
+                            ? Math.min(
+                                peakW,
+                                hydroAvailability.largest?.maxPeakW ?? peakW,
+                              )
+                            : peakW;
+                        const size =
+                          largestAffordableBuildSize(
+                            buildSizeOptions(minTick, maxTick, limit),
+                            readCash(),
+                            (capacity) => {
+                              const candidate = GENERATORS(
+                                game,
+                                capacity,
+                                windSpeeds,
+                                solarIrradiances,
+                                offshoreWindSpeeds,
+                                airborneWindSpeeds,
+                              ).find((item) => item.name === g.name)!;
+                              return withResilienceOptions(candidate, game, {})
+                                .buildCost;
+                            },
+                          ) ?? limit;
+                        revealResizedRow(g.name);
+                        setSliderTick(clampSizeTick(wToSliderTick(size)));
+                        setExactSizes((sizes) => ({
+                          ...sizes,
+                          [g.name]: size,
+                        }));
+                      }
+                }
                 date={game.date}
                 seed={game.seed}
                 location={game.location}

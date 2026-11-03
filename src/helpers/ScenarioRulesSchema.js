@@ -77,6 +77,11 @@ const OBJECTIVE_METRICS = [
   "monthEndDebt",
   "utilityOwnership",
   "assetRetirement",
+  "financialCoverage",
+  "customerCount",
+  "reserveMargin",
+  "efficiencySavings",
+  "demandServedShare",
 ];
 /** Reject functions, accessors, cycles and nonfinite values before detaching JSON data. */
 function isRuleJson(value, ancestors = new Set(), depth = 0) {
@@ -559,11 +564,16 @@ function ruleDiagnostics(value, path = "") {
       emissionsBudget: ["budgetTonnesCO2e"],
       emissionsPerDeliveredMWh: ["maxKgCO2ePerMWh"],
       localFuelShare: ["fuels", "minShare"],
-      fuelRetirement: ["fuel", "deadlineMonth"],
+      fuelRetirement: ["fuel", "deadlineMonth", "commissionedBeforeYear"],
       utilityOwnership: ["targets", "deadlineMonth"],
       assetRetirement: ["assetIds", "deadlineMonth"],
       monthlyBilledRate: ["maxDollarsPerKWh"],
       monthEndDebt: ["maxDebtDollars"],
+      financialCoverage: ["basis", "minCoverage"],
+      customerCount: ["minCustomers", "deadlineMonth"],
+      reserveMargin: ["minReserveW"],
+      efficiencySavings: ["minShare"],
+      demandServedShare: ["minShare", "hours"],
     };
     const metricFields = Object.prototype.hasOwnProperty.call(fields, v?.metric)
       ? fields[v.metric]
@@ -579,6 +589,7 @@ function ruleDiagnostics(value, path = "") {
           "fuelRetirement",
           "utilityOwnership",
           "assetRetirement",
+          "customerCount",
         ].includes(v?.metric)
           ? []
           : ["fromMonth", "throughMonth"]),
@@ -597,6 +608,7 @@ function ruleDiagnostics(value, path = "") {
         "fuelRetirement",
         "utilityOwnership",
         "assetRetirement",
+        "customerCount",
       ].includes(v.metric)
     )
       month(v.deadlineMonth, at(p, "deadlineMonth"));
@@ -608,10 +620,35 @@ function ruleDiagnostics(value, path = "") {
       ["maxKgCO2ePerMWh", 1e6],
       ["maxDollarsPerKWh", 100],
       ["maxDebtDollars", 1e12],
+      ["minCoverage", 1e6],
+      ["minCustomers", 1e12],
+      ["minReserveW", 1e15],
     ])
       if (metricFields.includes(key)) number(v[key], at(p, key), 0, max);
     if (v.metric === "localFuelShare") fuels(v.fuels, at(p, "fuels"));
     if (v.metric === "fuelRetirement") fuel(v.fuel, at(p, "fuel"));
+    if (v.commissionedBeforeYear !== undefined)
+      number(
+        v.commissionedBeforeYear,
+        at(p, "commissionedBeforeYear"),
+        1800,
+        2200,
+        true,
+      );
+    if (v.metric === "financialCoverage")
+      enumValue(v.basis, at(p, "basis"), ["revenue", "cash"]);
+    if (
+      v.hours !== undefined &&
+      (!Array.isArray(v.hours) ||
+        v.hours.length !== 2 ||
+        v.hours[0] !== 17 ||
+        v.hours[1] !== 21)
+    )
+      add(
+        "invalid-value",
+        at(p, "hours"),
+        "must be [17, 21], with the end hour excluded.",
+      );
     for (const key of ["targets", "assetIds"]) {
       if (metricFields.includes(key) && list(v[key], at(p, key), 16)) {
         if (!v[key].length)

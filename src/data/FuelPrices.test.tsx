@@ -13,6 +13,24 @@ const FIXTURE_YEARS = 20;
 const FIXTURE_ENDING_YEAR = FIXTURE_STARTING_YEAR + FIXTURE_YEARS - 1;
 const SEED = 1;
 
+it("prices the early proxy only with a loaded seam and preserves recorded receipts", () => {
+  const date = getDateFromMinute(0, 1882);
+  initFuelPricesFromCsv("year,month,naturalgas,coal,uranium,oil");
+  expect(() => getFuelPricesPerMBTU(date, SEED)).toThrow(
+    /early campaign baseline/,
+  );
+  const csv =
+    "year,month,naturalgas,coal,uranium,oil\n1975,1,0.8,1.2,0.2,3\n1975,12,1,1.3,0.2,3.2";
+  initFuelPricesFromCsv(csv);
+  const early = getFuelPricesPerMBTU(date, SEED);
+  expect(Object.isFrozen(early)).toBe(true);
+  expect(early.Coal).toBeGreaterThan(0);
+  expect(early.Coal).toBeLessThan(1.2);
+  expect(getFuelPricesPerMBTU(getDateFromMinute(0, 1975), SEED).Oil).toBe(3);
+  initFuelPricesFromCsv(csv);
+  expect(getFuelPricesPerMBTU(date, SEED)).toEqual(early);
+});
+
 // What each fuel costs in the fixture's first month, and how far it wobbles around its own trend
 // across the record, in log terms. Deliberately different per fuel: the projection measures each
 // fuel's spread from its own history rather than sharing one number, the way the real coal series

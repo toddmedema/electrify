@@ -1,6 +1,6 @@
 import cloneDeep from "lodash.clonedeep";
 import { getTimeFromTimeline, summarizeTimeline } from "../helpers/DateTime";
-import { tickState } from "../reducers/Game";
+import { tickState, generateNewTimeline } from "../reducers/Game";
 import {
   ActiveWorldEventType,
   GameType,
@@ -39,6 +39,47 @@ function inspect(mutate?: (tick: TickPresentFutureType) => void) {
 
 it("accepts an unchanged pair of real consecutive ticks", () => {
   expect(inspect().getViolations()).toEqual([]);
+});
+
+it("accounts for the last loan payment and still rejects unexplained cash loss", () => {
+  const game = cloneDeep(fixture);
+  const facility = game.facilities[0];
+  facility.loanAmountTotal = 10;
+  facility.loanAmountLeft = 5;
+  facility.loanMonthlyPayment = 500;
+  facility.interestRate = 0;
+  const opening = getTimeFromTimeline(game.date.minute, game.timeline)!;
+  game.timeline = generateNewTimeline(game, opening.cash, opening.customers);
+  const before = cloneDeep(
+    getTimeFromTimeline(game.date.minute, game.timeline)!,
+  );
+  const beforeState = cloneDeep(game);
+  const valid = new InvariantCollector();
+  checkTick(valid, beforeState, null, before, "before payoff", false);
+  tickState(game);
+  const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+  expect(game.facilities[0].loanAmountLeft).toBe(0);
+  checkTick(valid, game, before, now, "loan payoff", false);
+  expect(valid.getViolations()).toEqual([]);
+
+  const corrupted = new InvariantCollector();
+  checkTick(corrupted, beforeState, null, before, "before payoff", false);
+  checkTick(
+    corrupted,
+    game,
+    before,
+    { ...now, cash: now.cash - 10 },
+    "unexplained loss",
+    false,
+  );
+  expect(corrupted.getViolations()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        rule: "cash changes only by recorded revenue and expenses",
+        when: "unexplained loss",
+      }),
+    ]),
+  );
 });
 
 it.each([

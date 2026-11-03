@@ -4,7 +4,7 @@ import type { FuelNameType, MonthlyHistoryType } from "../Types";
 export type ObjectiveStatus =
   "pending" | "inProgress" | "completed" | "failed" | "unverifiable";
 
-/** Values use the compiled objective's units, including kg CO2e and starting-year dollars. */
+/** Values use the compiled objective's units, including its declared currency basis. */
 export interface ObjectiveResult {
   objective: CompiledRuleObjective;
   id: string;
@@ -24,6 +24,10 @@ export interface ObjectiveResult {
 export interface ObjectiveContext {
   rulesDigest: string;
   startingYear: number;
+  /** Calendar months before this bounded campaign generation. */
+  monthOffset?: number;
+  /** Campaign limits use final-year nominal dollars and compare actual bills/principal directly. */
+  moneyBasis?: "nominal";
   seed: number;
   durationMonths: number;
   ownership: "Investor" | "Public";
@@ -43,6 +47,12 @@ export interface ObjectiveMonthFacts {
   debtPrincipal?: number;
   /** Counts every owned asset, including paused and unfinished facilities. */
   ownedFuels?: Partial<Record<FuelNameType, number>>;
+  /** Counts the exact fuel and commissioning cutoff requested by a retirement objective. */
+  ownedVintageFuels?: {
+    fuel: FuelNameType;
+    commissionedBeforeYear: number;
+    count: number;
+  }[];
   ownedUtilities?: string[];
   /** Stable original equipment identities still owned at this month close. */
   ownedAssetIds?: string[];

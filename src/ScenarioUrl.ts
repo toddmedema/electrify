@@ -1,9 +1,32 @@
 import { SCENARIOS } from "./data/Scenarios";
 import { ScenarioType } from "./Types";
+import { isLegacyCampaignScenario } from "./data/LegacyCampaign";
 
 type LocationParts = Pick<Location, "pathname" | "search">;
 
 export { isDataCenterSetupSearch } from "./DataCenterUrl";
+
+/** A later-generation link opens the campaign setup, never a fresh successor company. */
+export function isLegacyCampaignSearch(search: string): boolean {
+  const params = new URLSearchParams(search);
+  const rawId = params.get("scenario");
+  return (
+    params.get("campaign") === "legacy" ||
+    (rawId !== null &&
+      /^\d+$/.test(rawId) &&
+      isLegacyCampaignScenario(Number(rawId)))
+  );
+}
+
+export function campaignSetupUrl(
+  location: LocationParts = window.location,
+): string {
+  const params = new URLSearchParams(location.search);
+  for (const key of ["scenario", "challenge", "customEvent", "dataCenters"])
+    params.delete(key);
+  params.set("campaign", "legacy");
+  return `${location.pathname}?${params.toString()}`;
+}
 
 /** Opens custom setup with one supported scenario event selected. */
 export function customEventFromSearch(search: string): number | undefined {
@@ -36,6 +59,7 @@ export function scenarioDetailsUrl(
   params.delete("challenge");
   params.delete("customEvent");
   params.delete("dataCenters");
+  if (params.get("campaign") === "legacy") params.delete("campaign");
   params.set("scenario", String(scenarioId));
   return `${location.pathname}?${params.toString()}`;
 }
@@ -49,6 +73,7 @@ export function scenarioListUrl(
   params.delete("challenge");
   params.delete("customEvent");
   params.delete("dataCenters");
+  if (params.get("campaign") === "legacy") params.delete("campaign");
   const search = params.toString();
   return `${location.pathname}${search ? `?${search}` : ""}`;
 }

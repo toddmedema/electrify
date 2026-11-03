@@ -42,6 +42,7 @@ import {
   ScenarioType,
 } from "../../Types";
 import CoopBrowseBar from "../base/CoopBrowseBar";
+import { isLegacyCampaignScenario } from "../../data/LegacyCampaign";
 
 export interface StateProps {
   game: GameType;
@@ -52,6 +53,7 @@ export interface StateProps {
 export interface DispatchProps {
   onBack: () => void;
   onCustomGame: () => void;
+  onCampaign?: () => void;
   /** Desktop builds with mod support: open the installed community scenarios. */
   onCommunityScenarios?: () => void;
   onDetails: (delta: Partial<GameType>) => void;
@@ -255,7 +257,9 @@ export default function NewGame(props: Props): React.JSX.Element {
   const ids = Object.keys(playCounts).map(Number);
   const completedTutorials = TUTORIALS.filter((s) => ids.includes(s.id)).length;
   const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
-  const scenarios = SCENARIOS.filter((s) => !s.tutorialSteps).sort(
+  const scenarios = SCENARIOS.filter(
+    (s) => !s.tutorialSteps && !isLegacyCampaignScenario(s.id),
+  ).sort(
     (a, b) =>
       b.startingYear - a.startingYear ||
       scenarioEndYear(b) - scenarioEndYear(a),
@@ -398,6 +402,29 @@ export default function NewGame(props: Props): React.JSX.Element {
                 ))}
               </div>
             )}
+          </>
+        )}
+        {!props.coop && (
+          <>
+            <MissionSectionHeader>Campaign</MissionSectionHeader>
+            <div className="groupedList">
+              <NavigableCardRow
+                testId="legacy-campaign-entry"
+                avatar={<Avatar src="/images/coal.svg" alt="" />}
+                title="Legacy campaign"
+                description={
+                  <span>
+                    Build one utility across nine generations.
+                    <br />
+                    <span className="missionMeta">
+                      1882–2061 · 20 years per CEO
+                    </span>
+                  </span>
+                }
+                ariaLabel="View legacy campaign"
+                onOpen={props.onCampaign}
+              />
+            </div>
           </>
         )}
         <MissionSectionHeader

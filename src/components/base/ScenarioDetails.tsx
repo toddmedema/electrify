@@ -22,6 +22,10 @@ import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
 import UtilitySupplyPlan from "./UtilitySupplyPlan";
 import { formatScore } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
+import {
+  legacyCompletedMonths,
+  legacyMonthOffset,
+} from "../../helpers/LegacyCampaign";
 import { ScoreProjectionType } from "../../helpers/ScoreProjection";
 import { useAppSelector } from "../../Store";
 import { GameCard } from "./GameCard";
@@ -47,7 +51,7 @@ function useScenarioForecast(game: GameType): ProjectionView | undefined {
   React.useEffect(() => subscribeProjection(refresh), []);
   const now = currentTick(game);
   const ended =
-    game.date.monthsElapsed >= (activeScenario(game)?.durationMonths ?? 0);
+    legacyCompletedMonths(game) >= (activeScenario(game)?.durationMonths ?? 0);
   const ready = projectionReady(game);
   React.useEffect(() => {
     if (now && !ended && !ready) requestProjection(game, now);
@@ -73,12 +77,13 @@ function ScoreOutlook({
   game: GameType;
   outlook: MissionProjection | undefined;
 }): React.JSX.Element {
+  const offset = legacyMonthOffset(game);
   const timeline = React.useMemo(() => {
     if (!projection)
       return [
         {
-          month: game.startingYear * 12,
-          year: game.startingYear - 1,
+          month: game.startingYear * 12 + offset,
+          year: game.startingYear + offset / 12 - 1,
           value: 0,
           projected: false,
         },
@@ -86,7 +91,7 @@ function ScoreOutlook({
     const last = history[0];
     const first = last
       ? last.year * 12 + last.month - projection.actual.length + 1
-      : game.startingYear * 12;
+      : game.startingYear * 12 + offset;
     const point = (index: number, value: number, projected: boolean) => {
       const month = first + index;
       return { month, year: Math.floor((month - 1) / 12), value, projected };
@@ -97,22 +102,30 @@ function ScoreOutlook({
         point(projection.actual.length + i, value, true),
       ),
     ];
-  }, [projection, history, game.startingYear]);
+  }, [projection, history, game.startingYear, offset]);
   const current = projection?.actual.at(-1) ?? 0;
   const change = projection ? projection.final - current : 0;
   const duration = activeScenario(game)!.durationMonths;
-  const ended = game.date.monthsElapsed >= duration;
+  const ended = legacyCompletedMonths(game) >= duration;
   const loss = scenarioLossSummary(game, outlook);
   const warningSpans = React.useMemo<Array<[number, number]>>(
     () =>
       loss.firstMonth === undefined
         ? []
-        : [[loss.firstMonth * MINUTES_PER_MONTH, duration * MINUTES_PER_MONTH]],
-    [loss.firstMonth, duration],
+        : [
+            [
+              loss.firstMonth * MINUTES_PER_MONTH,
+              (offset + duration) * MINUTES_PER_MONTH,
+            ],
+          ],
+    [loss.firstMonth, duration, offset],
   );
   const domain = React.useMemo<[number, number]>(
-    () => [0, (duration - 1) * MINUTES_PER_MONTH],
-    [duration],
+    () => [
+      offset * MINUTES_PER_MONTH,
+      (offset + duration - 1) * MINUTES_PER_MONTH,
+    ],
+    [duration, offset],
   );
   // The chart's height scales with its width, so a phone needs more to keep its axis readable
   const phone = useMediaQuery("(max-width: 599px)");
@@ -249,7 +262,17 @@ export function ScenarioDetailsContent({
   const missionProjection = forecast
     ? projectMission(game, forecast)
     : undefined;
-  const history = game.monthlyHistory;
+  const offset = legacyMonthOffset(game);
+  const history = React.useMemo(
+    () =>
+      offset
+        ? game.monthlyHistory.filter(
+            (row) =>
+              (row.year - game.startingYear) * 12 + row.month - 1 >= offset,
+          )
+        : game.monthlyHistory,
+    [game.monthlyHistory, game.startingYear, offset],
+  );
   // Both read only the completed months, which change once a month rather than every tick
   const breakdown = React.useMemo(
     () =>

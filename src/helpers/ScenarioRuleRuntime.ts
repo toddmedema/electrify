@@ -1,3 +1,7 @@
+import {
+  LEGACY_GENERATIONS,
+  LEGACY_GENERATION_MONTHS,
+} from "../data/LegacyCampaign";
 import { isOfficialCatalogRules } from "./ScenarioRules";
 import {
   officialPresentation,
@@ -189,8 +193,37 @@ export function interpretScenarioRuleReport(
         )
       : undefined;
   const attrs = observation?.attributes;
-  return interpretRuleReport(report, {
+  const generation =
+    rules.namespace.kind === "official"
+      ? LEGACY_GENERATIONS.find(
+          (generation) =>
+            rules.namespace.kind === "official" &&
+            generation.scenarioId === rules.namespace.scenarioId,
+        )
+      : undefined;
+  const offset =
+    generation && rules.durationMonths > LEGACY_GENERATION_MONTHS
+      ? generation.index * LEGACY_GENERATION_MONTHS
+      : 0;
+  const boundedReport =
+    generation && "fromMonth" in report
+      ? {
+          ...report,
+          fromMonth: report.fromMonth - offset,
+          throughMonth: report.throughMonth - offset,
+        }
+      : report;
+  return interpretRuleReport(boundedReport, {
     ...context,
+    ...(generation
+      ? {
+          startingYear: generation.startYear,
+          completedMonths: context.completedMonths - offset,
+          ...(context.snapshotMonth !== undefined
+            ? { snapshotMonth: context.snapshotMonth - offset }
+            : {}),
+        }
+      : {}),
     eventKeys: Object.fromEntries(ruleEvents(rules).map((e) => [e.id, e.key])),
     ...(attrs
       ? {
@@ -199,7 +232,7 @@ export function interpretScenarioRuleReport(
             storagePeakW: Number(attrs.storagePeakW),
             storagePeakWh: Number(attrs.storagePeakWh),
           },
-          snapshotMonth: Number(attrs.month),
+          snapshotMonth: Number(attrs.month) - offset,
         }
       : {}),
   });

@@ -49,6 +49,19 @@ it("starts from observations and allows forecast error for every weather field",
   ).toBeLessThan(0.1);
 });
 
+it("retains modeled-past provenance for campaign observations and basin lookbacks", () => {
+  const issuedAt = date((1979 - 1882) * 12 * 1440 + 15, 1882);
+  const campaign = createWeatherForecast(issuedAt, 7, undefined, true);
+  const ordinary = createWeatherForecast(issuedAt, 7);
+  expect(ordinary(issuedAt).YEAR).toBe(0);
+  expect(campaign(issuedAt)).toEqual(
+    getWeather(issuedAt, 7, 0, undefined, true),
+  );
+  const earlier = { ...issuedAt, year: 1978 };
+  expect(campaign(earlier)).toEqual(getWeather(earlier, 7, 0, undefined, true));
+  expect(ordinary(earlier).YEAR).toBe(0);
+});
+
 it("uses local seasons and interpolates hours, months and the year boundary", () => {
   const forecast = createWeatherForecast(date(0), 7);
   expect(forecast(date(6 * 1440 + 12 * 60)).TEMP_C).toBeGreaterThan(

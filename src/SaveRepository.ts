@@ -1,4 +1,5 @@
 import { encodeSave } from "./SaveEncoding";
+import { canonicalRuleJson } from "./helpers/RuleIdentity";
 import { saveOperationAborted, waitForSaveOperation } from "./SaveOperation";
 import {
   assertSupportedSaveSchema,
@@ -16,6 +17,7 @@ import type {
   SaveRecord,
   SavedRunResult,
   SaveStatus,
+  GameType,
 } from "./Types";
 
 export { SaveRepositoryError } from "./SaveModel";
@@ -33,6 +35,62 @@ interface StoredPayload {
   id: string;
   save: unknown;
   result?: unknown;
+}
+
+/** Both snapshots have already passed the injected domain validator. */
+function continuesCampaign(previous: GameType, next: GameType): boolean {
+  const before = previous.campaign,
+    after = next.campaign;
+  if (
+    !before ||
+    !after ||
+    after.generationIndex !== before.generationIndex + 1 ||
+    next.scenarioId !== previous.scenarioId + 1 ||
+    previous.seed !== next.seed ||
+    previous.difficulty !== next.difficulty ||
+    previous.startingYear !== next.startingYear ||
+    previous.customerMarketSize !== next.customerMarketSize ||
+    previous.date.minute > next.date.minute ||
+    canonicalRuleJson(previous.location) !== canonicalRuleJson(next.location) ||
+    after.completedTerms.length !== before.generationIndex + 1
+  )
+    return false;
+  const closed = after.completedTerms[before.generationIndex];
+  if (
+    !closed ||
+    (
+      [
+        "openingCustomers",
+        "referenceRate",
+        "peakMW",
+        "northCapacityMW",
+        "debtAllowance",
+        "emissionsBudgetTonnes",
+        "inheritedDemandMultiplier",
+      ] as const
+    ).some((field) => before[field] !== closed[field]) ||
+    before.completedTerms.some(
+      (term, index) =>
+        canonicalRuleJson(term) !==
+        canonicalRuleJson(after.completedTerms[index]),
+    ) ||
+    !previous.objectiveProgress
+  )
+    return false;
+  // A debounced write may skip the paused boundary snapshot, but cannot replace evidence
+  // already written by this same lease with another company's history.
+  return previous.objectiveProgress.entries.every((entry) => {
+    const archived = closed.objectiveProgress.entries.find(
+      (candidate) => candidate.id === entry.id,
+    );
+    return (
+      !!archived &&
+      canonicalRuleJson(entry.observations) ===
+        canonicalRuleJson(
+          archived.observations.slice(0, entry.observations.length),
+        )
+    );
+  });
 }
 
 export interface PendingCloudDelete {
@@ -861,10 +919,7 @@ export class SaveRepository {
                     "invalid",
                     "This game has ended and can no longer be updated.",
                   );
-                if (
-                  current.scenarioId !== validSave.game.scenarioId ||
-                  current.difficulty !== validSave.game.difficulty
-                )
+                if (current.difficulty !== validSave.game.difficulty)
                   throw new SaveRepositoryError(
                     "invalid",
                     "This snapshot belongs to a different game.",
@@ -877,6 +932,18 @@ export class SaveRepository {
                         "missing",
                         "This saved game's data is no longer available.",
                       );
+                    if (current.scenarioId !== validSave.game.scenarioId) {
+                      const previous = this.parseSave(payload.save);
+                      if (
+                        !previous ||
+                        previous.game.scenarioId !== current.scenarioId ||
+                        !continuesCampaign(previous.game, validSave.game)
+                      )
+                        throw new SaveRepositoryError(
+                          "invalid",
+                          "This snapshot belongs to a different game.",
+                        );
+                    }
                     const result =
                       payload.result === undefined
                         ? undefined
