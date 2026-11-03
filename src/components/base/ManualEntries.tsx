@@ -943,9 +943,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           A warning marks hours when reserve falls below 10%, and{" "}
           <EntryLink to={MANUAL_ENTRY.FORECASTS}>forecasts</EntryLink> show
-          where that's coming. That's the game's threshold, not a real
-          reliability standard, and staying above it doesn't guarantee you'll
-          avoid <EntryLink to={MANUAL_ENTRY.BLACKOUTS}>blackouts</EntryLink>.
+          where that's coming.
         </p>
       </div>
     ),

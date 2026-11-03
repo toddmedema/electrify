@@ -1,5 +1,5 @@
 import { openPane } from "./layout";
-import { editSavedGame, readSavedGame } from "./save-fixture";
+import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
 import path from "path";
 import { expect, test, Page } from "./fixtures";
@@ -230,6 +230,10 @@ for (const { theme, native, currentRank } of [
       .click();
     const dialog = page.getByRole("dialog", { name: "Mission complete" });
     await expect(dialog).toBeVisible();
+    await expect.poll(() => readSaveRecords(page)).toEqual([]);
+    await expect(
+      dialog.locator(".victoryMetric").filter({ hasText: "tenure" }),
+    ).toContainText("12 years");
     const leaderboard = dialog.getByRole("region", {
       name: "Leaderboard · Hard",
     });
@@ -357,6 +361,24 @@ for (const { theme, native, currentRank } of [
     await expectDialogToFit(preview);
     await preview.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(preview).toHaveCount(0);
+    if (theme === "dark" && !native) {
+      await newGame.click();
+      await page.getByRole("button", { name: "Back", exact: true }).click();
+      await expect(
+        page.getByRole("button", { name: "Play", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Continue", exact: true }),
+      ).toHaveCount(0);
+      await page.reload();
+      await expect(
+        page.getByRole("button", { name: "Play", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Continue", exact: true }),
+      ).toHaveCount(0);
+      return;
+    }
     await playAgain.click();
     await expect(dialog).not.toBeVisible();
     await expect(page.locator("#appbar:visible").first()).toBeVisible();
@@ -488,7 +510,17 @@ test("shared reliability rule ends the run at the third completed month", async 
   await expect(failure).toContainText(
     "You served less than 99.5% of demand for 3 months in a row, so the utility board ended your term.",
   );
-  await expect(failure).toContainText("You survived for 3 months");
+  await expect(
+    failure.locator(".victoryMetric").filter({ hasText: "tenure" }),
+  ).toContainText("3 months");
+  await expect(failure.locator(".victoryMetric")).toHaveCount(6);
+  const rate = failure
+    .locator(".victoryMetric")
+    .filter({ hasText: "lifetime rate" });
+  await expect(rate.locator("strong")).toHaveText(/^\$[\d.]+\/kWh$/);
+  await expect(failure).not.toContainText("starting-year");
+  await expect(failure).not.toContainText("You survived");
+  await expect.poll(() => readSaveRecords(page)).toEqual([]);
   await expect(failure).not.toContainText("Report unavailable");
   await expect(
     failure.getByRole("region", { name: "Objective results" }),
@@ -507,4 +539,19 @@ test("shared reliability rule ends the run at the third completed month", async 
       ),
     });
   }
+  await failure.getByRole("button", { name: "New game", exact: true }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Continue", exact: true }),
+  ).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Continue", exact: true }),
+  ).toHaveCount(0);
 });

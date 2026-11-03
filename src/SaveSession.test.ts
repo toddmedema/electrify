@@ -122,6 +122,9 @@ function fakeRepository() {
       >()
       .mockResolvedValue(metadata(2)),
     release: jest.fn<Promise<void>, [SaveLease]>().mockResolvedValue(undefined),
+    delete: jest
+      .fn<Promise<void>, [string, SaveLease]>()
+      .mockResolvedValue(undefined),
   };
   return repository;
 }
@@ -201,7 +204,7 @@ test("coalesces tick snapshots behind the one in-flight creation and keeps its s
   expect(writer.saved).toBe(latest);
 });
 
-test("a failed first save retries the original ID with the latest terminal outcome", async () => {
+test("an outcome after a failed first save never creates a finished save", async () => {
   const repository = fakeRepository();
   const creation = deferred<SaveRecord>();
   repository.create.mockReturnValueOnce(creation.promise);
@@ -228,35 +231,75 @@ test("a failed first save retries the original ID with the latest terminal outco
   );
   await writer.flush();
   expect(writer.mutationLease).toBeUndefined();
-  expect(repository.create).toHaveBeenCalledTimes(2);
-  expect(repository.create.mock.calls[1][0]).toMatchObject({
-    id: "A",
-    status: "fired",
-    result: { outcome: "fired" },
-    save: { game: final },
-  });
+  expect(repository.create).toHaveBeenCalledTimes(1);
+  expect(repository.delete).not.toHaveBeenCalled();
   expect(repository.release).not.toHaveBeenCalled();
 });
 
-test("completed results stay writable and a later terminal result replaces them", async () => {
+test.each(["completed", "bankrupt", "fired"] as const)(
+  "%s deletes the save and cannot recreate it on a later checkpoint",
+  async (outcome) => {
+    const repository = fakeRepository();
+    const { writer } = session(repository, record());
+    const cloudRequest = jest.fn();
+    const unsubscribe = subscribeCloudSaveRequests(cloudRequest);
+    writer.outcome(game, result(outcome));
+    await writer.flush();
+    expect(repository.delete).toHaveBeenCalledWith("A", {
+      saveId: "A",
+      writerToken: "writer-A",
+      revision: 1,
+    });
+    expect(cloudRequest).toHaveBeenCalledWith("A");
+    unsubscribe();
+    expect(repository.release).not.toHaveBeenCalled();
+    const continued = { ...game, dollarsPerkWh: 0.15 };
+    writer.capture(continued);
+    await writer.flush();
+    expect(repository.writeSnapshot).not.toHaveBeenCalled();
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(writer.file().result?.outcome).toBe(outcome);
+    expect(writer.mutationLease).toBeUndefined();
+  },
+);
+
+test("an outcome waits for in-flight creation before deleting that same save", async () => {
   const repository = fakeRepository();
-  const { writer } = session(repository, record());
+  const creation = deferred<SaveRecord>();
+  repository.create.mockReturnValueOnce(creation.promise);
+  const { writer } = session(repository);
+  const initial = writer.flush();
   writer.outcome(game, result("completed"));
+  expect(repository.delete).not.toHaveBeenCalled();
+  creation.resolve(record());
+  await initial;
   await writer.flush();
-  expect(repository.recordOutcome).toHaveBeenCalledTimes(1);
-  expect(repository.release).not.toHaveBeenCalled();
-  const continued = { ...game, dollarsPerkWh: 0.15 };
-  writer.capture(continued);
+  expect(repository.delete).toHaveBeenCalledTimes(1);
+  expect(repository.delete).toHaveBeenCalledWith(
+    "A",
+    expect.objectContaining({ revision: 1 }),
+  );
+  expect(repository.writeSnapshot).not.toHaveBeenCalled();
+});
+
+test("failed outcome deletion retries without saving or losing the result", async () => {
+  const repository = fakeRepository();
+  repository.delete.mockRejectedValueOnce(
+    new SaveRepositoryError("unavailable", "offline"),
+  );
+  const { writer, notify } = session(repository, record());
+  writer.outcome(game, result("bankrupt"));
+  await expect(writer.flush()).rejects.toThrow("offline");
+  expect(notify).toHaveBeenLastCalledWith(
+    "failed",
+    undefined,
+    expect.any(String),
+  );
   await writer.flush();
-  expect(repository.writeSnapshot).toHaveBeenCalledTimes(1);
-  expect(writer.file().result?.outcome).toBe("completed");
-  writer.outcome(continued, result("bankrupt"));
-  await writer.flush();
-  expect(repository.recordOutcome).toHaveBeenCalledTimes(2);
-  expect(repository.release).not.toHaveBeenCalled();
+  expect(repository.delete).toHaveBeenCalledTimes(2);
+  expect(repository.writeSnapshot).not.toHaveBeenCalled();
+  expect(writer.file().result?.outcome).toBe("bankrupt");
   expect(writer.mutationLease).toBeUndefined();
-  writer.capture({ ...continued, dollarsPerkWh: 0.2 });
-  expect(writer.latest).toBe(continued);
 });
 
 test("a fenced old writer retains an exportable snapshot and never recreates the record", async () => {
