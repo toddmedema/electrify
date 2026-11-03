@@ -2,12 +2,14 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../../data/Scenarios";
 import { GameType } from "../../Types";
 import NewGame, { Props } from "./NewGame";
+import { isLegacyCampaignScenario } from "../../data/LegacyCampaign";
 
 function props(overrides: Partial<Props> = {}): Props {
   return {
     game: {} as GameType,
     onBack: jest.fn(),
     onCustomGame: jest.fn(),
+    onCampaign: jest.fn(),
     onDetails: jest.fn(),
     onTutorial: jest.fn(),
     ...overrides,
@@ -37,6 +39,43 @@ const viewAllTutorialsName = `View all ${TUTORIALS.length}`;
 
 describe("NewGame", () => {
   beforeEach(() => localStorage.clear());
+
+  it("opens the campaign between lessons and challenges without listing its generations as challenges", () => {
+    const onCampaign = jest.fn();
+    render(<NewGame {...props({ onCampaign })} />);
+
+    expect(
+      screen
+        .getAllByRole("heading", { level: 2 })
+        .map((heading) => heading.textContent),
+    ).toEqual(["Learn the basics", "Campaign", "Challenges", "Custom game"]);
+    fireEvent.click(
+      screen.getByRole("button", { name: "View legacy campaign" }),
+    );
+    expect(onCampaign).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
+    expect(
+      challengeRows().every(
+        (row) =>
+          !isLegacyCampaignScenario(
+            Number(row.dataset.testid!.replace("mission-row-", "")),
+          ),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps the single-player campaign out of a co-op lobby", () => {
+    render(
+      <NewGame
+        {...props({
+          coop: { role: "host", players: [] } as unknown as Props["coop"],
+        })}
+      />,
+    );
+    expect(
+      screen.queryByTestId("legacy-campaign-entry"),
+    ).not.toBeInTheDocument();
+  });
 
   it("starts with one next lesson and three varied challenge recommendations", () => {
     render(<NewGame {...props()} />);
@@ -117,7 +156,8 @@ describe("NewGame", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
     const scenariosNewestFirst = SCENARIOS.filter(
-      (scenario) => !scenario.tutorialSteps,
+      (scenario) =>
+        !scenario.tutorialSteps && !isLegacyCampaignScenario(scenario.id),
     ).sort(
       (a, b) =>
         b.startingYear - a.startingYear ||
@@ -194,9 +234,10 @@ describe("NewGame", () => {
     fireEvent.click(screen.getByRole("button", { name: "Newest first" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Shortest first" }));
     const shortestDuration = Math.min(
-      ...SCENARIOS.filter((scenario) => !scenario.tutorialSteps).map(
-        (scenario) => scenario.durationMonths,
-      ),
+      ...SCENARIOS.filter(
+        (scenario) =>
+          !scenario.tutorialSteps && !isLegacyCampaignScenario(scenario.id),
+      ).map((scenario) => scenario.durationMonths),
     );
     const firstScenarioId = Number(
       challengeRows()[0].dataset.testid!.replace("mission-row-", ""),

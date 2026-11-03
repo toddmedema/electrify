@@ -1,19 +1,27 @@
 import { createNextState, freeze } from "@reduxjs/toolkit";
 import { createHash } from "crypto";
 import cloneDeep from "lodash.clonedeep";
-import { TICK_MINUTES, TICKS_PER_YEAR } from "../../Constants";
+import { TICK_MINUTES, TICKS_PER_MONTH, TICKS_PER_YEAR } from "../../Constants";
 import { SCENARIOS, DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
+import { LEGACY_CAMPAIGN_ID } from "../../data/LegacyCampaign";
+import { getWeather } from "../../data/Weather";
 import { serializeCommitmentMetadata } from "../../helpers/Commitment";
 import { prepareCustomScenario } from "../../helpers/CustomScenarioEvents";
-import { getDateFromMinute } from "../../helpers/DateTime";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { getHydroConditions } from "../../helpers/Hydro";
+import { createWeatherForecast } from "../../helpers/WeatherForecast";
 import { modScenario } from "../../mods/ModScenario";
 import { parseSave, serializeSave } from "../../SaveGame";
-import reducer, { tickState } from "../../reducers/Game";
+import reducer, {
+  continueLegacyCampaign,
+  tickState,
+} from "../../reducers/Game";
 import { schedulePolicy } from "../../reducers/GameActions";
 import { fullBuildForecast } from "../../testing/BuildForecastComparison";
 import { runMonths } from "../../testing/SimulationTestHelpers";
 import { createGame } from "../../testing/Simulator";
 import { loadSimData } from "../../testing/SimData";
+import { closingCompany } from "../../testing/LegacyCampaignProtocolFixtures";
 import type { GameType } from "../../Types";
 import { computeOutlook } from "./OutlookForecast";
 
@@ -60,6 +68,122 @@ it.each(SCENARIOS.map((scenario) => [scenario.id, scenario.name] as const))(
       scenarioId === 103
         ? "1a3034bacd031ed912686036e36432edbaad5489925ad798eec1af23aa8d2782"
         : undefined,
+    );
+  },
+);
+
+it("preserves modeled-past city and watershed resources in the historical campaign", () => {
+  const game = createGame({ scenarioId: LEGACY_CAMPAIGN_ID, seed: 611 });
+  expect(game.campaign?.generationIndex).toBe(0);
+  expect(game.date.year).toBe(1882);
+  expect(game.location.watershedId).not.toBe(game.location.id);
+  const forecast = expectUnchangedForecast(game);
+  const first = forecast.timeline[0];
+  const observed = getWeather(game.date, game.seed, 0, game.location.id, true);
+  expect(first.windKph).toBe(observed.WIND_KPH);
+  expect(first.windKph).not.toBe(getWeather(game.date, game.seed).WIND_KPH);
+  // The full control shares the weather reader. Independently pin its opt-in provenance
+  // through the owning weather/hydrology APIs so omitting modeledPast cannot pass both paths.
+  const watershedId = game.location.watershedId!;
+  const basinWeather = createWeatherForecast(
+    game.date,
+    game.seed,
+    watershedId,
+    true,
+  );
+  const monthReadings = forecast.timeline.filter(
+    (_tick, index) => index % TICKS_PER_MONTH === 0,
+  );
+  const basinRunoff = monthReadings.map(
+    (tick) =>
+      getHydroConditions(
+        getDateFromMinute(tick.minute, game.startingYear),
+        game.seed,
+        0,
+        watershedId,
+        basinWeather,
+      ).runoffMm,
+  );
+  expect(monthReadings.map((tick) => tick.hydroRunoffMm)).toStrictEqual(
+    basinRunoff,
+  );
+  expect(basinRunoff.some((runoff) => runoff > 0)).toBe(true);
+});
+
+it("preserves resource forecasts before and after a historical campaign handover", () => {
+  // Reuse the native handover fixture; economic feasibility is covered by the campaign sims.
+  const closing = closingCompany();
+  expect(closing.campaign?.pendingHandover).toBe(true);
+  expectUnchangedForecast(closing);
+  const inherited = reducer(closing, continueLegacyCampaign());
+  expect(inherited.scenarioId).toBe(LEGACY_CAMPAIGN_ID + 1);
+  expect(inherited.startingYear).toBe(1882);
+  expect(inherited.date.year).toBe(1902);
+  expect(inherited.date.minute).toBe(closing.date.minute);
+  const forecast = expectUnchangedForecast(inherited);
+  expect(forecast.timeline[0].minute).toBe(inherited.date.minute);
+  expect(forecast.timeline[0].windKph).toBe(
+    getWeather(inherited.date, inherited.seed, 0, inherited.location.id, true)
+      .WIND_KPH,
+  );
+});
+
+it("keeps legacy and modern forecasts isolated while sharing the same loaded city data", () => {
+  const legacy = createGame({ scenarioId: LEGACY_CAMPAIGN_ID, seed: 611 });
+  const modern = createGame({
+    scenarioId: 999,
+    scenario: prepareCustomScenario(DEFAULT_CUSTOM_SCENARIO),
+    seed: 613,
+  });
+  expect(modern.location.id).toBe(legacy.location.id);
+  // Deliberately alternate without reloading: the normals and recorded rows are shared,
+  // while issue-time observations retain each run's era and seed.
+  const past = expectUnchangedForecast(legacy);
+  const present = expectUnchangedForecast(modern);
+  expect(expectUnchangedForecast({ ...legacy })).toStrictEqual(past);
+  expect(expectUnchangedForecast({ ...modern })).toStrictEqual(present);
+  expect(past.timeline[0].windKph).toBe(
+    getWeather(legacy.date, legacy.seed, 0, legacy.location.id, true).WIND_KPH,
+  );
+  expect(present.timeline[0].windKph).toBe(
+    getWeather(modern.date, modern.seed, 0, modern.location.id).WIND_KPH,
+  );
+});
+
+it("preserves inherited historical resources through the normal save import", () => {
+  const inherited = reducer(closingCompany(), continueLegacyCampaign());
+  const expected = expectUnchangedForecast(inherited);
+  const restored = parseSave(
+    JSON.parse(JSON.stringify(serializeSave(inherited))),
+  );
+  expect(restored).not.toBeNull();
+  expect(restored!.game.campaign?.generationIndex).toBe(1);
+  expect(restored!.game.startingYear).toBe(1882);
+  expect(restored!.game.date.year).toBe(1902);
+  expect(expectUnchangedForecast(restored!.game)).toStrictEqual(expected);
+});
+
+it.each([
+  [LEGACY_CAMPAIGN_ID + 4, (1965 - 1962) * 12 * MINUTES_PER_MONTH, 1964, 1967],
+  [LEGACY_CAMPAIGN_ID + 4, (1980 - 1962) * 12 * MINUTES_PER_MONTH, 1979, 1982],
+  [LEGACY_CAMPAIGN_ID + 8, TICK_MINUTES, 2042, 2044],
+])(
+  "preserves term %i resources at minute %i across years %i–%i",
+  (scenarioId, boundaryMinute, firstYear, lastYear) => {
+    // The simulator supports standalone later-term balance fixtures through the native setup.
+    const game = createGame({ scenarioId, seed: 617 });
+    game.date = getDateFromMinute(
+      boundaryMinute - TICK_MINUTES,
+      game.startingYear,
+    );
+    const forecast = expectUnchangedForecast(game);
+    expect(game.date.year).toBe(firstYear);
+    expect(
+      getDateFromMinute(forecast.timeline.at(-1)!.minute, game.startingYear)
+        .year,
+    ).toBe(lastYear);
+    expect(forecast.timeline[0].windKph).toBe(
+      getWeather(game.date, game.seed, 0, game.location.id, true).WIND_KPH,
     );
   },
 );

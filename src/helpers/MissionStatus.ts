@@ -22,6 +22,7 @@ import { selectProjection } from "./Projection";
 import { isUtilityExpansionGame } from "./ExpansionContext";
 import { MONTHS } from "../Constants";
 import { utilityServiceGap } from "./UtilityPlanning";
+import { legacyCompletedMonths, legacyMonthOffset } from "./LegacyCampaign";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import {
   objectiveDefinitionText,
@@ -110,12 +111,13 @@ function objectiveRequirement(
 export function getMissionStatus(game: GameType) {
   const scenario = activeScenario(game);
   const duration = scenario?.durationMonths || 240;
-  const monthsRemaining = Math.max(0, duration - game.date.monthsElapsed);
+  const monthsRemaining = Math.max(0, duration - legacyCompletedMonths(game));
+  const termStartingYear = game.startingYear + legacyMonthOffset(game) / 12;
   const currentMonth = absoluteMonth(game.date.year, game.date.monthNumber);
   const history = completedMissionHistory(game);
   const now = currentTick(game);
   const requirements: MissionRequirement[] = gameObjectiveResults(game).map(
-    (result) => objectiveRequirement(result, game.startingYear, duration),
+    (result) => objectiveRequirement(result, termStartingYear, duration),
   );
   requirements.push({
     id: "cash",

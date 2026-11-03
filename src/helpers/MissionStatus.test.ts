@@ -66,6 +66,34 @@ const monthRow = (
 const requirement = (game: GameType, id: string) =>
   getMissionStatus(game).requirements.find((row) => row.id === id)!;
 
+test("a successor's remaining time and objective dates use its own 20-year term", () => {
+  const game = createNextState(createGame({ scenarioId: 117 }), (g) => {
+    g.scenarioId = 118;
+    g.campaign!.generationIndex = 1;
+    g.campaign!.termStartMonth = 240;
+    g.date = getDateFromMinute(241 * MINUTES_PER_MONTH, g.startingYear);
+    delete g.objectiveProgress;
+    g.monthlyHistory = [];
+    g.timeline = g.timeline.map((tick) => ({
+      ...tick,
+      minute: tick.minute + 241 * MINUTES_PER_MONTH,
+    }));
+  });
+  const status = getMissionStatus(game);
+  expect(status.monthsRemaining).toBe(239);
+  expect(status.finalNote).toBeUndefined();
+  const growth = status.requirements.find(
+    (row) => row.label === "Grow the customer base by 1921",
+  )!;
+  expect(growth.target).toContain("1921");
+  expect(growth.timing).toContain("12/1921");
+  const debt = status.requirements.find(
+    (row) => row.label === "Keep debt within the published allowance",
+  )!;
+  expect(debt.target).not.toContain("1882 dollars");
+  expect(debt.compact).not.toContain("1882 dollars");
+});
+
 test("zero demand cannot invent blackout failure", () => {
   const game = createNextState(fixture(38), (g) => {
     g.monthlyHistory = [

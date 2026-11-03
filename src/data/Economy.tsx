@@ -2,6 +2,7 @@ import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { getRandomRangeAt, RANDOM_STREAM } from "../helpers/Math";
 import { pow } from "../helpers/Pow";
 import { sin } from "../helpers/Libm";
+import { legacyCpi, legacyEconomy } from "./LegacyEra";
 
 // Rates only move with the calendar month, so this asks for just that rather than a whole
 // DateType. A DateType satisfies it, so callers holding one pass it straight through - and the
@@ -25,8 +26,7 @@ export interface MonthRefType {
 // Month to month CPI precision buys nothing here: the simulation reads inflation once a month and
 // spends it on cost escalation, where the annual figure is the honest resolution anyway.
 
-// The first year in EconomyRaw.csv. Asking for a year before this means the CSV was never loaded,
-// rather than that the game is being played in the 1960s.
+// The first recorded year in EconomyRaw.csv; earlier campaign years use explicit model inputs.
 const EARLIEST_DATA_YEAR = 1975;
 
 // Where the projection rests, and how far it is allowed to travel. The floor is the real one:
@@ -338,9 +338,9 @@ function getEconomy(date: MonthRefType, seed: number): MonthEconomyType {
         "Call initEconomy (browser) or initEconomyFromCsv (headless) first.",
     );
   }
-  // Anything before the data starts is the data's first month. No scenario begins there -- the
-  // earliest is 1980 -- and inventing a projection backwards would be worse than saying so.
-  const year = Math.max(date.year, EARLIEST_DATA_YEAR);
+  // Early campaign years use labeled model assumptions, never a repeated 1975 prime rate.
+  if (date.year < EARLIEST_DATA_YEAR) return legacyEconomy(date.year);
+  const year = date.year;
   if (economy[year] === undefined) {
     economy[year] = {};
   }
@@ -470,7 +470,8 @@ export function getCostTableDeflator(startingYear: number): number {
   if (startingYear >= COST_TABLE_DOLLAR_YEAR) {
     return 1;
   }
-  const year = Math.max(startingYear, 1975);
+  if (startingYear < 1975) return legacyCpi(startingYear) / 304.702;
+  const year = startingYear;
   return (
     CPI_U_ANNUAL_AVERAGE[year] / CPI_U_ANNUAL_AVERAGE[COST_TABLE_DOLLAR_YEAR]
   );

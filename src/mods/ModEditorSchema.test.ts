@@ -248,3 +248,82 @@ test("ownership, original-asset retirement and cohort goals match the production
     }
   }
 });
+
+test("featured goal editor branches match the parser's required fields and numeric bounds", () => {
+  const pack = validateMod(createAuthoringTemplate());
+  const window = { fromMonth: 1, throughMonth: 2 };
+  const verify = (goal: Record<string, unknown>, expected: boolean) => {
+    const candidate = {
+      ...pack,
+      objectives: [{ id: "featured", label: "Featured goal", ...goal }],
+    };
+    expect(validate(candidate)).toBe(expected);
+    expect(modDiagnostics(candidate).length === 0).toBe(expected);
+  };
+  const cases: [Record<string, unknown>, string, number][] = [
+    [
+      { metric: "financialCoverage", basis: "revenue", ...window },
+      "minCoverage",
+      1e6,
+    ],
+    [{ metric: "customerCount", deadlineMonth: 2 }, "minCustomers", 1e12],
+    [{ metric: "reserveMargin", ...window }, "minReserveW", 1e15],
+    [{ metric: "efficiencySavings", ...window }, "minShare", 1],
+    [{ metric: "demandServedShare", ...window }, "minShare", 1],
+  ];
+  for (const [goal, field, max] of cases) {
+    verify(goal, false);
+    verify({ ...goal, [field]: 0 }, true);
+    verify({ ...goal, [field]: max }, true);
+    verify({ ...goal, [field]: -0.001 }, false);
+    verify({ ...goal, [field]: max * 1.001 }, false);
+  }
+  verify(
+    { metric: "financialCoverage", basis: "cash", minCoverage: 1, ...window },
+    true,
+  );
+  verify({ metric: "financialCoverage", minCoverage: 1, ...window }, false);
+  verify(
+    { metric: "financialCoverage", basis: "grants", minCoverage: 1, ...window },
+    false,
+  );
+  verify({ metric: "customerCount", minCustomers: 150, ...window }, false);
+  verify(
+    { metric: "customerCount", minCustomers: 150, deadlineMonth: 2, ...window },
+    false,
+  );
+});
+
+test("commissioning cutoffs and evening hours stay optional and accept exactly the parser's scope", () => {
+  const pack = validateMod(createAuthoringTemplate());
+  const verify = (goal: Record<string, unknown>, expected: boolean) => {
+    const candidate = {
+      ...pack,
+      objectives: [{ id: "scoped-goal", label: "Scoped goal", ...goal }],
+    };
+    expect(validate(candidate)).toBe(expected);
+    expect(modDiagnostics(candidate).length === 0).toBe(expected);
+  };
+  const retirement = {
+    metric: "fuelRetirement",
+    fuel: "Oil",
+    deadlineMonth: 2,
+  };
+  verify(retirement, true);
+  for (const commissionedBeforeYear of [1800, 2001, 2200])
+    verify({ ...retirement, commissionedBeforeYear }, true);
+  for (const commissionedBeforeYear of [1799, 2201, 2000.5, null, "2001"])
+    verify({ ...retirement, commissionedBeforeYear }, false);
+  const service = {
+    metric: "demandServedShare",
+    fromMonth: 1,
+    throughMonth: 2,
+    minShare: 0.995,
+  };
+  verify(service, true);
+  verify({ ...service, hours: [17, 21] }, true);
+  for (const hours of [[17], [17, 21, 22], [21, 17], [18, 21], null, "evening"])
+    verify({ ...service, hours }, false);
+  verify({ ...service, commissionedBeforeYear: 2001 }, false);
+  verify({ ...retirement, hours: [17, 21] }, false);
+});

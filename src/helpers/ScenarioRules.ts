@@ -1,3 +1,9 @@
+import {
+  LEGACY_GENERATIONS,
+  LEGACY_GENERATION_MONTHS,
+  legacyRuleDefinitions,
+  isLegacyCampaignScenario,
+} from "../data/LegacyCampaign";
 import { renderScenarioText } from "./ScenarioText";
 import type {
   CompiledRuleEvent,
@@ -35,13 +41,20 @@ import {
   validOfficialArcMetadata,
   officialArcLoadScale,
 } from "./ScenarioRuleArcs";
-import { SCENARIOS } from "../data/Scenarios";
+import { SCENARIOS, getScenario } from "../data/Scenarios";
 import { inEraMoney } from "../data/FuelPrices";
 import { getScenarioLocation } from "./Locations";
 import { validOfficialArcChoiceMetadata } from "./ScenarioRuleChoices";
 import { scenarioRuleDependencyDiagnostics } from "./ScenarioRuleDependencies";
 import { requiredFuelShareFeasibility } from "./ScenarioFuelShares";
 import { TRANSMISSION_CORRIDORS } from "../data/AdjacentMarkets";
+import { customerMarketSizeAt } from "./Customers";
+import { MINUTES_PER_MONTH } from "./DateTime";
+import {
+  hasEconomy,
+  getRateInflationIndex,
+  getInflationIndex,
+} from "../data/Economy";
 
 export class RuleCompilationError extends Error {
   constructor(public diagnostics: RuleDiagnostic[]) {
@@ -288,12 +301,155 @@ function customScenarioRules(
   return rules;
 }
 
+const legacyRulesCache = new Map<string, CompiledScenarioRules>();
+
+/** Keep ordinary scenario output unchanged; native campaigns and authored meter goals opt in. */
+export function needsObjectiveEnergyMeters(game: GameType): boolean {
+  if (isLegacyCampaignScenario(game.scenarioId)) return true;
+  return (
+    scenarioRules(
+      getScenario(game.scenarioId, game.customScenario),
+      game,
+    )?.objectives.some(
+      ({ metric }) =>
+        metric === "efficiencySavings" || metric === "demandServedShare",
+    ) ?? false
+  );
+}
+/** Compile bounded CEO data, then project event/report clocks onto the physical campaign. */
+function legacyScenarioRules(
+  scenario: ScenarioType,
+  parameters: Pick<GameType, "difficulty" | "seed"> &
+    Partial<Pick<GameType, "campaign" | "customerMarketSize">>,
+): CompiledScenarioRules {
+  const index = LEGACY_GENERATIONS.findIndex(
+    (generation) => generation.scenarioId === scenario.id,
+  );
+  const generation = LEGACY_GENERATIONS[index];
+  const context = parameters.campaign;
+  const offset = context?.termStartMonth ?? 0;
+  const endDate = { year: generation.startYear + 19, monthNumber: 12 };
+  // Live campaigns freeze both conversions before play, so cold imports never read economy CSVs.
+  // Standalone catalog fixtures can bind their nominal starting rate once data is available.
+  const goalRateIndex = context
+    ? context.goalRateIndex
+    : hasEconomy()
+      ? getRateInflationIndex(endDate, 1882, parameters.seed) /
+        getRateInflationIndex(
+          { year: generation.startYear, monthNumber: 1 },
+          1882,
+          parameters.seed,
+        )
+      : 1;
+  const goalCostIndex = context
+    ? context.goalCostIndex
+    : hasEconomy()
+      ? getInflationIndex(endDate, 1882, parameters.seed)
+      : 1;
+  const endMarketCustomers =
+    context && parameters.customerMarketSize !== undefined
+      ? customerMarketSizeAt(
+          parameters.customerMarketSize,
+          (offset + LEGACY_GENERATION_MONTHS) * MINUTES_PER_MONTH,
+        )
+      : undefined;
+  const key = canonicalRuleJson([
+    scenario.id,
+    offset,
+    parameters.difficulty,
+    parameters.seed,
+    context?.peakMW,
+    context?.northCapacityMW,
+    context?.referenceRate,
+    context?.debtAllowance,
+    goalRateIndex,
+    goalCostIndex,
+    context?.emissionsBudgetTonnes,
+    context?.openingCustomers,
+    endMarketCustomers,
+  ]);
+  const cached = legacyRulesCache.get(key);
+  if (cached) return cached;
+  const definitions = legacyRuleDefinitions(index, {
+    ...context,
+    goalRateIndex,
+    goalCostIndex,
+    ...(endMarketCustomers === undefined ? {} : { endMarketCustomers }),
+  });
+  const local = compileScenarioRules(definitions, {
+    namespace: {
+      kind: "official",
+      scenarioId: scenario.id,
+      arcId: `legacy-generation-${index + 1}`,
+    },
+    difficulty: parameters.difficulty,
+    seed: parameters.seed,
+    startingYear: generation.startYear,
+    durationMonths: LEGACY_GENERATION_MONTHS,
+    startingPeakW: (context?.peakMW ?? 0) * 1e6,
+    startingAssetIds: scenario.facilities.flatMap((asset) =>
+      asset.assetId ? [asset.assetId] : [],
+    ),
+    inheritedObjectiveIds: definitions.objectives.map(
+      (objective) => objective.id,
+    ),
+  });
+  const shiftReport = (report: RuleReport): RuleReport =>
+    "fromMonth" in report
+      ? {
+          ...report,
+          fromMonth: report.fromMonth + offset,
+          throughMonth: report.throughMonth + offset,
+        }
+      : report;
+  const rules: CompiledScenarioRules = {
+    ...local,
+    // Preserve the historical task's prominence without changing canonical rule ordering elsewhere.
+    objectives: [...local.objectives].sort(
+      (left, right) =>
+        definitions.objectives.findIndex(({ id }) => id === left.id) -
+        definitions.objectives.findIndex(({ id }) => id === right.id),
+    ),
+    startingYear: context
+      ? LEGACY_GENERATIONS[0].startYear
+      : generation.startYear,
+    durationMonths: offset + LEGACY_GENERATION_MONTHS,
+    events: local.events.map((event) => ({
+      ...event,
+      startMonth: event.startMonth + offset,
+      possibleStartMonths: {
+        from: event.possibleStartMonths.from + offset,
+        to: event.possibleStartMonths.to + offset,
+      },
+      ...(event.report ? { report: shiftReport(event.report) } : {}),
+      ...(event.endReport ? { endReport: shiftReport(event.endReport) } : {}),
+    })),
+    choices: local.choices.map((choice) => ({
+      ...choice,
+      dueMonth: choice.dueMonth + offset,
+    })),
+    debriefReports: local.debriefReports.map(shiftReport),
+  };
+  freezePlain(rules);
+  identityCache.set(rules, ruleDigest(rules));
+  if (legacyRulesCache.size >= 64)
+    legacyRulesCache.delete(legacyRulesCache.keys().next().value!);
+  legacyRulesCache.set(key, rules);
+  return rules;
+}
+
 /** Static objective/catalog readers use fixed defaults; every live/forecast reader binds its game. */
 export function scenarioRules(
   scenario?: ScenarioType,
-  parameters?: Pick<GameType, "difficulty" | "seed">,
+  parameters?: Pick<GameType, "difficulty" | "seed"> &
+    Partial<Pick<GameType, "campaign" | "customerMarketSize">>,
 ): CompiledScenarioRules | undefined {
   if (!scenario) return undefined;
+  if (isLegacyCampaignScenario(scenario.id))
+    return legacyScenarioRules(
+      scenario,
+      parameters ?? { difficulty: "Employee", seed: scenario.seed ?? 0 },
+    );
   if (scenario.id === 999)
     return (
       scenario.mod?.rules ??
@@ -402,13 +558,25 @@ export function compileScenarioRules(
       "rules",
       "Rules must contain plain finite JSON data only.",
     );
+  const requestedNamespace = params.namespace;
   if (
     !RULE_DIFFICULTIES.includes(params.difficulty) ||
     !Number.isInteger(params.seed) ||
     params.seed < 0 ||
     params.seed > 4294967295 ||
     !Number.isInteger(params.startingYear) ||
-    params.startingYear < 1980 ||
+    (params.startingYear < 1980 &&
+      !(
+        requestedNamespace.kind === "official" &&
+        LEGACY_GENERATIONS.some(
+          (generation) =>
+            generation.scenarioId === requestedNamespace.scenarioId &&
+            generation.startYear === params.startingYear &&
+            requestedNamespace.arcId ===
+              `legacy-generation-${generation.index + 1}`,
+        ) &&
+        params.durationMonths === LEGACY_GENERATION_MONTHS
+      )) ||
     params.startingYear > 2100 ||
     !Number.isInteger(params.durationMonths) ||
     params.durationMonths < 1 ||

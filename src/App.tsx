@@ -28,6 +28,8 @@ import {
 
 import {
   customEventFromSearch,
+  campaignSetupUrl,
+  isLegacyCampaignSearch,
   isDataCenterSetupSearch,
   scenarioDetailsUrl,
   scenarioFromSearch,
@@ -266,10 +268,24 @@ export default function App() {
         );
         store.dispatch(navigate({ name: "CUSTOM_GAME", url }));
       }
+      const legacyCampaign =
+        !challenge &&
+        !dataCenterSetup &&
+        customEvent === undefined &&
+        isLegacyCampaignSearch(window.location.search);
+      if (legacyCampaign) {
+        const url = campaignSetupUrl();
+        getHistoryApi().replaceState(null, "", scenarioListUrl());
+        store.dispatch(
+          navigate({ name: "NEW_GAME", skipBrowserHistory: true }),
+        );
+        store.dispatch(navigate({ name: "CAMPAIGN", url }));
+      }
       const sharedScenario =
         !challenge &&
         !dataCenterSetup &&
         customEvent === undefined &&
+        !legacyCampaign &&
         scenarioFromSearch(window.location.search);
       if (sharedScenario) {
         const detailsUrl = scenarioDetailsUrl(sharedScenario.id);
@@ -302,6 +318,13 @@ export default function App() {
       if (customEventFromSearch(window.location.search) !== undefined) {
         store.dispatch(
           navigate({ name: "CUSTOM_GAME", skipBrowserHistory: true }),
+        );
+        e.preventDefault();
+        return;
+      }
+      if (isLegacyCampaignSearch(window.location.search)) {
+        store.dispatch(
+          navigate({ name: "CAMPAIGN", skipBrowserHistory: true }),
         );
         e.preventDefault();
         return;

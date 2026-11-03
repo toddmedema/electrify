@@ -17,6 +17,15 @@ const OBJECTIVE_DEFINITIONS = {
     "Acquire at least one named utility by the deadline; a completed connection alone does not transfer ownership.",
   assetRetirement:
     "Retire the named original assets by the deadline; replacement equipment is not targeted.",
+  financialCoverage:
+    "Customer and export revenue over the window, or the lowest monthly closing cash, divided by recorded operating expenses including imports, interest and programs; grants, asset purchases and loan principal are excluded. Zero expenses meet the coverage requirement.",
+  customerCount: "The absolute number of customers at the deadline.",
+  reserveMargin:
+    "The lowest recorded reachable supply headroom in every required month, with shortages counted as zero headroom.",
+  efficiencySavings:
+    "Measured efficiency energy savings divided by the eligible residential and commercial energy before efficiency over the window.",
+  demandServedShare:
+    "The lowest monthly share of demand served, across all hours or the specified evening hours; no demand means no unserved demand.",
 };
 
 module.exports = { OBJECTIVE_DEFINITIONS };

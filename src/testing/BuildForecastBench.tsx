@@ -1,6 +1,7 @@
 /** Opt-in paired catalog calculation benchmark: npm run perf:build-forecast. */
 import fs from "fs";
 import { DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
+import { LEGACY_CAMPAIGN_ID } from "../data/LegacyCampaign";
 import { prepareCustomScenario } from "../helpers/CustomScenarioEvents";
 import { computeOutlook } from "../components/base/OutlookForecast";
 import { forecastWorkerSnapshot } from "../components/base/ForecastWorkerSnapshot";
@@ -46,6 +47,17 @@ const fixtures = [
   {
     name: "Across the Valley utility expansion opening",
     create: () => createGame({ scenarioId: 116, seed: 17 }),
+  },
+  {
+    name: "Legacy First Light opening, 1882 SF and separate watershed",
+    create: () => {
+      const game = createGame({ scenarioId: LEGACY_CAMPAIGN_ID, seed: 611 });
+      expect(game.campaign?.generationIndex).toBe(0);
+      expect(game.date.year).toBe(1882);
+      expect(game.location.watershedId).toBeDefined();
+      expect(game.location.watershedId).not.toBe(game.location.id);
+      return game;
+    },
   },
 ];
 

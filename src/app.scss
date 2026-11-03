@@ -6049,6 +6049,9 @@ $homeSmokeCycle: 5.6s;
   position: relative;
   border-top: 1px solid var(--border-subtle);
 }
+.MuiDialog-paper .MuiDialogActions-root.campaignHandoverActions {
+  border-top: 0;
+}
 // A fade says there is more above the sticky actions. It follows the content's scroll timeline,
 // which is inactive when nothing scrolls, so a dialog that fits shows none.
 .MuiDialog-paper .MuiDialogContent-root + .MuiDialogActions-root::before {

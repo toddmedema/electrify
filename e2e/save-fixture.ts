@@ -144,7 +144,7 @@ export async function editSavedGame<T>(
   const save = decodeSave(record.save) as SaveGameType;
   const result = edit(save);
   await page.evaluate(
-    ({ databaseName, id, wire, date }) =>
+    ({ databaseName, id, wire, date, scenarioId, difficulty }) =>
       new Promise<void>((resolve, reject) => {
         const request = indexedDB.open(databaseName);
         request.onerror = () => reject(request.error);
@@ -161,6 +161,8 @@ export async function editSavedGame<T>(
               ...metadata.result,
               revision: metadata.result.revision + 1,
               date,
+              scenarioId,
+              difficulty,
             });
           payload.onsuccess = () =>
             tx.objectStore("payloads").put({
@@ -180,6 +182,8 @@ export async function editSavedGame<T>(
       id: record.metadata.id,
       wire: JSON.stringify(encodeSave(save)),
       date: { month: save.game.date.month, year: save.game.date.year },
+      scenarioId: save.game.scenarioId,
+      difficulty: save.game.difficulty,
     },
   );
   return result;

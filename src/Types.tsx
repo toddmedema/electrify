@@ -201,6 +201,7 @@ export interface DifficultyMultipliersType {
 }
 
 export type CardNameType =
+  | "CAMPAIGN"
   | "BUILD_GENERATORS"
   | "BUILD_STORAGE"
   | "BUILD_INTERTIES"
@@ -425,7 +426,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     customerBatteryLossWh?: number;
     rooftopSurplusW?: number;
     // Home and business load before rebate programs, and what efficiency and rooftop solar removed
-    // from it this tick. Present only while a rebate program has installed anything.
+    // from it this tick. Campaigns also meter eligible load and zero savings with programs off.
     rebateEligibleW?: number;
     efficiencySavedW?: number;
     rooftopSolarW?: number;
@@ -470,6 +471,11 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
   month: number;
   supplyWh: number; // total
   demandWh: number; // total
+  /** Campaign meters; absent historical observations remain unverifiable, never inferred as zero. */
+  efficiencySavedWh?: number;
+  efficiencyEligibleWh?: number; // Gross Residential + Commercial demand before efficiency/rooftop.
+  eveningDemandWh?: number; // Demand from 17:00 inclusive to 21:00 exclusive.
+  eveningUnservedWh?: number;
   // Persisted simulation facts used by story checkpoints. These are deliberately raw totals,
   // not narrative classifications such as "reliable" or "gas-heavy".
   deliveredWhByFuel: FuelProductionType;
@@ -1280,6 +1286,48 @@ export interface AcquireUtilityAction {
   financed: boolean;
   quoteKey: string;
 }
+/** One bounded CEO generation, retaining its own verifiable completed-month evidence. */
+export interface LegacyCampaignTermType {
+  generationIndex: number;
+  scenarioId: number;
+  openingCustomers: number;
+  referenceRate: number;
+  peakMW: number;
+  northCapacityMW: number;
+  debtAllowance: number;
+  goalRateIndex: number;
+  goalCostIndex: number;
+  emissionsBudgetTonnes: number;
+  inheritedDemandMultiplier: number;
+  closingCash: number;
+  closingCustomers: number;
+  closingDebt: number;
+  objectiveProgress: ObjectiveProgress;
+  objectiveResults: ObjectiveResult[];
+  debrief: VictoryDebriefType;
+}
+
+/** The physical simulation clock remains continuous; only CEO evidence uses local months. */
+export interface LegacyCampaignType {
+  version: 1;
+  generationIndex: number;
+  termStartMonth: number;
+  openingCustomers: number;
+  referenceRate: number;
+  peakMW: number;
+  northCapacityMW: number;
+  debtAllowance: number;
+  /** Frozen conversion from internal anchors to this term's final-year nominal dollars. */
+  goalRateIndex: number;
+  goalCostIndex: number;
+  emissionsBudgetTonnes: number;
+  inheritedDemandMultiplier: number;
+  openingCash: number;
+  openingFleet: VictoryFleetCapacityType[];
+  completedTerms: LegacyCampaignTermType[];
+  pendingHandover: boolean;
+}
+
 export interface GameType {
   utilityExpansion?: UtilityExpansionState;
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
@@ -1331,6 +1379,7 @@ export interface GameType {
   // The scenario the player assembled on the custom game screen. Authored scenarios live in
   // SCENARIOS, this one only ever exists here, so every lookup has to go through getScenario()
   customScenario?: ScenarioType;
+  campaign?: LegacyCampaignType;
   location: LocationType;
   speed: SpeedType;
   inGame: boolean;

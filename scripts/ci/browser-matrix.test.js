@@ -70,6 +70,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "modal-layout.spec.ts",
       "wildfire-scenario.spec.ts",
       "acquisitions.spec.ts",
+      "campaign.spec.ts",
       ...projects,
       "--project=mobile-360px",
     ]),

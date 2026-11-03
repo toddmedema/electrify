@@ -87,7 +87,7 @@ export function scenarioLossSummary(
           phrase = `${objective.fuels.join("/")} share <${target}`;
           break;
         case "fuelRetirement":
-          phrase = `${objective.fuel} still owned`;
+          phrase = `${objective.fuel}${objective.commissionedBeforeYear === undefined ? "" : ` commissioned before ${objective.commissionedBeforeYear}`} still owned`;
           break;
         case "monthlyBilledRate":
           phrase = `Billed rate >${target}`;
@@ -100,6 +100,21 @@ export function scenarioLossSummary(
           break;
         case "monthEndDebt":
           phrase = `Debt >${target}`;
+          break;
+        case "financialCoverage":
+          phrase = `${objective.basis === "cash" ? "Cash" : "Revenue"} <${target}`;
+          break;
+        case "customerCount":
+          phrase = `Fewer than ${target}`;
+          break;
+        case "reserveMargin":
+          phrase = `Reserve <${target}`;
+          break;
+        case "efficiencySavings":
+          phrase = `Efficiency savings <${target}`;
+          break;
+        case "demandServedShare":
+          phrase = `${objective.hours ? "Evening demand" : "Demand"} served <${target}`;
           break;
       }
     } else phrase = risk.label;

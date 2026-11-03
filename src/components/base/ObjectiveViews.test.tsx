@@ -92,5 +92,5 @@ it("renders stored objective debrief facts and unavailability without re-evaluat
   );
   expect(region).toHaveTextContent(bills.definition);
   expect(region).toHaveTextContent("Months 1–2");
-  expect(region).toHaveTextContent("$0.10000000000001/kWh");
+  expect(region).toHaveTextContent("$0.1/kWh (above goal)");
 });

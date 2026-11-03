@@ -1,4 +1,9 @@
+import { needsObjectiveEnergyMeters } from "./ScenarioRules";
 import { modScaledValue } from "./ScenarioMod";
+import {
+  isLegacyCampaignScenario,
+  legacyPolicyAllowed,
+} from "../data/LegacyCampaign";
 import type {
   GameType,
   DeferredResidentialLoad,
@@ -71,9 +76,23 @@ export function emptyPolicies(month = 0): PoliciesType {
 }
 export function policyAvailable(game: GameType): boolean {
   return (
-    POLICY_SCENARIOS.includes(game.scenarioId) &&
+    (POLICY_SCENARIOS.includes(game.scenarioId) ||
+      (isLegacyCampaignScenario(game.scenarioId) && game.date.year >= 1973)) &&
     !game.customScenario?.tutorialSteps &&
     (game.customScenario?.durationMonths ?? 240) >= 6
+  );
+}
+
+/** Calendar eligibility shares the continuous campaign clock with live and worker commands. */
+export function policyAllowedForGame(
+  game: GameType,
+  id: PolicyId,
+  month = game.date.monthsElapsed,
+): boolean {
+  return legacyPolicyAllowed(
+    game.scenarioId,
+    id,
+    game.startingYear + Math.floor(month / 12),
   );
 }
 export function validPolicyChange(value: unknown): value is PolicyChangeType {
@@ -253,6 +272,13 @@ export function advancePolicies(
   for (let m = p.month + 1; m <= month; m++) {
     POLICY_IDS.forEach((id) => {
       const s = p.programs[id];
+      if (!policyAllowedForGame(game, id, m)) {
+        s.tier = "Off";
+        s.adoption = 0;
+        s.spending = 0;
+        if (s.pending && s.pending.month <= m) delete s.pending;
+        return;
+      }
       if (s.pending && s.pending.month <= m) {
         s.tier = s.pending.tier;
         if (isOperatingPolicy(id) || isFlexibilityPolicy(id)) {
@@ -483,6 +509,13 @@ export function applyPolicyDemand(
   tick: TickPresentFutureType,
   weatherShare = 0,
 ) {
+  // Native setup builds its opening forecast before the linked campaign context is installed.
+  // Keep ordinary inactive ticks unchanged while recording the campaign's full eligible pool.
+  if (needsObjectiveEnergyMeters(game)) {
+    tick.rebateEligibleW =
+      tick.demandByType.Residential + tick.demandByType.Commercial;
+    tick.efficiencySavedW = 0;
+  }
   const p = game.policies?.programs;
   if (!p) return;
   const efficiency = efficiencyInEffect(
