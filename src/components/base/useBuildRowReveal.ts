@@ -1,3 +1,4 @@
+import { revealControl } from "./RevealControl";
 import * as React from "react";
 
 /** Follow the resized option after React has updated costs, row heights and sort order. */
@@ -11,7 +12,7 @@ export default function useBuildRowReveal(
       container.current?.querySelectorAll<HTMLElement>("[data-build-option]") ??
         [],
     ).find((element) => element.dataset.buildOption === pending.current);
-    row?.scrollIntoView?.({ block: "start", behavior: "instant" });
+    if (row) revealControl(row, "start");
     pending.current = undefined;
   });
   return (name: string) => {

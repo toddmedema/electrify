@@ -1,3 +1,4 @@
+import { useTvLayout } from "../../TvLayout";
 import { FEEDBACK_URL } from "../../CommunityLinks";
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
@@ -327,7 +328,9 @@ export function GameAppBar(props: Props) {
 
   const bigScreen = isBigScreen();
   // Tracks resizes even while paused, when the bar otherwise has no reason to re-render.
-  const singleRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
+  const tvMode = useTvLayout();
+  const wideRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
+  const singleRow = wideRow && !tvMode;
   const showProfit = useMediaQuery("(min-width:700px)", { noSsr: true });
   const roomForStatusText = useMediaQuery("(min-width:600px)", { noSsr: true });
   const monthlyProfit = React.useMemo(
@@ -393,7 +396,7 @@ export function GameAppBar(props: Props) {
    * entirely on the frames in between, which is where a good quarter of the frame budget went.
    */
   // Layout and speed availability must use the same media-query snapshot during resize.
-  const desktop = singleRow;
+  const desktop = singleRow || tvMode;
   const speedOptions = React.useMemo(
     () =>
       buildSpeedOptions({

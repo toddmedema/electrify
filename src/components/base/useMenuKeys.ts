@@ -1,3 +1,4 @@
+import { isTvLayout } from "../../TvLayout";
 import { KeyboardEvent, useLayoutEffect, useRef } from "react";
 import { CARD_TRANSITION_ANIMATION_MS } from "../../Constants";
 
@@ -45,6 +46,12 @@ export function restoreMenuFocus(returnSelector: string): void {
     // Home always starts at the top. Its own menu hook may already have focused that
     // action (or the player may have moved on), so never overwrite focus within it.
     if (home?.contains(document.activeElement)) return;
+    // A TV workspace restores the control and scroll position inside its previous tool.
+    if (
+      isTvLayout() &&
+      document.activeElement?.closest("[data-game-tool],.gameFleet")
+    )
+      return;
     const target = home
       ? home.querySelector<HTMLElement>("[data-main-action]")
       : trigger;
@@ -125,6 +132,12 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
       event.preventDefault();
       target.click();
     } else if (!native && event.key.startsWith("Arrow")) {
+      if (
+        !settings &&
+        isTvLayout() &&
+        document.documentElement.dataset.controllerInput === "true"
+      )
+        return;
       const groups = rows();
       const row = groups.findIndex((items) => items.includes(target));
       if (row < 0) return;

@@ -398,6 +398,33 @@ player resumes it; closing a purchase, help, or other blocking screen cannot res
 running speed. Multiplayer sleep also preserves the shared save and requires consent to continue.
 A wake checkpoint failure uses the existing visible save error and retry path.
 
+### TV layout
+
+The desktop title screen offers an explicit TV layout before starting a game. The same
+preference is available in Settings, where players can return to the desktop layout, adjust
+TV scale, and add a screen-edge inset. These preferences stay on this device; connecting a
+controller does not select TV layout automatically.
+
+TV layout keeps one active tool and the essential game status visible. Its shared scale covers
+text, charts, controls and controller glyphs. Build keeps comparison and forecast information
+inside the active view, and controller hints follow the current control with full controls help
+available separately. Existing chart, slider, text-entry and reorder controls retain their own
+navigation, nested Back and confirmation behavior.
+
+Headless controller checks exercise the renderer and native bridge mock. They do not establish
+couch-distance readability, overscan behavior, physical-controller compatibility or Steam binding
+delivery. Before release, test a private build on real 1080p and 4K TVs in both themes:
+
+- Enable TV layout from the title screen using only a controller. Adjust scale and inset,
+  relaunch, and verify device-local persistence and the option to return to desktop layout.
+- Complete tutorial → build/resize → pricing/programs → charts/events → save/reload. Check
+  chart values and explanatory details without hover, directional destinations, and focus and
+  scroll position when returning to a tool.
+- Verify cash, clock/speed, grid state and goals remain readable at couch distance. Repeat
+  with the largest text and TV scale, the largest inset, long event choices and text entry.
+- Test remapped glyphs, nested Back, a held Confirm across purchase review, disconnect/reconnect,
+  and recovery through the Steam overlay. Disconnect must leave the game paused until resumed.
+
 ### Steam Deck release acceptance
 
 Use a private Steam branch with the real App ID and the intended Linux runtime. For each release,

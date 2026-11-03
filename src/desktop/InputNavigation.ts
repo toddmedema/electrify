@@ -1,3 +1,6 @@
+import { revealControl } from "../components/base/RevealControl";
+import { isTvLayout } from "../TvLayout";
+
 const controlSelector =
   "button,a[href],input,select,textarea,summary,[role=button],[tabindex]";
 const popupSelector = "[role=dialog],[role=menu],[role=listbox]";
@@ -12,6 +15,15 @@ const keyCodes: Record<string, number> = {
 };
 
 function visible(element: HTMLElement): boolean {
+  // Native closed disclosures retain geometry for content-visibility layout, but cannot take focus.
+  for (
+    let details = element.closest("details:not([open])");
+    details;
+    details = details.parentElement?.closest("details:not([open])") ?? null
+  ) {
+    if (!details.querySelector(":scope > summary")?.contains(element))
+      return false;
+  }
   // Compact tools cover the fleet without unmounting it or changing pointer/keyboard access.
   // Controller focus must stay on the exposed surface, including when a resize covers focus.
   if (
@@ -40,6 +52,8 @@ export function inputScope(): HTMLElement {
   const screen = screens[screens.length - 1];
   const container = screen?.closest<HTMLElement>(".app_container");
   const tutorial = container?.querySelector<HTMLElement>(".tutorialHud");
+  if (isTvLayout())
+    return screen?.closest<HTMLElement>(".appFrame") ?? screen ?? document.body;
   return tutorial && visible(tutorial) ? container! : (screen ?? document.body);
 }
 
@@ -89,11 +103,7 @@ function key(target: HTMLElement, value: string): KeyboardEvent {
 
 function focus(element: HTMLElement) {
   element.focus({ preventScroll: true });
-  element.scrollIntoView?.({
-    block: "nearest",
-    inline: "nearest",
-    behavior: "instant",
-  });
+  revealControl(element);
 }
 
 function changeValue(
@@ -112,6 +122,66 @@ function changeValue(
   );
   element.dispatchEvent(new Event("input", { bubbles: true }));
   element.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+/** Follow rendered rows, keeping a scrolling list together before leaving for fixed chrome. */
+function spatialDestination(
+  target: HTMLElement,
+  controls: HTMLElement[],
+  direction: "up" | "down" | "left" | "right",
+): HTMLElement | undefined {
+  const from = target.getBoundingClientRect();
+  if (!from.width || !from.height) return undefined;
+  const vertical = direction === "up" || direction === "down";
+  const forward = direction === "down" || direction === "right" ? 1 : -1;
+  const scrollParent = (element: HTMLElement): HTMLElement | undefined => {
+    for (
+      let parent = element.parentElement;
+      parent;
+      parent = parent.parentElement
+    ) {
+      if (
+        /(auto|scroll)/.test(getComputedStyle(parent).overflowY) &&
+        parent.scrollHeight > parent.clientHeight
+      )
+        return parent;
+    }
+    return undefined;
+  };
+  const scrolling = vertical ? scrollParent(target) : undefined;
+  const cx = (from.left + from.right) / 2;
+  const cy = (from.top + from.bottom) / 2;
+  const candidates = controls.flatMap((element) => {
+    if (element === target) return [];
+    const rect = element.getBoundingClientRect();
+    if (!rect.width || !rect.height) return [];
+    const dx = (rect.left + rect.right) / 2 - cx;
+    const dy = (rect.top + rect.bottom) / 2 - cy;
+    const advance = (vertical ? dy : dx) * forward;
+    if (advance <= 2) return [];
+    const overlap = vertical
+      ? Math.min(from.right, rect.right) - Math.max(from.left, rect.left)
+      : Math.min(from.bottom, rect.bottom) - Math.max(from.top, rect.top);
+    // Horizontal navigation follows the current row; Down/Up leaves that row.
+    if (!vertical && overlap <= 0) return [];
+    const cross = Math.abs(vertical ? dx : dy);
+    return [
+      {
+        element,
+        advance,
+        cross,
+        aligned: overlap > 0,
+        sameScroll: !!scrolling && scrollParent(element) === scrolling,
+      },
+    ];
+  });
+  candidates.sort(
+    (a, b) =>
+      Number(b.sameScroll) - Number(a.sameScroll) ||
+      Number(b.aligned) - Number(a.aligned) ||
+      a.advance + a.cross * 0.25 - (b.advance + b.cross * 0.25),
+  );
+  return candidates[0]?.element;
 }
 
 /** Widget handlers get the first opportunity; native browser defaults need an explicit update. */
@@ -160,6 +230,11 @@ export function moveInputFocus(
   const controls = visibleControls(scope);
   if (!controls.length) return;
   const index = controls.indexOf(target);
+  if (isTvLayout() && index >= 0) {
+    const next = spatialDestination(target, controls, direction);
+    if (next) focus(next);
+    return;
+  }
   if (index >= 0) {
     focus(controls[(index + step + controls.length) % controls.length]);
   } else {
@@ -209,6 +284,10 @@ export function confirmInput(): void {
     )
   )
     target.click();
+  requestAnimationFrame(() => {
+    if (document.activeElement === target && visible(target))
+      revealControl(target);
+  });
 }
 
 /** Dispatch only to the current surface; its owner decides whether Back may dismiss it. */

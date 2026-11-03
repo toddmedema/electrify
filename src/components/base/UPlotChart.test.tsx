@@ -1,3 +1,7 @@
+import {
+  resetInputPresentation,
+  updateInputPresentation,
+} from "../../desktop/InputPresentation";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
@@ -45,6 +49,7 @@ describe("UPlotChart resizing", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
+    resetInputPresentation();
     (uPlot as unknown as jest.Mock).mockImplementation(() =>
       Object.assign(Object.create(uPlotPrototype), {
         over: document.createElement("div"),
@@ -83,7 +88,11 @@ describe("UPlotChart resizing", () => {
   });
 
   afterEach(() => {
-    act(() => applyTextSize("standard"));
+    act(() => {
+      delete document.documentElement.dataset.tvLayout;
+      resetInputPresentation();
+      applyTextSize("standard");
+    });
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
@@ -626,6 +635,76 @@ describe("UPlotChart resizing", () => {
     });
     const pinched = onRangeChange.mock.calls.at(-1)?.[0];
     expect(pinched[1] - pinched[0]).toBeLessThan(50);
+  });
+
+  it("preserves the selected viewport and pointer zoom when switching controller presentation", () => {
+    const onRangeChange = jest.fn();
+    const viewport = {
+      bounds: [0, 100] as [number, number],
+      range: [25, 75] as [number, number],
+      minSpan: 10,
+      onRangeChange,
+      onReset: jest.fn(),
+    };
+    const previous = uPlotPrototype.setScale.getMockImplementation();
+    uPlotPrototype.setScale.mockImplementation(function (
+      this: { scales?: Record<string, unknown> },
+      name: string,
+      range: unknown,
+    ) {
+      this.scales ??= {};
+      this.scales[name] = range;
+    });
+    try {
+      render(
+        <ChartViewportContext.Provider value={viewport}>
+          <UPlotChart
+            ariaLabel="Switchable chart"
+            state={{}}
+            data={[
+              [0, 100],
+              [2, 3],
+            ]}
+            tooltip={() => "Chart point"}
+            buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+          />
+        </ChartViewportContext.Provider>,
+      );
+      for (const active of [true, false]) {
+        act(() => updateInputPresentation({ active, connected: true }));
+        expect(screen.getByRole("img").tabIndex).toBe(active ? 0 : -1);
+        expect(currentPlot().scales.x).toEqual({ min: 25, max: 75 });
+        onRangeChange.mockClear();
+        act(() => {
+          currentPlot().over.dispatchEvent(
+            new WheelEvent("wheel", {
+              ctrlKey: true,
+              deltaY: -120,
+              clientX: 200,
+              cancelable: true,
+            }),
+          );
+          jest.advanceTimersByTime(200);
+        });
+        const range = onRangeChange.mock.calls.at(-1)?.[0];
+        expect(range[1] - range[0]).toBeLessThan(50);
+      }
+      act(() => updateInputPresentation({ active: true }));
+      currentPlot().setCursor = jest.fn();
+      currentPlot().valToPos = (value: number) => value;
+      fireEvent.keyDown(screen.getByRole("img"), { key: "Enter" });
+      expect(screen.getByRole("status")).toHaveTextContent("Chart point");
+      act(() => updateInputPresentation({ active: false }));
+      fireEvent.pointerDown(screen.getByRole("img"), {
+        pointerType: "mouse",
+        clientX: 10,
+        clientY: 10,
+      });
+      act(() => updateInputPresentation({ active: true }));
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    } finally {
+      uPlotPrototype.setScale.mockImplementation(previous ?? (() => {}));
+    }
   });
 
   it.each(["theme", "structure", "height", "presentation"])(

@@ -37,3 +37,12 @@ it.each([undefined, null, "", "900%", "small", 100, {}, NaN])(
     expect(document.documentElement.style.fontSize).toBe("100%");
   },
 );
+
+it("scales TV chart subscriptions and text together without changing text-size choice", () => {
+  applyTextSize("large", 1.5);
+  expect(getTextScale()).toBe(1.6875);
+  expect(document.documentElement.style.fontSize).toBe("168.75%");
+  expect(document.documentElement.dataset.textSize).toBe("large");
+  applyTextSize("large");
+  expect(getTextScale()).toBe(1.125);
+});

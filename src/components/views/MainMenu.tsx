@@ -20,6 +20,10 @@ import {
 import InstallAppButton from "../base/InstallAppButton";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useMenuKeys } from "../base/useMenuKeys";
+const TvLayoutSettings =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? React.lazy(() => import("../base/TvLayoutSettings"))
+    : () => null;
 // Keep Steam's co-op UI and authoritative worker out of the browser edition entirely.
 const MultiplayerButton =
   process.env.REACT_APP_DESKTOP === "true"
@@ -219,6 +223,11 @@ const MainMenu = (props: Props): React.JSX.Element => {
             </React.Suspense>
           )}
         </Stack>
+        {desktopApp && (
+          <React.Suspense fallback={null}>
+            <TvLayoutSettings compact />
+          </React.Suspense>
+        )}
         <Stack
           component="nav"
           aria-label="Game resources"

@@ -2,12 +2,17 @@ import { parseChallengeUrl } from "./helpers/Challenge";
 import { delta as uiDelta } from "./reducers/UI";
 import { logEvent } from "./Globals";
 import ScenarioChoiceDialog from "./components/base/ScenarioChoiceDialog";
-import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
+import {
+  ThemeProvider,
+  StyledEngineProvider,
+  createTheme,
+} from "@mui/material/styles";
 import {
   lazy,
   Suspense,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -51,6 +56,7 @@ import { ThemeChoiceType } from "./Types";
 import { InstallPromptProvider } from "./components/base/InstallAppButton";
 import type { DesktopPowerState } from "./Desktop";
 import { applyTextSize } from "./TextSize";
+import { normalizeTvInset, tvDisplayScale, tvLayoutEnabled } from "./TvLayout";
 import { getDesktop, isDesktopApp } from "./Desktop";
 
 const AchievementNotifications = lazy(
@@ -132,10 +138,34 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
   const choice: ThemeChoiceType = useAppSelector(
     (state) => state.settings.theme,
   );
-  const textSize = useAppSelector((state) => state.settings.textSize);
+  const settings = useAppSelector((state) => state.settings);
+  const { textSize, tvScale, tvInset } = settings;
+  const tvMode = tvLayoutEnabled(settings);
+  const [viewport, setViewport] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
   useLayoutEffect(() => {
-    applyTextSize(textSize);
-  }, [textSize]);
+    const apply = () => {
+      const root = document.documentElement;
+      root.dataset.tvLayout = String(tvMode);
+      root.style.setProperty(
+        "--tv-inset",
+        tvMode ? `${normalizeTvInset(tvInset)}vmin` : "0px",
+      );
+      applyTextSize(
+        textSize,
+        tvMode ? tvDisplayScale(tvScale, window.innerHeight) : 1,
+      );
+    };
+    apply();
+    const resize = () => {
+      apply();
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, [textSize, tvMode, tvScale, tvInset]);
   // "System" is a standing instruction rather than a value, and the system can change its mind
   // while the game is open - at sunset, on a schedule, or because the player just flipped it
   const [systemDark, setSystemDark] = useState(prefersDarkMode);
@@ -194,9 +224,35 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
     };
   }, [mode]);
 
-  return (
-    <ThemeProvider theme={createAppTheme(mode)}>{props.children}</ThemeProvider>
+  const theme = useMemo(
+    () =>
+      tvMode
+        ? createTheme(createAppTheme(mode), {
+            components: {
+              MuiPopover: {
+                defaultProps: {
+                  marginThreshold: Math.ceil(
+                    (Math.min(viewport.width, viewport.height) *
+                      normalizeTvInset(tvInset)) /
+                      100,
+                  ),
+                },
+              },
+              MuiMenu: {
+                defaultProps: {
+                  marginThreshold: Math.ceil(
+                    (Math.min(viewport.width, viewport.height) *
+                      normalizeTvInset(tvInset)) /
+                      100,
+                  ),
+                },
+              },
+            },
+          })
+        : createAppTheme(mode),
+    [mode, tvMode, tvInset, viewport],
   );
+  return <ThemeProvider theme={theme}>{props.children}</ThemeProvider>;
 }
 
 /**

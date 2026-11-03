@@ -11,6 +11,7 @@ import { DEFAULT_UNIT_SYSTEM, UNIT_SYSTEMS } from "../helpers/Units";
 import { THEME_CHOICES } from "../Theme";
 import { isDesktopApp } from "../Desktop";
 import { normalizeTextSize, TEXT_SIZES } from "../TextSize";
+import { normalizeTvInset, normalizeTvScale } from "../TvLayout";
 
 function storedVolume(key: string): number {
   const value = getStorageNumber(key, 1);
@@ -33,6 +34,9 @@ export const initialSettings: SettingsType = {
 if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
   // Desktop sound needs no first-run permission prompt. A saved mute is still authoritative.
   initialSettings.audioEnabled ??= true;
+  initialSettings.tvMode = getStorageBooleanOrUndefined("tvMode") ?? false;
+  initialSettings.tvScale = normalizeTvScale(getStorageNumber("tvScale", 1.5));
+  initialSettings.tvInset = normalizeTvInset(getStorageNumber("tvInset", 2));
   initialSettings.controllerVibrationEnabled =
     getStorageBooleanOrUndefined("controllerVibrationEnabled") ?? false;
   initialSettings.steamTimelineEnabled =
@@ -47,6 +51,10 @@ export const settingsSlice = createSlice({
       const changes = { ...action.payload };
       if (Object.prototype.hasOwnProperty.call(changes, "textSize"))
         changes.textSize = normalizeTextSize(changes.textSize);
+      if (Object.prototype.hasOwnProperty.call(changes, "tvScale"))
+        changes.tvScale = normalizeTvScale(changes.tvScale);
+      if (Object.prototype.hasOwnProperty.call(changes, "tvInset"))
+        changes.tvInset = normalizeTvInset(changes.tvInset);
       // Update values in local storage. Object.entries rather than keys + lookup so the value
       // stays tied to its key's type instead of needing a string index into SettingsType.
       Object.entries(changes).forEach(([key, value]) => {

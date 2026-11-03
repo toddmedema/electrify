@@ -1,3 +1,4 @@
+import { useBuildGridEvidence } from "./BuildForecast";
 import * as React from "react";
 import { Button, Typography } from "@mui/material";
 import DecisionDialog from "./DecisionDialog";
@@ -97,6 +98,7 @@ export function LivePurchaseReviewDialog(
 export default function PurchaseReviewDialog(
   props: PurchaseReviewDialogProps,
 ): React.JSX.Element {
+  const gridEvidence = useBuildGridEvidence();
   const {
     open,
     cash,
@@ -215,8 +217,8 @@ export default function PurchaseReviewDialog(
       titleId={props.titleId}
       title={props.title}
       closable
-      actionsClassName={props.cancelLabel ? "purchaseReviewActions" : undefined}
-      contentClassName="noPadding"
+      actionsClassName={`tvPurchaseReviewActions${props.cancelLabel ? " purchaseReviewActions" : ""}`}
+      contentClassName="noPadding purchaseReviewContent"
       actions={
         <>
           {submitting && (
@@ -260,6 +262,7 @@ export default function PurchaseReviewDialog(
       {props.preface}
       <DecisionImpactPreview facts={facts} />
       {props.afterFacts}
+      {gridEvidence}
     </DecisionDialog>
   );
 }

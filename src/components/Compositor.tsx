@@ -345,6 +345,7 @@ const tutorialCompletionSx = {
 } as const;
 
 export default class Compositor extends React.Component<Props, {}> {
+  private workspaceMemory = { run: -1, values: new Map<string, unknown>() };
   private removeShortcuts?: () => void;
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
   private snackbarContentRef = React.createRef<HTMLDivElement>();
@@ -483,7 +484,11 @@ export default class Compositor extends React.Component<Props, {}> {
   };
 
   private renderCard(): React.JSX.Element {
-    if (isGameCard(this.props.card.name)) return <GameWorkspace />;
+    const run = this.props.ui.evidenceRunId ?? 0;
+    if (this.workspaceMemory.run !== run)
+      this.workspaceMemory = { run, values: new Map() };
+    if (isGameCard(this.props.card.name))
+      return <GameWorkspace key={run} memory={this.workspaceMemory.values} />;
     switch (this.props.card.name) {
       case "SETTINGS":
         return <SettingsContainer />;

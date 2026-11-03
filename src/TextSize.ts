@@ -31,11 +31,12 @@ export const subscribeTextSize = (listener: () => void) => {
 };
 
 /** Scale type and its chart space without changing the viewport or device resolution. */
-export function applyTextSize(value: unknown): void {
+export function applyTextSize(value: unknown, displayScale = 1): void {
   const size = normalizeTextSize(value);
   document.documentElement.dataset.textSize = size;
-  document.documentElement.style.fontSize = `${scales[size] * 100}%`;
-  if (scale === scales[size]) return;
-  scale = scales[size];
+  const next = scales[size] * displayScale;
+  document.documentElement.style.fontSize = `${next * 100}%`;
+  if (scale === next) return;
+  scale = next;
   listeners.forEach((listener) => listener());
 }
