@@ -2,6 +2,7 @@ import * as React from "react";
 import { Button, Typography } from "@mui/material";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import InfoDialog from "./InfoDialog";
+import { isInstalledWebApp } from "../../InstalledApp";
 import {
   getPlayedScenarioIds,
   getStorageNumber,
@@ -12,10 +13,6 @@ import {
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-}
-
-interface NavigatorWithStandalone extends Navigator {
-  standalone?: boolean;
 }
 
 interface InstallContextType {
@@ -70,13 +67,6 @@ const INSTALL_VISITS_KEY = "installVisits";
 const INSTALL_VISIT_COUNTED_KEY = "installVisitCounted";
 const SNOOZE_MS = 30 * 24 * 60 * 60 * 1000;
 
-function standalone(): boolean {
-  return Boolean(
-    (navigator as NavigatorWithStandalone).standalone ||
-    window.matchMedia?.("(display-mode: standalone)").matches,
-  );
-}
-
 function iosDevice(): boolean {
   const ua = navigator.userAgent;
   return (
@@ -90,7 +80,7 @@ export function InstallPromptProvider(props: {
 }): React.JSX.Element {
   const [installPrompt, setInstallPrompt] =
     React.useState<BeforeInstallPromptEvent>();
-  const [installed, setInstalled] = React.useState(standalone);
+  const [installed, setInstalled] = React.useState(isInstalledWebApp);
   const [snoozed, setSnoozed] = React.useState(() => {
     try {
       const dismissed = getStorageNumber(INSTALL_SNOOZE_KEY, 0);

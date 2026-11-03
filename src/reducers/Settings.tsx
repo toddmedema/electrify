@@ -10,6 +10,7 @@ import { pause, resume } from "../data/Audio";
 import { DEFAULT_UNIT_SYSTEM, UNIT_SYSTEMS } from "../helpers/Units";
 import { THEME_CHOICES } from "../Theme";
 import { isDesktopApp } from "../Desktop";
+import { isInstalledWebApp } from "../InstalledApp";
 import { normalizeTextSize, TEXT_SIZES } from "../TextSize";
 
 function storedVolume(key: string): number {
@@ -30,9 +31,15 @@ export const initialSettings: SettingsType = {
   textSize: getStorageChoice("textSize", TEXT_SIZES, "standard"),
 };
 
-if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
-  // Desktop sound needs no first-run permission prompt. A saved mute is still authoritative.
+// Installed apps start with sound enabled; a saved preference always wins.
+if (
+  (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) ||
+  isInstalledWebApp()
+) {
   initialSettings.audioEnabled ??= true;
+}
+
+if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
   initialSettings.controllerVibrationEnabled =
     getStorageBooleanOrUndefined("controllerVibrationEnabled") ?? false;
   initialSettings.steamTimelineEnabled =

@@ -19,6 +19,8 @@ beforeEach(() => {
 afterEach(() => {
   localStorage.clear();
   delete window.electrifyDesktop;
+  jest.restoreAllMocks();
+  delete (navigator as Navigator & { standalone?: boolean }).standalone;
 });
 
 it("preserves the browser's first-run sound permission and omits desktop defaults", () => {
@@ -83,3 +85,29 @@ it("restores text size locally and rejects unsupported persisted and runtime cho
   expect(invalid.textSize).toBe("standard");
   expect(localStorage.getItem("textSize")).toBe("standard");
 });
+
+it.each(["standalone", "ios"])(
+  "defaults installed %s PWA sound on and remembers an explicit mute after relaunch",
+  (platform) => {
+    if (platform === "ios") {
+      Object.defineProperty(navigator, "standalone", {
+        configurable: true,
+        value: true,
+      });
+    } else {
+      const matchMedia = window.matchMedia;
+      jest.spyOn(window, "matchMedia").mockImplementation((query) => ({
+        ...matchMedia(query),
+        matches: query === "(display-mode: standalone)",
+      }));
+    }
+    const { default: reducer, initialSettings, change } = settings();
+    expect(initialSettings.audioEnabled).toBe(true);
+    expect(initialSettings.controllerVibrationEnabled).toBeUndefined();
+    expect(initialSettings.steamTimelineEnabled).toBeUndefined();
+    reducer(initialSettings, change({ audioEnabled: false }));
+    expect(settings().initialSettings.audioEnabled).toBe(false);
+    reducer(initialSettings, change({ audioEnabled: true }));
+    expect(settings().initialSettings.audioEnabled).toBe(true);
+  },
+);
