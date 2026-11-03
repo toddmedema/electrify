@@ -35,7 +35,13 @@ for (const theme of ["light", "dark"]) {
       await expect(locked).toHaveAttribute("aria-disabled", "true");
       await expect(locked.locator("svg")).toHaveCount(1);
     }
-    await expert.click();
+    // aria-disabled blocks selection; a physical tap/click still explains the lock.
+    await expert.scrollIntoViewIfNeeded();
+    const lockedBounds = (await expert.boundingBox())!;
+    await page.mouse.click(
+      lockedBounds.x + lockedBounds.width / 2,
+      lockedBounds.y + lockedBounds.height / 2,
+    );
     const hint = page.locator(".difficultyLockHint");
     await expect(hint).toContainText(
       "Complete an official scenario on Hard to unlock Expert.",
