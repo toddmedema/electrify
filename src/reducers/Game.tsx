@@ -218,7 +218,6 @@ import {
   startingDollarRevenue,
   totalScore,
 } from "../helpers/Scoring";
-import { formatLargeMass } from "../helpers/Units";
 import { buildStartedMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief, fleetCapacity } from "../helpers/Debrief";
 import {
@@ -4155,13 +4154,21 @@ export function* tickStatePhases(
             label:
               scenario.ownership === "Investor"
                 ? "final net worth"
-                : "lifetime rate (starting-year $/kWh)",
+                : "lifetime rate",
             value:
               scenario.ownership === "Investor"
                 ? formatMoneyConcise(summary.netWorth)
                 : summary.supplyWh > 0
-                  ? `$${(startingDollarRevenue(history, state.startingYear, state.seed) / (summary.supplyWh / 1000)).toFixed(3)}`
+                  ? `$${(startingDollarRevenue(history, state.startingYear, state.seed) / (summary.supplyWh / 1000)).toFixed(3)}/kWh`
                   : "No electricity supplied",
+          },
+          {
+            concept: "time",
+            label: "tenure",
+            value:
+              state.date.monthsElapsed >= 12
+                ? `${Math.floor(state.date.monthsElapsed / 12)} ${state.date.monthsElapsed < 24 ? "year" : "years"}`
+                : `${state.date.monthsElapsed} ${state.date.monthsElapsed === 1 ? "month" : "months"}`,
           },
           ...(debrief.scenarioMetrics ?? []),
         ];
@@ -4182,8 +4189,8 @@ export function* tickStatePhases(
             scenarioId: scoredScenarioId,
             outcome,
           });
-        // Bind the outcome before the reducer returns. The middleware persists the final
-        // Redux snapshot afterwards; no delayed callback can target a different live save.
+        // Bind the outcome before the reducer returns. The middleware retires this run's
+        // save afterwards; no delayed callback can target a different live save.
         if (saveEffects) {
           saveEffects.outcome(
             cloneDeep({
@@ -4254,20 +4261,10 @@ export function* tickStatePhases(
 
       if (failure) {
         const summary = summarizeHistory(history);
-        const yearsSurvived = state.date.year - state.startingYear;
-        const durationSurvived =
-          yearsSurvived > 0
-            ? `${yearsSurvived} ${yearsSurvived === 1 ? "year" : "years"}`
-            : `${state.date.monthsElapsed} ${state.date.monthsElapsed === 1 ? "month" : "months"}`;
         const failureMessage = () =>
-          `${
-            failure.outcome === "bankrupt"
-              ? "You've run out of money."
-              : failure.reason
-          }
-                You survived for ${durationSurvived},
-                earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of greenhouse gases, measured as CO2e.`;
+          failure.outcome === "bankrupt"
+            ? "You've run out of money."
+            : failure.reason || "The utility board ended your term.";
 
         // Tutorials are intentionally unscored even when completed, so retain their guided
         // failure dialog rather than putting one tutorial attempt on the global leaderboard.

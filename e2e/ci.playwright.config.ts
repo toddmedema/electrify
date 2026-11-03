@@ -15,6 +15,7 @@ const smoke = [
   "menu-keyboard.spec.ts",
   "main-menu.spec.ts",
   "music.spec.ts",
+  "pwa-sound.spec.ts",
   "achievements.spec.ts",
   "loading-navigation.spec.ts",
   "facilities-production-chart.spec.ts",
@@ -25,6 +26,8 @@ const smoke = [
   "offline-launch.spec.ts",
 ];
 const layout = [
+  "chart-touch.spec.ts",
+  "insights-expanded-chart.spec.ts",
   "build-generator-loading.spec.ts",
   "campaign.spec.ts",
   "sign-in.spec.ts",

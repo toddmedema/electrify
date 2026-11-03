@@ -7284,11 +7284,11 @@ img[src$="/transmission.svg"] {
 
 // Size navigation before the pane observer runs, so reopening preserves its scroll position.
 @container insights (max-width: 700px) {
-  .insights .insightsViewportDate {
+  .insightsViewportDate {
     font-size: var(--font-size-body2);
   }
 
-  .insights .insightsViewportToolbar {
+  .insightsViewportToolbar {
     height: auto;
     min-height: 44px;
     flex-wrap: nowrap;
@@ -7296,7 +7296,7 @@ img[src$="/transmission.svg"] {
     padding: 0 8px 0 16px;
   }
 
-  .insights .insightsViewportButtons {
+  .insightsViewportButtons {
     flex-basis: 220px;
     gap: 0;
 
@@ -8159,6 +8159,8 @@ option {
     border-radius: 0;
   }
   .MuiDialog-paper {
+    container-type: inline-size;
+    container-name: insights;
     background: var(--chart-surface);
   }
   .expandedChartTitle {
@@ -8189,14 +8191,6 @@ option {
   .insightsViewportToolbar {
     flex-shrink: 0;
     max-width: none;
-  }
-  .insightsViewportButtons {
-    .insightsViewportButton,
-    .MuiIconButton-root {
-      width: var(--control-size);
-      height: var(--control-size);
-      flex-basis: var(--control-size);
-    }
   }
   .expandedChartContent {
     display: flex;
@@ -8252,18 +8246,6 @@ option {
       svg {
         width: 32px;
       }
-    }
-  }
-}
-
-@media (max-width: 600px) {
-  .insightsChartDialog .insightsViewportToolbar {
-    height: auto;
-    flex-wrap: wrap;
-    padding: 8px 16px;
-    .insightsViewportDate {
-      flex: 1 0 100%;
-      white-space: normal;
     }
   }
 }

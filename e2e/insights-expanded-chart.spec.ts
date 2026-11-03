@@ -308,6 +308,22 @@ for (const theme of ["light", "dark"] as const) {
     await expect(chart).not.toHaveAccessibleName(
       /Biomass|Natural Gas|Oil|Uranium/,
     );
+    const navigation = dialog.getByRole("region", {
+      name: "Chart time navigation",
+    });
+    const date = (await navigation
+      .getByLabel(/^Displayed date range:/)
+      .boundingBox())!;
+    for (const button of await navigation.getByRole("button").all()) {
+      const box = (await button.boundingBox())!;
+      expect(
+        Math.abs(box.y + box.height / 2 - date.y - date.height / 2),
+        "date range and navigation buttons share one row",
+      ).toBeLessThanOrEqual(1);
+      const size = (await navigation.boundingBox())!.width <= 700 ? 44 : 40;
+      expect(box.width).toBe(size);
+      expect(box.height).toBe(size);
+    }
     await expect(dialog.locator(".uplot")).toBeVisible();
     await expectChartAxesInView(dialog);
     await expectMobileFuelLegend(dialog, page);
