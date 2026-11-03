@@ -27,12 +27,7 @@ export async function prefetchScenarioData(
   }
 }
 
-/**
- * Asks the active service worker to download every icon in the background. Icons are small and
- * shared by every screen, so this runs for all users at launch -- before any game starts -- not
- * just installed apps. The worker skips what it already has, so repeat calls are cheap.
- */
-export async function prefetchIcons(): Promise<void> {
+async function askWorkerToCache(type: string): Promise<void> {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) return;
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return;
@@ -40,9 +35,26 @@ export async function prefetchIcons(): Promise<void> {
 
   try {
     const registration = await navigator.serviceWorker.ready;
-    registration.active?.postMessage({ type: "CACHE_ICONS" });
+    registration.active?.postMessage({ type });
   } catch {
     // Prefetching is only an optimization. The service worker's fetch handler still caches any
-    // icon the app requests while online.
+    // file the app requests while online.
   }
+}
+
+/**
+ * Asks the active service worker to download every icon in the background. Icons are small and
+ * shared by every screen, so this runs for all users at launch -- before any game starts -- not
+ * just installed apps. The worker skips what it already has, so repeat calls are cheap.
+ */
+export function prefetchIcons(): Promise<void> {
+  return askWorkerToCache("CACHE_ICONS");
+}
+
+/**
+ * Asks the active service worker to store the deployed build, so the next launch works offline.
+ * The worker's own script is unchanged by most deploys, so its install step can't do this alone.
+ */
+export function prefetchBuild(): Promise<void> {
+  return askWorkerToCache("CACHE_BUILD");
 }

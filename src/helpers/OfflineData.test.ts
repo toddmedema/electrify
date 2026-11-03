@@ -1,5 +1,9 @@
 import { LocationType } from "../Types";
-import { prefetchIcons, prefetchScenarioData } from "./OfflineData";
+import {
+  prefetchBuild,
+  prefetchIcons,
+  prefetchScenarioData,
+} from "./OfflineData";
 
 describe("prefetchScenarioData", () => {
   const originalServiceWorker = navigator.serviceWorker;
@@ -83,6 +87,18 @@ describe("prefetchIcons", () => {
     await prefetchIcons();
 
     expect(postMessage).toHaveBeenCalledWith({ type: "CACHE_ICONS" });
+  });
+
+  it("asks the active worker to store the deployed build", async () => {
+    const postMessage = jest.fn();
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: { ready: Promise.resolve({ active: { postMessage } }) },
+    });
+
+    await prefetchBuild();
+
+    expect(postMessage).toHaveBeenCalledWith({ type: "CACHE_BUILD" });
   });
 
   it("does nothing when the worker has not activated", async () => {

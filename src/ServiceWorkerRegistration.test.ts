@@ -76,7 +76,10 @@ describe("registerServiceWorker", () => {
 
     jest.advanceTimersByTime(BACKGROUND_CACHE_DELAY_MS);
     await flush();
-    expect(messageTypes(sw.postMessage)).toEqual(["CACHE_ICONS"]);
+    expect(messageTypes(sw.postMessage)).toEqual([
+      "CACHE_BUILD",
+      "CACHE_ICONS",
+    ]);
   });
 
   it("also syncs every weather location for an installed app", async () => {
@@ -89,6 +92,7 @@ describe("registerServiceWorker", () => {
     await flush();
 
     expect(messageTypes(sw.postMessage).sort()).toEqual([
+      "CACHE_BUILD",
       "CACHE_ICONS",
       "SYNC_OFFLINE_DATA",
     ]);
@@ -106,7 +110,9 @@ describe("registerServiceWorker", () => {
     await flush();
 
     expect(messageTypes(sw.postMessage)).toEqual([
+      "CACHE_BUILD",
       "CACHE_ICONS",
+      "CACHE_BUILD",
       "CACHE_ICONS",
     ]);
   });
