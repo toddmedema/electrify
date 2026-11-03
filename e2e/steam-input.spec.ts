@@ -1091,7 +1091,7 @@ test("TV saved preferences style direct scenario links before play", async ({
     };
     savedTv();
   });
-  await page.goto("/?scenario=999");
+  await page.goto("/?scenario=116");
   const start = page.getByRole("button", { name: "Start game", exact: true });
   await expect(start).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
