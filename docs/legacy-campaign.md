@@ -30,9 +30,10 @@ them to bypass inheritance.
 
 ## Rules and money
 
-Every term requires solvency and retention of 90% of its opening customers. Later terms add
-final-year debt and billed-rate limits; the last three add emissions-intensity windows. The
-last term also checks its 2045 milestone. The historical task appears first, with shared
+Every term requires solvency. The customer-growth target replaces the 90% retention goal in
+Beyond the Dynamo; the other terms retain that safeguard. Later terms add final-year debt and
+billed-rate limits. Terms 7–8 also limit emissions intensity; the final term has a single
+whole-term carbon budget without additional intensity checks. The historical task appears first, with shared
 safeguards after it. The handover dialog previews the incoming CEO's exact goals by privately
 running the same transition used by Continue; this neither advances nor replaces the live company.
 

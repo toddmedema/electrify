@@ -7,6 +7,7 @@ import {
   objectiveTargetText,
   objectiveValueText,
   objectiveWindowText,
+  objectiveDefinitionText,
 } from "./ObjectivePresentation";
 
 const localShare: CompiledRuleObjective = {
@@ -31,6 +32,26 @@ const result = (changes: Partial<ObjectiveResult> = {}): ObjectiveResult => ({
   observedMonths: 1,
   requiredMonths: 12,
   ...changes,
+});
+
+it("uses concise emissions copy and whole-year ranges without changing the measurement", () => {
+  const objective: CompiledRuleObjective = {
+    id: "intensity",
+    label: "Footprint",
+    required: true,
+    metric: "emissionsPerDeliveredMWh",
+    fromMonth: 204,
+    throughMonth: 239,
+    maxKgCO2ePerMWh: 350,
+  };
+  expect(objectiveTargetText(objective)).toBe("≤350 kg CO₂e/MWh");
+  expect(objectiveWindowText(objective, 2002, 240)).toBe("2019–2021");
+  expect(
+    objectiveDefinitionText({
+      metric: objective.metric,
+      definition: objectiveDefinition(objective.metric),
+    }),
+  ).toBe("Emissions, including imports, exports and construction, per MWh.");
 });
 
 it("retains the actual side of an arbitrarily close share target", () => {
@@ -129,7 +150,7 @@ it.each<[CompiledRuleObjective, number, string]>([
       maxKgCO2ePerMWh: 500,
     },
     500,
-    "500 kg CO₂e / delivered MWh",
+    "500 kg CO₂e/MWh",
   ],
   [
     {

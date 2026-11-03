@@ -118,6 +118,14 @@ it("shows concise term results and requires an explicit handover", async () => {
   expect(
     screen.getByRole("list", { name: "Next term goals" }),
   ).toHaveTextContent("Reach ≥600 customers");
+  expect(
+    within(screen.getByRole("list", { name: "Next term goals" })).getAllByRole(
+      "listitem",
+    ),
+  ).toHaveLength(2);
+  expect(
+    screen.getByRole("list", { name: "Next term goals" }),
+  ).not.toHaveTextContent("Retain");
   expect(screen.getAllByRole("img", { name: "Met" })).toHaveLength(1);
   await userEvent.keyboard("{Escape}");
   expect(onContinue).not.toHaveBeenCalled();

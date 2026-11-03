@@ -137,9 +137,7 @@ test("only the scheduled 20-year boundary pauses for a CEO handover and continua
   const rules = scenarioRules(getScenario(next.scenarioId), next)!;
   expect(rules.events[0].startMonth).toBeGreaterThanOrEqual(240);
   expect(
-    rules.objectives.find(
-      (objective) => objective.metric === "customerRetention",
-    ),
+    rules.objectives.find((objective) => objective.metric === "customerCount"),
   ).toMatchObject({ deadlineMonth: 239 });
 });
 

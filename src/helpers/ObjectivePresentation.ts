@@ -50,7 +50,7 @@ export function objectiveValueText(
     case "emissionsBudget":
       return `${number(value / 1000, comparison === undefined ? undefined : comparison / 1000)} tonnes CO₂e`;
     case "emissionsPerDeliveredMWh":
-      return `${number(value, comparison)} kg CO₂e / delivered MWh`;
+      return `${number(value, comparison)} kg CO₂e/MWh`;
     case "monthlyBilledRate":
       return `$${number(value, comparison)}/kWh`;
     case "monthEndDebt":
@@ -83,6 +83,8 @@ export function objectiveWindowText(
   if (first === last) return monthText(first, startingYear);
   if (first % 12 === 0 && last === first + 11)
     return `${startingYear + Math.floor(first / 12)}`;
+  if (first % 12 === 0 && last % 12 === 11)
+    return `${startingYear + Math.floor(first / 12)}–${startingYear + Math.floor(last / 12)}`;
   if (Math.floor(first / 12) === Math.floor(last / 12))
     return `${MONTHS[first % 12]}–${MONTHS[last % 12]} ${startingYear + Math.floor(first / 12)}`;
   return `${monthText(first, startingYear)}–${monthText(last, startingYear)}`;
@@ -148,7 +150,9 @@ export function objectiveDefinitionText(
 ): string {
   return result.metric === "customerRetention"
     ? "Customers kept, as a share of your recorded customer baseline."
-    : result.definition;
+    : result.metric === "emissionsPerDeliveredMWh"
+      ? "Emissions, including imports, exports and construction, per MWh."
+      : result.definition;
 }
 
 export function objectiveObservedText(result: ObjectiveResult): string {

@@ -106,12 +106,19 @@ test.each(LEGACY_SCENARIOS)(
     expect(compiled).toBeDefined();
     expect(compiled!.objectives.length).toBeLessThanOrEqual(16);
     expect(
-      compiled!.objectives.find(({ id }) => id === "retain-customers"),
-    ).toMatchObject({
-      metric: "customerRetention",
-      deadlineMonth: 239,
-      minRetainedShare: 0.9,
-    });
+      compiled!.objectives.filter(
+        ({ metric }) => metric === "customerRetention",
+      ),
+    ).toEqual(
+      scenario.id === LEGACY_SCENARIOS[1].id
+        ? []
+        : [
+            expect.objectContaining({
+              deadlineMonth: 239,
+              minRetainedShare: 0.9,
+            }),
+          ],
+    );
     expect(
       compiled!.objectives.every(
         (objective) =>
@@ -166,6 +173,28 @@ test("customer expansion has a frozen feasible target for the inherited territor
   expect(growthGoal(100, 1000)).toMatchObject({ minCustomers: 150 });
   expect(growthGoal(1000, 1400)).toMatchObject({ minCustomers: 1330 });
 });
+
+test.each([
+  { index: 1, metrics: ["customerCount", "monthEndDebt"] },
+  {
+    index: 8,
+    metrics: [
+      "emissionsBudget",
+      "customerRetention",
+      "monthEndDebt",
+      "monthlyBilledRate",
+    ],
+  },
+])(
+  "term $index has no redundant customer or carbon goals",
+  ({ index, metrics }) => {
+    expect(
+      scenarioRules(LEGACY_SCENARIOS[index])!.objectives.map(
+        ({ metric }) => metric,
+      ),
+    ).toEqual(metrics);
+  },
+);
 
 test("a historical event moved beyond a CEO term is rejected by the owning compiler", () => {
   const definition = legacyRuleDefinitions(6);

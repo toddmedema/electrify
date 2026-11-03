@@ -406,16 +406,16 @@ export function legacyRuleDefinitions(
       budgetTonnesCO2e: context.emissionsBudgetTonnes ?? context.peakMW * 21900,
     },
   ];
-  const objectives: RuleObjective[] = [
-    featured[index],
-    {
+  const objectives: RuleObjective[] = [featured[index]];
+  // The stronger growth target already requires keeping the inherited customer base.
+  if (index !== 1)
+    objectives.push({
       id: "retain-customers",
       label: "Retain 90% of opening customers",
       metric: "customerRetention",
       minRetainedShare: 0.9,
       deadlineMonth: 240,
-    },
-  ];
+    });
   if (index >= 1)
     objectives.push({
       id: "funded-expansion",
@@ -434,25 +434,16 @@ export function legacyRuleDefinitions(
       throughMonth: 240,
       maxDollarsPerKWh: context.referenceRate * 1.35,
     });
-  if (index >= 6)
+  // The final CEO has one whole-term carbon budget instead of overlapping intensity limits.
+  if (index === 6 || index === 7)
     objectives.push({
       id: "clean-electricity",
-      label: "Reduce emissions per delivered MWh",
+      label: "Reduce emissions per MWh",
       metric: "emissionsPerDeliveredMWh",
       fromMonth: 217,
       throughMonth: 240,
-      maxKgCO2ePerMWh: index === 6 ? 350 : index === 7 ? 200 : 100,
+      maxKgCO2ePerMWh: index === 6 ? 350 : 200,
     });
-  if (index === 8) {
-    objectives.push({
-      id: "2045-milestone",
-      label: "Reach the 2045 electricity emissions milestone",
-      metric: "emissionsPerDeliveredMWh",
-      fromMonth: 37,
-      throughMonth: 48,
-      maxKgCO2ePerMWh: 100,
-    });
-  }
   const events: RuleEvent[] = [];
   switch (index) {
     case 0:

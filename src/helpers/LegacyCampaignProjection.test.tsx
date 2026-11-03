@@ -82,7 +82,7 @@ test("forecast goals use the current CEO's local evidence and actual calendar da
   expect(predicted.status).toBe("win");
   expect(predicted.through).toContain("1921");
   expect(
-    predicted.requirements.find(({ id }) => id === "retain-customers"),
+    predicted.requirements.find(({ id }) => id === "grow-the-customer-base"),
   ).toMatchObject({
     status: "on-track",
     detail: expect.stringContaining("1921"),

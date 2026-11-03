@@ -82,11 +82,11 @@ test("a successor's remaining time and objective dates use its own 20-year term"
   const status = getMissionStatus(game);
   expect(status.monthsRemaining).toBe(239);
   expect(status.finalNote).toBeUndefined();
-  const retention = status.requirements.find(
-    (row) => row.label === "Retain 90% of opening customers",
+  const growth = status.requirements.find(
+    (row) => row.label === "Grow the customer base by 1921",
   )!;
-  expect(retention.target).toContain("1921");
-  expect(retention.timing).toContain("12/1921");
+  expect(growth.target).toContain("1921");
+  expect(growth.timing).toContain("12/1921");
   const debt = status.requirements.find(
     (row) => row.label === "Keep debt within the published allowance",
   )!;
