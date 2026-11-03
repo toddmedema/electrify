@@ -82,6 +82,13 @@ for (const theme of ["light", "dark"]) {
         ),
         animations: "disabled",
       });
+      await page.locator(".scenarioDossier").screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `unlocks-dossier-${info.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
     }
     // Another tab / cloud synchronization publishes the same durable, validated win history.
     await page.evaluate((key) => {
