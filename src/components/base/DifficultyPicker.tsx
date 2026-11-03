@@ -125,7 +125,11 @@ export default function DifficultyPicker({
                     <LockOutlinedIcon sx={{ fontSize: 14, mr: 0.5 }} />
                     {DIFFICULTY_LABELS[d]} · Locked
                   </span>
-                  <Typography variant="caption" sx={{ whiteSpace: "normal" }}>
+                  <Typography
+                    id={`${descriptionId}-${d}`}
+                    variant="caption"
+                    sx={{ whiteSpace: "normal" }}
+                  >
                     {lockReason(d)}
                   </Typography>
                 </span>

@@ -37,10 +37,10 @@ for (const theme of ["light", "dark"] as const) {
   }, info) => {
     test.skip(!REVIEW_PROJECTS.includes(info.project.name));
     await page.addInitScript(
-      (value) => {
+      ({ mode, key, journal }) => {
         localStorage.clear();
         localStorage.setItem(key, JSON.stringify(journal));
-        localStorage.setItem("theme", value);
+        localStorage.setItem("theme", mode);
         localStorage.setItem("audioEnabled", "false");
         localStorage.setItem(
           "plays",

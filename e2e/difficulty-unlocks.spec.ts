@@ -9,7 +9,10 @@ for (const theme of ["light", "dark"]) {
     page,
   }, info) => {
     await page.addInitScript((mode) => {
-      localStorage.clear();
+      if (!sessionStorage.getItem("difficulty-test-ready")) {
+        localStorage.clear();
+        sessionStorage.setItem("difficulty-test-ready", "true");
+      }
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);
@@ -98,6 +101,7 @@ for (const theme of ["light", "dark"]) {
       history.pushState(null, "", "/?scenario=101");
       dispatchEvent(new PopStateEvent("popstate"));
     });
+    await page.reload();
     await expect(
       picker.getByRole("button", { name: "Easy", exact: true }),
     ).toBeVisible();
