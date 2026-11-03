@@ -1303,8 +1303,10 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
             active.matches("h1,h2,h3,h4,h5,h6")
           )
             return null;
+          // MUI uses enlarged invisible inputs for slider/switch hit areas; measure the visible widget.
           const target =
-            active.closest<HTMLElement>(".MuiSlider-root") ?? active;
+            active.closest<HTMLElement>(".MuiSlider-root,.MuiSwitch-root") ??
+            active;
           const rect = target.getBoundingClientRect();
           let left = 0,
             top = 0,
@@ -1607,11 +1609,28 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
       page.getByRole("menuitem", { name: "Settings", exact: true }),
     );
     await input(page, "confirm");
+    const sound = page.getByRole("switch", { name: "Sound", exact: true });
+    await select(page, sound);
+    const settingsHints = page.getByRole("complementary", {
+      name: "Controller controls",
+    });
+    await expect(
+      settingsHints.getByText("Select", { exact: true }),
+    ).toBeVisible();
+    await expect(settingsHints).not.toContainText("Edit text");
     await capture("settings");
+    await expect(sound).not.toBeChecked();
+    await input(page, "confirm");
+    await expect(sound).toBeChecked();
+    await expect(page.locator("html")).not.toHaveAttribute(
+      "data-mock-text-input",
+    );
     await expect(page.locator("html")).toHaveAttribute(
       "data-mock-input-context",
       "Menu",
     );
+    await input(page, "confirm");
+    await expect(sound).not.toBeChecked();
     await input(page, "back");
     await select(page, page.getByRole("button", { name: "menu", exact: true }));
     await input(page, "confirm");

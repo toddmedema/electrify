@@ -8,6 +8,7 @@ import {
   getInputPresentation,
   subscribeInputPresentation,
 } from "./InputPresentation";
+import { editableTextControl } from "./InputText";
 import "./Input.scss";
 
 const menuHints: [DesktopInputAction, string][] = [
@@ -50,7 +51,7 @@ function contextualHints(target: Element | null, gameplay: boolean): Hint[] {
     ];
   return [
     ["down", "Navigate"],
-    ["confirm", target?.matches("input,textarea") ? "Edit text" : "Select"],
+    ["confirm", editableTextControl(target) ? "Edit text" : "Select"],
     ["back", gameplay ? "Back / menu" : "Back"],
     ...(gameplay ? [["pause", "Pause / resume"] as Hint] : []),
   ];
