@@ -245,6 +245,7 @@ import { DEMAND_TYPES, demandByTypeAt } from "../data/DemandProfiles";
 import { combineStoryEffects, resolveStoryAtDate } from "../data/WorldEvents";
 import { getRawSolarIrradianceWM2, getWeather } from "../data/Weather";
 import { createWeatherForecast } from "../helpers/WeatherForecast";
+import type { OutputWeatherTick } from "../helpers/ExpectedOutput";
 import { COLD_MAX_GAS_PRICE_MULTIPLIER } from "../data/Hazards";
 import {
   activeWeatherHazardsFor,
@@ -4279,10 +4280,20 @@ function getDemandW(
   );
 }
 
-function reforecastWeatherAndPrices(
-  state: GameType,
-  forecastWeather = false,
-): TickPresentFutureType[] {
+type ResourceWeatherFields = Pick<
+  TickPresentFutureType,
+  | "solarIrradianceWM2"
+  | "windKph"
+  | "windAirborneKph"
+  | "temperatureC"
+  | "precipitationMm"
+  | "snowpackMm"
+  | "hydroRunoffMm"
+  | "windOffshoreKph"
+>;
+
+/** Weather and basin inputs shared by full simulation and catalog resource forecasts. */
+function createResourceWeatherReader(state: GameType, forecastWeather = false) {
   const weatherAt = forecastWeather
     ? createWeatherForecast(state.date, state.seed, state.location.id)
     : (date: DateType) => getWeather(date, state.seed);
@@ -4299,48 +4310,105 @@ function reforecastWeatherAndPrices(
     string,
     ReturnType<typeof getHydroConditions>
   >();
+  return (
+    date: DateType,
+    effects: WorldEventEffectsType,
+    target: ResourceWeatherFields = {
+      solarIrradianceWM2: 0,
+      windKph: 0,
+      windAirborneKph: 0,
+      temperatureC: 0,
+      precipitationMm: 0,
+      snowpackMm: 0,
+      hydroRunoffMm: 0,
+    },
+  ) => {
+    const weather = weatherAt(date);
+    const hydroKey = `${date.year}-${date.monthNumber}`;
+    let hydrology = hydrologyByMonth.get(hydroKey);
+    if (!hydrology) {
+      hydrology = hasHydro
+        ? getHydroConditions(
+            date,
+            state.seed,
+            0,
+            watershedId,
+            watershedWeatherAt,
+          )
+        : {
+            precipitationMm: 0,
+            snowpackMm: 0,
+            runoffMm: 0,
+            rainMm: 0,
+            meltMm: 0,
+          };
+      hydrologyByMonth.set(hydroKey, hydrology);
+    }
+    target.solarIrradianceWM2 = getRawSolarIrradianceWM2(
+      date,
+      state.location,
+      weather.CLOUD_PCT,
+    );
+    target.windKph = weather.WIND_KPH;
+    target.windAirborneKph = getAirborneWindReferenceKph(weather.WIND_KPH);
+    target.temperatureC = weather.TEMP_C + (effects.temperatureOffsetC || 0);
+    target.precipitationMm = hydrology.precipitationMm;
+    target.snowpackMm = hydrology.snowpackMm;
+    target.hydroRunoffMm =
+      hydrology.runoffMm * (effects.hydroRunoffMultiplier ?? 1);
+    if (weather.WIND_OFFSHORE_KPH === undefined) {
+      delete target.windOffshoreKph;
+    } else {
+      target.windOffshoreKph = weather.WIND_OFFSHORE_KPH;
+    }
+    return target;
+  };
+}
+
+/** Catalog quotes consume resource availability, without demand, dispatch or financial passes. */
+export function generateResourceForecast(
+  readOnlyState: GameType,
+  ticks = TICKS_PER_YEAR * 3,
+): OutputWeatherTick[] {
+  if (isDraft(readOnlyState)) readOnlyState = current(readOnlyState);
+  // Match the full forecast's story context, including its trailing-year observations. The
+  // weather stage reads the opening fleet; later dispatch passes never change these readings.
+  const state = {
+    ...readOnlyState,
+    monthlyHistory: readOnlyState.monthlyHistory.slice(0, 12),
+  };
+  const resourceAt = createResourceWeatherReader(state, true);
+  return Array.from({ length: ticks }, (_, index) => {
+    const minute = state.date.minute + index * TICK_MINUTES;
+    const date = getDateFromMinute(minute, state.startingYear);
+    const resources = resourceAt(date, storyEffectsAt(date, state));
+    return {
+      minute,
+      windKph: resources.windKph,
+      windOffshoreKph: resources.windOffshoreKph,
+      windAirborneKph: resources.windAirborneKph,
+      solarIrradianceWM2: resources.solarIrradianceWM2,
+      hydroRunoffMm: resources.hydroRunoffMm,
+      // Full timelines have no per-technology override here. Keep the compact worker output's
+      // explicit undefined property, rather than introducing a new resource interpretation.
+      renewableCapacityFactors: undefined,
+    };
+  });
+}
+
+function reforecastWeatherAndPrices(
+  state: GameType,
+  forecastWeather = false,
+): TickPresentFutureType[] {
+  const resourceAt = createResourceWeatherReader(state, forecastWeather);
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
-      const weather = weatherAt(date);
       const effects = storyEffectsAt(date, state);
-      const fuelPrices = getEffectiveFuelPrices(date, state, effects);
-      const hydroKey = `${date.year}-${date.monthNumber}`;
-      let hydrology = hydrologyByMonth.get(hydroKey);
-      if (!hydrology) {
-        hydrology = hasHydro
-          ? getHydroConditions(
-              date,
-              state.seed,
-              0,
-              watershedId,
-              watershedWeatherAt,
-            )
-          : {
-              precipitationMm: 0,
-              snowpackMm: 0,
-              runoffMm: 0,
-              rainMm: 0,
-              meltMm: 0,
-            };
-        hydrologyByMonth.set(hydroKey, hydrology);
-      }
       const forecast = {
         ...t,
-        ...fuelPrices,
-        solarIrradianceWM2: getRawSolarIrradianceWM2(
-          date,
-          state.location,
-          weather.CLOUD_PCT,
-        ),
-        windKph: weather.WIND_KPH,
-        windAirborneKph: getAirborneWindReferenceKph(weather.WIND_KPH),
-        temperatureC: weather.TEMP_C + (effects.temperatureOffsetC || 0),
+        ...getEffectiveFuelPrices(date, state, effects),
         storedWh: 0,
-        precipitationMm: hydrology.precipitationMm,
-        snowpackMm: hydrology.snowpackMm,
-        hydroRunoffMm:
-          hydrology.runoffMm * (effects.hydroRunoffMultiplier ?? 1),
         hydroReservoirWh: 0,
         hydroReservoirCapacityWh: 0,
         hydroSpillWh: 0,
@@ -4350,11 +4418,9 @@ function reforecastWeatherAndPrices(
         storageDischargeW: 0,
         supplyByFuel: {} as FuelProductionType,
       } as TickPresentFutureType;
-      if (weather.WIND_OFFSHORE_KPH === undefined) {
-        delete forecast.windOffshoreKph;
-      } else {
-        forecast.windOffshoreKph = weather.WIND_OFFSHORE_KPH;
-      }
+      // Reuse the full tick instead of allocating and spreading an intermediate resource row.
+      // Offshore readings are appended last, as in the original full-timeline serializer.
+      resourceAt(date, effects, forecast);
       return forecast;
     }
     return t;

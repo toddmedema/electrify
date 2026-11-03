@@ -909,3 +909,65 @@ Deliberately removing the two emitted catalog scale overrides makes that guard f
 at 700 px with an unwanted 12.8125 px top gutter; the original artifact was restored.
 The independent code review found no remaining actionable defects; its suggestion
 to cover positive scaling as well as the catalog exception is included.
+
+## Catalog resource-only forecast (2026-11-03)
+
+The build catalog now requests only its three-year resource readings. Its former full
+forecast also calculated demand, two dispatch/finance passes, generator commitment,
+customer retention and private fleet/loan progress before discarding those fields.
+`generateResourceForecast` uses the same weather/basin reader as the full simulation,
+the same estimated-weather owner and the same opening-fleet/trailing-year story context.
+Hydro and intertie outlooks retain their full forecast paths.
+
+Reproduce the paired calculation benchmark with Node 24 and the matching install:
+
+```sh
+npm run perf:build-forecast
+```
+
+Set `BUILD_FORECAST_BENCH_RESULT=/absolute/path/result.json` to retain its JSON report.
+The benchmark uses normal Jest VM globals, three complete warmups per path, and seven
+ABBA/BAAB pairs with two calculations per path in each pair. Every invocation receives
+a new top-level snapshot, preventing candidate WeakMap cache hits. Fixture setup and
+full strict output comparisons are outside the timed windows. The control is the prior
+catalog calculation through `generateForecastTimeline`, including its compact output
+assembly; the candidate calls the actual `computeOutlook("build")` entry point.
+
+On the local arm64 Mac, Node 24.22.2:
+
+| Three-year calculation | Full median (ms) | Resource median (ms) | Median paired reduction | Pair reduction range |
+| --- | ---: | ---: | ---: | ---: |
+| Shale Boom opening, seed 12345 | 57.982 | 8.093 | 86.05% | 83.77–87.32% |
+| Madrid hydro, 13 months + 7 ticks, seed 7 | 108.711 | 11.814 | 88.87% | 87.79–89.90% |
+| Custom SF offshore/separate watershed/composed arcs, seed 29 | 119.805 | 21.025 | 82.46% | 80.30–83.61% |
+| Across the Valley utility expansion opening, seed 17 | 136.750 | 12.181 | 91.09% | 90.13–92.23% |
+
+Reductions are medians of paired ratios, not ratios of the two independent median
+columns. These measure warmed calculation elapsed time, not browser paint, worker
+startup/data loading or equivalent frame-time savings. Other local validation may contend for the
+machine; all 28 pairs exceed the requested 20% improvement threshold.
+
+The retained parity suite checks every official opening scenario, developed mid-month
+hydro with a pending policy and more than twelve history rows, offshore/separate-basin
+custom forecasts with composed arcs, zero-inflow effects and within-month expiry,
+disabled stories, cache reuse and missing current frames. Comparisons include all
+returned fields and arrays, explicit undefined properties, frozen input state and
+separately serialized generator-commitment metadata. Representative complete-output
+hashes were also captured from an independent, unmodified `f55235c5` game module and
+matched exactly, protecting the shared-reader extraction as well as the new path.
+
+The shared reader writes directly into private full-forecast rows, avoiding an
+intermediate resource object and spread for every tick. A separate same-process
+comparison of the final full forecast against the untouched `f55235c5` module used
+the same four fixtures, three warmups and seven ABBA/BAAB pairs. Complete full
+timelines, separately serialized commitment metadata and raw JSON strings all
+matched. Median paired elapsed-time changes were -0.11% for Shale, +3.95% for
+developed Madrid, -6.80% for custom SF and -5.67% for utility expansion. Individual
+pairs were noisy; these results make no claim of a general full-engine speedup.
+
+Three independent reviews covered engine correctness, consumer/worker contracts and
+benchmark methodology. A final adversarial QA pass added save round-trip, modified
+Immer draft, weather reload/seed, January/horizon and compiled-rule event cases.
+All 49 focused consumer tests passed. Deliberately changing the resource forecast
+to read the original draft state made the new pending-change assertion fail;
+the correct implementation was restored before the passing final run.
