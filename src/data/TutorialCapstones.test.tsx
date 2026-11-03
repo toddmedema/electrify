@@ -283,7 +283,8 @@ describe("authored tutorial capstones", () => {
       ),
     );
     game.transmission!.lines[0].yearsToBuildLeft = 0;
-    game.transmission!.tradingPolicy = "BALANCED";
+    game.transmission!.buyingRule = "SHORTAGES";
+    game.transmission!.sellingRule = "SURPLUS";
     game.date.monthsElapsed = 15;
     const month = summarizeTimeline(game.timeline, game.startingYear);
     const imported: MonthlyHistoryType = {

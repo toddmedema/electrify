@@ -123,7 +123,7 @@ export const ADJACENT_MARKETS = [...uniqueMarkets.values()] as const;
 export const TRANSMISSION_CORRIDORS = [...uniqueCorridors.values()] as const;
 
 export function emptyTransmissionState(): TransmissionStateType {
-  return { tradingPolicy: "BALANCED", lines: [] };
+  return { buyingRule: "SHORTAGES", sellingRule: "SURPLUS", lines: [] };
 }
 
 export function transmissionProfileIdForLocation(

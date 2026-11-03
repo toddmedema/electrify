@@ -417,7 +417,11 @@ test("imports require a commissioned player-built intertie, not a construction o
     interestRate: 0,
     currentFlowW: 60,
   };
-  state.transmission = { tradingPolicy: "BALANCED", lines: [line] };
+  state.transmission = {
+    buyingRule: "SHORTAGES",
+    sellingRule: "SURPLUS",
+    lines: [line],
+  };
   hooks.tick(state, tick);
   expect(state.desktopAchievements!.month.importedWh).toBe(0);
   hooks.initialize(state);

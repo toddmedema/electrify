@@ -199,7 +199,11 @@ function tickCosts(game: GameType, runs: number) {
         ...game,
         multiplayer: undefined,
         transmission: game.transmission
-          ? { tradingPolicy: game.transmission.tradingPolicy, lines: [] }
+          ? {
+              buyingRule: game.transmission.buyingRule,
+              sellingRule: game.transmission.sellingRule,
+              lines: [],
+            }
           : undefined,
       });
       if (immer) state = freeze(state, true);
@@ -326,7 +330,11 @@ it("benchmarks maximum rules and real1200-month histories", async () => {
     ...game,
     multiplayer: undefined,
     transmission: game.transmission
-      ? { tradingPolicy: game.transmission.tradingPolicy, lines: [] }
+      ? {
+          buyingRule: game.transmission.buyingRule,
+          sellingRule: game.transmission.sellingRule,
+          lines: [],
+        }
       : undefined,
   };
   const soloEncoding = measure(() => JSON.stringify(serializeSave(solo)));

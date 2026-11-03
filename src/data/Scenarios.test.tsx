@@ -132,7 +132,7 @@ describe("tutorial mission metadata", () => {
         peakW: 500000000,
       }),
     ]);
-    expect(interties.tutorialSteps).toHaveLength(18);
+    expect(interties.tutorialSteps).toHaveLength(19);
   });
 
   it("keeps interties out of earlier tutorials without disabling ordinary California games", () => {
