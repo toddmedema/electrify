@@ -91,9 +91,10 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await page.getByRole("button", { name: "fast speed" }).click();
   // A finished line reports the power actually moving over it, which is what replaced the
   // static "Connected" label.
-  await expect(page.locator(".transmissionLineFlow")).toBeVisible({
-    timeout: 20000,
-  });
+  await expect(page.locator(".transmissionLine .facilityStatus")).toHaveText(
+    /^(Idle|Importing|Exporting) /,
+    { timeout: 20000 },
+  );
   // Construction alone is not enough: the objective advances only after this explicit pause.
   await expect(
     page.getByRole("heading", { name: "Step 6 of 19" }),
@@ -155,7 +156,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
 
   await page.getByRole("button", { name: "fast speed" }).click();
   // The line's own reading names the direction; the section header repeats it as a total
-  await expect(page.locator(".transmissionLineFlow")).toHaveText(
+  await expect(page.locator(".transmissionLine .facilityStatus")).toHaveText(
     /^Importing /,
     { timeout: 10000 },
   );
@@ -174,6 +175,14 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await expect(exchange).toContainText("Power flowing");
   await expect(exchange).toContainText("Available capacity");
   await expect(exchange).toContainText("Neighbor price");
+  // The step says to find imports on the chart: the layer plots them over time, not just now
+  await expect(exchange.getByText("Imports above 0")).toBeVisible();
+  await expect(
+    exchange.locator("#chartForecastPowerExchange .uplot"),
+  ).toBeVisible();
+  await expect(
+    exchange.getByRole("button", { name: "Expand Power exchange chart" }),
+  ).toBeVisible();
   await expect(
     exchange.getByRole("button", { name: "What is Interties?" }),
   ).toBeVisible();

@@ -87,7 +87,7 @@ function validModSetup(scenario: ScenarioType): boolean {
       "locationId",
       "location",
       "summary",
-      "briefing",
+      "threat",
       "themes",
       "recommendationOrder",
       "ownership",
@@ -140,7 +140,7 @@ function validModSetup(scenario: ScenarioType): boolean {
     })
   )
     return false;
-  for (const key of ["summary", "endTitle", "endMessage"] as const)
+  for (const key of ["summary", "threat", "endTitle", "endMessage"] as const)
     if (scenario[key] !== undefined && !safeText(scenario[key], 500))
       return false;
   if (
@@ -153,23 +153,6 @@ function validModSetup(scenario: ScenarioType): boolean {
       !number(scenario.recommendationOrder, 0, 1000))
   )
     return false;
-  if (scenario.briefing !== undefined) {
-    const b = scenario.briefing;
-    if (
-      !plain(b) ||
-      !keys(b, ["tone", "fantasy", "objective", "threat"]) ||
-      ![
-        "transition",
-        "boom",
-        "island",
-        "innovation",
-        "storm",
-        "legacy",
-      ].includes(b.tone) ||
-      ![b.fantasy, b.objective, b.threat].every((v) => safeText(v, 500))
-    )
-      return false;
-  }
   if (
     scenario.themes !== undefined &&
     (!Array.isArray(scenario.themes) ||

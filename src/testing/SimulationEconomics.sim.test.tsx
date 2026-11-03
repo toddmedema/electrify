@@ -72,7 +72,7 @@ describe("simulation economics", () => {
 
   /**
    * This used to run scenario 5 and assert zero emissions only `if` that run's fleet turned out
-   * to be renewables-only. Scenario 5 starts on a 450MW coal plant, so the condition was never
+   * to be renewables-only. Scenario 5 starts on a coal plant, so the condition was never
    * true and the assertion never ran. Build the fleet the test wants rather than hoping a
    * scenario supplies one.
    */

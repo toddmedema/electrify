@@ -91,10 +91,11 @@ import ChartForecastDemandByType, {
 } from "../base/ChartForecastDemandByType";
 import ChartFinances from "../base/ChartFinances";
 import ManualLink from "../base/ManualLink";
-import { MANUAL_ENTRY } from "../base/ManualEntries";
+import { MANUAL_ENTRY, ManualEntryTitleType } from "../base/ManualEntries";
 import FuelPriceFilter from "../base/FuelPriceFilter";
 import { ExpandedChartPresentation } from "../base/ChartPresentationContext";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
+import ChartForecastPowerExchange from "../base/ChartForecastPowerExchange";
 import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
 import ChartForecastSupplyByFuel, {
@@ -214,6 +215,43 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "weather", label: "Temperature", group: "Environment" },
   { id: "water", label: "Water", group: "Environment", availability: "hydro" },
 ] as const;
+
+/** Layers that are a table of figures, not a plot: no expand control and no help button. */
+const TABLE_LAYERS = ["financeDetails"] as const;
+export type ChartLayerId = Exclude<
+  InsightLayerId,
+  (typeof TABLE_LAYERS)[number]
+>;
+
+export function isChartLayer(id: InsightLayerId): id is ChartLayerId {
+  return !(TABLE_LAYERS as readonly InsightLayerId[]).includes(id);
+}
+
+/**
+ * The manual page behind each chart's (?). Keyed by layer, so adding a chart without choosing a
+ * page fails to compile. Where a quantity has its own entry the chart opens it; the rest open
+ * Insights & data layers, which describes them.
+ */
+export const INSIGHT_LAYER_MANUAL: Record<ChartLayerId, ManualEntryTitleType> =
+  {
+    supplyDemand: MANUAL_ENTRY.FORECASTS,
+    spareCapacity: MANUAL_ENTRY.RESERVE_CAPACITY,
+    powerExchange: MANUAL_ENTRY.INTERTIES,
+    demandByType: MANUAL_ENTRY.CUSTOMERS,
+    supplyByFuel: MANUAL_ENTRY.FORECASTS,
+    storage: MANUAL_ENTRY.POWER_AND_ENERGY,
+    customers: MANUAL_ENTRY.CUSTOMERS,
+    profit: MANUAL_ENTRY.FORECASTS,
+    revenue: MANUAL_ENTRY.RATES,
+    expenses: MANUAL_ENTRY.OPERATING_COSTS,
+    cash: MANUAL_ENTRY.FORECASTS,
+    fuelPrices: MANUAL_ENTRY.FUEL_COSTS,
+    inflationInterest: MANUAL_ENTRY.INTEREST_RATES,
+    emissions: MANUAL_ENTRY.EMISSIONS,
+    solarCapacityFactor: MANUAL_ENTRY.CAPACITY_FACTOR,
+    weather: MANUAL_ENTRY.FORECASTS,
+    water: MANUAL_ENTRY.HYDROPOWER,
+  };
 
 export type DefaultInsightPresetId =
   "overview" | "reliability" | "profitability" | "growth" | "decarbonization";
@@ -1671,10 +1709,25 @@ export default class Insights extends React.Component<Props, State> {
           );
           break;
         case "powerExchange":
-          body = this.props.live ? (
-            <LivePowerExchangeSummary />
-          ) : (
-            <PowerExchangeSummary game={game} now={currentTick(game)!} />
+          body = (
+            <>
+              {/* What is crossing the lines right now; the chart carries the rest of the time */}
+              {this.props.live ? (
+                <LivePowerExchangeSummary />
+              ) : (
+                <PowerExchangeSummary game={game} now={currentTick(game)!} />
+              )}
+              <ChartForecastPowerExchange
+                height={140}
+                timeline={projection.timeline}
+                domain={{ x: projection.domain.x }}
+                startingYear={game.startingYear}
+                multiyear={multiyear}
+                syncKey={syncKey}
+                currentMinute={projection.forecast[0]?.minute}
+                transmission={game.transmission}
+              />
+            </>
           );
           break;
         case "demandByType": {
@@ -1877,30 +1930,31 @@ export default class Insights extends React.Component<Props, State> {
             {id === "weather"
               ? `Temperature (${temperatureUnit(this.context as UnitSystemType)})`
               : definition.label}
-            {id === "powerExchange" && (
-              <ManualLink entry={MANUAL_ENTRY.INTERTIES} />
-            )}
           </Typography>
-          {id !== "powerExchange" && id !== "financeDetails" && (
-            <Tooltip title={`Expand ${definition.label} chart`}>
-              <IconButton
-                className="insightsExpandChart"
-                size="small"
-                aria-label={`Expand ${definition.label} chart`}
-                onClick={(event) =>
-                  this.setState({
-                    expandedLayer: id,
-                    expandedPlaceholderHeight:
-                      event.currentTarget
-                        .closest(".insightsTrack")
-                        ?.querySelector(".insightsTrackBody")
-                        ?.getBoundingClientRect().height || 0,
-                  })
-                }
-              >
-                <FullscreenIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+          {isChartLayer(id) && (
+            <>
+              <Tooltip title={`Expand ${definition.label} chart`}>
+                <IconButton
+                  className="insightsExpandChart"
+                  size="small"
+                  aria-label={`Expand ${definition.label} chart`}
+                  onClick={(event) =>
+                    this.setState({
+                      expandedLayer: id,
+                      expandedPlaceholderHeight:
+                        event.currentTarget
+                          .closest(".insightsTrack")
+                          ?.querySelector(".insightsTrackBody")
+                          ?.getBoundingClientRect().height || 0,
+                    })
+                  }
+                >
+                  <FullscreenIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              {/* Straight after the expand control, ahead of the layer-editing actions */}
+              <ManualLink entry={INSIGHT_LAYER_MANUAL[id]} />
+            </>
           )}
           {this.state.layersOpen && (
             <span className="insightsTrackActions">
@@ -2444,12 +2498,21 @@ export default class Insights extends React.Component<Props, State> {
                       id="expanded-chart-heading"
                       className="expandedChartTitle"
                     >
-                      <span id="expanded-chart-title">
-                        {
-                          INSIGHT_LAYERS.find(
-                            (layer) => layer.id === this.state.expandedLayer,
-                          )!.label
-                        }
+                      <span className="expandedChartHeading">
+                        <span id="expanded-chart-title">
+                          {
+                            INSIGHT_LAYERS.find(
+                              (layer) => layer.id === this.state.expandedLayer,
+                            )!.label
+                          }
+                        </span>
+                        {isChartLayer(this.state.expandedLayer) && (
+                          <ManualLink
+                            entry={
+                              INSIGHT_LAYER_MANUAL[this.state.expandedLayer]
+                            }
+                          />
+                        )}
                       </span>
                       <IconButton
                         autoFocus

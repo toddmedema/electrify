@@ -598,6 +598,13 @@ test("desktop menu keyboard navigation includes Mods between Manual and Settings
 async function dismissToast(page: Page) {
   const toast = page.locator(".snackbarContent");
   await expect(toast).toBeVisible();
+  const dismiss = toast.getByRole("button", { name: "Dismiss notification" });
+  if (await dismiss.isVisible()) {
+    await dismiss.click();
+    await expect(toast).toBeHidden();
+    return;
+  }
+  await toast.click({ trial: true });
   const box = (await toast.boundingBox())!;
   // Compact layouts dismiss toasts by swiping rather than showing a close button.
   await page.mouse.move(box.x + 24, box.y + box.height / 2);

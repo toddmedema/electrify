@@ -768,7 +768,8 @@ table,
   font-weight: 650;
 }
 
-.srOnly {
+.srOnly,
+.visuallyHidden {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
@@ -1497,12 +1498,12 @@ $pane_header_height: 48px;
 .powerExchangeHero {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 
   img {
-    width: 48px;
-    height: 48px;
-    flex: 0 0 48px;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
   }
 }
 
@@ -1619,11 +1620,13 @@ $pane_header_height: 48px;
   height: 40px;
 }
 
+// The reading of what is flowing now, sitting above the chart of what flowed and will flow. Kept
+// compact so the chart stays what the layer shows.
 .powerExchangeSummary {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px 16px 16px;
+  gap: 8px;
+  padding: 0 16px 8px;
 }
 
 // Touch keeps the full 44px Build target, which the 52px touch header holds with 4px either side
@@ -2508,30 +2511,43 @@ $pane_header_height: 48px;
   text-align: center;
 }
 
-.scenarioBriefingFacts {
-  display: grid;
-  gap: 0;
-  margin-top: 4px;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-  text-align: left;
+// The description's two companions, both quieter than the Start action below: the way into the
+// goals (a text button, blue for interaction) and the one risk to watch for (amber for warning).
+.scenarioBriefing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.scenarioBriefingFact {
+// A tinted note rather than a filled alert: the amber is soft enough that the text keeps the
+// page's full contrast, while the label and icon carry the deeper amber on their own.
+.scenarioWatchOut {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   gap: 12px;
-  padding: 12px 2px;
-  border-top: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 560px;
+  padding: 12px 16px;
+  border: 1px solid
+    color-mix(in srgb, var(--warning-dot) 55%, var(--bg-primary));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning-fill) 28%, var(--bg-primary));
+  text-align: left;
 
-  &:first-child {
-    border-top: 0;
+  .conceptIcon {
+    color: var(--warning-icon);
+    // Lines the glyph up with the label's first line
+    margin-top: -2px;
   }
 
   .MuiTypography-overline {
+    color: var(--warning-icon);
     font-weight: 600;
     line-height: 1.2;
+    margin-bottom: 4px;
   }
 }
 
@@ -2928,8 +2944,57 @@ $pane_header_height: 48px;
   }
 }
 
-// For things that use size() / get recalulcated on larger displays
+// Keep scale-dependent declarations together so breakpoints do not replay static styles.
+@mixin scaledStyling() {
+  .gameStatus {
+    gap: size(small);
+  }
+
+  .gameStatusValue,
+  .iconLabel {
+    gap: size(tiny);
+  }
+
+  #logo {
+    top: size(large);
+    left: size(large);
+    right: size(large);
+  }
+
+  #manual > :first-child {
+    margin-top: size(base);
+  }
+
+  #gameSetupTable {
+    margin: size(large) auto;
+  }
+
+  .cardList {
+    padding-top: size(base) !important;
+  }
+
+  // The catalog shares cardList but stays flush at every scale. Reapply its override too.
+  .missionList {
+    padding-top: 0 !important;
+  }
+
+  .selectedFacilitySummary {
+    padding: size(small) 16px;
+  }
+
+  .version {
+    margin-top: size(large);
+  }
+
+  .storyDerateBadge {
+    margin-left: size(small);
+  }
+}
+
+// Emit the base rules once. Only scaledStyling() is replayed at the larger size maps.
 @mixin styling() {
+  @include scaledStyling();
+
   // The vocabulary introduced by the missions stays attached to the same concepts in the live
   // interface. Text remains beside it for first-time recognition and screen magnification.
   .gameStatus,
@@ -2940,13 +3005,7 @@ $pane_header_height: 48px;
   }
 
   .gameStatus {
-    gap: size(small);
     min-width: 0;
-  }
-
-  .gameStatusValue,
-  .iconLabel {
-    gap: size(tiny);
   }
 
   .conceptLegend {
@@ -3004,9 +3063,6 @@ $pane_header_height: 48px;
   // ===============================================
   #logo {
     position: absolute;
-    top: size(large);
-    left: size(large);
-    right: size(large);
     img {
       width: 100%;
       max-width: $absmaxdimension;
@@ -3119,10 +3175,6 @@ $pane_header_height: 48px;
     // here would leave a gap between the top bar and the pinned header. The gutter lives on
     // the first child instead, where it doesn't affect pinning.
     padding-top: 0 !important;
-
-    > :first-child {
-      margin-top: size(base);
-    }
 
     figure {
       margin: $space-4 0;
@@ -3256,7 +3308,6 @@ $pane_header_height: 48px;
   }
 
   #gameSetupTable {
-    margin: size(large) auto;
     width: auto;
 
     tr {
@@ -3398,14 +3449,11 @@ $pane_header_height: 48px;
 
   .cardList {
     background: inherit;
-    padding-top: size(base) !important;
     padding-bottom: 20px; /* for devices with with bottom bars */
     height: 100%;
   }
 
   .missionList {
-    padding-top: 0 !important;
-
     .MuiListSubheader-root {
       padding: 16px 0 8px;
       line-height: 1.35;
@@ -4067,7 +4115,6 @@ $pane_header_height: 48px;
 
   // Which money is the selected facility's, above the chart that shows the company's
   .selectedFacilitySummary {
-    padding: size(small) 16px;
     background: var(--bg-selected);
     border-bottom: 1px solid var(--border-selected);
   }
@@ -4079,7 +4126,6 @@ $pane_header_height: 48px;
   .version {
     text-align: center;
     opacity: 0.7;
-    margin-top: size(large);
   }
 
   .outputProgressBar {
@@ -4125,7 +4171,6 @@ $pane_header_height: 48px;
 
   .storyDerateBadge {
     height: 20px;
-    margin-left: size(small);
     vertical-align: text-bottom;
 
     .MuiChip-label {
@@ -4300,16 +4345,13 @@ $pane_header_height: 48px;
 // Keep native tutorial paragraphs on the HUD's existing body scale.
 .tutorialHud .tutorialPrompt {
   margin: 4px 0 0;
+  // Hang the explanation off the action's text (20px icon + 8px gap).
+  padding-left: 28px;
   color: $font_color_primary;
   font-family: var(--font-family);
   font-size: var(--font-size-body1);
   font-weight: 400;
   line-height: 20px;
-}
-
-// Hang the explanation off the action's text (20px icon + 8px gap).
-.tutorialHud .tutorialPrompt {
-  padding-left: 28px;
 }
 
 // A separate clipped layer keeps the sweep behind the HUD without changing its scrolling.
@@ -4459,10 +4501,11 @@ $pane_header_height: 48px;
 @media screen and (min-width: $fold_pane_min_width) {
   .tutorialHud {
     display: grid;
-    grid-template-areas: "header content footer";
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    // Keep Exit on the left and the step counter beside Back/Next at every width.
+    grid-template-areas: "exit content step back next";
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     align-items: start;
-    column-gap: 24px;
+    column-gap: $space-2;
     row-gap: 0;
     padding-top: calc(8px + env(safe-area-inset-top));
     padding-bottom: 12px;
@@ -4475,28 +4518,13 @@ $pane_header_height: 48px;
   }
 
   .tutorialHudHeader {
-    grid-area: header;
+    grid-area: step;
   }
 
   // Centers the 20px action line in the header's and footer's 40px line
   .tutorialHudContent {
     grid-area: content;
     padding-top: 12px;
-  }
-
-  .tutorialHudFooter {
-    grid-area: footer;
-  }
-
-  // The phone's arrangement at every width: Exit quiet on the left, the step count beside the
-  // primary action on the right, so the controls never swap sides as the window changes.
-  .tutorialHud {
-    grid-template-areas: "exit content step back next";
-    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
-    column-gap: $space-2;
-  }
-
-  .tutorialHudContent {
     margin-left: $space-4;
     margin-right: $space-4;
   }
@@ -4515,10 +4543,6 @@ $pane_header_height: 48px;
 
   .tutorialHudFooterSpacer {
     display: none;
-  }
-
-  .tutorialHudHeader {
-    grid-area: step;
   }
 
   .tutorialHudHeader h2 {
@@ -4749,7 +4773,7 @@ $sizemap: (
 @media screen and (min-width: $abswidthmax),
   screen and (min-height: $absheightmax) {
   // Use the new desktop values defined above, only at this size
-  @include styling();
+  @include scaledStyling();
 
   body,
   html,
@@ -4784,7 +4808,7 @@ $sizemap: (
 );
 
 @media screen and (min-width: $desktop_breakpoint) {
-  @include styling();
+  @include scaledStyling();
 
   // The panes don't render one at this width -- all three destinations are already on screen.
   // Kept as a backstop for the frame between a window crossing the breakpoint and the
@@ -5457,48 +5481,12 @@ $homeSmokeCycle: 5.6s;
     min-height: 44px;
   }
 }
-.transmissionLine {
-  > summary {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    min-height: 44px;
-    cursor: pointer;
-    list-style: none;
-  }
-  > summary::-webkit-details-marker {
-    display: none;
-  }
-  > summary::after {
-    content: "+";
-    color: var(--interactive-strong);
-  }
-  &[open] > summary::after {
-    content: "−";
-  }
-  .transmissionLineText {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-width: 0;
-    gap: 4px;
-  }
-}
 .transmissionLineDetails {
   padding: 0 16px 16px 68px;
   display: grid;
   gap: 8px;
 }
 @media (max-width: ($phone_width - 1px)) {
-  .transmissionLine > summary {
-    gap: 8px;
-    padding: 12px;
-    flex-wrap: wrap;
-  }
-  .transmissionLine .transmissionLineText {
-    flex-basis: calc(100% - 64px);
-  }
   .transmissionLineDetails {
     padding: 0 12px 12px;
   }
@@ -5904,27 +5892,9 @@ $homeSmokeCycle: 5.6s;
 .transmissionFleet {
   margin-top: 0;
 }
-.transmissionLine > .facilityRowHeader > .facilityDisclosure {
-  gap: 8px;
-  padding: 12px 16px;
-}
-.transmissionLine .facilityDragHandle + .facilityDisclosure {
-  padding-left: 8px;
-}
+// A row without a grip carries its icon inside the disclosure, as a plant row does.
 .transmissionLine .facilityDisclosure .transmissionListIcon {
   margin-right: 8px;
-}
-.transmissionLine .transmissionLineName {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  white-space: nowrap;
-  font-size: var(--font-size-subtitle);
-  font-weight: 600;
-}
-.transmissionLine .MuiChip-root {
-  margin: 0;
 }
 .transmissionLine .transmissionLineDetails {
   padding: 0 16px 16px;
@@ -6471,15 +6441,6 @@ $programs_column: 800px;
   .decisionImpactFactDetail {
     grid-column: 1;
   }
-  .transmissionLine > .facilityRowHeader > .facilityDisclosure {
-    flex-wrap: wrap;
-  }
-  .transmissionLine .transmissionLineText {
-    flex-basis: calc(100% - 80px);
-  }
-  .transmissionLine .facilityChevron {
-    margin-left: auto;
-  }
   .insights .insightsRateMetric {
     padding: 0 8px;
   }
@@ -6500,40 +6461,6 @@ $programs_column: 800px;
 .facilitySectionFlow {
   min-width: 0;
   font-variant-numeric: tabular-nums;
-}
-.transmissionLine > .facilityRowHeader > .facilityDisclosure {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 20px;
-  align-items: center;
-  gap: 8px;
-  // The flow bar is painted behind the row, so everything on top of it needs a stacking
-  // context of its own -- the same lift facility rows give their text and actions.
-  position: relative;
-  overflow: hidden;
-  > *:not(.outputProgressBar) {
-    position: relative;
-    z-index: 1;
-  }
-}
-.transmissionLine
-  > .facilityRowHeader
-  > .facilityDragHandle
-  + .facilityDisclosure {
-  // The icon is already inside the reorder target, leaving text and the chevron.
-  grid-template-columns: minmax(0, 1fr) 20px;
-}
-// Reading and rating share one unit, so the pair shouldn't jitter as the flow moves
-.transmissionLineFlow {
-  font-variant-numeric: tabular-nums;
-}
-.transmissionLine .transmissionLineText {
-  min-width: 0;
-}
-.transmissionLine .transmissionLineText > .MuiTypography-body2 {
-  font-size: var(--font-size-caption);
-}
-.transmissionLine .facilityChevron {
-  margin-left: 0;
 }
 
 @media (pointer: coarse) {
@@ -7933,18 +7860,6 @@ img[src$="/transmission.svg"] {
   z-index: 3;
 }
 
-.visuallyHidden {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
-}
-
 @media screen and (max-width: ($fold_pane_min_width - 1px)) {
   .locationPicker {
     grid-template-columns: minmax(0, 1fr);
@@ -8187,6 +8102,13 @@ option {
   color: var(--interactive-strong);
   flex-shrink: 0;
 }
+// The (?) follows the expand control straight away, left-aligned in the header with it; only the
+// layer-editing actions are pushed to the trailing edge
+.insightsTrackHeader .manual-link {
+  flex-shrink: 0;
+  margin-left: 4px;
+  color: var(--interactive-strong);
+}
 .fuelPriceFilter {
   display: flex;
   align-items: center;
@@ -8249,6 +8171,16 @@ option {
     }
     .MuiIconButton-root {
       flex-shrink: 0;
+    }
+  }
+  // The title and its (?) stay together at the leading edge; the close button keeps the other
+  .expandedChartHeading {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    .manual-link {
+      flex-shrink: 0;
+      color: var(--interactive-strong);
     }
   }
   .insightsViewportToolbar {
@@ -8342,6 +8274,12 @@ option {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+// With the layer editor open the header also carries the move and remove actions. Where title,
+// expand, help and actions don't share a row, the actions drop to their own rather than the title
+// being cut to a stub; each control keeps its full touch target.
+.insights .MuiToolbar-root.insightsTrackHeader:has(> .insightsTrackActions) {
+  flex-wrap: wrap !important;
 }
 
 // Mouse selection remains separate from the one expanded inspection row.
@@ -8495,6 +8433,7 @@ option {
 
 .utilityAcquisitionHint {
   display: block;
+  margin-top: 4px;
 }
 
 @media (max-width: 390px) {

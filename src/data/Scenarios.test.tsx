@@ -135,6 +135,36 @@ describe("tutorial mission metadata", () => {
     expect(interties.tutorialSteps).toHaveLength(19);
   });
 
+  it("starts Forecasting with a small solar plant beside its coal plant", () => {
+    const [coal, solar, ...others] = getScenario(5)!.facilities;
+    expect(coal).toMatchObject({ fuel: "Coal" });
+    expect(solar).toMatchObject({ fuel: "Sun" });
+    expect(others).toEqual([]);
+    expect(solar.peakW!).toBeLessThan(coal.peakW!);
+  });
+
+  it("follows Forecasting's coal plant, not the solar plant, through its pause and resume steps", () => {
+    const steps = getScenario(5)!.tutorialSteps!;
+    const pause = steps.find((s) => s.target === '[aria-label="Pause Coal"]')!;
+    const resume = steps.find(
+      (s) => s.target === '[aria-label="Resume Coal"]',
+    )!;
+    const paused = (coal: boolean, solar: boolean) =>
+      ({
+        game: {
+          facilities: [
+            { fuel: "Sun", paused: solar },
+            { fuel: "Coal", paused: coal },
+          ],
+        },
+      }) as unknown as AppStateType;
+
+    expect(pause.advanceOn!(paused(false, true))).toBe(false);
+    expect(pause.advanceOn!(paused(true, false))).toBe(true);
+    expect(resume.advanceOn!(paused(true, false))).toBe(false);
+    expect(resume.advanceOn!(paused(false, true))).toBe(true);
+  });
+
   it("keeps interties out of earlier tutorials without disabling ordinary California games", () => {
     for (const tutorial of TUTORIALS.filter(({ id }) => id !== 112)) {
       expect(
@@ -332,16 +362,9 @@ describe("authored starting fleets", () => {
       admin: "TX",
       timeZone: "America/Chicago",
     });
-    expect(austin.briefing?.objective).toMatch(/strengthen.*freeze/i);
-    expect(austin.briefing?.objective).not.toMatch(/build/i);
-    expect(
-      [
-        austin.summary,
-        austin.briefing?.fantasy,
-        austin.briefing?.objective,
-        austin.briefing?.threat,
-      ].join(" "),
-    ).not.toMatch(/ERCOT|PPA|portfolio/i);
+    expect([austin.summary, austin.threat].join(" ")).not.toMatch(
+      /ERCOT|PPA|portfolio/i,
+    );
     expect(
       austin.facilities.reduce(
         (total, facility) => total + (facility.peakW || 0),
@@ -414,7 +437,7 @@ describe("authored starting fleets", () => {
       startingInterties: ["california-north"],
       intertiesEnabled: true,
     });
-    expect(wildfire.briefing?.threat).toMatch(/intertie.*90%/i);
+    expect(wildfire.threat).toMatch(/intertie.*90%/i);
     expect(wildfire.facilities[0]).toMatchObject({
       name: "Natural Gas CC",
       peakW: 12000000,
@@ -432,16 +455,50 @@ describe("authored starting fleets", () => {
   });
 });
 
-describe("briefing objectives", () => {
-  // A briefing objective is what the player optimises for, so it must not promise a check the
-  // game never makes. The classics that name a clean-up goal are won by surviving the term.
-  it("describe the real win condition in the classic scenarios", () => {
-    [100, 101, 103, 105].forEach((id) => {
-      const scenario = getScenario(id)!;
-      expect([scenario.name, scenario.briefing!.objective]).toEqual([
+// The mission list card and the game details subtitle show the same sentence, so a scenario is
+// described once. What the player is scored on lives in its objectives, not in a second blurb.
+describe("scenario descriptions", () => {
+  const described = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
+  const sentences = (text: string) =>
+    text
+      .split(/(?<=[.?!])\s+/)
+      .map((sentence) => sentence.trim().toLowerCase())
+      .filter(Boolean);
+
+  it("gives every scenario one description of its own", () => {
+    SCENARIOS.forEach((scenario) => {
+      expect([scenario.name, scenario.summary?.trim()]).toEqual([
         scenario.name,
-        expect.stringMatching(/solvent/),
+        expect.stringMatching(/\S/),
       ]);
+    });
+    expect(new Set(described.map((scenario) => scenario.summary)).size).toBe(
+      described.length,
+    );
+  });
+
+  it("keeps each description short enough for a list card", () => {
+    // A situation and what to do about it: two sentences at most
+    described.forEach((scenario) => {
+      expect([
+        scenario.name,
+        sentences(scenario.summary!).length <= 2,
+        scenario.summary!.length <= 100,
+      ]).toEqual([scenario.name, true, true]);
+    });
+  });
+
+  it("flags a risk the description does not already state", () => {
+    described.forEach((scenario) => {
+      expect([scenario.name, scenario.threat?.trim()]).toEqual([
+        scenario.name,
+        expect.stringMatching(/\S/),
+      ]);
+      const stated = new Set(sentences(scenario.summary!));
+      expect([
+        scenario.name,
+        sentences(scenario.threat!).filter((sentence) => stated.has(sentence)),
+      ]).toEqual([scenario.name, []]);
     });
   });
 });

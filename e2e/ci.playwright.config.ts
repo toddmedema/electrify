@@ -22,6 +22,7 @@ const smoke = [
   "intertie-order.spec.ts",
   "facility-selection.spec.ts",
   "operations-priorities.spec.ts",
+  "offline-launch.spec.ts",
 ];
 const layout = [
   "build-generator-loading.spec.ts",

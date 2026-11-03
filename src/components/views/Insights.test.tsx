@@ -34,9 +34,12 @@ import { GameType, TickPresentFutureType } from "../../Types";
 import Insights, {
   INSIGHT_PRESETS,
   INSIGHT_LAYERS,
+  INSIGHT_LAYER_MANUAL,
   MAX_CUSTOM_INSIGHT_PRESETS,
+  isChartLayer,
   withRequiredLayers,
 } from "./Insights";
+import { manualEntryByTitle } from "../base/ManualHelpPopover";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
 
 jest.mock("../base/GameCard", () => ({
@@ -352,6 +355,32 @@ jest.mock("../base/ChartForecastWeather", () => ({
   ),
 }));
 
+jest.mock("../base/ChartForecastPowerExchange", () => ({
+  __esModule: true,
+  default: ({
+    syncKey,
+    timeline,
+    domain,
+    currentMinute,
+  }: Omit<ChartMockProps, "timeline"> & {
+    timeline?: Array<{ transmissionCapacityW?: number }>;
+  }) => (
+    <div
+      role="img"
+      aria-label="Power exchange inspection"
+      data-chart="power-exchange"
+      data-sync-key={syncKey}
+      data-points={timeline?.length}
+      data-domain={domainValue(domain)}
+      data-forecast-start={currentMinute}
+      data-line-capacity={Math.max(
+        0,
+        ...(timeline || []).map((tick) => tick.transmissionCapacityW || 0),
+      )}
+    />
+  ),
+}));
+
 const user = userEvent.setup({ delay: null });
 
 let overviewGame: GameType;
@@ -569,6 +598,8 @@ function storeCustomPreset(name: string) {
 
 describe("Insights layers", () => {
   let overviewProjection: ProjectionView;
+  let exchangeGame: GameType;
+  let exchangeProjection: ProjectionView;
   beforeAll(() => {
     // Layer/preset controls share immutable real inputs and a real forecast. Cache
     // regression cases still create independent games with distinct history identities.
@@ -578,6 +609,21 @@ describe("Insights layers", () => {
       () => {},
     );
   });
+  // The same for a grid with an open intertie, whose forecast carries the exchange. Stored
+  // Energy and Water only appear for fleets that have storage and hydro, so it claims both.
+  // Its own hook, so a second twenty-year forecast has its own time allowance.
+  beforeAll(() => {
+    exchangeGame = createNextState(gameWithOpenIntertie(), () => {});
+    loadSimData(exchangeGame.location);
+    exchangeProjection = createNextState(
+      {
+        ...selectProjection(exchangeGame, exchangeGame.timeline[0]),
+        hasStorage: true,
+        hasHydro: true,
+      },
+      () => {},
+    );
+  }, 60_000);
   beforeEach(() => {
     localStorage.clear();
     // Other cases play different seeds and locations. Reusing the immutable game
@@ -586,22 +632,102 @@ describe("Insights layers", () => {
     cacheProjection(overviewGame, overviewProjection);
   });
 
-  it("offers chart expansion beside plotted layers, never summaries", () => {
+  it("offers every chart an expand control with its help button right after it, and tables neither", () => {
     localStorage.setItem(
       "insightsLayers",
       JSON.stringify(INSIGHT_LAYERS.map((layer) => layer.id)),
     );
-    renderInsights();
-    const tracks = screen.getAllByRole("region", { name: / evidence$/ });
-    for (const track of tracks) {
-      const name = track.getAttribute("aria-label")!.replace(/ evidence$/, "");
-      const expand = within(track).queryByRole("button", {
-        name: `Expand ${name} chart`,
+    cacheProjection(exchangeGame, exchangeProjection);
+    renderInsights(100, exchangeGame);
+    const tracks = screen
+      .getAllByRole("region", { name: / evidence$/ })
+      .map((track) => {
+        const name = track
+          .getAttribute("aria-label")!
+          .replace(/ evidence$/, "");
+        return {
+          track,
+          name,
+          layer: INSIGHT_LAYERS.find((l) => l.label === name)!,
+        };
       });
-      expect(expand !== null).toBe(
-        !["Power exchange", "Finance details"].includes(name),
-      );
+    expect(tracks).toHaveLength(INSIGHT_LAYERS.length);
+    const tables = tracks.filter(({ layer }) => !isChartLayer(layer.id));
+    expect(tables.map(({ name }) => name)).toEqual(["Finance details"]);
+    for (const { track } of tables) {
+      expect(
+        within(track).queryByRole("button", { name: /^(Expand|What is) / }),
+      ).toBeNull();
     }
+    const charts = tracks.flatMap(({ track, name, layer }) =>
+      isChartLayer(layer.id) ? [{ track, name, id: layer.id }] : [],
+    );
+    expect(charts).toHaveLength(INSIGHT_LAYERS.length - tables.length);
+    for (const { track, name, id } of charts) {
+      // Nothing interactive sits between the two, and both follow the title
+      const [expand, help] = within(track).getAllByRole("button");
+      expect(expand).toHaveAccessibleName(`Expand ${name} chart`);
+      expect(help).toHaveAccessibleName(`What is ${INSIGHT_LAYER_MANUAL[id]}?`);
+      const [title] = within(track).getAllByRole("heading", { level: 6 });
+      expect(
+        title.compareDocumentPosition(expand) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        expand.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+  });
+
+  it("keeps the help button beside the expand control while layers are being edited", async () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["cash", "profit"]));
+    renderInsights();
+    await user.click(labelledButton(/Layers/));
+    const track = screen.getByRole("region", { name: "Cash evidence" });
+    expect(
+      within(track)
+        .getAllByRole("button")
+        .slice(0, 5)
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual([
+      "Expand Cash chart",
+      "What is Insights & data layers?",
+      "Move Cash up",
+      "Move Cash down",
+      "Remove Cash",
+    ]);
+  });
+
+  it("opens the manual page chosen for the layer", async () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["spareCapacity"]));
+    const store = configureStore({ reducer: { ui: uiReducer } });
+    renderUI(
+      <Provider store={store}>
+        <Insights
+          game={overviewGame}
+          selectedFacilityId={null}
+          facilityDragActive={false}
+        />
+      </Provider>,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "What is Reserve Capacity?" }),
+    );
+    expect(store.getState().ui.manualHelpEntry).toBe("Reserve Capacity");
+  });
+
+  it("points every chart layer at a manual entry that exists", () => {
+    const charts: string[] = [];
+    const missing: string[] = [];
+    for (const { id } of INSIGHT_LAYERS) {
+      if (!isChartLayer(id)) continue;
+      charts.push(id);
+      if (!manualEntryByTitle(INSIGHT_LAYER_MANUAL[id])) missing.push(id);
+    }
+    expect(missing).toEqual([]);
+    expect(Object.keys(INSIGHT_LAYER_MANUAL).sort()).toEqual(charts.sort());
+    // The finance table has no plot to explain
+    expect(isChartLayer("financeDetails")).toBe(false);
   });
 
   it("keeps fuel selection and time zoom when expanding and closing a chart", async () => {
@@ -621,6 +747,10 @@ describe("Insights layers", () => {
     act(() => expand.focus());
     fireEvent.click(expand);
     const dialog = screen.getByRole("dialog", { name: "Fuel Prices" });
+    // The title names the dialog on its own; the help button beside it doesn't join the name
+    expect(
+      within(dialog).getByRole("button", { name: "What is Fuel costs?" }),
+    ).toBeVisible();
     expect(
       within(dialog).getByRole("button", { name: "Coal" }),
     ).toHaveAttribute("aria-pressed", "true");
@@ -1167,6 +1297,53 @@ describe("Insights layers", () => {
     );
   });
 
+  it("plots the exchange over the forecast's own time axis, beside the current reading", () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
+    cacheProjection(exchangeGame, exchangeProjection);
+    renderInsights(100, exchangeGame);
+
+    const exchange = screen.getByRole("region", {
+      name: "Power exchange evidence",
+    });
+    // The reading of what is flowing now stays, but is no longer the whole layer
+    expect(within(exchange).getByText("Power flowing")).toBeVisible();
+    expect(within(exchange).getByText("Available capacity")).toBeVisible();
+    const chart = within(exchange).getByRole("img", {
+      name: "Power exchange inspection",
+    });
+    expect(chart).toHaveAttribute("data-sync-key", "insights");
+    expect(Number(chart.getAttribute("data-points"))).toBeGreaterThan(100);
+    expect(Number(chart.getAttribute("data-line-capacity"))).toBeGreaterThan(0);
+    // The same viewport the other layers share, and the same marker for where the forecast starts
+    const [from, to] = JSON.parse(chart.getAttribute("data-domain")!);
+    expect(to).toBeGreaterThan(from);
+    expect(chart).toHaveAttribute("data-forecast-start", "0");
+  });
+
+  it("expands the power exchange like any other chart, with its help button in the header", async () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
+    cacheProjection(exchangeGame, exchangeProjection);
+    renderInsights(100, exchangeGame);
+
+    const expand = screen.getByRole("button", {
+      name: "Expand Power exchange chart",
+    });
+    act(() => expand.focus());
+    fireEvent.click(expand);
+    const dialog = screen.getByRole("dialog", { name: "Power exchange" });
+    expect(
+      within(dialog).getByRole("img", { name: "Power exchange inspection" }),
+    ).toHaveAttribute("data-sync-key", "insights-expanded");
+    expect(
+      within(dialog).getByRole("button", { name: "What is Interties?" }),
+    ).toBeVisible();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(expand).toHaveFocus();
+  });
+
   it("scrolls the power exchange into view on the phone step that points to it", () => {
     jest.useFakeTimers();
     const game = cloneDeep(
@@ -1538,6 +1715,20 @@ describe("Insights layers", () => {
     expect(screen.queryByText("Power exchange", { selector: "h6" })).toBeNull();
   });
 });
+
+function gameWithOpenIntertie(): GameType {
+  const game = cloneDeep(
+    gameReducer(
+      createGame({ scenarioId: 100, seed: 61 }),
+      buildTransmissionLine({
+        corridorId: "california-north",
+        financed: true,
+      }),
+    ),
+  );
+  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  return game;
+}
 
 function labelledButton(label: string | RegExp): HTMLElement {
   const button = screen.getByLabelText(label, {

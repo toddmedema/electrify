@@ -106,6 +106,131 @@ test("expanded chart axes and fuel controls fit with Larger text after resizing"
   }
 });
 
+test("every chart header keeps its help button beside the expand control, even while layers are edited", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify([
+        "supplyDemand",
+        "spareCapacity",
+        "fuelPrices",
+        "water",
+        "inflationInterest",
+        "cash",
+      ]),
+    );
+  });
+  await page.goto("/?scenario=108");
+  await page.getByRole("button", { name: "Start game" }).click();
+  const insights = page.locator(".insights:visible");
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
+  const tracks = insights.locator(".insightsTrack");
+  await expect(tracks.first()).toBeVisible();
+  const measure = () =>
+    tracks.evaluateAll((elements) =>
+      elements.map((track) => {
+        const box = (selector: string) => {
+          const element = track.querySelector(selector);
+          if (!element) return null;
+          const { left, right, top, bottom, width, height } =
+            element.getBoundingClientRect();
+          return { left, right, top, bottom, width, height };
+        };
+        const header = track.querySelector(".insightsTrackHeader")!;
+        return {
+          layer: track.getAttribute("data-layer"),
+          title: box("h6"),
+          expand: box(".insightsExpandChart"),
+          help: box(".insightsTrackHeader .manual-link"),
+          actions: box(".insightsTrackActions"),
+          overflow: header.scrollWidth - header.clientWidth,
+          helpCount: header.querySelectorAll(".manual-link").length,
+        };
+      }),
+    );
+  const minimum = await page.evaluate(() =>
+    matchMedia("(pointer: coarse)").matches ? 44 : 40,
+  );
+  const expectHeaders = async (editing: boolean) => {
+    const headers = await measure();
+    expect(headers.length).toBeGreaterThanOrEqual(5);
+    for (const {
+      layer,
+      title,
+      expand,
+      help,
+      actions,
+      overflow,
+      helpCount,
+    } of headers) {
+      const where = `${layer}${editing ? " while editing" : ""}`;
+      expect(helpCount, `${where} has exactly one help button`).toBe(1);
+      expect(expand && help && title, `${where} header controls`).toBeTruthy();
+      // Left-aligned: the help button follows the expand control by a small gap, not the edge
+      expect(help!.left - expand!.right, `${where} gap`).toBeGreaterThanOrEqual(
+        0,
+      );
+      expect(help!.left - expand!.right, `${where} gap`).toBeLessThanOrEqual(8);
+      expect(
+        Math.abs(help!.top - expand!.top),
+        `${where} row`,
+      ).toBeLessThanOrEqual(1);
+      expect(help!.width, `${where} target width`).toBeGreaterThanOrEqual(
+        minimum,
+      );
+      expect(help!.height, `${where} target height`).toBeGreaterThanOrEqual(
+        minimum,
+      );
+      expect(
+        title!.right,
+        `${where} title clears the controls`,
+      ).toBeLessThanOrEqual(expand!.left + 1);
+      expect(overflow, `${where} header overflow`).toBeLessThanOrEqual(1);
+      if (editing) {
+        expect(actions, `${where} actions`).toBeTruthy();
+        // After the help button on its row, or on the row beneath when a narrow header needs it
+        expect(
+          actions!.left >= help!.right - 1 || actions!.top >= help!.bottom - 1,
+          `${where} actions follow`,
+        ).toBe(true);
+        expect(
+          actions!.right,
+          `${where} actions stay on the screen`,
+        ).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+      } else {
+        expect(actions).toBeNull();
+      }
+    }
+  };
+  await expectHeaders(false);
+  await insights.getByRole("button", { name: /^Layers \(/ }).click();
+  await expectHeaders(true);
+  await insights.getByRole("button", { name: "Done choosing layers" }).click();
+
+  // The expanded view carries the same button, and the entry opens over it
+  await insights
+    .getByRole("button", { name: "Expand Fuel Prices chart" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Fuel Prices", exact: true });
+  const help = dialog.getByRole("button", { name: "What is Fuel costs?" });
+  await expect(help).toBeVisible();
+  await help.click();
+  const manual = page.getByRole("dialog", { name: "Manual help" });
+  await expect(
+    manual.getByRole("heading", { name: "Fuel costs", exact: true }),
+  ).toBeVisible();
+  await manual.getByRole("button", { name: "close", exact: true }).click();
+  await expect(manual).toBeHidden();
+  await dialog.getByRole("button", { name: "Close Fuel Prices chart" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`chart inspection preserves fuel selection and zoom in ${theme}`, async ({
     page,

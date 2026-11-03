@@ -2,6 +2,7 @@ import { DesktopBridge, DesktopScore } from "./Desktop";
 import {
   desktopGlobalRank,
   desktopScoreRank,
+  desktopScores,
   submitDesktopScore,
 } from "./DesktopScores";
 
@@ -126,5 +127,27 @@ it.each([1, 47, 147, 201])(
         return selection.scenarioId === 101 && selection.difficulty === "CEO";
       }),
     ).toBe(true);
+  },
+);
+
+it.each([
+  ["global", 3, 1, 3],
+  // Steam can range only a global board; the others are small already
+  ["friends", 3, undefined, undefined],
+  ["player", 3, undefined, undefined],
+  ["global", undefined, undefined, undefined],
+] as const)(
+  "reads the %s board with %s top rows as ranks %s to %s",
+  async (scope, topRows, startRank, endRank) => {
+    const desktop = bridge(() => [entry(540, 1)]);
+    await desktopScores(101, "CEO", scope, topRows);
+    const request = desktop.getLeaderboard.mock.calls[0][0];
+    expect(request).toMatchObject({
+      scenarioId: 101,
+      difficulty: "CEO",
+      scope,
+    });
+    expect(request.startRank).toBe(startRank);
+    expect(request.endRank).toBe(endRank);
   },
 );
