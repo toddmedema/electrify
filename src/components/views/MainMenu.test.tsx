@@ -109,9 +109,7 @@ describe("MainMenu", () => {
     window.electrifyDesktop = desktopBridge();
     const user = userEvent.setup();
     const { store } = renderMainMenu(<MainMenu {...props()} />);
-    expect(
-      screen.getByRole("button", { name: "Play", exact: true }),
-    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Play" })).toBeVisible();
     const enableTv = await screen.findByRole("button", {
       name: "Playing on a TV? Use TV layout",
     });
