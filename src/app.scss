@@ -6563,7 +6563,9 @@ $programs_column: 800px;
 .buildDetails {
   table-layout: fixed;
   .MuiTableCell-root {
-    height: 48px;
+    // Include both cell padding and the divider around the help control. Two-line labels
+    // must fit this same row instead of stretching it by a font-dependent fraction.
+    height: calc(var(--control-size) + 12px);
     box-sizing: border-box;
     padding: 4px 12px;
     vertical-align: middle;
@@ -6600,9 +6602,6 @@ $programs_column: 800px;
 @media (pointer: coarse) {
   .buildDetails .buildDetailHelp {
     width: 52px;
-  }
-  .buildDetails .MuiTableCell-root {
-    height: 52px;
   }
 }
 
