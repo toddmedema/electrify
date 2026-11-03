@@ -7,7 +7,6 @@ import CampaignHandover from "./CampaignHandover";
 export default function CampaignHandoverContainer(): React.JSX.Element | null {
   const dispatch = useAppDispatch();
   const campaign = useAppSelector((state) => state.game.campaign);
-  const facilityCount = useAppSelector((state) => state.game.facilities.length);
   const visible = useAppSelector(
     (state) =>
       state.game.inGame &&
@@ -21,7 +20,6 @@ export default function CampaignHandoverContainer(): React.JSX.Element | null {
   return (
     <CampaignHandover
       term={term}
-      facilityCount={facilityCount}
       onContinue={() => dispatch(continueLegacyCampaign())}
       onExit={() => {
         void quitSavedGame();

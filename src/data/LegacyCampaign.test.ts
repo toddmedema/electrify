@@ -82,6 +82,11 @@ test("the campaign resolves nine consecutive CEO terms without entering the chal
     expect(generation.startYear).toBe(1882 + index * 20);
     expect(generation.scenarioId).toBe(LEGACY_CAMPAIGN_ID + index);
     expect(getScenario(generation.scenarioId)).toBe(LEGACY_SCENARIOS[index]);
+    expect(LEGACY_SCENARIOS[index].name).toBe(
+      `${generation.name} (${generation.startYear}–${generation.startYear + 19})`,
+    );
+    expect(LEGACY_SCENARIOS[index].summary).toBeUndefined();
+    expect(LEGACY_SCENARIOS[index].briefing).toBeUndefined();
     expect(LEGACY_SCENARIOS[index].durationMonths).toBe(
       LEGACY_GENERATION_MONTHS,
     );

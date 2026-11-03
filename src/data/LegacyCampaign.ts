@@ -13,7 +13,6 @@ export interface LegacyGeneration {
   scenarioId: number;
   startYear: number;
   name: string;
-  summary: string;
   referenceRate: number;
   /** Authored borrowing allowance per frozen opening MW, in 2023 dollars. */
   readonly debtDollars2023PerMW: number;
@@ -26,7 +25,6 @@ export const LEGACY_GENERATIONS: readonly LegacyGeneration[] = [
     scenarioId: 117,
     startYear: 1882,
     name: "First Light",
-    summary: "Build a small utility and find a price that pays its bills.",
     referenceRate: 0.24,
     debtDollars2023PerMW: 20000000,
   },
@@ -35,7 +33,6 @@ export const LEGACY_GENERATIONS: readonly LegacyGeneration[] = [
     scenarioId: 118,
     startYear: 1902,
     name: "Beyond the Dynamo",
-    summary: "Expand the company without borrowing more than growth can repay.",
     referenceRate: 0.1,
     debtDollars2023PerMW: 20000000,
   },
@@ -44,8 +41,6 @@ export const LEGACY_GENERATIONS: readonly LegacyGeneration[] = [
     scenarioId: 119,
     startYear: 1922,
     name: "Affordable Growth",
-    summary:
-      "Keep electricity affordable as households and businesses use more.",
     referenceRate: 0.05,
     debtDollars2023PerMW: 20000000,
   },
@@ -54,7 +49,6 @@ export const LEGACY_GENERATIONS: readonly LegacyGeneration[] = [
     scenarioId: 120,
     startYear: 1942,
     name: "Everybody Plugs In",
-    summary: "Prepare for postwar growth and long construction commitments.",
     referenceRate: 0.025,
     debtDollars2023PerMW: 30000000,
   },
@@ -63,7 +57,6 @@ export const LEGACY_GENERATIONS: readonly LegacyGeneration[] = [
     scenarioId: 121,
     startYear: 1962,
     name: "The Power You Don't Build",
-    summary: "Compare new supply with efficiency through the oil shocks.",
     referenceRate: 0.035,
     debtDollars2023PerMW: 30000000,
   },
@@ -72,7 +65,6 @@ export const LEGACY_GENERATIONS: readonly LegacyGeneration[] = [
     scenarioId: 122,
     startYear: 1982,
     name: "The Price of Power",
-    summary: "Reduce exposure to expensive fuel and uncertain imports.",
     referenceRate: 0.06,
     debtDollars2023PerMW: 20000000,
   },
@@ -81,7 +73,6 @@ export const LEGACY_GENERATIONS: readonly LegacyGeneration[] = [
     scenarioId: 123,
     startYear: 2002,
     name: "The Sun Moves the Peak",
-    summary: "Build clean power that can still meet demand after sunset.",
     referenceRate: 0.1,
     debtDollars2023PerMW: 15000000,
   },
@@ -90,7 +81,6 @@ export const LEGACY_GENERATIONS: readonly LegacyGeneration[] = [
     scenarioId: 124,
     startYear: 2022,
     name: "Renew the Grid",
-    summary: "Replace aging equipment while electrification raises demand.",
     referenceRate: 0.15,
     debtDollars2023PerMW: 15000000,
   },
@@ -99,11 +89,14 @@ export const LEGACY_GENERATIONS: readonly LegacyGeneration[] = [
     scenarioId: 125,
     startYear: 2042,
     name: "A Different Kind of Growth",
-    summary: "Keep the next generation's grid affordable and low in emissions.",
     referenceRate: 0.2,
     debtDollars2023PerMW: 15000000,
   },
 ];
+
+export function legacyGenerationTitle(generation: LegacyGeneration): string {
+  return `${generation.name} (${generation.startYear}–${generation.startYear + LEGACY_GENERATION_MONTHS / 12 - 1})`;
+}
 
 export function isLegacyCampaignScenario(id: unknown): id is number {
   return (
@@ -243,20 +236,11 @@ const portfolios: ScenarioType["facilities"][] = [
 export const LEGACY_SCENARIOS: ScenarioType[] = LEGACY_GENERATIONS.map(
   (generation) => ({
     id: generation.scenarioId,
-    name: generation.name,
+    name: legacyGenerationTitle(generation),
     icon:
       generation.index < 3 ? "coal" : generation.index < 6 ? "oil" : "solar",
     locationId: "SF",
     ownership: "Investor",
-    summary: generation.summary,
-    briefing: {
-      tone: "legacy",
-      fantasy: `${generation.startYear}–${generation.startYear + 19}: ${generation.summary}`,
-      objective:
-        "Run the company for 20 years, stay solvent, and retain at least 90% of your opening customers.",
-      threat:
-        "The next CEO inherits your facilities, customers, construction projects, cash, and loans.",
-    },
     startingYear: generation.startYear,
     durationMonths: LEGACY_GENERATION_MONTHS,
     cash: [

@@ -5,17 +5,17 @@ The Campaign entry on Choose a game opens a fictional Northern California utilit
 speed controls still simulate every tick; a completed objective never skips the remaining
 years. The company pauses at a handover until the player continues or saves and exits.
 
-| Term                       | Years     | Main decision                                                 |
-| -------------------------- | --------- | ------------------------------------------------------------- |
-| First Light                | 1882–1901 | Finance small steam plants, price service, and consider hydro |
-| Beyond the Dynamo          | 1902–1921 | Match expansion and borrowing to demand                       |
-| Affordable Growth          | 1922–1941 | Maintain service at a lower real price                        |
-| Everybody Plugs In         | 1942–1961 | Prepare for growth and long construction commitments          |
-| The Power You Don't Build  | 1962–1981 | Compare supply with efficiency through oil price shocks       |
-| The Price of Power         | 1982–2001 | Manage fuel and import exposure                               |
-| The Sun Moves the Peak     | 2002–2021 | Meet demand with a cleaner, flexible portfolio                |
-| Renew the Grid             | 2022–2041 | Replace aging assets as electrification increases demand      |
-| A Different Kind of Growth | 2042–2061 | Maintain affordable, low-emissions service                    |
+| CEO term                               |
+| -------------------------------------- |
+| First Light (1882–1901)                |
+| Beyond the Dynamo (1902–1921)          |
+| Affordable Growth (1922–1941)          |
+| Everybody Plugs In (1942–1961)         |
+| The Power You Don't Build (1962–1981)  |
+| The Price of Power (1982–2001)         |
+| The Sun Moves the Peak (2002–2021)     |
+| Renew the Grid (2022–2041)             |
+| A Different Kind of Growth (2042–2061) |
 
 Only the first term initializes a company. Later terms preserve facilities and their purchased
 engineering, construction progress, hydro-site claims, loans, cash, customers, price memory,

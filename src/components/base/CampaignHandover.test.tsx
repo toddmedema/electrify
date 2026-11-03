@@ -44,7 +44,29 @@ const term: LegacyCampaignTermType = {
     entries: [],
     checksum: "test",
   },
-  objectiveResults: [],
+  objectiveResults: [
+    {
+      id: "retain-customers",
+      metric: "customerRetention",
+      label: "Retain 90% of opening customers",
+      required: true,
+      definition:
+        "Customers kept, as a share of your recorded customer baseline.",
+      status: "completed",
+      target: 0.9,
+      observed: 0.97,
+      observedMonths: 1,
+      requiredMonths: 1,
+      objective: {
+        id: "retain-customers",
+        label: "Retain 90% of opening customers",
+        metric: "customerRetention",
+        minRetainedShare: 0.9,
+        deadlineMonth: 239,
+        required: true,
+      },
+    },
+  ],
   debrief: {
     startingFleet: [],
     finalFleet: [],
@@ -58,31 +80,26 @@ const term: LegacyCampaignTermType = {
   },
 };
 
-it("reviews the real inherited company and requires an explicit handover", async () => {
+it("shows concise term results and requires an explicit handover", async () => {
   const onContinue = jest.fn();
   const onExit = jest.fn();
   render(
-    <CampaignHandover
-      term={term}
-      facilityCount={3}
-      onContinue={onContinue}
-      onExit={onExit}
-    />,
+    <CampaignHandover term={term} onContinue={onContinue} onExit={onExit} />,
   );
   expect(
     screen.getByRole("dialog", { name: "Generation 1 complete" }),
   ).toBeVisible();
+  expect(screen.getByText("First Light (1882–1901)")).toBeVisible();
+  expect(screen.getByRole("img", { name: "Met" })).toBeVisible();
+  expect(screen.getByText("Retain 90% of customers")).toBeVisible();
+  expect(screen.queryByText("Objectives")).not.toBeInTheDocument();
+  expect(screen.queryByText("Your successor inherits")).not.toBeInTheDocument();
+  expect(screen.queryByText("Demand served")).not.toBeInTheDocument();
+  expect(screen.queryByText("Demand not met")).not.toBeInTheDocument();
   expect(
-    screen.getByRole("region", { name: "Your successor inherits" }),
-  ).toHaveTextContent("3 facilities");
-  expect(
-    screen.getByRole("region", { name: "Your successor inherits" }),
-  ).toHaveTextContent("$8.1k");
-  expect(
-    screen.getByRole("region", { name: "Mission results" }),
-  ).toHaveTextContent("135");
-  expect(
-    screen.getByRole("heading", { name: "Next: Beyond the Dynamo" }),
+    screen.getByRole("heading", {
+      name: "Next: Beyond the Dynamo (1902–1921)",
+    }),
   ).toBeVisible();
   await userEvent.keyboard("{Escape}");
   expect(onContinue).not.toHaveBeenCalled();
@@ -93,6 +110,21 @@ it("reviews the real inherited company and requires an explicit handover", async
   expect(onContinue).toHaveBeenCalledTimes(1);
   await userEvent.click(screen.getByRole("button", { name: "Save and exit" }));
   expect(onExit).toHaveBeenCalledTimes(1);
+});
+
+it("does not mark an unmet goal as completed", () => {
+  render(
+    <CampaignHandover
+      term={{
+        ...term,
+        objectiveResults: [{ ...term.objectiveResults[0], status: "failed" }],
+      }}
+      onContinue={jest.fn()}
+      onExit={jest.fn()}
+    />,
+  );
+  expect(screen.getByRole("img", { name: "Failed" })).toBeVisible();
+  expect(screen.queryByRole("img", { name: "Met" })).not.toBeInTheDocument();
 });
 
 it("yields to the save recovery dialog and returns after recovery closes", () => {

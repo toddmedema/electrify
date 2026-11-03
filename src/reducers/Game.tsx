@@ -3,6 +3,7 @@ import {
   LEGACY_CAMPAIGN_ID,
   LEGACY_GENERATION_MONTHS,
   LEGACY_GENERATIONS,
+  legacyGenerationTitle,
   isLegacyCampaignScenario,
 } from "../data/LegacyCampaign";
 import {
@@ -2054,7 +2055,10 @@ export const gameSlice = createSlice({
         state,
         "WORLD_EVENT",
         `A new CEO takes over for ${LEGACY_GENERATIONS[nextIndex].startYear}–${LEGACY_GENERATIONS[nextIndex].startYear + 19}. Your company and its commitments continue.`,
-        { title: LEGACY_GENERATIONS[nextIndex].name, importance: "NOTABLE" },
+        {
+          title: legacyGenerationTitle(LEGACY_GENERATIONS[nextIndex]),
+          importance: "NOTABLE",
+        },
       );
     },
     buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {

@@ -55,6 +55,12 @@ for (const theme of ["light", "dark"] as const) {
     expect(headings.indexOf("Campaign")).toBeLessThan(
       headings.indexOf("Challenges"),
     );
+    await expect(page.locator('[class*="-exit-active"]')).toHaveCount(0);
+    const catalogColumn = await page
+      .locator(".missionList .groupedList")
+      .first()
+      .boundingBox();
+    expect(catalogColumn).not.toBeNull();
     if (
       process.env.REVIEW_SCREENSHOT_DIR &&
       theme === "light" &&
@@ -62,6 +68,7 @@ for (const theme of ["light", "dark"] as const) {
     ) {
       await expect(page.locator('[class*="-exit-active"]')).toHaveCount(0);
       await page.screenshot({
+        animations: "disabled",
         path: path.join(
           process.env.REVIEW_SCREENSHOT_DIR,
           "legacy-campaign-entry-desktop.png",
@@ -78,14 +85,41 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("list", { name: "Campaign generations" })
         .getByRole("listitem"),
     ).toHaveCount(9);
-    await expect(page.getByText("2042–2061", { exact: true })).toBeVisible();
-    await page
-      .getByRole("combobox", { name: "Difficulty", exact: true })
+    await expect(
+      page.getByText("First Light (1882–1901)", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("A Different Kind of Growth (2042–2061)", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText(/Your first grid:/)).toHaveCount(0);
+    const difficulty = page.getByRole("group", {
+      name: "Difficulty",
+      exact: true,
+    });
+    await difficulty
+      .getByRole("button", { name: DIFFICULTY_LABELS.Manager, exact: true })
       .click();
-    await page
-      .getByRole("option", { name: DIFFICULTY_LABELS.Manager, exact: true })
-      .click();
-    await expect(page.locator('[role="listbox"]')).toHaveCount(0);
+    await expect(
+      difficulty.getByRole("button", {
+        name: DIFFICULTY_LABELS.Manager,
+        exact: true,
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('[class*="-exit-active"]')).toHaveCount(0);
+    const content = await page.locator(".campaignSetupContent").boundingBox();
+    const header = await page
+      .locator(".campaignSetup .screenHeaderBar")
+      .boundingBox();
+    expect(content).not.toBeNull();
+    expect(header).not.toBeNull();
+    expect(Math.abs(content!.x - catalogColumn!.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(content!.width - catalogColumn!.width)).toBeLessThanOrEqual(
+      1,
+    );
+    expect(content!.x).toBeGreaterThanOrEqual(header!.x);
+    expect(content!.x + content!.width).toBeLessThanOrEqual(
+      header!.x + header!.width,
+    );
     expect(
       await page
         .locator(".screenPage:visible")
@@ -94,6 +128,7 @@ for (const theme of ["light", "dark"] as const) {
     if (process.env.REVIEW_SCREENSHOT_DIR) {
       await expect(page.locator('[class*="-exit-active"]')).toHaveCount(0);
       await page.screenshot({
+        animations: "disabled",
         path: path.join(
           process.env.REVIEW_SCREENSHOT_DIR,
           `legacy-campaign-${theme}-${info.project.name}.png`,
@@ -196,17 +231,33 @@ for (const theme of ["light", "dark"] as const) {
     await expect(handover.locator("..")).toHaveCSS("opacity", "1");
     await expectDialogToFit(handover);
     await expect(
-      handover.getByRole("heading", { name: "Next: Beyond the Dynamo" }),
+      handover.getByRole("heading", {
+        name: "Next: Beyond the Dynamo (1902–1921)",
+      }),
     ).toBeVisible();
+    await expect(handover.getByRole("img", { name: "Met" })).toHaveCount(1);
+    await expect(
+      handover.getByText("Retain 90% of customers", { exact: true }),
+    ).toBeVisible();
+    await expect(handover.getByText("Objectives", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(
+      handover.getByText("Your successor inherits", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      handover.getByText("Demand served", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      handover.getByText("Demand not met", { exact: true }),
+    ).toHaveCount(0);
     if (
       process.env.REVIEW_SCREENSHOT_DIR &&
       theme === "dark" &&
       info.project.name === "mobile-360px"
     ) {
-      await handover
-        .getByRole("heading", { name: "Next: Beyond the Dynamo" })
-        .scrollIntoViewIfNeeded();
       await page.screenshot({
+        animations: "disabled",
         path: path.join(
           process.env.REVIEW_SCREENSHOT_DIR,
           "legacy-campaign-handover-mobile-dark.png",

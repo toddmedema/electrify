@@ -1,3 +1,6 @@
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import {
   Box,
   Button,
@@ -7,15 +10,16 @@ import {
   DialogTitle,
   Typography,
 } from "@mui/material";
-import { LEGACY_GENERATIONS } from "../../data/LegacyCampaign";
-import { formatMoneyConcise } from "../../helpers/Format";
+import {
+  LEGACY_GENERATIONS,
+  legacyGenerationTitle,
+} from "../../data/LegacyCampaign";
+import { formatNumber } from "../../helpers/Format";
+import { finishedObjectiveStatusText } from "../../helpers/ObjectivePresentation";
 import { LegacyCampaignTermType } from "../../Types";
-import { RunDebrief } from "./RunResult";
-import CampaignGoalBasis from "./CampaignGoalBasis";
 
 export interface CampaignHandoverProps {
   term: LegacyCampaignTermType;
-  facilityCount: number;
   busy?: boolean;
   onContinue: () => void;
   onExit: () => void;
@@ -23,7 +27,6 @@ export interface CampaignHandoverProps {
 
 export default function CampaignHandover({
   term,
-  facilityCount,
   busy,
   onContinue,
   onExit,
@@ -40,54 +43,67 @@ export default function CampaignHandover({
         paper: {
           sx: {
             m: 1.5,
-            maxWidth: "calc(100% - 24px)",
+            width: "calc(100% - 24px)",
             maxHeight: "calc(100% - 24px)",
           },
         },
       }}
     >
-      <DialogTitle id="campaign-handover-title">
+      <DialogTitle id="campaign-handover-title" sx={{ p: 2, pb: 1 }}>
         Generation {term.generationIndex + 1} complete
       </DialogTitle>
-      <DialogContent>
-        <Typography component="h2" variant="h6">
-          {generation.name}
+      <DialogContent sx={{ px: 2, pb: 3 }}>
+        <Typography color="text.secondary">
+          {legacyGenerationTitle(generation)}
         </Typography>
-        <Typography color="text.secondary" sx={{ mb: 2 }}>
-          {generation.startYear}–{generation.startYear + 19}
-        </Typography>
-        <RunDebrief
-          debrief={{ ...term.debrief, objectiveResults: term.objectiveResults }}
-        />
-        <CampaignGoalBasis
-          scenarioId={term.scenarioId}
-          results={term.objectiveResults}
-        />
         <Box
-          component="section"
-          aria-label="Your successor inherits"
-          sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: "divider" }}
+          component="ul"
+          aria-label="Term results"
+          sx={{ listStyle: "none", p: 0, my: 3, display: "grid", gap: 1.5 }}
         >
-          <Typography component="h3" variant="subtitle1">
-            Your successor inherits
-          </Typography>
-          <Typography>
-            {facilityCount} {facilityCount === 1 ? "facility" : "facilities"}{" "}
-            and {formatMoneyConcise(term.closingDebt)} in outstanding loans,
-            along with your customers, cash, and commitments.
-          </Typography>
-          <Typography component="h3" variant="subtitle1" sx={{ mt: 2 }}>
-            Next: {next.name}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {next.startYear}–{next.startYear + 19} · {next.summary}
-          </Typography>
+          {term.objectiveResults.map((result) => {
+            const StatusIcon =
+              result.status === "completed"
+                ? CheckCircleIcon
+                : result.status === "failed"
+                  ? HighlightOffIcon
+                  : RadioButtonUncheckedIcon;
+            return (
+              <Box
+                component="li"
+                key={result.id}
+                sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}
+              >
+                <StatusIcon
+                  titleAccess={finishedObjectiveStatusText[result.status]}
+                  color={
+                    result.status === "completed"
+                      ? "success"
+                      : result.status === "failed"
+                        ? "error"
+                        : "disabled"
+                  }
+                  sx={{ fontSize: 20, mt: 0.25, flexShrink: 0 }}
+                />
+                <Typography>
+                  {result.metric === "customerRetention"
+                    ? `Retain ${formatNumber(result.target, { style: "percent" })} of customers`
+                    : result.label}
+                </Typography>
+              </Box>
+            );
+          })}
         </Box>
+        <Typography component="h3" variant="subtitle1">
+          Next: {legacyGenerationTitle(next)}
+        </Typography>
       </DialogContent>
       <DialogActions
         sx={{
           p: 2,
           gap: 1,
+          borderTop: 1,
+          borderColor: "divider",
           flexDirection: { xs: "column-reverse", sm: "row" },
           "& button": {
             m: "0 !important",

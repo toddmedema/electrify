@@ -1,10 +1,9 @@
-import { Box, Button, Divider, Stack, Typography } from "@mui/material";
+import { Box, Button, Stack, Typography } from "@mui/material";
 import {
   LEGACY_GENERATIONS,
-  LEGACY_SCENARIOS,
+  legacyGenerationTitle,
 } from "../../data/LegacyCampaign";
 import { DifficultyType } from "../../Types";
-import { formatCustomerCount, formatWatts } from "../../helpers/Format";
 import DifficultyPicker from "../base/DifficultyPicker";
 import ScreenPage from "../base/ScreenPage";
 
@@ -27,75 +26,72 @@ export default function CampaignSetup({
   onBack,
   onResume,
 }: CampaignSetupProps): React.JSX.Element {
-  const opening = LEGACY_SCENARIOS[0];
   return (
-    <ScreenPage title="Legacy campaign" onBack={onBack}>
+    <ScreenPage
+      title="Legacy campaign"
+      onBack={onBack}
+      className="campaignSetup"
+    >
       <Box className="scrollable" sx={{ flex: 1, minHeight: 0 }}>
-        <Box sx={{ maxWidth: 720, mx: "auto", p: { xs: 2, sm: 3 } }}>
-          <Typography variant="overline" color="text.secondary">
-            Northern California · 1882–2061
-          </Typography>
-          <Typography component="h2" variant="h5" sx={{ mt: 0.5, mb: 1 }}>
-            One utility. Nine generations.
-          </Typography>
-          <Typography sx={{ mb: 2 }}>
-            Begin with a small steam generator and lead nine 20-year CEO terms.
-            Each successor inherits your plants, customers, cash, and debt.
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Your first grid:{" "}
-            {formatCustomerCount(opening.startingCustomers ?? 100)} customers, a{" "}
-            {formatWatts(opening.facilities[0].peakW ?? 0)} steam generator, and
-            an opening price of ${opening.dollarsPerkWh.toFixed(2)}/kWh.
-          </Typography>
+        <Stack className="campaignSetupContent" spacing={3} sx={{ py: 2 }}>
+          <Box>
+            <Typography variant="overline" color="text.secondary">
+              Northern California · 1882–2061
+            </Typography>
+            <Typography component="h2" variant="h5" sx={{ mt: 0.5, mb: 1 }}>
+              One utility. Nine generations.
+            </Typography>
+            <Typography>
+              Lead one utility through nine 20-year CEO terms.
+            </Typography>
+          </Box>
           <Box
             component="section"
             aria-label="Campaign difficulty"
-            sx={{ mb: 3 }}
+            className="difficultyPicker"
           >
-            <Typography component="h3" variant="subtitle1" sx={{ mb: 1 }}>
+            <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>
               Difficulty
             </Typography>
             <DifficultyPicker
               value={difficulty}
               onChange={onDifficulty}
-              variant="select"
+              variant="toggle"
               showDescription
               readOnly={busy}
             />
           </Box>
-          <Divider />
-          <Typography component="h3" variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
-            Your CEO terms
-          </Typography>
-          <Box
-            component="ol"
-            aria-label="Campaign generations"
-            sx={{ m: 0, pl: 3 }}
-          >
-            {LEGACY_GENERATIONS.map((generation) => (
-              <Box
-                component="li"
-                key={generation.scenarioId}
-                sx={{ pl: 0.5, py: 1.5 }}
-              >
-                <Typography component="h4" variant="subtitle2">
-                  {generation.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {generation.startYear}–{generation.startYear + 19}
-                </Typography>
-                <Typography variant="body2">{generation.summary}</Typography>
-              </Box>
-            ))}
+          <Box component="section" aria-labelledby="campaign-terms-title">
+            <Typography
+              id="campaign-terms-title"
+              component="h2"
+              variant="subtitle1"
+              sx={{ mb: 1 }}
+            >
+              Your CEO terms
+            </Typography>
+            <Box
+              component="ol"
+              aria-label="Campaign generations"
+              sx={{ m: 0, pl: 3 }}
+            >
+              {LEGACY_GENERATIONS.map((generation) => (
+                <Box
+                  component="li"
+                  key={generation.scenarioId}
+                  sx={{ pl: 0.5, py: 0.5 }}
+                >
+                  <Typography>{legacyGenerationTitle(generation)}</Typography>
+                </Box>
+              ))}
+            </Box>
           </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            Use the normal speed controls between turning points. The game
-            pauses at each CEO handover. This fictional utility is inspired by
-            Northern California history. Early weather and prices are modeled;
-            future decades use scenario assumptions.
+          <Typography variant="body2" color="text.secondary">
+            The game pauses at each CEO handover. This fictional utility is
+            inspired by Northern California history; early weather and prices
+            are modeled, and future decades use scenario assumptions.
           </Typography>
-        </Box>
+        </Stack>
       </Box>
       <Stack
         component="footer"
@@ -110,6 +106,7 @@ export default function CampaignSetup({
       >
         {onResume && activeGeneration !== undefined && (
           <Button
+            className="scenarioStartButton"
             variant="contained"
             disabled={busy}
             onClick={onResume}
@@ -119,6 +116,7 @@ export default function CampaignSetup({
           </Button>
         )}
         <Button
+          className="scenarioStartButton"
           variant={onResume ? "outlined" : "contained"}
           disabled={busy}
           onClick={onStart}
