@@ -24,11 +24,22 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("heading", { name: "Across the Valley", exact: true }),
     ).toBeVisible();
+    // The dossier carries one description; the dated acquisition goal lives behind the labelled
+    // goals button rather than in a second paragraph of near-identical copy.
+    await expect(page.locator(".scenarioDossier")).toContainText(
+      "acquire a utility",
+    );
+    await page
+      .getByRole("button", { name: "Goals and scoring", exact: true })
+      .click();
+    const goalsDialog = page.getByRole("dialog");
     await expect(
-      page.getByText(
-        /Acquire Valley Electric or Ridge Electric by the end of 2014/,
-      ),
-    ).toBeVisible();
+      goalsDialog.getByRole("region", { name: "Requirements" }),
+    ).toContainText("Acquire Valley Electric or Ridge Electric · Dec 2014");
+    await goalsDialog
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
+    await expect(goalsDialog).toHaveCount(0);
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const facilities = page.locator(".facilities:visible");
     await expect(
