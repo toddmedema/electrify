@@ -10,7 +10,6 @@ import {
 } from "firebase/firestore";
 import {
   Button,
-  IconButton,
   Table,
   TableBody,
   TableCell,
@@ -21,11 +20,15 @@ import {
   ToggleButtonGroup,
 } from "@mui/material";
 import ScreenPage from "../base/ScreenPage";
-import InfoIcon from "@mui/icons-material/Info";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
-import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
-import { DIFFICULTY_LABELS, difficultyLabel } from "../../Constants";
+import ConceptIcon from "../base/ConceptIcon";
+import {
+  DIFFICULTY_IDS,
+  DIFFICULTY_LABELS,
+  difficultyLabel,
+} from "../../Constants";
 import DifficultyPicker from "../base/DifficultyPicker";
 import { getDb, login } from "../../Globals";
 import GoogleSignIn from "../base/GoogleSignIn";
@@ -36,6 +39,7 @@ import CoopBrowseBar, { CoopStartButton } from "../base/CoopBrowseBar";
 import {
   ChallengeInvitation,
   CoopSelectionType,
+  DifficultyType,
   GameType,
   LocationType,
   ScenarioType,
@@ -62,46 +66,106 @@ export interface DispatchProps {
   onStart: (scenarioId: number) => void;
 }
 
-interface State {
-  scores?: ScoreType[];
-  allScores?: ScoreType[];
-  myTopScore?: ScoreType;
+/** One difficulty's board. */
+interface BoardType {
+  scores: ScoreType[];
   // Tells "nobody has played this yet" apart from "the board couldn't be read"
-  boardFailed?: boolean;
+  failed?: boolean;
+}
+
+/**
+ * How many rows each difficulty's board reads and shows (the all-levels view has its own query).
+ * Every difficulty is read up front so that switching is instant, so on opening this is the most
+ * that is read per difficulty, alongside the player's own best.
+ */
+const BOARD_ROWS = 10;
+
+type SteamScope = "global" | "friends";
+
+type PerDifficulty<T> = Partial<Record<DifficultyType, T>>;
+
+/** Count a new request for this difficulty, which makes any earlier one stale. */
+function nextRequest(
+  ids: PerDifficulty<number>,
+  difficulty: DifficultyType,
+): number {
+  return (ids[difficulty] = (ids[difficulty] || 0) + 1);
+}
+
+function cancelRequests(ids: PerDifficulty<number>) {
+  for (const difficulty of DIFFICULTY_IDS) nextRequest(ids, difficulty);
+}
+
+/** The top of one difficulty's board. Throws if it can't be read. */
+async function fetchBoard(
+  scenarioId: number,
+  difficulty: DifficultyType,
+  scope: SteamScope,
+): Promise<ScoreType[]> {
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+    const { desktopScores } = await import("../../DesktopScores");
+    return desktopScores(scenarioId, difficulty, scope, BOARD_ROWS);
+  }
+  const querySnapshot = await getDocs(
+    query(
+      collection(getDb(), "scores"),
+      where("scoreVersion", "==", SCORE_VERSION),
+      where("outcome", "==", "completed"),
+      where("scenarioId", "==", scenarioId),
+      where("difficulty", "==", difficulty),
+      orderBy("score", "desc"),
+      limit(BOARD_ROWS),
+    ),
+  );
+  return querySnapshot.docs.map((doc) => doc.data() as ScoreType);
+}
+
+/** The player's own best at one difficulty, if they have completed it. */
+async function fetchMyBest(
+  scenarioId: number,
+  difficulty: DifficultyType,
+  uid: string,
+): Promise<ScoreType | undefined> {
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+    const { desktopScores } = await import("../../DesktopScores");
+    return (await desktopScores(scenarioId, difficulty, "player"))[0];
+  }
+  const querySnapshot = await getDocs(
+    query(
+      collection(getDb(), "scores"),
+      where("scoreVersion", "==", SCORE_VERSION),
+      where("outcome", "==", "completed"),
+      where("scenarioId", "==", scenarioId),
+      where("difficulty", "==", difficulty),
+      where("uid", "==", uid),
+      orderBy("score", "desc"),
+      limit(1),
+    ),
+  );
+  return querySnapshot.docs[0]?.data() as ScoreType | undefined;
+}
+
+interface State {
+  // Every difficulty's board and the player's best at it, read up front and keyed by difficulty
+  // so that switching difficulty is a lookup rather than a wait. A missing board is still loading.
+  boards: PerDifficulty<BoardType>;
+  myBests: PerDifficulty<ScoreType>;
+  allScores?: ScoreType[];
   allScoresFailed?: boolean;
   scenario: ScenarioType | null;
   location: LocationType | null;
   victoryDialogOpen?: boolean;
   leaderboardExpanded?: boolean;
   leaderboardMinHeight?: number;
-  steamScope?: "global" | "friends";
+  steamScope?: SteamScope;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
-function BriefingFact(props: {
-  concept: ConceptNameType;
-  label: string;
-  children: React.ReactNode;
-  action?: React.ReactNode;
-}): React.JSX.Element {
-  return (
-    <div className="scenarioBriefingFact">
-      <ConceptIcon concept={props.concept} fontSize="small" />
-      <div>
-        <Typography variant="overline" component="div">
-          {props.label}
-        </Typography>
-        <Typography variant="body2">{props.children}</Typography>
-      </div>
-      {props.action}
-    </div>
-  );
-}
-
 export default class NewGameDetails extends React.Component<Props, State> {
-  private boardRequestId = 0;
-  private myBestRequestId = 0;
+  // Per difficulty, so that retrying one board can't strand the others
+  private boardRequestIds: PerDifficulty<number> = {};
+  private myBestRequestIds: PerDifficulty<number> = {};
   private allScoresRequestId = 0;
   private leaderboardRef = React.createRef<HTMLDivElement>();
 
@@ -109,25 +173,36 @@ export default class NewGameDetails extends React.Component<Props, State> {
     super(props);
     const scenario = activeScenario(props.game) || null;
     this.state = {
+      boards: {},
+      myBests: {},
       scenario,
       location: getScenarioLocation(scenario) || null,
     };
   }
 
+  /** Friend challenges and co-op lobbies don't show the board, so they don't read it either. */
+  private showsBoard(props: Props = this.props) {
+    return !props.challenge && !props.coop;
+  }
+
+  /** The selected difficulty first, so it is the first query out and the first answered. */
+  private difficultiesSelectedFirst(): DifficultyType[] {
+    const selected = this.props.game.difficulty;
+    return [selected, ...DIFFICULTY_IDS.filter((id) => id !== selected)];
+  }
+
   /**
-   * The board itself, which is public -- anyone can read it, logged in or not. Seeing named
-   * strangers above you is the reason to sign up, so hiding it behind a login inverted the very
-   * incentive it exists to create.
+   * The boards themselves, which are public -- anyone can read them, logged in or not. Seeing
+   * named strangers above you is the reason to sign up, so hiding them behind a login inverted the
+   * very incentive they exist to create.
+   *
+   * Every difficulty is read at once, so that choosing another one shows its board straight away
+   * instead of pausing on "Loading...". Each answer lands on its own: one that fails or is slow
+   * affects only its difficulty.
    */
-  private async loadBoard() {
-    if (this.props.challenge) return;
-    const scenario = this.state.scenario;
-    if (!scenario) {
-      return;
-    }
-    const requestId = ++this.boardRequestId;
-    const difficulty = this.props.game.difficulty;
-    // Keep the compact board's space while another difficulty loads or has fewer scores.
+  private loadBoards() {
+    if (!this.showsBoard() || !this.state.scenario) return;
+    // Keep the board's space while the boards reload or have fewer scores.
     // Collapsing it briefly clamps the scroller and moves the difficulty buttons above it.
     const leaderboardMinHeight = this.state.leaderboardExpanded
       ? this.state.leaderboardMinHeight
@@ -135,47 +210,46 @@ export default class NewGameDetails extends React.Component<Props, State> {
           this.state.leaderboardMinHeight || 0,
           this.leaderboardRef.current?.getBoundingClientRect().height || 0,
         );
-    this.setState({
-      scores: undefined,
-      boardFailed: false,
-      leaderboardMinHeight,
-    });
+    this.setState({ boards: {}, leaderboardMinHeight });
+    for (const difficulty of this.difficultiesSelectedFirst()) {
+      void this.loadBoard(difficulty);
+    }
+  }
+
+  private async loadBoard(difficulty: DifficultyType) {
+    const scenario = this.state.scenario;
+    if (!scenario) {
+      return;
+    }
+    const requestId = nextRequest(this.boardRequestIds, difficulty);
+    let board: BoardType;
     try {
-      if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
-        const { desktopScores } = await import("../../DesktopScores");
-        const scores = await desktopScores(
+      board = {
+        scores: await fetchBoard(
           scenario.id,
           difficulty,
           this.state.steamScope || "global",
-        );
-        if (requestId === this.boardRequestId) this.setState({ scores });
-        return;
-      }
-      const querySnapshot = await getDocs(
-        query(
-          collection(getDb(), "scores"),
-          where("scoreVersion", "==", SCORE_VERSION),
-          where("outcome", "==", "completed"),
-          where("scenarioId", "==", scenario.id),
-          where("difficulty", "==", difficulty),
-          orderBy("score", "desc"),
-          limit(50),
         ),
-      );
-      if (requestId !== this.boardRequestId) {
-        return;
-      }
-      // Set in one go rather than once per document: fifty setStates to draw one table meant
-      // laying out a table that grew by a row each time
-      this.setState({
-        scores: querySnapshot.docs.map((doc) => doc.data() as ScoreType),
-      });
+      };
     } catch (err) {
       console.warn("Couldn't load the high scores: ", err);
-      if (requestId === this.boardRequestId) {
-        this.setState({ scores: [], boardFailed: true });
-      }
+      board = { scores: [], failed: true };
     }
+    if (requestId === this.boardRequestIds[difficulty]) {
+      this.setState((state) => ({
+        boards: { ...state.boards, [difficulty]: board },
+      }));
+    }
+  }
+
+  /** Asks again for a board that couldn't be read, showing "Loading..." meanwhile. */
+  private retryBoard(difficulty: DifficultyType) {
+    this.setState((state) => {
+      const boards = { ...state.boards };
+      delete boards[difficulty];
+      return { boards };
+    });
+    void this.loadBoard(difficulty);
   }
 
   /** Loads the scenario-wide board only when the player asks to compare every difficulty. */
@@ -229,39 +303,31 @@ export default class NewGameDetails extends React.Component<Props, State> {
     }
   }
 
-  /** The player's own best, which is the one row worth showing above the rest. */
-  private async loadMyBest(uid: string) {
+  /**
+   * The player's own best at every difficulty, which is the one row worth showing above the rest.
+   * Read up front like the boards, so that "Your best" doesn't disappear when the difficulty
+   * changes.
+   */
+  private loadMyBests(uid: string) {
+    if (!this.showsBoard() || !this.state.scenario) return;
+    this.setState({ myBests: {} });
+    for (const difficulty of this.difficultiesSelectedFirst()) {
+      void this.loadMyBest(uid, difficulty);
+    }
+  }
+
+  private async loadMyBest(uid: string, difficulty: DifficultyType) {
     const scenario = this.state.scenario;
     if (!scenario) {
       return;
     }
-    const requestId = ++this.myBestRequestId;
-    const difficulty = this.props.game.difficulty;
-    this.setState({ myTopScore: undefined });
+    const requestId = nextRequest(this.myBestRequestIds, difficulty);
     try {
-      if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
-        const { desktopScores } = await import("../../DesktopScores");
-        const scores = await desktopScores(scenario.id, difficulty, "player");
-        if (requestId === this.myBestRequestId)
-          this.setState({ myTopScore: scores[0] });
-        return;
-      }
-      const querySnapshot = await getDocs(
-        query(
-          collection(getDb(), "scores"),
-          where("scoreVersion", "==", SCORE_VERSION),
-          where("outcome", "==", "completed"),
-          where("scenarioId", "==", scenario.id),
-          where("difficulty", "==", difficulty),
-          where("uid", "==", uid),
-          orderBy("score", "desc"),
-          limit(1),
-        ),
-      );
-      if (requestId === this.myBestRequestId) {
-        this.setState({
-          myTopScore: querySnapshot.docs[0]?.data() as ScoreType | undefined,
-        });
+      const best = await fetchMyBest(scenario.id, difficulty, uid);
+      if (best && requestId === this.myBestRequestIds[difficulty]) {
+        this.setState((state) => ({
+          myBests: { ...state.myBests, [difficulty]: best },
+        }));
       }
     } catch (err) {
       console.warn("Couldn't load your best score: ", err);
@@ -275,19 +341,36 @@ export default class NewGameDetails extends React.Component<Props, State> {
     // Unconditional: the board is public, so it no longer waits on a login that may never come.
     // It used to be kicked off from shouldComponentUpdate, which is a purity hook and not a place
     // to start network requests from
-    this.loadBoard();
+    this.loadBoards();
     if (this.props.uid) {
-      this.loadMyBest(this.props.uid);
+      this.loadMyBests(this.props.uid);
     }
   }
 
   public componentWillUnmount() {
-    ++this.boardRequestId;
-    ++this.myBestRequestId;
+    cancelRequests(this.boardRequestIds);
+    cancelRequests(this.myBestRequestIds);
     ++this.allScoresRequestId;
   }
 
-  public componentDidUpdate(prevProps: Props) {
+  /**
+   * The board's height just before a difficulty switch swaps its rows: afterwards the
+   * DOM already shows the new difficulty, which may have fewer scores.
+   */
+  public getSnapshotBeforeUpdate(prevProps: Props): number | null {
+    if (
+      this.props.game.difficulty === prevProps.game.difficulty ||
+      this.state.leaderboardExpanded
+    )
+      return null;
+    return this.leaderboardRef.current?.getBoundingClientRect().height || null;
+  }
+
+  public componentDidUpdate(
+    prevProps: Props,
+    _prevState: State,
+    boardHeight: number | null,
+  ) {
     if (this.props.game.scenarioId !== prevProps.game.scenarioId) {
       const scenario =
         getScenario(
@@ -300,23 +383,36 @@ export default class NewGameDetails extends React.Component<Props, State> {
           location: getScenarioLocation(scenario) || null,
           leaderboardMinHeight: undefined,
         },
-        () => this.loadBoard(),
+        () => {
+          this.loadBoards();
+          if (this.props.uid) this.loadMyBests(this.props.uid);
+        },
       );
       return;
     }
-    if (this.props.game.difficulty !== prevProps.game.difficulty) {
-      this.loadBoard();
-      if (this.props.uid) {
-        this.loadMyBest(this.props.uid);
-      }
+    if (this.showsBoard() && !this.showsBoard(prevProps)) {
+      // Whatever was read while a lobby or challenge hid the board may be for another scenario
+      this.loadBoards();
+      if (this.props.uid) this.loadMyBests(this.props.uid);
       return;
+    }
+    if (this.props.game.difficulty !== prevProps.game.difficulty) {
+      // Every board is already loaded or on its way, so this is a lookup. Only a board that
+      // couldn't be read is asked for again.
+      const { difficulty } = this.props.game;
+      if (this.showsBoard() && this.state.boards[difficulty]?.failed) {
+        this.retryBoard(difficulty);
+      }
+      if (boardHeight && boardHeight > (this.state.leaderboardMinHeight || 0)) {
+        this.setState({ leaderboardMinHeight: boardHeight });
+      }
     }
     // Logging in from the button below the board is what makes "your best" answerable
     if (this.props.uid && this.props.uid !== prevProps.uid) {
-      this.loadMyBest(this.props.uid);
+      this.loadMyBests(this.props.uid);
     } else if (!this.props.uid && prevProps.uid) {
-      ++this.myBestRequestId;
-      this.setState({ myTopScore: undefined });
+      cancelRequests(this.myBestRequestIds);
+      this.setState({ myBests: {} });
     }
   }
 
@@ -325,11 +421,10 @@ export default class NewGameDetails extends React.Component<Props, State> {
       this.props;
     const {
       scenario,
-      scores,
-      myTopScore,
+      boards,
+      myBests,
       location,
       victoryDialogOpen,
-      boardFailed,
       allScores,
       allScoresFailed,
       leaderboardExpanded,
@@ -347,14 +442,15 @@ export default class NewGameDetails extends React.Component<Props, State> {
       );
     }
 
-    const briefing = scenario.briefing || {
-      fantasy: scenario.summary || scenario.name,
-      objective: "Keep the lights on and finish the term.",
-      threat: "Blackouts and insolvency can end the run early.",
-    };
     const endYear =
       scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
-    const visibleScores = leaderboardExpanded ? allScores : scores?.slice(0, 3);
+    // The selected difficulty's board and best come straight from what was read up front
+    const scores = boards[game.difficulty]?.scores;
+    const boardFailed = boards[game.difficulty]?.failed;
+    const myTopScore = myBests[game.difficulty];
+    const visibleScores = leaderboardExpanded
+      ? allScores
+      : scores?.slice(0, BOARD_ROWS);
     // Steam boards use the signed-in Steam account.
     const desktopApp =
       process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
@@ -390,29 +486,29 @@ export default class NewGameDetails extends React.Component<Props, State> {
               <Typography variant="overline" component="div">
                 {location.name} · {scenario.startingYear}–{endYear}
               </Typography>
-              <Typography variant="body1" color="textSecondary">
-                {briefing.fantasy}
-              </Typography>
-              <div className="scenarioBriefingFacts">
-                <BriefingFact
-                  concept="goal"
-                  label="Your goal"
-                  action={
-                    <IconButton
-                      onClick={toggleVictoryDialog}
-                      aria-label="Goals"
-                      color="primary"
-                      size="small"
-                    >
-                      <InfoIcon />
-                    </IconButton>
-                  }
+              {scenario.summary && (
+                <Typography variant="body1" color="textSecondary">
+                  {scenario.summary}
+                </Typography>
+              )}
+              <div className="scenarioBriefing">
+                <Button
+                  startIcon={<InfoOutlinedIcon />}
+                  onClick={toggleVictoryDialog}
                 >
-                  {briefing.objective}
-                </BriefingFact>
-                <BriefingFact concept="danger" label="Watch out">
-                  {briefing.threat}
-                </BriefingFact>
+                  Goals and scoring
+                </Button>
+                {scenario.threat && (
+                  <div className="scenarioWatchOut" role="note">
+                    <ConceptIcon concept="danger" fontSize="small" />
+                    <div>
+                      <Typography variant="overline" component="div">
+                        Watch out
+                      </Typography>
+                      <Typography variant="body2">{scenario.threat}</Typography>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="scenarioStartControls">
                 {challenge ? (
@@ -500,7 +596,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   ) => {
                     if (!steamScope) return;
                     this.setState({ steamScope, allScores: undefined }, () => {
-                      void this.loadBoard();
+                      this.loadBoards();
                       if (this.state.leaderboardExpanded)
                         void this.loadAllScores();
                     });
@@ -599,7 +695,9 @@ export default class NewGameDetails extends React.Component<Props, State> {
               {scores !== undefined && (
                 <div className="leaderboardToggle">
                   <Button size="small" onClick={() => this.toggleLeaderboard()}>
-                    {leaderboardExpanded ? "Show top 3" : "View all scores"}
+                    {leaderboardExpanded
+                      ? "Show this level"
+                      : "View all scores"}
                   </Button>
                 </div>
               )}

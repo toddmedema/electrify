@@ -821,22 +821,8 @@ export interface TutorialStepChangeType {
   currentCard: CardNameType;
 }
 
-export type ScenarioBriefingToneType =
-  "transition" | "boom" | "island" | "innovation" | "storm" | "legacy";
-
 export type ScenarioThemeType =
   "Extreme weather" | "Energy transition" | "Rapid growth";
-
-/**
- * The authored promise of a scenario, kept beside its simulation setup so the mission list and
- * briefing screen tell the same story. Each scenario's dedicated icon supplies the visual tone.
- */
-export interface ScenarioBriefingType {
-  tone: ScenarioBriefingToneType;
-  fantasy: string;
-  objective: string;
-  threat: string;
-}
 
 /** Facility catalog names a data-only scenario mod may adjust. */
 export type ModFacilityNameType =
@@ -927,8 +913,10 @@ export interface ScenarioType {
   // game, since the player may eventually pick a place no table knows about. When it's set it
   // wins over locationId; getScenarioLocation is the one place that resolves the two.
   location?: LocationType;
+  /** The one description of the scenario: the list card and the game details subtitle both show it. */
   summary?: string;
-  briefing?: ScenarioBriefingType;
+  /** The one risk worth flagging before play, shown as "Watch out" on the game details screen. */
+  threat?: string;
   // Player-facing browse categories. A challenge may appear in more than one theme.
   themes?: ScenarioThemeType[];
   // Lower numbers appear first in the compact recommendations; omitted challenges follow.

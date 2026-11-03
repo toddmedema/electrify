@@ -101,10 +101,19 @@ const pricingCapstoneSucceeded = (state: AppStateType) => {
   );
 };
 
+// Mission 6 pauses its coal plant, which stands beside a small solar plant that keeps the
+// supply forecast above zero. The lesson's steps follow the coal plant, not any paused facility.
+const coalPaused = (state: AppStateType) =>
+  state.game.facilities.some(
+    (facility) =>
+      "fuel" in facility && facility.fuel === "Coal" && !!facility.paused,
+  );
+
 const forecastingCapstoneSucceeded = (state: AppStateType) => {
+  // The starting coal and solar plants don't count: the player has to add a generator.
   const addedGenerator = state.game.facilities.some(
     (facility) =>
-      facility.id > 1 &&
+      facility.startingAssetId === undefined &&
       !("currentWh" in facility) &&
       facility.yearsToBuildLeft <= 0,
   );
@@ -705,11 +714,26 @@ export const SCENARIOS: ScenarioType[] = [
     endMessage:
       "You learned how to use forecasts to build capacity before a shortage.",
     facilities: [
+      // Trimmed from 450 MW, which fell about 8 MW short on August's heat-wave afternoon, the
+      // summer shortage the final challenge teaches. With the solar plant below that shortfall
+      // would vanish, so 410 MW keeps it: about 10 MW short in the early evening of that day,
+      // with every earlier month still covered.
       {
         assetId: "scenario-5-coal",
         fuel: "Coal",
-        peakW: 450000000,
+        peakW: 410000000,
         initialAgeYears: 20,
+      },
+      // Keeps the supply forecast above zero while the lesson pauses coal. At 100 MW the daytime
+      // curve peaks at 45-65 MW against 350-430 MW of demand: visible, yet far short, so the
+      // paused grid still shows a predicted blackout and blacks out at once. A 10 MW plant would
+      // keep August's shortfall but is about 1% of demand, too flat to read, and 25 MW already
+      // covers that shortfall, which is why the coal plant above is trimmed instead.
+      {
+        assetId: "scenario-5-sun",
+        fuel: "Sun",
+        peakW: 100000000,
+        initialAgeYears: 5,
       },
     ],
     tutorialSteps: [
@@ -728,8 +752,7 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "FACILITIES",
         target: '[aria-label="Pause Coal"]',
-        advanceOn: (s: AppStateType) =>
-          s.game.facilities.some((facility) => facility.paused),
+        advanceOn: coalPaused,
         action: "Tap Pause",
         content: (
           <TutorialPrompt text="Pausing a plant changes the supply forecast." />
@@ -795,8 +818,7 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "FACILITIES",
         target: '[aria-label="Resume Coal"]',
-        advanceOn: (s: AppStateType) =>
-          s.game.facilities.every((f) => !f.paused),
+        advanceOn: (s: AppStateType) => !coalPaused(s),
         action: "Tap Resume",
         content: <TutorialPrompt text="Bring your plant back online." />,
       },
@@ -1102,17 +1124,12 @@ export const SCENARIOS: ScenarioType[] = [
     name: "Carbon Fee",
     icon: "carbon fee",
     locationId: "SF",
-    summary: "Coal was cheap. Now there's a bill for the pollution.",
+    summary:
+      "Coal was cheap, but now pollution has a price. Decide what replaces your aging plants.",
+    threat:
+      "Coal's high emissions mean higher fees. You don't have much cash to replace it.",
     themes: ["Energy transition"],
     recommendationOrder: 3,
-    briefing: {
-      tone: "transition",
-      fantasy: "Replace aging plants while keeping the business running.",
-      objective:
-        "Stay solvent and keep the lights on for 12 years under a carbon fee. Retain at least 80% of your starting customers.",
-      threat:
-        "Coal's high emissions mean higher fees. You don't have much cash to replace it.",
-    },
     ownership: "Investor",
     minimumCustomerRetention: officialRetentionMetadata(100),
     startingYear: 2020,
@@ -1142,15 +1159,10 @@ export const SCENARIOS: ScenarioType[] = [
     name: "The Shale Boom",
     icon: "the shale boom",
     locationId: "PIT",
-    summary: "Fracking made gas cheap. How much are you willing to bet on it?",
+    summary:
+      "Fracking is making gas cheap. How much will you bet on it as your utility grows?",
+    threat: "Gas prices can rise long before a new plant pays for itself.",
     themes: ["Rapid growth"],
-    briefing: {
-      tone: "boom",
-      fantasy: "Grow your utility while local gas is cheap.",
-      objective:
-        "Stay solvent for 20 years through a gas boom and whatever follows. Retain at least 80% of your starting customers.",
-      threat: "Gas prices can rise long before a new plant pays for itself.",
-    },
     ownership: "Investor",
     minimumCustomerRetention: officialRetentionMetadata(103),
     startingYear: 2006,
@@ -1172,16 +1184,11 @@ export const SCENARIOS: ScenarioType[] = [
     name: "Paradise",
     icon: "paradise",
     locationId: "HNL",
-    summary: "Sun, wind and imported oil. Keep Hawaii powered on its own.",
+    summary:
+      "Hawaii runs on sun, wind and imported oil. Keep it powered as oil prices swing.",
+    threat:
+      "If your plants can't meet demand, there's no neighboring grid to help.",
     themes: ["Energy transition"],
-    briefing: {
-      tone: "island",
-      fantasy: "Power an island that can't import electricity.",
-      objective:
-        "Keep the island supplied and solvent as oil prices swing. Retain at least 80% of your starting customers.",
-      threat:
-        "If your plants can't meet demand, there's no neighboring grid to help.",
-    },
     ownership: "Investor",
     minimumCustomerRetention: officialRetentionMetadata(105),
     startingYear: 2003,
@@ -1215,16 +1222,11 @@ export const SCENARIOS: ScenarioType[] = [
     name: "Rise of Renewables",
     icon: "rise of renewables",
     locationId: "SF",
-    summary: "Clean power keeps getting cheaper. When do you make the switch?",
+    summary:
+      "Clean power keeps getting cheaper as demand grows. When will you make the switch?",
+    threat:
+      "Build now and you may overpay. Wait too long and you may not have enough power.",
     themes: ["Energy transition"],
-    briefing: {
-      tone: "innovation",
-      fantasy: "Build the next generation of clean power.",
-      objective:
-        "Stay solvent and keep up with demand as clean technology gets cheaper. Retain at least 80% of your starting customers.",
-      threat:
-        "Build now and you may overpay. Wait too long and you may not have enough power.",
-    },
     ownership: "Investor",
     minimumCustomerRetention: officialRetentionMetadata(101),
     startingYear: 2002,
@@ -1254,14 +1256,9 @@ export const SCENARIOS: ScenarioType[] = [
     locationId: "SJU",
     summary:
       "Hurricanes are coming to Puerto Rico. Build a grid that can take the hit.",
+    threat:
+      "Storms can damage several plants at once. A little spare capacity may not be enough.",
     themes: ["Extreme weather"],
-    briefing: {
-      tone: "storm",
-      fantasy: "Keep Puerto Rico powered through years of hurricanes.",
-      objective: "Keep customers supplied during severe storms.",
-      threat:
-        "Storms can damage several plants at once. A little spare capacity may not be enough.",
-    },
     ownership: "Public",
     startingYear: 2000,
     cash: 220000000,
@@ -1298,16 +1295,10 @@ export const SCENARIOS: ScenarioType[] = [
     name: "The End of an Era",
     icon: "the end of an era",
     locationId: "PIT",
-    summary: "Your company was built on coal. What comes next?",
+    summary:
+      "Your company was built on coal. Decide what replaces it as the plants age.",
+    threat: "Competitors are moving in, and replacements take years to build.",
     themes: ["Energy transition"],
-    briefing: {
-      tone: "legacy",
-      fantasy: "Decide what comes after a century of coal.",
-      objective:
-        "Stay solvent as your coal fleet ages. Retain at least 80% of your starting customers.",
-      threat:
-        "Your plants are aging and competitors are moving in. Replacements take years to build.",
-    },
     ownership: "Investor",
     minimumCustomerRetention: officialRetentionMetadata(102),
     startingYear: 1980,
@@ -1348,16 +1339,11 @@ export const SCENARIOS: ScenarioType[] = [
       timeZone: "America/New_York",
     },
     summary:
-      "Data centers want power. Residents want affordable bills. You have to deliver both.",
+      "Data centers will connect in 2026. Power them without raising residents' bills.",
+    threat:
+      "Data centers need power around the clock. New plants take years to build.",
     themes: ["Rapid growth"],
     recommendationOrder: 2,
-    briefing: {
-      tone: "boom",
-      fantasy: "Prepare a small city's grid for a surge in demand.",
-      objective: "Keep customers supplied as data centers connect in 2026.",
-      threat:
-        "Data centers need power around the clock. New plants take years to build.",
-    },
     ownership: "Public",
     startingYear: 2020,
     durationMonths: 16 * 12,
@@ -1418,16 +1404,11 @@ export const SCENARIOS: ScenarioType[] = [
       long: -97.7431,
       timeZone: "America/Chicago",
     },
-    summary: "Austin is about to freeze. The grid was built for heat.",
+    summary:
+      "Austin will freeze in February 2021. Strengthen a grid built for heat before it does.",
+    threat: "Heating demand surges as equipment freezes.",
     themes: ["Extreme weather"],
     recommendationOrder: 1,
-    briefing: {
-      tone: "storm",
-      fantasy: "Keep Austin powered through a brutal winter storm.",
-      objective:
-        "Strengthen the grid to supply customers through the February 2021 freeze.",
-      threat: "Heating demand surges as equipment freezes.",
-    },
     ownership: "Public",
     seed: 268107,
     startingYear: 2017,
@@ -1496,16 +1477,10 @@ export const SCENARIOS: ScenarioType[] = [
       resources: { hydro: true },
     },
     summary:
-      "Spain needs more power to keep cool, just as drought leaves less water to generate it.",
+      "Spain faces hot, dry summers. Keep power flowing as cooling demand rises.",
+    threat:
+      "Drought leaves less water for hydro. Hot river water also limits reactor cooling, cutting nuclear output.",
     themes: ["Extreme weather"],
-    briefing: {
-      tone: "storm",
-      fantasy: "Keep Spain powered through a hot, dry summer.",
-      objective:
-        "Keep power flowing as cooling demand rises and water supplies shrink.",
-      threat:
-        "Drought leaves less water for hydro. Hot river water also limits reactor cooling, cutting nuclear output.",
-    },
     ownership: "Public",
     startingYear: 2023,
     durationMonths: 48,
@@ -1580,15 +1555,9 @@ export const SCENARIOS: ScenarioType[] = [
       resources: { hydro: false },
     },
     summary:
-      "Your biggest reactor shuts down without warning. Have backup ready.",
+      "Your biggest reactor will shut down without warning. Have backup ready.",
+    threat: "The reactor stays offline for the rest of the mission.",
     themes: ["Energy transition"],
-    briefing: {
-      tone: "legacy",
-      fantasy: "Keep the lights on when your largest generator shuts down.",
-      objective: "Keep customers supplied after your main reactor shuts down.",
-      threat:
-        "The shutdown date is hidden. The reactor stays offline for the rest of the mission.",
-    },
     ownership: "Public",
     startingYear: 2023,
     durationMonths: 60,
@@ -1641,16 +1610,9 @@ export const SCENARIOS: ScenarioType[] = [
     icon: "wildfire emergency",
     locationId: "LA",
     summary:
-      "Your main import route will lose 90% of its capacity. Build a backup plan before wildfire season.",
+      "Wildfire will cut your power imports in early 2025. Build a backup plan before then.",
+    threat: "Your existing northern intertie will lose 90% of its capacity.",
     themes: ["Extreme weather"],
-    briefing: {
-      tone: "storm",
-      fantasy:
-        "Keep Los Angeles supplied when wildfire cuts your northern intertie.",
-      objective:
-        "Replace lost imports during the January and February 2025 intertie outage.",
-      threat: "Your existing northern intertie will lose 90% of its capacity.",
-    },
     ownership: "Public",
     startingYear: 2022,
     durationMonths: 60,
@@ -1709,17 +1671,11 @@ export const SCENARIOS: ScenarioType[] = [
       // The Highveld is 1,750m of inland plateau: no usable river for hydro, no volcanic heat.
       resources: { hydro: false, geothermal: false },
     },
-    summary: "An aging coal fleet is breaking down faster than you can fix it.",
+    summary:
+      "South Africa's aging coal fleet is breaking down faster than you can fix it.",
+    threat:
+      "More plants fail each year. Diesel generators can cover the gap, but the fuel bill adds up fast.",
     themes: ["Energy transition"],
-    briefing: {
-      tone: "legacy",
-      fantasy:
-        "Run South Africa's coal-heavy grid as its oldest stations start failing.",
-      objective:
-        "Keep customers supplied through five years of coal plant breakdowns.",
-      threat:
-        "More coal plants break down each year. Diesel generators can cover the gap, but the fuel bill adds up fast.",
-    },
     ownership: "Public",
     startingYear: 2016,
     durationMonths: 84,
@@ -1799,17 +1755,10 @@ export const SCENARIOS: ScenarioType[] = [
       resources: { hydro: true, geothermal: false },
     },
     summary:
-      "Nearly all your power comes from one river. The rains have failed.",
+      "Nearly all of Zambia's power comes from one river. An El Niño drought will drain it.",
+    threat:
+      "Inflow falls each year, and your small diesel plant can't replace the dam's output.",
     themes: ["Extreme weather"],
-    briefing: {
-      tone: "storm",
-      fantasy:
-        "Run a nearly all-hydro grid as an El Niño drought drains the reservoir.",
-      objective:
-        "Serve Zambia's customers through two years of falling water inflow to Kariba.",
-      threat:
-        "Less water reaches the reservoir each year. Your small diesel plant can't replace the dam's output.",
-    },
     ownership: "Public",
     startingYear: 2012,
     durationMonths: 72,
@@ -1895,16 +1844,10 @@ export const SCENARIOS: ScenarioType[] = [
       resources: { hydro: false, geothermal: false },
     },
     summary:
-      "Each summer needs more power than the last. Then comes the record heat of 2024.",
+      "Each Delhi summer will need more power than the last, ending in the record heat of 2024.",
+    threat:
+      "Air-conditioning demand rises while heat cuts power plant output. The monsoon arrives late, delaying relief.",
     themes: ["Extreme weather", "Rapid growth"],
-    briefing: {
-      tone: "storm",
-      fantasy: "Keep Delhi supplied as each summer's demand exceeds the last.",
-      objective:
-        "Meet four rising summer peaks, ending with the record heat of May and June 2024.",
-      threat:
-        "Air-conditioning demand rises while heat cuts power plant output. The monsoon arrives late, delaying relief.",
-    },
     ownership: "Public",
     startingYear: 2018,
     durationMonths: 84,
@@ -1967,15 +1910,9 @@ export const SCENARIOS: ScenarioType[] = [
     location: UTILITY_AREAS.champlain.location,
     summary:
       "Connect to your neighbors, acquire a utility, and keep your larger company supplied.",
+    threat:
+      "Network upkeep rises in 2015 and 2020, and power purchase limits shrink from 2017. Compare company terms before connecting.",
     themes: ["Rapid growth"],
-    briefing: {
-      tone: "boom",
-      fantasy: "Build Champlain Electric into a larger Vermont utility.",
-      objective:
-        "Acquire Valley Electric or Ridge Electric by the end of 2014. Retire original Oil A by the end of 2020 and acquired original oil plants by the end of 2023. Retain 90% of your expanded customer base at the end of 2024.",
-      threat:
-        "Compare company terms before connecting. This fictional network-renewal plan raises opening upkeep to 1.5× in 2015 and 2× in 2020, before inflation and customer growth. Valley's nuclear purchase halves in 2017; Champlain's ends in 2020, when Québec and Ridge purchase limits also halve. Plan supply and working capital.",
-    },
     ownership: "Investor",
     startingYear: 2005,
     durationMonths: 240,

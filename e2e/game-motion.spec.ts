@@ -158,6 +158,27 @@ test("exchange direction stays readable on narrow screens and with reduced motio
   expect(
     await exchange.evaluate((el) => el.scrollWidth - el.clientWidth),
   ).toBeLessThanOrEqual(1);
+  // The reading is one part of the layer: imports are also plotted over time, and expand like
+  // any other chart
+  const track = insights.locator('[data-layer="powerExchange"]');
+  await expect(
+    track.locator("#chartForecastPowerExchange .uplot"),
+  ).toBeVisible();
+  await track
+    .getByRole("button", { name: "Expand Power exchange chart" })
+    .click();
+  const expanded = page.getByRole("dialog", {
+    name: "Power exchange",
+    exact: true,
+  });
+  await expect(expanded.locator(".uplot")).toBeVisible();
+  await expect(
+    expanded.getByRole("button", { name: /^What is / }),
+  ).toBeVisible();
+  await expanded
+    .getByRole("button", { name: "Close Power exchange chart" })
+    .click();
+  await expect(expanded).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("exchange-dark.png") });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(exchange.locator(".powerExchangeArrow svg")).toHaveCSS(

@@ -21,6 +21,7 @@ import {
   bandsPlugin,
   chartFont,
   padRange,
+  patternFill,
   spansFromEdges,
   splitPastProjected,
   tickLabelFill,
@@ -229,40 +230,12 @@ function sourceFill(
   const palette = chartPalette();
   if (source === "Variable") return palette.variableFill;
   if (source === "Dispatchable") return palette.onDemandFill;
-  const kind = sourcePattern(source);
-  let pattern: CanvasPattern | null = null;
-  return (u) => {
-    if (!pattern) {
-      const tile = document.createElement("canvas");
-      const ratio = uPlot.pxRatio;
-      tile.width = tile.height = 16 * ratio;
-      const ctx = tile.getContext("2d")!;
-      ctx.scale(ratio, ratio);
-      // Loads allocate the production underneath them. A solid chart surface prevents the
-      // generation tint bleeding through and keeps each flow's appearance consistent.
-      if (allocation) {
-        ctx.fillStyle = palette.background;
-        ctx.fillRect(0, 0, 16, 16);
-      }
-      ctx.fillStyle = palette.powerFlowFill;
-      ctx.fillRect(0, 0, 16, 16);
-      ctx.strokeStyle = palette.powerFlowPattern;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      if (kind === "hatch") {
-        ctx.moveTo(-8, 16);
-        ctx.lineTo(16, -8);
-        ctx.moveTo(8, 16);
-        ctx.lineTo(16, 8);
-      } else {
-        ctx.moveTo(8.5, 0);
-        ctx.lineTo(8.5, 16);
-      }
-      ctx.stroke();
-      pattern = u.ctx.createPattern(tile, "repeat");
-    }
-    return pattern || palette.powerFlowFill;
-  };
+  // Loads allocate the production underneath them. A solid chart surface prevents the
+  // generation tint bleeding through and keeps each flow's appearance consistent.
+  return patternFill(
+    sourcePattern(source) === "hatch" ? "hatch" : "vertical",
+    allocation,
+  );
 }
 
 function buildOptions({

@@ -3,6 +3,7 @@ import { getStore } from "../StoreRegistry";
 import {
   AppStateType,
   GameType,
+  isStorage,
   MonthlyHistoryType,
   ScenarioType,
   TickPresentFutureType,
@@ -15,8 +16,14 @@ import gameReducer, {
   reprioritizeFacility,
   start,
   tickState,
+  togglePauseFacility,
 } from "../reducers/Game";
-import { summarizeTimeline } from "../helpers/DateTime";
+import {
+  getTimeFromTimeline,
+  MINUTES_PER_MONTH,
+  summarizeTimeline,
+} from "../helpers/DateTime";
+import { selectProjection } from "../helpers/Projection";
 import { GENERATORS, STORAGE } from "./Facilities";
 import { createGame } from "../testing/Simulator";
 import { prepareStorageReorder } from "../reducers/GameActions";
@@ -269,6 +276,67 @@ describe("authored tutorial capstones", () => {
     expect(objective.failure?.(appState(prepared))).toBe(false);
     expect(tickUntil(unprepared, objective.failure!, 800)).toBe(true);
     expect(objective.success(appState(unprepared))).toBe(false);
+  });
+
+  describe("Mission 6's starting fleet", () => {
+    const hasBlackout = (state: AppStateType) =>
+      state.game.eventLog.some((event) => event.kind === "BLACKOUT");
+
+    // Pausing the only plant used to flatten the supply forecast to zero. A supply line has to
+    // stand clear of the axis to read as a curve, so a few percent of demand would not count.
+    const VISIBLE_SHARE_OF_DEMAND = 0.05;
+
+    it("keeps forecast supply visible, and short of demand, with the coal plant paused", () => {
+      const game = createGame({ scenarioId: 5 });
+      expect(
+        game.facilities.some(
+          (facility) => !isStorage(facility) && facility.fuel !== "Coal",
+        ),
+      ).toBe(true);
+      const coal = game.facilities.find(
+        (facility) => facility.fuel === "Coal",
+      )!;
+      const paused = gameReducer(game, togglePauseFacility(coal.id));
+      const forecast = selectProjection(
+        paused,
+        getTimeFromTimeline(paused.date.minute, paused.timeline)!,
+      ).forecast;
+
+      const faintMonths: number[] = [];
+      for (let month = 0; month < 12; month++) {
+        const ticks = forecast.filter(
+          (tick) => Math.floor(tick.minute / MINUTES_PER_MONTH) === month,
+        );
+        expect(ticks.length).toBeGreaterThan(0);
+        const peakSupply = Math.max(...ticks.map((tick) => tick.supplyW));
+        const peakDemand = Math.max(...ticks.map((tick) => tick.demandW));
+        if (peakSupply <= peakDemand * VISIBLE_SHARE_OF_DEMAND)
+          faintMonths.push(month);
+        // Still a predicted blackout all day, so the lesson's chart keeps its warning
+        expect(ticks.every((tick) => tick.supplyW < tick.demandW)).toBe(true);
+      }
+      expect(faintMonths).toEqual([]);
+    });
+
+    it("blacks out the unprepared grid on August's heat wave, and not before", () => {
+      const game = createGame({ scenarioId: 5 });
+      expect(tickUntil(game, hasBlackout, 96 * 9)).toBe(true);
+      // The summer shortage the final challenge teaches: a fleet that rode out every earlier
+      // month, then came up a few megawatts short on the hottest afternoon.
+      expect(game.date.monthsElapsed).toBe(7);
+    });
+
+    it("makes a player who builds nothing fail at month seven, not succeed on the starting fleet", () => {
+      const objective = capstone(5);
+      const game = createGame({ scenarioId: 5 });
+      expect(
+        tickUntil(game, (state) => state.game.date.monthsElapsed >= 7, 800),
+      ).toBe(true);
+      // The heat wave comes later in the month, so only the month-seven rule decides this
+      expect(hasBlackout(appState(game))).toBe(false);
+      expect(objective.success(appState(game))).toBe(false);
+      expect(objective.failure!(appState(game))).toBe(true);
+    });
   });
 
   it("requires Mission 7 to settle a new safe-export month after observing imports", () => {

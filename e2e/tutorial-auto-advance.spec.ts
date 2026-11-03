@@ -122,7 +122,10 @@ for (const mission of [
           : "vertical bar shows energy stored",
       );
     } else if (mission === "Forecasting") {
-      await page.locator(".facilityRow .facilityDisclosure").first().click();
+      // A solar plant leads the fleet, so open the coal plant by name
+      await page
+        .getByRole("button", { name: "Inspect Coal", exact: true })
+        .click();
       await page
         .getByRole("button", { name: "Pause Coal", exact: true })
         .click();

@@ -470,7 +470,11 @@ test("insights header controls stay aligned in one compact row", async ({
       const trackHeaderBox = await trackHeader.boundingBox();
       expect(trackHeaderBox).not.toBeNull();
       await expect(trackHeader.locator(".insightsTrackActions")).toHaveCount(0);
-      expect(trackHeaderBox!.height).toBeLessThanOrEqual(45);
+      // One row: the title and its expand and help controls at their touch height, with the
+      // header's 8px inset above and below. A second row would make it about 104.
+      expect(trackHeaderBox!.height).toBeLessThanOrEqual(
+        minimumControlHeight + 16,
+      );
     }
   }
 
