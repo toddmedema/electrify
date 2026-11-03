@@ -4,7 +4,7 @@ import type { FuelNameType, MonthlyHistoryType } from "../Types";
 export type ObjectiveStatus =
   "pending" | "inProgress" | "completed" | "failed" | "unverifiable";
 
-/** Values use the compiled objective's units, including kg CO2e and starting-year dollars. */
+/** Values use the compiled objective's units, including its declared currency basis. */
 export interface ObjectiveResult {
   objective: CompiledRuleObjective;
   id: string;
@@ -26,6 +26,8 @@ export interface ObjectiveContext {
   startingYear: number;
   /** Calendar months before this bounded campaign generation. */
   monthOffset?: number;
+  /** Campaign limits use final-year nominal dollars and compare actual bills/principal directly. */
+  moneyBasis?: "nominal";
   seed: number;
   durationMonths: number;
   ownership: "Investor" | "Public";

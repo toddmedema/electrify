@@ -4335,6 +4335,8 @@ export function* tickStatePhases(
           peakMW: campaign.peakMW,
           northCapacityMW: campaign.northCapacityMW,
           debtAllowance: campaign.debtAllowance,
+          goalRateIndex: campaign.goalRateIndex,
+          goalCostIndex: campaign.goalCostIndex,
           emissionsBudgetTonnes: campaign.emissionsBudgetTonnes,
           inheritedDemandMultiplier: campaign.inheritedDemandMultiplier,
           closingCash: closingFrame.cash,

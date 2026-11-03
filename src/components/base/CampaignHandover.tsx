@@ -14,12 +14,12 @@ import {
   LEGACY_GENERATIONS,
   legacyGenerationTitle,
 } from "../../data/LegacyCampaign";
-import { formatNumber } from "../../helpers/Format";
 import {
   finishedObjectiveStatusText,
   objectiveGoalText,
   objectiveTargetText,
   objectiveWindowText,
+  objectiveValueText,
 } from "../../helpers/ObjectivePresentation";
 import type { CompiledRuleObjective } from "../../data/ScenarioRules";
 import { LegacyCampaignTermType } from "../../Types";
@@ -31,7 +31,7 @@ const goalText = (
   const window = objectiveWindowText(objective, startingYear, 240);
   switch (objective.metric) {
     case "customerRetention":
-      return `Retain ${formatNumber(objective.minRetainedShare, { style: "percent" })} of customers`;
+      return `Retain ${objectiveValueText(objective, objective.minRetainedShare)} of customers`;
     case "fuelRetirement":
       return objective.label;
     case "financialCoverage":
@@ -39,15 +39,15 @@ const goalText = (
         ? `${objective.basis === "revenue" ? "Revenue covers operating costs" : "Cash covers monthly operating costs"} · ${window}`
         : objectiveGoalText(objective, startingYear, 240);
     case "monthEndDebt":
-      return `Debt ≤$${formatNumber(Math.floor(objective.maxDebt), { maximumFractionDigits: 0 })} · ${window}`;
+      return `Debt ≤${objectiveValueText(objective, objective.maxDebt)} · ${window}`;
     case "monthlyBilledRate":
-      return `Billed rate ≤$${formatNumber(Math.floor(objective.maxDollarsPerKWh * 1e6) / 1e6, { maximumFractionDigits: 6 })}/kWh · ${window}`;
+      return `Billed rate ≤${objectiveValueText(objective, objective.maxDollarsPerKWh)} · ${window}`;
     case "emissionsBudget":
-      return `Emit ≤${formatNumber(Math.floor(objective.budgetKgCO2e / 1000), { maximumFractionDigits: 0 })} tonnes CO₂e this term`;
+      return `Emit ${objectiveTargetText(objective)} this term`;
     case "emissionsPerDeliveredMWh":
       return `Emit ${objectiveTargetText(objective)} · ${window}`;
     case "efficiencySavings":
-      return `Save ≥${formatNumber(objective.minShare, { style: "percent" })} of home and business electricity · ${window}`;
+      return `Save ≥${objectiveValueText(objective, objective.minShare)} of home and business electricity · ${window}`;
     default:
       return objectiveGoalText(objective, startingYear, 240);
   }
@@ -173,21 +173,6 @@ export default function CampaignHandover({
             </Box>
           ))}
         </Box>
-        {nextObjectives.some(
-          ({ metric }) =>
-            metric === "monthlyBilledRate" || metric === "monthEndDebt",
-        ) && (
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", mt: 1.5 }}
-          >
-            {nextObjectives.some(({ metric }) => metric === "monthlyBilledRate")
-              ? "Rate and debt limits"
-              : "Debt limits"}{" "}
-            use 1882 dollars.
-          </Typography>
-        )}
       </DialogContent>
       <DialogActions
         className="campaignHandoverActions"

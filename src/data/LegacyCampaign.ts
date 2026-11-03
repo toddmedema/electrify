@@ -1,4 +1,5 @@
 import type { ScenarioType, PolicyId } from "../Types";
+import { roundToSignificantDigits } from "../helpers/Math";
 import type {
   RuleEvent,
   RuleObjective,
@@ -266,6 +267,8 @@ export interface LegacyRuleContext {
   northCapacityMW: number;
   referenceRate: number;
   debtAllowance: number;
+  goalRateIndex?: number;
+  goalCostIndex?: number;
   emissionsBudgetTonnes?: number;
   openingCustomers?: number;
   endMarketCustomers?: number;
@@ -274,7 +277,8 @@ export interface LegacyRuleContext {
 /**
  * Static readers cannot run the forecast. Their explicitly approximate fixture peak is 70% of
  * non-storage nameplate. Live runs always supply the production forecast's frozen opening peak.
- * Rules use the continuous campaign's 1882 dollar basis; 9.9 is the early modeled CPI anchor.
+ * Internal pricing/cost anchors use 1882 dollars; frozen indices publish final-year money goals.
+ * 9.9 is the early modeled CPI anchor, not a currency the player needs to convert.
  * Keep this pure data module free of economy/catalog imports to preserve the startup boundary.
  */
 const LEGACY_OPENING_DOLLAR_RATIO = 9.9 / 304.702;
@@ -336,12 +340,15 @@ export function legacyRuleDefinitions(
       id: "grow-the-customer-base",
       label: "Grow the customer base by 1921",
       metric: "customerCount",
-      minCustomers: Math.ceil(
-        Math.min(
-          (context.openingCustomers ??
-            LEGACY_SCENARIOS[index].startingCustomers!) * 1.5,
-          (context.endMarketCustomers ?? Infinity) * 0.95,
+      minCustomers: roundToSignificantDigits(
+        Math.ceil(
+          Math.min(
+            (context.openingCustomers ??
+              LEGACY_SCENARIOS[index].startingCustomers!) * 1.5,
+            (context.endMarketCustomers ?? Infinity) * 0.95,
+          ),
         ),
+        3,
       ),
       deadlineMonth: 240,
     },
@@ -351,13 +358,16 @@ export function legacyRuleDefinitions(
       metric: "monthlyBilledRate",
       fromMonth: 229,
       throughMonth: 240,
-      maxDollarsPerKWh: context.referenceRate * 1.1,
+      maxDollarsPerKWh: roundToSignificantDigits(
+        context.referenceRate * 1.1 * (context.goalRateIndex ?? 1),
+        3,
+      ),
     },
     {
       id: "postwar-reserves",
       label: "Keep a 10% opening-peak reserve throughout 1952",
       metric: "reserveMargin",
-      minReserveW: context.peakMW * 1e6 * 0.1,
+      minReserveW: roundToSignificantDigits(context.peakMW * 1e6 * 0.1, 3),
       fromMonth: 121,
       throughMonth: 132,
     },
@@ -403,7 +413,10 @@ export function legacyRuleDefinitions(
       metric: "emissionsBudget",
       fromMonth: 1,
       throughMonth: 240,
-      budgetTonnesCO2e: context.emissionsBudgetTonnes ?? context.peakMW * 21900,
+      budgetTonnesCO2e: roundToSignificantDigits(
+        context.emissionsBudgetTonnes ?? context.peakMW * 21900,
+        3,
+      ),
     },
   ];
   const objectives: RuleObjective[] = [featured[index]];
@@ -423,7 +436,10 @@ export function legacyRuleDefinitions(
       metric: "monthEndDebt",
       fromMonth: 229,
       throughMonth: 240,
-      maxDebtDollars: context.debtAllowance,
+      maxDebtDollars: roundToSignificantDigits(
+        context.debtAllowance * (context.goalCostIndex ?? 1),
+        3,
+      ),
     });
   if (index >= 3)
     objectives.push({
@@ -432,7 +448,10 @@ export function legacyRuleDefinitions(
       metric: "monthlyBilledRate",
       fromMonth: 229,
       throughMonth: 240,
-      maxDollarsPerKWh: context.referenceRate * 1.35,
+      maxDollarsPerKWh: roundToSignificantDigits(
+        context.referenceRate * 1.35 * (context.goalRateIndex ?? 1),
+        3,
+      ),
     });
   // The final CEO has one whole-term carbon budget instead of overlapping intensity limits.
   if (index === 6 || index === 7)

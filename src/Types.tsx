@@ -1295,6 +1295,8 @@ export interface LegacyCampaignTermType {
   peakMW: number;
   northCapacityMW: number;
   debtAllowance: number;
+  goalRateIndex: number;
+  goalCostIndex: number;
   emissionsBudgetTonnes: number;
   inheritedDemandMultiplier: number;
   closingCash: number;
@@ -1315,6 +1317,9 @@ export interface LegacyCampaignType {
   peakMW: number;
   northCapacityMW: number;
   debtAllowance: number;
+  /** Frozen conversion from internal anchors to this term's final-year nominal dollars. */
+  goalRateIndex: number;
+  goalCostIndex: number;
   emissionsBudgetTonnes: number;
   inheritedDemandMultiplier: number;
   openingCash: number;

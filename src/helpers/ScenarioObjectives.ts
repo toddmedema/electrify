@@ -143,6 +143,7 @@ function initialEvidenceDigest(
     objective,
     rulesDigest: context.rulesDigest,
     startingYear: context.startingYear,
+    ...(context.moneyBasis ? { moneyBasis: context.moneyBasis } : {}),
     ...(context.monthOffset !== undefined
       ? { monthOffset: context.monthOffset }
       : {}),
@@ -353,11 +354,13 @@ export function objectiveMonthObservation(
     case "monthlyBilledRate":
       numerator =
         customerSalesRevenue(row) /
-        getRateInflationIndex(
-          { year: row.year, monthNumber: row.month },
-          context.startingYear,
-          context.seed,
-        );
+        (context.moneyBasis === "nominal"
+          ? 1
+          : getRateInflationIndex(
+              { year: row.year, monthNumber: row.month },
+              context.startingYear,
+              context.seed,
+            ));
       denominator = row.supplyWh / 1000;
       break;
     case "monthEndDebt":
@@ -365,11 +368,13 @@ export function objectiveMonthObservation(
         facts.debtPrincipal === undefined
           ? undefined
           : facts.debtPrincipal /
-            getInflationIndex(
-              { year: row.year, monthNumber: row.month },
-              context.startingYear,
-              context.seed,
-            );
+            (context.moneyBasis === "nominal"
+              ? 1
+              : getInflationIndex(
+                  { year: row.year, monthNumber: row.month },
+                  context.startingYear,
+                  context.seed,
+                ));
       break;
   }
   return [

@@ -1,4 +1,5 @@
 import { legacyMonthOffset, legacyCompletedMonths } from "./LegacyCampaign";
+import { isLegacyCampaignScenario } from "../data/LegacyCampaign";
 import {
   isUtilityExpansionGame,
   isUtilityExpansionScenario,
@@ -231,6 +232,8 @@ export function objectiveContextForGame(
         game.campaign.peakMW,
         game.campaign.northCapacityMW,
         game.campaign.debtAllowance,
+        game.campaign.goalRateIndex,
+        game.campaign.goalCostIndex,
         game.campaign.emissionsBudgetTonnes,
         game.campaign.inheritedDemandMultiplier,
       ]
@@ -245,6 +248,9 @@ export function objectiveContextForGame(
         objectives: definitions,
         seed: game.seed,
         startingYear: game.startingYear,
+        ...(isLegacyCampaignScenario(scenario.id)
+          ? { moneyBasis: "nominal" }
+          : {}),
         ...(game.campaign
           ? { monthOffset: legacyMonthOffset(game), campaignInputs }
           : {}),
@@ -258,6 +264,9 @@ export function objectiveContextForGame(
     rulesDigest: identity.digest,
     seed: game.seed,
     startingYear: game.startingYear,
+    ...(isLegacyCampaignScenario(scenario.id)
+      ? { moneyBasis: "nominal" as const }
+      : {}),
     ...(game.campaign ? { monthOffset: legacyMonthOffset(game) } : {}),
     durationMonths: scenario.durationMonths,
     ownership: scenario.ownership,
@@ -378,6 +387,9 @@ function historyObjectiveResults(
   const context: ObjectiveContext = {
     rulesDigest: ruleDigest(objectives),
     startingYear: scenario.startingYear,
+    ...(isLegacyCampaignScenario(scenario.id)
+      ? { moneyBasis: "nominal" as const }
+      : {}),
     seed: options.seed ?? scenario.seed ?? 0,
     durationMonths: scenario.durationMonths,
     ownership: scenario.ownership,
@@ -758,10 +770,7 @@ export function validGameObjectiveProgress(game: GameType): boolean {
         objective.metric === "monthEndDebt" ||
         objective.metric === "fuelRetirement" ||
         objective.metric === "utilityOwnership" ||
-        objective.metric === "assetRetirement" ||
-        // Cold campaign imports precede economy loading. Normalized billed rates, like
-        // historic principal, rely on the bounded owner-recorded evidence instead.
-        (game.campaign && objective.metric === "monthlyBilledRate")
+        objective.metric === "assetRetirement"
       )
         continue;
       const first =

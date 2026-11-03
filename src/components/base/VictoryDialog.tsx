@@ -27,7 +27,6 @@ import { SCENARIOS } from "../../data/Scenarios";
 import ResultLeaderboard from "./ResultLeaderboard";
 import { SCORE_VERSION } from "../../helpers/Scoring";
 import { isLegacyCampaignScenario } from "../../data/LegacyCampaign";
-import CampaignGoalBasis from "./CampaignGoalBasis";
 
 export interface StateProps {
   victory: VictoryType | null;
@@ -273,10 +272,6 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             />
           )}
         {victory.debrief && <RunDebrief debrief={victory.debrief} />}
-        <CampaignGoalBasis
-          scenarioId={victory.scenarioId}
-          results={victory.debrief?.objectiveResults}
-        />
       </DialogContent>
       <DialogActions
         className="victoryDialogActions"

@@ -38,6 +38,8 @@ const term: LegacyCampaignTermType = {
   peakMW: 0.07,
   northCapacityMW: 0,
   debtAllowance: 10000,
+  goalRateIndex: 1,
+  goalCostIndex: 1,
   emissionsBudgetTonnes: 1000,
   inheritedDemandMultiplier: 1,
   closingCash: 4200,
@@ -108,6 +110,7 @@ it("shows concise term results and requires an explicit handover", async () => {
   ).toBeVisible();
   expect(screen.queryByText("Objectives")).not.toBeInTheDocument();
   expect(screen.queryByText("Your successor inherits")).not.toBeInTheDocument();
+  expect(screen.queryByText(/1882 dollars/)).not.toBeInTheDocument();
   expect(screen.queryByText("Demand served")).not.toBeInTheDocument();
   expect(screen.queryByText("Demand not met")).not.toBeInTheDocument();
   expect(

@@ -3,7 +3,12 @@ import { getStore } from "../StoreRegistry";
 import type { RunSaveEffects } from "../SaveEffects";
 import { encodeSave } from "../SaveEncoding";
 import { GENERATORS } from "../data/Facilities";
-import { hasEconomy, initEconomyFromCsv } from "../data/Economy";
+import {
+  hasEconomy,
+  initEconomyFromCsv,
+  getInflationIndex,
+  getRateInflationIndex,
+} from "../data/Economy";
 import { loanBalanceAfterTicks } from "./Financials";
 import { interpretScenarioRuleReport } from "./ScenarioRuleRuntime";
 import cloneDeep from "lodash.clonedeep";
@@ -16,7 +21,14 @@ import {
   gameObjectiveResults,
   scenarioObjectiveDefinitions,
   objectiveOwnedVintageFuels,
+  objectiveContextForGame,
 } from "./ObjectiveRules";
+import {
+  objectiveMonthObservation,
+  objectiveTargetMet,
+} from "./ScenarioObjectives";
+import { roundToSignificantDigits } from "./Math";
+import { EMPTY_HISTORY } from "./DateTime";
 import { parseSave, serializeSave } from "../SaveGame";
 import reducer, {
   continueLegacyCampaign,
@@ -63,6 +75,8 @@ test("campaign initialization uses the native unranked setup and rejects forged 
   expect(parseSave(forged)).toBeNull();
   for (const field of [
     "peakMW",
+    "goalRateIndex",
+    "goalCostIndex",
     "northCapacityMW",
     "emissionsBudgetTonnes",
     "inheritedDemandMultiplier",
@@ -71,6 +85,55 @@ test("campaign initialization uses the native unranked setup and rejects forged 
     changed.game.campaign![field] += 1;
     expect(parseSave(changed)).toBeNull();
   }
+});
+
+test("campaign money uses final-year nominal limits and actual monthly amounts", () => {
+  const second = reducer(closingCompany(), continueLegacyCampaign());
+  const third = reducer(
+    closeProtocolGeneration(second),
+    continueLegacyCampaign(),
+  );
+  const scenario = LEGACY_SCENARIOS[2];
+  const goals = scenarioObjectiveDefinitions(scenario, third);
+  const debt = goals.find((goal) => goal.metric === "monthEndDebt")!;
+  const rate = goals.find((goal) => goal.metric === "monthlyBilledRate")!;
+  const expectedDebt = roundToSignificantDigits(
+    third.campaign!.debtAllowance *
+      getInflationIndex({ year: 1941, monthNumber: 12 }, 1882, third.seed),
+    3,
+  );
+  const expectedRate = roundToSignificantDigits(
+    third.campaign!.referenceRate *
+      1.1 *
+      getRateInflationIndex({ year: 1941, monthNumber: 12 }, 1882, third.seed),
+    3,
+  );
+  expect(debt).toMatchObject({ maxDebt: expectedDebt });
+  expect(rate).toMatchObject({ maxDollarsPerKWh: expectedRate });
+  expect(objectiveTargetMet(debt, expectedDebt)).toBe(true);
+  expect(objectiveTargetMet(debt, expectedDebt + 1)).toBe(false);
+  expect(objectiveTargetMet(rate, expectedRate)).toBe(true);
+  expect(objectiveTargetMet(rate, expectedRate + 0.001)).toBe(false);
+  const row = {
+    ...EMPTY_HISTORY,
+    year: 1941,
+    month: 1,
+    supplyWh: 1e6,
+    revenue: expectedRate * 1000,
+  };
+  const context = objectiveContextForGame(third, scenario);
+  expect(
+    objectiveMonthObservation(
+      debt,
+      { month: 228, history: row, debtPrincipal: expectedDebt },
+      context,
+      100,
+    ),
+  ).toEqual([228, expectedDebt, 1]);
+  expect(
+    objectiveMonthObservation(rate, { month: 228, history: row }, context, 100),
+  ).toEqual([228, expectedRate * 1000, 1000]);
+  expectColdImport(serializeSave(third));
 });
 
 test("oil retirement counts paused commissioned equipment, excludes replacements, and deduplicates cohort facts", () => {

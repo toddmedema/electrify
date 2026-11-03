@@ -90,8 +90,8 @@ test("a successor's remaining time and objective dates use its own 20-year term"
   const debt = status.requirements.find(
     (row) => row.label === "Keep debt within the published allowance",
   )!;
-  expect(debt.target).toContain("1882 dollars");
-  expect(debt.compact).toContain("1882 dollars");
+  expect(debt.target).not.toContain("1882 dollars");
+  expect(debt.compact).not.toContain("1882 dollars");
 });
 
 test("zero demand cannot invent blackout failure", () => {

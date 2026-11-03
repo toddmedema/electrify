@@ -34,6 +34,33 @@ const result = (changes: Partial<ObjectiveResult> = {}): ObjectiveResult => ({
   ...changes,
 });
 
+it.each([
+  [1679225, "1.68M"],
+  [123456, "123k"],
+  [2678123456, "2.68B"],
+  [0.000123456, "0.000123"],
+  [999999, "1M"],
+  [999499, "999k"],
+])(
+  "compact goals show at most three significant digits for %s",
+  (value, text) => {
+    expect(
+      objectiveValueText(
+        {
+          id: "debt",
+          label: "Debt",
+          required: true,
+          metric: "monthEndDebt",
+          fromMonth: 0,
+          throughMonth: 11,
+          maxDebt: value,
+        },
+        value,
+      ),
+    ).toBe(`$${text}`);
+  },
+);
+
 it("uses concise emissions copy and whole-year ranges without changing the measurement", () => {
   const objective: CompiledRuleObjective = {
     id: "intensity",
@@ -61,7 +88,7 @@ it("retains the actual side of an arbitrarily close share target", () => {
   );
   expect(objectiveValueText(localShare, 0.995)).toBe("99.5%");
   expect(objectiveTargetText({ ...localShare, minShare: 0.9999999 })).toBe(
-    "≥99.99999% local delivery from Wind",
+    "≥100% local delivery from Wind",
   );
 });
 
@@ -75,7 +102,7 @@ it("rounds a reading to a whole percent unless that would cross the target", () 
     minRetainedShare: 0.8,
   };
   expect(objectiveValueText(retention, 1.01234, 0.8)).toBe("101%");
-  expect(objectiveValueText(retention, 0.79996, 0.8)).toContain("79.99");
+  expect(objectiveValueText(retention, 0.79996, 0.8)).toBe("80% (below goal)");
   expect(
     objectiveObservedText(
       result({
@@ -122,7 +149,7 @@ it("shows missing evidence as unavailable without inventing a measured zero", ()
   ).toBe("0/12 months completed · history incomplete, not verifiable");
   expect(
     objectiveObservedText(result({ observed: 0.9949999, status: "failed" })),
-  ).toContain("99.49999%");
+  ).toContain("99.5% (below goal)");
 });
 
 it.each<[CompiledRuleObjective, number, string]>([
@@ -137,7 +164,7 @@ it.each<[CompiledRuleObjective, number, string]>([
       budgetKgCO2e: 123456789,
     },
     123456789,
-    "123,456.789 tonnes CO₂e",
+    "123k tonnes CO₂e",
   ],
   [
     {
@@ -201,7 +228,7 @@ it.each<[CompiledRuleObjective, number, string]>([
       maxDollarsPerKWh: 0.123456789,
     },
     0.123456789,
-    "$0.123456789/kWh",
+    "$0.123/kWh",
   ],
   [
     {
@@ -214,10 +241,10 @@ it.each<[CompiledRuleObjective, number, string]>([
       maxDebt: 123456789,
     },
     123456789,
-    "$123,456,789 principal",
+    "$123M",
   ],
 ])(
-  "prints explicit units without approximating a %s target",
+  "prints compact units with at most three significant digits for a %s target",
   (objective, value, expected) => {
     expect(objectiveValueText(objective, value)).toBe(expected);
     expect(objectiveValueText(objective, value, value)).toBe(expected);

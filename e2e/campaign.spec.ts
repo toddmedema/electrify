@@ -253,6 +253,8 @@ for (const theme of ["light", "dark"] as const) {
     const nextGoals = handover.getByRole("list", { name: "Next term goals" });
     await expect(nextGoals).toContainText(/Reach ≥\d[\d,.]* customers/);
     await expect(nextGoals.getByRole("listitem")).toHaveCount(2);
+    await expect(handover).not.toContainText("1882 dollars");
+    await expect(nextGoals).toContainText(/Debt ≤\$\d+(?:\.\d+)?[kMB]/);
     await expect(nextGoals).not.toContainText("Retain 90% of customers");
     await expect(nextGoals.getByRole("img", { name: "Met" })).toHaveCount(0);
     await expect(
@@ -413,11 +415,8 @@ for (const theme of ["light", "dark"] as const) {
         ),
       });
     }
-    const dollarBasis = lateHandover.getByText(
-      "Rate and debt limits use 1882 dollars.",
-    );
-    await dollarBasis.scrollIntoViewIfNeeded();
-    await expect(dollarBasis).toBeVisible();
+    await expect(lateHandover).not.toContainText("1882 dollars");
+    await finalGoals.getByRole("listitem").last().scrollIntoViewIfNeeded();
     await expect(finalGoals.getByRole("listitem").last()).toBeVisible();
     await expect(
       lateHandover.getByRole("button", { name: "Begin next term" }),

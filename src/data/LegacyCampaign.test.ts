@@ -9,6 +9,8 @@ import {
 import { SCENARIOS, getScenario } from "./Scenarios";
 import { scenarioRules, compileScenarioRules } from "../helpers/ScenarioRules";
 import { getCostTableDeflator } from "./Economy";
+import { roundToSignificantDigits } from "../helpers/Math";
+import { objectiveTarget } from "../helpers/ScenarioObjectives";
 import { LOCATIONS } from "../Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { resolveStoryAtDate } from "./WorldEvents";
@@ -67,7 +69,9 @@ test("authored debt allowances scale opening demand and never borrow a fixture c
     return objective.maxDebtDollars;
   };
   const before = allowance();
-  expect(before).toBeCloseTo(0.5 * 20000000 * getCostTableDeflator(1882), 10);
+  expect(before).toBe(
+    roundToSignificantDigits(0.5 * 20000000 * getCostTableDeflator(1882), 3),
+  );
   const cash = LEGACY_SCENARIOS[2].cash;
   try {
     LEGACY_SCENARIOS[2].cash = cash * 100;
@@ -172,6 +176,14 @@ test("customer expansion has a frozen feasible target for the inherited territor
       .objectives[0];
   expect(growthGoal(100, 1000)).toMatchObject({ minCustomers: 150 });
   expect(growthGoal(1000, 1400)).toMatchObject({ minCustomers: 1330 });
+});
+
+test("published campaign amounts are the exact three-significant-digit thresholds", () => {
+  for (const scenario of LEGACY_SCENARIOS)
+    for (const objective of scenarioRules(scenario)!.objectives) {
+      const target = objectiveTarget(objective);
+      expect(target).toBe(roundToSignificantDigits(target, 3));
+    }
 });
 
 test.each([

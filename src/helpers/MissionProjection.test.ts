@@ -86,9 +86,7 @@ it("flags a future billed-rate miss without changing recorded progress, then cle
   const risky = cloneDeep(projection);
   risky.financeProjected[1].revenue = 200.0001;
   expect(goal(game, risky, "bills")).toMatchObject({ status: "at-risk" });
-  expect(goal(game, risky, "bills").detail).toContain(
-    "$0.20000010000000001/kWh",
-  );
+  expect(goal(game, risky, "bills").detail).toContain("$0.2/kWh (above goal)");
   expect(projectMission(game, risky).status).toBe("loss");
   const approximate = cloneDeep(projection);
   approximate.financeProjected[1].revenue = 765.824;

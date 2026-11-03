@@ -50,6 +50,11 @@ import { requiredFuelShareFeasibility } from "./ScenarioFuelShares";
 import { TRANSMISSION_CORRIDORS } from "../data/AdjacentMarkets";
 import { customerMarketSizeAt } from "./Customers";
 import { MINUTES_PER_MONTH } from "./DateTime";
+import {
+  hasEconomy,
+  getRateInflationIndex,
+  getInflationIndex,
+} from "../data/Economy";
 
 export class RuleCompilationError extends Error {
   constructor(public diagnostics: RuleDiagnostic[]) {
@@ -323,6 +328,24 @@ function legacyScenarioRules(
   const generation = LEGACY_GENERATIONS[index];
   const context = parameters.campaign;
   const offset = context?.termStartMonth ?? 0;
+  const endDate = { year: generation.startYear + 19, monthNumber: 12 };
+  // Live campaigns freeze both conversions before play, so cold imports never read economy CSVs.
+  // Standalone catalog fixtures can bind their nominal starting rate once data is available.
+  const goalRateIndex = context
+    ? context.goalRateIndex
+    : hasEconomy()
+      ? getRateInflationIndex(endDate, 1882, parameters.seed) /
+        getRateInflationIndex(
+          { year: generation.startYear, monthNumber: 1 },
+          1882,
+          parameters.seed,
+        )
+      : 1;
+  const goalCostIndex = context
+    ? context.goalCostIndex
+    : hasEconomy()
+      ? getInflationIndex(endDate, 1882, parameters.seed)
+      : 1;
   const endMarketCustomers =
     context && parameters.customerMarketSize !== undefined
       ? customerMarketSizeAt(
@@ -339,6 +362,8 @@ function legacyScenarioRules(
     context?.northCapacityMW,
     context?.referenceRate,
     context?.debtAllowance,
+    goalRateIndex,
+    goalCostIndex,
     context?.emissionsBudgetTonnes,
     context?.openingCustomers,
     endMarketCustomers,
@@ -347,6 +372,8 @@ function legacyScenarioRules(
   if (cached) return cached;
   const definitions = legacyRuleDefinitions(index, {
     ...context,
+    goalRateIndex,
+    goalCostIndex,
     ...(endMarketCustomers === undefined ? {} : { endMarketCustomers }),
   });
   const local = compileScenarioRules(definitions, {

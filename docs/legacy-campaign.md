@@ -51,14 +51,19 @@ records archive their bounded evidence, recomputed verdicts, and debriefs. Save 
 the generation sequence, physical and financial baselines, and evidence, including after the
 global clock passes 1,200 months. These corruption checks do not authenticate edited saves.
 
-Cash and purchases use the current year's nominal dollars. Objective rate and debt limits use
-1882 dollars. The authored competitor benchmark is rebased at each handover, independently
+Cash and purchases use the current year's nominal dollars. Campaign rate and debt goals are
+frozen in the CEO term's final-year nominal dollars and compare directly with actual billed
+rates and outstanding principal. Published targets are rounded to three significant digits;
+the displayed value is the enforced limit. Large goal amounts use k/M/B suffixes. The
+authored competitor benchmark is rebased at each handover, independently
 from the player's price; price memory is preserved. Opening cash is the down payment for the
 100 kW steam quote plus six months of opening forecast operating outlay.
 
 Debt allowances scale with frozen opening peak demand. The authored 2023-dollar allowances per
 MW are $20 million for terms 2–3, $30 million for terms 4–5, $20 million for term 6, and
-$15 million for terms 7–9, converted to 1882 dollars. These are game parameters, not historical
+$15 million for terms 7–9, converted to each term's final-year dollars. The conversion factors
+are frozen with the company context and archived at handover, so cold imports do not need
+economy data to interpret financial evidence. These are game parameters, not historical
 borrowing limits. They make later borrowing depend on the inherited company's size.
 
 The final carbon budget is a planning proxy: opening representative-month average demand,

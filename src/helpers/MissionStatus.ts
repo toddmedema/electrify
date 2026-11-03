@@ -68,7 +68,6 @@ function objectiveRequirement(
   result: ObjectiveResult,
   startingYear: number,
   durationMonths: number,
-  dollarBasisYear?: number,
 ): MissionRequirement {
   const objective = result.objective;
   const last =
@@ -93,21 +92,15 @@ function objectiveRequirement(
       ? "pending"
       : objectiveValueText(objective, result.observed, result.target);
   const compact = `${target} (${observed})`;
-  const basis =
-    dollarBasisYear !== undefined &&
-    (objective.metric === "monthlyBilledRate" ||
-      objective.metric === "monthEndDebt")
-      ? ` · ${dollarBasisYear} dollars`
-      : "";
   return {
     id: result.id,
     label: result.label,
     definition: objectiveDefinitionText(result),
     required: result.required,
     reason: result.reason,
-    current: current + basis,
-    target: objectiveGoalText(objective, startingYear, durationMonths) + basis,
-    compact: `${result.required ? "" : "Optional · "}${compact}${basis}${result.status === "unverifiable" ? " · incomplete history" : ""}`,
+    current,
+    target: objectiveGoalText(objective, startingYear, durationMonths),
+    compact: `${result.required ? "" : "Optional · "}${compact}${result.status === "unverifiable" ? " · incomplete history" : ""}`,
     timing: `Completed months ${(first % 12) + 1}/${startingYear + Math.floor(first / 12)}–${(last % 12) + 1}/${startingYear + Math.floor(last / 12)}${result.required ? "" : "; optional, does not end the run"}`,
     status: statuses[result.status],
     deadline: startingYear * 12 + last + 1,
@@ -124,13 +117,7 @@ export function getMissionStatus(game: GameType) {
   const history = completedMissionHistory(game);
   const now = currentTick(game);
   const requirements: MissionRequirement[] = gameObjectiveResults(game).map(
-    (result) =>
-      objectiveRequirement(
-        result,
-        termStartingYear,
-        duration,
-        game.campaign ? game.startingYear : undefined,
-      ),
+    (result) => objectiveRequirement(result, termStartingYear, duration),
   );
   requirements.push({
     id: "cash",

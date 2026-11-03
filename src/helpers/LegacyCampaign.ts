@@ -7,7 +7,11 @@ import {
   LEGACY_SCENARIOS,
   isLegacyCampaignScenario,
 } from "../data/LegacyCampaign";
-import { getCostTableDeflator, getRateInflationIndex } from "../data/Economy";
+import {
+  getCostTableDeflator,
+  getRateInflationIndex,
+  getInflationIndex,
+} from "../data/Economy";
 import { MINUTES_PER_MONTH } from "./DateTime";
 
 export const legacyMonthOffset = (
@@ -37,6 +41,7 @@ export function legacyGenerationContext(
   const generation = LEGACY_GENERATIONS[generationIndex];
   const date = { year: generation.startYear, monthNumber: 1 };
   const rateDollars = getRateInflationIndex(date, game.startingYear, game.seed);
+  const endDate = { year: generation.startYear + 19, monthNumber: 12 };
   // Freeze the real opening forecast before installing the incoming generation's effects.
   const peakW = Math.max(1, ...game.timeline.map((tick) => tick.demandW));
   const annualDemandMWh =
@@ -51,6 +56,8 @@ export function legacyGenerationContext(
     termStartMonth: generationIndex * LEGACY_GENERATION_MONTHS,
     openingCustomers,
     referenceRate: scenario.dollarsPerkWh / rateDollars,
+    goalRateIndex: getRateInflationIndex(endDate, game.startingYear, game.seed),
+    goalCostIndex: getInflationIndex(endDate, game.startingYear, game.seed),
     peakMW: peakW / 1e6,
     northCapacityMW:
       (game.transmission?.lines.find(
@@ -218,6 +225,12 @@ export function validLegacyCampaign(game: GameType): boolean {
         context.northCapacityMW > 1e9 ||
         !nonnegative(context.debtAllowance) ||
         context.debtAllowance > 1e15 ||
+        !nonnegative(context.goalRateIndex) ||
+        context.goalRateIndex <= 0 ||
+        context.goalRateIndex > 1e12 ||
+        !nonnegative(context.goalCostIndex) ||
+        context.goalCostIndex <= 0 ||
+        context.goalCostIndex > 1e12 ||
         !nonnegative(context.emissionsBudgetTonnes) ||
         context.emissionsBudgetTonnes > 1e12 ||
         !nonnegative(context.inheritedDemandMultiplier) ||

@@ -1,60 +1,58 @@
-import { formatNumber } from "./Format";
+import { formatNumber, getWattUnit } from "./Format";
+import { roundToSignificantDigits } from "./Math";
 import type { CompiledRuleObjective } from "../data/ScenarioRules";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import { MONTHS } from "../Constants";
 import { objectiveTarget } from "./ScenarioObjectives";
 
-const number = (
-  value: number,
-  comparison?: number,
-  percent = false,
-): string => {
-  const rounded = Number(value.toPrecision(6));
-  const compared =
-    comparison === undefined ? undefined : Number(comparison.toPrecision(6));
-  // Keep a measured value on its actual side of a nearby target.
-  const precise = comparison === undefined || rounded === compared;
-  // A reading beside a whole-percent target needs no decimals, unless they decide the verdict.
-  if (percent && comparison !== undefined && !precise) {
-    const whole = Math.round(value * 100);
-    const target = Number((comparison * 100).toPrecision(6));
-    const roundedMeets = whole >= target;
-    const actualMeets = value * 100 >= target;
-    const sameSide = roundedMeets === actualMeets;
-    if (Number.isInteger(target) && sameSide && whole !== target)
-      return formatNumber(whole / 100, { style: "percent" });
-  }
-  return formatNumber(precise ? value : rounded, {
-    maximumSignificantDigits: precise ? 21 : 6,
-    ...(percent ? { style: "percent" } : {}),
-  });
-};
+const number = (value: number, percent = false): string =>
+  formatNumber(roundToSignificantDigits(value, 3), {
+    notation: "compact",
+    maximumSignificantDigits: 3,
+    useGrouping: false,
+    ...(percent ? { style: "percent" as const } : {}),
+  }).replace(/K\b/g, "k");
 
+/** Keep close readings honest without exposing hidden decimal precision. */
 export function objectiveValueText(
   objective: CompiledRuleObjective,
   value: number,
   comparison?: number,
+): string {
+  const text = objectiveAmountText(objective, value);
+  return comparison !== undefined &&
+    value !== comparison &&
+    text === objectiveAmountText(objective, comparison)
+    ? `${text} (${value < comparison ? "below" : "above"} goal)`
+    : text;
+}
+
+function objectiveAmountText(
+  objective: CompiledRuleObjective,
+  value: number,
 ): string {
   switch (objective.metric) {
     case "customerRetention":
     case "localFuelShare":
     case "efficiencySavings":
     case "demandServedShare":
-      return number(value, comparison, true);
+      return number(value, true);
     case "financialCoverage":
-      return `${number(value, comparison)}× operating costs`;
+      return `${number(value)}× operating costs`;
     case "customerCount":
-      return `${number(value, comparison)} customers`;
-    case "reserveMargin":
-      return `${number(value / 1e6, comparison === undefined ? undefined : comparison / 1e6)} MW headroom`;
+      return `${number(value)} customers`;
+    case "reserveMargin": {
+      const unit = getWattUnit(roundToSignificantDigits(value, 3));
+      return `${number(value / unit.divisor)}${unit.suffix}W reserve`;
+    }
     case "emissionsBudget":
-      return `${number(value / 1000, comparison === undefined ? undefined : comparison / 1000)} tonnes CO₂e`;
+      return `${number(value / 1000)} tonnes CO₂e`;
     case "emissionsPerDeliveredMWh":
-      return `${number(value, comparison)} kg CO₂e/MWh`;
+      return `${number(value)} kg CO₂e/MWh`;
     case "monthlyBilledRate":
-      return `$${number(value, comparison)}/kWh`;
+      return `$${number(value)}/kWh`;
     case "monthEndDebt":
-      return `$${number(value, comparison)} principal`;
+      return `$${number(value)}`;
     case "utilityOwnership":
       return `${number(value)} acquired ${value === 1 ? "utility" : "utilities"}`;
     case "assetRetirement":
