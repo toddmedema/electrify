@@ -49,7 +49,7 @@ for (const theme of ["light", "dark"] as const) {
         page.getByRole("button", { name: "Facilities", exact: true }),
       );
       const trading = facilities.getByRole("combobox", {
-        name: "Trading rule",
+        name: "Buying",
       });
       await trading.scrollIntoViewIfNeeded();
       await expect(trading).toBeInViewport({ ratio: 0.99 });

@@ -231,7 +231,8 @@ function accumulateTick(
       0,
     ) +
     (t.storageDischargeW || 0) +
-    (t.importedW || 0);
+    (t.importedW || 0) -
+    (t.storageImportedW || 0);
   const deliveredShare =
     grossSourcesW > 0 ? Math.min(t.demandW, t.supplyW) / grossSourcesW : 0;
   (Object.entries(t.supplyByFuel) as [FuelNameType, number][]).forEach(

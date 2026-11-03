@@ -2,6 +2,7 @@ import path from "path";
 import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
+import { reviewScreenshot } from "./review-screenshot";
 
 for (const theme of ["light", "dark"]) {
   test(`facility selection, context actions and group drag in ${theme}`, async ({
@@ -10,6 +11,7 @@ for (const theme of ["light", "dark"]) {
     await page.addInitScript((mode) => {
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
+      Math.random = () => 0.25;
     }, theme);
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
@@ -196,17 +198,22 @@ for (const theme of ["light", "dark"]) {
       false,
     );
     const drag = async (source: number, destination: number) => {
+      // Expanded details can put the destination outside the viewport. Collapse through
+      // the disclosure before capturing coordinates; inspection preserves the selected group.
+      const expanded = pane.locator(
+        '.facilityDisclosure[aria-expanded="true"]',
+      );
+      if (await expanded.count()) await expanded.click();
+      await expect(expanded).toHaveCount(0);
       await pane.locator(".unifiedFacilitiesList").evaluate((list) => {
         list.scrollTop = 0;
       });
       const handle = rows.nth(source).locator(".facilityDragHandle");
+      const target = rows.nth(destination).locator(".facilityDragHandle");
       await handle.scrollIntoViewIfNeeded();
       await handle.click({ trial: true });
+      await expect(target).toBeInViewport({ ratio: 1 });
       const from = (await handle.boundingBox())!;
-      const to = (await rows
-        .nth(destination)
-        .locator(".facilityDragHandle")
-        .boundingBox())!;
       const x = from.x + from.width / 2;
       await page.mouse.move(x, from.y + from.height / 2);
       await page.mouse.down();
@@ -215,11 +222,20 @@ for (const theme of ["light", "dark"]) {
       await expect(pane.locator(".facilityDragCount")).toHaveText(
         "2 facilities",
       );
-      await page.screenshot({
+      const to = (await target.boundingBox())!;
+      await reviewScreenshot(page, {
         path: info.outputPath(`facility-group-drag-${theme}.png`),
       });
       await page.mouse.move(x, to.y + to.height / 2, { steps: 12 });
-      await expect(rows.nth(destination)).not.toHaveCSS("transform", "none");
+      // The live announcement reports the actual pending destination. A row's transient
+      // transform is not the drop state, and can already be cleared at the final position.
+      await expect(
+        page
+          .locator('[aria-live="assertive"]')
+          .filter({ hasText: "You have moved the item" }),
+      ).toContainText(
+        `You have moved the item from position ${source + 1} to position ${destination + 1}`,
+      );
       await page.mouse.up();
       await expect(pane.locator(".dragging")).toHaveCount(0);
     };
@@ -305,7 +321,7 @@ for (const theme of ["light", "dark"]) {
     for (const item of await menu.getByRole("menuitem").all()) {
       expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(40);
     }
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: info.outputPath(`facility-menu-mouse-360-${theme}.png`),
     });
     if (process.env.PR_SCREENSHOTS) {

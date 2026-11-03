@@ -315,8 +315,11 @@ for (const theme of ["light", "dark"]) {
     await expect(chart.locator(".chartPointDetails")).toHaveCount(0);
     await image.focus();
     const selectPoint = async (index: number) => {
-      await image.press("Home");
-      for (let i = 0; i < index; i++) await image.press("ArrowRight");
+      const fromEnd = index > (game.timeline.length - 1) / 2;
+      await image.press(fromEnd ? "End" : "Home");
+      const steps = fromEnd ? game.timeline.length - 1 - index : index;
+      for (let i = 0; i < steps; i++)
+        await image.press(fromEnd ? "ArrowLeft" : "ArrowRight");
     };
     await selectPoint(charging);
     const details = chart.locator(".chartTooltip");

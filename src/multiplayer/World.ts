@@ -263,7 +263,8 @@ export function createWorld(
     const result = cloneGrid(game);
     // Keep explicitly authored existing assets; player links replace optional outside markets.
     result.transmission = {
-      tradingPolicy: "BALANCED",
+      buyingRule: "SHORTAGES",
+      sellingRule: "PROFITABLE",
       lines: (result.transmission?.lines || []).filter((line) =>
         scenario.startingInterties?.includes(line.corridorId),
       ),
@@ -588,9 +589,11 @@ export function stepWorld(world: World): void {
     if (planned.done)
       throw new Error("A grid could not prepare its shared tick");
     const plan = { ...planned.value };
-    const policy = g.transmission?.tradingPolicy;
-    if (policy === "CLOSED" || policy === "RELIABILITY_FIRST") plan.offerW = 0;
-    if (policy === "CLOSED" || policy === "SURPLUS_ONLY") plan.shortageW = 0;
+    if (g.transmission?.sellingRule === "NONE") plan.offerW = 0;
+    if (g.transmission?.buyingRule === "NONE") {
+      plan.shortageW = 0;
+      plan.storageChargeW = 0;
+    }
     return { phase, plan };
   });
   // Construction advances during planning, so completed upgrades apply to this settlement.
@@ -902,7 +905,11 @@ function validGrid(world: World, initial: World, i: number) {
         ...g,
         multiplayer: undefined,
         transmission: intertiesEnabledForScenario(scenario, g.location)
-          ? { tradingPolicy: g.transmission!.tradingPolicy, lines: nativeLines }
+          ? {
+              buyingRule: g.transmission!.buyingRule,
+              sellingRule: g.transmission!.sellingRule,
+              lines: nativeLines,
+            }
           : undefined,
       }),
     ) &&

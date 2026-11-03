@@ -26,7 +26,7 @@ for (const theme of ["light", "dark"]) {
     expect((await prompt.boundingBox())!.width).toBeGreaterThanOrEqual(
       availableWidth - 1,
     );
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`tutorial-wide-${theme}.png`),
       animations: "disabled",
     });
@@ -92,7 +92,7 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.getByText("On demand", { exact: true }).first(),
     ).toBeVisible();
-    await page.screenshot({
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`choices-${theme}.png`),
     });
     await page
@@ -118,8 +118,13 @@ for (const theme of ["light", "dark"]) {
       );
     }
     await details.scrollIntoViewIfNeeded();
-    await page.screenshot({
+    await page.mouse.move(0, 0);
+    await reviewScreenshot(page, {
       path: testInfo.outputPath(`details-${theme}.png`),
+    });
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`detail-rows-${theme}.png`),
+      animations: "disabled",
     });
   });
 }

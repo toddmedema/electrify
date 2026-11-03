@@ -1,3 +1,4 @@
+import { BUYING_LABELS, SELLING_LABELS } from "../../helpers/TradingRules";
 import { getCostTableIndex } from "../../data/Economy";
 import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import {
@@ -83,7 +84,8 @@ import { purchaseTerms } from "../../helpers/Financials";
 import {
   AcquireUtilityAction,
   GameType,
-  TradingPolicyType,
+  BuyingRuleType,
+  SellingRuleType,
   TransmissionCorridorDefinitionType,
   TransmissionLineOperatingType,
   UnitSystemType,
@@ -128,13 +130,6 @@ const sortOptions: ReadonlyArray<readonly [IntertieSortKey, string]> = [
   ["yearsToBuild", "Build time"],
   ["emissions", "Lowest emissions"],
 ];
-
-const POLICY_LABELS: Record<TradingPolicyType, string> = {
-  BALANCED: "Buy for shortages, sell extra",
-  RELIABILITY_FIRST: "Buy for shortages only",
-  SURPLUS_ONLY: "Sell extra only",
-  CLOSED: "No trading",
-};
 
 // The row's flow reading leads with one of these, in the import/export vocabulary the section
 // header, exchange summary and chart already use: "Sell" on this list means disposing of a
@@ -573,7 +568,8 @@ export interface TransmissionPanelProps {
   projectsOnly?: boolean;
   onBuild: (corridorId: string, financed: boolean, tier?: number) => void;
   onUpgrade: (corridorId: string, financed: boolean) => void;
-  onPolicy: (policy: TradingPolicyType) => void;
+  onBuyingRule: (rule: BuyingRuleType) => void;
+  onSellingRule: (rule: SellingRuleType) => void;
   onAcquire?: (payload: AcquireUtilityAction) => boolean | Promise<boolean>;
 }
 
@@ -599,32 +595,53 @@ function tradingFlowText(game: GameType): string | null {
   return "No power flowing";
 }
 
-// Keep the trading rule editable beside the ordered connections it governs.
+// The two directions are independent choices beside the connections they govern.
 function TradingControls({
   game,
-  onPolicy,
-}: Pick<TransmissionPanelProps, "game" | "onPolicy">) {
+  onBuyingRule,
+  onSellingRule,
+}: Pick<TransmissionPanelProps, "game" | "onBuyingRule" | "onSellingRule">) {
   const state = game.transmission;
+  const id = React.useId();
   if (!state?.lines.length || !hasTradingConnection(game)) return null;
   return (
     <div className="tradingControls">
-      <FormControl fullWidth size="small" className="tradingPolicy">
-        <InputLabel id="trading-policy-label">Trading rule</InputLabel>
-        <Select
-          labelId="trading-policy-label"
-          label="Trading rule"
-          value={state.tradingPolicy}
-          onChange={(event) =>
-            onPolicy(event.target.value as TradingPolicyType)
-          }
-        >
-          {Object.entries(POLICY_LABELS).map(([value, label]) => (
-            <MenuItem key={value} value={value}>
-              {label}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <div className="tradingRuleFields">
+        <FormControl fullWidth size="small" className="buyingRule">
+          <InputLabel id={`${id}-buying`}>Buying</InputLabel>
+          <Select
+            labelId={`${id}-buying`}
+            label="Buying"
+            value={state.buyingRule}
+            onChange={(event) =>
+              onBuyingRule(event.target.value as BuyingRuleType)
+            }
+          >
+            {Object.entries(BUYING_LABELS).map(([value, label]) => (
+              <MenuItem key={value} value={value}>
+                {label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth size="small" className="sellingRule">
+          <InputLabel id={`${id}-selling`}>Selling</InputLabel>
+          <Select
+            labelId={`${id}-selling`}
+            label="Selling"
+            value={state.sellingRule}
+            onChange={(event) =>
+              onSellingRule(event.target.value as SellingRuleType)
+            }
+          >
+            {Object.entries(SELLING_LABELS).map(([value, label]) => (
+              <MenuItem key={value} value={value}>
+                {label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </div>
     </div>
   );
 }
@@ -633,7 +650,8 @@ export default function TransmissionPanel({
   game,
   onBuild,
   onUpgrade,
-  onPolicy,
+  onBuyingRule,
+  onSellingRule,
   onAcquire,
   onCancel,
   onPause,
@@ -663,7 +681,11 @@ export default function TransmissionPanel({
     "buildCost",
   );
   const [reviewId, setReviewId] = React.useState<string | null>(null);
-  const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
+  const state = game.transmission ?? {
+    buyingRule: "SHORTAGES",
+    sellingRule: "SURPLUS",
+    lines: [],
+  };
   const availableCorridors = corridorsForGame(game);
   const now = currentTick(game);
   const reorderDisabled = !!(
@@ -797,7 +819,29 @@ export default function TransmissionPanel({
               <span className="facilitySectionFlow">{flowText}</span>
             )}
           </Typography>
-          <TradingControls game={game} onPolicy={onPolicy} />
+          <TradingControls
+            game={game}
+            onBuyingRule={onBuyingRule}
+            onSellingRule={onSellingRule}
+          />
+          {(now?.storageImportedW || 0) > 0 && (
+            <Typography
+              variant="caption"
+              color="textSecondary"
+              component="p"
+              sx={{ px: 2, pb: 1 }}
+              data-testid="import-uses"
+            >
+              {formatWatts(
+                Math.max(
+                  0,
+                  (now?.importedW || 0) - (now?.storageImportedW || 0),
+                ),
+              )}{" "}
+              for customers · {formatWatts(now?.storageImportedW || 0)} for
+              storage
+            </Typography>
+          )}
           {!state.lines.length && (
             <Typography
               variant="body2"
@@ -1233,10 +1277,10 @@ export default function TransmissionPanel({
                                       ? "Player generation, demand, and shared line capacity"
                                       : line.paused
                                         ? "Paused"
-                                        : state.tradingPolicy === "CLOSED" ||
-                                            (state.tradingPolicy ===
-                                              "SURPLUS_ONLY" &&
-                                              flowW >= 0)
+                                        : (state.buyingRule === "NONE" &&
+                                              flowW >= 0) ||
+                                            (state.sellingRule === "NONE" &&
+                                              flowW < 0)
                                           ? "Trading rule"
                                           : flowW < 0
                                             ? Math.abs(flowW) >=

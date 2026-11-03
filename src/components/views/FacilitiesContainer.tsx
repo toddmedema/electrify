@@ -19,7 +19,8 @@ import {
   upgradeTransmissionLine,
   cancelTransmissionLine,
   togglePauseTransmissionLine,
-  setTradingPolicy,
+  setBuyingRule,
+  setSellingRule,
 } from "../../reducers/Game";
 import {
   selectFacility,
@@ -155,8 +156,11 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(upgradeTransmissionLine({ corridorId, financed }));
       dispatch(snackbarOpen(INTERTIE_UPGRADE_APPROVED));
     },
-    onTradingPolicy: (policy) => {
-      dispatch(setTradingPolicy(policy));
+    onBuyingRule: (rule) => {
+      dispatch(setBuyingRule(rule));
+    },
+    onSellingRule: (rule) => {
+      dispatch(setSellingRule(rule));
     },
   };
 };

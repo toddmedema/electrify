@@ -9,7 +9,7 @@ import gameReducer, {
   buildFacility,
   generateNewTimeline,
   tickState,
-  setTradingPolicy,
+  setBuyingRule,
 } from "./Game";
 import { GameType, GeneratorShoppingType } from "../Types";
 import { GENERATORS, constructionKgco2eCurve } from "../data/Facilities";
@@ -127,7 +127,7 @@ describe("construction emissions", () => {
         }),
       ),
     );
-    state = cloneDeep(gameReducer(state, setTradingPolicy("CLOSED")));
+    state = cloneDeep(gameReducer(state, setBuyingRule("NONE")));
     expect(
       getTimeFromTimeline(state.date.minute, state.timeline)!
         .constructionKgco2e,

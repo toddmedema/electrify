@@ -6,7 +6,8 @@ import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import {
   buildTransmissionLine,
-  setTradingPolicy,
+  setBuyingRule,
+  setSellingRule,
   upgradeTransmissionLine,
 } from "../../reducers/Game";
 import { snackbarOpen } from "../../reducers/UI";
@@ -173,7 +174,8 @@ export default function BuildFacilities({
             <TransmissionPanel
               game={game}
               projectsOnly
-              onPolicy={(policy) => dispatch(setTradingPolicy(policy))}
+              onBuyingRule={(rule) => dispatch(setBuyingRule(rule))}
+              onSellingRule={(rule) => dispatch(setSellingRule(rule))}
               onUpgrade={(corridorId, financed) =>
                 dispatch(upgradeTransmissionLine({ corridorId, financed }))
               }

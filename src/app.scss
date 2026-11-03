@@ -1507,7 +1507,8 @@ $pane_header_height: 48px;
   }
 }
 
-.tradingPolicy,
+.buyingRule,
+.sellingRule,
 .transmissionLine,
 .powerExchangeSummary {
   background: var(--bg-primary);
@@ -5440,6 +5441,25 @@ $homeSmokeCycle: 5.6s;
 }
 .tradingControls {
   padding: 0 16px 12px;
+  display: grid;
+  gap: 8px;
+}
+.tradingRuleFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+
+  .MuiInputBase-root {
+    height: 100%;
+    min-height: 40px;
+  }
+  .MuiSelect-select {
+    white-space: normal;
+    text-overflow: clip;
+  }
+  .MuiFormControl-root {
+    min-width: 0;
+  }
 }
 @media (pointer: coarse) {
   .tradingControls .MuiInputBase-root {
@@ -6548,7 +6568,9 @@ $programs_column: 800px;
 .buildDetails {
   table-layout: fixed;
   .MuiTableCell-root {
-    height: 48px;
+    // Include both cell padding and the divider around the help control. Two-line labels
+    // must fit this same row instead of stretching it by a font-dependent fraction.
+    height: calc(var(--control-size) + 12px);
     box-sizing: border-box;
     padding: 4px 12px;
     vertical-align: middle;
@@ -6585,9 +6607,6 @@ $programs_column: 800px;
 @media (pointer: coarse) {
   .buildDetails .buildDetailHelp {
     width: 52px;
-  }
-  .buildDetails .MuiTableCell-root {
-    height: 52px;
   }
 }
 
