@@ -2,7 +2,7 @@ import {
   resetInputPresentation,
   updateInputPresentation,
 } from "../../desktop/InputPresentation";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import { ChartPresentationContext } from "./ChartPresentationContext";
@@ -371,19 +371,26 @@ describe("UPlotChart resizing", () => {
       if (typeof moveCursor === "function") moveCursor(plot);
     });
     fireEvent.keyDown(chart, { key: "Enter" });
-    const values = chart.querySelector(".chartTooltip") as HTMLElement;
-    expect(values.parentElement).toBe(plot.root);
-    expect(values.style.maxHeight).toBe("300px");
+    // uPlot owns this non-semantic container; query its rendered subtree through RTL.
+    const values = within(chart).getByText(
+      (_content, element) =>
+        element?.classList.contains("chartTooltip") ?? false,
+    );
+    expect(values).toHaveTextContent("Point 0");
+    expect(plot.root).toContainElement(values);
+    expect(plot.over).not.toContainElement(values);
+    expect(values).toHaveStyle({ maxHeight: "300px" });
     fireEvent.pointerDown(values);
     fireEvent.pointerMove(values);
     expect(screen.getByRole("status")).toHaveTextContent("Point 0");
-    expect(values.parentElement).toBe(plot.root);
+    expect(plot.root).toContainElement(values);
+    expect(plot.over).not.toContainElement(values);
     fireEvent.pointerDown(document.body);
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
     fireEvent.pointerDown(chart);
     plot.setCursor({ left: 20, top: 20 });
-    expect(values.parentElement).toBe(plot.over);
-    expect(values.style.maxHeight).toBe("160px");
+    expect(plot.over).toContainElement(values);
+    expect(values).toHaveStyle({ maxHeight: "160px" });
   });
 
   it("keeps compatibility moves from dismissing keyboard selection and hands off to intentional pointer input", () => {
