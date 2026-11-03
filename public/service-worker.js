@@ -5,11 +5,18 @@ const OFFLINE_DATA_REVISION = "/__offline-data-revision";
 // Generated from public/images at build time (scripts/generate-icon-manifest.js).
 const ICON_MANIFEST = "/icons.json";
 const MARKET_DATA = ["/data/FuelPricesRaw.csv", "/data/EconomyRaw.csv"];
+// Create React App's list of the current build's hashed bundles.
+const ASSET_MANIFEST = "/asset-manifest.json";
+// "/" is not listed: cacheBuild() stores it once the bundles it references are safely cached.
 const APP_SHELL = [
-  "/",
   "/manifest.json",
+  "/fonts/inter/inter.css",
+  "/fonts/inter/InterVariable.woff2",
+  "/fonts/inter/InterVariable-Italic.woff2",
   "/images/logo.svg",
   "/images/logo-dark.svg",
+  "/images/logo-home.svg",
+  "/images/logo-home-dark.svg",
   "/images/icon/192x192.png",
   "/images/icon/512x512.png",
   WEATHER_INDEX,
@@ -81,6 +88,47 @@ async function fetchAndCache(cache, url, durable = false, retainWrite) {
   if (retainWrite) retainWrite(stored);
   else await stored; // Offline sync still requires durable completion before advancing its revision.
   return response.clone();
+}
+
+/**
+ * Store every bundle of the deployed build before advancing the cached page, so an offline launch
+ * always gets HTML whose scripts, styles and lazy screens are all available. This file does not
+ * change with each deploy, so the page also requests this on launch; hashed names mean only what
+ * is missing is downloaded. Once "/" moves on, bundles from earlier builds are unreachable.
+ */
+async function cacheBuild() {
+  const cache = await caches.open(CACHE_VERSION);
+  const manifestResponse = await fetch(ASSET_MANIFEST, { cache: "no-cache" });
+  if (!manifestResponse.ok) {
+    throw new Error(`${manifestResponse.status} fetching ${ASSET_MANIFEST}`);
+  }
+  const { files, entrypoints } = await manifestResponse.json();
+  const assets = Object.values(files).filter(
+    (file) => file.startsWith("/static/") && !/\.(map|txt)$/.test(file),
+  );
+  const missing = (
+    await Promise.all(
+      assets.map(async (url) => ({ url, cached: await cache.match(url) })),
+    )
+  )
+    .filter(({ cached }) => !cached)
+    .map(({ url }) => url);
+  await Promise.all(missing.map((url) => fetchAndCache(cache, url, true)));
+
+  const page = await fetch("/", { cache: "no-cache" });
+  const html = await page.clone().text();
+  // A deploy in progress can pair this manifest with HTML from a different build.
+  if (!page.ok || !entrypoints.every((file) => html.includes(file))) {
+    throw new Error("The deployed page does not match its asset manifest");
+  }
+  await cache.put("/", page);
+
+  const current = new Set(assets);
+  const stale = (await cache.keys()).filter((request) => {
+    const { pathname } = new URL(request.url);
+    return pathname.startsWith("/static/") && !current.has(pathname);
+  });
+  await Promise.all(stale.map((request) => cache.delete(request)));
 }
 
 /** Fill any holes for one scenario without refreshing data that is already available offline. */
@@ -187,7 +235,10 @@ async function syncOfflineData() {
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL)),
+    caches
+      .open(CACHE_VERSION)
+      .then((cache) => cache.addAll(APP_SHELL))
+      .then(cacheBuild),
   );
 });
 
@@ -213,6 +264,9 @@ self.addEventListener("message", (event) => {
     event.waitUntil(cacheScenarioData(event.data.locationIds));
   } else if (event.data?.type === "CACHE_ICONS") {
     event.waitUntil(cacheIcons());
+  } else if (event.data?.type === "CACHE_BUILD") {
+    // Offline launches and partial deploys simply keep the last complete build.
+    event.waitUntil(cacheBuild().catch(() => undefined));
   }
 });
 
@@ -227,9 +281,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    const network = fetch(request);
-    event.waitUntil(cacheNetworkResponse(network, "/"));
-    event.respondWith(network.catch(() => caches.match("/")));
+    event.respondWith(fetch(request).catch(() => caches.match("/")));
     return;
   }
 
