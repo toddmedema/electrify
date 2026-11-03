@@ -584,6 +584,7 @@ function ruleDiagnostics(value, path = "") {
         "label",
         "metric",
         "required",
+        "checkpoint",
         ...([
           "customerRetention",
           "fuelRetirement",
@@ -602,6 +603,8 @@ function ruleDiagnostics(value, path = "") {
     enumValue(v.metric, at(p, "metric"), OBJECTIVE_METRICS);
     if (v.required !== undefined && typeof v.required !== "boolean")
       add("invalid-value", at(p, "required"), "must be true or false.");
+    if (v.checkpoint !== undefined && v.checkpoint !== true)
+      add("invalid-value", at(p, "checkpoint"), "must be true when specified.");
     if (
       [
         "customerRetention",

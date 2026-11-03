@@ -75,7 +75,7 @@ export function objectiveWindowText(
   const last =
     "throughMonth" in objective
       ? objective.throughMonth
-      : objective.metric === "fuelRetirement"
+      : objective.metric === "fuelRetirement" && !objective.checkpoint
         ? durationMonths - 1
         : first;
   if (first === last) return monthText(first, startingYear);
@@ -90,6 +90,37 @@ export function objectiveWindowText(
 
 export function objectiveTargetText(objective: CompiledRuleObjective): string {
   const target = objectiveValueText(objective, objectiveTarget(objective));
+  if (objective.checkpoint) {
+    switch (objective.metric) {
+      case "customerRetention":
+        return `Retain ${target} of customers`;
+      case "customerCount":
+        return `Reach ≥${target}`;
+      case "monthEndDebt":
+        return `Debt ≤${target}`;
+      case "monthlyBilledRate":
+        return `Billed rate ≤${target}`;
+      case "financialCoverage":
+        return objective.minCoverage === 1
+          ? `${objective.basis === "revenue" ? "Revenue covers operating costs" : "Cash covers monthly operating costs"}`
+          : `${objective.basis === "cash" ? "Cash" : "Revenue"} ≥${target}`;
+      case "reserveMargin":
+        return `Have ≥${target}`;
+      case "efficiencySavings":
+        return `Save ≥${target} of home and business electricity`;
+      case "demandServedShare":
+        return `Serve ≥${target} of ${objective.hours ? "evening " : ""}demand`;
+      case "emissionsBudget":
+      case "emissionsPerDeliveredMWh":
+        return `Emit ≤${target}`;
+      case "fuelRetirement":
+      case "assetRetirement":
+      case "utilityOwnership":
+        return objective.label;
+      case "localFuelShare":
+        return `≥${target} local delivery from ${objective.fuels.join(", ")}`;
+    }
+  }
   switch (objective.metric) {
     case "customerRetention":
       return `Keep ≥${target} of customer baseline`;
@@ -135,6 +166,18 @@ export function objectiveGoalText(
   startingYear: number,
   durationMonths: number,
 ): string {
+  if (objective.checkpoint) {
+    const last =
+      "deadlineMonth" in objective
+        ? objective.deadlineMonth
+        : objective.throughMonth;
+    return (
+      objectiveTargetText(objective) +
+      (last === durationMonths - 1
+        ? ""
+        : ` by ${last % 12 === 11 ? startingYear + Math.floor(last / 12) : monthText(last, startingYear)}`)
+    );
+  }
   const window = objectiveWindowText(objective, startingYear, durationMonths);
   return objective.metric === "customerRetention" ||
     objective.metric === "customerCount"
@@ -144,8 +187,27 @@ export function objectiveGoalText(
 
 /** The plain-language definition; the authored sentence stays canonical for saves and mods. */
 export function objectiveDefinitionText(
-  result: Pick<ObjectiveResult, "metric" | "definition">,
+  result: Pick<ObjectiveResult, "metric" | "definition"> &
+    Partial<Pick<ObjectiveResult, "objective">>,
 ): string {
+  if (result.objective?.checkpoint) {
+    switch (result.metric) {
+      case "emissionsBudget":
+        return "Total emissions during your term.";
+      case "monthEndDebt":
+        return "Outstanding loan principal, excluding interest.";
+      case "monthlyBilledRate":
+        return "Customer revenue per kWh, excluding grants and exports.";
+      case "emissionsPerDeliveredMWh":
+        return "Emissions, including imports, exports and construction, per MWh.";
+      case "customerRetention":
+        return "Customers kept at the deadline, as a share of your opening customers.";
+      case "fuelRetirement":
+        return result.definition;
+      default:
+        return result.definition;
+    }
+  }
   return result.metric === "customerRetention"
     ? "Customers kept, as a share of your recorded customer baseline."
     : result.metric === "emissionsPerDeliveredMWh"
@@ -160,7 +222,9 @@ export function objectiveObservedText(result: ObjectiveResult): string {
       : result.status === "failed"
         ? "No utility acquired by the deadline"
         : "No utility acquired yet";
-  const months = completedMonthsText(result);
+  const months = result.objective.checkpoint
+    ? undefined
+    : completedMonthsText(result);
   if (result.observed === undefined)
     return `${months ?? "Not measured yet"}${result.status === "unverifiable" ? " · history incomplete, not verifiable" : ""}`;
   const value = objectiveValueText(
@@ -169,6 +233,7 @@ export function objectiveObservedText(result: ObjectiveResult): string {
     result.target,
   );
   const live = result.status === "pending" || result.status === "inProgress";
+  if (result.objective.checkpoint) return `${value}${live ? " now" : ""}`;
   if (
     (result.metric === "customerRetention" ||
       result.metric === "customerCount") &&

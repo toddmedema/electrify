@@ -256,6 +256,10 @@ for (const theme of ["light", "dark"] as const) {
     await expect(handover).not.toContainText("1882 dollars");
     await expect(nextGoals).toContainText(/Debt ≤\$\d+(?:\.\d+)?[kMB]/);
     await expect(nextGoals).not.toContainText("Retain 90% of customers");
+    await expect(nextGoals).not.toContainText(/by|·|each month/);
+    await expect(
+      handover.getByRole("list", { name: "Term results" }),
+    ).toContainText("Revenue covers operating costs by 1885");
     await expect(nextGoals.getByRole("img", { name: "Met" })).toHaveCount(0);
     await expect(
       handover.getByText("First Light (1882–1901)", { exact: true }),
@@ -378,9 +382,13 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(finalGoals.getByRole("listitem")).toHaveCount(4);
     await expect(finalGoals).not.toContainText("kg CO₂e");
+    await expect(finalGoals).not.toContainText(/by|·|this term/);
+    await expect(
+      lateHandover.getByRole("list", { name: "Term results" }),
+    ).toContainText("by 2035");
     await expect(lateHandover).not.toContainText("delivered MWh");
     await expect(finalGoals.getByRole("listitem").first()).toContainText(
-      /Emit ≤.*tonnes CO₂e this term/,
+      /Emit ≤.*tonnes CO₂e/,
     );
     await expect(
       lateHandover.getByRole("button", { name: "Begin next term" }),

@@ -38,7 +38,12 @@ export default function SavedResultDialog(props: {
             </Typography>
             {result.endMessage && <Typography>{result.endMessage}</Typography>}
             <ResultScore result={result} />
-            {result.debrief && <RunDebrief debrief={result.debrief} />}
+            {result.debrief && (
+              <RunDebrief
+                debrief={result.debrief}
+                scenarioId={result.scenarioId}
+              />
+            )}
           </DialogContent>
           <DialogActions>
             <Button autoFocus variant="contained" onClick={props.onClose}>

@@ -83,10 +83,10 @@ test("a successor's remaining time and objective dates use its own 20-year term"
   expect(status.monthsRemaining).toBe(239);
   expect(status.finalNote).toBeUndefined();
   const growth = status.requirements.find(
-    (row) => row.label === "Grow the customer base by 1921",
+    (row) => row.label === "Grow the customer base",
   )!;
-  expect(growth.target).toContain("1921");
-  expect(growth.timing).toContain("12/1921");
+  expect(growth.target).not.toContain("1921");
+  expect(growth.timing).toBe("Checked at term end.");
   const debt = status.requirements.find(
     (row) => row.label === "Keep debt within the published allowance",
   )!;

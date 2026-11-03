@@ -150,18 +150,18 @@ test("each term leads with a distinct historical task and keeps its shared safeg
   ]);
   expect(featured[0]).toMatchObject({
     basis: "revenue",
-    fromMonth: 36,
+    fromMonth: 47,
     throughMonth: 47,
   });
-  expect(featured[3]).toMatchObject({ fromMonth: 120, throughMonth: 131 });
+  expect(featured[3]).toMatchObject({ fromMonth: 131, throughMonth: 131 });
   expect(featured[5]).toMatchObject({
     basis: "cash",
-    fromMonth: 222,
-    throughMonth: 239,
+    fromMonth: 227,
+    throughMonth: 227,
   });
   expect(featured[6]).toMatchObject({
     hours: [17, 21],
-    fromMonth: 204,
+    fromMonth: 239,
     throughMonth: 239,
   });
   expect(featured[7]).toMatchObject({
@@ -176,6 +176,23 @@ test("customer expansion has a frozen feasible target for the inherited territor
       .objectives[0];
   expect(growthGoal(100, 1000)).toMatchObject({ minCustomers: 150 });
   expect(growthGoal(1000, 1400)).toMatchObject({ minCustomers: 1330 });
+});
+
+test("campaign goals are December checkpoints, with only the carbon budget accumulating history", () => {
+  for (const scenario of LEGACY_SCENARIOS)
+    for (const objective of scenarioRules(scenario)!.objectives) {
+      expect(objective).toMatchObject({ checkpoint: true });
+      const last =
+        "deadlineMonth" in objective
+          ? objective.deadlineMonth
+          : objective.throughMonth;
+      expect(last % 12).toBe(11);
+      expect(
+        "fromMonth" in objective && objective.metric !== "emissionsBudget"
+          ? objective.fromMonth
+          : last,
+      ).toBe(last);
+    }
 });
 
 test("published campaign amounts are the exact three-significant-digit thresholds", () => {

@@ -36,7 +36,7 @@ it("keeps the successor's scenario forecast open after the first 240 months", ()
     expect(
       screen.getByRole("status", { name: "Scenario forecast" }),
     ).toHaveTextContent("Updating forecast");
-    expect(screen.getByRole("region", { name: "Goals" })).toHaveTextContent(
+    expect(screen.getByRole("region", { name: "Goals" })).not.toHaveTextContent(
       "1921",
     );
   } finally {

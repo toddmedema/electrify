@@ -329,16 +329,16 @@ export function legacyRuleDefinitions(
   const featured: RuleObjective[] = [
     {
       id: "first-profitable-year",
-      label: "Cover operating costs with electricity revenue in 1885",
+      label: "Cover operating costs with electricity revenue",
       metric: "financialCoverage",
       basis: "revenue",
       minCoverage: 1,
-      fromMonth: 37,
+      fromMonth: 48,
       throughMonth: 48,
     },
     {
       id: "grow-the-customer-base",
-      label: "Grow the customer base by 1921",
+      label: "Grow the customer base",
       metric: "customerCount",
       minCustomers: roundToSignificantDigits(
         Math.ceil(
@@ -354,9 +354,9 @@ export function legacyRuleDefinitions(
     },
     {
       id: "affordable-service",
-      label: "Keep electricity affordable in 1941",
+      label: "Keep electricity affordable",
       metric: "monthlyBilledRate",
-      fromMonth: 229,
+      fromMonth: 240,
       throughMonth: 240,
       maxDollarsPerKWh: roundToSignificantDigits(
         context.referenceRate * 1.1 * (context.goalRateIndex ?? 1),
@@ -365,19 +365,18 @@ export function legacyRuleDefinitions(
     },
     {
       id: "postwar-reserves",
-      label: "Keep a 10% opening-peak reserve throughout 1952",
+      label: "Keep a 10% opening-peak reserve",
       metric: "reserveMargin",
       minReserveW: roundToSignificantDigits(context.peakMW * 1e6 * 0.1, 3),
-      fromMonth: 121,
+      fromMonth: 132,
       throughMonth: 132,
     },
     {
       id: "efficiency-dividend",
-      label:
-        "Save 5% of home and business electricity through efficiency in 1981",
+      label: "Save 5% of home and business electricity through efficiency",
       metric: "efficiencySavings",
       minShare: 0.05,
-      fromMonth: 229,
+      fromMonth: 240,
       throughMonth: 240,
     },
     {
@@ -387,21 +386,21 @@ export function legacyRuleDefinitions(
       metric: "financialCoverage",
       basis: "cash",
       minCoverage: 1,
-      fromMonth: 223,
-      throughMonth: 240,
+      fromMonth: 228,
+      throughMonth: 228,
     },
     {
       id: "serve-the-evening-peak",
-      label: "Serve 99.5% of evening demand in 2019–2021",
+      label: "Serve 99.5% of evening demand",
       metric: "demandServedShare",
       hours: [17, 21],
       minShare: 0.995,
-      fromMonth: 205,
+      fromMonth: 240,
       throughMonth: 240,
     },
     {
       id: "renew-the-oil-fleet",
-      label: "Retire oil equipment commissioned through 2000 by 2035",
+      label: "Retire oil equipment commissioned through 2000",
       metric: "fuelRetirement",
       fuel: "Oil",
       commissionedBeforeYear: 2001,
@@ -434,7 +433,7 @@ export function legacyRuleDefinitions(
       id: "funded-expansion",
       label: "Keep debt within the published allowance",
       metric: "monthEndDebt",
-      fromMonth: 229,
+      fromMonth: 240,
       throughMonth: 240,
       maxDebtDollars: roundToSignificantDigits(
         context.debtAllowance * (context.goalCostIndex ?? 1),
@@ -446,7 +445,7 @@ export function legacyRuleDefinitions(
       id: "affordable-service",
       label: "Keep billed electricity affordable",
       metric: "monthlyBilledRate",
-      fromMonth: 229,
+      fromMonth: 240,
       throughMonth: 240,
       maxDollarsPerKWh: roundToSignificantDigits(
         context.referenceRate * 1.35 * (context.goalRateIndex ?? 1),
@@ -459,10 +458,11 @@ export function legacyRuleDefinitions(
       id: "clean-electricity",
       label: "Reduce emissions per MWh",
       metric: "emissionsPerDeliveredMWh",
-      fromMonth: 217,
+      fromMonth: 240,
       throughMonth: 240,
       maxKgCO2ePerMWh: index === 6 ? 350 : 200,
     });
+  for (const objective of objectives) objective.checkpoint = true;
   const events: RuleEvent[] = [];
   switch (index) {
     case 0:
