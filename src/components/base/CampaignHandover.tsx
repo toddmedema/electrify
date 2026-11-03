@@ -15,11 +15,47 @@ import {
   legacyGenerationTitle,
 } from "../../data/LegacyCampaign";
 import { formatNumber } from "../../helpers/Format";
-import { finishedObjectiveStatusText } from "../../helpers/ObjectivePresentation";
+import {
+  finishedObjectiveStatusText,
+  objectiveGoalText,
+  objectiveTargetText,
+  objectiveWindowText,
+} from "../../helpers/ObjectivePresentation";
+import type { CompiledRuleObjective } from "../../data/ScenarioRules";
 import { LegacyCampaignTermType } from "../../Types";
+
+const goalText = (
+  objective: CompiledRuleObjective,
+  startingYear: number,
+): string => {
+  const window = objectiveWindowText(objective, startingYear, 240);
+  switch (objective.metric) {
+    case "customerRetention":
+      return `Retain ${formatNumber(objective.minRetainedShare, { style: "percent" })} of customers`;
+    case "fuelRetirement":
+      return objective.label;
+    case "financialCoverage":
+      return objective.minCoverage === 1
+        ? `${objective.basis === "revenue" ? "Revenue covers operating costs" : "Cash covers monthly operating costs"} · ${window}`
+        : objectiveGoalText(objective, startingYear, 240);
+    case "monthEndDebt":
+      return `Debt ≤$${formatNumber(Math.floor(objective.maxDebt), { maximumFractionDigits: 0 })} · ${window}`;
+    case "monthlyBilledRate":
+      return `Billed rate ≤$${formatNumber(Math.floor(objective.maxDollarsPerKWh * 1e6) / 1e6, { maximumFractionDigits: 6 })}/kWh · ${window}`;
+    case "emissionsBudget":
+      return `Emit ≤${formatNumber(Math.floor(objective.budgetKgCO2e / 1000), { maximumFractionDigits: 0 })} tonnes CO₂e this term`;
+    case "emissionsPerDeliveredMWh":
+      return `Emit ${objectiveTargetText(objective)} · ${window}`;
+    case "efficiencySavings":
+      return `Save ≥${formatNumber(objective.minShare, { style: "percent" })} of home and business electricity · ${window}`;
+    default:
+      return objectiveGoalText(objective, startingYear, 240);
+  }
+};
 
 export interface CampaignHandoverProps {
   term: LegacyCampaignTermType;
+  nextObjectives: CompiledRuleObjective[];
   busy?: boolean;
   onContinue: () => void;
   onExit: () => void;
@@ -27,6 +63,7 @@ export interface CampaignHandoverProps {
 
 export default function CampaignHandover({
   term,
+  nextObjectives,
   busy,
   onContinue,
   onExit,
@@ -55,7 +92,14 @@ export default function CampaignHandover({
         <Box
           component="ul"
           aria-label="Term results"
-          sx={{ listStyle: "none", p: 0, my: 2, display: "grid", gap: 1.5 }}
+          sx={{
+            listStyle: "none",
+            p: 0,
+            mt: 2,
+            mb: 3,
+            display: "grid",
+            gap: 1.5,
+          }}
         >
           {term.objectiveResults.map((result) => {
             const StatusIcon =
@@ -68,7 +112,7 @@ export default function CampaignHandover({
               <Box
                 component="li"
                 key={result.id}
-                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}
               >
                 <StatusIcon
                   titleAccess={finishedObjectiveStatusText[result.status]}
@@ -79,12 +123,13 @@ export default function CampaignHandover({
                         ? "error"
                         : "disabled"
                   }
-                  sx={{ fontSize: 20, flexShrink: 0 }}
+                  sx={{ fontSize: 20, flexShrink: 0, mt: "1px" }}
                 />
                 <Typography>
-                  {result.metric === "customerRetention"
-                    ? `Retain ${formatNumber(result.target, { style: "percent" })} of customers`
-                    : result.label}
+                  {goalText(
+                    result.objective,
+                    LEGACY_GENERATIONS[term.generationIndex].startYear,
+                  )}
                 </Typography>
               </Box>
             );
@@ -93,6 +138,56 @@ export default function CampaignHandover({
         <Typography component="h3" variant="subtitle1">
           Next: {legacyGenerationTitle(next)}
         </Typography>
+        <Box
+          component="ul"
+          aria-label="Next term goals"
+          sx={{
+            listStyle: "none",
+            p: 0,
+            mt: 1.5,
+            mb: 0,
+            display: "grid",
+            gap: 1.5,
+          }}
+        >
+          {nextObjectives.map((objective, index) => (
+            <Box
+              component="li"
+              key={objective.id}
+              sx={{ display: "flex", gap: 1 }}
+            >
+              <RadioButtonUncheckedIcon
+                aria-hidden="true"
+                sx={{
+                  fontSize: 20,
+                  flexShrink: 0,
+                  mt: "1px",
+                  color: "text.secondary",
+                }}
+              />
+              <Typography
+                color={index === 0 ? "text.primary" : "text.secondary"}
+              >
+                {goalText(objective, next.startYear)}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+        {nextObjectives.some(
+          ({ metric }) =>
+            metric === "monthlyBilledRate" || metric === "monthEndDebt",
+        ) && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", mt: 1.5 }}
+          >
+            {nextObjectives.some(({ metric }) => metric === "monthlyBilledRate")
+              ? "Rate and debt limits"
+              : "Debt limits"}{" "}
+            use 1882 dollars.
+          </Typography>
+        )}
       </DialogContent>
       <DialogActions
         className="campaignHandoverActions"

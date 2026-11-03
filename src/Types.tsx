@@ -426,7 +426,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     customerBatteryLossWh?: number;
     rooftopSurplusW?: number;
     // Home and business load before rebate programs, and what efficiency and rooftop solar removed
-    // from it this tick. Present only while a rebate program has installed anything.
+    // from it this tick. Campaigns also meter eligible load and zero savings with programs off.
     rebateEligibleW?: number;
     efficiencySavedW?: number;
     rooftopSolarW?: number;
@@ -471,6 +471,11 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
   month: number;
   supplyWh: number; // total
   demandWh: number; // total
+  /** Campaign meters; absent historical observations remain unverifiable, never inferred as zero. */
+  efficiencySavedWh?: number;
+  efficiencyEligibleWh?: number; // Gross Residential + Commercial demand before efficiency/rooftop.
+  eveningDemandWh?: number; // Demand from 17:00 inclusive to 21:00 exclusive.
+  eveningUnservedWh?: number;
   // Persisted simulation facts used by story checkpoints. These are deliberately raw totals,
   // not narrative classifications such as "reliable" or "gas-heavy".
   deliveredWhByFuel: FuelProductionType;

@@ -105,7 +105,7 @@ export default function CampaignSetup({
             onClick={onResume}
             sx={{ minHeight: 44 }}
           >
-            Resume generation {activeGeneration + 1}
+            Resume term {activeGeneration + 1}
           </Button>
         )}
         <Button

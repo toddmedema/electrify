@@ -9,6 +9,7 @@ import type {
 import { getInflationIndex, getRateInflationIndex } from "../data/Economy";
 import { bestReachableCustomers } from "./Customers";
 import { customerSalesRevenue } from "./Scoring";
+import { deriveExpandedSummary } from "./DateTime";
 import { ruleDigest } from "./RuleIdentity";
 import {
   isRuleJson,
@@ -22,7 +23,13 @@ import { OBJECTIVE_DEFINITIONS } from "./ScenarioObjectiveDefinitions";
 
 export const objectiveDefinition = (
   metric: CompiledRuleObjective["metric"],
-): string => OBJECTIVE_DEFINITIONS[metric];
+  objective?: CompiledRuleObjective,
+): string =>
+  metric === "fuelRetirement" &&
+  objective?.metric === "fuelRetirement" &&
+  objective.commissionedBeforeYear !== undefined
+    ? `Own no ${objective.fuel} equipment commissioned before ${objective.commissionedBeforeYear} at the deadline or any later month close. Paused equipment counts; newer and unfinished equipment is excluded.`
+    : OBJECTIVE_DEFINITIONS[metric];
 
 const byId = (a: { id: string }, b: { id: string }) =>
   a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
@@ -48,9 +55,14 @@ function observationWindow(
   term: number,
   retentionAtDeadlineOnly = false,
 ): [number, number] {
-  if (objective.metric === "customerRetention")
+  if (
+    objective.metric === "customerRetention" ||
+    objective.metric === "customerCount"
+  )
     return [
-      retentionAtDeadlineOnly ? objective.deadlineMonth : 0,
+      objective.metric === "customerRetention" && retentionAtDeadlineOnly
+        ? objective.deadlineMonth
+        : 0,
       objective.deadlineMonth,
     ];
   if (objective.metric === "fuelRetirement")
@@ -64,7 +76,8 @@ function requiredWindow(
   objective: CompiledRuleObjective,
   term: number,
 ): [number, number] {
-  return objective.metric === "customerRetention"
+  return objective.metric === "customerRetention" ||
+    objective.metric === "customerCount"
     ? [objective.deadlineMonth, objective.deadlineMonth]
     : observationWindow(objective, term);
 }
@@ -88,6 +101,15 @@ export function objectiveTarget(objective: CompiledRuleObjective): number {
       return objective.maxDollarsPerKWh;
     case "monthEndDebt":
       return objective.maxDebt;
+    case "financialCoverage":
+      return objective.minCoverage;
+    case "customerCount":
+      return objective.minCustomers;
+    case "reserveMargin":
+      return objective.minReserveW;
+    case "efficiencySavings":
+    case "demandServedShare":
+      return objective.minShare;
   }
 }
 
@@ -98,9 +120,16 @@ export function objectiveTargetMet(
 ): boolean {
   if (!nonnegative(observed)) return false;
   const target = objectiveTarget(objective);
-  return ["customerRetention", "localFuelShare", "utilityOwnership"].includes(
-    objective.metric,
-  )
+  return [
+    "customerRetention",
+    "localFuelShare",
+    "utilityOwnership",
+    "financialCoverage",
+    "customerCount",
+    "reserveMargin",
+    "efficiencySavings",
+    "demandServedShare",
+  ].includes(objective.metric)
     ? observed >= target
     : observed <= target;
 }
@@ -277,11 +306,49 @@ export function objectiveMonthObservation(
               facts.ownedAssetIds!.includes(asset),
             ).length;
       break;
-    case "fuelRetirement":
+    case "fuelRetirement": {
+      const cohorts = facts.ownedVintageFuels?.filter(
+        (cohort) =>
+          cohort.fuel === objective.fuel &&
+          cohort.commissionedBeforeYear === objective.commissionedBeforeYear,
+      );
       numerator =
-        facts.ownedFuels === undefined
+        objective.commissionedBeforeYear === undefined
+          ? facts.ownedFuels === undefined
+            ? undefined
+            : (facts.ownedFuels[objective.fuel] ?? 0)
+          : cohorts?.length === 1
+            ? cohorts[0].count
+            : undefined;
+      break;
+    }
+    case "financialCoverage":
+      numerator =
+        objective.basis === "cash"
+          ? Math.max(0, row.cash)
+          : customerSalesRevenue(row) + (row.revenueExports ?? 0);
+      denominator = deriveExpandedSummary(row).expenses;
+      break;
+    case "customerCount":
+      numerator = row.customers;
+      break;
+    case "reserveMargin":
+      numerator =
+        row.minimumSupplyMarginW === undefined
           ? undefined
-          : (facts.ownedFuels[objective.fuel] ?? 0);
+          : Math.max(0, row.minimumSupplyMarginW);
+      break;
+    case "efficiencySavings":
+      numerator = row.efficiencySavedWh;
+      denominator = row.efficiencyEligibleWh;
+      break;
+    case "demandServedShare":
+      denominator = objective.hours ? row.eveningDemandWh : row.demandWh;
+      numerator = objective.hours
+        ? denominator === undefined || row.eveningUnservedWh === undefined
+          ? undefined
+          : denominator - row.eveningUnservedWh
+        : Math.min(row.supplyWh, row.demandWh);
       break;
     case "monthlyBilledRate":
       numerator =
@@ -397,14 +464,15 @@ export function evaluateScenarioObjectives(
       metric: objective.metric,
       label: objective.label,
       required: objective.required,
-      definition: objectiveDefinition(objective.metric),
+      definition: objectiveDefinition(objective.metric, objective),
       target: objectiveTarget(objective),
       observedMonths: observed.length,
       requiredMonths,
       status:
         context.completedMonths <=
-        (objective.metric === "customerRetention" &&
-        !context.retentionAtDeadlineOnly
+        ((objective.metric === "customerRetention" &&
+          !context.retentionAtDeadlineOnly) ||
+        objective.metric === "customerCount"
           ? 0
           : first)
           ? "pending"
@@ -412,12 +480,18 @@ export function evaluateScenarioObjectives(
     };
     const windowRatio =
       objective.metric === "emissionsPerDeliveredMWh" ||
-      objective.metric === "localFuelShare";
+      objective.metric === "localFuelShare" ||
+      objective.metric === "efficiencySavings" ||
+      (objective.metric === "financialCoverage" &&
+        objective.basis === "revenue");
+    const permitsZeroDenominator =
+      objective.metric === "financialCoverage" ||
+      objective.metric === "demandServedShare";
     let invalid = observed.some(
       ([, numerator, denominator]) =>
         numerator === null ||
         denominator === null ||
-        (!windowRatio && denominator === 0),
+        (!windowRatio && !permitsZeroDenominator && denominator === 0),
     );
     const duplicate = entry?.duplicateMonths.some(
       (month) =>
@@ -443,8 +517,16 @@ export function evaluateScenarioObjectives(
     );
     if (!Number.isFinite(numeratorTotal) || !Number.isFinite(denominatorTotal))
       invalid = true;
-    if (windowRatio && observed.length && denominatorTotal === 0)
+    if (
+      windowRatio &&
+      !permitsZeroDenominator &&
+      observed.length &&
+      denominatorTotal === 0
+    )
       invalid = true;
+    if (objective.metric === "demandServedShare")
+      for (const [, numerator, denominator] of observed)
+        if (numerator === 0 && denominator === 0) ratios.push(1);
     let failed = false;
     switch (objective.metric) {
       case "customerRetention": {
@@ -482,6 +564,7 @@ export function evaluateScenarioObjectives(
         break;
       case "emissionsPerDeliveredMWh":
       case "localFuelShare":
+      case "efficiencySavings":
         if (
           observed.length &&
           denominatorTotal > 0 &&
@@ -495,6 +578,50 @@ export function evaluateScenarioObjectives(
           result.observed !== undefined &&
           !objectiveTargetMet(objective, result.observed);
         break;
+      case "financialCoverage": {
+        if (observed.length) {
+          const coverage =
+            objective.basis === "revenue"
+              ? denominatorTotal > 0
+                ? numeratorTotal / denominatorTotal
+                : result.target
+              : ratios.length
+                ? Math.min(...ratios)
+                : result.target;
+          if (Number.isFinite(coverage)) result.observed = coverage;
+          else invalid = true;
+        }
+        failed =
+          objective.basis === "revenue"
+            ? ended &&
+              !invalid &&
+              !incomplete &&
+              result.observed !== undefined &&
+              !objectiveTargetMet(objective, result.observed)
+            : ratios.some((value) => !objectiveTargetMet(objective, value));
+        break;
+      }
+      case "reserveMargin":
+      case "demandServedShare":
+        if (ratios.length) result.observed = Math.min(...ratios);
+        failed = ratios.some((value) => !objectiveTargetMet(objective, value));
+        break;
+      case "customerCount": {
+        const latest = entry?.observations
+          .filter(([month]) => month < context.completedMonths)
+          .slice(-1)[0];
+        if (
+          latest?.[1] !== null &&
+          latest?.[1] !== undefined &&
+          latest[2] === 1
+        ) {
+          result.observed = latest[1];
+          failed =
+            latest[0] === objective.deadlineMonth &&
+            !objectiveTargetMet(objective, result.observed);
+        }
+        break;
+      }
       case "utilityOwnership":
         if (ratios.length) result.observed = Math.min(...ratios);
         failed =
@@ -533,6 +660,19 @@ export function evaluateScenarioObjectives(
                 "No target utility was acquired by the deadline.",
               assetRetirement:
                 "An original oil asset remained owned at the retirement deadline.",
+              financialCoverage:
+                objective.metric === "financialCoverage" &&
+                objective.basis === "cash"
+                  ? "Closing cash covered less than the required operating expenses in a completed month."
+                  : "Revenue over the window did not cover the required operating expenses.",
+              customerCount:
+                "Customers at the deadline were below the published growth target.",
+              reserveMargin:
+                "Reachable supply headroom fell below the required amount in a completed month.",
+              efficiencySavings:
+                "Measured efficiency savings were below the required share of eligible consumption.",
+              demandServedShare:
+                "A completed month's demand served was below the required share in the specified hours.",
             }[objective.metric];
     } else if (
       invalid ||
@@ -610,7 +750,8 @@ export function validObjectiveResult(value: unknown): value is ObjectiveResult {
     result.metric === result.objective.metric &&
     result.label === result.objective.label &&
     result.required === result.objective.required &&
-    result.definition === objectiveDefinition(result.metric) &&
+    result.definition ===
+      objectiveDefinition(result.metric, result.objective) &&
     ["pending", "inProgress", "completed", "failed", "unverifiable"].includes(
       result.status,
     ) &&
@@ -724,6 +865,8 @@ export function validObjectiveProgress(
             "monthEndDebt",
             "utilityOwnership",
             "assetRetirement",
+            "customerCount",
+            "reserveMargin",
           ].includes(objective.metric) &&
             denominator !== 1) ||
           (objective.metric === "customerRetention" &&
@@ -735,7 +878,11 @@ export function validObjectiveProgress(
               )) ||
           (objective.metric === "fuelRetirement" &&
             !Number.isSafeInteger(numerator)) ||
-          (objective.metric === "localFuelShare" &&
+          ([
+            "localFuelShare",
+            "efficiencySavings",
+            "demandServedShare",
+          ].includes(objective.metric) &&
             numerator > denominator * (1 + 1e-12))
         )
           return false;

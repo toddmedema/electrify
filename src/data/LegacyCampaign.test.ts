@@ -121,6 +121,52 @@ test.each(LEGACY_SCENARIOS)(
   },
 );
 
+test("each term leads with a distinct historical task and keeps its shared safeguards", () => {
+  const featured = LEGACY_SCENARIOS.map(
+    (scenario) => scenarioRules(scenario)!.objectives[0],
+  );
+  expect(new Set(featured.map(({ id }) => id)).size).toBe(9);
+  expect(featured.map(({ metric }) => metric)).toEqual([
+    "financialCoverage",
+    "customerCount",
+    "monthlyBilledRate",
+    "reserveMargin",
+    "efficiencySavings",
+    "financialCoverage",
+    "demandServedShare",
+    "fuelRetirement",
+    "emissionsBudget",
+  ]);
+  expect(featured[0]).toMatchObject({
+    basis: "revenue",
+    fromMonth: 36,
+    throughMonth: 47,
+  });
+  expect(featured[3]).toMatchObject({ fromMonth: 120, throughMonth: 131 });
+  expect(featured[5]).toMatchObject({
+    basis: "cash",
+    fromMonth: 222,
+    throughMonth: 239,
+  });
+  expect(featured[6]).toMatchObject({
+    hours: [17, 21],
+    fromMonth: 204,
+    throughMonth: 239,
+  });
+  expect(featured[7]).toMatchObject({
+    commissionedBeforeYear: 2001,
+    deadlineMonth: 167,
+  });
+});
+
+test("customer expansion has a frozen feasible target for the inherited territory", () => {
+  const growthGoal = (openingCustomers: number, endMarketCustomers: number) =>
+    legacyRuleDefinitions(1, { openingCustomers, endMarketCustomers })
+      .objectives[0];
+  expect(growthGoal(100, 1000)).toMatchObject({ minCustomers: 150 });
+  expect(growthGoal(1000, 1400)).toMatchObject({ minCustomers: 1330 });
+});
+
 test("a historical event moved beyond a CEO term is rejected by the owning compiler", () => {
   const definition = legacyRuleDefinitions(6);
   definition.events = definition.events!.map((event) =>

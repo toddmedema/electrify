@@ -1,3 +1,4 @@
+import { needsObjectiveEnergyMeters } from "./ScenarioRules";
 import { modScaledValue } from "./ScenarioMod";
 import {
   isLegacyCampaignScenario,
@@ -508,6 +509,13 @@ export function applyPolicyDemand(
   tick: TickPresentFutureType,
   weatherShare = 0,
 ) {
+  // Native setup builds its opening forecast before the linked campaign context is installed.
+  // Keep ordinary inactive ticks unchanged while recording the campaign's full eligible pool.
+  if (needsObjectiveEnergyMeters(game)) {
+    tick.rebateEligibleW =
+      tick.demandByType.Residential + tick.demandByType.Commercial;
+    tick.efficiencySavedW = 0;
+  }
   const p = game.policies?.programs;
   if (!p) return;
   const efficiency = efficiencyInEffect(

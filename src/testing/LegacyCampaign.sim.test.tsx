@@ -30,6 +30,7 @@ import { parseSave, serializeSave } from "../SaveGame";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { sliderTickToW, wToSliderTick } from "../helpers/BuildSizing";
 import { getHydroAvailability } from "../data/HydroSites";
+import { schedulePolicy } from "../reducers/GameActions";
 
 function playbookSizeUsesExistingControls(
   game: ReturnType<typeof createGame>,
@@ -127,8 +128,10 @@ test.each(
 );
 
 test.each<{ difficulty: DifficultyType; steamFirst: boolean }>([
+  { difficulty: "Intern", steamFirst: false },
   { difficulty: "Manager", steamFirst: false },
   { difficulty: "Employee", steamFirst: false },
+  { difficulty: "VP", steamFirst: false },
   { difficulty: "CEO", steamFirst: false },
   { difficulty: "Manager", steamFirst: true },
 ])(
@@ -146,7 +149,7 @@ test.each<{ difficulty: DifficultyType; steamFirst: boolean }>([
       [120, { name: "Coal", peakW: 50000, financed: true }],
       [157, { name: "Hydro", peakW: 750000, financed: true }],
       [240, { name: "Coal", peakW: 200000, financed: true }],
-      [600, { name: "Hydro", peakW: 2000000, financed: false }],
+      [504, { name: "Hydro", peakW: 2000000, financed: false }],
       [720, { name: "Oil", peakW: 1000000, financed: false }],
       [936, { name: "Geothermal", peakW: 2000000, financed: false }],
       [1440, { name: "Geothermal", peakW: 8000000, financed: true }],
@@ -156,10 +159,19 @@ test.each<{ difficulty: DifficultyType; steamFirst: boolean }>([
     if (steamFirst) {
       builds.delete(157);
       builds.set(241, { name: "Hydro", peakW: 750000, financed: true });
-      builds.delete(600);
-      builds.set(504, { name: "Hydro", peakW: 2000000, financed: false });
     }
+    if (difficulty === "VP")
+      builds.set(2052, {
+        name: "Battery",
+        peakWh: 300000000,
+        financed: true,
+      });
     if (difficulty === "CEO") {
+      builds.set(816, {
+        name: "Natural Gas Peaker",
+        peakW: 1000000,
+        financed: true,
+      });
       builds.set(936, { name: "Geothermal", peakW: 1000000, financed: false });
       builds.set(1296, { name: "Oil", peakW: 3000000, financed: false });
       builds.set(1440, { name: "Geothermal", peakW: 6000000, financed: true });
@@ -176,26 +188,45 @@ test.each<{ difficulty: DifficultyType; steamFirst: boolean }>([
         peakW: 10000000,
         financed: true,
       });
-      builds.set(2040, {
+      builds.set(2028, {
         name: "Battery",
         peakWh: 200000000,
         financed: true,
+      });
+      builds.set(2076, {
+        name: "Enhanced Geothermal",
+        peakW: 10000000,
+        financed: false,
       });
     }
     const savedHandovers: boolean[] = [];
     for (let month = 0; month < 2160; month++) {
       const scenario = getScenario(game.scenarioId)!;
+      const marketRate = getMarketRate(
+        legacyMarketReferenceRate(game, scenario),
+        game.date,
+        game.startingYear,
+        game.seed,
+      );
       game = officialCommand(
         game,
         delta({
-          dollarsPerkWh: getMarketRate(
-            legacyMarketReferenceRate(game, scenario),
-            game.date,
-            game.startingYear,
-            game.seed,
-          ),
+          // One selectable investor-rate step below market builds the customer base;
+          // the ordinary market-match control resumes after the first decade.
+          dollarsPerkWh:
+            month >= 240 && month < 360
+              ? (Math.floor(marketRate * 1000) - 1) / 1000
+              : marketRate,
         }),
       );
+      if (month === 1104) {
+        game = officialCommand(
+          game,
+          schedulePolicy({ id: "efficiency", tier: "On", month: month + 1 }),
+        );
+        if (game.policies?.programs.efficiency.pending?.tier !== "On")
+          throw new Error("Rejected efficiency enrollment in 1974");
+      }
       const build = builds.get(month);
       if (build) {
         const size = build.peakWh !== undefined ? build.peakWh : build.peakW;
@@ -229,6 +260,15 @@ test.each<{ difficulty: DifficultyType; steamFirst: boolean }>([
           );
         }
       }
+      if (steamFirst && month === 241) {
+        const spotInList = game.facilities.findIndex(
+          (facility) => facility.fuel === "Coal" && facility.btuPerWh === 35,
+        );
+        game = officialCommand(
+          game,
+          reprioritizeFacility({ spotInList, delta: -spotInList }),
+        );
+      }
       if (month === 270) {
         for (const facility of game.facilities.filter(
           (facility) =>
@@ -247,6 +287,17 @@ test.each<{ difficulty: DifficultyType; steamFirst: boolean }>([
               facility.fuel !== "Oil" ||
               facility.minuteCreated < 1296 * MINUTES_PER_MONTH,
           ))
+          game = officialCommand(game, sellFacility(facility.id));
+      }
+      if (game.date.year === 2035 && game.date.monthNumber === 12) {
+        const startingYear = game.startingYear;
+        for (const facility of game.facilities.filter(
+          (facility) =>
+            facility.fuel === "Oil" &&
+            facility.minuteOperational !== undefined &&
+            getDateFromMinute(facility.minuteOperational, startingYear).year <=
+              2000,
+        ))
           game = officialCommand(game, sellFacility(facility.id));
       }
       for (let tick = 0; tick < TICKS_PER_MONTH; tick++) tickState(game);
@@ -275,6 +326,7 @@ test.each<{ difficulty: DifficultyType; steamFirst: boolean }>([
                   revenue,
                   expensesOM,
                   expensesInterest,
+                  minimumSupplyMarginW,
                 }) => ({
                   peakDemandW,
                   demandWh,
@@ -282,6 +334,7 @@ test.each<{ difficulty: DifficultyType; steamFirst: boolean }>([
                   revenue,
                   expensesOM,
                   expensesInterest,
+                  minimumSupplyMarginW,
                 }),
               ),
             terms: game.campaign?.completedTerms.map((term) => ({

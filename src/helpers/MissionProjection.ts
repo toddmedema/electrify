@@ -59,10 +59,16 @@ function firstFailureMonth(
 ): number | undefined {
   if (result.status !== "failed") return undefined;
   const objective = result.objective;
-  if (objective.metric === "customerRetention") return objective.deadlineMonth;
+  if (
+    objective.metric === "customerRetention" ||
+    objective.metric === "customerCount"
+  )
+    return objective.deadlineMonth;
   if (
     objective.metric === "localFuelShare" ||
-    objective.metric === "emissionsPerDeliveredMWh"
+    objective.metric === "emissionsPerDeliveredMWh" ||
+    objective.metric === "efficiencySavings" ||
+    (objective.metric === "financialCoverage" && objective.basis === "revenue")
   )
     return objective.throughMonth;
   let cumulative = 0;

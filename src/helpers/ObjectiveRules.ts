@@ -172,7 +172,7 @@ const definitionsCache = new WeakMap<
 export function scenarioObjectiveDefinitions(
   scenario?: ScenarioType,
   parameters?: Pick<GameType, "difficulty" | "seed"> &
-    Partial<Pick<GameType, "campaign">>,
+    Partial<Pick<GameType, "campaign" | "customerMarketSize">>,
 ): CompiledRuleObjective[] {
   if (!scenario || scenario.tutorialSteps) return [];
   if (scenario.id === 116) return UTILITY_EXPANSION_OBJECTIVES;
@@ -221,6 +221,7 @@ export function objectiveContextForGame(
     difficulty: game.difficulty ?? "Employee",
     seed: game.seed,
     campaign: game.campaign,
+    customerMarketSize: game.customerMarketSize,
   });
   const campaignInputs = game.campaign
     ? [
@@ -545,6 +546,13 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
     delete completed.reason;
     return completed;
   });
+  // Campaigns lead with their authored historical task, followed by shared safeguards.
+  if (game.campaign) {
+    const order = new Map(
+      objectives.map((objective, index) => [objective.id, index]),
+    );
+    results.sort((left, right) => order.get(left.id)! - order.get(right.id)!);
+  }
   resultCache.set(progress, {
     completedMonths: context.completedMonths,
     rulesDigest: context.rulesDigest,
@@ -567,6 +575,42 @@ export function initializeGameObjectiveProgress(game: GameType): void {
             : game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
         )
       : undefined;
+}
+
+/** Paused equipment still belongs to its commissioning cohort; newer replacements do not. */
+export function objectiveOwnedVintageFuels(
+  game: Pick<GameType, "facilities" | "startingYear">,
+  objectives: readonly CompiledRuleObjective[],
+): NonNullable<
+  import("../data/ScenarioObjectives").ObjectiveMonthFacts["ownedVintageFuels"]
+> {
+  const seen = new Set<string>();
+  return objectives.flatMap((objective) => {
+    if (
+      objective.metric !== "fuelRetirement" ||
+      objective.commissionedBeforeYear === undefined
+    )
+      return [];
+    const key = `${objective.fuel}:${objective.commissionedBeforeYear}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    const cutoff =
+      (objective.commissionedBeforeYear - game.startingYear) *
+      12 *
+      MINUTES_PER_MONTH;
+    return [
+      {
+        fuel: objective.fuel,
+        commissionedBeforeYear: objective.commissionedBeforeYear,
+        count: game.facilities.filter(
+          (facility) =>
+            facility.fuel === objective.fuel &&
+            facility.minuteOperational !== undefined &&
+            facility.minuteOperational < cutoff,
+        ).length,
+      },
+    ];
+  });
 }
 
 export function recordGameObjectiveMonth(
@@ -602,6 +646,7 @@ export function recordGameObjectiveMonth(
     for (const facility of game.facilities)
       if (facility.fuel)
         ownedFuels[facility.fuel] = (ownedFuels[facility.fuel] ?? 0) + 1;
+  const ownedVintageFuels = objectiveOwnedVintageFuels(game, objectives);
   game.objectiveProgress = recordObjectiveMonth(
     progress,
     objectives,
@@ -628,6 +673,7 @@ export function recordGameObjectiveMonth(
           }
         : {}),
       ...(needsFuels ? { ownedFuels } : {}),
+      ...(ownedVintageFuels.length ? { ownedVintageFuels } : {}),
     },
     context,
   );
@@ -723,9 +769,11 @@ export function validGameObjectiveProgress(game: GameType): boolean {
           ? context.retentionAtDeadlineOnly
             ? objective.deadlineMonth
             : 0
-          : objective.fromMonth;
+          : objective.metric === "customerCount"
+            ? 0
+            : objective.fromMonth;
       const last =
-        objective.metric === "customerRetention"
+        "deadlineMonth" in objective
           ? objective.deadlineMonth
           : objective.throughMonth;
       if (month < first || month > last) continue;
@@ -796,6 +844,7 @@ export function runFailure(
     difficulty: game.difficulty,
     seed: game.seed ?? scenario.seed ?? 0,
     campaign: game.campaign,
+    customerMarketSize: game.customerMarketSize,
   });
   const progress =
     game.objectiveProgress ??

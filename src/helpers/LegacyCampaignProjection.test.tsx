@@ -46,7 +46,7 @@ test("forecast goals use the current CEO's local evidence and actual calendar da
     ...EMPTY_HISTORY,
     year: 1882 + Math.floor(month / 12),
     month: (month % 12) + 1,
-    customers: 100,
+    customers: 150,
     cash: 1e9,
     supplyWh: 1e6,
     demandWh: 1e6,

@@ -418,6 +418,7 @@ const objective = () => ({
         "fuelRetirement",
         "utilityOwnership",
         "assetRetirement",
+        "customerCount",
       ].includes(metric)
     ) {
       props.deadlineMonth = month();
@@ -478,9 +479,56 @@ const objective = () => ({
           "Month-end loan principal limit in dollars; excludes interest",
         ),
       },
+      financialCoverage: {
+        basis: enumeration(
+          ["revenue", "cash"],
+          "Revenue over the window or minimum monthly closing cash, relative to operating expenses.",
+        ),
+        minCoverage: numeric(0, 1e6, "Minimum multiple of operating expenses"),
+      },
+      customerCount: {
+        minCustomers: numeric(
+          0,
+          1e12,
+          "Absolute customer count at the deadline",
+        ),
+      },
+      reserveMargin: {
+        minReserveW: numeric(
+          0,
+          1e15,
+          "Minimum reachable supply headroom in watts each month",
+        ),
+      },
+      efficiencySavings: {
+        minShare: numeric(
+          0,
+          1,
+          "Minimum share of eligible residential and commercial energy saved over the window",
+        ),
+      },
+      demandServedShare: {
+        minShare: numeric(
+          0,
+          1,
+          "Minimum monthly share of demand served in the selected hours",
+        ),
+      },
     }[metric];
     Object.assign(props, targets);
     required.push(...Object.keys(targets));
+    if (metric === "fuelRetirement")
+      props.commissionedBeforeYear = numeric(
+        1800,
+        2200,
+        "Optional exclusive commissioning year cutoff; omit to target every owned asset of the fuel",
+        true,
+      );
+    if (metric === "demandServedShare")
+      props.hours = enumeration(
+        [[17, 21]],
+        "Optional local-time evening window, 17:00 inclusive to 21:00 exclusive; omit for all hours.",
+      );
     return object(
       props,
       required,

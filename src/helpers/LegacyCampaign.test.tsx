@@ -6,21 +6,16 @@ import { GENERATORS } from "../data/Facilities";
 import { hasEconomy, initEconomyFromCsv } from "../data/Economy";
 import { loanBalanceAfterTicks } from "./Financials";
 import { interpretScenarioRuleReport } from "./ScenarioRuleRuntime";
-import { resolveStoryAtDate } from "../data/WorldEvents";
-import { buildStorySnapshot } from "./Story";
 import cloneDeep from "lodash.clonedeep";
 import { TICKS_PER_MONTH, TICK_MINUTES } from "../Constants";
 import { LEGACY_SCENARIOS } from "../data/LegacyCampaign";
 import { getScenario } from "../data/Scenarios";
 import { scenarioRules } from "./ScenarioRules";
-import {
-  getDateFromMinute,
-  MINUTES_PER_MONTH,
-  summarizeTimeline,
-} from "./DateTime";
+import { MINUTES_PER_MONTH, summarizeTimeline } from "./DateTime";
 import {
   gameObjectiveResults,
-  recordGameObjectiveMonth,
+  scenarioObjectiveDefinitions,
+  objectiveOwnedVintageFuels,
 } from "./ObjectiveRules";
 import { parseSave, serializeSave } from "../SaveGame";
 import reducer, {
@@ -34,8 +29,10 @@ import { loadSimData } from "../testing/SimData";
 import {
   firstCompany,
   closingCompany,
+  closeProtocolGeneration,
 } from "../testing/LegacyCampaignProtocolFixtures";
 import { validLegacyCampaign } from "./LegacyCampaign";
+import { isStorage } from "../Types";
 import type { GameType, SaveGameType, VictoryType } from "../Types";
 
 /** Continue validates the wire save before Loading downloads simulation data. */
@@ -74,6 +71,33 @@ test("campaign initialization uses the native unranked setup and rejects forged 
     changed.game.campaign![field] += 1;
     expect(parseSave(changed)).toBeNull();
   }
+});
+
+test("oil retirement counts paused commissioned equipment, excludes replacements, and deduplicates cohort facts", () => {
+  const game = firstCompany();
+  const generator = game.facilities[0];
+  if (isStorage(generator))
+    throw new Error("Expected the starting steam generator");
+  game.facilities = [2000, 2001, undefined].map((year, index) => ({
+    ...generator,
+    id: index + 1,
+    fuel: "Oil",
+    paused: true,
+    minuteOperational:
+      year === undefined ? undefined : (year - 1882) * 12 * MINUTES_PER_MONTH,
+  }));
+  const objectives = scenarioObjectiveDefinitions(LEGACY_SCENARIOS[7]);
+  const cohortGoal = objectives.find(
+    (goal) => goal.metric === "fuelRetirement",
+  )!;
+  expect(
+    objectiveOwnedVintageFuels(game, [
+      cohortGoal,
+      { ...cohortGoal, id: "second-oil-deadline" },
+    ]),
+  ).toEqual([{ fuel: "Oil", commissionedBeforeYear: 2001, count: 1 }]);
+  game.facilities.shift();
+  expect(objectiveOwnedVintageFuels(game, [cohortGoal])[0].count).toBe(0);
 });
 
 test("only the scheduled 20-year boundary pauses for a CEO handover and continuation preserves the company", () => {
@@ -215,70 +239,6 @@ test("a resumed later generation does not mistake missing presentation history f
   expect(restored!.game.objectiveProgress?.completedMonths).toBe(0);
 });
 
-/** Evidence fixtures isolate the handover protocol; full economics use the headless campaigns. */
-function closeProtocolGeneration(
-  opening: GameType,
-  saveEffects?: RunSaveEffects,
-): GameType {
-  const game = cloneDeep(opening);
-  const campaign = game.campaign!;
-  const customers = campaign.openingCustomers;
-  const row = summarizeTimeline(game.timeline, 1882);
-  game.dollarsPerkWh = 0;
-  game.customerRate = 0;
-  for (let local = 0; local < 239; local++) {
-    const month = campaign.termStartMonth + local;
-    game.date = getDateFromMinute((month + 1) * MINUTES_PER_MONTH, 1882);
-    const closed = {
-      ...row,
-      year: 1882 + Math.floor(month / 12),
-      month: (month % 12) + 1,
-      customers,
-      cash: 1e12,
-      revenue: 0,
-      revenueExports: 0,
-      revenueGrants: 0,
-      supplyWh: 1e12,
-      demandWh: 1e12,
-      kgco2e: 0,
-      localKgco2e: 0,
-      importedKgco2e: 0,
-      constructionKgco2e: 0,
-    };
-    game.monthlyHistory.unshift(closed);
-    recordGameObjectiveMonth(game, closed);
-    const resolved = resolveStoryAtDate({
-      rules: scenarioRules(getScenario(game.scenarioId), game),
-      scenarioId: game.scenarioId,
-      difficulty: game.difficulty,
-      seed: game.seed,
-      date: game.date,
-      location: game.location,
-      snapshot: buildStorySnapshot(
-        game.monthlyHistory,
-        game.facilities,
-        game.date.minute,
-      ),
-      occurrences: game.worldEvents.occurrences,
-    });
-    game.worldEvents.occurrences.push(...resolved.occurrences);
-    game.worldEvents.active = resolved.active;
-  }
-  game.timeline = generateNewTimeline(game, 1e12, customers);
-  game.timeline.forEach((tick) => {
-    tick.cash = 1e12;
-    tick.customers = customers;
-    tick.customerRate = 0;
-    tick.customerBillingRate = 0;
-  });
-  game.date = getDateFromMinute(
-    (campaign.termStartMonth + 240) * MINUTES_PER_MONTH - TICK_MINUTES,
-    1882,
-  );
-  tickState(game, saveEffects);
-  return game;
-}
-
 test("all nine generations retain bounded, verifiable saves past 1200 global months", () => {
   jest.useFakeTimers();
   try {
@@ -295,7 +255,8 @@ test("all nine generations retain bounded, verifiable saves past 1200 global mon
       expect(game.objectiveProgress?.completedMonths).toBe(240);
       expect(game.campaign?.pendingHandover).toBe(index < 8);
       const save = cloneDeep(serializeSave(game));
-      expect(parseSave(save)).not.toBeNull();
+      if (!parseSave(save))
+        throw new Error(`Protocol save rejected after term ${index + 1}`);
       expectColdImport(save);
       expect(
         parseSave(JSON.parse(JSON.stringify(encodeSave(save)))),

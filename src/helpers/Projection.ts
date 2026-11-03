@@ -1,3 +1,4 @@
+import { needsObjectiveEnergyMeters } from "./ScenarioRules";
 import { GAME_TO_REAL_YEARS, TICK_MINUTES, TICKS_PER_YEAR } from "../Constants";
 import { getScenario } from "../data/Scenarios";
 import {
@@ -10,7 +11,10 @@ import { sampleForecastTimeline } from "./ForecastSampling";
 import { generateForecastTimeline } from "../reducers/Game";
 import { GameType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
 import type { ObjectiveMonthFacts } from "../data/ScenarioObjectives";
-import { scenarioObjectiveDefinitions } from "./ObjectiveRules";
+import {
+  objectiveOwnedVintageFuels,
+  scenarioObjectiveDefinitions,
+} from "./ObjectiveRules";
 import { getTotalDebt } from "./Financials";
 import { legacyMonthOffset } from "./LegacyCampaign";
 
@@ -55,6 +59,7 @@ export interface ProjectionView {
     | "month"
     | "debtPrincipal"
     | "ownedFuels"
+    | "ownedVintageFuels"
     | "ownedUtilities"
     | "ownedAssetIds"
   >[];
@@ -217,10 +222,11 @@ function buildProjection(
 
   // Cash risk and charts share one simulation, never longer than 20 years.
   const cashMonths = cashRunwayHorizon(game);
-  const needsAssets = scenarioObjectiveDefinitions(
+  const objectives = scenarioObjectiveDefinitions(
     getScenario(game.scenarioId, game.customScenario),
     game,
-  ).some(({ metric }) =>
+  );
+  const needsAssets = objectives.some(({ metric }) =>
     [
       "monthEndDebt",
       "fuelRetirement",
@@ -249,9 +255,14 @@ function buildProjection(
             if (facility.fuel)
               ownedFuels[facility.fuel] = (ownedFuels[facility.fuel] ?? 0) + 1;
           }
+          const ownedVintageFuels = objectiveOwnedVintageFuels(
+            state,
+            objectives,
+          );
           objectiveAssets.push({
             month,
             ownedFuels,
+            ...(ownedVintageFuels.length ? { ownedVintageFuels } : {}),
             debtPrincipal: getTotalDebt([
               ...state.facilities,
               ...(state.transmission?.lines ?? []),
@@ -308,10 +319,16 @@ function buildProjection(
   blackouts.unshift({ minute: rangeMin, value: 0 });
   const sampled = sampleForecastTimeline(timeline, 240 * MAX_FORECAST_YEARS);
 
-  const currentMonth = summarizeTimeline(game.timeline, game.startingYear);
+  const currentMonth = summarizeTimeline(
+    game.timeline,
+    game.startingYear,
+    undefined,
+    needsObjectiveEnergyMeters(game),
+  );
   const projectedMonths = summarizeTimelineByMonth(
     timeline,
     game.startingYear,
+    needsObjectiveEnergyMeters(game),
   ).slice(1);
   return {
     ...(needsAssets ? { objectiveAssets } : {}),

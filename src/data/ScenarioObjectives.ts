@@ -45,6 +45,12 @@ export interface ObjectiveMonthFacts {
   debtPrincipal?: number;
   /** Counts every owned asset, including paused and unfinished facilities. */
   ownedFuels?: Partial<Record<FuelNameType, number>>;
+  /** Counts the exact fuel and commissioning cutoff requested by a retirement objective. */
+  ownedVintageFuels?: {
+    fuel: FuelNameType;
+    commissionedBeforeYear: number;
+    count: number;
+  }[];
   ownedUtilities?: string[];
   /** Stable original equipment identities still owned at this month close. */
   ownedAssetIds?: string[];

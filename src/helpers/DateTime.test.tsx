@@ -261,6 +261,51 @@ describe("summarizeTimeline", () => {
     );
     expect(summary.revenue).toBe(20);
   });
+
+  it.each([TICK_MINUTES, 60])(
+    "meters campaign savings and the 17–21 service window at %i minute resolution",
+    (step) => {
+      const timeline = ticks(new Array(1440 / step).fill(100));
+      timeline.forEach((tick, index) => {
+        tick.minute = index * step;
+        tick.demandW = 100;
+        tick.supplyW =
+          tick.minute >= 18 * 60 && tick.minute < 19 * 60 ? 70 : 150;
+        tick.rebateEligibleW = 1000;
+        tick.efficiencySavedW = 100;
+        tick.rooftopSolarW = 700;
+      });
+      const ordinary = summarizeTimeline(timeline, 2020);
+      const metered = summarizeTimeline(timeline, 2020, undefined, true);
+      const {
+        efficiencySavedWh,
+        efficiencyEligibleWh,
+        eveningDemandWh,
+        eveningUnservedWh,
+        ...unchanged
+      } = metered;
+      expect(efficiencySavedWh).toBeCloseTo(100 * 24 * GAME_TO_REAL_YEARS);
+      expect(efficiencyEligibleWh).toBeCloseTo(1000 * 24 * GAME_TO_REAL_YEARS);
+      expect(eveningDemandWh).toBeCloseTo(100 * 4 * GAME_TO_REAL_YEARS);
+      expect(eveningUnservedWh).toBeCloseTo(30 * GAME_TO_REAL_YEARS);
+      expect(JSON.stringify(unchanged)).toBe(JSON.stringify(ordinary));
+      expect(summarizeTimelineByMonth(timeline, 2020, true)).toEqual([metered]);
+    },
+  );
+
+  it("does not replace missing historical efficiency readings with zero observations", () => {
+    const timeline = ticks([100, 200, 300]);
+    timeline.forEach((tick) => {
+      tick.rebateEligibleW = 1000;
+      tick.efficiencySavedW = 0;
+    });
+    delete timeline[1].rebateEligibleW;
+    const summary = summarizeTimeline(timeline, 2020, undefined, true);
+    expect(summary).not.toHaveProperty("efficiencyEligibleWh");
+    expect(summary).not.toHaveProperty("efficiencySavedWh");
+    expect(summary.eveningDemandWh).toBe(0);
+    expect(summary.eveningUnservedWh).toBe(0);
+  });
 });
 
 describe("summarizeHistory", () => {

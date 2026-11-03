@@ -41,13 +41,15 @@ import {
   validOfficialArcMetadata,
   officialArcLoadScale,
 } from "./ScenarioRuleArcs";
-import { SCENARIOS } from "../data/Scenarios";
+import { SCENARIOS, getScenario } from "../data/Scenarios";
 import { inEraMoney } from "../data/FuelPrices";
 import { getScenarioLocation } from "./Locations";
 import { validOfficialArcChoiceMetadata } from "./ScenarioRuleChoices";
 import { scenarioRuleDependencyDiagnostics } from "./ScenarioRuleDependencies";
 import { requiredFuelShareFeasibility } from "./ScenarioFuelShares";
 import { TRANSMISSION_CORRIDORS } from "../data/AdjacentMarkets";
+import { customerMarketSizeAt } from "./Customers";
+import { MINUTES_PER_MONTH } from "./DateTime";
 
 export class RuleCompilationError extends Error {
   constructor(public diagnostics: RuleDiagnostic[]) {
@@ -295,11 +297,25 @@ function customScenarioRules(
 }
 
 const legacyRulesCache = new Map<string, CompiledScenarioRules>();
+
+/** Keep ordinary scenario output unchanged; native campaigns and authored meter goals opt in. */
+export function needsObjectiveEnergyMeters(game: GameType): boolean {
+  if (isLegacyCampaignScenario(game.scenarioId)) return true;
+  return (
+    scenarioRules(
+      getScenario(game.scenarioId, game.customScenario),
+      game,
+    )?.objectives.some(
+      ({ metric }) =>
+        metric === "efficiencySavings" || metric === "demandServedShare",
+    ) ?? false
+  );
+}
 /** Compile bounded CEO data, then project event/report clocks onto the physical campaign. */
 function legacyScenarioRules(
   scenario: ScenarioType,
   parameters: Pick<GameType, "difficulty" | "seed"> &
-    Partial<Pick<GameType, "campaign">>,
+    Partial<Pick<GameType, "campaign" | "customerMarketSize">>,
 ): CompiledScenarioRules {
   const index = LEGACY_GENERATIONS.findIndex(
     (generation) => generation.scenarioId === scenario.id,
@@ -307,6 +323,13 @@ function legacyScenarioRules(
   const generation = LEGACY_GENERATIONS[index];
   const context = parameters.campaign;
   const offset = context?.termStartMonth ?? 0;
+  const endMarketCustomers =
+    context && parameters.customerMarketSize !== undefined
+      ? customerMarketSizeAt(
+          parameters.customerMarketSize,
+          (offset + LEGACY_GENERATION_MONTHS) * MINUTES_PER_MONTH,
+        )
+      : undefined;
   const key = canonicalRuleJson([
     scenario.id,
     offset,
@@ -317,10 +340,15 @@ function legacyScenarioRules(
     context?.referenceRate,
     context?.debtAllowance,
     context?.emissionsBudgetTonnes,
+    context?.openingCustomers,
+    endMarketCustomers,
   ]);
   const cached = legacyRulesCache.get(key);
   if (cached) return cached;
-  const definitions = legacyRuleDefinitions(index, context);
+  const definitions = legacyRuleDefinitions(index, {
+    ...context,
+    ...(endMarketCustomers === undefined ? {} : { endMarketCustomers }),
+  });
   const local = compileScenarioRules(definitions, {
     namespace: {
       kind: "official",
@@ -349,6 +377,12 @@ function legacyScenarioRules(
       : report;
   const rules: CompiledScenarioRules = {
     ...local,
+    // Preserve the historical task's prominence without changing canonical rule ordering elsewhere.
+    objectives: [...local.objectives].sort(
+      (left, right) =>
+        definitions.objectives.findIndex(({ id }) => id === left.id) -
+        definitions.objectives.findIndex(({ id }) => id === right.id),
+    ),
     startingYear: context
       ? LEGACY_GENERATIONS[0].startYear
       : generation.startYear,
@@ -381,7 +415,7 @@ function legacyScenarioRules(
 export function scenarioRules(
   scenario?: ScenarioType,
   parameters?: Pick<GameType, "difficulty" | "seed"> &
-    Partial<Pick<GameType, "campaign">>,
+    Partial<Pick<GameType, "campaign" | "customerMarketSize">>,
 ): CompiledScenarioRules | undefined {
   if (!scenario) return undefined;
   if (isLegacyCampaignScenario(scenario.id))

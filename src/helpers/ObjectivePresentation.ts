@@ -38,7 +38,15 @@ export function objectiveValueText(
   switch (objective.metric) {
     case "customerRetention":
     case "localFuelShare":
+    case "efficiencySavings":
+    case "demandServedShare":
       return number(value, comparison, true);
+    case "financialCoverage":
+      return `${number(value, comparison)}× operating costs`;
+    case "customerCount":
+      return `${number(value, comparison)} customers`;
+    case "reserveMargin":
+      return `${number(value / 1e6, comparison === undefined ? undefined : comparison / 1e6)} MW headroom`;
     case "emissionsBudget":
       return `${number(value / 1000, comparison === undefined ? undefined : comparison / 1000)} tonnes CO₂e`;
     case "emissionsPerDeliveredMWh":
@@ -52,7 +60,7 @@ export function objectiveValueText(
     case "assetRetirement":
       return `${number(value)} original oil ${value === 1 ? "asset" : "assets"}`;
     case "fuelRetirement":
-      return `${number(value)} owned ${objective.fuel} ${value === 1 ? "asset" : "assets"}`;
+      return `${number(value)} owned ${objective.fuel} ${value === 1 ? "asset" : "assets"}${objective.commissionedBeforeYear === undefined ? "" : ` commissioned before ${objective.commissionedBeforeYear}`}`;
   }
 }
 
@@ -97,6 +105,18 @@ export function objectiveTargetText(objective: CompiledRuleObjective): string {
       return `Bills ≤${target} each month`;
     case "monthEndDebt":
       return `Month-close debt ≤${target}`;
+    case "financialCoverage":
+      return objective.basis === "cash"
+        ? `Closing cash ≥${target} each month`
+        : `Revenue ≥${target} over the window`;
+    case "customerCount":
+      return `Reach ≥${target}`;
+    case "reserveMargin":
+      return `Keep ≥${target} each month`;
+    case "efficiencySavings":
+      return `Save ≥${target} of eligible energy`;
+    case "demandServedShare":
+      return `Serve ≥${target} of demand each month${objective.hours ? " · 17:00–21:00" : ""}`;
     default:
       return `≤${target}`;
   }
@@ -116,7 +136,8 @@ export function objectiveGoalText(
   durationMonths: number,
 ): string {
   const window = objectiveWindowText(objective, startingYear, durationMonths);
-  return objective.metric === "customerRetention"
+  return objective.metric === "customerRetention" ||
+    objective.metric === "customerCount"
     ? `${objectiveTargetText(objective)} by ${window}`
     : `${objectiveTargetText(objective)} · ${window}`;
 }
@@ -146,14 +167,24 @@ export function objectiveObservedText(result: ObjectiveResult): string {
     result.target,
   );
   const live = result.status === "pending" || result.status === "inProgress";
-  if (result.metric === "customerRetention" && live) return `${value} now`;
+  if (
+    (result.metric === "customerRetention" ||
+      result.metric === "customerCount") &&
+    live
+  )
+    return `${value} now`;
   const label =
-    result.metric === "customerRetention"
+    result.metric === "customerRetention" || result.metric === "customerCount"
       ? "Latest month close "
       : result.metric === "monthlyBilledRate" ||
           result.metric === "monthEndDebt"
         ? "Highest "
-        : "";
+        : result.metric === "reserveMargin" ||
+            result.metric === "demandServedShare" ||
+            (result.objective.metric === "financialCoverage" &&
+              result.objective.basis === "cash")
+          ? "Lowest "
+          : "";
   return `${label}${value}${months ? ` · ${months}` : ""}${result.status === "unverifiable" ? " · not verifiable" : ""}`;
 }
 

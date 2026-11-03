@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { store } from "../../Store";
@@ -7,8 +7,15 @@ import { dialogClose, dialogOpen } from "../../reducers/UI";
 import { sessionChanged } from "../../SaveLibrary";
 import { createGame } from "../../testing/Simulator";
 import { LegacyCampaignTermType } from "../../Types";
+import { LEGACY_SCENARIOS } from "../../data/LegacyCampaign";
+import { scenarioObjectiveDefinitions } from "../../helpers/ObjectiveRules";
 import CampaignHandover from "./CampaignHandover";
 import CampaignHandoverContainer from "./CampaignHandoverContainer";
+import { selectNextTermObjectives } from "./CampaignHandoverContainer";
+import { closingCompany } from "../../testing/LegacyCampaignProtocolFixtures";
+import gameReducer, { continueLegacyCampaign } from "../../reducers/Game";
+
+const nextObjectives = scenarioObjectiveDefinitions(LEGACY_SCENARIOS[1]);
 
 jest.mock("../../SaveSession", () => ({
   saveSessionMiddleware:
@@ -84,12 +91,21 @@ it("shows concise term results and requires an explicit handover", async () => {
   const onContinue = jest.fn();
   const onExit = jest.fn();
   render(
-    <CampaignHandover term={term} onContinue={onContinue} onExit={onExit} />,
+    <CampaignHandover
+      term={term}
+      nextObjectives={nextObjectives}
+      onContinue={onContinue}
+      onExit={onExit}
+    />,
   );
   expect(screen.getByRole("dialog", { name: "Term 1 complete" })).toBeVisible();
   expect(screen.queryByText("First Light (1882–1901)")).not.toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Met" })).toBeVisible();
-  expect(screen.getByText("Retain 90% of customers")).toBeVisible();
+  expect(
+    within(screen.getByRole("list", { name: "Term results" })).getByText(
+      "Retain 90% of customers",
+    ),
+  ).toBeVisible();
   expect(screen.queryByText("Objectives")).not.toBeInTheDocument();
   expect(screen.queryByText("Your successor inherits")).not.toBeInTheDocument();
   expect(screen.queryByText("Demand served")).not.toBeInTheDocument();
@@ -99,6 +115,10 @@ it("shows concise term results and requires an explicit handover", async () => {
       name: "Next: Beyond the Dynamo (1902–1921)",
     }),
   ).toBeVisible();
+  expect(
+    screen.getByRole("list", { name: "Next term goals" }),
+  ).toHaveTextContent("Reach ≥600 customers");
+  expect(screen.getAllByRole("img", { name: "Met" })).toHaveLength(1);
   await userEvent.keyboard("{Escape}");
   expect(onContinue).not.toHaveBeenCalled();
   expect(onExit).not.toHaveBeenCalled();
@@ -117,12 +137,30 @@ it("does not mark an unmet goal as completed", () => {
         ...term,
         objectiveResults: [{ ...term.objectiveResults[0], status: "failed" }],
       }}
+      nextObjectives={nextObjectives}
       onContinue={jest.fn()}
       onExit={jest.fn()}
     />,
   );
   expect(screen.getByRole("img", { name: "Failed" })).toBeVisible();
   expect(screen.queryByRole("img", { name: "Met" })).not.toBeInTheDocument();
+});
+
+it("previews the exact inherited next-term goals without advancing or mutating the company", () => {
+  const game = { ...closingCompany(), inGame: true };
+  const before = JSON.stringify(game);
+  const state = { ...store.getState(), game };
+  const preview = selectNextTermObjectives(state);
+  const next = gameReducer(game, continueLegacyCampaign());
+  expect(preview).toEqual(
+    scenarioObjectiveDefinitions(LEGACY_SCENARIOS[1], next),
+  );
+  expect(preview[0]).toMatchObject({ metric: "customerCount" });
+  expect(JSON.stringify(game)).toBe(before);
+  expect(selectNextTermObjectives(state)).toBe(preview);
+  expect(
+    selectNextTermObjectives({ ...state, game: { ...game, inGame: false } }),
+  ).toEqual([]);
 });
 
 it("yields to the save recovery dialog and returns after recovery closes", () => {

@@ -9,7 +9,12 @@ import { LEGACY_SCENARIOS } from "../src/data/LegacyCampaign";
 import { resolveStoryAtDate } from "../src/data/WorldEvents";
 import { parseSave, serializeSave } from "../src/SaveGame";
 import { encodeSave } from "../src/SaveEncoding";
-import { generateNewTimeline, tickState } from "../src/reducers/Game";
+import gameReducer, {
+  continueLegacyCampaign,
+  generateNewTimeline,
+  tickState,
+} from "../src/reducers/Game";
+import { closeProtocolGeneration } from "../src/testing/LegacyCampaignProtocolFixtures";
 import { loadSimData } from "../src/testing/SimData";
 import {
   getDateFromMinute,
@@ -196,6 +201,8 @@ for (const theme of ["light", "dark"] as const) {
           month: (month % 12) + 1,
           customers: 100,
           cash: 100000,
+          revenue:
+            row.expensesFuel + row.expensesOM + row.expensesInterest + 1e6,
         };
         game.monthlyHistory.unshift(closed);
         recordGameObjectiveMonth(game, closed);
@@ -242,12 +249,18 @@ for (const theme of ["light", "dark"] as const) {
         name: "Next: Beyond the Dynamo (1902–1921)",
       }),
     ).toBeVisible();
-    await expect(handover.getByRole("img", { name: "Met" })).toHaveCount(1);
+    await expect(handover.getByRole("img", { name: "Met" })).toHaveCount(2);
+    const nextGoals = handover.getByRole("list", { name: "Next term goals" });
+    await expect(nextGoals).toContainText(/Reach ≥\d[\d,.]* customers/);
+    await expect(nextGoals).toContainText("Retain 90% of customers");
+    await expect(nextGoals.getByRole("img", { name: "Met" })).toHaveCount(0);
     await expect(
       handover.getByText("First Light (1882–1901)", { exact: true }),
     ).toHaveCount(0);
     await expect(
-      handover.getByText("Retain 90% of customers", { exact: true }),
+      handover
+        .getByRole("list", { name: "Term results" })
+        .getByText("Retain 90% of customers", { exact: true }),
     ).toBeVisible();
     await expect(handover.getByText("Objectives", { exact: true })).toHaveCount(
       0,
@@ -261,9 +274,16 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       handover.getByText("Demand not met", { exact: true }),
     ).toHaveCount(0);
-    const goal = handover.getByText("Retain 90% of customers", { exact: true });
+    const goal = handover
+      .getByRole("list", { name: "Term results" })
+      .getByText("Retain 90% of customers", { exact: true });
     const [checkBox, goalBox, beginBox, exitBox] = await Promise.all([
-      handover.getByRole("img", { name: "Met" }).boundingBox(),
+      handover
+        .getByRole("list", { name: "Term results" })
+        .locator("li")
+        .filter({ hasText: "Retain 90% of customers" })
+        .getByRole("img", { name: "Met" })
+        .boundingBox(),
       goal.boundingBox(),
       handover
         .getByRole("button", { name: "Begin next term", exact: true })
@@ -323,6 +343,87 @@ for (const theme of ["light", "dark"] as const) {
     expect(successor?.customerRate).toBe(closed?.customerRate);
     expect(successor?.dollarsPerkWh).toBe(closed?.dollarsPerkWh);
     expect(successor?.timeline[0].cash).toBe(closed?.timeline[0].cash);
+
+    // A protocol fixture reaches the longest incoming term. Full campaign balance has separate
+    // real-action simulation coverage; this checks goal wrapping, scrolling, and saved previews.
+    await editSavedGame(page, (save) => {
+      let game = save.game;
+      loadSimData(game.location);
+      while (game.campaign!.generationIndex <= 7) {
+        game = closeProtocolGeneration(game);
+        if (game.campaign!.generationIndex === 7) break;
+        game = gameReducer(game, continueLegacyCampaign());
+      }
+      Object.assign(save, serializeSave(game));
+      expect(
+        parseSave(JSON.parse(JSON.stringify(encodeSave(save)))),
+      ).not.toBeNull();
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const lateHandover = page.getByRole("dialog", { name: "Term 8 complete" });
+    await expect(lateHandover).toBeVisible();
+    await expect(lateHandover.locator("..")).toHaveCSS("opacity", "1");
+    await expectDialogToFit(lateHandover);
+    await expect(
+      lateHandover.getByRole("heading", {
+        name: "Next: A Different Kind of Growth (2042–2061)",
+      }),
+    ).toBeVisible();
+    const finalGoals = lateHandover.getByRole("list", {
+      name: "Next term goals",
+    });
+    await expect(finalGoals.getByRole("listitem")).toHaveCount(6);
+    await expect(finalGoals.getByRole("listitem").first()).toContainText(
+      /Emit ≤.*tonnes CO₂e this term/,
+    );
+    await expect(
+      lateHandover.getByRole("button", { name: "Begin next term" }),
+    ).toBeVisible();
+    if (
+      process.env.REVIEW_SCREENSHOT_DIR &&
+      theme === "light" &&
+      info.project.name === "desktop-chromium"
+    ) {
+      await lateHandover
+        .getByRole("heading", { name: "Term 8 complete" })
+        .click();
+      await lateHandover.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          "legacy-campaign-final-preview-desktop-light.png",
+        ),
+      });
+    }
+    if (
+      process.env.REVIEW_SCREENSHOT_DIR &&
+      theme === "dark" &&
+      info.project.name === "mobile-360px"
+    ) {
+      await lateHandover
+        .getByRole("heading", { name: "Term 8 complete" })
+        .click();
+      await lateHandover.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          "legacy-campaign-final-preview-mobile-dark.png",
+        ),
+      });
+    }
+    const dollarBasis = lateHandover.getByText(
+      "Rate and debt limits use 1882 dollars.",
+    );
+    await dollarBasis.scrollIntoViewIfNeeded();
+    await expect(dollarBasis).toBeVisible();
+    await expect(finalGoals.getByRole("listitem").last()).toBeVisible();
+    await expect(
+      lateHandover.getByRole("button", { name: "Begin next term" }),
+    ).toBeVisible();
+    await lateHandover.getByRole("button", { name: "Begin next term" }).click();
+    await expect(lateHandover).toHaveCount(0);
+    const finalCompany = await readSavedGame(page);
+    expect(finalCompany?.campaign?.generationIndex).toBe(8);
+    expect(finalCompany?.objectiveProgress?.completedMonths).toBe(0);
   });
 }
 

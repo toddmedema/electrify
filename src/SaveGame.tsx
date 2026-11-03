@@ -568,6 +568,22 @@ export function parseSave(raw: unknown): SaveGameType | null {
         return true;
       }
       return (
+        [
+          record.efficiencySavedWh,
+          record.efficiencyEligibleWh,
+          record.eveningDemandWh,
+          record.eveningUnservedWh,
+        ].some(
+          (value) =>
+            value !== undefined &&
+            (typeof value !== "number" || !Number.isFinite(value) || value < 0),
+        ) ||
+        (record.efficiencySavedWh !== undefined &&
+          record.efficiencyEligibleWh !== undefined &&
+          record.efficiencySavedWh > record.efficiencyEligibleWh) ||
+        (record.eveningUnservedWh !== undefined &&
+          record.eveningDemandWh !== undefined &&
+          record.eveningUnservedWh > record.eveningDemandWh) ||
         typeof record.deliveredWhByFuel !== "object" ||
         record.deliveredWhByFuel === null ||
         Object.values(record.deliveredWhByFuel).some(
@@ -751,6 +767,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
           t.customerBatteryDischargeW,
           t.customerBatteryLossWh,
           t.rooftopSurplusW,
+          t.rebateEligibleW,
+          t.efficiencySavedW,
           t.shiftedResidentialW,
         ].some(
           (value) =>

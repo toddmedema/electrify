@@ -56,7 +56,7 @@ it("offers an existing company separately from starting over", () => {
   render(
     <CampaignSetup {...props({ activeGeneration: 3, onResume, onStart })} />,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Resume generation 4" }));
+  fireEvent.click(screen.getByRole("button", { name: "Resume term 4" }));
   expect(onResume).toHaveBeenCalledTimes(1);
   expect(onStart).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Start new campaign" }));

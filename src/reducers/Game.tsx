@@ -47,6 +47,7 @@ import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { validScenarioMod } from "../helpers/ScenarioMod";
 import {
   scenarioRules,
+  needsObjectiveEnergyMeters,
   scenarioRulesIdentity,
   isOfficialCatalogRules,
 } from "../helpers/ScenarioRules";
@@ -1965,7 +1966,12 @@ export const gameSlice = createSlice({
             (facility) => facility.startingAssetId === "legacy-first-steam",
           );
           if (steam) {
-            const month = summarizeTimeline(state.timeline, state.startingYear);
+            const month = summarizeTimeline(
+              state.timeline,
+              state.startingYear,
+              undefined,
+              needsObjectiveEnergyMeters(state),
+            );
             const operatingOutlay =
               month.expensesFuel +
               month.expensesOM +
@@ -3987,7 +3993,14 @@ export function* tickStatePhases(
       // Record final history for the month, then generate the new timeline
       // Observe the same settled frames as history, before rollover.
       onCompletedMonth?.(state.timeline);
-      history.unshift(summarizeTimeline(state.timeline, state.startingYear));
+      history.unshift(
+        summarizeTimeline(
+          state.timeline,
+          state.startingYear,
+          undefined,
+          needsObjectiveEnergyMeters(state),
+        ),
+      );
       recordGameObjectiveMonth(state, history[0]);
       // Reprice the company's credit off the year that just closed, before the forecast is built
       // against it. Operating results reprice monthly; new borrowing reprices immediately.

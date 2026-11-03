@@ -5,17 +5,17 @@ The Campaign entry on Choose a game opens a fictional Northern California utilit
 speed controls still simulate every tick; a completed objective never skips the remaining
 years. The company pauses at a handover until the player continues or saves and exits.
 
-| CEO term                               |
-| -------------------------------------- |
-| First Light (1882–1901)                |
-| Beyond the Dynamo (1902–1921)          |
-| Affordable Growth (1922–1941)          |
-| Everybody Plugs In (1942–1961)         |
-| The Power You Don't Build (1962–1981)  |
-| The Price of Power (1982–2001)         |
-| The Sun Moves the Peak (2002–2021)     |
-| Renew the Grid (2022–2041)             |
-| A Different Kind of Growth (2042–2061) |
+| CEO term                               | Distinct required objective                                                                                       |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| First Light (1882–1901)                | Electricity revenue covers recurring operating costs over 1885.                                                   |
+| Beyond the Dynamo (1902–1921)          | Reach 150% of opening customers by December 1921, capped at 95% of the addressable market at that date.           |
+| Affordable Growth (1922–1941)          | Keep every 1941 monthly billed rate within 110% of the frozen reference rate.                                     |
+| Everybody Plugs In (1942–1961)         | Maintain reachable supply headroom of at least 10% of the opening forecast peak throughout the 1952 demand step.  |
+| The Power You Don't Build (1962–1981)  | Save at least 5% of gross eligible residential/commercial electricity through efficiency over 1981.               |
+| The Price of Power (1982–2001)         | Close every month from July 2000 through December 2001 with cash covering that month's recurring operating costs. |
+| The Sun Moves the Peak (2002–2021)     | Serve at least 99.5% of demand between 17:00 and 21:00 in every month of 2019–2021.                               |
+| Renew the Grid (2022–2041)             | Retire oil equipment commissioned through 2000 by December 2035 and keep that cohort retired.                     |
+| A Different Kind of Growth (2042–2061) | Keep cumulative operational, imported and construction emissions within the frozen whole-term budget.             |
 
 Only the first term initializes a company. Later terms preserve facilities and their purchased
 engineering, construction progress, hydro-site claims, loans, cash, customers, price memory,
@@ -32,8 +32,17 @@ them to bypass inheritance.
 
 Every term requires solvency and retention of 90% of its opening customers. Later terms add
 final-year debt and billed-rate limits; the last three add emissions-intensity windows. The
-last term also checks its 2045 milestone and a generation-wide emissions budget. Reliability
-and three-month profit reports provide feedback without adding new objective metrics.
+last term also checks its 2045 milestone. The historical task appears first, with shared
+safeguards after it. The handover dialog previews the incoming CEO's exact goals by privately
+running the same transition used by Continue; this neither advances nor replaces the live company.
+
+Financial coverage excludes grants, capital purchases and loan principal; it includes fuel,
+maintenance, imports, interest, carbon charges and program expenses. Efficiency uses measured
+saved energy divided by eligible gross load, not the program switch or an unweighted average.
+Evening service has its own tick-level energy meters. Reserve uses the lowest reachable headroom,
+not nameplate capacity or an average that could hide shortages. Paused old oil plants still count;
+newer replacements and equipment not yet commissioned by 2001 do not. A company that already
+retired this cohort has legitimately fulfilled that goal. Missing measurements cannot earn a pass.
 
 Each term's bounded rules compile on a local 240-month clock. The trusted runtime translates
 events and reports to the continuous clock while objective evidence stays local. Completion
@@ -55,6 +64,21 @@ The final carbon budget is a planning proxy: opening representative-month averag
 annualized to 8,760 hours and twenty years, at 0.25 tonnes/MWh with a 1.3 demand allowance.
 It is frozen before play and includes the simulation's operational, import, and construction
 emissions. It is not a claim to predict twenty years of consumption or to reproduce SB 100.
+
+These targets are authored board requirements, not historical regulations. The themes draw on
+[early commercial electricity](https://edison.rutgers.edu/images/archive/innovations/EL/PearlStreetHeadnote.pdf),
+[California's regional grid development](https://seuc.senate.ca.gov/background-electricity-policy),
+[postwar electricity growth](https://docs.cpuc.ca.gov/published/report/3822.htm),
+[the efficiency response to the 1970s crisis](https://www.energy.ca.gov/about/50-years-energy-leadership),
+and [CAISO's evening flexibility analysis](https://www.caiso.com/Documents/FlexibleResourcesHelpRenewables_FastFacts.pdf).
+Customer growth represents aggregate accounts, not equitable geographic access. The crisis goal
+teaches liquidity under constrained supply: [GAO's account](https://www.gao.gov/assets/a234932.html)
+also identifies market power and market-design restrictions, which this game does not reconstruct.
+The oil cohort is a fictional modernization commitment, not a universal 30-year retirement law;
+[California's cooling policy](https://waterboards.ca.gov/water_issues/programs/ocean/cwa316/index.html)
+permits retirement, repowering and retrofits, with reliability extensions. The final budget is a
+future planning exercise; [SB 100](https://www.energy.ca.gov/sb100) concerns annual retail sales,
+not this simulation's cumulative lifecycle emissions measure.
 
 ## Historical data and explicit assumptions
 
