@@ -393,6 +393,20 @@ describe("UPlotChart resizing", () => {
     expect(values).toHaveStyle({ maxHeight: "160px" });
   });
 
+  it("lets an ordinary chart hand keyboard inspection to a mouse over its tooltip", () => {
+    const { chart } = renderInteractiveChart();
+    const tooltip = document.createElement("div");
+    tooltip.className = "chartTooltip";
+    tooltip.textContent = "Visible chart details";
+    chart.appendChild(tooltip);
+    fireEvent.keyDown(chart, { key: "Enter" });
+    expect(screen.getByRole("status")).toHaveTextContent("Point 0");
+    const move = new Event("pointermove", { bubbles: true });
+    Object.assign(move, { clientX: 20, clientY: 20, pointerType: "mouse" });
+    fireEvent(screen.getByText("Visible chart details"), move);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
   it("keeps compatibility moves from dismissing keyboard selection and hands off to intentional pointer input", () => {
     const { chart } = renderInteractiveChart();
     const pointer = (type: string, x: number, pointerType = "mouse") => {

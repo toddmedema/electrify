@@ -91,6 +91,20 @@ const TOOLTIP_OFFSET = 8;
 // pointer move; uPlot can resize its existing canvas cheaply in the meantime.
 const RESIZE_SETTLE_MS = 120;
 
+function keyboardTvTooltipTarget(
+  target: EventTarget | null,
+  keyboardSelected: boolean,
+): boolean {
+  // Only TV keyboard details move outside uPlot's pointer surface. Ordinary
+  // charts must still let a mouse landing on their tooltip take over inspection.
+  return (
+    isTvLayout() &&
+    keyboardSelected &&
+    target instanceof Element &&
+    !!target.closest(".chartTooltip")
+  );
+}
+
 function tooltipPlugin<S>(
   getState: () => S,
   getLabel: () => ((idx: number, state: S) => string) | undefined,
@@ -139,7 +153,8 @@ function tooltipPlugin<S>(
           // events so it can scroll, so a fast pointer landing on it would otherwise strand the
           // cursor and leave the tooltip behind; hand those moves back to the plot instead.
           el.addEventListener("mousemove", (event) => {
-            if (keyboardSelected()) return;
+            if (keyboardTvTooltipTarget(event.target, keyboardSelected()))
+              return;
             const bounds = u.over.getBoundingClientRect();
             u.setCursor({
               left: event.clientX - bounds.left,
@@ -901,7 +916,13 @@ export default function UPlotChart<S>(
         onPointerDownCapture={
           props.tooltip
             ? (event) => {
-                if ((event.target as Element).closest(".chartTooltip")) return;
+                if (
+                  keyboardTvTooltipTarget(
+                    event.target,
+                    selectedPointRef.current !== null,
+                  )
+                )
+                  return;
                 pointerPositionRef.current = {
                   x: event.clientX,
                   y: event.clientY,
@@ -913,7 +934,13 @@ export default function UPlotChart<S>(
         onPointerMoveCapture={
           props.tooltip
             ? (event) => {
-                if ((event.target as Element).closest(".chartTooltip")) return;
+                if (
+                  keyboardTvTooltipTarget(
+                    event.target,
+                    selectedPointRef.current !== null,
+                  )
+                )
+                  return;
                 const previous = pointerPositionRef.current;
                 pointerPositionRef.current = {
                   x: event.clientX,
