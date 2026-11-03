@@ -5,6 +5,7 @@ import type { DesktopBridge, DesktopState } from "../../Desktop";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import settingsReducer from "../../reducers/Settings";
+import cardReducer from "../../reducers/Card";
 
 function desktopBridge(available = false): DesktopBridge {
   const state: DesktopState = {
@@ -51,7 +52,9 @@ function props(overrides: Partial<Props> = {}): Props {
 
 // The desktop title includes the connected TV preference control, as it does in the app.
 function renderMainMenu(element: React.ReactElement) {
-  const store = configureStore({ reducer: { settings: settingsReducer } });
+  const store = configureStore({
+    reducer: { settings: settingsReducer, card: cardReducer },
+  });
   return {
     ...render(<Provider store={store}>{element}</Provider>),
     store,

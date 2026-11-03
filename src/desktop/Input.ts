@@ -408,6 +408,12 @@ export function startDesktopInput(
   document.addEventListener("focusin", trackFocus);
   const pointer = (event: Event) => {
     if (!event.isTrusted) return;
+    // The hints own an explicit help action. Keep its trigger mounted through activation.
+    if (
+      event.target instanceof Element &&
+      event.target.closest(".controllerHints")
+    )
+      return;
     choosingTextOption = null;
     delete document.documentElement.dataset.controllerInput;
     present({ active: false });

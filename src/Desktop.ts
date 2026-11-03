@@ -25,6 +25,11 @@ export interface DesktopState {
     displayName?: string;
     cloudEnabled: boolean;
     timelineSupported?: boolean;
+    presentation?: {
+      bigPicture?: boolean;
+      remotePlayTv?: boolean;
+      steamDeck?: boolean;
+    };
   };
 }
 export interface DesktopScore {

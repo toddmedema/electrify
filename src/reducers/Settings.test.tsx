@@ -89,7 +89,7 @@ it("restores text size locally and rejects unsupported persisted and runtime cho
 it("keeps TV presentation opt-in and restores its bounded device choices", () => {
   window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
   const { default: reducer, initialSettings, change } = settings();
-  expect(initialSettings.tvMode).toBe(false);
+  expect(initialSettings.tvMode).toBeUndefined();
   const tv = reducer(
     initialSettings,
     change({ tvMode: true, tvScale: 1.75, tvInset: 4 }),
@@ -104,6 +104,7 @@ it("keeps TV presentation opt-in and restores its bounded device choices", () =>
   expect(invalid).toMatchObject({ tvScale: 1.5, tvInset: 2 });
   const desktop = reducer(invalid, change({ tvMode: false }));
   expect(desktop.tvMode).toBe(false);
+  expect(settings().initialSettings.tvMode).toBe(false);
   expect(desktop.textSize).toBe(initialSettings.textSize);
 });
 

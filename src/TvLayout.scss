@@ -58,6 +58,26 @@ html[data-tv-layout="true"] {
   &[data-controller-input="true"] h2.gameToolTitle:focus {
     outline: none !important;
   }
+  &[data-controller-input="true"] :is(button, .MuiButtonBase-root):focus {
+    outline-offset: -0.1667rem;
+  }
+  &[data-controller-input="true"] .MuiSwitch-root {
+    &:focus-within {
+      outline: 0.1667rem solid var(--focus-ring) !important;
+      outline-offset: 0.1667rem;
+      border-radius: 0.375rem;
+    }
+    .MuiSwitch-switchBase:focus-within,
+    input:focus {
+      outline: none !important;
+    }
+  }
+  &[data-controller-input="true"] {
+    .MuiTouchRipple-ripplePulsate,
+    .MuiTouchRipple-childPulsate {
+      display: none;
+    }
+  }
   .gameToolPanel:focus-within .gameToolHeader {
     box-shadow: inset 0 -0.125rem var(--focus-ring);
   }
@@ -146,8 +166,37 @@ html[data-tv-layout="true"] {
     font-size: 0.875rem;
     gap: 0.5rem 1rem;
   }
+  .chartLegend:not(.chartLegend-inline) {
+    padding-block: 0.25rem 0.5rem;
+  }
+  .accessibleChart {
+    width: calc(100% - 0.5rem);
+    margin: 0.25rem;
+  }
   .insightsHeader {
     --insights-control-size: 2.75rem;
+  }
+  .insightsHeaderControls {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    .insightsPresetControls {
+      width: min(100%, 24rem);
+      flex: 0 1 24rem;
+      gap: 0.25rem;
+    }
+    .insightsPreset {
+      width: auto;
+      flex: 1 1 auto;
+    }
+    .insightsLayerControls {
+      width: auto;
+      min-width: 5rem !important;
+    }
+  }
+  .insightsNavigation {
+    width: 100%;
+    max-width: 64rem;
+    margin-inline: auto;
   }
   .insightsTracks,
   .insightsViewportToolbar {
@@ -162,8 +211,48 @@ html[data-tv-layout="true"] {
     padding-block: 0.25rem;
     flex-wrap: wrap;
   }
+  .insightsViewportButtons {
+    gap: 0.125rem;
+    align-items: center;
+    .insightsViewportButton,
+    .MuiIconButton-root {
+      width: 2.75rem;
+      height: 2.75rem;
+      flex: 0 0 2.75rem;
+    }
+  }
+  .insightEventRail {
+    max-width: 64rem;
+    min-height: 0;
+    padding: 0.5rem 0 0.5rem 1rem;
+  }
+  .insightEventList {
+    gap: 0.5rem;
+    padding-right: 1rem;
+  }
+  .insightEventChip {
+    min-height: 2.75rem;
+    padding: 0.25rem 0.5rem;
+    gap: 0.5rem;
+  }
+  .insightEventNumber {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-basis: 1.25rem;
+  }
+  .insightEventCopy {
+    max-width: 16rem;
+    gap: 0.125rem;
+  }
+  .insightEventTitle,
+  .insightEventDate {
+    line-height: 1.4;
+  }
   .insightsTrackHeader {
     flex-wrap: wrap;
+  }
+  .insights .insightsTrackHeader {
+    padding-block: 0;
   }
   .tvPurchaseReviewActions {
     flex-wrap: wrap;
@@ -172,6 +261,24 @@ html[data-tv-layout="true"] {
   }
   .purchaseReviewContent .decisionImpact {
     padding-inline: 1rem;
+  }
+}
+
+// Share the time/view controls when the player's text scale leaves room for both.
+@container insights (min-width: 54rem) {
+  html[data-tv-layout="true"] .insightsNavigation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    border-bottom: 1px solid var(--border-subtle);
+    .insightsHeader {
+      grid-area: 1 / 2;
+    }
+    .insightsViewportToolbar {
+      grid-area: 1 / 1;
+      height: 100%;
+      border-bottom: 0;
+    }
   }
 }
 
@@ -298,6 +405,22 @@ html[data-tv-layout="true"] {
     gap: 0.75rem;
     padding: 0.75rem 1rem;
   }
+  .settingsRow {
+    column-gap: 1.5rem;
+    > :first-child {
+      max-width: 48rem;
+    }
+  }
+  .facilityStats {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: 0.75rem 1rem;
+  }
+  .facilityDetailHeading,
+  .facilityStat dt,
+  .facilityStatValue,
+  .facilityStatNote {
+    line-height: 1.4;
+  }
   .base_main .customSetupColumns {
     grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
@@ -365,12 +488,24 @@ html[data-tv-layout="true"] {
     flex-wrap: wrap;
     gap: 0.5rem;
   }
-  .manual-popover {
-    max-width: min(44rem, calc(100vw - 2 * var(--tv-inset)));
-  }
   .MuiPopover-paper {
     max-width: calc(100vw - 2 * var(--tv-inset));
     max-height: calc(100dvh - 2 * var(--tv-inset));
+  }
+  .manual-popover.MuiPaper-root {
+    width: min(40rem, calc(100vw - 2 * var(--tv-inset)));
+    max-width: none;
+    max-height: min(32rem, calc(100dvh - 2 * var(--tv-inset) - 8rem));
+  }
+  .manual-popover-header {
+    flex: 0 0 auto;
+    gap: 0.5rem;
+    padding: 0.5rem 0.5rem 0.5rem 1rem;
+  }
+  .manual-popover-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.75rem 1rem;
   }
   .MuiSnackbar-root {
     bottom: calc(var(--tv-inset) + 0.75rem);
@@ -475,6 +610,14 @@ html[data-tv-layout="true"] {
   .buildOption {
     padding: 0.75rem;
   }
+  .buildOption .buildOptionMetrics {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+    gap: 0.75rem 1rem;
+    padding: 0 0.5rem 0.5rem;
+  }
+  .buildOptionMetric {
+    overflow-wrap: anywhere;
+  }
   .buildOptionSparkline {
     min-height: 2rem;
   }
@@ -500,6 +643,33 @@ html[data-tv-layout="true"] {
     max-width: 64rem;
     margin-inline: auto;
     width: 100%;
+  }
+  .operationsPriorities {
+    max-width: none;
+    padding-bottom: 0.75rem;
+  }
+  .eventLogItem {
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+    gap: 0 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+  .eventLogCopy {
+    gap: 0.25rem;
+  }
+  .eventLogSectionHeader,
+  .operationsSectionHeader {
+    padding-inline: 1rem;
+  }
+  .scenarioOutlookFigures {
+    gap: 0.75rem 2rem;
+    dd {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.125rem;
+    }
+  }
+  .scenarioOutlookChange {
+    line-height: 1.4;
   }
   .customerProgramsActions {
     flex-wrap: wrap;
@@ -604,7 +774,8 @@ html[data-tv-layout="true"] {
   }
   .buildFacilities .cardList {
     flex: 0 0 auto;
-    height: 16rem;
+    height: auto;
+    overflow: visible;
   }
 }
 

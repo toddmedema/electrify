@@ -350,6 +350,42 @@ describe("UPlotChart resizing", () => {
     expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(true);
   });
 
+  it("uses the full TV chart for keyboard values and restores the plot host for pointer inspection", () => {
+    document.documentElement.dataset.tvLayout = "true";
+    const { chart } = renderInteractiveChart();
+    const plot = currentPlot();
+    plot.root = document.createElement("div");
+    plot.root.appendChild(plot.over);
+    chart.appendChild(plot.root);
+    Object.defineProperty(plot.root, "clientHeight", { value: 300 });
+    Object.defineProperty(plot.over, "clientHeight", { value: 160 });
+    const built = (uPlot as unknown as jest.Mock).mock.calls.at(
+      -1,
+    )[0] as uPlot.Options;
+    const plugin = built.plugins!.at(-1)!;
+    const init = plugin.hooks.init;
+    if (typeof init === "function") init(plot, built, []);
+    const moveCursor = plugin.hooks.setCursor;
+    plot.setCursor = jest.fn((position: { left: number; top: number }) => {
+      plot.cursor = { ...position, idx: 0 };
+      if (typeof moveCursor === "function") moveCursor(plot);
+    });
+    fireEvent.keyDown(chart, { key: "Enter" });
+    const values = chart.querySelector(".chartTooltip") as HTMLElement;
+    expect(values.parentElement).toBe(plot.root);
+    expect(values.style.maxHeight).toBe("300px");
+    fireEvent.pointerDown(values);
+    fireEvent.pointerMove(values);
+    expect(screen.getByRole("status")).toHaveTextContent("Point 0");
+    expect(values.parentElement).toBe(plot.root);
+    fireEvent.pointerDown(document.body);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    fireEvent.pointerDown(chart);
+    plot.setCursor({ left: 20, top: 20 });
+    expect(values.parentElement).toBe(plot.over);
+    expect(values.style.maxHeight).toBe("160px");
+  });
+
   it("keeps compatibility moves from dismissing keyboard selection and hands off to intentional pointer input", () => {
     const { chart } = renderInteractiveChart();
     const pointer = (type: string, x: number, pointerType = "mouse") => {

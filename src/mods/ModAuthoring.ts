@@ -1,5 +1,5 @@
 import { DIFFICULTY_IDS, MONTHS, difficultyLabel } from "../Constants";
-import { formatNumber } from "../helpers/Format";
+import { formatNumber, formatWatts } from "../helpers/Format";
 import { getScenario } from "../data/Scenarios";
 import { POLICIES } from "../data/Policies";
 import { combineStoryEffects } from "../data/WorldEvents";
@@ -378,7 +378,9 @@ function facts(
           value:
             peak === undefined
               ? "Preparing baseline forecast…"
-              : `${number(peak / 1e6)} MW`,
+              : author
+                ? `${number(peak / 1e6)} MW`
+                : formatWatts(peak),
         },
         {
           label: "Starting cash and billed rate",

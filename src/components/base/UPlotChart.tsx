@@ -139,6 +139,7 @@ function tooltipPlugin<S>(
           // events so it can scroll, so a fast pointer landing on it would otherwise strand the
           // cursor and leave the tooltip behind; hand those moves back to the plot instead.
           el.addEventListener("mousemove", (event) => {
+            if (keyboardSelected()) return;
             const bounds = u.over.getBoundingClientRect();
             u.setCursor({
               left: event.clientX - bounds.left,
@@ -192,7 +193,8 @@ function tooltipPlugin<S>(
         outsidePointer = (event) => {
           if (
             el?.style.display === "block" &&
-            !u.over.contains(event.target as Node)
+            !u.over.contains(event.target as Node) &&
+            !el.contains(event.target as Node)
           ) {
             dismissDetails();
           }
@@ -239,22 +241,27 @@ function tooltipPlugin<S>(
           });
           context.textContent = groups.slice(2).join("\n\n");
           context.hidden = !context.textContent;
-          el.style.maxWidth = `${u.over.clientWidth}px`;
         } else {
           el.textContent = text;
         }
+        // Couch-scale event/axis rows can leave a shallow data plot. Keyboard inspection
+        // may use the complete chart surface so every selected value remains readable.
+        const host = isTvLayout() && keyboardSelected() ? u.root : u.over;
+        if (el.parentElement !== host) host.appendChild(el);
+        el.style.maxWidth = `${host.clientWidth}px`;
         el.style.display = "block";
-        el.style.maxHeight = `${u.over.clientHeight}px`;
+        el.style.maxHeight = `${host.clientHeight}px`;
         el.style.overflowY = "auto";
         // Kept inside the plot, the way Victory's constrainToVisibleArea tooltip was
-        const left = u.cursor.left!;
-        const top = u.cursor.top!;
-        const flipX =
-          left + TOOLTIP_OFFSET + el.offsetWidth > u.over.clientWidth;
+        const plotBounds = u.over.getBoundingClientRect();
+        const hostBounds = host.getBoundingClientRect();
+        const left = u.cursor.left! + plotBounds.left - hostBounds.left;
+        const top = u.cursor.top! + plotBounds.top - hostBounds.top;
+        const flipX = left + TOOLTIP_OFFSET + el.offsetWidth > host.clientWidth;
         const flipY =
-          top + TOOLTIP_OFFSET + el.offsetHeight > u.over.clientHeight;
-        el.style.left = `${Math.max(0, Math.min(u.over.clientWidth - el.offsetWidth, flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET))}px`;
-        el.style.top = `${Math.max(0, Math.min(u.over.clientHeight - el.offsetHeight, flipY ? top - TOOLTIP_OFFSET - el.offsetHeight : top + TOOLTIP_OFFSET))}px`;
+          top + TOOLTIP_OFFSET + el.offsetHeight > host.clientHeight;
+        el.style.left = `${Math.max(0, Math.min(host.clientWidth - el.offsetWidth, flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET))}px`;
+        el.style.top = `${Math.max(0, Math.min(host.clientHeight - el.offsetHeight, flipY ? top - TOOLTIP_OFFSET - el.offsetHeight : top + TOOLTIP_OFFSET))}px`;
       },
       destroy: (u: uPlot) => {
         document.removeEventListener("pointerdown", outsidePointer, true);
@@ -270,7 +277,10 @@ function tooltipPlugin<S>(
 
 function tvChartHeight(root: HTMLElement | null, requested: number): number {
   if (!isTvLayout()) return requested;
-  let height = requested;
+  // Stacked evidence needs room for its heading, legend and event row as well as its axes.
+  let height = root?.closest(".insightsTracks")
+    ? Math.min(requested, 200 * getTextScale())
+    : requested;
   for (
     let parent = root?.parentElement;
     parent;
@@ -846,7 +856,8 @@ export default function UPlotChart<S>(
   }, [viewportEnabled, plotLayout]);
 
   React.useLayoutEffect(() => {
-    plotRef.current?.redraw();
+    // Event rows can appear when a new projection is ready; recompute their reserved padding.
+    plotRef.current?.redraw(true, true);
   }, [annotations]);
 
   const selectPoint = (index: number) => {
@@ -890,6 +901,7 @@ export default function UPlotChart<S>(
         onPointerDownCapture={
           props.tooltip
             ? (event) => {
+                if ((event.target as Element).closest(".chartTooltip")) return;
                 pointerPositionRef.current = {
                   x: event.clientX,
                   y: event.clientY,
@@ -901,6 +913,7 @@ export default function UPlotChart<S>(
         onPointerMoveCapture={
           props.tooltip
             ? (event) => {
+                if ((event.target as Element).closest(".chartTooltip")) return;
                 const previous = pointerPositionRef.current;
                 pointerPositionRef.current = {
                   x: event.clientX,

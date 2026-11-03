@@ -14,6 +14,7 @@ import {
   TV_INSETS,
   TV_SCALES,
 } from "../../TvLayout";
+import TvModeSuggestion from "./TvModeSuggestion";
 
 /** Shared by the title screen setup and Display settings. */
 export default function TvLayoutSettings({
@@ -26,17 +27,20 @@ export default function TvLayoutSettings({
   const enabled = settings.tvMode === true;
   if (compact)
     return (
-      <Button
-        className="tvPresetEntry"
-        variant="outlined"
-        startIcon={<TvIcon />}
-        aria-pressed={enabled}
-        onClick={() => dispatch(change({ tvMode: !enabled }))}
-      >
-        {enabled
-          ? "TV layout on · switch to desktop"
-          : "Playing on a TV? Use TV layout"}
-      </Button>
+      <>
+        <TvModeSuggestion />
+        <Button
+          className="tvPresetEntry"
+          variant="outlined"
+          startIcon={<TvIcon />}
+          aria-pressed={enabled}
+          onClick={() => dispatch(change({ tvMode: !enabled }))}
+        >
+          {enabled
+            ? "TV layout on · switch to desktop"
+            : "Playing on a TV? Use TV layout"}
+        </Button>
+      </>
     );
   return (
     <Box className="tvLayoutSettings">

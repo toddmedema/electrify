@@ -41,7 +41,9 @@ if (
 }
 
 if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
-  initialSettings.tvMode = getStorageBooleanOrUndefined("tvMode") ?? false;
+  // Undefined means the player has not chosen yet. Both true and false suppress
+  // the first-launch suggestion, including after restarting Steam offline.
+  initialSettings.tvMode = getStorageBooleanOrUndefined("tvMode");
   initialSettings.tvScale = normalizeTvScale(getStorageNumber("tvScale", 1.5));
   initialSettings.tvInset = normalizeTvInset(getStorageNumber("tvInset", 2));
   initialSettings.controllerVibrationEnabled =
