@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from "fs";
-import { resolve } from "path";
+import { resolve, sep } from "path";
 import { runInNewContext } from "vm";
 import { createHash, webcrypto } from "crypto";
 
@@ -778,7 +778,7 @@ it("prepares every shipped audio file for offline play even before sound has bee
   }) as string[];
   const files = audio
     .filter((file) => /\.(mp3|wav)$/.test(file))
-    .map((file) => `/audio/${file}`);
+    .map((file) => `/audio/${file.split(sep).join("/")}`);
   expect(files.length).toBeGreaterThan(0);
   for (const file of files) expect(sw.entries.has(file)).toBe(true);
 });
