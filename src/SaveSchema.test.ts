@@ -59,7 +59,7 @@ it.each([6, 7])(
   },
 );
 
-it("continues an older rules digest without retaining competitive identity or mutating its source", () => {
+it("continues an older rules digest without retaining stale challenge identity or mutating its source", () => {
   const save = JSON.parse(JSON.stringify(serializeSave(game)));
   save.schemaVersion = 8;
   save.game.runIdentity.compatibilityId = `rules-1-${"0".repeat(64)}`;

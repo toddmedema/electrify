@@ -111,8 +111,8 @@ const exactKeys = (value: Record<string, unknown>, keys: string[]): boolean =>
   Object.keys(value).sort().join() === keys.sort().join();
 
 /**
- * A previous digest cannot establish competitive equivalence with this build. Validate its
- * self-contained authored setup and challenge linkage before retaining only playable progress.
+ * Validate a previous digest's self-contained authored setup and challenge linkage before
+ * continuing its progress. Remove stale share references; scoring eligibility is unchanged.
  * Current-digest identities still pass the canonical validation below this import boundary.
  */
 export function carrySavedRunForward<T extends Partial<GameType>>(

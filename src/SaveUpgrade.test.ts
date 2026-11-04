@@ -161,13 +161,13 @@ it("advances migrated progress through the real simulation without changing its 
   expect(parseSave(serializeSave(migrated!.game))).not.toBeNull();
 });
 
-it("starts a new game without inheriting a continued run's ranking restriction", () => {
+it("starts a new game without inheriting a continued run's forecast-refresh marker", () => {
   const continued = { ...game, rulesChanged: true, runIdentity: undefined };
   const fresh = gameReducer(continued, start(101));
   expect(fresh.rulesChanged).toBeUndefined();
 });
 
-it("keeps the ranking restriction through generic gameplay updates", () => {
+it("keeps the forecast-refresh marker through generic gameplay updates", () => {
   const continued = { ...game, rulesChanged: true, runIdentity: undefined };
   const updated = gameReducer(
     continued,

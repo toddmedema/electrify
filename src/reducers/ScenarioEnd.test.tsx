@@ -4,6 +4,8 @@ import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
 import { getPlayedScenarioIds } from "../LocalStorage";
 import { createGame } from "../testing/Simulator";
+import { parseSave, serializeSave } from "../SaveGame";
+import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 import {
   loaded,
   hasChronicBlackouts,
@@ -161,30 +163,58 @@ describe("ending a scenario from inside the reducer", () => {
     expect(victory?.ranked).toBe(true);
   });
 
-  it("shows the result of a continued run without submitting it to current leaderboards", () => {
-    const submitHighscore = jest.spyOn(User, "submitHighscore");
-    getStore().dispatch(quit());
-    const scenario = SCENARIOS.find((s) => s.id === 100)!;
-    const duration = scenario.durationMonths!;
-    let state = createGame({
-      scenarioId: scenario.id,
-      difficulty: "Intern",
-      initialBuild: { name: "Natural Gas CC", peakW: 500e6, financed: true },
-    });
-    state.rulesChanged = true;
-    state.runIdentity = undefined;
-    while (state.date.monthsElapsed < duration - 1) state = tick(state);
-    playOutOnTheStore(state, duration);
-    jest.runOnlyPendingTimers();
-    expect(getStore().getState().ui.victory).toEqual(
-      expect.objectContaining({
-        outcome: "completed",
-        ranked: false,
-        score: expect.any(Number),
-      }),
-    );
-    expect(submitHighscore).not.toHaveBeenCalled();
-  });
+  it.each(["schema-only", "changed-rules"])(
+    "preserves leaderboard eligibility and completion credit after a %s save upgrade",
+    (upgrade) => {
+      const submitHighscore = jest.spyOn(User, "submitHighscore");
+      getStore().dispatch(quit());
+      window.localStorage.removeItem("plays");
+      const scenario = SCENARIOS.find((s) => s.id === 100)!;
+      const duration = scenario.durationMonths!;
+      const state = createGame({
+        scenarioId: scenario.id,
+        difficulty: "Intern",
+        initialBuild: { name: "Natural Gas CC", peakW: 500e6, financed: true },
+      });
+      while (state.date.monthsElapsed < duration - 1) tickState(state);
+      const raw = JSON.parse(JSON.stringify(serializeSave(state)));
+      raw.schemaVersion = 8;
+      if (upgrade === "changed-rules")
+        raw.game.runIdentity.compatibilityId = `rules-1-${"0".repeat(64)}`;
+      const migrated = parseSave(raw);
+      expect(migrated).not.toBeNull();
+      expect(migrated!.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+      expect(migrated!.game.rulesChanged).toBe(
+        upgrade === "changed-rules" ? true : undefined,
+      );
+      expect(getPlayedScenarioIds()).not.toContain(scenario.id);
+      playOutOnTheStore(migrated!.game, duration);
+      jest.runOnlyPendingTimers();
+      const victory = getStore().getState().ui.victory;
+      expect(victory?.outcome).toBe("completed");
+      expect({
+        ranked: victory?.ranked,
+        submissions: submitHighscore.mock.calls.map(([submission]) => ({
+          scenarioId: submission.scenarioId,
+          difficulty: submission.difficulty,
+          score: submission.score,
+          outcome: submission.outcome,
+        })),
+        completed: getPlayedScenarioIds().includes(scenario.id),
+      }).toEqual({
+        ranked: true,
+        submissions: [
+          {
+            scenarioId: scenario.id,
+            difficulty: "Intern",
+            score: victory!.score,
+            outcome: "completed",
+          },
+        ],
+        completed: true,
+      });
+    },
+  );
 
   it("goes bankrupt without reading the revoked draft", () => {
     // No cash and free electricity: operating the fleet puts it under within a month

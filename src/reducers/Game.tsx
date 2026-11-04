@@ -4129,7 +4129,6 @@ export function* tickStatePhases(
       // were the same scenario. Mods always run as the custom scenario, so this also excludes
       // them from scores and completion records.
       const ranked =
-        !state.rulesChanged &&
         scenario.id !== CUSTOM_SCENARIO_ID &&
         !isLegacyCampaignScenario(scenario.id);
       const modded = !!state.customScenario?.mod;

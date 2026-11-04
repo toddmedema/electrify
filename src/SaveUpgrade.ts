@@ -51,8 +51,8 @@ const migrations: readonly Migration[] = [
       },
     };
   },
-  // 8 -> 9: older apps must reject saves continued after a simulation-rules change instead of
-  // ignoring their unranked marker and publishing a score against the wrong rules.
+  // 8 -> 9: continued runs need future-only forecast refresh after data loads. Older apps do not
+  // implement that continuation behavior and must not load these saves.
   (save) => save,
 ];
 

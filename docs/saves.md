@@ -16,7 +16,7 @@ policy to independent buying and selling rules with the same permissions: import
 serve shortages and exports use surplus. Neither storage imports nor profitable
 extra generation is enabled by migration. Recorded history, facilities, finances,
 policy queues and commitment forecasts stay intact. Schema 8 adds a version fence:
-apps without the continued-run ranking restriction must not load those saves.
+apps without the continued-run forecast refresh must not load those saves.
 
 Schemas before 6 are unsupported development formats. Missing, malformed and newer
 schema tags are rejected rather than guessed at. A valid newer tag retains the
@@ -33,14 +33,15 @@ A coherent authored save from a different simulation fingerprint can continue un
 the running rules after its progress passes the current domain checks. The loader
 checks the prior identity against its embedded authored setup and any attached
 challenge, then removes its shared identity and challenge and sets the persistent
-`rulesChanged` marker. Such runs show their result but cannot submit a competitive
-score. Once data loads, resumed continued runs rebuild only their future weather,
+`rulesChanged` marker. Upgraded runs retain leaderboard eligibility and normal
+scenario-completion credit; the marker only controls forecast refresh. Once data
+loads, resumed continued runs rebuild only their future weather,
 fuel prices, demand and supply forecasts under the running rules; recorded frames,
 current-frame finances and history are retained. Repeated loads rebuild the same
 forecast and also pick up later runtime changes after the old identity is gone.
 Current fingerprints keep their existing canonical identity checks; corrupt
 identity or challenge relationships are rejected rather than repaired. Starting a
-new game clears the restriction.
+new game clears the forecast-refresh marker.
 
 Authored challenge links still require the current fingerprint, and mod snapshots
 must match the current mod runtime and their frozen digests. See
