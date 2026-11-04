@@ -667,32 +667,12 @@ describe("weather hazards in the fleet", () => {
     );
   });
 
-  it("offers hail-resistant panels from the details and confirms before paying", async () => {
+  it("does not offer hail-resistant panels after solar construction", () => {
     const state = gameWithSolar();
-    const cost = retrofitCost(state.facilities[2], state, "hailResistant")!;
-    const { onRetrofit, onSelect } = renderFacilities(state, 3);
-
-    const details = screen.getByRole("region", { name: "Upgrades" });
-    expect(details).not.toHaveTextContent("Standard panels");
-    await user.click(
-      within(details).getByRole("button", {
-        name: `Add hail-resistant panels · ${formatMoneyConcise(cost)}`,
-      }),
-    );
-    const dialog = screen.getByRole("dialog", {
-      name: "Add hail-resistant panels to Solar?",
-    });
-    expect(dialog).not.toHaveTextContent("cash now");
-    await user.click(
-      within(dialog).getByRole("button", {
-        name: `Pay ${formatMoneyConcise(cost)}`,
-      }),
-    );
-    expect(onRetrofit).toHaveBeenCalledWith({
-      facilityId: 3,
-      upgrade: "hailResistant",
-    });
-    expect(onSelect).not.toHaveBeenCalled();
+    renderFacilities(state, 3);
+    expect(
+      screen.queryByRole("button", { name: /Add hail-resistant panels/ }),
+    ).toBeNull();
   });
 });
 
@@ -1857,17 +1837,18 @@ describe("mouse facility selection", () => {
 
   it("confirms the combined price of upgrades and blocks a cash shortfall", async () => {
     const game = fleet();
+    game.scenarioId = 107;
     game.facilities = game.facilities.slice(0, 2).map(
       (f) =>
         ({
           ...f,
-          name: "Solar",
-          fuel: "Sun",
+          name: "Gas",
+          fuel: "Natural Gas",
           resilience: undefined,
         }) as FacilityOperatingType,
     );
     const total = game.facilities.reduce(
-      (sum, f) => sum + retrofitCost(f, game, "hailResistant")!,
+      (sum, f) => sum + retrofitCost(f, game, "coldWeatherPackage")!,
       0,
     );
     getTimeFromTimeline(game.date.minute, game.timeline)!.cash = total - 1;
@@ -1877,7 +1858,7 @@ describe("mouse facility selection", () => {
     fireEvent.contextMenu(rows()[0]);
     expect(
       screen.getByRole("menuitem", {
-        name: /^Add hail-resistant panels \(2\)/,
+        name: /^Add cold-weather package \(2\)/,
       }),
     ).toHaveAttribute("aria-disabled", "true");
     cleanup();
@@ -1888,11 +1869,11 @@ describe("mouse facility selection", () => {
     fireEvent.contextMenu(rows()[0]);
     await user.click(
       screen.getByRole("menuitem", {
-        name: /^Add hail-resistant panels \(2\)/,
+        name: /^Add cold-weather package \(2\)/,
       }),
     );
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("Offline for one month");
+    expect(dialog).toHaveTextContent("90% of capacity available for a month");
     expect(view.onRetrofit).not.toHaveBeenCalled();
     await user.click(
       within(dialog).getByRole("button", {
@@ -1900,8 +1881,8 @@ describe("mouse facility selection", () => {
       }),
     );
     expect(utils.onRetrofit.mock.calls).toEqual([
-      [{ facilityId: 1, upgrade: "hailResistant" }],
-      [{ facilityId: 2, upgrade: "hailResistant" }],
+      [{ facilityId: 1, upgrade: "coldWeatherPackage" }],
+      [{ facilityId: 2, upgrade: "coldWeatherPackage" }],
     ]);
   });
 });

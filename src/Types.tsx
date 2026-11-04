@@ -1388,7 +1388,7 @@ export interface GameType {
   feePerKgCO2e: number;
   dollarsPerkWh: number;
   /**
-   * A public utility's rate follows inflation, stepping up each January until the player sets
+   * A utility's rate can follow inflation, stepping up each January until the player sets
    * one by hand. Absent in saves from before the option existed, which keep the rate they chose.
    */
   rateFollowsInflation?: boolean;
