@@ -15,6 +15,8 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { CityType } from "../../data/Cities";
+import { getTextScale, subscribeTextSize } from "../../TextSize";
+import { useTvLayout } from "../../TvLayout";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { WORLD_LAND_PATH } from "./WorldLand";
 import {
@@ -105,7 +107,14 @@ export default function LocationPicker({
 }: Props): React.JSX.Element {
   const controllerInput = useControllerInput();
   const coarsePointer = useMediaQuery("(pointer: coarse)");
-  const markerSize = coarsePointer ? 44 : 40;
+  const tvMode = useTvLayout();
+  const textScale = React.useSyncExternalStore(
+    subscribeTextSize,
+    getTextScale,
+    () => 1,
+  );
+  // Clustering and visible targets must share the same measured footprint.
+  const markerSize = (coarsePointer ? 44 : 40) * (tvMode ? textScale : 1);
   const [viewport, setViewport] = React.useState<MapViewport>(WORLD_VIEW);
   const [mapSize, setMapSize] = React.useState({ width: 600, height: 300 });
   const [rovingId, setRovingId] = React.useState(

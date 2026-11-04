@@ -9,7 +9,6 @@ import {
   spansBelow,
   splitPastProjected,
   stepTicks,
-  titlePlugin,
   xAxis,
   yAxis,
 } from "./UPlotHelpers";
@@ -68,7 +67,6 @@ export interface Props {
 
 interface State {
   timeline: ChartData[];
-  title: string;
   format: Props["format"];
   formatAxis: Props["format"];
   range: [number, number];
@@ -108,11 +106,7 @@ export function financeXValue(
     : (point.month - startingYear * 12 - 1) * MINUTES_PER_MONTH;
 }
 
-function buildOptions({
-  getState,
-  scale,
-  fontScale,
-}: BuildContext<State>): uPlot.Options {
+function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
     width: 0, // set by UPlotChart
     height: 0,
@@ -181,7 +175,6 @@ function buildOptions({
       },
     ],
     plugins: [
-      titlePlugin(() => getState().title, 7, fontScale),
       // The band plugin bails on an empty list, so charts without a note push nothing
       bandsPlugin(() => getState().pastSpans, chartPalette().blackout),
       bandsPlugin(() => getState().projectedSpans, chartPalette().blackout),
@@ -246,7 +239,6 @@ const ChartFinances = (props: Props): React.JSX.Element => {
 
   const state: State = {
     timeline: props.timeline,
-    title: props.hideTitle ? "" : props.title,
     format: props.format,
     formatAxis: props.formatAxis || props.format,
     range: [rangeMin, rangeMax],
@@ -267,18 +259,21 @@ const ChartFinances = (props: Props): React.JSX.Element => {
   };
 
   return (
-    <UPlotChart<State>
-      ariaLabel={`Chart of ${props.title} over time${props.warningSpans?.length ? `. ${props.warningNote ?? "Warning"} periods shaded` : ""}`}
-      formatSummaryValue={(value) => String(state.format(value))}
-      id={props.id || "chartFinances"}
-      height={props.height}
-      state={state}
-      data={[months, split.past, split.projected]}
-      seriesLabels={[`Past ${props.title}`, `Forecast ${props.title}`]}
-      buildOptions={buildOptions}
-      syncKey={props.syncKey}
-      tooltip={tooltip}
-    />
+    <>
+      {!props.hideTitle && <div className="chartCaption">{props.title}</div>}
+      <UPlotChart<State>
+        ariaLabel={`Chart of ${props.title} over time${props.warningSpans?.length ? `. ${props.warningNote ?? "Warning"} periods shaded` : ""}`}
+        formatSummaryValue={(value) => String(state.format(value))}
+        id={props.id || "chartFinances"}
+        height={props.height}
+        state={state}
+        data={[months, split.past, split.projected]}
+        seriesLabels={[`Past ${props.title}`, `Forecast ${props.title}`]}
+        buildOptions={buildOptions}
+        syncKey={props.syncKey}
+        tooltip={tooltip}
+      />
+    </>
   );
 };
 /**

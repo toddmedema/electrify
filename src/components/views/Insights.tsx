@@ -2273,183 +2273,186 @@ export default class Insights extends React.Component<Props, State> {
               <Typography variant="h6">Insights</Typography>
             </Toolbar>
           </div>
-          <Toolbar className="insightsHeader">
-            <div className="insightsHeaderControls">
-              <div
-                className="insightsPresetControls"
-                role="group"
-                aria-label="Preset controls"
-              >
-                <Select
-                  id="insightsPreset"
-                  value={this.state.preset}
-                  onChange={(event: SelectChangeEvent<InsightPresetId>) => {
-                    const preset = event.target.value as InsightPresetId;
-                    if (preset !== "custom") {
-                      this.applyPreset(preset);
-                    }
-                  }}
-                  className="headerControl insightsPreset"
-                  aria-label="Insight preset"
-                  renderValue={() => (
-                    <span className="insightsPresetValue">
-                      <span className="insightsPresetName">
-                        {selectedPreset?.label || "Unsaved view"}
-                      </span>
-                      {this.state.presetDirty && selectedPreset && (
-                        <span
-                          className="insightsPresetEdited"
-                          role="status"
-                          aria-label="Unsaved changes"
-                        >
-                          Edited
-                        </span>
-                      )}
-                    </span>
-                  )}
+          <div className="insightsNavigation">
+            <Toolbar className="insightsHeader">
+              <div className="insightsHeaderControls">
+                <div
+                  className="insightsPresetControls"
+                  role="group"
+                  aria-label="Preset controls"
                 >
-                  {!!this.state.presetLibrary.custom.length && (
-                    <ListSubheader>Default presets</ListSubheader>
-                  )}
-                  {Object.entries(INSIGHT_PRESETS).map(([id, preset]) => (
-                    <MenuItem key={id} value={id} data-insight-preset={id}>
-                      {preset.label}
-                    </MenuItem>
-                  ))}
-                  {!!this.state.presetLibrary.custom.length && (
-                    <ListSubheader>Your presets</ListSubheader>
-                  )}
-                  {this.state.presetLibrary.custom.map((preset) => (
-                    <MenuItem
-                      key={preset.id}
-                      value={`saved:${preset.id}`}
-                      data-insight-preset={preset.id}
-                    >
-                      <span className="insightsPresetMenuName">
-                        {preset.name}
+                  <Select
+                    id="insightsPreset"
+                    value={this.state.preset}
+                    onChange={(event: SelectChangeEvent<InsightPresetId>) => {
+                      const preset = event.target.value as InsightPresetId;
+                      if (preset !== "custom") {
+                        this.applyPreset(preset);
+                      }
+                    }}
+                    className="headerControl insightsPreset"
+                    aria-label="Insight preset"
+                    renderValue={() => (
+                      <span className="insightsPresetValue">
+                        <span className="insightsPresetName">
+                          {selectedPreset?.label || "Unsaved view"}
+                        </span>
+                        {this.state.presetDirty && selectedPreset && (
+                          <span
+                            className="insightsPresetEdited"
+                            role="status"
+                            aria-label="Unsaved changes"
+                          >
+                            Edited
+                          </span>
+                        )}
                       </span>
-                    </MenuItem>
-                  ))}
-                  {this.state.preset === "custom" && (
-                    <MenuItem value="custom" disabled>
-                      Unsaved view
-                    </MenuItem>
-                  )}
-                </Select>
-                <Tooltip title="Rename, save a copy, restore, or delete">
-                  <IconButton
-                    className="insightsPresetActions"
-                    size="small"
-                    aria-label="Preset actions"
-                    aria-haspopup="menu"
-                    aria-controls={
-                      this.state.presetMenuAnchor
-                        ? "insightsPresetActionsMenu"
-                        : undefined
-                    }
-                    aria-expanded={!!this.state.presetMenuAnchor}
-                    onClick={(event) =>
-                      this.setState({ presetMenuAnchor: event.currentTarget })
-                    }
+                    )}
                   >
-                    <MoreVertIcon fontSize="small" />
-                  </IconButton>
+                    {!!this.state.presetLibrary.custom.length && (
+                      <ListSubheader>Default presets</ListSubheader>
+                    )}
+                    {Object.entries(INSIGHT_PRESETS).map(([id, preset]) => (
+                      <MenuItem key={id} value={id} data-insight-preset={id}>
+                        {preset.label}
+                      </MenuItem>
+                    ))}
+                    {!!this.state.presetLibrary.custom.length && (
+                      <ListSubheader>Your presets</ListSubheader>
+                    )}
+                    {this.state.presetLibrary.custom.map((preset) => (
+                      <MenuItem
+                        key={preset.id}
+                        value={`saved:${preset.id}`}
+                        data-insight-preset={preset.id}
+                      >
+                        <span className="insightsPresetMenuName">
+                          {preset.name}
+                        </span>
+                      </MenuItem>
+                    ))}
+                    {this.state.preset === "custom" && (
+                      <MenuItem value="custom" disabled>
+                        Unsaved view
+                      </MenuItem>
+                    )}
+                  </Select>
+                  <Tooltip title="Rename, save a copy, restore, or delete">
+                    <IconButton
+                      className="insightsPresetActions"
+                      size="small"
+                      aria-label="Preset actions"
+                      aria-haspopup="menu"
+                      aria-controls={
+                        this.state.presetMenuAnchor
+                          ? "insightsPresetActionsMenu"
+                          : undefined
+                      }
+                      aria-expanded={!!this.state.presetMenuAnchor}
+                      onClick={(event) =>
+                        this.setState({ presetMenuAnchor: event.currentTarget })
+                      }
+                    >
+                      <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </div>
+                <Tooltip
+                  title={`Customize charts: choose layers and reorder (${visible.length} shown)`}
+                >
+                  <Button
+                    id="insightsLayersButton"
+                    className="insightsLayerControls"
+                    size="small"
+                    onClick={() =>
+                      this.setState({ layersOpen: !this.state.layersOpen })
+                    }
+                    aria-label={
+                      this.state.layersOpen
+                        ? "Done choosing layers"
+                        : `Layers (${visible.length} shown)`
+                    }
+                    aria-expanded={this.state.layersOpen}
+                    aria-controls="insightsLayerPanel"
+                  >
+                    {this.state.layersOpen ? "Done" : "Layers"}
+                  </Button>
                 </Tooltip>
               </div>
-              <Tooltip
-                title={`Customize charts: choose layers and reorder (${visible.length} shown)`}
+              <Menu
+                id="insightsPresetActionsMenu"
+                className={this.state.compact ? "insightsCompact" : undefined}
+                anchorEl={this.state.presetMenuAnchor}
+                open={!!this.state.presetMenuAnchor}
+                onClose={() => this.setState({ presetMenuAnchor: null })}
               >
-                <Button
-                  id="insightsLayersButton"
-                  className="insightsLayerControls"
-                  size="small"
-                  onClick={() =>
-                    this.setState({ layersOpen: !this.state.layersOpen })
+                <MenuItem
+                  className="insightsPresetSaveMenuItem"
+                  disabled={
+                    !this.state.layers.length ||
+                    (this.state.preset !== "custom" &&
+                      !this.state.presetDirty) ||
+                    (this.state.preset === "custom" && customLimitReached)
                   }
-                  aria-label={
-                    this.state.layersOpen
-                      ? "Done choosing layers"
-                      : `Layers (${visible.length} shown)`
-                  }
-                  aria-expanded={this.state.layersOpen}
-                  aria-controls="insightsLayerPanel"
+                  onClick={() => {
+                    this.setState({ presetMenuAnchor: null }, () =>
+                      this.savePresetChanges(),
+                    );
+                  }}
                 >
-                  {this.state.layersOpen ? "Done" : "Layers"}
-                </Button>
-              </Tooltip>
-            </div>
-            <Menu
-              id="insightsPresetActionsMenu"
-              className={this.state.compact ? "insightsCompact" : undefined}
-              anchorEl={this.state.presetMenuAnchor}
-              open={!!this.state.presetMenuAnchor}
-              onClose={() => this.setState({ presetMenuAnchor: null })}
-            >
-              <MenuItem
-                className="insightsPresetSaveMenuItem"
-                disabled={
-                  !this.state.layers.length ||
-                  (this.state.preset !== "custom" && !this.state.presetDirty) ||
-                  (this.state.preset === "custom" && customLimitReached)
-                }
-                onClick={() => {
-                  this.setState({ presetMenuAnchor: null }, () =>
-                    this.savePresetChanges(),
-                  );
-                }}
-              >
-                <SaveIcon fontSize="small" />
-                {this.state.preset === "custom"
-                  ? "Save as new"
-                  : "Save changes"}
-              </MenuItem>
-              {this.state.preset !== "custom" && (
-                <MenuItem
-                  className="insightsPresetSaveAsMenuItem"
-                  disabled={customLimitReached || !this.state.layers.length}
-                  onClick={() => this.openPresetDialog("saveAs")}
-                >
-                  <AddIcon fontSize="small" />
-                  Save as new
+                  <SaveIcon fontSize="small" />
+                  {this.state.preset === "custom"
+                    ? "Save as new"
+                    : "Save changes"}
                 </MenuItem>
-              )}
-              {selectedCustom && (
-                <MenuItem
-                  className="insightsPresetRenameMenuItem"
-                  onClick={() => this.openPresetDialog("rename")}
-                >
-                  <EditOutlinedIcon fontSize="small" />
-                  Rename
-                </MenuItem>
-              )}
-              {selectedCustom && (
-                <MenuItem
-                  className="insightsPresetResetMenuItem"
-                  onClick={() => this.openPresetDialog("delete")}
-                >
-                  <DeleteOutlineIcon fontSize="small" />
-                  Delete custom
-                </MenuItem>
-              )}
-              {selectedDefault &&
-                (this.state.presetDirty ||
-                  this.state.presetLibrary.defaults[selectedDefault]) && (
+                {this.state.preset !== "custom" && (
                   <MenuItem
-                    className="insightsPresetResetMenuItem"
-                    onClick={() => this.openPresetDialog("restore")}
+                    className="insightsPresetSaveAsMenuItem"
+                    disabled={customLimitReached || !this.state.layers.length}
+                    onClick={() => this.openPresetDialog("saveAs")}
                   >
-                    <RefreshIcon fontSize="small" />
-                    Reset to default
+                    <AddIcon fontSize="small" />
+                    Save as new
                   </MenuItem>
                 )}
-            </Menu>
-          </Toolbar>
+                {selectedCustom && (
+                  <MenuItem
+                    className="insightsPresetRenameMenuItem"
+                    onClick={() => this.openPresetDialog("rename")}
+                  >
+                    <EditOutlinedIcon fontSize="small" />
+                    Rename
+                  </MenuItem>
+                )}
+                {selectedCustom && (
+                  <MenuItem
+                    className="insightsPresetResetMenuItem"
+                    onClick={() => this.openPresetDialog("delete")}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                    Delete custom
+                  </MenuItem>
+                )}
+                {selectedDefault &&
+                  (this.state.presetDirty ||
+                    this.state.presetLibrary.defaults[selectedDefault]) && (
+                    <MenuItem
+                      className="insightsPresetResetMenuItem"
+                      onClick={() => this.openPresetDialog("restore")}
+                    >
+                      <RefreshIcon fontSize="small" />
+                      Reset to default
+                    </MenuItem>
+                  )}
+              </Menu>
+            </Toolbar>
+            {this.renderViewportControls(
+              viewportBounds,
+              viewportRange,
+              minViewportSpan,
+            )}
+          </div>
           {this.renderLayerPanel(projection)}
-          {this.renderViewportControls(
-            viewportBounds,
-            viewportRange,
-            minViewportSpan,
-          )}
           {!!upcomingEvents.length && (
             <InsightEventRail
               events={upcomingEvents}

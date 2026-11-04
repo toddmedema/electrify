@@ -230,9 +230,10 @@ describe("eventMarkersPlugin", () => {
       setLineDash: jest.fn(),
       stroke: jest.fn(),
       lineTo: jest.fn(),
+      measureText: jest.fn((text: string) => ({ width: text.length * 7 })),
     } as unknown as CanvasRenderingContext2D;
     const plot = {
-      bbox: { left: 0, top: 0, width: 100, height: 80 },
+      bbox: { left: 0, top: 40, width: 100, height: 80 },
       ctx,
       scales: { x: { min: 0, max: 10 } },
       valToPos: (value: number) => value * 10,
@@ -248,16 +249,75 @@ describe("eventMarkersPlugin", () => {
 
     (plugin.hooks!.draw as (plot: uPlot) => void)(plot);
 
-    expect(ctx.moveTo).toHaveBeenCalledWith(50.5, 0);
-    expect(ctx.moveTo).toHaveBeenCalledTimes(1);
-    expect(ctx.fillText).toHaveBeenCalledWith("1", 50.5, 10);
+    const options = {
+      width: 350,
+      height: 160,
+      padding: [10, 0, 0, 0],
+    } as uPlot.Options;
+    plugin.opts!(plot, options);
+    const topPadding = options.padding![0] as (...args: unknown[]) => number;
+    expect(topPadding(plot, 0, [], 0)).toBe(34);
+    expect(ctx.moveTo).toHaveBeenCalledWith(50.5, 40);
+    expect(ctx.moveTo).toHaveBeenCalledTimes(2);
+    expect(ctx.fillText).toHaveBeenCalledWith("1", 50.5, 28);
+    // The badge's lower edge stays above the data, in its reserved event row.
+    expect(ctx.arc).toHaveBeenCalledWith(50.5, 28, 8, 0, Math.PI * 2);
     expect(ctx.fillText).not.toHaveBeenCalledWith(
       "2",
       expect.any(Number),
       expect.any(Number),
     );
-    expect(ctx.save).toHaveBeenCalledTimes(1);
-    expect(ctx.restore).toHaveBeenCalledTimes(1);
+    expect(ctx.save).toHaveBeenCalledTimes(2);
+    expect(ctx.restore).toHaveBeenCalledTimes(2);
+  });
+
+  it("merges close and edge-clamped badges in one row while keeping true onset guides", () => {
+    const groupStrokeWidths: number[] = [];
+    const ctx = {
+      arc: jest.fn(),
+      roundRect: jest.fn(function (this: CanvasRenderingContext2D) {
+        groupStrokeWidths.push(this.lineWidth);
+      }),
+      beginPath: jest.fn(),
+      clip: jest.fn(),
+      fill: jest.fn(),
+      fillText: jest.fn(),
+      measureText: (text: string) => ({ width: text.length * 7 }),
+      moveTo: jest.fn(),
+      rect: jest.fn(),
+      restore: jest.fn(),
+      save: jest.fn(),
+      setLineDash: jest.fn(),
+      stroke: jest.fn(),
+      lineTo: jest.fn(),
+    } as unknown as CanvasRenderingContext2D;
+    const plot = {
+      bbox: { left: 0, top: 40, width: 100, height: 80 },
+      ctx,
+      scales: { x: { min: 0, max: 10 } },
+      valToPos: (value: number) => value * 10,
+      width: 350,
+    } as unknown as uPlot;
+    const plugin = eventMarkersPlugin(
+      () => [
+        { key: "freeze", x: 0, number: 1 },
+        { key: "recovery", x: 0.25, number: 2 },
+        { key: "nearby", x: 2.5, number: 3 },
+        { key: "later", x: 9.9, number: 4 },
+      ],
+      () => "recovery",
+    );
+    (plugin.hooks.draw as (plot: uPlot) => void)(plot);
+    expect(ctx.fillText).toHaveBeenCalledTimes(2);
+    expect(ctx.fillText).toHaveBeenCalledWith("1–3", 14.5, 28);
+    expect(ctx.fillText).toHaveBeenCalledWith("4", 92, 28);
+    expect(ctx.moveTo).toHaveBeenCalledWith(0.5, 40);
+    expect(ctx.moveTo).toHaveBeenCalledWith(3.5, 40);
+    expect(ctx.moveTo).toHaveBeenCalledWith(25.5, 40);
+    expect(ctx.roundRect).toHaveBeenCalledTimes(1);
+    expect(groupStrokeWidths).toEqual([2]);
+    expect(ctx.arc).toHaveBeenCalledTimes(1);
+    expect(ctx.arc).toHaveBeenCalledWith(92, 28, 8, 0, Math.PI * 2);
   });
 });
 

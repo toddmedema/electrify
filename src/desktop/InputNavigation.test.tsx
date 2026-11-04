@@ -427,3 +427,68 @@ it.each(["cancel", "drop"] as const)(
     expect(screen.getByRole("status")).toHaveTextContent("Idle");
   },
 );
+
+afterEach(() => {
+  delete document.documentElement.dataset.tvLayout;
+});
+it("TV directions follow visible rows while widget handlers retain first refusal", () => {
+  document.documentElement.dataset.tvLayout = "true";
+  render(
+    <main className="base_main">
+      <button>Top left</button>
+      <button>Bottom left</button>
+      <button>Top right</button>
+      <button>Bottom right</button>
+      <input
+        type="range"
+        aria-label="Output"
+        min={0}
+        max={10}
+        defaultValue={5}
+      />
+    </main>,
+  );
+  const place = (name: string, x: number, y: number) => {
+    jest
+      .spyOn(screen.getByRole("button", { name }), "getBoundingClientRect")
+      .mockReturnValue({
+        left: x,
+        right: x + 80,
+        top: y,
+        bottom: y + 40,
+        width: 80,
+        height: 40,
+      } as DOMRect);
+  };
+  place("Top left", 0, 0);
+  place("Bottom left", 0, 80);
+  place("Top right", 100, 0);
+  place("Bottom right", 100, 80);
+  screen.getByRole("button", { name: "Top left" }).focus();
+  moveInputFocus("right");
+  expect(screen.getByRole("button", { name: "Top right" })).toHaveFocus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "Bottom right" })).toHaveFocus();
+  moveInputFocus("left");
+  expect(screen.getByRole("button", { name: "Bottom left" })).toHaveFocus();
+  const range = screen.getByRole("slider", { name: "Output" });
+  range.focus();
+  moveInputFocus("right");
+  expect(range).toHaveFocus();
+  expect(range).toHaveValue("6");
+});
+
+it("excludes closed disclosure content even when the browser retains its layout boxes", () => {
+  render(
+    <main className="base_main">
+      <details>
+        <summary>Grid context</summary>
+        <button>Hidden forecast control</button>
+      </details>
+      <button>Purchase</button>
+    </main>,
+  );
+  expect(
+    visibleControls(inputScope()).map((element) => element.textContent),
+  ).toEqual(["Grid context", "Purchase"]);
+});

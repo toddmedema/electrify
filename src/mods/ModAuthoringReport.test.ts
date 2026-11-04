@@ -232,6 +232,21 @@ test("the common author report has all difficulty values, actual peak and additi
   }
 });
 
+test("player setup facts use the shared compact power readout", () => {
+  const scenario = modScenario(
+    prepared(),
+    undefined,
+    "Employee",
+    437538367.547,
+  );
+  const setup = modPlayerFacts(scenario).sections.find(
+    (section) => section.id === "setup",
+  )!;
+  expect(
+    setup.rows.find((row) => row.label === "Starting peak demand")!.value,
+  ).toBe("438MW");
+});
+
 test("independent semantic compilation errors become an invalid report rather than a thrown snapshot error", () => {
   const pack = prepared();
   pack.events![0].effects!.hydroInflowMultiplier = 0.05;

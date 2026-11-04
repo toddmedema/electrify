@@ -1251,6 +1251,12 @@ $topbar_height: 56px;
     color: var(--warning-icon);
   }
 }
+.gameStatusBar .missionSummary.statusWarning {
+  .missionRiskButton.MuiButton-root,
+  .missionSummaryMonths.MuiButton-root {
+    color: inherit;
+  }
+}
 
 // Remove the inline SVG's baseline space so its visual center matches the adjacent label.
 .statusIcon {
@@ -2381,6 +2387,14 @@ $pane_header_height: 48px;
 .accessibleChart {
   width: 100%;
   min-width: 0;
+}
+.chartCaption {
+  padding: 0.25rem 1rem;
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-emphasis);
+  line-height: 1.4;
+  text-align: center;
 }
 .chartTooltipContext {
   margin-top: 8px;

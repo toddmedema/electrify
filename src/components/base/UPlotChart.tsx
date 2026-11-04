@@ -1,3 +1,4 @@
+import { isTvLayout, useTvLayout } from "../../TvLayout";
 import * as React from "react";
 import { withoutNegativeZero } from "../../helpers/Format";
 import uPlot from "uplot";
@@ -90,6 +91,20 @@ const TOOLTIP_OFFSET = 8;
 // pointer move; uPlot can resize its existing canvas cheaply in the meantime.
 const RESIZE_SETTLE_MS = 120;
 
+function keyboardTvTooltipTarget(
+  target: EventTarget | null,
+  keyboardSelected: boolean,
+): boolean {
+  // Only TV keyboard details move outside uPlot's pointer surface. Ordinary
+  // charts must still let a mouse landing on their tooltip take over inspection.
+  return (
+    isTvLayout() &&
+    keyboardSelected &&
+    target instanceof Element &&
+    !!target.closest(".chartTooltip")
+  );
+}
+
 function tooltipPlugin<S>(
   getState: () => S,
   getLabel: () => ((idx: number, state: S) => string) | undefined,
@@ -138,6 +153,8 @@ function tooltipPlugin<S>(
           // events so it can scroll, so a fast pointer landing on it would otherwise strand the
           // cursor and leave the tooltip behind; hand those moves back to the plot instead.
           el.addEventListener("mousemove", (event) => {
+            if (keyboardTvTooltipTarget(event.target, keyboardSelected()))
+              return;
             const bounds = u.over.getBoundingClientRect();
             u.setCursor({
               left: event.clientX - bounds.left,
@@ -191,7 +208,8 @@ function tooltipPlugin<S>(
         outsidePointer = (event) => {
           if (
             el?.style.display === "block" &&
-            !u.over.contains(event.target as Node)
+            !u.over.contains(event.target as Node) &&
+            !el.contains(event.target as Node)
           ) {
             dismissDetails();
           }
@@ -238,22 +256,27 @@ function tooltipPlugin<S>(
           });
           context.textContent = groups.slice(2).join("\n\n");
           context.hidden = !context.textContent;
-          el.style.maxWidth = `${u.over.clientWidth}px`;
         } else {
           el.textContent = text;
         }
+        // Couch-scale event/axis rows can leave a shallow data plot. Keyboard inspection
+        // may use the complete chart surface so every selected value remains readable.
+        const host = isTvLayout() && keyboardSelected() ? u.root : u.over;
+        if (el.parentElement !== host) host.appendChild(el);
+        el.style.maxWidth = `${host.clientWidth}px`;
         el.style.display = "block";
-        el.style.maxHeight = `${u.over.clientHeight}px`;
+        el.style.maxHeight = `${host.clientHeight}px`;
         el.style.overflowY = "auto";
         // Kept inside the plot, the way Victory's constrainToVisibleArea tooltip was
-        const left = u.cursor.left!;
-        const top = u.cursor.top!;
-        const flipX =
-          left + TOOLTIP_OFFSET + el.offsetWidth > u.over.clientWidth;
+        const plotBounds = u.over.getBoundingClientRect();
+        const hostBounds = host.getBoundingClientRect();
+        const left = u.cursor.left! + plotBounds.left - hostBounds.left;
+        const top = u.cursor.top! + plotBounds.top - hostBounds.top;
+        const flipX = left + TOOLTIP_OFFSET + el.offsetWidth > host.clientWidth;
         const flipY =
-          top + TOOLTIP_OFFSET + el.offsetHeight > u.over.clientHeight;
-        el.style.left = `${Math.max(0, Math.min(u.over.clientWidth - el.offsetWidth, flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET))}px`;
-        el.style.top = `${Math.max(0, Math.min(u.over.clientHeight - el.offsetHeight, flipY ? top - TOOLTIP_OFFSET - el.offsetHeight : top + TOOLTIP_OFFSET))}px`;
+          top + TOOLTIP_OFFSET + el.offsetHeight > host.clientHeight;
+        el.style.left = `${Math.max(0, Math.min(host.clientWidth - el.offsetWidth, flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET))}px`;
+        el.style.top = `${Math.max(0, Math.min(host.clientHeight - el.offsetHeight, flipY ? top - TOOLTIP_OFFSET - el.offsetHeight : top + TOOLTIP_OFFSET))}px`;
       },
       destroy: (u: uPlot) => {
         document.removeEventListener("pointerdown", outsidePointer, true);
@@ -267,11 +290,37 @@ function tooltipPlugin<S>(
   };
 }
 
+function tvChartHeight(root: HTMLElement | null, requested: number): number {
+  if (!isTvLayout()) return requested;
+  // Stacked evidence needs room for its heading, legend and event row as well as its axes.
+  let height = root?.closest(".insightsTracks")
+    ? Math.min(requested, 200 * getTextScale())
+    : requested;
+  for (
+    let parent = root?.parentElement;
+    parent;
+    parent = parent.parentElement
+  ) {
+    if (
+      /(auto|scroll)/.test(getComputedStyle(parent).overflowY) &&
+      parent.clientHeight > 0
+    )
+      height = Math.min(
+        height,
+        Math.max(1, parent.clientHeight - 16 * getTextScale()),
+      );
+  }
+  return height;
+}
+
 export default function UPlotChart<S>(
   props: UPlotChartProps<S>,
 ): React.JSX.Element {
   const { ariaLabel, id, height, state, data, structureKey, syncKey } = props;
   const controllerInput = useControllerInput();
+  const tvMode = useTvLayout();
+  const interactiveTooltip =
+    props.interactiveTooltip || (controllerInput && !!props.tooltip);
   const presentation = React.useContext(ChartPresentationContext);
   const presentationRef = React.useRef(presentation);
   presentationRef.current = presentation;
@@ -403,6 +452,7 @@ export default function UPlotChart<S>(
     let resizeFrame: number | undefined;
     let settleTimer: ReturnType<typeof setTimeout> | undefined;
     let nextWidth = 0;
+    let measuredHeight = 0;
 
     const resizeExistingPlot = () => {
       resizeFrame = undefined;
@@ -416,9 +466,12 @@ export default function UPlotChart<S>(
           1,
           Math.round(
             presentationRef.current?.height ??
-              (exactHeightRef.current
-                ? heightRef.current || 300
-                : (heightRef.current || 300) * chartScale(nextWidth)),
+              tvChartHeight(
+                root,
+                exactHeightRef.current
+                  ? heightRef.current || 300
+                  : (heightRef.current || 300) * chartScale(nextWidth),
+              ),
           ),
         ),
       });
@@ -428,10 +481,23 @@ export default function UPlotChart<S>(
       // Floor fractional flex widths so uPlot's explicit canvas width can never
       // round a pixel wider than the pane that owns it.
       nextWidth = Math.floor(root.getBoundingClientRect().width);
-      if (nextWidth <= 0 || nextWidth === measuredWidthRef.current) {
+      const nextHeight = Math.round(
+        presentationRef.current?.height ??
+          tvChartHeight(
+            root,
+            exactHeightRef.current
+              ? heightRef.current || 300
+              : (heightRef.current || 300) * chartScale(nextWidth),
+          ),
+      );
+      if (
+        nextWidth <= 0 ||
+        (nextWidth === measuredWidthRef.current &&
+          nextHeight === measuredHeight)
+      )
         return;
-      }
       measuredWidthRef.current = nextWidth;
+      measuredHeight = nextHeight;
 
       // There is no canvas to resize on first layout, so build it immediately. Once it exists,
       // coalesce ResizeObserver bursts into one cheap setSize per animation frame and reserve
@@ -454,6 +520,14 @@ export default function UPlotChart<S>(
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
+    // A disclosure or TV chrome can change the available height without changing plot width.
+    if (tvMode)
+      for (
+        let parent = root.parentElement;
+        parent;
+        parent = parent.parentElement
+      )
+        observer.observe(parent);
     return () => {
       observer.disconnect();
       if (resizeFrame !== undefined) {
@@ -463,8 +537,32 @@ export default function UPlotChart<S>(
         clearTimeout(settleTimer);
       }
     };
-  }, []);
+  }, [tvMode]);
 
+  const plotLayout = React.useMemo(
+    () => ({
+      width,
+      height,
+      structureKey,
+      themeVersion,
+      textScale,
+      fontReady,
+      axisAlignment,
+      presentation,
+      tvMode,
+    }),
+    [
+      width,
+      height,
+      structureKey,
+      themeVersion,
+      textScale,
+      fontReady,
+      axisAlignment,
+      presentation,
+      tvMode,
+    ],
+  );
   React.useLayoutEffect(() => {
     // A width of zero means the pane has not been laid out yet (and, incidentally, that we are
     // in jsdom); the ResizeObserver above builds the plot as soon as there is somewhere to put
@@ -484,9 +582,10 @@ export default function UPlotChart<S>(
         dataUpdateRef.current = update;
       },
     });
-    const built = presentation
-      ? expandedChartOptions(options, presentation.fontScale)
-      : options;
+    const built =
+      presentation || tvMode
+        ? expandedChartOptions(options, presentation?.fontScale ?? 1)
+        : options;
     const alignedAxis = axisAlignment?.register(() =>
       plotRef.current?.redraw(true, true),
     );
@@ -515,7 +614,10 @@ export default function UPlotChart<S>(
           1,
           Math.round(
             presentation?.height ??
-              (height || 300) * (props.exactHeight ? 1 : scale),
+              tvChartHeight(
+                rootRef.current,
+                (height || 300) * (props.exactHeight ? 1 : scale),
+              ),
           ),
         ),
         // Only x is synced: these charts plot watts against watt-hours against dollars, so
@@ -568,18 +670,9 @@ export default function UPlotChart<S>(
       drawnRef.current = null;
       dataUpdateRef.current = undefined;
     };
-    // Data changes go through setData below; only size, shape and palette rebuild
+    // Data updates stay in place; every plot replacement shares this lifecycle with viewport/gestures.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    width,
-    height,
-    structureKey,
-    themeVersion,
-    textScale,
-    fontReady,
-    axisAlignment,
-    presentation,
-  ]);
+  }, [plotLayout]);
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {
@@ -596,16 +689,7 @@ export default function UPlotChart<S>(
         max: viewport.range[1],
       });
     }
-  }, [
-    viewport,
-    width,
-    height,
-    structureKey,
-    themeVersion,
-    textScale,
-    fontReady,
-    presentation,
-  ]);
+  }, [viewport, plotLayout]);
 
   React.useLayoutEffect(() => {
     const plot = plotRef.current;
@@ -784,19 +868,11 @@ export default function UPlotChart<S>(
       if (frame !== undefined) cancelAnimationFrame(frame);
       if (wheelTimer) clearTimeout(wheelTimer);
     };
-  }, [
-    width,
-    height,
-    structureKey,
-    themeVersion,
-    textScale,
-    viewportEnabled,
-    fontReady,
-    presentation,
-  ]);
+  }, [viewportEnabled, plotLayout]);
 
   React.useLayoutEffect(() => {
-    plotRef.current?.redraw();
+    // Event rows can appear when a new projection is ready; recompute their reserved padding.
+    plotRef.current?.redraw(true, true);
   }, [annotations]);
 
   const selectPoint = (index: number) => {
@@ -822,7 +898,7 @@ export default function UPlotChart<S>(
 
   return (
     <div className="accessibleChart">
-      {props.interactiveTooltip && (
+      {interactiveTooltip && (
         <span id={instructionsId} className="srOnly">
           {controllerInput
             ? "Select to inspect a time. Use Left and Right to read points. Back closes the tooltip."
@@ -834,12 +910,19 @@ export default function UPlotChart<S>(
         ref={rootRef}
         role="img"
         aria-label={accessibleLabel}
-        tabIndex={props.interactiveTooltip ? 0 : undefined}
-        aria-describedby={props.interactiveTooltip ? instructionsId : undefined}
-        onBlur={props.interactiveTooltip ? closeDetails : undefined}
+        tabIndex={interactiveTooltip ? 0 : undefined}
+        aria-describedby={interactiveTooltip ? instructionsId : undefined}
+        onBlur={props.tooltip ? closeDetails : undefined}
         onPointerDownCapture={
-          props.interactiveTooltip
+          props.tooltip
             ? (event) => {
+                if (
+                  keyboardTvTooltipTarget(
+                    event.target,
+                    selectedPointRef.current !== null,
+                  )
+                )
+                  return;
                 pointerPositionRef.current = {
                   x: event.clientX,
                   y: event.clientY,
@@ -849,8 +932,15 @@ export default function UPlotChart<S>(
             : undefined
         }
         onPointerMoveCapture={
-          props.interactiveTooltip
+          props.tooltip
             ? (event) => {
+                if (
+                  keyboardTvTooltipTarget(
+                    event.target,
+                    selectedPointRef.current !== null,
+                  )
+                )
+                  return;
                 const previous = pointerPositionRef.current;
                 pointerPositionRef.current = {
                   x: event.clientX,
@@ -871,7 +961,7 @@ export default function UPlotChart<S>(
             : undefined
         }
         onKeyDown={
-          props.interactiveTooltip
+          interactiveTooltip
             ? (event) => {
                 const current =
                   selectedPoint ?? plotRef.current?.cursor.idx ?? 0;
@@ -913,7 +1003,7 @@ export default function UPlotChart<S>(
           overflow: "hidden",
         }}
       />
-      {props.interactiveTooltip && (
+      {interactiveTooltip && (
         <span
           className="srOnly"
           role="status"

@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { useState } from "react";
 import { Autocomplete, TextField } from "@mui/material";
@@ -13,6 +13,8 @@ import { quit } from "../reducers/GameActions";
 import { navigate } from "../reducers/Card";
 import { getInputPresentation, startDesktopInput } from "./Input";
 import { buildSpeedOptions } from "../components/base/SpeedControls";
+import InputHints from "./InputHints";
+import { dialogClose } from "../reducers/UI";
 
 let stop: () => void;
 beforeEach(() => {
@@ -75,6 +77,48 @@ function Game() {
     </main>
   );
 }
+
+it.each(["pointerdown", "keydown"] as const)(
+  "keeps controller help mounted through trusted %s activation and hands off outside the footer",
+  async (eventType) => {
+    document.documentElement.dataset.tvLayout = "true";
+    const listeners = jest.spyOn(document, "addEventListener");
+    render(
+      <Provider store={store}>
+        <main className="base_main">
+          <button>Other action</button>
+        </main>
+        <InputHints />
+      </Provider>,
+    );
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    f.emit({ actions: ["down"] });
+    const help = screen.getByRole("button", { name: "All controls" });
+    const pointer = listeners.mock.calls.find(
+      ([type]) => type === eventType,
+    )![1] as EventListener;
+    const trustedPointer = (target: Element) =>
+      pointer({ isTrusted: true, target, key: "Enter" } as unknown as Event);
+    act(() => trustedPointer(help));
+    expect(getInputPresentation().active).toBe(true);
+    expect(help).toBeInTheDocument();
+    fireEvent.click(help);
+    expect(store.getState().ui.dialog).toMatchObject({
+      open: true,
+      title: "Controller controls",
+    });
+    act(() =>
+      trustedPointer(screen.getByRole("button", { name: "Other action" })),
+    );
+    expect(getInputPresentation().active).toBe(false);
+    store.dispatch(dialogClose());
+    delete document.documentElement.dataset.tvLayout;
+  },
+);
 
 function TextForm({ readonly = false, disabled = false } = {}) {
   const [value, setValue] = useState("Campaign one");

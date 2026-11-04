@@ -1,3 +1,4 @@
+import { useTvLayout } from "../../TvLayout";
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
@@ -902,6 +903,7 @@ export type Props = StateProps & DispatchProps;
 
 function BuildGenerators(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
+  const tvMode = useTvLayout();
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
   const { game, onBack } = props;
@@ -1114,6 +1116,16 @@ function BuildGenerators(props: Props): React.JSX.Element {
     );
   };
 
+  const comparison = (
+    <GeneratorComparison
+      generators={comparedGenerators}
+      outputShapes={outputShapes}
+      forecastPending={!forecast}
+      onClear={() => setComparedNames([])}
+      onRemove={toggleCompare}
+    />
+  );
+
   return (
     <div
       className="flexContainer screenCatalog"
@@ -1150,14 +1162,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
           Calculating output and energy costs…
         </Typography>
       )}
-      <GeneratorComparison
-        generators={comparedGenerators}
-        outputShapes={outputShapes}
-        forecastPending={!forecast}
-        onClear={() => setComparedNames([])}
-        onRemove={toggleCompare}
-      />
+      {!tvMode && comparison}
       <List ref={listRef} dense className="scrollable cardList">
+        {tvMode && comparedGenerators.length > 0 && (
+          <li className="tvComparisonItem">{comparison}</li>
+        )}
         {generators.map((g: GeneratorShoppingType) => {
           const advantages = [
             g.buildCost === lowestBuildCost ? "Lowest upfront cost" : undefined,

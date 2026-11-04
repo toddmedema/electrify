@@ -30,6 +30,10 @@ const {
   loadTextInputFunctions,
   validateTextInput,
 } = require("./steam-text-input.cjs");
+const {
+  loadPresentationFunctions,
+  steamPresentation,
+} = require("./steam-presentation.cjs");
 
 const CLOUD_PREFIX = /^electrify\/device-[a-f0-9]{32}\.json$/;
 const MAX_CLOUD_FILE_BYTES = 100 * 1024 * 1024;
@@ -79,6 +83,7 @@ class SteamService {
         displayName: this.client.localplayer.getName(),
       };
       this.native = loadFunctions();
+      this.presentation = loadPresentationFunctions();
       this.user = this.native.user();
       this.activity = new SteamActivity(
         this.native,
@@ -155,6 +160,9 @@ class SteamService {
       online,
       cloudEnabled,
       timelineSupported: !!this.activity?.supported,
+      presentation: this.client
+        ? steamPresentation(this.presentation)
+        : undefined,
       ...this.identity,
     };
   }

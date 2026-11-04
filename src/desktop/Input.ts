@@ -1,3 +1,5 @@
+import { revealControl } from "../components/base/RevealControl";
+import { isTvLayout } from "../TvLayout";
 import type { AppStore } from "../Store";
 import type {
   DesktopBridge,
@@ -146,7 +148,11 @@ export function startDesktopInput(
     );
     const active =
       document.activeElement?.closest<HTMLElement>("[data-game-tool]")?.dataset
-        .gameTool;
+        .gameTool ??
+      (isTvLayout()
+        ? document.querySelector<HTMLElement>(".gameToolPanel:not([hidden])")
+            ?.dataset.gameTool
+        : undefined);
     const opened = buttons.findIndex(
       (button) => button.getAttribute("aria-controls") === `tool-${active}`,
     );
@@ -157,14 +163,14 @@ export function startDesktopInput(
       const fleet = document.querySelector<HTMLElement>(
         ".base_main:not([inert]) .gameFleet",
       );
-      if (fleet) visibleControls(fleet)[0]?.focus();
+      if (fleet && !isTvLayout()) visibleControls(fleet)[0]?.focus();
     } else {
       const button = buttons[next - 1];
       const panelId = button.getAttribute("aria-controls");
       if (!panelId) button.click();
       const id = panelId ?? button.getAttribute("aria-controls");
       const panel = id ? document.getElementById(id) : null;
-      if (panel) visibleControls(panel)[0]?.focus();
+      if (panel && !isTvLayout()) visibleControls(panel)[0]?.focus();
     }
   };
   const chart = (delta: number) => {
@@ -200,11 +206,7 @@ export function startDesktopInput(
           : charts.length - 1
         : (current + delta + charts.length) % charts.length;
     charts[next].focus();
-    charts[next].scrollIntoView?.({
-      block: "nearest",
-      inline: "nearest",
-      behavior: "instant",
-    });
+    revealControl(charts[next]);
   };
   const act = (action: DesktopInputAction) => {
     const scope = inputScope();
@@ -339,6 +341,16 @@ export function startDesktopInput(
     "[role=dialog],[role=menu],[role=listbox],.MuiModal-root,.base_main,.gameWorkspace";
   const observer = new MutationObserver((mutations) => {
     if (
+      isTvLayout() &&
+      getInputPresentation().active &&
+      mutations.some(
+        (mutation) =>
+          mutation.type === "childList" &&
+          mutation.target.contains(document.activeElement),
+      )
+    )
+      scheduleReveal();
+    if (
       mutations.some((mutation) =>
         mutation.type === "attributes"
           ? (mutation.target as Element).matches(surfaceSelector)
@@ -361,8 +373,47 @@ export function startDesktopInput(
     attributes: true,
     attributeFilter: ["aria-hidden", "hidden", "inert"],
   });
+  // TV text, disclosure and chart layout can settle after focus moves. Keep that actual
+  // control exposed as its ancestors resize, without changing focus or a remembered scroll.
+  let revealFrame: number | undefined;
+  function scheduleReveal() {
+    if (revealFrame !== undefined) return;
+    revealFrame = requestAnimationFrame(() => {
+      revealFrame = undefined;
+      const target = document.activeElement;
+      if (
+        isTvLayout() &&
+        getInputPresentation().active &&
+        target instanceof HTMLElement &&
+        inputScope().contains(target)
+      )
+        revealControl(target);
+    });
+  }
+  const revealObserver =
+    typeof ResizeObserver === "function"
+      ? new ResizeObserver(scheduleReveal)
+      : undefined;
+  const trackFocus = () => {
+    revealObserver?.disconnect();
+    const target = document.activeElement;
+    if (!isTvLayout() || !(target instanceof HTMLElement)) return;
+    for (
+      let element: HTMLElement | null = target;
+      element;
+      element = element.parentElement
+    )
+      revealObserver?.observe(element);
+  };
+  document.addEventListener("focusin", trackFocus);
   const pointer = (event: Event) => {
     if (!event.isTrusted) return;
+    // The hints own an explicit help action. Keep its trigger mounted through activation.
+    if (
+      event.target instanceof Element &&
+      event.target.closest(".controllerHints")
+    )
+      return;
     choosingTextOption = null;
     delete document.documentElement.dataset.controllerInput;
     present({ active: false });
@@ -395,6 +446,9 @@ export function startDesktopInput(
     live = false;
     if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);
     observer.disconnect();
+    revealObserver?.disconnect();
+    if (revealFrame !== undefined) cancelAnimationFrame(revealFrame);
+    document.removeEventListener("focusin", trackFocus);
     stopInput();
     stopFocus();
     stopQuit();

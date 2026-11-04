@@ -115,3 +115,91 @@ export function ToolScrollMemory(props: {
   useRememberedScroll(props.scrollRef, props.id);
   return null;
 }
+
+interface FocusMemory {
+  element: HTMLElement;
+  id: string;
+  label: string | null;
+  text: string;
+  tag: string;
+}
+
+/** Focus shares the workspace lifetime and scroll memory; no DOM nodes enter a game save. */
+export function useToolFocusMemory(
+  ref: React.RefObject<HTMLElement | null>,
+  memory: Map<string, unknown>,
+  active: string,
+  enabled: boolean,
+) {
+  React.useEffect(() => {
+    if (!enabled) return;
+    const root = ref.current;
+    if (!root) return;
+    const remember = (event: FocusEvent) => {
+      const element = event.target;
+      if (
+        !(element instanceof HTMLElement) ||
+        element.matches("h1,h2,h3,h4,h5,h6")
+      )
+        return;
+      const pane = element.closest<HTMLElement>("[data-game-tool],.gameFleet");
+      if (!pane) return;
+      const key = pane.dataset.gameTool ?? "fleet";
+      memory.set(`focus.${key}`, {
+        element,
+        id: element.id,
+        label: element.getAttribute("aria-label"),
+        text: element.textContent ?? "",
+        tag: element.tagName,
+      } satisfies FocusMemory);
+    };
+    root.addEventListener("focusin", remember);
+    return () => root.removeEventListener("focusin", remember);
+  }, [enabled, memory, ref]);
+  React.useEffect(() => {
+    if (!enabled) return;
+    const saved = memory.get(`focus.${active}`) as FocusMemory | undefined;
+    if (!saved) return;
+    let frame: number | undefined;
+    let cancelled = false;
+    const cancel = () => {
+      cancelled = true;
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
+    const restore = (attempt: number) => {
+      if (cancelled) return;
+      const root = ref.current?.querySelector<HTMLElement>(
+        active === "fleet" ? ".gameFleet" : `[data-game-tool="${active}"]`,
+      );
+      const target =
+        root && !root.hidden
+          ? root.contains(saved.element)
+            ? saved.element
+            : Array.from(
+                root.querySelectorAll<HTMLElement>(
+                  "button,input,select,textarea,summary,a[href],[tabindex]",
+                ),
+              ).find((element) =>
+                saved.id
+                  ? element.id === saved.id
+                  : saved.label
+                    ? element.getAttribute("aria-label") === saved.label
+                    : element.tagName === saved.tag &&
+                      element.textContent === saved.text,
+              )
+          : undefined;
+      if (target && !target.matches(":disabled,[aria-disabled=true]"))
+        target.focus({ preventScroll: true });
+      else if (attempt < RESTORE_FRAMES)
+        frame = requestAnimationFrame(() => restore(attempt + 1));
+    };
+    frame = requestAnimationFrame(() => restore(0));
+    document.addEventListener("keydown", cancel, true);
+    document.addEventListener("pointerdown", cancel, true);
+    return () => {
+      cancel();
+      document.removeEventListener("keydown", cancel, true);
+      document.removeEventListener("pointerdown", cancel, true);
+    };
+  }, [active, enabled, memory, ref]);
+}

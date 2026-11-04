@@ -166,7 +166,7 @@ function ScoreOutlook({
                 >
                   {change > 0 ? "+" : "−"}
                   {formatScore(Math.abs(change))}
-                  <span className="srOnly"> from now</span>
+                  <span> from now</span>
                 </span>
               )}
             </dd>

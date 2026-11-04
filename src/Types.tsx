@@ -1474,6 +1474,10 @@ export interface SettingsType {
   theme: ThemeChoiceType;
   // Device preference: old settings and saved fixtures use the standard size.
   textSize?: TextSizeType;
+  // TV presentation belongs to this device, independently of saved campaigns.
+  tvMode?: boolean;
+  tvScale?: number;
+  tvInset?: number;
 }
 
 export interface DialogType {

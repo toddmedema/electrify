@@ -86,6 +86,28 @@ it("restores text size locally and rejects unsupported persisted and runtime cho
   expect(localStorage.getItem("textSize")).toBe("standard");
 });
 
+it("keeps TV presentation opt-in and restores its bounded device choices", () => {
+  window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
+  const { default: reducer, initialSettings, change } = settings();
+  expect(initialSettings.tvMode).toBeUndefined();
+  const tv = reducer(
+    initialSettings,
+    change({ tvMode: true, tvScale: 1.75, tvInset: 4 }),
+  );
+  expect(tv).toMatchObject({ tvMode: true, tvScale: 1.75, tvInset: 4 });
+  expect(settings().initialSettings).toMatchObject({
+    tvMode: true,
+    tvScale: 1.75,
+    tvInset: 4,
+  });
+  const invalid = reducer(tv, change({ tvScale: 99, tvInset: -4 }));
+  expect(invalid).toMatchObject({ tvScale: 1.5, tvInset: 2 });
+  const desktop = reducer(invalid, change({ tvMode: false }));
+  expect(desktop.tvMode).toBe(false);
+  expect(settings().initialSettings.tvMode).toBe(false);
+  expect(desktop.textSize).toBe(initialSettings.textSize);
+});
+
 it.each(["standalone", "ios"])(
   "defaults installed %s PWA sound on and remembers an explicit mute after relaunch",
   (platform) => {
@@ -105,6 +127,9 @@ it.each(["standalone", "ios"])(
     expect(initialSettings.audioEnabled).toBe(true);
     expect(initialSettings.controllerVibrationEnabled).toBeUndefined();
     expect(initialSettings.steamTimelineEnabled).toBeUndefined();
+    expect(initialSettings.tvMode).toBeUndefined();
+    expect(initialSettings.tvScale).toBeUndefined();
+    expect(initialSettings.tvInset).toBeUndefined();
     reducer(initialSettings, change({ audioEnabled: false }));
     expect(settings().initialSettings.audioEnabled).toBe(false);
     reducer(initialSettings, change({ audioEnabled: true }));

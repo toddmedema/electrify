@@ -1,3 +1,5 @@
+import { isTvLayout } from "../../TvLayout";
+import { getTextScale, subscribeTextSize } from "../../TextSize";
 import * as React from "react";
 import {
   Avatar,
@@ -794,12 +796,19 @@ export function fleetChartHeight(width: number, height: number): number {
 }
 
 function useFleetChartHeight(): number {
-  const measure = () => fleetChartHeight(window.innerWidth, window.innerHeight);
+  const measure = () =>
+    isTvLayout()
+      ? Math.round(220 * getTextScale())
+      : fleetChartHeight(window.innerWidth, window.innerHeight);
   const [height, setHeight] = React.useState(measure);
   React.useEffect(() => {
     const resize = () => setHeight(measure());
     window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
+    const stop = subscribeTextSize(resize);
+    return () => {
+      window.removeEventListener("resize", resize);
+      stop();
+    };
   }, []);
   return height;
 }
