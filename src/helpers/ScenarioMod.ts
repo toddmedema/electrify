@@ -351,7 +351,7 @@ export function validScenarioMod(
       typeof value.runtimeDigest !== "string" ||
       !/^sha256-[a-f0-9]{64}$/.test(value.runtimeDigest) ||
       typeof value.modRuntimeId !== "string" ||
-      !/^mod-1-[a-f0-9]{64}$/.test(value.modRuntimeId)
+      !/^mod-[1-9]\d*-[a-f0-9]{64}$/.test(value.modRuntimeId)
     )
       return false;
     const source = value.source,

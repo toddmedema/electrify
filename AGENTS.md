@@ -87,9 +87,10 @@ and behavioral tests over adding instructions here.
 
 ## Run compatibility manifest
 
-`src/data/RunCompatibility.json` is a generated, git-ignored hash of every simulation input:
-everything under `src/data`, `src/helpers`, and `src/reducers` except tests, plus
-`src/Constants.tsx`, `src/Types.tsx`, `package-lock.json`, and `public/data`. The npm entry points for
+`src/data/RunCompatibility.json` is a generated, git-ignored identity of the game reducer's
+runtime dependency graph and shipped data. Type-only, comment and formatting changes do not
+move official-run compatibility; co-op also retains a broad source/data/lockfile identity.
+The npm entry points for
 `start`, `build`, `test*`, `sim`, and `typecheck` regenerate it automatically, so never commit or
 merge it. Run `npm run compatibility:generate` by hand only if your editor complains that the file
 is missing. See `docs/run-compatibility.md` for why the hash is intentionally broad.
@@ -150,9 +151,10 @@ untracked. Agents without a verified hook should format the files they changed b
 - `src/components/views/` contains screens; adjacent `*Container.tsx` files provide Redux wiring.
   Reusable UI and charts live in `src/components/base/`. `Compositor.tsx` selects the current
   screen from the card-navigation state.
-- Saves accept only the current structure in `src/SaveSchema.ts`; there are no prelaunch
-  migrations or historical simulation runtimes. Keep untrusted-import validation,
-  current-format round trips and deterministic simulation behavior covered by tests.
+- Save structure changes append an ordered migration in `src/SaveUpgrade.ts`, which derives
+  the version re-exported by `src/SaveSchema.ts`. Keep old steps unchanged and validate decoded,
+  upgraded payloads before use. Cover retained progress, malformed/future-schema rejection,
+  idempotent current-format round trips and deterministic resumed simulation; see `docs/saves.md`.
 - `src/testing/Simulator.tsx` drives the real reducer, not a second model. Add economic invariants
   to `src/testing/Invariants.tsx`; do not duplicate game formulas in the simulator.
 - Background reading, loaded only when relevant: `docs/demand-model.md` (customer demand),
