@@ -92,14 +92,12 @@ jobs:
             arch: x64
             depot: win32-x64
             directory: win-unpacked
-          # One universal app serves Intel and Apple Silicon Macs. This Apple Silicon host
-          # packages and verifies both slices.
-          - label: macOS universal
+          - label: macOS ARM64
             runner: macos-15
             platform: darwin
             arch: arm64
-            depot: darwin-universal
-            directory: mac-universal
+            depot: darwin-arm64
+            directory: mac-arm64
     steps:
       - uses: actions/checkout@v7
         with:
@@ -126,7 +124,7 @@ jobs:
           name: desktop-renderer
       - name: Package and verify native depot
         timeout-minutes: 15
-        run: npm run desktop:pack:offline -- --skip-build --platform ${{ matrix.platform }} --arch ${{ matrix.platform == 'darwin' && 'universal' || matrix.arch }}
+        run: npm run desktop:pack:offline -- --skip-build --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
       - name: Save native packaging downloads
         if: "!cancelled() && steps.native-cache.outputs.cache-hit != 'true'"
         uses: actions/cache/save@v6

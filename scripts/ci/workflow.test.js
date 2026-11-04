@@ -30,14 +30,14 @@ test("PR CI runs three independent test groups and three native builds in eight 
   const workers = jobs.platform.strategy.matrix.include;
   assert.equal(workers.length + Object.keys(jobs).length - 1, 8);
   assert.deepEqual(workers.map(({ depot }) => depot).sort(), [
-    "darwin-universal",
+    "darwin-arm64",
     "linux-x64",
     "win32-x64",
   ]);
-  assert.equal(
-    workers.find(({ platform }) => platform === "darwin").arch,
-    "arm64",
-  );
+  const mac = workers.find(({ platform }) => platform === "darwin");
+  assert.equal(mac.runner, "macos-15");
+  assert.equal(mac.arch, "arm64");
+  assert.equal(mac.directory, "mac-arm64");
   assert.equal(jobs.build.needs, undefined);
   assert.equal(jobs.cpu.needs, undefined);
   assert.equal(jobs.platform.needs, "build");
@@ -52,6 +52,7 @@ test("PR CI runs three independent test groups and three native builds in eight 
   );
   assert.equal(nativeRuns.length, 1);
   assert.match(nativeRuns[0], /^npm run desktop:pack:offline -- --skip-build /);
+  assert(nativeRuns[0].endsWith(`--arch \${{ matrix.arch }}`));
   assert(
     !jobs.platform.steps.some(
       ({ uses }) => uses === "./.github/actions/jest-cache",
@@ -221,7 +222,14 @@ test("the required gate rejects every failed, skipped, cancelled or timed-out de
     });
   assert.equal(run(successful).status, 0);
   for (const dependency of Object.keys(successful))
-    for (const result of ["failure", "skipped", "cancelled", "timed_out", ""]) {
+    for (const result of [
+      "failure",
+      "skipped",
+      "cancelled",
+      "timed_out",
+      "abandoned",
+      "",
+    ]) {
       assert.notEqual(
         run({ ...successful, [dependency]: result }).status,
         0,

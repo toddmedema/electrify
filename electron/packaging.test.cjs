@@ -7,7 +7,6 @@ const { spawnSync } = require("node:child_process");
 const { finished } = require("node:stream/promises");
 const { FileMatcher } = require("app-builder-lib/out/fileMatcher");
 const {
-  installMacNativeSlices,
   packageConfiguration,
   withOfflineMacSigning,
   signMacAdHoc,
@@ -18,11 +17,99 @@ const {
   verifyArchiveAssets,
   verifyInputResources,
   digest,
+  macArm64Bytes,
+  verifyMacArm64Binary,
 } = require("../scripts/desktop-verify.js");
 const {
   preserveRuntimeNotices,
   verifyRuntimeNotices,
 } = require("../scripts/runtime-notices.js");
+
+test("packaging accepts only the supported Mac architecture", () => {
+  for (const arch of ["x64", "universal"]) {
+    const result = spawnSync(
+      process.execPath,
+      [
+        "scripts/desktop-package.js",
+        "--mode",
+        "offline",
+        "--platform",
+        "darwin",
+        "--arch",
+        arch,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /macOS ARM64/);
+  }
+});
+
+test("package filters exclude Intel Mac native dependencies on every target", () => {
+  const root = path.resolve(__dirname, "..");
+  const nativeStat = fs.statSync(
+    path.join(
+      root,
+      "node_modules/steamworks.js/dist/osx/steamworksjs.darwin-arm64.node",
+    ),
+  );
+  for (const platform of ["darwin", "linux", "win32"]) {
+    const config = packageConfiguration("offline", "dev", platform);
+    assert.deepEqual(config.mac.target, [{ target: "dir", arch: ["arm64"] }]);
+    const filter = new FileMatcher(
+      root,
+      path.join(root, ".tmp", "package-filter"),
+      (value) => value,
+      config.files,
+    ).createFilter();
+    for (const name of [
+      "node_modules/steamworks.js/dist/osx/steamworksjs.darwin-x64.node",
+      "node_modules/@koromix/koffi-darwin-x64/darwin_x64/koffi.node",
+    ])
+      assert.equal(filter(path.join(root, name), nativeStat), false, name);
+    assert.equal(
+      filter(
+        path.join(
+          root,
+          "node_modules/steamworks.js/dist/osx/steamworksjs.darwin-arm64.node",
+        ),
+        nativeStat,
+      ),
+      platform === "darwin",
+    );
+  }
+});
+
+test(
+  "Mac SDK extraction keeps only ARM64 and preserves the installed source",
+  {
+    skip: process.platform !== "darwin",
+  },
+  (t) => {
+    const source = path.resolve(
+      "node_modules/steamworks.js/dist/osx/libsteam_api.dylib",
+    );
+    const original = fs.readFileSync(source);
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "electrify-sdk-"));
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+    const extracted = path.join(directory, "libsteam_api.dylib");
+    fs.writeFileSync(extracted, macArm64Bytes(source));
+    verifyMacArm64Binary(extracted);
+    assert(fs.statSync(extracted).size < original.length);
+    assert.deepEqual(fs.readFileSync(source), original);
+    assert.deepEqual(macArm64Bytes(extracted), fs.readFileSync(extracted));
+    assert.throws(() => verifyMacArm64Binary(source), /must be ARM64-only/);
+    assert.throws(
+      () =>
+        macArm64Bytes(
+          path.resolve(
+            "node_modules/steamworks.js/dist/osx/steamworksjs.darwin-x64.node",
+          ),
+        ),
+      /Command failed/,
+    );
+  },
+);
 
 test("packaged app metadata uses the renderer artifact's build version", () => {
   const version = "26sept26-1507";
@@ -252,81 +339,6 @@ test("packaging refuses Git LFS pointer text and empty assets", () => {
   assert.throws(
     () => assertAsset(Buffer.alloc(0), "data/weather/region.bin"),
     /Empty/,
-  );
-});
-
-test("universal Mac packaging installs the missing Koffi slice exactly as locked", (t) => {
-  const temporaryRoot = path.resolve(".tmp", "native-tests");
-  fs.mkdirSync(temporaryRoot, { recursive: true });
-  const root = fs.mkdtempSync(path.join(temporaryRoot, "slices-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const entry = (arch) => ({
-    version: "3.3.3",
-    resolved: `https://registry.npmjs.org/@koromix/koffi-darwin-${arch}/-/koffi-darwin-${arch}-3.3.3.tgz`,
-    integrity: `sha512-${arch}`,
-    cpu: [arch],
-    optional: true,
-    os: ["darwin"],
-  });
-  fs.writeFileSync(
-    path.join(root, "package-lock.json"),
-    JSON.stringify({
-      lockfileVersion: 3,
-      packages: {
-        "node_modules/@koromix/koffi-darwin-arm64": entry("arm64"),
-        "node_modules/@koromix/koffi-darwin-x64": entry("x64"),
-      },
-    }),
-  );
-  const writePackage = (directory, version) => {
-    fs.mkdirSync(directory, { recursive: true });
-    fs.writeFileSync(
-      path.join(directory, "package.json"),
-      JSON.stringify({ version }),
-    );
-    fs.writeFileSync(path.join(directory, "koffi.node"), "native");
-  };
-  // npm ci on an Apple Silicon host installed only the arm64 slice.
-  writePackage(
-    path.join(root, "node_modules", "@koromix", "koffi-darwin-arm64"),
-    "3.3.3",
-  );
-  const calls = [];
-  const fakeNpm = (args) => {
-    calls.push(args);
-    const prefix = args[args.indexOf("--prefix") + 1];
-    const lock = JSON.parse(
-      fs.readFileSync(path.join(prefix, "package-lock.json"), "utf8"),
-    );
-    assert.deepEqual(
-      lock.packages["node_modules/@koromix/koffi-darwin-x64"],
-      entry("x64"),
-    );
-    writePackage(
-      path.join(prefix, "node_modules", "@koromix", "koffi-darwin-x64"),
-      "3.3.3",
-    );
-  };
-  installMacNativeSlices(root, fakeNpm);
-  assert.equal(calls.length, 1);
-  assert(calls[0].includes("--os=darwin") && calls[0].includes("--cpu=x64"));
-  assert.equal(
-    fs.readFileSync(
-      path.join(root, "node_modules/@koromix/koffi-darwin-x64/koffi.node"),
-      "utf8",
-    ),
-    "native",
-  );
-  installMacNativeSlices(root, fakeNpm);
-  assert.equal(calls.length, 1, "Installed slices are not fetched again");
-
-  // npm skips a platform mismatch silently, so an empty result must fail.
-  fs.rmSync(path.join(root, "node_modules/@koromix/koffi-darwin-x64"), {
-    recursive: true,
-  });
-  assert.throws(
-    () => installMacNativeSlices(root, () => {}),
-    /did not install the locked @koromix\/koffi-darwin-x64/,
   );
 });
 

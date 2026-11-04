@@ -3,12 +3,25 @@ const assert = require("node:assert/strict");
 const {
   DECLARATIONS,
   loadFunctions,
+  nativeLibraryPath,
   nativeBindingPath,
   initializeBinding,
   layouts,
   boardName,
   SteamLeaderboards,
 } = require("./steam-native.cjs");
+
+test("native runtime paths accept ARM64 Macs and reject unsupported Mac architectures", () => {
+  for (const resolve of [nativeLibraryPath, nativeBindingPath]) {
+    assert(resolve("darwin", "arm64").includes("osx"));
+    assert(resolve("win32", "x64").includes("win64"));
+    assert(resolve("linux", "x64").includes("linux64"));
+    assert.throws(
+      () => resolve("darwin", "x64"),
+      /does not have a bundled Steam/,
+    );
+  }
+});
 
 test("every flat Steam SDK symbol resolves against the actually bundled native library", () => {
   const functions = loadFunctions();
