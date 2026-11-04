@@ -7,12 +7,14 @@ import {
   setMusicVolume,
   setSoundEffectsVolume,
   state as audioState,
+  unlockAudio,
 } from "../../data/Audio";
 import {
   soundEffectsForUpdate,
   SoundEventSnapshot,
 } from "../../audio/SoundEvents";
 import { INIT_DELAY } from "../../Constants";
+import { isInstalledWebApp } from "../../InstalledApp";
 import * as React from "react";
 
 export interface StateProps extends SoundEventSnapshot {
@@ -22,46 +24,58 @@ export interface StateProps extends SoundEventSnapshot {
   musicIntensity: number;
 }
 
-export interface DispatchProps {
-  disableAudio: () => void;
-}
-
-interface Props extends StateProps, DispatchProps {}
-
-export default class Audio extends React.Component<Props, {}> {
+export default class Audio extends React.Component<StateProps, {}> {
   private loadTimer: ReturnType<typeof setTimeout> | undefined;
 
   componentDidMount() {
     setMusicInGame(this.props.inGame, this.props.musicIntensity);
+    if (!this.props.enabled) pause();
+    document.addEventListener("click", this.onGesture, true);
+    document.addEventListener("touchend", this.onGesture, true);
+    document.addEventListener("keydown", this.onGesture, true);
+    window.addEventListener("online", this.onGesture);
     // Load after a timeout so as not to overload the device.
     this.loadTimer = setTimeout(() => {
-      if (!this.props.enabled) {
-        return;
-      }
-      this.handleEnableState(this.props.enabled);
+      if (this.props.enabled) this.handleEnableState(true);
+      else if (isInstalledWebApp())
+        void loadAudioFiles(
+          this.props.musicVolume,
+          this.props.soundEffectsVolume,
+        );
     }, INIT_DELAY.LOAD_AUDIO_MILLIS);
   }
 
   componentWillUnmount() {
     clearTimeout(this.loadTimer);
+    document.removeEventListener("click", this.onGesture, true);
+    document.removeEventListener("touchend", this.onGesture, true);
+    document.removeEventListener("keydown", this.onGesture, true);
+    window.removeEventListener("online", this.onGesture);
     pause();
   }
+
+  private onGesture = () => {
+    if (!this.props.enabled || document.visibilityState === "hidden") return;
+    if (audioState.paused) resume();
+    else unlockAudio();
+    if (audioState.loaded === "UNLOADED" || audioState.loaded === "ERROR") {
+      void loadAudioFiles(
+        this.props.musicVolume,
+        this.props.soundEffectsVolume,
+      );
+    }
+  };
 
   private handleEnableState(enabled?: boolean) {
     if (!enabled) {
       pause();
       return;
     }
-    if (audioState.loaded === "UNLOADED") {
-      resume();
-      loadAudioFiles(this.props.musicVolume, this.props.soundEffectsVolume);
-    } else if (audioState.loaded === "ERROR") {
-      this.props.disableAudio();
-    } else {
-      setMusicVolume(this.props.musicVolume);
-      setSoundEffectsVolume(this.props.soundEffectsVolume);
-      resume();
-    }
+    clearTimeout(this.loadTimer);
+    setMusicVolume(this.props.musicVolume);
+    setSoundEffectsVolume(this.props.soundEffectsVolume);
+    resume();
+    void loadAudioFiles(this.props.musicVolume, this.props.soundEffectsVolume);
   }
 
   componentDidUpdate(prevProps: StateProps) {

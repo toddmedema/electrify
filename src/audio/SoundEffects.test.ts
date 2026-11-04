@@ -117,6 +117,20 @@ describe("SoundEffects", () => {
     expect(outputValues).toEqual(expect.arrayContaining([0, 1]));
   });
 
+  it("does not queue automatic cues behind autoplay permission", async () => {
+    const { context, starts } = fakeContext();
+    const effects = new SoundEffects(context as unknown as AudioContext);
+    context.state = "suspended";
+    effects.play("BLACKOUT");
+    expect(context.resume).not.toHaveBeenCalled();
+    expect(starts).toHaveLength(0);
+    context.state = "running";
+    await Promise.resolve();
+    expect(starts).toHaveLength(0);
+    effects.play("BUILD_COMMITTED");
+    expect(starts.length).toBeGreaterThan(0);
+  });
+
   it("silences an in-flight cue while paused", () => {
     const { context, outputValues } = fakeContext();
     const effects = new SoundEffects(context as unknown as AudioContext);

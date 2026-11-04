@@ -15,6 +15,7 @@ const smoke = [
   "menu-keyboard.spec.ts",
   "main-menu.spec.ts",
   "music.spec.ts",
+  "music-startup.spec.ts",
   "pwa-sound.spec.ts",
   "achievements.spec.ts",
   "loading-navigation.spec.ts",

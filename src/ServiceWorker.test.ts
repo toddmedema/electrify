@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { runInNewContext } from "vm";
 import { createHash, webcrypto } from "crypto";
@@ -763,4 +763,59 @@ describe("CACHE_ICONS", () => {
       "/images/transmission.svg",
     ]);
   });
+});
+
+it("prepares every shipped audio file for offline play even before sound has been enabled", async () => {
+  const sw = dataWorker();
+  sw.fetch.mockImplementation(async (request) =>
+    sw.path(request) === "/data/weather/index.json"
+      ? jsonResponse({ cities: {} })
+      : response(),
+  );
+  await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
+  const audio = readdirSync(resolve(process.cwd(), "public/audio"), {
+    recursive: true,
+  }) as string[];
+  const files = audio
+    .filter((file) => /\.(mp3|wav)$/.test(file))
+    .map((file) => `/audio/${file}`);
+  expect(files.length).toBeGreaterThan(0);
+  for (const file of files) expect(sw.entries.has(file)).toBe(true);
+});
+
+it("serves cached audio without a background re-download", async () => {
+  const sw = dataWorker();
+  sw.entries.set("/audio/basic/low.mp3", response(true, "music"));
+  const event = sw.request("cors", "/audio/basic/low.mp3");
+  expect(await (await event.result).text()).toBe("music");
+  await Promise.all(event.work);
+  expect(sw.fetch).not.toHaveBeenCalled();
+});
+
+it("retries an incomplete offline audio cache and does not re-download stored tracks", async () => {
+  const sw = dataWorker();
+  const missing = "/audio/basic/low.mp3";
+  sw.fetch.mockImplementation(async (request) => {
+    if (sw.path(request) === "/data/weather/index.json")
+      return jsonResponse({ cities: {} });
+    if (sw.path(request) === missing) throw new Error("offline");
+    return response();
+  });
+  await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
+  expect(sw.entries.has("/__offline-data-revision")).toBe(false);
+  expect(sw.entries.has(missing)).toBe(false);
+  expect(sw.entries.has("/audio/basic/high.mp3")).toBe(true);
+  sw.fetch.mockImplementation(async (request) =>
+    sw.path(request) === "/data/weather/index.json"
+      ? jsonResponse({ cities: {} })
+      : response(),
+  );
+  await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
+  expect(sw.entries.has(missing)).toBe(true);
+  expect(sw.entries.has("/__offline-data-revision")).toBe(true);
+  expect(
+    sw.fetch.mock.calls.filter(
+      ([request]) => sw.path(request) === "/audio/basic/high.mp3",
+    ),
+  ).toHaveLength(1);
 });

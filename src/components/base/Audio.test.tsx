@@ -1,3 +1,4 @@
+import { isInstalledWebApp } from "../../InstalledApp";
 import * as React from "react";
 import { act, render } from "@testing-library/react";
 import Audio, { StateProps } from "./Audio";
@@ -9,13 +10,17 @@ import {
   setMusicVolume,
   setSoundEffectsVolume,
   state,
+  unlockAudio,
 } from "../../data/Audio";
 import { INIT_DELAY } from "../../Constants";
+
+jest.mock("../../InstalledApp");
 
 jest.mock("../../data/Audio", () => ({
   loadAudioFiles: jest.fn(),
   pause: jest.fn(),
   resume: jest.fn(),
+  unlockAudio: jest.fn(),
   setMusicInGame: jest.fn(),
   setMusicVolume: jest.fn(),
   setSoundEffectsVolume: jest.fn(),
@@ -23,7 +28,7 @@ jest.mock("../../data/Audio", () => ({
   state: { loaded: "UNLOADED" },
 }));
 
-const props: StateProps & { disableAudio: () => void } = {
+const props: StateProps = {
   enabled: true,
   musicVolume: 1,
   soundEffectsVolume: 1,
@@ -33,12 +38,12 @@ const props: StateProps & { disableAudio: () => void } = {
   victoryOpen: false,
   dialogOpen: false,
   dialogTitle: "",
-  disableAudio: jest.fn(),
 };
 
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  (isInstalledWebApp as jest.Mock).mockReturnValue(false);
   state.loaded = "UNLOADED";
 });
 afterEach(() => jest.useRealTimers());
@@ -127,4 +132,30 @@ it("keeps live music pressure current while audio is loading or disabled", () =>
   rerender(<Audio {...props} inGame musicIntensity={0.9} enabled={false} />);
   expect(setMusicInGame).toHaveBeenLastCalledWith(true, 0.9);
   expect(loadAudioFiles).not.toHaveBeenCalled();
+});
+
+it("prepares installed-app music while muted, then resumes immediately when enabled", () => {
+  (isInstalledWebApp as jest.Mock).mockReturnValue(true);
+  const { rerender } = render(<Audio {...props} enabled={false} />);
+  act(() => jest.advanceTimersByTime(INIT_DELAY.LOAD_AUDIO_MILLIS));
+  expect(loadAudioFiles).toHaveBeenCalledTimes(1);
+  expect(resume).not.toHaveBeenCalled();
+  state.loaded = "LOADED";
+  rerender(<Audio {...props} />);
+  expect(resume).toHaveBeenCalledTimes(1);
+});
+
+it("retries browser unlocking on gestures without rebuilding music, and removes its listeners", () => {
+  state.loaded = "LOADED";
+  const { unmount } = render(<Audio {...props} />);
+  jest.clearAllMocks();
+  document.dispatchEvent(new Event("touchend"));
+  document.dispatchEvent(new Event("click"));
+  document.dispatchEvent(new Event("keydown"));
+  expect(unlockAudio).toHaveBeenCalledTimes(3);
+  expect(resume).not.toHaveBeenCalled();
+  expect(loadAudioFiles).not.toHaveBeenCalled();
+  unmount();
+  document.dispatchEvent(new Event("click"));
+  expect(unlockAudio).toHaveBeenCalledTimes(3);
 });

@@ -1,19 +1,13 @@
-import {
-  MUSIC_DEFINITIONS,
-  MUSIC_FADE_SECONDS,
-  MUSIC_GAME_VOLUME,
-} from "../Constants";
+import { MUSIC_DEFINITIONS, MUSIC_GAME_VOLUME } from "../Constants";
 import { AudioNode } from "./AudioNode";
 import {
   MUSIC_PRESSURE_HOLD_MS,
-  MUSIC_PRESSURE_ATTACK_SECONDS,
-  MUSIC_PRESSURE_RELEASE_SECONDS,
+  MUSIC_PAUSE_FADE_SECONDS,
   ThemeManager,
 } from "./ThemeManager";
 
 const BASIC = MUSIC_DEFINITIONS.basic;
-const BASIC_DURATION_SECONDS = BASIC.durationMs / 1000;
-
+const BASIC_DURATION_SECONDS = 391.99347;
 interface FakeSource {
   start: jest.Mock;
   stop: jest.Mock;
@@ -79,7 +73,7 @@ function fakeContext(tickPerSource: number = 0) {
 function playingBasicTheme(tickPerSource: number = 0) {
   const { context, sources } = fakeContext(tickPerSource);
   // Music files are deliberately longer than their listed duration, to leave room for reverb
-  const buffer = { duration: BASIC_DURATION_SECONDS + 10 } as AudioBuffer;
+  const buffer = { duration: BASIC_DURATION_SECONDS } as AudioBuffer;
   const nodes: { [key: string]: AudioNode } = {};
   for (const track of BASIC.tracks) {
     nodes[`${BASIC.directory}${track}`] = new AudioNode(
@@ -100,7 +94,8 @@ function musicHarness() {
   const nodes: { [key: string]: AudioNode } = {};
   for (const theme of Object.values(MUSIC_DEFINITIONS)) {
     const buffer = {
-      duration: theme.durationMs / 1000 + (theme.loop ? 0 : 10),
+      duration:
+        theme === MUSIC_DEFINITIONS.menu ? 43.63637 : BASIC_DURATION_SECONDS,
     } as AudioBuffer;
     for (const track of theme.tracks) {
       nodes[`${theme.directory}${track}`] = new AudioNode(
@@ -117,457 +112,230 @@ function musicHarness() {
   };
 }
 
-describe("menu and gameplay music", () => {
+describe("native music lifecycle", () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it("loops the menu on the audio clock without escalating into gameplay", () => {
-    const { themeManager, sources } = musicHarness();
-    themeManager.setIntensity(1);
-    expect(sources).toHaveLength(1);
-    expect(sources[0].loop).toBe(true);
-    expect(sources[0].buffer?.duration).toBe(
-      MUSIC_DEFINITIONS.menu.durationMs / 1000,
-    );
-    jest.advanceTimersByTime(BASIC.durationMs * 2);
-    expect(sources).toHaveLength(1);
-    expect(sources[0].stop).not.toHaveBeenCalled();
-  });
-
   it.each([1, 2])(
-    "keeps existing sources and their position when the active theme is selected again (%s)",
+    "keeps the same looping sources through ten song boundaries and timer stalls (%s)",
     (intensity) => {
       const { themeManager, context, sources } = musicHarness();
       themeManager.setIntensity(intensity);
-      const original = sources.slice();
-      context.currentTime = 7;
+      const count = intensity === 1 ? 1 : 3;
+      expect(sources).toHaveLength(count);
+      expect(sources.every((source) => source.loop)).toBe(true);
+      context.currentTime = BASIC_DURATION_SECONDS * 10 + 60;
+      jest.advanceTimersByTime(BASIC_DURATION_SECONDS * 10000);
       themeManager.setIntensity(intensity);
-      context.currentTime = 18.5;
-      themeManager.setIntensity(intensity);
-      expect(sources).toEqual(original);
-      for (const source of original) {
+      expect(sources).toHaveLength(count);
+      for (const source of sources) {
         expect(source.start).toHaveBeenCalledTimes(1);
         expect(source.stop).not.toHaveBeenCalled();
       }
-
-      themeManager.pause();
-      context.currentTime = 60;
-      themeManager.resume();
-      for (const source of sources.slice(original.length)) {
-        expect(source.start).toHaveBeenCalledWith(60, 18.5);
-      }
-      const resumed = sources.length;
-      context.currentTime = 65;
-      themeManager.resume();
-      expect(sources).toHaveLength(resumed);
     },
   );
 
-  it("crossfades into the existing aligned gameplay tracks when a game starts", () => {
+  it("crossfades only when entering or leaving gameplay", () => {
     const { themeManager, context, sources } = musicHarness();
     themeManager.setIntensity(1);
-    context.currentTime = 7;
+    context.currentTime = 20;
     themeManager.setIntensity(2);
-    expect(sources[0].stop).toHaveBeenCalledWith(7 + MUSIC_FADE_SECONDS);
-    const gameplay = sources.slice(1);
-    expect(gameplay).toHaveLength(BASIC.tracks.length);
-    for (const source of gameplay) {
-      expect(source.loop).toBe(false);
-      expect(source.buffer?.duration).toBe(BASIC_DURATION_SECONDS + 10);
-      expect(source.start).toHaveBeenCalledWith(7, 0);
-    }
+    expect(sources[0].stop).toHaveBeenCalledWith(25);
+    for (const source of sources.slice(1))
+      expect(source.start).toHaveBeenCalledWith(20.02, 0);
+    themeManager.setIntensity(6);
+    expect(sources).toHaveLength(4);
+    context.currentTime = 40;
+    themeManager.setIntensity(1);
+    for (const source of sources.slice(1, 4))
+      expect(source.stop).toHaveBeenCalledWith(45);
+    expect(sources[4].start).toHaveBeenCalledWith(40.02, 0);
   });
 
-  it("returns to the menu on quit and cancels the pending gameplay loop", () => {
-    const { themeManager, context, sources } = musicHarness();
-    themeManager.setIntensity(2);
-    context.currentTime = 15;
-    themeManager.setIntensity(1);
-    for (const source of sources.slice(0, BASIC.tracks.length)) {
-      expect(source.stop).toHaveBeenCalledWith(15 + MUSIC_FADE_SECONDS);
-    }
-    expect(sources[BASIC.tracks.length].loop).toBe(true);
-    jest.advanceTimersByTime(BASIC.durationMs * 2);
-    expect(sources).toHaveLength(BASIC.tracks.length + 1);
-  });
+  it.each([1, 2])(
+    "resumes the decoded loop position after several repetitions (%s)",
+    (intensity) => {
+      const { themeManager, context, sources } = musicHarness();
+      themeManager.setIntensity(intensity);
+      const count = sources.length;
+      const duration = sources[0].buffer!.duration;
+      context.currentTime = 0.02 + duration * 3 + 12;
+      themeManager.pause();
+      const stopAt = context.currentTime + MUSIC_PAUSE_FADE_SECONDS;
+      for (const source of sources)
+        expect(source.stop).toHaveBeenCalledWith(stopAt);
+      context.currentTime = 2000;
+      themeManager.resume();
+      for (const source of sources.slice(count)) {
+        expect(source.start.mock.calls[0][0]).toBe(2000.02);
+        expect(source.start.mock.calls[0][1]).toBeCloseTo(12);
+      }
+      themeManager.resume();
+      expect(sources).toHaveLength(count * 2);
+    },
+  );
 
-  it("resumes the menu at its position after several native loops", () => {
-    const { themeManager, context, sources } = musicHarness();
-    themeManager.setIntensity(1);
-    context.currentTime = (MUSIC_DEFINITIONS.menu.durationMs / 1000) * 3 + 12;
+  it("keeps stem starts aligned while node creation takes time", () => {
+    const { themeManager, context, sources } = playingBasicTheme(0.001);
+    context.currentTime = 40.02;
     themeManager.pause();
-    context.currentTime += 50;
     themeManager.resume();
-    expect(sources[1].loop).toBe(true);
-    expect(sources[1].start.mock.calls[0][1]).toBeCloseTo(12);
+    const starts = sources.slice(3).map((source) => source.start.mock.calls[0]);
+    expect(starts).toEqual(Array.from({ length: 3 }, () => starts[0]));
+    expect(starts[0][0]).toBeCloseTo(40.04);
+    expect(starts[0][1]).toBe(40);
   });
 
-  it("does not carry the old song's seek position across a muted scene change", () => {
+  it("does not carry an old seek or start sources when scenes change while paused", () => {
     const { themeManager, context, sources } = musicHarness();
     themeManager.setIntensity(2);
     context.currentTime = 60;
     themeManager.pause();
     themeManager.setIntensity(1);
-    expect(sources).toHaveLength(BASIC.tracks.length);
+    expect(sources).toHaveLength(3);
     context.currentTime = 90;
     themeManager.resume();
-    expect(sources[BASIC.tracks.length].start).toHaveBeenCalledWith(90, 0);
-    expect(sources[BASIC.tracks.length].loop).toBe(true);
+    expect(sources[3].start).toHaveBeenCalledWith(90.02, 0);
   });
 
-  it("stops the current looping source when music is stopped", () => {
-    const { themeManager, sources } = musicHarness();
-    themeManager.setIntensity(1);
-    themeManager.setIntensity(0);
-    expect(sources[0].stop).toHaveBeenCalled();
-  });
-
-  it("starts every game at zero with a fresh full loop timer", () => {
-    const { themeManager, context, sources } = musicHarness();
-    themeManager.setIntensity(2);
-    jest.advanceTimersByTime(60000);
-    context.currentTime = 60;
-    themeManager.setIntensity(1);
-    jest.advanceTimersByTime(20000);
-    context.currentTime = 80;
-    themeManager.setIntensity(2);
-    const restarted = sources.slice(-BASIC.tracks.length);
-    for (const source of restarted) {
-      expect(source.start).toHaveBeenCalledWith(80, 0);
-    }
-    const beforeWrap = sources.length;
-    context.currentTime = 80 + BASIC_DURATION_SECONDS - 0.001;
-    jest.advanceTimersByTime(BASIC.durationMs - 1);
-    expect(sources).toHaveLength(beforeWrap);
-    context.currentTime = 80 + BASIC_DURATION_SECONDS;
-    jest.advanceTimersByTime(1);
-    expect(sources).toHaveLength(beforeWrap + BASIC.tracks.length);
-  });
-});
-
-describe("gameplay loop clock", () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
-
-  it("waits for the audio playhead when the loop timer fires early", () => {
-    const { context, sources } = playingBasicTheme();
-    context.currentTime = 20;
-    jest.advanceTimersByTime(BASIC.durationMs);
-    expect(sources).toHaveLength(BASIC.tracks.length);
-
-    context.currentTime = BASIC_DURATION_SECONDS - 0.001;
-    jest.advanceTimersByTime(BASIC.durationMs - 20000 - 1);
-    expect(sources).toHaveLength(BASIC.tracks.length);
-    context.currentTime = BASIC_DURATION_SECONDS;
-    jest.advanceTimersByTime(1);
-    expect(sources).toHaveLength(BASIC.tracks.length * 2);
-    for (const source of sources.slice(BASIC.tracks.length)) {
-      expect(source.start).toHaveBeenCalledWith(BASIC_DURATION_SECONDS, 0);
-    }
-
-    context.currentTime = BASIC_DURATION_SECONDS * 2;
-    jest.advanceTimersByTime(BASIC.durationMs);
-    expect(sources).toHaveLength(BASIC.tracks.length * 3);
-    for (const source of sources.slice(0, BASIC.tracks.length)) {
-      expect(source.stop).not.toHaveBeenCalled();
-    }
-  });
-
-  it("waits without polling when audio is suspended just before the loop boundary", () => {
-    const { context, sources } = playingBasicTheme();
-    context.currentTime = BASIC_DURATION_SECONDS - 0.001;
-    context.state = "suspended";
-    jest.advanceTimersByTime(BASIC.durationMs);
-    expect(sources).toHaveLength(BASIC.tracks.length);
-    expect(jest.getTimerCount()).toBe(0);
-    jest.advanceTimersByTime(BASIC.durationMs * 2);
-    expect(sources).toHaveLength(BASIC.tracks.length);
-
-    context.state = "running";
-    context.dispatchEvent(new Event("statechange"));
-    expect(jest.getTimerCount()).toBe(1);
-    context.currentTime = BASIC_DURATION_SECONDS;
-    jest.advanceTimersByTime(2);
-    expect(sources).toHaveLength(BASIC.tracks.length * 2);
-    expect(jest.getTimerCount()).toBe(1);
-  });
-
-  it("keeps one loop deadline when paused and resumed while the context is suspended", () => {
+  it("keeps sources through browser context suspension and ignores redundant resume", () => {
     const { themeManager, context, sources } = playingBasicTheme();
-    context.currentTime = 20;
     context.state = "suspended";
-    jest.advanceTimersByTime(BASIC.durationMs);
-    expect(sources).toHaveLength(BASIC.tracks.length);
+    jest.advanceTimersByTime(1000000);
+    context.state = "running";
+    themeManager.resume();
+    expect(sources).toHaveLength(3);
+    expect(sources.every((source) => !source.stop.mock.calls.length)).toBe(
+      true,
+    );
+  });
+
+  it("stops once on repeated pauses, including before the scheduled start", () => {
+    const { themeManager, sources } = playingBasicTheme();
+    themeManager.pause();
     themeManager.pause();
     themeManager.resume();
-    expect(sources).toHaveLength(BASIC.tracks.length * 2);
-
-    context.state = "running";
-    context.dispatchEvent(new Event("statechange"));
-    expect(jest.getTimerCount()).toBe(1);
-    context.currentTime = BASIC_DURATION_SECONDS;
-    jest.advanceTimersByTime(BASIC.durationMs - 20000);
-    expect(sources).toHaveLength(BASIC.tracks.length * 3);
-    expect(jest.getTimerCount()).toBe(1);
+    for (const source of sources.slice(0, 3))
+      expect(source.stop).toHaveBeenCalledTimes(1);
+    for (const source of sources.slice(3))
+      expect(source.start.mock.calls[0][1]).toBe(0);
   });
 
-  it.each(["pause", "menu", "stop"])(
-    "cancels a suspended loop when playback changes to %s",
-    (change) => {
-      const { themeManager, context, sources } = musicHarness();
-      themeManager.setIntensity(2);
-      context.currentTime = 20;
-      context.state = "suspended";
-      jest.advanceTimersByTime(BASIC.durationMs);
-      expect(sources).toHaveLength(BASIC.tracks.length);
+  it("mutes every outgoing copy during a rapid scene change and pause", () => {
+    const { themeManager, context, sources } = musicHarness();
+    themeManager.setIntensity(1);
+    context.currentTime = 10;
+    themeManager.setIntensity(2);
+    context.currentTime = 11;
+    themeManager.setIntensity(1);
+    context.currentTime = 12;
+    themeManager.pause();
+    for (const source of sources)
+      expect(source.stop).toHaveBeenLastCalledWith(12.05);
+  });
 
-      if (change === "pause") themeManager.pause();
-      else themeManager.setIntensity(change === "menu" ? 1 : 0);
-      const starts = sources.length;
-      context.state = "running";
-      context.dispatchEvent(new Event("statechange"));
-      jest.advanceTimersByTime(BASIC.durationMs * 2);
-      expect(sources).toHaveLength(starts);
-      expect(jest.getTimerCount()).toBe(0);
-
-      context.currentTime = 90;
-      themeManager.resume();
-      const resumed = sources.slice(starts);
-      expect(resumed).toHaveLength(
-        change === "pause" ? BASIC.tracks.length : 0,
-      );
-      for (const source of resumed) {
-        expect(source.start).toHaveBeenCalledWith(90, 20);
-      }
-    },
-  );
+  it("honors zero intensity across pause/resume and starts fresh afterward", () => {
+    const { themeManager, sources } = playingBasicTheme();
+    themeManager.setIntensity(0);
+    themeManager.pause();
+    themeManager.resume();
+    expect(sources).toHaveLength(3);
+    themeManager.setIntensity(2);
+    expect(sources).toHaveLength(6);
+    for (const source of sources.slice(3))
+      expect(source.start.mock.calls[0][1]).toBe(0);
+  });
 });
 
-describe("dynamic gameplay music", () => {
+describe("dynamic gameplay mix", () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it("fades the full stable mix to 85% over five seconds, leaving menu gain unchanged", () => {
-    const { themeManager, context, gains } = musicHarness();
-    themeManager.setIntensity(1);
-    expect(gains[0].linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 5);
-    context.currentTime = 20;
+  it("keeps the full initial fade while pressure rises, without recreating sources", () => {
+    const { themeManager, context, gains, sources } = musicHarness();
     themeManager.setIntensity(2);
-    for (const gain of gains.slice(1)) {
-      expect(gain.setValueAtTime).toHaveBeenCalledWith(0, 20);
+    for (const gain of gains)
       expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
         MUSIC_GAME_VOLUME,
-        25,
+        5.02,
       );
-    }
+    context.currentTime = 1;
+    themeManager.setIntensity(10);
+    for (const gain of gains)
+      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 5.02);
+    expect(sources).toHaveLength(3);
   });
 
-  it("raises urgent layers smoothly without restarting sources or their playheads", () => {
+  it("lifts urgent layers first and holds brief recoveries before releasing smoothly", () => {
     const { themeManager, context, gains, sources } = musicHarness();
     themeManager.setIntensity(2);
     context.currentTime = 20;
     themeManager.setIntensity(6);
     const targets = gains.map(
-      (gain) => gain.linearRampToValueAtTime.mock.calls.slice(-1)[0][0],
+      (gain) => gain.linearRampToValueAtTime.mock.calls.at(-1)![0],
     );
     expect(targets[0]).toBeGreaterThan(MUSIC_GAME_VOLUME);
     expect(targets[1]).toBeGreaterThan(targets[0]);
     expect(targets[2]).toBeGreaterThan(targets[1]);
-    expect(targets[2]).toBeLessThan(1);
-    for (const gain of gains) {
-      expect(gain.cancelAndHoldAtTime).toHaveBeenLastCalledWith(20);
-      expect(gain.linearRampToValueAtTime.mock.calls.slice(-1)[0][1]).toBe(
-        20 + MUSIC_PRESSURE_ATTACK_SECONDS,
-      );
-    }
-    expect(sources).toHaveLength(BASIC.tracks.length);
-    for (const source of sources) {
-      expect(source.start).toHaveBeenCalledTimes(1);
-      expect(source.stop).not.toHaveBeenCalled();
-    }
-  });
-
-  it("keeps the full scene fade when pressure changes immediately after entry", () => {
-    const { themeManager, context, gains } = musicHarness();
-    themeManager.setIntensity(2);
-    context.currentTime = 1;
-    themeManager.setIntensity(10);
-    for (const gain of gains) {
-      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 5);
-    }
-  });
-
-  it("caps severe blackouts at the old volume ceiling and delays a slow recovery", () => {
-    const { themeManager, context, gains } = musicHarness();
-    themeManager.setIntensity(2);
-    context.currentTime = 20;
-    themeManager.setIntensity(10);
-    for (const gain of gains) {
-      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 23);
-    }
     themeManager.setIntensity(2);
     jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS - 1);
-    for (const gain of gains) {
-      expect(gain.linearRampToValueAtTime).toHaveBeenCalledTimes(2);
-    }
+    expect(gains[0].linearRampToValueAtTime).toHaveBeenCalledTimes(2);
     context.currentTime = 28;
     jest.advanceTimersByTime(1);
-    for (const gain of gains) {
+    for (const gain of gains)
       expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
         MUSIC_GAME_VOLUME,
-        28 + MUSIC_PRESSURE_RELEASE_SECONDS,
+        38,
       );
-    }
+    expect(sources).toHaveLength(3);
   });
 
-  it("uses the latest grid state after the hold and cancels recovery on renewed pressure", () => {
+  it("reads the latest recovery and cancels it on renewed pressure or a scene change", () => {
     const { themeManager, context, gains } = musicHarness();
     themeManager.setIntensity(10);
-    themeManager.setIntensity(2);
-    jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS / 2);
-    themeManager.setIntensity(6);
-    jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS / 2);
-    expect(gains[1].linearRampToValueAtTime).toHaveBeenLastCalledWith(
-      0.925,
-      MUSIC_PRESSURE_RELEASE_SECONDS,
-    );
     context.currentTime = 20;
     themeManager.setIntensity(2);
+    jest.advanceTimersByTime(4000);
+    themeManager.setIntensity(6);
+    jest.advanceTimersByTime(4000);
+    expect(gains[1].linearRampToValueAtTime).toHaveBeenLastCalledWith(
+      0.925,
+      30,
+    );
+    themeManager.setIntensity(2);
     themeManager.setIntensity(10);
-    jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS);
-    for (const gain of gains) {
-      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
-        1,
-        20 + MUSIC_PRESSURE_ATTACK_SECONDS,
-      );
-    }
-  });
-
-  it("clears pending recovery on quit and keeps the menu at its authored level", () => {
-    const { themeManager, gains } = musicHarness();
-    themeManager.setIntensity(10);
+    expect(jest.getTimerCount()).toBe(0);
     themeManager.setIntensity(2);
     themeManager.setIntensity(1);
-    const ramps = gains.map(
-      (gain) => gain.linearRampToValueAtTime.mock.calls.length,
-    );
-    jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS * 2);
-    expect(
-      gains.map((gain) => gain.linearRampToValueAtTime.mock.calls.length),
-    ).toEqual(ramps);
-    expect(gains[3].linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 5);
+    expect(jest.getTimerCount()).toBe(0);
+    expect(gains[3].linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 25.02);
   });
 
-  it("updates intensity while paused and resumes the same position at the latest mix", () => {
+  it("resumes paused gameplay at its saved position using the latest pressure", () => {
     const { themeManager, context, gains, sources } = musicHarness();
     themeManager.setIntensity(10);
-    context.currentTime = 40;
+    context.currentTime = 40.02;
     themeManager.pause();
     themeManager.setIntensity(2);
-    jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS);
-    expect(sources).toHaveLength(BASIC.tracks.length);
     context.currentTime = 90;
     themeManager.resume();
-    for (const source of sources.slice(BASIC.tracks.length)) {
-      expect(source.start).toHaveBeenCalledWith(90, 40);
-    }
-    for (const gain of gains.slice(BASIC.tracks.length)) {
-      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
+    for (const source of sources.slice(3))
+      expect(source.start).toHaveBeenCalledWith(90.02, 40);
+    for (const gain of gains.slice(3))
+      expect(gain.linearRampToValueAtTime.mock.calls.at(-1)![0]).toBe(
         MUSIC_GAME_VOLUME,
-        95,
       );
-    }
   });
 });
 
-describe("ThemeManager pause / resume", () => {
-  beforeEach(() => {
-    jest.useFakeTimers();
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  it("picks the theme back up where it was paused", () => {
-    const { themeManager, context, sources } = playingBasicTheme();
-    expect(sources).toHaveLength(BASIC.tracks.length);
-
-    context.currentTime = 40;
-    themeManager.pause();
-    context.currentTime = 95; // 55 seconds spent on another tab
-    themeManager.resume();
-
-    // Buffer sources are single-use, so resuming builds a fresh one per track -- each seeking to
-    // where the pause happened rather than to the top of the file
-    const resumed = sources.slice(BASIC.tracks.length);
-    expect(resumed).toHaveLength(BASIC.tracks.length);
-    for (const source of resumed) {
-      expect(source.start).toHaveBeenCalledWith(95, 40);
-    }
-  });
-
-  it("starts every track of a resumed theme together", () => {
-    // The stems are written to play on top of each other, so a per-track clock reading would let
-    // them drift apart by however long the theme takes to start
-    const { themeManager, context, sources } = playingBasicTheme(0.01);
-    context.currentTime = 40;
-    themeManager.pause();
-    themeManager.resume();
-
-    const resumed = sources.slice(BASIC.tracks.length);
-    const startArgs = resumed.map((source) => source.start.mock.calls[0]);
-    for (const args of startArgs) {
-      expect(args).toEqual(startArgs[0]);
-    }
-  });
-
-  it("wraps a resumed theme after what is left of it, not its full length", () => {
-    const { themeManager, context, sources } = playingBasicTheme();
-    context.currentTime = 40;
-    themeManager.pause();
-    themeManager.resume();
-    const beforeWrap = sources.length;
-
-    context.currentTime = BASIC_DURATION_SECONDS - 0.001;
-    jest.advanceTimersByTime(BASIC.durationMs - 40000 - 1);
-    expect(sources).toHaveLength(beforeWrap);
-
-    // Arming the loop with the full duration instead would push this 40 seconds later, and drift
-    // further on every pause / resume
-    context.currentTime = BASIC_DURATION_SECONDS;
-    jest.advanceTimersByTime(1);
-    expect(sources).toHaveLength(beforeWrap + BASIC.tracks.length);
-  });
-
-  it("restarts the theme when the pause lands past its end", () => {
-    const { themeManager, context, sources } = playingBasicTheme();
-    // The loop timer can run long when a background tab throttles timers
-    context.currentTime = BASIC_DURATION_SECONDS + 5;
-    themeManager.pause();
-    themeManager.resume();
-
-    const resumed = sources.slice(BASIC.tracks.length);
-    for (const source of resumed) {
-      expect(source.start).toHaveBeenCalledWith(expect.any(Number), 0);
-    }
-  });
-
-  it("ignores a resume that was not preceded by a pause", () => {
-    const { themeManager, sources } = playingBasicTheme();
-    themeManager.resume();
-    expect(sources).toHaveLength(BASIC.tracks.length);
-  });
-});
-
-describe("AudioNode seeking", () => {
-  it("falls back to the top of the track when the seek is past the buffer", () => {
+describe("AudioNode", () => {
+  it("wraps a looping seek using the real buffer duration", () => {
     const { context, sources } = fakeContext();
-    const buffer = { duration: 30 } as AudioBuffer;
-    const node = new AudioNode(context as unknown as AudioContext, buffer);
-
-    // Silence would be the alternative -- a source started past the end of its buffer never plays
-    node.playOnce(1, 0, 45, 10);
-    expect(sources[0].start).toHaveBeenCalledWith(10, 0);
+    const node = new AudioNode(
+      context as unknown as AudioContext,
+      { duration: 30 } as AudioBuffer,
+    );
+    node.play(1, 75, 10, 0.1);
+    expect(sources[0].start).toHaveBeenCalledWith(10, 15);
   });
 });

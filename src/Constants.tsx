@@ -337,27 +337,16 @@ export const MUSIC_INTENSITY_MAX = 10;
 export interface MusicDefinition {
   directory: string;
   tracks: string[];
-  durationMs: number;
-  loop?: boolean;
-  minIntensity: number;
-  maxIntensity: number;
 }
 
 export const MUSIC_DEFINITIONS: { [key: string]: MusicDefinition } = {
   menu: {
     directory: "menu/",
     tracks: ["quiet-current.wav"],
-    durationMs: (1924364 / 44100) * 1000,
-    loop: true,
-    minIntensity: 1,
-    maxIntensity: 1,
   },
   basic: {
     directory: "basic/",
     tracks: ["low.mp3", "medium.mp3", "high.mp3"],
-    durationMs: 392119,
-    minIntensity: 0,
-    maxIntensity: MUSIC_INTENSITY_MAX,
   },
 };
 

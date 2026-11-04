@@ -1,3 +1,4 @@
+import { unlockAudio } from "../../data/Audio";
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { AppStateType, SaveMetadata } from "../../Types";
@@ -26,6 +27,7 @@ export const mapDispatchToProps = (
 ): DispatchProps => {
   return {
     onAudioChange: (v: boolean) => {
+      if (v) unlockAudio();
       dispatch(changeSettings({ audioEnabled: v }));
     },
     onContinue: () => {

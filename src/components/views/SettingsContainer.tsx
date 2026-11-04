@@ -1,3 +1,4 @@
+import { unlockAudio } from "../../data/Audio";
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { navigateBack } from "../../reducers/Card";
@@ -34,6 +35,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(userDelta({ needsDisplayName: true }));
     },
     onAudioChange: (v: boolean) => {
+      if (v) unlockAudio();
       dispatch(changeSettings({ audioEnabled: v }));
     },
     onMusicVolumeChange: (v: number) => {

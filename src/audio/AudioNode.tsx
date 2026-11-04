@@ -6,6 +6,10 @@ export class AudioNode {
   private output: AudioDestinationNode | GainNode;
   private gain: GainNode | null;
   private source: AudioBufferSourceNode | null;
+  private playbacks = new Set<{
+    source: AudioBufferSourceNode;
+    gain: GainNode;
+  }>();
 
   constructor(
     audioContext: AudioContext,
@@ -19,52 +23,41 @@ export class AudioNode {
     this.source = null;
   }
 
+  public get duration(): number {
+    return this.buffer.duration;
+  }
+
   /** Routes future playbacks through a shared bus, used for independent music volume. */
   public setOutput(output: AudioDestinationNode | GainNode) {
     this.output = output;
   }
 
-  /**
-   * Buffer sources are single-use: stopping one throws it away, so picking a track back up means
-   * building a new source and seeking into the buffer. offsetSeconds is where in the track to
-   * start, and startAt is when on the context clock to start it -- ThemeManager passes one shared
-   * startAt for every track in a theme so the stems stay aligned with each other.
-   */
-  public playOnce(
-    initialVolume: number = 1,
-    fadeInVolume: number = 0,
-    offsetSeconds: number = 0,
-    startAt?: number,
-    loop: boolean = false,
+  /** Every track loops natively; a shared future start time keeps the stems aligned. */
+  public play(
+    volume: number,
+    offsetSeconds: number,
+    when: number,
+    fadeSeconds: number,
   ) {
-    const when = startAt === undefined ? this.context.currentTime : startAt;
-    // Starting past the end of a buffer plays nothing at all, so treat an out-of-range seek as
-    // the top of the track: restarting is a worse outcome than resuming, silence is worse still.
-    const offset =
-      offsetSeconds > 0 && offsetSeconds < this.buffer.duration
-        ? offsetSeconds
-        : 0;
-    this.gain = this.context.createGain();
-    this.gain.connect(this.output);
-    this.gain.gain.setValueAtTime(initialVolume, when);
-    if (fadeInVolume) {
-      this.fadeIn(fadeInVolume);
-    }
+    const offset = Math.max(0, offsetSeconds) % this.buffer.duration;
+    const gain = this.context.createGain();
+    this.gain = gain;
+    gain.connect(this.output);
+    gain.gain.setValueAtTime(0, when);
+    gain.gain.linearRampToValueAtTime(volume, when + fadeSeconds);
     const source = this.context.createBufferSource();
     this.source = source;
     source.buffer = this.buffer;
-    source.loop = loop;
-    const gain = this.gain;
+    source.loop = true;
+    const playback = { source, gain };
+    this.playbacks.add(playback);
     source.connect(gain);
     source.onended = () => {
+      this.playbacks.delete(playback);
       source.disconnect();
       gain.disconnect();
     };
     source.start(when, offset);
-  }
-
-  public fadeIn(peak?: number, seconds?: number) {
-    this.fadeTo(peak ?? 1, seconds ?? MUSIC_FADE_SECONDS);
   }
 
   /** Retarget an in-flight fade from its audible level rather than queueing competing ramps. */
@@ -72,7 +65,11 @@ export class AudioNode {
     if (!this.gain) {
       return;
     }
-    const param = this.gain.gain;
+    this.fadeGain(this.gain, volume, seconds);
+  }
+
+  private fadeGain(gain: GainNode, volume: number, seconds: number) {
+    const param = gain.gain;
     const now = this.context.currentTime;
     if (typeof param.cancelAndHoldAtTime === "function") {
       param.cancelAndHoldAtTime(now);
@@ -84,36 +81,21 @@ export class AudioNode {
     param.linearRampToValueAtTime(volume, now + seconds);
   }
 
-  public fadeOut(seconds?: number, stop?: boolean) {
-    if (seconds === undefined) {
-      seconds = MUSIC_FADE_SECONDS;
-    }
-    const gain = this.gain;
-    if (!gain) {
-      return;
-    }
-    this.fadeTo(0, seconds);
-    if (stop && this.source) {
-      const source = this.source;
-      try {
-        source.stop(this.context.currentTime + seconds);
-      } catch (_err) {
-        // An already-stopped single-use source may reject another stop request.
-        gain.disconnect();
-      }
-    }
+  public fadeOut(seconds = MUSIC_FADE_SECONDS) {
+    if (!this.gain || !this.source) return;
+    this.fadeGain(this.gain, 0, seconds);
+    this.source.stop(this.context.currentTime + seconds);
+    this.gain = null;
+    this.source = null;
   }
 
-  public getVolume(): number | null {
-    if (!this.gain) {
-      return null;
+  /** Also silence outgoing crossfades, including an older copy of this same track. */
+  public stopAll(seconds: number) {
+    for (const { source, gain } of this.playbacks) {
+      this.fadeGain(gain, 0, seconds);
+      source.stop(this.context.currentTime + seconds);
     }
-    return this.gain.gain.value;
-  }
-
-  // ThemeManager uses this as "has playOnce been called"; it intentionally keeps treating a
-  // naturally ended source as active so later intensity changes preserve the established mix.
-  public isPlaying(): boolean {
-    return this.source !== null;
+    this.gain = null;
+    this.source = null;
   }
 }
