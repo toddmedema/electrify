@@ -1,3 +1,4 @@
+import { DIFFICULTY_STORAGE_KEY, unlockedJournal } from "./difficulty-fixture";
 import path from "node:path";
 import { expect, test } from "./fixtures";
 
@@ -9,11 +10,15 @@ for (const theme of ["light", "dark"] as const) {
       width: testInfo.project.use.viewport!.width,
       height: 568,
     });
-    await page.addInitScript((mode) => {
-      localStorage.clear();
-      localStorage.setItem("theme", mode);
-      localStorage.setItem("audioEnabled", "false");
-    }, theme);
+    await page.addInitScript(
+      ({ mode, key, journal }) => {
+        localStorage.clear();
+        localStorage.setItem("theme", mode);
+        localStorage.setItem("audioEnabled", "false");
+        localStorage.setItem(key, JSON.stringify(journal));
+      },
+      { mode: theme, key: DIFFICULTY_STORAGE_KEY, journal: unlockedJournal },
+    );
     await page.goto("/?scenario=111");
     const scroller = page.locator("#listCard > .scrollable");
     const difficulties = page.getByRole("group", { name: "Difficulty" });

@@ -1,3 +1,4 @@
+import { unlockAllDifficulties } from "./difficulty-fixture";
 import { expect, Page, Browser } from "@playwright/test";
 import { gzipSync } from "node:zlib";
 import fs from "node:fs/promises";
@@ -471,6 +472,7 @@ class SteamRoom {
       permissions: ["clipboard-read", "clipboard-write"],
     });
     const page = await context.newPage();
+    await unlockAllDifficulties(page);
     page.on("request", (request) => {
       if (new URL(request.url()).pathname.startsWith("/audio/"))
         this.audioRequests.push(request.url());

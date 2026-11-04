@@ -1,3 +1,4 @@
+import { DIFFICULTY_STORAGE_KEY, unlockedJournal } from "./difficulty-fixture";
 import path from "path";
 import "../src/Store";
 import { test, expect } from "./fixtures";
@@ -35,17 +36,21 @@ for (const theme of ["light", "dark"] as const) {
     page,
   }, info) => {
     test.skip(!REVIEW_PROJECTS.includes(info.project.name));
-    await page.addInitScript((value) => {
-      localStorage.clear();
-      localStorage.setItem("theme", value);
-      localStorage.setItem("audioEnabled", "false");
-      localStorage.setItem(
-        "plays",
-        JSON.stringify({
-          plays: [{ scenarioId: 0, timesPlayed: 1, date: "2026-11-02" }],
-        }),
-      );
-    }, theme);
+    await page.addInitScript(
+      ({ mode, key, journal }) => {
+        localStorage.clear();
+        localStorage.setItem(key, JSON.stringify(journal));
+        localStorage.setItem("theme", mode);
+        localStorage.setItem("audioEnabled", "false");
+        localStorage.setItem(
+          "plays",
+          JSON.stringify({
+            plays: [{ scenarioId: 0, timesPlayed: 1, date: "2026-11-02" }],
+          }),
+        );
+      },
+      { mode: theme, key: DIFFICULTY_STORAGE_KEY, journal: unlockedJournal },
+    );
     await page.goto("/");
     await page.getByRole("button", { name: "Play", exact: true }).click();
     await expect(

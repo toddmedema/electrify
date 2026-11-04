@@ -1,3 +1,10 @@
+import { useUnlockedDifficulty } from "../../achievements/useAchievements";
+import { achievementJournal } from "../../achievements/Journal";
+import {
+  playableDifficulty,
+  unlockedDifficulty,
+} from "../../achievements/DifficultyUnlocks";
+import type { DifficultyType } from "../../Types";
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { start, delta, quit } from "../../reducers/Game";
@@ -10,22 +17,47 @@ import { AppStateType, GameType } from "../../Types";
 import NewGameDetails, { DispatchProps, StateProps } from "./NewGameDetails";
 import { coopControls } from "../../multiplayer/Registry";
 
-// A co-op guest follows the host's screens; its own controls don't change the selection.
+const difficultyAllowed = (difficulty: DifficultyType) =>
+  playableDifficulty(
+    difficulty,
+    unlockedDifficulty(achievementJournal.getSnapshot().progress),
+  ) === difficulty;
+const selectedDifficulty = () =>
+  playableDifficulty(
+    store.getState().ui.previewDifficulty ?? store.getState().game.difficulty,
+    unlockedDifficulty(achievementJournal.getSnapshot().progress),
+  );
+
+// Co-op guests follow the host's selection.
 const coopRole = () => store.getState().ui.coop?.role;
 
-const mapStateToProps = (state: AppStateType): StateProps => {
+// An explicit second parameter lets connect observe synced unlock changes.
+export const mapStateToProps = (
+  state: AppStateType,
+  ownProps?: { unlockedThrough: DifficultyType },
+): StateProps => {
+  const unlockedThrough =
+    ownProps?.unlockedThrough ??
+    unlockedDifficulty(achievementJournal.getSnapshot().progress);
   return {
     game: {
       ...state.game,
       scenarioId: state.ui.scenarioPreview ?? state.game.scenarioId,
-      difficulty: state.ui.previewDifficulty ?? state.game.difficulty,
+      difficulty:
+        state.ui.coop?.role === "guest"
+          ? (state.ui.previewDifficulty ?? state.game.difficulty)
+          : playableDifficulty(
+              state.ui.previewDifficulty ?? state.game.difficulty,
+              unlockedThrough,
+            ),
     },
     uid: state.user.uid,
     coop: state.ui.coop,
+    unlockedThrough,
   };
 };
 
-const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
+export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onBack: () => {
       if (coopRole() === "guest") {
@@ -38,6 +70,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onDelta: (d: Partial<GameType>) => {
       if (coopRole() === "guest") return;
+      if (d.difficulty && !difficultyAllowed(d.difficulty)) return;
       dispatch(uiDelta({ previewDifficulty: d.difficulty }));
     },
     onStart: (scenarioId: number) => {
@@ -46,17 +79,13 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         if (role === "host")
           coopControls()?.start({
             scenarioId,
-            difficulty:
-              store.getState().ui.previewDifficulty ??
-              store.getState().game.difficulty,
+            difficulty: selectedDifficulty(),
           });
         return;
       }
       startWithSaveGuard(dispatch, () => {
         getHistoryApi().replaceState(null, "", scenarioListUrl());
-        const difficulty =
-          store.getState().ui.previewDifficulty ??
-          store.getState().game.difficulty;
+        const difficulty = selectedDifficulty();
         dispatch(quit());
         dispatch(delta({ difficulty }));
         dispatch(start(scenarioId));
@@ -65,9 +94,12 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   };
 };
 
-const NewGameDetailsContainer = connect(
+const ConnectedNewGameDetails = connect(
   mapStateToProps,
   mapDispatchToProps,
 )(NewGameDetails);
 
-export default NewGameDetailsContainer;
+export default function NewGameDetailsContainer() {
+  const unlockedThrough = useUnlockedDifficulty();
+  return <ConnectedNewGameDetails unlockedThrough={unlockedThrough} />;
+}

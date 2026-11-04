@@ -9,6 +9,7 @@ import ScreenPage from "../base/ScreenPage";
 
 export interface CampaignSetupProps {
   difficulty: DifficultyType;
+  unlockedThrough?: DifficultyType;
   activeGeneration?: number;
   busy?: boolean;
   onDifficulty: (difficulty: DifficultyType) => void;
@@ -19,6 +20,7 @@ export interface CampaignSetupProps {
 
 export default function CampaignSetup({
   difficulty,
+  unlockedThrough,
   activeGeneration,
   busy,
   onDifficulty,
@@ -57,6 +59,7 @@ export default function CampaignSetup({
               variant="toggle"
               showDescription
               readOnly={busy}
+              unlockedThrough={unlockedThrough}
             />
           </Box>
           <Box component="section" aria-labelledby="campaign-terms-title">

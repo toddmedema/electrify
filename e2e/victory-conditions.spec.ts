@@ -31,7 +31,7 @@ for (const theme of ["light", "dark"] as const) {
         });
       await expect(
         page.getByText(
-          /Serving less than 95% of demand for 3 months in a row ends the run./,
+          /Serving less than 90% of demand for 3 months in a row ends the run./,
         ),
       ).toBeVisible();
       await expect(page.locator("#menuCard")).toHaveCount(0);
@@ -92,7 +92,7 @@ for (const theme of ["light", "dark"] as const) {
           );
         }
         await expect(requirements).toContainText(
-          "Serving less than 95% of demand for 3 months in a row ends the run.",
+          "Serving less than 90% of demand for 3 months in a row ends the run.",
         );
         await expect(briefing).not.toContainText("build or upgrade the grid");
         await expectDialogToFit(briefing);
@@ -162,7 +162,7 @@ for (const theme of ["light", "dark"] as const) {
         await expect(dialog).not.toContainText("Invest in the grid");
       }
       await expect(dialog).toContainText(
-        "Serving less than 95% of demand for 3 months in a row ends the run.",
+        "Serving less than 90% of demand for 3 months in a row ends the run.",
       );
       await expect(
         dialog.getByRole("region", { name: "Goals" }),

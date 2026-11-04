@@ -1,3 +1,9 @@
+import { useUnlockedDifficulty } from "../../achievements/useAchievements";
+import {
+  playableDifficulty,
+  unlockedDifficulty,
+} from "../../achievements/DifficultyUnlocks";
+import { achievementJournal } from "../../achievements/Journal";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import { startLegacyCampaign } from "../../reducers/Game";
@@ -9,8 +15,12 @@ import { scenarioListUrl } from "../../ScenarioUrl";
 
 export default function CampaignSetupContainer(): React.JSX.Element {
   const dispatch = useAppDispatch();
-  const difficulty = useAppSelector(
-    (state) => state.ui.previewDifficulty ?? state.game.difficulty,
+  const unlockedThrough = useUnlockedDifficulty();
+  const difficulty = playableDifficulty(
+    useAppSelector(
+      (state) => state.ui.previewDifficulty ?? state.game.difficulty,
+    ),
+    unlockedThrough,
   );
   const activeGeneration = useAppSelector((state) =>
     state.game.inGame ? state.game.campaign?.generationIndex : undefined,
@@ -19,9 +29,13 @@ export default function CampaignSetupContainer(): React.JSX.Element {
   return (
     <CampaignSetup
       difficulty={difficulty}
+      unlockedThrough={unlockedThrough}
       activeGeneration={activeGeneration}
       busy={busy}
-      onDifficulty={(value) => dispatch(uiDelta({ previewDifficulty: value }))}
+      onDifficulty={(value) => {
+        if (playableDifficulty(value, unlockedThrough) === value)
+          dispatch(uiDelta({ previewDifficulty: value }));
+      }}
       onBack={() => getHistoryApi().back()}
       onResume={
         activeGeneration === undefined
@@ -34,7 +48,13 @@ export default function CampaignSetupContainer(): React.JSX.Element {
       onStart={() => {
         void runSaveTransition(() => {
           getHistoryApi().replaceState(null, "", scenarioListUrl());
-          startLegacyCampaign(dispatch, difficulty);
+          startLegacyCampaign(
+            dispatch,
+            playableDifficulty(
+              difficulty,
+              unlockedDifficulty(achievementJournal.getSnapshot().progress),
+            ),
+          );
         });
       }}
     />

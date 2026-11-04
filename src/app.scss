@@ -2585,18 +2585,6 @@ $pane_header_height: 48px;
   width: 100%;
 }
 
-// A short phone keeps the one action in reach above the long briefing.
-@media (max-width: 599px) and (max-height: 700px) {
-  .scenarioStartControls {
-    position: sticky;
-    bottom: 0;
-    z-index: 2;
-    padding-block: 8px;
-    background: var(--bg-primary);
-    border-top: 1px solid var(--border-subtle);
-  }
-}
-
 .difficultyPicker {
   min-width: 0;
 
@@ -2608,9 +2596,15 @@ $pane_header_height: 48px;
   .MuiToggleButton-root {
     min-width: 0;
     flex: 1;
+    gap: 4px;
     padding: 4px 8px;
     font-size: var(--font-size-caption);
     line-height: 1.25;
+  }
+
+  .difficultyLocked.MuiToggleButton-root {
+    color: var(--font-color-faded);
+    background: var(--bg-raised);
   }
 
   .difficultyDescription {
@@ -2737,6 +2731,7 @@ $pane_header_height: 48px;
   }
 
   .difficultyPicker .MuiToggleButton-root {
+    flex-direction: column;
     padding-inline: 2px;
   }
 }

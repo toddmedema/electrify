@@ -71,6 +71,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "wildfire-scenario.spec.ts",
       "acquisitions.spec.ts",
       "campaign.spec.ts",
+      "difficulty-unlocks.spec.ts",
       ...projects,
       "--project=mobile-360px",
     ]),

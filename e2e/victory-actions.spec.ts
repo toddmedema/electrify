@@ -1,3 +1,4 @@
+import { unlockAllDifficulties } from "./difficulty-fixture";
 import { openPane } from "./layout";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
@@ -256,7 +257,8 @@ for (const { theme, native, currentRank } of [
     const popup = page.locator(".achievementToastPanel");
     if (!nativeBoard) {
       await expect(popup).toBeVisible();
-      await expect(popup).toContainText("Staying Power");
+      // Prerequisite wins already earned Staying Power; this run earns Four Nines.
+      await expect(popup).toContainText("Four Nines");
       await expect
         .poll(() =>
           popup.evaluate((el) => {
@@ -560,4 +562,8 @@ test("shared reliability rule ends the run at the third completed month", async 
   await expect(
     page.getByRole("button", { name: "Continue", exact: true }),
   ).toHaveCount(0);
+});
+
+test.beforeEach(async ({ page }) => {
+  await unlockAllDifficulties(page);
 });
