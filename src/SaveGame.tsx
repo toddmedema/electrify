@@ -14,6 +14,7 @@ import {
 import { validHydroClaims } from "./data/HydroSites";
 import {
   validRunIdentity,
+  carrySavedRunForward,
   sameRunIdentity,
   expandAuthoredRunReference,
   normalizedInputs,
@@ -33,6 +34,7 @@ import {
 import { APP_VERSION } from "./AppVersion";
 import { decodeSave } from "./SaveEncoding";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
+import { upgradeSave } from "./SaveUpgrade";
 import {
   validWorldEvent,
   validTransmissionCapacityLimits,
@@ -333,7 +335,7 @@ export function serializeSave(game: GameType): SaveGameType {
  * malformed facility would otherwise crash the sim mid-tick.
  */
 export function parseSave(raw: unknown): SaveGameType | null {
-  raw = decodeSave(raw);
+  raw = upgradeSave(decodeSave(raw));
   if (typeof raw !== "object" || raw === null) {
     return null;
   }
@@ -791,12 +793,13 @@ export function parseSave(raw: unknown): SaveGameType | null {
     )
   )
     return null;
-  const normalized = {
+  const normalized = carrySavedRunForward({
     ...game,
     policyPause: undefined,
     scenarioChoicePause: undefined,
     timeline: game.timeline.map((t) => ({ ...t })),
-  };
+  });
+  if (!normalized) return null;
   // Achievement telemetry is optional: a save from a newer catalog (or a tampered one) still
   // loads, and resume starts observing it afresh rather than trusting the stored counters.
   if (

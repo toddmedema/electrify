@@ -1,5 +1,6 @@
-/** Current save structure. Other schemas are rejected rather than migrated. */
-export const SAVE_SCHEMA_VERSION = 8;
+import { SAVE_SCHEMA_VERSION } from "./SaveUpgrade";
+
+export { SAVE_SCHEMA_VERSION } from "./SaveUpgrade";
 
 export function isFutureSave(raw: unknown): boolean {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;

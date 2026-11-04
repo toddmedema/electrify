@@ -1369,6 +1369,8 @@ export interface GameType {
   desktopAchievements?: import("./achievements/SimulationHooks").AchievementProgress;
   runIdentity?: RunIdentity;
   challenge?: ChallengeInvitation;
+  /** Progress continued under different simulation rules; refresh future forecasts on load. */
+  rulesChanged?: boolean;
   policies?: PoliciesType;
   policyPause?: { token: string; speed: SpeedType };
   /** Presentation speed restored after the pending scenario decision. */

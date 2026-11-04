@@ -1615,6 +1615,7 @@ export const gameSlice = createSlice({
         scenarioChoicePause: _scenarioChoicePause,
         objectiveProgress: _objectiveProgress,
         campaign: _campaign,
+        rulesChanged: _rulesChanged,
         ...payload
       } = action.payload;
       if (
@@ -2249,6 +2250,7 @@ export const gameSlice = createSlice({
       delete state.desktopAchievements;
       state.runIdentity = undefined;
       state.challenge = undefined;
+      delete state.rulesChanged;
       state.scenarioId = action.payload;
       // An empty timeline is how the loading screen tells a new game from a resumed one, so make
       // that true by construction rather than by whichever paths happen to lead here
@@ -2281,6 +2283,29 @@ export const gameSlice = createSlice({
       return restored;
     });
     builder.addCase(loaded, (state) => {
+      // A continued run's stored future belongs to another simulation. Once the data tables have
+      // loaded, recompute every future stage under this runtime while retaining the frame already
+      // played and all history. Repeating this on later loads also handles subsequent rule changes
+      // after the original shareable identity has been removed.
+      if (state.rulesChanged) {
+        state.timeline = reforecastWeatherAndPrices(state, false, true);
+        state.timeline = reforecastDemand(
+          state,
+          1,
+          [],
+          [],
+          [],
+          undefined,
+          true,
+        );
+        state.timeline = reforecastSupply(
+          state,
+          true,
+          TICK_MINUTES,
+          undefined,
+          true,
+        );
+      }
       // Saves carry the commitment forecast, so this only runs for one that somehow lacks it.
       // Rebuild just that metadata after the data tables have loaded, and keep every recorded
       // value: a full reforecast re-dispatches the tick that already happened, rewriting its
@@ -2295,7 +2320,7 @@ export const gameSlice = createSlice({
           !hasPreparedGeneratorCommitment(currentTick, facility.id)
         );
       });
-      if (needsCommitmentForecast) {
+      if (!state.rulesChanged && needsCommitmentForecast) {
         const forecast = reforecastSupply(state, true);
         state.timeline = original(state.timeline)!.map((tick, i) => {
           const recorded = { ...tick };
@@ -4696,10 +4721,14 @@ export function generateResourceForecast(
 function reforecastWeatherAndPrices(
   state: GameType,
   forecastWeather = false,
+  preserveCurrentFrame = false,
 ): TickPresentFutureType[] {
   const resourceAt = createResourceWeatherReader(state, forecastWeather);
   return state.timeline.map((t: TickPresentFutureType) => {
-    if (t.minute >= state.date.minute) {
+    if (
+      t.minute >= state.date.minute &&
+      !(preserveCurrentFrame && t.minute === state.date.minute)
+    ) {
       const date = getDateFromMinute(t.minute, state.startingYear);
       const effects = storyEffectsAt(date, state);
       const forecast = {
