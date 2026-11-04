@@ -2,18 +2,23 @@ import cloneDeep from "lodash.clonedeep";
 import { DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { createGame } from "../testing/Simulator";
 import { runMonths } from "../testing/SimulationTestHelpers";
-import reducer, { sellFacility, togglePauseFacility } from "./Game";
+import { TICKS_PER_MONTH } from "../Constants";
+import reducer, {
+  sellFacility,
+  togglePauseFacility,
+  generateForecastTimeline,
+} from "./Game";
 import { parseSave, serializeSave } from "../SaveGame";
 import { currentTick } from "../helpers/GameSelectors";
 
-const create = () =>
+const create = (permanentShutdownMonth?: number, startingMonth = 3) =>
   cloneDeep(
     createGame({
       scenarioId: 999,
       scenario: {
         ...DEFAULT_CUSTOM_SCENARIO,
         startingYear: 1986,
-        startingMonth: 3,
+        startingMonth,
         cash: 1e10,
         facilities: [
           {
@@ -21,6 +26,9 @@ const create = () =>
             fuel: "Uranium",
             peakW: 100e6,
             saleRestricted: true,
+            ...(permanentShutdownMonth === undefined
+              ? {}
+              : { permanentShutdownMonth }),
             maintenanceObligation: {
               startsMonth: 4,
               monthlyCost: 2e6,
@@ -77,4 +85,68 @@ it("rejects a malformed inherited facility catalog without throwing during impor
   const raw = JSON.parse(JSON.stringify(serializeSave(create())));
   raw.game.customScenario.facilities = null;
   expect(parseSave(raw)).toBeNull();
+});
+
+it.each(["SHORTAGES", "SHORTAGES_AND_STORAGE"] as const)(
+  "permanently disconnects at April rollover with %s and rejects subsequent resume commands",
+  (buyingRule) => {
+    const game = create(4);
+    const ordinary = create();
+    game.transmission!.buyingRule = buyingRule;
+    ordinary.transmission!.buyingRule = buyingRule;
+    expect(game.facilities[0].paused).not.toBe(true);
+    runMonths(game, 1);
+    runMonths(ordinary, 1);
+    expect(game.monthlyHistory[0].supplyWh).toBe(
+      ordinary.monthlyHistory[0].supplyWh,
+    );
+    expect(game.facilities[0].paused).toBe(true);
+    expect(currentTick(game)!.supplyByFuel.Uranium ?? 0).toBe(0);
+    const afterResume = reducer(
+      game,
+      togglePauseFacility(game.facilities[0].id),
+    );
+    expect(afterResume.facilities[0].paused).toBe(true);
+    expect(afterResume.meaningfulDecisions).toEqual(game.meaningfulDecisions);
+  },
+);
+
+it("initializes a term that opens after shutdown with the facility already disconnected", () => {
+  const game = create(4, 5);
+  expect(game.facilities[0].paused).toBe(true);
+  expect(currentTick(game)!.supplyByFuel.Uranium ?? 0).toBe(0);
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(game)))),
+  ).not.toBeNull();
+});
+
+it("rejects resumed or altered shutdown metadata in an imported save", () => {
+  const game = create(4);
+  runMonths(game, 1);
+  game.facilities[0].paused = true;
+  const valid = JSON.parse(JSON.stringify(serializeSave(game)));
+  expect(parseSave(valid)).not.toBeNull();
+  const resumed = cloneDeep(valid);
+  resumed.game.facilities[0].paused = false;
+  expect(parseSave(resumed)).toBeNull();
+  for (const permanentShutdownMonth of [undefined, 3, 5, 0, 4.5]) {
+    const edited = cloneDeep(valid);
+    edited.game.facilities[0].permanentShutdownMonth = permanentShutdownMonth;
+    expect(parseSave(edited)).toBeNull();
+  }
+});
+
+it("forecasts the permanent shutdown without disconnecting the live March plant early", () => {
+  const game = create(4);
+  const now = currentTick(game)!;
+  const forecast = generateForecastTimeline(
+    game,
+    now.cash,
+    now.customers,
+    TICKS_PER_MONTH * 2,
+  );
+  expect(forecast[0].supplyByFuel.Uranium).toBeGreaterThan(0);
+  expect(forecast[TICKS_PER_MONTH].supplyByFuel.Uranium ?? 0).toBe(0);
+  expect(forecast.at(-1)!.supplyByFuel.Uranium ?? 0).toBe(0);
+  expect(game.facilities[0].paused).not.toBe(true);
 });

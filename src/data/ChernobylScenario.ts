@@ -56,6 +56,7 @@ export const CHERNOBYL_SCENARIO: ScenarioType = {
       ...(index === 3
         ? {
             saleRestricted: true,
+            permanentShutdownMonth: 4,
             maintenanceObligation: {
               startsMonth: 4,
               monthlyCost: CHERNOBYL_RECOVERY_MONTHLY_COST,
@@ -89,7 +90,7 @@ const phases = [
     id: "disaster",
     title: "The Chernobyl disaster",
     previewTitle: "The Chernobyl disaster",
-    message: `Chernobyl's four units are offline after the 26 April 1986 disaster. Unit 4 is permanently lost and cannot be sold. Recovery costs on Unit 4 are ${formatMoneyConcise(CHERNOBYL_RECOVERY_MONTHLY_COST)} a month, even while paused.`,
+    message: `Chernobyl's four units are offline after the 26 April 1986 disaster. Unit 4 is permanently lost. Cleanup costs on Unit 4 are ${formatMoneyConcise(CHERNOBYL_RECOVERY_MONTHLY_COST)} a month.`,
     preview:
       "The disaster will destroy a reactor and shut down the site's surviving units.",
     startMonth: 4,

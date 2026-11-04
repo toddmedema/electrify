@@ -47,13 +47,12 @@ demand, tariffs, cash and construction options, remain game assumptions. The
 scenario models an electricity-service territory; it does not reconstruct the
 Soviet national grid or its administered prices. The four inherited Chernobyl units
 have no resale value. Unit 4 cannot be sold or removed, including before the
-accident, and remains responsible for cleanup. Newly built plants keep the ordinary
-resale rules.
+accident. From April 1986, it is permanently paused and has no operating or sale
+controls. Newly built plants keep the ordinary resale rules.
 
 Unit 4's mandatory maintenance becomes **$250 million per month from April 1986**.
-It replaces the destroyed reactor's ordinary operating upkeep and continues in full
-while paused. It appears in the unit's upkeep and lifetime expenses, with no
-duplicate company-level recovery fee.
+It replaces the destroyed reactor's ordinary operating upkeep and appears in the
+unit's upkeep and lifetime expenses, with no duplicate company-level recovery fee.
 
 The [UN recovery assessment, section 2.08](https://www.iaea.org/sites/default/files/strategy_for_recovery.pdf)
 reports **$18 billion** in Soviet rehabilitation spending during **1986–1991**,

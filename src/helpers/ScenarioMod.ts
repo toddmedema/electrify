@@ -244,6 +244,7 @@ function validModSetup(scenario: ScenarioType): boolean {
         "cashBackMultiplier",
         "saleRestricted",
         "maintenanceObligation",
+        "permanentShutdownMonth",
       ]) ||
       typeof asset.assetId !== "string" ||
       !ID_PATTERN.test(asset.assetId) ||
@@ -275,6 +276,8 @@ function validModSetup(scenario: ScenarioType): boolean {
     if (
       (asset.saleRestricted !== undefined &&
         typeof asset.saleRestricted !== "boolean") ||
+      (asset.permanentShutdownMonth !== undefined &&
+        !number(asset.permanentShutdownMonth, 1, 1211, true)) ||
       !validFacilityMaintenanceObligation(asset.maintenanceObligation)
     )
       return false;

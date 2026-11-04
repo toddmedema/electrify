@@ -17,6 +17,7 @@ export function startingFacilitySearch(
     cashBackMultiplier: _cashBack,
     saleRestricted: _saleRestricted,
     maintenanceObligation: _maintenanceObligation,
+    permanentShutdownMonth: _permanentShutdownMonth,
     initialReservoirFraction: _reservoir,
     label: _label,
     ...technology

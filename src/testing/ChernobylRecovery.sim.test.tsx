@@ -15,7 +15,11 @@ import {
   totalScore,
 } from "../helpers/Scoring";
 import { buildStorySnapshot } from "../helpers/Story";
-import gameReducer, { sellFacility, tickState } from "../reducers/Game";
+import gameReducer, {
+  sellFacility,
+  tickState,
+  togglePauseFacility,
+} from "../reducers/Game";
 import { parseSave } from "../SaveGame";
 import { DifficultyType } from "../Types";
 import { roundTrip } from "./SaveForgery";
@@ -76,6 +80,9 @@ describe("Chernobyl recovery through the real reducer", () => {
     for (const checkpoint of checkpoints) {
       runMonths(game, checkpoint.elapsed - previous);
       previous = checkpoint.elapsed;
+      const precedingEnergy = new Map(
+        game.facilities.map((facility) => [facility.id, facility.lifetimeWh]),
+      );
       tickState(game);
       expect(game.date).toMatchObject({
         year: checkpoint.year,
@@ -103,13 +110,14 @@ describe("Chernobyl recovery through the real reducer", () => {
           checkpoint.offline.includes(unit) ? 0 : 1,
         );
       }
+      const offlineFacilities = checkpoint.offline.map((unit) =>
+        game.facilities.find(
+          (facility) => facility.startingAssetId === `chernobyl-unit-${unit}`,
+        )!,
+      );
       expect(
-        checkpoint.offline.map(
-          (unit) =>
-            game.facilities.find(
-              (facility) =>
-                facility.startingAssetId === `chernobyl-unit-${unit}`,
-            )!.currentW,
+        offlineFacilities.map(
+          (facility) => facility.lifetimeWh - precedingEnergy.get(facility.id)!,
         ),
       ).toEqual(checkpoint.offline.map(() => 0));
       serviceRatios.push(
@@ -206,6 +214,7 @@ describe("Chernobyl recovery through the real reducer", () => {
       (facility) => facility.startingAssetId === "chernobyl-unit-4",
     )!;
     expect(reactor.saleRestricted).toBe(true);
+    expect(reactor.permanentShutdownMonth).toBe(4);
     expect(reactor.peakW).toBe(1e9);
     expect(reactor.maintenanceObligation).toEqual({
       startsMonth: 4,
@@ -233,6 +242,8 @@ describe("Chernobyl recovery through the real reducer", () => {
     for (const patch of [
       { saleRestricted: undefined },
       { saleRestricted: false },
+      { permanentShutdownMonth: undefined },
+      { permanentShutdownMonth: 5 },
       { maintenanceObligation: undefined },
       {
         maintenanceObligation: {
@@ -260,34 +271,49 @@ describe("Chernobyl recovery through the real reducer", () => {
     expect(parseSave(save)).not.toBeNull();
   });
 
-  it("cannot reduce the recovery bill by pausing the destroyed reactor", () => {
+  it("permanently shuts Unit 4 in April without removing its recovery bill", () => {
     const difficulty = "CEO";
     const seed = 17;
-    const reactorId = createGame({
-      scenarioId: CHERNOBYL_SCENARIO_ID,
-      seed,
-    }).facilities.find(
-      (facility) => facility.startingAssetId === "chernobyl-unit-4",
-    )!.id;
-    const paused = runSimulationOnce({
+    const game = createGame({
       scenarioId: CHERNOBYL_SCENARIO_ID,
       difficulty,
       seed,
-      scheduledActions: [{ month: 1, type: "toggle", facilityId: reactorId }],
     });
-    expectNoViolations(paused);
-    expect(paused.outcome).toBe("completed");
-    paused.months.slice(1).forEach((month) => {
+    const reactor = game.facilities.find(
+      (facility) => facility.startingAssetId === "chernobyl-unit-4",
+    )!;
+    expect(reactor.paused).not.toBe(true);
+    runMonths(game, 1);
+    expect(game.date).toMatchObject({ year: 1986, monthNumber: 4 });
+    const destroyed = game.facilities.find(({ id }) => id === reactor.id)!;
+    expect(destroyed.lifetimeWh).toBeGreaterThan(0);
+    expect(destroyed.paused).toBe(true);
+    const generationBefore = destroyed.lifetimeWh;
+    tickState(game);
+    expect(
+      game.facilities.find(({ id }) => id === reactor.id)!.lifetimeWh,
+    ).toBe(generationBefore);
+    const attemptedResume = gameReducer(game, togglePauseFacility(reactor.id));
+    expect(attemptedResume.facilities).toEqual(game.facilities);
+    const restored = parseSave(roundTrip(attemptedResume))!.game;
+    expect(
+      restored.facilities.find(({ id }) => id === reactor.id)?.paused,
+    ).toBe(true);
+    const result = simulate(difficulty, seed);
+    expectNoViolations(result);
+    expect(result.outcome).toBe("completed");
+    result.months.slice(1).forEach((month) => {
       expect(month.expensesOM).toBeGreaterThanOrEqual(
         CHERNOBYL_RECOVERY_MONTHLY_COST,
       );
     });
-    expect(
-      Math.round(
-        paused.finalFacilities.find(
-          (facility) => facility.startingAssetId === "chernobyl-unit-4",
-        )!.lifetimeExpenses,
-      ),
-    ).toBeGreaterThanOrEqual(14.75e9);
+    const finalReactor = result.finalFacilities.find(
+      (facility) => facility.startingAssetId === "chernobyl-unit-4",
+    )!;
+    expect(finalReactor.paused).toBe(true);
+    expect(finalReactor.currentW).toBe(0);
+    expect(Math.round(finalReactor.lifetimeExpenses)).toBeGreaterThanOrEqual(
+      14.75e9,
+    );
   });
 });

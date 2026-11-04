@@ -73,8 +73,13 @@ for (const theme of ["light", "dark"] as const) {
         name: "Sell Chernobyl Unit 4",
         exact: true,
       }),
-    ).toBeDisabled();
-    await expect(unitFour).toContainText("Cannot sell or remove this facility");
+    ).toHaveCount(0);
+    await expect(
+      unitFour.getByRole("button", {
+        name: "Pause Chernobyl Unit 4",
+        exact: true,
+      }),
+    ).toBeVisible();
     await expect(unitFour).toContainText("Cleanup and recovery");
     await expect(unitFour).toContainText("$250M/mo · $3B/yr");
     await expect(unitFour).toContainText("from Apr 1986");
@@ -102,7 +107,7 @@ for (const theme of ["light", "dark"] as const) {
       "Unit 4 is permanently lost",
     );
     await expect(page.locator(".ongoingEvents:visible")).toContainText(
-      "Recovery costs",
+      "Cleanup costs",
     );
     await expect(
       page.getByText("Save failed", { exact: false }),
@@ -110,6 +115,14 @@ for (const theme of ["light", "dark"] as const) {
     await expect
       .poll(async () => (await readSavedGame(page))?.date.monthNumber)
       .toBe(4);
+    await expect
+      .poll(
+        async () =>
+          (await readSavedGame(page))?.facilities.find(
+            (facility) => facility.startingAssetId === "chernobyl-unit-4",
+          )?.paused,
+      )
+      .toBe(true);
     expect(
       await events.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
@@ -117,15 +130,23 @@ for (const theme of ["light", "dark"] as const) {
       fleet,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    await expect(unitFour.locator(".facilityDisclosure")).toBeVisible();
+    await expect(unitFour.locator(".facilityDisclosure")).toContainText(
+      "0/1GW · 0% · paused",
+    );
     await expect(
       unitFour.getByRole("button", {
         name: "Sell Chernobyl Unit 4",
         exact: true,
       }),
-    ).toBeDisabled();
-    await expect(unitFour).toContainText(
-      "Required even while paused; replaces ordinary upkeep.",
-    );
+    ).toHaveCount(0);
+    await expect(
+      unitFour.getByRole("button", {
+        name: /^(Pause|Resume) Chernobyl Unit 4$/,
+      }),
+    ).toHaveCount(0);
+    await expect(unitFour).toContainText("Cleanup and recovery");
+    await expect(unitFour).toContainText("$250M/mo · $3B/yr");
     await expect(unitFour).not.toContainText("from Apr 1986");
     if (
       screenshots &&
@@ -136,9 +157,7 @@ for (const theme of ["light", "dark"] as const) {
       await page.clock.fastForward(10000);
       await page.clock.runFor(500);
       await page.locator(".snackbarContent").waitFor({ state: "hidden" });
-      await unitFour
-        .getByText("Cleanup and recovery", { exact: true })
-        .scrollIntoViewIfNeeded();
+      await unitFour.scrollIntoViewIfNeeded();
       await page.screenshot({
         path: path.join(screenshots, "chernobyl-maintenance-mobile.png"),
         animations: "disabled",

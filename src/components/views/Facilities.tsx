@@ -46,7 +46,10 @@ import {
   RetrofitFacilityAction,
   EvidenceRequestType,
 } from "../../Types";
-import { facilityCashBack } from "../../helpers/Financials";
+import {
+  facilityCashBack,
+  facilityPermanentlyShutdown,
+} from "../../helpers/Financials";
 import { storyOutputMultiplier } from "../../helpers/Story";
 import {
   formatMoneyConcise,
@@ -229,6 +232,7 @@ const RESERVOIR_WARNING_FRACTION = 0.2;
 function FacilityActions(props: {
   facility: FacilityOperatingType;
   upgrading: boolean;
+  permanentlyShutdown: boolean;
   onPause: DispatchProps["onPause"];
   onTogglePause: DispatchProps["onTogglePause"];
   onCancelRetrofit?: DispatchProps["onCancelRetrofit"];
@@ -240,12 +244,14 @@ function FacilityActions(props: {
     onPause,
     onTogglePause,
     upgrading,
+    permanentlyShutdown,
     onCancelRetrofit,
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
+  if (permanentlyShutdown && facility.saleRestricted) return null;
   return (
     <div className="facilityActions">
-      {upgrading && onCancelRetrofit && (
+      {upgrading && !permanentlyShutdown && onCancelRetrofit && (
         // Refunds in full and returns the plant to service at once, so it needs no confirmation
         <Button
           className="facilityCancelConstruction"
@@ -257,7 +263,7 @@ function FacilityActions(props: {
           <span className="facilityActionLabel">Cancel upgrade</span>
         </Button>
       )}
-      {!underConstruction && !upgrading && (
+      {!underConstruction && !upgrading && !permanentlyShutdown && (
         <Button
           variant="outlined"
           startIcon={
@@ -279,30 +285,23 @@ function FacilityActions(props: {
           </span>
         </Button>
       )}
-      <Button
-        className={underConstruction ? "facilityCancelConstruction" : undefined}
-        variant="outlined"
-        startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
-        aria-label={
-          (underConstruction ? "Cancel construction of " : "Sell ") +
-          facilityDisplayName(facility)
-        }
-        onClick={onOpenSell}
-        disabled={!!facility.saleRestricted}
-      >
-        <span className="facilityActionLabel">
-          {underConstruction ? "Cancel construction" : "Sell"}
-        </span>
-      </Button>
-      {facility.saleRestricted && (
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ flexBasis: "100%" }}
+      {!facility.saleRestricted && (
+        <Button
+          className={
+            underConstruction ? "facilityCancelConstruction" : undefined
+          }
+          variant="outlined"
+          startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
+          aria-label={
+            (underConstruction ? "Cancel construction of " : "Sell ") +
+            facilityDisplayName(facility)
+          }
+          onClick={onOpenSell}
         >
-          Cannot sell or remove this facility. Its cleanup responsibility
-          remains with the utility.
-        </Typography>
+          <span className="facilityActionLabel">
+            {underConstruction ? "Cancel construction" : "Sell"}
+          </span>
+        </Button>
       )}
     </div>
   );
@@ -320,6 +319,7 @@ const MemoizedFacilityActions = React.memo(
       previous.facility.saleRestricted === next.facility.saleRestricted &&
       previousUnderConstruction === nextUnderConstruction &&
       previous.upgrading === next.upgrading &&
+      previous.permanentlyShutdown === next.permanentlyShutdown &&
       previous.onCancelRetrofit === next.onCancelRetrofit &&
       previous.onPause === next.onPause &&
       previous.onTogglePause === next.onTogglePause &&
@@ -353,6 +353,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     )
   );
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const permanentlyShutdown = facilityPermanentlyShutdown(
+    facility,
+    game.date.minute,
+  );
+  const outputW = permanentlyShutdown ? 0 : facility.currentW;
   const installing = underConstruction
     ? undefined
     : upgradeInProgress(facility);
@@ -422,7 +427,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   // bar backwards off its own left edge and read as an idle battery.
   const outputFraction =
     facility.peakW > 0
-      ? Math.max(-1, Math.min(1, facility.currentW / facility.peakW))
+      ? Math.max(-1, Math.min(1, outputW / facility.peakW))
       : 0;
   // The row's second line has to stay one line on a 360px phone, so it leads with the reading
   // and the state and leaves anything else to a trailing detail that truncates first. Rated
@@ -449,7 +454,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } else if (upgrading) {
     const daysLeft = upgradeDaysLeft(installing!, game.date.minute);
     reading = partialUpgrade
-      ? formatWattsOfPeak(facility.currentW, facility.peakW)
+      ? formatWattsOfPeak(outputW, facility.peakW)
       : `Upgrading ${Math.round(builtFraction * 100)}%`;
     detail = (
       <>
@@ -465,7 +470,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } else if (facility.peakWh) {
     reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
-    reading = formatWattsOfPeak(facility.currentW, facility.peakW);
+    reading = formatWattsOfPeak(outputW, facility.peakW);
     // A reservoir row's percentage would read as how full it is, which its gauge already shows.
     if (!(fuel === "Hydro" && facility.reservoirCapacityWh))
       reading += ` · ${Math.round(Math.abs(outputFraction) * 100)}%`;
@@ -725,6 +730,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             <MemoizedFacilityActions
               facility={facility}
               upgrading={upgrading}
+              permanentlyShutdown={permanentlyShutdown}
               onPause={onPause}
               onTogglePause={onTogglePause}
               onCancelRetrofit={props.onCancelRetrofit}

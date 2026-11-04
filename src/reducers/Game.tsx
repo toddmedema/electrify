@@ -182,6 +182,7 @@ import {
 import {
   facilityCashBack,
   facilityMaintenanceCost,
+  facilityPermanentlyShutdown,
   getTotalDebt,
   getCreditInputs,
   getCreditPremium,
@@ -1828,7 +1829,8 @@ export const gameSlice = createSlice({
               search.assetId ||
               search.cashBackMultiplier !== undefined ||
               search.saleRestricted !== undefined ||
-              search.maintenanceObligation !== undefined
+              search.maintenanceObligation !== undefined ||
+              search.permanentShutdownMonth !== undefined
             ) {
               const built = state.facilities.find(
                 ({ id }) => !existingIds.has(id),
@@ -1844,6 +1846,10 @@ export const gameSlice = createSlice({
                   built.maintenanceObligation = {
                     ...search.maintenanceObligation,
                   };
+                if (search.permanentShutdownMonth !== undefined)
+                  built.permanentShutdownMonth = search.permanentShutdownMonth;
+                if (facilityPermanentlyShutdown(built, state.date.minute))
+                  built.paused = true;
               }
             }
           } else {
@@ -1868,7 +1874,8 @@ export const gameSlice = createSlice({
                 search.assetId ||
                 search.cashBackMultiplier !== undefined ||
                 search.saleRestricted !== undefined ||
-                search.maintenanceObligation !== undefined
+                search.maintenanceObligation !== undefined ||
+                search.permanentShutdownMonth !== undefined
               ) {
                 const built = state.facilities.find(
                   ({ id }) => !existingIds.has(id),
@@ -1884,6 +1891,11 @@ export const gameSlice = createSlice({
                     built.maintenanceObligation = {
                       ...search.maintenanceObligation,
                     };
+                  if (search.permanentShutdownMonth !== undefined)
+                    built.permanentShutdownMonth =
+                      search.permanentShutdownMonth;
+                  if (facilityPermanentlyShutdown(built, state.date.minute))
+                    built.paused = true;
                 }
               }
             } else {
@@ -2826,7 +2838,8 @@ function applySellFacility(state: GameType, id: number): boolean {
 
 function applyTogglePauseFacility(state: GameType, id: number): boolean {
   const facility = state.facilities.find((item) => item.id === id);
-  if (!facility) return false;
+  if (!facility || facilityPermanentlyShutdown(facility, state.date.minute))
+    return false;
   const before = facility.paused ? "paused" : "operating";
   facility.paused = !facility.paused;
   recordMeaningfulDecision(state, {
@@ -4920,6 +4933,10 @@ function* supplyFacilitiesFinancesPhases(
   advanceConstruction = true,
 ): Generator<PeerPlan, TickPresentFutureType, PeerSettlement | undefined> {
   const { facilities } = state;
+  // Compare each settled/forecast tick, not the rollover clock that may already be next month.
+  for (const facility of facilities)
+    if (facilityPermanentlyShutdown(facility, now.minute))
+      facility.paused = true;
   const noElapsed =
     (state.utilityExpansion ||
       (isLegacyCampaignScenario(state.scenarioId) && !state.customScenario) ||

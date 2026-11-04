@@ -25,6 +25,17 @@ import {
 import { pow } from "./Pow";
 import { exp, log, log1p } from "./Libm";
 
+/** The asset remains owned, but its scheduled permanent disconnection cannot be resumed. */
+export function facilityPermanentlyShutdown(
+  facility: Pick<FacilityOperatingType, "permanentShutdownMonth">,
+  minute: number,
+): boolean {
+  return (
+    facility.permanentShutdownMonth !== undefined &&
+    minute >= (facility.permanentShutdownMonth - 1) * MINUTES_PER_MONTH
+  );
+}
+
 /** Trusted inherited liabilities replace ordinary upkeep once their calendar month begins. */
 export function facilityMaintenanceCost(
   facility: Pick<FacilityOperatingType, "maintenanceObligation">,

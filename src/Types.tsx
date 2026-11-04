@@ -554,6 +554,8 @@ interface SharedOperatingType
   cashBackMultiplier?: number;
   saleRestricted?: boolean;
   maintenanceObligation?: FacilityMaintenanceObligationType;
+  /** Permanent disconnection from this January-anchored calendar month (1-based). */
+  permanentShutdownMonth?: number;
   id: number; // Monotonically increasing
   // Signed for storage: negative while charging
   currentW: number;
@@ -988,6 +990,8 @@ export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
   cashBackMultiplier?: number;
   saleRestricted?: boolean;
   maintenanceObligation?: FacilityMaintenanceObligationType;
+  /** Permanent disconnection from this January-anchored calendar month (1-based). */
+  permanentShutdownMonth?: number;
   /**
    * Share of its reservoir a starting hydro plant holds on the opening tick. Defaults to the
    * neutral half-pool. A scenario that opens on a known lake level, or in a hemisphere whose

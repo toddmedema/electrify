@@ -8,6 +8,7 @@ import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
 import {
   maxLoanAmount,
   validFacilityMaintenanceObligation,
+  facilityPermanentlyShutdown,
 } from "./helpers/Financials";
 import {
   accessContextForGame,
@@ -509,6 +510,15 @@ export function parseSave(raw: unknown): SaveGameType | null {
         optionalNumbersInvalid ||
         current.cashBackMultiplier !== inheritedAsset?.cashBackMultiplier ||
         current.saleRestricted !== inheritedAsset?.saleRestricted ||
+        current.permanentShutdownMonth !==
+          inheritedAsset?.permanentShutdownMonth ||
+        (current.permanentShutdownMonth !== undefined &&
+          (!Number.isInteger(current.permanentShutdownMonth) ||
+            typeof current.permanentShutdownMonth !== "number" ||
+            current.permanentShutdownMonth < 1 ||
+            current.permanentShutdownMonth > 1211)) ||
+        (facilityPermanentlyShutdown(facility, game.date!.minute) &&
+          current.paused !== true) ||
         (current.saleRestricted !== undefined &&
           typeof current.saleRestricted !== "boolean") ||
         !validFacilityMaintenanceObligation(current.maintenanceObligation) ||

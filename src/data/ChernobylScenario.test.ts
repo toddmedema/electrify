@@ -67,6 +67,7 @@ describe("Chernobyl's historical recovery", () => {
       (facility) => facility.assetId === "chernobyl-unit-4",
     )!;
     expect(destroyed.saleRestricted).toBe(true);
+    expect(destroyed.permanentShutdownMonth).toBe(4);
     expect(destroyed.maintenanceObligation).toEqual({
       startsMonth: 4,
       monthlyCost: 250e6,

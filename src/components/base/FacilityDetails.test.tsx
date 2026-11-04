@@ -471,7 +471,7 @@ describe("weather resilience details", () => {
   });
 });
 
-it("shows mandatory monthly and annual cleanup maintenance while the plant is paused", () => {
+it("shows the monthly cleanup charge without ordinary upkeep", () => {
   const game = carbonFee();
   const facility = game.facilities[0];
   facility.paused = true;
@@ -490,11 +490,28 @@ it("shows mandatory monthly and annual cleanup maintenance while the plant is pa
     />,
   );
   expect(screen.getByText("Cleanup and recovery")).toBeInTheDocument();
-  expect(
-    screen.getByText("$2M/mo · $24M/yr", { exact: false }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByText("Required even while paused; replaces ordinary upkeep."),
-  ).toBeInTheDocument();
+  expect(screen.getByText("$2M/mo", { exact: false })).toBeInTheDocument();
   expect(screen.queryByText("Fixed upkeep")).not.toBeInTheDocument();
+});
+
+it("dates a cleanup charge before it begins", () => {
+  const game = createGame({ scenarioId: 126 });
+  const unit = game.facilities.find(
+    (facility) => facility.startingAssetId === "chernobyl-unit-4",
+  )!;
+  showDetails(game, unit);
+  expect(
+    screen.getByText("$250M/mo · $3B/yr from Apr 1986", { exact: false }),
+  ).toBeInTheDocument();
+});
+
+it("hides retrofit actions after permanent shutdown", () => {
+  const game = coldGame();
+  const facility = game.facilities[0];
+  facility.permanentShutdownMonth = 1;
+  facility.paused = true;
+  showDetails(game, facility);
+  expect(
+    screen.queryByRole("region", { name: "Upgrades" }),
+  ).not.toBeInTheDocument();
 });

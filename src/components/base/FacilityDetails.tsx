@@ -15,6 +15,7 @@ import {
   facilityLifetime,
   facilityMaintenanceCost,
   facilityOutputFactor,
+  facilityPermanentlyShutdown,
 } from "../../helpers/Financials";
 import {
   formatPercent,
@@ -309,6 +310,10 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const storage = isStorage(facility) ? facility : undefined;
   const accentColor = facilityColor(fuel);
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const permanentlyShutdown = facilityPermanentlyShutdown(
+    facility,
+    date.minute,
+  );
   const isHydro = fuel === "Hydro" && !!facility.reservoirCapacityWh;
   const ageYears = facilityAgeYears(facility, date.minute);
   const outputFactor = facilityOutputFactor(facility, date.minute);
@@ -537,13 +542,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                     {facilityMaintenanceCost(facility, date.minute) ===
                       undefined &&
                       ` from ${MONTHS[(facility.maintenanceObligation.startsMonth - 1) % 12]} ${(props.game?.startingYear ?? date.year - Math.floor(date.monthsElapsed / 12)) + Math.floor((facility.maintenanceObligation.startsMonth - 1) / 12)}`}
-                    <Typography
-                      component="span"
-                      variant="caption"
-                      sx={{ display: "block" }}
-                    >
-                      Required even while paused; replaces ordinary upkeep.
-                    </Typography>
                   </>
                 }
               />
@@ -577,14 +575,14 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           </dl>
         </section>
       )}
-      {props.game && (
+      {props.game && !permanentlyShutdown && (
         <GasConversion
           facility={facility}
           game={props.game}
           onRetrofit={props.onRetrofit}
         />
       )}
-      {resilience && props.game && (
+      {resilience && props.game && !permanentlyShutdown && (
         <WeatherResilienceSection
           facility={facility}
           game={props.game}
