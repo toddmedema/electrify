@@ -73,7 +73,7 @@ function objectiveRequirement(
   const last =
     "throughMonth" in objective
       ? objective.throughMonth
-      : objective.metric === "fuelRetirement"
+      : objective.metric === "fuelRetirement" && !objective.checkpoint
         ? durationMonths - 1
         : objective.deadlineMonth;
   const first =
@@ -85,7 +85,9 @@ function objectiveRequirement(
     failed: "failed",
     unverifiable: "unknown",
   } as const;
-  const target = objectiveTargetText(objective);
+  const target = objective.checkpoint
+    ? objectiveGoalText(objective, startingYear, durationMonths)
+    : objectiveTargetText(objective);
   const current = objectiveObservedText(result);
   const observed =
     result.observed === undefined
@@ -101,7 +103,11 @@ function objectiveRequirement(
     current,
     target: objectiveGoalText(objective, startingYear, durationMonths),
     compact: `${result.required ? "" : "Optional · "}${compact}${result.status === "unverifiable" ? " · incomplete history" : ""}`,
-    timing: `Completed months ${(first % 12) + 1}/${startingYear + Math.floor(first / 12)}–${(last % 12) + 1}/${startingYear + Math.floor(last / 12)}${result.required ? "" : "; optional, does not end the run"}`,
+    timing: objective.checkpoint
+      ? last === durationMonths - 1
+        ? "Checked at term end."
+        : `Checked at the end of ${MONTHS[last % 12]} ${startingYear + Math.floor(last / 12)}.`
+      : `Completed months ${(first % 12) + 1}/${startingYear + Math.floor(first / 12)}–${(last % 12) + 1}/${startingYear + Math.floor(last / 12)}${result.required ? "" : "; optional, does not end the run"}`,
     status: statuses[result.status],
     deadline: startingYear * 12 + last + 1,
   };

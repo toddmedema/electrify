@@ -17,41 +17,12 @@ import {
 import {
   finishedObjectiveStatusText,
   objectiveGoalText,
-  objectiveTargetText,
-  objectiveWindowText,
-  objectiveValueText,
 } from "../../helpers/ObjectivePresentation";
 import type { CompiledRuleObjective } from "../../data/ScenarioRules";
 import { LegacyCampaignTermType } from "../../Types";
 
-const goalText = (
-  objective: CompiledRuleObjective,
-  startingYear: number,
-): string => {
-  const window = objectiveWindowText(objective, startingYear, 240);
-  switch (objective.metric) {
-    case "customerRetention":
-      return `Retain ${objectiveValueText(objective, objective.minRetainedShare)} of customers`;
-    case "fuelRetirement":
-      return objective.label;
-    case "financialCoverage":
-      return objective.minCoverage === 1
-        ? `${objective.basis === "revenue" ? "Revenue covers operating costs" : "Cash covers monthly operating costs"} · ${window}`
-        : objectiveGoalText(objective, startingYear, 240);
-    case "monthEndDebt":
-      return `Debt ≤${objectiveValueText(objective, objective.maxDebt)} · ${window}`;
-    case "monthlyBilledRate":
-      return `Billed rate ≤${objectiveValueText(objective, objective.maxDollarsPerKWh)} · ${window}`;
-    case "emissionsBudget":
-      return `Emit ${objectiveTargetText(objective)} this term`;
-    case "emissionsPerDeliveredMWh":
-      return `Emit ${objectiveTargetText(objective)} · ${window}`;
-    case "efficiencySavings":
-      return `Save ≥${objectiveValueText(objective, objective.minShare)} of home and business electricity · ${window}`;
-    default:
-      return objectiveGoalText(objective, startingYear, 240);
-  }
-};
+const goalText = (objective: CompiledRuleObjective, startingYear: number) =>
+  objectiveGoalText(objective, startingYear, 240);
 
 export interface CampaignHandoverProps {
   term: LegacyCampaignTermType;

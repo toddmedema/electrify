@@ -72,6 +72,7 @@ const term: LegacyCampaignTermType = {
         metric: "customerRetention",
         minRetainedShare: 0.9,
         deadlineMonth: 239,
+        checkpoint: true,
         required: true,
       },
     },

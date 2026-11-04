@@ -1,3 +1,5 @@
+import { isLegacyCampaignScenario } from "../../data/LegacyCampaign";
+import { getScenario } from "../../data/Scenarios";
 import { Box, Typography } from "@mui/material";
 import { VictoryDebriefType, VictoryType } from "../../Types";
 import ConceptIcon from "./ConceptIcon";
@@ -14,6 +16,7 @@ import {
   objectiveDefinitionText,
   objectiveObservedText,
   objectiveTargetText,
+  objectiveGoalText,
 } from "../../helpers/ObjectivePresentation";
 
 export function resultTitle(
@@ -65,10 +68,16 @@ export function ResultScore({
 
 export function RunDebrief({
   debrief,
+  scenarioId,
 }: {
   debrief: VictoryDebriefType;
+  scenarioId?: number;
 }): React.JSX.Element {
   const units = useUnits();
+  const scenario =
+    scenarioId === undefined || !isLegacyCampaignScenario(scenarioId)
+      ? undefined
+      : getScenario(scenarioId);
   const reliability = `${(debrief.reliability * 100).toFixed(debrief.reliability >= 0.999 ? 2 : 1)}%`;
   const metrics = [
     { concept: "supply" as const, label: "served", value: reliability },
@@ -148,10 +157,24 @@ export function RunDebrief({
                   {objectiveDefinitionText(result)}
                 </Typography>
                 <Typography component="p" variant="body2">
-                  {objectiveTargetText(result.objective)} ·{" "}
-                  {first === last
-                    ? `Month ${first + 1}`
-                    : `Months ${first + 1}–${last + 1}`}
+                  {result.objective.checkpoint ? (
+                    scenario === undefined ? (
+                      objectiveTargetText(result.objective)
+                    ) : (
+                      objectiveGoalText(
+                        result.objective,
+                        scenario.startingYear,
+                        scenario.durationMonths,
+                      )
+                    )
+                  ) : (
+                    <>
+                      {objectiveTargetText(result.objective)} ·{" "}
+                      {first === last
+                        ? `Month ${first + 1}`
+                        : `Months ${first + 1}–${last + 1}`}
+                    </>
+                  )}
                 </Typography>
                 <Typography component="p" variant="body2">
                   {objectiveObservedText(result)}

@@ -28,7 +28,7 @@ export const objectiveDefinition = (
   metric === "fuelRetirement" &&
   objective?.metric === "fuelRetirement" &&
   objective.commissionedBeforeYear !== undefined
-    ? `Own no ${objective.fuel} equipment commissioned before ${objective.commissionedBeforeYear} at the deadline or any later month close. Paused equipment counts; newer and unfinished equipment is excluded.`
+    ? `Own no ${objective.fuel} equipment commissioned before ${objective.commissionedBeforeYear} at the deadline${objective.checkpoint ? "" : " or any later month close"}. Paused equipment counts; newer and unfinished equipment is excluded.`
     : OBJECTIVE_DEFINITIONS[metric];
 
 const byId = (a: { id: string }, b: { id: string }) =>
@@ -66,7 +66,10 @@ function observationWindow(
       objective.deadlineMonth,
     ];
   if (objective.metric === "fuelRetirement")
-    return [objective.deadlineMonth, term - 1];
+    return [
+      objective.deadlineMonth,
+      objective.checkpoint ? objective.deadlineMonth : term - 1,
+    ];
   if ("deadlineMonth" in objective)
     return [objective.deadlineMonth, objective.deadlineMonth];
   return [objective.fromMonth, objective.throughMonth];
@@ -549,7 +552,8 @@ export function evaluateScenarioObjectives(
           failed =
             latest[0] === objective.deadlineMonth
               ? !objectiveTargetMet(objective, result.observed)
-              : !context.retentionAtDeadlineOnly &&
+              : !objective.checkpoint &&
+                !context.retentionAtDeadlineOnly &&
                 bestReachableCustomers(
                   latest[1],
                   remaining,
@@ -564,6 +568,7 @@ export function evaluateScenarioObjectives(
         if (observed.length && Number.isFinite(numeratorTotal))
           result.observed = numeratorTotal;
         failed =
+          (!objective.checkpoint || ended) &&
           result.observed !== undefined &&
           !objectiveTargetMet(objective, result.observed);
         break;
@@ -641,6 +646,7 @@ export function evaluateScenarioObjectives(
         failed = ratios.some((value) => !objectiveTargetMet(objective, value));
         break;
     }
+    if (objective.checkpoint && !ended) failed = false;
     if (failed) {
       result.status = "failed";
       result.reason =
@@ -763,7 +769,8 @@ export function validObjectiveResult(value: unknown): value is ObjectiveResult {
     result.target === objectiveTarget(result.objective) &&
     (result.observed === undefined || nonnegative(result.observed)) &&
     integer(result.requiredMonths, 1, 1200) &&
-    (result.objective.metric === "fuelRetirement"
+    (result.objective.metric === "fuelRetirement" &&
+    !result.objective.checkpoint
       ? result.requiredMonths <= 1200 - result.objective.deadlineMonth
       : result.requiredMonths ===
         ("deadlineMonth" in result.objective

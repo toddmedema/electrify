@@ -271,7 +271,12 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               displayName={props.displayName}
             />
           )}
-        {victory.debrief && <RunDebrief debrief={victory.debrief} />}
+        {victory.debrief && (
+          <RunDebrief
+            debrief={victory.debrief}
+            scenarioId={victory.scenarioId}
+          />
+        )}
       </DialogContent>
       <DialogActions
         className="victoryDialogActions"

@@ -155,8 +155,14 @@ export function closeProtocolGeneration(
     tick.customers = customers;
     tick.customerRate = 0;
     tick.customerBillingRate = 0;
+    tick.efficiencySavedW = 100;
+    tick.rebateEligibleW = 1000;
     // This fixture isolates the save protocol; realistic evening dispatch uses the sim playbooks.
     tick.supplyW = tick.demandW;
+    tick.kgco2e = 0;
+    tick.localKgco2e = 0;
+    tick.importedKgco2e = 0;
+    tick.constructionKgco2e = 0;
   });
   game.date = getDateFromMinute(
     (campaign.termStartMonth + 240) * MINUTES_PER_MONTH - TICK_MINUTES,

@@ -410,6 +410,11 @@ const objective = () => ({
       required: boolean(
         "Defaults to true. Set false for an optional goal that cannot end the run.",
       ),
+      checkpoint: {
+        const: true,
+        description:
+          "Judge once at the deadline or window end, without requiring the result to remain true afterward.",
+      },
     };
     const required = ["id", "label", "metric"];
     if (

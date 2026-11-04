@@ -133,7 +133,13 @@ export interface RuleChoice {
   requiresChoice?: RuleCondition;
   options: RuleOption[];
 }
-type ObjectiveBase = { id: string; label: string; required?: boolean };
+type ObjectiveBase = {
+  id: string;
+  label: string;
+  required?: boolean;
+  /** Judge once at the deadline/window end; completed checkpoints stay complete. */
+  checkpoint?: true;
+};
 type ObjectiveWindow = { fromMonth: number; throughMonth: number };
 type MeasuredObjective =
   | (ObjectiveWindow & {

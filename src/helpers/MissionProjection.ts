@@ -59,6 +59,10 @@ function firstFailureMonth(
 ): number | undefined {
   if (result.status !== "failed") return undefined;
   const objective = result.objective;
+  if (objective.checkpoint)
+    return "deadlineMonth" in objective
+      ? objective.deadlineMonth
+      : objective.throughMonth;
   if (
     objective.metric === "customerRetention" ||
     objective.metric === "customerCount"
