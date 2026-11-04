@@ -10,6 +10,7 @@ import {
   initializeLegacyCampaign,
   legacyGenerationContext,
   legacyCompletedMonths,
+  legacyMonthOffset,
   legacyMarketReferenceRate,
 } from "../helpers/LegacyCampaign";
 import {
@@ -1728,7 +1729,11 @@ export const gameSlice = createSlice({
       const startingCustomers = checkpoint?.startingCustomers ?? a.customers;
       const startingFacilities = checkpoint?.facilities ?? a.facilities;
       const startingRate = checkpoint?.dollarsPerkWh ?? scenario.dollarsPerkWh;
-      state.date = getDateFromMinute(0, scenario.startingYear);
+      state.startingMonth = scenario.startingMonth;
+      state.date = getDateFromMinute(
+        ((scenario.startingMonth ?? 1) - 1) * MINUTES_PER_MONTH,
+        scenario.startingYear,
+      );
       state.startingYear = scenario.startingYear;
       // A company on day one has no track record, no debt and nothing but cash, so it borrows at
       // whatever prime was in the year the scenario opens -- 4.75% in 2019, 21.5% in 1980. It is
@@ -1817,13 +1822,19 @@ export const gameSlice = createSlice({
               initialReservoirFraction,
               hydroAssignments[startingIndex],
             );
-            if (label || search.assetId) {
+            if (
+              label ||
+              search.assetId ||
+              search.cashBackMultiplier !== undefined
+            ) {
               const built = state.facilities.find(
                 ({ id }) => !existingIds.has(id),
               );
               if (built) {
                 if (label) built.name = label;
                 if (search.assetId) built.startingAssetId = search.assetId;
+                if (search.cashBackMultiplier !== undefined)
+                  built.cashBackMultiplier = search.cashBackMultiplier;
               }
             }
           } else {
@@ -1843,13 +1854,19 @@ export const gameSlice = createSlice({
                 initialAgeYears,
                 initialReservoirFraction,
               );
-              if (label || search.assetId) {
+              if (
+                label ||
+                search.assetId ||
+                search.cashBackMultiplier !== undefined
+              ) {
                 const built = state.facilities.find(
                   ({ id }) => !existingIds.has(id),
                 );
                 if (built) {
                   if (label) built.name = label;
                   if (search.assetId) built.startingAssetId = search.assetId;
+                  if (search.cashBackMultiplier !== undefined)
+                    built.cashBackMultiplier = search.cashBackMultiplier;
                 }
               }
             } else {
@@ -3501,8 +3518,7 @@ function applyPolicyEdit(
     state.date.monthsElapsed !==
       Math.floor(state.date.minute / MINUTES_PER_MONTH) ||
     payload.month !== state.date.monthsElapsed + 1 ||
-    payload.month >=
-      scenario.durationMonths + (state.campaign?.termStartMonth ?? 0)
+    payload.month >= scenario.durationMonths + legacyMonthOffset(state)
   )
     return false;
   if (
@@ -3799,8 +3815,8 @@ function tickWorkingState(state: GameType): GameType {
 function completedMonthCount(state: GameType): number {
   const latest = state.monthlyHistory[0];
   return Math.max(
-    (state.objectiveProgress?.completedMonths ?? 0) +
-      (state.campaign?.termStartMonth ?? 0),
+    legacyMonthOffset(state),
+    (state.objectiveProgress?.completedMonths ?? 0) + legacyMonthOffset(state),
     latest ? (latest.year - state.startingYear) * 12 + latest.month : 0,
   );
 }
@@ -4079,7 +4095,10 @@ export function* tickStatePhases(
           const failure = runFailure(state, scenario, history, now, false);
           const month = state.date.monthsElapsed;
           if (failure) state.multiplayer.ending = { ...failure, month };
-          else if (month >= (scenario.durationMonths || 12 * 20))
+          else if (
+            month >=
+            (scenario.durationMonths || 12 * 20) + legacyMonthOffset(state)
+          )
             state.multiplayer.ending = {
               outcome: "completed",
               title: scenario.endTitle || "Mission complete!",
@@ -4251,8 +4270,7 @@ export function* tickStatePhases(
       };
 
       const termMonths =
-        (scenario.durationMonths || 12 * 20) +
-        (state.campaign?.termStartMonth ?? 0);
+        (scenario.durationMonths || 12 * 20) + legacyMonthOffset(state);
       const failure = runFailure(state, scenario, history, now, isTutorial);
 
       desktopSimulationHooks()?.month(
@@ -4359,7 +4377,8 @@ export function* tickStatePhases(
           );
         }
       } else if (
-        state.date.monthsElapsed === (scenario.durationMonths || 12 * 20) &&
+        state.date.monthsElapsed ===
+          (scenario.durationMonths || 12 * 20) + legacyMonthOffset(state) &&
         !activeTutorialCapstone
       ) {
         // Success: Survived duration
@@ -6215,11 +6234,13 @@ function* supplyFacilitiesFinancesPhases(
   // there -- a lost game turned into a corrupted one, with no way back to a number
   const percentDemandUnfulfilled =
     demandWh > 0 ? (demandWh - supplyWh) / demandWh : 0;
-  const organicGrowthRate =
-    ORGANIC_GROWTH_MAX_ANNUAL -
-    difficulty.blackoutPenalty * percentDemandUnfulfilled;
   const scenario =
     getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
+  const organicGrowthRate =
+    ORGANIC_GROWTH_MAX_ANNUAL -
+    (scenario.retainCustomersDuringShortages
+      ? 0
+      : difficulty.blackoutPenalty * percentDemandUnfulfilled);
 
   // Save new financial info
   now.customerRate = updateCustomerRate(

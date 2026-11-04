@@ -7,9 +7,9 @@ import { chooseScenarioResponse } from "../reducers/GameActions";
 import { GameType } from "../Types";
 import { runSimulation, SimOptionsType, SimResultType } from "./Simulator";
 
-/** The scored scenarios the economics suites play; tutorials have their own coverage. */
+/** Ordinary objective scenarios; recovery scoring has its own balance comparisons. */
 export const ECONOMICS_SCENARIOS = SCENARIOS.filter(
-  (scenario) => !scenario.tutorialSteps,
+  (scenario) => !scenario.tutorialSteps && !scenario.reliabilityFailureDisabled,
 );
 
 export function baselineMeaningfulChoices(

@@ -63,6 +63,7 @@ import {
   ViolationType,
 } from "./Invariants";
 import { loadSimData } from "./SimData";
+import { legacyCompletedMonths } from "../helpers/LegacyCampaign";
 import { isLegacyCampaignScenario } from "../data/LegacyCampaign";
 
 export type StrategyType = "none" | "keepUp";
@@ -690,7 +691,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
   // tickState fires the game's end-of-run dialogs through setTimeout, which never run here, so the
   // loop watches state directly instead and stops on the same conditions the player would hit:
   // monthsElapsed reaching the scenario duration, negative cash, or chronic blackouts.
-  while (state.date.monthsElapsed < resolved.months) {
+  while (legacyCompletedMonths(state) < resolved.months) {
     // The baseline bot explicitly chooses a free option; the game never defaults for a player.
     const decision = pendingScenarioChoice(state);
     if (decision) {
@@ -765,32 +766,35 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     checkWeatherHazards(collector, state, formatWhen(state));
 
     if (now.cash < 0) {
-      bankruptAtMonth = state.date.monthsElapsed;
+      bankruptAtMonth = legacyCompletedMonths(state);
       break; // The real game forces a restart here, so anything past it isn't a reachable state
     }
 
-    if (hasChronicBlackouts(state.monthlyHistory, state.difficulty)) {
-      firedAtMonth = state.date.monthsElapsed;
+    if (
+      !scenario.reliabilityFailureDisabled &&
+      hasChronicBlackouts(state.monthlyHistory, state.difficulty)
+    ) {
+      firedAtMonth = legacyCompletedMonths(state);
       break;
     }
 
     // The real game ends a run as soon as an objective is decided; see decidedObjectiveFailure
     if (
       resolved.endOnDecidedObjective &&
-      state.date.monthsElapsed < scenario.durationMonths &&
+      legacyCompletedMonths(state) < scenario.durationMonths &&
       !scenario.tutorialSteps &&
       gameObjectiveResults(state).some(
         (result) => result.required && result.status === "failed",
       )
     ) {
-      firedAtMonth = state.date.monthsElapsed;
+      firedAtMonth = legacyCompletedMonths(state);
       break;
     }
 
     if (
       resolved.sellFacilityId !== null &&
       resolved.sellAtMonth > 0 &&
-      state.date.monthsElapsed === resolved.sellAtMonth
+      legacyCompletedMonths(state) === resolved.sellAtMonth
     ) {
       state = cloneDeep(
         gameReducer(state, sellFacility(resolved.sellFacilityId)),
@@ -801,7 +805,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       const toBuild = pickFacilityToBuild(state, state.monthlyHistory[0]);
       if (toBuild) {
         builds.push({
-          month: state.date.monthsElapsed,
+          month: legacyCompletedMonths(state),
           name: toBuild.name,
           buildCost: toBuild.buildCost,
         });
@@ -815,8 +819,8 @@ export function runSimulation(options: SimOptionsType): SimResultType {
         justBuilt = true;
       }
     }
-    if (state.date.monthsElapsed < resolved.months) {
-      applyScheduledActions(state.date.monthsElapsed);
+    if (legacyCompletedMonths(state) < resolved.months) {
+      applyScheduledActions(legacyCompletedMonths(state));
     }
     // The timeline was just regenerated and pre-rolled, so tick continuity restarts next tick
     prevTick = null;
@@ -825,18 +829,18 @@ export function runSimulation(options: SimOptionsType): SimResultType {
   const physicallySurvived =
     firedAtMonth === null &&
     bankruptAtMonth === null &&
-    state.date.monthsElapsed >= scenario.durationMonths;
+    legacyCompletedMonths(state) >= scenario.durationMonths;
   if (
     firedAtMonth === null &&
     bankruptAtMonth === null &&
-    state.date.monthsElapsed >= scenario.durationMonths &&
+    legacyCompletedMonths(state) >= scenario.durationMonths &&
     gameObjectiveResults(state).some(
       (result) =>
         result.required &&
         (result.status === "failed" || result.status === "unverifiable"),
     )
   ) {
-    firedAtMonth = state.date.monthsElapsed;
+    firedAtMonth = legacyCompletedMonths(state);
   }
 
   return {

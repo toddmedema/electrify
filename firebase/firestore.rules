@@ -55,7 +55,7 @@ service cloud.firestore {
             && data.keys().hasAll(['version', 'earned', 'tutorials', 'wins'])
             && data.keys().hasOnly(['version', 'earned', 'tutorials', 'wins'])
             && data.version == 1
-            && data.earned is list && data.earned.size() <= 36
+            && data.earned is list && data.earned.size() <= 37
             && data.earned.toSet().size() == data.earned.size()
             && data.earned.hasOnly([
             "FIRST_SPARK",
@@ -92,13 +92,14 @@ service cloud.firestore {
             "BEYOND_THE_RIVER",
             "BEAT_THE_HEAT",
             "ACROSS_THE_VALLEY",
+            "CHERNOBYL_RECOVERY",
             "MASTER_OF_THE_GRID",
             "OUT_OF_JUICE"
           ])
             && data.tutorials is list && data.tutorials.size() <= 7
             && data.tutorials.toSet().size() == data.tutorials.size()
             && data.tutorials.hasOnly([0,1,2,4,3,5,112])
-            && data.wins is list && data.wins.size() <= 75
+            && data.wins is list && data.wins.size() <= 80
             && data.wins.toSet().size() == data.wins.size()
             && data.wins.hasOnly([
             "100:Intern",
@@ -175,7 +176,12 @@ service cloud.firestore {
             "116:Employee",
             "116:Manager",
             "116:VP",
-            "116:CEO"
+            "116:CEO",
+            "126:Intern",
+            "126:Employee",
+            "126:Manager",
+            "126:VP",
+            "126:CEO"
           ]);
         }
         allow get: if isOwner(uid);

@@ -542,6 +542,8 @@ export function isStorage<T extends { peakWh?: number }>(
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
   startingAssetId?: string;
+  /** Transfer restrictions on inherited assets; absent means ordinary resale value. */
+  cashBackMultiplier?: number;
   id: number; // Monotonically increasing
   // Signed for storage: negative while charging
   currentW: number;
@@ -877,6 +879,7 @@ export interface ScenarioModType {
   parameters: {
     baseScenarioId: number;
     startingYear: number;
+    startingMonth?: number;
     durationMonths: number;
     seed: number;
     difficulty: DifficultyType;
@@ -939,12 +942,18 @@ export interface ScenarioType {
   // this off and draws a fresh seed each play; only the custom game screen sets it
   seed?: number;
   startingYear: number;
+  /** First playable calendar month, 1–12; omitted means January. */
+  startingMonth?: number;
+  /** Recovery terms keep service scoring without blackout dismissal. */
+  reliabilityFailureDisabled?: boolean;
   cash: number;
   // When absent, the location profile supplies the starting grid size.
   startingCustomers?: number;
   // Customer count and utility-scale load are not interchangeable. Authored scenarios can
   // calibrate the ordinary customer-driven baseline; otherwise the location profile is enough.
   startingDemandScale?: number;
+  /** Captive recovery territories retain their service obligation during blackouts. */
+  retainCustomersDuringShortages?: boolean;
   /** Optional weather/daily peak calibration; 1 preserves the original demand shape. */
   demandShapeExponent?: number;
   // Absolute loads owned by this scenario. A Data Centers schedule replaces the generic regional
@@ -965,6 +974,8 @@ export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
   /** Catalog identity of the original asset; never transferred to a replacement. */
   assetId?: string;
   initialAgeYears?: number;
+  /** Fraction of depreciated value transferable on sale, from 0 to 1. */
+  cashBackMultiplier?: number;
   /**
    * Share of its reservoir a starting hydro plant holds on the opening tick. Defaults to the
    * neutral half-pool. A scenario that opens on a known lake level, or in a hemisphere whose
@@ -1415,6 +1426,8 @@ export interface GameType {
   };
   date: DateType;
   startingYear: number;
+  /** Opening calendar month; the simulation clock remains anchored to January. */
+  startingMonth?: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
   /** Completed-month objective facts, retained independently of presentation history. */

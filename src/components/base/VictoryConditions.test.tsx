@@ -113,3 +113,21 @@ it("explains the CEO reliability limit", () => {
     "Serving less than 99.5% of demand for 3 months in a row ends the run.",
   );
 });
+
+it("explains recovery scoring without a reliability loss threshold", () => {
+  render(
+    <VictoryConditions
+      scenario={{ ...SCENARIOS[0], reliabilityFailureDisabled: true }}
+      difficulty="CEO"
+    />,
+  );
+  expect(
+    screen.getByText(/No minimum reliability requirement/),
+  ).toHaveTextContent(
+    "Blackouts reduce your score and drive customers away, but do not end the run.",
+  );
+  expect(screen.queryByText(/Serving less than/)).not.toBeInTheDocument();
+  expect(
+    screen.getByText(/Finish the term without bankruptcy/),
+  ).toBeInTheDocument();
+});

@@ -143,7 +143,9 @@ export function compileOfficialArcEvents(
         durationMonths: Math.max(
           0,
           Math.min(
-            compiled.durationMonths,
+            imported && compiled.durationUntilEnd
+              ? params.durationMonths - compiled.startMonth
+              : compiled.durationMonths,
             params.durationMonths - compiled.startMonth,
           ),
         ),
@@ -171,7 +173,7 @@ export function compileOfficialArcEvents(
             code: "missing-starting-asset",
             path: `rules.officialArcs[${scenarioId}]`,
             severity: "error",
-            message: `Sudden Nuclear Shutdown requires starting asset ${operation.target.assetId}. Choose its original base scenario or remove this arc.`,
+            message: `${source.name} requires starting asset ${operation.target.assetId}. Choose its original base scenario or remove this arc.`,
           });
       if (event.possibleStartMonths.to >= params.durationMonths)
         diagnostics.push({
@@ -217,6 +219,7 @@ const identifier = (value: unknown): value is string =>
   typeof value === "string" && /^[a-z][a-z0-9-]{0,79}$/.test(value);
 const IMPORTABLE_ARCS = [
   100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115, 116,
+  126,
 ];
 
 function validActionTarget(value: unknown): boolean {

@@ -360,6 +360,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
     game.seed > 4294967295 ||
     typeof game.startingYear !== "number" ||
     !Number.isFinite(game.startingYear) ||
+    (game.startingMonth !== undefined &&
+      (!Number.isInteger(game.startingMonth) ||
+        game.startingMonth < 1 ||
+        game.startingMonth > 12)) ||
     typeof game.customerMarketSize !== "number" ||
     !Number.isFinite(game.customerMarketSize) ||
     game.customerMarketSize <= 0 ||
@@ -447,6 +451,14 @@ export function parseSave(raw: unknown): SaveGameType | null {
         return true;
       }
       const current = facility as unknown as Record<string, unknown>;
+      const inheritedCashBackMultiplier = getScenario(
+        game.scenarioId!,
+        game.customScenario,
+      )?.facilities.find(
+        (starting) =>
+          starting.assetId !== undefined &&
+          starting.assetId === current.startingAssetId,
+      )?.cashBackMultiplier;
       const requiredNumbersInvalid = [
         current.annualOperatingCost,
         current.lifespanYears,
@@ -462,6 +474,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
         current.lifetimeStarts,
         current.minimumStableOutput,
         current.variableOperatingCostPerMWh,
+        current.cashBackMultiplier,
       ].some(
         (value) =>
           value !== undefined &&
@@ -481,6 +494,9 @@ export function parseSave(raw: unknown): SaveGameType | null {
         ) ||
         requiredNumbersInvalid ||
         optionalNumbersInvalid ||
+        current.cashBackMultiplier !== inheritedCashBackMultiplier ||
+        (typeof current.cashBackMultiplier === "number" &&
+          current.cashBackMultiplier > 1) ||
         (typeof current.minimumStableOutput === "number" &&
           current.minimumStableOutput > 1) ||
         (current.costIndexAtBuild !== undefined &&
@@ -683,6 +699,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
   const transmission = game.transmission;
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!validCustomEventScenario(game.customScenario)) return null;
+  // The opening month is part of the scenario contract, not an editable extension of its term.
+  if (
+    (game.startingMonth ?? 1) !== (scenario?.startingMonth ?? 1) ||
+    game.date.monthsElapsed < (game.startingMonth ?? 1) - 1
+  )
+    return null;
   if (
     game.customScenario?.mod !== undefined &&
     (!validScenarioMod(game.customScenario.mod, game.customScenario) ||

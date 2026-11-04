@@ -58,6 +58,7 @@ export function modBrowseSummary(scenario: ScenarioType): ModBrowseSummary {
         objective,
         scenario.startingYear,
         scenario.durationMonths,
+        (scenario.startingMonth ?? 1) - 1,
       ),
       required: objective.required !== false,
     })),

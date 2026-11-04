@@ -445,7 +445,10 @@ export function facilityCashBack(
       0,
       1 - facilityAgeYears(g, currentMinute) / g.lifespanYears,
     );
-    return g.buildCost * remainingLife - g.loanAmountLeft;
+    return (
+      g.buildCost * remainingLife * (g.cashBackMultiplier ?? 1) -
+      g.loanAmountLeft
+    );
   }
   // Cancellation unwinds the committed purchase. For a financed build this returns only the
   // down payment/equity because the outstanding loan is settled at the same time.

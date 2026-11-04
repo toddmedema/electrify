@@ -1,4 +1,5 @@
 import { OFFICIAL_EFFECT_SCENARIO_RULES } from "./OfficialScenarioEffectRules";
+import { CHERNOBYL_RULES } from "./ChernobylScenario";
 import { OFFICIAL_TARGET_SCENARIO_RULES } from "./OfficialScenarioTargetRules";
 import type { DifficultyType, StoryAttributeValueType } from "../Types";
 import type {
@@ -205,6 +206,7 @@ export const LOAD_SHEDDING_RULES: OfficialScenarioRuleDefinition = {
 export const OFFICIAL_SCENARIO_RULES: readonly OfficialScenarioRuleDefinition[] =
   [
     LOAD_SHEDDING_RULES,
+    CHERNOBYL_RULES,
     // Portfolio ownership has no global shock to transplant into another grid.
     {
       scenarioId: 116,

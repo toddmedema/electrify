@@ -48,7 +48,6 @@ import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
 import CampaignSetupContainer from "./views/CampaignSetupContainer";
 import CampaignHandoverContainer from "./base/CampaignHandoverContainer";
 import SettingsContainer from "./views/SettingsContainer";
-import SavedGames from "./views/SavedGames";
 import { navigate, navigateBack } from "../reducers/Card";
 import {
   reprioritizeFacility,
@@ -73,6 +72,10 @@ import { store } from "../Store";
 const CustomGameContainer = React.lazy(
   () =>
     import(/* webpackChunkName: "custom-game" */ "./views/CustomGameContainer"),
+);
+
+const SavedGames = React.lazy(
+  () => import(/* webpackChunkName: "saved-games" */ "./views/SavedGames"),
 );
 
 const AchievementGallery = React.lazy(() =>
@@ -505,7 +508,11 @@ export default class Compositor extends React.Component<Props, {}> {
           </React.Suspense>
         );
       case "SAVED_GAMES":
-        return <SavedGames />;
+        return (
+          <React.Suspense fallback={<p role="status">Loading saved games…</p>}>
+            <SavedGames />
+          </React.Suspense>
+        );
       case "MODS":
         return (
           <React.Suspense fallback={<p role="status">Loading mods…</p>}>

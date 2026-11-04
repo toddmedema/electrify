@@ -1,0 +1,111 @@
+import path from "path";
+import { expect, test } from "./fixtures";
+import { openPane } from "./layout";
+import { expectDialogToFit } from "./dialog-layout";
+import { readSavedGame } from "./save-fixture";
+
+for (const theme of ["light", "dark"] as const) {
+  test(`Chernobyl opens one month before the disaster with recovery rules in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.clock.install();
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+      Math.random = () => 0.25;
+    }, theme);
+    await page.goto("/?scenario=126");
+    await expect(
+      page.getByRole("heading", { name: "Chernobyl: Recovery" }),
+    ).toBeVisible();
+    await expect(page.locator(".scenarioDossier")).toContainText("Mar 1986");
+    await expect(page.locator(".scenarioDossier")).toContainText("Feb 1991");
+    await page
+      .getByRole("button", { name: "Goals and scoring", exact: true })
+      .click();
+    const goals = page.getByRole("dialog");
+    await expect(goals).toContainText("No minimum reliability requirement.");
+    await expect(goals).toContainText("but do not end the run.");
+    await expect(goals).toContainText("Finish the term without bankruptcy.");
+    await expect(goals).not.toContainText("3 months in a row");
+    await expectDialogToFit(goals);
+    await page.clock.runFor(500);
+    const screenshots = process.env.REVIEW_SCREENSHOT_DIR;
+    if (
+      screenshots &&
+      theme === "light" &&
+      testInfo.project.name === "mobile-390px"
+    ) {
+      await page.screenshot({
+        path: path.join(screenshots, "chernobyl-goals-mobile.png"),
+        animations: "disabled",
+      });
+    }
+    await page.keyboard.press("Escape");
+    await page.clock.runFor(500);
+    if (
+      screenshots &&
+      theme === "light" &&
+      testInfo.project.name === "desktop-chromium"
+    ) {
+      const dossier = page.locator(".scenarioDossier");
+      await dossier.screenshot({
+        path: path.join(screenshots, "chernobyl-details-desktop.png"),
+        animations: "disabled",
+      });
+    }
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const appbar = page.locator("#appbar:visible").first();
+    await expect(appbar).toContainText("Mar 1986");
+    const events = page.locator(".eventLog");
+    await openPane(
+      events,
+      page.getByRole("button", { name: "Events", exact: true }),
+    );
+    await appbar
+      .getByRole("button", { name: "fast speed", exact: true })
+      .click();
+    const disaster = page
+      .locator(".ongoingEvents:visible")
+      .getByText("The Chernobyl disaster", { exact: true });
+    for (
+      let second = 0;
+      second < 15 && !(await disaster.isVisible());
+      second++
+    ) {
+      await page.clock.fastForward(1000);
+    }
+    await expect(disaster).toBeVisible();
+    await expect(appbar).toContainText("Apr 1986");
+    await expect(page.locator(".ongoingEvents:visible")).toContainText(
+      "Unit 4 is permanently lost",
+    );
+    await expect(page.locator(".ongoingEvents:visible")).toContainText(
+      "Recovery costs",
+    );
+    await expect(
+      page.getByText("Save failed", { exact: false }),
+    ).not.toBeVisible();
+    await expect
+      .poll(async () => (await readSavedGame(page))?.date.monthNumber)
+      .toBe(4);
+    expect(
+      await events.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    if (
+      screenshots &&
+      theme === "dark" &&
+      testInfo.project.name === "desktop-chromium"
+    ) {
+      await page.mouse.move(0, 0);
+      await page.clock.fastForward(10000);
+      await page.clock.runFor(500);
+      await page.locator(".snackbarContent").waitFor({ state: "hidden" });
+      await page.screenshot({
+        path: path.join(screenshots, "chernobyl-disaster-desktop-dark.png"),
+        animations: "disabled",
+      });
+    }
+  });
+}
