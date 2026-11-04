@@ -53,6 +53,127 @@ async function expectMobileFuelLegend(container: Locator, page: Page) {
   }
 }
 
+async function expectLegendLayout(container: Locator) {
+  const legends = container.locator(".chartLegend");
+  expect(await legends.count()).toBeGreaterThan(0);
+  for (const legend of await legends.all()) {
+    const geometry = await legend.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        left: bounds.left,
+        right: bounds.right,
+        overflow: element.scrollWidth - element.clientWidth,
+        items: Array.from(element.querySelectorAll(".chartLegendItem")).map(
+          (item) => {
+            const pair = item.getBoundingClientRect();
+            const swatch = item
+              .querySelector(".chartLegendSwatch")!
+              .getBoundingClientRect();
+            const label = item
+              .querySelector(".chartLegendLabel")!
+              .getBoundingClientRect();
+            return {
+              left: pair.left,
+              right: pair.right,
+              top: pair.top,
+              bottom: pair.bottom,
+              sampleWidth: swatch.width,
+              sampleGap: label.left - swatch.right,
+            };
+          },
+        ),
+      };
+    });
+    expect(
+      geometry.overflow,
+      "legend stays inside its pane",
+    ).toBeLessThanOrEqual(1);
+    expect(
+      geometry.items[0].left - geometry.left,
+      "legend follows the heading's 16px content inset",
+    ).toBeCloseTo(16, 0);
+    for (const [index, item] of geometry.items.entries()) {
+      expect(item.right).toBeLessThanOrEqual(geometry.right - 15);
+      expect(
+        item.sampleWidth,
+        "series samples never shrink",
+      ).toBeGreaterThanOrEqual(8);
+      expect(item.sampleGap, "sample stays close to its own label").toBeCloseTo(
+        8,
+        0,
+      );
+      const previous = geometry.items[index - 1];
+      if (!previous) continue;
+      if (Math.abs(previous.top - item.top) <= 1) {
+        expect(
+          item.left - previous.right,
+          "series are clearly separated",
+        ).toBeGreaterThanOrEqual(16);
+      } else {
+        expect(
+          item.top - previous.bottom,
+          "wrapped rows retain breathing room",
+        ).toBeGreaterThanOrEqual(7);
+      }
+    }
+  }
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`chart legends align and wrap in ${theme} with Larger text`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("textSize", "larger");
+      localStorage.setItem(
+        "insightsLayers",
+        JSON.stringify([
+          "supplyDemand",
+          "demandByType",
+          "supplyByFuel",
+          "water",
+        ]),
+      );
+    }, theme);
+    await page.goto("/?scenario=108");
+    await page.getByRole("button", { name: "Start game" }).click();
+    const insights = page.locator(".insights:visible");
+    await openPane(
+      insights,
+      page.getByRole("button", { name: "Insights", exact: true }),
+    );
+    await expect(insights.locator(".uplot").first()).toBeVisible();
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.mouse.move(0, 0);
+      await insights.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `legends-${info.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+    await expectLegendLayout(insights);
+    for (const name of [
+      "Supply & Demand",
+      "Demand by use",
+      "Supply by Fuel",
+      "Water",
+    ]) {
+      await insights
+        .getByRole("button", { name: `Expand ${name} chart`, exact: true })
+        .click();
+      const dialog = page.getByRole("dialog", { name, exact: true });
+      await expectLegendLayout(dialog);
+      await expectChartAxesInView(dialog);
+      await dialog.getByRole("button", { name: `Close ${name} chart` }).click();
+      await expect(dialog).toHaveCount(0);
+    }
+  });
+}
+
 test("expanded chart axes and fuel controls fit with Larger text after resizing", async ({
   page,
 }, info) => {
