@@ -35,28 +35,35 @@ scripted outages; replacement plants remain available.
 
 ## Gameplay scale and economics
 
-The starting nuclear fleet represents one tenth of the site's four 1,000 MW units.
-The coal and oil plants stand for regional support. Customer counts, demand,
-tariffs, cash, construction options and recovery spending are calibrated for the
-game's electricity-market model. They are not historical estimates of the Soviet
-grid or its administered prices. The four inherited Chernobyl units have no resale
-value. Unit 4 cannot be sold or removed, including before the accident, and remains
-responsible for cleanup. Newly built plants keep the ordinary resale rules.
+The starting nuclear fleet uses the site's full nameplate capacity: four 1,000 MW
+reactors, totaling 4,000 MW. The [IAEA's 1989 cleanup report, Annex A, page 101](https://www-pub.iaea.org/MTCD/Publications/PDF/trs300_web.pdf)
+records four operating 1,000 MW electric reactors in early 1986. Reactor capacities
+and the reported historical recovery budget therefore use their full absolute
+scale.
 
-Unit 4's mandatory maintenance becomes **$25 million per month from April 1986**.
+The utility serves 1.5 million modeled customers, supported by 1,000 MW of coal and
+250 MW of oil generation. Those customer counts and support plants, along with
+demand, tariffs, cash and construction options, remain game assumptions. The
+scenario models an electricity-service territory; it does not reconstruct the
+Soviet national grid or its administered prices. The four inherited Chernobyl units
+have no resale value. Unit 4 cannot be sold or removed, including before the
+accident, and remains responsible for cleanup. Newly built plants keep the ordinary
+resale rules.
+
+Unit 4's mandatory maintenance becomes **$250 million per month from April 1986**.
 It replaces the destroyed reactor's ordinary operating upkeep and continues in full
 while paused. It appears in the unit's upkeep and lifetime expenses, with no
 duplicate company-level recovery fee.
 
 The [UN recovery assessment, section 2.08](https://www.iaea.org/sites/default/files/strategy_for_recovery.pdf)
 reports **$18 billion** in Soviet rehabilitation spending during **1986–1991**,
-citing Ukraine's national report. A flat average across those six calendar years,
-at the fleet's one-tenth scale, gives:
+citing Ukraine's national report. A flat average across those six calendar years
+gives:
 
-`$18 billion ÷ 72 months ÷ 10 = $25 million per month`
+`$18 billion ÷ 72 months = $250 million per month`
 
 The scenario charges 59 months, April 1986 through February 1991, for a modeled
-total of **$1.475 billion**. This approximates a share of the reported period,
+total of **$14.75 billion**. This approximates a share of the reported period,
 rather than charging all six years during a five-year mission. The report includes
 social assistance (35%) and resettlement (17%); it is a broad **cleanup and
 recovery** proxy, not a measured reactor-maintenance bill. It does not specify a
@@ -64,7 +71,7 @@ constant-dollar price year or exchange-rate method, so the game uses its reporte
 historical dollar figure without claiming a modern-dollar conversion. Actual
 spending was not uniform each month.
 
-The opening **$1.2 billion recovery reserve** is a gameplay calibration, not a
+The opening **$12 billion recovery reserve** is a gameplay calibration, not a
 historical appropriation. It funds the unavoidable obligation while preserving
 tradeoffs between rates, replacement generation and solvency.
 

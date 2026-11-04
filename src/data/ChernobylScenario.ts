@@ -5,8 +5,8 @@ import { formatMoneyConcise } from "../helpers/Format";
 // 117–125 belong to the Legacy campaign, including generations outside SCENARIOS.
 export const CHERNOBYL_SCENARIO_ID = 126;
 // UN recovery assessment §2.08: $18bn of rehabilitation spending in 1986–1991.
-// Flat six-year average, at the same one-tenth scale as the starting nuclear fleet.
-export const CHERNOBYL_RECOVERY_MONTHLY_COST = 18000000000 / (6 * 12) / 10;
+// Flat six-year average, using the reported historical dollar total at full scale.
+export const CHERNOBYL_RECOVERY_MONTHLY_COST = 18000000000 / (6 * 12);
 
 /** A regional recovery model, not a reconstruction of Soviet tariffs or the national grid. */
 export const CHERNOBYL_SCENARIO: ScenarioType = {
@@ -27,7 +27,7 @@ export const CHERNOBYL_SCENARIO: ScenarioType = {
   summary:
     "March 1986: Chernobyl's disaster is one month away. Restore service and earn the best score you can.",
   threat:
-    "Blackouts cost points but never end the run. Keep month-end cash at $0 or above. Unit 4 cannot be sold, and its cleanup costs continue while paused.",
+    "Blackouts will cost you points but don't end the game in this scenario. You'll need to avoid bankruptcy while paying for cleanup on the unsellable damaged reactor.",
   themes: ["Energy transition"],
   ownership: "Public",
   startingYear: 1986,
@@ -36,21 +36,21 @@ export const CHERNOBYL_SCENARIO: ScenarioType = {
   reliabilityFailureDisabled: true,
   retainCustomersDuringShortages: true,
   intertiesEnabled: false,
-  startingCustomers: 150000,
+  startingCustomers: 1500000,
   startingDemandScale: 6,
   dollarsPerkWh: 0.065,
-  // A recovery reserve makes the scaled historical liability payable; pricing and construction
+  // A recovery reserve makes the historical liability payable; pricing and construction
   // still determine how much of it survives. This opening fund is a gameplay calibration.
-  cash: 1200000000,
+  cash: 12000000000,
   feePerKgCO2e: 0,
-  // One tenth of the site's four 1,000 MW units. The fossil plants represent regional support.
+  // The site's actual four 1,000 MW units. The fossil plants represent regional support.
   // Dollar amounts, customer counts and support capacity are gameplay calibrations.
   facilities: [
     ...[9, 7, 5, 3].map((initialAgeYears, index) => ({
       assetId: `chernobyl-unit-${index + 1}`,
       label: `Chernobyl Unit ${index + 1}`,
       fuel: "Uranium" as const,
-      peakW: 100000000,
+      peakW: 1000000000,
       initialAgeYears,
       cashBackMultiplier: 0,
       ...(index === 3
@@ -67,13 +67,13 @@ export const CHERNOBYL_SCENARIO: ScenarioType = {
     {
       assetId: "chernobyl-regional-coal",
       fuel: "Coal",
-      peakW: 100000000,
+      peakW: 1000000000,
       initialAgeYears: 16,
     },
     {
       assetId: "chernobyl-regional-oil",
       fuel: "Oil",
-      peakW: 25000000,
+      peakW: 250000000,
       initialAgeYears: 10,
     },
   ],

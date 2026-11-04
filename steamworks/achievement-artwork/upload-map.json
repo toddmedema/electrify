@@ -310,7 +310,7 @@
     "name": "Chernobyl: Recovery",
     "description": "Successfully finish Chernobyl: Recovery on any difficulty.",
     "source": "public/images/chernobyl-recovery.svg",
-    "sourceSha256": "4a07a6978d6389d130c8bc1add3a15dbbcbaa776531f860bf1bdfb81323e8770",
+    "sourceSha256": "188771eaef7ffaafbfd071fc7d7439c109567e127b950e0577829f8302888f71",
     "achieved": "uploads/CHERNOBYL_RECOVERY_ACHIEVED.png",
     "unachieved": "uploads/CHERNOBYL_RECOVERY_UNACHIEVED.png"
   },

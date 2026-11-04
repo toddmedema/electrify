@@ -76,7 +76,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeDisabled();
     await expect(unitFour).toContainText("Cannot sell or remove this facility");
     await expect(unitFour).toContainText("Cleanup and recovery");
-    await expect(unitFour).toContainText("$25M/mo · $300M/yr");
+    await expect(unitFour).toContainText("$250M/mo · $3B/yr");
     await expect(unitFour).toContainText("from Apr 1986");
     const events = page.locator(".eventLog");
     await openPane(

@@ -1,4 +1,8 @@
-import { CHERNOBYL_SCENARIO, CHERNOBYL_SCENARIO_ID } from "./ChernobylScenario";
+import {
+  CHERNOBYL_RECOVERY_MONTHLY_COST,
+  CHERNOBYL_SCENARIO,
+  CHERNOBYL_SCENARIO_ID,
+} from "./ChernobylScenario";
 import { resolveStoryAtDate, upcomingStoryPhases } from "./WorldEvents";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { officialScenarioRules } from "../helpers/ScenarioRules";
@@ -18,7 +22,7 @@ const snapshot: StorySnapshotType = {
     name: id === 5 ? "Replacement reactor" : `Chernobyl Unit ${id}`,
     ...(id !== 5 ? { startingAssetId: `chernobyl-unit-${id}` } : {}),
     fuel: "Uranium",
-    peakW: 100000000,
+    peakW: 1000000000,
     ageYears: 3,
     // Even pausing an original unit before April cannot evade its shutdown.
     operational: id !== 2,
@@ -42,6 +46,35 @@ function context(
 }
 
 describe("Chernobyl's historical recovery", () => {
+  it("uses four 1GW reactors and the full cleanup obligation", () => {
+    const reactors = CHERNOBYL_SCENARIO.facilities.filter(
+      (facility) => facility.fuel === "Uranium",
+    );
+    expect(reactors.map((facility) => facility.peakW)).toEqual([
+      1e9, 1e9, 1e9, 1e9,
+    ]);
+    expect(CHERNOBYL_SCENARIO.startingCustomers).toBe(1500000);
+    expect(CHERNOBYL_SCENARIO.cash).toBe(12e9);
+    expect(
+      CHERNOBYL_SCENARIO.facilities.find((facility) => facility.fuel === "Coal")
+        ?.peakW,
+    ).toBe(1e9);
+    expect(
+      CHERNOBYL_SCENARIO.facilities.find((facility) => facility.fuel === "Oil")
+        ?.peakW,
+    ).toBe(250e6);
+    const destroyed = reactors.find(
+      (facility) => facility.assetId === "chernobyl-unit-4",
+    )!;
+    expect(destroyed.saleRestricted).toBe(true);
+    expect(destroyed.maintenanceObligation).toEqual({
+      startsMonth: 4,
+      monthlyCost: 250e6,
+      reason: "Cleanup and recovery",
+    });
+    expect(CHERNOBYL_RECOVERY_MONTHLY_COST * 59).toBe(14.75e9);
+  });
+
   it("gives one month before the scheduled disaster without an extra preparation period", () => {
     const march = context(2);
     expect(resolveStoryAtDate(march).effects).toEqual({});

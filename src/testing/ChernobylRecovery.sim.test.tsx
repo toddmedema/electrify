@@ -53,7 +53,7 @@ const reserveRun = (difficulty: DifficultyType, seed: number) =>
         type: "build",
         build: {
           name: "Oil",
-          peakW: 50e6,
+          peakW: 500e6,
           financed: true,
           priority: "reserve",
         },
@@ -206,6 +206,7 @@ describe("Chernobyl recovery through the real reducer", () => {
       (facility) => facility.startingAssetId === "chernobyl-unit-4",
     )!;
     expect(reactor.saleRestricted).toBe(true);
+    expect(reactor.peakW).toBe(1e9);
     expect(reactor.maintenanceObligation).toEqual({
       startsMonth: 4,
       monthlyCost: CHERNOBYL_RECOVERY_MONTHLY_COST,
@@ -287,6 +288,6 @@ describe("Chernobyl recovery through the real reducer", () => {
           (facility) => facility.startingAssetId === "chernobyl-unit-4",
         )!.lifetimeExpenses,
       ),
-    ).toBeGreaterThanOrEqual(CHERNOBYL_RECOVERY_MONTHLY_COST * 59);
+    ).toBeGreaterThanOrEqual(14.75e9);
   });
 });
