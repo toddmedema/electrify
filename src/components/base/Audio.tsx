@@ -29,14 +29,14 @@ export default class Audio extends React.Component<StateProps, {}> {
 
   componentDidMount() {
     setMusicInGame(this.props.inGame, this.props.musicIntensity);
-    if (!this.props.enabled) pause();
+    if (!this.props.enabled || document.visibilityState === "hidden") pause();
     document.addEventListener("click", this.onGesture, true);
     document.addEventListener("touchend", this.onGesture, true);
     document.addEventListener("keydown", this.onGesture, true);
-    window.addEventListener("online", this.onGesture);
     // Load after a timeout so as not to overload the device.
     this.loadTimer = setTimeout(() => {
-      if (this.props.enabled) this.handleEnableState(true);
+      if (this.props.enabled && document.visibilityState !== "hidden")
+        this.handleEnableState(true);
       else if (isInstalledWebApp())
         void loadAudioFiles(
           this.props.musicVolume,
@@ -50,7 +50,6 @@ export default class Audio extends React.Component<StateProps, {}> {
     document.removeEventListener("click", this.onGesture, true);
     document.removeEventListener("touchend", this.onGesture, true);
     document.removeEventListener("keydown", this.onGesture, true);
-    window.removeEventListener("online", this.onGesture);
     pause();
   }
 

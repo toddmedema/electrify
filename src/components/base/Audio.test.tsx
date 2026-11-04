@@ -159,3 +159,18 @@ it("retries browser unlocking on gestures without rebuilding music, and removes 
   document.dispatchEvent(new Event("click"));
   expect(unlockAudio).toHaveBeenCalledTimes(3);
 });
+
+it("does not let delayed initialization resume an installed app that went into the background", () => {
+  (isInstalledWebApp as jest.Mock).mockReturnValue(true);
+  render(<Audio {...props} />);
+  const visibility = jest
+    .spyOn(document, "visibilityState", "get")
+    .mockReturnValue("hidden");
+  try {
+    act(() => jest.advanceTimersByTime(INIT_DELAY.LOAD_AUDIO_MILLIS));
+    expect(resume).not.toHaveBeenCalled();
+    expect(loadAudioFiles).toHaveBeenCalledTimes(1);
+  } finally {
+    visibility.mockRestore();
+  }
+});
