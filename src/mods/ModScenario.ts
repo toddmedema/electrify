@@ -151,6 +151,25 @@ function resolveModSetup(input: unknown) {
     seed,
     startingYear,
     ...(overrides.location ? { locationId: overrides.location.id } : {}),
+    ...(!startingFleet
+      ? {
+          facilities: base.facilities.map((asset) => ({
+            ...asset,
+            ...(asset.maintenanceObligation
+              ? {
+                  maintenanceObligation: {
+                    ...asset.maintenanceObligation,
+                    monthlyCost: inEraMoney(
+                      asset.maintenanceObligation.monthlyCost,
+                      startingYear,
+                      base.startingYear,
+                    ),
+                  },
+                }
+              : {}),
+          })),
+        }
+      : {}),
     ...(startingFleet
       ? {
           facilities: startingFleet.map((asset, index) => ({

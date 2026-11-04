@@ -58,6 +58,26 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const appbar = page.locator("#appbar:visible").first();
     await expect(appbar).toContainText("Mar 1986");
+    const fleet = page.locator(".facilities");
+    await openPane(
+      fleet,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    const unitFour = page.locator(
+      '.facilityRow[data-facility="Chernobyl Unit 4"]',
+    );
+    await unitFour.locator(".facilityDisclosure").click();
+    await page.clock.runFor(500);
+    await expect(
+      unitFour.getByRole("button", {
+        name: "Sell Chernobyl Unit 4",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await expect(unitFour).toContainText("Cannot sell or remove this facility");
+    await expect(unitFour).toContainText("Cleanup and recovery");
+    await expect(unitFour).toContainText("$25M/mo · $300M/yr");
+    await expect(unitFour).toContainText("from Apr 1986");
     const events = page.locator(".eventLog");
     await openPane(
       events,
@@ -93,6 +113,41 @@ for (const theme of ["light", "dark"] as const) {
     expect(
       await events.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
+    await openPane(
+      fleet,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    await expect(
+      unitFour.getByRole("button", {
+        name: "Sell Chernobyl Unit 4",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await expect(unitFour).toContainText(
+      "Required even while paused; replaces ordinary upkeep.",
+    );
+    await expect(unitFour).not.toContainText("from Apr 1986");
+    if (
+      screenshots &&
+      theme === "light" &&
+      testInfo.project.name === "mobile-390px"
+    ) {
+      await page.mouse.move(0, 0);
+      await page.clock.fastForward(10000);
+      await page.clock.runFor(500);
+      await page.locator(".snackbarContent").waitFor({ state: "hidden" });
+      await unitFour
+        .getByText("Cleanup and recovery", { exact: true })
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: path.join(screenshots, "chernobyl-maintenance-mobile.png"),
+        animations: "disabled",
+      });
+    }
+    await openPane(
+      events,
+      page.getByRole("button", { name: "Events", exact: true }),
+    );
     if (
       screenshots &&
       theme === "dark" &&

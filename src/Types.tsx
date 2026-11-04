@@ -539,11 +539,21 @@ export function isStorage<T extends { peakWh?: number }>(
   return facility.peakWh !== undefined;
 }
 
+/** Fixed nominal upkeep that remains payable even when its inherited plant is paused. */
+export interface FacilityMaintenanceObligationType {
+  /** January-anchored calendar month, 1-based. */
+  startsMonth: number;
+  monthlyCost: number;
+  reason: string;
+}
+
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
   startingAssetId?: string;
   /** Transfer restrictions on inherited assets; absent means ordinary resale value. */
   cashBackMultiplier?: number;
+  saleRestricted?: boolean;
+  maintenanceObligation?: FacilityMaintenanceObligationType;
   id: number; // Monotonically increasing
   // Signed for storage: negative while charging
   currentW: number;
@@ -976,6 +986,8 @@ export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
   initialAgeYears?: number;
   /** Fraction of depreciated value transferable on sale, from 0 to 1. */
   cashBackMultiplier?: number;
+  saleRestricted?: boolean;
+  maintenanceObligation?: FacilityMaintenanceObligationType;
   /**
    * Share of its reservoir a starting hydro plant holds on the opening tick. Defaults to the
    * neutral half-pool. A scenario that opens on a known lake level, or in a hemisphere whose

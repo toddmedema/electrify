@@ -63,7 +63,8 @@ describe("Chernobyl's historical recovery", () => {
     expect(result.effects.facilityOutputMultipliersById).toEqual(
       Object.fromEntries(units.map((unit) => [String(unit), 0])),
     );
-    expect(result.effects.operatingExpensePerMonth).toBeGreaterThan(0);
+    // Cleanup belongs to the inherited reactor, never a second company-level charge.
+    expect(result.effects.operatingExpensePerMonth).toBeUndefined();
     // A newly constructed nuclear plant is not part of the damaged site.
     expect(result.effects.facilityOutputMultipliersById?.[5]).toBeUndefined();
   });

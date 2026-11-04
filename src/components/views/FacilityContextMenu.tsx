@@ -110,13 +110,17 @@ function actionsFor(
     {
       key: "cancelConstruction",
       label: "Cancel construction",
-      facilities: facilities.filter((f) => f.yearsToBuildLeft > 0),
+      facilities: facilities.filter(
+        (f) => f.yearsToBuildLeft > 0 && !f.saleRestricted,
+      ),
       confirm: true,
     },
     {
       key: "sell",
       label: "Sell",
-      facilities: facilities.filter((f) => f.yearsToBuildLeft <= 0),
+      facilities: facilities.filter(
+        (f) => f.yearsToBuildLeft <= 0 && !f.saleRestricted,
+      ),
       confirm: true,
     },
   ];
@@ -210,6 +214,11 @@ export default function FacilityContextMenu(props: {
         }}
       >
         {title && <ListSubheader disableSticky>{title}</ListSubheader>}
+        {selected.some((facility) => facility.saleRestricted) && (
+          <ListSubheader disableSticky className="facilityMenuHint">
+            Retained cleanup assets cannot be sold or removed.
+          </ListSubheader>
+        )}
         {offered.flatMap((action, index) => [
           ...(action.key === "sell" && index > 0
             ? [<Divider key="sale-divider" />]

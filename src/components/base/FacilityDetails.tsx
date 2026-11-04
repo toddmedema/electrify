@@ -13,6 +13,7 @@ import {
   facilityCashBack,
   facilityEquivalentCycles,
   facilityLifetime,
+  facilityMaintenanceCost,
   facilityOutputFactor,
 } from "../../helpers/Financials";
 import {
@@ -55,6 +56,7 @@ import {
 } from "../../Types";
 import HydroWaterSection from "./HydroWaterSection";
 import Sparkline from "./Sparkline";
+import { MONTHS } from "../../Constants";
 
 /**
  * What a selected facility has actually been doing: how hard it has run, what a MWh out of it
@@ -498,22 +500,52 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 value={formatMoneyConcise(facility.loanAmountLeft)}
               />
             )}
-            {variableOperatingCostPerMWh !== undefined && (
+            {variableOperatingCostPerMWh !== undefined &&
+              facilityMaintenanceCost(facility, date.minute) === undefined && (
+                <Stat
+                  label="Fixed upkeep"
+                  value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
+                />
+              )}
+            {variableOperatingCostPerMWh !== undefined &&
+              facilityMaintenanceCost(facility, date.minute) === undefined && (
+                <Stat
+                  label="Variable upkeep"
+                  value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh`}
+                />
+              )}
+            {facility.costPerStart !== undefined &&
+              facilityMaintenanceCost(facility, date.minute) === undefined && (
+                <Stat
+                  label="Non-fuel start cost"
+                  value={`${formatMoneyConcise(facility.costPerStart)}/start`}
+                />
+              )}
+            {facility.maintenanceObligation && (
               <Stat
-                label="Fixed upkeep"
-                value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
-              />
-            )}
-            {variableOperatingCostPerMWh !== undefined && (
-              <Stat
-                label="Variable upkeep"
-                value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh`}
-              />
-            )}
-            {facility.costPerStart !== undefined && (
-              <Stat
-                label="Non-fuel start cost"
-                value={`${formatMoneyConcise(facility.costPerStart)}/start`}
+                label={facility.maintenanceObligation.reason}
+                value={
+                  <>
+                    {formatMoneyConcise(
+                      facility.maintenanceObligation.monthlyCost,
+                    )}
+                    /mo ·{" "}
+                    {formatMoneyConcise(
+                      facility.maintenanceObligation.monthlyCost * 12,
+                    )}
+                    /yr
+                    {facilityMaintenanceCost(facility, date.minute) ===
+                      undefined &&
+                      ` from ${MONTHS[(facility.maintenanceObligation.startsMonth - 1) % 12]} ${(props.game?.startingYear ?? date.year - Math.floor(date.monthsElapsed / 12)) + Math.floor((facility.maintenanceObligation.startsMonth - 1) / 12)}`}
+                    <Typography
+                      component="span"
+                      variant="caption"
+                      sx={{ display: "block" }}
+                    >
+                      Required even while paused; replaces ordinary upkeep.
+                    </Typography>
+                  </>
+                }
               />
             )}
             {trend.length > 1 && fuel && (

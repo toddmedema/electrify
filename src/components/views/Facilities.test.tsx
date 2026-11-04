@@ -1918,3 +1918,17 @@ describe("fleetChartHeight", () => {
     expect(fleetChartHeight(width, height)).toBe(expected);
   });
 });
+
+it("explains why a retained cleanup facility cannot be sold", () => {
+  const game = cloneDeep(createGame({ scenarioId: 100 }));
+  const facility = game.facilities[0];
+  facility.saleRestricted = true;
+  const { onSell } = renderFacilities(game, facility.id);
+  expect(
+    screen.getByRole("button", { name: `Sell ${facility.name}` }),
+  ).toBeDisabled();
+  expect(
+    screen.getByText(/Cannot sell or remove this facility/),
+  ).toBeInTheDocument();
+  expect(onSell).not.toHaveBeenCalled();
+});

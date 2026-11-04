@@ -288,11 +288,22 @@ function FacilityActions(props: {
           facilityDisplayName(facility)
         }
         onClick={onOpenSell}
+        disabled={!!facility.saleRestricted}
       >
         <span className="facilityActionLabel">
           {underConstruction ? "Cancel construction" : "Sell"}
         </span>
       </Button>
+      {facility.saleRestricted && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ flexBasis: "100%" }}
+        >
+          Cannot sell or remove this facility. Its cleanup responsibility
+          remains with the utility.
+        </Typography>
+      )}
     </div>
   );
 }
@@ -306,6 +317,7 @@ const MemoizedFacilityActions = React.memo(
       previous.facility.id === next.facility.id &&
       previous.facility.name === next.facility.name &&
       previous.facility.paused === next.facility.paused &&
+      previous.facility.saleRestricted === next.facility.saleRestricted &&
       previousUnderConstruction === nextUnderConstruction &&
       previous.upgrading === next.upgrading &&
       previous.onCancelRetrofit === next.onCancelRetrofit &&

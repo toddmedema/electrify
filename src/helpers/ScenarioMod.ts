@@ -1,3 +1,4 @@
+import { validFacilityMaintenanceObligation } from "./Financials";
 import {
   validUtilityExpansionParameters,
   validUtilityExpansionSetup,
@@ -241,6 +242,8 @@ function validModSetup(scenario: ScenarioType): boolean {
         "hydroSiteId",
         "label",
         "cashBackMultiplier",
+        "saleRestricted",
+        "maintenanceObligation",
       ]) ||
       typeof asset.assetId !== "string" ||
       !ID_PATTERN.test(asset.assetId) ||
@@ -267,6 +270,12 @@ function validModSetup(scenario: ScenarioType): boolean {
     if (
       asset.cashBackMultiplier !== undefined &&
       !number(asset.cashBackMultiplier, 0, 1)
+    )
+      return false;
+    if (
+      (asset.saleRestricted !== undefined &&
+        typeof asset.saleRestricted !== "boolean") ||
+      !validFacilityMaintenanceObligation(asset.maintenanceObligation)
     )
       return false;
     if (asset.label !== undefined && !safeText(asset.label, 100)) return false;

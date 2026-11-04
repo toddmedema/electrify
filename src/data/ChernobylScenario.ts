@@ -4,7 +4,9 @@ import { formatMoneyConcise } from "../helpers/Format";
 
 // 117–125 belong to the Legacy campaign, including generations outside SCENARIOS.
 export const CHERNOBYL_SCENARIO_ID = 126;
-export const CHERNOBYL_RECOVERY_MONTHLY_COST = 4000000;
+// UN recovery assessment §2.08: $18bn of rehabilitation spending in 1986–1991.
+// Flat six-year average, at the same one-tenth scale as the starting nuclear fleet.
+export const CHERNOBYL_RECOVERY_MONTHLY_COST = 18000000000 / (6 * 12) / 10;
 
 /** A regional recovery model, not a reconstruction of Soviet tariffs or the national grid. */
 export const CHERNOBYL_SCENARIO: ScenarioType = {
@@ -25,7 +27,7 @@ export const CHERNOBYL_SCENARIO: ScenarioType = {
   summary:
     "March 1986: Chernobyl's disaster is one month away. Restore service and earn the best score you can.",
   threat:
-    "Blackouts cost points but never end the run. Keep month-end cash at $0 or above. Your four inherited reactors have no resale value.",
+    "Blackouts cost points but never end the run. Keep month-end cash at $0 or above. Unit 4 cannot be sold, and its cleanup costs continue while paused.",
   themes: ["Energy transition"],
   ownership: "Public",
   startingYear: 1986,
@@ -37,7 +39,9 @@ export const CHERNOBYL_SCENARIO: ScenarioType = {
   startingCustomers: 150000,
   startingDemandScale: 6,
   dollarsPerkWh: 0.065,
-  cash: 60000000,
+  // A recovery reserve makes the scaled historical liability payable; pricing and construction
+  // still determine how much of it survives. This opening fund is a gameplay calibration.
+  cash: 1200000000,
   feePerKgCO2e: 0,
   // One tenth of the site's four 1,000 MW units. The fossil plants represent regional support.
   // Dollar amounts, customer counts and support capacity are gameplay calibrations.
@@ -49,6 +53,16 @@ export const CHERNOBYL_SCENARIO: ScenarioType = {
       peakW: 100000000,
       initialAgeYears,
       cashBackMultiplier: 0,
+      ...(index === 3
+        ? {
+            saleRestricted: true,
+            maintenanceObligation: {
+              startsMonth: 4,
+              monthlyCost: CHERNOBYL_RECOVERY_MONTHLY_COST,
+              reason: "Cleanup and recovery",
+            },
+          }
+        : {}),
     })),
     {
       assetId: "chernobyl-regional-coal",
@@ -75,7 +89,7 @@ const phases = [
     id: "disaster",
     title: "The Chernobyl disaster",
     previewTitle: "The Chernobyl disaster",
-    message: `Chernobyl's four units are offline after the 26 April 1986 disaster. Unit 4 is permanently lost. Recovery costs ${formatMoneyConcise(CHERNOBYL_RECOVERY_MONTHLY_COST)} a month through the end of the mission.`,
+    message: `Chernobyl's four units are offline after the 26 April 1986 disaster. Unit 4 is permanently lost and cannot be sold. Recovery costs on Unit 4 are ${formatMoneyConcise(CHERNOBYL_RECOVERY_MONTHLY_COST)} a month, even while paused.`,
     preview:
       "The disaster will destroy a reactor and shut down the site's surviving units.",
     startMonth: 4,
@@ -134,8 +148,6 @@ export const CHERNOBYL_RULES: OfficialScenarioRuleDefinition = {
             },
             outputMultiplier: 0,
           })),
-          // Ongoing recovery spending is a game budget, not an estimate of disaster losses.
-          operatingExpenseDollarsPerMonth: CHERNOBYL_RECOVERY_MONTHLY_COST,
         },
       }),
     ),

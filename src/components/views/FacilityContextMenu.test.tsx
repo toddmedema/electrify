@@ -106,3 +106,32 @@ it("explains staged winterization without promising a full outage", async () => 
   );
   expect(dialog).not.toHaveTextContent(/offline/i);
 });
+
+it("bulk sale excludes retained assets and explains their ongoing responsibility", async () => {
+  const user = userEvent.setup({ delay: null });
+  const game = cloneDeep(createGame({ scenarioId: 100 }));
+  game.facilities[0].saleRestricted = true;
+  const onSell = jest.fn();
+  render(
+    <FacilityContextMenu
+      game={game}
+      target={{
+        ids: game.facilities.map((facility) => facility.id),
+        top: 100,
+        left: 100,
+      }}
+      onClose={jest.fn()}
+      onSell={onSell}
+      onTogglePause={jest.fn()}
+      onPause={jest.fn()}
+    />,
+  );
+  expect(
+    screen.getByText(/Retained cleanup assets cannot be sold or removed/),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("menuitem", { name: "Sell (1)" }));
+  await user.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "Sell" }),
+  );
+  expect(onSell.mock.calls).toEqual([[game.facilities[1].id]]);
+});

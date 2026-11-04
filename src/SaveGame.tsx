@@ -5,7 +5,10 @@ import { isBuyingRule, isSellingRule } from "./helpers/TradingRules";
 import { validUtilityExpansion } from "./helpers/ExpansionValidation";
 import { validScenarioMod } from "./helpers/ScenarioMod";
 import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
-import { maxLoanAmount } from "./helpers/Financials";
+import {
+  maxLoanAmount,
+  validFacilityMaintenanceObligation,
+} from "./helpers/Financials";
 import {
   accessContextForGame,
   effectiveCorridor,
@@ -445,20 +448,30 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (!Array.isArray(game.facilities) || !validHydroClaims(game as GameType)) {
     return null;
   }
+  const inheritedScenario = getScenario(game.scenarioId, game.customScenario);
+  if (inheritedScenario && !Array.isArray(inheritedScenario.facilities))
+    return null;
+  if (
+    inheritedScenario?.facilities.some(
+      (starting) =>
+        starting?.saleRestricted &&
+        !game.facilities!.some(
+          (owned) => owned?.startingAssetId === starting.assetId,
+        ),
+    )
+  )
+    return null;
   if (
     game.facilities.some((facility) => {
       if (typeof facility !== "object" || facility === null) {
         return true;
       }
       const current = facility as unknown as Record<string, unknown>;
-      const inheritedCashBackMultiplier = getScenario(
-        game.scenarioId!,
-        game.customScenario,
-      )?.facilities.find(
+      const inheritedAsset = inheritedScenario?.facilities.find(
         (starting) =>
-          starting.assetId !== undefined &&
+          starting?.assetId !== undefined &&
           starting.assetId === current.startingAssetId,
-      )?.cashBackMultiplier;
+      );
       const requiredNumbersInvalid = [
         current.annualOperatingCost,
         current.lifespanYears,
@@ -494,7 +507,13 @@ export function parseSave(raw: unknown): SaveGameType | null {
         ) ||
         requiredNumbersInvalid ||
         optionalNumbersInvalid ||
-        current.cashBackMultiplier !== inheritedCashBackMultiplier ||
+        current.cashBackMultiplier !== inheritedAsset?.cashBackMultiplier ||
+        current.saleRestricted !== inheritedAsset?.saleRestricted ||
+        (current.saleRestricted !== undefined &&
+          typeof current.saleRestricted !== "boolean") ||
+        !validFacilityMaintenanceObligation(current.maintenanceObligation) ||
+        normalizedInputs(current.maintenanceObligation) !==
+          normalizedInputs(inheritedAsset?.maintenanceObligation) ||
         (typeof current.cashBackMultiplier === "number" &&
           current.cashBackMultiplier > 1) ||
         (typeof current.minimumStableOutput === "number" &&

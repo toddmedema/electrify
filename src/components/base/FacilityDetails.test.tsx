@@ -470,3 +470,31 @@ describe("weather resilience details", () => {
     expect(screen.queryByRole("region", { name: "Upgrades" })).toBeNull();
   });
 });
+
+it("shows mandatory monthly and annual cleanup maintenance while the plant is paused", () => {
+  const game = carbonFee();
+  const facility = game.facilities[0];
+  facility.paused = true;
+  facility.maintenanceObligation = {
+    startsMonth: 1,
+    monthlyCost: 2e6,
+    reason: "Cleanup and recovery",
+  };
+  render(
+    <FacilityDetails
+      facility={facility}
+      date={game.date}
+      seed={game.seed}
+      location={game.location}
+      game={game}
+    />,
+  );
+  expect(screen.getByText("Cleanup and recovery")).toBeInTheDocument();
+  expect(
+    screen.getByText("$2M/mo · $24M/yr", { exact: false }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText("Required even while paused; replaces ordinary upkeep."),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Fixed upkeep")).not.toBeInTheDocument();
+});

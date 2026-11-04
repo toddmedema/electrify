@@ -1,5 +1,6 @@
 import cloneDeep from "lodash.clonedeep";
 import {
+  CHERNOBYL_RECOVERY_MONTHLY_COST,
   CHERNOBYL_SCENARIO,
   CHERNOBYL_SCENARIO_ID,
 } from "../data/ChernobylScenario";
@@ -14,7 +15,7 @@ import {
   totalScore,
 } from "../helpers/Scoring";
 import { buildStorySnapshot } from "../helpers/Story";
-import { tickState } from "../reducers/Game";
+import gameReducer, { sellFacility, tickState } from "../reducers/Game";
 import { parseSave } from "../SaveGame";
 import { DifficultyType } from "../Types";
 import { roundTrip } from "./SaveForgery";
@@ -197,13 +198,22 @@ describe("Chernobyl recovery through the real reducer", () => {
     },
   );
 
-  it("keeps inherited reactor resale restrictions across saves and rejects changed restrictions", () => {
+  it("keeps Unit 4 and its cleanup obligation through sale attempts and saves", () => {
     const game = createGame({ scenarioId: CHERNOBYL_SCENARIO_ID, seed: 17 });
     const save = roundTrip(game);
     const restored = parseSave(save)!.game;
     const reactor = restored.facilities.find(
       (facility) => facility.startingAssetId === "chernobyl-unit-4",
     )!;
+    expect(reactor.saleRestricted).toBe(true);
+    expect(reactor.maintenanceObligation).toEqual({
+      startsMonth: 4,
+      monthlyCost: CHERNOBYL_RECOVERY_MONTHLY_COST,
+      reason: "Cleanup and recovery",
+    });
+    const attemptedSale = gameReducer(restored, sellFacility(reactor.id));
+    expect(attemptedSale.facilities).toEqual(restored.facilities);
+    expect(currentTick(attemptedSale)!.cash).toBe(currentTick(restored)!.cash);
     expect(facilityCashBack(reactor, restored.date.minute)).toBe(0);
     expect(
       facilityCashBack(
@@ -219,6 +229,64 @@ describe("Chernobyl recovery through the real reducer", () => {
       ).cashBackMultiplier = multiplier;
       expect(parseSave(forged)).toBeNull();
     }
+    for (const patch of [
+      { saleRestricted: undefined },
+      { saleRestricted: false },
+      { maintenanceObligation: undefined },
+      {
+        maintenanceObligation: {
+          ...reactor.maintenanceObligation!,
+          monthlyCost: 0,
+        },
+      },
+      {
+        maintenanceObligation: {
+          ...reactor.maintenanceObligation!,
+          startsMonth: 5,
+        },
+      },
+    ]) {
+      const forged = cloneDeep(save);
+      Object.assign(
+        forged.game.facilities.find(
+          (facility: { startingAssetId?: string }) =>
+            facility.startingAssetId === "chernobyl-unit-4",
+        ),
+        patch,
+      );
+      expect(parseSave(forged)).toBeNull();
+    }
     expect(parseSave(save)).not.toBeNull();
+  });
+
+  it("cannot reduce the recovery bill by pausing the destroyed reactor", () => {
+    const difficulty = "CEO";
+    const seed = 17;
+    const reactorId = createGame({
+      scenarioId: CHERNOBYL_SCENARIO_ID,
+      seed,
+    }).facilities.find(
+      (facility) => facility.startingAssetId === "chernobyl-unit-4",
+    )!.id;
+    const paused = runSimulationOnce({
+      scenarioId: CHERNOBYL_SCENARIO_ID,
+      difficulty,
+      seed,
+      scheduledActions: [{ month: 1, type: "toggle", facilityId: reactorId }],
+    });
+    expectNoViolations(paused);
+    expect(paused.outcome).toBe("completed");
+    paused.months.slice(1).forEach((month) => {
+      expect(month.expensesOM).toBeGreaterThanOrEqual(
+        CHERNOBYL_RECOVERY_MONTHLY_COST,
+      );
+    });
+    expect(
+      Math.round(
+        paused.finalFacilities.find(
+          (facility) => facility.startingAssetId === "chernobyl-unit-4",
+        )!.lifetimeExpenses,
+      ),
+    ).toBeGreaterThanOrEqual(CHERNOBYL_RECOVERY_MONTHLY_COST * 59);
   });
 });
