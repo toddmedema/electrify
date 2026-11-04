@@ -11,7 +11,7 @@ import {
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { difficultyLockReason } from "../../achievements/DifficultyUnlocks";
 import { DIFFICULTY_IDS, DIFFICULTY_LABELS } from "../../Constants";
-import { DifficultyType } from "../../Types";
+import { DifficultyType, ScenarioType } from "../../Types";
 import { reliabilityRuleText } from "../../helpers/ObjectiveRules";
 
 // Interface copy stays out of Constants.tsx so editing it never changes the run compatibility ID
@@ -27,6 +27,10 @@ export const DIFFICULTY_DESCRIPTIONS: Record<DifficultyType, string> = {
 
 export interface DifficultyPickerProps {
   value: DifficultyType;
+  scenario?: Pick<
+    ScenarioType,
+    "reliabilityFailureDisabled" | "retainCustomersDuringShortages"
+  >;
   onChange: (difficulty: DifficultyType) => void;
   // A row of buttons for a screen built around the choice, or a compact select for a settings table
   variant: "toggle" | "select";
@@ -46,6 +50,7 @@ function isDifficulty(value: unknown): value is DifficultyType {
 /** The one control for choosing a run's difficulty. */
 export default function DifficultyPicker({
   value,
+  scenario,
   onChange,
   variant,
   showDescription,
@@ -135,7 +140,7 @@ export default function DifficultyPicker({
                 </span>
               ) : (
                 <Tooltip
-                  title={`${DIFFICULTY_DESCRIPTIONS[d]} ${reliabilityRuleText(d)}`}
+                  title={`${DIFFICULTY_DESCRIPTIONS[d]} ${reliabilityRuleText(d, scenario)}`}
                   placement="right"
                 >
                   <span>{DIFFICULTY_LABELS[d]}</span>
@@ -147,7 +152,7 @@ export default function DifficultyPicker({
         {lockHint}
         {showDescription && (
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            {reliabilityRuleText(value)}
+            {reliabilityRuleText(value, scenario)}
           </Typography>
         )}
       </>
@@ -177,7 +182,7 @@ export default function DifficultyPicker({
             className={lockReason(d) ? "difficultyLocked" : undefined}
             title={
               lockReason(d) ||
-              `${DIFFICULTY_DESCRIPTIONS[d]} ${reliabilityRuleText(d)}`
+              `${DIFFICULTY_DESCRIPTIONS[d]} ${reliabilityRuleText(d, scenario)}`
             }
             aria-label={
               lockReason(d)
@@ -219,7 +224,7 @@ export default function DifficultyPicker({
               }}
             >
               {DIFFICULTY_DESCRIPTIONS[difficulty]}{" "}
-              {reliabilityRuleText(difficulty)}
+              {reliabilityRuleText(difficulty, scenario)}
             </span>
           ))}
         </Typography>

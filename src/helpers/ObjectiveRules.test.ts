@@ -194,9 +194,11 @@ it.each([
   ["VP", 0.99],
   ["CEO", 0.995],
 ] as const)(
-  "applies the %s rule throughout every scenario",
+  "applies the %s rule to scenarios with reliability dismissal",
   (difficulty, threshold) => {
-    for (const target of [...SCENARIOS, DEFAULT_CUSTOM_SCENARIO]) {
+    for (const target of [...SCENARIOS, DEFAULT_CUSTOM_SCENARIO].filter(
+      (target) => !target.reliabilityFailureDisabled,
+    )) {
       const history = [3, 2, 1].map((month) =>
         row(target.startingYear, month, threshold - 0.001, 1e6),
       );

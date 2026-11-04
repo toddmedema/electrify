@@ -68,6 +68,7 @@ function objectiveRequirement(
   result: ObjectiveResult,
   startingYear: number,
   durationMonths: number,
+  monthOffset = 0,
 ): MissionRequirement {
   const objective = result.objective;
   const last =
@@ -78,6 +79,8 @@ function objectiveRequirement(
         : objective.deadlineMonth;
   const first =
     "fromMonth" in objective ? objective.fromMonth : objective.deadlineMonth;
+  const firstCalendarMonth = first + monthOffset;
+  const lastCalendarMonth = last + monthOffset;
   const statuses = {
     pending: "pending",
     inProgress: "in-progress",
@@ -86,7 +89,7 @@ function objectiveRequirement(
     unverifiable: "unknown",
   } as const;
   const target = objective.checkpoint
-    ? objectiveGoalText(objective, startingYear, durationMonths)
+    ? objectiveGoalText(objective, startingYear, durationMonths, monthOffset)
     : objectiveTargetText(objective);
   const current = objectiveObservedText(result);
   const observed =
@@ -101,15 +104,20 @@ function objectiveRequirement(
     required: result.required,
     reason: result.reason,
     current,
-    target: objectiveGoalText(objective, startingYear, durationMonths),
+    target: objectiveGoalText(
+      objective,
+      startingYear,
+      durationMonths,
+      monthOffset,
+    ),
     compact: `${result.required ? "" : "Optional · "}${compact}${result.status === "unverifiable" ? " · incomplete history" : ""}`,
     timing: objective.checkpoint
       ? last === durationMonths - 1
         ? "Checked at term end."
-        : `Checked at the end of ${MONTHS[last % 12]} ${startingYear + Math.floor(last / 12)}.`
-      : `Completed months ${(first % 12) + 1}/${startingYear + Math.floor(first / 12)}–${(last % 12) + 1}/${startingYear + Math.floor(last / 12)}${result.required ? "" : "; optional, does not end the run"}`,
+        : `Checked at the end of ${MONTHS[lastCalendarMonth % 12]} ${startingYear + Math.floor(lastCalendarMonth / 12)}.`
+      : `Completed months ${(firstCalendarMonth % 12) + 1}/${startingYear + Math.floor(firstCalendarMonth / 12)}–${(lastCalendarMonth % 12) + 1}/${startingYear + Math.floor(lastCalendarMonth / 12)}${result.required ? "" : "; optional, does not end the run"}`,
     status: statuses[result.status],
-    deadline: startingYear * 12 + last + 1,
+    deadline: startingYear * 12 + lastCalendarMonth + 1,
   };
 }
 
@@ -118,12 +126,18 @@ export function getMissionStatus(game: GameType) {
   const scenario = activeScenario(game);
   const duration = scenario?.durationMonths || 240;
   const monthsRemaining = Math.max(0, duration - legacyCompletedMonths(game));
-  const termStartingYear = game.startingYear + legacyMonthOffset(game) / 12;
+  const termMonthOffset = legacyMonthOffset(game);
   const currentMonth = absoluteMonth(game.date.year, game.date.monthNumber);
   const history = completedMissionHistory(game);
   const now = currentTick(game);
   const requirements: MissionRequirement[] = gameObjectiveResults(game).map(
-    (result) => objectiveRequirement(result, termStartingYear, duration),
+    (result) =>
+      objectiveRequirement(
+        result,
+        game.startingYear,
+        duration,
+        termMonthOffset,
+      ),
   );
   requirements.push({
     id: "cash",
@@ -148,35 +162,36 @@ export function getMissionStatus(game: GameType) {
       (row, index) =>
         absoluteMonth(row.year, row.month) === currentMonth - index - 1,
     );
-  requirements.push({
-    id: "survival",
-    label: "Keep power flowing",
-    compact: `Avoid 3 consecutive months < ${firingThreshold} served (${
-      latest.length
-        ? latest
+  if (!scenario?.reliabilityFailureDisabled)
+    requirements.push({
+      id: "survival",
+      label: "Keep power flowing",
+      compact: `Avoid 3 consecutive months < ${firingThreshold} served (${
+        latest.length
+          ? latest
+              .slice()
+              .reverse()
+              .map((row) => formatServed(demandServed(row)))
+              .join(", ")
+          : "no completed months"
+      })`,
+      current: latest.length
+        ? `Last ${latest.length === 1 ? "month" : `${latest.length} months`}: ${latest
             .slice()
             .reverse()
             .map((row) => formatServed(demandServed(row)))
-            .join(", ")
-        : "no completed months"
-    })`,
-    current: latest.length
-      ? `Last ${latest.length === 1 ? "month" : `${latest.length} months`}: ${latest
-          .slice()
-          .reverse()
-          .map((row) => formatServed(demandServed(row)))
-          .join(" · ")}`
-      : "No completed months",
-    target: reliabilityRuleText(game.difficulty),
-    timing:
-      "Checked at month end; current ticks are not completed-month results",
-    status: consecutive
-      ? hasChronicBlackouts(latest, game.difficulty)
-        ? "failed"
-        : "in-progress"
-      : "unknown",
-    deadline: currentMonth + 1,
-  });
+            .join(" · ")}`
+        : "No completed months",
+      target: reliabilityRuleText(game.difficulty),
+      timing:
+        "Checked at month end; current ticks are not completed-month results",
+      status: consecutive
+        ? hasChronicBlackouts(latest, game.difficulty)
+          ? "failed"
+          : "in-progress"
+        : "unknown",
+      deadline: currentMonth + 1,
+    });
   const prominent = requirements
     .map((item, index) => ({ item, index }))
     .filter(
@@ -206,8 +221,9 @@ export function getMissionStatus(game: GameType) {
       monthsRemaining === 0
         ? "Term complete. The recorded final outcome is authoritative; missing history is not verifiable."
         : undefined,
-    scoreNote:
-      "Score contributions are separate from these victory and survival requirements.",
+    scoreNote: scenario?.reliabilityFailureDisabled
+      ? `Restore service to earn points. Blackouts reduce your score${scenario.retainCustomersDuringShortages ? "" : " and drive customers away"}, but do not end the run.`
+      : "Score contributions are separate from these victory and survival requirements.",
   };
 }
 

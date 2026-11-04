@@ -27,7 +27,12 @@ const params = (
   seed: 12345,
   startingYear: 2050,
   durationMonths: 240,
-  startingAssetIds: ["scenario-110-grand-nuclear-unit"],
+  startingAssetIds: [
+    "scenario-110-grand-nuclear-unit",
+    ...source(126).facilities.flatMap((asset) =>
+      asset.assetId ? [asset.assetId] : [],
+    ),
+  ],
   receivingScenario: { ...DEFAULT_CUSTOM_SCENARIO, startingYear: 2050 },
   ...patch,
 });
@@ -36,8 +41,8 @@ const compile = (
   patch: Partial<OfficialArcCompileParameters> = {},
 ) => compileOfficialArcEvents(params(patch), ids);
 
-test("all fifteen importable challenges compile detached JSON and data-center keeps its load-only arc", () => {
-  expect(challenges).toHaveLength(15);
+test("all sixteen importable challenges compile detached JSON and data-center keeps its load-only arc", () => {
+  expect(challenges).toHaveLength(16);
   const events = compile(challenges.map((scenario) => scenario.id));
   expect(events).toHaveLength(
     OFFICIAL_SCENARIO_RULES.reduce(
@@ -467,4 +472,26 @@ test("preserves independent IDs and names for all fifteen hurricane target draws
       }
     }
   }
+});
+
+test("Chernobyl imports retain January calendar offsets, require the original assets and keep Unit 4 offline through the receiving term", () => {
+  const events = compile([126], { durationMonths: 240 });
+  const disaster = events.find((event) => event.source.phaseId === "disaster")!;
+  expect(disaster.startMonth).toBe(3);
+  const final = events.find((event) => event.durationUntilEnd)!;
+  expect(final.startMonth + final.durationMonths).toBe(240);
+  const missing: RuleDiagnostic[] = [];
+  compile([126], { startingAssetIds: [], diagnostics: missing });
+  expect(
+    missing
+      .filter((diagnostic) => diagnostic.code === "missing-starting-asset")
+      .every((diagnostic) =>
+        diagnostic.message.startsWith(
+          "Chernobyl: Recovery requires starting asset",
+        ),
+      ),
+  ).toBe(true);
+  expect(() => compile([126], { startingAssetIds: [] })).toThrow(
+    /chernobyl-unit-4/,
+  );
 });

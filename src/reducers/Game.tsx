@@ -10,6 +10,7 @@ import {
   initializeLegacyCampaign,
   legacyGenerationContext,
   legacyCompletedMonths,
+  legacyMonthOffset,
   legacyMarketReferenceRate,
 } from "../helpers/LegacyCampaign";
 import {
@@ -180,6 +181,8 @@ import {
 } from "../helpers/DateTime";
 import {
   facilityCashBack,
+  facilityMaintenanceCost,
+  facilityPermanentlyShutdown,
   getTotalDebt,
   getCreditInputs,
   getCreditPremium,
@@ -1729,7 +1732,11 @@ export const gameSlice = createSlice({
       const startingCustomers = checkpoint?.startingCustomers ?? a.customers;
       const startingFacilities = checkpoint?.facilities ?? a.facilities;
       const startingRate = checkpoint?.dollarsPerkWh ?? scenario.dollarsPerkWh;
-      state.date = getDateFromMinute(0, scenario.startingYear);
+      state.startingMonth = scenario.startingMonth;
+      state.date = getDateFromMinute(
+        ((scenario.startingMonth ?? 1) - 1) * MINUTES_PER_MONTH,
+        scenario.startingYear,
+      );
       state.startingYear = scenario.startingYear;
       // A company on day one has no track record, no debt and nothing but cash, so it borrows at
       // whatever prime was in the year the scenario opens -- 4.75% in 2019, 21.5% in 1980. It is
@@ -1818,13 +1825,32 @@ export const gameSlice = createSlice({
               initialReservoirFraction,
               hydroAssignments[startingIndex],
             );
-            if (label || search.assetId) {
+            if (
+              label ||
+              search.assetId ||
+              search.cashBackMultiplier !== undefined ||
+              search.saleRestricted !== undefined ||
+              search.maintenanceObligation !== undefined ||
+              search.permanentShutdownMonth !== undefined
+            ) {
               const built = state.facilities.find(
                 ({ id }) => !existingIds.has(id),
               );
               if (built) {
                 if (label) built.name = label;
                 if (search.assetId) built.startingAssetId = search.assetId;
+                if (search.cashBackMultiplier !== undefined)
+                  built.cashBackMultiplier = search.cashBackMultiplier;
+                if (search.saleRestricted !== undefined)
+                  built.saleRestricted = search.saleRestricted;
+                if (search.maintenanceObligation !== undefined)
+                  built.maintenanceObligation = {
+                    ...search.maintenanceObligation,
+                  };
+                if (search.permanentShutdownMonth !== undefined)
+                  built.permanentShutdownMonth = search.permanentShutdownMonth;
+                if (facilityPermanentlyShutdown(built, state.date.minute))
+                  built.paused = true;
               }
             }
           } else {
@@ -1844,13 +1870,33 @@ export const gameSlice = createSlice({
                 initialAgeYears,
                 initialReservoirFraction,
               );
-              if (label || search.assetId) {
+              if (
+                label ||
+                search.assetId ||
+                search.cashBackMultiplier !== undefined ||
+                search.saleRestricted !== undefined ||
+                search.maintenanceObligation !== undefined ||
+                search.permanentShutdownMonth !== undefined
+              ) {
                 const built = state.facilities.find(
                   ({ id }) => !existingIds.has(id),
                 );
                 if (built) {
                   if (label) built.name = label;
                   if (search.assetId) built.startingAssetId = search.assetId;
+                  if (search.cashBackMultiplier !== undefined)
+                    built.cashBackMultiplier = search.cashBackMultiplier;
+                  if (search.saleRestricted !== undefined)
+                    built.saleRestricted = search.saleRestricted;
+                  if (search.maintenanceObligation !== undefined)
+                    built.maintenanceObligation = {
+                      ...search.maintenanceObligation,
+                    };
+                  if (search.permanentShutdownMonth !== undefined)
+                    built.permanentShutdownMonth =
+                      search.permanentShutdownMonth;
+                  if (facilityPermanentlyShutdown(built, state.date.minute))
+                    built.paused = true;
                 }
               }
             } else {
@@ -2776,7 +2822,7 @@ function applyBuildFacility(
 
 function applySellFacility(state: GameType, id: number): boolean {
   const sold = state.facilities.find((g: FacilityOperatingType) => g.id === id);
-  if (!sold) return false;
+  if (!sold || sold.saleRestricted) return false;
   logGameEvent(
     state,
     sold.yearsToBuildLeft > 0 ? "BUILD" : "SELL",
@@ -2817,7 +2863,8 @@ function applySellFacility(state: GameType, id: number): boolean {
 
 function applyTogglePauseFacility(state: GameType, id: number): boolean {
   const facility = state.facilities.find((item) => item.id === id);
-  if (!facility) return false;
+  if (!facility || facilityPermanentlyShutdown(facility, state.date.minute))
+    return false;
   const before = facility.paused ? "paused" : "operating";
   facility.paused = !facility.paused;
   recordMeaningfulDecision(state, {
@@ -3526,8 +3573,7 @@ function applyPolicyEdit(
     state.date.monthsElapsed !==
       Math.floor(state.date.minute / MINUTES_PER_MONTH) ||
     payload.month !== state.date.monthsElapsed + 1 ||
-    payload.month >=
-      scenario.durationMonths + (state.campaign?.termStartMonth ?? 0)
+    payload.month >= scenario.durationMonths + legacyMonthOffset(state)
   )
     return false;
   if (
@@ -3824,8 +3870,8 @@ function tickWorkingState(state: GameType): GameType {
 function completedMonthCount(state: GameType): number {
   const latest = state.monthlyHistory[0];
   return Math.max(
-    (state.objectiveProgress?.completedMonths ?? 0) +
-      (state.campaign?.termStartMonth ?? 0),
+    legacyMonthOffset(state),
+    (state.objectiveProgress?.completedMonths ?? 0) + legacyMonthOffset(state),
     latest ? (latest.year - state.startingYear) * 12 + latest.month : 0,
   );
 }
@@ -4104,7 +4150,10 @@ export function* tickStatePhases(
           const failure = runFailure(state, scenario, history, now, false);
           const month = state.date.monthsElapsed;
           if (failure) state.multiplayer.ending = { ...failure, month };
-          else if (month >= (scenario.durationMonths || 12 * 20))
+          else if (
+            month >=
+            (scenario.durationMonths || 12 * 20) + legacyMonthOffset(state)
+          )
             state.multiplayer.ending = {
               outcome: "completed",
               title: scenario.endTitle || "Mission complete!",
@@ -4276,8 +4325,7 @@ export function* tickStatePhases(
       };
 
       const termMonths =
-        (scenario.durationMonths || 12 * 20) +
-        (state.campaign?.termStartMonth ?? 0);
+        (scenario.durationMonths || 12 * 20) + legacyMonthOffset(state);
       const failure = runFailure(state, scenario, history, now, isTutorial);
 
       desktopSimulationHooks()?.month(
@@ -4384,7 +4432,8 @@ export function* tickStatePhases(
           );
         }
       } else if (
-        state.date.monthsElapsed === (scenario.durationMonths || 12 * 20) &&
+        state.date.monthsElapsed ===
+          (scenario.durationMonths || 12 * 20) + legacyMonthOffset(state) &&
         !activeTutorialCapstone
       ) {
         // Success: Survived duration
@@ -4913,6 +4962,10 @@ function* supplyFacilitiesFinancesPhases(
   advanceConstruction = true,
 ): Generator<PeerPlan, TickPresentFutureType, PeerSettlement | undefined> {
   const { facilities } = state;
+  // Compare each settled/forecast tick, not the rollover clock that may already be next month.
+  for (const facility of facilities)
+    if (facilityPermanentlyShutdown(facility, now.minute))
+      facility.paused = true;
   const noElapsed =
     (state.utilityExpansion ||
       (isLegacyCampaignScenario(state.scenarioId) && !state.customScenario) ||
@@ -6052,26 +6105,32 @@ function* supplyFacilitiesFinancesPhases(
       // incurs no variable O&M while it is disconnected from dispatch.
       const deliveredW = g.paused ? 0 : Math.max(0, g.currentW);
       const generatedWh = (deliveredW / ticksPerHour) * GAME_TO_REAL_YEARS;
-      let facilityOM = 0;
-      if (g.paused) {
-        // paused facilities only pay half of their operating costs
-        facilityOM += g.annualOperatingCost / ticksPerYear / 2;
-      } else {
-        facilityOM += g.annualOperatingCost / ticksPerYear;
-      }
-      facilityOM +=
-        (generatedWh / 1000000) * (g.variableOperatingCostPerMWh || 0);
       const started = startedFacilityIds.has(g.id);
-      if (started) {
-        // One simulated day stands for the average month. The visible off-to-on edge therefore
-        // represents the same daily start repeated throughout that month.
-        facilityOM += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
+      const mandatoryMaintenance = facilityMaintenanceCost(g, now.minute);
+      let facilityOM = 0;
+      if (mandatoryMaintenance !== undefined) {
+        // This nominal obligation survives pause/output changes and replaces reactor operating upkeep.
+        facilityOM = mandatoryMaintenance / ticksPerMonth;
+      } else {
+        if (g.paused) {
+          // paused facilities only pay half of their operating costs
+          facilityOM += g.annualOperatingCost / ticksPerYear / 2;
+        } else {
+          facilityOM += g.annualOperatingCost / ticksPerYear;
+        }
+        facilityOM +=
+          (generatedWh / 1000000) * (g.variableOperatingCostPerMWh || 0);
+        if (started) {
+          // One simulated day stands for the average month. The visible off-to-on edge therefore
+          // represents the same daily start repeated throughout that month.
+          facilityOM += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
+        }
+        facilityOM *=
+          ((g.fuel &&
+            tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
+            1) *
+          (costIndexNow / (g.costIndexAtBuild || 1));
       }
-      facilityOM *=
-        ((g.fuel &&
-          tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
-          1) *
-        (costIndexNow / (g.costIndexAtBuild || 1));
       facilityExpenses += facilityOM;
       expensesOM += facilityOM;
       const fuel = g.fuel && FUELS[g.fuel];
@@ -6244,11 +6303,13 @@ function* supplyFacilitiesFinancesPhases(
   // there -- a lost game turned into a corrupted one, with no way back to a number
   const percentDemandUnfulfilled =
     demandWh > 0 ? (demandWh - supplyWh) / demandWh : 0;
-  const organicGrowthRate =
-    ORGANIC_GROWTH_MAX_ANNUAL -
-    difficulty.blackoutPenalty * percentDemandUnfulfilled;
   const scenario =
     getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
+  const organicGrowthRate =
+    ORGANIC_GROWTH_MAX_ANNUAL -
+    (scenario.retainCustomersDuringShortages
+      ? 0
+      : difficulty.blackoutPenalty * percentDemandUnfulfilled);
 
   // Save new financial info
   now.customerRate = updateCustomerRate(

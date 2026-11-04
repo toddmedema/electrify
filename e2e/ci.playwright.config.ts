@@ -26,6 +26,7 @@ const smoke = [
   "offline-launch.spec.ts",
 ];
 const layout = [
+  "chernobyl-recovery.spec.ts",
   "difficulty-unlocks.spec.ts",
   "chart-touch.spec.ts",
   "insights-expanded-chart.spec.ts",

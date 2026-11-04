@@ -1,4 +1,5 @@
 import { UTILITY_AREAS } from "./UtilityExpansion";
+import { CHERNOBYL_SCENARIO } from "./ChernobylScenario";
 import { LEGACY_SCENARIOS } from "./LegacyCampaign";
 import { officialRetentionMetadata } from "./OfficialScenarioRules";
 import {
@@ -1928,6 +1929,7 @@ export const SCENARIOS: ScenarioType[] = [
     endMessage:
       "See what expansion cost and how your larger company performed.",
   },
+  CHERNOBYL_SCENARIO,
 ];
 
 // The opening missions, in the order a new player should work through them

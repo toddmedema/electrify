@@ -84,7 +84,12 @@ const CHALLENGE_SORTS: Array<{
 ];
 
 function scenarioEndYear(scenario: ScenarioType): number {
-  return scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
+  return (
+    scenario.startingYear +
+    Math.floor(
+      ((scenario.startingMonth ?? 1) - 1 + scenario.durationMonths - 1) / 12,
+    )
+  );
 }
 
 interface MissionListItemProps {

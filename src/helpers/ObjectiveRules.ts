@@ -51,8 +51,16 @@ export const reliabilityThreshold = (difficulty: DifficultyType): number =>
     difficulty
   ];
 
-export const reliabilityRuleText = (difficulty: DifficultyType): string =>
-  `Serving less than ${formatRequiredShare(reliabilityThreshold(difficulty))} of demand for 3 months in a row ends the run.`;
+export const reliabilityRuleText = (
+  difficulty: DifficultyType,
+  scenario?: Pick<
+    ScenarioType,
+    "reliabilityFailureDisabled" | "retainCustomersDuringShortages"
+  >,
+): string =>
+  scenario?.reliabilityFailureDisabled
+    ? `No minimum reliability requirement. Blackouts reduce your score${scenario.retainCustomersDuringShortages ? "" : " and drive customers away"}, but do not end the run.`
+    : `Serving less than ${formatRequiredShare(reliabilityThreshold(difficulty))} of demand for 3 months in a row ends the run.`;
 
 export function hasChronicBlackouts(
   history: MonthlyHistoryType[],
@@ -169,6 +177,41 @@ const definitionsCache = new WeakMap<
     result: CompiledRuleObjective[];
   }
 >();
+const calendarDefinitions = new WeakMap<
+  CompiledRuleObjective[],
+  Map<number, CompiledRuleObjective[]>
+>();
+
+/** Compiled rules use January calendar offsets; objective evidence counts playable months. */
+function playableObjectiveDefinitions(
+  definitions: CompiledRuleObjective[],
+  openingOffset: number,
+): CompiledRuleObjective[] {
+  if (!openingOffset) return definitions;
+  let offsets = calendarDefinitions.get(definitions);
+  if (!offsets) {
+    offsets = new Map();
+    calendarDefinitions.set(definitions, offsets);
+  }
+  let playable = offsets.get(openingOffset);
+  if (!playable) {
+    playable = definitions.map((objective) =>
+      "fromMonth" in objective
+        ? {
+            ...objective,
+            fromMonth: objective.fromMonth - openingOffset,
+            throughMonth: objective.throughMonth - openingOffset,
+          }
+        : {
+            ...objective,
+            deadlineMonth: objective.deadlineMonth - openingOffset,
+          },
+    );
+    offsets.set(openingOffset, playable);
+  }
+  return playable;
+}
+
 /** Trusted setup fields and frozen mod rules enter the same objective evaluator. */
 export function scenarioObjectiveDefinitions(
   scenario?: ScenarioType,
@@ -179,7 +222,10 @@ export function scenarioObjectiveDefinitions(
   if (scenario.id === 116) return UTILITY_EXPANSION_OBJECTIVES;
   const compiled = scenarioRules(scenario, parameters);
   if (compiled && (scenario.id !== 999 || scenario.mod))
-    return compiled.objectives;
+    return playableObjectiveDefinitions(
+      compiled.objectives,
+      (scenario.startingMonth ?? 1) - 1,
+    );
   const cached = definitionsCache.get(scenario);
   if (
     cached &&
@@ -215,7 +261,12 @@ export function objectiveContextForGame(
     GameType,
     "seed" | "startingYear" | "date" | "customerMarketSize"
   > &
-    Partial<Pick<GameType, "difficulty" | "utilityExpansion" | "campaign">>,
+    Partial<
+      Pick<
+        GameType,
+        "difficulty" | "utilityExpansion" | "campaign" | "startingMonth"
+      >
+    >,
   scenario: ScenarioType,
 ): ObjectiveContext {
   const definitions = scenarioObjectiveDefinitions(scenario, {
@@ -251,7 +302,7 @@ export function objectiveContextForGame(
         ...(isLegacyCampaignScenario(scenario.id)
           ? { moneyBasis: "nominal" }
           : {}),
-        ...(game.campaign
+        ...(game.campaign || legacyMonthOffset(game)
           ? { monthOffset: legacyMonthOffset(game), campaignInputs }
           : {}),
         durationMonths: scenario.durationMonths,
@@ -267,7 +318,9 @@ export function objectiveContextForGame(
     ...(isLegacyCampaignScenario(scenario.id)
       ? { moneyBasis: "nominal" as const }
       : {}),
-    ...(game.campaign ? { monthOffset: legacyMonthOffset(game) } : {}),
+    ...(game.campaign || legacyMonthOffset(game)
+      ? { monthOffset: legacyMonthOffset(game) }
+      : {}),
     durationMonths: scenario.durationMonths,
     ownership: scenario.ownership,
     ...(isUtilityExpansionScenario(scenario)
@@ -387,6 +440,9 @@ function historyObjectiveResults(
   const context: ObjectiveContext = {
     rulesDigest: ruleDigest(objectives),
     startingYear: scenario.startingYear,
+    ...((scenario.startingMonth ?? 1) > 1
+      ? { monthOffset: (scenario.startingMonth ?? 1) - 1 }
+      : {}),
     ...(isLegacyCampaignScenario(scenario.id)
       ? { moneyBasis: "nominal" as const }
       : {}),
@@ -822,6 +878,7 @@ export function runFailure(
         GameType,
         | "seed"
         | "startingYear"
+        | "startingMonth"
         | "objectiveProgress"
         | "utilityExpansion"
         | "scenarioId"
@@ -841,6 +898,7 @@ export function runFailure(
       difficulty: game.difficulty,
       seed: game.seed ?? scenario.seed ?? 0,
       startingYear: game.startingYear ?? scenario.startingYear,
+      startingMonth: game.startingMonth ?? scenario.startingMonth,
       date: game.date,
       customerMarketSize: game.customerMarketSize,
       utilityExpansion: game.utilityExpansion,
@@ -879,7 +937,10 @@ export function runFailure(
             result.status === "unverifiable")),
     )?.reason;
   if (now.cash < 0) return { outcome: "bankrupt", title: "Bankrupt!" };
-  if (hasChronicBlackouts(history, game.difficulty))
+  if (
+    !scenario.reliabilityFailureDisabled &&
+    hasChronicBlackouts(history, game.difficulty)
+  )
     return {
       outcome: "fired",
       title: "Fired!",

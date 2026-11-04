@@ -225,9 +225,10 @@ const pack = (baseScenarioId: number): ModPackage =>
     objectives: [],
   });
 
-test("all fifteen imported arcs validate as complete detached snapshots in every difficulty", () => {
+test("all sixteen imported arcs validate as complete detached snapshots in every difficulty", () => {
   for (const id of [
     100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115, 116,
+    126,
   ]) {
     for (const difficulty of DIFFICULTY_IDS) {
       const scenario = modScenario(pack(id), undefined, difficulty);

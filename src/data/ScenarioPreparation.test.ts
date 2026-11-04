@@ -1,8 +1,9 @@
 import { SCENARIOS } from "./Scenarios";
+import { CHERNOBYL_SCENARIO_ID } from "./ChernobylScenario";
 import { UTILITY_AREAS, utilityEntitlementsAt } from "./UtilityExpansion";
 import type { UtilityId } from "../Types";
 import { scenarioRules } from "../helpers/ScenarioRules";
-import { getDateFromMinute } from "../helpers/DateTime";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 
 // Pin historical headline dates while checking the actual engine schedule, including seeded arcs.
 const HEADLINERS: Record<
@@ -36,7 +37,12 @@ const HEADLINERS: Record<
   },
 };
 
-test.each(SCENARIOS.filter((scenario) => !scenario.tutorialSteps))(
+test.each(
+  SCENARIOS.filter(
+    (scenario) =>
+      !scenario.tutorialSteps && scenario.id !== CHERNOBYL_SCENARIO_ID,
+  ),
+)(
   "$name opens in January at least 36 months before its headline event",
   (scenario) => {
     const headline = HEADLINERS[scenario.id];
@@ -78,6 +84,25 @@ test.each(SCENARIOS.filter((scenario) => !scenario.tutorialSteps))(
     }
   },
 );
+
+test("Chernobyl recovery opens in March 1986 one month before the disaster", () => {
+  const scenario = SCENARIOS.find(({ id }) => id === CHERNOBYL_SCENARIO_ID)!;
+  const openingMonth = (scenario.startingMonth ?? 1) - 1;
+  expect(
+    getDateFromMinute(openingMonth * MINUTES_PER_MONTH, scenario.startingYear),
+  ).toMatchObject({ year: 1986, monthNumber: 3 });
+  for (const seed of [1, 2468, 9981]) {
+    const rules = scenarioRules(scenario, { difficulty: "Manager", seed })!;
+    const disaster = rules.events.find(({ id }) => id === "disaster")!;
+    expect(disaster.startMonth - openingMonth).toBe(1);
+    expect(
+      getDateFromMinute(
+        disaster.startMonth * MINUTES_PER_MONTH,
+        scenario.startingYear,
+      ),
+    ).toMatchObject({ year: 1986, monthNumber: 4 });
+  }
+});
 
 test("Across the Valley's headline applies through the dated entitlement API", () => {
   const source = UTILITY_AREAS["valley-electric"].entitlements.find(

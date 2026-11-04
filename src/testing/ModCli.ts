@@ -274,7 +274,7 @@ export function formatModSimulation(run: ModSimulationRun): string {
       ? run.objectiveResults.flatMap((objective) => [
           `  ${objective.label} · ${objective.required ? "Required" : "Optional"} · ${objectiveStatusText[objective.status]}`,
           `    ${objective.definition}`,
-          `    ${objectiveTargetText(objective.objective)} · ${objectiveWindowText(objective.objective, result.scenario.startingYear, result.scenario.durationMonths)}`,
+          `    ${objectiveTargetText(objective.objective)} · ${objectiveWindowText(objective.objective, result.scenario.startingYear, result.scenario.durationMonths, (result.scenario.startingMonth ?? 1) - 1)}`,
           `    ${objectiveObservedText(objective)}${objective.reason ? ` ${objective.reason}` : ""}`,
         ])
       : ["  No scenario goals. Ordinary game failures still apply."]),

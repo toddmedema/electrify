@@ -361,7 +361,7 @@ function facts(
         { label: "Location", value: location?.name ?? "Unavailable" },
         {
           label: "Era and duration",
-          value: `${window(0, scenario.durationMonths - 1, scenario.startingYear)} · ${scenario.durationMonths} months`,
+          value: `${window((scenario.startingMonth ?? 1) - 1, (scenario.startingMonth ?? 1) - 1 + scenario.durationMonths - 1, scenario.startingYear)} · ${scenario.durationMonths} months`,
         },
         {
           label: "Difficulty",
@@ -394,7 +394,10 @@ function facts(
     id: "objectives",
     title: "Scenario objectives",
     rows: [
-      { label: "Reliability", value: reliabilityRuleText(rules.difficulty) },
+      {
+        label: "Reliability",
+        value: reliabilityRuleText(rules.difficulty, scenario),
+      },
       {
         label: "Objective intent",
         value:
@@ -411,6 +414,7 @@ function facts(
             objective,
             scenario.startingYear,
             scenario.durationMonths,
+            (scenario.startingMonth ?? 1) - 1,
           ),
         ],
       })),
