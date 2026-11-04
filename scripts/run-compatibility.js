@@ -144,6 +144,9 @@ function followImport(from, specifier) {
   const base = path.posix.normalize(
     path.posix.join(path.posix.dirname(from), specifier),
   );
+  // Runtime integrity readers import this generated output. Bootstrap without requiring an
+  // existing manifest, and never feed its previous contents back into its own identity.
+  if (base === output) return;
   if (!base.startsWith("src/"))
     throw new Error(`Simulation import leaves src: ${from}: ${specifier}`);
   const file = [

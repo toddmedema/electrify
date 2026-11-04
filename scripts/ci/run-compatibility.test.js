@@ -310,6 +310,37 @@ test("unresolved simulation imports fail closed", (t) => {
   assert.match(result.stderr, /Unresolved simulation import/);
 });
 
+for (const specifier of [
+  "../data/RunCompatibility.json",
+  "../helpers/../data/RunCompatibility.json",
+])
+  test(`generated manifest import ${specifier} bootstraps without an existing output`, (t) => {
+    const f = fixture(t);
+    f.write(
+      "src/helpers/ScenarioRulesCompiler.ts",
+      `import manifest from "${specifier}"; export const value = manifest.compatibilityId;\n`,
+    );
+    assert.equal(fs.existsSync(f.output), false);
+    const first = f.manifest();
+    const bytes = fs.readFileSync(f.output, "utf8");
+    assert.deepEqual(f.manifest(), first);
+    assert.equal(fs.readFileSync(f.output, "utf8"), bytes);
+    fs.rmSync(f.output);
+    assert.deepEqual(f.manifest(), first);
+    assert.equal(fs.readFileSync(f.output, "utf8"), bytes);
+  });
+
+test("a missing import beside the generated manifest still fails closed", (t) => {
+  const f = fixture(t);
+  f.write(
+    "src/helpers/ScenarioRulesCompiler.ts",
+    'import "../data/RunCompatibility-other.json"; export const value = 1;\n',
+  );
+  const result = f.run();
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Unresolved simulation import/);
+});
+
 test("only the audited scenario prompt components are presentation boundaries", (t) => {
   const f = fixture(t);
   f.write(
