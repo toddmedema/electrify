@@ -34,7 +34,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     await expect(
       requirements.getByText(
-        "Serving less than 95% of demand for 3 months in a row ends the run.",
+        "Serving less than 90% of demand for 3 months in a row ends the run.",
         {
           exact: true,
         },

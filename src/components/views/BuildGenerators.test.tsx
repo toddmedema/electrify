@@ -18,11 +18,7 @@ import { createGame } from "../../testing/Simulator";
 import * as ExpectedOutput from "../../helpers/ExpectedOutput";
 import * as GameReducer from "../../reducers/Game";
 import * as Facilities from "../../data/Facilities";
-import {
-  getTimeFromTimeline,
-  getDateFromMinute,
-  MINUTES_PER_MONTH,
-} from "../../helpers/DateTime";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { SCENARIOS } from "../../data/Scenarios";
 import { formatMoneyConcise } from "../../helpers/Format";
 import {
@@ -328,10 +324,12 @@ describe("the three-year build forecast", () => {
   const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
   let timeline: jest.SpyInstance;
   beforeEach(() => {
-    timeline = jest.spyOn(GameReducer, "generateForecastTimeline");
+    timeline = jest.spyOn(GameReducer, "generateResourceForecast");
   });
   afterEach(() => {
-    timeline.mockRestore();
+    // Restore quote spies even when an earlier assertion fails, so they cannot leak into
+    // the next test with their implementation reset by Jest.
+    jest.restoreAllMocks();
   });
 
   // What a player reads off the screen: all of its text and every typical-year sparkline
@@ -418,13 +416,8 @@ describe("the three-year build forecast", () => {
     );
     // StrictMode renders twice; the second render reuses the first one's forecast
     expect(timeline).toHaveBeenCalledTimes(1);
-    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-    expect(timeline).toHaveBeenCalledWith(
-      game,
-      now.cash,
-      now.customers,
-      TICKS_PER_YEAR * 3,
-    );
+    expect(timeline).toHaveBeenCalledWith(game);
+    expect(timeline.mock.results[0].value).toHaveLength(TICKS_PER_YEAR * 3);
 
     const generators = jest.spyOn(Facilities, "GENERATORS");
     const slider = screen.getByRole("slider");
@@ -461,7 +454,7 @@ describe("the three-year build forecast", () => {
     // Equal inputs do not need another simulation.
     view.rerender(<BuildGenerators game={{ ...game }} {...callbacks} />);
     expect(timeline).toHaveBeenCalledTimes(1);
-    // And a changed input reaches it: here the cash the forecast starts from
+    // A changed paused snapshot still reaches the resource forecast through its existing key.
     const richer = {
       ...game,
       timeline: game.timeline.map((tick) =>
@@ -472,7 +465,7 @@ describe("the three-year build forecast", () => {
     };
     view.rerender(<BuildGenerators game={richer} {...callbacks} />);
     await waitFor(() => expect(timeline).toHaveBeenCalledTimes(2));
-    expect(timeline.mock.calls[1][1]).toBe(1e12);
+    expect(timeline.mock.calls[1][0]).toBe(richer);
   });
 
   it("refreshes running quotes at month boundaries and after fleet decisions", async () => {
@@ -484,7 +477,7 @@ describe("the three-year build forecast", () => {
     expect(timeline).toHaveBeenCalledTimes(1);
     for (let i = 0; i < 96; i++)
       game = createNextState(game, (draft) => GameReducer.tickState(draft));
-    // Discard the reducer's own rollover forecast calls; measure only the catalog.
+    // Measure the monthly refresh independently of the opening catalog calculation.
     timeline.mockClear();
     view.rerender(<BuildGenerators game={game} {...callbacks} />);
     await waitFor(() => expect(timeline).toHaveBeenCalledTimes(1));

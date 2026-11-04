@@ -1,3 +1,5 @@
+import { playableDifficulty } from "../achievements/DifficultyUnlocks";
+import type { DifficultyType } from "../Types";
 import { DIFFICULTY_LABELS } from "../Constants";
 import { getScenario } from "../data/Scenarios";
 import type { AppStateType, CoopSelectionType, ScenarioType } from "../Types";
@@ -73,6 +75,7 @@ export function coopSelection(
 /** The host's selection as it would be mirrored, or undefined off the scenario screens. */
 export function hostSelection(
   state: AppStateType,
+  unlockedThrough: DifficultyType = "CEO",
 ): HostBrowseSelection | undefined {
   const card = state.card.name;
   if (!isBrowseCard(card)) return undefined;
@@ -85,7 +88,10 @@ export function hostSelection(
       : {}),
     scenarioId:
       card === "NEW_GAME_DETAILS" ? state.ui.scenarioPreview : undefined,
-    difficulty: state.ui.previewDifficulty ?? state.game.difficulty,
+    difficulty: playableDifficulty(
+      state.ui.previewDifficulty ?? state.game.difficulty,
+      unlockedThrough,
+    ),
     custom: card === "CUSTOM_GAME" ? state.ui.coop?.custom : undefined,
   };
 }

@@ -78,6 +78,7 @@ import {
 
 export interface StateProps {
   game: GameType;
+  unlockedThrough?: DifficultyType;
   scenario: ScenarioType;
   /** Choosing with a co-op lobby: guests see the host's setup and can only mark Ready. */
   coop?: CoopSelectionType;
@@ -760,6 +761,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                         value={game.difficulty}
                         onChange={(difficulty) => onDelta({ difficulty })}
                         readOnly={guest}
+                        unlockedThrough={props.unlockedThrough}
                       />
                     </TableCell>
                   </TableRow>

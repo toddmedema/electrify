@@ -61,6 +61,7 @@
     "mods:arcs": "node scripts/mods-arcs.js",
     "premods:arcs": "npm run compatibility:generate",
     "perf:bench": "node scripts/dev/run.js bench",
+    "perf:build-forecast": "node scripts/dev/run.js jest test --watchAll=false --runInBand --testMatch=\"**/src/testing/BuildForecastBench.tsx\"",
     "perf:bundle": "node scripts/perf/bundle-size.js",
     "perf:rebaseline": "node scripts/perf/rebaseline.js",
     "fetch-weather": "node scripts/fetch-weather.js",

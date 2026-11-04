@@ -1,3 +1,5 @@
+import { achievementJournal } from "../achievements/Journal";
+import { unlockedDifficulty } from "../achievements/DifficultyUnlocks";
 import {
   useCallback,
   useEffect,
@@ -82,7 +84,10 @@ export default function MultiplayerRoot() {
       store.dispatch(uiDelta({ coop: next }));
     if (view) return;
     if (host) {
-      const selection = hostSelection(store.getState());
+      const selection = hostSelection(
+        store.getState(),
+        unlockedDifficulty(achievementJournal.getSnapshot().progress),
+      );
       if (selection && !next.starting) session.publishBrowse(selection);
     } else if (browse?.phase === "browsing") {
       // A guest follows the host's screen, scenario and difficulty.
@@ -222,9 +227,13 @@ export default function MultiplayerRoot() {
     const stop = session.subscribe(sync);
     const stopCoop = session.subscribe(syncCoop);
     const stopStore = store.subscribe(syncCoop);
+    const stopProgress = achievementJournal.subscribe(syncCoop);
     registerCoopControls({
       start: (spec) => {
-        const selection = hostSelection(store.getState());
+        const selection = hostSelection(
+          store.getState(),
+          unlockedDifficulty(achievementJournal.getSnapshot().progress),
+        );
         if (selection)
           session.publishBrowse({ ...selection, phase: "playing" });
         void session.start({ spec }).catch((error) => {
@@ -292,6 +301,7 @@ export default function MultiplayerRoot() {
       stop();
       stopCoop();
       stopStore();
+      stopProgress();
       stopNative?.();
       registerLobbyOpener(undefined);
       registerCoopControls(undefined);

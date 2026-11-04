@@ -67,3 +67,81 @@ describe("DifficultyPicker", () => {
     expect(onChange).toHaveBeenCalledWith("Manager");
   });
 });
+
+it("explains tapped and focused locks without selecting them, then reacts to an unlock", () => {
+  const onChange = jest.fn();
+  const { rerender } = render(
+    <DifficultyPicker
+      variant="toggle"
+      value="Intern"
+      unlockedThrough="Intern"
+      onChange={onChange}
+    />,
+  );
+  const expert = screen.getByRole("button", { name: "Expert, locked" });
+  expect(expert).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(expert);
+  expect(onChange).not.toHaveBeenCalled();
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "on Hard to unlock Expert",
+  );
+  expect(screen.getByRole("button", { name: "Beginner" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  fireEvent.focus(screen.getByRole("button", { name: "Medium, locked" }));
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "on Easy to unlock Medium",
+  );
+  rerender(
+    <DifficultyPicker
+      variant="toggle"
+      value="Intern"
+      unlockedThrough="Employee"
+      onChange={onChange}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Easy" }));
+  expect(onChange).toHaveBeenCalledWith("Employee");
+});
+
+it("keeps a locked select option from changing difficulty and explains its requirement", () => {
+  const onChange = jest.fn();
+  render(
+    <DifficultyPicker
+      variant="select"
+      value="Intern"
+      unlockedThrough="Intern"
+      onChange={onChange}
+    />,
+  );
+  fireEvent.mouseDown(screen.getByRole("combobox"));
+  const expert = screen.getByRole("option", { name: "Expert, locked" });
+  expect(expert).toHaveTextContent("on Hard to unlock Expert");
+  expect(expert).toHaveAccessibleDescription(
+    "Complete an official scenario on Hard to unlock Expert.",
+  );
+  fireEvent.click(expert);
+  expect(onChange).not.toHaveBeenCalled();
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "on Hard to unlock Expert",
+  );
+});
+
+it("shows the host's read-only choice without claiming the guest must unlock it", () => {
+  render(
+    <DifficultyPicker
+      variant="toggle"
+      value="CEO"
+      unlockedThrough="Intern"
+      readOnly
+      onChange={jest.fn()}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "Expert" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Expert" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+});

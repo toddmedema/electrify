@@ -909,3 +909,80 @@ Deliberately removing the two emitted catalog scale overrides makes that guard f
 at 700 px with an unwanted 12.8125 px top gutter; the original artifact was restored.
 The independent code review found no remaining actionable defects; its suggestion
 to cover positive scaling as well as the catalog exception is included.
+
+## Catalog resource-only forecast (2026-11-03)
+
+The build catalog now requests only its three-year resource readings. Its former full
+forecast also calculated demand, two dispatch/finance passes, generator commitment,
+customer retention and private fleet/loan progress before discarding those fields.
+`generateResourceForecast` uses the same weather/basin reader as the full simulation,
+the same estimated-weather owner and the same opening-fleet/trailing-year story context.
+Hydro and intertie outlooks retain their full forecast paths.
+
+Reproduce the paired calculation benchmark with Node 24 and the matching install:
+
+```sh
+npm run perf:build-forecast
+```
+
+Set `BUILD_FORECAST_BENCH_RESULT=/absolute/path/result.json` to retain its JSON report.
+The benchmark uses normal Jest VM globals, three complete warmups per path, and seven
+ABBA/BAAB pairs with two calculations per path in each pair. Every invocation receives
+a new top-level snapshot, preventing candidate WeakMap cache hits. Fixture setup and
+full strict output comparisons are outside the timed windows. The control is the prior
+catalog calculation through `generateForecastTimeline`, including its compact output
+assembly; the candidate calls the actual `computeOutlook("build")` entry point.
+
+The final integrated measurement merges Legacy campaign base `05dc9fbf` into
+the resource-only forecast change. It adds the native First Light setup in 1882
+with seed 611, using the canonical simulator setup and its separate city/watershed
+series. Both forecast paths retain the campaign's opt-in modeled historical weather.
+The measurement uses the local arm64 Mac and Node 24.22.2:
+
+| Three-year calculation | Full median (ms) | Resource median (ms) | Median paired reduction | Pair reduction range |
+| --- | ---: | ---: | ---: | ---: |
+| Shale Boom opening, seed 12345 | 67.798 | 9.224 | 85.78% | 85.15–86.91% |
+| Madrid hydro, 13 months + 7 ticks, seed 7 | 109.901 | 12.200 | 88.90% | 87.93–89.35% |
+| Custom SF offshore/separate watershed/composed arcs, seed 29 | 143.190 | 24.514 | 82.98% | 80.51–83.89% |
+| Across the Valley utility expansion opening, seed 17 | 121.501 | 11.814 | 90.28% | 90.06–90.77% |
+| Legacy First Light opening, 1882 SF/separate watershed, seed 611 | 97.752 | 13.642 | 84.67% | 82.16–86.35% |
+
+Reductions are medians of paired ratios, not ratios of the two independent median
+columns. These measure warmed calculation elapsed time, not browser paint, worker
+startup/data loading or equivalent frame-time savings. Other local validation may
+contend for the machine; all 35 pairs exceed the requested 20% improvement threshold.
+
+The retained parity suite checks every official opening scenario, developed mid-month
+hydro with a pending policy and more than twelve history rows, offshore/separate-basin
+custom forecasts with composed arcs, zero-inflow effects and within-month expiry,
+disabled stories, cache reuse and missing current frames. Comparisons include all
+returned fields and arrays, explicit undefined properties, frozen input state and
+separately serialized generator-commitment metadata. Representative complete-output
+hashes were also captured from an independent, unmodified `f55235c5` game module and
+matched exactly, protecting the shared-reader extraction as well as the new path.
+
+The shared reader writes directly into private full-forecast rows, avoiding an
+intermediate resource object and spread for every tick. Before the Legacy campaign
+base integration, a separate same-process comparison of the full forecast against
+the untouched `f55235c5` module used
+the same four fixtures, three warmups and seven ABBA/BAAB pairs. Complete full
+timelines, separately serialized commitment metadata and raw JSON strings all
+matched. Median paired elapsed-time changes were -0.11% for Shale, +3.95% for
+developed Madrid, -6.80% for custom SF and -5.67% for utility expansion. Individual
+pairs were noisy; these results make no claim of a general full-engine speedup.
+
+Before the Legacy campaign base integration, three independent reviews covered
+engine correctness, consumer/worker contracts and benchmark methodology. A final
+adversarial QA pass added save round-trip, modified
+Immer draft, weather reload/seed, January/horizon and compiled-rule event cases.
+All 49 focused consumer tests passed. Deliberately changing the resource forecast
+to read the original draft state made the new pending-change assertion fail;
+the correct implementation was restored before the passing final run.
+
+Integration review also checks the canonical 1882 campaign setup and an actual
+1902 handover while the continuous clock retains its 1882 origin. Independent
+city-weather and basin-inflow assertions prevent shared full/resource code from
+masking a lost historical-weather flag. Separately omitting that flag from the
+city and watershed readers made their respective assertions fail; both negative
+controls were restored before the passing combined focused run. The four modern
+base-output pins remain unchanged.
