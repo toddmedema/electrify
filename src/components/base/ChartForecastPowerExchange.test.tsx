@@ -101,12 +101,16 @@ describe("ChartForecastPowerExchange", () => {
       zeroRule.mockRestore();
     }
     // The key says which is which, in the same textures the plot uses
-    expect(
-      screen.getByText("Imports above 0").closest(".chartLegendItem"),
-    ).toContainHTML("chartLegendSwatch-vertical");
-    expect(
-      screen.getByText("Exports below 0").closest(".chartLegendItem"),
-    ).toContainHTML("chartLegendSwatch-hatch");
+    const legendItem = (name: string) =>
+      screen.getByText((_text, element) => element?.textContent === name, {
+        selector: ".chartLegendItem",
+      });
+    expect(legendItem("Imports above 0")).toContainHTML(
+      "chartLegendSwatch-vertical",
+    );
+    expect(legendItem("Exports below 0")).toContainHTML(
+      "chartLegendSwatch-hatch",
+    );
   });
 
   it("keeps zero inside the range with room on the side that never fires", () => {
