@@ -9,7 +9,8 @@ import type { Action } from "@reduxjs/toolkit";
 import type { IntertieArchetypeIdType } from "./data/IntertieArchetypes";
 import type { SavedCommitmentMetadata } from "./helpers/Commitment";
 
-export type AudioLoadingType = "UNLOADED" | "LOADING" | "ERROR" | "LOADED";
+export type AudioLoadingType =
+  "UNLOADED" | "LOADING" | "ERROR" | "UNSUPPORTED" | "LOADED";
 
 export type MonthType =
   | "Jan"

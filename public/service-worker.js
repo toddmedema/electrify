@@ -4,6 +4,18 @@ const WEATHER_INDEX = "/data/weather/index.json";
 const OFFLINE_DATA_REVISION = "/__offline-data-revision";
 // Generated from public/images at build time (scripts/generate-icon-manifest.js).
 const ICON_MANIFEST = "/icons.json";
+// Audio paths are not content-hashed and cached tracks are never revalidated. Replacing an
+// audio file at the same path requires a CACHE_VERSION bump so existing installs get new bytes.
+const AUDIO_FILES = [
+  "/audio/menu/quiet-current.wav",
+  "/audio/intro/intro.mp3",
+  "/audio/menu/select.wav",
+  "/audio/menu/confirm.wav",
+  "/audio/menu/back.wav",
+  "/audio/basic/low.mp3",
+  "/audio/basic/medium.mp3",
+  "/audio/basic/high.mp3",
+];
 const MARKET_DATA = ["/data/FuelPricesRaw.csv", "/data/EconomyRaw.csv"];
 // Create React App's list of the current build's hashed bundles.
 const ASSET_MANIFEST = "/asset-manifest.json";
@@ -220,9 +232,11 @@ async function syncOfflineData() {
       : weatherUrls.filter((url) => !cachedUrls.has(url));
 
   const downloads = await Promise.allSettled(
-    [...MARKET_DATA, ...weatherToFetch].map((url) =>
-      fetchAndCache(cache, url, true),
-    ),
+    [
+      ...MARKET_DATA,
+      ...weatherToFetch,
+      ...AUDIO_FILES.filter((url) => !cachedUrls.has(url)),
+    ].map((url) => fetchAndCache(cache, url, true)),
   );
   if (downloads.every((result) => result.status === "fulfilled")) {
     try {
@@ -304,6 +318,17 @@ self.addEventListener("fetch", (event) => {
       ),
     );
     event.respondWith(verified);
+    return;
+  }
+
+  if (url.pathname.startsWith("/audio/")) {
+    // Large tracks are cache-first; replacing them follows the CACHE_VERSION rule above.
+    const result = caches.match(request).then(async (cached) => {
+      if (cached) return cached;
+      return fetchAndCache(await caches.open(CACHE_VERSION), request);
+    });
+    event.waitUntil(result.catch(() => undefined));
+    event.respondWith(result);
     return;
   }
 

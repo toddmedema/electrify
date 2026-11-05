@@ -22,14 +22,12 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
-  return {
-    disableAudio(): void {
-      dispatch(snackbarOpen("Audio not supported on this device; disabling."));
-      dispatch(changeSettings({ audioEnabled: false }));
-    },
-  };
-};
+const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
+  disableAudio: () => {
+    dispatch(snackbarOpen("Audio not supported on this device; disabling."));
+    dispatch(changeSettings({ audioEnabled: false }));
+  },
+});
 
 const AudioContainer = connect(mapStateToProps, mapDispatchToProps)(Audio);
 

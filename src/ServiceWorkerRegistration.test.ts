@@ -98,6 +98,20 @@ describe("registerServiceWorker", () => {
     ]);
   });
 
+  it("caches audio and data immediately when this session installs, and retries on reconnection", async () => {
+    const sw = fakeWindow();
+    restore = sw.restore;
+    registerServiceWorker(sw.win);
+    await flush();
+    sw.fire("appinstalled");
+    await flush();
+    expect(messageTypes(sw.postMessage)).toContain("SYNC_OFFLINE_DATA");
+    sw.postMessage.mockClear();
+    sw.fire("online");
+    await flush();
+    expect(messageTypes(sw.postMessage)).toContain("SYNC_OFFLINE_DATA");
+  });
+
   it("re-requests icons when connectivity returns", async () => {
     const sw = fakeWindow();
     restore = sw.restore;
