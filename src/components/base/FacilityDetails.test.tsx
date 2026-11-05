@@ -36,13 +36,13 @@ function coldGame(): GameType {
   return game;
 }
 
-function withSolar(game: GameType, hailResistant = false) {
+function withSolar(game: GameType) {
   const solar = {
     ...cloneDeep(game.facilities[0]),
     id: 3,
     name: "Solar",
     fuel: "Sun",
-    resilience: { hailResistant },
+    resilience: { solarTrackers: false },
   } as FacilityOperatingType;
   game.facilities.push(solar);
   return solar;
@@ -222,16 +222,6 @@ describe("weather resilience details", () => {
     );
   });
 
-  it("does not offer hail retrofits even while solar repairs are underway", () => {
-    const game = carbonFee();
-    const solar = withSolar(game);
-    outage(game, solar, true, 0.7);
-    showDetails(game, solar);
-    expect(
-      screen.queryByRole("button", { name: /Add hail-resistant panels/ }),
-    ).toBeNull();
-  });
-
   it("reports a retrofit being installed and offers no second one", () => {
     const game = coldGame();
     const gas = game.facilities[0];
@@ -250,20 +240,19 @@ describe("weather resilience details", () => {
     ).toBeNull();
   });
 
-  it("names trackers on a tracked solar farm", () => {
+  it("describes tracker gain as annual energy on a tracked solar farm", () => {
     const game = carbonFee();
     const solar = withSolar(game);
     solar.resilience = {
-      hailResistant: false,
       solarTrackers: true,
       trackerHailDamageFactor: 0.5,
     };
     showDetails(game, solar);
     expect(section()).toHaveTextContent(
-      "Solar trackersAbout 20% more morning and evening power.",
+      "Solar trackersAbout 20% more energy a year, mostly in the morning and evening.",
     );
     expect(section()).toHaveTextContent(
-      "About 20% more morning and evening power.",
+      "About 20% more energy a year, mostly in the morning and evening.",
     );
   });
 
@@ -282,9 +271,7 @@ describe("weather resilience details", () => {
       screen.getByRole("region", { name: "Economics" }),
     ).toBeInTheDocument();
     view.rerender(details(game, solar, jest.fn()));
-    expect(
-      screen.queryByRole("button", { name: /^Add hail-resistant panels/ }),
-    ).toBeNull();
+    expect(screen.queryByRole("region", { name: "Upgrades" })).toBeNull();
   });
 
   it("gives design temperatures in the player's units with a true minus", async () => {
@@ -305,14 +292,6 @@ describe("weather resilience details", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent(
       "Rated to \u221222°F instead of 18°F; halves remaining cold losses and deep-freeze losses.",
     );
-  });
-
-  it("reports installed protection and stops offering it", () => {
-    const game = carbonFee();
-    const solar = withSolar(game, true);
-    showDetails(game, solar);
-    expect(section()).toHaveTextContent("Hail-resistant panels");
-    expect(within(section()).queryByRole("button")).toBeNull();
   });
 
   it("reports an active hail outage and when repairs finish", () => {

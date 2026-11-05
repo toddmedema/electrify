@@ -1,9 +1,5 @@
 import { formatTemperature } from "../../helpers/Units";
-import {
-  FacilityUpgradeType,
-  ResilienceUpgradeType,
-  UnitSystemType,
-} from "../../Types";
+import { FacilityUpgradeType, UnitSystemType } from "../../Types";
 
 /**
  * Copy shared by the build dialog, the facility details pane and the fleet row, so a weather
@@ -23,20 +19,11 @@ export function resilienceName(upgrade: FacilityUpgradeType): string {
   switch (upgrade) {
     case "combinedCycle":
       return "combined-cycle generation";
-    case "hailResistant":
-      return "hail-resistant panels";
     case "solarTrackers":
       return "solar trackers";
     default:
       return "cold-weather package";
   }
-}
-
-/** The upgrade's name as an action, e.g. "Add hail-resistant panels". */
-export function resilienceActionLabel(upgrade: ResilienceUpgradeType): string {
-  return upgrade === "hailResistant"
-    ? "Add hail-resistant panels"
-    : "Add cold-weather package";
 }
 
 /** What a cold-weather package does to a plant's rating and its losses in deeper cold. */

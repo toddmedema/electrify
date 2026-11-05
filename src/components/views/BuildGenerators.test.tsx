@@ -1145,30 +1145,7 @@ describe("weather hardening in the purchase dialog", () => {
     ).toBeNull();
   });
 
-  it("offers hail-resistant solar as an opt-in that follows the quoted price", () => {
-    const onBuild = showBuildList();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Review purchase of Solar" }),
-    );
-    const dialog = screen.getByRole("dialog");
-    const option = within(dialog).getByRole("checkbox", {
-      name: /^Hail-resistant panels \+\$/,
-    });
-    expect(option).not.toBeChecked();
-    fireEvent.click(option);
-    fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
-    const [quote] = onBuild.mock.calls[0];
-    expect(quote.resilience).toEqual({
-      hailResistant: true,
-      solarTrackers: false,
-    });
-    expect(quote.resilienceExtraBuildCost).toBeGreaterThan(0);
-    expect(option).toHaveAccessibleName(
-      `Hail-resistant panels +${formatMoneyConcise(quote.resilienceExtraBuildCost)}`,
-    );
-  });
-
-  it("offers solar trackers at build, pitched on morning and evening output", () => {
+  it("offers solar trackers at build, described by annual energy gain", () => {
     const onBuild = showBuildList();
     fireEvent.click(
       screen.getByRole("button", { name: "Review purchase of Solar" }),
@@ -1179,14 +1156,13 @@ describe("weather hardening in the purchase dialog", () => {
     });
     expect(option).not.toBeChecked();
     expect(option).toHaveAccessibleDescription(
-      /more morning and evening power.*Stows in hail\. Can't be added later\./,
+      /20% more energy a year.*morning and evening.*Stows in hail\. Can't be added later\./,
     );
     fireEvent.click(option);
     fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
     const [quote] = onBuild.mock.calls[0];
     expect(quote.resilience).toMatchObject({
       solarTrackers: true,
-      hailResistant: false,
     });
     expect(quote.resilience.trackerHailDamageFactor).toBeGreaterThan(0);
   });

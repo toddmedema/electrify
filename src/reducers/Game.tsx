@@ -910,9 +910,6 @@ function trimWorldEventRecords(state: GameType) {
   trimWorldEventOccurrences(state);
 }
 
-// Below this share of the solar fleet, hail on hail-resistant panels is logged without pausing.
-const NEGLIGIBLE_RESISTANT_HAIL_SHARE = 0.05;
-
 function formatDays(days: number): string {
   return `${days} day${days === 1 ? "" : "s"}`;
 }
@@ -977,7 +974,6 @@ function recordHailStorm(state: GameType, key: string, startsMinute: number) {
       damagedFraction: impact.damagedFraction,
       repairDays: impact.repairDays,
       repairCost: impact.repairCost,
-      hailResistant: impact.hailResistant,
       oneTimeCost: impact.repairCost,
       oneTimeCostMinute: chargeMinute,
     },
@@ -1001,23 +997,18 @@ function recordHailStorm(state: GameType, key: string, startsMinute: number) {
   const share = solarW > 0 ? damagedW / solarW : 0;
   const repairCost = impacts.reduce((total, i) => total + i.repairCost, 0);
   const repairDays = Math.max(...impacts.map((i) => i.repairDays));
-  const negligible =
-    impacts.every((i) => i.hailResistant) &&
-    share < NEGLIGIBLE_RESISTANT_HAIL_SHARE;
   const percent = Math.max(1, Math.round(share * 100));
   const terms = `Repairs cost ${formatMoneyConcise(repairCost)} and take about ${formatDays(repairDays)}.`;
-  const message = negligible
-    ? `Hail-resistant panels held damage to ${percent}% of your solar fleet. ${terms}`
-    : `Hail damaged ${percent}% of your solar fleet. ${terms}`;
+  const message = `Hail damaged ${percent}% of your solar fleet. ${terms}`;
   logGameEvent(state, "WORLD_EVENT", message, {
-    importance: negligible ? "NOTABLE" : "CRITICAL",
+    importance: "CRITICAL",
     actionTarget: { card: "FACILITIES", view: "FLEET" },
-    title: negligible ? "Minor hail damage" : "Hail damage",
+    title: "Hail damage",
     concept: "severeWeather",
     storyPhaseKey: key,
-    turningPointPriority: negligible ? undefined : 110,
+    turningPointPriority: 110,
     reportedKey: key,
-    pause: !negligible,
+    pause: true,
   });
 }
 
@@ -3183,9 +3174,7 @@ function applyUpgradeTransmissionLine(
 /** The retrofit's name as it reads mid-sentence, e.g. "a cold-weather package". */
 function retrofitLabel(upgrade: FacilityUpgradeType): string {
   if (upgrade === "combinedCycle") return "combined-cycle generation";
-  return upgrade === "hailResistant"
-    ? "hail-resistant panels"
-    : "a cold-weather package";
+  return "a cold-weather package";
 }
 
 /**
@@ -3266,11 +3255,7 @@ function applyRetrofitFacility(
     },
   );
   // Levers are lowercase kebab-case; saves reject anything else.
-  const lever = conversion
-    ? "combined-cycle"
-    : payload.upgrade === "hailResistant"
-      ? "hail-resistant"
-      : "cold-weather-package";
+  const lever = conversion ? "combined-cycle" : "cold-weather-package";
   if (!bulk)
     recordMeaningfulDecision(state, {
       lever: `resilience:${facility.id}:${lever}`,
@@ -3311,9 +3296,7 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
   const lever =
     upgrade.upgrade === "combinedCycle"
       ? "combined-cycle"
-      : upgrade.upgrade === "hailResistant"
-        ? "hail-resistant"
-        : "cold-weather-package";
+      : "cold-weather-package";
   recordMeaningfulDecision(state, {
     lever: `resilience:${facility.id}:${lever}`,
     label: `Cancel upgrade of ${facility.name}`,

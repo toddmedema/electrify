@@ -151,20 +151,6 @@ describe("hail damage", () => {
     expect(hailOccurrences(state)).toHaveLength(hits.length);
   });
 
-  it("logs light damage to hail-resistant panels as minor", () => {
-    const state = game(DENVER, HAIL.seed);
-    state.facilities
-      .filter((f) => f.fuel === "Sun")
-      .forEach((f) => (f.resilience = { hailResistant: true }));
-    tickToMonth(state, HAIL.month);
-    const key = hazardEventKey("HAIL", "Denver", HAIL.month);
-    const log = state.eventLog.find((e) => e.storyPhaseKey === key)!;
-    expect(log.title).toBe("Minor hail damage");
-    expect(log.message).toMatch(
-      /^Hail-resistant panels held damage to \d+% of your solar fleet\. Repairs cost \$[\d.]+[KMB]? and take about \d+ days?\.$/,
-    );
-  });
-
   it("is independent of fleet order", () => {
     const { hits } = atHailOnset();
     const reordered = game(DENVER, HAIL.seed);
@@ -322,16 +308,6 @@ describe("hail damage", () => {
 });
 
 describe("retrofits", () => {
-  it("rejects new hail retrofits without charging or changing solar sites", () => {
-    const state = game(DENVER, HAIL.seed);
-    const solar = state.facilities.find((f) => f.fuel === "Sun")!;
-    const next = dispatch(
-      state,
-      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
-    );
-    expect(next).toEqual(state);
-  });
-
   it("charges the cost once, records it, and rejects a repeat", () => {
     const state = game(DENVER, HAIL.seed);
     tickToMonth(state, 1);
@@ -394,51 +370,6 @@ describe("retrofits", () => {
       getTimeFromTimeline(control.date.minute, control.timeline)!.expensesOM,
       6,
     );
-  });
-
-  it("resumes a legacy hail retrofit and finishes installing its protection", () => {
-    const state = game(DENVER, HAIL.seed);
-    tickToMonth(state, 1);
-    const [solar, other] = state.facilities.filter((f) => f.fuel === "Sun");
-    solar.upgradeInProgress = {
-      upgrade: "hailResistant",
-      cost: 4.5e6,
-      startsMinute: state.date.minute,
-      completesMinute: state.date.minute + MINUTES_PER_MONTH,
-    };
-    const saved = parseSave(JSON.parse(JSON.stringify(serializeSave(state))));
-    expect(saved).not.toBeNull();
-    const next = cloneDeep(gameReducer(undefined, resume(saved!.game)));
-    const completes = next.date.minute + MINUTES_PER_MONTH;
-    let otherPeakW = 0;
-    while (next.date.minute < completes - TICK_MINUTES) {
-      tickState(next);
-      expect(next.facilities.find((f) => f.id === solar.id)!.currentW).toBe(0);
-      otherPeakW = Math.max(
-        otherPeakW,
-        next.facilities.find((f) => f.id === other.id)!.currentW,
-      );
-    }
-    // The comparison array kept generating through the same daylight
-    expect(otherPeakW).toBeGreaterThan(0);
-    tickToMinute(next, completes + 12 * 60);
-    const done = next.facilities.find((f) => f.id === solar.id)!;
-    expect(done.upgradeInProgress).toBeUndefined();
-    expect(done.resilience?.hailResistant).toBe(true);
-    expect(
-      next.eventLog.some((e) => e.message.startsWith("Upgrade complete:")),
-    ).toBe(true);
-    // Back in service: it generates again once the sun is up
-    let peakW = 0;
-    tickToMinute(next, completes + MINUTES_PER_MONTH / 2);
-    for (let i = 0; i < 24 * 4; i++) {
-      tickState(next);
-      peakW = Math.max(
-        peakW,
-        next.facilities.find((f) => f.id === solar.id)!.currentW,
-      );
-    }
-    expect(peakW).toBeGreaterThan(0);
   });
 
   it("completes staged winterization without reporting a return to service", () => {

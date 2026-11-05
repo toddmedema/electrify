@@ -1073,12 +1073,10 @@ export type StoryAttributeValueType =
   string | number | boolean | string[] | number[];
 
 export type WeatherHazardType = "HAIL" | "EXTREME_COLD";
-export type ResilienceUpgradeType =
-  "hailResistant" | "coldWeatherPackage" | "solarTrackers";
+export type ResilienceUpgradeType = "coldWeatherPackage" | "solarTrackers";
 
 /** Weather hardening on one facility. Each field only applies to the fuel noted beside it. */
 export interface FacilityResilienceType {
-  hailResistant?: boolean; // "Sun" only
   // "Sun" only, and only at build: single-axis trackers that follow the sun and stow in hail
   solarTrackers?: boolean;
   // "Sun" with trackers: the share of hail damage a tracked array still takes, fixed at build by

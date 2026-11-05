@@ -21,8 +21,6 @@ import {
   getWeatherHazardProfile,
   HAIL_EXPOSURE_HIT_SHARE,
   HAIL_MAX_DAMAGED_FRACTION,
-  HAIL_RESISTANT_BUILD_SHARE,
-  HAIL_RESISTANT_DAMAGE_FACTOR,
   NORTHERN_HAIL_MONTHLY_WEIGHTS,
   regionalColdThresholdC,
   STANDARD_GAS_DESIGN_MIN_TEMP_C,
@@ -208,7 +206,6 @@ export interface HailImpactType {
   repairDays: number; // Whole days
   repairMinutes: number;
   repairCost: number; // What the company pays, charged once
-  hailResistant: boolean;
 }
 
 /**
@@ -240,14 +237,11 @@ export function sampleHailImpacts(args: {
         key,
         `facility|${facility.id}|repair`,
       );
-      const hailResistant = !!facility.resilience?.hailResistant;
       const damagedFraction =
         Math.min(
           HAIL_MAX_DAMAGED_FRACTION,
           (0.04 + 0.36 * intensity * intensity) * (0.5 + damageDraw),
-        ) *
-        (hailResistant ? HAIL_RESISTANT_DAMAGE_FACTOR : 1) *
-        trackerHailFactor(facility);
+        ) * trackerHailFactor(facility);
       const repairDays = Math.ceil(
         (5 + 80 * damagedFraction) * (0.8 + 0.4 * repairDraw),
       );
@@ -259,7 +253,6 @@ export function sampleHailImpacts(args: {
         repairDays,
         repairMinutes: realDaysToGameMinutes(repairDays),
         repairCost,
-        hailResistant,
       };
     })
     .sort((a, b) => a.facilityId - b.facilityId);
@@ -373,16 +366,16 @@ export function trackerOutputMultiplier(
   return 1 + TRACKER_SHOULDER_GAIN * sin(hourAngle) ** 2;
 }
 
-/** The weather protection shown for this technology, including build-only solar panels. */
+/** The upgrade shown for this technology, including build-only solar trackers. */
 function upgradeForFuel(fuel: unknown): ResilienceUpgradeType | undefined {
-  if (fuel === "Sun") return "hailResistant";
+  if (fuel === "Sun") return "solarTrackers";
   if (isWinterizationFuel(fuel)) return "coldWeatherPackage";
   return undefined;
 }
 
 /** Every option a new plant of this technology can be bought with. */
 function buildUpgradesForFuel(fuel: unknown): ResilienceUpgradeType[] {
-  if (fuel === "Sun") return ["solarTrackers", "hailResistant"];
+  if (fuel === "Sun") return ["solarTrackers"];
   if (isWinterizationFuel(fuel)) return ["coldWeatherPackage"];
   return [];
 }
@@ -427,7 +420,7 @@ function upgradeOffered(
         coldPackageCanHelp(game.location))
     );
   }
-  return isWeatherHazardEligible(game, "HAIL");
+  return false;
 }
 
 /** How long a retrofit holds a plant offline: one game month. */
@@ -524,9 +517,7 @@ export function retrofittedResilience(
   game: GameType,
   upgrade: ResilienceUpgradeType,
 ): FacilityResilienceType {
-  if (upgrade === "hailResistant") {
-    return { ...facility.resilience, hailResistant: true };
-  }
+  if (upgrade !== "coldWeatherPackage") return { ...facility.resilience };
   return {
     ...facility.resilience,
     coldWeatherPackage: true,
@@ -556,13 +547,11 @@ export type ResilienceSelectionType = Partial<
 
 const BUILD_OPTION_LABELS: Record<ResilienceUpgradeType, string> = {
   solarTrackers: "Solar trackers",
-  hailResistant: "Hail-resistant panels",
   coldWeatherPackage: "Cold-weather package",
 };
 
 const BUILD_OPTION_SHARES: Record<ResilienceUpgradeType, number> = {
   solarTrackers: TRACKER_BUILD_SHARE,
-  hailResistant: HAIL_RESISTANT_BUILD_SHARE,
   coldWeatherPackage: 0,
 };
 
@@ -776,12 +765,12 @@ export interface FacilityResilienceSummaryType {
   upgrade: ResilienceUpgradeType;
   label: string;
   installed: boolean;
-  detail?: string; // Hail only; gas shows its temperature rating instead
+  detail?: string; // Gas shows its temperature rating instead
   retrofitCost?: number; // Absent once installed
   replacementValue: number;
 }
 
-/** The resilience summary for a solar or gas facility, or undefined when none applies. */
+/** The upgrade summary for a solar or winterizable facility, or undefined when none applies. */
 export function facilityResilienceSummary(
   game: GameType,
   facility: FacilityOperatingType,
@@ -797,18 +786,11 @@ export function facilityResilienceSummary(
   const installed = !!facility.resilience?.[upgrade];
   let label: string;
   let detail: string | undefined;
-  if (upgrade === "hailResistant") {
-    const tracked = !!facility.resilience?.solarTrackers;
-    label = installed ? "Hail-resistant panels" : "Standard panels";
-    if (installed) {
-      detail = tracked
-        ? "Breaks less in a hailstorm, and trackers stow ahead of it."
-        : "Breaks less in a hailstorm.";
-    } else {
-      detail = tracked
-        ? "Trackers stow ahead of hail."
-        : "Takes full hail damage.";
-    }
+  if (upgrade === "solarTrackers") {
+    label = installed ? "Solar trackers" : "Fixed panels";
+    if (installed)
+      detail =
+        "About 20% more energy a year, mostly in the morning and evening.";
   } else {
     // The pane shows the plant's rating instead, in the player's temperature unit.
     label = installed ? "Cold-weather package" : "Standard winterization";

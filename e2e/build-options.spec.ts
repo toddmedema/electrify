@@ -605,7 +605,7 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`hail-resistant panels are available only during solar construction in ${theme}`, async ({
+  test(`solar purchase offers only trackers in ${theme}`, async ({
     page,
   }, info) => {
     await page.addInitScript((mode) => {
@@ -615,24 +615,6 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=108");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const fleet = page.locator(".facilities:visible");
-    await openPane(
-      fleet,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
-    const row = fleet.locator('.facilityRow[data-fuel="Sun"]').first();
-    await row.locator(".facilityDisclosure").click();
-    await expect(
-      row.getByRole("button", { name: /Add hail-resistant panels/ }),
-    ).toHaveCount(0);
-    if (info.project.name === "desktop-chromium") {
-      await row.click({ button: "right" });
-      await expect(page.getByRole("menu")).toBeVisible();
-      await expect(
-        page.getByRole("menuitem", { name: /Add hail-resistant panels/ }),
-      ).toHaveCount(0);
-      await page.keyboard.press("Escape");
-    }
     const build = await openBuild(page);
     await build.getByRole("tab", { name: "Generators", exact: true }).click();
     await build.getByRole("slider", { name: /^Capacity/ }).press("Home");
@@ -640,21 +622,20 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Review purchase of Solar", exact: true })
       .click();
     const dialog = page.getByRole("dialog");
-    const option = dialog.getByRole("checkbox", {
-      name: /^Hail-resistant panels/,
-    });
+    await expect(dialog.getByRole("checkbox")).toHaveCount(1);
+    const option = dialog.getByRole("checkbox", { name: /^Solar trackers/ });
     await expect(option).not.toBeChecked();
     await option.check();
     await expect(option).toBeChecked();
     if (
       process.env.REVIEW_SCREENSHOT_DIR &&
-      theme === "dark" &&
-      info.project.name === "desktop-chromium"
+      ((theme === "dark" && info.project.name === "desktop-chromium") ||
+        (theme === "light" && info.project.name === "mobile-390px"))
     ) {
       await dialog.screenshot({
         path: path.join(
           process.env.REVIEW_SCREENSHOT_DIR,
-          "solar-build-protection.png",
+          `solar-build-options-${info.project.name}.png`,
         ),
         animations: "disabled",
       });

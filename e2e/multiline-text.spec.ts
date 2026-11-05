@@ -173,7 +173,7 @@ for (const theme of ["light", "dark"] as const) {
         expect(title.x + title.width + 7).toBeLessThanOrEqual(close.x);
         if (name === "Solar") {
           const description = dialog.getByText(
-            "Follows the sun for about 20% more morning and evening power.",
+            "Follows the sun for about 20% more energy a year, mostly in the morning and evening.",
             { exact: true },
           );
           await expect(description).toBeVisible();

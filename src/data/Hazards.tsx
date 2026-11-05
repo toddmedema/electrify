@@ -38,10 +38,6 @@ export const DEFAULT_REGIONAL_COLD_THRESHOLD_C = { cold: -25, mild: -15 };
 export const HAIL_EXPOSURE_HIT_SHARE = 0.7;
 /** Largest share of one array a single storm can break; reported utility-PV losses stay partial. */
 export const HAIL_MAX_DAMAGED_FRACTION = 0.6;
-/** Hail-resistant arrays (thicker glass, tracker hail stow) break this share of a standard loss. */
-export const HAIL_RESISTANT_DAMAGE_FACTOR = 0.3;
-/** Extra build cost for hail-resistant design. Source: DOE FEMP solar hail resilience guide. */
-export const HAIL_RESISTANT_BUILD_SHARE = 0.03;
 
 /**
  * An upgrade added to a standing plant costs this multiple of building it in (crews remobilize

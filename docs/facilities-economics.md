@@ -398,8 +398,7 @@ All values are rounded game balance, not a site-specific risk assessment.
   climatologies (Cecil & Blankenship 2012; Bang & Cecil 2019) elsewhere. Unprofiled locations fall
   back by latitude band. The busiest hail regions are capped at 0.06 storms per year, so about
   nine 20-year runs in ten see at most two damaging storms even there, and most low-risk places
-  see none. A storm hits each array with 70% probability and breaks at most 60% of it;
-  hail-resistant designs break 30% as much.
+  see none. A storm hits each array with 70% probability and breaks at most 60% of it.
 - **Repairs.** The company pays the full repair cost once: the damaged share of the array's
   replacement value (its build cost carried forward by inflation).
 - **Extreme cold.** Each month's representative-day minimum is compared with each gas plant's
@@ -414,11 +413,10 @@ All values are rounded game balance, not a site-specific risk assessment.
   where the one-winter-in-twelve low reaches the standard -8 °C rating (or, without a weather
   record, outside the lowland tropics and subtropics); elsewhere it could never help. A cold snap's gas-price multiple is capped so that,
   combined with any authored gas shock that month, prices reach at most 3× normal.
-- **Hardening prices.** Hail-resistant panels add 3% to a solar build, after DOE FEMP's solar
-  hail-resilience guidance; a cold-weather package adds 2% to a gas build.
-- **Retrofits.** Either can be added to a standing plant for 1.5× its build share, charged on the
-  plant's replacement value (4.5% and 3%). The plant is offline for one game month while the work
-  is done, and the player can cancel before then for a full refund and immediate return to service.
+- **Hardening prices.** A cold-weather package adds 2% to a gas build.
+- **Retrofits.** A cold-weather package can be added to an eligible standing plant for 1.5× its
+  build share, charged on the plant's replacement value. Staged winterization keeps 90% of
+  capacity available for a game month. Cancel before completion for a full refund.
 - **Solar trackers.** A build-only option for solar, modelled on Nextpower (formerly Nextracker),
   the largest single-axis tracker supplier. It is available from 2014, when the self-powered NX
   Horizon tracker began shipping, and priced at 7% of the build: Nextpower's FY2025 revenue was
@@ -428,7 +426,7 @@ All values are rounded game balance, not a site-specific risk assessment.
   `1 + 0.6 sin²(hour angle)`, which is unchanged at noon and averages +20% over a clear day, still
   clipped at nameplate. Trackers stow steeply ahead of hail: arrays bought before 2024 take half
   the damage, and those bought from 2024 take a quarter, after NX Horizon Hail Pro-75's 75° stow
-  and VDE Americas' stow-angle findings. The share multiplies with hail-resistant panels.
+  and VDE Americas' stow-angle findings.
 
 ## Primary references
 

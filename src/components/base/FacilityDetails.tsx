@@ -41,7 +41,6 @@ import {
   coldPackageEffect,
   dayCount,
   formatDesignTemperature,
-  resilienceActionLabel,
   resilienceName,
 } from "./WeatherResilienceText";
 import { RETROFIT_COST_MULTIPLIER } from "../../data/Hazards";
@@ -168,7 +167,6 @@ function WeatherResilienceSection(props: {
       headingRef.current?.focus();
     }
   }, [focusHeading]);
-  const hail = summary.upgrade === "hailResistant";
   const cost = summary.retrofitCost;
   const cash = currentCash(game);
   const shortfall = cost === undefined ? 0 : Math.max(0, cost - cash);
@@ -177,28 +175,20 @@ function WeatherResilienceSection(props: {
   const designMinTempC =
     facility.resilience?.designMinTempC ?? STANDARD_GAS_DESIGN_MIN_TEMP_C;
   const detail =
-    hail || facility.fuel !== "Natural Gas"
+    facility.fuel !== "Natural Gas"
       ? summary.detail
       : `Rated to ${formatDesignTemperature(designMinTempC, units)}`;
-  const actionLabel = resilienceActionLabel(summary.upgrade);
+  const actionLabel = "Add cold-weather package";
   const retrofitted = canOffer
     ? retrofittedResilience(facility, game, summary.upgrade)
     : undefined;
   const hazard = facilityHazardStatus(game, facility);
   const installing = upgradeInProgress(facility);
   const activeOutage =
-    hazard && (hazard.hazard === "HAIL") === hail
-      ? hail
-        ? "Doesn't speed up current repairs."
-        : "Doesn't end this month's cold outage."
+    hazard?.hazard === "EXTREME_COLD"
+      ? "Doesn't end this month's cold outage."
       : undefined;
-  if (
-    !summary.installed &&
-    !facility.resilience?.solarTrackers &&
-    !installing &&
-    !canOffer
-  )
-    return <></>;
+  if (!summary.installed && !installing && !canOffer) return <></>;
   return (
     <section className="facilityDetailSection" aria-label="Upgrades">
       <Typography
@@ -216,16 +206,6 @@ function WeatherResilienceSection(props: {
           </Typography>
           <Typography variant="body2" color="textSecondary">
             {detail}
-          </Typography>
-        </div>
-      )}
-      {facility.resilience?.solarTrackers && (
-        <div className="facilityResilienceSummary">
-          <Typography variant="body2" className="facilityStatValue">
-            Solar trackers
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            About 20% more morning and evening power.
           </Typography>
         </div>
       )}
@@ -271,15 +251,13 @@ function WeatherResilienceSection(props: {
           }}
         >
           <DialogContentText>
-            {hail
-              ? "Less damage from future hail."
-              : facility.fuel !== "Natural Gas"
-                ? "Permanently halves this plant’s output losses in the deep freeze."
-                : coldPackageEffect(
-                    retrofitted?.designMinTempC ?? designMinTempC,
-                    designMinTempC,
-                    units,
-                  )}
+            {facility.fuel !== "Natural Gas"
+              ? "Permanently halves this plant’s output losses in the deep freeze."
+              : coldPackageEffect(
+                  retrofitted?.designMinTempC ?? designMinTempC,
+                  designMinTempC,
+                  units,
+                )}
           </DialogContentText>
           <DialogContentText>
             {summary.upgrade === "coldWeatherPackage"
