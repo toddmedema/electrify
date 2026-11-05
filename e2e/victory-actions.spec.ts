@@ -254,7 +254,7 @@ for (const { theme, native, currentRank } of [
     await expect(
       dialog.getByRole("region", { name: "Mission results" }),
     ).toContainText("final net worth");
-    const popup = page.locator(".achievementToastPanel");
+    const popup = page.locator(".achievementToastPanel").first();
     if (!nativeBoard) {
       await expect(popup).toBeVisible();
       // Prerequisite wins already earned Staying Power; this run earns Four Nines.
