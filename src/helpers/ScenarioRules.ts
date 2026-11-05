@@ -234,12 +234,14 @@ function customScenarioRules(
   parameters: Pick<GameType, "difficulty" | "seed">,
 ): CompiledScenarioRules | undefined {
   if (!scenario.eventScenarioIds?.length) return undefined;
+  const durationMonths =
+    scenario.durationMonths + (scenario.startingMonth ?? 1) - 1;
   const key = JSON.stringify([
     parameters.difficulty,
     parameters.seed,
     scenario.eventScenarioIds,
     scenario.startingYear,
-    scenario.durationMonths,
+    durationMonths,
     scenario.startingCustomers,
     scenario.startingDemandScale,
     getScenarioLocation(scenario),
@@ -263,6 +265,8 @@ function customScenarioRules(
     for (const original of compiled.events) {
       const event: CompiledRuleEvent = JSON.parse(JSON.stringify(original));
       event.id = `arc-${id}-${original.id}`;
+      if (event.durationUntilEnd)
+        event.durationMonths = Math.max(0, durationMonths - event.startMonth);
       if (event.effects.operatingExpensePerMonth !== undefined)
         event.effects.operatingExpensePerMonth *= moneyScale;
       event.targets = event.targets.map((operation) =>
@@ -282,7 +286,7 @@ function customScenarioRules(
     difficulty: parameters.difficulty,
     seed: parameters.seed,
     startingYear: scenario.startingYear,
-    durationMonths: scenario.durationMonths,
+    durationMonths,
     startingPeakW: 0,
     startingAssetIds: scenario.facilities.flatMap((asset) =>
       asset.assetId ? [asset.assetId] : [],

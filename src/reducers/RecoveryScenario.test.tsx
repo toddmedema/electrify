@@ -11,8 +11,41 @@ import { runFailure } from "../helpers/ObjectiveRules";
 import { legacyCompletedMonths } from "../helpers/LegacyCampaign";
 import { currentTick } from "../helpers/GameSelectors";
 import { tickState } from "./Game";
+import { getStore } from "../StoreRegistry";
+import { snackbarClose } from "./UI";
 
 const scenarioId = CHERNOBYL_SCENARIO.id;
+
+it.each([
+  [scenarioId, true],
+  [100, false],
+] as const)(
+  "describes the actual customer consequences of blackouts in scenario %i",
+  (id, retainsCustomers) => {
+    jest.useFakeTimers();
+    try {
+      getStore().dispatch(snackbarClose());
+      const game = cloneDeep(createGame({ scenarioId: id }));
+      game.facilities.forEach((facility) => {
+        facility.paused = true;
+      });
+      tickState(game);
+      jest.runOnlyPendingTimers();
+      expect(getStore().getState().ui.snackbar.message).toContain("Blackout:");
+      const message = getStore().getState().ui.snackbar.message;
+      expect(message.includes("Customers leave while it lasts.")).toBe(
+        !retainsCustomers,
+      );
+      expect(message.includes("Blackouts reduce your score.")).toBe(
+        retainsCustomers,
+      );
+    } finally {
+      getStore().dispatch(snackbarClose());
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    }
+  },
+);
 
 it("opens in March without inventing pre-term history or rolling over on its first tick", () => {
   const game = cloneDeep(createGame({ scenarioId }));
