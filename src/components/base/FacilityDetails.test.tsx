@@ -42,7 +42,7 @@ function withSolar(game: GameType) {
     id: 3,
     name: "Solar",
     fuel: "Sun",
-    resilience: undefined,
+    resilience: { solarTrackers: false },
   } as FacilityOperatingType;
   game.facilities.push(solar);
   return solar;
@@ -238,6 +238,22 @@ describe("weather resilience details", () => {
     expect(
       screen.queryByRole("button", { name: /^Add cold-weather package/ }),
     ).toBeNull();
+  });
+
+  it("names trackers on a tracked solar farm", () => {
+    const game = carbonFee();
+    const solar = withSolar(game);
+    solar.resilience = {
+      solarTrackers: true,
+      trackerHailDamageFactor: 0.5,
+    };
+    showDetails(game, solar);
+    expect(section()).toHaveTextContent(
+      "Solar trackersAbout 20% more morning and evening power.",
+    );
+    expect(section()).toHaveTextContent(
+      "About 20% more morning and evening power.",
+    );
   });
 
   it("offers no retrofit while a plant is under construction", () => {

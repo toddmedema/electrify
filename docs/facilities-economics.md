@@ -205,7 +205,7 @@ poor proxy for the physical value the player can sell:
 | Oil                 | 30 years | NREL technology-comparison economic life for combustion turbines |
 | Onshore wind        | 25 years | EIA AEO2025 large-plant operating life                           |
 | Offshore wind       | 25 years | EIA AEO2025 fixed-bottom operating life                          |
-| Solar PV            | 35 years | EIA AEO2025 PV operating life                                    |
+| Solar PV            | 35 years | EIA AEO2025 single-axis PV operating life                        |
 | Hydropower          | 50 years | EIA AEO2025 reference operating life                             |
 | Geothermal          | 40 years | EIA AEO2025 dual-flash operating life                            |
 | Enhanced geothermal | 30 years | NREL EGS resource and plant-life assumption                      |
@@ -417,6 +417,16 @@ All values are rounded game balance, not a site-specific risk assessment.
 - **Retrofits.** A cold-weather package can be added to an eligible standing plant for 1.5× its
   build share, charged on the plant's replacement value. Staged winterization keeps 90% of
   capacity available for a game month. Cancel before completion for a full refund.
+- **Solar trackers.** A build-only option for solar, modelled on Nextpower (formerly Nextracker),
+  the largest single-axis tracker supplier. It is available from 2014, when the self-powered NX
+  Horizon tracker began shipping, and priced at 7% of the build: Nextpower's FY2025 revenue was
+  about $0.09 per watt delivered ($2.96B for 34 GW, Form 10-K), against roughly $1.25/W for
+  utility PV (LBNL Utility-Scale Solar). Tracking adds about 20% of annual energy over fixed tilt
+  (LBNL, NREL PVWatts), almost all of it in the morning and evening. The game scales output by
+  `1 + 0.6 sin²(hour angle)`, which is unchanged at noon and averages +20% over a clear day, still
+  clipped at nameplate. Trackers stow steeply ahead of hail: arrays bought before 2024 take half
+  the damage, and those bought from 2024 take a quarter, after NX Horizon Hail Pro-75's 75° stow
+  and VDE Americas' stow-angle findings.
 
 ## Primary references
 

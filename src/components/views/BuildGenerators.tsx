@@ -56,7 +56,10 @@ import {
   ResilienceSelectionType,
   withResilienceOptions,
 } from "../../helpers/Hazards";
-import { STANDARD_GAS_DESIGN_MIN_TEMP_C } from "../../data/Hazards";
+import {
+  STANDARD_GAS_DESIGN_MIN_TEMP_C,
+  TRACKER_ANNUAL_ENERGY_MULTIPLIER,
+} from "../../data/Hazards";
 import {
   coldPackageEffect,
   formatDesignTemperature,
@@ -345,36 +348,49 @@ export function GeneratorBuildItem(
   const optionDetails = (
     option: ResilienceBuildOptionType,
   ): { text: string; warning?: boolean }[] => {
-    if (!props.withResilience) return [];
-    const standardMinTempC =
-      props.withResilience({}).resilience?.designMinTempC ??
-      STANDARD_GAS_DESIGN_MIN_TEMP_C;
-    const lines: { text: string; warning?: boolean }[] = [
-      {
-        text:
-          generator.fuel !== "Natural Gas"
-            ? "Permanently halves this plant’s output losses in the deep freeze."
-            : coldPackageEffect(
-                props.withResilience({ [option.upgrade]: true }).resilience
-                  ?.designMinTempC ?? standardMinTempC,
-                standardMinTempC,
-                units,
-              ),
-      },
-    ];
-    if (option.defaultSelected) {
-      lines.push({
-        text: `Recommended here: winters often drop below ${formatDesignTemperature(standardMinTempC, units)}.`,
-      });
+    switch (option.upgrade) {
+      case "solarTrackers":
+        return [
+          {
+            text: "Follows the sun for about 20% more morning and evening power.",
+          },
+          { text: "Stows in hail. Can't be added later." },
+        ];
+      default: {
+        if (!props.withResilience) return [];
+        const standardMinTempC =
+          props.withResilience({}).resilience?.designMinTempC ??
+          STANDARD_GAS_DESIGN_MIN_TEMP_C;
+        const lines: { text: string; warning?: boolean }[] = [
+          {
+            text:
+              generator.fuel !== "Natural Gas"
+                ? "Permanently halves this plant’s output losses in the deep freeze."
+                : coldPackageEffect(
+                    props.withResilience({ [option.upgrade]: true }).resilience
+                      ?.designMinTempC ?? standardMinTempC,
+                    standardMinTempC,
+                    units,
+                  ),
+          },
+        ];
+        if (option.defaultSelected) {
+          lines.push({
+            text: `Recommended here: winters often drop below ${formatDesignTemperature(standardMinTempC, units)}.`,
+          });
+        }
+        return lines;
+      }
     }
-    return lines;
   };
   const anySelected = resilienceOptions.some(
     (option) => resilienceSelection[option.upgrade],
   );
   const affordabilityWarning =
     anySelected && !quoteCanBuild && canBuild
-      ? "Uncheck to afford the downpayment."
+      ? resilienceOptions.length > 1
+        ? "Uncheck options to afford the downpayment."
+        : "Uncheck to afford the downpayment."
       : undefined;
 
   const compareAction = props.onCompare && canBuild && (
@@ -755,7 +771,13 @@ export function GeneratorBuildItem(
           {
             concept: "supply",
             label: "Typical output",
-            value: `+${formatWatts(typicalOutputW)}`,
+            // The selected quote's trackers add their morning and evening energy
+            value: `+${formatWatts(
+              typicalOutputW *
+                (quote.resilience?.solarTrackers
+                  ? TRACKER_ANNUAL_ENERGY_MULTIPLIER
+                  : 1),
+            )}`,
             detail: waterShape
               ? `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`
               : `${formatWatts(generator.peakW)} max; weather may limit it.`,

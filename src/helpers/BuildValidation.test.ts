@@ -33,10 +33,15 @@ describe("validBuildFacility weather resilience", () => {
         }),
       ),
     ).toBe(true);
-    expect(valid(generator({ fuel: "Sun" }))).toBe(true);
+    expect(
+      valid(generator({ fuel: "Sun", resilience: { solarTrackers: true } })),
+    ).toBe(true);
   });
 
   it("rejects hardening on the wrong technology", () => {
+    expect(valid(generator({ resilience: { solarTrackers: true } }))).toBe(
+      false,
+    );
     expect(
       valid(
         generator({ fuel: "Sun", resilience: { coldWeatherPackage: true } }),
@@ -44,6 +49,9 @@ describe("validBuildFacility weather resilience", () => {
     ).toBe(false);
     expect(
       valid(generator({ fuel: "Sun", resilience: { designMinTempC: -20 } })),
+    ).toBe(false);
+    expect(
+      valid(generator({ fuel: "Wind", resilience: { solarTrackers: false } })),
     ).toBe(false);
   });
 
@@ -57,6 +65,24 @@ describe("validBuildFacility weather resilience", () => {
       expect(valid(generator({ resilience: { designMinTempC } }))).toBe(false);
     });
     expect(valid(generator({ resilience: { extra: true } }))).toBe(false);
+    [0, 1.5, Number.NaN].forEach((trackerHailDamageFactor) => {
+      expect(
+        valid(
+          generator({
+            fuel: "Sun",
+            resilience: { solarTrackers: true, trackerHailDamageFactor },
+          }),
+        ),
+      ).toBe(false);
+    });
+    expect(
+      valid(
+        generator({
+          fuel: "Sun",
+          resilience: { solarTrackers: true, trackerHailDamageFactor: 0.5 },
+        }),
+      ),
+    ).toBe(true);
     expect(valid(generator({ resilienceExtraBuildCost: -1 }))).toBe(false);
     expect(valid(generator({ resilienceExtraBuildCost: 2_000_000 }))).toBe(
       false,
@@ -83,7 +109,7 @@ describe("validBuildFacility gas cycle", () => {
 describe("validRetrofitFacility", () => {
   it("accepts a facility id and a known upgrade", () => {
     expect(
-      validRetrofitFacility({ facilityId: 3, upgrade: "coldWeatherPackage" }),
+      validRetrofitFacility({ facilityId: 3, upgrade: "solarTrackers" }),
     ).toBe(true);
     expect(
       validRetrofitFacility({ facilityId: 0, upgrade: "coldWeatherPackage" }),
@@ -94,11 +120,11 @@ describe("validRetrofitFacility", () => {
     [
       undefined,
       null,
-      "coldWeatherPackage",
+      "solarTrackers",
       { facilityId: 3 },
-      { facilityId: -1, upgrade: "coldWeatherPackage" },
-      { facilityId: 1.5, upgrade: "coldWeatherPackage" },
-      { facilityId: "3", upgrade: "coldWeatherPackage" },
+      { facilityId: -1, upgrade: "solarTrackers" },
+      { facilityId: 1.5, upgrade: "solarTrackers" },
+      { facilityId: "3", upgrade: "solarTrackers" },
       { facilityId: 3, upgrade: "floodWall" },
     ].forEach((payload) => {
       expect(validRetrofitFacility(payload)).toBe(false);

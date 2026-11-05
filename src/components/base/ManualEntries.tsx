@@ -1220,7 +1220,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.WEATHER_DAMAGE,
     group: "Gameplay",
     keywords:
-      "hail storm freeze cold snap winterization repair resilience retrofit hardening cold-weather package downtime",
+      "hail storm freeze cold snap winterization repair resilience retrofit hardening cold-weather package solar trackers downtime",
     entry: (
       <div>
         <p>
@@ -1256,6 +1256,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           In Deep Freeze, gas, coal, nuclear and wind plants can be winterized
           permanently. The bulk offer covers eligible plants still needing
           protection; new builds need their own package.
+        </p>
+        <p>
+          <strong>Solar trackers</strong> (from 2014, only when building) turn
+          panels to follow the sun, adding about 20% more power a year, mostly
+          in the morning and evening (a higher{" "}
+          <EntryLink to={MANUAL_ENTRY.CAPACITY_FACTOR}>
+            capacity factor
+          </EntryLink>
+          ). They also tilt panels steeply to reduce hail damage.
         </p>
       </div>
     ),

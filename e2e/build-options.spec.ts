@@ -605,7 +605,7 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`solar purchase needs no optional upgrades in ${theme}`, async ({
+  test(`solar purchase offers only trackers in ${theme}`, async ({
     page,
   }, info) => {
     await page.addInitScript((mode) => {
@@ -622,7 +622,11 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Review purchase of Solar", exact: true })
       .click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("checkbox")).toHaveCount(0);
+    await expect(dialog.getByRole("checkbox")).toHaveCount(1);
+    const option = dialog.getByRole("checkbox", { name: /^Solar trackers/ });
+    await expect(option).not.toBeChecked();
+    await option.check();
+    await expect(option).toBeChecked();
     if (
       process.env.REVIEW_SCREENSHOT_DIR &&
       ((theme === "dark" && info.project.name === "desktop-chromium") ||

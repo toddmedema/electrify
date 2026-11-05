@@ -640,13 +640,24 @@ describe("SaveGame", () => {
       resilience: { coldWeatherPackage: true, designMinTempC: -30 },
     };
     expect(withFacility(gas)).not.toBeNull();
-    expect(withFacility({ fuel: "Sun", resilience: undefined })).not.toBeNull();
+    expect(
+      withFacility({ fuel: "Sun", resilience: { solarTrackers: true } }),
+    ).not.toBeNull();
     [
       { ...gas, resilience: { coldWeatherPackage: "yes" } },
       { ...gas, resilience: { designMinTempC: 5 } },
+      { ...gas, resilience: { solarTrackers: true } },
       { ...gas, resilience: "hardened" },
       { fuel: "Sun", resilience: { coldWeatherPackage: true } },
+      { fuel: "Uranium", resilience: { solarTrackers: false } },
+      { fuel: "Sun", resilience: { trackerHailDamageFactor: 0 } },
     ].forEach((patch) => expect(withFacility(patch)).toBeNull());
+    expect(
+      withFacility({
+        fuel: "Sun",
+        resilience: { solarTrackers: true, trackerHailDamageFactor: 0.25 },
+      }),
+    ).not.toBeNull();
   });
 
   it("validates a retrofit being installed", () => {

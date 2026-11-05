@@ -172,6 +172,19 @@ for (const theme of ["light", "dark"] as const) {
           .boundingBox())!;
         expect(title.x + title.width + 7).toBeLessThanOrEqual(close.x);
         if (name === "Solar") {
+          const description = dialog.getByText(
+            "Follows the sun for about 20% more morning and evening power.",
+            { exact: true },
+          );
+          await expect(description).toBeVisible();
+          if (page.viewportSize()!.width < 600) {
+            const lines = await description.evaluate(
+              (el) =>
+                el.getBoundingClientRect().height /
+                parseFloat(getComputedStyle(el).lineHeight),
+            );
+            expect(lines).toBeGreaterThan(1);
+          }
           await reviewScreenshot(page, {
             path: info.outputPath(`solar-purchase-${theme}.png`),
             animations: "disabled",

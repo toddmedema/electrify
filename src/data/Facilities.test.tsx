@@ -545,11 +545,13 @@ describe("weather resilience defaults", () => {
     expect(extra).toBeGreaterThan(0);
   });
 
-  it("quotes solar without optional upgrades", () => {
+  it("offers solar trackers unselected by default", () => {
     const solar = quotes(dallas).filter((g) => g.fuel === "Sun");
     expect(solar.length).toBeGreaterThan(0);
     solar.forEach((g) => {
-      expect(g.resilience).toBeUndefined();
+      expect(g.resilience).toEqual({
+        solarTrackers: false,
+      });
       expect(g.resilienceExtraBuildCost).toBeUndefined();
     });
   });

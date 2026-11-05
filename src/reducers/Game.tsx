@@ -284,6 +284,7 @@ import {
   retrofitOutputMultiplier,
   retrofittedResilience,
   sampleHailImpacts,
+  trackerOutputMultiplier,
   upgradeInProgress,
   isUpgradingAt,
 } from "../helpers/Hazards";
@@ -1139,7 +1140,12 @@ function completeRetrofits(state: GameType, simulated = false) {
     if (upgrade.upgrade === "combinedCycle") {
       completeGasConversion(facility, context);
       if (!simulated) desktopSimulationHooks()?.converted(state, facility.id);
-    } else facility.resilience = retrofittedResilience(facility, context);
+    } else
+      facility.resilience = retrofittedResilience(
+        facility,
+        context,
+        upgrade.upgrade,
+      );
     delete facility.upgradeInProgress;
     if (simulated) return;
     // Staged winterization keeps the plant running, so it never comes back online.
@@ -5319,8 +5325,15 @@ function* supplyFacilitiesFinancesPhases(
         const requiredTargetW = Math.max(targetW, mandatedW);
         switch (g.fuel) {
           case "Sun":
+            // Trackers raise morning and evening output; the array still clips at nameplate.
             g.currentW =
-              availablePeakW * outputFactor * Math.min(1, solarOutputFactor);
+              availablePeakW *
+              outputFactor *
+              Math.min(
+                1,
+                solarOutputFactor *
+                  trackerOutputMultiplier(g, tickDate.minuteOfDay),
+              );
             break;
           case "Wind":
             g.currentW = availablePeakW * outputFactor * windOutputFactor;

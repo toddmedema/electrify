@@ -565,7 +565,7 @@ describe("weather hazards in the fleet", () => {
       id: 3,
       name: "Solar",
       fuel: "Sun",
-      resilience: undefined,
+      resilience: { solarTrackers: false },
     } as FacilityOperatingType);
     return state;
   }
