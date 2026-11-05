@@ -3947,11 +3947,6 @@ $pane_header_height: 48px;
       animation: tutorialTargetPulse 10s ease-in-out infinite;
     }
 
-    // The next segment paints over an outset focus ring unless the focused one is raised
-    &:focus-visible {
-      z-index: 2;
-    }
-
     @media (prefers-reduced-motion: reduce) {
       &[data-active-speed="true"]::before {
         animation: none;
