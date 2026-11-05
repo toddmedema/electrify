@@ -47,6 +47,7 @@ export default function ChartLegend(props: Props): React.JSX.Element {
             <svg
               className="chartLegendSwatch chartLegendSwatch-line"
               viewBox="0 0 20 4"
+              preserveAspectRatio="none"
               aria-hidden="true"
             >
               <line
@@ -75,7 +76,7 @@ export default function ChartLegend(props: Props): React.JSX.Element {
               }}
             />
           )}
-          {item.name}
+          <span className="chartLegendLabel">{item.name}</span>
         </span>
       ))}
       {props.note && <span className="chartLegendNote">{props.note}</span>}
