@@ -1259,7 +1259,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           <strong>Solar trackers</strong> (from 2014, only when building) turn
-          panels to follow the sun, adding about 20% more power a year, mostly
+          panels to follow the sun, adding about 20% more energy a year, mostly
           in the morning and evening (a higher{" "}
           <EntryLink to={MANUAL_ENTRY.CAPACITY_FACTOR}>
             capacity factor

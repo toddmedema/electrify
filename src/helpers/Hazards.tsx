@@ -788,7 +788,9 @@ export function facilityResilienceSummary(
   let detail: string | undefined;
   if (upgrade === "solarTrackers") {
     label = installed ? "Solar trackers" : "Fixed panels";
-    if (installed) detail = "About 20% more morning and evening power.";
+    if (installed)
+      detail =
+        "About 20% more energy a year, mostly in the morning and evening.";
   } else {
     // The pane shows the plant's rating instead, in the player's temperature unit.
     label = installed ? "Cold-weather package" : "Standard winterization";

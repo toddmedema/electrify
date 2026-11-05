@@ -240,7 +240,7 @@ describe("weather resilience details", () => {
     ).toBeNull();
   });
 
-  it("names trackers on a tracked solar farm", () => {
+  it("describes tracker gain as annual energy on a tracked solar farm", () => {
     const game = carbonFee();
     const solar = withSolar(game);
     solar.resilience = {
@@ -249,10 +249,10 @@ describe("weather resilience details", () => {
     };
     showDetails(game, solar);
     expect(section()).toHaveTextContent(
-      "Solar trackersAbout 20% more morning and evening power.",
+      "Solar trackersAbout 20% more energy a year, mostly in the morning and evening.",
     );
     expect(section()).toHaveTextContent(
-      "About 20% more morning and evening power.",
+      "About 20% more energy a year, mostly in the morning and evening.",
     );
   });
 

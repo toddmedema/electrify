@@ -1145,7 +1145,7 @@ describe("weather hardening in the purchase dialog", () => {
     ).toBeNull();
   });
 
-  it("offers solar trackers at build, pitched on morning and evening output", () => {
+  it("offers solar trackers at build, described by annual energy gain", () => {
     const onBuild = showBuildList();
     fireEvent.click(
       screen.getByRole("button", { name: "Review purchase of Solar" }),
@@ -1156,7 +1156,7 @@ describe("weather hardening in the purchase dialog", () => {
     });
     expect(option).not.toBeChecked();
     expect(option).toHaveAccessibleDescription(
-      /more morning and evening power.*Stows in hail\. Can't be added later\./,
+      /20% more energy a year.*morning and evening.*Stows in hail\. Can't be added later\./,
     );
     fireEvent.click(option);
     fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));

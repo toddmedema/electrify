@@ -352,7 +352,7 @@ export function GeneratorBuildItem(
       case "solarTrackers":
         return [
           {
-            text: "Follows the sun for about 20% more morning and evening power.",
+            text: "Follows the sun for about 20% more energy a year, mostly in the morning and evening.",
           },
           { text: "Stows in hail. Can't be added later." },
         ];
