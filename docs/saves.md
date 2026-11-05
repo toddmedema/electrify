@@ -16,9 +16,7 @@ policy to independent buying and selling rules with the same permissions: import
 serve shortages and exports use surplus. Neither storage imports nor profitable
 extra generation is enabled by migration. Recorded history, facilities, finances,
 policy queues and commitment forecasts stay intact. Schema 8 adds a version fence:
-apps without the continued-run forecast refresh must not load those saves. Schema 9 removes
-retired solar options and unfinished retired installations while keeping financial history
-and supported tracker settings. Retired installations no longer hold a plant offline.
+apps without the continued-run forecast refresh must not load those saves.
 
 Schemas before 6 are unsupported development formats. Missing, malformed and newer
 schema tags are rejected rather than guessed at. A valid newer tag retains the

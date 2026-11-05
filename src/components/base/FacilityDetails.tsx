@@ -180,7 +180,7 @@ function WeatherResilienceSection(props: {
       : `Rated to ${formatDesignTemperature(designMinTempC, units)}`;
   const actionLabel = "Add cold-weather package";
   const retrofitted = canOffer
-    ? retrofittedResilience(facility, game, summary.upgrade)
+    ? retrofittedResilience(facility, game)
     : undefined;
   const hazard = facilityHazardStatus(game, facility);
   const installing = upgradeInProgress(facility);

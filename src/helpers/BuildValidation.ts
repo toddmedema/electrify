@@ -17,12 +17,10 @@ function nonNegative(value: unknown): value is number {
 
 const FACILITY_UPGRADES: readonly FacilityUpgradeType[] = [
   "coldWeatherPackage",
-  "solarTrackers",
   "combinedCycle",
 ];
 
 const RESILIENCE_FIELDS_BY_FUEL: Readonly<Record<string, readonly string[]>> = {
-  Sun: ["solarTrackers", "trackerHailDamageFactor"],
   "Natural Gas": ["coldWeatherPackage", "designMinTempC"],
   Coal: ["coldWeatherPackage"],
   Uranium: ["coldWeatherPackage"],
@@ -31,7 +29,7 @@ const RESILIENCE_FIELDS_BY_FUEL: Readonly<Record<string, readonly string[]>> = {
 
 /**
  * Weather hardening on a quote or a saved facility: known flags only, each on the technology it
- * applies to, with a bounded gas design temperature and tracker hail share, so an edited save
+ * applies to, with a bounded gas design temperature, so an edited save
  * cannot harden a plant it does not describe.
  */
 export function validResilienceRecord(fuel: unknown, raw: unknown): boolean {
@@ -48,14 +46,6 @@ export function validResilienceRecord(fuel: unknown, raw: unknown): boolean {
           Number.isFinite(value) &&
           value >= DESIGN_MIN_TEMP_BOUNDS_C.min &&
           value <= DESIGN_MIN_TEMP_BOUNDS_C.max
-        );
-      }
-      if (key === "trackerHailDamageFactor") {
-        return (
-          typeof value === "number" &&
-          Number.isFinite(value) &&
-          value > 0 &&
-          value <= 1
         );
       }
       return typeof value === "boolean";

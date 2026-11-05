@@ -1145,28 +1145,6 @@ describe("weather hardening in the purchase dialog", () => {
     ).toBeNull();
   });
 
-  it("offers solar trackers at build, pitched on morning and evening output", () => {
-    const onBuild = showBuildList();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Review purchase of Solar" }),
-    );
-    const dialog = screen.getByRole("dialog");
-    const option = within(dialog).getByRole("checkbox", {
-      name: /^Solar trackers \+\$/,
-    });
-    expect(option).not.toBeChecked();
-    expect(option).toHaveAccessibleDescription(
-      /more morning and evening power.*Stows in hail\. Can't be added later\./,
-    );
-    fireEvent.click(option);
-    fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
-    const [quote] = onBuild.mock.calls[0];
-    expect(quote.resilience).toMatchObject({
-      solarTrackers: true,
-    });
-    expect(quote.resilience.trackerHailDamageFactor).toBeGreaterThan(0);
-  });
-
   function gasItem(cash: number, onBuild = jest.fn()) {
     const game = coldGame();
     const quote = GENERATORS(game, 419000000, [], []).find(

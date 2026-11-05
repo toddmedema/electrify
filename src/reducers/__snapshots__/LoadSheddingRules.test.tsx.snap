@@ -2,35 +2,35 @@
 
 exports[`CEO phase and forecast facts are pinned 1`] = `
 Object {
-  "grid": "ef46696be3f75d741b75aecd1a859c9a79f342233deccb73fe27a704ec74d110",
+  "grid": "e43ae2d83fc58638286a147a3e7078efac792914d4a3224158f377aaae46ddeb",
   "phases": "81941eddddac3754c0d814dec198a37e17b55a7bf7948236ed8cabd6d5105d95",
 }
 `;
 
 exports[`Employee phase and forecast facts are pinned 1`] = `
 Object {
-  "grid": "04669f0f142bed32374d1d62a474ce6169f0a5b28bcf8757a620a6a7d0fcde3c",
+  "grid": "64257b9cf87289ab9e81c30b461f10b28a509db0097f092abade5b7e841e9c1d",
   "phases": "89c14b4b7babd4b82b7f8208c3f99fae1ade9933765b91ebe063ea13ba822c4e",
 }
 `;
 
 exports[`Intern phase and forecast facts are pinned 1`] = `
 Object {
-  "grid": "54b20a7252ede2d8393647369843ed352decfe90baae03cf7dd0fbb41b56a608",
+  "grid": "0f82fb5224e55533cd08b5f391c2e00079f2baf1973fe94e708bafb3d3a8a87a",
   "phases": "3b11ea3f5fa81a4a0c0d389f0f394d58befcfcb588b4675b3337e33cb2e354b7",
 }
 `;
 
 exports[`Manager phase and forecast facts are pinned 1`] = `
 Object {
-  "grid": "9d8f3bff09111c7019ee31f5465442de48ef13dc69fdda1cd59dd3cecfb72e65",
+  "grid": "e39fad04b8ea4f4daaf00f01b85183f1bd995515750ac5de0c0603a51ea38218",
   "phases": "f55912bdae4a999afe82ee30d5d5721e74de391ca1f81a4da88f2533d355e5a9",
 }
 `;
 
 exports[`VP phase and forecast facts are pinned 1`] = `
 Object {
-  "grid": "fb02461421434ccaba5d4a85d3986ce2b7d32a4b5d79a12710570fbac12a19f2",
+  "grid": "d3a422f595ee104312ea908f7085a5a25d616a910b5c17d862591d82fc1f54e2",
   "phases": "0028d906cddb15dfcd6c1124d726236f1f6f29d22713936b91f5482fb77476d8",
 }
 `;

@@ -24,12 +24,6 @@ import {
   NORTHERN_HAIL_MONTHLY_WEIGHTS,
   regionalColdThresholdC,
   STANDARD_GAS_DESIGN_MIN_TEMP_C,
-  TRACKER_BUILD_SHARE,
-  TRACKER_FIRST_YEAR,
-  TRACKER_HAIL_DAMAGE_FACTOR,
-  TRACKER_HAIL_PRO_DAMAGE_FACTOR,
-  TRACKER_HAIL_PRO_YEAR,
-  TRACKER_SHOULDER_GAIN,
   WEATHER_HAZARD_AUTHORED_FREEZE_SCENARIOS,
   WEATHER_HAZARD_OPT_OUT_SCENARIOS,
   WEATHER_HAZARD_TUTORIAL_SCENARIOS,
@@ -41,7 +35,7 @@ import { isWinterizationFuel, winterizationPrice } from "./Winterization";
 import { TICK_MINUTES } from "../Constants";
 import { randomAt, RANDOM_STREAM } from "./Math";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
-import { exp, sin } from "./Libm";
+import { exp } from "./Libm";
 
 /**
  * Hail damage to solar and extreme cold for gas (issue #73), as pure functions of game state.
@@ -237,11 +231,10 @@ export function sampleHailImpacts(args: {
         key,
         `facility|${facility.id}|repair`,
       );
-      const damagedFraction =
-        Math.min(
-          HAIL_MAX_DAMAGED_FRACTION,
-          (0.04 + 0.36 * intensity * intensity) * (0.5 + damageDraw),
-        ) * trackerHailFactor(facility);
+      const damagedFraction = Math.min(
+        HAIL_MAX_DAMAGED_FRACTION,
+        (0.04 + 0.36 * intensity * intensity) * (0.5 + damageDraw),
+      );
       const repairDays = Math.ceil(
         (5 + 80 * damagedFraction) * (0.8 + 0.4 * repairDraw),
       );
@@ -335,92 +328,34 @@ export function resolveColdImpact(args: {
   };
 }
 
-/** The share of a hailstorm's damage a tracked array still takes; 1 without trackers. */
-function trackerHailFactor(facility: FacilityOperatingType): number {
-  return facility.resilience?.solarTrackers
-    ? (facility.resilience.trackerHailDamageFactor ??
-        TRACKER_HAIL_DAMAGE_FACTOR)
-    : 1;
-}
-
-/** The hail share trackers bought in this year keep: steeper stow arrived with Hail Pro-75. */
-export function trackerHailDamageFactorForYear(year: number): number {
-  return year >= TRACKER_HAIL_PRO_YEAR
-    ? TRACKER_HAIL_PRO_DAMAGE_FACTOR
-    : TRACKER_HAIL_DAMAGE_FACTOR;
-}
-
-/**
- * A tracked array's output relative to a fixed one at this time of day. Trackers gain little at
- * noon, when a fixed array already faces the sun, and most in the morning and evening; see
- * TRACKER_SHOULDER_GAIN. The simulation clamps the product at nameplate as it does for any array.
- */
-export function trackerOutputMultiplier(
-  facility: FacilityOperatingType,
-  minuteOfDay: number,
-): number {
-  if (!facility.resilience?.solarTrackers) {
-    return 1;
-  }
-  const hourAngle = ((minuteOfDay / 60 - 12) / 12) * Math.PI;
-  return 1 + TRACKER_SHOULDER_GAIN * sin(hourAngle) ** 2;
-}
-
-/** The upgrade shown for this technology, including build-only solar trackers. */
+/** The weather upgrade shown for this technology. */
 function upgradeForFuel(fuel: unknown): ResilienceUpgradeType | undefined {
-  if (fuel === "Sun") return "solarTrackers";
-  if (isWinterizationFuel(fuel)) return "coldWeatherPackage";
-  return undefined;
+  return isWinterizationFuel(fuel) ? "coldWeatherPackage" : undefined;
 }
 
-/** Every option a new plant of this technology can be bought with. */
-function buildUpgradesForFuel(fuel: unknown): ResilienceUpgradeType[] {
-  if (fuel === "Sun") return ["solarTrackers"];
-  if (isWinterizationFuel(fuel)) return ["coldWeatherPackage"];
-  return [];
-}
-
-/**
- * Whether an upgrade is offered in this game at all. Hardening needs its hazard to be able to
- * occur, and a cold-weather package is only sold where cold can plausibly breach a standard
- * plant's rating. Trackers pay for themselves in sunshine alone, so they are offered wherever the
- * technology exists, except in tutorials that teach one mechanic at a time.
- */
-function upgradeOffered(
-  game: GameType,
-  upgrade: ResilienceUpgradeType,
-  fuel?: unknown,
-): boolean {
-  if (upgrade === "solarTrackers") {
-    return (
-      !WEATHER_HAZARD_TUTORIAL_SCENARIOS.has(game.scenarioId) &&
-      game.date.year >= TRACKER_FIRST_YEAR
+/** Winterization is offered where cold can breach a standard plant's rating. */
+function upgradeOffered(game: GameType, fuel?: unknown): boolean {
+  if (
+    game.storyEffectsDisabled ||
+    WEATHER_HAZARD_TUTORIAL_SCENARIOS.has(game.scenarioId)
+  )
+    return false;
+  const rules = game.customScenario?.mod?.rules ?? game.customScenario?.rules;
+  const authored =
+    game.scenarioId === 107 ||
+    !!game.customScenario?.eventScenarioIds?.includes(107) ||
+    [...(rules?.events ?? []), ...(rules?.arcEvents ?? [])].some(
+      (event) =>
+        event.protection?.kind === "deepFreezeWinterization" &&
+        isWinterizationFuel(fuel) &&
+        (event.effects.facilityOutputMultipliersByFuel?.[fuel] ?? 1) < 1,
     );
-  }
-  if (upgrade === "coldWeatherPackage") {
-    if (
-      game.storyEffectsDisabled ||
-      WEATHER_HAZARD_TUTORIAL_SCENARIOS.has(game.scenarioId)
-    )
-      return false;
-    const rules = game.customScenario?.mod?.rules ?? game.customScenario?.rules;
-    const authored =
-      game.scenarioId === 107 ||
-      !!game.customScenario?.eventScenarioIds?.includes(107) ||
-      [...(rules?.events ?? []), ...(rules?.arcEvents ?? [])].some(
-        (event) =>
-          event.protection?.kind === "deepFreezeWinterization" &&
-          isWinterizationFuel(fuel) &&
-          (event.effects.facilityOutputMultipliersByFuel?.[fuel] ?? 1) < 1,
-      );
-    return (
-      authored ||
-      (fuel === "Natural Gas" &&
-        isWeatherHazardEligible(game, "EXTREME_COLD") &&
-        coldPackageCanHelp(game.location))
-    );
-  }
-  return false;
+  return (
+    authored ||
+    (fuel === "Natural Gas" &&
+      isWeatherHazardEligible(game, "EXTREME_COLD") &&
+      coldPackageCanHelp(game.location))
+  );
 }
 
 /** How long a retrofit holds a plant offline: one game month. */
@@ -501,7 +436,7 @@ export function retrofitCost(
     upgrade !== "coldWeatherPackage" ||
     !isWinterizationFuel(facility.fuel) ||
     facility.resilience?.[upgrade] ||
-    !upgradeOffered(game, upgrade, facility.fuel)
+    !upgradeOffered(game, facility.fuel)
   ) {
     return undefined;
   }
@@ -515,9 +450,7 @@ export function retrofitCost(
 export function retrofittedResilience(
   facility: FacilityOperatingType,
   game: GameType,
-  upgrade: ResilienceUpgradeType,
 ): FacilityResilienceType {
-  if (upgrade !== "coldWeatherPackage") return { ...facility.resilience };
   return {
     ...facility.resilience,
     coldWeatherPackage: true,
@@ -545,16 +478,6 @@ export type ResilienceSelectionType = Partial<
   Record<ResilienceUpgradeType, boolean>
 >;
 
-const BUILD_OPTION_LABELS: Record<ResilienceUpgradeType, string> = {
-  solarTrackers: "Solar trackers",
-  coldWeatherPackage: "Cold-weather package",
-};
-
-const BUILD_OPTION_SHARES: Record<ResilienceUpgradeType, number> = {
-  solarTrackers: TRACKER_BUILD_SHARE,
-  coldWeatherPackage: 0,
-};
-
 /** The quote's price without any build option folded in. */
 function baseBuildCost(quote: GeneratorShoppingType): number {
   return quote.buildCost - (quote.resilienceExtraBuildCost || 0);
@@ -565,21 +488,17 @@ export function resilienceBuildOptions(
   quote: GeneratorShoppingType,
   game: GameType,
 ): ResilienceBuildOptionType[] {
-  const base = baseBuildCost(quote);
-  return buildUpgradesForFuel(quote.fuel)
-    .filter((upgrade) => upgradeOffered(game, upgrade, quote.fuel))
-    .map((upgrade) => ({
+  const upgrade = upgradeForFuel(quote.fuel);
+  if (!upgrade || !upgradeOffered(game, quote.fuel)) return [];
+  return [
+    {
       upgrade,
-      label: BUILD_OPTION_LABELS[upgrade],
-      extraBuildCost:
-        upgrade === "coldWeatherPackage"
-          ? winterizationPrice(quote, game, true)
-          : Math.round(base * BUILD_OPTION_SHARES[upgrade]),
-      defaultSelected:
-        upgrade === "coldWeatherPackage" &&
-        getWeatherHazardProfile(game.location).coldClimate,
-      selected: !!quote.resilience?.[upgrade],
-    }));
+      label: "Cold-weather package",
+      extraBuildCost: winterizationPrice(quote, game, true),
+      defaultSelected: getWeatherHazardProfile(game.location).coldClimate,
+      selected: !!quote.resilience?.coldWeatherPackage,
+    },
+  ];
 }
 
 /** The options a quote currently carries, as a selection. */
@@ -599,7 +518,7 @@ export function resilienceSelection(
  * The quote with its build options set to the selection. Each chosen option's whole-dollar price
  * is added to buildCost and their sum remembered in resilienceExtraBuildCost, so changing the
  * selection restores the original price and repeating it is a no-op.
- * Gas quotes always carry their resolved design temperature, and tracked arrays their hail stow.
+ * Gas quotes always carry their resolved design temperature.
  * Returns a new quote.
  */
 export function withResilienceOptions(
@@ -625,17 +544,7 @@ export function withResilienceOptions(
     next.resilienceExtraBuildCost = extra;
   }
   let resilience: FacilityResilienceType | undefined;
-  if (quote.fuel === "Sun" && options.length) {
-    resilience = {};
-    options.forEach((option) => {
-      resilience![option.upgrade] = chosen.has(option.upgrade);
-    });
-    if (chosen.has("solarTrackers")) {
-      resilience.trackerHailDamageFactor = trackerHailDamageFactorForYear(
-        game.date.year,
-      );
-    }
-  } else if (
+  if (
     isWinterizationFuel(quote.fuel) &&
     (quote.fuel === "Natural Gas" || options.length)
   ) {
@@ -770,7 +679,7 @@ export interface FacilityResilienceSummaryType {
   replacementValue: number;
 }
 
-/** The upgrade summary for a solar or winterizable facility, or undefined when none applies. */
+/** The upgrade summary for a winterizable facility, or undefined when none applies. */
 export function facilityResilienceSummary(
   game: GameType,
   facility: FacilityOperatingType,
@@ -778,23 +687,17 @@ export function facilityResilienceSummary(
   const upgrade = upgradeForFuel(facility.fuel);
   if (
     !upgrade ||
-    (!facility.resilience?.[upgrade] &&
-      !upgradeOffered(game, upgrade, facility.fuel))
+    (!facility.resilience?.[upgrade] && !upgradeOffered(game, facility.fuel))
   ) {
     return undefined;
   }
   const installed = !!facility.resilience?.[upgrade];
-  let label: string;
-  let detail: string | undefined;
-  if (upgrade === "solarTrackers") {
-    label = installed ? "Solar trackers" : "Fixed panels";
-    if (installed) detail = "About 20% more morning and evening power.";
-  } else {
-    // The pane shows the plant's rating instead, in the player's temperature unit.
-    label = installed ? "Cold-weather package" : "Standard winterization";
-    if (facility.fuel !== "Natural Gas")
-      detail = "Halves output losses in the deep freeze.";
-  }
+  const label = installed ? "Cold-weather package" : "Standard winterization";
+  // The pane shows gas plants' ratings in the player's temperature unit.
+  const detail =
+    facility.fuel !== "Natural Gas"
+      ? "Halves output losses in the deep freeze."
+      : undefined;
   return {
     upgrade,
     label,

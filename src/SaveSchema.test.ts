@@ -2,88 +2,8 @@ import { parseSave, serializeSave } from "./SaveGame";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
 import { createGame } from "./testing/Simulator";
 import { projectAuthoredRunReference } from "./helpers/RunIdentity";
-import cloneDeep from "lodash.clonedeep";
-import gameReducer, { resume, tickState } from "./reducers/Game";
 
 const game = createGame({ scenarioId: 101, seed: 31337 });
-
-it("retires obsolete solar options from older saves while retaining playable progress", () => {
-  const { legacy, solar } = legacySolarSave();
-  const original = JSON.stringify(legacy);
-  const upgraded = parseSave(legacy);
-  expect(upgraded).not.toBeNull();
-  const current = upgraded!.game;
-  const restoredSolar = current.facilities.find(
-    (facility) => facility.id === solar.id,
-  )!;
-  expect(restoredSolar.resilience).toEqual({
-    solarTrackers: true,
-    trackerHailDamageFactor: 0.25,
-  });
-  expect(restoredSolar.upgradeInProgress).toBeUndefined();
-  expect(current.date).toEqual(legacy.game.date);
-  expect(current.timeline).toEqual(legacy.game.timeline);
-  expect(current.monthlyHistory).toEqual(legacy.game.monthlyHistory);
-  expect(JSON.stringify(legacy)).toBe(original);
-  const roundTrip = parseSave(
-    JSON.parse(JSON.stringify(serializeSave(current))),
-  );
-  expect(roundTrip!.game).toEqual(current);
-  const advance = (state: typeof current) => {
-    const resumed = cloneDeep(gameReducer(undefined, resume(state)));
-    tickState(resumed);
-    return resumed;
-  };
-  expect(advance(roundTrip!.game)).toEqual(advance(current));
-  expect(
-    parseSave({ ...legacy, schemaVersion: SAVE_SCHEMA_VERSION }),
-  ).toBeNull();
-});
-
-it.each([
-  { resilience: { retiredOption: "yes" } },
-  { resilience: { solarTrackers: "yes" } },
-  {
-    upgradeInProgress: {
-      upgrade: "retiredOption",
-      cost: -1,
-      startsMinute: 0,
-      completesMinute: 100,
-    },
-  },
-  { upgradeInProgress: null },
-])(
-  "rejects malformed legacy options without repairing progress: %p",
-  (patch) => {
-    const { legacy, solar } = legacySolarSave();
-    Object.assign(solar, patch);
-    const original = JSON.stringify(legacy);
-    expect(parseSave(legacy)).toBeNull();
-    expect(JSON.stringify(legacy)).toBe(original);
-  },
-);
-
-function legacySolarSave() {
-  const played = createGame({ scenarioId: 108, seed: 31337 });
-  while (played.date.monthsElapsed < 1) tickState(played);
-  const legacy = JSON.parse(JSON.stringify(serializeSave(played)));
-  legacy.schemaVersion = 9;
-  const solar = legacy.game.facilities.find(
-    (facility: { fuel: string }) => facility.fuel === "Sun",
-  );
-  solar.resilience = {
-    solarTrackers: true,
-    trackerHailDamageFactor: 0.25,
-    retiredOption: true,
-  };
-  solar.upgradeInProgress = {
-    upgrade: "retiredOption",
-    cost: 1e6,
-    startsMinute: played.date.minute,
-    completesMinute: played.date.minute + 100,
-  };
-  return { legacy, solar };
-}
 
 it.each([
   undefined,

@@ -19,8 +19,6 @@ export function resilienceName(upgrade: FacilityUpgradeType): string {
   switch (upgrade) {
     case "combinedCycle":
       return "combined-cycle generation";
-    case "solarTrackers":
-      return "solar trackers";
     default:
       return "cold-weather package";
   }

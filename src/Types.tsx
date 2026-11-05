@@ -1072,15 +1072,10 @@ export type StoryAttributeValueType =
   string | number | boolean | string[] | number[];
 
 export type WeatherHazardType = "HAIL" | "EXTREME_COLD";
-export type ResilienceUpgradeType = "coldWeatherPackage" | "solarTrackers";
+export type ResilienceUpgradeType = "coldWeatherPackage";
 
 /** Weather hardening on one facility. Each field only applies to the fuel noted beside it. */
 export interface FacilityResilienceType {
-  // "Sun" only, and only at build: single-axis trackers that follow the sun and stow in hail
-  solarTrackers?: boolean;
-  // "Sun" with trackers: the share of hail damage a tracked array still takes, fixed at build by
-  // the stow angle the trackers of that year could reach.
-  trackerHailDamageFactor?: number; // (0, 1]
   coldWeatherPackage?: boolean; // Gas, coal, nuclear, and onshore wind
   // "Natural Gas" fuel only: the coldest representative-day minimum the plant runs through without a
   // derate, resolved at build or retrofit from the location so it cannot drift afterwards.
