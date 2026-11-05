@@ -29,6 +29,7 @@ import ConceptIcon from "../base/ConceptIcon";
 import {
   DIFFICULTY_IDS,
   DIFFICULTY_LABELS,
+  MONTHS,
   difficultyLabel,
 } from "../../Constants";
 import DifficultyPicker from "../base/DifficultyPicker";
@@ -450,7 +451,10 @@ export default class NewGameDetails extends React.Component<Props, State> {
         ? difficultyLockReason(game.difficulty, this.props.unlockedThrough)
         : undefined;
     const endYear =
-      scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
+      scenario.startingYear +
+      Math.floor(
+        ((scenario.startingMonth ?? 1) - 1 + scenario.durationMonths - 1) / 12,
+      );
     // The selected difficulty's board and best come straight from what was read up front
     const scores = boards[game.difficulty]?.scores;
     const boardFailed = boards[game.difficulty]?.failed;
@@ -491,7 +495,15 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 {scenario.name}
               </Typography>
               <Typography variant="overline" component="div">
-                {location.name} · {scenario.startingYear}–{endYear}
+                {location.name} ·{" "}
+                {scenario.startingMonth
+                  ? `${MONTHS[scenario.startingMonth - 1]} `
+                  : ""}
+                {scenario.startingYear}–
+                {scenario.startingMonth
+                  ? `${MONTHS[(scenario.startingMonth - 1 + scenario.durationMonths - 1) % 12]} `
+                  : ""}
+                {endYear}
               </Typography>
               {scenario.summary && (
                 <Typography variant="body1" color="textSecondary">
@@ -532,6 +544,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 ) : (
                   <div className="difficultyPicker">
                     <DifficultyPicker
+                      scenario={scenario}
                       variant="toggle"
                       showDescription
                       value={game.difficulty}
@@ -556,7 +569,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 )}
                 {this.props.challenge && (
                   <Typography variant="body2" color="text.secondary">
-                    {reliabilityRuleText(game.difficulty)}
+                    {reliabilityRuleText(game.difficulty, scenario)}
                   </Typography>
                 )}
                 {coop ? (

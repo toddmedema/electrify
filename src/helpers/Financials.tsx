@@ -17,12 +17,58 @@ import {
 } from "../Types";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import {
+  MINUTES_PER_MONTH,
   deriveExpandedSummary,
   EMPTY_HISTORY,
   reduceHistories,
 } from "./DateTime";
 import { pow } from "./Pow";
 import { exp, log, log1p } from "./Libm";
+
+/** The asset remains owned, but its scheduled permanent disconnection cannot be resumed. */
+export function facilityPermanentlyShutdown(
+  facility: Pick<FacilityOperatingType, "permanentShutdownMonth">,
+  minute: number,
+): boolean {
+  return (
+    facility.permanentShutdownMonth !== undefined &&
+    minute >= (facility.permanentShutdownMonth - 1) * MINUTES_PER_MONTH
+  );
+}
+
+/** Trusted inherited liabilities replace ordinary upkeep once their calendar month begins. */
+export function facilityMaintenanceCost(
+  facility: Pick<FacilityOperatingType, "maintenanceObligation">,
+  minute: number,
+): number | undefined {
+  const obligation = facility.maintenanceObligation;
+  return obligation &&
+    minute >= (obligation.startsMonth - 1) * MINUTES_PER_MONTH
+    ? obligation.monthlyCost
+    : undefined;
+}
+
+export function validFacilityMaintenanceObligation(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    Object.keys(record).every((key) =>
+      ["startsMonth", "monthlyCost", "reason"].includes(key),
+    ) &&
+    typeof record.startsMonth === "number" &&
+    Number.isInteger(record.startsMonth) &&
+    record.startsMonth >= 1 &&
+    record.startsMonth <= 1211 &&
+    typeof record.monthlyCost === "number" &&
+    Number.isFinite(record.monthlyCost) &&
+    record.monthlyCost >= 0 &&
+    record.monthlyCost <= 1e12 &&
+    typeof record.reason === "string" &&
+    !!record.reason.trim() &&
+    record.reason.length <= 160
+  );
+}
 
 // Project finance tenors run shorter than the asset: about 15-20 years for renewables and storage.
 const LOAN_TENOR_SHARE_OF_LIFE = 0.8;
@@ -445,7 +491,10 @@ export function facilityCashBack(
       0,
       1 - facilityAgeYears(g, currentMinute) / g.lifespanYears,
     );
-    return g.buildCost * remainingLife - g.loanAmountLeft;
+    return (
+      g.buildCost * remainingLife * (g.cashBackMultiplier ?? 1) -
+      g.loanAmountLeft
+    );
   }
   // Cancellation unwinds the committed purchase. For a financed build this returns only the
   // down payment/equity because the outstanding loan is settled at the same time.

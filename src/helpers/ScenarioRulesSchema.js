@@ -21,6 +21,7 @@ const FACILITY_NAMES = [
 
 const RULE_SCENARIO_IDS = [
   100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115, 116,
+  126,
 ];
 const FACILITY_MODIFIER_KEYS = [
   "buildCost",
@@ -682,7 +683,7 @@ function ruleDiagnostics(value, path = "") {
       value[key].forEach((item, i) => validate(item, `${at(path, key)}[${i}]`));
   if (
     value.officialArcs !== undefined &&
-    list(value.officialArcs, at(path, "officialArcs"), 14)
+    list(value.officialArcs, at(path, "officialArcs"), RULE_SCENARIO_IDS.length)
   )
     value.officialArcs.forEach((arc, i) => {
       const p = `${at(path, "officialArcs")}[${i}]`;

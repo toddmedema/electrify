@@ -102,7 +102,11 @@ export function officialScenarioRules(
   const catalog = officialScenarioRuleDefinition(scenario.id);
   if (!catalog) return undefined;
   const startingYear = setup.startingYear ?? scenario.startingYear;
-  const durationMonths = setup.durationMonths ?? scenario.durationMonths;
+  // Event definitions use January-anchored calendar months, while term duration counts playable months.
+  const durationMonths =
+    (setup.durationMonths ?? scenario.durationMonths) +
+    (scenario.startingMonth ?? 1) -
+    1;
   const key = `${parameters.difficulty}:${parameters.seed}:${startingYear}:${durationMonths}`;
   let cache = officialRulesCache.get(scenario);
   if (!cache) {
@@ -580,7 +584,8 @@ export function compileScenarioRules(
     params.startingYear > 2100 ||
     !Number.isInteger(params.durationMonths) ||
     params.durationMonths < 1 ||
-    params.durationMonths > 1200 ||
+    // Compiled horizons include up to eleven pre-opening calendar months.
+    params.durationMonths > 1211 ||
     !Number.isFinite(params.startingPeakW) ||
     params.startingPeakW < 0 ||
     params.startingPeakW > 1e15

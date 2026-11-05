@@ -44,6 +44,7 @@ export default function VictoryConditions({
               objective,
               scenario.startingYear,
               scenario.durationMonths,
+              (scenario.startingMonth ?? 1) - 1,
             )}
           </Typography>
         </li>
@@ -64,7 +65,7 @@ export default function VictoryConditions({
         </Typography>
         <ul className="victorySurvivalList">
           <li>Finish the term without bankruptcy.</li>
-          <li>{reliabilityRuleText(difficulty)}</li>
+          <li>{reliabilityRuleText(difficulty, scenario)}</li>
         </ul>
         {required.length > 0 && objectiveRows(required)}
       </Box>

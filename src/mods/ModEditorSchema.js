@@ -721,7 +721,7 @@ function createModEditorSchema() {
           },
           ["scenarioId"],
         ),
-        14,
+        RULE_SCENARIO_IDS.length,
       ),
       events: list(event(), RULE_LIMITS.events),
       choices: list(

@@ -165,6 +165,7 @@ export function RunDebrief({
                         result.objective,
                         scenario.startingYear,
                         scenario.durationMonths,
+                        (scenario.startingMonth ?? 1) - 1,
                       )
                     )
                   ) : (

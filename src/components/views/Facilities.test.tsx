@@ -111,7 +111,7 @@ function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
   ref?: React.RefObject<Facilities>,
-): Handlers {
+): Handlers & { rerenderGame: (game: GameType) => void } {
   const handlers: Handlers = {
     onTogglePause: jest.fn(),
     onPause: jest.fn(),
@@ -122,7 +122,7 @@ function renderFacilities(
     onCancelRetrofit: jest.fn(),
   };
   const store = configureStore({ reducer: { ui: uiReducer } });
-  function ControlledFacilities() {
+  function ControlledFacilities({ game }: { game: GameType }) {
     const [selected, setSelected] = React.useState(selectedFacilityId);
     return (
       <Facilities
@@ -149,10 +149,13 @@ function renderFacilities(
       />
     );
   }
-  render(<ControlledFacilities />, {
+  const view = render(<ControlledFacilities game={game} />, {
     wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
   });
-  return handlers;
+  return {
+    ...handlers,
+    rerenderGame: (next) => view.rerender(<ControlledFacilities game={next} />),
+  };
 }
 
 // Address inspection targets by their class; asking for a role by name computes an accessible
@@ -1898,4 +1901,52 @@ describe("fleetChartHeight", () => {
   ])("sizes a %ix%i window to %ipx", (width, height, expected) => {
     expect(fleetChartHeight(width, height)).toBe(expected);
   });
+});
+
+it("hides sale for a retained facility while leaving its operating controls available", () => {
+  const game = cloneDeep(createGame({ scenarioId: 100 }));
+  const facility = game.facilities[0];
+  facility.saleRestricted = true;
+  const { onSell } = renderFacilities(game, facility.id);
+  expect(
+    screen.queryByRole("button", { name: `Sell ${facility.name}` }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: `Pause ${facility.name}` }),
+  ).toBeEnabled();
+  expect(onSell).not.toHaveBeenCalled();
+});
+
+it("removes an already-paused reactor's resume control when its permanent shutdown starts", () => {
+  const opening = createGame({ scenarioId: 126 });
+  const unit = opening.facilities.find(
+    (facility) => facility.startingAssetId === "chernobyl-unit-4",
+  )!;
+  unit.paused = true;
+  const view = renderFacilities(opening, unit.id);
+  expect(
+    screen.getByRole("button", { name: "Resume Chernobyl Unit 4" }),
+  ).toBeEnabled();
+
+  const april = cloneDeep(opening);
+  while (april.date.monthNumber === 3) tickState(april);
+  // Paused plants can retain an internal spin-down setpoint without delivering electricity.
+  april.facilities.find((facility) => facility.id === unit.id)!.currentW =
+    400e6;
+  view.rerenderGame(april);
+
+  expect(
+    screen.getByRole("button", { name: /^Inspect Chernobyl Unit 4/ }),
+  ).toHaveTextContent("0/1GW · 0% · paused");
+
+  expect(
+    screen.queryByRole("button", { name: "Resume Chernobyl Unit 4" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Pause Chernobyl Unit 4" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Sell Chernobyl Unit 4" }),
+  ).not.toBeInTheDocument();
+  expect(view.onTogglePause).not.toHaveBeenCalled();
 });

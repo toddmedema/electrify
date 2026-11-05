@@ -61,6 +61,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
     ...list([
       "--config=e2e/playwright.config.ts",
       "chart-touch.spec.ts",
+      "chernobyl-recovery.spec.ts",
       "insights-expanded-chart.spec.ts",
       "build-generator-loading.spec.ts",
       "sign-in.spec.ts",
