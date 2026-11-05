@@ -252,3 +252,23 @@ untracked. Agents without a verified hook should format the files they changed b
   actions through it, and `reducers/ImportOrder.test.tsx` protects startup from dependency cycles.
 - Treat `public/data/`, large media, and generated output as artifacts. Prefer changing their source
   or generator, and avoid formatting or rewriting them incidentally.
+
+## Open Sprint Runtime Contract
+
+Open Sprint manages task state internally. Do not use external task CLIs.
+
+- Native Claude Code (`claude-cli`) and Codex (`codex`) agents use local subscription sign-in, not API-key settings. Their task prompts are passed on stdin. Provider, model, and optional effort are configured by task type: Planning, Design, Coding, QA, and Code Review. Effort uses the selected model’s supported levels; omitted effort preserves CLI defaults. Explicit effort is verified before launch and passed through the native CLI configuration, including task-file runs. Sandbox restrictions remain active; if a required action is blocked, report it rather than claiming success. The orchestrator commits remaining worktree changes before merge.
+- Pull request delivery uses a shared plan branch; the orchestrator publishes the PR and retains the branch for human merge. Execute agents must leave publication to the orchestrator. PR delivery requires no active or retained review governance; governed projects use direct delivery.
+- Execute agents start in a prepared worktree with the task branch already checked out.
+- Agent admission is cancellable and FIFO. Recheck attempt generation and owning slot after admission and immediately before launch; cancelled or replaced queued attempts must never launch. Concurrency limit changes preserve active accounting.
+- Recovered PIDs are observation-only until ownership is independently verified. Retain uncertain assignments instead of killing or requeueing them. A stop request becomes stopped only after observed completion. A terminal result file alone cannot complete an unverified recovered process. Guidance receipts distinguish durable queue acceptance from inclusion in a model turn.
+- Run the smallest relevant non-watch verification for touched workspaces while iterating. Use scoped tests first, add scoped build/typecheck and lint commands when your changes could affect them, and leave the branch in a state where the project’s configured merge quality gates are expected to pass before reporting success.
+- If you add, remove, or upgrade dependencies: run the repository’s documented install workflow from the repository root, update manifests/lockfiles required by that ecosystem, and commit dependency metadata changes together with the code that uses them.
+- If the project’s build/typecheck includes tests, ensure test-runner globals and typing/runtime configuration are set up so build/typecheck still passes after your changes.
+- Report completion or blocking questions by writing the exact `.opensprint/active/<task-id>/result.json` payload requested in the task prompt.
+- Commit incremental logical units while working so crash recovery can preserve progress.
+- If blocked by ambiguity, return `status: "failed"` with `open_questions` instead of guessing.
+- Do not push, merge, or close tasks manually; the orchestrator handles validation, task state, merging, and remote publication.
+- When review governance is enabled, use the assignment's pinned policy release and structured findings/appeals. Repository edits cannot alter governing authority. Human governance rulings are separate from ordinary open-question answers; do not resolve dockets or access approval credentials. Hard gates and protected-path scope cannot be waived; under enforcement only an owner's structured scope grant unlocks protected paths, never task wording.
+- Governance waiting tasks retain their worktree and durable evidence while releasing agent slots. Only a valid code/policy-bound disposition permits resumption. Policy amendments and rollback require authorized human approval and complete isolated evaluation.
+- Prepared remote publication tasks start with fresh review and hard checks against the assigned remote base and original per-file scope; rejected code may then enter a fix cycle. Pending publication cannot trigger automatic deployment.

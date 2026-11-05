@@ -73,3 +73,12 @@ desktop-config.json
 # Server-only Firebase function configuration and local secret overrides.
 /firebase/functions/.env*
 /firebase/functions/.secret*
+
+.opensprint/*.json
+.opensprint/orchestrator-state.json
+.opensprint/worktrees/
+.opensprint/pending-commits.json
+.opensprint/sessions/
+.opensprint/active/
+.opensprint/guidance/
+.opensprint/runtime/
