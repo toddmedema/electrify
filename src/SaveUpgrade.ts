@@ -1,4 +1,5 @@
 import type { BuyingRuleType, SellingRuleType } from "./Types";
+import { validUpgradeInProgress } from "./helpers/BuildValidation";
 
 type DecodedSave = Record<string, unknown>;
 type Migration = (save: DecodedSave) => DecodedSave | null;
@@ -54,6 +55,48 @@ const migrations: readonly Migration[] = [
   // 8 -> 9: continued runs need future-only forecast refresh after data loads. Older apps do not
   // implement that continuation behavior and must not load these saves.
   (save) => save,
+  // 9 -> 10: retain the supported solar options and discard retired installations. Financial
+  // history stays intact; an obsolete installation no longer holds its facility offline.
+  (save) => {
+    if (!object(save.game) || !Array.isArray(save.game.facilities)) return null;
+    const facilities: DecodedSave[] = [];
+    for (const raw of save.game.facilities) {
+      if (!object(raw)) return null;
+      const facility = { ...raw };
+      if (facility.fuel === "Sun") {
+        if (facility.resilience !== undefined) {
+          if (!object(facility.resilience)) return null;
+          const retained: DecodedSave = {};
+          for (const [key, value] of Object.entries(facility.resilience)) {
+            if (["solarTrackers", "trackerHailDamageFactor"].includes(key))
+              retained[key] = value;
+            else if (value !== undefined && typeof value !== "boolean")
+              return null;
+          }
+          facility.resilience = retained;
+        }
+        const pending = facility.upgradeInProgress;
+        if (
+          object(pending) &&
+          typeof pending.upgrade === "string" &&
+          !["coldWeatherPackage", "solarTrackers", "combinedCycle"].includes(
+            pending.upgrade,
+          )
+        ) {
+          if (
+            !validUpgradeInProgress({
+              ...pending,
+              upgrade: "coldWeatherPackage",
+            })
+          )
+            return null;
+          delete facility.upgradeInProgress;
+        }
+      }
+      facilities.push(facility);
+    }
+    return { ...save, game: { ...save.game, facilities } };
+  },
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

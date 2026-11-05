@@ -1220,7 +1220,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.WEATHER_DAMAGE,
     group: "Gameplay",
     keywords:
-      "hail storm freeze cold snap winterization repair resilience retrofit hardening hail-resistant panels cold-weather package solar trackers downtime",
+      "hail storm freeze cold snap winterization repair resilience retrofit hardening cold-weather package solar trackers downtime",
     entry: (
       <div>
         <p>
@@ -1242,16 +1242,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           </li>
         </ul>
         <p>
-          <strong>Protection:</strong> When building, add hail-resistant panels
-          to solar, or a cold-weather package to gas. The package is only
-          offered where winters get cold enough to matter. It halves cold losses
-          and is rated to <ColdPackageRating />, or colder in cold climates.
+          <strong>Protection:</strong> When building, add a cold-weather package
+          to gas. The package is only offered where winters get cold enough to
+          matter. It halves cold losses and is rated to <ColdPackageRating />,
+          or colder in cold climates.
         </p>
         <p>
-          Hail-resistant panels can only be chosen during construction. Adding a
-          cold-weather package later from the facility&apos;s details costs 50%
-          more. Winterizing keeps 90% of capacity available during a month of
-          staged work. Cancel before completion for a full refund.
+          Adding a cold-weather package later from the facility&apos;s details
+          costs 50% more. Winterizing keeps 90% of capacity available during a
+          month of staged work. Cancel before completion for a full refund.
         </p>
         <p>
           In Deep Freeze, gas, coal, nuclear and wind plants can be winterized

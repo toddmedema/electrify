@@ -1145,29 +1145,6 @@ describe("weather hardening in the purchase dialog", () => {
     ).toBeNull();
   });
 
-  it("offers hail-resistant solar as an opt-in that follows the quoted price", () => {
-    const onBuild = showBuildList();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Review purchase of Solar" }),
-    );
-    const dialog = screen.getByRole("dialog");
-    const option = within(dialog).getByRole("checkbox", {
-      name: /^Hail-resistant panels \+\$/,
-    });
-    expect(option).not.toBeChecked();
-    fireEvent.click(option);
-    fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
-    const [quote] = onBuild.mock.calls[0];
-    expect(quote.resilience).toEqual({
-      hailResistant: true,
-      solarTrackers: false,
-    });
-    expect(quote.resilienceExtraBuildCost).toBeGreaterThan(0);
-    expect(option).toHaveAccessibleName(
-      `Hail-resistant panels +${formatMoneyConcise(quote.resilienceExtraBuildCost)}`,
-    );
-  });
-
   it("offers solar trackers at build, pitched on morning and evening output", () => {
     const onBuild = showBuildList();
     fireEvent.click(
@@ -1186,7 +1163,6 @@ describe("weather hardening in the purchase dialog", () => {
     const [quote] = onBuild.mock.calls[0];
     expect(quote.resilience).toMatchObject({
       solarTrackers: true,
-      hailResistant: false,
     });
     expect(quote.resilience.trackerHailDamageFactor).toBeGreaterThan(0);
   });

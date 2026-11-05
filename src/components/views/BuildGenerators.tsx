@@ -356,8 +356,6 @@ export function GeneratorBuildItem(
           },
           { text: "Stows in hail. Can't be added later." },
         ];
-      case "hailResistant":
-        return [];
       default: {
         if (!props.withResilience) return [];
         const standardMinTempC =

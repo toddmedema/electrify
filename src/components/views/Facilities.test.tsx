@@ -565,7 +565,7 @@ describe("weather hazards in the fleet", () => {
       id: 3,
       name: "Solar",
       fuel: "Sun",
-      resilience: { hailResistant: false },
+      resilience: { solarTrackers: false },
     } as FacilityOperatingType);
     return state;
   }
@@ -668,14 +668,6 @@ describe("weather hazards in the fleet", () => {
       "aria-label",
       `Inspect ${gas.name}, Extreme cold, 55% available`,
     );
-  });
-
-  it("does not offer hail-resistant panels after solar construction", () => {
-    const state = gameWithSolar();
-    renderFacilities(state, 3);
-    expect(
-      screen.queryByRole("button", { name: /Add hail-resistant panels/ }),
-    ).toBeNull();
   });
 });
 

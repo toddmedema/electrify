@@ -641,17 +641,16 @@ describe("SaveGame", () => {
     };
     expect(withFacility(gas)).not.toBeNull();
     expect(
-      withFacility({ fuel: "Sun", resilience: { hailResistant: true } }),
+      withFacility({ fuel: "Sun", resilience: { solarTrackers: true } }),
     ).not.toBeNull();
     [
       { ...gas, resilience: { coldWeatherPackage: "yes" } },
       { ...gas, resilience: { designMinTempC: 5 } },
-      { ...gas, resilience: { hailResistant: true } },
+      { ...gas, resilience: { solarTrackers: true } },
       { ...gas, resilience: "hardened" },
       { fuel: "Sun", resilience: { coldWeatherPackage: true } },
-      { fuel: "Uranium", resilience: { hailResistant: false } },
+      { fuel: "Uranium", resilience: { solarTrackers: false } },
       { fuel: "Sun", resilience: { trackerHailDamageFactor: 0 } },
-      { ...gas, resilience: { solarTrackers: true } },
     ].forEach((patch) => expect(withFacility(patch)).toBeNull());
     expect(
       withFacility({
