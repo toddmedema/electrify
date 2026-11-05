@@ -5,6 +5,43 @@ import { prepareCustomScenario } from "../helpers/CustomScenarioEvents";
 import { createGame } from "../testing/Simulator";
 import { generateNewTimeline } from "./Game";
 import { parseSave, serializeSave } from "../SaveGame";
+import { scenarioRules } from "../helpers/ScenarioRules";
+import { CHERNOBYL_SCENARIO_ID } from "../data/ChernobylScenario";
+
+test.each([60, 120])(
+  "an imported permanent shutdown lasts through a %i-month custom term",
+  (durationMonths) => {
+    const scenario = prepareCustomScenario({
+      ...DEFAULT_CUSTOM_SCENARIO,
+      durationMonths,
+      eventScenarioIds: [CHERNOBYL_SCENARIO_ID],
+      facilities: [{ fuel: "Uranium", peakW: 1e9 }],
+    });
+    const game = createGame({ scenarioId: 999, scenario });
+    const finalPhase = scenarioRules(scenario, game)!.events.find(
+      (event) => event.id === "arc-126-unit-three-returns",
+    )!;
+    expect(finalPhase.durationUntilEnd).toBe(true);
+    expect(finalPhase.startMonth + finalPhase.durationMonths).toBe(
+      durationMonths,
+    );
+    game.date = getDateFromMinute(
+      (durationMonths - 1) * MINUTES_PER_MONTH,
+      game.startingYear,
+    );
+    expect(
+      generateNewTimeline(
+        { ...game, storyEffectsDisabled: true },
+        1e9,
+        1e6,
+        1,
+      )[0].supplyByFuel.Uranium,
+    ).toBeGreaterThan(0);
+    expect(
+      generateNewTimeline(game, 1e9, 1e6, 1)[0].supplyByFuel.Uranium ?? 0,
+    ).toBe(0);
+  },
+);
 
 function customGame() {
   return createGame({

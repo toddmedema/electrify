@@ -4035,8 +4035,12 @@ export function* tickStatePhases(
       delete state.blackout;
     }
     if (!state.multiplayer && inBlackout !== wasInBlackout) {
+      const retainsCustomers = getScenario(
+        state.scenarioId,
+        state.customScenario,
+      )?.retainCustomersDuringShortages;
       const message = inBlackout
-        ? `${BLACKOUT_TOAST_PREFIX} ${formatWatts(now.demandW - now.supplyW)} short. Customers leave while it lasts. Build more supply, or resume a paused plant.`
+        ? `${BLACKOUT_TOAST_PREFIX} ${formatWatts(now.demandW - now.supplyW)} short. ${retainsCustomers ? "Blackouts reduce your score." : "Customers leave while it lasts."} Build more supply, or resume a paused plant.`
         : BLACKOUT_OVER_TOAST;
       setTimeout(() => {
         // Pausing a plant is the usual way into a blackout, and it raises its own "Paused X /
@@ -4223,6 +4227,8 @@ export function* tickStatePhases(
           debrief.startingCash = state.campaign.openingCash;
           debrief.startingFleet = cloneDeep(state.campaign.openingFleet);
         }
+        // History counts playable months and spans the whole career in a campaign.
+        const tenureMonths = history.length;
         debrief.scenarioMetrics = [
           {
             concept: "money",
@@ -4241,9 +4247,9 @@ export function* tickStatePhases(
             concept: "time",
             label: "tenure",
             value:
-              state.date.monthsElapsed >= 12
-                ? `${Math.floor(state.date.monthsElapsed / 12)} ${state.date.monthsElapsed < 24 ? "year" : "years"}`
-                : `${state.date.monthsElapsed} ${state.date.monthsElapsed === 1 ? "month" : "months"}`,
+              tenureMonths >= 12
+                ? `${Math.floor(tenureMonths / 12)} ${tenureMonths < 24 ? "year" : "years"}`
+                : `${tenureMonths} ${tenureMonths === 1 ? "month" : "months"}`,
           },
           ...(debrief.scenarioMetrics ?? []),
         ];

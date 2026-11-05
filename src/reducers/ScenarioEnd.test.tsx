@@ -132,6 +132,21 @@ describe("ending a scenario from inside the reducer", () => {
     expect(getStore().getState().game.speed).toBe("PAUSED");
   });
 
+  it("reports only playable months in a term that opens after January", () => {
+    getStore().dispatch(quit());
+    const scenario = customScenario({ durationMonths: 2, startingMonth: 3 });
+    let state = createGame({ scenarioId: CUSTOM_SCENARIO_ID, scenario });
+    while (state.date.monthsElapsed < 4) state = tick(state);
+    jest.runOnlyPendingTimers();
+    expect(
+      getStore().getState().ui.victory?.debrief?.scenarioMetrics,
+    ).toContainEqual({
+      concept: "time",
+      label: "tenure",
+      value: "2 months",
+    });
+  });
+
   /**
    * The freeze this guards against: the reducer read the player's previous best straight off the
    * store, which Redux refuses to do while a reducer is running. The throw came out of the tick
