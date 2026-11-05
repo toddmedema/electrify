@@ -42,6 +42,7 @@ export default function SavedResultDialog(props: {
               <RunDebrief
                 debrief={result.debrief}
                 scenarioId={result.scenarioId}
+                outcome={result.outcome}
               />
             )}
           </DialogContent>

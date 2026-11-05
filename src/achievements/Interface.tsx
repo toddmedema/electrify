@@ -243,6 +243,78 @@ export function AchievementGallery(): React.JSX.Element {
   );
 }
 
+function AchievementToast({
+  entry,
+  active,
+  onView,
+}: {
+  entry: (typeof catalog)[number];
+  active: boolean;
+  onView?: () => void;
+}): React.JSX.Element {
+  const panel = React.useRef<HTMLDivElement>(null);
+  const dismiss = () => {
+    // Keep keyboard focus in the stack when its focused card is dismissed.
+    if (panel.current?.contains(document.activeElement)) {
+      const neighbor =
+        panel.current.nextElementSibling ||
+        panel.current.previousElementSibling;
+      neighbor
+        ?.querySelector<HTMLButtonElement>(".achievementToastClose")
+        ?.focus();
+    }
+    achievementJournal.dismiss(entry.id);
+  };
+  const swipe = useSwipeToDismiss(panel, dismiss);
+  React.useEffect(() => {
+    if (!active) return;
+    const timer = setTimeout(
+      () => achievementJournal.dismiss(entry.id),
+      ACHIEVEMENT_TOAST_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [active, entry.id]);
+  return (
+    <Paper
+      ref={panel}
+      variant="outlined"
+      className="achievementToastPanel"
+      {...swipe.handlers}
+    >
+      <div className="achievementArt">
+        <img src={`images/${entry.icon}.svg`} alt="" />
+      </div>
+      <div className="achievementToastText">
+        <Typography variant="overline" component="p">
+          Achievement unlocked
+        </Typography>
+        <Typography variant="subtitle1" component="p">
+          {entry.name}
+        </Typography>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          className="achievementToastRequirement"
+        >
+          {entry.description}
+        </Typography>
+        {onView && (
+          <Button size="small" onClick={onView}>
+            View achievements
+          </Button>
+        )}
+      </div>
+      <IconButton
+        aria-label={`Dismiss ${entry.name} achievement notification`}
+        onClick={dismiss}
+        className="achievementToastClose"
+      >
+        <CloseIcon />
+      </IconButton>
+    </Paper>
+  );
+}
+
 /** Announce awards over the game and its result dialogs without stealing focus. */
 export default function AchievementNotifications(): React.JSX.Element {
   const state = useAchievements();
@@ -252,16 +324,17 @@ export default function AchievementNotifications(): React.JSX.Element {
   const [container, setContainer] = React.useState<HTMLElement | null>(null);
   const [hovered, setHovered] = React.useState(false);
   const [focused, setFocused] = React.useState(false);
-  const id = state.notifications[0];
-  const panel = React.useRef<HTMLDivElement>(null);
-  const swipe = useSwipeToDismiss(panel, () => {
-    if (id) achievementJournal.dismiss(id);
+  const stack = React.useRef<HTMLDivElement>(null);
+  const [scrollable, setScrollable] = React.useState(false);
+  const entries = state.notifications.flatMap((id) => {
+    const entry = catalog.find((item) => item.id === id);
+    return entry ? [entry] : [];
   });
+  const hasNotifications = entries.length > 0;
   // Height of the phone tab bar when one is actually on screen; tutorials and build cards hide it.
   const [navClearance, setNavClearance] = React.useState(0);
-  const entry = catalog.find((item) => item.id === id);
   React.useLayoutEffect(() => {
-    if (!id) return;
+    if (!hasNotifications) return;
     const inspect = () => {
       setPageHidden(document.hidden);
       // Stay inside the active modal's accessibility and focus boundary, above its backdrop.
@@ -285,6 +358,10 @@ export default function AchievementNotifications(): React.JSX.Element {
             )
           : 0,
       );
+      setScrollable(
+        !!stack.current &&
+          stack.current.scrollHeight > stack.current.clientHeight,
+      );
     };
     inspect();
     const observer = new MutationObserver(inspect);
@@ -296,23 +373,20 @@ export default function AchievementNotifications(): React.JSX.Element {
       observer.disconnect();
       document.removeEventListener("visibilitychange", inspect);
     };
-  }, [id]);
-  const open = !!entry && !state.steamAvailable && !pageHidden && !snackbarOpen;
-  // The next award reuses this panel; it must not arrive mid-fling or still faded out.
-  const { reset } = swipe;
-  React.useLayoutEffect(() => reset(), [id, reset]);
+  }, [hasNotifications]);
+  const open =
+    hasNotifications && !state.steamAvailable && !pageHidden && !snackbarOpen;
   React.useEffect(() => {
-    setHovered(!!open && !!panel.current?.matches(":hover"));
-    setFocused(!!open && !!panel.current?.contains(document.activeElement));
-  }, [id, open, container]);
-  React.useEffect(() => {
-    if (!open || hovered || focused || !id) return;
-    const timer = setTimeout(
-      () => achievementJournal.dismiss(id),
-      ACHIEVEMENT_TOAST_MS,
-    );
-    return () => clearTimeout(timer);
-  }, [open, hovered, focused, id]);
+    setHovered(!!open && !!stack.current?.matches(":hover"));
+    setFocused(!!open && !!stack.current?.contains(document.activeElement));
+  }, [state.notifications, open, container]);
+  const onView =
+    container === document.body
+      ? () => {
+          achievementJournal.clearNotifications();
+          dispatch(navigate("ACHIEVEMENTS"));
+        }
+      : undefined;
   return (
     <Portal container={container}>
       <>
@@ -322,11 +396,16 @@ export default function AchievementNotifications(): React.JSX.Element {
           aria-atomic="true"
           className="srOnly"
         >
-          {open && entry
-            ? `Achievement unlocked: ${entry.name}. ${entry.description}`
+          {open
+            ? entries
+                .map(
+                  (entry) =>
+                    `Achievement unlocked: ${entry.name}. ${entry.description}`,
+                )
+                .join(" ")
             : ""}
         </div>
-        {entry && (
+        {hasNotifications && (
           <Snackbar
             open={open}
             anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
@@ -337,11 +416,9 @@ export default function AchievementNotifications(): React.JSX.Element {
               } as React.CSSProperties
             }
           >
-            <Paper
-              ref={panel}
-              variant="outlined"
-              className="achievementToastPanel"
-              {...swipe.handlers}
+            <div
+              ref={stack}
+              className={`achievementToastStack${scrollable ? " isScrollable" : ""}`}
               onMouseEnter={() => setHovered(true)}
               onMouseLeave={() => setHovered(false)}
               onFocus={() => setFocused(true)}
@@ -350,43 +427,15 @@ export default function AchievementNotifications(): React.JSX.Element {
                   setFocused(false);
               }}
             >
-              <div className="achievementArt">
-                <img src={`images/${entry.icon}.svg`} alt="" />
-              </div>
-              <div className="achievementToastText">
-                <Typography variant="overline" component="p">
-                  Achievement unlocked
-                </Typography>
-                <Typography variant="subtitle1" component="p">
-                  {entry.name}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  className="achievementToastRequirement"
-                >
-                  {entry.description}
-                </Typography>
-                {container === document.body && (
-                  <Button
-                    size="small"
-                    onClick={() => {
-                      achievementJournal.clearNotifications();
-                      dispatch(navigate("ACHIEVEMENTS"));
-                    }}
-                  >
-                    View achievements
-                  </Button>
-                )}
-              </div>
-              <IconButton
-                aria-label={`Dismiss ${entry.name} achievement notification`}
-                onClick={() => achievementJournal.dismiss(id)}
-                className="achievementToastClose"
-              >
-                <CloseIcon />
-              </IconButton>
-            </Paper>
+              {entries.map((entry) => (
+                <AchievementToast
+                  key={entry.id}
+                  entry={entry}
+                  active={open && !hovered && !focused}
+                  onView={onView}
+                />
+              ))}
+            </div>
           </Snackbar>
         )}
       </>

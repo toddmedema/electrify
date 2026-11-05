@@ -3,7 +3,7 @@ import * as React from "react";
 import { Box, Typography, useMediaQuery } from "@mui/material";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { GameType, ScenarioType, ScoreCategoryType } from "../../Types";
-import { DIFFICULTY_LABELS } from "../../Constants";
+import { DIFFICULTY_LABELS, MONTHS } from "../../Constants";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
   deriveExpandedSummary,
@@ -83,7 +83,7 @@ function ScoreOutlook({
       return [
         {
           month: game.startingYear * 12 + offset,
-          year: game.startingYear + offset / 12 - 1,
+          year: game.startingYear + Math.floor((offset - 1) / 12),
           value: 0,
           projected: false,
         },
@@ -306,7 +306,9 @@ export function ScenarioDetailsContent({
   const facts = [
     {
       label: "Timeframe",
-      value: `${scenario.startingYear}–${scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}`,
+      value: scenario.startingMonth
+        ? `${MONTHS[scenario.startingMonth - 1]} ${scenario.startingYear}–${MONTHS[(scenario.startingMonth - 1 + scenario.durationMonths - 1) % 12]} ${scenario.startingYear + Math.floor((scenario.startingMonth - 1 + scenario.durationMonths - 1) / 12)}`
+        : `${scenario.startingYear}–${scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}`,
     },
     ...(location ? [{ label: "Location", value: location.name }] : []),
     { label: "Difficulty", value: DIFFICULTY_LABELS[game.difficulty] },

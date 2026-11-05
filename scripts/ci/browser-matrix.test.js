@@ -62,6 +62,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
     ...list([
       "--config=e2e/playwright.config.ts",
       "chart-touch.spec.ts",
+      "chernobyl-recovery.spec.ts",
       "insights-expanded-chart.spec.ts",
       "build-generator-loading.spec.ts",
       "sign-in.spec.ts",
@@ -73,6 +74,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "acquisitions.spec.ts",
       "campaign.spec.ts",
       "difficulty-unlocks.spec.ts",
+      "toggle-borders.spec.ts",
       ...projects,
       "--project=mobile-360px",
     ]),

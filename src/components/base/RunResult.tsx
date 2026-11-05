@@ -69,11 +69,17 @@ export function ResultScore({
 export function RunDebrief({
   debrief,
   scenarioId,
+  outcome,
 }: {
   debrief: VictoryDebriefType;
   scenarioId?: number;
+  outcome: VictoryType["outcome"];
 }): React.JSX.Element {
   const units = useUnits();
+  const objectiveResults =
+    outcome === "bankrupt" || outcome === "fired"
+      ? debrief.objectiveResults
+      : undefined;
   const scenario =
     scenarioId === undefined || !isLegacyCampaignScenario(scenarioId)
       ? undefined
@@ -111,7 +117,7 @@ export function RunDebrief({
           <span>{metric.label}</span>
         </div>
       ))}
-      {!!debrief.objectiveResults?.length && (
+      {!!objectiveResults?.length && (
         <Box
           component="section"
           aria-label="Objective results"
@@ -124,7 +130,7 @@ export function RunDebrief({
           >
             Objectives
           </Typography>
-          {debrief.objectiveResults.map((result) => {
+          {objectiveResults.map((result) => {
             const first =
               "fromMonth" in result.objective
                 ? result.objective.fromMonth
@@ -165,6 +171,7 @@ export function RunDebrief({
                         result.objective,
                         scenario.startingYear,
                         scenario.durationMonths,
+                        (scenario.startingMonth ?? 1) - 1,
                       )
                     )
                   ) : (

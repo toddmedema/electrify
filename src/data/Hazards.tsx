@@ -45,12 +45,9 @@ export const HAIL_RESISTANT_BUILD_SHARE = 0.03;
 
 /**
  * An upgrade added to a standing plant costs this multiple of building it in (crews remobilize
- * and work around finished equipment), charged on the plant's replacement value, and holds the
- * plant offline for a month while it is installed.
+ * and work around finished equipment). Winterization is installed in stages over a month.
  */
 export const RETROFIT_COST_MULTIPLIER = 1.5;
-export const HAIL_RESISTANT_RETROFIT_SHARE =
-  HAIL_RESISTANT_BUILD_SHARE * RETROFIT_COST_MULTIPLIER;
 
 /**
  * Single-axis solar trackers, priced and dated from Nextpower (formerly Nextracker), the largest

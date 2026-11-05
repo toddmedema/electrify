@@ -88,4 +88,8 @@ module.exports = {
     name: "Across the Valley",
     durationMonths: 240,
   },
+  126: {
+    name: "Chernobyl: Recovery",
+    durationMonths: 60,
+  },
 };

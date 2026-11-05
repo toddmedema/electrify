@@ -44,6 +44,7 @@ const {
 } = require("./steam-native.cjs");
 const {
   readScenarioMetadata,
+  readAuthoredScenarioMetadata,
   renderLocalization,
 } = require("../scripts/generate-steam-localization.js");
 const SCENARIOS = require("./steam-localization.cjs");
@@ -99,9 +100,7 @@ function fixture({
 
 test("authored scenario metadata and Steam upload tokens stay aligned without executing game code", () => {
   const root = path.resolve(__dirname, "..");
-  const scenarios = readScenarioMetadata(
-    fs.readFileSync(path.join(root, "src/data/Scenarios.tsx"), "utf8"),
-  );
+  const scenarios = readAuthoredScenarioMetadata(root);
   assert.deepEqual(
     SCENARIOS,
     scenarios,
@@ -122,6 +121,64 @@ test("authored scenario metadata and Steam upload tokens stay aligned without ex
         "const SCENARIOS = [{id:12,name:process.env.SECRET,durationMonths:12}];",
       ),
     /literal name/,
+  );
+});
+
+test("metadata follows trusted imported constants without executing their modules", () => {
+  const source =
+    'import { RECOVERY as imported } from "./Recovery"; export const SCENARIOS = [imported];';
+  const modules = {
+    "./Recovery":
+      'throw new Error("Never execute"); import { DURATION } from "./Duration"; export const ID = 126; export const RECOVERY = {id: ID, name:"Chernobyl: Recovery", durationMonths:DURATION, facilities:process.exit(1)};',
+    "./Duration": "const YEARS = 5; export const DURATION = 12*YEARS;",
+  };
+  assert.deepEqual(
+    readScenarioMetadata(source, (name) => modules[name]),
+    {
+      126: { name: "Chernobyl: Recovery", durationMonths: 60 },
+    },
+  );
+  assert.throws(() => readScenarioMetadata(source), /trusted local constants/);
+  assert.throws(
+    () =>
+      readScenarioMetadata(
+        source,
+        () => 'const RECOVERY = {id:126,name:"Private",durationMonths:60};',
+      ),
+    /exported constants/,
+  );
+  assert.throws(
+    () =>
+      readScenarioMetadata(
+        source,
+        () =>
+          'export const ID = process.env.SECRET; export const RECOVERY = {id:ID,name:"Unsafe",durationMonths:60};',
+      ),
+    /numeric literals/,
+  );
+  assert.throws(
+    () =>
+      readScenarioMetadata(
+        source,
+        () =>
+          'let ID = 126; export const RECOVERY = {id:ID,name:"Mutable",durationMonths:60};',
+      ),
+    /must be constants/,
+  );
+  for (const cycle of [
+    "export const RECOVERY = OTHER; const OTHER = RECOVERY;",
+    'const MONTHS = 2*MONTHS; export const RECOVERY = {id:126,name:"Cycle",durationMonths:MONTHS};',
+  ])
+    assert.throws(() => readScenarioMetadata(source, () => cycle), /Cyclic/);
+  assert.throws(
+    () =>
+      readScenarioMetadata(
+        'import { RECOVERY } from "../private"; const SCENARIOS = [RECOVERY];',
+        () => {
+          throw new Error("Must not read traversal");
+        },
+      ),
+    /trusted local constants/,
   );
 });
 

@@ -40,14 +40,22 @@ export function presentOfficialRuleOccurrence(
   if (rules.namespace.kind !== "official" || !event.source) return undefined;
   const presentation = officialPresentation(event);
   if (!presentation) return undefined;
+  // New targeted catalog events retain common receipts, including pinned asset identities.
+  // Legacy reviews below retain their established public receipt shapes.
+  const commonReceipt =
+    !presentation.nativeReview &&
+    (event.targets.length > 0 ||
+      event.transactions.length > 0 ||
+      !!event.protection);
   if (presentation.nativeReview && !context) return undefined;
   const attributes: Record<string, StoryAttributeValueType> = {
+    ...(commonReceipt ? core.attributes : {}),
     scheduledMonth: event.startMonth,
     ...presentation.attributes,
     ...presentation.attributesByDifficulty?.[rules.difficulty],
   };
-  let message = event.message;
-  let importance = event.source.importance;
+  let message = commonReceipt ? core.message : event.message;
+  let importance = commonReceipt ? core.importance : event.source.importance;
   const effects = { ...core.effects };
   const snapshot = context?.snapshot;
   const selectedIds = (core.attributes.selectedFacilityIds ?? []) as number[];

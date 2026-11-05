@@ -198,9 +198,8 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     game.startingYear,
     game.seed,
   );
-  // Tutorials and multiplayer matches set their own rates, so only a solo public run can
-  // follow inflation.
-  const canFollow = !investor && !scenario.tutorialSteps && !game.multiplayer;
+  // Tutorials and multiplayer matches set their own rates.
+  const canFollow = !scenario.tutorialSteps && !game.multiplayer;
   const following = canFollow && !!game.rateFollowsInflation;
   const max = publicRateCap(
     referenceRate,

@@ -18,7 +18,10 @@ import {
 } from "../../helpers/Hazards";
 import { gasConversionQuote } from "../../helpers/GasConversion";
 import { currentCash } from "../../helpers/GameSelectors";
-import { facilityCashBack } from "../../helpers/Financials";
+import {
+  facilityCashBack,
+  facilityPermanentlyShutdown,
+} from "../../helpers/Financials";
 import { formatFacilitySize, formatMoneyConcise } from "../../helpers/Format";
 import ConfirmDialog from "../base/ConfirmDialog";
 import type { DispatchProps } from "./Facilities";
@@ -49,16 +52,12 @@ function actionsFor(
   facilities: FacilityOperatingType[],
 ): FleetAction[] {
   const operating = facilities.filter(
-    (f) => f.yearsToBuildLeft <= 0 && !isUpgradingAt(f, game.date.minute),
+    (f) =>
+      f.yearsToBuildLeft <= 0 &&
+      !isUpgradingAt(f, game.date.minute) &&
+      !facilityPermanentlyShutdown(f, game.date.minute),
   );
   const upgrades: FleetAction[] = [
-    {
-      key: "hailResistant",
-      label: "Add hail-resistant panels",
-      facilities: [],
-      cost: 0,
-      confirm: true,
-    },
     {
       key: "coldWeatherPackage",
       label: "Add cold-weather package",
@@ -75,6 +74,7 @@ function actionsFor(
     },
   ];
   for (const facility of facilities) {
+    if (facilityPermanentlyShutdown(facility, game.date.minute)) continue;
     const resilience = facilityResilienceSummary(game, facility);
     const conversion = gasConversionQuote(facility, game);
     for (const action of upgrades) {
@@ -105,18 +105,26 @@ function actionsFor(
     {
       key: "cancelUpgrade",
       label: "Cancel upgrade",
-      facilities: facilities.filter((f) => !!f.upgradeInProgress),
+      facilities: facilities.filter(
+        (f) =>
+          !!f.upgradeInProgress &&
+          !facilityPermanentlyShutdown(f, game.date.minute),
+      ),
     },
     {
       key: "cancelConstruction",
       label: "Cancel construction",
-      facilities: facilities.filter((f) => f.yearsToBuildLeft > 0),
+      facilities: facilities.filter(
+        (f) => f.yearsToBuildLeft > 0 && !f.saleRestricted,
+      ),
       confirm: true,
     },
     {
       key: "sell",
       label: "Sell",
-      facilities: facilities.filter((f) => f.yearsToBuildLeft <= 0),
+      facilities: facilities.filter(
+        (f) => f.yearsToBuildLeft <= 0 && !f.saleRestricted,
+      ),
       confirm: true,
     },
   ];
@@ -197,7 +205,7 @@ export default function FacilityContextMenu(props: {
   return (
     <>
       <Menu
-        open={!!target && selected.length > 0}
+        open={!!target && selected.length > 0 && offered.length > 0}
         onClose={props.onClose}
         anchorReference="anchorPosition"
         anchorPosition={
@@ -270,9 +278,7 @@ export default function FacilityContextMenu(props: {
               <DialogContentText>
                 {confirmation.key === "combinedCycle"
                   ? "Use less gas for the same power. Six months offline; slower starts and 45% minimum output afterward."
-                  : confirmation.key === "coldWeatherPackage"
-                    ? "Staged installation keeps 90% of capacity available for a month. Improves protection against extreme cold."
-                    : "Offline for one month. Less damage from future hail; current repairs still need to finish."}{" "}
+                  : "Staged installation keeps 90% of capacity available for a month. Improves protection against extreme cold."}{" "}
                 Cancel before completion for a full refund.
               </DialogContentText>
               {shortfall > 0 && (

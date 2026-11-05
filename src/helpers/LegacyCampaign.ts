@@ -14,12 +14,14 @@ import {
 } from "../data/Economy";
 import { MINUTES_PER_MONTH } from "./DateTime";
 
+/** January-anchored opening of the active term, including non-January recovery runs. */
 export const legacyMonthOffset = (
-  game: Partial<Pick<GameType, "campaign">>,
-): number => game.campaign?.termStartMonth ?? 0;
+  game: Partial<Pick<GameType, "campaign" | "startingMonth">>,
+): number => game.campaign?.termStartMonth ?? (game.startingMonth ?? 1) - 1;
 
 export const legacyCompletedMonths = (
-  game: Pick<GameType, "date"> & Partial<Pick<GameType, "campaign">>,
+  game: Pick<GameType, "date"> &
+    Partial<Pick<GameType, "campaign" | "startingMonth">>,
 ): number => Math.max(0, game.date.monthsElapsed - legacyMonthOffset(game));
 
 /** Authored competition remains independent from the player's live price and bill memory. */

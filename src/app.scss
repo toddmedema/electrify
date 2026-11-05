@@ -681,15 +681,32 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   left: auto;
   right: max(16px, env(safe-area-inset-right));
   // The measured tab bar already includes the safe area it pads for.
-  bottom: calc(
+  --achievement-bottom: calc(
     16px +
       max(var(--achievement-nav-clearance, 0px), env(safe-area-inset-bottom))
   );
+  bottom: var(--achievement-bottom);
   width: min(384px, calc(100vw - 32px));
   max-width: none;
 }
+.achievementToastStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-height: calc(
+    100dvh - var(--achievement-bottom) - max(16px, env(safe-area-inset-top))
+  );
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  // A tall stack scrolls vertically on touch screens; sideways swipes still dismiss cards.
+  &.isScrollable .achievementToastPanel {
+    touch-action: pan-y;
+  }
+}
 .achievementToastPanel {
   display: flex;
+  flex-shrink: 0;
   position: relative;
   // Swipe it away like a toast; the release animates the snap back
   touch-action: none;
@@ -2479,6 +2496,38 @@ $pane_header_height: 48px;
   overflow: visible;
 }
 
+// Insights keys share the heading's content edge. Keep each sample with its label,
+// with more space between series than within a pair, even when a dense key wraps.
+.insightsTrackBody,
+.expandedChartBody {
+  .chartLegend {
+    gap: 8px 16px;
+    padding: 0 16px 8px;
+    font-weight: 400;
+    letter-spacing: normal;
+  }
+  .chartLegendItem {
+    gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+  }
+  .chartLegendLabel {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .chartLegendSwatch {
+    flex-shrink: 0;
+  }
+  .chartLegendSwatch-line,
+  .chartLegendSwatch-demand {
+    width: 24px;
+  }
+  .chartLegendSwatch-line line {
+    stroke-width: 2;
+  }
+}
+
 .closableDialogTitle {
   display: flex;
   align-items: flex-start;
@@ -3945,11 +3994,6 @@ $pane_header_height: 48px;
       border-radius: 50%;
       pointer-events: none;
       animation: tutorialTargetPulse 10s ease-in-out infinite;
-    }
-
-    // The next segment paints over an outset focus ring unless the focused one is raised
-    &:focus-visible {
-      z-index: 2;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -8222,15 +8266,12 @@ option {
   .fuelPriceFilter .MuiButton-root {
     font-size: var(--font-size-body1);
   }
-  .chartLegend,
   .chartTooltip {
     font-size: var(--font-size-body1);
   }
   .chartLegend {
-    padding: 8px 16px;
-  }
-  .chartLegendSwatch-line {
-    width: 32px;
+    padding-top: 8px;
+    font-size: var(--font-size-body2);
   }
 }
 

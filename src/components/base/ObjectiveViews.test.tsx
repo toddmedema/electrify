@@ -7,6 +7,9 @@ import { createGame } from "../../testing/Simulator";
 import { activeScenario } from "../../helpers/GameSelectors";
 import { ScenarioDetailsContent } from "./ScenarioDetails";
 import { RunDebrief } from "./RunResult";
+import VictoryDialog from "./VictoryDialog";
+import SavedResultDialog from "./SavedResultDialog";
+import type { VictoryType } from "../../Types";
 
 const bills: ObjectiveResult = {
   objective: {
@@ -68,6 +71,7 @@ it("renders stored objective debrief facts and unavailability without re-evaluat
   };
   render(
     <RunDebrief
+      outcome="fired"
       debrief={{
         startingFleet: [],
         finalFleet: [],
@@ -94,3 +98,54 @@ it("renders stored objective debrief facts and unavailability without re-evaluat
   expect(region).toHaveTextContent("Months 1–2");
   expect(region).toHaveTextContent("$0.1/kWh (above goal)");
 });
+
+for (const view of ["live", "saved"] as const) {
+  it.each(["completed", "fired", "bankrupt"] as const)(
+    `${view} results show objectives only when the mission failed (%s)`,
+    (outcome) => {
+      const result: VictoryType & { outcome: typeof outcome } = {
+        scenarioId: 100,
+        scenarioName: "Carbon Fee",
+        difficulty: "CEO",
+        score: 812,
+        breakdown: { supply: 812 },
+        ranked: false,
+        outcome,
+        debrief: {
+          startingFleet: [],
+          finalFleet: [],
+          startingCash: 0,
+          finalCash: 0,
+          finalCustomers: 0,
+          reliability: 1,
+          unservedWh: 0,
+          kgco2e: 0,
+          highlights: [],
+          objectiveResults: [bills],
+        },
+      };
+      render(
+        view === "saved" ? (
+          <SavedResultDialog result={result} onClose={() => undefined} />
+        ) : (
+          <VictoryDialog
+            victory={result}
+            loggedIn={false}
+            onClose={() => undefined}
+            onQuit={() => undefined}
+            onRetry={() => undefined}
+            onLogin={() => undefined}
+            onShared={() => undefined}
+            onShareFailed={() => undefined}
+          />
+        ),
+      );
+      expect(
+        screen.getByRole("region", { name: "Mission results" }),
+      ).toBeVisible();
+      expect(
+        screen.queryAllByRole("region", { name: "Objective results" }),
+      ).toHaveLength(outcome === "completed" ? 0 : 1);
+    },
+  );
+}

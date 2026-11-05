@@ -13,7 +13,9 @@ import {
   facilityCashBack,
   facilityEquivalentCycles,
   facilityLifetime,
+  facilityMaintenanceCost,
   facilityOutputFactor,
+  facilityPermanentlyShutdown,
 } from "../../helpers/Financials";
 import {
   formatPercent,
@@ -55,6 +57,7 @@ import {
 } from "../../Types";
 import HydroWaterSection from "./HydroWaterSection";
 import Sparkline from "./Sparkline";
+import { MONTHS } from "../../Constants";
 
 /**
  * What a selected facility has actually been doing: how hard it has run, what a MWh out of it
@@ -307,6 +310,10 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const storage = isStorage(facility) ? facility : undefined;
   const accentColor = facilityColor(fuel);
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const permanentlyShutdown = facilityPermanentlyShutdown(
+    facility,
+    date.minute,
+  );
   const isHydro = fuel === "Hydro" && !!facility.reservoirCapacityWh;
   const ageYears = facilityAgeYears(facility, date.minute);
   const outputFactor = facilityOutputFactor(facility, date.minute);
@@ -498,22 +505,45 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 value={formatMoneyConcise(facility.loanAmountLeft)}
               />
             )}
-            {variableOperatingCostPerMWh !== undefined && (
+            {variableOperatingCostPerMWh !== undefined &&
+              facilityMaintenanceCost(facility, date.minute) === undefined && (
+                <Stat
+                  label="Fixed upkeep"
+                  value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
+                />
+              )}
+            {variableOperatingCostPerMWh !== undefined &&
+              facilityMaintenanceCost(facility, date.minute) === undefined && (
+                <Stat
+                  label="Variable upkeep"
+                  value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh`}
+                />
+              )}
+            {facility.costPerStart !== undefined &&
+              facilityMaintenanceCost(facility, date.minute) === undefined && (
+                <Stat
+                  label="Non-fuel start cost"
+                  value={`${formatMoneyConcise(facility.costPerStart)}/start`}
+                />
+              )}
+            {facility.maintenanceObligation && (
               <Stat
-                label="Fixed upkeep"
-                value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
-              />
-            )}
-            {variableOperatingCostPerMWh !== undefined && (
-              <Stat
-                label="Variable upkeep"
-                value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh`}
-              />
-            )}
-            {facility.costPerStart !== undefined && (
-              <Stat
-                label="Non-fuel start cost"
-                value={`${formatMoneyConcise(facility.costPerStart)}/start`}
+                label={facility.maintenanceObligation.reason}
+                value={
+                  <>
+                    {formatMoneyConcise(
+                      facility.maintenanceObligation.monthlyCost,
+                    )}
+                    /mo ·{" "}
+                    {formatMoneyConcise(
+                      facility.maintenanceObligation.monthlyCost * 12,
+                    )}
+                    /yr
+                    {facilityMaintenanceCost(facility, date.minute) ===
+                      undefined &&
+                      ` from ${MONTHS[(facility.maintenanceObligation.startsMonth - 1) % 12]} ${(props.game?.startingYear ?? date.year - Math.floor(date.monthsElapsed / 12)) + Math.floor((facility.maintenanceObligation.startsMonth - 1) / 12)}`}
+                  </>
+                }
               />
             )}
             {trend.length > 1 && fuel && (
@@ -545,14 +575,14 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           </dl>
         </section>
       )}
-      {props.game && (
+      {props.game && !permanentlyShutdown && (
         <GasConversion
           facility={facility}
           game={props.game}
           onRetrofit={props.onRetrofit}
         />
       )}
-      {resilience && props.game && (
+      {resilience && props.game && !permanentlyShutdown && (
         <WeatherResilienceSection
           facility={facility}
           game={props.game}

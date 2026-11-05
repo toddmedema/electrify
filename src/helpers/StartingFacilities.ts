@@ -14,6 +14,10 @@ export function startingFacilitySearch(
     assetId: _assetId,
     hydroSiteId: _site,
     initialAgeYears: _age,
+    cashBackMultiplier: _cashBack,
+    saleRestricted: _saleRestricted,
+    maintenanceObligation: _maintenanceObligation,
+    permanentShutdownMonth: _permanentShutdownMonth,
     initialReservoirFraction: _reservoir,
     label: _label,
     ...technology

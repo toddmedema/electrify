@@ -1,3 +1,4 @@
+import { validFacilityMaintenanceObligation } from "./Financials";
 import {
   validUtilityExpansionParameters,
   validUtilityExpansionSetup,
@@ -66,7 +67,12 @@ const safeText = (v: unknown, max: number) =>
   v.length <= max &&
   !UNSAFE_TEXT.test(v) &&
   !UNSAFE_MARKUP.test(v);
-const number = (v: unknown, min: number, max: number, integer = false) =>
+const number = (
+  v: unknown,
+  min: number,
+  max: number,
+  integer = false,
+): v is number =>
   typeof v === "number" &&
   Number.isFinite(v) &&
   v >= min &&
@@ -96,6 +102,9 @@ function validModSetup(scenario: ScenarioType): boolean {
       "startingIntertieAccess",
       "seed",
       "startingYear",
+      "startingMonth",
+      "reliabilityFailureDisabled",
+      "retainCustomersDuringShortages",
       "cash",
       "startingCustomers",
       "startingDemandScale",
@@ -149,6 +158,12 @@ function validModSetup(scenario: ScenarioType): boolean {
       !safeText(scenario.hydroInventoryKey, 100)) ||
     (scenario.intertiesEnabled !== undefined &&
       typeof scenario.intertiesEnabled !== "boolean") ||
+    (scenario.startingMonth !== undefined &&
+      !number(scenario.startingMonth, 1, 12, true)) ||
+    (scenario.reliabilityFailureDisabled !== undefined &&
+      typeof scenario.reliabilityFailureDisabled !== "boolean") ||
+    (scenario.retainCustomersDuringShortages !== undefined &&
+      typeof scenario.retainCustomersDuringShortages !== "boolean") ||
     (scenario.recommendationOrder !== undefined &&
       !number(scenario.recommendationOrder, 0, 1000))
   )
@@ -226,6 +241,10 @@ function validModSetup(scenario: ScenarioType): boolean {
         "initialReservoirFraction",
         "hydroSiteId",
         "label",
+        "cashBackMultiplier",
+        "saleRestricted",
+        "maintenanceObligation",
+        "permanentShutdownMonth",
       ]) ||
       typeof asset.assetId !== "string" ||
       !ID_PATTERN.test(asset.assetId) ||
@@ -247,6 +266,19 @@ function validModSetup(scenario: ScenarioType): boolean {
     if (
       asset.initialReservoirFraction !== undefined &&
       !number(asset.initialReservoirFraction, 0, 1)
+    )
+      return false;
+    if (
+      asset.cashBackMultiplier !== undefined &&
+      !number(asset.cashBackMultiplier, 0, 1)
+    )
+      return false;
+    if (
+      (asset.saleRestricted !== undefined &&
+        typeof asset.saleRestricted !== "boolean") ||
+      (asset.permanentShutdownMonth !== undefined &&
+        !number(asset.permanentShutdownMonth, 1, 1211, true)) ||
+      !validFacilityMaintenanceObligation(asset.maintenanceObligation)
     )
       return false;
     if (asset.label !== undefined && !safeText(asset.label, 100)) return false;
@@ -351,7 +383,7 @@ export function validScenarioMod(
       typeof value.runtimeDigest !== "string" ||
       !/^sha256-[a-f0-9]{64}$/.test(value.runtimeDigest) ||
       typeof value.modRuntimeId !== "string" ||
-      !/^mod-1-[a-f0-9]{64}$/.test(value.modRuntimeId)
+      !/^mod-[1-9]\d*-[a-f0-9]{64}$/.test(value.modRuntimeId)
     )
       return false;
     const source = value.source,
@@ -385,6 +417,7 @@ export function validScenarioMod(
       !keys(params, [
         "baseScenarioId",
         "startingYear",
+        "startingMonth",
         "durationMonths",
         "seed",
         "difficulty",
@@ -395,6 +428,8 @@ export function validScenarioMod(
         !RULE_SCENARIO_IDS.includes(params.baseScenarioId as number)) ||
       !number(params.startingYear, 1980, 2100, true) ||
       !number(params.durationMonths, 6, 1200, true) ||
+      (params.startingMonth !== undefined &&
+        !number(params.startingMonth, 1, 12, true)) ||
       !number(params.seed, 0, 4294967295, true) ||
       !number(params.startingCustomers, 1, 1e8, true) ||
       !number(params.startingDemandScale, 0.01, 100)
@@ -408,6 +443,16 @@ export function validScenarioMod(
       return false;
     if (!validCompiledScenarioRules(value.rules)) return false;
     const rules = value.rules;
+    const openingOffset = (params.startingMonth ?? 1) - 1;
+    if (
+      rules.objectives.some(
+        (objective) =>
+          ("fromMonth" in objective
+            ? objective.fromMonth
+            : objective.deadlineMonth) < openingOffset,
+      )
+    )
+      return false;
     if (
       source.objectiveMode === "replace" &&
       rules.objectives.some((goal) => goal.inherited)
@@ -419,7 +464,8 @@ export function validScenarioMod(
       rules.difficulty !== params.difficulty ||
       rules.seed !== params.seed ||
       rules.startingYear !== params.startingYear ||
-      rules.durationMonths !== params.durationMonths
+      rules.durationMonths !==
+        params.durationMonths + (params.startingMonth ?? 1) - 1
     )
       return false;
     if (value.facilities !== undefined) {
@@ -452,6 +498,7 @@ export function validScenarioMod(
         scenario.rules !== undefined ||
         scenario.name !== source.title ||
         scenario.startingYear !== params.startingYear ||
+        (scenario.startingMonth ?? 1) !== (params.startingMonth ?? 1) ||
         scenario.durationMonths !== params.durationMonths ||
         scenario.seed !== params.seed ||
         scenario.startingCustomers !== params.startingCustomers ||

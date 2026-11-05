@@ -871,6 +871,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           rivals, or above it to earn more from each while some leave. The
           market rate rises with{" "}
           <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>inflation</EntryLink>.
+          Enable Follow inflation to raise your own rate each January too.
+          Choosing a rate by hand turns it off.
         </p>
         <p>
           <strong>Publicly owned:</strong> Customers can't switch utilities.
@@ -1246,10 +1248,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           and is rated to <ColdPackageRating />, or colder in cold climates.
         </p>
         <p>
-          Adding either later from the facility&apos;s details costs 50% more.
-          Hail retrofits take the plant offline for a month; winterizing keeps
-          90% of capacity available during a month of staged work. You can
-          cancel before it starts for a full refund.
+          Hail-resistant panels can only be chosen during construction. Adding a
+          cold-weather package later from the facility&apos;s details costs 50%
+          more. Winterizing keeps 90% of capacity available during a month of
+          staged work. Cancel before completion for a full refund.
         </p>
         <p>
           In Deep Freeze, gas, coal, nuclear and wind plants can be winterized

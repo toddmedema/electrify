@@ -331,9 +331,20 @@ it("offers a public utility a switch to follow inflation, off once a rate is cho
   expect(onDelta).toHaveBeenLastCalledWith({ rateFollowsInflation: true });
 });
 
-it("doesn't offer an investor-owned utility inflation to follow", () => {
-  renderRates(100);
-  expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+it("offers investor-owned utilities an opt-in switch to follow inflation", () => {
+  const onDelta = jest.fn();
+  render(
+    <RateControls game={createGame({ scenarioId: 100 })} onDelta={onDelta} />,
+  );
+  const follow = screen.getByRole("switch", { name: "Follow inflation" });
+  expect(follow).not.toBeChecked();
+  fireEvent.click(follow);
+  expect(onDelta).toHaveBeenCalledWith({ rateFollowsInflation: true });
+});
+
+it("keeps inflation following out of tutorials", () => {
+  renderRates(0);
+  expect(screen.queryByRole("switch", { name: "Follow inflation" })).toBeNull();
 });
 
 it("keeps keyboard focus on the slider across committed rate steps", () => {

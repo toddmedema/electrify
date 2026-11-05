@@ -306,9 +306,18 @@
     "unachieved": "uploads/ACROSS_THE_VALLEY_UNACHIEVED.png"
   },
   {
+    "apiName": "CHERNOBYL_RECOVERY",
+    "name": "Chernobyl: Recovery",
+    "description": "Successfully finish Chernobyl: Recovery on any difficulty.",
+    "source": "public/images/chernobyl-recovery.svg",
+    "sourceSha256": "188771eaef7ffaafbfd071fc7d7439c109567e127b950e0577829f8302888f71",
+    "achieved": "uploads/CHERNOBYL_RECOVERY_ACHIEVED.png",
+    "unachieved": "uploads/CHERNOBYL_RECOVERY_UNACHIEVED.png"
+  },
+  {
     "apiName": "MASTER_OF_THE_GRID",
     "name": "Master of the Grid",
-    "description": "Successfully finish all 15 official scenarios on CEO.",
+    "description": "Successfully finish all 16 official scenarios on CEO.",
     "source": "public/images/achievement-master-of-the-grid.svg",
     "sourceSha256": "37683077455b2a2c08ab6412b964514000ece40b08c4b297fe10c7fdd8981606",
     "achieved": "uploads/MASTER_OF_THE_GRID_ACHIEVED.png",

@@ -5,7 +5,11 @@ import { isBuyingRule, isSellingRule } from "./helpers/TradingRules";
 import { validUtilityExpansion } from "./helpers/ExpansionValidation";
 import { validScenarioMod } from "./helpers/ScenarioMod";
 import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
-import { maxLoanAmount } from "./helpers/Financials";
+import {
+  maxLoanAmount,
+  validFacilityMaintenanceObligation,
+  facilityPermanentlyShutdown,
+} from "./helpers/Financials";
 import {
   accessContextForGame,
   effectiveCorridor,
@@ -14,6 +18,7 @@ import {
 import { validHydroClaims } from "./data/HydroSites";
 import {
   validRunIdentity,
+  carrySavedRunForward,
   sameRunIdentity,
   expandAuthoredRunReference,
   normalizedInputs,
@@ -33,6 +38,7 @@ import {
 import { APP_VERSION } from "./AppVersion";
 import { decodeSave } from "./SaveEncoding";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
+import { upgradeSave } from "./SaveUpgrade";
 import {
   validWorldEvent,
   validTransmissionCapacityLimits,
@@ -333,7 +339,7 @@ export function serializeSave(game: GameType): SaveGameType {
  * malformed facility would otherwise crash the sim mid-tick.
  */
 export function parseSave(raw: unknown): SaveGameType | null {
-  raw = decodeSave(raw);
+  raw = upgradeSave(decodeSave(raw));
   if (typeof raw !== "object" || raw === null) {
     return null;
   }
@@ -360,6 +366,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
     game.seed > 4294967295 ||
     typeof game.startingYear !== "number" ||
     !Number.isFinite(game.startingYear) ||
+    (game.startingMonth !== undefined &&
+      (!Number.isInteger(game.startingMonth) ||
+        game.startingMonth < 1 ||
+        game.startingMonth > 12)) ||
     typeof game.customerMarketSize !== "number" ||
     !Number.isFinite(game.customerMarketSize) ||
     game.customerMarketSize <= 0 ||
@@ -441,12 +451,30 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (!Array.isArray(game.facilities) || !validHydroClaims(game as GameType)) {
     return null;
   }
+  const inheritedScenario = getScenario(game.scenarioId, game.customScenario);
+  if (inheritedScenario && !Array.isArray(inheritedScenario.facilities))
+    return null;
+  if (
+    inheritedScenario?.facilities.some(
+      (starting) =>
+        starting?.saleRestricted &&
+        !game.facilities!.some(
+          (owned) => owned?.startingAssetId === starting.assetId,
+        ),
+    )
+  )
+    return null;
   if (
     game.facilities.some((facility) => {
       if (typeof facility !== "object" || facility === null) {
         return true;
       }
       const current = facility as unknown as Record<string, unknown>;
+      const inheritedAsset = inheritedScenario?.facilities.find(
+        (starting) =>
+          starting?.assetId !== undefined &&
+          starting.assetId === current.startingAssetId,
+      );
       const requiredNumbersInvalid = [
         current.annualOperatingCost,
         current.lifespanYears,
@@ -462,6 +490,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
         current.lifetimeStarts,
         current.minimumStableOutput,
         current.variableOperatingCostPerMWh,
+        current.cashBackMultiplier,
       ].some(
         (value) =>
           value !== undefined &&
@@ -481,6 +510,24 @@ export function parseSave(raw: unknown): SaveGameType | null {
         ) ||
         requiredNumbersInvalid ||
         optionalNumbersInvalid ||
+        current.cashBackMultiplier !== inheritedAsset?.cashBackMultiplier ||
+        current.saleRestricted !== inheritedAsset?.saleRestricted ||
+        current.permanentShutdownMonth !==
+          inheritedAsset?.permanentShutdownMonth ||
+        (current.permanentShutdownMonth !== undefined &&
+          (!Number.isInteger(current.permanentShutdownMonth) ||
+            typeof current.permanentShutdownMonth !== "number" ||
+            current.permanentShutdownMonth < 1 ||
+            current.permanentShutdownMonth > 1211)) ||
+        (facilityPermanentlyShutdown(facility, game.date!.minute) &&
+          current.paused !== true) ||
+        (current.saleRestricted !== undefined &&
+          typeof current.saleRestricted !== "boolean") ||
+        !validFacilityMaintenanceObligation(current.maintenanceObligation) ||
+        normalizedInputs(current.maintenanceObligation) !==
+          normalizedInputs(inheritedAsset?.maintenanceObligation) ||
+        (typeof current.cashBackMultiplier === "number" &&
+          current.cashBackMultiplier > 1) ||
         (typeof current.minimumStableOutput === "number" &&
           current.minimumStableOutput > 1) ||
         (current.costIndexAtBuild !== undefined &&
@@ -683,6 +730,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
   const transmission = game.transmission;
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!validCustomEventScenario(game.customScenario)) return null;
+  // The opening month is part of the scenario contract, not an editable extension of its term.
+  if (
+    (game.startingMonth ?? 1) !== (scenario?.startingMonth ?? 1) ||
+    game.date.monthsElapsed < (game.startingMonth ?? 1) - 1
+  )
+    return null;
   if (
     game.customScenario?.mod !== undefined &&
     (!validScenarioMod(game.customScenario.mod, game.customScenario) ||
@@ -791,12 +844,13 @@ export function parseSave(raw: unknown): SaveGameType | null {
     )
   )
     return null;
-  const normalized = {
+  const normalized = carrySavedRunForward({
     ...game,
     policyPause: undefined,
     scenarioChoicePause: undefined,
     timeline: game.timeline.map((t) => ({ ...t })),
-  };
+  });
+  if (!normalized) return null;
   // Achievement telemetry is optional: a save from a newer catalog (or a tampered one) still
   // loads, and resume starts observing it afresh rather than trusting the stored counters.
   if (

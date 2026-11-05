@@ -322,11 +322,22 @@ describe("hail damage", () => {
 });
 
 describe("retrofits", () => {
+  it("rejects new hail retrofits without charging or changing solar sites", () => {
+    const state = game(DENVER, HAIL.seed);
+    const solar = state.facilities.find((f) => f.fuel === "Sun")!;
+    const next = dispatch(
+      state,
+      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
+    );
+    expect(next).toEqual(state);
+  });
+
   it("charges the cost once, records it, and rejects a repeat", () => {
     const state = game(DENVER, HAIL.seed);
     tickToMonth(state, 1);
-    const solar = state.facilities.find((f) => f.fuel === "Sun")!;
-    const cost = retrofitCost(solar, state, "hailResistant")!;
+    const gas = state.facilities.find((f) => f.fuel === "Natural Gas")!;
+    gas.resilience = { coldWeatherPackage: false, designMinTempC: -8 };
+    const cost = retrofitCost(gas, state, "coldWeatherPackage")!;
     expect(cost).toBeGreaterThan(0);
     const cashBefore = getTimeFromTimeline(
       state.date.minute,
@@ -334,15 +345,15 @@ describe("retrofits", () => {
     )!.cash;
     const next = dispatch(
       state,
-      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
+      retrofitFacility({ facilityId: gas.id, upgrade: "coldWeatherPackage" }),
     );
     const at = getTimeFromTimeline(next.date.minute, next.timeline)!;
     expect(cashBefore - at.cash).toBe(cost);
     // Installed over the next month, not at once
-    const installing = next.facilities.find((f) => f.id === solar.id)!;
-    expect(installing.resilience?.hailResistant).toBe(false);
+    const installing = next.facilities.find((f) => f.id === gas.id)!;
+    expect(installing.resilience?.coldWeatherPackage).toBe(false);
     expect(installing.upgradeInProgress).toEqual({
-      upgrade: "hailResistant",
+      upgrade: "coldWeatherPackage",
       cost,
       startsMinute: next.date.minute,
       completesMinute: next.date.minute + MINUTES_PER_MONTH,
@@ -351,17 +362,17 @@ describe("retrofits", () => {
     // Immer freezes an unchanged base, so each probe works on its own copy.
     const repeated = dispatch(
       cloneDeep(next),
-      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
+      retrofitFacility({ facilityId: gas.id, upgrade: "coldWeatherPackage" }),
     );
     expect(
       getTimeFromTimeline(repeated.date.minute, repeated.timeline)!.cash,
     ).toBe(at.cash);
     // Wrong technology, unknown facility and malformed payloads are rejected.
-    const gas = next.facilities.find((f) => f.fuel === "Natural Gas")!;
+    const solar = next.facilities.find((f) => f.fuel === "Sun")!;
     [
-      { facilityId: gas.id, upgrade: "hailResistant" },
-      { facilityId: 99999, upgrade: "hailResistant" },
-      { facilityId: solar.id, upgrade: "bogus" },
+      { facilityId: solar.id, upgrade: "coldWeatherPackage" },
+      { facilityId: 99999, upgrade: "coldWeatherPackage" },
+      { facilityId: gas.id, upgrade: "bogus" },
     ].forEach((payload) => {
       const rejected = dispatch(
         cloneDeep(next),
@@ -385,14 +396,19 @@ describe("retrofits", () => {
     );
   });
 
-  it("holds the plant offline for a month, then installs the upgrade", () => {
+  it("resumes a legacy hail retrofit and finishes installing its protection", () => {
     const state = game(DENVER, HAIL.seed);
     tickToMonth(state, 1);
     const [solar, other] = state.facilities.filter((f) => f.fuel === "Sun");
-    const next = dispatch(
-      state,
-      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
-    );
+    solar.upgradeInProgress = {
+      upgrade: "hailResistant",
+      cost: 4.5e6,
+      startsMinute: state.date.minute,
+      completesMinute: state.date.minute + MINUTES_PER_MONTH,
+    };
+    const saved = parseSave(JSON.parse(JSON.stringify(serializeSave(state))));
+    expect(saved).not.toBeNull();
+    const next = cloneDeep(gameReducer(undefined, resume(saved!.game)));
     const completes = next.date.minute + MINUTES_PER_MONTH;
     let otherPeakW = 0;
     while (next.date.minute < completes - TICK_MINUTES) {
@@ -496,14 +512,15 @@ describe("retrofits", () => {
   it("saves and resumes after a retrofit exactly like an uninterrupted run", () => {
     const state = game(DENVER, HAIL.seed);
     tickToMonth(state, 1);
-    const solar = state.facilities.find((f) => f.fuel === "Sun")!;
+    const gas = state.facilities.find((f) => f.fuel === "Natural Gas")!;
+    gas.resilience = { coldWeatherPackage: false, designMinTempC: -8 };
     const retrofitted = dispatch(
       state,
-      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
+      retrofitFacility({ facilityId: gas.id, upgrade: "coldWeatherPackage" }),
     );
     expect(retrofitted.meaningfulDecisions.at(-1)).toMatchObject({
-      lever: `resilience:${solar.id}:hail-resistant`,
-      after: "hail-resistant",
+      lever: `resilience:${gas.id}:cold-weather-package`,
+      after: "cold-weather-package",
     });
     const continued = cloneDeep(retrofitted);
     const saved = parseSave(
@@ -525,13 +542,15 @@ describe("retrofits", () => {
     tickToMonth(state, 1);
     const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
     now.cash = 1;
-    const solar = state.facilities.find((f) => f.fuel === "Sun")!;
+    const gas = state.facilities.find((f) => f.fuel === "Natural Gas")!;
+    gas.resilience = { coldWeatherPackage: false, designMinTempC: -8 };
     const next = dispatch(
       state,
-      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
+      retrofitFacility({ facilityId: gas.id, upgrade: "coldWeatherPackage" }),
     );
     expect(
-      next.facilities.find((f) => f.id === solar.id)!.resilience?.hailResistant,
+      next.facilities.find((f) => f.id === gas.id)!.resilience
+        ?.coldWeatherPackage,
     ).toBeFalsy();
   });
 });
@@ -703,17 +722,18 @@ describe("month-end transactions", () => {
     const state = game(DENVER, HAIL.seed);
     tickToMinute(state, 2 * MINUTES_PER_MONTH - TICK_MINUTES);
     expect(state.date.monthsElapsed).toBe(1);
+    const gas = state.facilities.find((f) => f.fuel === "Natural Gas")!;
+    gas.resilience = { coldWeatherPackage: false, designMinTempC: -8 };
     const control = cloneDeep(state);
-    const solar = state.facilities.find((f) => f.fuel === "Sun")!;
-    const cost = retrofitCost(solar, state, "hailResistant")!;
+    const cost = retrofitCost(gas, state, "coldWeatherPackage")!;
     const retrofitted = dispatch(
       state,
-      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
+      retrofitFacility({ facilityId: gas.id, upgrade: "coldWeatherPackage" }),
     );
     expect(
-      retrofitted.facilities.find((f) => f.id === solar.id)!.upgradeInProgress
+      retrofitted.facilities.find((f) => f.id === gas.id)!.upgradeInProgress
         ?.upgrade,
-    ).toBe("hailResistant");
+    ).toBe("coldWeatherPackage");
     // The rollover tick clamps prev and now to the month's final frame.
     tickState(retrofitted);
     tickState(control);

@@ -234,26 +234,21 @@ describe("VictoryDialog", () => {
     expect(screen.queryByText("Construction complete: Solar")).toBeNull();
   });
 
-  it("fills in the global rank once it resolves", async () => {
-    mockFetchGlobalRank.mockResolvedValue(4);
-    renderDialog();
-    expect(await screen.findByText(/#4 across all levels/)).toBeInTheDocument();
-    expect(mockFetchGlobalRank).toHaveBeenCalledWith(101, 812, "CEO");
-  });
-
-  it("drops the rank line rather than the dialog when the query fails", async () => {
-    const warn = jest
-      .spyOn(console, "warn")
-      .mockImplementation(() => undefined);
-    mockFetchGlobalRank.mockRejectedValue(new Error("unavailable"));
-    renderDialog();
-
-    await waitFor(() =>
-      expect(screen.queryByText(/across all levels/)).not.toBeInTheDocument(),
-    );
-    expect(screen.getByText(/800 electricity supplied/)).toBeInTheDocument();
-    warn.mockRestore();
-  });
+  it.each([undefined, 640, 900])(
+    "keeps the personal-best line free of global rank (previous best: %s)",
+    (previousBest) => {
+      mockFetchGlobalRank.mockResolvedValue(1);
+      renderDialog({ victory: aVictory({ previousBest }) });
+      expect(
+        screen.getByText(
+          previousBest === 900 ? "Personal best 900" : "New personal best",
+          { exact: true },
+        ),
+      ).toBeVisible();
+      expect(screen.queryByText(/across all levels|globally|#1/)).toBeNull();
+      expect(mockFetchGlobalRank).not.toHaveBeenCalled();
+    },
+  );
 
   // previousBest is read when the run ends, before the score write, so it is the run before this
   // one rather than the one just finished

@@ -178,7 +178,7 @@ function objectiveDetail(result: ObjectiveResult, game: GameType): string {
     objectiveTargetMet(result.objective, result.observed)
       ? rounded
       : result.observed;
-  return `${prefix}: ${objectiveValueText(result.objective, shown, result.target)} · ${objectiveWindowText(result.objective, game.startingYear + legacyMonthOffset(game) / 12, activeScenario(game)!.durationMonths)}.`;
+  return `${prefix}: ${objectiveValueText(result.objective, shown, result.target)} · ${objectiveWindowText(result.objective, game.startingYear, activeScenario(game)!.durationMonths, legacyMonthOffset(game))}.`;
 }
 
 /** All required goals plus month-end bankruptcy and the rolling three-month blackout rule. */
@@ -292,26 +292,27 @@ export function projectMission(
       row.supplyWh >= 0 &&
       row.demandWh >= 0,
   );
-  requirements.push({
-    id: "survival",
-    label: "Avoid chronic blackouts",
-    required: true,
-    failureMonth: blackout ? monthIndex(blackout, game) : undefined,
-    status: recordedBlackout
-      ? "failed"
-      : blackout
-        ? "at-risk"
-        : fullTerm && historyKnown && reliabilityKnown
-          ? "on-track"
-          : "unavailable",
-    detail: recordedBlackout
-      ? "Recorded blackouts already reached three consecutive months."
-      : blackout
-        ? `Three consecutive months below the service threshold by ${monthLabel(monthIndex(blackout, game), game)}.`
-        : fullTerm && historyKnown && reliabilityKnown
-          ? "No three-month blackout streak projected."
-          : "Not enough monthly coverage to rule out a blackout streak.",
-  });
+  if (!scenario.reliabilityFailureDisabled)
+    requirements.push({
+      id: "survival",
+      label: "Avoid chronic blackouts",
+      required: true,
+      failureMonth: blackout ? monthIndex(blackout, game) : undefined,
+      status: recordedBlackout
+        ? "failed"
+        : blackout
+          ? "at-risk"
+          : fullTerm && historyKnown && reliabilityKnown
+            ? "on-track"
+            : "unavailable",
+      detail: recordedBlackout
+        ? "Recorded blackouts already reached three consecutive months."
+        : blackout
+          ? `Three consecutive months below the service threshold by ${monthLabel(monthIndex(blackout, game), game)}.`
+          : fullTerm && historyKnown && reliabilityKnown
+            ? "No three-month blackout streak projected."
+            : "Not enough monthly coverage to rule out a blackout streak.",
+    });
   const required = requirements.filter((row) => row.required);
   const shortage = months.find((row) => row.supplyWh < row.demandWh);
   return {

@@ -332,6 +332,37 @@ describe("SaveRepository", () => {
     expect(await repository.readRaw("first")).toEqual(original);
   });
 
+  it("opens a prior-release device save without rewriting it until a successful checkpoint", async () => {
+    const game = createGame({ scenarioId: 101, seed: 31337 });
+    await repository.create({
+      id: "first",
+      name: "Before the update",
+      save: serializeSave(game),
+      scenarioName: "Rise of Renewables",
+      writerToken: "tab-one",
+    });
+    await mutateStoredPayload((payload) => {
+      const save = payload.save as ReturnType<typeof serializeSave>;
+      save.schemaVersion = 8;
+      save.game.runIdentity!.compatibilityId = `rules-1-${"a".repeat(64)}`;
+    });
+    const original = await repository.readRaw("first");
+    const opened = await repository.read("first");
+    expect(opened.save.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(opened.save.game.rulesChanged).toBe(true);
+    expect(opened.save.game.runIdentity).toBeUndefined();
+    expect(opened.save.game.facilities).toEqual(game.facilities);
+    expect(opened.save.game.date).toEqual(game.date);
+    expect(await repository.readRaw("first")).toEqual(original);
+
+    await repository.writeSnapshot(lease(), opened.save, "Rise of Renewables");
+    expect(await repository.readRaw("first")).not.toEqual(original);
+    const reopened = await repository.read("first");
+    expect(reopened.save).toEqual(opened.save);
+    expect(reopened.metadata.revision).toBe(2);
+    expect(reopened.save.game.rulesChanged).toBe(true);
+  });
+
   it("acquires metadata, payload and revision atomically and excludes other live writers", async () => {
     await create();
     await expect(other.prepareResume("first", "tab-two")).rejects.toMatchObject(

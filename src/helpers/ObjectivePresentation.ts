@@ -69,15 +69,18 @@ export function objectiveWindowText(
   objective: CompiledRuleObjective,
   startingYear: number,
   durationMonths: number,
+  monthOffset = 0,
 ): string {
   const first =
-    "fromMonth" in objective ? objective.fromMonth : objective.deadlineMonth;
+    ("fromMonth" in objective ? objective.fromMonth : objective.deadlineMonth) +
+    monthOffset;
   const last =
-    "throughMonth" in objective
+    monthOffset +
+    ("throughMonth" in objective
       ? objective.throughMonth
       : objective.metric === "fuelRetirement" && !objective.checkpoint
         ? durationMonths - 1
-        : first;
+        : first - monthOffset);
   if (first === last) return monthText(first, startingYear);
   if (first % 12 === 0 && last === first + 11)
     return `${startingYear + Math.floor(first / 12)}`;
@@ -165,6 +168,7 @@ export function objectiveGoalText(
   objective: CompiledRuleObjective,
   startingYear: number,
   durationMonths: number,
+  monthOffset = 0,
 ): string {
   if (objective.checkpoint) {
     const last =
@@ -175,10 +179,15 @@ export function objectiveGoalText(
       objectiveTargetText(objective) +
       (last === durationMonths - 1
         ? ""
-        : ` by ${last % 12 === 11 ? startingYear + Math.floor(last / 12) : monthText(last, startingYear)}`)
+        : ` by ${(last + monthOffset) % 12 === 11 ? startingYear + Math.floor((last + monthOffset) / 12) : monthText(last + monthOffset, startingYear)}`)
     );
   }
-  const window = objectiveWindowText(objective, startingYear, durationMonths);
+  const window = objectiveWindowText(
+    objective,
+    startingYear,
+    durationMonths,
+    monthOffset,
+  );
   return objective.metric === "customerRetention" ||
     objective.metric === "customerCount"
     ? `${objectiveTargetText(objective)} by ${window}`

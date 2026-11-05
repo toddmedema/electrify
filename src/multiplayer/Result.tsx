@@ -162,6 +162,7 @@ export default function CoopResult({
                           ? result.objective.throughMonth + 1
                           : result.objective.deadlineMonth +
                             result.requiredMonths),
+                      (scenario?.startingMonth ?? 1) - 1,
                     )}
                   </Typography>
                   <Typography variant="body2">

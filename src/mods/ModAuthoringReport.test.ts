@@ -351,3 +351,29 @@ test("player facts clear zero signs without changing valid negative modifiers", 
   expect(monthly.rows[0].value).toContain("Temperature: -0.001 °C");
   expect(Object.is(scenario.facilities[0].initialAgeYears, -0)).toBe(true);
 });
+
+test("Chernobyl author facts show the actual March term and recovery reliability rule", () => {
+  const pack = validateMod({
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "recovery-facts",
+    title: "Recovery facts",
+    creator: "Author",
+    version: "1",
+    description: "Recover power.",
+    baseScenarioId: 126,
+  });
+  loadSimData(getScenarioLocation(modResolvedSetup(pack))!);
+  const report = buildModAuthorReport(pack);
+  expect(report.valid).toBe(true);
+  const setup = report.sections.find((section) => section.id === "setup")!.rows;
+  expect(
+    setup.find((row) => row.label === "Era and duration")!.value,
+  ).toContain("Mar 1986–Feb 1991");
+  const objectives = report.sections.find(
+    (section) => section.id === "objectives",
+  )!.rows;
+  expect(
+    objectives.find((row) => row.label === "Reliability")!.value,
+  ).toContain("No minimum reliability requirement");
+});
