@@ -30,6 +30,7 @@ export class ThemeManager {
     private nodes: Record<string, AudioNode>,
   ) {}
 
+  /** Save the decoded playhead and silence every source, including outgoing crossfades. */
   public pause() {
     if (this.paused) return;
     this.paused = true;
@@ -42,6 +43,7 @@ export class ThemeManager {
     this.themeStartedAt = null;
   }
 
+  /** Restart the selected scene at its saved playhead with the latest grid pressure. */
   public resume() {
     if (!this.paused) return;
     this.paused = false;
@@ -49,6 +51,7 @@ export class ThemeManager {
     if (this.intensity > 0) this.start(this.resumeOffsetSeconds, 0.1);
   }
 
+  /** Measure progress modulo the decoded loop so pauses across a boundary resume in place. */
   private elapsedInTheme(): number {
     if (this.themeStartedAt === null || !this.active.length) return 0;
     // Use decoded samples, not an independently authored timer or rounded MP3 duration.
@@ -58,12 +61,14 @@ export class ThemeManager {
     );
   }
 
+  /** Fade the current scene and clear its playhead before choosing another scene. */
   private stop(seconds = MUSIC_FADE_SECONDS) {
     this.active.forEach((node) => node.fadeOut(seconds));
     this.active = [];
     this.themeStartedAt = null;
   }
 
+  /** Select silence, menu or gameplay, updating pressure without restarting the same scene. */
   public setIntensity(intensity: number) {
     intensity = Number.isFinite(intensity)
       ? Math.min(MUSIC_INTENSITY_MAX, Math.max(0, intensity))
@@ -95,6 +100,7 @@ export class ThemeManager {
     }
   }
 
+  /** Start every stem at one future audio-clock time and a shared decoded offset. */
   private start(offsetSeconds = 0, fadeSeconds = MUSIC_FADE_SECONDS) {
     // Schedule every stem slightly ahead on one clock, so creating nodes cannot stagger them.
     const startAt = this.context.currentTime + 0.02;
@@ -111,6 +117,7 @@ export class ThemeManager {
     return Math.max(0, (this.intensity - 2) / (MUSIC_INTENSITY_MAX - 2));
   }
 
+  /** Keep menu volume steady and lift gameplay layers in order as grid pressure rises. */
   private trackVolume(track: string): number {
     if (this.theme === MUSIC_DEFINITIONS.menu) {
       return 1;
@@ -133,6 +140,7 @@ export class ThemeManager {
     }
   }
 
+  /** Retarget stem gains without shortening an in-progress scene transition. */
   private updateMix(seconds: number) {
     // Grid changes during the scene fade must not shorten the five-second arrival.
     const duration = Math.max(
@@ -147,6 +155,7 @@ export class ThemeManager {
     });
   }
 
+  /** Respond to worsening pressure immediately and hold brief recoveries before fading down. */
   private updateTheme() {
     const pressure = this.pressure();
     if (pressure >= this.mixedPressure) {

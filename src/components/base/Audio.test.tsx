@@ -28,7 +28,7 @@ jest.mock("../../data/Audio", () => ({
   state: { loaded: "UNLOADED" },
 }));
 
-const props: StateProps = {
+const props: StateProps & { disableAudio: () => void } = {
   enabled: true,
   musicVolume: 1,
   soundEffectsVolume: 1,
@@ -38,6 +38,7 @@ const props: StateProps = {
   victoryOpen: false,
   dialogOpen: false,
   dialogTitle: "",
+  disableAudio: jest.fn(),
 };
 
 beforeEach(() => {
@@ -47,6 +48,48 @@ beforeEach(() => {
   state.loaded = "UNLOADED";
 });
 afterEach(() => jest.useRealTimers());
+
+it("disables unsupported audio once and stops trying on later gestures", () => {
+  (loadAudioFiles as jest.Mock).mockImplementationOnce(() => {
+    Object.assign(state, { loaded: "UNSUPPORTED" });
+  });
+  render(<Audio {...props} />);
+  act(() => jest.advanceTimersByTime(INIT_DELAY.LOAD_AUDIO_MILLIS));
+  expect(props.disableAudio).toHaveBeenCalledTimes(1);
+  jest.clearAllMocks();
+  document.dispatchEvent(new Event("click"));
+  document.dispatchEvent(new Event("touchend"));
+  document.dispatchEvent(new Event("keydown"));
+  expect(loadAudioFiles).not.toHaveBeenCalled();
+  expect(resume).not.toHaveBeenCalled();
+  expect(unlockAudio).not.toHaveBeenCalled();
+  expect(props.disableAudio).not.toHaveBeenCalled();
+});
+
+it("keeps retryable download errors enabled for a later gesture", () => {
+  (loadAudioFiles as jest.Mock).mockImplementationOnce(() => {
+    state.loaded = "ERROR";
+  });
+  render(<Audio {...props} />);
+  act(() => jest.advanceTimersByTime(INIT_DELAY.LOAD_AUDIO_MILLIS));
+  expect(props.disableAudio).not.toHaveBeenCalled();
+  document.dispatchEvent(new Event("click"));
+  expect(loadAudioFiles).toHaveBeenCalledTimes(2);
+  expect(props.disableAudio).not.toHaveBeenCalled();
+});
+
+it("reports unsupported installed-app audio when enabled after muted preparation", () => {
+  (isInstalledWebApp as jest.Mock).mockReturnValue(true);
+  (loadAudioFiles as jest.Mock).mockImplementationOnce(() => {
+    Object.assign(state, { loaded: "UNSUPPORTED" });
+  });
+  const { rerender } = render(<Audio {...props} enabled={false} />);
+  act(() => jest.advanceTimersByTime(INIT_DELAY.LOAD_AUDIO_MILLIS));
+  expect(props.disableAudio).not.toHaveBeenCalled();
+  rerender(<Audio {...props} />);
+  expect(props.disableAudio).toHaveBeenCalledTimes(1);
+  expect(loadAudioFiles).toHaveBeenCalledTimes(1);
+});
 
 it("loads only the mounted instance in StrictMode", () => {
   render(

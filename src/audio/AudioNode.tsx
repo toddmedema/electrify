@@ -68,6 +68,7 @@ export class AudioNode {
     this.fadeGain(this.gain, volume, seconds);
   }
 
+  /** Replace pending automation while preserving the current level on older Web Audio engines. */
   private fadeGain(gain: GainNode, volume: number, seconds: number) {
     const param = gain.gain;
     const now = this.context.currentTime;
@@ -81,6 +82,7 @@ export class AudioNode {
     param.linearRampToValueAtTime(volume, now + seconds);
   }
 
+  /** Fade and stop the current source while retaining older crossfades until their own stops. */
   public fadeOut(seconds = MUSIC_FADE_SECONDS) {
     if (!this.gain || !this.source) return;
     this.fadeGain(this.gain, 0, seconds);

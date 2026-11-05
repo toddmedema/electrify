@@ -4,6 +4,8 @@ const WEATHER_INDEX = "/data/weather/index.json";
 const OFFLINE_DATA_REVISION = "/__offline-data-revision";
 // Generated from public/images at build time (scripts/generate-icon-manifest.js).
 const ICON_MANIFEST = "/icons.json";
+// Audio paths are not content-hashed and cached tracks are never revalidated. Replacing an
+// audio file at the same path requires a CACHE_VERSION bump so existing installs get new bytes.
 const AUDIO_FILES = [
   "/audio/menu/quiet-current.wav",
   "/audio/intro/intro.mp3",
@@ -320,7 +322,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.pathname.startsWith("/audio/")) {
-    // Large, immutable tracks are cache-first. Revalidating every listen doubles mobile I/O.
+    // Large tracks are cache-first; replacing them follows the CACHE_VERSION rule above.
     const result = caches.match(request).then(async (cached) => {
       if (cached) return cached;
       return fetchAndCache(await caches.open(CACHE_VERSION), request);

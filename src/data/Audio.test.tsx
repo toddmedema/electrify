@@ -39,6 +39,22 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks());
 
+it.each(["load", "unlock"])(
+  "treats missing Web Audio during %s as unsupported without retrying later gestures",
+  async (entry) => {
+    (getAudioContext as jest.Mock).mockReturnValue(null);
+    if (entry === "load") await loadAudioFiles();
+    else unlockAudio();
+    expect(state.loaded).toBe("UNSUPPORTED");
+    for (let i = 0; i < 3; i++) {
+      resume();
+      unlockAudio();
+      await loadAudioFiles();
+    }
+    expect(getAudioContext).toHaveBeenCalledTimes(1);
+  },
+);
+
 it.each([false, true])(
   "uses the latest game state when decoding finishes (initial inGame=%s)",
   async (initialInGame) => {

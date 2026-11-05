@@ -24,9 +24,16 @@ export interface StateProps extends SoundEventSnapshot {
   musicIntensity: number;
 }
 
-export default class Audio extends React.Component<StateProps, {}> {
+export interface DispatchProps {
+  disableAudio: () => void;
+}
+
+interface Props extends StateProps, DispatchProps {}
+
+export default class Audio extends React.Component<Props, {}> {
   private loadTimer: ReturnType<typeof setTimeout> | undefined;
 
+  /** Track scene and gesture changes, then prepare installed-app music after startup settles. */
   componentDidMount() {
     setMusicInGame(this.props.inGame, this.props.musicIntensity);
     if (!this.props.enabled || document.visibilityState === "hidden") pause();
@@ -37,11 +44,7 @@ export default class Audio extends React.Component<StateProps, {}> {
     this.loadTimer = setTimeout(() => {
       if (this.props.enabled && document.visibilityState !== "hidden")
         this.handleEnableState(true);
-      else if (isInstalledWebApp())
-        void loadAudioFiles(
-          this.props.musicVolume,
-          this.props.soundEffectsVolume,
-        );
+      else if (isInstalledWebApp()) this.loadAudio();
     }, INIT_DELAY.LOAD_AUDIO_MILLIS);
   }
 
@@ -53,18 +56,32 @@ export default class Audio extends React.Component<StateProps, {}> {
     pause();
   }
 
+  /** Retry autoplay permission and transient loads while the gesture is still active. */
   private onGesture = () => {
-    if (!this.props.enabled || document.visibilityState === "hidden") return;
+    if (
+      !this.props.enabled ||
+      document.visibilityState === "hidden" ||
+      audioState.loaded === "UNSUPPORTED"
+    )
+      return;
     if (audioState.paused) resume();
     else unlockAudio();
-    if (audioState.loaded === "UNLOADED" || audioState.loaded === "ERROR") {
+    if (audioState.loaded !== "LOADING" && audioState.loaded !== "LOADED")
+      this.loadAudio();
+  };
+
+  /** Report missing Web Audio support while leaving download and decode failures retryable. */
+  private loadAudio() {
+    if (audioState.loaded !== "UNSUPPORTED")
       void loadAudioFiles(
         this.props.musicVolume,
         this.props.soundEffectsVolume,
       );
-    }
-  };
+    if (audioState.loaded === "UNSUPPORTED" && this.props.enabled)
+      this.props.disableAudio();
+  }
 
+  /** Apply the master switch without moving the playhead or retrying unsupported devices. */
   private handleEnableState(enabled?: boolean) {
     if (!enabled) {
       pause();
@@ -74,9 +91,10 @@ export default class Audio extends React.Component<StateProps, {}> {
     setMusicVolume(this.props.musicVolume);
     setSoundEffectsVolume(this.props.soundEffectsVolume);
     resume();
-    void loadAudioFiles(this.props.musicVolume, this.props.soundEffectsVolume);
+    this.loadAudio();
   }
 
+  /** Keep scene mixing, volume controls and event cues aligned with the latest game state. */
   componentDidUpdate(prevProps: StateProps) {
     if (
       this.props.inGame !== prevProps.inGame ||

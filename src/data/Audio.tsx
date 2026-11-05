@@ -41,8 +41,13 @@ export function pause() {
 
 /** Call synchronously in a gesture, before downloads or React updates can consume activation. */
 export function unlockAudio() {
+  if (state.loaded === "UNSUPPORTED") return;
   const context = getAudioContext();
-  if (context && context.state !== "running" && context.state !== "closed") {
+  if (!context) {
+    state.loaded = "UNSUPPORTED";
+    return;
+  }
+  if (context.state !== "running" && context.state !== "closed") {
     // Safari can also report an interrupted context. A later gesture can retry a rejection.
     void context.resume().catch(() => undefined);
   }
@@ -89,7 +94,7 @@ export function getAllMusicFiles(): string[] {
   );
 }
 
-// can't use Fetch for local files since audio files might come from file://, must use this instead
+/** Decode a track over XHR, which also supports the desktop app's file:// URLs. */
 export function loadAudioLocalFile(
   context: AudioContext,
   url: string,
@@ -114,10 +119,15 @@ export function loadAudioLocalFile(
 
 /** Load once, with menu playback ready before the expensive gameplay decodes. */
 export async function loadAudioFiles(musicVolume = 1, soundEffectsVolume = 1) {
-  if (state.loaded === "LOADING" || state.loaded === "LOADED") return;
+  if (
+    state.loaded === "LOADING" ||
+    state.loaded === "LOADED" ||
+    state.loaded === "UNSUPPORTED"
+  )
+    return;
   const ac = getAudioContext();
   if (!ac) {
-    state.loaded = "ERROR";
+    state.loaded = "UNSUPPORTED";
     return;
   }
   state.loaded = "LOADING";
