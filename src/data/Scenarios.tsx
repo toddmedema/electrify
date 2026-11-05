@@ -506,7 +506,7 @@ export const SCENARIOS: ScenarioType[] = [
   {
     id: 4,
     name: "Mission 4: Finances",
-    icon: "coal",
+    icon: "tutorial-finances",
     summary: "Read the books",
     locationId: "SF",
     ownership: "Investor",
@@ -615,7 +615,7 @@ export const SCENARIOS: ScenarioType[] = [
   {
     id: 3,
     name: "Mission 5: Pricing",
-    icon: "wind",
+    icon: "tutorial-pricing",
     summary: "Grow your customers",
     locationId: "SF",
     ownership: "Investor",
@@ -701,7 +701,7 @@ export const SCENARIOS: ScenarioType[] = [
   {
     id: 5,
     name: "Mission 6: Forecasting",
-    icon: "geothermal",
+    icon: "tutorial-forecasting",
     summary: "See what's coming",
     locationId: "SF",
     ownership: "Investor",
