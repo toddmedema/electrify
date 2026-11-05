@@ -10,6 +10,41 @@ import { dialogOpen, dialogClose } from "../reducers/UI";
 import { achievementJournal } from "./Journal";
 import { recordIntent } from "./Progress";
 
+beforeEach(() => {
+  localStorage.clear();
+  achievementJournal.refresh();
+  achievementJournal.clearNotifications();
+});
+
+test("simultaneous awards are all readable and dismiss independently", () => {
+  const view = render(
+    <Provider store={store}>
+      <AchievementNotifications />
+    </Provider>,
+  );
+  act(() => {
+    achievementJournal.merge(
+      recordIntent({ earned: ["FIRST_SPARK", "OUT_OF_JUICE", "CLEAN_FINISH"] }),
+      true,
+    );
+  });
+  const first = screen.getByRole("button", { name: /Dismiss First Spark/ });
+  const second = screen.getByRole("button", { name: /Dismiss Out of Juice/ });
+  const third = screen.getByRole("button", { name: /Dismiss Clean Finish/ });
+  expect(first).toBeVisible();
+  expect(second).toBeVisible();
+  expect(third).toBeVisible();
+  expect(screen.getByRole("status")).toHaveTextContent("First Spark");
+  expect(screen.getByRole("status")).toHaveTextContent("Out of Juice");
+  expect(screen.getByRole("status")).toHaveTextContent("Clean Finish");
+  fireEvent.click(second);
+  expect(second).not.toBeInTheDocument();
+  expect(first).toBeVisible();
+  expect(third).toBeVisible();
+  view.unmount();
+  achievementJournal.clearNotifications();
+});
+
 test("new awards appear while the completion modal is still open", () => {
   store.dispatch(
     dialogOpen({ open: true, title: "Mission complete!", message: "" }),
@@ -53,7 +88,7 @@ test("synced accounts omit the account panel, while sync failures keep retry ava
   achievementJournal.activate();
 });
 
-test("queued notifications keep their timer paused while focused or hovered", () => {
+test("the stack stays readable while any notification is focused or hovered", () => {
   jest.useFakeTimers();
   achievementJournal.merge(
     recordIntent({ earned: ["FIRST_SPARK", "OUT_OF_JUICE"] }),
@@ -65,7 +100,7 @@ test("queued notifications keep their timer paused while focused or hovered", ()
     </Provider>,
   );
   const close = screen.getByRole("button", { name: /Dismiss First Spark/ });
-  const panel = screen.getByText("Achievement unlocked", { exact: true });
+  const panel = screen.getAllByText("Achievement unlocked", { exact: true })[0];
   fireEvent.mouseEnter(panel);
   act(() => close.focus());
   fireEvent.mouseLeave(panel);
@@ -76,17 +111,45 @@ test("queued notifications keep their timer paused while focused or hovered", ()
   expect(next).toHaveFocus();
   act(() => jest.advanceTimersByTime(9000));
   expect(next).toBeInTheDocument();
-  fireEvent.mouseEnter(panel);
+  fireEvent.mouseEnter(next);
   act(() => next.blur());
   act(() => jest.advanceTimersByTime(9000));
   expect(next).toBeInTheDocument();
-  fireEvent.mouseLeave(panel);
+  fireEvent.mouseLeave(next);
   act(() => jest.advanceTimersByTime(ACHIEVEMENT_TOAST_MS - 1));
   expect(next).toBeInTheDocument();
   act(() => jest.advanceTimersByTime(1));
   expect(
     screen.queryByRole("button", { name: /Dismiss Out of Juice/ }),
   ).not.toBeInTheDocument();
+  view.unmount();
+  jest.useRealTimers();
+});
+
+test("an award arriving during the stack gets its own reading time", () => {
+  jest.useFakeTimers();
+  achievementJournal.merge(recordIntent({ earned: ["FIRST_SPARK"] }), true);
+  const view = render(
+    <Provider store={store}>
+      <AchievementNotifications />
+    </Provider>,
+  );
+  act(() => jest.advanceTimersByTime(ACHIEVEMENT_TOAST_MS - 1000));
+  act(() => {
+    achievementJournal.merge(recordIntent({ earned: ["OUT_OF_JUICE"] }), true);
+  });
+  expect(
+    screen.getByRole("button", { name: /Dismiss First Spark/ }),
+  ).toBeVisible();
+  const later = screen.getByRole("button", { name: /Dismiss Out of Juice/ });
+  expect(later).toBeVisible();
+  act(() => jest.advanceTimersByTime(1000));
+  expect(
+    screen.queryByRole("button", { name: /Dismiss First Spark/ }),
+  ).not.toBeInTheDocument();
+  expect(later).toBeVisible();
+  act(() => jest.advanceTimersByTime(ACHIEVEMENT_TOAST_MS - 1000));
+  expect(later).not.toBeInTheDocument();
   view.unmount();
   jest.useRealTimers();
 });
@@ -113,9 +176,9 @@ test("a sideways or downward swipe dismisses the notification, a short drag does
       <AchievementNotifications />
     </Provider>,
   );
-  // Pointer events bubble from the text to the panel that handles the swipe.
-  const panel = screen.getByText("Achievement unlocked", { exact: true });
-  const drag = (to: { x: number; y: number }) => {
+  // Pointer events bubble from the award title to its swipe handler.
+  const drag = (name: string, to: { x: number; y: number }) => {
+    const panel = screen.getByText(name, { exact: true });
     fireEvent.pointerDown(panel, {
       button: 0,
       pointerId: 1,
@@ -130,19 +193,19 @@ test("a sideways or downward swipe dismisses the notification, a short drag does
     fireEvent.pointerUp(panel, { pointerId: 1, clientX: to.x, clientY: to.y });
     act(() => jest.advanceTimersByTime(200));
   };
-  drag({ x: 130, y: 110 });
+  drag("Four Nines", { x: 130, y: 110 });
   expect(
     screen.getByRole("button", { name: /Dismiss Four Nines/ }),
   ).toBeInTheDocument();
-  drag({ x: 20, y: 100 });
+  drag("Four Nines", { x: 20, y: 100 });
   expect(
     screen.queryByRole("button", { name: /Dismiss Four Nines/ }),
   ).not.toBeInTheDocument();
-  // The next award takes its place and can be swiped the same way.
+  // Dismissing one card leaves the other in place, without a fling or faded state.
   expect(
     screen.getByRole("button", { name: /Dismiss Clean Finish/ }),
   ).toBeInTheDocument();
-  drag({ x: 100, y: 180 });
+  drag("Clean Finish", { x: 100, y: 180 });
   expect(
     screen.queryByRole("button", { name: /Dismiss Clean Finish/ }),
   ).not.toBeInTheDocument();

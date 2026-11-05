@@ -147,11 +147,28 @@ test("gallery lists all requirements, filters earned awards, restores keyboard f
   await expect(page.locator(".achievementRow.isUnlocked")).toHaveCount(0);
 });
 
-test("a real mission unlocks First Spark with a usable popup and persists it without a repeat popup", async ({
+test("a real mission stacks simultaneous awards and persists them without repeat popups", async ({
   page,
 }, info) => {
   test.setTimeout(90000);
-  await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
+  await page.addInitScript((key) => {
+    localStorage.setItem("audioEnabled", "false");
+    // Completing Mission 1 now also completes the full tutorial collection.
+    if (!localStorage.getItem(key))
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          version: 1,
+          guest: {
+            version: 1,
+            earned: [],
+            tutorials: [1, 2, 4, 3, 5, 112],
+            wins: [],
+          },
+          accounts: {},
+        }),
+      );
+  }, STORAGE_KEY);
   await page.goto("/");
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
@@ -161,8 +178,22 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
   await expect(
     page.getByRole("heading", { name: /Mission complete!/ }),
   ).toBeVisible({ timeout: 60000 });
-  const popup = page.locator(".achievementToastPanel");
+  const popups = page.locator(".achievementToastPanel");
+  await expect(popups).toHaveCount(2);
+  const popup = popups.filter({ hasText: "First Spark" });
+  const graduate = popups.filter({ hasText: "Grid Graduate" });
   await expect(popup).toBeVisible();
+  await expect(graduate).toBeVisible();
+  const firstBounds = (await popup.boundingBox())!;
+  const secondBounds = (await graduate.boundingBox())!;
+  expect(firstBounds.y).toBeGreaterThanOrEqual(0);
+  expect(firstBounds.y + firstBounds.height).toBeLessThanOrEqual(
+    secondBounds.y,
+  );
+  expect(secondBounds.y + secondBounds.height).toBeLessThanOrEqual(
+    page.viewportSize()!.height,
+  );
+  await expect(graduate).toContainText("Complete all seven tutorial missions.");
   await popup.hover();
   await expect(popup).toContainText("First Spark");
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -196,7 +227,7 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
     const navTop = (await nav.count())
       ? (await nav.boundingBox())!.y
       : viewport.height;
-    const popupBounds = (await popup.boundingBox())!;
+    const popupBounds = (await graduate.boundingBox())!;
     return navTop - (popupBounds.y + popupBounds.height);
   };
   // The next mission changes the chrome after the dialog closes. Wait for its measured
@@ -207,9 +238,25 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
   await expect
     .poll(async () => (await close.boundingBox())?.height ?? 0)
     .toBeGreaterThanOrEqual(44);
-  await screenshot(page, info, "popup");
+  await screenshot(page, info, "stacked-popups");
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
-  await screenshot(page, info, "popup-dark");
+  await screenshot(page, info, "stacked-popups-dark");
+  // A short viewport must keep every card reachable, including by vertical touch scrolling.
+  const viewportBeforeResize = page.viewportSize()!;
+  await page.setViewportSize({
+    width: viewportBeforeResize.width,
+    height: 180,
+  });
+  const stack = page.locator(".achievementToastStack");
+  await expect(stack).toHaveClass(/isScrollable/);
+  await expect(popup).toHaveCSS("touch-action", "pan-y");
+  const stackBounds = (await stack.boundingBox())!;
+  expect(stackBounds.y).toBeGreaterThanOrEqual(0);
+  expect(stackBounds.y + stackBounds.height).toBeLessThanOrEqual(180);
+  await graduate.getByRole("button", { name: /Dismiss Grid Graduate/ }).click();
+  await expect(popups).toHaveCount(1);
+  await expect(popup).toBeVisible();
+  await page.setViewportSize(viewportBeforeResize);
   await page
     .getByRole("button", { name: "Next tutorial", exact: true })
     .click();
@@ -218,7 +265,7 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
     .getByRole("button", { name: "View achievements", exact: true })
     .click();
   await expect(
-    page.getByText(`1 of ${catalog.length} unlocked`, { exact: true }),
+    page.getByText(`2 of ${catalog.length} unlocked`, { exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(
@@ -228,7 +275,7 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
   await page.reload();
   await openGallery(page);
   await expect(
-    page.getByText(`1 of ${catalog.length} unlocked`, { exact: true }),
+    page.getByText(`2 of ${catalog.length} unlocked`, { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".achievementToastPanel")).toBeHidden();
 });
