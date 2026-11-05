@@ -420,6 +420,10 @@ export function createAppTheme(mode: ThemeModeType): Theme {
             "&:not(.Mui-disabled)": {
               color: mode === "light" ? primaryDarkColor : palette.interactive,
             },
+            // Grouped borders overlap by one pixel; keep the selected edge on top.
+            "&.Mui-selected": { zIndex: 1 },
+            // Keyboard focus must also clear the neighboring selected segment.
+            "&:focus-visible": { zIndex: 2 },
             "&.Mui-selected:not(.Mui-disabled)": {
               color: "var(--font-color-primary)",
               backgroundColor: "var(--bg-selected)",

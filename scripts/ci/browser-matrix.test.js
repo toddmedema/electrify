@@ -73,6 +73,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "acquisitions.spec.ts",
       "campaign.spec.ts",
       "difficulty-unlocks.spec.ts",
+      "toggle-borders.spec.ts",
       ...projects,
       "--project=mobile-360px",
     ]),
