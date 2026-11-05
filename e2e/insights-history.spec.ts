@@ -191,7 +191,9 @@ for (const theme of ["light", "dark"] as const) {
       .toBe(true);
     await expect(pricing).toContainText("Market");
     expect(
-      await pricing.evaluate((el) => el.scrollWidth - el.clientWidth),
+      await programs
+        .locator(".customerProgramsBody")
+        .evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
     const label = await pricing
       .getByText("Follow inflation", { exact: true })
