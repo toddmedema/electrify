@@ -14,6 +14,7 @@ import type { RoomView, World } from "./Types";
 import type { BrowseState } from "./Browse";
 import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
 import { COOP_TEST_SPEC } from "../testing/MultiplayerFixtures";
+import { DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { coopSelection } from "./Choosing";
 
 const host = "host",
@@ -1199,6 +1200,26 @@ test("the host coalesces its selection, catches joiners up at once and resends i
   const before = sentBrowse(f).length;
   jest.advanceTimersByTime(2500);
   expect(sentBrowse(f).length).toBeGreaterThan(before);
+  f.session.dispose();
+});
+
+test("custom setup waits for the host's settings before offering Ready", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  sendBrowse(f, browse({ card: "CUSTOM_GAME" }));
+  expect(coopSelection(f.session.getSnapshot()).receivingScenario).toBe(true);
+  sendBrowse(
+    f,
+    browse({
+      card: "CUSTOM_GAME",
+      revision: 2,
+      custom: { ...DEFAULT_CUSTOM_SCENARIO, seed: 2468 },
+    }),
+  );
+  expect(coopSelection(f.session.getSnapshot()).receivingScenario).toBe(false);
+  const key = selectionKey(f.session.getSnapshot().browse!);
+  await f.session.setReady(key);
+  expect(coopSelection(f.session.getSnapshot()).ready).toBe(true);
   f.session.dispose();
 });
 
