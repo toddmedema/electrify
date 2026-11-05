@@ -122,13 +122,13 @@ describe("weather resilience details", () => {
   });
 
   it("says how much cash a retrofit still needs and ties it to the button", () => {
-    const game = carbonFee();
-    const solar = withSolar(game);
-    const cost = retrofitCost(solar, game, "hailResistant")!;
+    const game = coldGame();
+    const gas = game.facilities[0];
+    const cost = retrofitCost(gas, game, "coldWeatherPackage")!;
     game.timeline[0].cash = cost - 1000000;
-    showDetails(game, solar);
+    showDetails(game, gas);
     const button = within(section()).getByRole("button", {
-      name: /^Add hail-resistant panels/,
+      name: /^Add cold-weather package/,
     });
     expect(button).toBeDisabled();
     expect(button).toHaveAccessibleDescription(
@@ -137,13 +137,13 @@ describe("weather resilience details", () => {
   });
 
   it("disables Pay when cash falls short while the dialog is open", () => {
-    const game = carbonFee();
-    const solar = withSolar(game);
-    const cost = retrofitCost(solar, game, "hailResistant")!;
-    const { onRetrofit, rerender } = showDetails(game, solar);
+    const game = coldGame();
+    const gas = game.facilities[0];
+    const cost = retrofitCost(gas, game, "coldWeatherPackage")!;
+    const { onRetrofit, rerender } = showDetails(game, gas);
     fireEvent.click(
       within(section()).getByRole("button", {
-        name: /^Add hail-resistant panels/,
+        name: /^Add cold-weather package/,
       }),
     );
     const poorer = cloneDeep(game);
@@ -159,23 +159,22 @@ describe("weather resilience details", () => {
     expect(onRetrofit).not.toHaveBeenCalled();
   });
 
-  it("confirms a hail retrofit and moves focus after paying", () => {
-    const game = carbonFee();
-    const solar = withSolar(game);
-    const cost = retrofitCost(solar, game, "hailResistant")!;
-    const { onRetrofit } = showDetails(game, solar);
+  it("confirms a winterization retrofit and moves focus after paying", () => {
+    const game = coldGame();
+    const gas = game.facilities[0];
+    const cost = retrofitCost(gas, game, "coldWeatherPackage")!;
+    const { onRetrofit } = showDetails(game, gas);
     fireEvent.click(
       within(section()).getByRole("button", {
-        name: `Add hail-resistant panels · ${formatMoneyConcise(cost)}`,
+        name: `Add cold-weather package · ${formatMoneyConcise(cost)}`,
       }),
     );
     const dialog = screen.getByRole("dialog", {
-      name: "Add hail-resistant panels to Solar?",
+      name: `Add cold-weather package to ${gas.name}?`,
     });
-    expect(dialog).toHaveTextContent("Less damage from future hail.");
-    // The plant's downtime, the premium over building it in and the way out
+    // Staged work, the premium over building it in and the way out
     expect(dialog).toHaveTextContent(
-      "Solar goes offline for a month while it's installed. Adding it now costs 50% more than building it in. Cancel before it's done for a full refund.",
+      "Staged installation keeps 90% of capacity available for a month. Adding it now costs 50% more than building it in. Cancel before it's done for a full refund.",
     );
     expect(dialog).not.toHaveTextContent("cash now");
     fireEvent.click(
@@ -184,8 +183,8 @@ describe("weather resilience details", () => {
       }),
     );
     expect(onRetrofit).toHaveBeenCalledWith({
-      facilityId: solar.id,
-      upgrade: "hailResistant",
+      facilityId: gas.id,
+      upgrade: "coldWeatherPackage",
     });
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByRole("heading", { name: "Upgrades" })).toHaveFocus();
@@ -223,19 +222,14 @@ describe("weather resilience details", () => {
     );
   });
 
-  it("says a retrofit does not speed up current hail repairs", async () => {
+  it("does not offer hail retrofits even while solar repairs are underway", () => {
     const game = carbonFee();
     const solar = withSolar(game);
     outage(game, solar, true, 0.7);
     showDetails(game, solar);
-    await userEvent.click(
-      within(section()).getByRole("button", {
-        name: /^Add hail-resistant panels/,
-      }),
-    );
-    expect(screen.getByRole("dialog")).toHaveTextContent(
-      "Doesn't speed up current repairs.",
-    );
+    expect(
+      screen.queryByRole("button", { name: /Add hail-resistant panels/ }),
+    ).toBeNull();
   });
 
   it("reports a retrofit being installed and offers no second one", () => {

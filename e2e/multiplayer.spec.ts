@@ -1611,6 +1611,47 @@ async function saveAndQuit(page: Page) {
   ).toBeVisible();
 }
 
+test("custom setup waits for host settings before a guest can mark Ready", async ({
+  browser,
+}) => {
+  const room = new SteamRoom();
+  const host = await room.player(browser, 0);
+  const guest = await room.player(browser, 1);
+  await hostGame(host);
+  await joinGame(guest, room);
+  // The card is mirrored before its lazy editor publishes the seeded custom settings.
+  // Hold that editor on the host while the guest opens its own copy normally.
+  let releaseEditor = () => {};
+  const editor = new Promise<void>((resolve) => {
+    releaseEditor = resolve;
+  });
+  await host.route("**/static/js/*.chunk.js", async (route) => {
+    await editor;
+    await route.continue();
+  });
+  try {
+    await host.getByTestId("mission-row-999").click();
+    await expect(
+      guest.getByRole("heading", { name: "Custom setup", exact: true }),
+    ).toBeVisible();
+    await expect(
+      guest.getByRole("button", { name: /^(I'm ready|Receiving scenario…)$/ }),
+    ).toBeDisabled();
+  } finally {
+    releaseEditor();
+  }
+  const ready = guest.getByRole("button", { name: "I'm ready", exact: true });
+  await expect(ready).toBeEnabled();
+  await ready.click();
+  await expect(
+    host
+      .getByRole("list", { name: "Players", exact: true })
+      .last()
+      .getByRole("img", { name: "Ready", exact: true }),
+  ).toBeVisible();
+  expect(room.transportErrors).toEqual([]);
+});
+
 for (const width of [1280, 390]) {
   test(`multiplayer creation and resume walkthrough at ${width}px`, async ({
     browser,

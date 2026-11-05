@@ -23,7 +23,6 @@ import {
   HAIL_MAX_DAMAGED_FRACTION,
   HAIL_RESISTANT_BUILD_SHARE,
   HAIL_RESISTANT_DAMAGE_FACTOR,
-  HAIL_RESISTANT_RETROFIT_SHARE,
   NORTHERN_HAIL_MONTHLY_WEIGHTS,
   regionalColdThresholdC,
   STANDARD_GAS_DESIGN_MIN_TEMP_C,
@@ -374,7 +373,7 @@ export function trackerOutputMultiplier(
   return 1 + TRACKER_SHOULDER_GAIN * sin(hourAngle) ** 2;
 }
 
-/** The upgrade a standing plant of this technology can have added later, if any. */
+/** The weather protection shown for this technology, including build-only solar panels. */
 function upgradeForFuel(fuel: unknown): ResilienceUpgradeType | undefined {
   if (fuel === "Sun") return "hailResistant";
   if (isWinterizationFuel(fuel)) return "coldWeatherPackage";
@@ -506,17 +505,14 @@ export function retrofitCost(
   if (
     !isOperational(facility) ||
     upgradeInProgress(facility) ||
-    upgradeForFuel(facility.fuel) !== upgrade ||
+    upgrade !== "coldWeatherPackage" ||
+    !isWinterizationFuel(facility.fuel) ||
     facility.resilience?.[upgrade] ||
     !upgradeOffered(game, upgrade, facility.fuel)
   ) {
     return undefined;
   }
-  return upgrade === "coldWeatherPackage"
-    ? winterizationPrice(facility, game)
-    : Math.round(
-        replacementValue(facility, game) * HAIL_RESISTANT_RETROFIT_SHARE,
-      );
+  return winterizationPrice(facility, game);
 }
 
 /**

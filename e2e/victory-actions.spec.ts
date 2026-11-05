@@ -51,7 +51,7 @@ async function installLeaderboardFixture(page: Page, currentRank: number) {
           online: true,
           cloudEnabled: false,
           steamId,
-          displayName: "Daniel McEntee",
+          displayName: "Current operator",
         },
       }),
       setDisplay: async () => display,
@@ -77,7 +77,7 @@ async function installLeaderboardFixture(page: Page, currentRank: number) {
                 {
                   ...submitted,
                   steamId,
-                  displayName: "Daniel McEntee",
+                  displayName: "Current operator",
                   rank,
                 },
               ]
@@ -231,6 +231,12 @@ for (const { theme, native, currentRank } of [
       .click();
     const dialog = page.getByRole("dialog", { name: "Mission complete" });
     await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByRole("region", { name: "Objective results" }),
+    ).toHaveCount(0);
+    await expect(dialog.locator(".victoryStanding")).not.toContainText(
+      /across all levels|globally/,
+    );
     await expect.poll(() => readSaveRecords(page)).toEqual([]);
     await expect(
       dialog.locator(".victoryMetric").filter({ hasText: "tenure" }),
@@ -281,7 +287,7 @@ for (const { theme, native, currentRank } of [
       await expect(leaderboard.getByRole("columnheader")).toHaveCount(0);
       await expect(
         leaderboard.getByRole("row", { name: "This run" }),
-      ).toContainText(`${currentRank.toLocaleString("en-US")}Daniel McEntee`);
+      ).toContainText(`${currentRank.toLocaleString("en-US")}Current operator`);
       await expect(
         leaderboard
           .getByRole("row", { name: "This run" })

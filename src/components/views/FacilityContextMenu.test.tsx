@@ -10,17 +10,17 @@ import FacilityContextMenu from "./FacilityContextMenu";
 
 it("requotes the original upgrade targets and blocks confirmation when cash falls", async () => {
   const user = userEvent.setup({ delay: null });
-  const game = createGame({ scenarioId: 100 });
-  game.facilities = game.facilities.map(
+  const game = createGame({ scenarioId: 107 });
+  game.facilities = game.facilities.slice(0, 2).map(
     (f) =>
       ({
         ...f,
-        name: "Solar",
-        fuel: "Sun",
+        name: "Gas",
+        fuel: "Natural Gas",
         resilience: undefined,
       }) as FacilityOperatingType,
   );
-  const cost = retrofitCost(game.facilities[0], game, "hailResistant")!;
+  const cost = retrofitCost(game.facilities[0], game, "coldWeatherPackage")!;
   getTimeFromTimeline(game.date.minute, game.timeline)!.cash = 1e12;
   const onRetrofit = jest.fn();
   const props = {
@@ -34,7 +34,7 @@ it("requotes the original upgrade targets and blocks confirmation when cash fall
   };
   const { rerender } = render(<FacilityContextMenu {...props} />);
   await user.click(
-    screen.getByRole("menuitem", { name: /^Add hail-resistant panels \(2\)/ }),
+    screen.getByRole("menuitem", { name: /^Add cold-weather package \(2\)/ }),
   );
   let next = cloneDeep(game);
   getTimeFromTimeline(next.date.minute, next.timeline)!.cash = cost - 1;
@@ -49,7 +49,7 @@ it("requotes the original upgrade targets and blocks confirmation when cash fall
   rerender(<FacilityContextMenu {...props} game={next} target={null} />);
   await user.click(within(dialog).getByRole("button", { name: /^Pay / }));
   expect(onRetrofit.mock.calls).toEqual([
-    [{ facilityId: game.facilities[0].id, upgrade: "hailResistant" }],
+    [{ facilityId: game.facilities[0].id, upgrade: "coldWeatherPackage" }],
   ]);
 });
 
@@ -157,13 +157,13 @@ it("offers no context menu for a permanently shut retained reactor", () => {
 
 it("leaves shutdown assets out of mixed bulk resume and upgrade targets", async () => {
   const user = userEvent.setup({ delay: null });
-  const game = createGame({ scenarioId: 100 });
-  game.facilities = game.facilities.map(
+  const game = createGame({ scenarioId: 107 });
+  game.facilities = game.facilities.slice(0, 2).map(
     (facility) =>
       ({
         ...facility,
-        name: "Solar",
-        fuel: "Sun",
+        name: "Gas",
+        fuel: "Natural Gas",
         resilience: undefined,
         paused: true,
       }) as FacilityOperatingType,
@@ -189,12 +189,12 @@ it("leaves shutdown assets out of mixed bulk resume and upgrade targets", async 
   expect(props.onTogglePause.mock.calls).toEqual([[game.facilities[1].id]]);
   rerender(<FacilityContextMenu {...props} />);
   await user.click(
-    screen.getByRole("menuitem", { name: /^Add hail-resistant panels \(1\)/ }),
+    screen.getByRole("menuitem", { name: /^Add cold-weather package \(1\)/ }),
   );
   await user.click(
     within(screen.getByRole("dialog")).getByRole("button", { name: /^Pay / }),
   );
   expect(props.onRetrofit.mock.calls).toEqual([
-    [{ facilityId: game.facilities[1].id, upgrade: "hailResistant" }],
+    [{ facilityId: game.facilities[1].id, upgrade: "coldWeatherPackage" }],
   ]);
 });

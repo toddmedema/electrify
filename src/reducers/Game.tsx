@@ -1752,7 +1752,10 @@ export const gameSlice = createSlice({
       state.dollarsPerkWh = startingRate;
       state.customerRate = startingRate;
       // A tutorial checkpoint's rate is part of its lesson, so it stays where it was authored.
-      state.rateFollowsInflation = !checkpoint && canFollowInflation(state);
+      state.rateFollowsInflation =
+        !checkpoint &&
+        scenario.ownership === "Public" &&
+        canFollowInflation(state);
       state.customerMarketSize = startingCustomers * CUSTOMER_MARKET_MULTIPLIER;
       initializeGameObjectiveProgress(state);
       state.startingDemandScale = scenario.startingDemandScale ?? 1;
@@ -3644,29 +3647,23 @@ function applyPolicyEdit(
 }
 
 /**
- * Whether this run's rate can follow inflation at all: solo public utilities only. Investor-owned
- * and multiplayer companies, and tutorials, set their own rates.
+ * Whether this run's rate can follow inflation: solo utilities outside tutorials.
  */
 function canFollowInflation(state: GameType): boolean {
   const scenario = getScenario(state.scenarioId, state.customScenario);
-  return (
-    !!scenario &&
-    scenario.ownership === "Public" &&
-    !scenario.tutorialSteps &&
-    !state.multiplayer
-  );
+  return !!scenario && !scenario.tutorialSteps && !state.multiplayer;
 }
 
 /**
  * Whether the rate moves with inflation: the saved setting, honoured only where following is
- * allowed, so an edited save cannot inflate an investor's or a multiplayer company's rate.
+ * allowed, so an edited save cannot change tutorial or multiplayer pricing.
  */
 function followsInflation(state: GameType): boolean {
   return !!state.rateFollowsInflation && canFollowInflation(state);
 }
 
 /**
- * The rate a following public utility charges at `date`: the current rate carried forward by
+ * The rate a following utility charges at `date`: the current rate carried forward by
  * whatever inflation has passed since now, mirroring the live rollover's January step.
  */
 function inflationAdjustedRateAt(state: GameType, date: DateType): number {

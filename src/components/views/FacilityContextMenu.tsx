@@ -59,13 +59,6 @@ function actionsFor(
   );
   const upgrades: FleetAction[] = [
     {
-      key: "hailResistant",
-      label: "Add hail-resistant panels",
-      facilities: [],
-      cost: 0,
-      confirm: true,
-    },
-    {
       key: "coldWeatherPackage",
       label: "Add cold-weather package",
       facilities: [],
@@ -285,9 +278,7 @@ export default function FacilityContextMenu(props: {
               <DialogContentText>
                 {confirmation.key === "combinedCycle"
                   ? "Use less gas for the same power. Six months offline; slower starts and 45% minimum output afterward."
-                  : confirmation.key === "coldWeatherPackage"
-                    ? "Staged installation keeps 90% of capacity available for a month. Improves protection against extreme cold."
-                    : "Offline for one month. Less damage from future hail; current repairs still need to finish."}{" "}
+                  : "Staged installation keeps 90% of capacity available for a month. Improves protection against extreme cold."}{" "}
                 Cancel before completion for a full refund.
               </DialogContentText>
               {shortfall > 0 && (

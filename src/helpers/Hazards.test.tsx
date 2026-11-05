@@ -401,10 +401,11 @@ describe("replacementValue", () => {
 });
 
 describe("retrofitCost", () => {
-  it("prices retrofits at half as much again as building them in", () => {
+  it("offers winterization but keeps solar hardening build-only", () => {
     const game = gameAt(DENVER);
-    // Hail uses replacement value; targeted winterization follows capacity.
-    expect(retrofitCost(facility(1, "Sun"), game, "hailResistant")).toBe(4.5e6);
+    expect(
+      retrofitCost(facility(1, "Sun"), game, "hailResistant"),
+    ).toBeUndefined();
     expect(
       retrofitCost(facility(1, "Natural Gas"), game, "coldWeatherPackage"),
     ).toBe(300000);
@@ -453,8 +454,8 @@ describe("retrofitCost", () => {
 describe("retrofitCost under construction", () => {
   it("is not offered until the facility is operating", () => {
     const game = gameAt(DENVER);
-    const building = facility(1, "Sun", { yearsToBuildLeft: 0.5 });
-    expect(retrofitCost(building, game, "hailResistant")).toBeUndefined();
+    const building = facility(1, "Natural Gas", { yearsToBuildLeft: 0.5 });
+    expect(retrofitCost(building, game, "coldWeatherPackage")).toBeUndefined();
     expect(
       facilityResilienceSummary(game, building)!.retrofitCost,
     ).toBeUndefined();
@@ -724,14 +725,14 @@ describe("facilityHazardStatus", () => {
 });
 
 describe("facilityResilienceSummary", () => {
-  it("summarizes solar hardening and retrofit", () => {
+  it("summarizes solar hardening without offering a retrofit", () => {
     const sun = facility(1, "Sun");
     const summary = facilityResilienceSummary(gameAt(DENVER), sun)!;
     expect(summary).toMatchObject({
       upgrade: "hailResistant",
       label: "Standard panels",
       installed: false,
-      retrofitCost: 4.5e6,
+      retrofitCost: undefined,
       replacementValue: 1e8,
     });
     const hardened = facility(2, "Sun", {

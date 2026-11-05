@@ -9,6 +9,7 @@ import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import { openPane } from "./layout";
 import { verifyMenuKeyboard } from "./menu-keyboard";
 import { readSavedGame } from "./save-fixture";
+import { gameObjectiveResults } from "../src/helpers/ObjectiveRules";
 import type { DesktopInputFrame } from "../src/Desktop";
 
 declare global {
@@ -521,13 +522,16 @@ for (const [theme, winning] of [
     });
     await advanceExampleTo(page, result);
     const evidence = result.getByRole("region", { name: "Mission results" });
-    await expect(
-      result.getByRole("region", { name: "Objective results" }),
-    ).toContainText("Retain your starting customers");
-    if (!winning)
+    const objectives = result.getByRole("region", {
+      name: "Objective results",
+    });
+    await expect(objectives).toHaveCount(winning ? 0 : 1);
+    if (!winning) {
+      await expect(objectives).toContainText("Retain your starting customers");
       await expect(result).toContainText(
         "You served less than 95% of demand for 3 months in a row",
       );
+    }
     await expect(result).toContainText(
       "Modded run · not ranked and no achievements.",
     );
@@ -1124,6 +1128,31 @@ for (const [theme, requiredBills] of [
       await appbar
         .getByRole("button", { name: "fast speed", exact: true })
         .click();
+      await expect(appbar).toContainText("Mar 2020", { timeout: 30000 });
+      await appbar.getByRole("button", { name: "pause", exact: true }).click();
+      const recorded = (await readSavedGame(page))!;
+      expect(recorded.date.monthsElapsed).toBe(2);
+      expect(gameObjectiveResults(recorded)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "bills",
+            required: false,
+            status: "failed",
+            observedMonths: 2,
+            requiredMonths: 2,
+          }),
+          expect.objectContaining({
+            id: "supply",
+            required: true,
+            status: "completed",
+            observedMonths: 2,
+            requiredMonths: 2,
+          }),
+        ]),
+      );
+      await appbar
+        .getByRole("button", { name: "fast speed", exact: true })
+        .click();
     }
     const result = page.getByRole("dialog", {
       name: requiredBills ? "Mission objective missed" : "Mission complete",
@@ -1133,19 +1162,20 @@ for (const [theme, requiredBills] of [
     const evidence = result.getByRole("region", {
       name: "Objective results",
     });
-    await expect(evidence).toContainText(
-      `Keep bills affordable · ${requiredBills ? "Required" : "Optional"} · Failed`,
-    );
-    await expect(evidence).toContainText(
-      "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
-    );
-    await expect(evidence).toContainText("Months 1–2");
-    await expect(evidence).toContainText(
-      "At least one completed month billed more than the starting-year rate ceiling.",
-    );
-    await expect(evidence).toContainText(
-      requiredBills ? "1/2 months completed" : "2/2 months completed",
-    );
+    await expect(evidence).toHaveCount(requiredBills ? 1 : 0);
+    if (requiredBills) {
+      await expect(evidence).toContainText(
+        "Keep bills affordable · Required · Failed",
+      );
+      await expect(evidence).toContainText(
+        "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
+      );
+      await expect(evidence).toContainText("Months 1–2");
+      await expect(evidence).toContainText(
+        "At least one completed month billed more than the starting-year rate ceiling.",
+      );
+      await expect(evidence).toContainText("1/2 months completed");
+    }
     await expect(result).toContainText(
       "Modded run · not ranked and no achievements.",
     );
@@ -1153,17 +1183,21 @@ for (const [theme, requiredBills] of [
     // Ordinary notices defer behind the result dialog; wait for their exit
     // transition instead of swiping a toast that is already disappearing.
     await expect(page.locator(".snackbarContent")).toBeHidden();
-    const goal = evidence
-      .getByText("Keep bills affordable", { exact: false })
-      .first();
+    const goal = requiredBills
+      ? evidence.getByText("Keep bills affordable", { exact: false }).first()
+      : result
+          .getByRole("region", { name: "Mission results" })
+          .getByText("served", { exact: true });
     await scrollEvidenceIntoView(goal);
     await expect(goal).toBeInViewport({ ratio: 1 });
-    await expect(
-      evidence.getByText(
-        "At least one completed month billed more than the starting-year rate ceiling.",
-        { exact: true },
-      ),
-    ).toBeInViewport({ ratio: 1 });
+    if (requiredBills) {
+      await expect(
+        evidence.getByText(
+          "At least one completed month billed more than the starting-year rate ceiling.",
+          { exact: true },
+        ),
+      ).toBeInViewport({ ratio: 1 });
+    }
     await expect(
       page.locator("iframe#webpack-dev-server-client-overlay"),
     ).toHaveCount(0);

@@ -165,7 +165,7 @@ for (const theme of ["light", "dark"]) {
     test("facility sale and resilience confirmations fit", async ({
       page,
     }, info) => {
-      await page.goto("/?scenario=108");
+      await page.goto("/?scenario=107");
       await page
         .getByRole("button", { name: "Start game", exact: true })
         .click();
@@ -174,9 +174,9 @@ for (const theme of ["light", "dark"]) {
         fleet,
         page.getByRole("button", { name: "Facilities", exact: true }),
       );
-      const row = fleet.locator(".facilityRow").filter({
-        has: page.locator(".facilityName", { hasText: /^Solar$/ }),
-      });
+      const row = fleet
+        .locator('.facilityRow[data-fuel="Natural Gas"]')
+        .first();
       await row.locator(".facilityDisclosure").click();
       await row.getByRole("button", { name: /^Sell/ }).click();
       const dialog = page.getByRole("dialog");
