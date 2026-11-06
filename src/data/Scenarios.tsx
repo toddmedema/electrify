@@ -391,7 +391,7 @@ export const SCENARIOS: ScenarioType[] = [
     cash: 220000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
-    durationMonths: 24,
+    durationMonths: 24, // Initial forecast span; the capstone has no time limit.
     endTitle: "Mission complete!",
     endMessage:
       "You learned how to store spare electricity and use it to cover peak demand.",
@@ -494,12 +494,10 @@ export const SCENARIOS: ScenarioType[] = [
             ],
           },
           success: storageCapstoneSucceeded,
-          failure: (s: AppStateType) =>
-            s.game.date.monthsElapsed >= 24 && !storageCapstoneSucceeded(s),
           successMessage:
             "You learned how to store spare electricity and use it to cover peak demand.",
           failureMessage:
-            "The grid still has peak shortages after two years. Try faster-building storage with enough output and stored energy to cover the peaks.",
+            "Build storage with enough output and stored energy to cover the peaks for a full day without a blackout.",
         },
       },
     ],

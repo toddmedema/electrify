@@ -1327,6 +1327,39 @@ describe("Insights layers", () => {
     );
   });
 
+  it("keeps Mission 7's exchange checked across presets without changing saved layers", async () => {
+    const savedLayers = JSON.stringify(INSIGHT_PRESETS.reliability.layers);
+    localStorage.setItem("insightsLayers", savedLayers);
+    localStorage.setItem("insightsActivePreset", "reliability");
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 112 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    renderInsights(112, game);
+    expect(
+      screen.getByRole("combobox", { name: "Insight preset" }),
+    ).toHaveTextContent("Reliability");
+    await user.click(labelledButton(/Layers/));
+    const exchange = screen.getByRole("checkbox", { name: "Power exchange" });
+    expect(exchange).toBeChecked();
+    expect(exchange).toBeDisabled();
+
+    await choosePreset("Overview");
+    expect(exchange).toBeChecked();
+    expect(exchange).toBeDisabled();
+    expect(
+      screen.getByRole("heading", { name: "Power exchange" }),
+    ).toBeVisible();
+    expect(localStorage.getItem("insightsLayers")).toBe(savedLayers);
+    expect(localStorage.getItem("insightsActivePreset")).toBe("reliability");
+  });
+
   it("plots the exchange over the forecast's own time axis, beside the current reading", () => {
     localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
     cacheProjection(exchangeGame, exchangeProjection);
