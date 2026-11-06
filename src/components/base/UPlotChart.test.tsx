@@ -612,7 +612,7 @@ describe("UPlotChart resizing", () => {
     expect(zoomed[1] - zoomed[0]).toBeLessThan(100);
   });
 
-  it("pans with a pointer drag and zooms with a touch pinch", () => {
+  it("pans with a mouse drag", () => {
     const onRangeChange = jest.fn();
     const pointer = (type: string, values: Record<string, string | number>) => {
       const event = new Event(type, { bubbles: true, cancelable: true });
@@ -662,37 +662,66 @@ describe("UPlotChart resizing", () => {
     });
     expect(onRangeChange).toHaveBeenCalled();
     expect(onRangeChange.mock.calls.at(-1)?.[0]).toEqual([50, 100]);
-
-    onRangeChange.mockClear();
-    pointer("pointerdown", {
-      pointerId: 2,
-      pointerType: "touch",
-      button: 0,
-      clientX: 100,
-      clientY: 10,
-    });
-    pointer("pointerdown", {
-      pointerId: 3,
-      pointerType: "touch",
-      button: 0,
-      clientX: 200,
-      clientY: 10,
-    });
-    pointer("pointermove", {
-      pointerId: 3,
-      pointerType: "touch",
-      clientX: 250,
-      clientY: 10,
-    });
-    pointer("pointerup", {
-      pointerId: 3,
-      pointerType: "touch",
-      clientX: 250,
-      clientY: 10,
-    });
-    const pinched = onRangeChange.mock.calls.at(-1)?.[0];
-    expect(pinched[1] - pinched[0]).toBeLessThan(50);
   });
+
+  it.each([false, true])(
+    "pans and pinches paired touches without scale drift (staggered: %s)",
+    (staggered) => {
+      const onRangeChange = jest.fn();
+      render(
+        <ChartViewportContext.Provider
+          value={{
+            bounds: [0, 100],
+            range: [25, 75],
+            minSpan: 10,
+            onRangeChange,
+            onReset: jest.fn(),
+          }}
+        >
+          <UPlotChart
+            ariaLabel="Touch chart"
+            state={{}}
+            data={[
+              [0, 100],
+              [2, 3],
+            ]}
+            buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+          />
+        </ChartViewportContext.Provider>,
+      );
+      const touch = (type: string, positions: number[], y = 10) => {
+        const event = new Event(type, { bubbles: true, cancelable: true });
+        Object.assign(event, {
+          touches: positions.map((clientX, identifier) => ({
+            identifier,
+            clientX,
+            clientY: y,
+          })),
+        });
+        act(() => currentPlot().over.dispatchEvent(event));
+        return event;
+      };
+      expect(touch("touchstart", [100]).defaultPrevented).toBe(false);
+      if (!staggered) touch("touchend", []);
+      expect(touch("touchstart", [100, 200]).defaultPrevented).toBe(true);
+      expect(touch("touchmove", [140, 240], 40).defaultPrevented).toBe(true);
+      act(() => jest.advanceTimersByTime(20));
+      expect(onRangeChange).toHaveBeenLastCalledWith([20, 70]);
+
+      // Browser pointer cancellation must not terminate the independently owned touch stream.
+      const cancelled = new Event("pointercancel", { bubbles: true });
+      Object.assign(cancelled, { pointerId: 1, pointerType: "touch" });
+      currentPlot().over.dispatchEvent(cancelled);
+      touch("touchmove", [80, 280], 60);
+      touch(staggered ? "touchcancel" : "touchend", []);
+      // The original value under the midpoint stays under the new midpoint while zooming.
+      expect(onRangeChange).toHaveBeenLastCalledWith([32.5, 57.5], true);
+      onRangeChange.mockClear();
+      touch("touchmove", [150]);
+      act(() => jest.advanceTimersByTime(20));
+      expect(onRangeChange).not.toHaveBeenCalled();
+    },
+  );
 
   it("preserves the selected viewport and pointer zoom when switching controller presentation", () => {
     const onRangeChange = jest.fn();

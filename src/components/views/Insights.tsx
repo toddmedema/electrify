@@ -1520,8 +1520,8 @@ export default class Insights extends React.Component<Props, State> {
           )}
         </div>
         <span id={hintId} className="srOnly">
-          Drag a finger to inspect values. Pinch or use the zoom controls to
-          zoom. Drag with a mouse or use the pan controls to move through time.
+          Drag a finger to inspect values. Pinch to zoom. Drag with two fingers
+          or a mouse to move through time, or use the zoom and pan controls.
         </span>
         <span className="srOnly" aria-live="polite">
           {this.state.viewportAnnouncement}

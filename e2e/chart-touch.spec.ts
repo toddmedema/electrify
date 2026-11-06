@@ -1,5 +1,101 @@
 import { expect, test, type Locator, type Page } from "./fixtures";
 import { openPane } from "./layout";
+import path from "path";
+
+async function navigateWithTwoFingers(
+  page: Page,
+  chart: Locator,
+  staggered: boolean,
+) {
+  const plot = chart.locator(".u-over");
+  await plot.scrollIntoViewIfNeeded();
+  const box = (await plot.boundingBox())!;
+  const session = await page.context().newCDPSession(page);
+  const range = async () => [
+    Number(await chart.getAttribute("data-viewport-min")),
+    Number(await chart.getAttribute("data-viewport-max")),
+  ];
+  const initial = await range();
+  const span = initial[1] - initial[0];
+  const points = (shift: number, spread = 0.12) =>
+    [-1, 1].map((side, id) => ({
+      id,
+      x:
+        Math.round(box.x + box.width * (0.4 + shift)) +
+        side * Math.round(box.width * spread),
+      y: Math.round(box.y + box.height * 0.5 + shift * 100),
+    }));
+  try {
+    if (staggered) {
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: points(0).slice(0, 1),
+      });
+    }
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: points(0),
+    });
+    await expect(chart.locator(".chartTooltip")).toBeHidden();
+    // Translate both fingers together, including vertical movement that could let the
+    // browser take over and cancel a pointer-based chart gesture.
+    for (const shift of [0.04, 0.08, 0.12, 0.16]) {
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: points(shift),
+      });
+    }
+    await expect.poll(async () => (await range())[0]).toBeLessThan(initial[0]);
+    const panned = await range();
+    expect(initial[0] - panned[0]).toBeGreaterThan(span * 0.1);
+    expect(panned[1] - panned[0]).toBeCloseTo(span, 3);
+    for (const spread of [0.16, 0.2, 0.24]) {
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: points(0.16, spread),
+      });
+    }
+    await expect
+      .poll(async () => {
+        const next = await range();
+        return next[1] - next[0];
+      })
+      .toBeLessThan(span * 0.6);
+    expect((await plot.boundingBox())!.y).toBeCloseTo(box.y, 0);
+    for (const spread of [0.2, 0.16, 0.12]) {
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: points(0.16, spread),
+      });
+    }
+    await expect
+      .poll(async () => {
+        const next = await range();
+        return next[1] - next[0];
+      })
+      .toBeCloseTo(span, 3);
+  } finally {
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await session.detach();
+  }
+  // Content above can reflow as the date window changes. Scroll anchoring may adjust
+  // scrollTop, but the plot under the player's fingers must stay in place.
+  expect((await plot.boundingBox())!.y).toBeCloseTo(box.y, 0);
+  await expect
+    .poll(() =>
+      chart.evaluate(
+        (element) =>
+          element.closest<HTMLElement>(".scrollable, .expandedChartContent")!
+            .style.overflowAnchor,
+      ),
+    )
+    .toBe("");
+  expect(await page.evaluate(() => window.visualViewport!.scale)).toBe(1);
+  return range();
+}
 
 async function scrub(page: Page, chart: Locator) {
   const plot = chart.locator(".u-over");
@@ -60,42 +156,32 @@ for (const theme of ["light", "dark"]) {
     await insights
       .getByRole("button", { name: "Zoom in", exact: true })
       .click();
+    await insights.getByRole("button", { name: "Pan later" }).click();
     const chart = insights.locator('[data-layer="cash"] [role=img]');
     const range = await chart.getAttribute("data-viewport-min");
     await scrub(page, chart);
     await expect(chart).toHaveAttribute("data-viewport-min", range!);
-    // Two fingers retain the shared zoom gesture after one-finger inspection.
-    const plotBox = (await chart.locator(".u-over").boundingBox())!;
-    const session = await page.context().newCDPSession(page);
-    const y = Math.round(plotBox.y + plotBox.height * 0.8);
-    const center = Math.round(plotBox.x + plotBox.width / 2);
-    const span = async () =>
-      Number(await chart.getAttribute("data-viewport-max")) -
-      Number(await chart.getAttribute("data-viewport-min"));
-    const initialSpan = await span();
-    await session.send("Input.dispatchTouchEvent", {
-      type: "touchStart",
-      touchPoints: [
-        { x: center - 20, y },
-        { x: center + 20, y },
-      ],
-    });
-    await session.send("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [
-        { x: center - 60, y },
-        { x: center + 60, y },
-      ],
-    });
-    await session.send("Input.dispatchTouchEvent", {
-      type: "touchEnd",
-      touchPoints: [],
-    });
-    await session.detach();
-    await expect.poll(span).toBeLessThan(initialSpan);
+    const moved = await navigateWithTwoFingers(page, chart, theme === "dark");
+    const synced = insights.locator('[data-layer="supplyDemand"] [role=img]');
+    await expect(synced).toHaveAttribute("data-viewport-min", String(moved[0]));
+    await expect(synced).toHaveAttribute("data-viewport-max", String(moved[1]));
     await insights.getByRole("button", { name: "Expand Cash chart" }).click();
     const dialog = page.getByRole("dialog", { name: "Cash", exact: true });
     await scrub(page, dialog.getByRole("img"));
+    await navigateWithTwoFingers(
+      page,
+      dialog.getByRole("img"),
+      theme !== "dark",
+    );
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `cash-touch-${info.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
     await dialog.getByRole("button", { name: "Close Cash chart" }).click();
   });
 }
