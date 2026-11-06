@@ -336,7 +336,16 @@ export default function UPlotChart<S>(
     element: HTMLElement;
     top: number;
     overflowAnchor: string;
+    observer: MutationObserver;
   }>();
+  const anchorGestureScroll = React.useCallback(() => {
+    const scroll = gestureScrollRef.current;
+    const plot = plotRef.current;
+    if (scroll && plot) {
+      scroll.element.scrollTop +=
+        plot.over.getBoundingClientRect().top - scroll.top;
+    }
+  }, []);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
   const dataUpdateRef = React.useRef<
     ((plot: uPlot, data: uPlot.AlignedData) => void) | undefined
@@ -696,15 +705,9 @@ export default function UPlotChart<S>(
         min: viewport.range[0],
         max: viewport.range[1],
       });
-      const scroll = gestureScrollRef.current;
-      if (scroll) {
-        // Range summaries above the active chart can wrap or disappear during zoom.
-        // Anchor the plot the player is holding rather than a browser-selected descendant.
-        scroll.element.scrollTop +=
-          plotRef.current.over.getBoundingClientRect().top - scroll.top;
-      }
+      anchorGestureScroll();
     }
-  }, [viewport, plotLayout]);
+  }, [viewport, plotLayout, anchorGestureScroll]);
 
   React.useLayoutEffect(() => {
     const plot = plotRef.current;
@@ -734,7 +737,10 @@ export default function UPlotChart<S>(
         cancelAnimationFrame(scrollReleaseFrame);
       scrollReleaseFrame = undefined;
       const scroll = gestureScrollRef.current;
-      if (scroll) scroll.element.style.overflowAnchor = scroll.overflowAnchor;
+      if (scroll) {
+        scroll.observer.disconnect();
+        scroll.element.style.overflowAnchor = scroll.overflowAnchor;
+      }
       gestureScrollRef.current = undefined;
     };
     const holdScroll = () => {
@@ -748,12 +754,22 @@ export default function UPlotChart<S>(
         parent = parent.parentElement
       ) {
         if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY)) {
+          const observer = new MutationObserver(anchorGestureScroll);
           gestureScrollRef.current = {
             element: parent,
             top: over.getBoundingClientRect().top,
             overflowAnchor: parent.style.overflowAnchor,
+            observer,
           };
           parent.style.overflowAnchor = "none";
+          // A neighboring chart can fill its height after React's initial range layout.
+          // Follow those node and size updates only while the player holds this plot.
+          observer.observe(parent, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["style"],
+          });
           break;
         }
       }
@@ -967,7 +983,7 @@ export default function UPlotChart<S>(
       if (wheelTimer) clearTimeout(wheelTimer);
       releaseScroll();
     };
-  }, [viewportEnabled, plotLayout]);
+  }, [viewportEnabled, plotLayout, anchorGestureScroll]);
 
   React.useLayoutEffect(() => {
     // Event rows can appear when a new projection is ready; recompute their reserved padding.

@@ -723,6 +723,82 @@ describe("UPlotChart resizing", () => {
     },
   );
 
+  it("keeps a held chart steady when a neighboring chart finishes mounting, then releases the position on cancellation", async () => {
+    render(
+      <div
+        role="region"
+        aria-label="Scrollable charts"
+        style={{ overflowY: "auto" }}
+      >
+        <ChartViewportContext.Provider
+          value={{
+            bounds: [0, 100],
+            range: [25, 75],
+            minSpan: 10,
+            onRangeChange: jest.fn(),
+            onReset: jest.fn(),
+          }}
+        >
+          <UPlotChart
+            ariaLabel="Held chart"
+            state={{}}
+            data={[
+              [0, 100],
+              [2, 3],
+            ]}
+            buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+          />
+        </ChartViewportContext.Provider>
+      </div>,
+    );
+    const scroll = screen.getByRole("region", { name: "Scrollable charts" });
+    const plot = currentPlot();
+    // The canvas mock does not attach its overlay; put it in the real scrolling ancestor.
+    scroll.appendChild(plot.over);
+    const neighbor = document.createElement("div");
+    scroll.prepend(neighbor);
+    scroll.scrollTop = 50;
+    let layoutTop = 200;
+    const bounds = plot.over.getBoundingClientRect();
+    jest.spyOn(plot.over, "getBoundingClientRect").mockImplementation(() => ({
+      ...bounds,
+      top: layoutTop - scroll.scrollTop,
+    }));
+    const touch = (type: string) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.assign(event, {
+        touches:
+          type === "touchstart"
+            ? [100, 200].map((clientX, identifier) => ({
+                identifier,
+                clientX,
+                clientY: 10,
+              }))
+            : [],
+      });
+      act(() => plot.over.dispatchEvent(event));
+    };
+    touch("touchstart");
+    expect(plot.over.getBoundingClientRect().top).toBe(150);
+
+    // A sibling canvas gets its height after the range's initial React layout has finished.
+    await act(async () => {
+      layoutTop = 240;
+      neighbor.style.height = "160px";
+      await Promise.resolve();
+    });
+    expect(plot.over.getBoundingClientRect().top).toBe(150);
+
+    touch("touchcancel");
+    act(() => jest.advanceTimersByTime(20));
+    await act(async () => {
+      layoutTop = 280;
+      neighbor.style.height = "200px";
+      await Promise.resolve();
+    });
+    expect(plot.over.getBoundingClientRect().top).toBe(190);
+  });
+
   it("preserves the selected viewport and pointer zoom when switching controller presentation", () => {
     const onRangeChange = jest.fn();
     const viewport = {
