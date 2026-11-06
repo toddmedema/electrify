@@ -18,27 +18,26 @@ _No content yet_
 
 ## Assumptions and Constraints
 
-- This verification workstream depends on production-build-and-scenario-discovery delivering generated landing documents and a merged sitemap.
-- Deployment, CDN changes, and live infrastructure changes require a separately authorized release. Publication remains the orchestrator's responsibility.
-- Use existing save formats and gameplay contracts; do not introduce backend services or fallback routes.
-- Live-host verification remains unrun until an authorized deployment. Local static hosting does not establish CloudFront error behavior.
-- Slug removals or renames require an explicit redirect or retirement decision because non-deleting uploads may retain obsolete documents. Search ranking and traffic are observations, not release guarantees.
+This work depends on `static-scenario-page-generator`, `transition-and-growth-scenario-content`, and `disruption-and-recovery-scenario-content`.
+
+The plan assumes `scripts/build.js` derives its output directory from `BUILD_PATH` or `build` and performs the production build before existing post-build checks. `public/sitemap.xml` remains the source of existing non-scenario entries. Existing scenario URL resolution and application entry behavior require no implementation changes.
+
+Keep changes focused on build integration, catalog contracts, sitemap generation, discovery links, and artifact verification. Preserve unrelated static-page styling and content. Remote stale-file retirement remains a release-process responsibility rather than automatic generator deletion.
 
 ## Feature List
 
-Provide original, scenario-specific landing-page editorial content for Hurricane Season, Deep Freeze, Heatwave + Drought, Sudden Nuclear Shutdown, Wildfire Emergency, Load Shedding, The River Runs Dry, Delhi Summer, and Chernobyl: Recovery.
-
-Each record must explain the scenario's introduction, main challenge, meaningful player decisions, and learning outcomes, with a page title, description, and relevant related scenario IDs. Explain distinct challenges through their actual modeled conditions. Keep copy concise and suitable for the shared mobile layout, preserve visible names beside artwork, and avoid color-only meaning.
+- Publish a scenario index at `/scenarios.html` and editorial pages at `/scenarios/<slug>.html`, ordered consistently with the game catalog.
+- Add descriptive HTML links to the scenario index from `public/about.html` and the root document's static navigation, preserving the existing navigation hierarchy.
+- Include the index and each scenario page exactly once in the production sitemap while preserving existing entries and metadata.
+- Preserve existing static pages and game entry links. The Data Center learning-page cross-link belongs to the transition-content sub-plan.
 
 ## Technical Architecture
 
-Extend `e2e/learning-pages.spec.ts` and verify that the existing CI browser configuration selects it and reaches the new assertions. Reuse `e2e/layout.ts`, established fixtures, and the existing scenario-details suite. Test generated documents against production output through `E2E_BASE_URL`; the development server's public directory is insufficient evidence.
+Integrate the static scenario generator and complete editorial manifest into `scripts/build.js` after a successful CRA build, respecting `BUILD_PATH` and the default `build` directory. Preserve existing version and edition checks, and propagate generation failures as build failures.
 
-Representative coverage must include long titles, long prose, encoded image filenames, related links, the Data Center educational cross-link, unavailable storage, blocked analytics, existing saves, and browser history. Save-preservation checks must use an existing fixture and assert retained progress and the absence of automatic run start.
+Merge validated artifact URLs with `public/sitemap.xml` into the production sitemap without modifying the source sitemap or adding build-time modification dates. Output must be deterministic and support regeneration into an existing output directory without overwriting source files or unrelated artifacts.
 
-Follow verify-electrify to demonstrate that new browser assertions detect representative violations and accept valid neighboring cases. Run changed headless specs for desktop-chromium, mobile-390px, and mobile-360px, then required integrated gates before handoff. Reuse prior evidence only while valid, and distinguish passed, failed, skipped, and unrun checks. Do not add simulation-specific work solely for editorial changes; retain simulation gates required by integrated checks.
-
-Inspect `scripts/deploy.sh` and existing release documentation, then document a scoped release checklist in existing documentation or a focused scenario-page document.
+Keep the editorial manifest build-only and outside the game runtime dependency graph. Place the real-catalog contract in the existing TypeScript Jest environment so production generation remains independent of React and simulation imports. Include this contract in existing pre-publication quality gates. Do not commit or modify generated `RunCompatibility.json`.
 
 ## Data Model
 
@@ -50,19 +49,17 @@ No runtime domain model, save schema, scenario identifier, or simulation data ch
 
 ## API Contracts
 
-Verify the observable behavior of `/scenarios.html`, representative `/scenarios/<slug>.html` documents, `/sitemap.xml`, and `/?scenario=<id>`.
-
-Scenario play links must open the correct existing scenario details screen without automatically starting a run, overwriting saved progress, or bypassing start-game safeguards. Browser Back and Forward must preserve established application behavior and permit return to the landing document.
-
-The release checklist must verify actual HTTP status codes, HTML responses, Content-Type headers, canonicals, sitemap discovery, unknown scenario-document behavior, and stale remote objects. Explicitly identify unknown paths that return an indexable SPA shell and any required CDN change without implementing that change.
+Production output includes `/scenarios.html`, `/scenarios/<slug>.html`, and merged `/sitemap.xml`. Every generated play query must resolve through `scenarioFromSearch` to its intended scenario record. Build failure diagnostics must identify the offending record, field, URL, or asset. No new backend endpoint or gameplay route is introduced.
 
 ## Non-Functional Requirements
 
-Generated scenario index and representative detail documents must remain readable with JavaScript disabled in light and dark themes at viewport widths of 1280, 390, and 360 px. Verify no horizontal overflow, readable long titles and prose, loaded images, semantic navigation, visible keyboard focus, working skip links, and controls meeting the repository's size requirements.
-
-Static documents must load without the React game bundle, simulation data, authentication, analytics availability, or available storage. Existing learning pages and static navigation must retain their behavior and presentation.
-
-Review screenshots for hierarchy, contrast, wrapping, focus, control sizes, and image clarity across desktop and mobile layouts and both themes. Supply 1–3 representative reviewed images for orchestrator publication; keep artifacts temporary and free of personal data and debug overlays, and report capture or upload limitations.
+- Compare the editorial manifest against the actual eligible `SCENARIOS` set, including imported scenarios, and verify names, icons, catalog ordering, and play-query resolution.
+- Reject missing, extra, duplicate, tutorial, legacy-only, custom, removed, or otherwise invalid editorial references. Use valid and violating fixtures to demonstrate that guards fail for the intended reason, including a newly eligible scenario without content.
+- Test sitemap preservation, deduplication, escaping, deterministic output, conflicting URLs, malformed source sitemap data, and canonical agreement.
+- Verify generation failure propagation and artifact placement for default and custom `BUILD_PATH` values.
+- Semantically validate every generated document's metadata, structured content, local links, and canonical, social, and sitemap URL agreement. Avoid broad snapshots.
+- Preserve preview indexing controls and separately verify that production pages receive no accidental `noindex` directive.
+- Run focused Node and Jest suites plus applicable lint and type checks. Final integrated and browser evidence belongs to the next sub-plan.
 
 ## Open Questions
 
