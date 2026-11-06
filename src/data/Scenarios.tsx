@@ -459,7 +459,7 @@ export const SCENARIOS: ScenarioType[] = [
         onNext: () => prepareStorageReorder(),
         action: "Check the storage bar",
         content: (
-          <TutorialPrompt text="The vertical bar shows energy stored (MWh). The horizontal bar shows charging or discharging (MW)." />
+          <TutorialPrompt text="The horizontal bar shows charging or discharging power (MW); 1 MW can power about 800 US homes on average. The vertical bar shows energy stored (MW-hours): 1 MW-hour supplies 1 MW for an hour." />
         ),
       },
       {
@@ -485,7 +485,7 @@ export const SCENARIOS: ScenarioType[] = [
         hideUi: EARLY_MISSION_HIDDEN,
         action: "Build storage to cover peak demand",
         content: (
-          <TutorialPrompt text="Your coal plant cannot cover the peaks. Choose storage that can be ready within two years, then supply a full day without a blackout." />
+          <TutorialPrompt text="Your coal plant cannot cover the peaks. Build a storage facility and supply a full day without a blackout." />
         ),
         capstone: {
           checkpoint: {

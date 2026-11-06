@@ -844,6 +844,36 @@ describe("Insights layers", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("checks required tutorial layers when the selected preset omits them", async () => {
+    renderInsights(4);
+    await user.click(labelledButton(/Layers/));
+
+    const expectRequiredLayers = () => {
+      for (const name of ["Profit", "Finance details"]) {
+        const checkbox = screen.getByRole("checkbox", { name });
+        expect(checkbox).toBeChecked();
+        expect(checkbox).toBeDisabled();
+        expect(screen.getByRole("heading", { name })).toBeVisible();
+      }
+      expect(
+        screen.getByRole("checkbox", { name: "Supply & Demand" }),
+      ).toBeChecked();
+      expect(
+        screen.getByRole("checkbox", { name: "Supply & Demand" }),
+      ).toBeEnabled();
+      expect(
+        screen.getByRole("checkbox", { name: "Revenue" }),
+      ).not.toBeChecked();
+    };
+    expectRequiredLayers();
+    await choosePreset("Profitability");
+    await choosePreset("Overview");
+    expectRequiredLayers();
+    expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual(
+      INSIGHT_PRESETS.overview.layers,
+    );
+  });
+
   it("adds monthly lowest spare capacity to Reliability and lets players toggle the layer", async () => {
     renderInsights();
     await choosePreset("Reliability");
