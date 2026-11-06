@@ -18,48 +18,46 @@ _No content yet_
 
 ## Assumptions and Constraints
 
-This work depends on `static-scenario-page-generator`, `transition-and-growth-scenario-content`, and `disruption-and-recovery-scenario-content`.
-
-The plan assumes `scripts/build.js` derives its output directory from `BUILD_PATH` or `build` and performs the production build before existing post-build checks. `public/sitemap.xml` remains the source of existing non-scenario entries. Existing scenario URL resolution and application entry behavior require no implementation changes.
-
-Keep changes focused on build integration, catalog contracts, sitemap generation, discovery links, and artifact verification. Preserve unrelated static-page styling and content. Remote stale-file retirement remains a release-process responsibility rather than automatic generator deletion.
+- Use Node 24 and existing locked dependencies where practical.
+- The production canonical origin is `https://electrifygame.com`.
+- Proposed build-only locations are `scripts/scenario-pages/` and `content/scenario-pages.json`; implementation may follow established repository naming conventions.
+- This foundation has no sibling sub-plan dependency and must be independently verifiable with fixtures; production content comes from two editorial sub-plans.
+- Sitemap generation, production build wiring, and production browser testing belong to the integration sub-plan.
+- Preserve ScenarioType, scenario IDs, saves, multiplayer payloads, and RunCompatibility.json.
 
 ## Feature List
 
-- Publish a scenario index at `/scenarios.html` and editorial pages at `/scenarios/<slug>.html`, ordered consistently with the game catalog.
-- Add descriptive HTML links to the scenario index from `public/about.html` and the root document's static navigation, preserving the existing navigation hierarchy.
-- Include the index and each scenario page exactly once in the production sitemap while preserving existing entries and metadata.
-- Preserve existing static pages and game entry links. The Data Center learning-page cross-link belongs to the transition-content sub-plan.
+- Generate complete static `/scenarios.html` and `/scenarios/<slug>.html` documents with readable content and ordinary navigation when JavaScript is disabled.
+- Each detail page includes one descriptive H1, the scenario premise, introduction, challenge, decisions, learning outcomes, breadcrumbs, related scenarios, and a dominant play link to `/?scenario=<id>`.
+- Provide unique page titles and descriptions, absolute self-referencing canonical URLs, matching Open Graph and Twitter metadata, and parseable WebPage JSON-LD consistent with visible content.
 
 ## Technical Architecture
 
-Integrate the static scenario generator and complete editorial manifest into `scripts/build.js` after a successful CRA build, respecting `BUILD_PATH` and the default `build` directory. Preserve existing version and edition checks, and propagate generation failures as build failures.
-
-Merge validated artifact URLs with `public/sitemap.xml` into the production sitemap without modifying the source sitemap or adding build-time modification dates. Output must be deterministic and support regeneration into an existing output directory without overwriting source files or unrelated artifacts.
-
-Keep the editorial manifest build-only and outside the game runtime dependency graph. Place the real-catalog contract in the existing TypeScript Jest environment so production generation remains independent of React and simulation imports. Include this contract in existing pre-publication quality gates. Do not commit or modify generated `RunCompatibility.json`.
+- Implement a deterministic Node generator with separate record validation, URL derivation, shared HTML template rendering, and artifact writing.
+- Read structured editorial data, templates, and local assets for validation without importing Scenarios.tsx, Redux, React, or simulation modules; keep build-only editorial code and data outside the simulation runtime dependency graph.
+- Derive canonical, social, breadcrumb, related, and play destinations from validated records.
+- Reuse the existing brand header, privacy/about footer, gameplay preview image, scenario artwork, logo, and social-preview assets. Scope additions to `public/legal.css` to preserve existing learning-page presentation.
+- Generated pages must not load the React bundle, simulation data, authentication, or required scripts.
+- Validate scenario IDs structurally and related references against supplied records; real-catalog eligibility remains the responsibility of a later Jest contract.
 
 ## Data Model
 
-Populate exactly one complete record per assigned scenario in the shared build-only editorial manifest. Each record must contain the correct persisted scenario ID, visible name, icon, stable explicit slug, introduction, main challenge, meaningful decisions, learning outcomes, title, description, and relevant related IDs.
+Introduce a build-only editorial record contract containing `scenarioId`, `slug`, `name`, `icon`, `title`, `description`, `introduction`, `challenge`, `decisions`, `learningOutcomes`, and `relatedScenarioIds`.
 
-Read Chernobyl: Recovery's exact exported ID and definition from `src/data/ChernobylScenario.ts`; do not infer its ID from catalog position. Slugs must remain independent of display-name punctuation, including Heatwave + Drought and Chernobyl: Recovery. Related IDs must identify eligible challenges and exclude tutorials, legacy generations, custom games, and mods.
-
-No runtime domain model, save schema, scenario identifier, or simulation data changes are required.
+Use structured text and lists rather than editorial HTML. Require complete, nonempty content; unique IDs, slugs, titles, descriptions, and derived canonical URLs; valid local assets; and related IDs that reference supplied records without duplicates or self-references.
 
 ## API Contracts
 
-Production output includes `/scenarios.html`, `/scenarios/<slug>.html`, and merged `/sitemap.xml`. Every generated play query must resolve through `scenarioFromSearch` to its intended scenario record. Build failure diagnostics must identify the offending record, field, URL, or asset. No new backend endpoint or gameplay route is introduced.
+Expose a generator entry point accepting an output directory and content records. Emit the scenario index and detail HTML documents and return artifact information suitable for later sitemap integration. Fail unsuccessfully with actionable diagnostics on invalid input or rendering errors. No backend API is added.
 
 ## Non-Functional Requirements
 
-- Compare the editorial manifest against the actual eligible `SCENARIOS` set, including imported scenarios, and verify names, icons, catalog ordering, and play-query resolution.
-- Reject missing, extra, duplicate, tutorial, legacy-only, custom, removed, or otherwise invalid editorial references. Use valid and violating fixtures to demonstrate that guards fail for the intended reason, including a newly eligible scenario without content.
-- Test sitemap preservation, deduplication, escaping, deterministic output, conflicting URLs, malformed source sitemap data, and canonical agreement.
-- Verify generation failure propagation and artifact placement for default and custom `BUILD_PATH` values.
-- Semantically validate every generated document's metadata, structured content, local links, and canonical, social, and sitemap URL agreement. Avoid broad snapshots.
-- Preserve preview indexing controls and separately verify that production pages receive no accidental `noindex` directive.
-- Run focused Node and Jest suites plus applicable lint and type checks. Final integrated and browser evidence belongs to the next sub-plan.
+- Identical inputs must produce identical output bytes without timestamps. Write only owned artifacts inside the specified output directory, preserve unrelated files, and limit cleanup to demonstrably owned generated files.
+- Reject incomplete records, malformed metadata, unsafe paths, traversal sequences, separators or arbitrary URLs in slugs, invalid related references, and missing assets. Never substitute generic copy or resolve unknown slugs to arbitrary records.
+- Escape text and attributes, encode asset URLs correctly, support special characters and filenames containing spaces, safely serialize XML-compatible URL values, and prevent JSON-LD content from breaking out of its script element.
+- Use accessible semantics, a skip link, visible focus, semantic headings, descriptive links, appropriate image alternatives, and explicit image dimensions.
+- Provide responsive light and dark presentation using existing color tokens and the 4 px spacing rhythm. Controls must be at least 40 px high on desktop and 44 px on coarse-pointer devices; stack content at phone widths and support 1280, 390, and 360 px layouts. Reading must remain available without theme storage or analytics.
+- Use focused Node tooling tests and the verify-electrify approach, pairing valid fixtures with deliberate violations of schema, duplicate, metadata, path, relationship, asset, and serialization guards. Verify semantic HTML, one H1 per detail page, required sections, metadata consistency, parseable JSON-LD, deterministic bytes, arbitrary output directories, preservation of unrelated files, and absence of game or simulation resources.
 
 ## Open Questions
 
