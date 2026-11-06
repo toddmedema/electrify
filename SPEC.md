@@ -18,31 +18,33 @@ _No content yet_
 
 ## Assumptions and Constraints
 
-The seven named current built-in challenge definitions determine scope. Their delivery grouping must not introduce public categories, difficulty ratings, or strategic recommendations. Use existing artwork and English prose, preserve special characters and icon filenames, and retain current catalog order.
+The nine assigned scenarios are assumed to complete the current eligible catalog alongside seven scenarios in the other editorial workstream. This workstream grouping creates no player-facing categories or recommendations. Preserve the catalog's existing presentation order when integrating the complete manifest.
 
-Editorial claims must match scenario definitions and relevant authored events. Do not present simulated situations as historical facts or forecasts, promise outcomes, recommend unsupported optimal strategies, or copy event schedules. Avoid unnecessary numeric game facts; every retained numeric fact requires a consistency assertion. Report source ambiguity that changes a scenario's meaning instead of inventing mechanics.
+Validate editorial claims against each scenario's starting conditions and relevant authored events, including the imported Chernobyl definition. Distinguish modeled situations from historical claims or forecasts, avoid unverified historical details, and make no guarantees about outcomes or optimal strategies. Omit incidental numeric details; retain numbers only when needed for understanding and backed by consistency checks.
 
-Do not change game data, simulation formulas, scenario IDs, save structures, or records assigned to the other editorial workstream.
+Do not change game mechanics, event schedules, artwork, or source descriptions to fit landing-page copy.
 
 ## Feature List
 
-Author scenario landing-page content for Carbon Fee, The Shale Boom, Paradise, Rise of Renewables, The End of an Era, Data Center Boom, and Across the Valley. Each scenario must have a distinctive introduction, main challenge, meaningful player decisions, learning outcomes, unique title, and unique meta description.
+Provide original, scenario-specific landing-page editorial content for Hurricane Season, Deep Freeze, Heatwave + Drought, Sudden Nuclear Shutdown, Wildfire Emergency, Load Shedding, The River Runs Dry, Delhi Summer, and Chernobyl: Recovery.
 
-Keep the Data Center Boom landing page focused on its electricity-market challenge and `public/data-centers.html` focused on broader education. Preserve distinct canonical URLs and add ordinary links in both directions, secondary to the primary play action.
+Each record must explain the scenario's introduction, main challenge, meaningful player decisions, and learning outcomes, with a page title, description, and relevant related scenario IDs. Explain distinct challenges through their actual modeled conditions. Keep copy concise and suitable for the shared mobile layout, preserve visible names beside artwork, and avoid color-only meaning.
 
 ## Technical Architecture
 
-Depend on `static-scenario-page-generator` to render each editorial record at `/scenarios/<stable-slug>.html` with a primary play link to `/?scenario=<id>`. No new API is introduced.
+Depend on `static-scenario-page-generator` and populate only the nine assigned records in its shared build-only manifest. Delegate encoding and URL construction to the shared generator. Generated detail routes use stable `.html` slugs and link to the existing `/?scenario=<id>` play destination; no new API is required.
 
-Review each assigned definition in `src/data/Scenarios.tsx` and its relevant authored event sources before writing. Describe decisions through actual modeled constraints. Use concise copy, direct headings, decision-oriented lists, and visible scenario names beside artwork.
+Validate assigned records through the generator, using supporting fixtures where cross-workstream references require them. Check asset resolution, nonempty required sections, metadata uniqueness within the assigned subset, URL encoding, and consistency of retained numeric facts. Review every record against its scenario definition and relevant event sources.
 
-Render assigned records through the generator with valid supporting fixtures for cross-workstream references. Validate required fields, local assets, metadata uniqueness within the subset, encoded destinations, and any retained numeric claims; review each page against its scenario and event sources. The integration sub-plan owns whole-catalog completeness and cross-workstream uniqueness checks; whole-catalog automated validation and browser QA remain with their owning sub-plans.
+Integration owns full-catalog coverage enforcement and cross-workstream duplicate checks. Integration and final verification sub-plans own whole-catalog and production browser checks.
 
 ## Data Model
 
-Populate exactly one complete record per assigned scenario in the shared build-only editorial manifest. Each record must contain its persisted scenario ID, exact presentation references, an explicit stable lowercase slug, introduction, main challenge, meaningful player decisions, learning outcomes, title, meta description, and a small set of relevant related scenarios referenced by eligible IDs.
+Populate exactly one complete record per assigned scenario in the shared build-only editorial manifest. Each record must contain the correct persisted scenario ID, visible name, icon, stable explicit slug, introduction, main challenge, meaningful decisions, learning outcomes, title, description, and relevant related IDs.
 
-Establish stable slugs before adding cross-links. Titles and descriptions must differ meaningfully, beyond simple string uniqueness.
+Read Chernobyl: Recovery's exact exported ID and definition from `src/data/ChernobylScenario.ts`; do not infer its ID from catalog position. Slugs must remain independent of display-name punctuation, including Heatwave + Drought and Chernobyl: Recovery. Related IDs must identify eligible challenges and exclude tutorials, legacy generations, custom games, and mods.
+
+No runtime domain model, save schema, scenario identifier, or simulation data changes are required.
 
 ## API Contracts
 
