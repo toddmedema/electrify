@@ -18,11 +18,11 @@ _No content yet_
 
 ## Assumptions and Constraints
 
-The nine assigned scenarios are assumed to complete the current eligible catalog alongside seven scenarios in the other editorial workstream. This workstream grouping creates no player-facing categories or recommendations. Preserve the catalog's existing presentation order when integrating the complete manifest.
-
-Validate editorial claims against each scenario's starting conditions and relevant authored events, including the imported Chernobyl definition. Distinguish modeled situations from historical claims or forecasts, avoid unverified historical details, and make no guarantees about outcomes or optimal strategies. Omit incidental numeric details; retain numbers only when needed for understanding and backed by consistency checks.
-
-Do not change game mechanics, event schedules, artwork, or source descriptions to fit landing-page copy.
+- This verification workstream depends on production-build-and-scenario-discovery delivering generated landing documents and a merged sitemap.
+- Deployment, CDN changes, and live infrastructure changes require a separately authorized release. Publication remains the orchestrator's responsibility.
+- Use existing save formats and gameplay contracts; do not introduce backend services or fallback routes.
+- Live-host verification remains unrun until an authorized deployment. Local static hosting does not establish CloudFront error behavior.
+- Slug removals or renames require an explicit redirect or retirement decision because non-deleting uploads may retain obsolete documents. Search ranking and traffic are observations, not release guarantees.
 
 ## Feature List
 
@@ -32,11 +32,13 @@ Each record must explain the scenario's introduction, main challenge, meaningful
 
 ## Technical Architecture
 
-Depend on `static-scenario-page-generator` and populate only the nine assigned records in its shared build-only manifest. Delegate encoding and URL construction to the shared generator. Generated detail routes use stable `.html` slugs and link to the existing `/?scenario=<id>` play destination; no new API is required.
+Extend `e2e/learning-pages.spec.ts` and verify that the existing CI browser configuration selects it and reaches the new assertions. Reuse `e2e/layout.ts`, established fixtures, and the existing scenario-details suite. Test generated documents against production output through `E2E_BASE_URL`; the development server's public directory is insufficient evidence.
 
-Validate assigned records through the generator, using supporting fixtures where cross-workstream references require them. Check asset resolution, nonempty required sections, metadata uniqueness within the assigned subset, URL encoding, and consistency of retained numeric facts. Review every record against its scenario definition and relevant event sources.
+Representative coverage must include long titles, long prose, encoded image filenames, related links, the Data Center educational cross-link, unavailable storage, blocked analytics, existing saves, and browser history. Save-preservation checks must use an existing fixture and assert retained progress and the absence of automatic run start.
 
-Integration owns full-catalog coverage enforcement and cross-workstream duplicate checks. Integration and final verification sub-plans own whole-catalog and production browser checks.
+Follow verify-electrify to demonstrate that new browser assertions detect representative violations and accept valid neighboring cases. Run changed headless specs for desktop-chromium, mobile-390px, and mobile-360px, then required integrated gates before handoff. Reuse prior evidence only while valid, and distinguish passed, failed, skipped, and unrun checks. Do not add simulation-specific work solely for editorial changes; retain simulation gates required by integrated checks.
+
+Inspect `scripts/deploy.sh` and existing release documentation, then document a scoped release checklist in existing documentation or a focused scenario-page document.
 
 ## Data Model
 
@@ -48,11 +50,19 @@ No runtime domain model, save schema, scenario identifier, or simulation data ch
 
 ## API Contracts
 
-_No content yet_
+Verify the observable behavior of `/scenarios.html`, representative `/scenarios/<slug>.html` documents, `/sitemap.xml`, and `/?scenario=<id>`.
+
+Scenario play links must open the correct existing scenario details screen without automatically starting a run, overwriting saved progress, or bypassing start-game safeguards. Browser Back and Forward must preserve established application behavior and permit return to the landing document.
+
+The release checklist must verify actual HTTP status codes, HTML responses, Content-Type headers, canonicals, sitemap discovery, unknown scenario-document behavior, and stale remote objects. Explicitly identify unknown paths that return an indexable SPA shell and any required CDN change without implementing that change.
 
 ## Non-Functional Requirements
 
-_No content yet_
+Generated scenario index and representative detail documents must remain readable with JavaScript disabled in light and dark themes at viewport widths of 1280, 390, and 360 px. Verify no horizontal overflow, readable long titles and prose, loaded images, semantic navigation, visible keyboard focus, working skip links, and controls meeting the repository's size requirements.
+
+Static documents must load without the React game bundle, simulation data, authentication, analytics availability, or available storage. Existing learning pages and static navigation must retain their behavior and presentation.
+
+Review screenshots for hierarchy, contrast, wrapping, focus, control sizes, and image clarity across desktop and mobile layouts and both themes. Supply 1–3 representative reviewed images for orchestrator publication; keep artifacts temporary and free of personal data and debug overlays, and report capture or upload limitations.
 
 ## Open Questions
 
