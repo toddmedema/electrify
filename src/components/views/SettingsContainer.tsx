@@ -4,7 +4,6 @@ import { connect } from "react-redux";
 import { navigateBack } from "../../reducers/Card";
 import { change as changeSettings } from "../../reducers/Settings";
 import { delta as userDelta, logout } from "../../reducers/User";
-import { login } from "../../Globals";
 import {
   AppStateType,
   TextSizeType,
@@ -23,9 +22,6 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
-    onLogin: (options) => {
-      void login(options);
-    },
     onLogout: () => {
       dispatch(logout());
     },

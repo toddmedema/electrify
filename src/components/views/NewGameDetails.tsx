@@ -33,8 +33,8 @@ import {
   difficultyLabel,
 } from "../../Constants";
 import DifficultyPicker from "../base/DifficultyPicker";
-import { getDb, login } from "../../Globals";
-import GoogleSignIn from "../base/GoogleSignIn";
+import { getDb } from "../../Globals";
+import SignInButtons from "../base/SignInButtons";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
@@ -742,8 +742,16 @@ export default class NewGameDetails extends React.Component<Props, State> {
           )}
           {/* Below the board rather than in place of it: the board is the reason to log in */}
           {!challenge && !uid && !desktopApp && (
-            <div style={{ textAlign: "center", margin: "12px 0 24px" }}>
-              <GoogleSignIn centered onSignIn={login} />
+            <div
+              style={{
+                textAlign: "center",
+                margin: "12px 0 24px",
+                display: "grid",
+                justifyItems: "center",
+                gap: 8,
+              }}
+            >
+              <SignInButtons />
               <Typography variant="body2" color="textSecondary">
                 To set a high score under your own name
               </Typography>

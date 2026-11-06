@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithPopup,
   signOut,
 } from "firebase/auth";
@@ -31,18 +32,26 @@ const firebaseApp =
       });
 // Desktop accounts come from Steam; even constructing Firebase Auth starts web transport.
 export const firebaseAppAuth = firebaseApp ? getAuth(firebaseApp) : undefined;
-const provider = new GoogleAuthProvider();
+export type SignInProvider = "google" | "apple";
 
 export interface SignInOptions {
+  provider?: SignInProvider;
   mailingList?: boolean;
 }
 
-export function login(options: SignInOptions = {}): Promise<boolean> {
+export function login({
+  provider = "google",
+  mailingList = false,
+}: SignInOptions = {}): Promise<boolean> {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp())
     return Promise.resolve(false);
-  return signInWithPopup(firebaseAppAuth!, provider)
+  const authProvider =
+    provider === "apple"
+      ? new OAuthProvider("apple.com")
+      : new GoogleAuthProvider();
+  return signInWithPopup(firebaseAppAuth!, authProvider)
     .then((credential) => {
-      if (options.mailingList) {
+      if (mailingList) {
         // Auth listeners can close the dialog before signup finishes.
         // Keep signup independent of login and cloud sync.
         void subscribeAfterSignIn(firebaseAppAuth!, credential.user).catch(

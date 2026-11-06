@@ -12,8 +12,7 @@ import {
   challengeShareContent,
   challengeComparison,
 } from "../../helpers/Challenge";
-import { logEvent, SignInOptions } from "../../Globals";
-import GoogleSignIn from "./GoogleSignIn";
+import { logEvent } from "../../Globals";
 import ShareIcon from "@mui/icons-material/Share";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
@@ -22,6 +21,7 @@ import { canShare, shareText } from "../../helpers/Share";
 import { formatScore } from "../../helpers/Format";
 import { ResultScore, resultTitle, RunDebrief } from "./RunResult";
 import { isDesktopApp } from "../../Desktop";
+import SignInButtons from "./SignInButtons";
 import { SCENARIOS } from "../../data/Scenarios";
 import ResultLeaderboard from "./ResultLeaderboard";
 import { SCORE_VERSION } from "../../helpers/Scoring";
@@ -38,7 +38,6 @@ export interface DispatchProps {
   onClose: () => void;
   onQuit: () => void;
   onRetry: (victory: VictoryType) => void;
-  onLogin: (options?: SignInOptions) => void;
   // Reported once the player has actually shared, with how it went out
   onShared: (victory: VictoryType, method: string) => void;
   onShareFailed: () => void;
@@ -48,7 +47,7 @@ export interface Props extends StateProps, DispatchProps {}
 
 /** Score and debrief render immediately; the leaderboard owns its network loading state. */
 export default function VictoryDialog(props: Props): React.JSX.Element {
-  const { victory, loggedIn, onClose, onQuit, onLogin } = props;
+  const { victory, loggedIn, onClose, onQuit } = props;
   const [preview, setPreview] = React.useState(false);
   const [sharing, setSharing] = React.useState(false);
   const campaign = isLegacyCampaignScenario(victory?.scenarioId);
@@ -193,13 +192,10 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               color="textSecondary"
               component="div"
             >
-              <GoogleSignIn
-                centered
-                label="Log in to join the leaderboard"
-                variant="text"
-                size="small"
-                onSignIn={onLogin}
-              />
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                Sign in to join the leaderboard
+              </Typography>
+              <SignInButtons />
             </Typography>
           )}
         {!campaign &&

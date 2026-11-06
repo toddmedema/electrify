@@ -11,10 +11,10 @@ import {
   Typography,
 } from "@mui/material";
 import { createSharedSave } from "../../CloudSaveTransport";
-import { firebaseAppAuth, login } from "../../Globals";
+import { firebaseAppAuth, login, SignInOptions } from "../../Globals";
+import SignInButtons from "./SignInButtons";
 import { snapshotSavedGame } from "../../SaveSession";
 import type { SaveFileType } from "../../Types";
-import MailingListCheckbox from "./MailingListCheckbox";
 
 export default function ShareSaveDialog({
   id,
@@ -27,7 +27,6 @@ export default function ShareSaveDialog({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [mailingList, setMailingList] = useState(false);
   const [file, setFile] = useState<SaveFileType>();
   const request = useRef(0);
   const input = useRef<HTMLInputElement>(null);
@@ -52,7 +51,6 @@ export default function ShareSaveDialog({
     setUrl("");
     setError("");
     setCopied(false);
-    setMailingList(false);
     setFile(undefined);
     if (id) {
       setBusy(true);
@@ -74,19 +72,19 @@ export default function ShareSaveDialog({
       request.current = generation + 1;
     };
   }, [id]);
-  const signInAndShare = async () => {
-    if (!file) return;
+  const signInAndShare = async (options: SignInOptions = {}) => {
+    if (!file) return false;
     const generation = request.current;
     setError("");
     setBusy(true);
-    if (!firebaseAppAuth?.currentUser && !(await login({ mailingList }))) {
-      if (generation === request.current) {
-        setBusy(false);
-        setError("Couldn't finish sign-in. Try again.");
-      }
-      return;
+    try {
+      if (!firebaseAppAuth?.currentUser && !(await login(options)))
+        return false;
+      if (generation === request.current) await create(file, generation);
+      return true;
+    } finally {
+      if (generation === request.current) setBusy(false);
     }
-    if (generation === request.current) await create(file, generation);
   };
   return (
     <Dialog
@@ -108,7 +106,7 @@ export default function ShareSaveDialog({
           </Typography>
           {busy && (
             <Typography role="status">
-              {file ? "Creating share link…" : "Preparing saved game…"}
+              {file ? "Preparing share link…" : "Preparing saved game…"}
             </Typography>
           )}
           {error && <Alert severity="error">{error}</Alert>}
@@ -124,16 +122,9 @@ export default function ShareSaveDialog({
           )}
           {!url && !busy && !firebaseAppAuth?.currentUser && (
             <Typography variant="body2">
-              Sign in with Google to create a share link. No account is needed
-              to open it.
+              Sign in with Google or Apple to create a share link. No account is
+              needed to open it.
             </Typography>
-          )}
-          {!url && !firebaseAppAuth?.currentUser && (
-            <MailingListCheckbox
-              checked={mailingList}
-              onChange={setMailingList}
-              disabled={busy || !file}
-            />
           )}
           {copied && (
             <Typography role="status" color="success.main">
@@ -142,7 +133,7 @@ export default function ShareSaveDialog({
           )}
         </Stack>
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ flexWrap: "wrap", gap: 1, px: 3, pb: 2 }}>
         <Button onClick={onClose}>Close</Button>
         {url ? (
           <Button
@@ -160,16 +151,20 @@ export default function ShareSaveDialog({
           >
             Copy link
           </Button>
-        ) : (
+        ) : firebaseAppAuth?.currentUser ? (
           <Button
             variant="contained"
             disabled={busy || !file}
             onClick={() => void signInAndShare()}
           >
-            {firebaseAppAuth?.currentUser
-              ? "Create share link"
-              : "Sign in and share"}
+            Create share link
           </Button>
+        ) : (
+          <SignInButtons
+            key={id}
+            disabled={busy || !file}
+            onSignIn={signInAndShare}
+          />
         )}
       </DialogActions>
     </Dialog>

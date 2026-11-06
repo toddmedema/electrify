@@ -1,6 +1,57 @@
 import { expect, Locator, Page } from "@playwright/test";
 
-/** Google sign-in and its optional consent remain usable at every supported width. */
+/** Both providers must remain equal, usable columns at every supported width. */
+export async function expectSignInButtonsToFit(scope: Page | Locator) {
+  await expectMailingListChoice(scope);
+  const google = scope.getByRole("button", {
+    name: "Sign in with Google",
+    exact: true,
+  });
+  const apple = scope.getByRole("button", {
+    name: "Sign in with Apple",
+    exact: true,
+  });
+  // Card transitions briefly mount the outgoing and incoming screens together.
+  await expect(google).toHaveCount(1);
+  await expect(apple).toHaveCount(1);
+  await expect(google).toBeVisible();
+  await expect(apple).toBeVisible();
+  // A leaderboard response can move the entire row between protocol calls. Read both
+  // controls in one browser task so their geometry describes the same layout state.
+  const layout = await scope
+    .getByRole("group", { name: "Sign in", exact: true })
+    .evaluate((group) => ({
+      buttons: Array.from(group.querySelectorAll("button")).map((button) => {
+        const { x, y, width, height } = button.getBoundingClientRect();
+        return {
+          name: button.getAttribute("aria-label"),
+          x,
+          y,
+          width,
+          height,
+          overflow: button.scrollWidth - button.clientWidth,
+        };
+      }),
+      viewportWidth: window.innerWidth,
+      minimumHeight: matchMedia("(pointer: coarse)").matches ? 44 : 40,
+    }));
+  expect(layout.buttons.map((button) => button.name)).toEqual([
+    "Sign in with Google",
+    "Sign in with Apple",
+  ]);
+  const [a, b] = layout.buttons;
+  expect(Math.abs(a.y - b.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(a.height - b.height)).toBeLessThanOrEqual(1);
+  expect(Math.abs(a.width - b.width)).toBeLessThanOrEqual(1);
+  expect(b.x).toBeGreaterThanOrEqual(a.x + a.width);
+  expect(a.height).toBeGreaterThanOrEqual(layout.minimumHeight);
+  expect(a.x).toBeGreaterThanOrEqual(0);
+  expect(b.x + b.width).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  for (const button of layout.buttons)
+    expect(button.overflow).toBeLessThanOrEqual(1);
+}
+
+/** Optional consent remains unchecked, aligned and usable beside either provider. */
 export async function expectMailingListChoice(
   scope: Page | Locator,
   buttonName = "Sign in with Google",

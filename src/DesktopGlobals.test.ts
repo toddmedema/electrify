@@ -31,6 +31,9 @@ it("does not initialize Firebase, auth, analytics or a database in the native ap
   });
   globals.logEvent("launch");
   await expect(globals.login()).resolves.toBe(false);
+  await expect(
+    globals.login({ provider: "apple", mailingList: true }),
+  ).resolves.toBe(false);
   await expect(globals.logout()).resolves.toBeUndefined();
   expect(() => globals.getDb()).toThrow("desktop game");
   expect(mockInitializeApp).not.toHaveBeenCalled();

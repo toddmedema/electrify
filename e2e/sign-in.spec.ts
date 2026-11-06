@@ -1,9 +1,9 @@
 import path from "node:path";
 import { expect, test } from "./fixtures";
-import { expectMailingListChoice } from "./layout";
+import { expectSignInButtonsToFit } from "./layout";
 
 for (const theme of ["light", "dark"]) {
-  test(`Google sign-in has optional mailing-list consent in ${theme}`, async ({
+  test(`account providers stay side by side in ${theme}`, async ({
     page,
     context,
   }, info) => {
@@ -12,10 +12,10 @@ for (const theme of ["light", "dark"]) {
       localStorage.setItem("audioEnabled", "false");
     }, theme);
     await page.goto("/?scenario=101");
-    await expectMailingListChoice(page);
+    await expectSignInButtonsToFit(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Settings", exact: true }).click();
-    await expectMailingListChoice(page);
+    await expectSignInButtonsToFit(page);
     const mailingList = page.getByRole("checkbox", {
       name: "Join the Electrify mailing list",
     });
@@ -28,7 +28,7 @@ for (const theme of ["light", "dark"]) {
         (theme === "dark" && info.project.name === "mobile-360px"))
     ) {
       await page
-        .getByRole("button", { name: "Sign in with Google", exact: true })
+        .getByRole("button", { name: "Sign in with Apple", exact: true })
         .scrollIntoViewIfNeeded();
       await page.mouse.move(0, 0);
       await page.screenshot({
@@ -47,11 +47,16 @@ for (const theme of ["light", "dark"]) {
       .getByRole("button", { name: "Achievements", exact: true })
       .click();
     const gallery = page.locator(".achievementCard");
-    await expectMailingListChoice(gallery);
+    await expectSignInButtonsToFit(gallery);
     await context.setOffline(true);
-    await expect(
-      gallery.getByRole("button", { name: "Sign in with Google", exact: true }),
-    ).toBeDisabled();
     await expect(gallery.getByRole("checkbox")).toBeDisabled();
+    for (const name of ["Google", "Apple"]) {
+      await expect(
+        gallery.getByRole("button", {
+          name: `Sign in with ${name}`,
+          exact: true,
+        }),
+      ).toBeDisabled();
+    }
   });
 }
