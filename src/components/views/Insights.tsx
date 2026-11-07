@@ -37,7 +37,6 @@ import SaveIcon from "@mui/icons-material/Save";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import {
@@ -94,6 +93,7 @@ import ChartForecastDemandByType, {
 } from "../base/ChartForecastDemandByType";
 import ChartFinances from "../base/ChartFinances";
 import ManualLink from "../base/ManualLink";
+import ConceptIcon from "../base/ConceptIcon";
 import { MANUAL_ENTRY, ManualEntryTitleType } from "../base/ManualEntries";
 import FuelFilter from "../base/FuelFilter";
 import { ExpandedChartPresentation } from "../base/ChartPresentationContext";
@@ -1706,7 +1706,12 @@ export default class Insights extends React.Component<Props, State> {
                   role="note"
                   aria-label={`Forecast shortfall for ${projection.shortfall.label}: about ${formatWattHours(Number(projection.shortfall.wh.toPrecision(2)))} of demand unmet, about ${formatWatts(Number(projection.shortfall.peakW.toPrecision(2)))} peak`}
                 >
-                  <WarningAmberIcon fontSize="small" aria-hidden="true" />
+                  <ConceptIcon
+                    concept="danger"
+                    fontSize="small"
+                    color="inherit"
+                    decorative
+                  />
                   <span>
                     <strong>Shortfall, {projection.shortfall.label}:</strong> ~
                     {formatWattHours(

@@ -1,7 +1,6 @@
 import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { Box, Typography, useMediaQuery } from "@mui/material";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { GameType, ScenarioType, ScoreCategoryType } from "../../Types";
 import { DIFFICULTY_LABELS, MONTHS } from "../../Constants";
 import { getScenarioLocation } from "../../helpers/Locations";
@@ -19,6 +18,7 @@ import {
 import { useUnits } from "./UnitsContext";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
+import ConceptIcon from "./ConceptIcon";
 import UtilitySupplyPlan from "./UtilitySupplyPlan";
 import { formatScore } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
@@ -199,7 +199,12 @@ function ScoreOutlook({
         >
           {outlook?.status === "loss" ? (
             <>
-              <WarningAmberIcon fontSize="small" aria-hidden="true" />
+              <ConceptIcon
+                concept="danger"
+                fontSize="small"
+                color="inherit"
+                decorative
+              />
               <span>
                 <strong>Projected loss:</strong> {loss.text}
                 {outlook.shortageFrom && (

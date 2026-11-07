@@ -26,8 +26,8 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
 import ScreenPage from "../base/ScreenPage";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import LocationPicker from "../base/LocationPicker";
+import ConceptIcon from "../base/ConceptIcon";
 import InfoDialog from "../base/InfoDialog";
 import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
 import DifficultyPicker from "../base/DifficultyPicker";
@@ -862,9 +862,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     <>
                       <div className="customSetupOutlookState">
                         {outlook.outlook.worstShortfallW > 0 ? (
-                          <WarningAmberIcon
+                          <ConceptIcon
+                            concept="danger"
                             fontSize="small"
-                            aria-hidden="true"
+                            color="inherit"
+                            decorative
                           />
                         ) : (
                           <CheckCircleOutlineIcon

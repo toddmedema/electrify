@@ -15,7 +15,7 @@ import {
 import { logEvent, SignInOptions } from "../../Globals";
 import GoogleSignIn from "./GoogleSignIn";
 import ShareIcon from "@mui/icons-material/Share";
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import ConceptIcon from "./ConceptIcon";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import { VictoryType } from "../../Types";
 import { canShare, shareText } from "../../helpers/Share";
@@ -117,10 +117,11 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               aria-hidden
             />
           ) : (
-            <EmojiEventsIcon
+            <ConceptIcon
+              concept="goal"
               color="warning"
-              sx={{ fontSize: 44 }}
-              aria-hidden
+              style={{ fontSize: 44 }}
+              decorative
             />
           )}
           <Typography variant="h5" component="span" sx={{ fontWeight: 600 }}>

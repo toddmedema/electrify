@@ -3,10 +3,14 @@ import * as React from "react";
 import {
   DialogContentText,
   Divider,
+  ListItemIcon,
+  ListItemText,
   ListSubheader,
   Menu,
   MenuItem,
 } from "@mui/material";
+import CancelIcon from "@mui/icons-material/Cancel";
+import ConceptIcon from "../base/ConceptIcon";
 import {
   FacilityOperatingType,
   GameType,
@@ -39,6 +43,30 @@ type ActionKey =
   | "cancelConstruction"
   | "sell"
   | RetrofitFacilityAction["upgrade"];
+/**
+ * One glyph per facility action, shared by the row buttons and this menu so a player who has
+ * used one recognizes the other. Upgrades are building work, so they take the build glyph.
+ */
+export function facilityActionIcon(
+  key: ActionKey,
+  fontSize: "small" | "medium" = "medium",
+): React.ReactElement {
+  switch (key) {
+    case "pause":
+      return <ConceptIcon concept="pause" fontSize={fontSize} decorative />;
+    case "resume":
+      return <ConceptIcon concept="play" fontSize={fontSize} decorative />;
+    case "cancelUpgrade":
+    case "cancelConstruction":
+      return <CancelIcon fontSize={fontSize} />;
+    // Selling returns cash, as the event log's sale rows already show; it isn't a delete
+    case "sell":
+      return <ConceptIcon concept="money" fontSize={fontSize} decorative />;
+    default:
+      return <ConceptIcon concept="build" fontSize={fontSize} decorative />;
+  }
+}
+
 interface FleetAction {
   key: ActionKey;
   label: string;
@@ -237,7 +265,12 @@ export default function FacilityContextMenu(props: {
               else execute(action);
             }}
           >
-            {actionLabel(action, selected.length > 1)}
+            <ListItemIcon>
+              {facilityActionIcon(action.key, "small")}
+            </ListItemIcon>
+            <ListItemText>
+              {actionLabel(action, selected.length > 1)}
+            </ListItemText>
           </MenuItem>,
         ])}
         {offered.some(
