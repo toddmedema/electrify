@@ -2486,13 +2486,6 @@ $pane_header_height: 48px;
   border-radius: 50%;
 }
 
-// The demand overlay is a dashed line rather than a filled band, so its key looks like one
-.chartLegendSwatch-demand {
-  height: 0;
-  border-top: 2px dashed $font_color_primary;
-  border-radius: 0;
-}
-
 // Line-chart keys carry the series' dash pattern, since that's what tells them apart
 .chartLegendSwatch-line {
   width: 20px;
@@ -2524,8 +2517,7 @@ $pane_header_height: 48px;
   .chartLegendSwatch {
     flex-shrink: 0;
   }
-  .chartLegendSwatch-line,
-  .chartLegendSwatch-demand {
+  .chartLegendSwatch-line {
     width: 24px;
   }
   .chartLegendSwatch-line line {
@@ -4188,10 +4180,6 @@ $pane_header_height: 48px;
   .selectedFacilitySummary {
     background: var(--bg-selected);
     border-bottom: 1px solid var(--border-selected);
-  }
-
-  .chartLegendItem-muted {
-    opacity: 0.35;
   }
 
   .version {
@@ -8183,41 +8171,56 @@ option {
   margin-left: 4px;
   color: var(--interactive-strong);
 }
-.fuelPriceFilter {
+.fuelFilter {
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 4px 16px 8px;
   font-size: var(--font-size-body2);
   container-type: inline-size;
-  container-name: fuel-prices;
-  .fuelPriceFilterLabel {
+  container-name: fuel-filter;
+  .fuelFilterLabel {
     margin-right: 4px;
     color: var(--font-color-faded);
   }
-  .fuelPriceFilterOptions {
+  .fuelFilterOptions {
     display: flex;
     flex: 1;
     flex-wrap: wrap;
     min-width: 0;
     gap: 4px;
   }
-  .MuiButton-root {
+  .MuiButton-root,
+  .fuelFilterOverlay {
     gap: 8px;
     padding: 4px 8px;
     min-height: var(--control-size);
     border: 1px solid transparent;
     color: var(--font-color-primary);
-    &[aria-pressed="true"] {
-      border-color: var(--interactive-strong);
-      background: var(--bg-selected);
-      font-weight: 700;
-    }
     svg {
       width: 40px;
       height: 6px;
       flex-shrink: 0;
     }
+  }
+  .MuiButton-root[aria-pressed="true"] {
+    border-color: var(--interactive-strong);
+    background: var(--bg-selected);
+    font-weight: 700;
+  }
+  // What the fuels are stacked against. It sits among the controls but is no control, so it
+  // is quieter than they are and has no pressed state
+  .fuelFilterOverlay {
+    display: inline-flex;
+    align-items: center;
+    color: var(--font-color-faded);
+  }
+  .fuelFilterFill {
+    display: inline-block;
+    width: 16px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
   }
 }
 .insightsChartDialog {
@@ -8281,7 +8284,7 @@ option {
       flex-shrink: 0;
     }
   }
-  .fuelPriceFilter .MuiButton-root {
+  .fuelFilter .MuiButton-root {
     font-size: var(--font-size-body1);
   }
   .chartTooltip {
@@ -8293,16 +8296,17 @@ option {
   }
 }
 
-// Three named controls per row keep the fuel key to two rows on phones and narrow panes.
-// The sample sits above its name so the dash pattern stays long enough to recognize.
-@container fuel-prices (max-width: 568px) {
-  .fuelPriceFilterLabel {
+// Three named controls per row keep the fuel key short on phones and narrow panes. The sample
+// sits above its name so the dash pattern stays long enough to recognize.
+@container fuel-filter (max-width: 568px) {
+  .fuelFilterLabel {
     display: none;
   }
-  .fuelPriceFilter .fuelPriceFilterOptions {
+  .fuelFilter .fuelFilterOptions {
     display: grid;
     grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr));
-    .MuiButton-root {
+    .MuiButton-root,
+    .fuelFilterOverlay {
       flex-direction: column;
       justify-content: center;
       gap: 4px;

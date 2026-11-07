@@ -52,6 +52,8 @@ jest.mock("../base/GameCard", () => ({
 interface ChartMockProps {
   currentMinute?: number;
   selectedFuel?: string;
+  fuels?: string[];
+  highlightFuel?: string;
   title?: string;
   hideTitle?: boolean;
   format?: (value: number) => number | string;
@@ -66,10 +68,13 @@ const domainValue = (domain?: ChartMockProps["domain"]) =>
   JSON.stringify(Array.isArray(domain) ? domain : domain?.x);
 
 let mockSupplyDemandPaints = 0;
+// Bottom to top of the supply stack, as forecastFuels orders it
+let mockSupplyFuels: string[] = [];
 
 // Restore real timers even when a test that fakes them fails partway
 afterEach(() => {
   jest.useRealTimers();
+  mockSupplyFuels = [];
 });
 
 it("extends the full planning horizon when a successor takes over, including restored views", () => {
@@ -277,9 +282,16 @@ jest.mock("../base/ChartForecastDemandByType", () => ({
 }));
 jest.mock("../base/ChartForecastSupplyByFuel", () => ({
   __esModule: true,
-  forecastFuels: () => [],
-  default: ({ syncKey }: ChartMockProps) => (
-    <div role="img" data-chart="supply-by-fuel" data-sync-key={syncKey} />
+  forecastFuels: () => mockSupplyFuels,
+  default: ({ syncKey, fuels, highlightFuel }: ChartMockProps) => (
+    <div
+      role="img"
+      aria-label="Supply by fuel inspection"
+      data-chart="supply-by-fuel"
+      data-sync-key={syncKey}
+      data-fuels={fuels?.join(",")}
+      data-highlight={highlightFuel || ""}
+    />
   ),
 }));
 jest.mock("../base/ChartForecastSupplyDemand", () => ({
@@ -782,6 +794,67 @@ describe("Insights layers", () => {
     );
   });
 
+  it("narrows supply by fuel with the same selectable key as fuel prices", () => {
+    mockSupplyFuels = ["Coal", "Natural Gas", "Wind"];
+    localStorage.setItem("insightsLayers", JSON.stringify(["supplyByFuel"]));
+    renderInsights();
+    const key = screen.getByRole("group", { name: "Show supply by fuel" });
+    // Top of the stack first, as the bands read, then what they are stacked against
+    expect(
+      within(key)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["All fuels", "Wind", "Natural Gas", "Coal"]);
+    expect(within(key).getByText("Demand")).toBeVisible();
+    expect(
+      within(key).queryByRole("button", { name: "Demand" }),
+    ).not.toBeInTheDocument();
+    const chart = () =>
+      screen.getByRole("img", { name: "Supply by fuel inspection" });
+    expect(chart()).toHaveAttribute("data-fuels", "Coal,Natural Gas,Wind");
+    expect(
+      within(key).getByRole("button", { name: "All fuels" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(within(key).getByRole("button", { name: "Natural Gas" }));
+    expect(chart()).toHaveAttribute("data-fuels", "Natural Gas");
+    expect(
+      within(key).getByRole("button", { name: "Natural Gas" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(key).getByRole("button", { name: "All fuels" }),
+    ).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(within(key).getByRole("button", { name: "All fuels" }));
+    expect(chart()).toHaveAttribute("data-fuels", "Coal,Natural Gas,Wind");
+  });
+
+  it("returns supply by fuel to every fuel once the chosen one leaves the forecast", () => {
+    mockSupplyFuels = ["Coal", "Wind"];
+    localStorage.setItem("insightsLayers", JSON.stringify(["supplyByFuel"]));
+    const { rerender } = renderInsights();
+    fireEvent.click(screen.getByRole("button", { name: "Coal" }));
+    expect(
+      screen.getByRole("img", { name: "Supply by fuel inspection" }),
+    ).toHaveAttribute("data-fuels", "Coal");
+    mockSupplyFuels = ["Wind"];
+    // Selecting a facility is what makes the pane draw again
+    rerender(
+      <Insights
+        game={overviewGame}
+        selectedFacilityId={-1}
+        facilityDragActive={false}
+      />,
+    );
+    expect(
+      screen.getByRole("img", { name: "Supply by fuel inspection" }),
+    ).toHaveAttribute("data-fuels", "Wind");
+    expect(screen.getByRole("button", { name: "All fuels" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
   it("shows expanded finance rows and both rate graphs", () => {
     localStorage.setItem(
       "insightsLayers",
@@ -877,6 +950,9 @@ describe("Insights layers", () => {
     expect(
       within(track).getByRole("img", { name: /Monthly lowest reserve/ }),
     ).toBeInTheDocument();
+    // The tooltip names each month as recorded or projected; no key repeats it
+    expect(within(track).queryByText("Recorded")).not.toBeInTheDocument();
+    expect(within(track).queryByText("Projected")).not.toBeInTheDocument();
     const headings = screen.getAllByRole("heading", { level: 6 });
     expect(headings[1]).toHaveTextContent("Supply & Demand");
     expect(headings[2]).toHaveTextContent("Lowest reserve");

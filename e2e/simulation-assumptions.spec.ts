@@ -23,7 +23,7 @@ for (const theme of ["light", "dark"] as const) {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText("Loan option");
     await expect(dialog).not.toContainText("Payments start now");
-    await expect(dialog).toContainText("Estimated upkeep");
+    await expect(dialog).toContainText("Maintenance");
     expect(
       await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);

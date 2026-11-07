@@ -698,12 +698,9 @@ export function GeneratorBuildItem(
         loanMonths={facilityLoanMonths(quote.lifespanYears)}
         cashDisabled={!buildable}
         loanDisabled={!buildable}
+        cashLabel="Cash option"
+        upkeepLabel="Maintenance"
         upkeepPerMonth={estimatedAnnualOperatingCost(quote) / 12}
-        upkeepDetail={
-          fuelPrices[generator.fuel]
-            ? "Plus fuel and loan payments."
-            : "Plus loan payments."
-        }
         onlineInMonths={Math.round(generator.yearsToBuild * 12)}
         onPurchase={(financed) => {
           props.onBuild(financed, hasOptions ? resilienceSelection : undefined);
@@ -770,7 +767,7 @@ export function GeneratorBuildItem(
         extraFacts={[
           {
             concept: "supply",
-            label: "Typical output",
+            label: "Average output over a year",
             // The selected quote's trackers add their morning and evening energy
             value: `+${formatWatts(
               typicalOutputW *
@@ -778,9 +775,9 @@ export function GeneratorBuildItem(
                   ? TRACKER_ANNUAL_ENERGY_MULTIPLIER
                   : 1),
             )}`,
-            detail: waterShape
-              ? `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`
-              : `${formatWatts(generator.peakW)} max; weather may limit it.`,
+            ...(waterShape && {
+              detail: `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`,
+            }),
           },
           ...(sites
             ? [
@@ -801,7 +798,7 @@ export function GeneratorBuildItem(
             value:
               kgCO2ePerMWh > 0
                 ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
-                : "No direct emissions modeled",
+                : "None",
           },
         ]}
       />

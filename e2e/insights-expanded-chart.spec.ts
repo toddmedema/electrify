@@ -23,9 +23,13 @@ async function expectChartAxesInView(dialog: Locator) {
   }
 }
 
-async function expectMobileFuelLegend(container: Locator, page: Page) {
+async function expectMobileFuelLegend(
+  container: Locator,
+  page: Page,
+  name = "Show fuel prices",
+) {
   if (page.viewportSize()!.width > 600) return;
-  const legend = container.getByRole("group", { name: "Show fuel prices" });
+  const legend = container.getByRole("group", { name });
   await expect(legend.getByText("Show", { exact: true })).toBeHidden();
   await expect
     .poll(() =>
@@ -51,6 +55,41 @@ async function expectMobileFuelLegend(container: Locator, page: Page) {
       ),
     ).toBeLessThanOrEqual(1);
   }
+}
+
+/**
+ * The supply stack's key is the fuel price chart's selectable one, so it is held to the same
+ * touch targets and kept inside its pane; it also names demand without making it a choice.
+ */
+async function expectSelectableFuelKey(
+  container: Locator,
+  page: Page,
+  name: string,
+) {
+  const key = container.getByRole("group", { name });
+  await expect(key).toBeVisible();
+  await expect(
+    key.getByRole("button", { name: "All fuels", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(key.getByText("Demand", { exact: true })).toBeVisible();
+  await expect(
+    key.getByRole("button", { name: "Demand", exact: true }),
+  ).toHaveCount(0);
+  const minimumHeight = await page.evaluate(() =>
+    matchMedia("(pointer: coarse)").matches ? 44 : 40,
+  );
+  for (const button of await key.getByRole("button").all()) {
+    const bounds = (await button.boundingBox())!;
+    expect(bounds.height).toBeGreaterThanOrEqual(minimumHeight);
+    expect(
+      await button.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+  }
+  expect(
+    await key.evaluate((element) => element.scrollWidth - element.clientWidth),
+  ).toBeLessThanOrEqual(1);
 }
 
 async function expectLegendLayout(container: Locator) {
@@ -166,7 +205,11 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: `Expand ${name} chart`, exact: true })
         .click();
       const dialog = page.getByRole("dialog", { name, exact: true });
-      await expectLegendLayout(dialog);
+      if (name === "Supply by Fuel") {
+        await expectSelectableFuelKey(dialog, page, "Show supply by fuel");
+      } else {
+        await expectLegendLayout(dialog);
+      }
       await expectChartAxesInView(dialog);
       await dialog.getByRole("button", { name: `Close ${name} chart` }).click();
       await expect(dialog).toHaveCount(0);

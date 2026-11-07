@@ -14,10 +14,6 @@ export interface LegendItemType {
   color: string;
   /** SVG dash pattern, for series told apart by their line style as well as their colour */
   dash?: string | undefined;
-  /** Drawn as a rule rather than a block, for a series that is a line over the others */
-  rule?: boolean;
-  /** Faded back, for a series the chart itself is currently drawing faded back */
-  muted?: boolean;
   /** Matches a patterned area without borrowing the line styles used for forecasts. */
   pattern?: "hatch" | "vertical";
   /** Quiet base wash behind the pattern. */
@@ -37,12 +33,7 @@ export default function ChartLegend(props: Props): React.JSX.Element {
       className={"chartLegend" + (props.inline ? " chartLegend-inline" : "")}
     >
       {props.items.map((item) => (
-        <span
-          key={item.name}
-          className={
-            "chartLegendItem" + (item.muted ? " chartLegendItem-muted" : "")
-          }
-        >
+        <span key={item.name} className="chartLegendItem">
           {item.dash ? (
             <svg
               className="chartLegendSwatch chartLegendSwatch-line"
@@ -60,8 +51,6 @@ export default function ChartLegend(props: Props): React.JSX.Element {
                 strokeDasharray={item.dash}
               />
             </svg>
-          ) : item.rule ? (
-            <span className="chartLegendSwatch chartLegendSwatch-demand" />
           ) : (
             <span
               className={
