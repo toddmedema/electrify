@@ -814,10 +814,13 @@ export function fleetChartHeight(width: number, height: number): number {
 }
 
 function useFleetChartHeight(): number {
-  const measure = () =>
-    isTvLayout()
+  const measure = () => {
+    const height = isTvLayout()
       ? Math.round(220 * getTextScale())
       : fleetChartHeight(window.innerWidth, window.innerHeight);
+    // Split-screen keeps the daily plot 20% shorter to leave room for the fleet.
+    return window.electrifyCouch ? Math.round(height * 0.8) : height;
+  };
   const [height, setHeight] = React.useState(measure);
   React.useEffect(() => {
     const resize = () => setHeight(measure());

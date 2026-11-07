@@ -4,22 +4,15 @@ import { GameDate, YearProgressBar } from "../components/base/GameCalendar";
 import GameMenu from "../components/base/GameMenu";
 import { useOnline } from "../components/base/OnlineStatus";
 import MissionSummary from "../components/base/MissionSummary";
-import { buildSpeedOptions } from "../components/base/SpeedControls";
 import type {
   ActiveEventGroupType,
   UpcomingStoryEventType,
 } from "../components/views/StoryEventSelectors";
-import type { EvidenceTargetType, GameType, SpeedType } from "../Types";
-import type { CouchSummary } from "./Protocol";
+import type { EvidenceTargetType, GameType } from "../Types";
 import "./Toolbar.scss";
 
 export interface CouchToolbarProps {
   game: GameType;
-  players: CouchSummary["players"];
-  effectiveSpeed: SpeedType;
-  readyRequired: boolean;
-  ready: string[];
-  reason: string;
   menuOpen: boolean;
   menuFooter?: ReactNode;
   online?: boolean;
@@ -27,21 +20,15 @@ export interface CouchToolbarProps {
   activeEvents?: ActiveEventGroupType[];
   onMenuOpen: () => void;
   onMenuClose: () => void;
-  onSpeed: (seatId: string, speed: SpeedType) => void;
   onManual: () => void;
   onSettings: () => void;
   onSaveQuit: () => void;
   onEvidence?: (target: EvidenceTargetType) => void;
 }
 
-/** One calendar/menu serves the match; each player's speed remains an independent selection. */
+/** One calendar/menu serves the match; company controls live in each player's pane. */
 export default function CouchToolbar({
   game,
-  players,
-  effectiveSpeed,
-  readyRequired,
-  ready,
-  reason,
   menuOpen,
   menuFooter,
   online,
@@ -49,7 +36,6 @@ export default function CouchToolbar({
   activeEvents,
   onMenuOpen,
   onMenuClose,
-  onSpeed,
   onManual,
   onSettings,
   onSaveQuit,
@@ -83,36 +69,6 @@ export default function CouchToolbar({
               onEvidence={onEvidence}
               eventsOnly
             />
-          </div>
-          <div className="couchPlayerSpeeds">
-            {players.map((player, index) => (
-              <div
-                key={player.id}
-                className="couchPlayerSpeed"
-                role="group"
-                aria-label={`P${index + 1} speed controls`}
-                data-seat-id={player.id}
-              >
-                <span className="couchSpeedPlayer" title={player.name}>
-                  P{index + 1}
-                  {player.retired ? " · Retired" : ""}
-                </span>
-                {buildSpeedOptions({
-                  speed: player.selectedSpeed,
-                  desktop: true,
-                  disabled: player.retired || menuOpen,
-                  onSpeedChange: (speed) => onSpeed(player.id, speed),
-                  multiplayer: {
-                    activeSpeed: effectiveSpeed,
-                    players: players.filter((seat) => !seat.retired),
-                    selfId: player.id,
-                    reason,
-                    readyRequired,
-                    ready: ready.includes(player.id),
-                  },
-                })}
-              </div>
-            ))}
           </div>
         </Toolbar>
       </div>

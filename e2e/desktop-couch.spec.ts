@@ -71,7 +71,7 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
         { id: "local-p2", name: "South Power" },
       ],
       zoom: 1.5,
-      inset: 16,
+      inset: 0,
       gutter: 8,
       bandHeight: 96,
     }),
@@ -121,6 +121,7 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
           view.webContents !== window.webContents,
       );
       return {
+        contentSize: window.getContentSize(),
         shellZoom: window.webContents.getZoomFactor(),
         separateSessions:
           views[0].webContents.session !== views[1].webContents.session &&
@@ -147,7 +148,12 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
     expect(seat.protocol).toBe("electrify:");
     expect(seat.bounds.width / seat.zoom).toBeGreaterThanOrEqual(360);
     expect(seat.bounds.y).toBe(96);
+    expect(seat.bounds.y + seat.bounds.height).toBe(native.contentSize[1]);
   }
+  expect(native.seats[0].bounds.x).toBe(0);
+  expect(native.seats[1].bounds.x + native.seats[1].bounds.width).toBe(
+    native.contentSize[0],
+  );
   expect(native.seats[0].bounds.x + native.seats[0].bounds.width).toBeLessThan(
     native.seats[1].bounds.x,
   );

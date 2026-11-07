@@ -11,11 +11,19 @@ Each controller explicitly joins a company. P1 chooses an existing co-op scenari
 or custom game; both players confirm that selection. The campaign roster then
 stays fixed. An assigned controller controls only its company's document. The
 shared bar reuses the single-player calendar and year progress, upcoming event
-and months-left display. Each player has an independent on-screen speed selector;
-the slowest selection wins. Start opens one shared three-dot menu and pauses the
+and months-left display. Each player has an independent speed selector in their
+pane; the slowest selection wins. Start opens one shared three-dot menu and pauses the
 match for everyone. The requesting controller's complete bindings appear along
 the bottom while that menu is open. Player panes keep cash and grid state, with
 icon-only navigation and no duplicate menu, calendar, event or control-hint bars.
+The panes fill the left, right and bottom edges, retaining only the center separator.
+The daily supply/demand plot is 20% shorter in split-screen to leave more room
+for the fleet.
+
+Prompts prefer Steam's controller glyphs. When Steam supplies only a physical
+control label, recognized labels use a small CC0 SVG subset from
+[Kenney Input Prompts](https://kenney.nl/assets/input-prompts). Unknown bindings
+keep their text labels; icons are never guessed from an action's default binding.
 
 The native model and save format support two to four companies, but the UI rejects
 three and four until their release gates pass. It also refuses a layout below

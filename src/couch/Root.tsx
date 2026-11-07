@@ -80,7 +80,6 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const [textOwner, setTextOwner] = useState<string>();
   const [settingsOwner, setSettingsOwner] = useState<string>();
   const [sessionFault, setSessionFault] = useState(false);
-  const [blockers, setBlockers] = useState<readonly string[]>([]);
   const globalRequest = useRef<{
     kind: "leave" | "settings" | "text" | "menu" | "manual";
     seatId: string;
@@ -687,7 +686,6 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         },
       });
       coordinator.current = owner;
-      owner.subscribe(() => setBlockers(owner.getSnapshot().blockers));
       if (saved) owner.restore(saved, crypto.randomUUID());
       else owner.start(spec!, seats, crypto.randomUUID(), crypto.randomUUID());
       await new Promise<void>((resolve, reject) => {
@@ -719,7 +717,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       await request({
         kind: "open",
         seats,
-        inset: 24,
+        inset: 0,
         gutter: 8,
         bandHeight: Math.ceil(
           band.current?.getBoundingClientRect().height ?? 96,
@@ -872,21 +870,9 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           {sharedGame && summary && (
             <CouchToolbar
               game={sharedGame}
-              players={summary.players}
-              effectiveSpeed={summary.speed}
-              readyRequired={summary.readyRequired}
-              ready={summary.ready}
-              reason={[summary.reason, ...blockers].filter(Boolean).join(" · ")}
               menuOpen={!!menuOwner}
               onMenuOpen={() => openMenu()}
               onMenuClose={() => cancelGlobal("Menu closed")}
-              onSpeed={(id, speed) => {
-                if (!globalRequest.current)
-                  coordinator.current?.commandForSeat(id, {
-                    kind: "speed",
-                    speed,
-                  });
-              }}
               onSettings={() => menuAction("settings")}
               onManual={() => menuAction("manual")}
               onSaveQuit={() => menuAction("leave")}

@@ -6,7 +6,7 @@ const SEAT_IDS = ["local-p1", "local-p2", "local-p3", "local-p4"];
 /** Coordinates are DIPs; CSS dimensions are computed only after zoom. */
 function couchLayout(width, height, count, options = {}) {
   const zoom = options.zoom ?? Math.max(1.5, height / 720);
-  const inset = options.inset ?? 16;
+  const inset = options.inset ?? 0;
   const gutter = options.gutter ?? 8;
   const bandHeight = options.bandHeight ?? 96;
   if (
@@ -26,9 +26,8 @@ function couchLayout(width, height, count, options = {}) {
     bandHeight > 600
   )
     throw new Error("Invalid couch layout");
-  const seatWidth = Math.floor(
-    (width - inset * 2 - gutter * (count - 1)) / count,
-  );
+  const availableWidth = width - inset * 2 - gutter * (count - 1);
+  const seatWidth = Math.floor(availableWidth / count);
   const seatHeight = Math.floor(height - bandHeight - inset);
   const fits = seatWidth / zoom >= 360 && seatHeight / zoom >= 360;
   return {
@@ -39,12 +38,22 @@ function couchLayout(width, height, count, options = {}) {
     bandHeight,
     cssWidth: seatWidth / zoom,
     cssHeight: seatHeight / zoom,
-    bounds: Array.from({ length: count }, (_, i) => ({
-      x: Math.round(inset + i * (seatWidth + gutter)),
-      y: Math.round(bandHeight),
-      width: Math.max(0, seatWidth),
-      height: Math.max(0, seatHeight),
-    })),
+    bounds: Array.from({ length: count }, (_, i) => {
+      // Partition the remainder too, so an odd window width leaves no strip at
+      // the right edge and the center separator keeps its requested width.
+      const left = Math.round(
+        inset + (i * availableWidth) / count + i * gutter,
+      );
+      const right = Math.round(
+        inset + ((i + 1) * availableWidth) / count + i * gutter,
+      );
+      return {
+        x: left,
+        y: Math.round(bandHeight),
+        width: Math.max(0, right - left),
+        height: Math.max(0, seatHeight),
+      };
+    }),
   };
 }
 

@@ -1,4 +1,4 @@
-:is(.base_main, .couchSharedToolbar) {
+.base_main {
   // Which speed the clock is running at, said as a selection rather than as three enabled
   // buttons and one greyed-out one - disabled reads as "you can't have this", not "you're on it"
   // Selection uses a surface change; every enabled speed remains a blue control.

@@ -29,22 +29,3 @@
     }
   }
 }
-.couchPlayerSpeeds {
-  display: flex;
-  gap: 16px;
-  margin-left: auto;
-  flex-wrap: wrap;
-}
-.couchPlayerSpeed {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  .MuiToggleButton-root {
-    min-height: 40px;
-    min-width: 40px;
-  }
-}
-.couchSpeedPlayer {
-  font-weight: 600;
-  white-space: nowrap;
-}

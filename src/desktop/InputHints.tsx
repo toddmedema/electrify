@@ -9,6 +9,7 @@ import {
   subscribeInputPresentation,
 } from "./InputPresentation";
 import { editableTextControl } from "./InputText";
+import ControllerGlyph from "./ControllerGlyph";
 import "./Input.scss";
 
 const menuHints: [DesktopInputAction, string][] = [
@@ -128,12 +129,10 @@ function glyphHint(
   if (!glyph && !showUnbound) return null;
   return (
     <span className="controllerHint" key={action}>
-      {glyph?.image ? (
-        <img src={glyph.image} alt={glyph.label} />
+      {glyph ? (
+        <ControllerGlyph glyph={glyph} />
       ) : (
-        <span className="controllerHintBinding">
-          {glyph?.label ?? "Unbound"}
-        </span>
+        <span className="controllerHintBinding">Unbound</span>
       )}
       <span>{label}</span>
     </span>

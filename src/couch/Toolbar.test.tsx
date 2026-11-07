@@ -8,28 +8,9 @@ import CouchToolbar, { CouchToolbarProps } from "./Toolbar";
 function props(overrides: Partial<CouchToolbarProps> = {}): CouchToolbarProps {
   return {
     game: createGame({ scenarioId: 101 }),
-    players: [
-      {
-        id: "local-p1",
-        name: "North Power",
-        selectedSpeed: "FAST",
-        retired: false,
-      },
-      {
-        id: "local-p2",
-        name: "South Power",
-        selectedSpeed: "NORMAL",
-        retired: false,
-      },
-    ],
-    effectiveSpeed: "NORMAL",
-    readyRequired: false,
-    ready: [],
-    reason: "",
     menuOpen: false,
     onMenuOpen: jest.fn(),
     onMenuClose: jest.fn(),
-    onSpeed: jest.fn(),
     onManual: jest.fn(),
     onSettings: jest.fn(),
     onSaveQuit: jest.fn(),
@@ -45,7 +26,7 @@ function show(value: CouchToolbarProps) {
   );
 }
 
-it("shows one shared calendar and independent labelled speed selections", () => {
+it("shows one shared calendar while speed controls stay in the player panes", () => {
   const value = props();
   show(value);
   expect(screen.getAllByRole("button", { name: "menu" })).toHaveLength(1);
@@ -58,45 +39,11 @@ it("shows one shared calendar and independent labelled speed selections", () => 
       exact: false,
     }),
   ).toBeVisible();
-  const p1 = screen.getByRole("group", {
-    name: "P1 speed controls",
-  });
-  const p2 = screen.getByRole("group", {
-    name: "P2 speed controls",
-  });
-  expect(
-    within(p1).getByRole("button", { name: "fast speed" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  expect(
-    within(p2).getByRole("button", { name: "normal speed" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  fireEvent.click(within(p2).getByRole("button", { name: "slow speed" }));
-  expect(value.onSpeed).toHaveBeenCalledWith("local-p2", "SLOW");
-  expect(
-    within(p1).getByRole("button", { name: "fast speed" }),
-  ).toHaveAttribute("aria-pressed", "true");
+  expect(screen.queryAllByRole("group", { name: /speed/ })).toHaveLength(0);
   expect(screen.queryByText(/On this TV|Unranked|Last local save/)).toBeNull();
   expect(
     screen.queryByRole("button", { name: "Save & Quit for everyone" }),
   ).toBeNull();
-});
-
-it("keeps retired companies labelled but disables their speed controls", () => {
-  const value = props();
-  value.players[0].retired = true;
-  show(value);
-  const p1 = screen.getByRole("group", {
-    name: "P1 speed controls",
-  });
-  for (const button of within(p1).getAllByRole("button"))
-    expect(button).toBeDisabled();
-  expect(within(p1).getByText("P1 · Retired")).toBeVisible();
-  expect(
-    within(screen.getByRole("group", { name: "P2 speed controls" })).getByRole(
-      "button",
-      { name: "normal speed" },
-    ),
-  ).toBeEnabled();
 });
 
 it("shows common upcoming events even when the first company has a cash warning", () => {

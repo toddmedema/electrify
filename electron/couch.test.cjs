@@ -12,11 +12,30 @@ const seats = [
   { id: "local-p2", name: "Two" },
 ];
 
-test("couch layout accounts for DIP insets/gutters before applying readable zoom", () => {
+test("couch layout fills the outer edges while retaining a center gutter and readable zoom", () => {
   const layout = couchLayout(1920, 1080, 2);
   assert.equal(layout.fits, true);
-  assert.equal(layout.cssWidth, 940 / 1.5);
-  assert.equal(layout.bounds[1].x + layout.bounds[1].width, 1904);
+  assert.equal(layout.cssWidth, 956 / 1.5);
+  for (const [width, height, count] of [
+    [1920, 1080, 2],
+    [1921, 1081, 2],
+    [1921, 1081, 3],
+    [1921, 1081, 4],
+    [3840, 2160, 2],
+  ]) {
+    const edgeToEdge = couchLayout(width, height, count);
+    const last = edgeToEdge.bounds.at(-1);
+    assert.equal(edgeToEdge.bounds[0].x, 0);
+    assert.equal(last.x + last.width, width);
+    for (const bounds of edgeToEdge.bounds)
+      assert.equal(bounds.y + bounds.height, height);
+    for (let i = 1; i < edgeToEdge.bounds.length; i++)
+      assert.equal(
+        edgeToEdge.bounds[i].x -
+          (edgeToEdge.bounds[i - 1].x + edgeToEdge.bounds[i - 1].width),
+        edgeToEdge.gutter,
+      );
+  }
   const four = couchLayout(1920, 1080, 4, {
     inset: 24,
     gutter: 8,
@@ -28,7 +47,7 @@ test("couch layout accounts for DIP insets/gutters before applying readable zoom
     couchLayout(1920, 1080, 2).cssWidth,
     couchLayout(3840, 2160, 2, {
       zoom: 3,
-      inset: 32,
+      inset: 0,
       gutter: 16,
       bandHeight: 192,
     }).cssWidth,

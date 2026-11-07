@@ -392,16 +392,18 @@ export function GameAppBar(props: Props) {
    */
   // Layout and speed availability must use the same media-query snapshot during resize.
   const desktop = singleRow || tvMode;
+  const speedDisabled = !!multiplayer?.ending;
   const speedOptions = React.useMemo(
     () =>
       buildSpeedOptions({
         speed,
         onSpeedChange,
         desktop,
+        disabled: speedDisabled,
         multiplayer: sharedClockSpeedProps(multiplayer),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [speed, onSpeedChange, desktop, clock, multiplayer?.seat],
+    [speed, onSpeedChange, desktop, speedDisabled, clock, multiplayer?.seat],
   );
   // A window narrowed below desktop width loses the ULTRA button, so it can't stay the selected
   // speed. Re-checked whenever the speed changes too: a card that paused the clock can restore
@@ -598,9 +600,7 @@ export function GameAppBar(props: Props) {
             {!couchSeat && <GameDate date={date} showTime={bigScreen} />}
           </Typography>
           {singleRow && statusRow}
-          {!window.electrifyCouch && (
-            <div id="speedChangeButtons">{speedOptions}</div>
-          )}
+          <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
       </div>
       {!isTutorial && props.saveState === "failed" && (

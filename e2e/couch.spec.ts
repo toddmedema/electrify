@@ -41,32 +41,23 @@ async function startCouch<Actor extends Page | Frame>(
   await expect.poll(() => couch.seats.size).toBe(2);
 }
 
-const speedControls = (page: Page, player: "P1" | "P2") =>
-  page.getByRole("group", { name: `${player} speed controls`, exact: true });
-const clock = (page: Page, player: "P1" | "P2") =>
-  // MUI's modal menu correctly hides toolbar siblings from AT. Read the clock's
-  // rendered state behind that modal while all interaction queries stay visible-only.
-  page
-    .getByRole("group", {
-      name: `${player} speed controls`,
-      exact: true,
-      includeHidden: true,
-    })
-    .getByRole("group", {
-      name: "your game speed",
-      exact: true,
-      includeHidden: true,
-    });
-async function runNormally(page: Page) {
-  for (const player of ["P1", "P2"] as const)
-    await speedControls(page, player)
+const speedControls = (seat: Page | Frame) =>
+  seat.getByRole("group", { name: "your game speed", exact: true });
+const clock = (seat: Page | Frame) =>
+  // The global overlay hides embedded player views. Read their rendered clock
+  // state while all interaction queries remain visible-only.
+  seat.getByRole("group", {
+    name: "your game speed",
+    exact: true,
+    includeHidden: true,
+  });
+async function runNormally(...seats: (Page | Frame)[]) {
+  for (const seat of seats)
+    await speedControls(seat)
       .getByRole("button", { name: "normal speed", exact: true })
       .click();
-  for (const player of ["P1", "P2"] as const)
-    await expect(clock(page, player)).toHaveAttribute(
-      "data-active-speed",
-      "NORMAL",
-    );
+  for (const seat of seats)
+    await expect(clock(seat)).toHaveAttribute("data-active-speed", "NORMAL");
 }
 async function expectSeatChromeRemoved(seat: Page | Frame) {
   await expect(seat.locator(".couchIdentity")).toHaveCount(0);
@@ -75,6 +66,13 @@ async function expectSeatChromeRemoved(seat: Page | Frame) {
   await expect(seat.locator(".missionSummary")).toHaveCount(0);
   await expect(seat.locator(".controllerHints")).toHaveCount(0);
   await expect(seat.locator(".gameDockLabel")).toHaveCount(0);
+  await expect(speedControls(seat)).toBeVisible();
+  await expect(
+    seat.locator("#appbar").getByRole("group", {
+      name: "your game speed",
+      exact: true,
+    }),
+  ).toHaveCount(1);
   for (const name of ["Build", "Programs", "Insights", "Events", "Scenario"])
     await expect(seat.getByRole("button", { name, exact: true })).toBeVisible();
 }
@@ -99,6 +97,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     );
   }
   await expect(page.locator(".appFrameBody")).toBeHidden();
+  await expect(speedControls(page)).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "menu", exact: true }),
   ).toHaveCount(1);
@@ -106,7 +105,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await expect(page.locator(".missionSummary")).toBeVisible();
   await expectSeatChromeRemoved(p1);
   await expectSeatChromeRemoved(p2);
-  await runNormally(page);
+  await runNormally(p1, p2);
   await expect.poll(() => couch.checkpoint()?.grids.length).toBe(2);
   const originalCounts = couch
     .checkpoint()!
@@ -155,14 +154,8 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await couch.input({ "101": ["menu"] });
   const gameMenu = page.getByRole("menu", { name: "Game menu", exact: true });
   await expect(gameMenu).toBeVisible();
-  await expect(clock(page, "P1")).toHaveAttribute(
-    "data-active-speed",
-    "PAUSED",
-  );
-  await expect(clock(page, "P2")).toHaveAttribute(
-    "data-active-speed",
-    "PAUSED",
-  );
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
+  await expect(clock(p2)).toHaveAttribute("data-active-speed", "PAUSED");
   await expect(
     page.getByRole("complementary", {
       name: "Controller controls",
@@ -170,11 +163,13 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("complementary", {
-      name: "Controller controls",
-      exact: true,
-    }),
-  ).toContainText("Right stick up");
+    page
+      .getByRole("complementary", {
+        name: "Controller controls",
+        exact: true,
+      })
+      .getByRole("img", { name: "Right stick up", exact: true }),
+  ).toBeVisible();
   await gameMenu
     .getByRole("menuitem", { name: "Settings", exact: true })
     .click();
@@ -297,7 +292,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   ).toEqual(complete.grids.map((grid) => grid.facilities.length));
 });
 
-test("TV couch shared toolbar owns speed, menu pauses and full-window presentation", async ({
+test("TV couch player toolbars own speed with edge-to-edge panes and global pause", async ({
   context,
   page,
 }, info) => {
@@ -314,6 +309,7 @@ test("TV couch shared toolbar owns speed, menu pauses and full-window presentati
     await expectSeatChromeRemoved(seat);
   }
   await expect(page.locator(".appFrameBody")).toBeHidden();
+  await expect(speedControls(page)).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "menu", exact: true }),
   ).toHaveCount(1);
@@ -334,27 +330,24 @@ test("TV couch shared toolbar owns speed, menu pauses and full-window presentati
   await expect(
     page.getByRole("button", { name: "Save & Quit for everyone", exact: true }),
   ).toHaveCount(0);
-  await runNormally(page);
-  await speedControls(page, "P1")
+  await runNormally(p1, p2);
+  await speedControls(p1)
     .getByRole("button", { name: "fast speed", exact: true })
     .click();
   await expect(
-    speedControls(page, "P1").getByRole("button", {
+    speedControls(p1).getByRole("button", {
       name: "fast speed",
       exact: true,
     }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
-    speedControls(page, "P2").getByRole("button", {
+    speedControls(p2).getByRole("button", {
       name: "normal speed",
       exact: true,
     }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(clock(page, "P1")).toHaveAttribute(
-    "data-active-speed",
-    "NORMAL",
-  );
-  const selectedStyle = await speedControls(page, "P1")
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "NORMAL");
+  const selectedStyle = await speedControls(p1)
     .getByRole("button", { name: "fast speed", exact: true })
     .evaluate((button) => {
       const probe = document.createElement("span");
@@ -368,24 +361,39 @@ test("TV couch shared toolbar owns speed, menu pauses and full-window presentati
   expect(selectedStyle.actual).toBe(selectedStyle.expected);
   await expect
     .poll(() =>
-      speedControls(page, "P1")
+      speedControls(p1)
         .getByRole("button", { name: "normal speed", exact: true })
         .evaluate(
           (button) => getComputedStyle(button, "::before").borderTopWidth,
         ),
     )
     .toBe("2px");
-  await speedControls(page, "P2")
+  await speedControls(p2)
     .getByRole("button", { name: "slow speed", exact: true })
     .click();
-  await expect(clock(page, "P1")).toHaveAttribute("data-active-speed", "SLOW");
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "SLOW");
   await expect(
-    speedControls(page, "P1").getByRole("button", {
+    speedControls(p1).getByRole("button", {
       name: "fast speed",
       exact: true,
     }),
   ).toHaveAttribute("aria-pressed", "true");
-  await runNormally(page);
+  await runNormally(p1, p2);
+  // The couch daily plot uses 176 design px, 20% below solo's 220. Larger
+  // text is already enabled by the real fixture, making its visible height 220 px.
+  for (const seat of [p1, p2]) {
+    await expect(seat.locator("html")).toHaveAttribute(
+      "data-text-size",
+      "larger",
+    );
+    const dailyChart = seat.locator(".facilitySupplyChart .accessibleChart");
+    await expect(dailyChart).toBeVisible();
+    await expect
+      .poll(() =>
+        dailyChart.evaluate((chart) => chart.getBoundingClientRect().height),
+      )
+      .toBe(220);
+  }
   await p2.getByRole("button", { name: "Insights", exact: true }).click();
   await expect(p2.locator(".insights:visible .uplot").first()).toBeVisible();
   await p2.locator(".insights:visible .uplot").first().scrollIntoViewIfNeeded();
@@ -405,10 +413,25 @@ test("TV couch shared toolbar owns speed, menu pauses and full-window presentati
       1,
     );
   }
-  for (const bounds of layout!.bounds) {
-    expect(bounds.y).toBeGreaterThanOrEqual(Math.ceil(band!.y + band!.height));
-    expect(bounds.x + bounds.width).toBeLessThanOrEqual(1920);
-    expect(bounds.y + bounds.height).toBeLessThanOrEqual(1080);
+  expect(layout!.bounds[0].x).toBe(0);
+  expect(layout!.bounds[1].x + layout!.bounds[1].width).toBe(1920);
+  expect(layout!.bounds[1].x).toBeGreaterThan(
+    layout!.bounds[0].x + layout!.bounds[0].width,
+  );
+  for (const [index, bounds] of layout!.bounds.entries()) {
+    expect(bounds.y).toBe(Math.ceil(band!.y + band!.height));
+    expect(bounds.y + bounds.height).toBe(1080);
+    const rendered = await page
+      .locator(`#couch-fixture-local-p${index + 1}`)
+      .boundingBox();
+    expect(rendered).not.toBeNull();
+    expect(rendered!.x).toBeCloseTo(bounds.x, 1);
+    expect(rendered!.y).toBeCloseTo(bounds.y, 1);
+    expect(rendered!.x + rendered!.width).toBeCloseTo(
+      bounds.x + bounds.width,
+      1,
+    );
+    expect(rendered!.y + rendered!.height).toBeCloseTo(1080, 1);
   }
   if (process.env.REVIEW_SCREENSHOT_DIR)
     await page.screenshot({
@@ -427,29 +450,18 @@ test("TV couch shared toolbar owns speed, menu pauses and full-window presentati
       exact: true,
     }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("complementary", {
-      name: "Controller controls",
-      exact: true,
-    }),
-  ).toContainText("Cross");
-  await expect(
-    page.getByRole("complementary", {
-      name: "Controller controls",
-      exact: true,
-    }),
-  ).toContainText("Options");
-  await expect(
-    page.getByRole("complementary", {
-      name: "Controller controls",
-      exact: true,
-    }),
-  ).toContainText("Right stick up");
-  for (const player of ["P1", "P2"] as const)
-    await expect(clock(page, player)).toHaveAttribute(
-      "data-active-speed",
-      "PAUSED",
-    );
+  const legend = page.getByRole("complementary", {
+    name: "Controller controls",
+    exact: true,
+  });
+  // The native fixture intentionally supplies labels without images. Recognized
+  // bindings still need visible icons with their actual accessible origin names.
+  for (const name of ["Cross", "Options", "Right stick up", "Right stick down"])
+    await expect(legend.getByRole("img", { name, exact: true })).toBeVisible();
+  for (const action of ["Game menu", "Pause / resume", "Slower", "Faster"])
+    await expect(legend.getByText(action, { exact: true })).toBeVisible();
+  for (const seat of [p1, p2])
+    await expect(clock(seat)).toHaveAttribute("data-active-speed", "PAUSED");
   await couch.input({ "101": ["build"] });
   await expect(
     p1.getByRole("region", { name: "Build", exact: true }),
@@ -471,11 +483,8 @@ test("TV couch shared toolbar owns speed, menu pauses and full-window presentati
       exact: true,
     }),
   ).toHaveCount(0);
-  for (const player of ["P1", "P2"] as const)
-    await expect(clock(page, player)).toHaveAttribute(
-      "data-active-speed",
-      "NORMAL",
-    );
+  for (const seat of [p1, p2])
+    await expect(clock(seat)).toHaveAttribute("data-active-speed", "NORMAL");
   await expect(
     p1.getByRole("region", { name: "Build", exact: true }),
   ).toHaveCount(0);
