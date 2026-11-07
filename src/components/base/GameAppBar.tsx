@@ -60,7 +60,7 @@ import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus } from "./useMenuKeys";
 
 /**
- * The game's global state: cash, monthly profit on wide screens, the date, speed, year progress,
+ * The game's global state: cash, monthly profit, the date, speed, year progress,
  * and whether the lights are currently out.
  *
  * This used to live inside whichever pane happened to be showing, which on desktop meant all of
@@ -68,7 +68,7 @@ import { restoreMenuFocus } from "./useMenuKeys";
  * so it spans the app instead -- one bar above the panes on desktop, and the card's own header
  * on a phone, where there is only ever one pane anyway.
  *
- * Narrower windows stack it in two rows: cash, date and speed above, then the grid readout and
+ * Narrower windows stack it in two rows: cash, profit, date and speed above, then the grid readout and
  * the mission. Once the workspace has room for side columns those rows fold into one bar, in the
  * order a player checks them: cash, profit and date, the grid, the mission (the only part that
  * gives up width), then the speed controls pinned right where they always are.
@@ -331,22 +331,18 @@ export function GameAppBar(props: Props) {
   const tvMode = useTvLayout();
   const wideRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
   const singleRow = wideRow && !tvMode;
-  const showProfit = useMediaQuery("(min-width:700px)", { noSsr: true });
   const roomForStatusText = useMediaQuery("(min-width:600px)", { noSsr: true });
   const monthlyProfit = React.useMemo(
     () =>
-      showProfit
-        ? deriveExpandedSummary(
-            summarizeTimeline(
-              game.timeline,
-              game.startingYear,
-              (tick) =>
-                Math.floor(tick.minute / MINUTES_PER_MONTH) ===
-                date.monthsElapsed,
-            ),
-          ).profit
-        : 0,
-    [showProfit, game.timeline, game.startingYear, date.monthsElapsed],
+      deriveExpandedSummary(
+        summarizeTimeline(
+          game.timeline,
+          game.startingYear,
+          (tick) =>
+            Math.floor(tick.minute / MINUTES_PER_MONTH) === date.monthsElapsed,
+        ),
+      ).profit,
+    [game.timeline, game.startingYear, date.monthsElapsed],
   );
   // Crossing the breakpoint moves the status row to another parent, which remounts its
   // controls; a player tabbed onto one keeps their place rather than dropping to the page.
@@ -590,12 +586,12 @@ export function GameAppBar(props: Props) {
         <Toolbar className={inBlackout ? "blackout-pulsing" : ""}>
           {menu}
           <Typography variant="h6" className="gameStatus">
-            <span
-              className={`gameStatusValue${now.cash < 0 ? " gameCashNegative" : ""}`}
-            >
-              {formatMoneyStable(now.cash)}
-            </span>
-            {showProfit && (
+            <span className="gameBalance">
+              <span
+                className={`gameStatusValue${now.cash < 0 ? " gameCashNegative" : ""}`}
+              >
+                {formatMoneyStable(now.cash)}
+              </span>
               <Tooltip title="Current month forecast: revenue minus operating expenses, including interest and imports.">
                 <Typography
                   // Tutorials lock navigation, so the figure opens nothing there.
@@ -620,7 +616,7 @@ export function GameAppBar(props: Props) {
                   {formatMoneyStable(monthlyProfit)}/mo
                 </Typography>
               </Tooltip>
-            )}
+            </span>
             <span className="weak gameStatusValue">
               {/* One inline run, so the flex gap doesn't open before the comma. */}
               <span>

@@ -121,9 +121,9 @@ describe("GameAppBar", () => {
     },
   );
 
-  it("keeps the profit forecast out of the phone top bar", () => {
+  it("shows the profit forecast in the phone top bar", () => {
     renderAppBar();
-    expect(screen.queryByLabelText(/^Monthly profit forecast/)).toBeNull();
+    expect(screen.getByLabelText(/^Monthly profit forecast/)).toBeVisible();
   });
   it("opens the feedback form directly from the game menu", () => {
     const open = jest.spyOn(window, "open").mockImplementation(() => null);
