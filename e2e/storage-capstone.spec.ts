@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
 import { dragCoalAbovePumpedHydro, waitForSettled } from "./layout";
 
@@ -41,6 +42,10 @@ for (const theme of ["light", "dark"]) {
       .click();
     await page.getByRole("button", { name: "Take loan", exact: true }).click();
     await expect(hud).toContainText("Check the storage bar");
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`storage-units-${theme}.png`),
+      animations: "disabled",
+    });
     await hud.getByRole("button", { name: "Next", exact: true }).click();
     await expect(hud).toContainText("Drag Coal above Pumped Hydro");
     await dragCoalAbovePumpedHydro(page);
@@ -50,10 +55,18 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("tab", { name: "Storage", exact: true }).click();
     await waitForSettled(page, ".constructionCapacitySlider");
     const size = page.locator(".constructionCapacitySlider input");
-    // The practice purchase was 500 MWh. A 200 MWh battery can cover this grid's peaks.
-    await size.press("ArrowLeft");
-    await size.press("ArrowLeft");
-    await size.press("ArrowLeft");
+    // The capstone sizes its first storage project from the coal plant. Select
+    // 200 MWh explicitly rather than assuming it kept the practice grid's size.
+    for (let step = 0; step < 37; step++) {
+      if (
+        await page
+          .getByRole("slider", { name: "Capacity 200MWh", exact: true })
+          .count()
+      )
+        break;
+      await size.press("ArrowLeft");
+    }
+    await expect(size).toHaveAccessibleName("Capacity 200MWh");
     await page
       .getByRole("button", {
         name: "Review purchase of Lithium Battery",

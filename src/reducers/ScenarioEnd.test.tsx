@@ -1,5 +1,6 @@
 import { projectAuthoredRunReference } from "../helpers/RunIdentity";
 import { createNextState as produce } from "@reduxjs/toolkit";
+import cloneDeep from "lodash.clonedeep";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
 import { getPlayedScenarioIds } from "../LocalStorage";
@@ -425,5 +426,49 @@ describe("finishing a tutorial", () => {
     expect(completed.ui.snackbar.open).toBe(false);
     expect(completed.game.speed).toBe("PAUSED");
     expect(getPlayedScenarioIds()).toContain(tutorial.id);
+  });
+
+  it("lets storage construction outlast two years and completes after a fully supplied day", () => {
+    window.localStorage.clear();
+    const mission = TUTORIALS.find((scenario) => scenario.id === 2)!;
+    const capstoneIndex = mission.tutorialSteps!.findIndex(
+      (step) => step.capstone,
+    );
+    const objective = mission.tutorialSteps![capstoneIndex].capstone!;
+    let state = createGame({
+      scenarioId: mission.id,
+      scenario: { ...mission, facilities: objective.checkpoint!.facilities! },
+      difficulty: "Employee",
+      initialBuild: { name: "Pumped Hydro", peakWh: 1e9, financed: true },
+    });
+    state.tutorialStep = capstoneIndex;
+    expect(
+      state.facilities.find((facility) => facility.name === "Pumped Hydro")!
+        .yearsToBuildLeft,
+    ).toBeGreaterThan(2);
+    while (state.date.monthsElapsed < 23) state = tick(state);
+
+    playOutOnTheStore(state, 24);
+    jest.runOnlyPendingTimers();
+    const continuing = getStore().getState();
+    expect(continuing.game.tutorialStep).toBe(capstoneIndex);
+    expect(continuing.ui.dialog.open).toBe(false);
+    expect(getPlayedScenarioIds()).not.toContain(mission.id);
+
+    const forecast = cloneDeep(continuing.game);
+    for (
+      let i = 0;
+      i < 1200 && !objective.success({ ...continuing, game: forecast });
+      i++
+    ) {
+      tickState(forecast);
+    }
+    expect(objective.success({ ...continuing, game: forecast })).toBe(true);
+    playOutOnTheStore(continuing.game, forecast.date.monthsElapsed);
+    jest.runOnlyPendingTimers();
+    expect(getStore().getState().ui.dialog).toEqual(
+      expect.objectContaining({ open: true, tutorialComplete: true }),
+    );
+    expect(getPlayedScenarioIds()).toContain(mission.id);
   });
 });

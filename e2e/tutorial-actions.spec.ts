@@ -90,6 +90,31 @@ for (const [index, mission] of missions.entries()) {
         path: testInfo.outputPath(`${mission.name}-actions.png`),
       });
     }
+    if (mission.name === "Finances") {
+      await dock.getByRole("button", { name: "Insights", exact: true }).click();
+      const insights = page.locator(".insights:visible");
+      await expect(
+        insights.getByRole("combobox", { name: "Insight preset" }),
+      ).toContainText("Overview");
+      await insights.getByRole("button", { name: /^Layers \(/ }).click();
+      for (const name of ["Profit", "Finance details"]) {
+        const checkbox = insights.getByRole("checkbox", { name, exact: true });
+        await expect(checkbox).toBeChecked();
+        await expect(checkbox).toBeDisabled();
+        await expect(
+          insights.getByRole("heading", { name, exact: true }),
+        ).toBeAttached();
+      }
+      await expect(
+        insights.getByRole("checkbox", { name: "Supply & Demand" }),
+      ).toBeChecked();
+      await expect(
+        insights.getByRole("checkbox", { name: "Supply & Demand" }),
+      ).toBeEnabled();
+      await reviewScreenshot(page, {
+        path: testInfo.outputPath("finance-overview-layers.png"),
+      });
+    }
     if (mission.name === "Generators") {
       const build = dock.getByRole("button", { name: "Build", exact: true });
       await build.click();
