@@ -121,7 +121,7 @@ function tooltipPlugin<S>(
   let touchStart: (event: TouchEvent) => void;
   let touchMove: (event: TouchEvent) => void;
   let touchEnd: (event: TouchEvent) => void;
-  let cancelTouch: () => void;
+  let cancelTouch: (event: Event) => void;
   let outsidePointer: (event: PointerEvent) => void;
   let touchId: number | undefined;
   let touchingPlot = false;
@@ -209,7 +209,9 @@ function tooltipPlugin<S>(
           if (!event.touches.length) touchingPlot = false;
           touchId = undefined;
         };
-        cancelTouch = () => {
+        cancelTouch = (event) => {
+          // Scrolling the breakdown cancels its own pointer, not chart inspection.
+          if (el?.contains(event.target as Node)) return;
           // Native scrolling cancels pointer events while touch events may keep arriving.
           touchingPlot = false;
           touchId = undefined;
