@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Dialog,
@@ -21,7 +21,14 @@ import type { CouchSummary } from "./Protocol";
 import SettingsContainer from "../components/views/SettingsContainer";
 import { beginCouchPlatform } from "./Platform";
 import { nextControllerSeat } from "./Bindings";
-import { formatHour } from "../helpers/DateTime";
+import type { EvidenceTargetType, GameType } from "../Types";
+import CouchToolbar from "./Toolbar";
+import { ControlsLegend } from "../desktop/InputHints";
+import ManualContainer from "../components/views/ManualContainer";
+import {
+  selectActiveEventGroups,
+  selectUpcomingStoryEvents,
+} from "../components/views/StoryEventSelectors";
 import "./couch.scss";
 
 type Device = DesktopInputFrame & { id: string };
@@ -64,6 +71,9 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [saveTime, setSaveTime] = useState<number>();
   const [summary, setSummary] = useState<CouchSummary>();
+  const [commonGame, setCommonGame] = useState<GameType>();
+  const [menuOwner, setMenuOwner] = useState<string>();
+  const [manualOwner, setManualOwner] = useState<string>();
   const [exitOwner, setExitOwner] = useState<string>();
   const [recovery, setRecovery] = useState<string[]>([]);
   const [invalidLayout, setInvalidLayout] = useState(false);
@@ -72,12 +82,13 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const [sessionFault, setSessionFault] = useState(false);
   const [blockers, setBlockers] = useState<readonly string[]>([]);
   const globalRequest = useRef<{
-    kind: "leave" | "settings" | "text";
+    kind: "leave" | "settings" | "text" | "menu" | "manual";
     seatId: string;
     generation: number;
     id: string;
   }>();
   const routes = useRef(new Map<string, number>());
+  const deviceGlyphs = useRef(new Map<string, DesktopInputFrame["glyphs"]>());
   const platform = useRef<ReturnType<typeof beginCouchPlatform>>();
   const mounted = useRef(false);
   const starts = useRef(0);
@@ -97,6 +108,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     saved,
     exitOwner,
     busy,
+    devices,
   });
   current.current = {
     seats,
@@ -107,6 +119,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     saved,
     exitOwner,
     busy,
+    devices,
   };
 
   const close = async () => {
@@ -131,11 +144,76 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     leaveRequest.current = undefined;
     setExitOwner(undefined);
     setSettingsOwner(undefined);
+    setMenuOwner(undefined);
+    setManualOwner(undefined);
     coordinator.current?.setInputGate("global-request", false);
   };
   const gateGlobal = () => {
     coordinator.current?.setInputGate("global-request", true);
     coordinator.current?.setBlocker("global-dialog", "TV session dialog open");
+  };
+  const openMenu = (seatId?: string, generation?: number, id?: string) => {
+    const state = current.current;
+    if (state.stage !== "play" || state.busy) return;
+    const active = globalRequest.current;
+    if (active) {
+      if (active.kind === "menu" && (!seatId || seatId === active.seatId))
+        cancelGlobal("Menu closed");
+      return;
+    }
+    const owner =
+      seatId ??
+      state.seats.find((seat) =>
+        state.devices.some(
+          (device) => device.id === state.bindings[seat.id] && device.connected,
+        ),
+      )?.id;
+    if (!owner) return;
+    globalRequest.current = {
+      kind: "menu",
+      seatId: owner,
+      generation: generation ?? routes.current.get(owner) ?? 0,
+      id: id ?? crypto.randomUUID(),
+    };
+    gateGlobal();
+    setMenuOwner(owner);
+  };
+  const menuAction = (kind: "settings" | "manual" | "leave") => {
+    const active = globalRequest.current;
+    if (!active || active.kind !== "menu") return;
+    globalRequest.current = { ...active, kind };
+    setMenuOwner(undefined);
+    if (kind === "settings") {
+      setSettingsOwner(active.seatId);
+      store.dispatch(navigate("SETTINGS"));
+    } else if (kind === "manual") {
+      setManualOwner(active.seatId);
+      store.dispatch(navigate("MANUAL"));
+    } else {
+      setExitOwner(active.seatId);
+      setSaveFailed(false);
+      setDiscarding(false);
+    }
+  };
+  const showEvidence = (target: EvidenceTargetType) => {
+    if (globalRequest.current) return;
+    const state = current.current;
+    const owner = state.seats.find(
+      (seat) =>
+        !state.summary?.players.find((player) => player.id === seat.id)
+          ?.retired &&
+        state.devices.some(
+          (device) => device.id === state.bindings[seat.id] && device.connected,
+        ),
+    )?.id;
+    const generation = owner && routes.current.get(owner);
+    if (owner && generation)
+      void request({
+        kind: "send",
+        seatId: owner,
+        generation,
+        message: { kind: "evidence", generation, target },
+      });
   };
   const requestExit = (seatId: string) => {
     if (globalRequest.current || current.current.busy) return;
@@ -164,10 +242,13 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     setBindings({});
     setReady([]);
     setSummary(undefined);
+    setCommonGame(undefined);
     setRecovery([]);
     setInvalidLayout(false);
     setSessionFault(false);
     setSettingsOwner(undefined);
+    setMenuOwner(undefined);
+    setManualOwner(undefined);
     setExitOwner(undefined);
     setTextOwner(undefined);
     setSaved(undefined);
@@ -191,7 +272,14 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     const stop = desktop.onCouchEvent!((input) => {
       const event = input as NativeEvent;
       if (event.kind === "devices") {
-        const next = event.devices ?? [];
+        const next = (event.devices ?? []).map((device) => {
+          const glyphs = {
+            ...deviceGlyphs.current.get(device.id),
+            ...device.glyphs,
+          };
+          deviceGlyphs.current.set(device.id, glyphs);
+          return { ...device, glyphs };
+        });
         setDevices(next);
         const state = current.current;
         const connected = new Set(
@@ -524,6 +612,9 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       const worker = createMultiplayerWorker();
       const owner = new CouchCoordinator(worker, {
         onAccountView: (view) => platform.current?.publish(view),
+        onSharedView: (view) => {
+          if (view.game) setCommonGame(view.game);
+        },
         persist: async (world: World) => {
           const result = (await request({ kind: "write-save", world })) as {
             updatedAt: number;
@@ -568,6 +659,8 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           setSettingsOwner(seatId);
           store.dispatch(navigate("SETTINGS"));
         },
+        onMenu: (seatId, generation, requestId) =>
+          openMenu(seatId, generation, requestId),
         onError: (message: string) => {
           setError(message);
           if (coordinator.current?.getSnapshot().phase === "faulted")
@@ -597,15 +690,50 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       owner.subscribe(() => setBlockers(owner.getSnapshot().blockers));
       if (saved) owner.restore(saved, crypto.randomUUID());
       else owner.start(spec!, seats, crypto.randomUUID(), crypto.randomUUID());
+      await new Promise<void>((resolve, reject) => {
+        let stop = () => {};
+        const timer = setTimeout(() => {
+          stop();
+          reject(new Error("The shared game did not finish preparing"));
+        }, 60000);
+        const sync = () => {
+          const state = owner.getSnapshot();
+          if (state.phase === "playing" && state.summary) {
+            clearTimeout(timer);
+            stop();
+            resolve();
+          } else if (state.phase === "faulted" || state.phase === "closed") {
+            clearTimeout(timer);
+            stop();
+            reject(new Error(state.error ?? "The local session closed"));
+          }
+        };
+        stop = owner.subscribe(sync);
+        sync();
+      });
       setStage("play");
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+      if (!mounted.current || generation !== starts.current) return;
       await request({
         kind: "open",
         seats,
         inset: 24,
         gutter: 8,
-        bandHeight: 96,
+        bandHeight: Math.ceil(
+          band.current?.getBoundingClientRect().height ?? 96,
+        ),
       });
       if (!mounted.current || generation !== starts.current) return;
+      await request({
+        kind: "layout",
+        options: {
+          bandHeight: Math.ceil(
+            band.current?.getBoundingClientRect().height ?? 96,
+          ),
+        },
+      });
     } catch (failure) {
       if (!mounted.current || generation !== starts.current) return;
       setError(String(failure));
@@ -633,6 +761,14 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     resize.observe(band.current);
     return () => resize.disconnect();
   }, [stage]); // eslint-disable-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    if (stage === "play")
+      document.documentElement.dataset.couchShellActive = "true";
+    else delete document.documentElement.dataset.couchShellActive;
+    return () => {
+      delete document.documentElement.dataset.couchShellActive;
+    };
+  }, [stage]);
 
   useEffect(() => {
     void request({ kind: "setup-confirm", value: stage === "confirm" });
@@ -651,6 +787,8 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       const state = store.getState();
       if (settingsOwner && state.card.name !== "SETTINGS")
         cancelGlobal("Settings closed");
+      if (manualOwner && state.card.name !== "MANUAL")
+        cancelGlobal("Manual closed");
       if (previous === state.settings) return;
       previous = state.settings;
       routes.current.forEach((generation, seatId) => {
@@ -662,7 +800,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         });
       });
     });
-  }, [settingsOwner]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [settingsOwner, manualOwner]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const active = globalRequest.current;
     if (
@@ -690,6 +828,8 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const globalOwner =
     textOwner ||
     settingsOwner ||
+    manualOwner ||
+    menuOwner ||
     exitOwner ||
     (summary?.complete
       ? (seats.find((seat) =>
@@ -715,36 +855,61 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     void request({ kind: "overlay", seatId: globalOwner ?? null });
   }, [globalOwner, stage]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const sharedGame = useMemo(
+    () =>
+      commonGame && { ...commonGame, date: summary?.date ?? commonGame.date },
+    [commonGame, summary?.date],
+  );
+  const sharedState = sharedGame && { ...store.getState(), game: sharedGame };
+  const menuDevice = devices.find(
+    (device) => device.id === bindings[menuOwner ?? ""],
+  );
+
   return (
     <>
       {stage === "play" && (
         <div ref={band} className="couchBand" data-couch-shell="true">
-          <div>
-            <strong>On this TV · Unranked</strong>
-            <p role="status">
-              {summary?.date
-                ? `${summary.date.year} / ${summary.date.monthNumber} · ${formatHour(summary.date)} · `
-                : ""}
-              {summary?.speed ?? "PAUSED"} · {summary?.reason}
-            </p>
-            <p>
-              {summary?.players
-                .map(
-                  (player, index) =>
-                    `P${index + 1} ${player.name}: ${player.retired ? "Retired" : player.selectedSpeed}`,
-                )
-                .join(" · ")}
-            </p>
-            <p>
-              Last local save:{" "}
-              {saveTime ? new Date(saveTime).toLocaleTimeString() : "Saving…"}
-            </p>
-          </div>
-          <Button onClick={() => requestExit("local-p1")}>
-            Save & Quit for everyone
-          </Button>
-          {error && <p role="alert">{error}</p>}
-          {!!blockers.length && <p role="status">{blockers.join(" · ")}</p>}
+          {sharedGame && summary && (
+            <CouchToolbar
+              game={sharedGame}
+              players={summary.players}
+              effectiveSpeed={summary.speed}
+              readyRequired={summary.readyRequired}
+              ready={summary.ready}
+              reason={[summary.reason, ...blockers].filter(Boolean).join(" · ")}
+              menuOpen={!!menuOwner}
+              onMenuOpen={() => openMenu()}
+              onMenuClose={() => cancelGlobal("Menu closed")}
+              onSpeed={(id, speed) => {
+                if (!globalRequest.current)
+                  coordinator.current?.commandForSeat(id, {
+                    kind: "speed",
+                    speed,
+                  });
+              }}
+              onSettings={() => menuAction("settings")}
+              onManual={() => menuAction("manual")}
+              onSaveQuit={() => menuAction("leave")}
+              onEvidence={showEvidence}
+              menuFooter={
+                menuOwner ? (
+                  <>
+                    <ControlsLegend
+                      glyphs={menuDevice?.glyphs ?? {}}
+                      player={`P${menuOwner.slice(-1)}`}
+                    />
+                    {error && (
+                      <p className="couchMenuNotice" role="alert">
+                        {error}
+                      </p>
+                    )}
+                  </>
+                ) : undefined
+              }
+              upcoming={sharedState && selectUpcomingStoryEvents(sharedState)}
+              activeEvents={sharedState && selectActiveEventGroups(sharedState)}
+            />
+          )}
         </div>
       )}
       <Dialog
@@ -925,6 +1090,22 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           </Button>
         </DialogActions>
       </Dialog>
+      <Dialog
+        open={!!manualOwner}
+        fullWidth
+        maxWidth="md"
+        aria-label="TV session manual"
+      >
+        <DialogTitle>Manual</DialogTitle>
+        <DialogContent>
+          <ManualContainer />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => cancelGlobal("Manual closed")}>
+            Return to all companies
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Dialog open={!!summary?.complete && !exitOwner} fullWidth maxWidth="sm">
         <DialogTitle>Match complete</DialogTitle>
         <DialogContent>
@@ -1058,6 +1239,8 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           stage === "play" &&
           !exitOwner &&
           !settingsOwner &&
+          !manualOwner &&
+          !menuOwner &&
           !textOwner &&
           !!(recovery.length || missing.length || invalidLayout || sessionFault)
         }

@@ -210,8 +210,8 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
     )!;
     view.webContents.setZoomFactor(1.75);
   }, native.seats[0].id);
-  expect(
-    await desktop.app.evaluate(({ BrowserWindow, WebContentsView }) => {
+  const changedZoom = await desktop.app.evaluate(
+    ({ BrowserWindow, WebContentsView }) => {
       const window = BrowserWindow.getAllWindows()[0];
       return {
         shell: window.webContents.getZoomFactor(),
@@ -223,8 +223,12 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
           )
           .map((view) => view.webContents.getZoomFactor()),
       };
-    }),
-  ).toEqual({ shell: native.shellZoom, seats: [1.75, 1.5] });
+    },
+  );
+  // Chromium stores zoom as a level; converting back can differ by one floating-point bit.
+  expect(changedZoom.seats[0]).toBeCloseTo(1.75, 12);
+  expect(changedZoom.shell).toBe(native.shellZoom);
+  expect(changedZoom.seats[1]).toBe(native.seats[1].zoom);
   const oldGeneration = await p1.evaluate(() =>
     window.electrifyCouch!.getGeneration(),
   );

@@ -1,4 +1,10 @@
-import type { MatchSpec, RoomView, Seat, World } from "../multiplayer/Types";
+import type {
+  Command,
+  MatchSpec,
+  RoomView,
+  Seat,
+  World,
+} from "../multiplayer/Types";
 import type {
   WorkerRequest,
   WorkerResponse,
@@ -39,10 +45,13 @@ export interface CouchCoordinatorOptions {
     request: Extract<SeatMessage, { kind: "leave" }>,
   ) => void;
   onSettings?: (seatId: string, generation: number, requestId: string) => void;
+  onMenu?: (seatId: string, generation: number, requestId: string) => void;
   onSeatLost?: (seatId: string, generation: number, reason: string) => void;
   onSummary?: (summary: CouchSummary) => void;
   /** Account publication must not wait for a stalled seat renderer to acknowledge a view. */
   onAccountView?: (view: RoomView) => void;
+  /** Common event/calendar presentation follows a company still playing, independently of P1. */
+  onSharedView?: (view: RoomView) => void;
   onError?: (message: string) => void;
   now?: () => number;
 }
@@ -235,6 +244,29 @@ export class CouchCoordinator {
       });
     this.update({ error: undefined });
   }
+  /** The shell's labelled speed buttons use the same seat queue and receipts as controllers. */
+  commandForSeat(seatId: string, command: Extract<Command, { kind: "speed" }>) {
+    const route = this.routes.get(seatId);
+    const view = this.views.get(seatId);
+    if (
+      this.state.phase !== "playing" ||
+      this.state.closing ||
+      this.inputGates.size > 0 ||
+      !route ||
+      route.failed ||
+      !view ||
+      !this.active(seatId)
+    )
+      return false;
+    route.send({
+      kind: "shell-command",
+      generation: route.generation,
+      matchId: view.matchId,
+      epoch: view.epoch,
+      command,
+    });
+    return true;
+  }
   receive(seatId: string, generation: number, input: unknown) {
     const route = this.routes.get(seatId);
     if (
@@ -258,6 +290,11 @@ export class CouchCoordinator {
     }
     if (input.kind === "global-settings") {
       this.options.onSettings?.(seatId, generation, input.requestId);
+      return true;
+    }
+    if (input.kind === "global-menu") {
+      if (this.state.phase !== "playing" || this.state.closing) return false;
+      this.options.onMenu?.(seatId, generation, input.requestId);
       return true;
     }
     if (input.kind === "leave") {
@@ -346,6 +383,18 @@ export class CouchCoordinator {
       return;
     }
     if (data.kind === "views") {
+      const published = this.roster
+        .map((seat) => ({ seat, view: data.views[seat.id] }))
+        .filter((entry) => !!entry.view?.game);
+      const common =
+        published.find(({ seat, view }) =>
+          view.grids.some((grid) => grid.seat.id === seat.id && !grid.retired),
+        ) ??
+        published.find(
+          ({ view }) =>
+            view.grids.length > 0 && view.grids.every((grid) => grid.retired),
+        );
+      if (common) this.options.onSharedView?.(common.view);
       if (this.state.phase === "starting") {
         this.update({ phase: "playing" });
         this.roster.forEach((seat) => {

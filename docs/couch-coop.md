@@ -10,9 +10,12 @@ another controller backend.
 Each controller explicitly joins a company. P1 chooses an existing co-op scenario
 or custom game; both players confirm that selection. The campaign roster then
 stays fixed. An assigned controller controls only its company's document. The
-shared band shows the authoritative calendar, effective speed, player selections
-and local save time. Speed actions address the owning company's selection even
-though the clock lives in the shell. The slowest selection wins.
+shared bar reuses the single-player calendar and year progress, upcoming event
+and months-left display. Each player has an independent on-screen speed selector;
+the slowest selection wins. Start opens one shared three-dot menu and pauses the
+match for everyone. The requesting controller's complete bindings appear along
+the bottom while that menu is open. Player panes keep cash and grid state, with
+icon-only navigation and no duplicate menu, calendar, event or control-hint bars.
 
 The native model and save format support two to four companies, but the UI rejects
 three and four until their release gates pass. It also refuses a layout below
@@ -61,7 +64,7 @@ One write contains all grids, edges, outcomes, command sequences and receipts.
 Periodic checkpoints and explicit saves share a serialized atomic-write queue and
 previous-copy recovery. Save & Quit stops new commands, rejects unsent actions
 explicitly and waits for the worker's checkpoint barrier and successful local
-write. A receipt means applied; the band's save time means durably written.
+write. A receipt means applied; a successful save acknowledgment means durably written.
 Unreadable files are preserved. Loading requires explicit controller assignment
 and fresh readiness; hardware handles are never persisted.
 

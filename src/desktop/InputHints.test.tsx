@@ -1,7 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { store } from "../Store";
-import InputHints from "./InputHints";
+import InputHints, { ControlsLegend } from "./InputHints";
 import {
   resetInputPresentation,
   updateInputPresentation,
@@ -49,4 +49,23 @@ it("keeps the existing solo behavior when pointer input becomes active", () => {
   expect(
     screen.queryByLabelText("Controller controls"),
   ).not.toBeInTheDocument();
+});
+
+it("shows the complete shared menu legend with the requesting controller bindings", () => {
+  render(
+    <ControlsLegend
+      player="P2"
+      glyphs={{
+        confirm: { label: "Cross" },
+        menu: { label: "Options" },
+        speedUp: { label: "Remapped faster" },
+      }}
+    />,
+  );
+  expect(screen.getByLabelText("Controller controls")).toBeVisible();
+  expect(screen.getByText("P2 controls")).toBeVisible();
+  expect(screen.getByText("Options")).toBeVisible();
+  expect(screen.getByText("Remapped faster")).toBeVisible();
+  expect(screen.getByText("Build")).toBeVisible();
+  expect(screen.getByText("Previous chart")).toBeVisible();
 });

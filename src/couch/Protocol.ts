@@ -44,10 +44,18 @@ export type SeatMessage =
       epoch: string;
     }
   | { kind: "leave"; requestId: string; skipSave?: boolean }
-  | { kind: "global-settings"; requestId: string };
+  | { kind: "global-settings"; requestId: string }
+  | { kind: "global-menu"; requestId: string };
 export type SeatEvent =
   | { kind: "view"; generation: number; delivery: number; view: RoomView }
   | { kind: "error"; generation: number; message: string }
+  | {
+      kind: "shell-command";
+      generation: number;
+      matchId: string;
+      epoch: string;
+      command: Extract<Command, { kind: "speed" }>;
+    }
   | {
       kind: "rejected";
       generation: number;
@@ -78,7 +86,7 @@ export function isSeatMessage(input: unknown): input is SeatMessage {
       Number.isSafeInteger(input.delivery) &&
       Number(input.delivery) > 0
     );
-  if (input.kind === "global-settings")
+  if (input.kind === "global-settings" || input.kind === "global-menu")
     return (
       Object.keys(input).length === 2 &&
       typeof input.requestId === "string" &&

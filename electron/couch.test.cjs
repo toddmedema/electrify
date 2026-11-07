@@ -58,6 +58,15 @@ test("logical roster rejects hardware identities and seat ports cannot claim a s
     seatMessage({ kind: "global-settings", requestId: "settings-1" }),
     true,
   );
+  assert.equal(seatMessage({ kind: "global-menu", requestId: "menu-1" }), true);
+  assert.equal(
+    seatMessage({
+      kind: "global-menu",
+      requestId: "menu-1",
+      sender: "local-p2",
+    }),
+    false,
+  );
   assert.equal(
     seatMessage({
       kind: "global-settings",

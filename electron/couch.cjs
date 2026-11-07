@@ -73,7 +73,7 @@ function seatMessage(message) {
     return keys.every((key) =>
       ["kind", "revision", "sequence", "delivery"].includes(key),
     );
-  if (message.kind === "global-settings")
+  if (message.kind === "global-settings" || message.kind === "global-menu")
     return (
       keys.every((key) => ["kind", "requestId"].includes(key)) &&
       typeof message.requestId === "string" &&

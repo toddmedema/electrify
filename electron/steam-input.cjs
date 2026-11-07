@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { nativeLibraryPath } = require("./steam-native.cjs");
 
-const MENU_ACTIONS = ["up", "down", "left", "right", "confirm", "back"];
+const MENU_ACTIONS = ["up", "down", "left", "right", "confirm", "back", "menu"];
 const ACTION_SETS = {
   Menu: MENU_ACTIONS,
   Gameplay: [

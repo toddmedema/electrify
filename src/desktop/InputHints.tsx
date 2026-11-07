@@ -119,18 +119,52 @@ export default function InputHints() {
   );
 }
 
-function glyphHint([action, label]: Hint, glyphs: DesktopInputFrame["glyphs"]) {
+function glyphHint(
+  [action, label]: Hint,
+  glyphs: DesktopInputFrame["glyphs"],
+  showUnbound = false,
+) {
   const glyph = glyphs[action];
-  if (!glyph) return null;
+  if (!glyph && !showUnbound) return null;
   return (
     <span className="controllerHint" key={action}>
-      {glyph.image ? (
+      {glyph?.image ? (
         <img src={glyph.image} alt={glyph.label} />
       ) : (
-        <span className="controllerHintBinding">{glyph.label}</span>
+        <span className="controllerHintBinding">
+          {glyph?.label ?? "Unbound"}
+        </span>
       )}
       <span>{label}</span>
     </span>
+  );
+}
+
+/** One complete legend in the shared menu, with the requesting controller's bindings. */
+export function ControlsLegend({
+  glyphs,
+  player,
+}: {
+  glyphs: DesktopInputFrame["glyphs"];
+  player: string;
+}) {
+  const hints: Hint[] = [
+    ["up", "Move up"],
+    ["down", "Move down"],
+    ["left", "Move left"],
+    ["right", "Move right"],
+    ["confirm", "Select"],
+    ["back", "Back"],
+    ["menu", "Game menu"],
+    ...gameHints.slice(3),
+  ];
+  return (
+    <aside className="couchControlsLegend" aria-label="Controller controls">
+      <strong>{player} controls</strong>
+      <div className="controllerHintActions">
+        {hints.map((hint) => glyphHint(hint, glyphs, true))}
+      </div>
+    </aside>
   );
 }
 

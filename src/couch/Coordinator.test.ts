@@ -34,6 +34,8 @@ function fixture(
   persist = jest.fn().mockResolvedValue(undefined),
   onSeatLost = jest.fn(),
   onAccountView = jest.fn(),
+  onMenu = jest.fn(),
+  onSharedView = jest.fn(),
 ) {
   jest.useFakeTimers();
   let world: World;
@@ -91,6 +93,8 @@ function fixture(
     persist,
     onSeatLost,
     onAccountView,
+    onMenu,
+    onSharedView,
   });
   const messages: Record<string, SeatEvent[]> = {};
   const clients = seats.map((seat) => {
@@ -120,6 +124,8 @@ function fixture(
     persist,
     onSeatLost,
     onAccountView,
+    onMenu,
+    onSharedView,
     world: () => world,
     dispose,
   };
@@ -578,6 +584,129 @@ it("publishes authoritative P1 account state while its renderer has an unacknowl
     const latest = f.onAccountView.mock.calls.at(-1)![0];
     expect(latest.revision).toBe(f.world().revision);
     expect(latest.game.multiplayer.seat).toBe("local-p1");
+  } finally {
+    f.dispose();
+  }
+});
+
+it("routes each shared speed selector through its owning queue and preserves independent sequence receipts", async () => {
+  const f = fixture();
+  try {
+    await f.clients[0].submit({ kind: "rate", value: 0.11 });
+    expect(
+      f.coordinator.commandForSeat("local-p1", {
+        kind: "speed",
+        speed: "FAST",
+      }),
+    ).toBe(true);
+    expect(
+      f.coordinator.commandForSeat("local-p2", {
+        kind: "speed",
+        speed: "NORMAL",
+      }),
+    ).toBe(true);
+    await Promise.resolve();
+    expect(f.world().selectedSpeeds).toEqual({
+      "local-p1": "FAST",
+      "local-p2": "NORMAL",
+    });
+    expect(f.world().speed).toBe("NORMAL");
+    expect(f.world().sequences).toEqual({ "local-p1": 2, "local-p2": 1 });
+    expect(f.world().receipts["local-p1"].sequence).toBe(2);
+    expect(f.world().receipts["local-p2"].sequence).toBe(1);
+    expect(
+      f.coordinator.commandForSeat("unknown", { kind: "speed", speed: "FAST" }),
+    ).toBe(false);
+    f.clients[0].receive({
+      kind: "shell-command",
+      generation: 1,
+      matchId: "match",
+      epoch: "old",
+      command: { kind: "speed", speed: "ULTRA" },
+    });
+    f.clients[0].receive({
+      kind: "shell-command",
+      generation: 0,
+      matchId: "match",
+      epoch: "epoch",
+      command: { kind: "speed", speed: "ULTRA" },
+    });
+    expect(f.world().selectedSpeeds["local-p1"]).toBe("FAST");
+    f.coordinator.setInputGate("global-menu", true);
+    expect(
+      f.coordinator.commandForSeat("local-p2", {
+        kind: "speed",
+        speed: "ULTRA",
+      }),
+    ).toBe(false);
+    expect(f.world().selectedSpeeds["local-p2"]).toBe("NORMAL");
+  } finally {
+    f.dispose();
+  }
+});
+
+it("authenticates a global menu request by its bound seat and rejects forged or stale owners", () => {
+  const f = fixture();
+  try {
+    expect(
+      f.coordinator.receive("local-p2", 1, {
+        kind: "global-menu",
+        requestId: "menu-2",
+      }),
+    ).toBe(true);
+    expect(f.onMenu).toHaveBeenCalledWith("local-p2", 1, "menu-2");
+    expect(
+      f.coordinator.receive("local-p2", 0, {
+        kind: "global-menu",
+        requestId: "stale",
+      }),
+    ).toBe(false);
+    expect(
+      f.coordinator.receive("local-p1", 1, {
+        kind: "global-menu",
+        requestId: "forged",
+        sender: "local-p2",
+      }),
+    ).toBe(false);
+    expect(f.onMenu).toHaveBeenCalledTimes(1);
+  } finally {
+    f.dispose();
+  }
+});
+
+it("keeps shared presentation on an active company after P1 retires without changing account attribution", () => {
+  const f = fixture();
+  try {
+    expect(f.onSharedView.mock.calls.at(-1)![0].game.multiplayer.seat).toBe(
+      "local-p1",
+    );
+    f.world().outcomes["local-p1"] = {
+      outcome: "bankrupt",
+      title: "Bankrupt",
+      month: 0,
+    };
+    f.publish();
+    expect(f.onSharedView.mock.calls.at(-1)![0].game.multiplayer.seat).toBe(
+      "local-p2",
+    );
+    expect(f.onAccountView.mock.calls.at(-1)![0].game.multiplayer.seat).toBe(
+      "local-p1",
+    );
+    const calls = f.onSharedView.mock.calls.length;
+    f.emit({
+      kind: "views",
+      views: { "local-p1": roomView(f.world(), "local-p1") },
+    });
+    expect(f.onSharedView).toHaveBeenCalledTimes(calls);
+    f.world().outcomes["local-p2"] = {
+      outcome: "bankrupt",
+      title: "Bankrupt",
+      month: 0,
+    };
+    f.publish();
+    expect(f.onSharedView.mock.calls.at(-1)![0].game.multiplayer.seat).toBe(
+      "local-p1",
+    );
   } finally {
     f.dispose();
   }

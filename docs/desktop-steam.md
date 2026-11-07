@@ -324,6 +324,11 @@ X to open Build, Y or Start to pause/resume, bumpers for panes, triggers for cha
 stick's up/down directions for speed. Steam's displayed origins describe the equivalent inputs
 on other controllers and follow player customization.
 
+In couch co-op, Start opens the shared three-dot menu and pauses every company.
+The shared top bar also has an independent speed selector for each player. B stays
+local Back; the full controller legend appears along the bottom while the shared
+menu is open.
+
 Confirming an editable text field opens Steam's gamepad text editor. Submitted text follows the
 field's normal validation and React change handling; cancelling preserves the original value.
 Controller actions are suspended while the editor is open and require release before continuing.

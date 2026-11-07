@@ -75,6 +75,17 @@ export class CouchClient {
       this.update({ error: event.message });
       return;
     }
+    if (event.kind === "shell-command") {
+      const view = this.state.view;
+      if (
+        view &&
+        view.matchId === event.matchId &&
+        view.epoch === event.epoch &&
+        event.command?.kind === "speed"
+      )
+        this.command(event.command);
+      return;
+    }
     if (event.kind === "rejected") {
       const pending = this.pending;
       if (
@@ -238,6 +249,10 @@ export class CouchClient {
   settings = () => {
     if (!this.disposed)
       this.send({ kind: "global-settings", requestId: crypto.randomUUID() });
+  };
+  menu = () => {
+    if (!this.disposed)
+      this.send({ kind: "global-menu", requestId: crypto.randomUUID() });
   };
   leave = (options?: { skipSave?: boolean }): Promise<void> => {
     const requestId = crypto.randomUUID();

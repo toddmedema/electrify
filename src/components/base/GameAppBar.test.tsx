@@ -75,6 +75,38 @@ afterEach(() => {
 });
 
 describe("GameAppBar", () => {
+  it("keeps company cash and grid state while common couch chrome lives in the shell", () => {
+    const previous = Object.getOwnPropertyDescriptor(window, "electrifyCouch");
+    Object.defineProperty(window, "electrifyCouch", {
+      configurable: true,
+      value: { role: "seat" },
+    });
+    try {
+      const game = createGame({ scenarioId: 101 });
+      game.inGame = true;
+      renderAppBar({ game });
+      expect(
+        screen.getByText(
+          formatMoneyStable(
+            getTimeFromTimeline(game.date.minute, game.timeline)!.cash,
+          ),
+        ),
+      ).toBeVisible();
+      expect(
+        screen.getByRole("button", {
+          name: /Current grid status:|Open the Reserve manual entry/,
+        }),
+      ).toBeVisible();
+      expect(screen.queryByRole("button", { name: "menu" })).toBeNull();
+      expect(screen.queryByLabelText("Mission progress")).toBeNull();
+      expect(screen.queryByRole("progressbar")).toBeNull();
+      expect(screen.queryByRole("group", { name: "game speed" })).toBeNull();
+    } finally {
+      if (previous) Object.defineProperty(window, "electrifyCouch", previous);
+      else delete window.electrifyCouch;
+    }
+  });
+
   it.each([1, -1, 0])(
     "shows the current month profit forecast beside cash on desktop (%s)",
     (sign) => {

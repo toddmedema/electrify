@@ -553,3 +553,107 @@ it("routes a couch seat's speed and readiness semantically when duplicate clock 
     speed: "PAUSED",
   });
 });
+
+it("opens the shared couch menu from Start even while a company dialog owns local focus", async () => {
+  store.dispatch(delta({ inGame: true }));
+  render(
+    <main className="base_main">
+      <div className="gameWorkspace" />
+      <section role="dialog">
+        <button>Company purchase</button>
+      </section>
+    </main>,
+  );
+  const post = jest.fn();
+  window.electrifyCouch = {
+    role: "seat",
+    seatId: "local-p2",
+    getGeneration: () => 1,
+    ready: async () => {},
+    onMessage: () => () => {},
+    post,
+  };
+  const f = bridge();
+  stop = startDesktopInput(store, f.desktop);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  screen.getByRole("button", { name: "Company purchase" }).focus();
+  const previousCrypto = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+  Object.defineProperty(globalThis, "crypto", {
+    configurable: true,
+    value: { randomUUID: () => "menu-request" },
+  });
+  try {
+    f.emit({ actions: ["menu"] });
+    expect(post).toHaveBeenCalledWith({
+      kind: "global-menu",
+      requestId: "menu-request",
+    });
+  } finally {
+    if (previousCrypto)
+      Object.defineProperty(globalThis, "crypto", previousCrypto);
+    else Reflect.deleteProperty(globalThis, "crypto");
+  }
+  expect(f.desktop.setInputContext).toHaveBeenCalledWith("Menu");
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+});
+
+it("routes Start to the single shared menu button from the shell", async () => {
+  const open = jest.fn();
+  const hiddenMenu = jest.fn();
+  render(
+    <>
+      <div hidden>
+        <button className="gameMenuButton" onClick={hiddenMenu}>
+          Hidden company menu
+        </button>
+      </div>
+      <main className="base_main" data-couch-shell="true">
+        <button className="gameMenuButton" onClick={open}>
+          Global menu
+        </button>
+      </main>
+    </>,
+  );
+  const f = bridge();
+  stop = startDesktopInput(store, f.desktop);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  f.emit({ actions: ["menu"] });
+  expect(open).toHaveBeenCalledTimes(1);
+  expect(hiddenMenu).not.toHaveBeenCalled();
+});
+
+it("keeps the solo Start binding as pause during gameplay", async () => {
+  store.dispatch(delta({ speed: "NORMAL" }));
+  render(<Game />);
+  const f = bridge();
+  stop = startDesktopInput(store, f.desktop);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(f.desktop.setInputContext).toHaveBeenCalledWith("Gameplay");
+  f.emit({ actions: ["menu"] });
+  expect(store.getState().game.speed).toBe("PAUSED");
+});
+
+it("keeps solo Start as Back in the Menu action set", async () => {
+  const back = jest.fn();
+  render(
+    <main className="base_main">
+      <button aria-label="Back" onClick={back}>
+        Back
+      </button>
+    </main>,
+  );
+  const f = bridge();
+  stop = startDesktopInput(store, f.desktop);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(f.desktop.setInputContext).toHaveBeenCalledWith("Menu");
+  f.emit({ actions: ["menu"] });
+  expect(back).toHaveBeenCalledTimes(1);
+});

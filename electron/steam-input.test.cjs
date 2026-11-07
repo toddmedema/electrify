@@ -151,10 +151,11 @@ test("manifest supplies unique, localized actions and every default layout binds
     for (const preset of presets) {
       const context = value(preset, "name");
       const bound = new Set();
+      const byInput = new Map();
       for (const [id] of value(preset, "group_source_bindings")) {
         const group = groups.find((candidate) => value(candidate, "id") === id);
         assert.ok(group, `${file} preset references a missing group`);
-        for (const [, input] of value(group, "inputs")) {
+        for (const [inputName, input] of value(group, "inputs")) {
           const binding = value(
             value(value(value(input, "activators"), "Full_Press"), "bindings"),
             "binding",
@@ -167,11 +168,27 @@ test("manifest supplies unique, localized actions and every default layout binds
           assert.equal(match[1], context);
           assert.ok(names.has(match[2]), `${file} unknown action ${match[2]}`);
           bound.add(match[2]);
+          byInput.set(inputName, match[2]);
         }
       }
       assert.deepEqual(
         [...bound].sort(),
         ACTION_SETS[context].map((action) => `${context}_${action}`).sort(),
+      );
+      assert.equal(
+        byInput.get("button_escape"),
+        `${context}_menu`,
+        `${file} Start opens the game menu`,
+      );
+      assert.equal(
+        byInput.get("button_menu"),
+        `${context}_back`,
+        `${file} View/Back remains local Back`,
+      );
+      assert.equal(
+        byInput.get("button_b"),
+        `${context}_back`,
+        `${file} B remains local Back`,
       );
     }
   }

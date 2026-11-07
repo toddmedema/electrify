@@ -1,0 +1,22 @@
+.gameYearProgressBar {
+  // Overlay the app bar's lower edge without adding a gap before the pane headers.
+  position: absolute;
+  inset: auto 0 -4px;
+  padding: 4px 0;
+  pointer-events: none;
+  z-index: 100;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 4px 0;
+    height: 1px;
+    background: var(--border-subtle);
+  }
+
+  .yearProgressFill {
+    position: relative;
+    height: 1px;
+    background: var(--font-color-faded);
+  }
+}

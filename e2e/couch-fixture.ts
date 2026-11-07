@@ -1,4 +1,4 @@
-import { BrowserContext, Page, expect } from "@playwright/test";
+import { BrowserContext, Frame, Page, expect } from "@playwright/test";
 import type { DesktopInputAction, DesktopInputFrame } from "../src/Desktop";
 import type { World } from "../src/multiplayer/Types";
 
@@ -8,15 +8,71 @@ const devices: Device[] = ["101", "202"].map((id) => ({
   connected: true,
   actions: [],
   glyphs: {
+    up: { label: "D-pad up" },
+    down: { label: "D-pad down" },
+    left: { label: "D-pad left" },
+    right: { label: "D-pad right" },
     confirm: { label: id === "101" ? "A" : "Cross" },
-    build: { label: "X" },
+    back: { label: id === "101" ? "B" : "Circle" },
+    menu: { label: id === "101" ? "Start" : "Options" },
+    pause: { label: id === "101" ? "Y" : "Triangle" },
+    speedUp: { label: "Right stick up" },
+    speedDown: { label: "Right stick down" },
+    previousPane: { label: id === "101" ? "LB" : "L1" },
+    nextPane: { label: id === "101" ? "RB" : "R1" },
+    build: { label: id === "101" ? "X" : "Square" },
+    previousChart: { label: id === "101" ? "LT" : "L2" },
+    nextChart: { label: id === "101" ? "RT" : "R2" },
   },
 }));
 
+interface CouchLayout {
+  fits: boolean;
+  zoom: number;
+  cssWidth: number;
+  cssHeight: number;
+  bounds: { x: number; y: number; width: number; height: number }[];
+}
+export interface CouchFixture<Actor extends Page | Frame> {
+  seats: Map<string, { page: Actor; generation: number }>;
+  checkpoint: () => World | undefined;
+  layout: () => CouchLayout | undefined;
+  input: (actions: Record<string, DesktopInputAction[]>) => Promise<void>;
+}
+const {
+  couchLayout,
+}: {
+  couchLayout: (
+    width: number,
+    height: number,
+    count: number,
+    options: Record<string, unknown>,
+  ) => CouchLayout;
+} = require("../electron/couch.cjs");
+const isPage = (actor: Page | Frame): actor is Page =>
+  "setViewportSize" in actor;
+const actorClosed = (actor: Page | Frame) =>
+  isPage(actor) ? actor.isClosed() : actor.isDetached();
+
+export function createCouchFixture(
+  context: BrowserContext,
+  shell: Page,
+): Promise<CouchFixture<Page>>;
+export function createCouchFixture(
+  context: BrowserContext,
+  shell: Page,
+  options: { embedded: true },
+): Promise<CouchFixture<Frame>>;
 /** Replace native transport only. Shell coordinator, simulation worker, seat clients,
- * Redux stores, controls and data loading are the production implementations. */
-export async function createCouchFixture(context: BrowserContext, shell: Page) {
-  const seats = new Map<string, { page: Page; generation: number }>();
+ * Redux stores, controls and data loading are the production implementations. Embedded
+ * mode paints those same documents at the native bounds for full-window layout review;
+ * it does not establish native focus/process isolation. */
+export async function createCouchFixture(
+  context: BrowserContext,
+  shell: Page,
+  options?: { embedded: true },
+): Promise<CouchFixture<Page | Frame>> {
+  const seats = new Map<string, { page: Page | Frame; generation: number }>();
   const bindings = new Map<string, string>();
   let saved: World | undefined;
   let updatedAt = 0;
@@ -24,15 +80,64 @@ export async function createCouchFixture(context: BrowserContext, shell: Page) {
   let playing = false;
   let confirmOnly = false;
   let generation = 0;
+  let layout: CouchLayout | undefined;
+  let layoutOptions: Record<string, unknown> = {};
+  const iframeId = (id: string) => `couch-fixture-${id}`;
+  async function relayout(update: Record<string, unknown> = {}) {
+    layoutOptions = { ...layoutOptions, ...update };
+    if (!playing) return { layout };
+    const viewport = shell.viewportSize();
+    if (!viewport) throw new Error("Couch fixture needs an explicit viewport");
+    layout = couchLayout(viewport.width, viewport.height, 2, layoutOptions);
+    if (options?.embedded) {
+      await shell.evaluate(
+        ({ layout, hidden }) => {
+          ["local-p1", "local-p2"].forEach((id, index) => {
+            const frame = document.getElementById(`couch-fixture-${id}`);
+            if (!frame) return;
+            const bounds = layout.bounds[index];
+            Object.assign(frame.style, {
+              position: "fixed",
+              left: `${bounds.x}px`,
+              top: `${bounds.y}px`,
+              width: `${bounds.width / layout.zoom}px`,
+              height: `${bounds.height / layout.zoom}px`,
+              transform: `scale(${layout.zoom})`,
+              transformOrigin: "top left",
+              border: "0",
+              padding: "0",
+              margin: "0",
+              zIndex: "1000",
+              visibility: hidden || !layout.fits ? "hidden" : "visible",
+            });
+          });
+        },
+        { layout, hidden: !!overlayOwner },
+      );
+    } else {
+      for (const route of seats.values()) {
+        if (isPage(route.page))
+          await route.page.setViewportSize({
+            width: Math.floor(layout.cssWidth),
+            height: Math.floor(layout.cssHeight),
+          });
+      }
+    }
+    return { layout };
+  }
   const emit = async (event: unknown) =>
     shell.evaluate((detail) => {
       window.dispatchEvent(new CustomEvent("couchNativeEvent", { detail }));
     }, event);
   await context.exposeBinding(
     "__couchTestRequest",
-    async ({ page }, raw: Record<string, unknown>) => {
+    async ({ frame: sourceFrame }, raw: Record<string, unknown>) => {
       if (raw.kind === "seat-post") {
-        const route = [...seats].find(([, value]) => value.page === page);
+        const route = [...seats].find(
+          ([, value]) =>
+            (isPage(value.page) ? value.page.mainFrame() : value.page) ===
+            sourceFrame,
+        );
         if (route)
           await emit({
             kind: "seat-message",
@@ -42,7 +147,7 @@ export async function createCouchFixture(context: BrowserContext, shell: Page) {
           });
         return;
       }
-      if (page !== shell)
+      if (sourceFrame !== shell.mainFrame())
         throw new Error("Only the shell owns native session controls");
       switch (raw.kind) {
         case "setup":
@@ -81,15 +186,15 @@ export async function createCouchFixture(context: BrowserContext, shell: Page) {
           return { id: "saved-local", updatedAt };
         case "overlay":
           overlayOwner = raw.seatId as string | null;
-          return;
+          return relayout();
         case "layout":
-          return { layout: { fits: true } };
+          return relayout(raw.options as Record<string, unknown>);
         case "send": {
           const route = seats.get(String(raw.seatId));
           if (
             route &&
             route.generation === raw.generation &&
-            !route.page.isClosed()
+            !actorClosed(route.page)
           )
             await route.page.evaluate(
               (detail) =>
@@ -101,15 +206,34 @@ export async function createCouchFixture(context: BrowserContext, shell: Page) {
           return;
         }
         case "open": {
+          layoutOptions = { ...raw, ...layoutOptions };
           playing = true;
+          await relayout();
           for (const seat of raw.seats as { id: string }[]) {
-            const seatPage = await context.newPage();
+            let seatPage: Page | Frame;
+            if (options?.embedded) {
+              await shell.evaluate(
+                ({ id, seatId }) => {
+                  const frame = document.createElement("iframe");
+                  frame.id = id;
+                  frame.title = `${seatId} company`;
+                  document.body.appendChild(frame);
+                },
+                { id: iframeId(seat.id), seatId: seat.id },
+              );
+              const handle = await shell
+                .locator(`#${iframeId(seat.id)}`)
+                .elementHandle();
+              const frame = await handle?.contentFrame();
+              if (!frame) throw new Error("Could not create the seat document");
+              seatPage = frame;
+            } else seatPage = await context.newPage();
             const currentGeneration = ++generation;
             seats.set(seat.id, {
               page: seatPage,
               generation: currentGeneration,
             });
-            await seatPage.setViewportSize({ width: 620, height: 640 });
+            await relayout();
             const target = new URL(shell.url());
             target.search = `couchSeat=${seat.id}&generation=${currentGeneration}`;
             await seatPage.goto(target.href);
@@ -123,14 +247,19 @@ export async function createCouchFixture(context: BrowserContext, shell: Page) {
               generation: currentGeneration,
             });
           }
-          return { available: true, layout: { fits: true } };
+          return { available: true, layout };
         }
         case "close":
           playing = false;
           overlayOwner = null;
-          await Promise.all(
-            [...seats.values()].map(({ page: seatPage }) => seatPage.close()),
-          );
+          for (const { page: actor } of seats.values()) {
+            if (isPage(actor)) await actor.close();
+          }
+          await shell.evaluate(() => {
+            document
+              .querySelectorAll('iframe[id^="couch-fixture-"]')
+              .forEach((frame) => frame.remove());
+          });
           seats.clear();
           bindings.clear();
           return;
@@ -261,6 +390,7 @@ export async function createCouchFixture(context: BrowserContext, shell: Page) {
   return {
     seats,
     checkpoint: () => saved,
+    layout: () => layout,
     async input(actions: Record<string, DesktopInputAction[]>) {
       // Main selects routes before asynchronous renderer handlers bind a joining device.
       const sampledBindings = new Map(bindings);

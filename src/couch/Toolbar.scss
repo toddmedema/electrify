@@ -1,0 +1,50 @@
+.couchSharedToolbar {
+  width: 100%;
+  min-width: 0;
+
+  #topbar > .MuiToolbar-root {
+    gap: 16px;
+    flex-wrap: wrap !important;
+    padding-block: 8px;
+  }
+  #topbar .couchCalendar {
+    flex: 0 0 auto;
+    margin: 0;
+    min-width: 0;
+  }
+  .gameStatus .gameStatusHour {
+    display: inline;
+  }
+  .couchSharedMission {
+    flex: 1 1 20rem;
+    min-width: 0;
+    margin: 0;
+    border: 0;
+    background: none;
+    .missionSummary {
+      border: 0;
+      padding: 0;
+      width: 100%;
+      background: none;
+    }
+  }
+}
+.couchPlayerSpeeds {
+  display: flex;
+  gap: 16px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.couchPlayerSpeed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  .MuiToggleButton-root {
+    min-height: 40px;
+    min-width: 40px;
+  }
+}
+.couchSpeedPlayer {
+  font-weight: 600;
+  white-space: nowrap;
+}

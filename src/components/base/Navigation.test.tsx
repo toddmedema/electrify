@@ -40,12 +40,29 @@ afterAll(() => {
   window.PointerEvent = originalPointerEvent;
 });
 afterEach(() => {
+  delete window.electrifyCouch;
   resetInputPresentation();
   document.elementFromPoint = originalElementFromPoint;
   jest.useRealTimers();
 });
 
 describe("Navigation", () => {
+  it("keeps accessible icon-only actions in a couch company", () => {
+    window.electrifyCouch = {
+      role: "seat",
+      seatId: "local-p1",
+      getGeneration: () => 1,
+      ready: async () => {},
+      onMessage: () => () => {},
+      post: () => {},
+    };
+    renderNavigation();
+    for (const name of ["Build", "Programs", "Insights"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toHaveAccessibleName(name);
+      expect(button).not.toHaveTextContent(name);
+    }
+  });
   beforeEach(() => {
     store.dispatch(
       delta({

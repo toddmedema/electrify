@@ -234,7 +234,23 @@ export function startDesktopInput(
   };
   const act = (action: DesktopInputAction) => {
     const scope = inputScope();
-    if (["up", "down", "left", "right"].includes(action)) {
+    if (action === "menu") {
+      if (window.electrifyCouch?.role === "seat")
+        window.electrifyCouch.post({
+          kind: "global-menu",
+          requestId: crypto.randomUUID(),
+        });
+      else if (document.querySelector("[data-couch-shell]"))
+        document
+          .querySelector<HTMLElement>("[data-couch-shell] .gameMenuButton")
+          ?.click();
+      else {
+        if (context === "Gameplay") speed("pause");
+        else act("back");
+        return;
+      }
+      feedback("confirm");
+    } else if (["up", "down", "left", "right"].includes(action)) {
       const textControl = focusedTextControl();
       moveInputFocus(action as "up" | "down" | "left" | "right");
       choosingTextOption =
@@ -296,13 +312,19 @@ export function startDesktopInput(
       const blocked = overlay(scope);
       const cardBefore = store.getState().card;
       if (!backInput() && !blocked && store.getState().card === cardBefore) {
-        if (gameplay())
-          document
-            .querySelector<HTMLElement>(
-              ".base_main:not([inert]) .gameMenuButton",
-            )
-            ?.click();
-        else
+        if (gameplay()) {
+          if (window.electrifyCouch?.role === "seat")
+            window.electrifyCouch.post({
+              kind: "global-menu",
+              requestId: crypto.randomUUID(),
+            });
+          else
+            document
+              .querySelector<HTMLElement>(
+                ".base_main:not([inert]) .gameMenuButton",
+              )
+              ?.click();
+        } else
           controls()
             .find((button) => button.getAttribute("aria-label") === "Back")
             ?.click();

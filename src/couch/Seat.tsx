@@ -6,7 +6,6 @@ import { store } from "../Store";
 import CompositorContainer from "../components/CompositorContainer";
 import UnitsProvider from "../components/base/UnitsContext";
 import ScenarioChoiceDialog from "../components/base/ScenarioChoiceDialog";
-import InputHints from "../desktop/InputHints";
 import { startDesktopInput } from "../desktop/Input";
 import { initEconomy } from "../data/Economy";
 import { initFuelPrices } from "../data/FuelPrices";
@@ -19,6 +18,8 @@ import { registerMultiplayerRuntime } from "../multiplayer/Registry";
 import { CouchClient } from "./Client";
 import type { SettingsType } from "../Types";
 import type { GameType } from "../Types";
+import type { EvidenceTargetType } from "../Types";
+import { openEvidence } from "../helpers/Evidence";
 import "../TvLayout.scss";
 import "./couch.scss";
 
@@ -48,6 +49,7 @@ export default function CouchSeat() {
         kind?: string;
         generation?: number;
         settings?: SettingsType;
+        target?: EvidenceTargetType;
       };
       if (
         event.kind === "presentation" &&
@@ -64,6 +66,12 @@ export default function CouchSeat() {
             audioEnabled: false,
           }),
         );
+      } else if (
+        event.kind === "evidence" &&
+        event.generation === client.generation &&
+        event.target
+      ) {
+        store.dispatch(openEvidence(event.target));
       } else client.receive(message);
     });
     const stopInput = startDesktopInput(store, getDesktop()!);
@@ -105,11 +113,6 @@ export default function CouchSeat() {
       <ThemedApp>
         <UnitsProvider>
           <div className="appFrame couchSeat">
-            <div className="couchIdentity" aria-label="Player">
-              P{bridge.seatId.slice(-1)} ·{" "}
-              {state.view?.grids.find((grid) => grid.seat.id === bridge.seatId)
-                ?.seat.name ?? "Connecting company"}
-            </div>
             {state.error && <div role="alert">{state.error}</div>}
             <div className="appFrameBody">
               {loadError ? (
@@ -143,7 +146,6 @@ export default function CouchSeat() {
               )}
             </div>
             <ScenarioChoiceDialog />
-            <InputHints />
           </div>
         </UnitsProvider>
       </ThemedApp>
