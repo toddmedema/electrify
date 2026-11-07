@@ -2,6 +2,58 @@ import { expect, test, type Locator, type Page } from "./fixtures";
 import { openPane } from "./layout";
 import path from "path";
 
+async function ignoreForeignContact(page: Page, chart: Locator) {
+  const plot = chart.locator(".u-over");
+  await plot.scrollIntoViewIfNeeded();
+  const box = (await plot.boundingBox())!;
+  const initial = [
+    await chart.getAttribute("data-viewport-min"),
+    await chart.getAttribute("data-viewport-max"),
+  ];
+  // The page corner is outside the plot, so this contact belongs to the page,
+  // even while its global TouchList accompanies moves in the chart.
+  expect(box.y).toBeGreaterThan(1);
+  const foreign = { id: 99, x: 1, y: 1 };
+  const inside = (shift: number) => ({
+    id: 0,
+    x: Math.round(box.x + box.width * (0.35 + shift)),
+    y: Math.round(box.y + box.height * 0.5),
+  });
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [inside(0)],
+    });
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [inside(0), foreign],
+    });
+    for (const shift of [0.04, 0.08, 0.12]) {
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [inside(shift), foreign],
+      });
+    }
+    // Let the chart's scheduled range update and React layout settle before
+    // asserting that unrelated contacts did not navigate this viewport.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
+    await expect(chart).toHaveAttribute("data-viewport-min", initial[0]!);
+    await expect(chart).toHaveAttribute("data-viewport-max", initial[1]!);
+  } finally {
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await session.detach();
+  }
+}
+
 async function navigateWithTwoFingers(
   page: Page,
   chart: Locator,
@@ -161,6 +213,7 @@ for (const theme of ["light", "dark"]) {
     const range = await chart.getAttribute("data-viewport-min");
     await scrub(page, chart);
     await expect(chart).toHaveAttribute("data-viewport-min", range!);
+    await ignoreForeignContact(page, chart);
     const moved = await navigateWithTwoFingers(page, chart, theme === "dark");
     const synced = insights.locator('[data-layer="supplyDemand"] [role=img]');
     await expect(synced).toHaveAttribute("data-viewport-min", String(moved[0]));

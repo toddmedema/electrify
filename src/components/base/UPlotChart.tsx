@@ -723,6 +723,7 @@ export default function UPlotChart<S>(
     let wheelTimer: ReturnType<typeof setTimeout> | undefined;
     let scrollReleaseFrame: number | undefined;
     let drag: { id: number; x: number } | undefined;
+    const ownedTouchIds = new Set<number>();
     let pinch:
       | {
           ids: [number, number];
@@ -845,8 +846,12 @@ export default function UPlotChart<S>(
         commit();
       }, 160);
     };
-    const startPinch = (event: TouchEvent) => {
-      const [a, b] = Array.from(event.touches);
+    const plotTouches = (event: TouchEvent) =>
+      Array.from(event.touches).filter((touch) =>
+        ownedTouchIds.has(touch.identifier),
+      );
+    const startPinch = (touches: Touch[]) => {
+      const [a, b] = touches;
       if (!a || !b) return;
       holdScroll();
       pinch = {
@@ -857,27 +862,32 @@ export default function UPlotChart<S>(
       };
     };
     const onTouchStart = (event: TouchEvent) => {
-      if (event.touches.length < 2) return;
+      for (const touch of Array.from(event.changedTouches)) {
+        if (touch.target instanceof Node && over.contains(touch.target))
+          ownedTouchIds.add(touch.identifier);
+      }
+      const touches = plotTouches(event);
+      if (touches.length < 2) return;
       // Cancel native scrolling/zoom before it can take over this gesture. Touch events
       // supply both positions together; individual pointer moves would invent a pinch
       // between the two halves of an otherwise parallel two-finger swipe.
       event.preventDefault();
       if (!pinch) {
         liveRange = viewportRef.current?.range ?? liveRange;
-        startPinch(event);
+        startPinch(touches);
       }
     };
     const onTouchMove = (event: TouchEvent) => {
-      if (event.touches.length < 2) return;
+      const touches = plotTouches(event);
+      if (touches.length < 2) return;
       event.preventDefault();
       const value = viewportRef.current;
       if (!value) return;
       if (!pinch) {
-        startPinch(event);
+        startPinch(touches);
         return;
       }
       const gesture = pinch;
-      const touches = Array.from(event.touches);
       const a = touches.find((touch) => touch.identifier === gesture.ids[0]);
       const b = touches.find((touch) => touch.identifier === gesture.ids[1]);
       if (!a || !b) return;
@@ -900,10 +910,13 @@ export default function UPlotChart<S>(
       );
     };
     const onTouchEnd = (event: TouchEvent) => {
+      const remaining = plotTouches(event);
+      for (const id of ownedTouchIds) {
+        if (!remaining.some((touch) => touch.identifier === id))
+          ownedTouchIds.delete(id);
+      }
       if (!pinch) return;
-      const remaining = Array.from(event.touches);
       if (
-        event.type !== "touchcancel" &&
         pinch.ids.every((id) =>
           remaining.some((touch) => touch.identifier === id),
         )
@@ -911,7 +924,7 @@ export default function UPlotChart<S>(
         return;
       commit();
       pinch = undefined;
-      if (event.type !== "touchcancel") startPinch(event);
+      if (event.type !== "touchcancel") startPinch(remaining);
       // Keep the anchor through the final React layout, including an unpainted pending range.
       if (!pinch) scrollReleaseFrame = requestAnimationFrame(releaseScroll);
     };
@@ -968,6 +981,7 @@ export default function UPlotChart<S>(
     over.addEventListener("pointercancel", onPointerEnd);
     over.addEventListener("dblclick", onDoubleClick);
     return () => {
+      ownedTouchIds.clear();
       over.style.touchAction = "";
       over.removeEventListener("wheel", onWheel);
       over.removeEventListener("touchstart", onTouchStart);

@@ -691,12 +691,15 @@ describe("UPlotChart resizing", () => {
       );
       const touch = (type: string, positions: number[], y = 10) => {
         const event = new Event(type, { bubbles: true, cancelable: true });
+        const touches = positions.map((clientX, identifier) => ({
+          identifier,
+          clientX,
+          clientY: y,
+          target: currentPlot().over,
+        }));
         Object.assign(event, {
-          touches: positions.map((clientX, identifier) => ({
-            identifier,
-            clientX,
-            clientY: y,
-          })),
+          touches,
+          changedTouches: touches,
         });
         act(() => currentPlot().over.dispatchEvent(event));
         return event;
@@ -720,6 +723,165 @@ describe("UPlotChart resizing", () => {
       touch("touchmove", [150]);
       act(() => jest.advanceTimersByTime(20));
       expect(onRangeChange).not.toHaveBeenCalled();
+    },
+  );
+
+  const viewportTouch = (
+    target: HTMLElement,
+    type: string,
+    touches: Array<{
+      identifier: number;
+      clientX: number;
+      clientY: number;
+      target: EventTarget;
+    }>,
+    changedTouches = touches,
+  ) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.assign(event, { touches, changedTouches });
+    act(() => target.dispatchEvent(event));
+    return event;
+  };
+  const renderTouchViewport = (name: string, onRangeChange: jest.Mock) => {
+    render(
+      <ChartViewportContext.Provider
+        value={{
+          bounds: [0, 100],
+          range: [25, 75],
+          minSpan: 10,
+          onRangeChange,
+          onReset: jest.fn(),
+        }}
+      >
+        <UPlotChart
+          ariaLabel={name}
+          state={{}}
+          data={[
+            [0, 100],
+            [2, 3],
+          ]}
+          buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+        />
+      </ChartViewportContext.Provider>,
+    );
+    return currentPlot().over as HTMLDivElement;
+  };
+
+  it.each(["neighboring chart", "unrelated control"])(
+    "ignores a contact that started on a %s",
+    (outside) => {
+      const onRangeChange = jest.fn();
+      const otherRangeChange = jest.fn();
+      const over = renderTouchViewport("Owned chart", onRangeChange);
+      const foreign =
+        outside === "neighboring chart"
+          ? renderTouchViewport("Other chart", otherRangeChange)
+          : document.createElement("button");
+      const own = (x: number) => ({
+        identifier: 0,
+        clientX: x,
+        clientY: 10,
+        target: over,
+      });
+      const other = (x: number) => ({
+        identifier: 1,
+        clientX: x,
+        clientY: 10,
+        target: foreign,
+      });
+
+      viewportTouch(over, "touchstart", [own(100)]);
+      viewportTouch(
+        foreign,
+        "touchstart",
+        [own(100), other(200)],
+        [other(200)],
+      );
+      viewportTouch(over, "touchmove", [own(140), other(240)], [own(140)]);
+      // Touch.target remains the original element even when the other finger moves
+      // over this plot. Global contacts must not become this chart's pinch pair.
+      const move = viewportTouch(
+        over,
+        "touchmove",
+        [own(160), other(360)],
+        [own(160)],
+      );
+      act(() => jest.advanceTimersByTime(20));
+      viewportTouch(over, "touchend", [other(360)], [own(160)]);
+      viewportTouch(foreign, "touchend", [], [other(360)]);
+      expect(onRangeChange).not.toHaveBeenCalled();
+      expect(otherRangeChange).not.toHaveBeenCalled();
+      expect(move.defaultPrevented).toBe(false);
+    },
+  );
+
+  it.each(["touchend", "touchcancel"])(
+    "does not replace an owned pinch contact with an unrelated contact after %s",
+    (type) => {
+      const onRangeChange = jest.fn();
+      const over = renderTouchViewport("Owned chart", onRangeChange);
+      const foreign = document.createElement("button");
+      const own = (identifier: number, clientX: number) => ({
+        identifier,
+        clientX,
+        clientY: 10,
+        target: over,
+      });
+      const other = (clientX: number) => ({
+        identifier: 99,
+        clientX,
+        clientY: 10,
+        target: foreign,
+      });
+
+      viewportTouch(over, "touchstart", [own(0, 100), own(1, 200)]);
+      viewportTouch(
+        over,
+        "touchmove",
+        [other(320), own(0, 140), own(1, 240)],
+        [own(0, 140), own(1, 240)],
+      );
+      act(() => jest.advanceTimersByTime(20));
+      expect(onRangeChange).toHaveBeenLastCalledWith([20, 70]);
+      viewportTouch(over, type, [other(320), own(0, 140)], [own(1, 240)]);
+      expect(onRangeChange).toHaveBeenLastCalledWith([20, 70], true);
+      onRangeChange.mockClear();
+      viewportTouch(
+        over,
+        "touchmove",
+        [other(340), own(0, 160)],
+        [own(0, 160)],
+      );
+      const move = viewportTouch(
+        over,
+        "touchmove",
+        [other(360), own(0, 180)],
+        [own(0, 180)],
+      );
+      act(() => jest.advanceTimersByTime(20));
+      expect(onRangeChange).not.toHaveBeenCalled();
+      expect(move.defaultPrevented).toBe(false);
+
+      // A new second contact in this plot still starts a valid pinch, even while
+      // an unrelated finger precedes both owned contacts in the global list.
+      expect(
+        viewportTouch(
+          over,
+          "touchstart",
+          [other(360), own(0, 180), own(2, 280)],
+          [own(2, 280)],
+        ).defaultPrevented,
+      ).toBe(true);
+      viewportTouch(
+        over,
+        "touchmove",
+        [other(360), own(0, 130), own(2, 330)],
+        [own(0, 130), own(2, 330)],
+      );
+      act(() => jest.advanceTimersByTime(20));
+      const range = onRangeChange.mock.calls.at(-1)?.[0];
+      expect(range[1] - range[0]).toBeCloseTo(25);
+      viewportTouch(over, "touchend", [other(360)], [own(0, 130), own(2, 330)]);
     },
   );
 
@@ -766,15 +928,18 @@ describe("UPlotChart resizing", () => {
     }));
     const touch = (type: string) => {
       const event = new Event(type, { bubbles: true, cancelable: true });
+      const touches =
+        type === "touchstart"
+          ? [100, 200].map((clientX, identifier) => ({
+              identifier,
+              clientX,
+              clientY: 10,
+              target: plot.over,
+            }))
+          : [];
       Object.assign(event, {
-        touches:
-          type === "touchstart"
-            ? [100, 200].map((clientX, identifier) => ({
-                identifier,
-                clientX,
-                clientY: 10,
-              }))
-            : [],
+        touches,
+        changedTouches: touches,
       });
       act(() => plot.over.dispatchEvent(event));
     };
