@@ -254,11 +254,12 @@ describe("dynamic gameplay mix", () => {
   it("keeps the full initial fade while pressure rises, without recreating sources", () => {
     const { themeManager, context, gains, sources } = musicHarness();
     themeManager.setIntensity(2);
-    for (const gain of gains)
+    for (const gain of gains.slice(0, 2))
       expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
         MUSIC_GAME_VOLUME,
         5.02,
       );
+    expect(gains[2].linearRampToValueAtTime).toHaveBeenLastCalledWith(0, 5.02);
     context.currentTime = 1;
     themeManager.setIntensity(10);
     for (const gain of gains)
@@ -266,7 +267,21 @@ describe("dynamic gameplay mix", () => {
     expect(sources).toHaveLength(3);
   });
 
-  it("lifts urgent layers first and holds brief recoveries before releasing smoothly", () => {
+  it.each([
+    ["calm", 2, 0],
+    ["just below healthy reserves", 2.001, 0.177827941],
+    ["low reserves", 4, 0.177827941],
+    ["exhausted reserves without a blackout", 6, 0.177827941],
+    ["a small blackout", 7.6, 1],
+    ["a severe blackout", 10, 1],
+  ])("sets the high layer's gain for %s", (_state, intensity, expectedGain) => {
+    const { themeManager, gains } = musicHarness();
+    themeManager.setIntensity(intensity);
+    const target = gains[2].linearRampToValueAtTime.mock.calls.at(-1)![0];
+    expect(target).toBeCloseTo(expectedGain, 8);
+  });
+
+  it("fades the high layer up over three seconds and back to silence after a recovery hold", () => {
     const { themeManager, context, gains, sources } = musicHarness();
     themeManager.setIntensity(2);
     context.currentTime = 20;
@@ -276,17 +291,24 @@ describe("dynamic gameplay mix", () => {
     );
     expect(targets[0]).toBeGreaterThan(MUSIC_GAME_VOLUME);
     expect(targets[1]).toBeGreaterThan(targets[0]);
-    expect(targets[2]).toBeGreaterThan(targets[1]);
+    expect(targets[2]).toBeCloseTo(0.177827941, 8);
+    expect(gains[2].cancelAndHoldAtTime).toHaveBeenLastCalledWith(20);
+    expect(gains[2].linearRampToValueAtTime.mock.calls.at(-1)![1]).toBe(23);
+    context.currentTime = 24;
+    themeManager.setIntensity(7.6);
+    expect(gains[2].linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 27);
     themeManager.setIntensity(2);
     jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS - 1);
-    expect(gains[0].linearRampToValueAtTime).toHaveBeenCalledTimes(2);
-    context.currentTime = 28;
+    expect(gains[2].linearRampToValueAtTime).toHaveBeenCalledTimes(3);
+    context.currentTime = 32;
     jest.advanceTimersByTime(1);
-    for (const gain of gains)
+    for (const gain of gains.slice(0, 2))
       expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
         MUSIC_GAME_VOLUME,
-        38,
+        42,
       );
+    expect(gains[2].cancelAndHoldAtTime).toHaveBeenLastCalledWith(32);
+    expect(gains[2].linearRampToValueAtTime).toHaveBeenLastCalledWith(0, 42);
     expect(sources).toHaveLength(3);
   });
 
@@ -301,6 +323,10 @@ describe("dynamic gameplay mix", () => {
     expect(gains[1].linearRampToValueAtTime).toHaveBeenLastCalledWith(
       0.925,
       30,
+    );
+    expect(gains[2].linearRampToValueAtTime.mock.calls.at(-1)![0]).toBeCloseTo(
+      0.177827941,
+      8,
     );
     themeManager.setIntensity(2);
     themeManager.setIntensity(10);
@@ -321,10 +347,11 @@ describe("dynamic gameplay mix", () => {
     themeManager.resume();
     for (const source of sources.slice(3))
       expect(source.start).toHaveBeenCalledWith(90.02, 40);
-    for (const gain of gains.slice(3))
+    for (const gain of gains.slice(3, 5))
       expect(gain.linearRampToValueAtTime.mock.calls.at(-1)![0]).toBe(
         MUSIC_GAME_VOLUME,
       );
+    expect(gains[5].linearRampToValueAtTime.mock.calls.at(-1)![0]).toBe(0);
   });
 });
 
