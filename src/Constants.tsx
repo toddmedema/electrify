@@ -333,6 +333,8 @@ export const NAV_CARDS = [
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const NAVIGATION_DEBOUNCE_MS = 600;
 export const MUSIC_INTENSITY_MAX = 10;
+// Reserve pressure occupies 0–0.5; live blackouts are above this range.
+export const MUSIC_LOW_RESERVE_PRESSURE_MAX = 0.5;
 
 export interface MusicDefinition {
   directory: string;

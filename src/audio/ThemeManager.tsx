@@ -3,9 +3,14 @@ import {
   MUSIC_FADE_SECONDS,
   MUSIC_GAME_VOLUME,
   MUSIC_INTENSITY_MAX,
+  MUSIC_LOW_RESERVE_PRESSURE_MAX,
   MusicDefinition,
 } from "../Constants";
 import { AudioNode } from "./AudioNode";
+import { pow } from "../helpers/Pow";
+
+// Web Audio gains are amplitude ratios: -15 dB is 10^(-15/20), about 17.8% gain.
+const MUSIC_HIGH_LOW_RESERVE_GAIN = pow(10, -15 / 20);
 
 export const MUSIC_PRESSURE_HOLD_MS = 8000;
 export const MUSIC_PRESSURE_ATTACK_SECONDS = 3;
@@ -117,19 +122,20 @@ export class ThemeManager {
     return Math.max(0, (this.intensity - 2) / (MUSIC_INTENSITY_MAX - 2));
   }
 
-  /** Keep menu volume steady and lift gameplay layers in order as grid pressure rises. */
+  /** Bring in the high layer at low reserves, reaching full gain only during blackouts. */
   private trackVolume(track: string): number {
     if (this.theme === MUSIC_DEFINITIONS.menu) {
       return 1;
     }
-    // Keep every authored layer at 85% when stable. Lift the urgent high layer first, then the
-    // medium and low layers, reaching the original ceiling together in a severe blackout.
     const pressure = this.mixedPressure;
-    const lift = track.startsWith("high")
-      ? Math.sqrt(pressure)
-      : track.startsWith("low")
-        ? pressure * pressure
-        : pressure;
+    if (track.startsWith("high")) {
+      if (pressure === 0) return 0;
+      return pressure <= MUSIC_LOW_RESERVE_PRESSURE_MAX
+        ? MUSIC_HIGH_LOW_RESERVE_GAIN
+        : 1;
+    }
+    // Keep the supporting layers at 85% when calm, lifting them as pressure rises.
+    const lift = track.startsWith("low") ? pressure * pressure : pressure;
     return MUSIC_GAME_VOLUME + (1 - MUSIC_GAME_VOLUME) * lift;
   }
 
