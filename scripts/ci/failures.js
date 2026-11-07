@@ -136,7 +136,7 @@ function reproduce(tests) {
       commands.add(
         `${spec}:${line} runs only in CI (native windows); read its trace in the diagnostics artifact`,
       );
-    else if (spec === "e2e/steam-input.spec.ts")
+    else if (["e2e/steam-input.spec.ts", "e2e/couch.spec.ts"].includes(spec))
       commands.add("npm run check -- --steps steam-input");
     else if (["e2e/multiplayer.spec.ts", "e2e/mods.spec.ts"].includes(spec))
       commands.add("npm run check -- --steps multiplayer");

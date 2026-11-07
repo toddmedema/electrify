@@ -1,3 +1,4 @@
+import { withCouchPlatform } from "../couch/Platform";
 import type { AppStore } from "../Store";
 import { getDesktop } from "../Desktop";
 import { initializeDesktopSaves } from "../DesktopSaves";
@@ -15,12 +16,13 @@ export async function initializeDesktop(): Promise<void> {
 export function startDesktopServices(store: AppStore): () => void {
   const desktop = getDesktop();
   if (!desktop) return () => {};
+  const account = withCouchPlatform(store);
   const feedback = startDesktopFeedback(store);
   const stops = [
-    startDesktopActivity(store, desktop),
+    startDesktopActivity(account, desktop),
     feedback,
     startDesktopInput(store, desktop, feedback.controllerCue),
-    startAchievements(store, desktop),
+    startAchievements(account, desktop),
   ];
   return () => stops.forEach((stop) => stop());
 }

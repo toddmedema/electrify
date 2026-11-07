@@ -97,6 +97,7 @@ class SteamInput {
     this.context = "Menu";
     this.enabled = false;
     this.controllers = new Map();
+    this.deviceContexts = new Map();
     this.connectedHandles = [];
     this.sets = new Map();
     this.handles = new Map();
@@ -142,6 +143,41 @@ class SteamInput {
     return { ...this.frame, actions: [] };
   }
 
+  setDeviceMode(enabled) {
+    this.deviceMode = enabled;
+    for (const state of this.controllers.values()) state.armed = false;
+  }
+
+  setDevicePublisher(publish) {
+    this.devicePublisher = publish;
+    this.deviceSnapshots = new Map();
+  }
+
+  setDeviceContext(id, context) {
+    validateInputContext(context);
+    if (typeof id !== "string" || !/^\d+$/.test(id))
+      return { connected: false, actions: [], glyphs: {} };
+    const controller = BigInt(id);
+    if (this.deviceContexts.get(controller) !== context) {
+      this.deviceContexts.set(controller, context);
+      this.controllers.delete(controller);
+    }
+    return {
+      connected: this.connectedHandles.includes(controller),
+      actions: [],
+      glyphs: this.controllers.get(controller)?.glyphs ?? {},
+    };
+  }
+
+  releaseDevice(id) {
+    if (typeof id !== "string" || !/^\d+$/.test(id)) return;
+    const state = this.controllers.get(BigInt(id));
+    if (state) {
+      state.armed = false;
+      state.held.clear();
+    }
+  }
+
   handle(cache, name, getter) {
     if (!cache.has(name)) {
       const handle = getter(this.input, name);
@@ -160,6 +196,15 @@ class SteamInput {
     try {
       this.readFrame();
     } catch (error) {
+      this.devicePublisher?.(
+        this.connectedHandles.map((handle) => ({
+          id: String(handle),
+          connected: false,
+          disconnected: true,
+          actions: [],
+          glyphs: {},
+        })),
+      );
       if (this.frame.connected)
         this.publish({
           connected: false,
@@ -191,24 +236,34 @@ class SteamInput {
       if (!handles.includes(handle)) this.controllers.delete(handle);
     const actionSet = this.handle(this.sets, this.context, api.actionSet);
     const actions = new Set();
+    const deviceFrames = [];
     const now = this.now();
     for (const controller of handles) {
+      const context = this.deviceContexts.get(controller) ?? this.context;
+      const deviceSet = this.handle(this.sets, context, api.actionSet);
+      const deviceActions = new Set();
       let state = this.controllers.get(controller);
       if (!state) {
         state = { armed: false, held: new Map() };
         this.controllers.set(controller, state);
-        if (actionSet) api.activate(input, controller, actionSet);
+        if (deviceSet) api.activate(input, controller, deviceSet);
+        deviceFrames.push({
+          id: String(controller),
+          connected: true,
+          actions: [],
+          glyphs: {},
+        });
         // Activate before the next RunFrame, so the first read sees the new set.
         continue;
       }
-      if (!actionSet) continue;
-      api.activate(input, controller, actionSet);
+      if (!deviceSet) continue;
+      api.activate(input, controller, deviceSet);
       let active = false;
       let held = false;
-      for (const action of ACTION_SETS[this.context]) {
+      for (const action of ACTION_SETS[context]) {
         const handle = this.handle(
           this.handles,
-          `${this.context}_${action}`,
+          `${context}_${action}`,
           api.action,
         );
         if (!handle) continue;
@@ -221,17 +276,55 @@ class SteamInput {
           pressed &&
           this.enabled &&
           state.armed &&
-          !disconnected &&
+          (!disconnected || !!this.deviceMode) &&
           (repeatAt === undefined ||
             (DIRECTIONS.has(action) && now >= repeatAt))
         ) {
           actions.add(action);
+          deviceActions.add(action);
           this.glyphController = controller;
           state.held.set(action, now + (repeatAt === undefined ? 400 : 120));
         } else if (!pressed) state.held.delete(action);
       }
-      if (!this.enabled || disconnected) state.armed = false;
+      if (!this.enabled || (disconnected && !this.deviceMode))
+        state.armed = false;
       else if (active && !held) state.armed = true;
+      if (now >= (state.glyphAt ?? 0)) {
+        state.glyphs = this.readGlyphs(controller, deviceSet, context);
+        state.glyphAt = now + 1000;
+      }
+      deviceFrames.push({
+        id: String(controller),
+        connected: true,
+        actions: [...deviceActions],
+        glyphs: state.glyphs ?? {},
+      });
+    }
+    if (this.devicePublisher) {
+      for (const id of this.deviceSnapshots.keys())
+        if (!handles.some((handle) => String(handle) === id))
+          deviceFrames.push({
+            id,
+            connected: false,
+            disconnected: true,
+            actions: [],
+            glyphs: {},
+          });
+      const snapshot = new Map(
+        deviceFrames
+          .filter((frame) => frame.connected)
+          .map((frame) => [
+            frame.id,
+            JSON.stringify({ ...frame, actions: [] }),
+          ]),
+      );
+      if (
+        deviceFrames.some((frame) => frame.actions.length) ||
+        JSON.stringify([...snapshot]) !==
+          JSON.stringify([...this.deviceSnapshots])
+      )
+        this.devicePublisher(deviceFrames);
+      this.deviceSnapshots = snapshot;
     }
     const glyphController = handles.includes(this.glyphController)
       ? this.glyphController
@@ -267,11 +360,11 @@ class SteamInput {
     }
   }
 
-  readGlyphs(controller, actionSet) {
+  readGlyphs(controller, actionSet, context = this.context) {
     if (!controller || !actionSet) return {};
     const glyphs = {};
-    for (const action of ACTION_SETS[this.context]) {
-      const handle = this.handles.get(`${this.context}_${action}`);
+    for (const action of ACTION_SETS[context]) {
+      const handle = this.handles.get(`${context}_${action}`);
       if (!handle) continue;
       const origins = Buffer.alloc(8 * 4);
       const count = this.api.origins(

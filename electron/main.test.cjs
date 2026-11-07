@@ -494,3 +494,24 @@ test("feedback opens in the system browser while unapproved URLs stay blocked", 
   assert.equal(prevented, true);
   assert.deepEqual(f.externalUrls, [feedback, discord, feedback]);
 });
+
+test("unaccepted couch play is disabled in the ordinary desktop runtime", async (t) => {
+  const { request } = await startup(t);
+  const status = await request("desktop:couch", { kind: "status" });
+  assert.equal(status.preview, false);
+  assert.equal(
+    await request("desktop:couch", {
+      kind: "cancel-text",
+      requestId: "obsolete-request",
+    }),
+    false,
+  );
+  await assert.rejects(
+    request("desktop:couch", { kind: "setup" }),
+    /development preview/,
+  );
+  await assert.rejects(
+    request("desktop:couch", { kind: "open", seats: [] }),
+    /development preview/,
+  );
+});

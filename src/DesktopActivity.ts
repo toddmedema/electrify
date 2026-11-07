@@ -17,8 +17,9 @@ export function desktopActivity(state: RootState): DesktopActivity {
   const timelineEnabled = !!state.settings.steamTimelineEnabled;
   if (card.name === "LOADING" || saves.transitioning)
     return { phase: "loading", timelineEnabled };
-  const phase = ui.victory
-    ? ui.victory.outcome === "completed"
+  const ending = ui.victory ?? game.multiplayer?.ending;
+  const phase = ending
+    ? ending.outcome === "completed"
       ? "victory"
       : "ended"
     : !game.inGame || card.name === "MAIN_MENU"
@@ -139,14 +140,16 @@ export function startDesktopActivity(
       }
     }
     highWater.set(runId, Math.max(seen, latest));
-    const victory = current.ui.victory;
+    const victory = current.ui.victory ?? game.multiplayer?.ending;
+    const previousVictory =
+      previous.ui.victory ?? previous.game.multiplayer?.ending;
     if (victory?.outcome === "completed") {
       if (
         enabled &&
         !reset &&
         previous.settings.steamTimelineEnabled &&
         !current.saves.transitioning &&
-        previous.ui.victory !== victory &&
+        previousVictory !== victory &&
         !victories.has(runId)
       )
         send("victory", "victory");
@@ -166,7 +169,10 @@ export function startDesktopActivity(
     runKey(previous),
     Math.max(0, ...previous.game.eventLog.map(({ id }) => id)),
   );
-  if (previous.ui.victory?.outcome === "completed")
+  if (
+    (previous.ui.victory ?? previous.game.multiplayer?.ending)?.outcome ===
+    "completed"
+  )
     victories.add(runKey(previous));
   publish(previous);
   const unsubscribe = store.subscribe(update);

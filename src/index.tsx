@@ -86,7 +86,22 @@ const startDesktop: () => Promise<void> =
       }
     : async () => {};
 const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
-if (desktopApp) void startDesktop();
+if (
+  process.env.REACT_APP_DESKTOP === "true" &&
+  window.electrifyCouch?.role === "seat"
+) {
+  void Promise.all([
+    window.electrifyCouch.ready(),
+    import(/* webpackChunkName: "couch-seat" */ "./couch/Seat"),
+  ]).then(([, { default: Seat }]) => {
+    root.render(
+      <Provider store={store}>
+        <Seat />
+        <StartupHandoff />
+      </Provider>,
+    );
+  });
+} else if (desktopApp) void startDesktop();
 else {
   const startWeb = () => {
     void prepareAchievements()

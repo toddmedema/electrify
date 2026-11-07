@@ -1,6 +1,8 @@
 const {
   app,
   BrowserWindow,
+  WebContentsView,
+  MessageChannelMain,
   dialog,
   ipcMain,
   protocol,
@@ -23,6 +25,8 @@ const {
   validateScore,
 } = require("./runtime.cjs");
 const { atomicWrite, readJson, DesktopSaveStore } = require("./storage.cjs");
+const { CouchViews } = require("./couch.cjs");
+const { LocalCoopSaveStore } = require("./local-coop-storage.cjs");
 const { SteamService } = require("./steam.cjs");
 const { SteamMultiplayer, lobbyFromArgs } = require("./steam-multiplayer.cjs");
 const { ModStore } = require("./mods.cjs");
@@ -87,8 +91,14 @@ if (primaryInstance)
       (process.env.ELECTRIFY_TEST === "1" ||
         process.env.ELECTRIFY_OFFLINE === "1"),
   );
+const couchPreviewEnabled =
+  (!app.isPackaged && process.env.ELECTRIFY_TEST === "1") ||
+  process.env.ELECTRIFY_COUCH_PREVIEW === "1";
 let window;
 let saves;
+let couch;
+let localSaves;
+let couchTextRequest;
 let preferences;
 let quitting = false;
 let finalizingQuit = false;
@@ -148,6 +158,14 @@ function state() {
   };
 }
 
+function closeCouch() {
+  if (couchTextRequest) {
+    couchTextRequest = undefined;
+    steam.textInput?.finish({ status: "cancelled" });
+  }
+  couch?.close();
+}
+
 function publishState() {
   if (window && !window.isDestroyed())
     window.webContents.send("desktop:state-changed", state());
@@ -175,8 +193,19 @@ function publishGameFocus() {
         !quitRequested &&
         power.phase === "awake",
     );
+  couch?.foreground(
+    !!window &&
+      !window.isDestroyed() &&
+      window.isFocused() &&
+      !steam.overlayActive &&
+      !steam.textInput?.active &&
+      !steam.dialogs?.active &&
+      !quitRequested &&
+      power.phase === "awake",
+  );
 }
-steam.onOverlayChanged = publishGameFocus;
+const publishOriginalGameFocus = publishGameFocus;
+steam.onOverlayChanged = publishOriginalGameFocus;
 
 function publishPower(phase) {
   power = { phase, generation: power.generation + 1 };
@@ -184,6 +213,8 @@ function publishPower(phase) {
   steam.setInputEnabled(false);
   if (window && !window.isDestroyed())
     window.webContents.send("desktop:power-changed", { ...power });
+  for (const seat of couch?.seats.values() ?? [])
+    seat.view.webContents.send("desktop:power-changed", { ...power });
   publishGameFocus();
 }
 
@@ -361,7 +392,21 @@ handle("desktop:friends", () => {
 });
 handle("desktop:activity", (activity) => steam.setActivity(activity));
 handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
-handle("desktop:input-context", (context) => steam.setInputContext(context));
+handle("desktop:input-context", (context) => {
+  if (couch?.active()) {
+    if (!couch.setup && !couch.overlayOwner)
+      return { connected: false, actions: [], glyphs: {} };
+    const owner = couch.bindings.get(couch.shellOwner());
+    return (
+      steam.input?.setDeviceContext(owner, context) ?? {
+        connected: false,
+        actions: [],
+        glyphs: {},
+      }
+    );
+  }
+  return steam.setInputContext(context);
+});
 handle("desktop:text-input", (input) => {
   if (
     !window?.isFocused() ||
@@ -411,6 +456,150 @@ function multiplayerRequest(input) {
   return steam.multiplayer.request(input);
 }
 handle("desktop:multiplayer", multiplayerRequest);
+handle("desktop:couch", async (input) => {
+  if (!input || typeof input !== "object")
+    throw new Error("Invalid local session request");
+  switch (input.kind) {
+    case "status":
+      return {
+        ...(couch?.status() ?? { available: false, devices: [] }),
+        preview: couchPreviewEnabled,
+      };
+    case "setup":
+      if (!couchPreviewEnabled)
+        throw new Error(
+          "On this TV is a development preview pending controller and hardware acceptance",
+        );
+      if (!couch?.status().available)
+        throw new Error(
+          "Steam Input is unavailable. Start through Steam with installed controller bindings, including Offline Mode.",
+        );
+      if (couch.seats.size) throw new Error("A local session is already open");
+      couch.setup = true;
+      steam.input?.setDeviceMode(true);
+      steam.input?.setContext("Menu");
+      for (const device of couch.devices) steam.input?.releaseDevice(device.id);
+      return couch.status();
+    case "setup-confirm":
+      if (typeof input.value !== "boolean")
+        throw new Error("Invalid setup confirmation mode");
+      couch.confirmOnly = input.value;
+      return couch.status();
+    case "open":
+      if (!couchPreviewEnabled)
+        throw new Error(
+          "On this TV is a development preview pending controller and hardware acceptance",
+        );
+      return couch.open(input);
+    case "close":
+      closeCouch();
+      return couch.status();
+    case "reset-bindings":
+      if (couch.seats.size)
+        throw new Error("The company roster is frozen during a match");
+      for (const device of couch.devices) steam.input?.releaseDevice(device.id);
+      couch.bindings.clear();
+      return couch.status();
+    case "bind":
+      return couch.bind(input.seatId, input.controllerId);
+    case "send":
+      return couch.send(input);
+    case "layout":
+      return couch.relayout(
+        input.options ?? {
+          bandHeight: input.bandHeight,
+          zoom: input.zoom,
+          inset: input.inset,
+          gutter: input.gutter,
+        },
+      );
+    case "overlay":
+      return couch.overlay(
+        input.seatId ?? (input.open ? input.ownerSeatId : null),
+      );
+    case "reload-seat":
+      return couch.reload(input.seatId);
+    case "cancel-text":
+      if (
+        typeof input.requestId !== "string" ||
+        couchTextRequest?.id !== input.requestId
+      )
+        return false;
+      steam.textInput?.finish({ status: "cancelled" });
+      return true;
+    case "list-saves":
+      return localSaves.list();
+    case "read-save":
+      return localSaves.select(input.id);
+    case "write-save":
+      return localSaves.save(input.world);
+    case "delete-save":
+      return localSaves.remove(input.id);
+    default:
+      throw new Error("Unknown local session request");
+  }
+});
+ipcMain.handle("couch:state", (event) => {
+  if (!couch?.identify(event)) throw new Error("Untrusted local seat request");
+  return state();
+});
+ipcMain.handle("couch:input-context", (event, context) => {
+  const seat = couch?.identify(event);
+  if (!seat) throw new Error("Untrusted local seat request");
+  return couch.setContext(seat, context);
+});
+ipcMain.handle("couch:text-input", async (event, input) => {
+  const seat = couch?.identify(event);
+  if (!seat) throw new Error("Untrusted local seat request");
+  if (
+    couchTextRequest ||
+    couch.overlayOwner ||
+    !window.isFocused() ||
+    steam.overlayActive ||
+    steam.dialogs?.active ||
+    quitRequested ||
+    power.phase !== "awake"
+  )
+    return { status: "unavailable" };
+  const request = {
+    seatId: seat.id,
+    generation: seat.generation,
+    id: crypto.randomUUID(),
+  };
+  couchTextRequest = request;
+  couch.overlay(seat.id);
+  request.overlayVersion = couch.overlayVersion;
+  window.webContents.send("desktop:couch-event", {
+    kind: "global-text",
+    open: true,
+    ...request,
+  });
+  try {
+    const result = await steam.showTextInput(input);
+    if (
+      couch.seats.get(seat.id) !== seat ||
+      seat.generation !== request.generation
+    )
+      return { status: "cancelled" };
+    return result;
+  } finally {
+    if (couchTextRequest === request) {
+      couchTextRequest = undefined;
+      if (
+        couch.overlayVersion === request.overlayVersion &&
+        couch.seats.get(seat.id) === seat &&
+        seat.generation === request.generation
+      )
+        couch.overlay(null);
+      window.webContents.send("desktop:couch-event", {
+        kind: "global-text",
+        open: false,
+        ...request,
+      });
+    }
+  }
+});
+
 ipcMain.on("desktop:ready-to-quit", (event, success) => {
   if (
     !trustedSender(event, window) ||
@@ -456,6 +645,61 @@ function openSteamPage(url) {
       console.warn(`Steam overlay unavailable: ${error.message}`);
     }
   openExternal(url);
+}
+
+async function prepareBundledSession(partition) {
+  const isolatedSession = session.fromPartition(partition);
+  isolatedSession.setPermissionRequestHandler(
+    (_contents, _permission, callback) => callback(false),
+  );
+  isolatedSession.setPermissionCheckHandler(() => false);
+  isolatedSession.webRequest.onBeforeRequest((details, callback) => {
+    // All gameplay resources are in this bundle. Steam networking uses its native client APIs.
+    callback({
+      cancel:
+        !isAppUrl(details.url) &&
+        !details.url.startsWith("devtools:") &&
+        !details.url.startsWith("blob:") &&
+        !details.url.startsWith("data:"),
+    });
+  });
+  const policy = contentPolicy();
+  await isolatedSession.protocol.handle("electrify", async (request) => {
+    try {
+      const filename = resolveAsset(root, request.url);
+      const data = await fs.promises.readFile(filename);
+      const headers = {
+        "Content-Type":
+          contentTypes[path.extname(filename).toLowerCase()] ||
+          "application/octet-stream",
+        "Content-Security-Policy": policy,
+        "X-Content-Type-Options": "nosniff",
+        "Accept-Ranges": "bytes",
+      };
+      const range = request.headers.get("range");
+      if (range) {
+        const match = /^bytes=(\d+)-(\d*)$/.exec(range);
+        if (!match) return new Response(null, { status: 416 });
+        const start = Number(match[1]);
+        const end = match[2]
+          ? Math.min(Number(match[2]), data.length - 1)
+          : data.length - 1;
+        if (start > end || start >= data.length)
+          return new Response(null, { status: 416 });
+        return new Response(data.subarray(start, end + 1), {
+          status: 206,
+          headers: {
+            ...headers,
+            "Content-Range": `bytes ${start}-${end}/${data.length}`,
+          },
+        });
+      }
+      return new Response(data, { headers });
+    } catch {
+      return new Response("Bundled asset unavailable", { status: 404 });
+    }
+  });
+  return isolatedSession;
 }
 
 async function createWindow() {
@@ -507,57 +751,9 @@ async function createWindow() {
     }
   }
   const player = steam.state().steamId || "offline";
-  const isolatedSession = session.fromPartition(`persist:electrify-${player}`);
-  isolatedSession.setPermissionRequestHandler(
-    (_contents, _permission, callback) => callback(false),
+  const isolatedSession = await prepareBundledSession(
+    `persist:electrify-${player}`,
   );
-  isolatedSession.setPermissionCheckHandler(() => false);
-  isolatedSession.webRequest.onBeforeRequest((details, callback) => {
-    // All gameplay resources are in this bundle. Steam networking uses its native client APIs.
-    callback({
-      cancel:
-        !isAppUrl(details.url) &&
-        !details.url.startsWith("devtools:") &&
-        !details.url.startsWith("blob:") &&
-        !details.url.startsWith("data:"),
-    });
-  });
-  const policy = contentPolicy();
-  await isolatedSession.protocol.handle("electrify", async (request) => {
-    try {
-      const filename = resolveAsset(root, request.url);
-      const data = await fs.promises.readFile(filename);
-      const headers = {
-        "Content-Type":
-          contentTypes[path.extname(filename).toLowerCase()] ||
-          "application/octet-stream",
-        "Content-Security-Policy": policy,
-        "X-Content-Type-Options": "nosniff",
-        "Accept-Ranges": "bytes",
-      };
-      const range = request.headers.get("range");
-      if (range) {
-        const match = /^bytes=(\d+)-(\d*)$/.exec(range);
-        if (!match) return new Response(null, { status: 416 });
-        const start = Number(match[1]);
-        const end = match[2]
-          ? Math.min(Number(match[2]), data.length - 1)
-          : data.length - 1;
-        if (start > end || start >= data.length)
-          return new Response(null, { status: 416 });
-        return new Response(data.subarray(start, end + 1), {
-          status: 206,
-          headers: {
-            ...headers,
-            "Content-Range": `bytes ${start}-${end}/${data.length}`,
-          },
-        });
-      }
-      return new Response(data, { headers });
-    } catch {
-      return new Response("Bundled asset unavailable", { status: 404 });
-    }
-  });
   window = new BrowserWindow({
     title: "Electrify",
     width: preferences.width,
@@ -625,21 +821,72 @@ async function createWindow() {
     // A crashed renderer can't answer the save handshake; don't make Quit wait for it.
     rendererReady = false;
     rendererCrashed = true;
+    closeCouch();
     steam.setInputEnabled(false);
     if (quitRequested && !finalizingQuit) void quitFailure();
   });
   window.on("blur", publishGameFocus);
   window.on("focus", publishGameFocus);
   window.webContents.on("did-start-loading", () => {
+    closeCouch();
     rendererReady = false;
     steam.setInputEnabled(false);
   });
   const inputManifest = app.isPackaged
     ? path.join(process.resourcesPath, "steam-input", "actions.vdf")
     : path.join(app.getAppPath(), "steamworks", "input", "actions.vdf");
+  couch = new CouchViews({
+    window,
+    WebContentsView,
+    MessageChannelMain,
+    prepareSession: prepareBundledSession,
+    preload: path.join(__dirname, "couch-preload.cjs"),
+    url: APP_URL,
+    publish: (event) => {
+      if (
+        event.kind === "seat-lost" &&
+        couchTextRequest?.seatId === event.seatId &&
+        couchTextRequest.generation === event.generation
+      )
+        steam.textInput?.finish({ status: "cancelled" });
+      window.webContents.send("desktop:couch-event", event);
+    },
+    input: () => steam.input,
+  });
+  localSaves = new LocalCoopSaveStore(
+    saves.directory,
+    steam.state().steamId || "offline",
+    require("./coop-codec.cjs"),
+  );
+  window.on("resize", () => {
+    if (couch?.seats.size) couch.relayout();
+  });
+  window.on("enter-full-screen", () => {
+    if (couch?.seats.size) couch.relayout();
+  });
+  window.on("leave-full-screen", () => {
+    if (couch?.seats.size) couch.relayout();
+  });
+  screen.on?.("display-metrics-changed", () => {
+    if (couch?.seats.size) couch.relayout();
+  });
   steam.configureInput(inputManifest, (frame) => {
-    if (window && !window.isDestroyed() && rendererReady)
+    if (window && !window.isDestroyed() && rendererReady && !couch?.active())
       window.webContents.send("desktop:input-event", frame);
+  });
+  steam.input?.setDevicePublisher((devices) => {
+    couch.inputFrame(devices);
+    if (
+      couchTextRequest &&
+      devices.some(
+        (device) =>
+          !device.connected &&
+          device.id === couch.bindings.get(couchTextRequest.seatId),
+      )
+    )
+      steam.textInput?.finish({ status: "cancelled" });
+    const shellFrame = couch.shellFrame(devices);
+    if (shellFrame) window.webContents.send("desktop:input-event", shellFrame);
   });
   window.on("leave-full-screen", () => {
     if (displayUpdating) return;
@@ -698,6 +945,7 @@ async function createWindow() {
   }, 5000);
   steamTimer.unref();
   window.once("closed", () => {
+    closeCouch();
     steam.input?.dispose();
     clearInterval(steamTimer);
     clearTimeout(resizeTimer);

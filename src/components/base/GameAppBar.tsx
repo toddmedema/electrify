@@ -454,7 +454,19 @@ export function GameAppBar(props: Props) {
             </MenuItem>
           )}
           <MenuItem onClick={onManual}>Manual</MenuItem>
-          <MenuItem onClick={onSettings}>Settings</MenuItem>
+          <MenuItem
+            onClick={() => {
+              if (window.electrifyCouch) {
+                handleMenuClose();
+                window.electrifyCouch.post({
+                  kind: "global-settings",
+                  requestId: crypto.randomUUID(),
+                });
+              } else onSettings();
+            }}
+          >
+            Settings
+          </MenuItem>
           {!steamAvailable && (
             <MenuItem onClick={props.onAchievements}>Achievements</MenuItem>
           )}
@@ -474,16 +486,18 @@ export function GameAppBar(props: Props) {
           <MenuItem onClick={handleQuit}>
             {isTutorial ? "Main menu" : "Save & Quit"}
           </MenuItem>
-          {process.env.REACT_APP_DESKTOP === "true" && isDesktopApp() && (
-            <MenuItem
-              onClick={() => {
-                handleMenuClose();
-                void getDesktop()?.quit();
-              }}
-            >
-              Quit
-            </MenuItem>
-          )}
+          {process.env.REACT_APP_DESKTOP === "true" &&
+            isDesktopApp() &&
+            !window.electrifyCouch && (
+              <MenuItem
+                onClick={() => {
+                  handleMenuClose();
+                  void getDesktop()?.quit();
+                }}
+              >
+                Quit
+              </MenuItem>
+            )}
         </Menu>
       </>
     ),
@@ -617,18 +631,22 @@ export function GameAppBar(props: Props) {
                 </Typography>
               </Tooltip>
             </span>
-            <span className="weak gameStatusValue">
-              {/* One inline run, so the flex gap doesn't open before the comma. */}
-              <span>
-                {date.month} {date.year}
-                {bigScreen && (
-                  <span className="gameStatusHour">, {formatHour(date)}</span>
-                )}
+            {!window.electrifyCouch && (
+              <span className="weak gameStatusValue">
+                {/* One inline run, so the flex gap doesn't open before the comma. */}
+                <span>
+                  {date.month} {date.year}
+                  {bigScreen && (
+                    <span className="gameStatusHour">, {formatHour(date)}</span>
+                  )}
+                </span>
               </span>
-            </span>
+            )}
           </Typography>
           {singleRow && statusRow}
-          <div id="speedChangeButtons">{speedOptions}</div>
+          {!window.electrifyCouch && (
+            <div id="speedChangeButtons">{speedOptions}</div>
+          )}
         </Toolbar>
       </div>
       {!isTutorial && props.saveState === "failed" && (

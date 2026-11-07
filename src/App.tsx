@@ -136,7 +136,9 @@ function setupStorage(document: Document) {
  * Inside the Provider because it reads the setting from the store, and above everything else
  * because a palette change has to reach the whole tree.
  */
-function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
+export function ThemedApp(props: {
+  children: React.JSX.Element;
+}): React.JSX.Element {
   const choice: ThemeChoiceType = useAppSelector(
     (state) => state.settings.theme,
   );
@@ -157,7 +159,9 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
       );
       applyTextSize(
         textSize,
-        tvMode ? tvDisplayScale(tvScale, window.innerHeight) : 1,
+        tvMode && !window.electrifyCouch
+          ? tvDisplayScale(tvScale, window.innerHeight)
+          : 1,
       );
     };
     apply();
@@ -434,8 +438,13 @@ export default function App() {
     let achievementsLive = true;
     void import(
       /* webpackChunkName: "achievements" */ "./achievements/Runtime"
-    ).then(({ startAchievementServices }) => {
-      if (achievementsLive) stopAchievements = startAchievementServices(store);
+    ).then(async ({ startAchievementServices }) => {
+      const account =
+        process.env.REACT_APP_DESKTOP === "true"
+          ? (await import("./couch/Platform")).withCouchPlatform(store)
+          : store;
+      if (achievementsLive)
+        stopAchievements = startAchievementServices(account);
     });
 
     const desktop =

@@ -80,6 +80,9 @@ test("the host worker schedules every tick at the shared speed and reschedules s
       matchId: "match",
       epoch: "epoch",
     });
+    const { desktopSimulationHooks } =
+      require("../achievements/SimulationHooks") as typeof import("../achievements/SimulationHooks");
+    expect(desktopSimulationHooks()).toBeUndefined();
     expect(ticks).toBe(0);
     for (const [sequence, speed] of (
       ["SLOW", "NORMAL", "FAST", "ULTRA", "PAUSED"] as SpeedType[]
@@ -406,6 +409,76 @@ test("a command that throws mid-match stops the shared clock for everyone and re
     post.mockRestore();
     scope.onmessage = previousMessage;
     globalThis.fetch = previousFetch;
+    jest.useRealTimers();
+  }
+});
+
+test("local shell summaries follow an active company's calendar after P1 retires", async () => {
+  jest.useFakeTimers();
+  const scope = globalThis as unknown as Worker;
+  const previousMessage = scope.onmessage;
+  const post = jest.spyOn(scope, "postMessage").mockImplementation(() => {});
+  const { createWorld } = jest.requireMock("../multiplayer/World");
+  const outcomes = {
+    "local-p1": { outcome: "bankrupt", title: "Bankrupt", month: 1 },
+  };
+  createWorld.mockReturnValue({
+    matchId: "local-match",
+    epoch: "local-epoch",
+    revision: 4,
+    speed: "PAUSED",
+    paused: true,
+    reason: "Ready up",
+    readyRequired: true,
+    ready: [],
+    seats: [
+      { id: "local-p1", name: "Ada" },
+      { id: "local-p2", name: "Grace" },
+    ],
+    grids: [{ date: { minute: 10 } }, { date: { minute: 100 } }],
+    outcomes,
+    activities: {},
+    selectedSpeeds: { "local-p1": "PAUSED", "local-p2": "NORMAL" },
+  });
+  const create = createWorld.getMockImplementation();
+  createWorld.mockImplementation((...args: unknown[]) => {
+    // Local simulation must install the real telemetry hooks before creating any grid.
+    const { desktopSimulationHooks } =
+      require("../achievements/SimulationHooks") as typeof import("../achievements/SimulationHooks");
+    expect(desktopSimulationHooks()).toBeDefined();
+    return create(...args);
+  });
+  try {
+    require("./Multiplayer.worker");
+    await scope.onmessage!({
+      data: {
+        kind: "create",
+        local: true,
+        spec: { scenarioId: 101, difficulty: "Employee" },
+        seats: [
+          { id: "local-p1", name: "Ada" },
+          { id: "local-p2", name: "Grace" },
+        ],
+        matchId: "local-match",
+        epoch: "local-epoch",
+      },
+    } as MessageEvent<WorkerRequest>);
+    expect(post).toHaveBeenCalledWith({
+      kind: "summary",
+      summary: expect.objectContaining({
+        date: { minute: 100 },
+        outcomes,
+        complete: false,
+        players: [
+          expect.objectContaining({ id: "local-p1", retired: true }),
+          expect.objectContaining({ id: "local-p2", retired: false }),
+        ],
+      }),
+    });
+  } finally {
+    jest.clearAllTimers();
+    post.mockRestore();
+    scope.onmessage = previousMessage;
     jest.useRealTimers();
   }
 });

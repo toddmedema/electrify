@@ -104,8 +104,16 @@ export function pauseWorld(world: World, reason: string) {
   syncClock(world);
 }
 
+// Shell lifecycle blockers are ephemeral; restoring a checkpoint requires fresh consent.
+const shellBlockers = new WeakMap<World, readonly string[]>();
+export function setWorldBlockers(world: World, reasons: readonly string[]) {
+  shellBlockers.set(world, [...reasons]);
+  syncClock(world);
+}
+
 function syncClock(world: World) {
   const active = activeSeats(world);
+  const blockers = shellBlockers.get(world) || [];
   const pausedBy = active.filter(
     (seat) =>
       world.activities[seat.id] || world.selectedSpeeds[seat.id] === "PAUSED",
@@ -115,7 +123,11 @@ function syncClock(world: World) {
     pendingScenarioChoice(world.grids[world.seats.indexOf(seat)]),
   );
   world.speed =
-    world.readyRequired || pausedBy.length || choosing.length || !active.length
+    world.readyRequired ||
+    blockers.length ||
+    pausedBy.length ||
+    choosing.length ||
+    !active.length
       ? "PAUSED"
       : active.reduce<SpeedType>(
           (slowest, seat) =>
@@ -128,6 +140,7 @@ function syncClock(world: World) {
   if (!active.length) world.reason = "Match complete";
   else if (!world.readyRequired)
     world.reason = [
+      ...blockers,
       ...choosing.map((seat) => `${seat.name}: Choosing a response`),
       ...pausedBy.map((seat) =>
         world.activities[seat.id]

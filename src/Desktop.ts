@@ -92,6 +92,8 @@ export type DesktopTextInputResult =
 export interface DesktopBridge {
   // Optional methods are feature-detected by the renderer, so adding one never bumps apiVersion.
   // apiVersion changes only when an existing method changes incompatibly.
+  couchRequest?(input: Record<string, unknown>): Promise<unknown>;
+  onCouchEvent?(callback: (event: unknown) => void): () => void;
   mods?(
     input: import("./mods/Types").ModRequest,
   ): Promise<import("./mods/Types").ModLibrary>;
@@ -161,6 +163,14 @@ export interface DesktopBridge {
 declare global {
   interface Window {
     electrifyDesktop?: DesktopBridge;
+    electrifyCouch?: {
+      role: "seat";
+      seatId: string;
+      getGeneration(): number;
+      ready(): Promise<void>;
+      onMessage(callback: (message: unknown) => void): () => void;
+      post(message: unknown): void;
+    };
   }
 }
 

@@ -368,3 +368,61 @@ test("optional native symbol failures do not disable other Steam APIs", () => {
 test("every SteamInput006 export and its returned bool struct resolves in the pinned SDK", () => {
   assert.ok(loadInputFunctions());
 });
+
+test("couch input retains same-frame device actions and independent contexts", () => {
+  const { input, state, poll } = fixture();
+  const devices = [];
+  input.setDevicePublisher((frame) => devices.push(frame));
+  input.setDeviceMode(true);
+  state.controllers = [1n, 2n];
+  input.setDeviceContext("1", "Gameplay");
+  input.setDeviceContext("2", "Menu");
+  poll();
+  poll();
+  state.down = new Set(["Gameplay_confirm", "Menu_confirm"]);
+  poll();
+  assert.deepEqual(
+    devices.at(-1).map((frame) => [frame.id, frame.actions]),
+    [
+      ["1", ["confirm"]],
+      ["2", ["confirm"]],
+    ],
+  );
+  poll();
+  state.down.clear();
+  poll();
+  state.controllers = [1n];
+  state.down.add("Gameplay_confirm");
+  poll();
+  assert.deepEqual(
+    devices.at(-1).map((frame) => [frame.id, frame.connected, frame.actions]),
+    [
+      ["1", true, ["confirm"]],
+      ["2", false, []],
+    ],
+  );
+  input.dispose();
+});
+
+test("replacement and global dialog release barriers disarm held controls per device", () => {
+  const { input, state, poll } = fixture();
+  const devices = [];
+  input.setDevicePublisher((frame) => devices.push(frame));
+  input.setDeviceMode(true);
+  poll();
+  poll();
+  state.down.add("Menu_confirm");
+  poll();
+  assert.deepEqual(devices.at(-1)[0].actions, ["confirm"]);
+  input.releaseDevice("1");
+  const before = devices.length;
+  poll();
+  poll();
+  assert.equal(devices.length, before);
+  state.down.clear();
+  poll();
+  state.down.add("Menu_confirm");
+  poll();
+  assert.deepEqual(devices.at(-1)[0].actions, ["confirm"]);
+  input.dispose();
+});

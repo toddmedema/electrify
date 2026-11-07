@@ -72,7 +72,9 @@ export default function InputHints() {
     document.addEventListener("focusin", update);
     return () => document.removeEventListener("focusin", update);
   }, []);
-  if (!state.active && !state.pausedAfterDisconnect) return null;
+  const showActions =
+    state.connected && (state.active || !!window.electrifyCouch);
+  if (!showActions && !state.pausedAfterDisconnect) return null;
   const hints = tvMode
     ? contextualHints(focused, state.context === "Gameplay")
     : state.context === "Gameplay"
@@ -89,7 +91,7 @@ export default function InputHints() {
             Game paused. Select a speed to resume when ready.
           </p>
         )}
-        {state.active && state.connected && (
+        {showActions && (
           <div className="controllerHintActions">
             {hints.map((hint) => glyphHint(hint, state.glyphs))}
             {tvMode && (

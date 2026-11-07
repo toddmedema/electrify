@@ -115,6 +115,30 @@ export function startDesktopInput(
       });
   };
   const speed = (action: "pause" | "speedUp" | "speedDown") => {
+    if (window.electrifyCouch?.role === "seat") {
+      const clock = store.getState().game.multiplayer?.clock;
+      const speeds = ["PAUSED", "SLOW", "NORMAL", "FAST", "ULTRA"] as const;
+      const selected = clock?.selectedSpeed ?? "PAUSED";
+      if (selected !== "PAUSED") runningSpeed = selected;
+      const index = Math.max(0, speeds.indexOf(selected));
+      const next =
+        action === "pause"
+          ? selected === "PAUSED" || (clock?.readyRequired && !clock.ready)
+            ? (speeds.find((value) => value === runningSpeed) ?? "NORMAL")
+            : "PAUSED"
+          : speeds[
+              Math.max(
+                0,
+                Math.min(
+                  speeds.length - 1,
+                  index + (action === "speedUp" ? 1 : -1),
+                ),
+              )
+            ];
+      releasePause();
+      store.dispatch(setSpeed(next));
+      return;
+    }
     const buttons = speedButtons();
     if (!buttons.length) return;
     const selected = buttons.find(
@@ -304,7 +328,7 @@ export function startDesktopInput(
       !ready ||
       editingText ||
       !foreground ||
-      document.visibilityState === "hidden" ||
+      (!window.electrifyCouch && document.visibilityState === "hidden") ||
       store.getState().saves.transitioning ||
       !frame.connected ||
       !frame.actions.length

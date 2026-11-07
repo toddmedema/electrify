@@ -15,6 +15,7 @@ import { getInputPresentation, startDesktopInput } from "./Input";
 import { buildSpeedOptions } from "../components/base/SpeedControls";
 import InputHints from "./InputHints";
 import { dialogClose } from "../reducers/UI";
+import { registerMultiplayerRuntime } from "../multiplayer/Registry";
 
 let stop: () => void;
 beforeEach(() => {
@@ -25,6 +26,8 @@ beforeEach(() => {
   store.dispatch(quit());
 });
 afterEach(() => {
+  registerMultiplayerRuntime(undefined);
+  delete window.electrifyCouch;
   stop?.();
   store.dispatch(quit());
   jest.clearAllTimers();
@@ -475,4 +478,78 @@ it("reveals fleet charts before focusing them when a compact tool covers the fle
   expect(store.getState().card.name).toBe("FACILITIES");
   act(() => jest.advanceTimersByTime(20));
   expect(screen.getByRole("img", { name: "Supply chart" })).toHaveFocus();
+});
+
+it("routes a couch seat's speed and readiness semantically when duplicate clock controls are absent", async () => {
+  Object.defineProperty(window, "electrifyCouch", {
+    configurable: true,
+    value: { role: "seat", seatId: "local-p2" },
+  });
+  const clock = (
+    selectedSpeed: "PAUSED" | "NORMAL" | "FAST",
+    readyRequired = false,
+  ) => {
+    store.dispatch(
+      delta({
+        inGame: true,
+        multiplayer: {
+          seat: "local-p2",
+          clock: {
+            activeSpeed: "PAUSED",
+            selectedSpeed,
+            readyRequired,
+            ready: !readyRequired,
+            reason: "",
+            players: [],
+          },
+        },
+      }),
+    );
+  };
+  clock("PAUSED", true);
+  store.dispatch(navigate("FACILITIES"));
+  const runtime = {
+    foregroundMode: "application" as const,
+    command: jest.fn(),
+    submit: jest.fn().mockResolvedValue(undefined),
+    activity: jest.fn(),
+    leave: jest.fn().mockResolvedValue(undefined),
+  };
+  registerMultiplayerRuntime(runtime);
+  render(
+    <main className="base_main">
+      <div className="gameWorkspace">
+        <button className="gameMenuButton">Menu</button>
+      </div>
+    </main>,
+  );
+  expect(
+    screen.queryByRole("button", { name: /speed/i }),
+  ).not.toBeInTheDocument();
+  const f = bridge();
+  stop = startDesktopInput(store, f.desktop);
+  await act(async () => Promise.resolve());
+  f.emit({ actions: ["pause"] });
+  expect(runtime.command).toHaveBeenLastCalledWith({
+    kind: "speed",
+    speed: "NORMAL",
+  });
+  clock("NORMAL");
+  f.emit({ actions: ["speedUp"] });
+  expect(runtime.command).toHaveBeenLastCalledWith({
+    kind: "speed",
+    speed: "FAST",
+  });
+  clock("FAST");
+  f.emit({ actions: ["speedDown"] });
+  expect(runtime.command).toHaveBeenLastCalledWith({
+    kind: "speed",
+    speed: "NORMAL",
+  });
+  clock("NORMAL");
+  f.emit({ actions: ["pause"] });
+  expect(runtime.command).toHaveBeenLastCalledWith({
+    kind: "speed",
+    speed: "PAUSED",
+  });
 });

@@ -1,3 +1,4 @@
+import { couchPlatformActive, subscribeCouchPlatform } from "../couch/Platform";
 import type { AppStore } from "../Store";
 import { getDesktop } from "../Desktop";
 import { soundEffectsForUpdate, SoundEventSnapshot } from "./SoundEvents";
@@ -136,6 +137,7 @@ export function startDesktopFeedback(store: AppStore) {
     const { settings, game } = store.getState();
     return (
       foreground() &&
+      !couchPlatformActive() &&
       !reduced.matches &&
       !!settings.controllerVibrationEnabled &&
       !(game.inGame && game.speed === "PAUSED")
@@ -207,6 +209,9 @@ export function startDesktopFeedback(store: AppStore) {
     if (!focused) stop();
   });
   const stopQuit = desktop.onBeforeQuit(stop);
+  const stopCouch = subscribeCouchPlatform(() => {
+    if (couchPlatformActive()) haptics.stop();
+  });
   window.addEventListener("blur", onBlur);
   window.addEventListener("focus", onFocus);
   document.addEventListener("visibilitychange", onVisibility);
@@ -220,6 +225,7 @@ export function startDesktopFeedback(store: AppStore) {
       stopStore();
       stopNative();
       stopQuit();
+      stopCouch();
       window.removeEventListener("blur", onBlur);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
