@@ -850,20 +850,14 @@ describe("Insights layers", () => {
 
     const expectRequiredLayers = () => {
       for (const name of ["Profit", "Finance details"]) {
-        const checkbox = screen.getByRole("checkbox", { name });
+        const checkbox = labelledCheckbox(name);
         expect(checkbox).toBeChecked();
         expect(checkbox).toBeDisabled();
         expect(screen.getByRole("heading", { name })).toBeVisible();
       }
-      expect(
-        screen.getByRole("checkbox", { name: "Supply & Demand" }),
-      ).toBeChecked();
-      expect(
-        screen.getByRole("checkbox", { name: "Supply & Demand" }),
-      ).toBeEnabled();
-      expect(
-        screen.getByRole("checkbox", { name: "Revenue" }),
-      ).not.toBeChecked();
+      expect(labelledCheckbox("Supply & Demand")).toBeChecked();
+      expect(labelledCheckbox("Supply & Demand")).toBeEnabled();
+      expect(labelledCheckbox("Revenue")).not.toBeChecked();
     };
     expectRequiredLayers();
     await choosePreset("Profitability");
@@ -1346,7 +1340,7 @@ describe("Insights layers", () => {
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("Reliability");
     await user.click(labelledButton(/Layers/));
-    const exchange = screen.getByRole("checkbox", { name: "Power exchange" });
+    const exchange = labelledCheckbox("Power exchange");
     expect(exchange).toBeChecked();
     expect(exchange).toBeDisabled();
 
@@ -1791,6 +1785,16 @@ function gameWithOpenIntertie(): GameType {
   );
   game.transmission!.lines[0].yearsToBuildLeft = 0;
   return game;
+}
+
+// Label queries avoid repeatedly computing every MUI checkbox's accessible name.
+// Check accessibility explicitly so a hidden labelled input still fails the contract.
+function labelledCheckbox(label: string): HTMLElement {
+  const checkbox = screen.getByLabelText(label, {
+    selector: 'input[type="checkbox"]',
+  });
+  expect(isInaccessible(checkbox)).toBe(false);
+  return checkbox;
 }
 
 function labelledButton(label: string | RegExp): HTMLElement {
