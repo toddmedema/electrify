@@ -764,7 +764,7 @@ describe("UPlotChart resizing", () => {
         />
       </ChartViewportContext.Provider>,
     );
-    return currentPlot().over as HTMLDivElement;
+    return { over: currentPlot().over as HTMLDivElement };
   };
 
   it.each(["neighboring chart", "unrelated control"])(
@@ -772,10 +772,10 @@ describe("UPlotChart resizing", () => {
     (outside) => {
       const onRangeChange = jest.fn();
       const otherRangeChange = jest.fn();
-      const over = renderTouchViewport("Owned chart", onRangeChange);
+      const { over } = renderTouchViewport("Owned chart", onRangeChange);
       const foreign =
         outside === "neighboring chart"
-          ? renderTouchViewport("Other chart", otherRangeChange)
+          ? renderTouchViewport("Other chart", otherRangeChange).over
           : document.createElement("button");
       const own = (x: number) => ({
         identifier: 0,
@@ -819,7 +819,7 @@ describe("UPlotChart resizing", () => {
     "does not replace an owned pinch contact with an unrelated contact after %s",
     (type) => {
       const onRangeChange = jest.fn();
-      const over = renderTouchViewport("Owned chart", onRangeChange);
+      const { over } = renderTouchViewport("Owned chart", onRangeChange);
       const foreign = document.createElement("button");
       const own = (identifier: number, clientX: number) => ({
         identifier,
