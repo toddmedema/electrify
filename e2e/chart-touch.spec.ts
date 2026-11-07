@@ -386,6 +386,7 @@ for (const theme of ["light", "dark"]) {
     const chart = insights.locator('[data-layer="cash"] [role=img]');
     const range = await chart.getAttribute("data-viewport-min");
     await scrub(page, chart, insights.locator(".scrollable"));
+    await restoreMouseAfterTouch(page, chart);
     await expect(chart).toHaveAttribute("data-viewport-min", range!);
     await ignoreForeignContact(page, chart);
     const moved = await navigateWithTwoFingers(page, chart, theme === "dark");

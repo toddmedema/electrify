@@ -242,8 +242,7 @@ function tooltipPlugin<S>(
         };
         // uPlot updates its cursor during mousemove. Restore ordinary mouse inspection
         // first, even when the mouse was already over this plot before a touch gesture.
-        if (!hoverOnly)
-          u.over.addEventListener("mousemove", restoreMouseHover, true);
+        u.over.addEventListener("mousemove", restoreMouseHover, true);
         if (hoverOnly) {
           u.over.addEventListener("mouseenter", () => {
             hovering = true;

@@ -331,6 +331,32 @@ describe("UPlotChart resizing", () => {
     expect(tip).not.toBeVisible();
   });
 
+  it("restores synchronized tooltips from local mouse movement after multi-touch, without reopening from sync alone", () => {
+    const { plot, tip } = renderMouseTooltipChart("shared-inspection");
+    // This fixture leaves synchronized charts unhovered. Enter once before touch input,
+    // then keep the mouse over the plot throughout the gesture and recovery.
+    fireEvent.mouseEnter(plot.over);
+    plot.setCursor({ left: 20, top: 40 });
+    expect(tip).toBeVisible();
+    const touches = [40, 80].map((clientX, identifier) => ({
+      target: plot.over,
+      identifier,
+      clientX,
+      clientY: 40,
+    }));
+    fireEvent.touchStart(plot.over, { touches, changedTouches: touches });
+    expect(tip).not.toBeVisible();
+    fireEvent.touchEnd(plot.over, { touches: [], changedTouches: touches });
+    // A synchronized cursor update is not local mouse input and must stay hidden.
+    plot.setCursor({ left: 40, top: 40 });
+    expect(tip).not.toBeVisible();
+    fireEvent.mouseMove(plot.over, { clientX: 60, clientY: 40 });
+    expect(tip).toBeVisible();
+    fireEvent.mouseLeave(plot.over);
+    plot.setCursor({ left: 80, top: 40 });
+    expect(tip).not.toBeVisible();
+  });
+
   it.each(["pointercancel", "touchcancel"])(
     "keeps breakdown details open when tooltip scrolling sends %s, but dismisses chart cancellation",
     (eventType) => {
