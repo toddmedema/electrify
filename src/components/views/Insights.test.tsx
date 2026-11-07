@@ -1345,8 +1345,9 @@ describe("Insights layers", () => {
     expect(exchange).toBeDisabled();
 
     await choosePreset("Overview");
-    expect(exchange).toBeChecked();
-    expect(exchange).toBeDisabled();
+    const overviewExchange = labelledCheckbox("Power exchange");
+    expect(overviewExchange).toBeChecked();
+    expect(overviewExchange).toBeDisabled();
     expect(
       screen.getByRole("heading", { name: "Power exchange" }),
     ).toBeVisible();
