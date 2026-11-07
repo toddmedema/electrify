@@ -20,15 +20,15 @@ async function scrub(page: Page, chart: Locator) {
     const first = await tooltip.textContent();
     await session.send("Input.dispatchTouchEvent", {
       type: "touchMove",
-      touchPoints: [point(0.55, 0.65)],
+      touchPoints: [point(0.55)],
     });
     await expect(tooltip).toBeVisible();
     await expect(tooltip).not.toHaveText(first!);
     const middle = await tooltip.textContent();
-    // Continue the same gesture vertically as well as horizontally: scrolling must not cancel it.
+    // Horizontal inspection keeps following the finger without moving the page.
     await session.send("Input.dispatchTouchEvent", {
       type: "touchMove",
-      touchPoints: [point(0.85, 0.2)],
+      touchPoints: [point(0.85)],
     });
     await expect(tooltip).not.toHaveText(middle!);
   } finally {
@@ -41,6 +41,76 @@ async function scrub(page: Page, chart: Locator) {
 }
 
 for (const theme of ["light", "dark"]) {
+  test(`vertical one-finger swipes scroll Insights over every chart in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(!info.project.use.hasTouch);
+    await page.addInitScript((theme) => {
+      localStorage.clear();
+      localStorage.setItem("theme", theme);
+      localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem(
+        "insightsLayers",
+        JSON.stringify([
+          "supplyByFuel",
+          "supplyDemand",
+          "fuelPrices",
+          "cash",
+          "demandByType",
+          "weather",
+          "water",
+          "solarCapacityFactor",
+        ]),
+      );
+    }, theme);
+    await page.goto("/?scenario=107");
+    await page.getByRole("button", { name: "Start game" }).click();
+    const insights = page.locator(".insights:visible");
+    await openPane(insights, page.locator("#insightsNav"));
+    const scroller = insights.locator(".scrollable");
+    const charts = insights.locator(".insightsTrack [role=img]");
+    await expect(charts).toHaveCount(7);
+    const session = await page.context().newCDPSession(page);
+    try {
+      for (const chart of await charts.all()) {
+        const plot = chart.locator(".u-over");
+        await plot.scrollIntoViewIfNeeded();
+        const box = (await plot.boundingBox())!;
+        const before = await scroller.evaluate((el) => el.scrollTop);
+        const canScrollDown = await scroller.evaluate(
+          (el) => el.scrollHeight - el.clientHeight - el.scrollTop > 160,
+        );
+        const dy = canScrollDown ? -140 : 140;
+        const x = Math.round(box.x + box.width / 2);
+        const y = Math.round(box.y + box.height / 2);
+        await session.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ x, y }],
+        });
+        for (let step = 1; step <= 8; step++) {
+          await session.send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [{ x: x + step, y: y + (dy * step) / 8 }],
+          });
+        }
+        await session.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+        await expect
+          .poll(async () =>
+            canScrollDown
+              ? (await scroller.evaluate((el) => el.scrollTop)) - before
+              : before - (await scroller.evaluate((el) => el.scrollTop)),
+          )
+          .toBeGreaterThan(60);
+        await expect(chart.locator(".chartTooltip")).not.toBeVisible();
+      }
+    } finally {
+      await session.detach();
+    }
+  });
+
   test(`touch drags inspect production, synced insights, and expanded charts in ${theme}`, async ({
     page,
   }, info) => {

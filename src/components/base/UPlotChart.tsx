@@ -121,6 +121,7 @@ function tooltipPlugin<S>(
   let touchStart: (event: TouchEvent) => void;
   let touchMove: (event: TouchEvent) => void;
   let touchEnd: (event: TouchEvent) => void;
+  let cancelTouch: () => void;
   let outsidePointer: (event: PointerEvent) => void;
   let touchId: number | undefined;
   let touchingPlot = false;
@@ -193,9 +194,12 @@ function tooltipPlugin<S>(
         };
         touchMove = (event) => {
           if (!touchingPlot) return;
-          // Keep native scrolling from cancelling inspection or the viewport's pinch gesture.
-          event.preventDefault();
-          if (event.touches.length !== 1 || touchId === undefined) return;
+          // One finger keeps native vertical scrolling; two fingers own chart zoom.
+          if (event.touches.length > 1) {
+            event.preventDefault();
+            return;
+          }
+          if (touchId === undefined) return;
           const touch = Array.from(event.touches).find(
             (touch) => touch.identifier === touchId,
           );
@@ -204,6 +208,13 @@ function tooltipPlugin<S>(
         touchEnd = (event) => {
           if (!event.touches.length) touchingPlot = false;
           touchId = undefined;
+        };
+        cancelTouch = () => {
+          // Native scrolling cancels pointer events while touch events may keep arriving.
+          touchingPlot = false;
+          touchId = undefined;
+          hovering = false;
+          dismissDetails();
         };
         outsidePointer = (event) => {
           if (
@@ -218,7 +229,8 @@ function tooltipPlugin<S>(
         u.over.addEventListener("touchstart", touchStart, { passive: true });
         u.over.addEventListener("touchmove", touchMove, { passive: false });
         u.over.addEventListener("touchend", touchEnd);
-        u.over.addEventListener("touchcancel", touchEnd);
+        u.over.addEventListener("touchcancel", cancelTouch);
+        u.over.addEventListener("pointercancel", cancelTouch);
         if (hoverOnly) {
           u.over.addEventListener("mouseenter", () => {
             hovering = true;
@@ -283,7 +295,8 @@ function tooltipPlugin<S>(
         u.over.removeEventListener("touchstart", touchStart);
         u.over.removeEventListener("touchmove", touchMove);
         u.over.removeEventListener("touchend", touchEnd);
-        u.over.removeEventListener("touchcancel", touchEnd);
+        u.over.removeEventListener("touchcancel", cancelTouch);
+        u.over.removeEventListener("pointercancel", cancelTouch);
         if (dismiss) document.removeEventListener("keydown", dismiss);
       },
     },
@@ -698,7 +711,6 @@ export default function UPlotChart<S>(
       return;
     }
     const over = plot.over;
-    over.style.touchAction = "pan-y";
     let liveRange = currentViewport.range;
     let frame: number | undefined;
     let pending: ChartViewportRange | undefined;
@@ -789,7 +801,7 @@ export default function UPlotChart<S>(
         event.preventDefault();
         return;
       }
-      // One finger inspects the tooltip. Mouse drags pan; two fingers still pinch to zoom.
+      // One finger scrolls vertically or inspects horizontally; two fingers pinch to zoom.
       if (event.pointerType === "touch") return;
       drag = {
         id: event.pointerId,
@@ -858,7 +870,6 @@ export default function UPlotChart<S>(
     over.addEventListener("pointercancel", onPointerEnd);
     over.addEventListener("dblclick", onDoubleClick);
     return () => {
-      over.style.touchAction = "";
       over.removeEventListener("wheel", onWheel);
       over.removeEventListener("pointerdown", onPointerDown);
       over.removeEventListener("pointermove", onPointerMove);
