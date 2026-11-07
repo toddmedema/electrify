@@ -548,7 +548,9 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).not.toBeInTheDocument();
   expect(screen.queryByText("$11.9M/yr")).not.toBeInTheDocument();
   expect(screen.queryByText("Flexible power")).toBeNull();
-  expect(screen.queryByText(/Typical output/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(/Average output over a year/),
+  ).not.toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Show Natural Gas Peaker details" }),
   );
@@ -581,14 +583,18 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   );
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).not.toHaveTextContent("What changes");
-  expect(impact).toHaveTextContent("Cash purchase");
+  expect(impact).toHaveTextContent("Cash option");
+  expect(impact).not.toHaveTextContent("Cash purchase");
   expect(impact).toHaveTextContent(
     /Loan option.* \+ .*\/mo \(\d+\.\d+% for 30 years\)/,
   );
-  expect(impact).toHaveTextContent("Estimated upkeep");
+  expect(impact).toHaveTextContent("Maintenance");
+  expect(impact).not.toHaveTextContent("Estimated upkeep");
+  expect(impact).not.toHaveTextContent("loan payments");
   expect(impact).toHaveTextContent("Online in");
-  expect(impact).toHaveTextContent("Typical output");
-  expect(impact).toHaveTextContent("weather may limit it");
+  expect(impact).toHaveTextContent("Average output over a year");
+  expect(impact).not.toHaveTextContent("Typical output");
+  expect(impact).not.toHaveTextContent("weather may limit it");
   expect(impact).not.toHaveTextContent("largest forecast shortage");
   expect(impact).not.toHaveTextContent("Loan:");
   expect(
@@ -603,6 +609,40 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   // starve its timer on a busy CI worker.
   await waitForElementToBeRemoved(dialog);
 }, 15000);
+
+it.each([
+  ["Solar", /Direct emissions\s*None/],
+  ["Wind", /Direct emissions\s*None/],
+  ["Natural Gas Peaker", /Direct emissions\s*[\d.,]+\s*\w+\/MWh/],
+])(
+  "reports %s direct emissions as a rate, or None when it burns nothing",
+  (name, emissions) => {
+    const game = createGame({ scenarioId: 111, difficulty: "CEO" });
+    const generator = GENERATORS(game, 100e6, [], []).find(
+      (candidate) => candidate.name === name,
+    )!;
+    render(
+      <GeneratorBuildItem
+        cash={1000000000}
+        date={game.date}
+        interestRate={game.interestRate}
+        generator={generator}
+        location={game.location}
+        seed={game.seed}
+        onBuild={jest.fn()}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: `Review purchase of ${name}` }),
+    );
+    const impact = screen.getByRole("region", { name: "Expected impact" });
+    expect(impact).toHaveTextContent(emissions);
+    expect(impact).not.toHaveTextContent("No direct emissions modeled");
+    // A weather-driven plant's maximum is already in the title, so no subtext repeats it
+    expect(impact).not.toHaveTextContent("weather may limit it");
+    expect(impact).not.toHaveTextContent("loan payments");
+  },
+);
 
 it("shows Coal's start charge without the representative-day breakdown", () => {
   const game = createGame({ scenarioId: 111, difficulty: "CEO" });

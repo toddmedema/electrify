@@ -174,7 +174,7 @@ for (const theme of ["light", "dark"] as const) {
           expect(layout.height).toBeLessThanOrEqual(layout.line + 1);
         }
       } else {
-        await expect(metrics).not.toContainText("Typical output");
+        await expect(metrics).not.toContainText("Average output over a year");
         const sparklines = page.locator(".buildOptionSparkline svg");
         await expect(sparklines).toHaveCount(await cards.count());
         const strokes = await sparklines.evaluateAll((lines) =>
@@ -328,7 +328,8 @@ for (const theme of ["light", "dark"] as const) {
       await expectContinuousDialogSurface(dialog);
       const cashValue = dialog
         .locator(".decisionImpactFact")
-        .filter({ hasText: /^Cash purchase/ })
+        // Generators call it the cash option; storage still calls it a cash purchase
+        .filter({ hasText: /^Cash (option|purchase)/ })
         .locator(".decisionImpactFactValue");
       const loanFact = dialog
         .locator(".decisionImpactFact")

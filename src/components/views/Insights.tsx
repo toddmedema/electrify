@@ -42,12 +42,14 @@ import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import {
   DerivedHistoryKeysType,
+  FuelNameType,
   GameType,
   MonthlyHistoryType,
   PricedFuelNameType,
   TickPresentFutureType,
   UnitSystemType,
 } from "../../Types";
+import { PRICED_FUELS } from "../../Constants";
 import {
   deriveExpandedSummary,
   EMPTY_HISTORY,
@@ -84,6 +86,7 @@ import {
   chartPalette,
   demandTypeColors,
   fuelColors,
+  fuelDashArrays,
   waterDashArrays,
 } from "../../Theme";
 import ChartForecastDemandByType, {
@@ -92,7 +95,7 @@ import ChartForecastDemandByType, {
 import ChartFinances from "../base/ChartFinances";
 import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY, ManualEntryTitleType } from "../base/ManualEntries";
-import FuelPriceFilter from "../base/FuelPriceFilter";
+import FuelFilter from "../base/FuelFilter";
 import { ExpandedChartPresentation } from "../base/ChartPresentationContext";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastPowerExchange from "../base/ChartForecastPowerExchange";
@@ -353,6 +356,7 @@ interface State {
   expandedLayer?: InsightLayerId;
   expandedPlaceholderHeight: number;
   selectedPriceFuel?: PricedFuelNameType;
+  selectedSupplyFuel?: FuelNameType;
   temporaryLayer?: InsightLayerId;
   layers: InsightLayerId[];
   preset: InsightPresetId;
@@ -1622,16 +1626,6 @@ export default class Insights extends React.Component<Props, State> {
         case "spareCapacity":
           body = (
             <>
-              <ChartLegend
-                items={[
-                  { name: "Recorded", color: chartPalette().supply },
-                  {
-                    name: "Projected",
-                    color: chartPalette().supply,
-                    dash: "4,4",
-                  },
-                ]}
-              />
               <ChartMonthlySpareCapacity
                 height={140}
                 past={projection.financePast}
@@ -1763,18 +1757,30 @@ export default class Insights extends React.Component<Props, State> {
           );
           break;
         }
-        case "supplyByFuel":
+        case "supplyByFuel": {
+          // A fuel that has left the forecast can no longer be the one chosen
+          const selectedFuel = fuels.find(
+            (fuel) => fuel === this.state.selectedSupplyFuel,
+          );
           body = (
             <>
-              <ChartLegend
-                items={[
-                  ...[...fuels].reverse().map((fuel) => ({
-                    name: fuel,
-                    color: fuelColors()[fuel],
-                    muted: !!highlightFuel && fuel !== highlightFuel,
-                  })),
-                  { name: "Demand", color: "", rule: true },
-                ]}
+              <FuelFilter
+                label="Show supply by fuel"
+                // Top of the stack first, so the key reads in the order the bands do
+                fuels={[...fuels].reverse()}
+                selectedFuel={selectedFuel}
+                onChange={(selectedSupplyFuel) =>
+                  this.setState({ selectedSupplyFuel })
+                }
+                sample={(fuel) => ({ kind: "fill", color: fuelColors()[fuel] })}
+                overlay={{
+                  name: "Demand",
+                  sample: {
+                    kind: "line",
+                    color: chartPalette().demand,
+                    dash: "4,2",
+                  },
+                }}
               />
               <ChartForecastSupplyByFuel
                 height={140}
@@ -1782,14 +1788,16 @@ export default class Insights extends React.Component<Props, State> {
                 domain={{ x: projection.domain.x }}
                 startingYear={game.startingYear}
                 multiyear={multiyear}
-                fuels={fuels}
+                fuels={selectedFuel ? [selectedFuel] : fuels}
                 syncKey={syncKey}
-                highlightFuel={highlightFuel}
+                // One band alone has nothing to be faded against
+                highlightFuel={selectedFuel ? undefined : highlightFuel}
                 currentMinute={projection.forecast[0]?.minute}
               />
             </>
           );
           break;
+        }
         case "storage":
           body = (
             <ChartForecastStorage
@@ -1805,11 +1813,18 @@ export default class Insights extends React.Component<Props, State> {
         case "fuelPrices":
           body = (
             <>
-              <FuelPriceFilter
+              <FuelFilter
+                label="Show fuel prices"
+                fuels={PRICED_FUELS}
                 selectedFuel={this.state.selectedPriceFuel}
                 onChange={(selectedPriceFuel) =>
                   this.setState({ selectedPriceFuel })
                 }
+                sample={(fuel) => ({
+                  kind: "line",
+                  color: fuelColors()[fuel],
+                  dash: fuelDashArrays[fuel],
+                })}
               />
               <ChartForecastFuelPrices
                 selectedFuel={this.state.selectedPriceFuel}

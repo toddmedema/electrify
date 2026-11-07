@@ -71,6 +71,8 @@ export interface PurchaseReviewDialogProps {
   upkeepBeforePerMonth?: number;
   upkeepLabel?: string;
   upkeepDetail?: string;
+  /** Names the pay-in-full fact; defaults to "Cash purchase" */
+  cashLabel?: string;
   /** Omitted when the preface already says when it opens */
   onlineInMonths?: number;
   onlineInLabel?: string;
@@ -151,7 +153,7 @@ export default function PurchaseReviewDialog(
     ...(props.leadingFacts ?? []),
     {
       concept: "money",
-      label: "Cash purchase",
+      label: props.cashLabel ?? "Cash purchase",
       value:
         props.paymentSummary?.cash.value ??
         `${formatMoneyConcise(cashDue)} now`,
