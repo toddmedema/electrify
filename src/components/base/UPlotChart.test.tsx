@@ -249,6 +249,88 @@ describe("UPlotChart resizing", () => {
     expect(screen.getByText(/Sunrise: 6:05 AM/)).toBeVisible();
   });
 
+  const renderMouseTooltipChart = (syncKey?: string) => {
+    render(
+      <UPlotChart
+        ariaLabel="Mouse inspection chart"
+        state={{}}
+        data={[
+          [0, 1],
+          [10, 10],
+        ]}
+        buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+        tooltip={() => "Inspected point"}
+        syncKey={syncKey}
+      />,
+    );
+    const plot = currentPlot();
+    const built = (uPlot as unknown as jest.Mock).mock.calls.at(
+      -1,
+    )[0] as uPlot.Options;
+    const plugin = built.plugins!.at(-1)!;
+    screen
+      .getByRole("img", { name: /Mouse inspection chart/ })
+      .appendChild(plot.over);
+    plot.setCursor = jest.fn((position: { left: number; top: number }) => {
+      plot.cursor = { ...position, idx: 0 };
+      const cursor = plugin.hooks!.setCursor;
+      if (typeof cursor === "function") cursor(plot);
+    });
+    // uPlot installs its cursor listener before the plugin's init hook runs.
+    plot.over.addEventListener("mousemove", () =>
+      plot.setCursor({ left: 60, top: 40 }),
+    );
+    const init = plugin.hooks!.init;
+    if (typeof init === "function") init(plot, built, [[], []]);
+    plot.destroy = jest.fn(() => {
+      const destroy = plugin.hooks!.destroy;
+      if (typeof destroy === "function") destroy(plot);
+    });
+    fireEvent.mouseEnter(plot.over);
+    plot.setCursor({ left: 20, top: 40 });
+    const tip = screen.getByText("Inspected point");
+    if (syncKey) fireEvent.mouseLeave(plot.over);
+    return { plot, tip };
+  };
+
+  it.each(["a second plot contact", "a contact elsewhere on the page"])(
+    "restores an ordinary mouse tooltip after multi-touch with %s",
+    (source) => {
+      const { plot, tip } = renderMouseTooltipChart();
+      plot.setCursor({ left: 20, top: 40 });
+      expect(tip).toBeVisible();
+      const touches = [
+        plot.over,
+        source.includes("elsewhere") ? document.body : plot.over,
+      ].map((target, identifier) => ({
+        target,
+        identifier,
+        clientX: 40 + identifier * 40,
+        clientY: 40,
+      }));
+      fireEvent.touchStart(plot.over, { touches, changedTouches: touches });
+      expect(tip).not.toBeVisible();
+      fireEvent.touchEnd(plot.over, { touches: [], changedTouches: touches });
+      // The mouse can already be over the plot when touch inspection finishes.
+      // A fresh move must restore details before uPlot updates its cursor.
+      fireEvent.mouseMove(plot.over, { clientX: 60, clientY: 40 });
+      expect(tip).toBeVisible();
+      expect(tip).toHaveTextContent("Inspected point");
+    },
+  );
+
+  it("keeps synchronized mouse tooltips local to the hovered chart", () => {
+    const { plot, tip } = renderMouseTooltipChart("shared-inspection");
+    plot.setCursor({ left: 20, top: 40 });
+    expect(tip).not.toBeVisible();
+    fireEvent.mouseEnter(plot.over);
+    plot.setCursor({ left: 40, top: 40 });
+    expect(tip).toBeVisible();
+    fireEvent.mouseLeave(plot.over);
+    plot.setCursor({ left: 60, top: 40 });
+    expect(tip).not.toBeVisible();
+  });
+
   it("rebuilds a mounted canvas when text size changes without a window resize", () => {
     render(
       <UPlotChart

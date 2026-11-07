@@ -2,6 +2,47 @@ import { expect, test, type Locator, type Page } from "./fixtures";
 import { openPane } from "./layout";
 import path from "path";
 
+async function restoreMouseAfterTouch(page: Page, chart: Locator) {
+  const plot = chart.locator(".u-over");
+  const tooltip = chart.locator(".chartTooltip");
+  await plot.scrollIntoViewIfNeeded();
+  const box = (await plot.boundingBox())!;
+  const x = Math.round(box.x + box.width * 0.4);
+  const y = Math.round(box.y + box.height * 0.5);
+  await page.mouse.move(x, y);
+  await expect(tooltip).toBeVisible();
+  const session = await page.context().newCDPSession(page);
+  let touching = false;
+  try {
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [
+        { id: 0, x, y },
+        { id: 1, x: x + 30, y },
+      ],
+    });
+    touching = true;
+    await expect(tooltip).toBeHidden();
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    touching = false;
+    await page.mouse.move(x + 60, y);
+    await expect(tooltip).toBeVisible();
+  } finally {
+    try {
+      if (touching)
+        await session.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+    } finally {
+      await session.detach();
+    }
+  }
+}
+
 async function ignoreForeignContact(page: Page, chart: Locator) {
   const plot = chart.locator(".u-over");
   await plot.scrollIntoViewIfNeeded();
@@ -199,7 +240,9 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=107");
     await page.getByRole("button", { name: "Start game" }).click();
-    await scrub(page, page.locator("#chartSupplyDemand [role=img]"));
+    const production = page.locator("#chartSupplyDemand [role=img]");
+    await scrub(page, production);
+    await restoreMouseAfterTouch(page, production);
     const insights = page.locator(".insights:visible");
     await openPane(
       insights,

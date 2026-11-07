@@ -123,6 +123,7 @@ function tooltipPlugin<S>(
   let touchMove: (event: TouchEvent) => void;
   let touchEnd: (event: TouchEvent) => void;
   let outsidePointer: (event: PointerEvent) => void;
+  let restoreMouseHover: () => void;
   let touchId: number | undefined;
   let touchingPlot = false;
   // A synced chart moves its cursor when a neighbour is hovered, which is the point -- but it
@@ -222,6 +223,13 @@ function tooltipPlugin<S>(
         u.over.addEventListener("touchmove", touchMove, { passive: false });
         u.over.addEventListener("touchend", touchEnd);
         u.over.addEventListener("touchcancel", touchEnd);
+        restoreMouseHover = () => {
+          hovering = true;
+        };
+        // uPlot updates its cursor during mousemove. Restore ordinary mouse inspection
+        // first, even when the mouse was already over this plot before a touch gesture.
+        if (!hoverOnly)
+          u.over.addEventListener("mousemove", restoreMouseHover, true);
         if (hoverOnly) {
           u.over.addEventListener("mouseenter", () => {
             hovering = true;
@@ -287,6 +295,7 @@ function tooltipPlugin<S>(
         u.over.removeEventListener("touchmove", touchMove);
         u.over.removeEventListener("touchend", touchEnd);
         u.over.removeEventListener("touchcancel", touchEnd);
+        u.over.removeEventListener("mousemove", restoreMouseHover, true);
         if (dismiss) document.removeEventListener("keydown", dismiss);
       },
     },
