@@ -1155,14 +1155,52 @@ for (const theme of ["light", "dark"] as const) {
     for (const width of [700, 699, 390, 360]) {
       await page.setViewportSize({ width, height: 800 });
       const profit = appbar.getByLabel(/^Monthly profit forecast/);
-      if (width >= 700) await expect(profit).toBeVisible();
-      else await expect(profit).toHaveCount(0);
+      await expect(profit).toBeVisible();
       expect(
         await appbar.evaluate(
           (element) => element.scrollWidth - element.clientWidth,
         ),
       ).toBeLessThanOrEqual(1);
     }
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`phone profit stacks beneath cash and opens finances in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(!info.project.use.hasTouch || page.viewportSize()!.width >= 700);
+    await startGame(page, theme, 111);
+    const appbar = page.locator("#appbar");
+    const cash = appbar.locator(".gameStatusValue").first();
+    const profit = appbar.getByLabel(/^Monthly profit forecast/);
+    await expect(profit).toBeVisible();
+    await expect(profit).toHaveText(/^[+−-]?\$[\d.,]+[KMBT]?\/mo$/);
+    const [cashBox, profitBox, dateBox, speedsBox] = await Promise.all([
+      cash.boundingBox(),
+      profit.boundingBox(),
+      appbar.locator(".gameStatusValue.weak").boundingBox(),
+      appbar.locator("#speedChangeButtons").boundingBox(),
+    ]);
+    expect(profitBox!.y).toBeGreaterThanOrEqual(cashBox!.y + cashBox!.height);
+    expect(Math.abs(profitBox!.x - cashBox!.x)).toBeLessThanOrEqual(1);
+    expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(speedsBox!.x);
+    expect(profitBox!.x + profitBox!.width).toBeLessThanOrEqual(speedsBox!.x);
+    expect(
+      await appbar.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    await page.mouse.move(0, 0);
+    await reviewScreenshot(page, {
+      path: info.outputPath(`phone-profit-${theme}.png`),
+      animations: "disabled",
+    });
+    await profit.click();
+    await expect(
+      page.getByRole("region", { name: "Insights", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.locator('.insights [data-layer="financeDetails"]'),
+    ).toBeInViewport();
   });
 }
 

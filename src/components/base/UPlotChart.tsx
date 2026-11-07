@@ -122,6 +122,7 @@ function tooltipPlugin<S>(
   let touchStart: (event: TouchEvent) => void;
   let touchMove: (event: TouchEvent) => void;
   let touchEnd: (event: TouchEvent) => void;
+  let cancelTouch: (event: Event) => void;
   let outsidePointer: (event: PointerEvent) => void;
   let restoreMouseHover: () => void;
   let touchId: number | undefined;
@@ -197,9 +198,12 @@ function tooltipPlugin<S>(
         };
         touchMove = (event) => {
           if (!touchingPlot) return;
-          // Keep native scrolling from cancelling inspection or the viewport's pinch gesture.
-          event.preventDefault();
-          if (event.touches.length !== 1 || touchId === undefined) return;
+          // One finger keeps native vertical scrolling; two fingers own chart zoom.
+          if (event.touches.length > 1) {
+            event.preventDefault();
+            return;
+          }
+          if (touchId === undefined) return;
           const touch = Array.from(event.touches).find(
             (touch) => touch.identifier === touchId,
           );
@@ -208,6 +212,15 @@ function tooltipPlugin<S>(
         touchEnd = (event) => {
           if (!event.touches.length) touchingPlot = false;
           touchId = undefined;
+        };
+        cancelTouch = (event) => {
+          // Scrolling the breakdown cancels its own pointer, not chart inspection.
+          if (el?.contains(event.target as Node)) return;
+          // Native scrolling cancels pointer events while touch events may keep arriving.
+          touchingPlot = false;
+          touchId = undefined;
+          hovering = false;
+          dismissDetails();
         };
         outsidePointer = (event) => {
           if (
@@ -222,7 +235,8 @@ function tooltipPlugin<S>(
         u.over.addEventListener("touchstart", touchStart, { passive: true });
         u.over.addEventListener("touchmove", touchMove, { passive: false });
         u.over.addEventListener("touchend", touchEnd);
-        u.over.addEventListener("touchcancel", touchEnd);
+        u.over.addEventListener("touchcancel", cancelTouch);
+        u.over.addEventListener("pointercancel", cancelTouch);
         restoreMouseHover = () => {
           hovering = true;
         };
@@ -294,7 +308,8 @@ function tooltipPlugin<S>(
         u.over.removeEventListener("touchstart", touchStart);
         u.over.removeEventListener("touchmove", touchMove);
         u.over.removeEventListener("touchend", touchEnd);
-        u.over.removeEventListener("touchcancel", touchEnd);
+        u.over.removeEventListener("touchcancel", cancelTouch);
+        u.over.removeEventListener("pointercancel", cancelTouch);
         u.over.removeEventListener("mousemove", restoreMouseHover, true);
         if (dismiss) document.removeEventListener("keydown", dismiss);
       },
@@ -725,7 +740,6 @@ export default function UPlotChart<S>(
       return;
     }
     const over = plot.over;
-    over.style.touchAction = "pan-y";
     let liveRange = currentViewport.range;
     let frame: number | undefined;
     let pending: ChartViewportRange | undefined;
@@ -942,6 +956,7 @@ export default function UPlotChart<S>(
       // pointercancel from browser gesture arbitration must not finish a touch pinch.
       if (event.pointerType === "touch" || event.button !== 0) return;
       if (viewportRef.current) liveRange = viewportRef.current.range;
+
       drag = {
         id: event.pointerId,
         x: event.clientX,
@@ -991,7 +1006,6 @@ export default function UPlotChart<S>(
     over.addEventListener("dblclick", onDoubleClick);
     return () => {
       ownedTouchIds.clear();
-      over.style.touchAction = "";
       over.removeEventListener("wheel", onWheel);
       over.removeEventListener("touchstart", onTouchStart);
       over.removeEventListener("touchmove", onTouchMove);

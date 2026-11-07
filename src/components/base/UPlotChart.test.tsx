@@ -331,6 +331,58 @@ describe("UPlotChart resizing", () => {
     expect(tip).not.toBeVisible();
   });
 
+  it.each(["pointercancel", "touchcancel"])(
+    "keeps breakdown details open when tooltip scrolling sends %s, but dismisses chart cancellation",
+    (eventType) => {
+      render(
+        <UPlotChart
+          ariaLabel="Scrollable breakdown"
+          state={{}}
+          data={[
+            [0, 1],
+            [10, 10],
+          ]}
+          buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+          interactiveTooltip
+          tooltip={() =>
+            "12 AM\nTotal supply: 10W\nWind: 10W\n\nTotal load: 9W\nDemand: 9W"
+          }
+        />,
+      );
+      const plot = currentPlot();
+      const built = (uPlot as unknown as jest.Mock).mock.calls.at(
+        -1,
+      )[0] as uPlot.Options;
+      const plugin = built.plugins!.at(-1)!;
+      screen
+        .getByRole("img", { name: /Scrollable breakdown/ })
+        .appendChild(plot.over);
+      const init = plugin.hooks!.init;
+      if (typeof init === "function")
+        init(plot, built, [
+          [0, 1],
+          [10, 10],
+        ]);
+      plot.setCursor = jest.fn((position: { left: number; top: number }) => {
+        plot.cursor = { ...position, idx: position.left < 0 ? null : 0 };
+        const cursor = plugin.hooks!.setCursor;
+        if (typeof cursor === "function") cursor(plot);
+      });
+      const touch = { identifier: 1, clientX: 80, clientY: 80 };
+      fireEvent.touchStart(plot.over, { touches: [touch] });
+      fireEvent.touchEnd(plot.over, { touches: [] });
+      const details = screen.getByText("Total supply: 10W");
+      expect(details).toBeVisible();
+      fireEvent.touchStart(details, { touches: [touch] });
+      fireEvent(details, new Event(eventType, { bubbles: true }));
+      expect(details).toBeVisible();
+      fireEvent.touchEnd(details, { touches: [] });
+      fireEvent.touchStart(plot.over, { touches: [touch] });
+      fireEvent(plot.over, new Event(eventType, { bubbles: true }));
+      expect(details).not.toBeVisible();
+    },
+  );
+
   it("rebuilds a mounted canvas when text size changes without a window resize", () => {
     render(
       <UPlotChart

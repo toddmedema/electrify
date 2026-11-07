@@ -844,6 +844,30 @@ describe("Insights layers", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("checks required tutorial layers when the selected preset omits them", async () => {
+    renderInsights(4);
+    await user.click(labelledButton(/Layers/));
+
+    const expectRequiredLayers = () => {
+      for (const name of ["Profit", "Finance details"]) {
+        const checkbox = labelledCheckbox(name);
+        expect(checkbox).toBeChecked();
+        expect(checkbox).toBeDisabled();
+        expect(screen.getByRole("heading", { name })).toBeVisible();
+      }
+      expect(labelledCheckbox("Supply & Demand")).toBeChecked();
+      expect(labelledCheckbox("Supply & Demand")).toBeEnabled();
+      expect(labelledCheckbox("Revenue")).not.toBeChecked();
+    };
+    expectRequiredLayers();
+    await choosePreset("Profitability");
+    await choosePreset("Overview");
+    expectRequiredLayers();
+    expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual(
+      INSIGHT_PRESETS.overview.layers,
+    );
+  });
+
   it("adds monthly lowest spare capacity to Reliability and lets players toggle the layer", async () => {
     renderInsights();
     await choosePreset("Reliability");
@@ -1297,6 +1321,40 @@ describe("Insights layers", () => {
     );
   });
 
+  it("keeps Mission 7's exchange checked across presets without changing saved layers", async () => {
+    const savedLayers = JSON.stringify(INSIGHT_PRESETS.reliability.layers);
+    localStorage.setItem("insightsLayers", savedLayers);
+    localStorage.setItem("insightsActivePreset", "reliability");
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 112 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    renderInsights(112, game);
+    expect(
+      screen.getByRole("combobox", { name: "Insight preset" }),
+    ).toHaveTextContent("Reliability");
+    await user.click(labelledButton(/Layers/));
+    const exchange = labelledCheckbox("Power exchange");
+    expect(exchange).toBeChecked();
+    expect(exchange).toBeDisabled();
+
+    await choosePreset("Overview");
+    const overviewExchange = labelledCheckbox("Power exchange");
+    expect(overviewExchange).toBeChecked();
+    expect(overviewExchange).toBeDisabled();
+    expect(
+      screen.getByRole("heading", { name: "Power exchange" }),
+    ).toBeVisible();
+    expect(localStorage.getItem("insightsLayers")).toBe(savedLayers);
+    expect(localStorage.getItem("insightsActivePreset")).toBe("reliability");
+  });
+
   it("plots the exchange over the forecast's own time axis, beside the current reading", () => {
     localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
     cacheProjection(exchangeGame, exchangeProjection);
@@ -1728,6 +1786,16 @@ function gameWithOpenIntertie(): GameType {
   );
   game.transmission!.lines[0].yearsToBuildLeft = 0;
   return game;
+}
+
+// Label queries avoid repeatedly computing every MUI checkbox's accessible name.
+// Check accessibility explicitly so a hidden labelled input still fails the contract.
+function labelledCheckbox(label: string): HTMLElement {
+  const checkbox = screen.getByLabelText(label, {
+    selector: 'input[type="checkbox"]',
+  });
+  expect(isInaccessible(checkbox)).toBe(false);
+  return checkbox;
 }
 
 function labelledButton(label: string | RegExp): HTMLElement {

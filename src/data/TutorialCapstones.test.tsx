@@ -158,7 +158,7 @@ describe("authored tutorial capstones", () => {
     ).toEqual(["Coal"]);
     expect(objective.success(appState(game))).toBe(false);
     expect(tickUntil(game, objective.success, 2400)).toBe(true);
-    expect(objective.failure?.(appState(game))).toBe(false);
+    expect(objective.failure?.(appState(game)) ?? false).toBe(false);
     // Blackouts before commissioning are the problem the player fixes, not an instant failure.
     expect(game.eventLog.some((e) => e.kind === "BLACKOUT")).toBe(true);
     let mixed = gameReducer(
@@ -182,7 +182,7 @@ describe("authored tutorial capstones", () => {
   });
 
   it.each([undefined, 1000000])(
-    "rejects missing or undersized storage (%s)",
+    "keeps missing or undersized storage incomplete past two years (%s)",
     (peakWh) => {
       const scenario = {
         ...tutorial(2),
@@ -196,7 +196,10 @@ describe("authored tutorial capstones", () => {
           ? { initialBuild: { name: "Battery", peakWh, financed: true } }
           : {}),
       });
-      expect(tickUntil(game, capstone(2).failure!, 2400)).toBe(true);
+      expect(
+        tickUntil(game, (state) => state.game.date.monthsElapsed >= 25, 2400),
+      ).toBe(true);
+      expect(capstone(2).failure?.(appState(game)) ?? false).toBe(false);
       expect(capstone(2).success(appState(game))).toBe(false);
     },
   );

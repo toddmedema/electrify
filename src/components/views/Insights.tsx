@@ -1314,7 +1314,10 @@ export default class Insights extends React.Component<Props, State> {
                   control={
                     <Checkbox
                       id={`insightsLayer${layer.id[0].toUpperCase()}${layer.id.slice(1)}`}
-                      checked={this.state.layers.includes(layer.id)}
+                      checked={
+                        required.includes(layer.id) ||
+                        this.state.layers.includes(layer.id)
+                      }
                       disabled={required.includes(layer.id)}
                       onChange={() => this.toggleLayer(layer.id)}
                     />
