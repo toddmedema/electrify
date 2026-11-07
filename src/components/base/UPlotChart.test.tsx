@@ -249,6 +249,114 @@ describe("UPlotChart resizing", () => {
     expect(screen.getByText(/Sunrise: 6:05 AM/)).toBeVisible();
   });
 
+  const renderMouseTooltipChart = (syncKey?: string) => {
+    render(
+      <UPlotChart
+        ariaLabel="Mouse inspection chart"
+        state={{}}
+        data={[
+          [0, 1],
+          [10, 10],
+        ]}
+        buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+        tooltip={() => "Inspected point"}
+        syncKey={syncKey}
+      />,
+    );
+    const plot = currentPlot();
+    const built = (uPlot as unknown as jest.Mock).mock.calls.at(
+      -1,
+    )[0] as uPlot.Options;
+    const plugin = built.plugins!.at(-1)!;
+    screen
+      .getByRole("img", { name: /Mouse inspection chart/ })
+      .appendChild(plot.over);
+    plot.setCursor = jest.fn((position: { left: number; top: number }) => {
+      plot.cursor = { ...position, idx: 0 };
+      const cursor = plugin.hooks!.setCursor;
+      if (typeof cursor === "function") cursor(plot);
+    });
+    // uPlot installs its cursor listener before the plugin's init hook runs.
+    plot.over.addEventListener("mousemove", () =>
+      plot.setCursor({ left: 60, top: 40 }),
+    );
+    const init = plugin.hooks!.init;
+    if (typeof init === "function") init(plot, built, [[], []]);
+    plot.destroy = jest.fn(() => {
+      const destroy = plugin.hooks!.destroy;
+      if (typeof destroy === "function") destroy(plot);
+    });
+    fireEvent.mouseEnter(plot.over);
+    plot.setCursor({ left: 20, top: 40 });
+    const tip = screen.getByText("Inspected point");
+    if (syncKey) fireEvent.mouseLeave(plot.over);
+    return { plot, tip };
+  };
+
+  it.each(["a second plot contact", "a contact elsewhere on the page"])(
+    "restores an ordinary mouse tooltip after multi-touch with %s",
+    (source) => {
+      const { plot, tip } = renderMouseTooltipChart();
+      plot.setCursor({ left: 20, top: 40 });
+      expect(tip).toBeVisible();
+      const touches = [
+        plot.over,
+        source.includes("elsewhere") ? document.body : plot.over,
+      ].map((target, identifier) => ({
+        target,
+        identifier,
+        clientX: 40 + identifier * 40,
+        clientY: 40,
+      }));
+      fireEvent.touchStart(plot.over, { touches, changedTouches: touches });
+      expect(tip).not.toBeVisible();
+      fireEvent.touchEnd(plot.over, { touches: [], changedTouches: touches });
+      // The mouse can already be over the plot when touch inspection finishes.
+      // A fresh move must restore details before uPlot updates its cursor.
+      fireEvent.mouseMove(plot.over, { clientX: 60, clientY: 40 });
+      expect(tip).toBeVisible();
+      expect(tip).toHaveTextContent("Inspected point");
+    },
+  );
+
+  it("keeps synchronized mouse tooltips local to the hovered chart", () => {
+    const { plot, tip } = renderMouseTooltipChart("shared-inspection");
+    plot.setCursor({ left: 20, top: 40 });
+    expect(tip).not.toBeVisible();
+    fireEvent.mouseEnter(plot.over);
+    plot.setCursor({ left: 40, top: 40 });
+    expect(tip).toBeVisible();
+    fireEvent.mouseLeave(plot.over);
+    plot.setCursor({ left: 60, top: 40 });
+    expect(tip).not.toBeVisible();
+  });
+
+  it("restores synchronized tooltips from local mouse movement after multi-touch, without reopening from sync alone", () => {
+    const { plot, tip } = renderMouseTooltipChart("shared-inspection");
+    // This fixture leaves synchronized charts unhovered. Enter once before touch input,
+    // then keep the mouse over the plot throughout the gesture and recovery.
+    fireEvent.mouseEnter(plot.over);
+    plot.setCursor({ left: 20, top: 40 });
+    expect(tip).toBeVisible();
+    const touches = [40, 80].map((clientX, identifier) => ({
+      target: plot.over,
+      identifier,
+      clientX,
+      clientY: 40,
+    }));
+    fireEvent.touchStart(plot.over, { touches, changedTouches: touches });
+    expect(tip).not.toBeVisible();
+    fireEvent.touchEnd(plot.over, { touches: [], changedTouches: touches });
+    // A synchronized cursor update is not local mouse input and must stay hidden.
+    plot.setCursor({ left: 40, top: 40 });
+    expect(tip).not.toBeVisible();
+    fireEvent.mouseMove(plot.over, { clientX: 60, clientY: 40 });
+    expect(tip).toBeVisible();
+    fireEvent.mouseLeave(plot.over);
+    plot.setCursor({ left: 80, top: 40 });
+    expect(tip).not.toBeVisible();
+  });
+
   it.each(["pointercancel", "touchcancel"])(
     "keeps breakdown details open when tooltip scrolling sends %s, but dismisses chart cancellation",
     (eventType) => {
@@ -664,7 +772,7 @@ describe("UPlotChart resizing", () => {
     expect(zoomed[1] - zoomed[0]).toBeLessThan(100);
   });
 
-  it("pans with a pointer drag and zooms with a touch pinch", () => {
+  it("pans with a mouse drag", () => {
     const onRangeChange = jest.fn();
     const pointer = (type: string, values: Record<string, string | number>) => {
       const event = new Event(type, { bubbles: true, cancelable: true });
@@ -714,36 +822,306 @@ describe("UPlotChart resizing", () => {
     });
     expect(onRangeChange).toHaveBeenCalled();
     expect(onRangeChange.mock.calls.at(-1)?.[0]).toEqual([50, 100]);
+  });
 
-    onRangeChange.mockClear();
-    pointer("pointerdown", {
-      pointerId: 2,
-      pointerType: "touch",
-      button: 0,
-      clientX: 100,
-      clientY: 10,
+  it.each([false, true])(
+    "pans and pinches paired touches without scale drift (staggered: %s)",
+    (staggered) => {
+      const onRangeChange = jest.fn();
+      render(
+        <ChartViewportContext.Provider
+          value={{
+            bounds: [0, 100],
+            range: [25, 75],
+            minSpan: 10,
+            onRangeChange,
+            onReset: jest.fn(),
+          }}
+        >
+          <UPlotChart
+            ariaLabel="Touch chart"
+            state={{}}
+            data={[
+              [0, 100],
+              [2, 3],
+            ]}
+            buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+          />
+        </ChartViewportContext.Provider>,
+      );
+      const touch = (type: string, positions: number[], y = 10) => {
+        const event = new Event(type, { bubbles: true, cancelable: true });
+        const touches = positions.map((clientX, identifier) => ({
+          identifier,
+          clientX,
+          clientY: y,
+          target: currentPlot().over,
+        }));
+        Object.assign(event, {
+          touches,
+          changedTouches: touches,
+        });
+        act(() => currentPlot().over.dispatchEvent(event));
+        return event;
+      };
+      expect(touch("touchstart", [100]).defaultPrevented).toBe(false);
+      if (!staggered) touch("touchend", []);
+      expect(touch("touchstart", [100, 200]).defaultPrevented).toBe(true);
+      expect(touch("touchmove", [140, 240], 40).defaultPrevented).toBe(true);
+      act(() => jest.advanceTimersByTime(20));
+      expect(onRangeChange).toHaveBeenLastCalledWith([20, 70]);
+
+      // Browser pointer cancellation must not terminate the independently owned touch stream.
+      const cancelled = new Event("pointercancel", { bubbles: true });
+      Object.assign(cancelled, { pointerId: 1, pointerType: "touch" });
+      currentPlot().over.dispatchEvent(cancelled);
+      touch("touchmove", [80, 280], 60);
+      touch(staggered ? "touchcancel" : "touchend", []);
+      // The original value under the midpoint stays under the new midpoint while zooming.
+      expect(onRangeChange).toHaveBeenLastCalledWith([32.5, 57.5], true);
+      onRangeChange.mockClear();
+      touch("touchmove", [150]);
+      act(() => jest.advanceTimersByTime(20));
+      expect(onRangeChange).not.toHaveBeenCalled();
+    },
+  );
+
+  const viewportTouch = (
+    target: HTMLElement,
+    type: string,
+    touches: Array<{
+      identifier: number;
+      clientX: number;
+      clientY: number;
+      target: EventTarget;
+    }>,
+    changedTouches = touches,
+  ) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.assign(event, { touches, changedTouches });
+    act(() => target.dispatchEvent(event));
+    return event;
+  };
+  const renderTouchViewport = (name: string, onRangeChange: jest.Mock) => {
+    render(
+      <ChartViewportContext.Provider
+        value={{
+          bounds: [0, 100],
+          range: [25, 75],
+          minSpan: 10,
+          onRangeChange,
+          onReset: jest.fn(),
+        }}
+      >
+        <UPlotChart
+          ariaLabel={name}
+          state={{}}
+          data={[
+            [0, 100],
+            [2, 3],
+          ]}
+          buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+        />
+      </ChartViewportContext.Provider>,
+    );
+    return { over: currentPlot().over as HTMLDivElement };
+  };
+
+  it.each(["neighboring chart", "unrelated control"])(
+    "ignores a contact that started on a %s",
+    (outside) => {
+      const onRangeChange = jest.fn();
+      const otherRangeChange = jest.fn();
+      const { over } = renderTouchViewport("Owned chart", onRangeChange);
+      const foreign =
+        outside === "neighboring chart"
+          ? renderTouchViewport("Other chart", otherRangeChange).over
+          : document.createElement("button");
+      const own = (x: number) => ({
+        identifier: 0,
+        clientX: x,
+        clientY: 10,
+        target: over,
+      });
+      const other = (x: number) => ({
+        identifier: 1,
+        clientX: x,
+        clientY: 10,
+        target: foreign,
+      });
+
+      viewportTouch(over, "touchstart", [own(100)]);
+      viewportTouch(
+        foreign,
+        "touchstart",
+        [own(100), other(200)],
+        [other(200)],
+      );
+      viewportTouch(over, "touchmove", [own(140), other(240)], [own(140)]);
+      // Touch.target remains the original element even when the other finger moves
+      // over this plot. Global contacts must not become this chart's pinch pair.
+      const move = viewportTouch(
+        over,
+        "touchmove",
+        [own(160), other(360)],
+        [own(160)],
+      );
+      act(() => jest.advanceTimersByTime(20));
+      viewportTouch(over, "touchend", [other(360)], [own(160)]);
+      viewportTouch(foreign, "touchend", [], [other(360)]);
+      expect(onRangeChange).not.toHaveBeenCalled();
+      expect(otherRangeChange).not.toHaveBeenCalled();
+      expect(move.defaultPrevented).toBe(false);
+    },
+  );
+
+  it.each(["touchend", "touchcancel"])(
+    "does not replace an owned pinch contact with an unrelated contact after %s",
+    (type) => {
+      const onRangeChange = jest.fn();
+      const { over } = renderTouchViewport("Owned chart", onRangeChange);
+      const foreign = document.createElement("button");
+      const own = (identifier: number, clientX: number) => ({
+        identifier,
+        clientX,
+        clientY: 10,
+        target: over,
+      });
+      const other = (clientX: number) => ({
+        identifier: 99,
+        clientX,
+        clientY: 10,
+        target: foreign,
+      });
+
+      viewportTouch(over, "touchstart", [own(0, 100), own(1, 200)]);
+      viewportTouch(
+        over,
+        "touchmove",
+        [other(320), own(0, 140), own(1, 240)],
+        [own(0, 140), own(1, 240)],
+      );
+      act(() => jest.advanceTimersByTime(20));
+      expect(onRangeChange).toHaveBeenLastCalledWith([20, 70]);
+      viewportTouch(over, type, [other(320), own(0, 140)], [own(1, 240)]);
+      expect(onRangeChange).toHaveBeenLastCalledWith([20, 70], true);
+      onRangeChange.mockClear();
+      viewportTouch(
+        over,
+        "touchmove",
+        [other(340), own(0, 160)],
+        [own(0, 160)],
+      );
+      const move = viewportTouch(
+        over,
+        "touchmove",
+        [other(360), own(0, 180)],
+        [own(0, 180)],
+      );
+      act(() => jest.advanceTimersByTime(20));
+      expect(onRangeChange).not.toHaveBeenCalled();
+      expect(move.defaultPrevented).toBe(false);
+
+      // A new second contact in this plot still starts a valid pinch, even while
+      // an unrelated finger precedes both owned contacts in the global list.
+      expect(
+        viewportTouch(
+          over,
+          "touchstart",
+          [other(360), own(0, 180), own(2, 280)],
+          [own(2, 280)],
+        ).defaultPrevented,
+      ).toBe(true);
+      viewportTouch(
+        over,
+        "touchmove",
+        [other(360), own(0, 130), own(2, 330)],
+        [own(0, 130), own(2, 330)],
+      );
+      act(() => jest.advanceTimersByTime(20));
+      const range = onRangeChange.mock.calls.at(-1)?.[0];
+      expect(range[1] - range[0]).toBeCloseTo(25);
+      viewportTouch(over, "touchend", [other(360)], [own(0, 130), own(2, 330)]);
+    },
+  );
+
+  it("keeps a held chart steady when a neighboring chart finishes mounting, then releases the position on cancellation", async () => {
+    render(
+      <div
+        role="region"
+        aria-label="Scrollable charts"
+        style={{ overflowY: "auto" }}
+      >
+        <ChartViewportContext.Provider
+          value={{
+            bounds: [0, 100],
+            range: [25, 75],
+            minSpan: 10,
+            onRangeChange: jest.fn(),
+            onReset: jest.fn(),
+          }}
+        >
+          <UPlotChart
+            ariaLabel="Held chart"
+            state={{}}
+            data={[
+              [0, 100],
+              [2, 3],
+            ]}
+            buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+          />
+        </ChartViewportContext.Provider>
+      </div>,
+    );
+    const scroll = screen.getByRole("region", { name: "Scrollable charts" });
+    const plot = currentPlot();
+    // The canvas mock does not attach its overlay; put it in the real scrolling ancestor.
+    scroll.appendChild(plot.over);
+    const neighbor = document.createElement("div");
+    scroll.prepend(neighbor);
+    scroll.scrollTop = 50;
+    let layoutTop = 200;
+    const bounds = plot.over.getBoundingClientRect();
+    jest.spyOn(plot.over, "getBoundingClientRect").mockImplementation(() => ({
+      ...bounds,
+      top: layoutTop - scroll.scrollTop,
+    }));
+    const touch = (type: string) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      const touches =
+        type === "touchstart"
+          ? [100, 200].map((clientX, identifier) => ({
+              identifier,
+              clientX,
+              clientY: 10,
+              target: plot.over,
+            }))
+          : [];
+      Object.assign(event, {
+        touches,
+        changedTouches: touches,
+      });
+      act(() => plot.over.dispatchEvent(event));
+    };
+    touch("touchstart");
+    expect(plot.over.getBoundingClientRect().top).toBe(150);
+
+    // A sibling canvas gets its height after the range's initial React layout has finished.
+    await act(async () => {
+      layoutTop = 240;
+      neighbor.style.height = "160px";
+      await Promise.resolve();
     });
-    pointer("pointerdown", {
-      pointerId: 3,
-      pointerType: "touch",
-      button: 0,
-      clientX: 200,
-      clientY: 10,
+    expect(plot.over.getBoundingClientRect().top).toBe(150);
+
+    touch("touchcancel");
+    act(() => jest.advanceTimersByTime(20));
+    await act(async () => {
+      layoutTop = 280;
+      neighbor.style.height = "200px";
+      await Promise.resolve();
     });
-    pointer("pointermove", {
-      pointerId: 3,
-      pointerType: "touch",
-      clientX: 250,
-      clientY: 10,
-    });
-    pointer("pointerup", {
-      pointerId: 3,
-      pointerType: "touch",
-      clientX: 250,
-      clientY: 10,
-    });
-    const pinched = onRangeChange.mock.calls.at(-1)?.[0];
-    expect(pinched[1] - pinched[0]).toBeLessThan(50);
+    expect(plot.over.getBoundingClientRect().top).toBe(190);
   });
 
   it("preserves the selected viewport and pointer zoom when switching controller presentation", () => {

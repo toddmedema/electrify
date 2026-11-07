@@ -17,6 +17,7 @@ import { ChartAxisAlignmentContext } from "./ChartAxisAlignment";
 import {
   ChartViewportContext,
   ChartViewportRange,
+  clampChartViewport,
   panChartViewport,
   rangesEqual,
   zoomChartViewport,
@@ -123,6 +124,7 @@ function tooltipPlugin<S>(
   let touchEnd: (event: TouchEvent) => void;
   let cancelTouch: (event: Event) => void;
   let outsidePointer: (event: PointerEvent) => void;
+  let restoreMouseHover: () => void;
   let touchId: number | undefined;
   let touchingPlot = false;
   // A synced chart moves its cursor when a neighbour is hovered, which is the point -- but it
@@ -184,6 +186,8 @@ function tooltipPlugin<S>(
         touchStart = (event) => {
           if (event.touches.length !== 1) {
             touchId = undefined;
+            hovering = false;
+            if (el) el.style.display = "none";
             return;
           }
           // A new gesture inside the breakdown scrolls its contents instead of moving it.
@@ -233,6 +237,12 @@ function tooltipPlugin<S>(
         u.over.addEventListener("touchend", touchEnd);
         u.over.addEventListener("touchcancel", cancelTouch);
         u.over.addEventListener("pointercancel", cancelTouch);
+        restoreMouseHover = () => {
+          hovering = true;
+        };
+        // uPlot updates its cursor during mousemove. Restore ordinary mouse inspection
+        // first, even when the mouse was already over this plot before a touch gesture.
+        u.over.addEventListener("mousemove", restoreMouseHover, true);
         if (hoverOnly) {
           u.over.addEventListener("mouseenter", () => {
             hovering = true;
@@ -299,6 +309,7 @@ function tooltipPlugin<S>(
         u.over.removeEventListener("touchend", touchEnd);
         u.over.removeEventListener("touchcancel", cancelTouch);
         u.over.removeEventListener("pointercancel", cancelTouch);
+        u.over.removeEventListener("mousemove", restoreMouseHover, true);
         if (dismiss) document.removeEventListener("keydown", dismiss);
       },
     },
@@ -344,6 +355,20 @@ export default function UPlotChart<S>(
   const viewport = React.useContext(ChartViewportContext);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const plotRef = React.useRef<uPlot | null>(null);
+  const gestureScrollRef = React.useRef<{
+    element: HTMLElement;
+    top: number;
+    overflowAnchor: string;
+    observer: MutationObserver;
+  }>();
+  const anchorGestureScroll = React.useCallback(() => {
+    const scroll = gestureScrollRef.current;
+    const plot = plotRef.current;
+    if (scroll && plot) {
+      scroll.element.scrollTop +=
+        plot.over.getBoundingClientRect().top - scroll.top;
+    }
+  }, []);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
   const dataUpdateRef = React.useRef<
     ((plot: uPlot, data: uPlot.AlignedData) => void) | undefined
@@ -703,8 +728,9 @@ export default function UPlotChart<S>(
         min: viewport.range[0],
         max: viewport.range[1],
       });
+      anchorGestureScroll();
     }
-  }, [viewport, plotLayout]);
+  }, [viewport, plotLayout, anchorGestureScroll]);
 
   React.useLayoutEffect(() => {
     const plot = plotRef.current;
@@ -717,9 +743,60 @@ export default function UPlotChart<S>(
     let frame: number | undefined;
     let pending: ChartViewportRange | undefined;
     let wheelTimer: ReturnType<typeof setTimeout> | undefined;
-    const pointers = new Map<number, { x: number; y: number }>();
+    let scrollReleaseFrame: number | undefined;
     let drag: { id: number; x: number } | undefined;
-    let pinchDistance: number | undefined;
+    const ownedTouchIds = new Set<number>();
+    let pinch:
+      | {
+          ids: [number, number];
+          distance: number;
+          anchor: number;
+          range: ChartViewportRange;
+        }
+      | undefined;
+
+    const releaseScroll = () => {
+      if (scrollReleaseFrame !== undefined)
+        cancelAnimationFrame(scrollReleaseFrame);
+      scrollReleaseFrame = undefined;
+      const scroll = gestureScrollRef.current;
+      if (scroll) {
+        scroll.observer.disconnect();
+        scroll.element.style.overflowAnchor = scroll.overflowAnchor;
+      }
+      gestureScrollRef.current = undefined;
+    };
+    const holdScroll = () => {
+      if (scrollReleaseFrame !== undefined)
+        cancelAnimationFrame(scrollReleaseFrame);
+      scrollReleaseFrame = undefined;
+      if (gestureScrollRef.current) return;
+      for (
+        let parent = over.parentElement;
+        parent;
+        parent = parent.parentElement
+      ) {
+        if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY)) {
+          const observer = new MutationObserver(anchorGestureScroll);
+          gestureScrollRef.current = {
+            element: parent,
+            top: over.getBoundingClientRect().top,
+            overflowAnchor: parent.style.overflowAnchor,
+            observer,
+          };
+          parent.style.overflowAnchor = "none";
+          // A neighboring chart can fill its height after React's initial range layout.
+          // Follow those node and size updates only while the player holds this plot.
+          observer.observe(parent, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["style"],
+          });
+          break;
+        }
+      }
+    };
 
     const schedule = (range: ChartViewportRange) => {
       liveRange = range;
@@ -791,20 +868,94 @@ export default function UPlotChart<S>(
         commit();
       }, 160);
     };
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.button !== 0) return;
-      if (viewportRef.current) liveRange = viewportRef.current.range;
-      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      if (pointers.size >= 2) {
-        const [a, b] = [...pointers.values()];
-        pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
-        drag = undefined;
-        pointers.forEach((_pointer, id) => over.setPointerCapture?.(id));
-        event.preventDefault();
+    const plotTouches = (event: TouchEvent) =>
+      Array.from(event.touches).filter((touch) =>
+        ownedTouchIds.has(touch.identifier),
+      );
+    const startPinch = (touches: Touch[]) => {
+      const [a, b] = touches;
+      if (!a || !b) return;
+      holdScroll();
+      pinch = {
+        ids: [a.identifier, b.identifier],
+        distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+        anchor: point((a.clientX + b.clientX) / 2),
+        range: liveRange,
+      };
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      for (const touch of Array.from(event.changedTouches)) {
+        if (touch.target instanceof Node && over.contains(touch.target))
+          ownedTouchIds.add(touch.identifier);
+      }
+      const touches = plotTouches(event);
+      if (touches.length < 2) return;
+      // Cancel native scrolling/zoom before it can take over this gesture. Touch events
+      // supply both positions together; individual pointer moves would invent a pinch
+      // between the two halves of an otherwise parallel two-finger swipe.
+      event.preventDefault();
+      if (!pinch) {
+        liveRange = viewportRef.current?.range ?? liveRange;
+        startPinch(touches);
+      }
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const touches = plotTouches(event);
+      if (touches.length < 2) return;
+      event.preventDefault();
+      const value = viewportRef.current;
+      if (!value) return;
+      if (!pinch) {
+        startPinch(touches);
         return;
       }
-      // One finger scrolls vertically or inspects horizontally; two fingers pinch to zoom.
-      if (event.pointerType === "touch") return;
+      const gesture = pinch;
+      const a = touches.find((touch) => touch.identifier === gesture.ids[0]);
+      const b = touches.find((touch) => touch.identifier === gesture.ids[1]);
+      if (!a || !b) return;
+      const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      if (!distance || !gesture.distance) return;
+      const zoomed = zoomChartViewport(
+        value.bounds,
+        gesture.range,
+        value.minSpan,
+        gesture.distance / distance,
+        gesture.anchor,
+      );
+      const span = zoomed[1] - zoomed[0];
+      const anchorValue =
+        gesture.range[0] +
+        (gesture.range[1] - gesture.range[0]) * gesture.anchor;
+      const min = anchorValue - span * point((a.clientX + b.clientX) / 2);
+      schedule(
+        clampChartViewport(value.bounds, [min, min + span], value.minSpan),
+      );
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      const remaining = plotTouches(event);
+      for (const id of ownedTouchIds) {
+        if (!remaining.some((touch) => touch.identifier === id))
+          ownedTouchIds.delete(id);
+      }
+      if (!pinch) return;
+      if (
+        pinch.ids.every((id) =>
+          remaining.some((touch) => touch.identifier === id),
+        )
+      )
+        return;
+      commit();
+      pinch = undefined;
+      if (event.type !== "touchcancel") startPinch(remaining);
+      // Keep the anchor through the final React layout, including an unpainted pending range.
+      if (!pinch) scrollReleaseFrame = requestAnimationFrame(releaseScroll);
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      // Touch navigation belongs to the paired touch stream above. In particular,
+      // pointercancel from browser gesture arbitration must not finish a touch pinch.
+      if (event.pointerType === "touch" || event.button !== 0) return;
+      if (viewportRef.current) liveRange = viewportRef.current.range;
+
       drag = {
         id: event.pointerId,
         x: event.clientX,
@@ -812,29 +963,8 @@ export default function UPlotChart<S>(
       over.setPointerCapture?.(event.pointerId);
     };
     const onPointerMove = (event: PointerEvent) => {
-      if (pointers.has(event.pointerId)) {
-        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      }
       const value = viewportRef.current;
       if (!value) return;
-      if (pinchDistance !== undefined && pointers.size >= 2) {
-        const [a, b] = [...pointers.values()];
-        const distance = Math.hypot(a.x - b.x, a.y - b.y);
-        if (distance > 0) {
-          event.preventDefault();
-          schedule(
-            zoomChartViewport(
-              value.bounds,
-              liveRange,
-              value.minSpan,
-              pinchDistance / distance,
-              point((a.x + b.x) / 2),
-            ),
-          );
-          pinchDistance = distance;
-        }
-        return;
-      }
       if (!drag || drag.id !== event.pointerId) return;
       const deltaX = event.clientX - drag.x;
       if (rangesEqual(value.bounds, liveRange)) return;
@@ -851,14 +981,12 @@ export default function UPlotChart<S>(
       );
     };
     const onPointerEnd = (event: PointerEvent) => {
-      const interacted = pinchDistance !== undefined || !!drag;
-      pointers.delete(event.pointerId);
-      if (pointers.size < 2) pinchDistance = undefined;
-      if (drag?.id === event.pointerId) drag = undefined;
+      if (!drag || drag.id !== event.pointerId) return;
+      drag = undefined;
       if (over.hasPointerCapture?.(event.pointerId)) {
         over.releasePointerCapture(event.pointerId);
       }
-      if (interacted) commit();
+      commit();
     };
     const onDoubleClick = (event: MouseEvent) => {
       event.preventDefault();
@@ -866,13 +994,22 @@ export default function UPlotChart<S>(
     };
 
     over.addEventListener("wheel", onWheel, { passive: false });
+    over.addEventListener("touchstart", onTouchStart, { passive: false });
+    over.addEventListener("touchmove", onTouchMove, { passive: false });
+    over.addEventListener("touchend", onTouchEnd);
+    over.addEventListener("touchcancel", onTouchEnd);
     over.addEventListener("pointerdown", onPointerDown);
     over.addEventListener("pointermove", onPointerMove);
     over.addEventListener("pointerup", onPointerEnd);
     over.addEventListener("pointercancel", onPointerEnd);
     over.addEventListener("dblclick", onDoubleClick);
     return () => {
+      ownedTouchIds.clear();
       over.removeEventListener("wheel", onWheel);
+      over.removeEventListener("touchstart", onTouchStart);
+      over.removeEventListener("touchmove", onTouchMove);
+      over.removeEventListener("touchend", onTouchEnd);
+      over.removeEventListener("touchcancel", onTouchEnd);
       over.removeEventListener("pointerdown", onPointerDown);
       over.removeEventListener("pointermove", onPointerMove);
       over.removeEventListener("pointerup", onPointerEnd);
@@ -880,8 +1017,9 @@ export default function UPlotChart<S>(
       over.removeEventListener("dblclick", onDoubleClick);
       if (frame !== undefined) cancelAnimationFrame(frame);
       if (wheelTimer) clearTimeout(wheelTimer);
+      releaseScroll();
     };
-  }, [viewportEnabled, plotLayout]);
+  }, [viewportEnabled, plotLayout, anchorGestureScroll]);
 
   React.useLayoutEffect(() => {
     // Event rows can appear when a new projection is ready; recompute their reserved padding.
