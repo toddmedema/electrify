@@ -11,6 +11,19 @@ import {
 // other native specs, this runs in CI or with an explicit --headed local opt-in.
 let desktop: DesktopSession;
 let profile: string;
+type Backdrop = {
+  kind: "overlay-backdrop";
+  owner: string;
+  version: number;
+  captureId: number;
+  viewport: { width: number; height: number };
+  snapshots: {
+    seatId: string;
+    generation: number;
+    bounds: { x: number; y: number; width: number; height: number };
+    image: string;
+  }[];
+};
 
 async function seatPage(seatId: string): Promise<Page> {
   let found: Page | undefined;
@@ -157,6 +170,172 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
   expect(native.seats[0].bounds.x + native.seats[0].bounds.width).toBeLessThan(
     native.seats[1].bounds.x,
   );
+  // The shell cannot paint over native child views. Its menu backdrop must be
+  // captured from the actual paused pages and painted before those views hide.
+  for (const page of [p1, p2])
+    await page.evaluate(() => {
+      const probe = globalThis as unknown as {
+        couchInputProbe: { keyboard: number; mouse: number };
+      };
+      probe.couchInputProbe = { keyboard: 0, mouse: 0 };
+      window.addEventListener(
+        "keydown",
+        () => probe.couchInputProbe.keyboard++,
+        true,
+      );
+      window.addEventListener(
+        "mousedown",
+        () => probe.couchInputProbe.mouse++,
+        true,
+      );
+    });
+  const sendNativeInput = (id: number) =>
+    desktop.app.evaluate(({ webContents }, targetId) => {
+      const contents = webContents.fromId(targetId)!;
+      contents.focus();
+      contents.sendInputEvent({ type: "keyDown", keyCode: "K" });
+      contents.sendInputEvent({ type: "keyUp", keyCode: "K" });
+      contents.sendInputEvent({
+        type: "mouseDown",
+        x: 24,
+        y: 24,
+        button: "left",
+        clickCount: 1,
+      });
+      contents.sendInputEvent({
+        type: "mouseUp",
+        x: 24,
+        y: 24,
+        button: "left",
+        clickCount: 1,
+      });
+    }, id);
+  const inputProbe = (page: Page) =>
+    page.evaluate(
+      () =>
+        (
+          globalThis as unknown as {
+            couchInputProbe: { keyboard: number; mouse: number };
+          }
+        ).couchInputProbe,
+    );
+  await sendNativeInput(native.seats[0].id);
+  await expect.poll(() => inputProbe(p1)).toEqual({ keyboard: 1, mouse: 1 });
+  for (const page of [p1, p2])
+    await page.evaluate(() => {
+      (globalThis as unknown as { couchInputProbe: unknown }).couchInputProbe =
+        {
+          keyboard: 0,
+          mouse: 0,
+        };
+    });
+  const initialOverlay = await desktop.page.evaluate(
+    async () =>
+      (await window.electrifyDesktop!.couchRequest!({
+        kind: "overlay",
+        seatId: "local-p2",
+      })) as {
+        overlay: { owner: string; version: number; captureId: number };
+      },
+  );
+  const latestBackdrop = () =>
+    desktop.page.evaluate(() =>
+      (globalThis as unknown as { couchAudit: Backdrop[] }).couchAudit.findLast(
+        (event) => event.kind === "overlay-backdrop" && !!event.owner,
+      ),
+    );
+  await expect
+    .poll(async () => (await latestBackdrop())?.captureId)
+    .toBe(initialOverlay.overlay.captureId);
+  const backdrop = (await latestBackdrop())!;
+  expect(backdrop.snapshots).toHaveLength(2);
+  expect(backdrop.snapshots.map((snapshot) => snapshot.bounds)).toEqual(
+    native.seats.map((seat) => seat.bounds),
+  );
+  expect(backdrop.viewport).toEqual({
+    width: native.contentSize[0],
+    height: native.contentSize[1],
+  });
+  const inspectNativeImages = (snapshot: Backdrop) =>
+    desktop.app.evaluate(
+      ({ nativeImage }, images) =>
+        images.map(({ image }) => {
+          const decoded = nativeImage.createFromDataURL(image);
+          return {
+            empty: decoded.isEmpty(),
+            size: decoded.getSize(),
+            bytes: decoded.toPNG().length,
+          };
+        }),
+      snapshot.snapshots,
+    );
+  for (const image of await inspectNativeImages(backdrop)) {
+    expect(image.empty).toBe(false);
+    expect(image.size.width).toBeGreaterThan(0);
+    expect(image.size.height).toBeGreaterThan(0);
+    expect(Math.max(image.size.width, image.size.height)).toBeLessThanOrEqual(
+      2048,
+    );
+    expect(image.bytes).toBeLessThanOrEqual(4 * 1024 * 1024);
+  }
+  const nativeVisibility = () =>
+    desktop.app.evaluate(({ BrowserWindow, WebContentsView }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      return window.contentView.children
+        .filter(
+          (view): view is Electron.WebContentsView =>
+            view instanceof WebContentsView,
+        )
+        .map((view) => view.getVisible());
+    });
+  expect(await nativeVisibility()).toEqual([true, true]);
+  for (const seat of native.seats) await sendNativeInput(seat.id);
+  for (const page of [p1, p2])
+    await expect
+      .poll(() => inputProbe(page))
+      .toEqual({ keyboard: 0, mouse: 0 });
+  expect(
+    await desktop.page.evaluate(
+      ({ version, captureId }) =>
+        window.electrifyDesktop!.couchRequest!({
+          kind: "overlay-ready",
+          version,
+          captureId,
+        }),
+      { version: backdrop.version, captureId: backdrop.captureId - 1 },
+    ),
+  ).toBe(false);
+  expect(await nativeVisibility()).toEqual([true, true]);
+  expect(
+    await desktop.page.evaluate(
+      ({ version, captureId }) =>
+        window.electrifyDesktop!.couchRequest!({
+          kind: "overlay-ready",
+          version,
+          captureId,
+        }),
+      backdrop,
+    ),
+  ).toBe(true);
+  expect(await nativeVisibility()).toEqual([false, false]);
+  await desktop.page.evaluate(() =>
+    window.electrifyDesktop!.couchRequest!({ kind: "refresh-overlay" }),
+  );
+  await expect
+    .poll(async () => (await latestBackdrop())?.captureId)
+    .toBeGreaterThan(backdrop.captureId);
+  const refreshed = (await latestBackdrop())!;
+  expect(refreshed.snapshots).toHaveLength(2);
+  expect(
+    (await inspectNativeImages(refreshed)).every((image) => !image.empty),
+  ).toBe(true);
+  expect(await nativeVisibility()).toEqual([false, false]);
+  await desktop.page.evaluate(() =>
+    window.electrifyDesktop!.couchRequest!({ kind: "overlay", seatId: null }),
+  );
+  expect(await nativeVisibility()).toEqual([true, true]);
+  await sendNativeInput(native.seats[0].id);
+  await expect.poll(() => inputProbe(p1)).toEqual({ keyboard: 1, mouse: 1 });
   await p1.evaluate(() => window.electrifyCouch!.post({ kind: "heartbeat" }));
   await expect
     .poll(() =>

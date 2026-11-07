@@ -127,6 +127,12 @@ function fixture() {
           this.identity = identity;
         },
         send: () => {},
+        focus: () => {},
+        capturePage: async () => ({
+          isEmpty: () => false,
+          getSize: () => ({ width: 960, height: 984 }),
+          toPNG: () => Buffer.from("snapshot"),
+        }),
         close: () => {
           this.closed = true;
         },
@@ -157,6 +163,7 @@ function fixture() {
   const host = {
     getContentSize: () => size,
     contentView: { addChildView() {}, removeChildView() {} },
+    webContents: { focus() {} },
   };
   const manager = new CouchViews({
     window: host,
@@ -232,10 +239,20 @@ test("exact top-frame bindings, authenticated ports, generations, isolated views
   assert.equal(manager.seats.size, 0);
 });
 
-test("invalid resize exposes shell recovery without shrinking companies; overlays hide seat surfaces", async () => {
+test("overlays retain paused screens until their captured backdrop is ready; invalid resize exposes shell recovery", async () => {
   const { manager, views, size, events } = fixture();
   await manager.open({ seats });
   manager.overlay("local-p2");
+  assert.ok(views.every((view) => view.visible));
+  await new Promise(setImmediate);
+  const backdrop = events.findLast(
+    (event) => event.kind === "overlay-backdrop",
+  );
+  assert.equal(backdrop.snapshots.length, 2);
+  assert.equal(
+    manager.overlayReady(backdrop.version, backdrop.captureId),
+    true,
+  );
   assert.ok(views.every((view) => !view.visible));
   manager.relayout();
   assert.ok(views.every((view) => !view.visible));
@@ -406,8 +423,8 @@ test("closing while a partition is preparing cannot create orphaned seats or clo
   manager.close();
 });
 
-test("a later-loading seat stays hidden beneath an already active global overlay", async () => {
-  const { manager, views } = fixture();
+test("a later-loading seat stays hidden beneath an already acknowledged global overlay", async () => {
+  const { manager, views, events } = fixture();
   const secondPartition = Promise.withResolvers();
   const preparingSecond = Promise.withResolvers();
   let count = 0;
@@ -420,12 +437,206 @@ test("a later-loading seat stays hidden beneath an already active global overlay
   await preparingSecond.promise;
   manager.overlay("local-p1");
   assert.equal(views.length, 1);
+  await new Promise(setImmediate);
+  const first = events.findLast((event) => event.kind === "overlay-backdrop");
+  assert.equal(manager.overlayReady(first.version, first.captureId), true);
   assert.equal(views[0].visible, false);
   secondPartition.resolve({});
   await opening;
   assert.equal(views.length, 2);
   assert.ok(views.every((view) => !view.visible));
+  await new Promise(setImmediate);
+  const latest = events.findLast((event) => event.kind === "overlay-backdrop");
+  assert.equal(latest.snapshots.length, 2);
+  assert.equal(manager.overlayReady(first.version, first.captureId), false);
+  assert.equal(manager.overlayReady(latest.version, latest.captureId), true);
   manager.overlay(null);
   assert.ok(views.every((view) => view.visible));
+  manager.close();
+});
+
+test("pending and committed backdrops gate native keyboard, pointer and both controllers", async () => {
+  const { manager, views, events } = fixture();
+  await manager.open({ seats });
+  const delivered = [];
+  let focused = 0;
+  manager.window.webContents.focus = () => focused++;
+  manager.bindings.set("local-p1", "1");
+  manager.bindings.set("local-p2", "2");
+  for (const view of views)
+    view.webContents.send = (channel) => delivered.push(channel);
+  const frames = [
+    { id: "1", connected: true, actions: ["confirm"], glyphs: {} },
+    { id: "2", connected: true, actions: ["menu"], glyphs: {} },
+  ];
+  const nativeBlocked = () =>
+    views.every((view) =>
+      ["before-input-event", "before-mouse-event"].every((name) => {
+        let blocked = false;
+        view.webContents.emit(name, {
+          preventDefault: () => (blocked = true),
+        });
+        return blocked;
+      }),
+    );
+  assert.equal(nativeBlocked(), false);
+  const status = manager.overlay("local-p2");
+  assert.equal(status.overlay.owner, "local-p2");
+  assert.equal(nativeBlocked(), true);
+  assert.equal(
+    manager.overlayReady(status.overlay.version, status.overlay.captureId),
+    false,
+  );
+  manager.inputFrame(frames);
+  assert.deepEqual(delivered, []);
+  assert.equal(manager.shellFrame(frames).id, "2");
+  views[0].webContents.emit("focus");
+  assert.equal(focused, 2);
+  await new Promise(setImmediate);
+  const backdrop = events.findLast(
+    (event) => event.kind === "overlay-backdrop",
+  );
+  assert.deepEqual(backdrop.viewport, { width: 1920, height: 1080 });
+  assert.deepEqual(
+    backdrop.snapshots.map(({ seatId, generation, bounds, image }) => ({
+      seatId,
+      generation,
+      bounds,
+      image,
+    })),
+    seats.map((seat, i) => ({
+      seatId: seat.id,
+      generation: views[i].identity.generation,
+      bounds: manager.layout.bounds[i],
+      image: `data:image/png;base64,${Buffer.from("snapshot").toString("base64")}`,
+    })),
+  );
+  assert.equal(
+    manager.overlayReady(backdrop.version, backdrop.captureId),
+    true,
+  );
+  assert.equal(nativeBlocked(), true);
+  manager.overlay(null);
+  assert.equal(nativeBlocked(), false);
+  assert.equal(manager.status().overlay, null);
+  assert.equal(events.at(-1).owner, null);
+  assert.equal(
+    manager.overlayReady(backdrop.version, backdrop.captureId),
+    false,
+  );
+  manager.inputFrame(frames);
+  assert.equal(delivered.length, 2);
+  assert.throws(
+    () => manager.overlay("local-p4"),
+    /Invalid global dialog owner/,
+  );
+  manager.close();
+});
+
+test("late captures and ready acknowledgements cannot cross close, reopen, layout or generation changes", async () => {
+  const { manager, views, events } = fixture();
+  await manager.open({ seats });
+  const pending = Promise.withResolvers();
+  const original = views[0].webContents.capturePage;
+  views[0].webContents.capturePage = () => pending.promise;
+  const first = manager.overlay("local-p1").overlay;
+  manager.overlay(null);
+  views[0].webContents.capturePage = original;
+  const reopened = manager.overlay("local-p1").overlay;
+  manager.relayout({ bandHeight: 120 });
+  const afterLayout = manager.status().overlay;
+  manager.lost(manager.seats.get("local-p2"), "renderer-crash");
+  const afterGeneration = manager.status().overlay;
+  pending.resolve(await original());
+  await new Promise(setImmediate);
+  const published = events.filter(
+    (event) => event.kind === "overlay-backdrop" && event.owner,
+  );
+  assert.equal(published.length, 1);
+  assert.equal(published[0].captureId, afterGeneration.captureId);
+  assert.equal(
+    published[0].snapshots[1].generation,
+    manager.seats.get("local-p2").generation,
+  );
+  for (const stale of [first, reopened, afterLayout])
+    assert.equal(manager.overlayReady(stale.version, stale.captureId), false);
+  assert.ok(views.every((view) => view.visible));
+  assert.equal(
+    manager.overlayReady(afterGeneration.version, afterGeneration.captureId),
+    true,
+  );
+  assert.ok(views.every((view) => !view.visible));
+  manager.close();
+  assert.equal(
+    manager.overlayReady(afterGeneration.version, afterGeneration.captureId),
+    false,
+  );
+});
+
+test("hidden refreshes bound images and capture failures still allow the shared menu to recover", async () => {
+  const { manager, views, events } = fixture();
+  await manager.open({ seats });
+  let resized;
+  const options = [];
+  views[0].webContents.capturePage = async (rect, opts) => {
+    options.push({ rect, opts });
+    return {
+      isEmpty: () => false,
+      getSize: () => ({ width: 4000, height: 2000 }),
+      resize: (size) => {
+        resized = size;
+        return { toPNG: () => Buffer.from("bounded") };
+      },
+    };
+  };
+  views[1].webContents.capturePage = async () => {
+    throw new Error("Renderer failed");
+  };
+  manager.overlay("local-p1");
+  await new Promise(setImmediate);
+  let backdrop = events.findLast((event) => event.kind === "overlay-backdrop");
+  assert.deepEqual(resized, { width: 2048, height: 1024, quality: "good" });
+  assert.equal(backdrop.snapshots.length, 1);
+  assert.equal(
+    manager.overlayReady(backdrop.version, backdrop.captureId),
+    true,
+  );
+  const version = manager.overlayVersion;
+  views[0].webContents.capturePage = async () => ({
+    isEmpty: () => false,
+    getSize: () => ({ width: 960, height: 984 }),
+    toPNG: () => Buffer.alloc(4 * 1024 * 1024 + 1),
+  });
+  manager.refreshOverlay();
+  assert.ok(views.every((view) => !view.visible));
+  await new Promise(setImmediate);
+  backdrop = events.findLast((event) => event.kind === "overlay-backdrop");
+  assert.deepEqual(backdrop.snapshots, []);
+  assert.equal(manager.overlayVersion, version);
+  assert.equal(
+    manager.overlayReady(backdrop.version, backdrop.captureId),
+    true,
+  );
+  assert.deepEqual(options, [{ rect: undefined, opts: { stayHidden: true } }]);
+  manager.close();
+});
+
+test("a nonresponsive capture reaches a bounded fallback instead of trapping the shared menu", async (t) => {
+  const { manager, views, events } = fixture();
+  await manager.open({ seats });
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  views[0].webContents.capturePage = () => new Promise(() => {});
+  manager.overlay("local-p1");
+  t.mock.timers.tick(1500);
+  await new Promise(setImmediate);
+  const backdrop = events.findLast(
+    (event) => event.kind === "overlay-backdrop",
+  );
+  assert.equal(backdrop.snapshots.length, 1);
+  assert.equal(backdrop.snapshots[0].seatId, "local-p2");
+  assert.equal(
+    manager.overlayReady(backdrop.version, backdrop.captureId),
+    true,
+  );
   manager.close();
 });

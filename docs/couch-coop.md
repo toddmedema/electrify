@@ -19,6 +19,8 @@ icon-only navigation and no duplicate menu, calendar, event or control-hint bars
 The panes fill the left, right and bottom edges, retaining only the center separator.
 The daily supply/demand plot is 20% shorter in split-screen to leave more room
 for the fleet.
+Cash and monthly profit share a row in each company pane. The shared date and
+event name follow the grid-status type size, including native zoom and text scaling.
 
 Prompts prefer Steam's controller glyphs. When Steam supplies only a physical
 control label, recognized labels use a small CC0 SVG subset from
@@ -43,7 +45,11 @@ top-level seat document and binds its message port to a company and generation.
 Seat messages cannot create, restore or checkpoint a world, impersonate another
 sender, or invoke account IPC. The coordinator preserves independent command
 sequences, authoritative receipts, coalesced view delivery and a full recovery
-baseline. Global dialogs hide native views and gate gameplay input. Controller
+baseline. Global dialogs gate gameplay input. Paused company screens remain visible
+behind the shared menu, settings and manual as bounded native captures. The shell
+decodes and paints them before acknowledging the native-view handoff; stale
+capture generations cannot hide a newer session. Layout and presentation changes
+refresh the backdrop while the real company views stay hidden. Controller
 replacement or renderer reload revokes the old route and requires fresh readiness.
 
 Application foreground, power and global dialogs are session blockers. Seat focus

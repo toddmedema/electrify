@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Button,
   Dialog,
@@ -14,7 +21,8 @@ import type { MatchSpec, Seat, World } from "../multiplayer/Types";
 import { coopControls, registerCoopControls } from "../multiplayer/Registry";
 import { navigate } from "../reducers/Card";
 import { delta as uiDelta } from "../reducers/UI";
-import { store } from "../Store";
+import { store, useAppSelector } from "../Store";
+import { tvDisplayScale, tvLayoutEnabled } from "../TvLayout";
 import { getScenario } from "../data/Scenarios";
 import { registerShutdownCheckpoint } from "../desktop/Shutdown";
 import type { CouchSummary } from "./Protocol";
@@ -23,6 +31,9 @@ import { beginCouchPlatform } from "./Platform";
 import { nextControllerSeat } from "./Bindings";
 import type { EvidenceTargetType, GameType } from "../Types";
 import CouchToolbar from "./Toolbar";
+import CouchBackdrop from "./Backdrop";
+import type { CouchOverlayBackdrop } from "./Backdrop";
+import CouchDialog from "./Dialog";
 import { ControlsLegend } from "../desktop/InputHints";
 import ManualContainer from "../components/views/ManualContainer";
 import {
@@ -39,7 +50,12 @@ type NativeEvent = {
   message?: unknown;
   reason?: string;
   devices?: Device[];
-  layout?: { fits: boolean };
+  layout?: { fits: boolean; zoom: number };
+  owner?: string | null;
+  version?: number;
+  captureId?: number;
+  viewport?: CouchOverlayBackdrop["viewport"];
+  snapshots?: CouchOverlayBackdrop["snapshots"];
   open?: boolean;
   id?: string;
 };
@@ -52,6 +68,7 @@ const defaultSeats: Seat[] = [
 /** The shell owns the worker and persistence; native binds every inbound seat route. */
 export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const desktop = getDesktop()!;
+  const settings = useAppSelector((state) => state.settings);
   const request = (input: Record<string, unknown>) =>
     desktop.couchRequest!(input);
   const [seats, setSeats] = useState<Seat[]>(defaultSeats);
@@ -77,6 +94,8 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const [exitOwner, setExitOwner] = useState<string>();
   const [recovery, setRecovery] = useState<string[]>([]);
   const [invalidLayout, setInvalidLayout] = useState(false);
+  const [nativeZoom, setNativeZoom] = useState(1);
+  const [backdrop, setBackdrop] = useState<CouchOverlayBackdrop>();
   const [textOwner, setTextOwner] = useState<string>();
   const [settingsOwner, setSettingsOwner] = useState<string>();
   const [sessionFault, setSessionFault] = useState(false);
@@ -98,6 +117,17 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   }>();
   const band = useRef<HTMLDivElement>(null);
   const coordinator = useRef<import("./Coordinator").CouchCoordinator>();
+  const overlayOwner = useRef<string>();
+  const acknowledgeBackdrop = useCallback(
+    (version: number, captureId: number) => {
+      void desktop.couchRequest!({
+        kind: "overlay-ready",
+        version,
+        captureId,
+      }).catch((failure) => setError(String(failure)));
+    },
+    [desktop],
+  );
   const current = useRef({
     seats,
     bindings,
@@ -132,6 +162,13 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   };
   const cancelGlobal = (message: string) => {
     const active = globalRequest.current;
+    if (active?.kind === "text") {
+      setTextOwner(undefined);
+      coordinator.current?.setBlocker(`text:${active.id}`, null);
+      void request({ kind: "cancel-text", requestId: active.id }).catch(
+        (failure) => setError(String(failure)),
+      );
+    }
     if (active?.kind === "leave")
       coordinator.current?.resolveLeave(
         active.seatId,
@@ -455,6 +492,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         );
       } else if (event.kind === "layout") {
         setInvalidLayout(!event.layout?.fits);
+        if (event.layout?.zoom) setNativeZoom(event.layout.zoom);
         coordinator.current?.setBlocker(
           "layout",
           event.layout?.fits
@@ -462,6 +500,27 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
             : "Restore a display area with at least 360 CSS pixels per company",
           true,
         );
+      } else if (event.kind === "overlay-backdrop") {
+        if (event.owner === null) setBackdrop(undefined);
+        else if (
+          event.owner === overlayOwner.current &&
+          typeof event.owner === "string" &&
+          typeof event.version === "number" &&
+          typeof event.captureId === "number" &&
+          event.viewport &&
+          event.snapshots
+        ) {
+          setBackdrop({
+            owner: event.owner,
+            version: event.version,
+            captureId: event.captureId,
+            viewport: event.viewport,
+            snapshots: event.snapshots.filter(
+              (snapshot) =>
+                routes.current.get(snapshot.seatId) === snapshot.generation,
+            ),
+          });
+        }
       } else if (event.kind === "global-text") {
         if (event.open) {
           if (current.current.busy) {
@@ -789,14 +848,28 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         cancelGlobal("Manual closed");
       if (previous === state.settings) return;
       previous = state.settings;
-      routes.current.forEach((generation, seatId) => {
-        void request({
+      const sent = [...routes.current].map(([seatId, generation]) =>
+        request({
           kind: "send",
           seatId,
           generation,
           message: { kind: "presentation", generation, settings: previous },
-        });
-      });
+        }),
+      );
+      void Promise.all(sent)
+        .then(() => {
+          // Let each company apply the new presentation before refreshing its
+          // paused image behind the settings controls.
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (mounted.current && overlayOwner.current)
+                void request({ kind: "refresh-overlay" }).catch((failure) =>
+                  setError(String(failure)),
+                );
+            });
+          });
+        })
+        .catch((failure) => setError(String(failure)));
     });
   }, [settingsOwner, manualOwner]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -843,8 +916,10 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           ),
         )?.id ?? "local-p1")
       : undefined);
+  overlayOwner.current = globalOwner;
   useEffect(() => {
     if (stage !== "play") return;
+    if (!globalOwner) setBackdrop(undefined);
     coordinator.current?.setBlocker(
       "global-dialog",
       globalOwner ? "TV session dialog open" : null,
@@ -859,17 +934,38 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     [commonGame, summary?.date],
   );
   const sharedState = sharedGame && { ...store.getState(), game: sharedGame };
-  const menuDevice = devices.find(
-    (device) => device.id === bindings[menuOwner ?? ""],
+  const controlsOwner = menuOwner || settingsOwner || manualOwner;
+  const controlsDevice = devices.find(
+    (device) => device.id === bindings[controlsOwner ?? ""],
   );
+  const controls = controlsOwner ? (
+    <>
+      <ControlsLegend
+        glyphs={controlsDevice?.glyphs ?? {}}
+        player={`P${controlsOwner.slice(-1)}`}
+      />
+      {error && (
+        <p className="couchMenuNotice" role="alert">
+          {error}
+        </p>
+      )}
+    </>
+  ) : undefined;
+  const shellDisplayScale = tvLayoutEnabled(settings)
+    ? tvDisplayScale(settings.tvScale, window.innerHeight)
+    : 1;
 
   return (
     <>
+      {stage === "play" && backdrop && backdrop.owner === globalOwner && (
+        <CouchBackdrop backdrop={backdrop} onReady={acknowledgeBackdrop} />
+      )}
       {stage === "play" && (
         <div ref={band} className="couchBand" data-couch-shell="true">
           {sharedGame && summary && (
             <CouchToolbar
               game={sharedGame}
+              statusScale={nativeZoom / shellDisplayScale}
               menuOpen={!!menuOwner}
               onMenuOpen={() => openMenu()}
               onMenuClose={() => cancelGlobal("Menu closed")}
@@ -877,21 +973,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
               onManual={() => menuAction("manual")}
               onSaveQuit={() => menuAction("leave")}
               onEvidence={showEvidence}
-              menuFooter={
-                menuOwner ? (
-                  <>
-                    <ControlsLegend
-                      glyphs={menuDevice?.glyphs ?? {}}
-                      player={`P${menuOwner.slice(-1)}`}
-                    />
-                    {error && (
-                      <p className="couchMenuNotice" role="alert">
-                        {error}
-                      </p>
-                    )}
-                  </>
-                ) : undefined
-              }
+              menuFooter={menuOwner ? controls : undefined}
               upcoming={sharedState && selectUpcomingStoryEvents(sharedState)}
               activeEvents={sharedState && selectActiveEventGroups(sharedState)}
             />
@@ -1057,8 +1139,10 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           Finish or cancel the Steam text dialog to return to all companies.
         </DialogContent>
       </Dialog>
-      <Dialog
+      <CouchDialog
         open={!!settingsOwner}
+        controls={settingsOwner ? controls : undefined}
+        onClose={() => cancelGlobal("Settings closed")}
         fullWidth
         maxWidth="md"
         aria-label="TV session settings"
@@ -1068,30 +1152,32 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           settings
         </DialogTitle>
         <DialogContent>
-          <SettingsContainer />
+          <SettingsContainer onBack={() => cancelGlobal("Settings closed")} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => cancelGlobal("Settings closed")}>
             Return to all companies
           </Button>
         </DialogActions>
-      </Dialog>
-      <Dialog
+      </CouchDialog>
+      <CouchDialog
         open={!!manualOwner}
+        controls={manualOwner ? controls : undefined}
+        onClose={() => cancelGlobal("Manual closed")}
         fullWidth
         maxWidth="md"
         aria-label="TV session manual"
       >
         <DialogTitle>Manual</DialogTitle>
         <DialogContent>
-          <ManualContainer />
+          <ManualContainer onBack={() => cancelGlobal("Manual closed")} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => cancelGlobal("Manual closed")}>
             Return to all companies
           </Button>
         </DialogActions>
-      </Dialog>
+      </CouchDialog>
       <Dialog open={!!summary?.complete && !exitOwner} fullWidth maxWidth="sm">
         <DialogTitle>Match complete</DialogTitle>
         <DialogContent>

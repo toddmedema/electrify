@@ -1,5 +1,5 @@
 import { MenuItem, Toolbar, Typography } from "@mui/material";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { GameDate, YearProgressBar } from "../components/base/GameCalendar";
 import GameMenu from "../components/base/GameMenu";
 import { useOnline } from "../components/base/OnlineStatus";
@@ -13,6 +13,8 @@ import "./Toolbar.scss";
 
 export interface CouchToolbarProps {
   game: GameType;
+  /** Native seat zoom relative to the shell's applied TV display scale. */
+  statusScale?: number;
   menuOpen: boolean;
   menuFooter?: ReactNode;
   online?: boolean;
@@ -29,6 +31,7 @@ export interface CouchToolbarProps {
 /** One calendar/menu serves the match; company controls live in each player's pane. */
 export default function CouchToolbar({
   game,
+  statusScale = 1,
   menuOpen,
   menuFooter,
   online,
@@ -43,7 +46,11 @@ export default function CouchToolbar({
 }: CouchToolbarProps) {
   const connected = useOnline();
   return (
-    <div id="appbar" className="couchSharedToolbar">
+    <div
+      id="appbar"
+      className="couchSharedToolbar"
+      style={{ "--couch-status-scale": statusScale } as CSSProperties}
+    >
       <div id="topbar">
         <Toolbar>
           <GameMenu

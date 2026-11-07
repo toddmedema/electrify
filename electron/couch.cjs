@@ -2,6 +2,55 @@ const { isAppUrl } = require("./runtime.cjs");
 const { validateInputContext } = require("./steam-input.cjs");
 
 const SEAT_IDS = ["local-p1", "local-p2", "local-p3", "local-p4"];
+const BACKDROP_MAX_EDGE = 2048;
+const BACKDROP_MAX_BYTES = 4 * 1024 * 1024;
+const BACKDROP_TIMEOUT_MS = 1500;
+
+async function captureSeat(seat, bounds, current) {
+  let timer;
+  try {
+    const image = await Promise.race([
+      seat.view.webContents.capturePage(undefined, { stayHidden: true }),
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("Local screen capture timed out")),
+          BACKDROP_TIMEOUT_MS,
+        );
+        timer.unref?.();
+      }),
+    ]);
+    if (!current() || image.isEmpty()) return;
+    const size = image.getSize();
+    if (
+      !Number.isFinite(size.width) ||
+      !Number.isFinite(size.height) ||
+      size.width <= 0 ||
+      size.height <= 0
+    )
+      return;
+    const scale = Math.min(
+      1,
+      BACKDROP_MAX_EDGE / size.width,
+      BACKDROP_MAX_EDGE / size.height,
+    );
+    const bounded =
+      scale < 1
+        ? image.resize({
+            width: Math.max(1, Math.round(size.width * scale)),
+            height: Math.max(1, Math.round(size.height * scale)),
+            quality: "good",
+          })
+        : image;
+    const png = bounded.toPNG();
+    if (!png.length || png.length > BACKDROP_MAX_BYTES) return;
+    return { bounds, image: `data:image/png;base64,${png.toString("base64")}` };
+  } catch {
+    // A crashed or unpainted company must not trap the shared recovery/menu UI.
+    return;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** Coordinates are DIPs; CSS dimensions are computed only after zoom. */
 function couchLayout(width, height, count, options = {}) {
@@ -156,6 +205,13 @@ class CouchViews {
           "Assigned-controller vibration is unavailable with this Steam Input adapter.",
       },
       layout: this.layout,
+      overlay: this.overlayOwner
+        ? {
+            owner: this.overlayOwner,
+            version: this.overlayVersion,
+            captureId: this.overlayCapture?.captureId,
+          }
+        : null,
     };
   }
   identify(event) {
@@ -307,6 +363,15 @@ class CouchViews {
           if (!isAppUrl(event.url)) event.preventDefault();
         });
         wc.on("will-attach-webview", (event) => event.preventDefault());
+        // Capturing keeps the paused surfaces visible briefly. Gate native input
+        // before that asynchronous work, including explicitly focused seat pages.
+        for (const name of ["before-input-event", "before-mouse-event"])
+          wc.on(name, (event) => {
+            if (this.overlayOwner) event.preventDefault();
+          });
+        wc.on("focus", () => {
+          if (this.overlayOwner) this.window.webContents.focus();
+        });
         wc.on("render-process-gone", () => this.lost(seat, "renderer-crash"));
         wc.on("did-start-loading", () => {
           if (seat.port) this.lost(seat, "renderer-reload");
@@ -353,10 +418,11 @@ class CouchViews {
             seatId: seat.id,
             generation: seat.generation,
           });
+          if (this.overlayOwner) this.refreshOverlay();
         });
         this.window.contentView.addChildView(view);
         view.setBounds(this.layout.bounds[index]);
-        view.setVisible(!this.overlayOwner && this.layout.fits);
+        view.setVisible(!this.overlayHidden && this.layout.fits);
         await wc.loadURL(this.url);
         if (lifecycle !== this.lifecycle)
           throw new Error("The local session closed while starting");
@@ -382,6 +448,7 @@ class CouchViews {
       generation: oldGeneration,
       reason,
     });
+    if (this.overlayOwner) this.refreshOverlay();
   }
   send({ seatId, generation, message }) {
     const seat = this.seats.get(seatId);
@@ -405,23 +472,25 @@ class CouchViews {
       this.options,
     );
     [...this.seats.values()].forEach((seat, i) => {
-      seat.view.setVisible(this.layout.fits && !this.overlayOwner);
+      seat.view.setVisible(this.layout.fits && !this.overlayHidden);
       if (this.layout.fits) {
         seat.view.setBounds(this.layout.bounds[i]);
         seat.view.webContents.setZoomFactor(this.layout.zoom);
       }
     });
     this.publish({ kind: "layout", layout: this.layout });
+    if (this.overlayOwner) this.refreshOverlay();
     return this.status();
   }
   overlay(seatId) {
-    if (seatId !== null && !SEAT_IDS.includes(seatId))
+    if (seatId !== null && !this.seats.has(seatId))
       throw new Error("Invalid global dialog owner");
     this.overlayOwner = seatId;
     this.overlayVersion = (this.overlayVersion ?? 0) + 1;
     for (const device of this.devices) this.input()?.releaseDevice(device.id);
+    if (!seatId) this.overlayHidden = false;
     for (const seat of this.seats.values()) {
-      seat.view.setVisible(!seatId && this.layout.fits);
+      seat.view.setVisible(!this.overlayHidden && this.layout.fits);
       const controller = this.bindings.get(seat.id);
       if (controller)
         this.input()?.setDeviceContext(
@@ -429,7 +498,93 @@ class CouchViews {
           seatId === seat.id ? "Menu" : (seat.context ?? "Menu"),
         );
     }
+    if (seatId) {
+      this.window.webContents.focus();
+      this.refreshOverlay();
+    } else this.clearOverlay();
     return this.status();
+  }
+  clearOverlay() {
+    this.overlayCapture = undefined;
+    this.captureId = (this.captureId ?? 0) + 1;
+    this.publish({
+      kind: "overlay-backdrop",
+      owner: null,
+      version: this.overlayVersion ?? 0,
+      captureId: this.captureId,
+      snapshots: [],
+    });
+  }
+  currentCapture(capture) {
+    return (
+      this.overlayCapture === capture &&
+      this.overlayOwner === capture.owner &&
+      this.overlayVersion === capture.version &&
+      this.lifecycle === capture.lifecycle &&
+      this.layout === capture.layout &&
+      this.seats.size === capture.seats.length &&
+      capture.seats.every(
+        ({ seat, generation }) =>
+          this.seats.get(seat.id) === seat && seat.generation === generation,
+      )
+    );
+  }
+  refreshOverlay() {
+    if (!this.overlayOwner) return this.status();
+    const [width, height] = this.window.getContentSize();
+    const capture = {
+      owner: this.overlayOwner,
+      version: this.overlayVersion,
+      captureId: (this.captureId = (this.captureId ?? 0) + 1),
+      lifecycle: this.lifecycle,
+      layout: this.layout,
+      viewport: { width, height },
+      seats: [...this.seats.values()].map((seat, i) => ({
+        seat,
+        generation: seat.generation,
+        bounds: this.layout.bounds[i],
+      })),
+      published: false,
+    };
+    this.overlayCapture = capture;
+    // Start while the first overlay's company views are still visible. Refreshes
+    // use Electron's stayHidden option and never expose those native views again.
+    void Promise.all(
+      capture.seats.map(async ({ seat, generation, bounds }) => {
+        const snapshot =
+          capture.layout.fits &&
+          (await captureSeat(seat, bounds, () => this.currentCapture(capture)));
+        return snapshot
+          ? { seatId: seat.id, generation, ...snapshot }
+          : undefined;
+      }),
+    ).then((snapshots) => {
+      if (!this.currentCapture(capture)) return;
+      capture.published = true;
+      this.publish({
+        kind: "overlay-backdrop",
+        owner: capture.owner,
+        version: capture.version,
+        captureId: capture.captureId,
+        layout: capture.layout,
+        viewport: capture.viewport,
+        snapshots: snapshots.filter(Boolean),
+      });
+    });
+    return this.status();
+  }
+  overlayReady(version, captureId) {
+    const capture = this.overlayCapture;
+    if (
+      !capture?.published ||
+      version !== capture.version ||
+      captureId !== capture.captureId ||
+      !this.currentCapture(capture)
+    )
+      return false;
+    this.overlayHidden = true;
+    for (const { view } of this.seats.values()) view.setVisible(false);
+    return true;
   }
   reload(seatId) {
     const seat = this.seats.get(seatId);
@@ -454,6 +609,8 @@ class CouchViews {
     this.setup = false;
     this.confirmOnly = false;
     this.overlayOwner = undefined;
+    this.overlayHidden = false;
+    this.clearOverlay();
     this.input()?.setDeviceMode(false);
     this.input()?.deviceContexts.clear();
     this.input()?.setContext("Menu");

@@ -30,6 +30,24 @@ html[data-couch-seat] {
   border-bottom: 1px solid var(--border-subtle);
   min-height: 4px;
 }
+.couchBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+  user-select: none;
+  background: var(--bg-sunken);
+  img {
+    position: absolute;
+    object-fit: fill;
+  }
+}
+html[data-couch-shell-active="true"]
+  .couchDialogWithControls
+  .MuiDialog-container {
+  box-sizing: border-box;
+  padding-bottom: var(--couch-controls-height, 160px);
+}
 .couchControlsLegend {
   position: fixed;
   z-index: 1400;

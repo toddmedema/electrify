@@ -517,6 +517,10 @@ handle("desktop:couch", async (input) => {
       return couch.overlay(
         input.seatId ?? (input.open ? input.ownerSeatId : null),
       );
+    case "overlay-ready":
+      return couch.overlayReady(input.version, input.captureId);
+    case "refresh-overlay":
+      return couch.refreshOverlay();
     case "reload-seat":
       return couch.reload(input.seatId);
     case "cancel-text":

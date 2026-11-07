@@ -37,6 +37,8 @@ export interface CouchFixture<Actor extends Page | Frame> {
   seats: Map<string, { page: Actor; generation: number }>;
   checkpoint: () => World | undefined;
   layout: () => CouchLayout | undefined;
+  backdropRevision: () => number;
+  cancelledText: () => readonly string[];
   input: (actions: Record<string, DesktopInputAction[]>) => Promise<void>;
 }
 const {
@@ -82,10 +84,25 @@ export async function createCouchFixture(
   let generation = 0;
   let layout: CouchLayout | undefined;
   let layoutOptions: Record<string, unknown> = {};
+  let overlayVersion = 0;
+  let captureId = 0;
+  let publishedCaptureId = 0;
+  let readyCaptureId = 0;
+  let overlayCommitted = false;
+  let captureQueue = Promise.resolve();
+  const cancelledText: string[] = [];
   const iframeId = (id: string) => `couch-fixture-${id}`;
-  async function relayout(update: Record<string, unknown> = {}) {
+  async function relayout(
+    update: Record<string, unknown> = {},
+    refreshOverlay = true,
+  ) {
     layoutOptions = { ...layoutOptions, ...update };
-    if (!playing) return { layout };
+    if (
+      !playing ||
+      shell.isClosed() ||
+      [...seats.values()].some(({ page }) => actorClosed(page))
+    )
+      return { layout };
     const viewport = shell.viewportSize();
     if (!viewport) throw new Error("Couch fixture needs an explicit viewport");
     layout = couchLayout(viewport.width, viewport.height, 2, layoutOptions);
@@ -112,7 +129,7 @@ export async function createCouchFixture(
             });
           });
         },
-        { layout, hidden: !!overlayOwner },
+        { layout, hidden: overlayCommitted },
       );
     } else {
       for (const route of seats.values()) {
@@ -123,12 +140,89 @@ export async function createCouchFixture(
           });
       }
     }
+    await emit({ kind: "layout", layout });
+    if (overlayOwner && refreshOverlay) scheduleCapture();
     return { layout };
   }
   const emit = async (event: unknown) =>
     shell.evaluate((detail) => {
       window.dispatchEvent(new CustomEvent("couchNativeEvent", { detail }));
     }, event);
+  const overlayStatus = () =>
+    overlayOwner
+      ? { owner: overlayOwner, version: overlayVersion, captureId }
+      : null;
+  function scheduleCapture() {
+    const owner = overlayOwner;
+    if (!owner || !layout) return;
+    const version = overlayVersion;
+    const id = ++captureId;
+    const capturedLayout = structuredClone(layout);
+    const viewport = shell.viewportSize()!;
+    captureQueue = captureQueue
+      .then(async () => {
+        if (
+          owner !== overlayOwner ||
+          version !== overlayVersion ||
+          id !== captureId
+        )
+          return;
+        const snapshots = [];
+        try {
+          for (const [index, [seatId, route]] of [...seats].entries()) {
+            let png: Buffer;
+            if (isPage(route.page)) png = await route.page.screenshot();
+            else {
+              // Native capturePage reads a seat document alone, including while
+              // its view is hidden during refresh. Temporarily expose that real
+              // document and suppress only the outer shell in this capture.
+              await shell.locator(`#${iframeId(seatId)}`).evaluate((frame) => {
+                (frame as HTMLElement).style.visibility = "visible";
+              });
+              png = await route.page.locator("html").screenshot({
+                animations: "disabled",
+                style:
+                  'html:not([data-couch-seat]) body > :not(iframe[id^="couch-fixture-"]), html:not([data-couch-seat]) body > :not(iframe[id^="couch-fixture-"]) * { visibility: hidden !important; }',
+              });
+            }
+            snapshots.push({
+              seatId,
+              generation: route.generation,
+              bounds: capturedLayout.bounds[index],
+              image: `data:image/png;base64,${png.toString("base64")}`,
+            });
+          }
+        } finally {
+          await relayout({}, false);
+        }
+        if (
+          owner !== overlayOwner ||
+          version !== overlayVersion ||
+          id !== captureId
+        )
+          return;
+        publishedCaptureId = id;
+        await emit({
+          kind: "overlay-backdrop",
+          owner,
+          version,
+          captureId: id,
+          layout: capturedLayout,
+          viewport,
+          snapshots,
+        });
+      })
+      .catch((error) => {
+        if (
+          !shell.isClosed() &&
+          ![...seats.values()].some(({ page }) => actorClosed(page)) &&
+          owner === overlayOwner &&
+          version === overlayVersion &&
+          id === captureId
+        )
+          console.error("Couch fixture seat capture failed", error);
+      });
+  }
   await context.exposeBinding(
     "__couchTestRequest",
     async ({ frame: sourceFrame }, raw: Record<string, unknown>) => {
@@ -153,10 +247,19 @@ export async function createCouchFixture(
         case "setup":
           return { available: true, preview: true, devices };
         case "status":
-          return { available: true, preview: true, devices, active: playing };
+          return {
+            available: true,
+            preview: true,
+            devices,
+            active: playing,
+            overlay: overlayStatus(),
+          };
         case "setup-confirm":
           confirmOnly = raw.value === true;
           return;
+        case "cancel-text":
+          cancelledText.push(String(raw.requestId));
+          return true;
         case "bind":
           bindings.set(String(raw.seatId), String(raw.controllerId));
           return;
@@ -184,9 +287,53 @@ export async function createCouchFixture(
           saved = structuredClone(raw.world) as World;
           updatedAt = Date.now();
           return { id: "saved-local", updatedAt };
-        case "overlay":
-          overlayOwner = raw.seatId as string | null;
-          return relayout();
+        case "overlay": {
+          const owner = raw.seatId as string | null;
+          if (owner !== overlayOwner) {
+            overlayOwner = owner;
+            overlayVersion++;
+            overlayCommitted = false;
+            await relayout({}, false);
+            if (owner) scheduleCapture();
+            else {
+              captureId++;
+              await emit({
+                kind: "overlay-backdrop",
+                owner: null,
+                version: overlayVersion,
+                captureId,
+                snapshots: [],
+              });
+            }
+          }
+          return {
+            available: true,
+            active: playing,
+            layout,
+            overlay: overlayStatus(),
+          };
+        }
+        case "overlay-ready":
+          if (
+            overlayOwner &&
+            raw.version === overlayVersion &&
+            raw.captureId === captureId &&
+            raw.captureId === publishedCaptureId
+          ) {
+            overlayCommitted = true;
+            readyCaptureId = publishedCaptureId;
+            await relayout({}, false);
+            return true;
+          }
+          return false;
+        case "refresh-overlay":
+          scheduleCapture();
+          return {
+            available: true,
+            active: playing,
+            layout,
+            overlay: overlayStatus(),
+          };
         case "layout":
           return relayout(raw.options as Record<string, unknown>);
         case "send": {
@@ -252,6 +399,16 @@ export async function createCouchFixture(
         case "close":
           playing = false;
           overlayOwner = null;
+          overlayVersion++;
+          captureId++;
+          overlayCommitted = false;
+          await emit({
+            kind: "overlay-backdrop",
+            owner: null,
+            version: overlayVersion,
+            captureId,
+            snapshots: [],
+          });
           for (const { page: actor } of seats.values()) {
             if (isPage(actor)) await actor.close();
           }
@@ -391,7 +548,17 @@ export async function createCouchFixture(
     seats,
     checkpoint: () => saved,
     layout: () => layout,
+    backdropRevision: () => readyCaptureId,
+    cancelledText: () => cancelledText,
     async input(actions: Record<string, DesktopInputAction[]>) {
+      // Native capturePage never changes the shell's DOM. Embedded capture
+      // temporarily suppresses only that outer DOM, so finish its capture work
+      // before resolving semantic keyboard scope or focus for a controller frame.
+      for (;;) {
+        const pending = captureQueue;
+        await pending;
+        if (pending === captureQueue) break;
+      }
       // Main selects routes before asynchronous renderer handlers bind a joining device.
       const sampledBindings = new Map(bindings);
       const sampledPlaying = playing;

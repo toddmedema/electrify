@@ -57,6 +57,7 @@ import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus } from "./useMenuKeys";
 import GameMenu from "./GameMenu";
 import { GameDate, YearProgressBar } from "./GameCalendar";
+import "./GameAppBar.scss";
 
 /**
  * The game's global state: cash, monthly profit, the date, speed, year progress,

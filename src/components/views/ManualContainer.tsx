@@ -15,11 +15,15 @@ const mapStateToProps = (state: RootState): StateProps => {
   };
 };
 
-export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
+export const mapDispatchToProps = (
+  dispatch: AppDispatch,
+  ownProps?: { onBack?: () => void },
+): DispatchProps => {
   return {
     onBack: () => {
       dispatch(manualTrailCleared());
-      dispatch(navigateBack());
+      if (ownProps?.onBack) ownProps.onBack();
+      else dispatch(navigateBack());
       restoreMenuFocus("[data-manual-trigger]");
     },
     onFollowLink: (to, from) => {

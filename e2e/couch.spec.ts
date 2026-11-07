@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures";
-import type { Frame, Page } from "@playwright/test";
+import type { Frame, Locator, Page } from "@playwright/test";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { createCouchFixture } from "./couch-fixture";
 import type { CouchFixture } from "./couch-fixture";
@@ -59,6 +60,161 @@ async function runNormally(...seats: (Page | Frame)[]) {
   for (const seat of seats)
     await expect(clock(seat)).toHaveAttribute("data-active-speed", "NORMAL");
 }
+async function renderedFontSize(element: Locator) {
+  return element.evaluate((node) =>
+    parseFloat(getComputedStyle(node).fontSize),
+  );
+}
+
+async function expectCompanyMoneyRow(seat: Page | Frame) {
+  const geometry = await seat.locator(".gameBalance").evaluate((balance) => {
+    const cash = balance
+      .querySelector(".gameStatusValue")!
+      .getBoundingClientRect();
+    const profit = balance
+      .querySelector(".gameMonthlyProfit")!
+      .getBoundingClientRect();
+    return {
+      cash: {
+        left: cash.left,
+        right: cash.right,
+        top: cash.top,
+        bottom: cash.bottom,
+      },
+      profit: {
+        left: profit.left,
+        right: profit.right,
+        top: profit.top,
+        bottom: profit.bottom,
+      },
+    };
+  });
+  expect
+    .soft(geometry.profit.left, "profit sits beside company cash")
+    .toBeGreaterThan(geometry.cash.right);
+  expect
+    .soft(
+      Math.min(geometry.cash.bottom, geometry.profit.bottom) -
+        Math.max(geometry.cash.top, geometry.profit.top),
+      "cash and monthly profit share one row",
+    )
+    .toBeGreaterThan(0);
+}
+
+async function expectSettingsClearance(globalSettings: Locator) {
+  await expect
+    .poll(
+      async () => {
+        const action = await globalSettings
+          .getByRole("button", { name: "Return to all companies", exact: true })
+          .boundingBox();
+        const footer = await globalSettings
+          .getByRole("complementary", {
+            name: "Controller controls",
+            exact: true,
+          })
+          .boundingBox();
+        return action && footer
+          ? action.y + action.height - footer.y
+          : Infinity;
+      },
+      { message: "settings return action stays above the controls legend" },
+    )
+    .toBeLessThanOrEqual(0);
+}
+
+async function expectSharedCaptionSize(
+  page: Page,
+  seat: Page | Frame,
+  zoom: number,
+) {
+  await expect
+    .poll(
+      async () => {
+        const reserveFont = await renderedFontSize(
+          seat.locator(".gridHealthStatusWord, .gridHealthMetric").first(),
+        );
+        const fonts = await Promise.all([
+          renderedFontSize(page.locator(".couchCalendar .gameStatusValue")),
+          renderedFontSize(page.locator(".missionRiskText")),
+        ]);
+        return Math.max(
+          ...fonts.map((font) => Math.abs(font - reserveFont * zoom)),
+        );
+      },
+      { message: "shared date/event matches physical reserve-label font" },
+    )
+    .toBeLessThan(0.5);
+}
+
+async function expectPlayersPainted(page: Page) {
+  for (const id of ["local-p1", "local-p2"]) {
+    const snapshot = page.locator(`[data-couch-backdrop-seat="${id}"]`);
+    await expect(
+      snapshot,
+      `${id} remains painted beneath the shared overlay`,
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        snapshot.evaluate(
+          (image) =>
+            (image as HTMLImageElement).complete &&
+            (image as HTMLImageElement).naturalWidth > 0,
+        ),
+      )
+      .toBe(true);
+    // Native views hide only after the shell has decoded the real seat captures.
+    await expect(page.locator(`#couch-fixture-${id}`)).toBeHidden();
+    const nativeBounds = await page
+      .locator(`#couch-fixture-${id}`)
+      .evaluate((frame) => {
+        const rect = frame.getBoundingClientRect();
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      });
+    const paintedBounds = await snapshot.boundingBox();
+    expect(paintedBounds).not.toBeNull();
+    for (const key of ["x", "y", "width", "height"] as const)
+      expect(paintedBounds![key]).toBeCloseTo(nativeBounds[key], 0);
+  }
+}
+
+async function pointerTarget(page: Page, seat: Frame, button: Locator) {
+  const seatId = await seat.locator("html").getAttribute("data-couch-seat");
+  const bounds = await button.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  });
+  const frame = await page
+    .locator(`#couch-fixture-${seatId}`)
+    .evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        x: rect.x,
+        y: rect.y,
+        zoom: new DOMMatrix(getComputedStyle(node).transform).a,
+      };
+    });
+  // Observe the real event target, including when the coordinator would reject
+  // its command. The global overlay must intercept the pointer before the pane.
+  await button.evaluate((target) =>
+    target.addEventListener(
+      "click",
+      () => {
+        document.documentElement.dataset.couchPointerLeak = "true";
+      },
+      { once: true },
+    ),
+  );
+  await page.mouse.click(
+    frame.x + (bounds.x + bounds.width / 2) * frame.zoom,
+    frame.y + (bounds.y + bounds.height / 2) * frame.zoom,
+  );
+  await expect(seat.locator("html")).not.toHaveAttribute(
+    "data-couch-pointer-leak",
+    "true",
+  );
+}
+
 async function expectSeatChromeRemoved(seat: Page | Frame) {
   await expect(seat.locator(".couchIdentity")).toHaveCount(0);
   await expect(seat.locator(".gameMenuButton")).toHaveCount(0);
@@ -162,6 +318,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
       exact: true,
     }),
   ).toBeVisible();
+
   await expect(
     page
       .getByRole("complementary", {
@@ -308,6 +465,9 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
     await expect(seat.locator("#appbar:visible")).toBeVisible();
     await expectSeatChromeRemoved(seat);
   }
+  const zoom = couch.layout()!.zoom;
+  for (const seat of [p1, p2]) await expectCompanyMoneyRow(seat);
+  await expectSharedCaptionSize(page, p1, zoom);
   await expect(page.locator(".appFrameBody")).toBeHidden();
   await expect(speedControls(page)).toHaveCount(0);
   await expect(
@@ -444,6 +604,7 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
   await couch.input({ "202": ["menu"] });
   const gameMenu = page.getByRole("menu", { name: "Game menu", exact: true });
   await expect(gameMenu).toBeVisible();
+  await expectPlayersPainted(page);
   await expect(
     page.getByRole("complementary", {
       name: "Controller controls",
@@ -490,5 +651,275 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
   ).toHaveCount(0);
   await expect(
     p2.getByRole("region", { name: "Insights", exact: true }),
+  ).toBeVisible();
+  await couch.input({ "202": ["menu"] });
+  await expect(gameMenu).toBeVisible();
+  await expectPlayersPainted(page);
+  await pointerTarget(
+    page,
+    p2,
+    clock(p2).getByRole("button", {
+      name: "ultra speed",
+      exact: true,
+      includeHidden: true,
+    }),
+  );
+  // A backdrop click may dismiss the menu; either way the underlying speed never changes.
+  await expect(
+    clock(p2).getByRole("button", {
+      name: "normal speed",
+      exact: true,
+      includeHidden: true,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+  if (
+    (await page
+      .getByRole("button", { name: "menu", exact: true, includeHidden: true })
+      .getAttribute("aria-expanded")) !== "true"
+  ) {
+    await expect(gameMenu).toBeHidden();
+    await couch.input({ "202": ["menu"] });
+  }
+  await gameMenu
+    .getByRole("menuitem", { name: "Settings", exact: true })
+    .click();
+  const globalSettings = page.getByRole("dialog", {
+    name: "P2 Utility: TV session settings",
+    exact: true,
+  });
+  await expect(globalSettings).toBeVisible();
+  await expectPlayersPainted(page);
+  await expectSettingsClearance(globalSettings);
+  await expect(
+    page.getByRole("complementary", {
+      name: "Controller controls",
+      exact: true,
+    }),
+  ).toBeVisible();
+  if (process.env.REVIEW_SCREENSHOT_DIR)
+    await page.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        `couch-settings-${info.project.name}.png`,
+      ),
+      animations: "disabled",
+    });
+  for (const seat of [p1, p2])
+    await expect(clock(seat)).toHaveAttribute("data-active-speed", "PAUSED");
+  await couch.input({ "101": ["build"] });
+  await expect(
+    p1.getByRole("region", { name: "Build", exact: true, includeHidden: true }),
+  ).toHaveCount(0);
+  await pointerTarget(
+    page,
+    p2,
+    clock(p2).getByRole("button", {
+      name: "ultra speed",
+      exact: true,
+      includeHidden: true,
+    }),
+  );
+  await expect(globalSettings).toHaveCount(0);
+  for (const seat of [p1, p2])
+    await expect(clock(seat)).toHaveAttribute("data-active-speed", "NORMAL");
+  await expect(
+    clock(p2).getByRole("button", {
+      name: "normal speed",
+      exact: true,
+      includeHidden: true,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+  for (const closeWith of ["controller", "header"] as const) {
+    await couch.input({ "202": ["menu"] });
+    await gameMenu
+      .getByRole("menuitem", { name: "Settings", exact: true })
+      .click();
+    await expect(globalSettings).toBeVisible();
+    await expect(
+      globalSettings.getByRole("complementary", {
+        name: "Controller controls",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expectSettingsClearance(globalSettings);
+    await expectPlayersPainted(page);
+    if (closeWith === "controller") {
+      await globalSettings
+        .getByRole("button", { name: "System", exact: true })
+        .focus();
+      await couch.input({ "202": ["back"] });
+    } else {
+      await globalSettings
+        .getByRole("button", { name: "Back", exact: true })
+        .click();
+    }
+    await expect(globalSettings).toHaveCount(0);
+    await expect(page.locator(".couchDialogWithControls:visible")).toHaveCount(
+      0,
+    );
+    for (const seat of [p1, p2])
+      await expect(clock(seat)).toHaveAttribute("data-active-speed", "NORMAL");
+  }
+  await couch.input({ "202": ["menu"] });
+  await gameMenu
+    .getByRole("menuitem", { name: "Settings", exact: true })
+    .click();
+  await expect(globalSettings).toBeVisible();
+  await expect(
+    globalSettings.getByRole("complementary", {
+      name: "Controller controls",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expectSettingsClearance(globalSettings);
+  await expectPlayersPainted(page);
+  const backdropHash = async () =>
+    createHash("sha256")
+      .update(
+        (await page
+          .locator('[data-couch-backdrop-seat="local-p1"]')
+          .getAttribute("src")) ?? "",
+      )
+      .digest("hex");
+  const desktopBackdrop = couch.backdropRevision();
+  const interfaceLayout = globalSettings.getByRole("group", {
+    name: "Interface layout",
+    exact: true,
+  });
+  await interfaceLayout
+    .getByRole("button", { name: "TV", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
+  await expectSettingsClearance(globalSettings);
+  await expectSharedCaptionSize(page, p1, couch.layout()!.zoom);
+  await expect
+    .poll(couch.backdropRevision, {
+      message: "paused player capture refreshes after TV layout change",
+    })
+    .toBeGreaterThan(desktopBackdrop);
+  await expectPlayersPainted(page);
+  const tvBackdrop = couch.backdropRevision();
+  await interfaceLayout
+    .getByRole("button", { name: "Desktop", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "false");
+  await expectSettingsClearance(globalSettings);
+  await expectSharedCaptionSize(page, p1, couch.layout()!.zoom);
+  await expect.poll(couch.backdropRevision).toBeGreaterThan(tvBackdrop);
+  await expectPlayersPainted(page);
+  const previousBackdrop = await backdropHash();
+  const originalTheme =
+    info.project.use.colorScheme === "dark" ? "dark" : "light";
+  const changedTheme = originalTheme === "dark" ? "light" : "dark";
+  await globalSettings
+    .getByRole("group", { name: "Appearance", exact: true })
+    .getByRole("button", {
+      name: changedTheme === "dark" ? "Dark" : "Light",
+      exact: true,
+    })
+    .click();
+  for (const seat of [p1, p2])
+    await expect(seat.locator("html")).toHaveAttribute(
+      "data-theme",
+      changedTheme,
+    );
+  await expect
+    .poll(backdropHash, {
+      message: "paused player capture refreshes with shared appearance",
+    })
+    .not.toBe(previousBackdrop);
+  await expectPlayersPainted(page);
+  const changedBackdrop = await backdropHash();
+  await globalSettings
+    .getByRole("group", { name: "Appearance", exact: true })
+    .getByRole("button", { name: "System", exact: true })
+    .click();
+  for (const seat of [p1, p2])
+    await expect(seat.locator("html")).toHaveAttribute(
+      "data-theme",
+      originalTheme,
+    );
+  await expect.poll(backdropHash).not.toBe(changedBackdrop);
+  await expectPlayersPainted(page);
+  await globalSettings
+    .getByRole("button", { name: "Return to all companies", exact: true })
+    .click();
+  await expect(globalSettings).toHaveCount(0);
+  for (const seat of [p1, p2])
+    await expect(clock(seat)).toHaveAttribute("data-active-speed", "NORMAL");
+});
+
+test("TV couch lost Steam text owner recovers without dismissing newer text", async ({
+  context,
+  page,
+}, info) => {
+  test.skip(
+    info.project.name !== "tv-1080-light",
+    "One authenticated shell event regression covers the owner lifecycle",
+  );
+  const couch = await createCouchFixture(context, page);
+  await startCouch(page, couch);
+  const p1 = couch.seats.get("local-p1")!;
+  const p2 = couch.seats.get("local-p2")!;
+  for (const seat of [p1.page, p2.page])
+    await expect(seat.locator("#appbar:visible")).toBeVisible();
+  await runNormally(p1.page, p2.page);
+  const nativeEvent = (detail: Record<string, unknown>) =>
+    page.evaluate((event) => {
+      window.dispatchEvent(
+        new CustomEvent("couchNativeEvent", { detail: event }),
+      );
+    }, detail);
+  const oldText = {
+    kind: "global-text",
+    id: "old-p1-text",
+    seatId: "local-p1",
+    generation: p1.generation,
+  };
+  await nativeEvent({ ...oldText, open: true });
+  await expect(
+    page.getByRole("heading", {
+      name: "P1 Utility: entering text",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await nativeEvent({
+    kind: "seat-lost",
+    seatId: "local-p1",
+    generation: p1.generation,
+    reason: "Controller seat unavailable",
+  });
+  await expect.poll(couch.cancelledText).toContain("old-p1-text");
+  await expect(
+    page.getByRole("heading", {
+      name: "P1 Utility: entering text",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "TV session paused", exact: true }),
+  ).toBeVisible();
+  await nativeEvent({ ...oldText, open: false });
+  await expect(
+    page.getByRole("heading", { name: "TV session paused", exact: true }),
+  ).toBeVisible();
+  const newText = {
+    kind: "global-text",
+    id: "new-p2-text",
+    seatId: "local-p2",
+    generation: p2.generation,
+  };
+  await nativeEvent({ ...newText, open: true });
+  const newerDialog = page.getByRole("heading", {
+    name: "P2 Utility: entering text",
+    exact: true,
+  });
+  await expect(newerDialog).toBeVisible();
+  await nativeEvent({ ...oldText, open: false });
+  await expect(newerDialog).toBeVisible();
+  await nativeEvent({ ...newText, open: false });
+  await expect(newerDialog).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "TV session paused", exact: true }),
   ).toBeVisible();
 });
