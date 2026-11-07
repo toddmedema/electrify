@@ -142,10 +142,8 @@ function glyphHint(
 /** One complete legend in the shared menu, with the requesting controller's bindings. */
 export function ControlsLegend({
   glyphs,
-  player,
 }: {
   glyphs: DesktopInputFrame["glyphs"];
-  player: string;
 }) {
   const hints: Hint[] = [
     ["up", "Move up"],
@@ -159,7 +157,7 @@ export function ControlsLegend({
   ];
   return (
     <aside className="couchControlsLegend" aria-label="Controller controls">
-      <strong>{player} controls</strong>
+      <strong>Controls</strong>
       <div className="controllerHintActions">
         {hints.map((hint) => glyphHint(hint, glyphs, true))}
       </div>

@@ -2,7 +2,16 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { nativeLibraryPath } = require("./steam-native.cjs");
 
-const MENU_ACTIONS = ["up", "down", "left", "right", "confirm", "back", "menu"];
+const MENU_ACTIONS = [
+  "up",
+  "down",
+  "left",
+  "right",
+  "confirm",
+  "back",
+  "menu",
+  "menuAlt",
+];
 const ACTION_SETS = {
   Menu: MENU_ACTIONS,
   Gameplay: [
@@ -191,6 +200,7 @@ class SteamInput {
     return cache.get(name);
   }
 
+  /** Convert an optional SDK failure into one disconnected frame, then stop polling safely. */
   poll() {
     if (!this.initialized) return;
     try {
@@ -218,6 +228,10 @@ class SteamInput {
     }
   }
 
+  /**
+   * Sample independent controller contexts with release-before-activation barriers.
+   * Publish action edges/repeats and presence changes; serialize PNG glyphs only on throttled origin refresh.
+   */
   readFrame() {
     const { api, input } = this;
     api.runFrame(input, true);
@@ -237,6 +251,7 @@ class SteamInput {
     const actionSet = this.handle(this.sets, this.context, api.actionSet);
     const actions = new Set();
     const deviceFrames = [];
+    const snapshot = new Map();
     const now = this.now();
     for (const controller of handles) {
       const context = this.deviceContexts.get(controller) ?? this.context;
@@ -244,8 +259,9 @@ class SteamInput {
       const deviceActions = new Set();
       let state = this.controllers.get(controller);
       if (!state) {
-        state = { armed: false, held: new Map() };
+        state = { armed: false, held: new Map(), glyphKey: "" };
         this.controllers.set(controller, state);
+        snapshot.set(String(controller), state.glyphKey);
         if (deviceSet) api.activate(input, controller, deviceSet);
         deviceFrames.push({
           id: String(controller),
@@ -290,9 +306,16 @@ class SteamInput {
         state.armed = false;
       else if (active && !held) state.armed = true;
       if (now >= (state.glyphAt ?? 0)) {
-        state.glyphs = this.readGlyphs(controller, deviceSet, context);
+        const glyphs = this.readGlyphs(controller, deviceSet, context);
+        // PNG payloads are serialized only on this throttled origin refresh.
+        const key = JSON.stringify(glyphs);
+        if (key !== state.glyphKey) {
+          state.glyphs = glyphs;
+          state.glyphKey = key;
+        }
         state.glyphAt = now + 1000;
       }
+      snapshot.set(String(controller), state.glyphKey);
       deviceFrames.push({
         id: String(controller),
         connected: true,
@@ -310,18 +333,10 @@ class SteamInput {
             actions: [],
             glyphs: {},
           });
-      const snapshot = new Map(
-        deviceFrames
-          .filter((frame) => frame.connected)
-          .map((frame) => [
-            frame.id,
-            JSON.stringify({ ...frame, actions: [] }),
-          ]),
-      );
       if (
         deviceFrames.some((frame) => frame.actions.length) ||
-        JSON.stringify([...snapshot]) !==
-          JSON.stringify([...this.deviceSnapshots])
+        snapshot.size !== this.deviceSnapshots.size ||
+        [...snapshot].some(([id, key]) => this.deviceSnapshots.get(id) !== key)
       )
         this.devicePublisher(deviceFrames);
       this.deviceSnapshots = snapshot;

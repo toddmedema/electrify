@@ -8,9 +8,7 @@ it("keeps the control legend inside the active modal dialog's accessible scope",
     <CouchDialog
       open
       aria-label="TV settings"
-      controls={
-        <ControlsLegend player="P2" glyphs={{ back: { label: "B" } }} />
-      }
+      controls={<ControlsLegend glyphs={{ back: { label: "B" } }} />}
     >
       <DialogTitle>Settings</DialogTitle>
     </CouchDialog>,
@@ -29,7 +27,7 @@ it("passes Escape through the same close handler as the shared dialog", () => {
       open
       aria-label="TV settings"
       onClose={onClose}
-      controls={<ControlsLegend player="P1" glyphs={{}} />}
+      controls={<ControlsLegend glyphs={{}} />}
     >
       <DialogTitle>Settings</DialogTitle>
     </CouchDialog>,

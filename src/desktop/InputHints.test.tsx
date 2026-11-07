@@ -54,7 +54,6 @@ it("keeps the existing solo behavior when pointer input becomes active", () => {
 it("shows the complete shared menu legend with the requesting controller bindings", () => {
   render(
     <ControlsLegend
-      player="P2"
       glyphs={{
         confirm: { label: "Cross" },
         menu: { label: "Options" },
@@ -63,7 +62,7 @@ it("shows the complete shared menu legend with the requesting controller binding
     />,
   );
   expect(screen.getByLabelText("Controller controls")).toBeVisible();
-  expect(screen.getByText("P2 controls")).toBeVisible();
+  expect(screen.getByText("Controls")).toBeVisible();
   expect(screen.getByRole("img", { name: "Options" })).toBeVisible();
   expect(screen.getByText("Remapped faster")).toBeVisible();
   expect(screen.getByText("Build")).toBeVisible();
@@ -73,7 +72,6 @@ it("shows the complete shared menu legend with the requesting controller binding
 it("uses origin icons for recognized bindings and retains custom binding text", () => {
   render(
     <ControlsLegend
-      player="P2"
       glyphs={{
         down: { label: "D-pad down" },
         confirm: { label: "Cross" },
@@ -101,7 +99,6 @@ it("uses origin icons for recognized bindings and retains custom binding text", 
 it("preserves Steam-provided glyphs and does not guess unknown origins from actions", () => {
   render(
     <ControlsLegend
-      player="P1"
       glyphs={{
         confirm: { label: "A", image: "data:image/png;base64,steam-glyph" },
         menu: { label: "Keyboard Start" },
@@ -143,7 +140,7 @@ it.each([
   "Plus",
   "-",
 ])("renders an accessible icon for the supplied %s origin", (label) => {
-  render(<ControlsLegend player="P1" glyphs={{ confirm: { label } }} />);
+  render(<ControlsLegend glyphs={{ confirm: { label } }} />);
   expect(screen.getByRole("img", { name: label.trim() })).toBeVisible();
   expect(screen.getByText("Select")).toBeVisible();
 });

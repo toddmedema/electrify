@@ -1,11 +1,43 @@
 const { isAppUrl } = require("./runtime.cjs");
-const { validateInputContext } = require("./steam-input.cjs");
+const { validateInputContext, ACTION_SETS } = require("./steam-input.cjs");
+const MENU_ACTIONS = new Set(ACTION_SETS.Menu);
+const DIRECTIONS = new Set(["up", "down", "left", "right"]);
+
+/** One shared focus accepts assigned players; fresh button intent wins over a held direction. */
+function sharedMenuFrame(seatIds, bindings, devices, preferredSeatId) {
+  const candidates = Array.from(seatIds, (seatId) => {
+    const frame = devices.find(
+      (device) => device.id === bindings.get(seatId) && device.connected,
+    );
+    return (
+      frame && {
+        seatId,
+        frame: {
+          ...frame,
+          actions: frame.actions.filter((action) => MENU_ACTIONS.has(action)),
+        },
+      }
+    );
+  }).filter(Boolean);
+  return (
+    candidates.find(({ frame }) =>
+      frame.actions.some((action) => !DIRECTIONS.has(action)),
+    ) ??
+    candidates.find(({ frame }) => frame.actions.length) ??
+    candidates.find(({ seatId }) => seatId === preferredSeatId) ??
+    candidates[0]
+  );
+}
 
 const SEAT_IDS = ["local-p1", "local-p2", "local-p3", "local-p4"];
 const BACKDROP_MAX_EDGE = 2048;
 const BACKDROP_MAX_BYTES = 4 * 1024 * 1024;
 const BACKDROP_TIMEOUT_MS = 1500;
 
+/**
+ * Capture a bounded PNG without exposing a hidden company. Stale, empty, oversized
+ * or timed-out results are omitted so capture failure cannot trap the shared UI.
+ */
 async function captureSeat(seat, bounds, current) {
   let timer;
   try {
@@ -123,6 +155,10 @@ function validSeats(seats) {
   return seats.map(({ id, name }) => ({ id, name }));
 }
 
+/**
+ * Admit only seat-to-shell message shapes. Native route identity is supplied
+ * separately; payloads cannot choose a sender or invoke worker lifecycle controls.
+ */
 function seatMessage(message) {
   if (!message || typeof message !== "object" || Array.isArray(message))
     return false;
@@ -208,12 +244,14 @@ class CouchViews {
       overlay: this.overlayOwner
         ? {
             owner: this.overlayOwner,
+            shared: !!this.overlayShared,
             version: this.overlayVersion,
             captureId: this.overlayCapture?.captureId,
           }
         : null,
     };
   }
+  /** Match the exact live top frame; a matching URL alone never grants seat authority. */
   identify(event) {
     return [...this.seats.values()].find(
       ({ view }) =>
@@ -230,7 +268,7 @@ class CouchViews {
     return (
       this.input()?.setDeviceContext(
         controller,
-        this.overlayOwner === seat.id ? "Menu" : context,
+        this.overlayShared || this.overlayOwner === seat.id ? "Menu" : context,
       ) ?? {
         connected: false,
         actions: [],
@@ -238,6 +276,7 @@ class CouchViews {
       }
     );
   }
+  /** Publish device presence while suppressing all seat input during global UI ownership. */
   inputFrame(devices) {
     this.devices = devices.map((frame) => ({ ...frame, actions: [] }));
     if (!this.active()) return;
@@ -250,7 +289,10 @@ class CouchViews {
     }
   }
   shellOwner() {
-    if (this.overlayOwner) return this.overlayOwner;
+    if (this.overlayOwner)
+      return this.overlayShared
+        ? (this.sharedInputSeat ?? this.overlayOwner)
+        : this.overlayOwner;
     const connected = (seatId) =>
       this.devices.some(
         (device) => device.connected && device.id === this.bindings.get(seatId),
@@ -259,8 +301,52 @@ class CouchViews {
       ? "local-p1"
       : ([...this.bindings.keys()].find(connected) ?? "local-p1");
   }
+  /** Keep every shared-menu controller in Menu without replacing each seat's stored gameplay context. */
+  shellContext(context) {
+    validateInputContext(context);
+    if (this.overlayShared)
+      for (const seatId of this.seats.keys())
+        this.input()?.setDeviceContext(this.bindings.get(seatId), "Menu");
+    return (
+      this.input()?.setDeviceContext(
+        this.bindings.get(this.shellOwner()),
+        this.overlayOwner ? "Menu" : context,
+      ) ?? { connected: false, actions: [], glyphs: {} }
+    );
+  }
+  selectSharedController(seatId, controllerId) {
+    if (
+      this.sharedInputSeat === seatId &&
+      this.sharedControllerId === controllerId
+    )
+      return;
+    this.sharedInputSeat = seatId;
+    this.sharedControllerId = controllerId;
+    if (controllerId)
+      this.publish({
+        kind: "shell-controller",
+        seatId,
+        controllerId,
+        generation: this.seats.get(seatId).generation,
+      });
+  }
+  /**
+   * Select one frame for shared focus, retaining exclusive routing for text entry.
+   * Setup confirmation stays seat-owned so readiness cannot also activate a shell control.
+   */
   shellFrame(devices) {
     if (!this.setup && !this.overlayOwner) return;
+    if (this.overlayShared) {
+      const selected = sharedMenuFrame(
+        this.seats.keys(),
+        this.bindings,
+        devices,
+        this.sharedInputSeat ?? this.overlayOwner,
+      );
+      if (!selected) return;
+      this.selectSharedController(selected.seatId, selected.frame.id);
+      return selected.frame;
+    }
     const owner = this.bindings.get(this.shellOwner());
     const frame = devices.find((device) => device.id === owner);
     if (!frame) return;
@@ -271,6 +357,7 @@ class CouchViews {
         }
       : frame;
   }
+  /** A replacement explicitly revokes the previous renderer generation; hardware never swaps companies. */
   bind(seatId, controllerId) {
     if (
       !SEAT_IDS.includes(seatId) ||
@@ -296,6 +383,10 @@ class CouchViews {
     }
     return { seatId, controllerId };
   }
+  /**
+   * Create isolated company documents and authenticated ports. The lifecycle token
+   * prevents delayed session preparation from attaching views after close or reopen.
+   */
   async open(input) {
     const seats = validSeats(input.seats);
     if (seats.length > 2)
@@ -436,6 +527,7 @@ class CouchViews {
       throw error;
     }
   }
+  /** Revoke the old port generation before notifying recovery or accepting another capture. */
   lost(seat, reason) {
     seat.port?.close();
     seat.port = undefined;
@@ -456,6 +548,7 @@ class CouchViews {
     seat.port.postMessage(message);
     return true;
   }
+  /** Recompute DIP bounds; unreadable layouts expose shell recovery and invalidate any pending backdrop. */
   relayout(options = {}) {
     if (!this.seats.size) return this.status();
     this.options = {
@@ -482,10 +575,26 @@ class CouchViews {
     if (this.overlayOwner) this.refreshOverlay();
     return this.status();
   }
-  overlay(seatId) {
+  /**
+   * Transfer native input ownership and disarm held controls; the shell separately
+   * pauses the worker. Text entry remains exclusive unless sharing is explicitly granted.
+   */
+  overlay(seatId, shared = false) {
+    if (typeof shared !== "boolean")
+      throw new Error("Invalid shared dialog mode");
+    const previousOwner = this.overlayOwner;
+    const wasShared = this.overlayShared;
     if (seatId !== null && !this.seats.has(seatId))
       throw new Error("Invalid global dialog owner");
     this.overlayOwner = seatId;
+    this.overlayShared = !!seatId && shared;
+    if (this.overlayShared) {
+      if (!wasShared || previousOwner !== seatId)
+        this.selectSharedController(seatId, this.bindings.get(seatId));
+    } else {
+      this.sharedInputSeat = undefined;
+      this.sharedControllerId = undefined;
+    }
     this.overlayVersion = (this.overlayVersion ?? 0) + 1;
     for (const device of this.devices) this.input()?.releaseDevice(device.id);
     if (!seatId) this.overlayHidden = false;
@@ -495,7 +604,9 @@ class CouchViews {
       if (controller)
         this.input()?.setDeviceContext(
           controller,
-          seatId === seat.id ? "Menu" : (seat.context ?? "Menu"),
+          this.overlayShared || seatId === seat.id
+            ? "Menu"
+            : (seat.context ?? "Menu"),
         );
     }
     if (seatId) {
@@ -504,17 +615,20 @@ class CouchViews {
     } else this.clearOverlay();
     return this.status();
   }
-  clearOverlay() {
+  /** Invalidate pending captures; suppress notification when teardown has already destroyed the shell. */
+  clearOverlay(publish = true) {
     this.overlayCapture = undefined;
     this.captureId = (this.captureId ?? 0) + 1;
-    this.publish({
-      kind: "overlay-backdrop",
-      owner: null,
-      version: this.overlayVersion ?? 0,
-      captureId: this.captureId,
-      snapshots: [],
-    });
+    if (publish)
+      this.publish({
+        kind: "overlay-backdrop",
+        owner: null,
+        version: this.overlayVersion ?? 0,
+        captureId: this.captureId,
+        snapshots: [],
+      });
   }
+  /** A capture is valid only for the same overlay, lifecycle, layout and complete seat generations. */
   currentCapture(capture) {
     return (
       this.overlayCapture === capture &&
@@ -529,6 +643,10 @@ class CouchViews {
       )
     );
   }
+  /**
+   * Return status immediately and publish captures asynchronously. Refreshes leave
+   * committed native views hidden; the renderer must acknowledge the new capture before hiding others.
+   */
   refreshOverlay() {
     if (!this.overlayOwner) return this.status();
     const [width, height] = this.window.getContentSize();
@@ -573,6 +691,7 @@ class CouchViews {
     });
     return this.status();
   }
+  /** Hide native views only after the shell acknowledges painting this exact, still-current capture. */
   overlayReady(version, captureId) {
     const capture = this.overlayCapture;
     if (
@@ -595,13 +714,18 @@ class CouchViews {
     for (const { view } of this.seats.values())
       view.webContents.send("desktop:focus-changed", value);
   }
+  /**
+   * Revoke asynchronous work and dispose ports and company web contents even after
+   * native window destruction, when accessing contentView or publishing would throw.
+   */
   close() {
     this.lifecycle++;
     this.opening = false;
     this.count = undefined;
+    const windowAlive = !this.window.isDestroyed?.();
     for (const seat of this.seats.values()) {
       seat.port?.close();
-      this.window.contentView.removeChildView(seat.view);
+      if (windowAlive) this.window.contentView.removeChildView(seat.view);
       if (!seat.view.webContents.isDestroyed()) seat.view.webContents.close();
     }
     this.seats.clear();
@@ -609,11 +733,21 @@ class CouchViews {
     this.setup = false;
     this.confirmOnly = false;
     this.overlayOwner = undefined;
+    this.overlayShared = false;
+    this.sharedInputSeat = undefined;
+    this.sharedControllerId = undefined;
     this.overlayHidden = false;
-    this.clearOverlay();
+    this.clearOverlay(windowAlive);
     this.input()?.setDeviceMode(false);
     this.input()?.deviceContexts.clear();
     this.input()?.setContext("Menu");
   }
 }
-module.exports = { SEAT_IDS, couchLayout, validSeats, seatMessage, CouchViews };
+module.exports = {
+  SEAT_IDS,
+  couchLayout,
+  validSeats,
+  seatMessage,
+  sharedMenuFrame,
+  CouchViews,
+};

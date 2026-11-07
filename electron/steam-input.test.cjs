@@ -182,8 +182,13 @@ test("manifest supplies unique, localized actions and every default layout binds
       );
       assert.equal(
         byInput.get("button_menu"),
-        `${context}_back`,
-        `${file} View/Back remains local Back`,
+        `${context}_menuAlt`,
+        `${file} View/Select has its own couch menu action`,
+      );
+      assert.equal(
+        byInput.get("button_a"),
+        `${context}_confirm`,
+        `${file} A stays Confirm`,
       );
       assert.equal(
         byInput.get("button_b"),
@@ -442,4 +447,39 @@ test("replacement and global dialog release barriers disarm held controls per de
   poll();
   assert.deepEqual(devices.at(-1)[0].actions, ["confirm"]);
   input.dispose();
+});
+
+test("per-device glyph PNGs are serialized only on origin refresh, not every input poll", () => {
+  const f = fixture();
+  const devices = [];
+  let serialized = 0;
+  f.input.setDevicePublisher((frames) => devices.push(frames));
+  f.input.readGlyphs = () => {
+    const glyphs = {
+      confirm: {
+        label: f.state.origin === 1 ? "A" : "Cross",
+        image: "data:image/png;base64," + "a".repeat(120000),
+      },
+    };
+    return {
+      ...glyphs,
+      toJSON: () => {
+        serialized++;
+        return glyphs;
+      },
+    };
+  };
+  f.poll(1001);
+  const count = serialized;
+  const published = devices.length;
+  for (let i = 0; i < 20; i++) f.poll(10);
+  assert.equal(serialized, count);
+  assert.equal(devices.length, published);
+  f.state.origin = 2;
+  f.poll(1001);
+  assert.equal(devices.length, published + 1);
+  assert.equal(devices.at(-1)[0].glyphs.confirm.label, "Cross");
+  f.state.controllers = [];
+  f.poll();
+  assert.equal(devices.at(-1)[0].disconnected, true);
 });

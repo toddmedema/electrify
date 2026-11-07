@@ -396,14 +396,7 @@ handle("desktop:input-context", (context) => {
   if (couch?.active()) {
     if (!couch.setup && !couch.overlayOwner)
       return { connected: false, actions: [], glyphs: {} };
-    const owner = couch.bindings.get(couch.shellOwner());
-    return (
-      steam.input?.setDeviceContext(owner, context) ?? {
-        connected: false,
-        actions: [],
-        glyphs: {},
-      }
-    );
+    return couch.shellContext(context);
   }
   return steam.setInputContext(context);
 });
@@ -513,10 +506,15 @@ handle("desktop:couch", async (input) => {
           gutter: input.gutter,
         },
       );
-    case "overlay":
+    case "overlay": {
+      const shared = input.shared ?? false;
+      if (typeof shared !== "boolean")
+        throw new Error("Invalid shared dialog mode");
       return couch.overlay(
         input.seatId ?? (input.open ? input.ownerSeatId : null),
+        shared && !couchTextRequest && !steam.textInput?.active,
       );
+    }
     case "overlay-ready":
       return couch.overlayReady(input.version, input.captureId);
     case "refresh-overlay":
@@ -889,6 +887,7 @@ async function createWindow() {
       )
     )
       steam.textInput?.finish({ status: "cancelled" });
+    if (steam.textInput?.active) return;
     const shellFrame = couch.shellFrame(devices);
     if (shellFrame) window.webContents.send("desktop:input-event", shellFrame);
   });

@@ -20,7 +20,7 @@ import type { DesktopInputFrame } from "../Desktop";
 import type { MatchSpec, Seat, World } from "../multiplayer/Types";
 import { coopControls, registerCoopControls } from "../multiplayer/Registry";
 import { navigate } from "../reducers/Card";
-import { delta as uiDelta } from "../reducers/UI";
+import { delta as uiDelta, dialogOpen } from "../reducers/UI";
 import { store, useAppSelector } from "../Store";
 import { tvDisplayScale, tvLayoutEnabled } from "../TvLayout";
 import { getScenario } from "../data/Scenarios";
@@ -58,6 +58,7 @@ type NativeEvent = {
   snapshots?: CouchOverlayBackdrop["snapshots"];
   open?: boolean;
   id?: string;
+  controllerId?: string;
 };
 type Saved = { id: string; name: string; updatedAt: number; players: Seat[] };
 const defaultSeats: Seat[] = [
@@ -98,6 +99,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const [backdrop, setBackdrop] = useState<CouchOverlayBackdrop>();
   const [textOwner, setTextOwner] = useState<string>();
   const [settingsOwner, setSettingsOwner] = useState<string>();
+  const [controlsController, setControlsController] = useState<string>();
   const [sessionFault, setSessionFault] = useState(false);
   const globalRequest = useRef<{
     kind: "leave" | "settings" | "text" | "menu" | "manual";
@@ -151,15 +153,33 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     devices,
   };
 
+  /** Revoke pending starts and leave the shell even if native teardown fails.
+   * Cleanup errors are reported on the main menu after the couch UI unmounts. */
   const close = async () => {
     starts.current++;
     coordinator.current?.dispose();
     coordinator.current = undefined;
-    await request({ kind: "close" });
-    store.dispatch(uiDelta({ coop: undefined }));
-    store.dispatch(navigate("MAIN_MENU"));
-    onClose();
+    let closeFailure: unknown;
+    try {
+      await request({ kind: "close" });
+    } catch (failure) {
+      closeFailure = failure;
+    } finally {
+      store.dispatch(uiDelta({ coop: undefined }));
+      store.dispatch(navigate("MAIN_MENU"));
+      onClose();
+    }
+    if (closeFailure)
+      store.dispatch(
+        dialogOpen({
+          open: true,
+          title: "TV session cleanup failed",
+          message: String(closeFailure),
+        }),
+      );
   };
+  /** Release this shared request and settle any waiting leave/text operation.
+   * Other pause blockers remain owned by the coordinator and its lifecycle effects. */
   const cancelGlobal = (message: string) => {
     const active = globalRequest.current;
     if (active?.kind === "text") {
@@ -188,12 +208,14 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     coordinator.current?.setInputGate("global-request", true);
     coordinator.current?.setBlocker("global-dialog", "TV session dialog open");
   };
+  /** Any assigned controller may toggle shared navigation, but cannot interrupt a save.
+   * A new menu records its requester before gating company commands synchronously. */
   const openMenu = (seatId?: string, generation?: number, id?: string) => {
     const state = current.current;
     if (state.stage !== "play" || state.busy) return;
     const active = globalRequest.current;
     if (active) {
-      if (active.kind === "menu" && (!seatId || seatId === active.seatId))
+      if (["menu", "settings", "manual"].includes(active.kind))
         cancelGlobal("Menu closed");
       return;
     }
@@ -214,6 +236,8 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     gateGlobal();
     setMenuOwner(owner);
   };
+  /** Transfer an open menu's request identity to its destination without releasing input.
+   * The same pause and native overlay remain in force throughout the transition. */
   const menuAction = (kind: "settings" | "manual" | "leave") => {
     const active = globalRequest.current;
     if (!active || active.kind !== "menu") return;
@@ -264,14 +288,22 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     setSaveFailed(false);
     setDiscarding(false);
   };
+  /** Invalidate the failed session before rebuilding the join screen and save library.
+   * Late completions cannot revive it; native failures remain visible after local reset. */
   const returnToSetup = async () => {
-    starts.current++;
-    setBusy(false);
+    const generation = ++starts.current;
+    setBusy(true);
+    const failures: string[] = [];
     platform.current?.dispose();
     platform.current = beginCouchPlatform();
     coordinator.current?.dispose();
     coordinator.current = undefined;
-    await request({ kind: "close" });
+    try {
+      await request({ kind: "close" });
+    } catch (failure) {
+      failures.push(String(failure));
+    }
+    if (!mounted.current || generation !== starts.current) return;
     routes.current.clear();
     globalRequest.current = undefined;
     leaveRequest.current = undefined;
@@ -287,22 +319,36 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     setManualOwner(undefined);
     setExitOwner(undefined);
     setTextOwner(undefined);
+    setControlsController(undefined);
     setSaved(undefined);
     setSpec(undefined);
     setSeats(defaultSeats);
     setStage("join");
     store.dispatch(uiDelta({ coop: undefined }));
     store.dispatch(navigate("MAIN_MENU"));
-    await request({ kind: "setup" });
-    const library = (await request({ kind: "list-saves" })) as {
-      slots?: Saved[];
-    };
-    setLibrary(library.slots ?? []);
+    setLibrary([]);
+    try {
+      await request({ kind: "setup" });
+      const library = (await request({ kind: "list-saves" })) as {
+        slots?: Saved[];
+      };
+      if (mounted.current && generation === starts.current)
+        setLibrary(library.slots ?? []);
+    } catch (failure) {
+      failures.push(String(failure));
+    } finally {
+      if (mounted.current && generation === starts.current) {
+        setError(failures.join(". "));
+        setBusy(false);
+      }
+    }
   };
   useEffect(() => {
     mounted.current = true;
     const startCounter = starts;
     platform.current = beginCouchPlatform();
+    const toggleMenu = () => openMenu();
+    window.addEventListener("electrify:couch-menu", toggleMenu);
     const previous = coopControls();
     let live = true;
     const stop = desktop.onCouchEvent!((input) => {
@@ -463,6 +509,12 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
             settings: store.getState().settings,
           },
         });
+      } else if (event.kind === "shell-controller") {
+        if (
+          event.controllerId &&
+          current.current.bindings[event.seatId] === event.controllerId
+        )
+          setControlsController(event.controllerId);
       } else if (event.kind === "seat-message") {
         coordinator.current?.receive(
           event.seatId,
@@ -588,9 +640,12 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       platform.current?.dispose();
       live = false;
       stop();
+      window.removeEventListener("electrify:couch-menu", toggleMenu);
       registerCoopControls(previous);
       coordinator.current?.dispose();
-      void request({ kind: "close" });
+      void request({ kind: "close" }).catch((failure) =>
+        console.error("TV session cleanup failed", failure),
+      );
     };
     // The shell's lifetime spans setup, play and the save barrier.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -655,6 +710,8 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     };
   }, [desktop, stage]);
 
+  /** Create one authoritative worker, then open native seats after shared state is ready.
+   * Lifecycle tokens reject stale starts, and measured toolbar height reserves their bounds. */
   const start = async () => {
     if ((!spec && !saved) || busy) return;
     setBusy(true);
@@ -796,8 +853,15 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       setError(String(failure));
       coordinator.current?.dispose();
       coordinator.current = undefined;
-      await request({ kind: "close" });
-      await request({ kind: "setup" });
+      const failures = [String(failure)];
+      try {
+        await request({ kind: "close" });
+        await request({ kind: "setup" });
+      } catch (cleanupFailure) {
+        failures.push(String(cleanupFailure));
+      }
+      if (!mounted.current || generation !== starts.current) return;
+      setError(failures.join(". "));
       setBindings({});
       setReady([]);
       setStage("join");
@@ -925,8 +989,12 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       globalOwner ? "TV session dialog open" : null,
     );
     coordinator.current?.setInputGate("global-dialog", !!globalOwner);
-    void request({ kind: "overlay", seatId: globalOwner ?? null });
-  }, [globalOwner, stage]); // eslint-disable-line react-hooks/exhaustive-deps
+    void request({
+      kind: "overlay",
+      seatId: globalOwner ?? null,
+      shared: !!globalOwner && !textOwner,
+    }).catch((failure) => setError(String(failure)));
+  }, [globalOwner, stage, textOwner]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sharedGame = useMemo(
     () =>
@@ -936,14 +1004,12 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const sharedState = sharedGame && { ...store.getState(), game: sharedGame };
   const controlsOwner = menuOwner || settingsOwner || manualOwner;
   const controlsDevice = devices.find(
-    (device) => device.id === bindings[controlsOwner ?? ""],
+    (device) =>
+      device.id === (controlsController ?? bindings[controlsOwner ?? ""]),
   );
   const controls = controlsOwner ? (
     <>
-      <ControlsLegend
-        glyphs={controlsDevice?.glyphs ?? {}}
-        player={`P${controlsOwner.slice(-1)}`}
-      />
+      <ControlsLegend glyphs={controlsDevice?.glyphs ?? {}} />
       {error && (
         <p className="couchMenuNotice" role="alert">
           {error}
@@ -967,7 +1033,6 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
               game={sharedGame}
               statusScale={nativeZoom / shellDisplayScale}
               menuOpen={!!menuOwner}
-              onMenuOpen={() => openMenu()}
               onMenuClose={() => cancelGlobal("Menu closed")}
               onSettings={() => menuAction("settings")}
               onManual={() => menuAction("manual")}
@@ -1005,7 +1070,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
                   label={`P${index + 1} company`}
                   value={seat.name}
                   slotProps={{ htmlInput: { maxLength: 80 } }}
-                  disabled={stage !== "join"}
+                  disabled={busy || stage !== "join" || !!saved}
                   onChange={(event) =>
                     setSeats((value) =>
                       value.map((item) =>
@@ -1145,20 +1210,11 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         onClose={() => cancelGlobal("Settings closed")}
         fullWidth
         maxWidth="md"
-        aria-label="TV session settings"
+        className="couchSettingsDialog"
+        aria-label="Settings"
+        slotProps={{ paper: { "aria-label": "Settings" } }}
       >
-        <DialogTitle>
-          {seats.find((seat) => seat.id === settingsOwner)?.name}: TV session
-          settings
-        </DialogTitle>
-        <DialogContent>
-          <SettingsContainer onBack={() => cancelGlobal("Settings closed")} />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => cancelGlobal("Settings closed")}>
-            Return to all companies
-          </Button>
-        </DialogActions>
+        <SettingsContainer onBack={() => cancelGlobal("Settings closed")} />
       </CouchDialog>
       <CouchDialog
         open={!!manualOwner}

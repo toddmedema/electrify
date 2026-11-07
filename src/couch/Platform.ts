@@ -35,6 +35,8 @@ export function beginCouchPlatform() {
   projection = { token, baseline: true, revision: -1 };
   notify();
   return {
+    /** Accept monotone P1 snapshots only while this shell still owns the projection token.
+     * A new epoch first exposes an inactive baseline so old achievements are not re-announced. */
     publish(view: RoomView): boolean {
       const current = projection;
       if (

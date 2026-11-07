@@ -62,6 +62,8 @@ export class CouchClient {
     this.state = { ...this.state, ...update };
     this.listeners.forEach((listener) => listener());
   }
+  /** Apply only this renderer generation's session events and acknowledge received views.
+   * Match/epoch changes discard old commands; authoritative receipts settle the current queue. */
   receive(input: unknown) {
     if (this.disposed || !input || typeof input !== "object") return;
     const event = input as SeatEvent;
@@ -216,6 +218,8 @@ export class CouchClient {
     if ((own.pauseReason ?? null) !== this.activityReason)
       this.command({ kind: "activity", reason: this.activityReason });
   }
+  /** Assign a sequence only when one queued action can enter the current match.
+   * Keeping a single pending envelope makes retries identical and preserves command order. */
   private flush() {
     const view = this.state.view;
     if (
@@ -261,6 +265,8 @@ export class CouchClient {
       this.send({ kind: "leave", requestId, skipSave: options?.skipSave });
     });
   };
+  /** Continue heartbeats while paused and resend the same pending envelope after packet loss.
+   * A missing coordinator stops queue progress without pretending the action was applied. */
   private pump() {
     if (this.disposed) return;
     this.send({ kind: "heartbeat" });

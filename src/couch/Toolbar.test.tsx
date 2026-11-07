@@ -9,7 +9,6 @@ function props(overrides: Partial<CouchToolbarProps> = {}): CouchToolbarProps {
   return {
     game: createGame({ scenarioId: 101 }),
     menuOpen: false,
-    onMenuOpen: jest.fn(),
     onMenuClose: jest.fn(),
     onManual: jest.fn(),
     onSettings: jest.fn(),
@@ -29,7 +28,7 @@ function show(value: CouchToolbarProps) {
 it("shows one shared calendar while speed controls stay in the player panes", () => {
   const value = props();
   show(value);
-  expect(screen.getAllByRole("button", { name: "menu" })).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: "menu" })).toBeNull();
   expect(screen.getByRole("progressbar")).toHaveAttribute(
     "aria-valuenow",
     String(Math.round(value.game.date.percentOfYear * 100)),
@@ -67,42 +66,44 @@ it("shows common upcoming events even when the first company has a cash warning"
   expect(screen.queryByRole("button", { name: /Cash out/ })).toBeNull();
 });
 
-it("opens the shared three-dot menu and delegates actions without a duplicate quit button", () => {
-  const value = props();
-  function ControlledMenu() {
-    const [open, setOpen] = useState(false);
-    return (
-      <CouchToolbar
-        {...value}
-        menuOpen={open}
-        onMenuOpen={() => setOpen(true)}
-        onMenuClose={() => setOpen(false)}
-      />
-    );
-  }
-  render(
-    <ThemeProvider theme={createAppTheme("light")}>
-      <ControlledMenu />
-    </ThemeProvider>,
-  );
-  fireEvent.click(screen.getByRole("button", { name: "menu" }));
-  const menu = screen.getByRole("menu", { name: "Game menu" });
-  expect(within(menu).getByRole("menuitem", { name: "Manual" })).toBeVisible();
-  fireEvent.click(within(menu).getByRole("menuitem", { name: "Settings" }));
+it("shows the shared floating menu with Return to game first and delegates its actions", () => {
+  const value = props({ menuOpen: true });
+  show(value);
+  const menu = screen.getByRole("dialog", { name: "Game menu" });
+  expect(
+    within(menu)
+      .getAllByRole("button")
+      .map((button) => button.textContent),
+  ).toEqual(["Return to game", "Manual", "Settings", "Quit"]);
+  fireEvent.click(within(menu).getByRole("button", { name: "Settings" }));
   expect(value.onSettings).toHaveBeenCalledTimes(1);
-  fireEvent.click(within(menu).getByRole("menuitem", { name: "Save & Quit" }));
+  fireEvent.click(within(menu).getByRole("button", { name: "Manual" }));
+  expect(value.onManual).toHaveBeenCalledTimes(1);
+  fireEvent.click(within(menu).getByRole("button", { name: "Quit" }));
   expect(value.onSaveQuit).toHaveBeenCalledTimes(1);
+  fireEvent.click(within(menu).getByRole("button", { name: "Return to game" }));
+  expect(value.onMenuClose).toHaveBeenCalledTimes(1);
+});
+
+it("moves menu selection using the same real focus as the controller", () => {
+  show(props({ menuOpen: true }));
+  const resume = screen.getByRole("button", { name: "Return to game" });
+  resume.focus();
+  fireEvent.keyDown(resume, { key: "ArrowDown" });
+  const manual = screen.getByRole("button", { name: "Manual" });
+  expect(manual).toHaveFocus();
+  fireEvent.keyDown(manual, { key: "ArrowUp" });
+  expect(resume).toHaveFocus();
 });
 
 it("keeps the controller legend accessible inside the active menu modal only while open", () => {
   const value = props();
   function ControlledMenu() {
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(true);
     return (
       <CouchToolbar
         {...value}
         menuOpen={open}
-        onMenuOpen={() => setOpen(true)}
         onMenuClose={() => setOpen(false)}
         menuFooter={
           <aside aria-label="Controller controls">
@@ -117,15 +118,11 @@ it("keeps the controller legend accessible inside the active menu modal only whi
       <ControlledMenu />
     </ThemeProvider>,
   );
-  expect(
-    screen.queryByRole("complementary", { name: "Controller controls" }),
-  ).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "menu" }));
-  expect(screen.getByRole("menu", { name: "Game menu" })).toBeVisible();
+  expect(screen.getByRole("dialog", { name: "Game menu" })).toBeVisible();
   expect(
     screen.getByRole("complementary", { name: "Controller controls" }),
   ).toBeVisible();
-  fireEvent.keyDown(screen.getByRole("menu", { name: "Game menu" }), {
+  fireEvent.keyDown(screen.getByRole("dialog", { name: "Game menu" }), {
     key: "Escape",
   });
   expect(

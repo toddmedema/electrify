@@ -1,8 +1,7 @@
-import { MenuItem, Toolbar, Typography } from "@mui/material";
+import { Toolbar, Typography } from "@mui/material";
 import type { CSSProperties, ReactNode } from "react";
 import { GameDate, YearProgressBar } from "../components/base/GameCalendar";
-import GameMenu from "../components/base/GameMenu";
-import { useOnline } from "../components/base/OnlineStatus";
+import CouchMenu from "./Menu";
 import MissionSummary from "../components/base/MissionSummary";
 import type {
   ActiveEventGroupType,
@@ -17,10 +16,8 @@ export interface CouchToolbarProps {
   statusScale?: number;
   menuOpen: boolean;
   menuFooter?: ReactNode;
-  online?: boolean;
   upcoming?: UpcomingStoryEventType[];
   activeEvents?: ActiveEventGroupType[];
-  onMenuOpen: () => void;
   onMenuClose: () => void;
   onManual: () => void;
   onSettings: () => void;
@@ -34,52 +31,48 @@ export default function CouchToolbar({
   statusScale = 1,
   menuOpen,
   menuFooter,
-  online,
   upcoming,
   activeEvents,
-  onMenuOpen,
   onMenuClose,
   onManual,
   onSettings,
   onSaveQuit,
   onEvidence,
 }: CouchToolbarProps) {
-  const connected = useOnline();
   return (
-    <div
-      id="appbar"
-      className="couchSharedToolbar"
-      style={{ "--couch-status-scale": statusScale } as CSSProperties}
-    >
-      <div id="topbar">
-        <Toolbar>
-          <GameMenu
-            open={menuOpen}
-            online={online ?? connected}
-            onOpen={menuOpen ? onMenuClose : onMenuOpen}
-            onClose={onMenuClose}
-            footer={menuFooter}
-          >
-            <MenuItem onClick={onManual}>Manual</MenuItem>
-            <MenuItem onClick={onSettings}>Settings</MenuItem>
-            <MenuItem onClick={onSaveQuit}>Save &amp; Quit</MenuItem>
-          </GameMenu>
-          <Typography variant="h6" className="gameStatus couchCalendar">
-            <GameDate date={game.date} showTime />
-          </Typography>
-          <div className="gameStatusBar couchSharedMission">
-            <MissionSummary
-              game={game}
-              upcoming={upcoming}
-              activeEvents={activeEvents}
-              onActiveEvents={() => onEvidence?.({ card: "EVENTS" })}
-              onEvidence={onEvidence}
-              eventsOnly
-            />
-          </div>
-        </Toolbar>
+    <>
+      <div
+        id="appbar"
+        className="couchSharedToolbar"
+        style={{ "--couch-status-scale": statusScale } as CSSProperties}
+      >
+        <div id="topbar">
+          <Toolbar>
+            <Typography variant="h6" className="gameStatus couchCalendar">
+              <GameDate date={game.date} showTime />
+            </Typography>
+            <div className="gameStatusBar couchSharedMission">
+              <MissionSummary
+                game={game}
+                upcoming={upcoming}
+                activeEvents={activeEvents}
+                onActiveEvents={() => onEvidence?.({ card: "EVENTS" })}
+                onEvidence={onEvidence}
+                eventsOnly
+              />
+            </div>
+          </Toolbar>
+        </div>
+        <YearProgressBar date={game.date} />
       </div>
-      <YearProgressBar date={game.date} />
-    </div>
+      <CouchMenu
+        open={menuOpen}
+        controls={menuFooter}
+        onClose={onMenuClose}
+        onManual={onManual}
+        onSettings={onSettings}
+        onQuit={onSaveQuit}
+      />
+    </>
   );
 }

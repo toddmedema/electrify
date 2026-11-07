@@ -5,7 +5,7 @@
   "description" "Navigate with the D-pad or left stick. Confirm, back, pause, speed, panes, build, and charts are independently rebindable."
   "controller_type" "controller_ps5"
   "major_revision" "1"
-  "minor_revision" "0"
+  "minor_revision" "1"
   "actions"
   {
     "Menu"
@@ -21,6 +21,7 @@
         "Menu_confirm" "#Action_confirm"
         "Menu_back" "#Action_back"
         "Menu_menu" "#Action_menu"
+        "Menu_menuAlt" "#Action_menuAlt"
       }
     }
     "Gameplay"
@@ -36,6 +37,7 @@
         "Gameplay_confirm" "#Action_confirm"
         "Gameplay_back" "#Action_back"
         "Gameplay_menu" "#Action_menu"
+        "Gameplay_menuAlt" "#Action_menuAlt"
         "Gameplay_pause" "#Action_pause"
         "Gameplay_speedUp" "#Action_speedUp"
         "Gameplay_speedDown" "#Action_speedDown"
@@ -60,6 +62,7 @@
       "Action_confirm" "Confirm"
       "Action_back" "Back"
       "Action_menu" "Open game menu"
+      "Action_menuAlt" "Select / View: game menu or back"
       "Action_pause" "Pause or resume"
       "Action_speedUp" "Increase speed"
       "Action_speedDown" "Decrease speed"
@@ -111,7 +114,7 @@
     "inputs"
     {
       "button_escape" { "activators" { "Full_Press" { "bindings" { "binding" "game_action Menu Menu_menu" } } } }
-      "button_menu" { "activators" { "Full_Press" { "bindings" { "binding" "game_action Menu Menu_back" } } } }
+      "button_menu" { "activators" { "Full_Press" { "bindings" { "binding" "game_action Menu Menu_menuAlt" } } } }
     }
   }
   "group"
@@ -157,7 +160,7 @@
     "inputs"
     {
       "button_escape" { "activators" { "Full_Press" { "bindings" { "binding" "game_action Gameplay Gameplay_menu" } } } }
-      "button_menu" { "activators" { "Full_Press" { "bindings" { "binding" "game_action Gameplay Gameplay_back" } } } }
+      "button_menu" { "activators" { "Full_Press" { "bindings" { "binding" "game_action Gameplay Gameplay_menuAlt" } } } }
       "left_bumper" { "activators" { "Full_Press" { "bindings" { "binding" "game_action Gameplay Gameplay_previousPane" } } } }
       "right_bumper" { "activators" { "Full_Press" { "bindings" { "binding" "game_action Gameplay Gameplay_nextPane" } } } }
     }

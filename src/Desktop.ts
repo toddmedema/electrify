@@ -64,6 +64,7 @@ export type DesktopInputAction =
   | "confirm"
   | "back"
   | "menu"
+  | "menuAlt"
   | "pause"
   | "speedUp"
   | "speedDown"

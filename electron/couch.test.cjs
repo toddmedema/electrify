@@ -640,3 +640,95 @@ test("a nonresponsive capture reaches a bounded fallback instead of trapping the
   );
   manager.close();
 });
+
+test("every bound player can navigate a shared overlay while text overlays retain exclusive input", async () => {
+  const { manager, events } = fixture();
+  await manager.open({ seats });
+  manager.bindings.set("local-p1", "1");
+  manager.bindings.set("local-p2", "2");
+  manager.overlay("local-p2", true);
+  const frames = [
+    { id: "1", connected: true, actions: ["down"], glyphs: {} },
+    { id: "2", connected: true, actions: [], glyphs: {} },
+    { id: "3", connected: true, actions: ["menu"], glyphs: {} },
+  ];
+  assert.equal(manager.shellFrame(frames).id, "1");
+  assert.deepEqual(events.at(-1), {
+    kind: "shell-controller",
+    seatId: "local-p1",
+    controllerId: "1",
+    generation: manager.seats.get("local-p1").generation,
+  });
+  frames[1].actions = ["confirm"];
+  assert.equal(manager.shellFrame(frames).id, "2");
+  frames[0].actions = ["confirm"];
+  assert.equal(manager.shellFrame(frames).id, "1");
+  frames[0].actions = ["speedUp", "build"];
+  frames[1].actions = [];
+  assert.deepEqual(manager.shellFrame(frames).actions, []);
+  assert.equal(manager.shellFrame(frames).id, "1");
+  frames[0].connected = false;
+  frames[0].actions = ["menu"];
+  assert.equal(manager.shellFrame(frames).id, "2");
+  manager.overlay("local-p2");
+  frames[0].connected = true;
+  frames[0].actions = ["confirm"];
+  assert.equal(manager.shellFrame(frames).id, "2");
+  assert.deepEqual(manager.shellFrame(frames).actions, []);
+  assert.equal(manager.overlayOwner, "local-p2");
+  manager.close();
+});
+
+test("shared shell and late seat contexts remain Menu until the overlay closes", async () => {
+  const { manager } = fixture();
+  await manager.open({ seats });
+  const contexts = new Map();
+  manager.input = () => ({
+    setDeviceContext: (id, context) => {
+      contexts.set(id, context);
+      return { connected: true, actions: [], glyphs: {} };
+    },
+    releaseDevice() {},
+    setDeviceMode() {},
+    deviceContexts: new Map(),
+    setContext() {},
+  });
+  manager.bindings.set("local-p1", "1");
+  manager.bindings.set("local-p2", "2");
+  const p1 = manager.seats.get("local-p1"),
+    p2 = manager.seats.get("local-p2");
+  manager.setContext(p1, "Gameplay");
+  manager.setContext(p2, "Gameplay");
+  manager.overlay("local-p2", true);
+  assert.equal(contexts.get("1"), "Menu");
+  assert.equal(contexts.get("2"), "Menu");
+  manager.setContext(p1, "Gameplay");
+  manager.shellContext("Gameplay");
+  assert.equal(contexts.get("1"), "Menu");
+  assert.equal(contexts.get("2"), "Menu");
+  manager.overlay(null);
+  assert.equal(contexts.get("1"), "Gameplay");
+  assert.equal(contexts.get("2"), "Gameplay");
+  assert.throws(() => manager.overlay("local-p1", "shared"), /Invalid/);
+  manager.close();
+});
+
+test("closing after native window destruction still disposes every seat and port", async () => {
+  const { manager, views, ports, events } = fixture();
+  await manager.open({ seats });
+  let closed = 0;
+  const closePort = () => closed++;
+  for (const port of ports) port.close = closePort;
+  manager.window.isDestroyed = () => true;
+  Object.defineProperty(manager.window, "contentView", {
+    get() {
+      throw new Error("Destroyed window access");
+    },
+  });
+  const before = events.length;
+  manager.close();
+  assert.equal(closed, 2);
+  assert.ok(views.every((view) => view.closed));
+  assert.equal(manager.seats.size, 0);
+  assert.equal(events.length, before);
+});

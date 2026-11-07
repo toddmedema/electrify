@@ -234,18 +234,16 @@ export function startDesktopInput(
   };
   const act = (action: DesktopInputAction) => {
     const scope = inputScope();
-    if (action === "menu") {
+    if (action === "menu" || action === "menuAlt") {
       if (window.electrifyCouch?.role === "seat")
         window.electrifyCouch.post({
           kind: "global-menu",
           requestId: crypto.randomUUID(),
         });
       else if (document.querySelector("[data-couch-shell]"))
-        document
-          .querySelector<HTMLElement>("[data-couch-shell] .gameMenuButton")
-          ?.click();
+        window.dispatchEvent(new CustomEvent("electrify:couch-menu"));
       else {
-        if (context === "Gameplay") speed("pause");
+        if (action === "menu" && context === "Gameplay") speed("pause");
         else act("back");
         return;
       }

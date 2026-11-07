@@ -12,15 +12,20 @@ or custom game; both players confirm that selection. The campaign roster then
 stays fixed. An assigned controller controls only its company's document. The
 shared bar reuses the single-player calendar and year progress, upcoming event
 and months-left display. Each player has an independent speed selector in their
-pane; the slowest selection wins. Start opens one shared three-dot menu and pauses the
-match for everyone. The requesting controller's complete bindings appear along
-the bottom while that menu is open. Player panes keep cash and grid state, with
+pane; the slowest selection wins. Start/Menu or Select/View opens a centered shared
+menu and pauses the match for everyone. Return to game, Manual, Settings and Quit
+use the home menu's button sizes. Press the menu control again to return to play.
+Either controller can navigate this menu and the shared Settings modal, whose
+preferences apply to every player. The active controller's complete bindings appear
+under Controls along the bottom while the menu, Settings or Manual is open.
+Player panes keep cash and grid state, with
 icon-only navigation and no duplicate menu, calendar, event or control-hint bars.
 The panes fill the left, right and bottom edges, retaining only the center separator.
 The daily supply/demand plot is 20% shorter in split-screen to leave more room
 for the fleet.
 Cash and monthly profit share a row in each company pane. The shared date and
-event name follow the grid-status type size, including native zoom and text scaling.
+event name and months-left text follow the grid-status type size, including native
+zoom and text scaling.
 
 Prompts prefer Steam's controller glyphs. When Steam supplies only a physical
 control label, recognized labels use a small CC0 SVG subset from

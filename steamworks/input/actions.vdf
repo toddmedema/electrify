@@ -1,7 +1,7 @@
 "Action Manifest"
 {
   "major_revision" "1"
-  "minor_revision" "1"
+  "minor_revision" "2"
   "configurations"
   {
     "controller_xbox360" { "0" { "path" "controller_xbox360.vdf" } }
@@ -26,6 +26,7 @@
         "Menu_confirm" "#Action_confirm"
         "Menu_back" "#Action_back"
         "Menu_menu" "#Action_menu"
+        "Menu_menuAlt" "#Action_menuAlt"
       }
     }
     "Gameplay"
@@ -41,6 +42,7 @@
         "Gameplay_confirm" "#Action_confirm"
         "Gameplay_back" "#Action_back"
         "Gameplay_menu" "#Action_menu"
+        "Gameplay_menuAlt" "#Action_menuAlt"
         "Gameplay_pause" "#Action_pause"
         "Gameplay_speedUp" "#Action_speedUp"
         "Gameplay_speedDown" "#Action_speedDown"
@@ -65,6 +67,7 @@
       "Action_confirm" "Confirm"
       "Action_back" "Back"
       "Action_menu" "Open game menu"
+      "Action_menuAlt" "Select / View: game menu or back"
       "Action_pause" "Pause or resume"
       "Action_speedUp" "Increase speed"
       "Action_speedDown" "Decrease speed"

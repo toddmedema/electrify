@@ -15,6 +15,7 @@ const devices: Device[] = ["101", "202"].map((id) => ({
     confirm: { label: id === "101" ? "A" : "Cross" },
     back: { label: id === "101" ? "B" : "Circle" },
     menu: { label: id === "101" ? "Start" : "Options" },
+    menuAlt: { label: id === "101" ? "View" : "PlayStation Share" },
     pause: { label: id === "101" ? "Y" : "Triangle" },
     speedUp: { label: "Right stick up" },
     speedDown: { label: "Right stick down" },
@@ -39,10 +40,12 @@ export interface CouchFixture<Actor extends Page | Frame> {
   layout: () => CouchLayout | undefined;
   backdropRevision: () => number;
   cancelledText: () => readonly string[];
+  failNextNative: (kind: "setup" | "list-saves" | "close") => void;
   input: (actions: Record<string, DesktopInputAction[]>) => Promise<void>;
 }
 const {
   couchLayout,
+  sharedMenuFrame,
 }: {
   couchLayout: (
     width: number,
@@ -50,6 +53,12 @@ const {
     count: number,
     options: Record<string, unknown>,
   ) => CouchLayout;
+  sharedMenuFrame: (
+    seatIds: Iterable<string>,
+    bindings: ReadonlyMap<string, string>,
+    devices: Device[],
+    preferredSeatId?: string,
+  ) => { seatId: string; frame: Device } | undefined;
 } = require("../electron/couch.cjs");
 const isPage = (actor: Page | Frame): actor is Page =>
   "setViewportSize" in actor;
@@ -79,6 +88,8 @@ export async function createCouchFixture(
   let saved: World | undefined;
   let updatedAt = 0;
   let overlayOwner: string | null = null;
+  let overlayShared = false;
+  let sharedInputSeat: string | undefined;
   let playing = false;
   let confirmOnly = false;
   let generation = 0;
@@ -91,6 +102,7 @@ export async function createCouchFixture(
   let overlayCommitted = false;
   let captureQueue = Promise.resolve();
   const cancelledText: string[] = [];
+  const failNextNative = new Set<string>();
   const iframeId = (id: string) => `couch-fixture-${id}`;
   async function relayout(
     update: Record<string, unknown> = {},
@@ -243,6 +255,8 @@ export async function createCouchFixture(
       }
       if (sourceFrame !== shell.mainFrame())
         throw new Error("Only the shell owns native session controls");
+      if (failNextNative.delete(String(raw.kind)))
+        throw new Error(`Fixture ${String(raw.kind)} failure`);
       switch (raw.kind) {
         case "setup":
           return { available: true, preview: true, devices };
@@ -289,22 +303,36 @@ export async function createCouchFixture(
           return { id: "saved-local", updatedAt };
         case "overlay": {
           const owner = raw.seatId as string | null;
-          if (owner !== overlayOwner) {
-            overlayOwner = owner;
-            overlayVersion++;
-            overlayCommitted = false;
-            await relayout({}, false);
-            if (owner) scheduleCapture();
-            else {
-              captureId++;
-              await emit({
-                kind: "overlay-backdrop",
-                owner: null,
-                version: overlayVersion,
-                captureId,
-                snapshots: [],
-              });
+          const wasShared = overlayShared;
+          const previousOwner = overlayOwner;
+          overlayOwner = owner;
+          overlayShared = !!owner && raw.shared === true;
+          if (overlayShared) {
+            if (!wasShared || previousOwner !== owner) {
+              sharedInputSeat = owner!;
+              const controllerId = bindings.get(owner!);
+              if (controllerId)
+                await emit({
+                  kind: "shell-controller",
+                  seatId: owner,
+                  controllerId,
+                  generation: seats.get(owner!)?.generation,
+                });
             }
+          } else sharedInputSeat = undefined;
+          overlayVersion++;
+          if (!owner) overlayCommitted = false;
+          await relayout({}, false);
+          if (owner) scheduleCapture();
+          else {
+            captureId++;
+            await emit({
+              kind: "overlay-backdrop",
+              owner: null,
+              version: overlayVersion,
+              captureId,
+              snapshots: [],
+            });
           }
           return {
             available: true,
@@ -399,6 +427,8 @@ export async function createCouchFixture(
         case "close":
           playing = false;
           overlayOwner = null;
+          overlayShared = false;
+          sharedInputSeat = undefined;
           overlayVersion++;
           captureId++;
           overlayCommitted = false;
@@ -550,6 +580,9 @@ export async function createCouchFixture(
     layout: () => layout,
     backdropRevision: () => readyCaptureId,
     cancelledText: () => cancelledText,
+    failNextNative: (kind) => {
+      failNextNative.add(kind);
+    },
     async input(actions: Record<string, DesktopInputAction[]>) {
       // Native capturePage never changes the shell's DOM. Embedded capture
       // temporarily suppresses only that outer DOM, so finish its capture work
@@ -563,6 +596,7 @@ export async function createCouchFixture(
       const sampledBindings = new Map(bindings);
       const sampledPlaying = playing;
       const sampledOverlay = overlayOwner;
+      const sampledShared = overlayShared;
       const sampledConfirmOnly = confirmOnly;
       const frames = devices.map((device) => ({
         ...device,
@@ -570,8 +604,27 @@ export async function createCouchFixture(
       }));
       await emit({ kind: "devices", devices: frames });
       if (!sampledPlaying || sampledOverlay) {
+        const selected = sampledShared
+          ? sharedMenuFrame(
+              sampledBindings.keys(),
+              sampledBindings,
+              frames,
+              sharedInputSeat ?? sampledOverlay ?? undefined,
+            )
+          : undefined;
         const device = sampledBindings.get(sampledOverlay || "local-p1");
-        const frame = frames.find((item) => item.id === device);
+        const frame = sampledShared
+          ? selected?.frame
+          : frames.find((item) => item.id === device);
+        if (selected && selected.seatId !== sharedInputSeat) {
+          sharedInputSeat = selected.seatId;
+          await emit({
+            kind: "shell-controller",
+            seatId: selected.seatId,
+            controllerId: selected.frame.id,
+            generation: seats.get(selected.seatId)?.generation,
+          });
+        }
         if (frame)
           await shell.evaluate(
             (detail) =>

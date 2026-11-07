@@ -68,6 +68,7 @@ export class CouchCoordinator {
   private routes = new Map<string, Route>();
   private roster: Seat[] = [];
   private views = new Map<string, RoomView>();
+  private sharedView?: RoomView;
   private blockers = new Map<string, string>();
   private inputGates = new Set<string>();
   private saving: Promise<unknown> = Promise.resolve();
@@ -120,6 +121,8 @@ export class CouchCoordinator {
     this.options.onError?.(message);
     this.broadcast((generation) => ({ kind: "error", generation, message }));
   }
+  /** Commit the immutable logical roster once, before creating or restoring a world.
+   * Native routes outside that roster lose authority before startup publications begin. */
   private prepare(seats: Seat[]) {
     if (this.state.phase !== "setup")
       throw new Error("This local session already started");
@@ -180,6 +183,8 @@ export class CouchCoordinator {
     if (view) this.publish(seatId, view);
     return true;
   }
+  /** Revoke only the matching renderer generation and pause an active company for recovery.
+   * Retired companies no longer impose connection or readiness requirements on the match. */
   detachSeat(
     seatId: string,
     generation: number,
@@ -267,6 +272,8 @@ export class CouchCoordinator {
     });
     return true;
   }
+  /** Accept authority from the native seat route, never from renderer-supplied identity.
+   * Global barriers reject new commands while allowing submitted retries to settle receipts. */
   receive(seatId: string, generation: number, input: unknown) {
     const route = this.routes.get(seatId);
     if (
@@ -368,6 +375,8 @@ export class CouchCoordinator {
       if (!route.failed) route.send(build(route.generation));
     });
   }
+  /** Merge authoritative worker output before selecting a stable shared company view.
+   * Whole-world checkpoints persist in order, and lifecycle checks reject late save results. */
   private response(data: WorkerResponse) {
     if (this.state.phase === "closed") return;
     this.lastWorker = this.now();
@@ -383,18 +392,6 @@ export class CouchCoordinator {
       return;
     }
     if (data.kind === "views") {
-      const published = this.roster
-        .map((seat) => ({ seat, view: data.views[seat.id] }))
-        .filter((entry) => !!entry.view?.game);
-      const common =
-        published.find(({ seat, view }) =>
-          view.grids.some((grid) => grid.seat.id === seat.id && !grid.retired),
-        ) ??
-        published.find(
-          ({ view }) =>
-            view.grids.length > 0 && view.grids.every((grid) => grid.retired),
-        );
-      if (common) this.options.onSharedView?.(common.view);
       if (this.state.phase === "starting") {
         this.update({ phase: "playing" });
         this.roster.forEach((seat) => {
@@ -429,6 +426,24 @@ export class CouchCoordinator {
         )
           route.pendingSequence = undefined;
         this.publish(id, view);
+      }
+      // A partial worker reply cannot change which active company's view owns
+      // shared presentation. Update the stored views before selecting in roster order.
+      const published = this.roster.flatMap((seat) => {
+        const view = this.views.get(seat.id);
+        return view?.game ? [{ seat, view }] : [];
+      });
+      const common =
+        published.find(({ seat, view }) =>
+          view.grids.some((grid) => grid.seat.id === seat.id && !grid.retired),
+        ) ??
+        published.find(
+          ({ view }) =>
+            view.grids.length > 0 && view.grids.every((grid) => grid.retired),
+        );
+      if (common && common.view !== this.sharedView) {
+        this.sharedView = common.view;
+        this.options.onSharedView?.(common.view);
       }
       return;
     }
@@ -526,6 +541,8 @@ export class CouchCoordinator {
       this.post({ kind: "checkpoint", requestId, pause });
     });
   }
+  /** Keep worker and renderer liveness independent from the simulation's paused clock.
+   * A stalled worker faults the session; a stalled active seat enters recoverable pause. */
   private pump() {
     if (this.state.phase !== "playing" && this.state.phase !== "starting")
       return;
@@ -565,6 +582,7 @@ export class CouchCoordinator {
     this.requests.clear();
     this.routes.clear();
     this.views.clear();
+    this.sharedView = undefined;
     this.update({ phase: "closed" });
     this.listeners.clear();
   }

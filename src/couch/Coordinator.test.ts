@@ -674,6 +674,30 @@ it("authenticates a global menu request by its bound seat and rejects forged or 
   }
 });
 
+it("retains the first active company when only another company's view is published", () => {
+  const f = fixture();
+  try {
+    const shared = f.onSharedView.mock.calls.at(-1)![0];
+    const calls = f.onSharedView.mock.calls.length;
+    f.emit({
+      kind: "views",
+      views: { "local-p2": roomView(f.world(), "local-p2") },
+    });
+    expect(f.onSharedView).toHaveBeenCalledTimes(calls);
+    expect(f.onSharedView.mock.calls.at(-1)![0]).toBe(shared);
+    f.emit({
+      kind: "views",
+      views: { "local-p1": roomView(f.world(), "local-p1") },
+    });
+    expect(f.onSharedView).toHaveBeenCalledTimes(calls + 1);
+    expect(f.onSharedView.mock.calls.at(-1)![0].game.multiplayer.seat).toBe(
+      "local-p1",
+    );
+  } finally {
+    f.dispose();
+  }
+});
+
 it("keeps shared presentation on an active company after P1 retires without changing account attribution", () => {
   const f = fixture();
   try {

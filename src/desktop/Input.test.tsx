@@ -554,53 +554,59 @@ it("routes a couch seat's speed and readiness semantically when duplicate clock 
   });
 });
 
-it("opens the shared couch menu from Start even while a company dialog owns local focus", async () => {
-  store.dispatch(delta({ inGame: true }));
-  render(
-    <main className="base_main">
-      <div className="gameWorkspace" />
-      <section role="dialog">
-        <button>Company purchase</button>
-      </section>
-    </main>,
-  );
-  const post = jest.fn();
-  window.electrifyCouch = {
-    role: "seat",
-    seatId: "local-p2",
-    getGeneration: () => 1,
-    ready: async () => {},
-    onMessage: () => () => {},
-    post,
-  };
-  const f = bridge();
-  stop = startDesktopInput(store, f.desktop);
-  await act(async () => {
-    await Promise.resolve();
-  });
-  screen.getByRole("button", { name: "Company purchase" }).focus();
-  const previousCrypto = Object.getOwnPropertyDescriptor(globalThis, "crypto");
-  Object.defineProperty(globalThis, "crypto", {
-    configurable: true,
-    value: { randomUUID: () => "menu-request" },
-  });
-  try {
-    f.emit({ actions: ["menu"] });
-    expect(post).toHaveBeenCalledWith({
-      kind: "global-menu",
-      requestId: "menu-request",
+it.each(["menu", "menuAlt"] as const)(
+  "opens the shared couch menu from %s even while a company dialog owns local focus",
+  async (action) => {
+    store.dispatch(delta({ inGame: true }));
+    render(
+      <main className="base_main">
+        <div className="gameWorkspace" />
+        <section role="dialog">
+          <button>Company purchase</button>
+        </section>
+      </main>,
+    );
+    const post = jest.fn();
+    window.electrifyCouch = {
+      role: "seat",
+      seatId: "local-p2",
+      getGeneration: () => 1,
+      ready: async () => {},
+      onMessage: () => () => {},
+      post,
+    };
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await act(async () => {
+      await Promise.resolve();
     });
-  } finally {
-    if (previousCrypto)
-      Object.defineProperty(globalThis, "crypto", previousCrypto);
-    else Reflect.deleteProperty(globalThis, "crypto");
-  }
-  expect(f.desktop.setInputContext).toHaveBeenCalledWith("Menu");
-  expect(screen.getByRole("dialog")).toBeInTheDocument();
-});
+    screen.getByRole("button", { name: "Company purchase" }).focus();
+    const previousCrypto = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "crypto",
+    );
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: { randomUUID: () => "menu-request" },
+    });
+    try {
+      f.emit({ actions: [action] });
+      expect(post).toHaveBeenCalledWith({
+        kind: "global-menu",
+        requestId: "menu-request",
+      });
+    } finally {
+      if (previousCrypto)
+        Object.defineProperty(globalThis, "crypto", previousCrypto);
+      else Reflect.deleteProperty(globalThis, "crypto");
+    }
+    expect(f.desktop.setInputContext).toHaveBeenCalledWith("Menu");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  },
+);
 
-it("routes Start to the single shared menu button from the shell", async () => {
-  const open = jest.fn();
+it("routes Start and Select to the shared shell event without a visible menu trigger", async () => {
+  const toggle = jest.fn();
   const hiddenMenu = jest.fn();
   render(
     <>
@@ -609,21 +615,52 @@ it("routes Start to the single shared menu button from the shell", async () => {
           Hidden company menu
         </button>
       </div>
-      <main className="base_main" data-couch-shell="true">
-        <button className="gameMenuButton" onClick={open}>
-          Global menu
-        </button>
-      </main>
+      <main className="base_main" data-couch-shell="true" />
     </>,
+  );
+  window.addEventListener("electrify:couch-menu", toggle);
+  try {
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    f.emit({ actions: ["confirm"] });
+    expect(toggle).not.toHaveBeenCalled();
+    f.emit({ actions: ["menu"] });
+    f.emit({ actions: ["menuAlt"] });
+    expect(toggle).toHaveBeenCalledTimes(2);
+    expect(hiddenMenu).not.toHaveBeenCalled();
+  } finally {
+    window.removeEventListener("electrify:couch-menu", toggle);
+  }
+});
+
+it("keeps solo Select as local Back during gameplay", async () => {
+  const back = jest.fn();
+  store.dispatch(delta({ inGame: true, speed: "NORMAL" }));
+  render(
+    <main
+      className="base_main"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          back();
+        }
+      }}
+    >
+      <div className="gameWorkspace" />
+      <button>Fleet</button>
+    </main>,
   );
   const f = bridge();
   stop = startDesktopInput(store, f.desktop);
   await act(async () => {
     await Promise.resolve();
   });
-  f.emit({ actions: ["menu"] });
-  expect(open).toHaveBeenCalledTimes(1);
-  expect(hiddenMenu).not.toHaveBeenCalled();
+  f.emit({ actions: ["menuAlt"] });
+  expect(back).toHaveBeenCalledTimes(1);
+  expect(store.getState().game.speed).toBe("NORMAL");
 });
 
 it("keeps the solo Start binding as pause during gameplay", async () => {
@@ -639,21 +676,24 @@ it("keeps the solo Start binding as pause during gameplay", async () => {
   expect(store.getState().game.speed).toBe("PAUSED");
 });
 
-it("keeps solo Start as Back in the Menu action set", async () => {
-  const back = jest.fn();
-  render(
-    <main className="base_main">
-      <button aria-label="Back" onClick={back}>
-        Back
-      </button>
-    </main>,
-  );
-  const f = bridge();
-  stop = startDesktopInput(store, f.desktop);
-  await act(async () => {
-    await Promise.resolve();
-  });
-  expect(f.desktop.setInputContext).toHaveBeenCalledWith("Menu");
-  f.emit({ actions: ["menu"] });
-  expect(back).toHaveBeenCalledTimes(1);
-});
+it.each(["menu", "menuAlt"] as const)(
+  "keeps solo %s as Back in the Menu action set",
+  async (action) => {
+    const back = jest.fn();
+    render(
+      <main className="base_main">
+        <button aria-label="Back" onClick={back}>
+          Back
+        </button>
+      </main>,
+    );
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(f.desktop.setInputContext).toHaveBeenCalledWith("Menu");
+    f.emit({ actions: [action] });
+    expect(back).toHaveBeenCalledTimes(1);
+  },
+);

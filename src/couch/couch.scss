@@ -48,6 +48,34 @@ html[data-couch-shell-active="true"]
   box-sizing: border-box;
   padding-bottom: var(--couch-controls-height, 160px);
 }
+.couchSettingsDialog .MuiDialog-paper > .screenPage {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.couchPauseMenu {
+  padding: 24px;
+  align-items: center;
+  .MuiButton-root {
+    width: min(100%, 208px);
+    transition: none;
+    &:hover {
+      background: transparent;
+    }
+    &.MuiButton-text.MuiButton-colorPrimary:focus {
+      background: var(--interactive-strong);
+      color: var(--interactive-contrast);
+      outline: none !important;
+    }
+  }
+}
+html[data-tv-layout="true"] {
+  .couchPauseDialog .MuiDialog-paper {
+    max-width: calc(24rem + 48px);
+  }
+  .couchPauseMenu .MuiButton-root {
+    width: min(100%, 24rem);
+  }
+}
 .couchControlsLegend {
   position: fixed;
   z-index: 1400;
