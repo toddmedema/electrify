@@ -38,8 +38,87 @@ async function startCouch<Actor extends Page | Frame>(
     .getByRole("dialog")
     .getByRole("button", { name: "Start for everyone", exact: true });
   await expect(start).toBeDisabled();
+  const openReplies = await couch.settledNativeRequests("open");
   await couch.input({ "101": ["confirm"], "202": ["confirm"] });
   await expect.poll(() => couch.seats.size).toBe(2);
+  // The fixture publishes seat actors before navigating them. The open reply
+  // follows both navigations and attachments; map size alone is not readiness.
+  await expect
+    .poll(() => couch.settledNativeRequests("open"))
+    .toBe(openReplies + 1);
+  for (const [id, { page: seat }] of couch.seats) {
+    await expect(seat.locator("html")).toHaveAttribute("data-couch-seat", id);
+    await expect(seat.locator("#appbar:visible")).toBeVisible();
+  }
+}
+
+for (const nativeBindings of [false, true]) {
+  test(`TV couch startup waits for delayed P2 navigation (native bindings=${nativeBindings})`, async ({
+    context,
+    page,
+  }, info) => {
+    test.skip(
+      !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
+      "Seat startup readiness in both palettes and transports",
+    );
+    const couch = nativeBindings
+      ? await createCouchFixture(context, page, { nativeBindings: true })
+      : await createCouchFixture(context, page);
+    let documentReleased = false;
+    let releaseDocument!: () => void;
+    const heldDocument = new Promise<void>((resolve) => {
+      releaseDocument = resolve;
+    });
+    let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+    await context.route(/\?couchSeat=local-p2&generation=/, async (route) => {
+      // Fault injection only: make the real second-seat document slower than
+      // the map-size poll. Startup must await readiness, not an assumed delay.
+      releaseTimer = setTimeout(() => {
+        documentReleased = true;
+        releaseDocument();
+      }, 1000);
+      await heldDocument;
+      await route.continue();
+    });
+    try {
+      await startCouch(page, couch);
+      const openReplies = await couch.settledNativeRequests("open");
+      await info.attach("startup-readiness", {
+        body: JSON.stringify({
+          documentReleased,
+          openReplies,
+          seats: [...couch.seats].map(([id, route]) => ({
+            id,
+            generation: route.generation,
+            url: route.page.url(),
+          })),
+        }),
+        contentType: "application/json",
+      });
+      expect(documentReleased).toBe(true);
+      expect(openReplies).toBe(1);
+      const p1 = couch.seats.get("local-p1")!.page;
+      const p2 = couch.seats.get("local-p2")!.page;
+      await couch.input({ "101": ["menu"] });
+      const menu = page.getByRole("dialog", { name: "Game menu", exact: true });
+      await expect(menu).toBeVisible();
+      await menu
+        .getByRole("button", { name: "Return to game", exact: true })
+        .click();
+      await expect(menu).toHaveCount(0);
+      await couch.input({ "202": ["build"] });
+      await expect(
+        p2.getByRole("region", { name: "Build", exact: true }),
+      ).toBeVisible();
+      await expect(
+        p1.getByRole("region", { name: "Build", exact: true }),
+      ).toHaveCount(0);
+    } finally {
+      clearTimeout(releaseTimer);
+      releaseDocument();
+      await context.unrouteAll({ behavior: "wait" });
+    }
+  });
 }
 
 const speedControls = (seat: Page | Frame) =>
