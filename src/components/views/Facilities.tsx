@@ -813,6 +813,10 @@ export function fleetChartHeight(width: number, height: number): number {
   return Math.round(compactHeight * 0.85);
 }
 
+/**
+ * Keep chart height synchronized with window and text-size changes.
+ * Couch panes reserve 20% of the usual plot height for the rest of each company's fleet.
+ */
 function useFleetChartHeight(): number {
   /** Measure the plot in CSS pixels, applying text scale to TV design dimensions once.
    * The couch reduction reserves fleet space before native view zoom magnifies the whole pane. */

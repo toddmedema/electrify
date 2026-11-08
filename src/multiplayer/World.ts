@@ -106,6 +106,10 @@ export function pauseWorld(world: World, reason: string) {
 
 // Shell lifecycle blockers are ephemeral; restoring a checkpoint requires fresh consent.
 const shellBlockers = new WeakMap<World, readonly string[]>();
+/**
+ * Copy ephemeral shell blockers into this world's clock calculation.
+ * They remain outside persisted checkpoints so resume always obtains fresh consent.
+ */
 export function setWorldBlockers(world: World, reasons: readonly string[]) {
   shellBlockers.set(world, [...reasons]);
   syncClock(world);

@@ -4,7 +4,7 @@ import type { MouseEventHandler, ReactNode } from "react";
 import { IconButton, Menu, MenuItem } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 
-/** The same menu trigger, offline notice and popup serve solo and the shared couch shell. */
+/** Keep the solo menu trigger, offline notice and actions within one accessible popup. */
 export default function GameMenu({
   anchorEl,
   open = !!anchorEl,
