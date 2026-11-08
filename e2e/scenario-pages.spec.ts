@@ -29,7 +29,7 @@ test.describe("scenario pages without JavaScript", () => {
             process.env.REVIEW_SCREENSHOT_DIR,
             "scenarios-desktop.png",
           ),
-          fullPage: true,
+          fullPage: false,
           animations: "disabled",
         });
       }
@@ -79,12 +79,15 @@ test.describe("scenario pages without JavaScript", () => {
           ((theme === "light" && info.project.name === "desktop-chromium") ||
             (theme === "dark" && info.project.name === "mobile-390px"))
         ) {
+          await page.evaluate(() =>
+            window.scrollTo({ top: 0, behavior: "instant" }),
+          );
           await page.screenshot({
             path: path.join(
               process.env.REVIEW_SCREENSHOT_DIR,
               `deep-freeze-${info.project.name}-${theme}.png`,
             ),
-            fullPage: true,
+            fullPage: info.project.name === "desktop-chromium",
             animations: "disabled",
           });
         }
