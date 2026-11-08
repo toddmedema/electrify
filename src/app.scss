@@ -3661,7 +3661,6 @@ $pane_header_height: 48px;
 
     .missionMeta {
       display: block;
-      margin-top: 2px;
       color: $font_color_faded;
     }
 
@@ -3680,6 +3679,37 @@ $pane_header_height: 48px;
       .MuiChip-label {
         padding: 0 8px;
       }
+    }
+  }
+
+  .missionCatalogItem {
+    .MuiCardHeader-content {
+      min-width: 0;
+    }
+
+    .MuiCardHeader-title {
+      font-size: var(--font-size-subtitle);
+      line-height: 1.5rem;
+    }
+
+    .MuiCardHeader-subheader {
+      margin-top: 4px;
+      font-size: var(--font-size-body2);
+      line-height: 1.25rem;
+    }
+
+    .missionCatalogSummary {
+      display: block;
+    }
+
+    .missionMeta {
+      margin-top: 4px;
+      font-size: var(--font-size-caption);
+      line-height: 1.25rem;
+    }
+
+    .missionThemeTag {
+      line-height: 1.25rem;
     }
   }
 

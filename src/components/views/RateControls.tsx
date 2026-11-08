@@ -293,7 +293,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
         </span>
       </span>
       {investor ? (
-        <span className="insightsRateMetric">
+        <span className="insightsRateMetric insightsRateMetricCustomers">
           <span className="insightsRateMetricLabel">Customers/mo</span>
           <strong className="insightsRateMetricValue">
             {formattedCustomerChange}

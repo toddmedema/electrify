@@ -64,7 +64,8 @@ export function formatAbbreviatedNumber(
     ({ divisor }) => Math.abs(value) >= divisor / 2,
   );
   const scaled = unit ? value / unit.divisor : value;
-  const integerDigits = Math.abs(scaled).toString().split(".")[0].length;
+  const integerDigits =
+    Math.abs(scaled) < 1 ? 0 : Math.abs(scaled).toString().split(".")[0].length;
   return (
     formatDecimalNumber(scaled, {
       digits: totalDigits ? Math.max(totalDigits - integerDigits, 0) : digits,

@@ -296,9 +296,23 @@ describe("historical quantity abbreviations", () => {
 
   it("keeps useful decimals for changes and short mass labels", () => {
     expect(formatAbbreviatedNumber(9900, { digits: 1 })).toBe("9.9k");
+    expect(formatAbbreviatedNumber(549, { totalDigits: 3 })).toBe("0.549k");
     expect(formatAbbreviatedNumber(1234, { totalDigits: 3 })).toBe("1.23k");
     expect(formatAbbreviatedNumber(12340, { totalDigits: 3 })).toBe("12.3k");
     expect(formatAbbreviatedNumber(123400, { totalDigits: 3 })).toBe("123k");
     expect(formatAbbreviatedNumber(999999, { totalDigits: 3 })).toBe("1m");
+  });
+
+  it.each<[number, string]>([
+    [500, "0.5k"],
+    [549, "0.55k"],
+    [-549, "-0.55k"],
+    [550, "0.55k"],
+    [549000, "0.55m"],
+    [-549000, "-0.55m"],
+    [549000000, "0.55b"],
+    [549000000000, "0.55t"],
+  ])("preserves two digits below one unit for %s", (value, expected) => {
+    expect(formatAbbreviatedNumber(value, { totalDigits: 2 })).toBe(expected);
   });
 });

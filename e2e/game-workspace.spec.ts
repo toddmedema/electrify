@@ -881,6 +881,45 @@ test("Programs keeps points visible through monthly forecast refreshes", async (
   }
 });
 
+test("pricing keeps changing customer forecasts on one line", async ({
+  page,
+}, info) => {
+  await startGame(page, "dark");
+  await page.locator("#programsNav").click();
+  const pricing = page.getByRole("region", { name: "Electricity pricing" });
+  await expect(pricing).toBeVisible();
+  await settleSheets(page);
+  const rate = pricing.getByRole("slider");
+  for (const key of ["Home", "End", "ArrowLeft", "ArrowLeft", "ArrowLeft"]) {
+    await rate.press(key);
+    const metric = pricing.locator(".insightsRateMetric").last();
+    const value = metric.locator(".insightsRateMetricValue");
+    await expect(value).toContainText(/^[+-]?\d.*\(.*%\)$/);
+    const geometry = await value.evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return {
+        lines: range.getClientRects().length,
+        overflow: element.scrollWidth - element.clientWidth,
+      };
+    });
+    expect(geometry.lines).toBe(1);
+    expect(geometry.overflow).toBeLessThanOrEqual(1);
+    expect(
+      await pricing
+        .locator(".insightsRateMetrics")
+        .evaluate((element) => element.scrollWidth - element.clientWidth),
+    ).toBeLessThanOrEqual(1);
+  }
+  await settleSheets(page);
+  await pricing.getByRole("heading", { name: "Electricity pricing" }).click();
+  await page.mouse.move(0, 0);
+  await reviewScreenshot(page, {
+    path: info.outputPath("pricing-customer-forecast.png"),
+    animations: "disabled",
+  });
+});
+
 test("Programs owns pricing and Build keeps purchase dialogs above its sheet", async ({
   page,
 }, testInfo) => {

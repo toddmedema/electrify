@@ -175,9 +175,10 @@ export function formatCustomerChange(
   change: number,
   customers: number,
 ): string {
-  const formattedChange = formatAbbreviatedNumber(Math.abs(change), {
-    digits: 1,
-  });
+  const formattedChange = formatAbbreviatedNumber(
+    Number(Math.abs(change).toPrecision(2)),
+    { totalDigits: 2 },
+  );
   const sign = change >= 0 ? "+" : "-";
   const percent =
     customers > 0
