@@ -512,7 +512,7 @@ for (const theme of ["light", "dark"] as const) {
     while (await popup.isVisible())
       await popup.getByRole("button", { name: /^Dismiss/ }).click();
     await expectDialogToFit(dialog);
-    await demand.scrollIntoViewIfNeeded();
+    await metrics.last().scrollIntoViewIfNeeded();
     if (process.env.REVIEW_SCREENSHOT_DIR) {
       await expect(dialog.locator("..")).toHaveCSS("opacity", "1");
       await page.mouse.move(0, 0);
