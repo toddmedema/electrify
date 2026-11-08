@@ -209,20 +209,12 @@ it("surfaces the researched Uri outcome metrics", () => {
 
   expect(debrief.scenarioMetrics).toEqual([
     expect.objectContaining({
-      label: "Demand not met during Winter Storm Uri · Feb 2021",
+      label: "Demand not met during Winter Storm Uri",
       value: "100MWh",
     }),
     expect.objectContaining({
-      label: "Largest shortage during Winter Storm Uri",
-      value: "100MW",
-    }),
-    expect.objectContaining({
-      label: "Electricity rate · before → after",
-      value: "$0.09/kWh → $0.1/kWh",
-    }),
-    expect.objectContaining({
-      label: "Cash stayed above $0 through Mar 2021",
-      value: "Yes",
+      label: "Billed rate · Jan 2021 → Mar 2021",
+      value: "9¢/kWh → 10¢/kWh",
     }),
   ]);
 });
@@ -245,7 +237,7 @@ it("retains native connection metrics before and after arrival without waiting f
     },
     {
       label: "Electricity rate",
-      value: "$0.1/kWh → $0.12/kWh",
+      value: "10¢/kWh → 12¢/kWh",
       concept: "rate",
     },
   ]);
@@ -263,7 +255,7 @@ it("retains native connection metrics before and after arrival without waiting f
     },
     {
       label: "Electricity rate",
-      value: "$0.1/kWh → $0.12/kWh",
+      value: "10¢/kWh → 12¢/kWh",
       concept: "rate",
     },
   ]);
@@ -293,24 +285,14 @@ it("retains each native Uri observation when a run ends before recovery", () => 
   ).scenarioMetrics;
   expect(result).toEqual([
     {
-      label: "Demand not met during Winter Storm Uri · Feb 2021",
+      label: "Demand not met during Winter Storm Uri",
       value: "100MWh",
       concept: "blackout",
     },
     {
-      label: "Largest shortage during Winter Storm Uri",
-      value: "100MW",
-      concept: "supply",
-    },
-    {
-      label: "Electricity rate · before → after",
+      label: "Billed rate · Jan 2021 → Mar 2021",
       value: "Not reached",
       concept: "rate",
-    },
-    {
-      label: "Cash stayed above $0 through Mar 2021",
-      value: "Not reached",
-      concept: "money",
     },
   ]);
   const unreached = buildVictoryDebrief(
@@ -320,7 +302,7 @@ it("retains each native Uri observation when a run ends before recovery", () => 
     [],
     [before],
   ).scenarioMetrics;
-  expect(unreached).toHaveLength(4);
+  expect(unreached).toHaveLength(2);
   expect(unreached!.every((metric) => metric.value === "Not reached")).toBe(
     true,
   );
@@ -349,13 +331,13 @@ it("derives native review dates from the resolved starting year", () => {
     months,
   ).scenarioMetrics;
   expect(metrics).toContainEqual({
-    label: "Demand not met during Winter Storm Uri · Feb 2041",
+    label: "Demand not met during Winter Storm Uri",
     value: "0Wh",
     concept: "blackout",
   });
   expect(metrics).toContainEqual({
-    label: "Cash stayed above $0 through Mar 2041",
-    value: "Yes",
-    concept: "money",
+    label: "Billed rate · Jan 2041 → Mar 2041",
+    value: "9¢/kWh → 9¢/kWh",
+    concept: "rate",
   });
 });

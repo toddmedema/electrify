@@ -612,7 +612,7 @@ describe("data-center debrief feedback", () => {
       label: "Months with blackouts after Data Centers arrived",
       unit: "months",
     });
-    expect(metric(result, "electricityRate").value).toBe("$0.1/kWh → $0.2/kWh");
+    expect(metric(result, "electricityRate").value).toBe("10¢/kWh → 20¢/kWh");
     expect(result.importance).toBe("NOTABLE");
   });
 
@@ -624,7 +624,7 @@ describe("data-center debrief feedback", () => {
         endingRateDollarsPerKWh: 0,
       }),
     );
-    expect(metric(result, "electricityRate").value).toBe("$0.2/kWh → $0/kWh");
+    expect(metric(result, "electricityRate").value).toBe("20¢/kWh → 0¢/kWh");
     expect(result.importance).toBe("ROUTINE");
   });
 
@@ -677,7 +677,9 @@ describe("deep-freeze debrief feedback", () => {
       value: 25,
       unit: "W",
     });
-    expect(metric(result, "electricityRate").value).toBe("$100/kWh → $200/kWh");
+    expect(metric(result, "electricityRate").value).toBe(
+      "10000¢/kWh → 20000¢/kWh",
+    );
     expect(metric(result, "cashStayedPositive")).toMatchObject({
       value: true,
       unit: "boolean",
@@ -765,7 +767,7 @@ describe("catalog debrief observations before the term ends", () => {
     });
     expect(metric(partial, "electricityRate")).toMatchObject({
       available: true,
-      value: "$0.1/kWh → $0.12/kWh",
+      value: "10¢/kWh → 12¢/kWh",
     });
     const strict = interpretRuleReport(report, inputs);
     expect(strict.available).toBe(false);
@@ -789,7 +791,7 @@ describe("catalog debrief observations before the term ends", () => {
       expect(metric(result, "blackoutMonths").available).toBe(false);
       expect(metric(result, "electricityRate")).toMatchObject({
         available: true,
-        value: "$0.1/kWh → $0.12/kWh",
+        value: "10¢/kWh → 12¢/kWh",
       });
     }
   });
@@ -801,7 +803,7 @@ describe("catalog debrief observations before the term ends", () => {
       catalogDebrief: true,
     });
     expect(metric(result, "unservedWh")).toMatchObject({
-      label: "Demand not met during Winter Storm Uri · Feb 2020",
+      label: "Demand not met during Winter Storm Uri",
       available: true,
       value: 100,
     });
@@ -829,13 +831,16 @@ describe("catalog debrief observations before the term ends", () => {
     );
     expect(result.available).toBe(true);
     expect(metric(result, "unservedWh").label).toBe(
-      "Demand not met during Winter Storm Uri · Feb 2040",
+      "Demand not met during Winter Storm Uri",
     );
     expect(metric(result, "cashStayedPositive")).toMatchObject({
       label: "Cash stayed above $0 through Mar 2040",
       value: true,
     });
-    expect(metric(result, "electricityRate").value).toBe("$90/kWh → $100/kWh");
+    expect(metric(result, "electricityRate")).toMatchObject({
+      label: "Billed rate · Jan 2040 → Mar 2040",
+      value: "9000¢/kWh → 10000¢/kWh",
+    });
     const strict = interpretRuleReport(
       freeze,
       context(shifted, { startingYear: 2040 }),

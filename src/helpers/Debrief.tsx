@@ -147,14 +147,21 @@ function scenarioMetrics(
           ...(catalogDebrief ? { catalogDebrief: true } : {}),
         });
         return result.metrics.length
-          ? result.metrics.map((metric) => ({
-              label: metric.label,
-              value:
-                catalogDebrief && !metric.available
-                  ? "Not reached"
-                  : reportMetricValue(metric),
-              concept: reportMetricConcept(metric),
-            }))
+          ? result.metrics
+              .filter(
+                (metric) =>
+                  report.kind !== "deepFreeze" ||
+                  (metric.id !== "maximumDeficitW" &&
+                    metric.id !== "cashStayedPositive"),
+              )
+              .map((metric) => ({
+                label: metric.label,
+                value:
+                  catalogDebrief && !metric.available
+                    ? "Not reached"
+                    : reportMetricValue(metric),
+                concept: reportMetricConcept(metric),
+              }))
           : [
               {
                 label: result.label,

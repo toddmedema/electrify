@@ -22,6 +22,7 @@ import {
   buildStorySnapshot,
 } from "../src/helpers/Story";
 import { parseSave } from "../src/SaveGame";
+import { ruleChoices } from "../src/helpers/ScenarioRuleDependencies";
 import type { GameType } from "../src/Types";
 
 /** Exercise populated standings through the real native-score adapter, without a native window. */
@@ -240,7 +241,7 @@ for (const { theme, native, currentRank } of [
     await expect.poll(() => readSaveRecords(page)).toEqual([]);
     await expect(
       dialog.locator(".victoryMetric").filter({ hasText: "tenure" }),
-    ).toContainText("12 years");
+    ).toHaveCount(0);
     const leaderboard = dialog.getByRole("region", {
       name: "Leaderboard · Hard",
     });
@@ -398,6 +399,134 @@ for (const { theme, native, currentRank } of [
   });
 }
 
+for (const theme of ["light", "dark"] as const) {
+  test(`Uri victory shows actionable metrics and distinguishes billed from lifetime rates in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await installLeaderboardFixture(page, 47);
+    await page.goto("/?scenario=107");
+    await page.getByRole("button", { name: "Hard", exact: true }).click();
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await page
+      .getByRole("button", { name: "fast speed", exact: true })
+      .first()
+      .click();
+    await expect(
+      page.locator("#appbar:visible .gameStatusValue.weak"),
+    ).not.toContainText("Jan 2017");
+    await page
+      .getByRole("button", { name: "pause", exact: true })
+      .first()
+      .click();
+    await editSavedGame(page, (save) => {
+      const game = save.game;
+      const realMonth = game.monthlyHistory[0];
+      expect(realMonth).toBeDefined();
+      // Hold nominal customer bills at 9.9¢; the lifetime score still uses 2017 dollars.
+      game.monthlyHistory = Array.from({ length: 83 }, (_, index) => ({
+        ...realMonth,
+        year: game.startingYear + Math.floor((82 - index) / 12),
+        month: ((82 - index) % 12) + 1,
+        revenue: (realMonth.supplyWh / 1000) * 0.099,
+        revenueExports: 0,
+        revenueGrants: 0,
+      }));
+      const offset = 83 * MINUTES_PER_MONTH - game.timeline[0].minute;
+      for (const tick of game.timeline) tick.minute += offset;
+      game.date = getDateFromMinute(
+        84 * MINUTES_PER_MONTH - 15,
+        game.startingYear,
+      );
+      game.dollarsPerkWh = 0.099;
+      game.meaningfulDecisions = [
+        {
+          key: "rate",
+          lever: "rate",
+          label: "Changed the retail rate",
+          month: 1,
+          kind: "rate",
+          before: "$0.09/kWh",
+          after: "$0.099/kWh",
+        },
+      ];
+      rebuildCompletionEvidence(game);
+      // The native save also needs the no-cost preparation decision that precedes Uri.
+      const choice = ruleChoices(scenarioRules(getScenario(107), game)!).find(
+        (choice) => choice.options.some((option) => option.id === "standard"),
+      )!;
+      const option = choice.options.find((option) => option.id === "standard")!;
+      game.worldEvents.occurrences.push({
+        key: choice.key,
+        definitionId: choice.key,
+        startsMinute: choice.dueMonth * MINUTES_PER_MONTH,
+        endsMinute: choice.dueMonth * MINUTES_PER_MONTH,
+        attributes: {
+          choice: option.id,
+          cost: option.cost,
+          upfrontGrant: option.grant,
+          scenarioChoice: true,
+        },
+        effects: {},
+        title: choice.title,
+        message: option.message,
+      });
+      expect(parseSave(save)).not.toBeNull();
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page
+      .locator("#appbar:visible")
+      .getByRole("button", { name: "normal speed", exact: true })
+      .first()
+      .click();
+    const dialog = page.getByRole("dialog", { name: "After the thaw" });
+    await expect(dialog).toBeVisible();
+    const metrics = dialog.locator(".victoryMetric");
+    await expect(metrics).toHaveCount(7);
+    await expect(
+      metrics.filter({ hasText: /tenure|Cash stayed above|Largest shortage/ }),
+    ).toHaveCount(0);
+    const demand = metrics.filter({
+      hasText: "Demand not met during Winter Storm Uri",
+    });
+    await expect(demand.locator("span")).toHaveText(
+      "Demand not met during Winter Storm Uri",
+    );
+    await expect(
+      metrics
+        .filter({ hasText: "Billed rate · Jan 2021 → Mar 2021" })
+        .locator("strong"),
+    ).toHaveText("9.9¢/kWh → 9.9¢/kWh");
+    const lifetime = metrics.filter({
+      hasText: "lifetime rate · 2017 dollars",
+    });
+    await expect(lifetime.locator("strong")).toHaveText(/^[\d.]+¢\/kWh$/);
+    expect(
+      parseFloat((await lifetime.locator("strong").textContent())!),
+    ).toBeLessThan(9.9);
+    const popup = page.locator(".achievementToastPanel").first();
+    while (await popup.isVisible())
+      await popup.getByRole("button", { name: /^Dismiss/ }).click();
+    await expectDialogToFit(dialog);
+    await demand.scrollIntoViewIfNeeded();
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await expect(dialog.locator("..")).toHaveCSS("opacity", "1");
+      await page.mouse.move(0, 0);
+      await dialog.screenshot({
+        animations: "disabled",
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `uri-victory-${info.project.name}-${theme}.png`,
+        ),
+      });
+    }
+  });
+}
+
 test("retrying a failed scenario keeps its difficulty in the game and mission details", async ({
   page,
 }, info) => {
@@ -531,7 +660,7 @@ test("shared reliability rule ends the run at the third completed month", async 
   const rate = failure
     .locator(".victoryMetric")
     .filter({ hasText: "lifetime rate" });
-  await expect(rate.locator("strong")).toHaveText(/^\$[\d.]+\/kWh$/);
+  await expect(rate.locator("strong")).toHaveText(/^[\d.]+¢\/kWh$/);
   await expect(failure).not.toContainText("starting-year");
   await expect(failure).not.toContainText("You survived");
   await expect.poll(() => readSaveRecords(page)).toEqual([]);
