@@ -206,8 +206,12 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         (candidate) => status.bindings?.[candidate.id] === controllerId,
       )?.id;
       if (!acknowledged) {
+        const reason =
+          bindFailure instanceof Error
+            ? bindFailure.message
+            : String(bindFailure);
         throw new Error(
-          `${String(bindFailure)}${status.bindings?.[seat.id] === controllerId ? ". Native routing changed but recovery did not finish. Press Confirm again." : ""}`,
+          `${reason}${status.bindings?.[seat.id] === controllerId ? ". Native routing changed but recovery did not finish. Press Confirm again." : ""}`,
         );
       }
       if (
@@ -582,7 +586,8 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
             const nativeOwner = [...bindingFailures.current.values()].find(
               (failure) =>
                 failure.epoch === starts.current &&
-                failure.controllerId === device.id,
+                failure.controllerId === device.id &&
+                failure.nativeOwner !== undefined,
             )?.nativeOwner;
             const free = nextControllerSeat(
               state.seats,

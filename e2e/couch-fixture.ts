@@ -1,4 +1,4 @@
-import { BrowserContext, Frame, Page, expect } from "@playwright/test";
+import { BrowserContext, Frame, Page, errors, expect } from "@playwright/test";
 import type { DesktopInputAction, DesktopInputFrame } from "../src/Desktop";
 import type { World } from "../src/multiplayer/Types";
 
@@ -50,6 +50,10 @@ export interface CouchFixture<Actor extends Page | Frame> {
     requested: Promise<void>;
     settle: (outcome: "resolve" | "reject") => void;
   };
+  deferNativeClose: (offset: number) => {
+    requested: Promise<void>;
+    settle: () => void;
+  };
   checkpoint: () => World | undefined;
   layout: () => CouchLayout | undefined;
   backdropRevision: () => number;
@@ -57,7 +61,7 @@ export interface CouchFixture<Actor extends Page | Frame> {
   presentationMessages: () => number;
   settleCaptures: () => Promise<void>;
   cancelledText: () => readonly string[];
-  failNextNative: (kind: "setup" | "list-saves" | "close") => void;
+  failNextNative: (kind: "setup" | "list-saves" | "close" | "status") => void;
   input: (actions: Record<string, DesktopInputAction[]>) => Promise<void>;
 }
 const {
@@ -177,6 +181,10 @@ export async function createCouchFixture(
         outcome: Promise<"resolve" | "reject">;
       }
     | undefined;
+  let closeRequests = 0;
+  let deferredClose:
+    | { ordinal: number; requested: () => void; outcome: Promise<void> }
+    | undefined;
   let saved: World | undefined;
   let updatedAt = 0;
   let overlayOwner: string | null = null;
@@ -295,20 +303,41 @@ export async function createCouchFixture(
     const id = ++captureId;
     const capturedLayout = structuredClone(layout);
     const viewport = shell.viewportSize()!;
+    const capturedSeats = [...seats].map(([seatId, route]) => ({
+      seatId,
+      route,
+      generation: route.generation,
+    }));
+    const current = () =>
+      owner === overlayOwner &&
+      version === overlayVersion &&
+      id === captureId &&
+      seats.size === capturedSeats.length &&
+      capturedSeats.every(
+        ({ seatId, route, generation }) =>
+          seats.get(seatId) === route && route.generation === generation,
+      );
     captureQueue = captureQueue
       .then(async () => {
-        if (
-          owner !== overlayOwner ||
-          version !== overlayVersion ||
-          id !== captureId
-        )
-          return;
+        if (!current()) return;
         const snapshots = [];
         try {
-          for (const [index, [seatId, route]] of [...seats].entries()) {
+          for (const [
+            index,
+            { seatId, route, generation },
+          ] of capturedSeats.entries()) {
+            if (!current()) return;
             let png: Buffer;
-            if (isPage(route.page)) png = await route.page.screenshot();
-            else {
+            if (isPage(route.page)) {
+              try {
+                // Match native captureSeat's bounded failure: a screenshot can
+                // stall during navigation, but must never trap controller input.
+                png = await route.page.screenshot({ timeout: 1500 });
+              } catch (error) {
+                if (error instanceof errors.TimeoutError) continue;
+                throw error;
+              }
+            } else {
               // Native capturePage reads a seat document alone, including while
               // its view is hidden during refresh. Temporarily expose that real
               // document and suppress only the outer shell in this capture.
@@ -321,9 +350,10 @@ export async function createCouchFixture(
                   'html:not([data-couch-seat]) body > :not(iframe[id^="couch-fixture-"]), html:not([data-couch-seat]) body > :not(iframe[id^="couch-fixture-"]) * { visibility: hidden !important; }',
               });
             }
+            if (!current()) return;
             snapshots.push({
               seatId,
-              generation: route.generation,
+              generation,
               bounds: capturedLayout.bounds[index],
               image: `data:image/png;base64,${png.toString("base64")}`,
             });
@@ -331,12 +361,7 @@ export async function createCouchFixture(
         } finally {
           await relayout({}, false);
         }
-        if (
-          owner !== overlayOwner ||
-          version !== overlayVersion ||
-          id !== captureId
-        )
-          return;
+        if (!current()) return;
         publishedCaptureId = id;
         await emit({
           kind: "overlay-backdrop",
@@ -352,9 +377,7 @@ export async function createCouchFixture(
         if (
           !shell.isClosed() &&
           ![...seats.values()].some(({ page }) => actorClosed(page)) &&
-          owner === overlayOwner &&
-          version === overlayVersion &&
-          id === captureId
+          current()
         )
           console.error("Couch fixture seat capture failed", error);
       });
@@ -591,7 +614,13 @@ export async function createCouchFixture(
           }
           return { available: true, layout };
         }
-        case "close":
+        case "close": {
+          const ordinal = ++closeRequests;
+          // Native revokes routes synchronously. Delayed transport cleanup must
+          // dispose only the old actors, never a newly opened session.
+          const closingSeats = [...seats.values()];
+          seats.clear();
+          bindings.clear();
           native?.manager.close();
           playing = false;
           overlayOwner = null;
@@ -607,17 +636,22 @@ export async function createCouchFixture(
             captureId,
             snapshots: [],
           });
-          for (const { page: actor } of seats.values()) {
-            if (isPage(actor)) await actor.close();
+          if (deferredClose?.ordinal === ordinal) {
+            const pending = deferredClose;
+            deferredClose = undefined;
+            pending.requested();
+            await pending.outcome;
           }
-          await shell.evaluate(() => {
-            document
-              .querySelectorAll('iframe[id^="couch-fixture-"]')
-              .forEach((frame) => frame.remove());
-          });
-          seats.clear();
-          bindings.clear();
+          for (const { page: actor } of closingSeats) {
+            if (actorClosed(actor)) continue;
+            if (isPage(actor)) await actor.close();
+            else
+              await (
+                await actor.frameElement()
+              ).evaluate((frame) => frame.parentNode?.removeChild(frame));
+          }
           return;
+        }
         default:
           throw new Error(
             `Unexpected couch fixture request: ${String(raw.kind)}`,
@@ -812,6 +846,19 @@ export async function createCouchFixture(
         settle = resolve;
       });
       deferredBind = { commitBeforeReply, requested, outcome };
+      return { requested: pending, settle };
+    },
+    deferNativeClose(offset) {
+      if (deferredClose) throw new Error("A close is already deferred");
+      let requested!: () => void;
+      let settle!: () => void;
+      const pending = new Promise<void>((resolve) => {
+        requested = resolve;
+      });
+      const outcome = new Promise<void>((resolve) => {
+        settle = resolve;
+      });
+      deferredClose = { ordinal: closeRequests + offset, requested, outcome };
       return { requested: pending, settle };
     },
     checkpoint: () => saved,
