@@ -36,6 +36,7 @@ function fixture(
   onAccountView = jest.fn(),
   onMenu = jest.fn(),
   onSharedView = jest.fn(),
+  onSettings = jest.fn(),
 ) {
   jest.useFakeTimers();
   let world: World;
@@ -95,6 +96,7 @@ function fixture(
     onAccountView,
     onMenu,
     onSharedView,
+    onSettings,
   });
   const messages: Record<string, SeatEvent[]> = {};
   const clients = seats.map((seat) => {
@@ -732,6 +734,58 @@ it("keeps shared presentation on an active company after P1 retires without chan
       "local-p1",
     );
   } finally {
+    f.dispose();
+  }
+});
+
+it("rejects settings before play starts", () => {
+  jest.useFakeTimers();
+  const onSettings = jest.fn();
+  const worker = { postMessage: jest.fn(), terminate: jest.fn() };
+  const coordinator = new CouchCoordinator(worker as unknown as Worker, {
+    persist: jest.fn(),
+    onSettings,
+  });
+  try {
+    coordinator.attachSeat("local-p1", 1, jest.fn());
+    const request = { kind: "global-settings", requestId: "settings" };
+    expect(coordinator.receive("local-p1", 1, request)).toBe(false);
+    coordinator.start(COOP_TEST_SPEC, seats, "match", "epoch");
+    expect(coordinator.getSnapshot().phase).toBe("starting");
+    expect(coordinator.receive("local-p1", 1, request)).toBe(false);
+    expect(onSettings).not.toHaveBeenCalled();
+  } finally {
+    coordinator.dispose();
+  }
+});
+
+it("accepts settings during play and rejects them while closing or faulted", async () => {
+  const pending = Promise.withResolvers<void>();
+  const onSettings = jest.fn();
+  const f = fixture(
+    jest.fn(() => pending.promise),
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    onSettings,
+  );
+  try {
+    const request = { kind: "global-settings", requestId: "settings" };
+    expect(f.coordinator.receive("local-p2", 1, request)).toBe(true);
+    expect(onSettings).toHaveBeenCalledWith("local-p2", 1, "settings");
+    const saving = f.coordinator.save(true);
+    void saving.catch(() => undefined);
+    expect(f.coordinator.getSnapshot().closing).toBe(true);
+    expect(f.coordinator.receive("local-p2", 1, request)).toBe(false);
+    pending.resolve();
+    await saving;
+    f.worker.onerror?.();
+    expect(f.coordinator.getSnapshot().phase).toBe("faulted");
+    expect(f.coordinator.receive("local-p2", 1, request)).toBe(false);
+    expect(onSettings).toHaveBeenCalledTimes(1);
+  } finally {
+    pending.resolve();
     f.dispose();
   }
 });
