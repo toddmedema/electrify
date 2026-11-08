@@ -76,7 +76,7 @@ function facts(page, context) {
   return `<dl class="scenario-facts">
     <div><dt>Location</dt><dd>${e(page.location)}</dd></div>
     <div><dt>Starts in</dt><dd>${e(page.startingYear)}</dd></div>
-    <div><dt>${page.kind === "campaign" ? "Generation" : "Time to plan"}</dt><dd>${e(page.durationYears)} years</dd></div>
+    <div><dt>${page.kind === "campaign" ? "Generation" : "Your term"}</dt><dd>${e(page.durationYears)} years</dd></div>
   </dl>`;
 }
 
