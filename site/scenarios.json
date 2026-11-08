@@ -1,0 +1,811 @@
+[
+  {
+    "scenarioId": 107,
+    "slug": "deep-freeze",
+    "name": "Deep Freeze",
+    "location": "Austin, Texas",
+    "startingYear": 2017,
+    "durationYears": 7,
+    "theme": "Extreme weather",
+    "icon": "/images/texas deep freeze.svg",
+    "dek": "A grid built for Texas heat is about to face a very different test. You have four years to prepare for the February 2021 freeze.",
+    "description": "Prepare Austin's power grid for the February 2021 freeze. Balance winter protection, backup power and residents' bills in Electrify.",
+    "setup": [
+      "You take over a public utility in 2017 with gas, coal, nuclear and wind power. The fleet looks substantial on paper. The question is how much of it will still work when heating demand rises and equipment freezes.",
+      "This scenario gives you advance warning of the 2021 freeze so you can try a different response. Spend on preparation, build additional supply, and leave enough money to run the utility through the emergency."
+    ],
+    "decisions": [
+      {
+        "title": "Prepare before the forecast turns",
+        "body": "Compare winter protection with other uses for your cash. Work that is still on the drawing board cannot help during the freeze."
+      },
+      {
+        "title": "Look beyond installed capacity",
+        "body": "Watch available supply as the temperature falls. Several sources can struggle at once, just as customers need more electricity."
+      },
+      {
+        "title": "Keep service affordable",
+        "body": "New equipment has to be paid for. Find a way to strengthen the grid while keeping the public utility's finances and bills in view."
+      }
+    ],
+    "takeaway": "What would you change if you could start preparing four years before the freeze?",
+    "related": [108, 115, 111]
+  },
+  {
+    "scenarioId": 106,
+    "slug": "data-center-boom",
+    "name": "Data Center Boom",
+    "location": "Manassas, Virginia",
+    "startingYear": 2020,
+    "durationYears": 16,
+    "theme": "Rapid growth",
+    "icon": "/images/ai data center boom.svg",
+    "dek": "The data centers arrive in 2026. Their power needs are much bigger than your small city utility, and residents still need affordable electricity.",
+    "description": "Data centers are coming to Manassas. Build enough power for their round-the-clock demand while protecting residents' bills in Electrify.",
+    "setup": [
+      "Start in 2020 with a municipal utility serving 16,500 customers, a gas peaker and an aging oil plant. You have six years before a major new data-center load connects to the grid.",
+      "The new demand runs around the clock. A fleet that handles the city's evening peak may be a poor fit for that extra load. Choose how to accommodate the growth, then live with the construction costs, fuel bills and emissions."
+    ],
+    "decisions": [
+      {
+        "title": "Decide how growth connects",
+        "body": "Accept developer funding for the full connection in 2026, or forgo that money to phase in demand. More time means delaying some electricity sales too."
+      },
+      {
+        "title": "Build for the hours that matter",
+        "body": "Compare cheap daytime generation with supply that can cover nights and cloudy periods. The data centers keep drawing power after sunset."
+      },
+      {
+        "title": "Keep the city's customers",
+        "body": "Raising prices until residents leave is a costly way to make room. Plan supply and spending around the community already on your grid."
+      }
+    ],
+    "takeaway": "Can a small public utility accommodate a very large new customer without passing the cost to everyone else?",
+    "related": [103, 115, 116]
+  },
+  {
+    "scenarioId": 100,
+    "slug": "carbon-fee",
+    "name": "Carbon Fee",
+    "location": "San Francisco, California",
+    "startingYear": 2020,
+    "durationYears": 12,
+    "theme": "Energy transition",
+    "icon": "/images/carbon fee.svg",
+    "dek": "Coal helped build your company. Now every tonne of emissions comes with a bill, and replacing the old fleet will take time and money.",
+    "description": "Run a California utility as a carbon fee changes the economics of coal. Choose replacement power, manage costs and keep customers in Electrify.",
+    "setup": [
+      "Your utility enters 2020 with an aging coal plant, a gas plant and a limited construction budget. A carbon fee changes what those plants cost to run, even before you buy anything new.",
+      "The transition has to work as a business and as a power system. Closing the coal plant cuts emissions, but its customers still need electricity while replacements are being built."
+    ],
+    "decisions": [
+      {
+        "title": "Count the full cost of coal",
+        "body": "Look at fuel, operating costs and emissions fees together. Yesterday's cheapest plant may no longer produce your cheapest electricity."
+      },
+      {
+        "title": "Sequence the replacement",
+        "body": "Choose what to build and when to retire old capacity. Construction time makes the order of your decisions matter."
+      },
+      {
+        "title": "Give customers a reason to stay",
+        "body": "Set prices that cover the transition without driving away your customer base. A cleaner fleet still needs a viable utility behind it."
+      }
+    ],
+    "takeaway": "Try turning a price on pollution into a practical plan for the next twelve years.",
+    "related": [101, 102, 113]
+  },
+  {
+    "scenarioId": 103,
+    "slug": "the-shale-boom",
+    "name": "The Shale Boom",
+    "location": "Pittsburgh, Pennsylvania",
+    "startingYear": 2006,
+    "durationYears": 20,
+    "theme": "Rapid growth",
+    "icon": "/images/the shale boom.svg",
+    "dek": "Cheap gas looks like an opportunity. A power plant is a long commitment to a fuel price that can change much faster.",
+    "description": "Lead a Pittsburgh utility through the shale boom. Weigh cheap natural gas against fuel-price risk, growing demand and an aging coal fleet.",
+    "setup": [
+      "You begin in 2006 with a coal plant and a decision about what comes next. The shale boom makes natural gas increasingly attractive as your utility grows.",
+      "A low fuel bill today does not guarantee one for the life of a new plant. This twenty-year scenario gives your investment time to pay off, and gives fuel prices time to test the assumptions behind it."
+    ],
+    "decisions": [
+      {
+        "title": "Choose how far to lean into gas",
+        "body": "Compare the immediate savings with the cost of tying more of your fleet to a single fuel."
+      },
+      {
+        "title": "Prepare for a less comfortable year",
+        "body": "Leave room for price shocks and reduced output. A plan built around the cheapest months may struggle when conditions change."
+      },
+      {
+        "title": "Grow without losing your footing",
+        "body": "Match construction to demand and keep enough cash to operate. Cheap generation does little good if the company cannot finance its next move."
+      }
+    ],
+    "takeaway": "How much of a temporary advantage would you turn into a twenty-year investment?",
+    "related": [102, 106, 100]
+  },
+  {
+    "scenarioId": 105,
+    "slug": "paradise",
+    "name": "Paradise",
+    "location": "Honolulu, Hawaii",
+    "startingYear": 2003,
+    "durationYears": 13,
+    "theme": "Energy transition",
+    "icon": "/images/paradise.svg",
+    "dek": "There is plenty of sun and wind. There is also an imported-oil bill, and no neighboring grid to call when local supply falls short.",
+    "description": "Run an island utility in Hawaii. Replace imported oil with local power while managing variable renewables and keeping the lights on in Electrify.",
+    "setup": [
+      "Take over an island utility in 2003 with oil, wind and solar generation. The oil plant provides much of your capacity, leaving the utility exposed when fuel prices rise.",
+      "You can build more local clean power, but the island has to balance its own supply. Good annual production is not enough if the fleet cannot cover a quiet evening or a stretch of weak wind."
+    ],
+    "decisions": [
+      {
+        "title": "Reduce dependence on imported fuel",
+        "body": "Compare the upfront cost of new generation with years of oil purchases. Watch how fuel prices change the value of your investments."
+      },
+      {
+        "title": "Plan for gaps between renewables",
+        "body": "Give storage and backup a job in your fleet. Their value becomes clearer in the hours when sun and wind do not meet demand."
+      },
+      {
+        "title": "Keep an island's margin for error",
+        "body": "Build enough flexibility to handle changing demand without relying on imports. Every shortage has to be solved on your side of the ocean."
+      }
+    ],
+    "takeaway": "How much of the island's imported oil can you replace without leaving a gap in supply?",
+    "related": [101, 114, 111]
+  },
+  {
+    "scenarioId": 101,
+    "slug": "rise-of-renewables",
+    "name": "Rise of Renewables",
+    "location": "San Francisco, California",
+    "startingYear": 2002,
+    "durationYears": 12,
+    "theme": "Energy transition",
+    "icon": "/images/rise of renewables.svg",
+    "dek": "Clean power is getting cheaper. Demand is growing too. Waiting for a better deal has a cost of its own.",
+    "description": "Choose when to invest as renewable power gets cheaper. Balance construction timing, growing demand and reliable supply in Electrify.",
+    "setup": [
+      "Your California utility starts in 2002 with nuclear and oil generation. Over the next twelve years, changing technology costs create opportunities to build a different fleet.",
+      "The difficult part is timing. Buy early and later projects may be cheaper. Wait and you may have too little power while construction catches up. Your existing plants have to carry the utility through that gap."
+    ],
+    "decisions": [
+      {
+        "title": "Choose your moment to build",
+        "body": "Watch the cost of new capacity alongside the supply forecast. A lower purchase price is useful only if the plant opens in time."
+      },
+      {
+        "title": "Make room for variable output",
+        "body": "Compare the hours when wind and solar generate with the hours customers need power. Plan the rest of the fleet around that difference."
+      },
+      {
+        "title": "Pay for the transition",
+        "body": "Keep construction, operating expenses and customer prices in balance as the fleet changes. Future savings still need funding today."
+      }
+    ],
+    "takeaway": "Find a pace of investment that follows falling costs without falling behind demand.",
+    "related": [100, 105, 123]
+  },
+  {
+    "scenarioId": 104,
+    "slug": "hurricane-season",
+    "name": "Hurricane Season",
+    "location": "San Juan, Puerto Rico",
+    "startingYear": 2000,
+    "durationYears": 20,
+    "theme": "Extreme weather",
+    "icon": "/images/hurricane season.svg",
+    "dek": "A storm can take several power plants out of service at once. Build a Puerto Rico grid with enough room to recover.",
+    "description": "Prepare a Puerto Rico utility for hurricane damage. Build backup, manage imported fuel and restore reliable electricity in Electrify.",
+    "setup": [
+      "You start in 2000 with oil, gas and coal plants serving an island grid. There are years to build before the scenario's major hurricane, but the utility still has to operate and pay its bills in the meantime.",
+      "Storm damage can affect several plants together. The spare capacity that covers an ordinary outage may be too little for an emergency that also puts pressure on fuel costs."
+    ],
+    "decisions": [
+      {
+        "title": "Build before repairs are needed",
+        "body": "Decide how much preparation you can afford while the grid is operating normally. New construction takes time that an emergency will not give back."
+      },
+      {
+        "title": "Consider what can fail together",
+        "body": "Look beyond the loss of one plant. Compare a larger reserve with a fleet whose sources do not all share the same weaknesses."
+      },
+      {
+        "title": "Fund the recovery",
+        "body": "Keep cash available for the period of reduced output and expensive fuel. Restoring supply and staying solvent are part of the same job."
+      }
+    ],
+    "takeaway": "What would a utility built with hurricane recovery in mind do differently?",
+    "related": [107, 111, 105]
+  },
+  {
+    "scenarioId": 102,
+    "slug": "the-end-of-an-era",
+    "name": "The End of an Era",
+    "location": "Pittsburgh, Pennsylvania",
+    "startingYear": 1980,
+    "durationYears": 20,
+    "theme": "Energy transition",
+    "icon": "/images/the end of an era.svg",
+    "dek": "Your company's coal plants are getting old. Their replacements need years to build, and competitors are ready to take the customers you lose.",
+    "description": "Replace an aging coal fleet in Pittsburgh. Plan construction, protect your customers and keep the utility running through a twenty-year transition.",
+    "setup": [
+      "It is 1980, and your utility runs on two coal plants of different ages. They are familiar assets, but their future output and operating costs will make standing still an expensive decision.",
+      "The next twenty years are about managing the handover from the old fleet to the new one. There is no single retirement date that solves everything: capacity, construction time, financing and customer prices all have to fit together."
+    ],
+    "decisions": [
+      {
+        "title": "Replace capacity before it disappears",
+        "body": "Use the outlook for aging plants to plan construction. Starting a replacement after a shortage begins may leave a long gap."
+      },
+      {
+        "title": "Choose what succeeds coal",
+        "body": "Compare new generation by the service it can provide and what the company can afford. The cheapest project may not cover every hour you need."
+      },
+      {
+        "title": "Keep customers through the change",
+        "body": "Watch reliability and prices together. Losing the customers who fund your transition makes the remaining work harder to pay for."
+      }
+    ],
+    "takeaway": "Build the company that comes after coal while the old company is still paying the bills.",
+    "related": [100, 103, 113]
+  },
+  {
+    "scenarioId": 108,
+    "slug": "heatwave-and-drought",
+    "name": "Heatwave + Drought",
+    "location": "Madrid, Spain",
+    "startingYear": 2023,
+    "durationYears": 4,
+    "theme": "Extreme weather",
+    "icon": "/images/heatwave-drought.svg",
+    "dek": "Cooling demand rises just as the water runs low. Hydro produces less, and hot rivers limit nuclear cooling too.",
+    "description": "Keep a Spanish power grid supplied through heat and drought. Manage falling hydro and nuclear output as cooling demand rises in Electrify.",
+    "setup": [
+      "Start in 2023 with a scaled model of Spain's generation mix, including hydro, wind, solar, gas, nuclear and battery storage. It is a varied fleet, but several sources depend on the same weather.",
+      "Hot, dry summers squeeze both sides of the supply chart. Customers need more cooling while low inflow reduces hydro availability and warm river water cuts reactor output. You have four years to make that combination manageable."
+    ],
+    "decisions": [
+      {
+        "title": "Budget water as well as capacity",
+        "body": "Watch reservoir conditions and the drought outlook. A dam's rated output says little about how long it can keep generating with reduced inflow."
+      },
+      {
+        "title": "Cover the coinciding losses",
+        "body": "Plan for hydro and nuclear limits together. Compare additional generation, storage and demand measures against the hours of greatest strain."
+      },
+      {
+        "title": "Check the cost of your backup",
+        "body": "Gas can help cover a shortfall, but fuel costs and emissions remain part of the result. Build a plan you can afford to use."
+      }
+    ],
+    "takeaway": "A varied fleet can still share a single vulnerability. Find out how yours handles a shortage of water.",
+    "related": [114, 115, 110]
+  },
+  {
+    "scenarioId": 110,
+    "slug": "sudden-nuclear-shutdown",
+    "name": "Sudden Nuclear Shutdown",
+    "location": "Paris, France",
+    "startingYear": 2023,
+    "durationYears": 5,
+    "theme": "Energy transition",
+    "icon": "/images/sudden-nuclear-trip.svg",
+    "dek": "Your biggest reactor will stop producing power. It will stay offline for the rest of your term. Have something ready to take its place.",
+    "description": "Prepare for the loss of your largest nuclear unit in France. Build a backup plan for a five-year electricity strategy scenario in Electrify.",
+    "setup": [
+      "Your utility starts with a large nuclear unit, wind, solar, a small gas peaker and a battery. Much of its dependable supply comes from one reactor.",
+      "That reactor will shut down during the scenario and remain unavailable. You know the risk before taking charge, but the fleet still has to serve customers while you decide how much contingency to build."
+    ],
+    "decisions": [
+      {
+        "title": "Size the gap",
+        "body": "Look at the reactor's contribution across the day. Replacing its rated capacity and replacing the electricity customers actually use are different calculations."
+      },
+      {
+        "title": "Prepare a workable reserve",
+        "body": "Compare backup generation with storage and other supply options. A battery can shift energy into a difficult hour only if there is energy to charge it."
+      },
+      {
+        "title": "Pay for readiness",
+        "body": "Decide how much spare equipment the utility can carry before the shutdown. Balance that expense against the cost of being unprepared."
+      }
+    ],
+    "takeaway": "How much of your plan still works when its largest power source disappears?",
+    "related": [126, 108, 111]
+  },
+  {
+    "scenarioId": 111,
+    "slug": "wildfire-emergency",
+    "name": "Wildfire Emergency",
+    "location": "Los Angeles, California",
+    "startingYear": 2022,
+    "durationYears": 5,
+    "theme": "Extreme weather",
+    "icon": "/images/wildfire emergency.svg",
+    "dek": "Most of your spare power comes from somewhere else. In early 2025, wildfire will cut the capacity of your northern connection by 90%.",
+    "description": "Prepare a California utility for a wildfire outage that cuts its main power imports. Compare local generation, storage and backup connections.",
+    "setup": [
+      "Take charge of an import-dependent utility in 2022. A small local fleet of gas, solar, wind and battery storage works alongside the northern intertie that helps keep customers supplied.",
+      "The scenario gives you advance warning of a severe import restriction in early 2025. This is a fictional utility set in Los Angeles, giving you a focused way to explore what happens when a major supply route fails."
+    ],
+    "decisions": [
+      {
+        "title": "Know what the connection provides",
+        "body": "Check how much imported power you use in difficult hours. Available local capacity may look very different once the northern route is restricted."
+      },
+      {
+        "title": "Build another way to supply customers",
+        "body": "Compare local construction, storage and other connections. Complete the work before the outage rather than counting on equipment still being built."
+      },
+      {
+        "title": "Test the plan through the day",
+        "body": "Look beyond the sunny hours. The local fleet has to keep working when solar output falls and the usual imports are largely unavailable."
+      }
+    ],
+    "takeaway": "A reliable connection is useful. Having a plan for losing it is useful too.",
+    "related": [104, 110, 123]
+  },
+  {
+    "scenarioId": 113,
+    "slug": "load-shedding",
+    "name": "Load Shedding",
+    "location": "Johannesburg, South Africa",
+    "startingYear": 2016,
+    "durationYears": 7,
+    "theme": "Energy transition",
+    "icon": "/images/load shedding.svg",
+    "dek": "The coal fleet keeps breaking down. Diesel can cover some of the gap, but it cannot make the problem cheap to ignore.",
+    "description": "Respond to South Africa's aging coal fleet in Electrify. Build replacement supply while balancing recurring shortages and rising diesel costs.",
+    "setup": [
+      "You start in 2016 with a scaled South African fleet dominated by coal, alongside a little nuclear, diesel, wind and solar power. Much of the coal equipment is already decades old.",
+      "Over the scenario, coal availability falls as breakdowns outpace repairs. Waiting leaves you with less usable power and a growing need for expensive emergency fuel. Replacement plants take time to finish."
+    ],
+    "decisions": [
+      {
+        "title": "Build against declining output",
+        "body": "Plan around the coal fleet's available power, not its nameplate capacity. Each drop in output leaves more work for the rest of your system."
+      },
+      {
+        "title": "Use diesel deliberately",
+        "body": "Emergency generation can keep customers supplied, but fuel purchases quickly consume cash. Decide what it should bridge and when that bridge should end."
+      },
+      {
+        "title": "Make the replacement last",
+        "body": "Choose a mix that covers demand throughout the day and stays affordable to operate. Avoid replacing one concentrated vulnerability with another."
+      }
+    ],
+    "takeaway": "Can your new capacity arrive faster than the old fleet loses its ability to deliver?",
+    "related": [102, 114, 100]
+  },
+  {
+    "scenarioId": 114,
+    "slug": "the-river-runs-dry",
+    "name": "The River Runs Dry",
+    "location": "Lusaka, Zambia",
+    "startingYear": 2012,
+    "durationYears": 6,
+    "theme": "Extreme weather",
+    "icon": "/images/river runs dry.svg",
+    "dek": "A full reservoir makes the opening years look comfortable. An El Niño drought will test a grid built around the Zambezi.",
+    "description": "Manage a hydro-dependent Zambian grid as drought drains the reservoir. Find replacement power for households, businesses and copper mines in Electrify.",
+    "setup": [
+      "Start in 2012 with a hydro-dominated utility, a small diesel plant and a little solar. Your customers include the Copperbelt mines, whose electricity demand continues around the clock.",
+      "The reservoir begins full, but falling inflow changes how long that stored water will last. Once the drought takes hold, the diesel plant is far too small to replace the dam on its own."
+    ],
+    "decisions": [
+      {
+        "title": "Look past today's reservoir level",
+        "body": "Watch the inflow outlook before the lake looks empty. Water stored now buys time to build, rather than a guarantee of future supply."
+      },
+      {
+        "title": "Find power beyond the river",
+        "body": "Compare alternative generation and storage with the needs of a hydro-dependent fleet. Extra capacity has to provide energy when water cannot."
+      },
+      {
+        "title": "Serve the load that does not sleep",
+        "body": "Plan for the mines as well as household peaks. Daytime solar helps, but the industrial load still needs electricity through the night."
+      }
+    ],
+    "takeaway": "Use the full reservoir to prepare for the years when it will no longer be full.",
+    "related": [108, 113, 105]
+  },
+  {
+    "scenarioId": 115,
+    "slug": "delhi-summer",
+    "name": "Delhi Summer",
+    "location": "Delhi, India",
+    "startingYear": 2018,
+    "durationYears": 7,
+    "theme": "Extreme weather",
+    "icon": "/images/delhi summer.svg",
+    "dek": "Every summer needs more cooling. The heat also cuts power plant output, and a late monsoon delays the relief you were counting on.",
+    "description": "Prepare Delhi's power supply for rising air-conditioning demand and the heat of 2024. Balance generation, storage and customer bills in Electrify.",
+    "setup": [
+      "Take over in 2018 with coal, gas, solar, wind and a small battery. Your seven-year term runs through the extreme heat of 2024, with each summer putting more pressure on the grid.",
+      "Demand grows as air conditioners work harder, while high temperatures reduce available plant output. You need enough power at the difficult hours, and enough financial room to keep preparing for the next summer."
+    ],
+    "decisions": [
+      {
+        "title": "Build for the next summer",
+        "body": "Use the time between hot seasons to complete new capacity. A fleet that survived last year's peak may have too little room for the next one."
+      },
+      {
+        "title": "Follow demand beyond midday",
+        "body": "Compare solar production, cooling demand and storage together. Check which hours remain short after adding another project."
+      },
+      {
+        "title": "Reduce pressure where you can",
+        "body": "Weigh demand measures against additional supply. Less electricity needed during a difficult hour can help both the reserve margin and the operating bill."
+      }
+    ],
+    "takeaway": "Build a utility that can keep up with hotter summers without making every year a new emergency.",
+    "related": [108, 107, 106]
+  },
+  {
+    "scenarioId": 116,
+    "slug": "across-the-valley",
+    "name": "Across the Valley",
+    "location": "Burlington, Vermont",
+    "startingYear": 2005,
+    "durationYears": 20,
+    "theme": "Rapid growth",
+    "icon": "/images/across-the-valley.svg",
+    "dek": "The utility across the valley is for sale. Buying it brings more customers, more equipment and more obligations than the purchase price alone suggests.",
+    "description": "Connect and acquire neighboring utilities in a fictional Vermont power market. Compare purchase terms, network costs and supply obligations in Electrify.",
+    "setup": [
+      "Begin in 2005 running Champlain Electric, a fictional utility around Burlington. You can connect with neighbors and acquire another company, turning a local operation into a larger regional utility.",
+      "The deal brings a whole company with it. Supply contracts, debt, customers and network upkeep all affect what expansion costs. Upkeep rises later in your term, while power-purchase limits become tighter from 2017."
+    ],
+    "decisions": [
+      {
+        "title": "Read the company terms",
+        "body": "Compare the purchase price with inherited debt, equipment and supply contracts. A cheaper acquisition can leave the larger company with a harder job."
+      },
+      {
+        "title": "Check what a connection can carry",
+        "body": "Plan around the power you can actually move between areas. More generation in the portfolio does not automatically mean enough deliverable electricity everywhere."
+      },
+      {
+        "title": "Budget for the larger network",
+        "body": "Allow for upkeep and changing purchase limits over the full term. Expansion has to keep working after the acquisition is paid for."
+      }
+    ],
+    "takeaway": "Find out whether a bigger company gives you a stronger grid, or simply more grid to look after.",
+    "related": [106, 103, 118]
+  },
+  {
+    "scenarioId": 126,
+    "slug": "chernobyl-recovery",
+    "name": "Chernobyl: Recovery",
+    "location": "Kyiv, Ukrainian SSR",
+    "startingYear": 1986,
+    "durationYears": 5,
+    "theme": "Energy transition",
+    "icon": "/images/chernobyl-recovery.svg",
+    "dek": "March 1986. The disaster is one month away. Your task is to restore electricity service while paying for a damaged reactor that will never produce power again.",
+    "description": "Manage five years of electricity recovery after Chernobyl in Electrify. Restore service, fund cleanup and avoid bankruptcy in a regional recovery model.",
+    "setup": [
+      "The scenario begins in March 1986, with the site's four reactors operating alongside regional coal and oil support. The disaster takes all four reactors offline; the surviving units return at different times, while Unit 4 is permanently lost.",
+      "Your term runs through February 1991. This is a regional recovery model, with calibrated finances and support capacity rather than a reconstruction of the Soviet grid. Blackouts reduce your score without ending the run. Bankruptcy can still end it, and the damaged reactor carries an ongoing cleanup obligation."
+    ],
+    "decisions": [
+      {
+        "title": "Restore what service you can",
+        "body": "Use the remaining fleet and new construction to reduce shortages while surviving reactors are unavailable. There is room to continue after a blackout and improve."
+      },
+      {
+        "title": "Fund an obligation that remains",
+        "body": "Keep cleanup costs in your cash plan. The destroyed reactor cannot be sold to remove the liability, and restored generation does not make that expense disappear."
+      },
+      {
+        "title": "Review recovery beyond the score",
+        "body": "Track service, customer bills and emissions through the five-year term. The model's endpoint does not represent an end to the disaster's human or environmental consequences."
+      }
+    ],
+    "takeaway": "How much service can you restore while keeping the recovery effort financially viable?",
+    "related": [110, 113, 104]
+  },
+  {
+    "scenarioId": 117,
+    "slug": "legacy-first-light",
+    "name": "First Light (1882–1901)",
+    "location": "A fictional California utility",
+    "startingYear": 1882,
+    "durationYears": 20,
+    "theme": "Legacy campaign",
+    "icon": "/images/coal.svg",
+    "kind": "campaign",
+    "dek": "One small coal plant. One hundred customers. Start a utility in 1882 and leave the next generation a company worth inheriting.",
+    "description": "Begin Electrify's Legacy campaign in 1882. Build a small electric utility, cover operating costs and pass your company to the next generation.",
+    "setup": [
+      "First Light opens the Legacy campaign, a sequence of nine twenty-year terms running from 1882 to 2061. You begin with a small coal plant and a hundred customers in a fictional California utility.",
+      "Get electricity revenue to cover operating costs by the end of your fourth year, then prepare for growing demand. The company you build carries forward: later leaders inherit its equipment, customers and financial position."
+    ],
+    "decisions": [
+      {
+        "title": "Make the first customers pay their way",
+        "body": "Set a price that supports operation without losing the small community you serve. Early cash has several jobs and little room for waste."
+      },
+      {
+        "title": "Expand beyond the opening plant",
+        "body": "Watch demand growth and the arrival of a small hydro opportunity. Compare new construction with the coal bill you will otherwise keep paying."
+      },
+      {
+        "title": "Leave something useful behind",
+        "body": "Think past your own term. The next generation takes over the company you actually built, including its debts and aging equipment."
+      }
+    ],
+    "takeaway": "Start small, then see what nearly two centuries of decisions can grow from it.",
+    "related": [118, 119, 102]
+  },
+  {
+    "scenarioId": 118,
+    "slug": "legacy-beyond-the-dynamo",
+    "name": "Beyond the Dynamo (1902–1921)",
+    "location": "A fictional California utility",
+    "startingYear": 1902,
+    "durationYears": 20,
+    "theme": "Legacy campaign",
+    "icon": "/images/coal.svg",
+    "kind": "campaign",
+    "dek": "Electricity is becoming a bigger business. Grow the customer base without leaving your successor a pile of debt.",
+    "description": "Explore the 1902–1921 term of Electrify's Legacy campaign. Grow an inherited utility, finance expansion and prepare the company for its next handover.",
+    "setup": [
+      "Beyond the Dynamo is the second Legacy generation, reached by continuing the company founded in First Light. Your opening fleet and finances depend on the decisions made during that first term.",
+      "The goal now is growth. Reach more customers as electricity demand rises, while keeping end-of-term debt within the published allowance. Extra sales are useful only if the utility can afford the system needed to serve them."
+    ],
+    "decisions": [
+      {
+        "title": "Give new customers enough supply",
+        "body": "Plan construction alongside customer growth. Winning more accounts creates a new obligation to keep their electricity reliable."
+      },
+      {
+        "title": "Finance expansion carefully",
+        "body": "Weigh borrowing against the revenue new capacity can earn. The campaign checks the debt you leave at the end of your term."
+      },
+      {
+        "title": "Work with the inherited company",
+        "body": "Review existing plants before ordering replacements. Some early investments may still be useful; others will need a plan before the next handover."
+      }
+    ],
+    "takeaway": "Continue from First Light and decide what responsible growth looks like for your company.",
+    "related": [117, 119, 116]
+  },
+  {
+    "scenarioId": 119,
+    "slug": "legacy-affordable-growth",
+    "name": "Affordable Growth (1922–1941)",
+    "location": "A fictional California utility",
+    "startingYear": 1922,
+    "durationYears": 20,
+    "theme": "Legacy campaign",
+    "icon": "/images/coal.svg",
+    "kind": "campaign",
+    "dek": "The company has grown. Now keep electricity affordable as more people depend on it.",
+    "description": "Keep electricity affordable in the 1922–1941 Legacy campaign term. Balance an inherited utility's prices, construction plans and debt in Electrify.",
+    "setup": [
+      "This third Legacy term begins with the company handed down from Beyond the Dynamo. Its customers, aging plants and financial commitments remain yours to manage.",
+      "Demand continues to rise, but raising prices is not an unlimited source of construction money. Your featured objective sets an affordability goal for the end of the term, alongside the need to retain customers and manage debt."
+    ],
+    "decisions": [
+      {
+        "title": "Build with the bill in mind",
+        "body": "Compare projects by their operating costs as well as their price to build. Your customers will live with both."
+      },
+      {
+        "title": "Keep growth financially useful",
+        "body": "Match new capacity to the demand you expect. Borrowing for equipment that arrives too late or sits unused makes affordability harder."
+      },
+      {
+        "title": "Price for a lasting business",
+        "body": "Follow the term's published rate objective while keeping revenue sufficient to run the utility. A low bill and an insolvent company cannot last together."
+      }
+    ],
+    "takeaway": "Carry your company into its third generation and make growth something customers can afford.",
+    "related": [118, 120, 100]
+  },
+  {
+    "scenarioId": 120,
+    "slug": "legacy-everybody-plugs-in",
+    "name": "Everybody Plugs In (1942–1961)",
+    "location": "A fictional California utility",
+    "startingYear": 1942,
+    "durationYears": 20,
+    "theme": "Legacy campaign",
+    "icon": "/images/oil.svg",
+    "kind": "campaign",
+    "dek": "More homes and businesses need electricity. Build enough room for growth before a busy grid becomes a fragile one.",
+    "description": "Build reserves for growing electricity demand in Electrify's 1942–1961 Legacy term. Keep inherited customers supplied and expansion affordable.",
+    "setup": [
+      "The fourth Legacy generation inherits a utility shaped by sixty years of earlier choices. Demand rises during your term as more electricity use puts the existing fleet to work.",
+      "A featured checkpoint asks for spare capacity relative to the opening peak. Meeting it means thinking ahead: a plant commissioned after the checkpoint will not help, however useful it becomes later."
+    ],
+    "decisions": [
+      {
+        "title": "Build ahead of the busiest hours",
+        "body": "Watch the supply outlook as demand grows. Capacity that barely met the opening load may have little margin left when the checkpoint arrives."
+      },
+      {
+        "title": "Keep expansion affordable",
+        "body": "Balance the cost of extra reserve with the campaign's customer-bill and debt objectives. Readiness is part of the service your utility sells."
+      },
+      {
+        "title": "Prepare another handover",
+        "body": "Choose equipment with the next term in mind. New plants will age into your successor's fleet rather than disappear when your term ends."
+      }
+    ],
+    "takeaway": "Continue the campaign and build a company with room for the next wave of electricity demand.",
+    "related": [119, 121, 106]
+  },
+  {
+    "scenarioId": 121,
+    "slug": "legacy-the-power-you-dont-build",
+    "name": "The Power You Don't Build (1962–1981)",
+    "location": "A fictional California utility",
+    "startingYear": 1962,
+    "durationYears": 20,
+    "theme": "Legacy campaign",
+    "icon": "/images/oil.svg",
+    "kind": "campaign",
+    "dek": "The oil shocks are coming. Help homes and businesses use less electricity, and find out what that saves your utility.",
+    "description": "Guide an inherited utility through 1962–1981 in Electrify. Use efficiency to reduce demand as oil shocks test the Legacy campaign's fifth generation.",
+    "setup": [
+      "Your fifth Legacy term runs through the oil-price shocks of the 1970s. How exposed the company is depends on the fleet handed down by earlier generations.",
+      "The featured goal asks for electricity savings from efficiency in homes and businesses. Meeting demand can mean building more supply, but it can also mean reducing the amount customers need to use. Both choices have costs and timing to consider."
+    ],
+    "decisions": [
+      {
+        "title": "Compare savings with new supply",
+        "body": "Look at efficiency alongside generation projects. Electricity saved can reduce the fuel and capacity needed to serve the same customers."
+      },
+      {
+        "title": "Prepare for expensive oil",
+        "body": "Review the inherited fleet's fuel exposure before the shocks arrive. Decisions made in the quieter years shape the bills that follow."
+      },
+      {
+        "title": "Meet the term's goals together",
+        "body": "Track efficiency savings alongside customer retention, affordability and debt. A successful policy still has to fit the utility's finances."
+      }
+    ],
+    "takeaway": "Try meeting more of your customers' needs with less electricity to generate.",
+    "related": [120, 122, 105]
+  },
+  {
+    "scenarioId": 122,
+    "slug": "legacy-the-price-of-power",
+    "name": "The Price of Power (1982–2001)",
+    "location": "A fictional California utility",
+    "startingYear": 1982,
+    "durationYears": 20,
+    "theme": "Legacy campaign",
+    "icon": "/images/oil.svg",
+    "kind": "campaign",
+    "dek": "Imported power is part of the plan. When regional supply tightens, your company needs both electricity and cash to fall back on.",
+    "description": "Manage regional supply risk in the 1982–2001 Legacy campaign term. Prepare local backup and a cash reserve for constrained imports in Electrify.",
+    "setup": [
+      "The sixth generation inherits a century of utility decisions. This term runs from 1982 through 2001, with a regional import constraint near its end.",
+      "You need a cash buffer during the energy crisis as well as enough supply to serve customers. A strategy that works in ordinary trading conditions may leave too little flexibility when the region is short of power."
+    ],
+    "decisions": [
+      {
+        "title": "Know your reliance on imports",
+        "body": "Check the contribution of northern supply during the hours that matter. Prepare for the published constraint before it takes effect."
+      },
+      {
+        "title": "Keep money available",
+        "body": "Plan for the cash-reserve checkpoint as you choose projects. Useful equipment cannot substitute for money needed to cover operating costs."
+      },
+      {
+        "title": "Balance reserve with customer bills",
+        "body": "Compare local backup, connections and spending against affordability and debt limits. The company has to survive the crisis and the next handover."
+      }
+    ],
+    "takeaway": "Bring your inherited company through a term when access to power can no longer be taken for granted.",
+    "related": [121, 123, 111]
+  },
+  {
+    "scenarioId": 123,
+    "slug": "legacy-the-sun-moves-the-peak",
+    "name": "The Sun Moves the Peak (2002–2021)",
+    "location": "A fictional California utility",
+    "startingYear": 2002,
+    "durationYears": 20,
+    "theme": "Legacy campaign",
+    "icon": "/images/solar.svg",
+    "kind": "campaign",
+    "dek": "Solar can change the shape of your supply chart. The hard hours may be waiting on the other side of sunset.",
+    "description": "Serve evening demand as your utility gets cleaner in Electrify's 2002–2021 Legacy term. Plan around solar timing and a wildfire import restriction.",
+    "setup": [
+      "The seventh Legacy generation begins in 2002 with the company you have carried through six previous terms. Its inherited fleet may offer a useful foundation or a lot of unfinished work.",
+      "Your featured objective focuses on serving evening demand, alongside a cleaner electricity supply. A northern import restriction during July and August 2021 adds another reason to look closely at local supply and storage."
+    ],
+    "decisions": [
+      {
+        "title": "Follow the evening load",
+        "body": "Check supply after solar output falls. More daytime generation can help charge storage, but the evening still needs enough usable power."
+      },
+      {
+        "title": "Prepare for restricted imports",
+        "body": "Use the scenario's advance warning to plan for the late-term wildfire disruption. Do not assume the northern connection can always fill the gap."
+      },
+      {
+        "title": "Lower emissions without losing service",
+        "body": "Compare the emissions goal with reliability, bills and debt. A cleaner portfolio has to keep supplying the customers it serves."
+      }
+    ],
+    "takeaway": "Continue the campaign and build for the hours when a sunny day has already ended.",
+    "related": [122, 124, 101]
+  },
+  {
+    "scenarioId": 124,
+    "slug": "legacy-renew-the-grid",
+    "name": "Renew the Grid (2022–2041)",
+    "location": "A fictional California utility",
+    "startingYear": 2022,
+    "durationYears": 20,
+    "theme": "Legacy campaign",
+    "icon": "/images/solar.svg",
+    "kind": "campaign",
+    "dek": "More customers need electricity, and old oil equipment is losing its usefulness. Replace the legacy you no longer want to pass on.",
+    "description": "Renew an inherited utility in Electrify's 2022–2041 Legacy term. Retire old oil equipment, reduce emissions and build for rising electricity demand.",
+    "setup": [
+      "The eighth Legacy term begins in 2022 with everything earlier leaders left behind. Electricity demand rises, while oil equipment at least thirty years old loses output from 2030.",
+      "Your featured objective requires retiring oil equipment commissioned through 2000. What needs replacing depends on your own campaign history. You also need cleaner electricity, affordable bills and a manageable financial handover."
+    ],
+    "decisions": [
+      {
+        "title": "Inspect the inherited fleet",
+        "body": "Find the old oil equipment that falls within the retirement objective. A long-lived asset can remain on the books after it stops being useful."
+      },
+      {
+        "title": "Sequence retirement and replacement",
+        "body": "Give new capacity enough time to finish before removing old supply. Demand growth makes the replacement job larger than a simple swap."
+      },
+      {
+        "title": "Improve what comes next",
+        "body": "Keep emissions, customer bills and debt in view as you renew the fleet. Your successor inherits the consequences of this round of construction."
+      }
+    ],
+    "takeaway": "Decide which parts of your company's long history still belong in its future.",
+    "related": [123, 125, 102]
+  },
+  {
+    "scenarioId": 125,
+    "slug": "legacy-a-different-kind-of-growth",
+    "name": "A Different Kind of Growth (2042–2061)",
+    "location": "A fictional California utility",
+    "startingYear": 2042,
+    "durationYears": 20,
+    "theme": "Legacy campaign",
+    "icon": "/images/solar.svg",
+    "kind": "campaign",
+    "dek": "The final generation inherits nearly two centuries of decisions. Meet growing demand while keeping the whole term within a carbon budget.",
+    "description": "Finish Electrify's Legacy campaign in 2042–2061. Serve a growing utility while managing a cumulative carbon budget, affordability and inherited debt.",
+    "setup": [
+      "The ninth and final Legacy generation takes over in 2042. The company is the result of eight previous handovers, with the fleet, customers and financial position you carried through them.",
+      "Your featured objective is a cumulative emissions budget covering the whole twenty-year term. A clean final year cannot erase emissions from the years before it. Growing demand makes the timing of each investment part of that budget."
+    ],
+    "decisions": [
+      {
+        "title": "Spend the carbon budget over time",
+        "body": "Watch accumulated emissions as well as the current fuel mix. Earlier reductions leave more room for difficult periods later in the term."
+      },
+      {
+        "title": "Supply the next wave of demand",
+        "body": "Plan capacity and demand measures together as electricity use grows. Check that the cleaner fleet can serve customers across the full day."
+      },
+      {
+        "title": "Finish with a viable company",
+        "body": "Keep customer retention, affordability and debt alongside the climate objective. Two centuries of expansion end with a utility that still has people to serve."
+      }
+    ],
+    "takeaway": "Follow your company to 2061 and see what your long sequence of choices adds up to.",
+    "related": [124, 117, 100]
+  }
+]

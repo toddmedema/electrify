@@ -1,6 +1,18 @@
 // CRA 5 still configures the middleware hooks and HTTPS option removed in
 // webpack-dev-server 5. Keep CRA's start script, compiler messages and proxy handling while
 // translating only those retired options to their current equivalents.
+const { spawnSync } = require("node:child_process");
+const path = require("node:path");
+const site = spawnSync(
+  process.execPath,
+  [path.join(__dirname, "site/generate.js"), "--check"],
+  {
+    stdio: "inherit",
+  },
+);
+if (site.error) throw site.error;
+if (site.status !== 0) process.exit(site.status || 1);
+
 process.env.BABEL_ENV = "development";
 process.env.NODE_ENV = "development";
 process.env.REACT_APP_VERSION = require("./build-version").buildVersion();
