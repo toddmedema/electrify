@@ -2535,12 +2535,6 @@ $pane_header_height: 48px;
   aspect-ratio: 1;
   align-self: center;
   margin-bottom: 12px;
-
-  > img {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
 }
 
 .scenarioDossierCopy {
@@ -7032,11 +7026,6 @@ $programs_column: 800px;
   padding: 2px;
   border-radius: 50%;
   background: var(--font-color-primary);
-}
-
-// Let the tall rack rise above the circular badge without changing its round backing plate.
-.MuiAvatar-root:has(> .MuiAvatar-img[src$="/ai data center boom.svg"]) {
-  overflow: visible;
 }
 
 // Preserve the artwork's silhouette in every avatar, including the manual and catalogs.

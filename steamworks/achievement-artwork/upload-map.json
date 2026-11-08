@@ -229,7 +229,7 @@
     "name": "Ahead of the Boom",
     "description": "Successfully finish Data Center Boom on any difficulty.",
     "source": "public/images/ai data center boom.svg",
-    "sourceSha256": "a3a4a53ed33e0adf7038c09335127fe920bbbe0d7c7d98cedc3a4ec69e9f2992",
+    "sourceSha256": "0d8e47883e9a2a8956049d3c9f448335189963ee4138143f8b559abd67a55751",
     "achieved": "uploads/AHEAD_OF_THE_BOOM_ACHIEVED.png",
     "unachieved": "uploads/AHEAD_OF_THE_BOOM_UNACHIEVED.png"
   },

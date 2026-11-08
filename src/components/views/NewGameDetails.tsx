@@ -480,20 +480,11 @@ export default class NewGameDetails extends React.Component<Props, State> {
         <CoopBrowseBar coop={coop} />
         <div className="scrollable">
           <section className="scenarioDossier" aria-labelledby="scenario-title">
-            {scenario.icon === "ai data center boom" ? (
-              <span className="scenarioDossierIcon">
-                <img
-                  src={`/images/${scenario.icon.toLowerCase()}.svg`}
-                  alt={`${scenario.name} icon`}
-                />
-              </span>
-            ) : (
-              <img
-                className="scenarioDossierIcon"
-                src={`/images/${scenario.icon.toLowerCase()}.svg`}
-                alt={`${scenario.name} icon`}
-              />
-            )}
+            <img
+              className="scenarioDossierIcon"
+              src={`/images/${scenario.icon.toLowerCase()}.svg`}
+              alt={`${scenario.name} icon`}
+            />
             <div className="scenarioDossierCopy">
               <Typography
                 id="scenario-title"
