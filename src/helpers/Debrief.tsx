@@ -152,7 +152,8 @@ function scenarioMetrics(
                 (metric) =>
                   report.kind !== "deepFreeze" ||
                   (metric.id !== "maximumDeficitW" &&
-                    metric.id !== "cashStayedPositive"),
+                    metric.id !== "cashStayedPositive" &&
+                    metric.id !== "electricityRate"),
               )
               .map((metric) => ({
                 label: metric.label,

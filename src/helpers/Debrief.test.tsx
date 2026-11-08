@@ -212,10 +212,6 @@ it("surfaces the researched Uri outcome metrics", () => {
       label: "Demand not met during Winter Storm Uri",
       value: "100MWh",
     }),
-    expect.objectContaining({
-      label: "Billed rate · Jan 2021 → Mar 2021",
-      value: "9¢/kWh → 10¢/kWh",
-    }),
   ]);
 });
 
@@ -289,11 +285,6 @@ it("retains each native Uri observation when a run ends before recovery", () => 
       value: "100MWh",
       concept: "blackout",
     },
-    {
-      label: "Billed rate · Jan 2021 → Mar 2021",
-      value: "Not reached",
-      concept: "rate",
-    },
   ]);
   const unreached = buildVictoryDebrief(
     scenario,
@@ -302,13 +293,13 @@ it("retains each native Uri observation when a run ends before recovery", () => 
     [],
     [before],
   ).scenarioMetrics;
-  expect(unreached).toHaveLength(2);
+  expect(unreached).toHaveLength(1);
   expect(unreached!.every((metric) => metric.value === "Not reached")).toBe(
     true,
   );
 });
 
-it("derives native review dates from the resolved starting year", () => {
+it("reads Uri observations from the resolved starting year", () => {
   const scenario = {
     ...SCENARIOS.find((candidate) => candidate.id === 107)!,
     startingYear: 2037,
@@ -334,10 +325,5 @@ it("derives native review dates from the resolved starting year", () => {
     label: "Demand not met during Winter Storm Uri",
     value: "0Wh",
     concept: "blackout",
-  });
-  expect(metrics).toContainEqual({
-    label: "Billed rate · Jan 2041 → Mar 2041",
-    value: "9¢/kWh → 9¢/kWh",
-    concept: "rate",
   });
 });

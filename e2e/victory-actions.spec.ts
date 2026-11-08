@@ -400,7 +400,7 @@ for (const { theme, native, currentRank } of [
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`Uri victory shows actionable metrics and distinguishes billed from lifetime rates in ${theme}`, async ({
+  test(`Uri victory shows only the lifetime rate in ${theme}`, async ({
     page,
   }, info) => {
     await page.addInitScript((mode) => {
@@ -486,9 +486,11 @@ for (const theme of ["light", "dark"] as const) {
     const dialog = page.getByRole("dialog", { name: "After the thaw" });
     await expect(dialog).toBeVisible();
     const metrics = dialog.locator(".victoryMetric");
-    await expect(metrics).toHaveCount(7);
+    await expect(metrics).toHaveCount(6);
     await expect(
-      metrics.filter({ hasText: /tenure|Cash stayed above|Largest shortage/ }),
+      metrics.filter({
+        hasText: /tenure|Cash stayed above|Largest shortage|Billed rate/,
+      }),
     ).toHaveCount(0);
     const demand = metrics.filter({
       hasText: "Demand not met during Winter Storm Uri",
@@ -496,11 +498,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(demand.locator("span")).toHaveText(
       "Demand not met during Winter Storm Uri",
     );
-    await expect(
-      metrics
-        .filter({ hasText: "Billed rate · Jan 2021 → Mar 2021" })
-        .locator("strong"),
-    ).toHaveText("9.9¢/kWh → 9.9¢/kWh");
+    await expect(metrics.filter({ hasText: /rate/i })).toHaveCount(1);
     const lifetime = metrics.filter({
       hasText: "lifetime rate · 2017 dollars",
     });
