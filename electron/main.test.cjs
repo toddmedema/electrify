@@ -24,6 +24,7 @@ async function startup(
   const powerMonitor = new EventEmitter();
   const messages = [];
   const inputEnabled = [];
+  const stoppedIntervals = [];
   const appRoot = path.resolve(".tmp", "main-startup-app");
   const display = { workAreaSize: { width: 1920, height: 1080 } };
   let game;
@@ -50,7 +51,11 @@ async function startup(
         setWindowOpenHandler(handler) {
           this.openWindow = handler;
         },
-        send: (channel, value) => messages.push([channel, value]),
+        send: (channel, value) => {
+          if (this.destroyed)
+            throw new Error("Object has been destroyed: webContents.send");
+          messages.push([channel, value]);
+        },
       });
       calls.push({ kind: "construct", visible: this.visible });
       // A hidden macOS window does not confirm the constructor's fullscreen intent.
@@ -129,7 +134,9 @@ async function startup(
     getPath: () => path.join(appRoot, "profile"),
     requestSingleInstanceLock: () => true,
     whenReady: () => Promise.resolve(),
-    quit() {},
+    quit() {
+      calls.push({ kind: "quit" });
+    },
   });
   const ipcMain = Object.assign(new EventEmitter(), {
     handle: (channel, callback) => handlers.set(channel, callback),
@@ -238,7 +245,7 @@ async function startup(
       setTimeout,
       clearTimeout,
       setInterval: () => ({ unref() {} }),
-      clearInterval() {},
+      clearInterval: (timer) => stoppedIntervals.push(timer),
       console: {
         error: (...values) => {
           const message = values.map(String).join(" ");
@@ -263,6 +270,7 @@ async function startup(
     powerMonitor,
     messages,
     inputEnabled,
+    stoppedIntervals,
     writes,
     errors,
     nativeDialogs,
@@ -514,4 +522,27 @@ test("unaccepted couch play is disabled in the ordinary desktop runtime", async 
     request("desktop:couch", { kind: "open", seats: [] }),
     /development preview/,
   );
+});
+
+test("graceful solo quit finishes the main closed listener without publishing to destroyed web contents", async (t) => {
+  const f = await startup(t, {
+    preferences: { fullscreen: false, width: 1024, height: 768 },
+  });
+  f.game.emit("ready-to-show");
+  await f.shown;
+  await f.request("desktop:state");
+  assert.equal(
+    (await f.request("desktop:couch", { kind: "status" })).active,
+    false,
+  );
+  f.request("desktop:quit");
+  f.send("desktop:ready-to-quit", true);
+  await settle();
+  assert.equal(f.calls.filter(({ kind }) => kind === "quit").length, 1);
+  const delivered = f.messages.length;
+  assert.doesNotThrow(() => f.game.destroy());
+  assert.equal(f.game.isDestroyed(), true);
+  assert.equal(f.messages.length, delivered);
+  // The listener must continue past couch disposal to finish the other native cleanup.
+  assert.equal(f.stoppedIntervals.length, 1);
 });
