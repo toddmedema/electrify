@@ -4,6 +4,7 @@ import type { Command } from "./Types";
 import { isGameCommand } from "./Commands";
 
 interface Runtime {
+  foregroundMode?: "application";
   command: (command: Command) => void;
   submit: (command: Command) => Promise<void>;
   activity: (reason: string | null) => void;
@@ -12,9 +13,14 @@ interface Runtime {
 }
 let runtime: Runtime | undefined;
 export const multiplayerRuntime = () => runtime;
+/** Replace the command owner for this document and reset its foreground-pause baseline.
+ * Native seats use application focus so sibling-view visibility cannot pause their companies. */
 export function registerMultiplayerRuntime(value: Runtime | undefined) {
   runtime = value;
-  hidden = typeof document !== "undefined" && document.hidden;
+  hidden =
+    value?.foregroundMode !== "application" &&
+    typeof document !== "undefined" &&
+    document.hidden;
 }
 let openLobby: (() => void) | undefined;
 export const registerLobbyOpener = (open?: () => void) => {
@@ -68,8 +74,10 @@ export const multiplayerMiddleware: Middleware<object, AppStateType> =
       });
     if (name === "systemSuspend")
       runtime.command({ kind: "speed", speed: "PAUSED" });
-    if (name === "pageHidden") hidden = true;
-    if (name === "pageVisible") hidden = false;
+    if (runtime.foregroundMode !== "application") {
+      if (name === "pageHidden") hidden = true;
+      if (name === "pageVisible") hidden = false;
+    }
     const result = next(action);
     const state = api.getState();
     const reason = hidden

@@ -864,6 +864,7 @@ export class MultiplayerSession {
           }
           return;
         }
+        if (data.kind === "summary") return;
         if (data.kind === "keepalive") {
           for (const id of this.state.lobby.connected)
             if (id !== this.state.lobby.selfId)

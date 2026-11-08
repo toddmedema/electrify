@@ -7,7 +7,12 @@ import uiReducer, {
   dialogClose,
   setFacilityDragActive,
 } from "../reducers/UI";
-import { multiplayerSnapshot, systemSuspend } from "../reducers/GameActions";
+import {
+  multiplayerSnapshot,
+  systemSuspend,
+  pageHidden,
+  pageVisible,
+} from "../reducers/GameActions";
 import { multiplayerMiddleware, registerMultiplayerRuntime } from "./Registry";
 
 afterEach(() => {
@@ -16,7 +21,7 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-function fixture() {
+function fixture(applicationForeground = false) {
   jest.useFakeTimers();
   const initial = store.getState();
   const local = configureStore({
@@ -32,6 +37,9 @@ function fixture() {
       ),
   });
   const runtime = {
+    foregroundMode: applicationForeground
+      ? ("application" as const)
+      : undefined,
     command: jest.fn(),
     submit: jest.fn(),
     activity: jest.fn(),
@@ -107,4 +115,14 @@ test("system sleep submits a persistent shared pause instead of an automatic bac
     kind: "speed",
     speed: "PAUSED",
   });
+});
+
+test("isolated couch seats use the application's foreground gate instead of another seat's DOM focus", () => {
+  const { local, runtime } = fixture(true);
+  local.dispatch(pageHidden());
+  expect(runtime.activity).toHaveBeenLastCalledWith(null);
+  local.dispatch(navigate("BUILD_GENERATORS"));
+  expect(runtime.activity).toHaveBeenLastCalledWith("Building capacity");
+  local.dispatch(pageVisible());
+  expect(runtime.activity).toHaveBeenLastCalledWith("Building capacity");
 });

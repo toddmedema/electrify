@@ -695,7 +695,9 @@ test("controller hints follow the active device without blocking keyboard naviga
   await expect(hints).toHaveCount(0);
   await input(page, "down");
   await expect(hints).toBeVisible();
-  await expect(hints).toContainText("A");
+  await expect(
+    hints.getByRole("img", { name: "A", exact: true }),
+  ).toBeVisible();
   await expect(hints).toContainText("Select");
   await page.keyboard.press("ArrowDown");
   await expect(hints).toHaveCount(0);
@@ -1047,6 +1049,9 @@ test("TV controller help accepts pointer and physical keyboard activation", asyn
   await input(page, "down");
   await help.click();
   await expect(dialog).toBeVisible();
+  await expectControllerGlyphScale(
+    dialog.getByRole("img", { name: "A", exact: true }),
+  );
   await dialog
     .getByRole("button", { name: "Close controls", exact: true })
     .click();
@@ -1102,6 +1107,29 @@ async function captureTvPage(page: Page, info: TestInfo, name: string) {
       ),
       animations: "disabled",
     });
+}
+
+async function expectControllerGlyphScale(glyph: Locator) {
+  const sizes = await glyph.evaluate((element) => {
+    // Both sources describe the same binding: fallback SVGs must retain the
+    // readable size of native Steam images as TV and text scaling change.
+    const native = document.createElement("img");
+    native.className = "controllerGlyph";
+    native.alt = "";
+    element.after(native);
+    try {
+      const actual = element.getBoundingClientRect();
+      const expected = native.getBoundingClientRect();
+      return {
+        actual: { width: actual.width, height: actual.height },
+        expected: { width: expected.width, height: expected.height },
+      };
+    } finally {
+      native.remove();
+    }
+  });
+  expect(sizes.actual).toEqual(sizes.expected);
+  expect(sizes.actual.height).toBeGreaterThan(24);
 }
 
 test("TV saved preferences style direct scenario links before play", async ({
@@ -1697,6 +1725,11 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await expect(
       page.getByRole("dialog", { name: "Controller controls" }),
     ).toBeVisible();
+    await expectControllerGlyphScale(
+      page
+        .getByRole("dialog", { name: "Controller controls" })
+        .getByRole("img", { name: "A", exact: true }),
+    );
     await page.evaluate(
       (glyphs) =>
         window.dispatchEvent(

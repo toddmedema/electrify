@@ -1,0 +1,40 @@
+Kenney Input Prompts — SVG subset
+
+Source: https://kenney.nl/assets/input-prompts
+Guide: https://kenney.nl/knowledge-base/game-assets-2d/using-input-prompts
+Version: 1.5A
+
+Electrify embeds selected monochrome SVG paths in
+src/desktop/ControllerGlyphPaths.json. The paths retain their original
+64 × 64 coordinate system; the renderer replaces white fill with currentColor
+so the prompts follow the active light or dark theme. Directional D-pad prompts
+use the outline variants, which distinguish the pressed direction by shape.
+
+Upstream license:
+
+Input Prompts (1.5A)
+
+	Created/distributed by Kenney (www.kenney.nl)
+	Creation date: 11-07-2026
+
+			------------------------------
+
+	License: (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	You can use this content for personal, educational, and commercial purposes.
+
+	Support by crediting 'Kenney' or 'www.kenney.nl' (this is not a requirement)
+
+			------------------------------
+
+	• Website : www.kenney.nl
+	• Donate  : www.kenney.nl/donate
+
+	• Patreon : patreon.com/kenney
+
+	Follow on social media for updates:
+
+	• Twitter:	twitter.com/KenneyNL
+	• Instagram: 	instagram.com/kenney_nl
+	• Mastodon:	mastodon.gamedev.place/@kenney

@@ -153,7 +153,10 @@ test("controller journeys retain their own attempt report after leaving multipla
   );
   assert.equal(report.config.failOnFlakyTests, true);
   assert(report.suites.length > 0);
-  assert(report.suites.every(({ file }) => file === "steam-input.spec.ts"));
+  assert.deepEqual([...new Set(report.suites.map(({ file }) => file))].sort(), [
+    "couch.spec.ts",
+    "steam-input.spec.ts",
+  ]);
   assert.deepEqual(
     require("../check").steps.find(({ id }) => id === "steam-input").reports,
     ["results.json"],

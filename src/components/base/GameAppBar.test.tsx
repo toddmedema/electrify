@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { getTimeFromTimeline, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { TICK_MINUTES } from "../../Constants";
@@ -13,7 +14,7 @@ import { createAppTheme } from "../../Theme";
 import userEvent from "@testing-library/user-event";
 import { createGame } from "../../testing/Simulator";
 import { modScenario } from "../../mods/ModScenario";
-import { TickPresentFutureType } from "../../Types";
+import { SpeedType, TickPresentFutureType } from "../../Types";
 import {
   GameAppBar,
   getGridHealth,
@@ -75,6 +76,95 @@ afterEach(() => {
 });
 
 describe("GameAppBar", () => {
+  it.each<{ seat: string; selectedSpeed: SpeedType; selectedLabel: string }>([
+    { seat: "local-p1", selectedSpeed: "FAST", selectedLabel: "fast speed" },
+    {
+      seat: "local-p2",
+      selectedSpeed: "NORMAL",
+      selectedLabel: "normal speed",
+    },
+  ])(
+    "shows $seat's own speed controls beside company cash while common chrome stays in the shell",
+    ({ seat, selectedSpeed, selectedLabel }) => {
+      const previous = Object.getOwnPropertyDescriptor(
+        window,
+        "electrifyCouch",
+      );
+      Object.defineProperty(window, "electrifyCouch", {
+        configurable: true,
+        value: { role: "seat" },
+      });
+      try {
+        const game = createGame({ scenarioId: 101 });
+        game.inGame = true;
+        game.speed = "SLOW";
+        game.multiplayer = {
+          seat,
+          clock: {
+            activeSpeed: "SLOW",
+            selectedSpeed,
+            reason: "",
+            readyRequired: false,
+            ready: false,
+            players: [
+              { id: "local-p1", name: "North Power", selectedSpeed: "FAST" },
+              { id: "local-p2", name: "South Power", selectedSpeed: "NORMAL" },
+            ],
+          },
+        };
+        const onSpeedChange = jest.fn();
+        renderAppBar({ game, onSpeedChange });
+        expect(
+          screen.getByText(
+            formatMoneyStable(
+              getTimeFromTimeline(game.date.minute, game.timeline)!.cash,
+            ),
+          ),
+        ).toBeVisible();
+        expect(
+          screen.getByRole("button", {
+            name: /Current grid status:|Open the Reserve manual entry/,
+          }),
+        ).toBeVisible();
+        expect(screen.queryByRole("button", { name: "menu" })).toBeNull();
+        expect(screen.queryByLabelText("Mission progress")).toBeNull();
+        expect(screen.queryByRole("progressbar")).toBeNull();
+        const speeds = screen.getByRole("group", { name: "your game speed" });
+        expect(within(speeds).getAllByRole("button")).toHaveLength(5);
+        expect(
+          within(speeds).getByRole("button", { name: selectedLabel }),
+        ).toHaveAttribute("aria-pressed", "true");
+        expect(
+          within(speeds).getByRole("button", { name: "slow speed" }),
+        ).toHaveAttribute("aria-current", "true");
+        fireEvent.click(
+          within(speeds).getByRole("button", { name: "fast speed" }),
+        );
+        expect(onSpeedChange).toHaveBeenCalledWith("FAST");
+      } finally {
+        if (previous) Object.defineProperty(window, "electrifyCouch", previous);
+        else delete window.electrifyCouch;
+      }
+    },
+  );
+
+  it("disables speed changes after this company's multiplayer run ends", () => {
+    const game = createGame({ scenarioId: 101 });
+    game.inGame = true;
+    game.multiplayer = {
+      seat: "local-p1",
+      ending: { outcome: "bankrupt", title: "Bankrupt", month: 1 },
+    };
+    const onSpeedChange = jest.fn();
+    renderAppBar({ game, onSpeedChange });
+    const speeds = screen.getByRole("group", { name: "game speed" });
+    for (const button of within(speeds).getAllByRole("button")) {
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+    }
+    expect(onSpeedChange).not.toHaveBeenCalled();
+  });
+
   it.each([1, -1, 0])(
     "shows the current month profit forecast beside cash on desktop (%s)",
     (sign) => {

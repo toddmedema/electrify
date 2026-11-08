@@ -4,11 +4,13 @@ import PauseIcon from "@mui/icons-material/Pause";
 import PersonIcon from "@mui/icons-material/Person";
 import { TICK_MS } from "../../Constants";
 import { GameType, SpeedType } from "../../Types";
+import "./SpeedControls.scss";
 
 export interface SpeedOptionsProps {
   speed: SpeedType;
   onSpeedChange: (speed: SpeedType) => void;
   desktop: boolean;
+  disabled?: boolean;
   multiplayer?: MultiplayerSpeedOptionsProps;
 }
 
@@ -91,8 +93,10 @@ function playersAtSpeed(
   return `${selectionLabel(option)}: ${names.length ? names.join(", ") : "nobody"}`;
 }
 
+/** Keep a player's requested selection distinct from the clock's effective running speed.
+ * Shared-clock reselections are emitted too, preserving quick reversals and explicit readiness. */
 function speedOptions(
-  { speed, onSpeedChange, desktop, multiplayer }: SpeedOptionsProps,
+  { speed, onSpeedChange, desktop, multiplayer, disabled }: SpeedOptionsProps,
   descriptionId?: string,
 ): React.JSX.Element {
   const resume = !!multiplayer?.readyRequired && !multiplayer.ready;
@@ -106,6 +110,7 @@ function speedOptions(
           multiplayer ? "speedToggles multiplayerSpeedToggles" : "speedToggles"
         }
         exclusive
+        disabled={disabled}
         size="small"
         value={speed}
         onChange={(_event, next: SpeedType | null) => {

@@ -114,7 +114,33 @@ export function startDesktopInput(
         present({ active: false, connected: false, glyphs: {} });
       });
   };
+  /** Change the owning seat's requested speed, preserving its last running choice and ready-up intent.
+   * Solo input activates only the speed buttons available in the current layout. */
   const speed = (action: "pause" | "speedUp" | "speedDown") => {
+    if (window.electrifyCouch?.role === "seat") {
+      const clock = store.getState().game.multiplayer?.clock;
+      const speeds = ["PAUSED", "SLOW", "NORMAL", "FAST", "ULTRA"] as const;
+      const selected = clock?.selectedSpeed ?? "PAUSED";
+      if (selected !== "PAUSED") runningSpeed = selected;
+      const index = Math.max(0, speeds.indexOf(selected));
+      const next =
+        action === "pause"
+          ? selected === "PAUSED" || (clock?.readyRequired && !clock.ready)
+            ? (speeds.find((value) => value === runningSpeed) ?? "NORMAL")
+            : "PAUSED"
+          : speeds[
+              Math.max(
+                0,
+                Math.min(
+                  speeds.length - 1,
+                  index + (action === "speedUp" ? 1 : -1),
+                ),
+              )
+            ];
+      releasePause();
+      store.dispatch(setSpeed(next));
+      return;
+    }
     const buttons = speedButtons();
     if (!buttons.length) return;
     const selected = buttons.find(
@@ -208,9 +234,25 @@ export function startDesktopInput(
     charts[next].focus();
     revealControl(charts[next]);
   };
+  /** Apply controller intent to real focused controls in this document's current input scope.
+   * Couch menu actions cross the authenticated shell route; company tool actions remain local. */
   const act = (action: DesktopInputAction) => {
     const scope = inputScope();
-    if (["up", "down", "left", "right"].includes(action)) {
+    if (action === "menu" || action === "menuAlt") {
+      if (window.electrifyCouch?.role === "seat")
+        window.electrifyCouch.post({
+          kind: "global-menu",
+          requestId: crypto.randomUUID(),
+        });
+      else if (document.querySelector("[data-couch-shell]"))
+        window.dispatchEvent(new CustomEvent("electrify:couch-menu"));
+      else {
+        if (action === "menu" && context === "Gameplay") speed("pause");
+        else act("back");
+        return;
+      }
+      feedback("confirm");
+    } else if (["up", "down", "left", "right"].includes(action)) {
       const textControl = focusedTextControl();
       moveInputFocus(action as "up" | "down" | "left" | "right");
       choosingTextOption =
@@ -272,13 +314,19 @@ export function startDesktopInput(
       const blocked = overlay(scope);
       const cardBefore = store.getState().card;
       if (!backInput() && !blocked && store.getState().card === cardBefore) {
-        if (gameplay())
-          document
-            .querySelector<HTMLElement>(
-              ".base_main:not([inert]) .gameMenuButton",
-            )
-            ?.click();
-        else
+        if (gameplay()) {
+          if (window.electrifyCouch?.role === "seat")
+            window.electrifyCouch.post({
+              kind: "global-menu",
+              requestId: crypto.randomUUID(),
+            });
+          else
+            document
+              .querySelector<HTMLElement>(
+                ".base_main:not([inert]) .gameMenuButton",
+              )
+              ?.click();
+        } else
           controls()
             .find((button) => button.getAttribute("aria-label") === "Back")
             ?.click();
@@ -304,7 +352,7 @@ export function startDesktopInput(
       !ready ||
       editingText ||
       !foreground ||
-      document.visibilityState === "hidden" ||
+      (!window.electrifyCouch && document.visibilityState === "hidden") ||
       store.getState().saves.transitioning ||
       !frame.connected ||
       !frame.actions.length

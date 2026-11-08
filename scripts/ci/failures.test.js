@@ -225,6 +225,7 @@ test("simulation and all desktop-renderer failures select their actual local gat
       "src/testing/GoldenOutputs.sim.test.tsx",
       "e2e/mods.spec.ts:183:5 › desktop keyboard journey",
       "e2e/steam-input.spec.ts:200:5 › controller input",
+      "e2e/couch.spec.ts:12:5 › independent local companies",
     ]),
     [
       "npm run check -- --steps simulations",

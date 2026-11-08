@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld(
   "electrifyDesktop",
   Object.freeze({
     apiVersion: 1,
+    couchRequest: (input) => ipcRenderer.invoke("desktop:couch", input),
+    onCouchEvent: (callback) => subscribe("desktop:couch-event", callback),
     mods: (input) => ipcRenderer.invoke("desktop:mods", input),
     getState: () => ipcRenderer.invoke("desktop:state"),
     setDisplay: (display) => ipcRenderer.invoke("desktop:display", display),

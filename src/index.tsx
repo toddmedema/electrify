@@ -86,7 +86,37 @@ const startDesktop: () => Promise<void> =
       }
     : async () => {};
 const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
-if (desktopApp) void startDesktop();
+if (
+  process.env.REACT_APP_DESKTOP === "true" &&
+  window.electrifyCouch?.role === "seat"
+) {
+  void Promise.all([
+    window.electrifyCouch.ready(),
+    import(/* webpackChunkName: "couch-seat" */ "./couch/Seat"),
+  ])
+    .then(([, { default: Seat }]) => {
+      root.render(
+        <Provider store={store}>
+          <Seat />
+          <StartupHandoff />
+        </Provider>,
+      );
+    })
+    .catch(() => {
+      document.getElementById("appStartup")?.remove();
+      root.render(
+        <div role="alert" style={{ padding: 24 }}>
+          <p>This company could not finish loading.</p>
+          <button
+            style={{ minHeight: 44, padding: "8px 16px", font: "inherit" }}
+            onClick={() => window.location.reload()}
+          >
+            Reload this company
+          </button>
+        </div>,
+      );
+    });
+} else if (desktopApp) void startDesktop();
 else {
   const startWeb = () => {
     void prepareAchievements()
