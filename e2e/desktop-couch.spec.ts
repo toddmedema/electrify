@@ -25,6 +25,16 @@ type Backdrop = {
   }[];
 };
 
+type InputPhase =
+  "baseline" | "overlayVisible" | "overlayHidden" | "afterClear";
+type InputProbe = Record<InputPhase, { keyboard: number; mouse: number }>;
+const inputMarkers = {
+  baseline: { keyCode: "K", mouseModifier: undefined },
+  overlayVisible: { keyCode: "O", mouseModifier: "alt" },
+  overlayHidden: { keyCode: "L", mouseModifier: "control" },
+  afterClear: { keyCode: "Z", mouseModifier: "shift" },
+} as const;
+
 async function seatPage(seatId: string): Promise<Page> {
   let found: Page | undefined;
   await expect
@@ -173,62 +183,79 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
   // The shell cannot paint over native child views. Its menu backdrop must be
   // captured from the actual paused pages and painted before those views hide.
   for (const page of [p1, p2])
-    await page.evaluate(() => {
-      const probe = globalThis as unknown as {
-        couchInputProbe: { keyboard: number; mouse: number };
+    await page.evaluate((markers) => {
+      const probe = globalThis as unknown as { couchInputProbe: InputProbe };
+      probe.couchInputProbe = {
+        baseline: { keyboard: 0, mouse: 0 },
+        overlayVisible: { keyboard: 0, mouse: 0 },
+        overlayHidden: { keyboard: 0, mouse: 0 },
+        afterClear: { keyboard: 0, mouse: 0 },
       };
-      probe.couchInputProbe = { keyboard: 0, mouse: 0 };
       window.addEventListener(
         "keydown",
-        () => probe.couchInputProbe.keyboard++,
+        (event) => {
+          const phase = Object.entries(markers).find(
+            ([, marker]) => marker.keyCode === event.key.toUpperCase(),
+          )?.[0] as InputPhase | undefined;
+          if (phase) probe.couchInputProbe[phase].keyboard++;
+        },
         true,
       );
       window.addEventListener(
         "mousedown",
-        () => probe.couchInputProbe.mouse++,
+        (event) => {
+          const modifier = event.altKey
+            ? "alt"
+            : event.ctrlKey
+              ? "control"
+              : event.shiftKey
+                ? "shift"
+                : undefined;
+          const phase = Object.entries(markers).find(
+            ([, marker]) => marker.mouseModifier === modifier,
+          )?.[0] as InputPhase | undefined;
+          if (phase) probe.couchInputProbe[phase].mouse++;
+        },
         true,
       );
-    });
-  const sendNativeInput = (id: number) =>
-    desktop.app.evaluate(({ webContents }, targetId) => {
-      const contents = webContents.fromId(targetId)!;
-      contents.focus();
-      contents.sendInputEvent({ type: "keyDown", keyCode: "K" });
-      contents.sendInputEvent({ type: "keyUp", keyCode: "K" });
-      contents.sendInputEvent({
-        type: "mouseDown",
-        x: 24,
-        y: 24,
-        button: "left",
-        clickCount: 1,
-      });
-      contents.sendInputEvent({
-        type: "mouseUp",
-        x: 24,
-        y: 24,
-        button: "left",
-        clickCount: 1,
-      });
-    }, id);
+    }, inputMarkers);
+  const sendNativeInput = (id: number, phase: InputPhase) =>
+    desktop.app.evaluate(
+      ({ webContents }, { targetId, marker }) => {
+        const contents = webContents.fromId(targetId)!;
+        const modifiers = marker.mouseModifier ? [marker.mouseModifier] : [];
+        contents.focus();
+        contents.sendInputEvent({ type: "keyDown", keyCode: marker.keyCode });
+        contents.sendInputEvent({ type: "keyUp", keyCode: marker.keyCode });
+        contents.sendInputEvent({
+          type: "mouseDown",
+          x: 24,
+          y: 24,
+          button: "left",
+          clickCount: 1,
+          modifiers,
+        });
+        contents.sendInputEvent({
+          type: "mouseUp",
+          x: 24,
+          y: 24,
+          button: "left",
+          clickCount: 1,
+          modifiers,
+        });
+      },
+      { targetId: id, marker: inputMarkers[phase] },
+    );
   const inputProbe = (page: Page) =>
     page.evaluate(
       () =>
-        (
-          globalThis as unknown as {
-            couchInputProbe: { keyboard: number; mouse: number };
-          }
-        ).couchInputProbe,
+        (globalThis as unknown as { couchInputProbe: InputProbe })
+          .couchInputProbe,
     );
-  await sendNativeInput(native.seats[0].id);
-  await expect.poll(() => inputProbe(p1)).toEqual({ keyboard: 1, mouse: 1 });
-  for (const page of [p1, p2])
-    await page.evaluate(() => {
-      (globalThis as unknown as { couchInputProbe: unknown }).couchInputProbe =
-        {
-          keyboard: 0,
-          mouse: 0,
-        };
-    });
+  await sendNativeInput(native.seats[0].id, "baseline");
+  await expect
+    .poll(async () => (await inputProbe(p1)).baseline)
+    .toEqual({ keyboard: 1, mouse: 1 });
   const initialOverlay = await desktop.page.evaluate(
     async () =>
       (await window.electrifyDesktop!.couchRequest!({
@@ -289,11 +316,10 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
         .map((view) => view.getVisible());
     });
   expect(await nativeVisibility()).toEqual([true, true]);
-  for (const seat of native.seats) await sendNativeInput(seat.id);
-  for (const page of [p1, p2])
-    await expect
-      .poll(() => inputProbe(page))
-      .toEqual({ keyboard: 0, mouse: 0 });
+  // Keep the visible-view attempt distinct from later hidden-view input and
+  // post-clear receipts, so delayed leaks cannot count as successful sentinels.
+  for (const seat of native.seats)
+    await sendNativeInput(seat.id, "overlayVisible");
   expect(
     await desktop.page.evaluate(
       ({ version, captureId }) =>
@@ -318,6 +344,8 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
     ),
   ).toBe(true);
   expect(await nativeVisibility()).toEqual([false, false]);
+  for (const seat of native.seats)
+    await sendNativeInput(seat.id, "overlayHidden");
   await desktop.page.evaluate(() =>
     window.electrifyDesktop!.couchRequest!({ kind: "refresh-overlay" }),
   );
@@ -334,8 +362,19 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
     window.electrifyDesktop!.couchRequest!({ kind: "overlay", seatId: null }),
   );
   expect(await nativeVisibility()).toEqual([true, true]);
-  await sendNativeInput(native.seats[0].id);
-  await expect.poll(() => inputProbe(p1)).toEqual({ keyboard: 1, mouse: 1 });
+  // Both event pipelines on both seats must deliver a later marker before any
+  // negative assertion. Wait for each focused seat before focusing its sibling.
+  for (const [index, page] of [p1, p2].entries()) {
+    await sendNativeInput(native.seats[index].id, "afterClear");
+    await expect
+      .poll(async () => (await inputProbe(page)).afterClear)
+      .toEqual({ keyboard: 1, mouse: 1 });
+  }
+  for (const page of [p1, p2]) {
+    const probe = await inputProbe(page);
+    expect(probe.overlayVisible).toEqual({ keyboard: 0, mouse: 0 });
+    expect(probe.overlayHidden).toEqual({ keyboard: 0, mouse: 0 });
+  }
   await p1.evaluate(() => window.electrifyCouch!.post({ kind: "heartbeat" }));
   await expect
     .poll(() =>
