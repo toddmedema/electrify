@@ -94,6 +94,65 @@ it("interprets mod debriefs from completed facts and marks a missing-history nei
   );
 });
 
+it("retains authored deep-freeze debrief observations after all three months complete", () => {
+  const scenario = modScenario({
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "freeze-debrief-fixture",
+    title: "Freeze debrief",
+    creator: "Creator",
+    version: "1",
+    description: "Recorded freeze results.",
+    baseScenarioId: 999,
+    seed: 42,
+    officialArcs: [],
+    scenario: { startingCustomers: 10000, cash: 1e9, durationMonths: 6 },
+    objectives: [],
+    events: [],
+    debriefReports: [
+      { id: "freeze", kind: "deepFreeze", fromMonth: 1, throughMonth: 3 },
+    ],
+  });
+  const game = createGame({
+    scenarioId: 999,
+    scenario,
+    seed: 42,
+    weatherHazardsEnabled: false,
+  });
+  while (game.date.monthsElapsed < 3) tickState(game);
+  const months = game.monthlyHistory;
+  expect(months).toHaveLength(3);
+  const metrics = buildVictoryDebrief(
+    scenario,
+    summarizeHistory(months),
+    game.facilities,
+    [],
+    months,
+    game.dollarsPerkWh,
+    game.worldEvents.occurrences,
+  ).scenarioMetrics;
+  expect(metrics).toEqual(
+    expect.arrayContaining([
+      {
+        label: "Largest shortage during the freeze",
+        value: expect.stringMatching(/W$/),
+        concept: "supply",
+      },
+      {
+        label: "Electricity rate · before → after",
+        value: expect.stringMatching(/¢\/kWh → .*¢\/kWh$/),
+        concept: "rate",
+      },
+      {
+        label: "Cash stayed above $0 through the recovery month",
+        value: "Yes",
+        concept: "money",
+      },
+    ]),
+  );
+  expect(metrics).toHaveLength(4);
+});
+
 it("captures a plain then-versus-now story and the latest meaningful beats", () => {
   const scenario = SCENARIOS.find((candidate) => candidate.id === 100)!;
   const events = [

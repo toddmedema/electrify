@@ -150,6 +150,7 @@ function scenarioMetrics(
           ? result.metrics
               .filter(
                 (metric) =>
+                  rules.namespace.kind !== "official" ||
                   report.kind !== "deepFreeze" ||
                   (metric.id !== "maximumDeficitW" &&
                     metric.id !== "cashStayedPositive" &&
