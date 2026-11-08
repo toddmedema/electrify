@@ -463,7 +463,10 @@ class CouchViews {
         wc.on("focus", () => {
           if (this.overlayOwner) this.window.webContents.focus();
         });
-        wc.on("render-process-gone", () => this.lost(seat, "renderer-crash"));
+        wc.on("render-process-gone", () => {
+          if (this.seats.get(seat.id) !== seat) return;
+          this.lost(seat, "renderer-crash");
+        });
         wc.on("did-start-loading", () => {
           if (seat.port) this.lost(seat, "renderer-reload");
         });

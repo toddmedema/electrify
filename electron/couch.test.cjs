@@ -771,3 +771,32 @@ test("intentional teardown retires seat routes before synchronous native exit ca
   assert.ok(views.every((view) => view.closed));
   assert.equal(events.filter((event) => event.kind === "seat-lost").length, 0);
 });
+
+test("renderer crashes ignore removed and replaced seats while current seats still report loss", async () => {
+  const { manager, events } = fixture();
+  await manager.open({ seats });
+  const removed = manager.seats.get("local-p1");
+  manager.close();
+  const afterClose = events.length;
+  removed.view.webContents.emit("render-process-gone");
+  assert.equal(events.length, afterClose);
+  await manager.open({ seats });
+  const current = manager.seats.get("local-p1");
+  const generation = current.generation;
+  const port = current.port;
+  const beforeCrash = events.length;
+  removed.view.webContents.emit("render-process-gone");
+  assert.equal(events.length, beforeCrash);
+  assert.equal(current.generation, generation);
+  assert.equal(current.port, port);
+  current.view.webContents.emit("render-process-gone");
+  assert.equal(current.port, undefined);
+  assert.ok(current.generation > generation);
+  assert.deepEqual(events.at(-1), {
+    kind: "seat-lost",
+    seatId: "local-p1",
+    generation,
+    reason: "renderer-crash",
+  });
+  manager.close();
+});
