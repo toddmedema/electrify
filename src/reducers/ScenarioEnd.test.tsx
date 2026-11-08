@@ -113,11 +113,9 @@ describe("ending a scenario from inside the reducer", () => {
     expect(victory?.scenarioName).toBe("A Test Run");
     expect(state.meaningfulDecisions).toEqual([]);
     expect(victory?.outcome).toBe("completed");
-    expect(victory?.debrief?.scenarioMetrics).toContainEqual({
-      concept: "time",
-      label: "tenure",
-      value: "2 months",
-    });
+    expect(victory?.debrief?.scenarioMetrics).not.toContainEqual(
+      expect.objectContaining({ label: "tenure" }),
+    );
     expect(Object.keys(victory?.breakdown || {}).length).toBeGreaterThan(0);
     expect(victory?.debrief).toEqual(
       expect.objectContaining({
@@ -133,18 +131,23 @@ describe("ending a scenario from inside the reducer", () => {
     expect(getStore().getState().game.speed).toBe("PAUSED");
   });
 
-  it("reports only playable months in a term that opens after January", () => {
+  it("shows the public lifetime rate in cents with its starting-dollar basis", () => {
     getStore().dispatch(quit());
-    const scenario = customScenario({ durationMonths: 2, startingMonth: 3 });
+    const scenario = customScenario({
+      durationMonths: 2,
+      startingMonth: 3,
+      ownership: "Public",
+      dollarsPerkWh: 0.099,
+    });
     let state = createGame({ scenarioId: CUSTOM_SCENARIO_ID, scenario });
     while (state.date.monthsElapsed < 4) state = tick(state);
     jest.runOnlyPendingTimers();
     expect(
       getStore().getState().ui.victory?.debrief?.scenarioMetrics,
     ).toContainEqual({
-      concept: "time",
-      label: "tenure",
-      value: "2 months",
+      concept: "money",
+      label: `lifetime rate · ${state.startingYear} dollars`,
+      value: "9.9¢/kWh",
     });
   });
 

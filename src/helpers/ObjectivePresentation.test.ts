@@ -228,7 +228,7 @@ it.each<[CompiledRuleObjective, number, string]>([
       maxDollarsPerKWh: 0.123456789,
     },
     0.123456789,
-    "$0.123/kWh",
+    "12.3¢/kWh",
   ],
   [
     {

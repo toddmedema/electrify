@@ -1,4 +1,4 @@
-import { formatNumber, getWattUnit } from "./Format";
+import { formatNumber, formatRateCompact, getWattUnit } from "./Format";
 import { roundToSignificantDigits } from "./Math";
 import type { CompiledRuleObjective } from "../data/ScenarioRules";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
@@ -50,7 +50,7 @@ function objectiveAmountText(
     case "emissionsPerDeliveredMWh":
       return `${number(value)} kg CO₂e/MWh`;
     case "monthlyBilledRate":
-      return `$${number(value)}/kWh`;
+      return `${formatRateCompact(value)}/kWh`;
     case "monthEndDebt":
       return `$${number(value)}`;
     case "utilityOwnership":
