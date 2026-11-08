@@ -1443,13 +1443,12 @@ export default class Insights extends React.Component<Props, State> {
     const full = rangesEqual(bounds, range);
     const scenarioRange = clampChartViewport(
       bounds,
-      [
-        0,
-        Math.min(
-          scenarioEndMinute(this.props.game) ?? Infinity,
-          20 * 12 * MINUTES_PER_MONTH,
-        ),
-      ],
+      [0, scenarioEndMinute(this.props.game) ?? 20 * 12 * MINUTES_PER_MONTH],
+      minSpan,
+    );
+    const fullTimelineRange = clampChartViewport(
+      bounds,
+      [0, Math.min(scenarioRange[1], 20 * 12 * MINUTES_PER_MONTH)],
       minSpan,
     );
     const span = range[1] - range[0];
@@ -1512,8 +1511,8 @@ export default class Insights extends React.Component<Props, State> {
           {iconButton(
             "Fit full timeline",
             <FitScreenIcon />,
-            rangesEqual(scenarioRange, range),
-            () => setRange(scenarioRange),
+            rangesEqual(fullTimelineRange, range),
+            () => setRange(fullTimelineRange),
           )}
           {iconButton("Zoom in", <ZoomInIcon />, span <= minSpan, () =>
             setRange(

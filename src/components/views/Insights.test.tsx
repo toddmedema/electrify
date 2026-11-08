@@ -1168,6 +1168,7 @@ describe("Insights layers", () => {
           durationMonths,
         },
       });
+      expect(labelledButton("Zoom out")).toBeDisabled();
       await user.click(labelledButton("Zoom in"));
       await user.click(labelledButton("Fit full timeline"));
       expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(

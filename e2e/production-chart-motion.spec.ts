@@ -64,10 +64,11 @@ async function start(page: Page, theme: string, textSize = "standard") {
     };
     const drawImage = CanvasRenderingContext2D.prototype.drawImage;
     CanvasRenderingContext2D.prototype.drawImage = function (
-      ...args: Parameters<typeof drawImage>
+      ...args: [CanvasImageSource, number, number, ...number[]]
     ) {
       const [source, , sourceY, , , x, y, width] = args;
       if (
+        args.length === 9 &&
         this.canvas.matches("#chartSupplyDemand .u-wrap > canvas") &&
         source instanceof HTMLCanvasElement &&
         sourceY === 0 &&
@@ -77,7 +78,7 @@ async function start(page: Page, theme: string, textSize = "standard") {
         // The cached solid stroke is clipped at the historic/forecast boundary.
         probe.boundary = (x + width) / devicePixelRatio;
       }
-      return drawImage.apply(this, args);
+      return Reflect.apply(drawImage, this, args);
     };
     const observe = () => {
       const marker = document.querySelector<HTMLElement>(
@@ -163,6 +164,8 @@ test("1x smoothly advances Now with stationary curves, then snaps for inspection
   expect(motion.canvasDraws).toBeLessThanOrEqual(5);
   expect(await canvas.boundingBox()).toEqual(bounds);
   if (process.env.REVIEW_SCREENSHOT_DIR) {
+    // Capture the midpoint so the guide visibly leads the historic boundary.
+    await page.clock.runFor(100);
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({
       path: path.join(
