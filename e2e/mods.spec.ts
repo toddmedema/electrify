@@ -1076,7 +1076,7 @@ for (const [theme, requiredBills] of [
       "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
     );
     await expect(rules).toContainText(
-      "Bills ≤$0/kWh each month · Jan–Feb 2020",
+      "Bills ≤0¢/kWh each month · Jan–Feb 2020",
     );
     await expect(rules).not.toContainText(
       /Recorded:|months completed|Not started/,
@@ -1101,7 +1101,7 @@ for (const [theme, requiredBills] of [
         /months completed|At least one completed month/,
       );
       await expect(rules).toContainText(
-        "Bills ≤$0/kWh each month · Jan–Feb 2020",
+        "Bills ≤0¢/kWh each month · Jan–Feb 2020",
       );
       await expect(rules.getByText("Optional", { exact: true })).toBeVisible();
       await expect(
@@ -1116,7 +1116,7 @@ for (const [theme, requiredBills] of [
       await scrollEvidenceIntoView(goal);
       await expect(goal).toBeInViewport({ ratio: 1 });
       await expect(
-        rules.getByText("Bills ≤$0/kWh each month · Jan–Feb 2020", {
+        rules.getByText("Bills ≤0¢/kWh each month · Jan–Feb 2020", {
           exact: true,
         }),
       ).toBeInViewport({ ratio: 1 });
