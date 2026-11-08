@@ -238,6 +238,7 @@ class CouchViews {
     return {
       available: !!this.input()?.initialized,
       devices: this.devices,
+      bindings: Object.fromEntries(this.bindings),
       active: this.active(),
       haptics: {
         supported: false,

@@ -3,7 +3,7 @@ import type { DesktopInputAction, DesktopInputFrame } from "../src/Desktop";
 import type { World } from "../src/multiplayer/Types";
 
 type Device = DesktopInputFrame & { id: string };
-const devices: Device[] = ["101", "202"].map((id) => ({
+const defaultDevices: Device[] = ["101", "202"].map((id) => ({
   id,
   connected: true,
   actions: [],
@@ -36,6 +36,20 @@ interface CouchLayout {
 }
 export interface CouchFixture<Actor extends Page | Frame> {
   seats: Map<string, { page: Actor; generation: number }>;
+  failNextNativeReload: (seatId: string) => void;
+  settledNativeRequests: (kind: string) => Promise<number>;
+  nativeEvidence: () => {
+    topology: Record<string, { generation: number; hasPort: boolean }>;
+    errors: readonly string[];
+    calls: { bind: number; status: number; inputFrame: number };
+  };
+  nativeBindings: () => Record<string, string>;
+  bindAttempts: () => readonly { seatId: string; controllerId: string }[];
+  setConnected: (connections: Record<string, boolean>) => Promise<void>;
+  deferNextBind: (commitBeforeReply?: boolean) => {
+    requested: Promise<void>;
+    settle: (outcome: "resolve" | "reject") => void;
+  };
   checkpoint: () => World | undefined;
   layout: () => CouchLayout | undefined;
   backdropRevision: () => number;
@@ -63,6 +77,44 @@ const {
     preferredSeatId?: string,
   ) => { seatId: string; frame: Device } | undefined;
 } = require("../electron/couch.cjs");
+interface NativeHarness {
+  manager: {
+    setup: boolean;
+    bindings: Map<string, string>;
+    seats: Map<
+      string,
+      {
+        generation: number;
+        port?: unknown;
+        view: { webContents: { reload: () => void } };
+      }
+    >;
+    bind: (
+      seatId: string,
+      controllerId: string,
+    ) => { seatId: string; controllerId: string };
+    status: () => {
+      available: boolean;
+      devices: Device[];
+      bindings: Record<string, string>;
+      active: boolean;
+    };
+    inputFrame: (frames: Device[]) => void;
+    open: (input: Record<string, unknown>) => Promise<unknown>;
+    close: () => void;
+    overlay: (owner: string | null, shared: boolean) => unknown;
+    relayout: (options: Record<string, unknown>) => unknown;
+  };
+  size: number[];
+}
+const {
+  createCouchNativeFixture,
+}: {
+  createCouchNativeFixture: (configuration: {
+    input: () => unknown;
+    publish: (event: { kind: string }) => void;
+  }) => NativeHarness;
+} = require("../scripts/ci/couch-native-fixture");
 const isPage = (actor: Page | Frame): actor is Page =>
   "setViewportSize" in actor;
 const actorClosed = (actor: Page | Frame) =>
@@ -77,6 +129,11 @@ export function createCouchFixture(
   shell: Page,
   options: { embedded: true },
 ): Promise<CouchFixture<Frame>>;
+export function createCouchFixture(
+  context: BrowserContext,
+  shell: Page,
+  options: { nativeBindings: true },
+): Promise<CouchFixture<Page>>;
 /** Replace native transport only. Shell coordinator, simulation worker, seat clients,
  * Redux stores, controls and data loading are the production implementations. Embedded
  * mode paints those same documents at the native bounds for full-window layout review;
@@ -84,10 +141,42 @@ export function createCouchFixture(
 export async function createCouchFixture(
   context: BrowserContext,
   shell: Page,
-  options?: { embedded: true },
+  options?: { embedded?: true; nativeBindings?: true },
 ): Promise<CouchFixture<Page | Frame>> {
   const seats = new Map<string, { page: Page | Frame; generation: number }>();
-  const bindings = new Map<string, string>();
+  let nativeEvents = Promise.resolve();
+  const inputAdapter = {
+    initialized: true,
+    deviceContexts: new Map(),
+    releaseDevice: () => {},
+    setDeviceMode: () => {},
+    setContext: () => {},
+    setDeviceContext: () => ({ connected: true, actions: [], glyphs: {} }),
+  };
+  const native = options?.nativeBindings
+    ? createCouchNativeFixture({
+        input: () => inputAdapter,
+        publish: (event) => {
+          if (event.kind === "devices" || event.kind === "seat-lost")
+            nativeEvents = nativeEvents.then(() => emit(event));
+        },
+      })
+    : undefined;
+  const viewport = shell.viewportSize();
+  if (native && viewport)
+    native.size.splice(0, 2, viewport.width, viewport.height);
+  const bindings = native?.manager.bindings ?? new Map<string, string>();
+  const nativeErrors: string[] = [];
+  const nativeCalls = { bind: 0, status: 0, inputFrame: 0 };
+  const devices = structuredClone(defaultDevices);
+  const bindAttempts: { seatId: string; controllerId: string }[] = [];
+  let deferredBind:
+    | {
+        commitBeforeReply: boolean;
+        requested: () => void;
+        outcome: Promise<"resolve" | "reject">;
+      }
+    | undefined;
   let saved: World | undefined;
   let updatedAt = 0;
   let overlayOwner: string | null = null;
@@ -172,6 +261,29 @@ export async function createCouchFixture(
     shell.evaluate((detail) => {
       window.dispatchEvent(new CustomEvent("couchNativeEvent", { detail }));
     }, event);
+  const feedDevices = async (frames: Device[]) => {
+    if (native) {
+      nativeCalls.inputFrame++;
+      native.manager.inputFrame(frames);
+      await nativeEvents;
+    } else await emit({ kind: "devices", devices: frames });
+  };
+  const syncNativeSeat = async (seatId: string) => {
+    const route = seats.get(seatId);
+    const seat = native?.manager.seats.get(seatId);
+    if (!route || !seat?.port) return;
+    if (route.generation !== seat.generation) {
+      route.generation = seat.generation;
+      const target = new URL(shell.url());
+      target.search = `couchSeat=${seatId}&generation=${seat.generation}`;
+      await route.page.goto(target.href);
+      await expect(route.page.locator("html")).toHaveAttribute(
+        "data-couch-seat",
+        seatId,
+      );
+    }
+    await emit({ kind: "seat-attached", seatId, generation: seat.generation });
+  };
   const overlayStatus = () =>
     overlayOwner
       ? { owner: overlayOwner, version: overlayVersion, captureId }
@@ -271,13 +383,23 @@ export async function createCouchFixture(
         throw new Error(`Fixture ${String(raw.kind)} failure`);
       switch (raw.kind) {
         case "setup":
+          if (native) {
+            native.manager.setup = true;
+            await feedDevices(devices);
+            return { ...native.manager.status(), preview: true };
+          }
           return { available: true, preview: true, devices };
         case "status":
+          if (native) {
+            nativeCalls.status++;
+            return { ...native.manager.status(), preview: true };
+          }
           return {
             available: true,
             preview: true,
             devices,
             active: playing,
+            bindings: Object.fromEntries(bindings),
             overlay: overlayStatus(),
           };
         case "setup-confirm":
@@ -286,9 +408,32 @@ export async function createCouchFixture(
         case "cancel-text":
           cancelledText.push(String(raw.requestId));
           return true;
-        case "bind":
-          bindings.set(String(raw.seatId), String(raw.controllerId));
-          return;
+        case "bind": {
+          const seatId = String(raw.seatId);
+          const controllerId = String(raw.controllerId);
+          bindAttempts.push({ seatId, controllerId });
+          if (native) {
+            nativeCalls.bind++;
+            try {
+              const result = native.manager.bind(seatId, controllerId);
+              await nativeEvents;
+              await syncNativeSeat(seatId);
+              return result;
+            } catch (failure) {
+              nativeErrors.push(String(failure));
+              await nativeEvents;
+              throw failure;
+            }
+          }
+          const pending = deferredBind;
+          deferredBind = undefined;
+          if (pending?.commitBeforeReply) bindings.set(seatId, controllerId);
+          pending?.requested();
+          if (pending && (await pending.outcome) === "reject")
+            throw new Error("Fixture bind failure");
+          if (!pending?.commitBeforeReply) bindings.set(seatId, controllerId);
+          return { seatId, controllerId };
+        }
         case "reset-bindings":
           bindings.clear();
           return;
@@ -315,6 +460,7 @@ export async function createCouchFixture(
           return { id: "saved-local", updatedAt };
         case "overlay": {
           const owner = raw.seatId as string | null;
+          native?.manager.overlay(owner, raw.shared === true);
           const wasShared = overlayShared;
           const previousOwner = overlayOwner;
           overlayOwner = owner;
@@ -376,6 +522,9 @@ export async function createCouchFixture(
             overlay: overlayStatus(),
           };
         case "layout":
+          native?.manager.relayout(
+            (raw.options ?? {}) as Record<string, unknown>,
+          );
           return relayout(raw.options as Record<string, unknown>);
         case "send": {
           const route = seats.get(String(raw.seatId));
@@ -397,6 +546,7 @@ export async function createCouchFixture(
           return;
         }
         case "open": {
+          if (native) await native.manager.open(raw);
           layoutOptions = { ...raw, ...layoutOptions };
           playing = true;
           await relayout();
@@ -419,7 +569,8 @@ export async function createCouchFixture(
               if (!frame) throw new Error("Could not create the seat document");
               seatPage = frame;
             } else seatPage = await context.newPage();
-            const currentGeneration = ++generation;
+            const currentGeneration =
+              native?.manager.seats.get(seat.id)?.generation ?? ++generation;
             seats.set(seat.id, {
               page: seatPage,
               generation: currentGeneration,
@@ -441,6 +592,7 @@ export async function createCouchFixture(
           return { available: true, layout };
         }
         case "close":
+          native?.manager.close();
           playing = false;
           overlayOwner = null;
           overlayShared = false;
@@ -485,14 +637,27 @@ export async function createCouchFixture(
     );
     const params = new URLSearchParams(location.search);
     const seatId = params.get("couchSeat");
-    const native = (input: Record<string, unknown>) =>
-      (
-        window as unknown as {
-          __couchTestRequest: (
-            input: Record<string, unknown>,
-          ) => Promise<unknown>;
-        }
-      ).__couchTestRequest(input);
+    const replies: Record<string, number> = {};
+    Object.defineProperty(window, "__couchFixtureReplies", { value: replies });
+    const native = async (input: Record<string, unknown>) => {
+      try {
+        return await (
+          window as unknown as {
+            __couchTestRequest: (
+              input: Record<string, unknown>,
+            ) => Promise<unknown>;
+          }
+        ).__couchTestRequest(input);
+      } finally {
+        // Observe completion after the caller's own await continuation, without timed sleeps.
+        queueMicrotask(() =>
+          queueMicrotask(() => {
+            const kind = String(input.kind);
+            replies[kind] = (replies[kind] ?? 0) + 1;
+          }),
+        );
+      }
+    };
     const subscribe = <T>(name: string, callback: (value: T) => void) => {
       const listener = (event: Event) =>
         callback((event as CustomEvent<T>).detail);
@@ -592,6 +757,63 @@ export async function createCouchFixture(
   });
   return {
     seats,
+    nativeBindings: () => Object.fromEntries(bindings),
+    failNextNativeReload(seatId) {
+      const seat = native?.manager.seats.get(seatId);
+      if (!seat?.port) throw new Error("Native-backed live seat required");
+      const reload = seat.view.webContents.reload;
+      seat.view.webContents.reload = () => {
+        seat.view.webContents.reload = reload;
+        throw new Error("Fixture native reload failure");
+      };
+    },
+    settledNativeRequests: (kind) =>
+      shell.evaluate(
+        (key) =>
+          (
+            window as unknown as {
+              __couchFixtureReplies: Record<string, number>;
+            }
+          ).__couchFixtureReplies[key] ?? 0,
+        kind,
+      ),
+    nativeEvidence: () => ({
+      topology: Object.fromEntries(
+        [...(native?.manager.seats ?? [])].map(([id, seat]) => [
+          id,
+          { generation: seat.generation, hasPort: !!seat.port },
+        ]),
+      ),
+      errors: [...nativeErrors],
+      calls: { ...nativeCalls },
+    }),
+    bindAttempts: () => bindAttempts,
+    async setConnected(connections) {
+      for (const [id, connected] of Object.entries(connections)) {
+        const existing = devices.find((device) => device.id === id);
+        if (existing) existing.connected = connected;
+        else
+          devices.push({
+            ...structuredClone(defaultDevices[0]),
+            id,
+            connected,
+          });
+      }
+      await feedDevices(devices);
+    },
+    deferNextBind(commitBeforeReply = false) {
+      if (deferredBind) throw new Error("A bind is already deferred");
+      let requested!: () => void;
+      let settle!: (outcome: "resolve" | "reject") => void;
+      const pending = new Promise<void>((resolve) => {
+        requested = resolve;
+      });
+      const outcome = new Promise<"resolve" | "reject">((resolve) => {
+        settle = resolve;
+      });
+      deferredBind = { commitBeforeReply, requested, outcome };
+      return { requested: pending, settle };
+    },
     checkpoint: () => saved,
     layout: () => layout,
     backdropRevision: () => readyCaptureId,
@@ -617,7 +839,7 @@ export async function createCouchFixture(
         ...device,
         actions: actions[device.id] ?? [],
       }));
-      await emit({ kind: "devices", devices: frames });
+      await feedDevices(frames);
       if (!sampledPlaying || sampledOverlay) {
         const selected = sampledShared
           ? sharedMenuFrame(

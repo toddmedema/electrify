@@ -62,6 +62,96 @@ describe.each([2, 3, 4])("%i-company controller recovery", (count) => {
     );
   });
 
+  it("retries an authoritative native owner without accepting it or stealing an earlier company", () => {
+    const connected = new Set(["replacement"]);
+    const nativeOwner = seats[1].id;
+    const accepted = {};
+    expect(
+      nextControllerSeat(seats, accepted, connected, new Set(), nativeOwner),
+    ).toBe(seats[1]);
+    expect(accepted).toEqual({});
+    expect(nextControllerSeat(seats, accepted, connected, new Set())).toBe(
+      seats[0],
+    );
+  });
+
+  it("does not redirect a native-owned retry when its company is pending, retired or already accepted", () => {
+    const nativeOwner = seats[1].id;
+    const connected = new Set(["replacement"]);
+    expect(
+      nextControllerSeat(
+        seats,
+        {},
+        connected,
+        new Set(),
+        nativeOwner,
+        new Set([nativeOwner]),
+      ),
+    ).toBeUndefined();
+    expect(
+      nextControllerSeat(
+        seats,
+        {},
+        connected,
+        new Set([nativeOwner]),
+        nativeOwner,
+      ),
+    ).toBeUndefined();
+    expect(
+      nextControllerSeat(
+        seats,
+        { [nativeOwner]: "replacement" },
+        connected,
+        new Set(),
+        nativeOwner,
+      ),
+    ).toBeUndefined();
+    expect(
+      nextControllerSeat(seats, {}, connected, new Set(), "removed-company"),
+    ).toBeUndefined();
+    expect(
+      nextControllerSeat(
+        seats,
+        {},
+        connected,
+        new Set([nativeOwner]),
+        nativeOwner,
+        new Set(
+          seats
+            .filter((seat) => seat.id !== nativeOwner)
+            .map((seat) => seat.id),
+        ),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("retains native ownership and one-controller results fallback when everyone retired", () => {
+    const retired = new Set(seats.map((seat) => seat.id));
+    const connected = new Set(["replacement"]);
+    expect(nextControllerSeat(seats, {}, connected, retired, seats[1].id)).toBe(
+      seats[1],
+    );
+    expect(
+      nextControllerSeat(
+        seats,
+        { [seats[0].id]: "replacement" },
+        connected,
+        retired,
+        seats[1].id,
+      ),
+    ).toBeUndefined();
+    expect(
+      nextControllerSeat(
+        seats,
+        {},
+        connected,
+        retired,
+        seats[1].id,
+        new Set([seats[1].id]),
+      ),
+    ).toBeUndefined();
+  });
+
   it("restores session controls when all companies retired and no assigned controller remains", () => {
     const retired = new Set(seats.map((seat) => seat.id));
     expect(

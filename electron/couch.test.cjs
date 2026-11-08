@@ -1,12 +1,9 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { EventEmitter } = require("node:events");
+const { couchLayout, validSeats, seatMessage } = require("./couch.cjs");
 const {
-  couchLayout,
-  validSeats,
-  seatMessage,
-  CouchViews,
-} = require("./couch.cjs");
+  createCouchNativeFixture: fixture,
+} = require("../scripts/ci/couch-native-fixture");
 const seats = [
   { id: "local-p1", name: "One" },
   { id: "local-p2", name: "Two" },
@@ -95,91 +92,6 @@ test("logical roster rejects hardware identities and seat ports cannot claim a s
     false,
   );
 });
-
-function fixture() {
-  const views = [],
-    events = [],
-    partitions = [],
-    ports = [];
-  class View {
-    constructor(options) {
-      this.options = options;
-      this.webContents = Object.assign(new EventEmitter(), {
-        mainFrame: { url: "electrify://app/index.html" },
-        isDestroyed: () => false,
-        setWindowOpenHandler: (callback) => {
-          this.open = callback;
-        },
-        setZoomMode: (mode) => {
-          this.zoomMode = mode;
-        },
-        setZoomFactor: (factor) => {
-          this.zoom = factor;
-        },
-        loadURL: async () => {
-          this.webContents.emit("did-finish-load");
-        },
-        reload: () => {
-          this.webContents.emit("did-start-loading");
-          this.webContents.emit("did-finish-load");
-        },
-        postMessage: (_channel, identity) => {
-          this.identity = identity;
-        },
-        send: () => {},
-        focus: () => {},
-        capturePage: async () => ({
-          isEmpty: () => false,
-          getSize: () => ({ width: 960, height: 984 }),
-          toPNG: () => Buffer.from("snapshot"),
-        }),
-        close: () => {
-          this.closed = true;
-        },
-      });
-      views.push(this);
-    }
-    setBounds(bounds) {
-      this.bounds = bounds;
-    }
-    setVisible(visible) {
-      this.visible = visible;
-    }
-  }
-  class Channel {
-    constructor() {
-      this.port1 = Object.assign(new EventEmitter(), {
-        start() {},
-        close() {},
-        postMessage(message) {
-          this.message = message;
-        },
-      });
-      this.port2 = {};
-      ports.push(this.port1);
-    }
-  }
-  const size = [1920, 1080];
-  const host = {
-    getContentSize: () => size,
-    contentView: { addChildView() {}, removeChildView() {} },
-    webContents: { focus() {} },
-  };
-  const manager = new CouchViews({
-    window: host,
-    WebContentsView: View,
-    MessageChannelMain: Channel,
-    prepareSession: async (partition) => {
-      partitions.push(partition);
-      return { partition };
-    },
-    input: () => undefined,
-    publish: (event) => events.push(event),
-    preload: "/preload",
-    url: "electrify://app/index.html",
-  });
-  return { manager, views, events, partitions, ports, size };
-}
 
 test("exact top-frame bindings, authenticated ports, generations, isolated views and teardown", async () => {
   const { manager, views, events, partitions, ports } = fixture();
@@ -832,4 +744,36 @@ test("renderer crashes ignore removed and replaced seats while current seats sti
     reason: "renderer-crash",
   });
   manager.close();
+});
+
+test("binding status reconciles precondition and partial native failures without swapping the other company", async () => {
+  const { manager, views } = fixture();
+  manager.inputFrame(
+    ["1", "2", "3"].map((id) => ({
+      id,
+      connected: true,
+      actions: [],
+      glyphs: {},
+    })),
+  );
+  manager.bind("local-p1", "1");
+  manager.bind("local-p2", "2");
+  await manager.open({ seats });
+  try {
+    const baseline = manager.status().bindings;
+    assert.deepEqual(baseline, { "local-p1": "1", "local-p2": "2" });
+    assert.throws(() => manager.bind("local-p1", "2"), /already owns/);
+    assert.deepEqual(manager.status().bindings, baseline);
+    views[0].webContents.reload = () => {
+      throw new Error("native reload failed");
+    };
+    assert.throws(() => manager.bind("local-p1", "3"), /native reload failed/);
+    assert.deepEqual(manager.status().bindings, {
+      "local-p1": "3",
+      "local-p2": "2",
+    });
+    assert.deepEqual(baseline, { "local-p1": "1", "local-p2": "2" });
+  } finally {
+    manager.close();
+  }
 });
