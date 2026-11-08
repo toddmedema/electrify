@@ -2535,6 +2535,12 @@ $pane_header_height: 48px;
   aspect-ratio: 1;
   align-self: center;
   margin-bottom: 12px;
+
+  > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
 }
 
 .scenarioDossierCopy {
@@ -3661,7 +3667,6 @@ $pane_header_height: 48px;
 
     .missionMeta {
       display: block;
-      margin-top: 2px;
       color: $font_color_faded;
     }
 
@@ -3680,6 +3685,37 @@ $pane_header_height: 48px;
       .MuiChip-label {
         padding: 0 8px;
       }
+    }
+  }
+
+  .missionCatalogItem {
+    .MuiCardHeader-content {
+      min-width: 0;
+    }
+
+    .MuiCardHeader-title {
+      font-size: var(--font-size-subtitle);
+      line-height: 1.5rem;
+    }
+
+    .MuiCardHeader-subheader {
+      margin-top: 4px;
+      font-size: var(--font-size-body2);
+      line-height: 1.25rem;
+    }
+
+    .missionCatalogSummary {
+      display: block;
+    }
+
+    .missionMeta {
+      margin-top: 4px;
+      font-size: var(--font-size-caption);
+      line-height: 1.25rem;
+    }
+
+    .missionThemeTag {
+      line-height: 1.25rem;
     }
   }
 
@@ -6996,6 +7032,11 @@ $programs_column: 800px;
   padding: 2px;
   border-radius: 50%;
   background: var(--font-color-primary);
+}
+
+// Let the tall rack rise above the circular badge without changing its round backing plate.
+.MuiAvatar-root:has(> .MuiAvatar-img[src$="/ai data center boom.svg"]) {
+  overflow: visible;
 }
 
 // Preserve the artwork's silhouette in every avatar, including the manual and catalogs.
