@@ -78,7 +78,7 @@ it("labels optional goals and explains their actual units without making them a 
       "Affordable practice",
     ),
   ).toBeNull();
-  expect(screen.getByText(/Bills ≤\$0.123\/kWh/)).toBeInTheDocument();
+  expect(screen.getByText(/Bills ≤12.3¢\/kWh/)).toBeInTheDocument();
   expect(
     screen.getByText("Stretch goals; not required to win."),
   ).toBeInTheDocument();

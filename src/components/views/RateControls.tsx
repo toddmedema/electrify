@@ -22,7 +22,7 @@ import {
   publicRateCap,
   publicTargetRate,
 } from "../../helpers/Customers";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise, formatRateCompact } from "../../helpers/Format";
 import { formatCustomerChange } from "../../helpers/HistoryMetrics";
 import {
   PUBLIC_RATE_POINTS_PER_CENT,
@@ -35,10 +35,6 @@ import {
   subscribeProjection,
 } from "../base/DeferredProjection";
 import "./Programs.scss";
-
-function formatRateCompact(rate: number): string {
-  return `${Number((rate * 100).toFixed(1))}¢`;
-}
 
 /** Axis labels read in cents below a dollar, so they fit beneath the slider. */
 function formatRateAxis(rate: number): string {

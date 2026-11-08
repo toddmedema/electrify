@@ -210,6 +210,7 @@ import {
 } from "../helpers/Customers";
 import {
   formatMoneyConcise,
+  formatRateCompact,
   formatWatts,
   formatWattHours,
 } from "../helpers/Format";
@@ -4215,22 +4216,26 @@ export function* tickStatePhases(
             label:
               scenario.ownership === "Investor"
                 ? "final net worth"
-                : "lifetime rate",
+                : `lifetime rate · ${state.startingYear} dollars`,
             value:
               scenario.ownership === "Investor"
                 ? formatMoneyConcise(summary.netWorth)
                 : summary.supplyWh > 0
-                  ? `$${(startingDollarRevenue(history, state.startingYear, state.seed) / (summary.supplyWh / 1000)).toFixed(3)}/kWh`
+                  ? `${formatRateCompact(startingDollarRevenue(history, state.startingYear, state.seed) / (summary.supplyWh / 1000))}/kWh`
                   : "No electricity supplied",
           },
-          {
-            concept: "time",
-            label: "tenure",
-            value:
-              tenureMonths >= 12
-                ? `${Math.floor(tenureMonths / 12)} ${tenureMonths < 24 ? "year" : "years"}`
-                : `${tenureMonths} ${tenureMonths === 1 ? "month" : "months"}`,
-          },
+          ...(outcome === "completed"
+            ? []
+            : [
+                {
+                  concept: "time" as const,
+                  label: "tenure",
+                  value:
+                    tenureMonths >= 12
+                      ? `${Math.floor(tenureMonths / 12)} ${tenureMonths < 24 ? "year" : "years"}`
+                      : `${tenureMonths} ${tenureMonths === 1 ? "month" : "months"}`,
+                },
+              ]),
           ...(debrief.scenarioMetrics ?? []),
         ];
 

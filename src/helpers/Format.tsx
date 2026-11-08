@@ -79,6 +79,11 @@ export function formatFixed(value: number, digits: number): string {
   return withoutNegativeZero(value.toFixed(digits));
 }
 
+/** Electricity prices in cents per kWh, with at most one decimal place. */
+export function formatRateCompact(dollarsPerKWh: number): string {
+  return `${Number(formatFixed(dollarsPerKWh * 100, 1))}¢`;
+}
+
 /**
  * Format power using its actual magnitude, without promoting sub-GW values to GW. Values of 10 or
  * more in their unit are always whole numbers ("541MW"); smaller ones keep one decimal ("9.8GW")

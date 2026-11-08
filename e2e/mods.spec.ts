@@ -1054,6 +1054,14 @@ for (const [theme, requiredBills] of [
             required: requiredBills,
           },
         ],
+        debriefReports: [
+          {
+            id: "freeze-feedback",
+            kind: "deepFreeze",
+            fromMonth: 1,
+            throughMonth: 3,
+          },
+        ],
       }),
     };
     await mockDesktop(page, false, theme, [entry]);
@@ -1076,7 +1084,7 @@ for (const [theme, requiredBills] of [
       "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
     );
     await expect(rules).toContainText(
-      "Bills ≤$0/kWh each month · Jan–Feb 2020",
+      "Bills ≤0¢/kWh each month · Jan–Feb 2020",
     );
     await expect(rules).not.toContainText(
       /Recorded:|months completed|Not started/,
@@ -1101,7 +1109,7 @@ for (const [theme, requiredBills] of [
         /months completed|At least one completed month/,
       );
       await expect(rules).toContainText(
-        "Bills ≤$0/kWh each month · Jan–Feb 2020",
+        "Bills ≤0¢/kWh each month · Jan–Feb 2020",
       );
       await expect(rules.getByText("Optional", { exact: true })).toBeVisible();
       await expect(
@@ -1116,7 +1124,7 @@ for (const [theme, requiredBills] of [
       await scrollEvidenceIntoView(goal);
       await expect(goal).toBeInViewport({ ratio: 1 });
       await expect(
-        rules.getByText("Bills ≤$0/kWh each month · Jan–Feb 2020", {
+        rules.getByText("Bills ≤0¢/kWh each month · Jan–Feb 2020", {
           exact: true,
         }),
       ).toBeInViewport({ ratio: 1 });
@@ -1159,6 +1167,19 @@ for (const [theme, requiredBills] of [
       exact: true,
     });
     await expect(result).toBeVisible({ timeout: 60000 });
+    if (!requiredBills) {
+      const feedback = result.getByRole("region", {
+        name: "Mission results",
+        exact: true,
+      });
+      await expect(feedback).toContainText(
+        "Largest shortage during the freeze",
+      );
+      await expect(feedback).toContainText("Electricity rate · before → after");
+      await expect(feedback).toContainText(
+        "Cash stayed above $0 through the recovery month",
+      );
+    }
     const evidence = result.getByRole("region", {
       name: "Objective results",
     });
@@ -1202,6 +1223,22 @@ for (const [theme, requiredBills] of [
       page.locator("iframe#webpack-dev-server-client-overlay"),
     ).toHaveCount(0);
     expect(await noHorizontalScroll(page)).toBe(true);
+    if (!requiredBills) {
+      const shortage = result
+        .getByRole("region", { name: "Mission results", exact: true })
+        .locator(".victoryMetric")
+        .filter({ hasText: "Largest shortage during the freeze" });
+      await scrollEvidenceIntoView(shortage);
+      await expect(shortage).toBeInViewport({ ratio: 1 });
+      await expect(
+        result.getByText("Electricity rate · before → after", { exact: true }),
+      ).toBeInViewport({ ratio: 1 });
+      await expect(
+        result.getByText("Cash stayed above $0 through the recovery month", {
+          exact: true,
+        }),
+      ).toBeInViewport({ ratio: 1 });
+    }
     await screenshot(
       page,
       `mod-objective-${requiredBills ? "failure" : "success"}-${page.viewportSize()!.width}-${theme}.png`,
