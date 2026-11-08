@@ -27,6 +27,7 @@ import { createGame } from "../../testing/Simulator";
 import { loadSimData } from "../../testing/SimData";
 import {
   cacheProjection,
+  forecastViewportBounds,
   ProjectionView,
   selectProjection,
 } from "../../helpers/Projection";
@@ -1203,7 +1204,13 @@ describe("Insights layers", () => {
           termStartMonth,
         },
       };
-      cacheProjection(game, overviewProjection);
+      cacheProjection(game, {
+        ...overviewProjection,
+        domain: {
+          ...overviewProjection.domain,
+          x: forecastViewportBounds(game),
+        },
+      });
       renderInsights(scenarioId, game);
       await user.click(labelledButton("Zoom in"));
       await user.click(labelledButton("Fit full timeline"));
