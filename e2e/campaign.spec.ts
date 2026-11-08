@@ -2,7 +2,7 @@ import { DIFFICULTY_STORAGE_KEY, unlockedJournal } from "./difficulty-fixture";
 import path from "path";
 import "../src/Store";
 import { test, expect } from "./fixtures";
-import { openBuild } from "./layout";
+import { openBuild, openPane } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { TICKS_PER_MONTH, DIFFICULTY_LABELS } from "../src/Constants";
@@ -440,6 +440,70 @@ for (const theme of ["light", "dark"] as const) {
     expect(finalCompany?.campaign?.generationIndex).toBe(8);
     expect(finalCompany?.objectiveProgress?.completedMonths).toBe(0);
   });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(
+    "successor timeline fits the current 20-year term in " + theme,
+    async ({ page }, info) => {
+      test.skip(!REVIEW_PROJECTS.includes(info.project.name));
+      await page.addInitScript((mode) => {
+        localStorage.clear();
+        localStorage.setItem("theme", mode);
+        localStorage.setItem("audioEnabled", "false");
+      }, theme);
+      await page.goto("/?campaign=legacy");
+      await page
+        .getByRole("button", { name: "Start campaign", exact: true })
+        .click();
+      await expect(page.locator(".facilities:visible")).toBeVisible();
+      await page
+        .getByRole("button", { name: "pause", exact: true })
+        .first()
+        .click();
+      await editSavedGame(page, (save) => {
+        loadSimData(save.game.location);
+        save.game = gameReducer(
+          closeProtocolGeneration(save.game),
+          continueLegacyCampaign(),
+        );
+        expect(save.game.campaign?.termStartMonth).toBe(240);
+        expect(
+          parseSave(JSON.parse(JSON.stringify(encodeSave(save)))),
+        ).not.toBeNull();
+      });
+      await page.reload();
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+
+      const insights = page.locator(".insights:visible");
+      await openPane(
+        insights,
+        page.getByRole("button", { name: "Insights", exact: true }),
+      );
+      await expect(insights.locator(".uplot").first()).toBeVisible();
+      const fit = insights.getByRole("button", { name: "Fit full timeline" });
+      await expect(fit).toBeEnabled();
+      await fit.click();
+      await expect(
+        insights.getByLabel(/Displayed date range:/),
+      ).toHaveAttribute("aria-label", "Displayed date range: 1902–21");
+      await expect(fit).toBeDisabled();
+      if (
+        process.env.REVIEW_SCREENSHOT_DIR &&
+        ((theme === "light" && info.project.name === "desktop-chromium") ||
+          (theme === "dark" && info.project.name === "mobile-390px"))
+      ) {
+        await page.evaluate(() => document.fonts.ready);
+        await page.screenshot({
+          animations: "disabled",
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            "successor-fit-" + theme + "-" + info.project.name + ".png",
+          ),
+        });
+      }
+    },
+  );
 }
 
 test("a later-generation URL opens campaign setup instead of a fresh successor company", async ({
