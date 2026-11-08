@@ -1,0 +1,705 @@
+.scenario-site {
+  --scenario-rule: var(--border);
+  --scenario-brief: var(--surface-soft);
+}
+
+.scenario-site .topnav a {
+  display: inline-flex;
+}
+
+.scenario-site .topbar__inner {
+  gap: 16px;
+}
+
+.scenario-site h2,
+.scenario-site h3 {
+  margin: 0;
+  color: var(--text);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.scenario-site h2 {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+}
+
+.scenario-site h3 {
+  font-size: 1.25rem;
+}
+
+.scenario-site :target {
+  scroll-margin-top: 6.5rem;
+}
+
+.scenario-site .hero__inner {
+  padding-top: 32px;
+  padding-bottom: 64px;
+}
+
+.scenario-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 48px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.scenario-breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.scenario-hero__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 19rem;
+  align-items: center;
+  gap: clamp(32px, 7vw, 96px);
+}
+
+.scenario-site .hero h1 {
+  font-size: clamp(3rem, 5.5vw, 5rem);
+  line-height: 1.04;
+  letter-spacing: -0.055em;
+  overflow-wrap: break-word;
+}
+
+.scenario-site .hero__lede {
+  max-width: 35rem;
+  margin-top: 24px;
+  font-size: 1.25rem;
+  line-height: 1.55;
+}
+
+.scenario-site .hero__actions {
+  align-items: center;
+  gap: 16px 24px;
+  margin-top: 32px;
+}
+
+.scenario-site .button {
+  min-height: 48px;
+  padding: 12px 20px;
+  gap: 12px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.scenario-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.scenario-play-note {
+  max-width: 36rem;
+  margin: 20px 0 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.scenario-brief {
+  min-width: 0;
+  padding: 32px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--scenario-brief);
+}
+
+.scenario-brief__icon {
+  display: block;
+  width: 152px;
+  height: 152px;
+  margin: 0 auto 32px;
+  object-fit: contain;
+}
+
+.scenario-facts {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+
+.scenario-facts > div {
+  display: grid;
+  gap: 4px;
+}
+
+.scenario-facts dt {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.scenario-facts dd {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.scenario-content {
+  display: grid;
+  gap: 64px;
+  padding-top: 64px;
+  padding-bottom: 80px;
+}
+
+.scenario-start,
+.scenario-decisions {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr);
+  gap: clamp(32px, 6vw, 80px);
+}
+
+.scenario-section-label .eyebrow {
+  margin-bottom: 12px;
+}
+
+.scenario-prose {
+  max-width: 42rem;
+}
+
+.scenario-prose p,
+.scenario-decisions__list p,
+.scenario-invitation p,
+.scenario-directory-ending p {
+  margin: 0;
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.scenario-prose p + p {
+  margin-top: 20px;
+}
+
+.scenario-decisions {
+  padding-top: 48px;
+  border-top: 1px solid var(--scenario-rule);
+}
+
+.scenario-decisions__list {
+  display: grid;
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scenario-decisions__list li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.scenario-decisions__list li + li {
+  padding-top: 24px;
+  border-top: 1px solid var(--scenario-rule);
+}
+
+.scenario-decision-number {
+  padding-top: 2px;
+  color: var(--brand-strong);
+  font-size: 0.875rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.scenario-decisions__list p {
+  margin-top: 12px;
+  font-size: 1rem;
+}
+
+.scenario-invitation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 32px;
+  padding: 40px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  border-left: 4px solid var(--brand-strong);
+}
+
+.scenario-invitation h2 {
+  max-width: 29ch;
+  font-size: clamp(1.6rem, 2.6vw, 2rem);
+}
+
+.scenario-invitation p:not(.eyebrow) {
+  max-width: 42rem;
+  margin-top: 16px;
+  font-size: 0.9375rem;
+}
+
+.scenario-related__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.scenario-related__heading .eyebrow {
+  margin-bottom: 12px;
+}
+
+.scenario-entries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 48px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scenario-entry {
+  display: flex;
+  min-width: 0;
+  border-bottom: 1px solid var(--scenario-rule);
+}
+
+.scenario-entry__link {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 20px;
+  width: 100%;
+  padding: 28px 0;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.scenario-entry__link:hover {
+  color: var(--text);
+}
+
+.scenario-entry__link:hover h3,
+.scenario-entry__link:focus-visible h3 {
+  color: var(--brand-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.scenario-entry__link img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.scenario-entry__meta {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.scenario-entry h3 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  text-wrap: pretty;
+}
+
+.scenario-entry__dek {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.scenario-entry__more {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 16px;
+  color: var(--brand-strong);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.scenario-entry--compact .scenario-entry__link {
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.scenario-entry--compact img {
+  width: 48px;
+  height: 48px;
+}
+
+.scenario-directory-hero .hero__inner {
+  padding-top: 72px;
+  padding-bottom: 72px;
+}
+
+.scenario-directory-hero__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(15rem, 0.8fr);
+  align-items: center;
+  gap: 64px;
+}
+
+.scenario-directory-art {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  justify-items: center;
+  max-width: 22rem;
+  padding: 32px 24px;
+  border-block: 1px solid var(--border);
+}
+
+.scenario-directory-art img {
+  display: block;
+  width: 100%;
+  max-width: 112px;
+  height: auto;
+}
+
+.scenario-directory-art p {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.scenario-directory-art strong {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.scenario-catalog {
+  padding-top: 64px;
+}
+
+.scenario-catalog__intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 64px;
+}
+
+.scenario-catalog__intro h2 {
+  max-width: 20ch;
+}
+
+.scenario-catalog__intro > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 1rem;
+  text-wrap: pretty;
+}
+
+.scenario-theme-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 32px 0 56px;
+}
+
+.scenario-theme-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.scenario-theme-nav a:hover {
+  border-color: var(--brand-strong);
+  background: var(--brand-wash);
+}
+
+.scenario-group + .scenario-group {
+  margin-top: 64px;
+}
+
+.scenario-group__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 48px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid var(--text);
+}
+
+.scenario-group__heading h2 {
+  font-size: 1.5rem;
+}
+
+.scenario-group__heading p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.scenario-directory-ending {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 40px;
+  margin-top: 64px;
+  padding: 40px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.scenario-directory-ending h2 {
+  max-width: 25ch;
+  font-size: 1.75rem;
+}
+
+.scenario-directory-ending p:not(.eyebrow) {
+  margin-top: 16px;
+}
+
+@media (max-width: 60rem) {
+  .scenario-hero__layout {
+    grid-template-columns: minmax(0, 1fr) 16rem;
+    gap: 32px;
+  }
+
+  .scenario-brief {
+    padding: 24px;
+  }
+
+  .scenario-directory-hero__layout {
+    gap: 32px;
+  }
+
+  .scenario-entries {
+    column-gap: 32px;
+  }
+
+  .scenario-invitation {
+    grid-template-columns: 1fr;
+  }
+
+  .scenario-invitation .button {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 48rem) {
+  .scenario-site .hero__inner {
+    padding-bottom: 40px;
+  }
+
+  .scenario-breadcrumb {
+    margin-bottom: 24px;
+  }
+
+  .scenario-hero__layout,
+  .scenario-directory-hero__layout,
+  .scenario-start,
+  .scenario-decisions,
+  .scenario-catalog__intro,
+  .scenario-directory-ending {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .scenario-site .hero h1 {
+    max-width: 14ch;
+    font-size: clamp(2.75rem, 8vw, 4.25rem);
+  }
+
+  .scenario-site .hero__lede {
+    font-size: 1.125rem;
+  }
+
+  .scenario-brief {
+    display: grid;
+    grid-template-columns: 80px minmax(0, 1fr);
+    align-items: center;
+    gap: 24px;
+    margin-top: 8px;
+    padding: 24px;
+  }
+
+  .scenario-brief__icon {
+    width: 80px;
+    height: 80px;
+    margin: 0;
+  }
+
+  .scenario-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+  }
+
+  .scenario-facts > div:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .scenario-content {
+    gap: 40px;
+    padding-top: 40px;
+    padding-bottom: 56px;
+  }
+
+  .scenario-decisions {
+    padding-top: 32px;
+  }
+
+  .scenario-directory-hero .hero__inner {
+    padding-top: 48px;
+  }
+
+  .scenario-directory-art {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    max-width: none;
+    padding: 24px 0 0;
+    border-bottom: 0;
+  }
+
+  .scenario-directory-art img {
+    max-width: 80px;
+  }
+
+  .scenario-directory-art p {
+    display: none;
+  }
+
+  .scenario-catalog {
+    padding-top: 40px;
+  }
+
+  .scenario-catalog__intro h2 {
+    max-width: 25ch;
+  }
+
+  .scenario-theme-nav {
+    margin: 24px 0 40px;
+  }
+
+  .scenario-group__heading {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .scenario-entries {
+    grid-template-columns: 1fr;
+  }
+
+  .scenario-entry__link {
+    padding-block: 24px;
+  }
+
+  .scenario-group + .scenario-group {
+    margin-top: 48px;
+  }
+
+  .scenario-directory-ending {
+    margin-top: 48px;
+    padding-top: 32px;
+  }
+
+  .scenario-directory-ending .button {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 37.5rem) {
+  .scenario-site .brand img {
+    width: 116px;
+  }
+
+  .scenario-site .topbar__inner {
+    gap: 8px;
+  }
+
+  .scenario-site .topnav {
+    gap: 0;
+  }
+
+  .scenario-site .topnav a {
+    padding-inline: 8px;
+    font-size: 0.8125rem;
+  }
+
+  .scenario-site .topnav a:not([aria-current="page"]):not(.topnav__play) {
+    display: inline-flex;
+  }
+
+  .scenario-site .topnav .topnav__play {
+    margin-left: 4px;
+  }
+
+  .scenario-site .hero__actions {
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .scenario-site .hero__actions .scenario-text-link {
+    justify-content: center;
+  }
+
+  .scenario-brief {
+    gap: 20px;
+    padding: 20px;
+  }
+
+  .scenario-invitation {
+    padding: 24px 20px;
+    gap: 24px;
+  }
+
+  .scenario-invitation .button {
+    justify-self: stretch;
+  }
+
+  .scenario-related__heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .scenario-theme-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scenario-theme-nav a {
+    padding-inline: 12px;
+    gap: 8px;
+    font-size: 0.8125rem;
+  }
+
+  .scenario-entry__link {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .scenario-entry__link img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .scenario-site .site-footer__inner {
+    align-items: start;
+    gap: 12px;
+  }
+
+  .scenario-site .site-footer nav {
+    gap: 4px 16px;
+  }
+}
