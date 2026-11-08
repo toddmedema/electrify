@@ -229,7 +229,7 @@
     "name": "Ahead of the Boom",
     "description": "Successfully finish Data Center Boom on any difficulty.",
     "source": "public/images/ai data center boom.svg",
-    "sourceSha256": "3e29a7e76c39d7d900d02804f5ec0cfe57dee020a94b38fbdee09e903c9f1c14",
+    "sourceSha256": "a3a4a53ed33e0adf7038c09335127fe920bbbe0d7c7d98cedc3a4ec69e9f2992",
     "achieved": "uploads/AHEAD_OF_THE_BOOM_ACHIEVED.png",
     "unachieved": "uploads/AHEAD_OF_THE_BOOM_UNACHIEVED.png"
   },
@@ -247,7 +247,7 @@
     "name": "Cool Under Pressure",
     "description": "Successfully finish Heatwave + Drought on any difficulty.",
     "source": "public/images/heatwave-drought.svg",
-    "sourceSha256": "9d0cb4dd77f785ec9e66ae0e737a17c982f402b01994155eb9de7705fd7b5ca8",
+    "sourceSha256": "60004fa46f28d7bfdd008fa3f03717e2e22295f6192b344d71f0a92c3e600a44",
     "achieved": "uploads/COOL_UNDER_PRESSURE_ACHIEVED.png",
     "unachieved": "uploads/COOL_UNDER_PRESSURE_UNACHIEVED.png"
   },
