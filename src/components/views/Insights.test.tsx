@@ -1182,6 +1182,46 @@ describe("Insights layers", () => {
     },
   );
 
+  it.each([
+    [1, 118],
+    [2, 119],
+  ])(
+    "fits the active successor term with a 20-year span for generation %s",
+    async (generationIndex, scenarioId) => {
+      const first = createGame({ scenarioId: 117 });
+      const termStartMonth = generationIndex * 240;
+      const game = {
+        ...first,
+        scenarioId,
+        date: getDateFromMinute(
+          (termStartMonth + 6) * MINUTES_PER_MONTH,
+          first.startingYear,
+        ),
+        campaign: {
+          ...first.campaign!,
+          generationIndex,
+          termStartMonth,
+        },
+      };
+      cacheProjection(game, overviewProjection);
+      renderInsights(scenarioId, game);
+      await user.click(labelledButton("Zoom in"));
+      await user.click(labelledButton("Fit full timeline"));
+      const domain = [
+        termStartMonth * MINUTES_PER_MONTH,
+        (termStartMonth + 240) * MINUTES_PER_MONTH,
+      ];
+      expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+        "data-domain",
+        JSON.stringify(domain),
+      );
+      expect(domain[1] - domain[0]).toBe(240 * MINUTES_PER_MONTH);
+      expect(game.date.minute).toBeGreaterThanOrEqual(domain[0]);
+      expect(game.date.minute).toBeLessThan(domain[1]);
+      expect(labelledButton("Fit full timeline")).toBeDisabled();
+    },
+  );
+
   it("opens on the full scenario and keeps its endpoints as the game advances", () => {
     const game = overviewGame;
     const view = renderInsights(100, game);

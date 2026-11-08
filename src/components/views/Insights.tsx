@@ -1446,9 +1446,19 @@ export default class Insights extends React.Component<Props, State> {
       [0, scenarioEndMinute(this.props.game) ?? 20 * 12 * MINUTES_PER_MONTH],
       minSpan,
     );
+    // Successor scenarios share a continuous campaign clock but own a new term.
+    const termStartMinute =
+      (this.props.game.campaign?.termStartMonth ?? 0) * MINUTES_PER_MONTH;
+    const cappedEndMinute = termStartMinute + 20 * 12 * MINUTES_PER_MONTH;
     const fullTimelineRange = clampChartViewport(
       bounds,
-      [0, Math.min(scenarioRange[1], 20 * 12 * MINUTES_PER_MONTH)],
+      [
+        termStartMinute,
+        Math.min(
+          scenarioEndMinute(this.props.game) ?? cappedEndMinute,
+          cappedEndMinute,
+        ),
+      ],
       minSpan,
     );
     const span = range[1] - range[0];
