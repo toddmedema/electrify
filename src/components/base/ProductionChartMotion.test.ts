@@ -11,7 +11,7 @@ describe("daily production time guide", () => {
   let host: HTMLDivElement;
   let plot: uPlot;
   let motion: ReturnType<typeof productionChartMotion>;
-  const range: [number, number] = [0, 60];
+  const range: [number, number] = [0, 90];
   const marker = () =>
     host.querySelector<HTMLElement>("[data-production-now]")!;
   function hook(name: "init" | "draw" | "destroy") {
@@ -46,10 +46,9 @@ describe("daily production time guide", () => {
     speed = "SLOW";
     reduced = false;
     range[0] = 0;
-    range[1] = 60;
+    range[1] = 90;
     preferenceChange = () => undefined;
     jest.useFakeTimers();
-    jest.spyOn(performance, "now").mockImplementation(() => now);
     jest.spyOn(window, "requestAnimationFrame");
     jest.spyOn(window, "matchMedia").mockImplementation(
       () =>
@@ -79,8 +78,8 @@ describe("daily production time guide", () => {
         restore: jest.fn(),
         measureText: () => ({ width: 24 }),
       },
-      bbox: { left: 0, top: 20, width: 60, height: 40 },
-      scales: { x: { min: 0, max: 60 } },
+      bbox: { left: 0, top: 20, width: 90, height: 40 },
+      scales: { x: { min: 0, max: 90 } },
       valToPos: (value: number) =>
         ((value - range[0]) * plot.bbox.width) / (range[1] - range[0]),
     } as unknown as uPlot;
@@ -94,51 +93,53 @@ describe("daily production time guide", () => {
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
-  it("adds a halfway position between native ticks without scheduling chart redraws or changing data", () => {
+  it("leads the historic boundary between native ticks without redrawing curves or changing data", () => {
     draw(30, 200);
     const data = plot.data;
-    expect(marker().style.transform).toBe("translateX(15px)");
+    expect(marker().style.transform).toBe("translateX(30px)");
     advance(300);
-    expect(marker().style.transform).toBe("translateX(22.5px)");
+    expect(marker().style.transform).toBe("translateX(37.5px)");
     expect(plot.data).toBe(data);
     draw(45, 400);
-    expect(marker().style.transform).toBe("translateX(30px)");
+    expect(marker().style.transform).toBe("translateX(45px)");
     expect(marker()).toHaveAttribute("aria-hidden", "true");
     expect(marker().style.pointerEvents).toBe("none");
     expect(marker().textContent).toBe("Now");
     expect(marker().nextSibling).toBe(plot.over);
     expect(window.requestAnimationFrame).not.toHaveBeenCalled();
   });
-  it("continues an interrupted transition from its displayed position", () => {
+  it("keeps up with the historic boundary when native ticks arrive early", () => {
     draw(30, 200);
     advance(300);
     draw(45, 300);
-    expect(marker().style.transform).toBe("translateX(22.5px)");
+    expect(marker().style.transform).toBe("translateX(45px)");
     advance(400);
-    expect(marker().style.transform).toBe("translateX(33.75px)");
+    expect(marker().style.transform).toBe("translateX(52.5px)");
   });
   it("lands on the endpoint if the next native tick is delayed", () => {
     draw(30, 200);
     advance(420);
-    expect(marker().style.transform).toBe("translateX(30px)");
+    expect(marker().style.transform).toBe("translateX(45px)");
+    advance(1000);
+    expect(marker().style.transform).toBe("translateX(45px)");
     expect(jest.getTimerCount()).toBe(0);
   });
   it("retains annotation redraw progress and snaps for forecast edits or skipped ticks", () => {
     draw(30, 200);
     draw(30, 250, true);
     advance(300);
-    expect(marker().style.transform).toBe("translateX(22.5px)");
+    expect(marker().style.transform).toBe("translateX(37.5px)");
     draw(30, 300);
     expect(marker().style.transform).toBe("translateX(30px)");
     expect(jest.getTimerCount()).toBe(0);
-    draw(60, 400);
+    draw(90, 400);
     expect(marker().style.display).toBe("none");
   });
   it("snaps after geometry and day-range changes", () => {
     draw(30, 200);
     plot.bbox.width = 120;
     draw(30, 250, true);
-    expect(marker().style.transform).toBe("translateX(60px)");
+    expect(marker().style.transform).toBe("translateX(40px)");
     expect(jest.getTimerCount()).toBe(0);
     range[0] = 60;
     range[1] = 120;
@@ -153,7 +154,7 @@ describe("daily production time guide", () => {
     draw(30, 300);
     expect(jest.getTimerCount()).toBe(0);
     expect(
-      Number.parseFloat(marker().querySelector("span")!.style.left) + 3,
+      Number.parseFloat(marker().querySelector("span")!.style.left) + 4.5,
     ).toBe(12);
     draw(135, 400);
     draw(150, 600);
@@ -162,8 +163,8 @@ describe("daily production time guide", () => {
     draw(570, 900);
     expect(jest.getTimerCount()).toBe(0);
     expect(
-      Number.parseFloat(marker().querySelector("span")!.style.left) + 57,
-    ).toBe(48);
+      Number.parseFloat(marker().querySelector("span")!.style.left) + 85.5,
+    ).toBe(78);
   });
   it("restores native guides at pause and faster speeds, then resumes without stale motion", () => {
     draw(30, 200);
@@ -181,6 +182,8 @@ describe("daily production time guide", () => {
   });
   it("honors reduced motion and visibility changes immediately", () => {
     draw(30, 200);
+    advance(300);
+    expect(marker().style.transform).toBe("translateX(37.5px)");
     reduced = true;
     preferenceChange();
     expect(jest.getTimerCount()).toBe(0);
@@ -199,7 +202,10 @@ describe("daily production time guide", () => {
   });
   it("snaps on inspection and removes listeners after uPlot detaches", () => {
     draw(30, 200);
+    advance(300);
+    expect(marker().style.transform).toBe("translateX(37.5px)");
     plot.over.dispatchEvent(new Event("pointerenter"));
+    expect(marker().style.transform).toBe("translateX(30px)");
     expect(jest.getTimerCount()).toBe(0);
     draw(45, 400);
     expect(jest.getTimerCount()).toBe(0);
