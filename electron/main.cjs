@@ -158,6 +158,10 @@ function state() {
   };
 }
 
+/**
+ * Cancel any company-owned text request before releasing native company views.
+ * This also runs during shell teardown, when the window may already be destroyed.
+ */
 function closeCouch() {
   if (couchTextRequest) {
     couchTextRequest = undefined;
@@ -166,11 +170,18 @@ function closeCouch() {
   couch?.close();
 }
 
+/**
+ * Publish current desktop capabilities only while the shell can receive events.
+ */
 function publishState() {
   if (window && !window.isDestroyed())
     window.webContents.send("desktop:state-changed", state());
 }
 
+/**
+ * Apply the same focus, power and native-dialog gates to Steam Input and every renderer.
+ * Company views must stop accepting input whenever the shared shell loses game focus.
+ */
 function publishGameFocus() {
   steam.setInputEnabled(
     !!window &&
@@ -207,6 +218,10 @@ function publishGameFocus() {
 const publishOriginalGameFocus = publishGameFocus;
 steam.onOverlayChanged = publishOriginalGameFocus;
 
+/**
+ * Advance the power generation and gate native input before notifying shell and seats.
+ * Focus is recalculated afterward so waking cannot bypass an active modal or quit.
+ */
 function publishPower(phase) {
   power = { phase, generation: power.generation + 1 };
   // Gate native input before notifying the renderer, even if the OS keeps our window focused.
@@ -649,6 +664,10 @@ function openSteamPage(url) {
   openExternal(url);
 }
 
+/**
+ * Create a partition restricted to bundled resources, with browser permissions denied.
+ * Its protocol serves verified asset paths with the shared CSP and media byte ranges.
+ */
 async function prepareBundledSession(partition) {
   const isolatedSession = session.fromPartition(partition);
   isolatedSession.setPermissionRequestHandler(
@@ -704,6 +723,10 @@ async function prepareBundledSession(partition) {
   return isolatedSession;
 }
 
+/**
+ * Create the desktop shell and its isolated services from the packaged renderer.
+ * Native close, crash and resize handlers retain ownership of company-view cleanup.
+ */
 async function createWindow() {
   if (!fs.existsSync(path.join(root, "index.html")))
     throw new Error("Run npm run desktop:build before opening Electrify");

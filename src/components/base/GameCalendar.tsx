@@ -22,6 +22,9 @@ export function GameDate({
   );
 }
 
+/**
+ * Render the shared calendar's year progress with a matching accessible percentage.
+ */
 export function YearProgressBar({ date }: { date: DateType }) {
   return (
     <div
