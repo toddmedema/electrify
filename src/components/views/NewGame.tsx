@@ -145,9 +145,8 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
     isTutorial || s.id === CUSTOM_SCENARIO_ID ? (
       s.summary
     ) : (
-      <span>
-        {s.summary}
-        <br />
+      <>
+        <span className="missionCatalogSummary">{s.summary}</span>
         <span className="missionMeta">
           {location.name} · {s.startingYear}–{scenarioEndYear(s)}
         </span>
@@ -165,11 +164,12 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
             ))}
           </span>
         )}
-      </span>
+      </>
     );
   return (
     <NavigableCardRow
       testId={`mission-row-${s.id}`}
+      className="missionCatalogItem"
       onOpen={readOnly ? undefined : onSelect}
       ariaLabel={
         isTutorial
@@ -200,7 +200,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
         </Badge>
       }
       title={<span>{name}</span>}
-      description={<span>{summary}</span>}
+      description={summary}
     />
   );
 }

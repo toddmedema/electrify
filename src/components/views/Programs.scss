@@ -51,6 +51,10 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
+
+    &:has(.insightsRateMetricCustomers) {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    }
   }
 
   .insightsRateMetric {
@@ -68,6 +72,10 @@
   .insightsRateMetricValue {
     font-size: var(--font-size-subtitle);
     font-variant-numeric: tabular-nums;
+  }
+
+  .insightsRateMetricCustomers .insightsRateMetricValue {
+    white-space: nowrap;
   }
 
   .budgetSlider {

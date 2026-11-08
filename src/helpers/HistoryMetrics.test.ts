@@ -32,6 +32,23 @@ describe("the customer forecast", () => {
     expect(formatCustomerChange(-9900, 1000000)).toEqual("-9.9k (-1.0%)");
     expect(formatCustomerChange(9900, 0)).toEqual("+9.9k");
   });
+
+  it.each<[number, string]>([
+    [-14600, "-15k (-1.5%)"],
+    [14600, "+15k (+1.5%)"],
+    [146000, "+150k (+14.6%)"],
+    [1460000, "+1.5m (+146.0%)"],
+    [146, "+150 (+0.0%)"],
+    [549, "+0.55k (+0.1%)"],
+    [-549, "-0.55k (-0.1%)"],
+    [549000, "+0.55m (+54.9%)"],
+    [-549000, "-0.55m (-54.9%)"],
+    [999, "+1k (+0.1%)"],
+    [999500, "+1m (+100.0%)"],
+    [0, "+0 (+0.0%)"],
+  ])("rounds %s customers to two significant digits", (change, expected) => {
+    expect(formatCustomerChange(change, 1000000)).toBe(expected);
+  });
 });
 
 it("does not display negative zero in customer changes or inflation", () => {
