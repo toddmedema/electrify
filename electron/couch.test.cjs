@@ -265,6 +265,39 @@ test("overlays retain paused screens until their captured backdrop is ready; inv
   manager.close();
 });
 
+test("rejected relayout options preserve valid state and later band-only resizing", async () => {
+  const { manager, views, events } = fixture();
+  await manager.open({ seats, zoom: 1.5, inset: 0, gutter: 8, bandHeight: 96 });
+  try {
+    const options = { ...manager.options };
+    const layout = manager.layout;
+    const bounds = views.map((view) => ({ ...view.bounds }));
+    const publications = events.length;
+    for (const rejected of [
+      { zoom: 10 },
+      { inset: 201 },
+      { gutter: 101 },
+      { bandHeight: 601 },
+    ]) {
+      assert.throws(() => manager.relayout(rejected), /Invalid couch layout/);
+      assert.deepEqual(manager.options, options);
+      assert.equal(manager.layout, layout);
+      assert.deepEqual(
+        views.map((view) => view.bounds),
+        bounds,
+      );
+      assert.equal(events.length, publications);
+    }
+    const resized = manager.relayout({ bandHeight: 100 });
+    assert.equal(resized.layout.fits, true);
+    assert.deepEqual(manager.options, { ...options, bandHeight: 100 });
+    assert.ok(views.every((view) => view.bounds.y === 100 && view.visible));
+    assert.equal(events.at(-1).kind, "layout");
+  } finally {
+    manager.close();
+  }
+});
+
 test("preload handshake publishes its current generation and retains a baseline through liveness pulses", async () => {
   const fs = require("node:fs");
   const path = require("node:path");

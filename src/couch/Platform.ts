@@ -21,6 +21,9 @@ const notify = () => {
 };
 
 export const couchPlatformActive = () => !!projection;
+/**
+ * Observe shell projection changes and return cleanup for the same listener identity.
+ */
 export function subscribeCouchPlatform(listener: () => void): () => void {
   listeners.add(listener);
   return () => {

@@ -138,6 +138,10 @@ function couchLayout(width, height, count, options = {}) {
   };
 }
 
+/**
+ * Copy a bounded, ordered logical roster while rejecting hardware identities and empty names.
+ * Caller-supplied extra fields never become native routing or ownership authority.
+ */
 function validSeats(seats) {
   if (
     !Array.isArray(seats) ||
@@ -555,22 +559,28 @@ class CouchViews {
     seat.port.postMessage(message);
     return true;
   }
-  /** Recompute DIP bounds; unreadable layouts expose shell recovery and invalidate any pending backdrop. */
+  /**
+   * Validate candidate DIP bounds before committing options or touching native views.
+   * Rejected requests preserve recovery through later partial updates; unreadable
+   * valid layouts expose shell recovery and invalidate any pending backdrop.
+   */
   relayout(options = {}) {
     if (!this.seats.size) return this.status();
-    this.options = {
+    const nextOptions = {
       ...this.options,
       ...Object.fromEntries(
         Object.entries(options).filter(([, value]) => value !== undefined),
       ),
     };
     const [width, height] = this.window.getContentSize();
-    this.layout = couchLayout(
+    const nextLayout = couchLayout(
       width,
       height,
       this.count ?? this.seats.size,
-      this.options,
+      nextOptions,
     );
+    this.options = nextOptions;
+    this.layout = nextLayout;
     [...this.seats.values()].forEach((seat, i) => {
       seat.view.setVisible(this.layout.fits && !this.overlayHidden);
       if (this.layout.fits) {
