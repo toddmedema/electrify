@@ -5,7 +5,8 @@ import { openPane } from "./layout";
 declare global {
   interface Window {
     __productionMotion?: {
-      samples: Array<{ x: number; at: number }>;
+      samples: Array<{ x: number; at: number; boundary: number }>;
+      boundary: number;
       canvasDraws: number;
     };
     __reducedMotionChange?: Promise<void>;
@@ -50,7 +51,8 @@ async function start(page: Page, theme: string, textSize = "standard") {
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 200);
   await page.evaluate(() => {
     const probe = {
-      samples: [] as Array<{ x: number; at: number }>,
+      samples: [] as Array<{ x: number; at: number; boundary: number }>,
+      boundary: 0,
       canvasDraws: 0,
     };
     window.__productionMotion = probe;
@@ -59,6 +61,24 @@ async function start(page: Page, theme: string, textSize = "standard") {
       if (this.canvas.matches("#chartSupplyDemand .u-wrap > canvas"))
         probe.canvasDraws++;
       return clear.apply(this, args);
+    };
+    const drawImage = CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage = function (
+      ...args: [CanvasImageSource, number, number, ...number[]]
+    ) {
+      const [source, , sourceY, , , x, y, width] = args;
+      if (
+        args.length === 9 &&
+        this.canvas.matches("#chartSupplyDemand .u-wrap > canvas") &&
+        source instanceof HTMLCanvasElement &&
+        sourceY === 0 &&
+        y > 0 &&
+        source.getContext("2d")!.getLineDash().length === 0
+      ) {
+        // The cached solid stroke is clipped at the historic/forecast boundary.
+        probe.boundary = (x + width) / devicePixelRatio;
+      }
+      return Reflect.apply(drawImage, this, args);
     };
     const observe = () => {
       const marker = document.querySelector<HTMLElement>(
@@ -69,7 +89,11 @@ async function start(page: Page, theme: string, textSize = "standard") {
           marker.getBoundingClientRect().x -
           marker.parentElement!.getBoundingClientRect().x;
         if (x !== probe.samples.at(-1)?.x)
-          probe.samples.push({ x, at: performance.now() });
+          probe.samples.push({
+            x,
+            at: performance.now(),
+            boundary: probe.boundary,
+          });
       }
       requestAnimationFrame(observe);
     };
@@ -124,10 +148,24 @@ test("1x smoothly advances Now with stationary curves, then snaps for inspection
   await page.clock.runFor(1200);
   const motion = await sample(page);
   expect(interpolates(motion.samples)).toBe(true);
+  expect(motion.samples.every(({ x, boundary }) => x >= boundary - 0.01)).toBe(
+    true,
+  );
+  expect(motion.samples.some(({ x, boundary }) => x > boundary + 0.1)).toBe(
+    true,
+  );
+  expect(
+    motion.samples.some(({ x, boundary }) => Math.abs(x - boundary) < 0.01),
+  ).toBe(true);
+  expect(
+    new Set(motion.samples.map(({ boundary }) => boundary)).size,
+  ).toBeGreaterThan(1);
   expect(motion.canvasDraws).toBeGreaterThan(0);
   expect(motion.canvasDraws).toBeLessThanOrEqual(5);
   expect(await canvas.boundingBox()).toEqual(bounds);
   if (process.env.REVIEW_SCREENSHOT_DIR) {
+    // Capture the midpoint so the guide visibly leads the historic boundary.
+    await page.clock.runFor(100);
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({
       path: path.join(

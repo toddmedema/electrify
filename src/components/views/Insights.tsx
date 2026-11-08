@@ -1446,6 +1446,21 @@ export default class Insights extends React.Component<Props, State> {
       [0, scenarioEndMinute(this.props.game) ?? 20 * 12 * MINUTES_PER_MONTH],
       minSpan,
     );
+    // Successor scenarios share a continuous campaign clock but own a new term.
+    const termStartMinute =
+      (this.props.game.campaign?.termStartMonth ?? 0) * MINUTES_PER_MONTH;
+    const cappedEndMinute = termStartMinute + 20 * 12 * MINUTES_PER_MONTH;
+    const fullTimelineRange = clampChartViewport(
+      bounds,
+      [
+        termStartMinute,
+        Math.min(
+          scenarioEndMinute(this.props.game) ?? cappedEndMinute,
+          cappedEndMinute,
+        ),
+      ],
+      minSpan,
+    );
     const span = range[1] - range[0];
     const rangeLabel = viewportLabel(range, this.props.game.startingYear);
     const setRange = (next: ChartViewportRange) =>
@@ -1503,8 +1518,11 @@ export default class Insights extends React.Component<Props, State> {
             full || rangesEqual(scenarioRange, range),
             () => setRange(scenarioRange),
           )}
-          {iconButton("Fit full timeline", <FitScreenIcon />, full, () =>
-            setRange(bounds),
+          {iconButton(
+            "Fit full timeline",
+            <FitScreenIcon />,
+            rangesEqual(fullTimelineRange, range),
+            () => setRange(fullTimelineRange),
           )}
           {iconButton("Zoom in", <ZoomInIcon />, span <= minSpan, () =>
             setRange(
