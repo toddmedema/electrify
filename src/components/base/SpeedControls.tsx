@@ -68,7 +68,7 @@ function describeSharedClock(
     })
     .join(". ");
   const reason = multiplayer.reason ? `${multiplayer.reason}. ` : "";
-  return `Game speed: ${selectionLabel(multiplayer.activeSpeed)}. Your selection: ${selectionLabel(speed)}. ${reason}${players}.${resume ? " Select a speed to resume." : ""}`;
+  return `Game speed: ${selectionLabel(multiplayer.activeSpeed)}. Your selection: ${selectionLabel(speed)}. The slowest player sets the game speed. Any paused player pauses everyone. ${reason}${players}.${resume ? " Select a speed to resume." : ""}`;
 }
 
 /** Hovering a shared-clock speed names every player at it, by their Steam name. */
@@ -79,8 +79,7 @@ function playersAtSpeed(
   const names = multiplayer.players
     .filter(
       (player) =>
-        player.selectedSpeed === option ||
-        (option === "PAUSED" && !!player.pauseReason),
+        (player.pauseReason ? "PAUSED" : player.selectedSpeed) === option,
     )
     .map((player) => {
       const you = player.id === multiplayer.selfId ? " (you)" : "";
@@ -139,8 +138,8 @@ function speedOptions(
             multiplayer?.players.filter(
               (player) =>
                 player.id !== multiplayer.selfId &&
-                (player.selectedSpeed === option ||
-                  (option === "PAUSED" && !!player.pauseReason)),
+                (player.pauseReason ? "PAUSED" : player.selectedSpeed) ===
+                  option,
             ) || [];
           return (
             <ToggleButton
@@ -166,7 +165,7 @@ function speedOptions(
                   sx={{ position: "absolute", inset: 0, pointerEvents: "none" }}
                 >
                   {/* One neutral marker per other player, filling slots from the left on a
-                      12 px pitch about the centre, so the side slots clear the active ring.
+                      12 px pitch about the centre, so the side slots clear your selection ring.
                       Who chose what is in the title and description, not marker colour. */}
                   {peers.map((player, slot) => (
                     <PersonIcon

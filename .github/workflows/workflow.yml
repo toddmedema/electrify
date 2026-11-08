@@ -122,6 +122,9 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: desktop-renderer
+      - name: Install redistributable Linux runtime inputs
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libnss3 libnspr4 libsqlite3-0
       - name: Package and verify native depot
         timeout-minutes: 15
         run: npm run desktop:pack:offline -- --skip-build --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}

@@ -117,8 +117,8 @@ export function startDesktopInput(
   /** Change the owning seat's requested speed, preserving its last running choice and ready-up intent.
    * Solo input activates only the speed buttons available in the current layout. */
   const speed = (action: "pause" | "speedUp" | "speedDown") => {
-    if (window.electrifyCouch?.role === "seat") {
-      const clock = store.getState().game.multiplayer?.clock;
+    const clock = store.getState().game.multiplayer?.clock;
+    if (clock) {
       const speeds = ["PAUSED", "SLOW", "NORMAL", "FAST", "ULTRA"] as const;
       const selected = clock?.selectedSpeed ?? "PAUSED";
       if (selected !== "PAUSED") runningSpeed = selected;

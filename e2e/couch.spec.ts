@@ -614,8 +614,8 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
     }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "NORMAL");
-  const selectedStyle = await speedControls(p1)
-    .getByRole("button", { name: "fast speed", exact: true })
+  const activeStyle = await speedControls(p1)
+    .getByRole("button", { name: "normal speed", exact: true })
     .evaluate((button) => {
       const probe = document.createElement("span");
       probe.style.color =
@@ -625,11 +625,11 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
       probe.remove();
       return { actual: getComputedStyle(button).backgroundColor, expected };
     });
-  expect(selectedStyle.actual).toBe(selectedStyle.expected);
+  expect(activeStyle.actual).toBe(activeStyle.expected);
   await expect
     .poll(() =>
       speedControls(p1)
-        .getByRole("button", { name: "normal speed", exact: true })
+        .getByRole("button", { name: "fast speed", exact: true })
         .evaluate(
           (button) => getComputedStyle(button, "::before").borderTopWidth,
         ),

@@ -84,19 +84,21 @@ test("the lobby heading receives initial focus and focus on a new lobby mode", a
   await act(async () => jest.advanceTimersByTime(1000));
   expect(title).toHaveFocus();
   await act(async () =>
-    screen.getByRole("textbox", { name: "Invite code" }).focus(),
+    screen.getByRole("textbox", { name: "6-digit invite code" }).focus(),
   );
   await act(async () => session.join("10977524123456789"));
-  expect(screen.queryByRole("textbox", { name: "Invite code" })).toBeNull();
+  expect(
+    screen.queryByRole("textbox", { name: "6-digit invite code" }),
+  ).toBeNull();
   expect(title).toHaveFocus();
 });
 
-test.each(["Invite code", "Host a game"])(
+test.each(["6-digit invite code", "Host a game"])(
   "the lobby preserves focus on %s when navigation precedes the end of its opening animation",
   async (name) => {
     await showLobby();
     const control = screen.getByRole(
-      name === "Invite code" ? "textbox" : "button",
+      name === "6-digit invite code" ? "textbox" : "button",
       { name },
     );
     await act(async () => control.focus());
@@ -130,17 +132,17 @@ test("returning from Mods cannot interrupt controller invite entry when both tra
   });
   try {
     await act(async () => Promise.resolve());
-    // Dialog container → Back → Host a game → Invite code, through the real controller.
+    // Dialog container → Back → Host a game → 6-digit invite code, through the real controller.
     const down = () => input({ ...frame, actions: ["down"] });
     for (let step = 0; step < 3; step++) act(down);
-    const code = screen.getByRole("textbox", { name: "Invite code" });
+    const code = screen.getByRole("textbox", { name: "6-digit invite code" });
     expect(code).toHaveFocus();
     await act(async () => jest.advanceTimersByTime(1000));
     expect(code).toHaveFocus();
     await act(async () => input({ ...frame, actions: ["confirm"] }));
     expect(showTextInput).toHaveBeenCalledTimes(1);
     expect(showTextInput).toHaveBeenCalledWith(
-      expect.objectContaining({ description: "Invite code" }),
+      expect.objectContaining({ description: "6-digit invite code" }),
     );
     expect(code).toHaveFocus();
   } finally {

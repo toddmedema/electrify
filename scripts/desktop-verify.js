@@ -127,6 +127,8 @@ function verifyInputResources(resources, source = "steamworks/input") {
 }
 
 function verifyPackaged(directory) {
+  if (process.platform === "linux")
+    require("./linux-runtime").verifyLinuxRuntime(directory);
   const resources =
     process.platform === "darwin"
       ? path.join(directory, "Electrify.app", "Contents", "Resources")

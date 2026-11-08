@@ -11,6 +11,7 @@ export interface LobbyState {
   inviteLobbyId?: string;
   available: boolean;
   lobbyId?: string;
+  inviteCode?: string;
   hostId?: string;
   selfId?: string;
   members: LobbyMember[];

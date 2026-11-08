@@ -267,6 +267,7 @@ class SteamRoom {
   dropped = new Set<string>();
   host = "76561198000000001";
   lobbyId = "109775242999999999";
+  inviteCode = "012345";
   private async transportFailure(id: string, error: unknown) {
     if (this.transportErrors.length) return;
     const message = `${id}: ${error instanceof Error ? error.message : String(error)}`;
@@ -283,6 +284,7 @@ class SteamRoom {
       selfId: id,
       hostId: member ? this.host : undefined,
       lobbyId: member ? this.lobbyId : undefined,
+      inviteCode: member ? this.inviteCode : undefined,
       members: member ? [...this.members] : [],
       connected:
         !member || this.dropped.has(id)
@@ -355,7 +357,11 @@ class SteamRoom {
   async request(id: string, input: NativeRequest): Promise<unknown> {
     if (input.kind === "state") return this.state(id);
     if (input.kind === "create" || input.kind === "join") {
-      if (input.kind === "join" && input.lobbyId !== this.lobbyId)
+      if (
+        input.kind === "join" &&
+        input.lobbyId !== this.inviteCode &&
+        input.lobbyId !== this.lobbyId
+      )
         throw new Error("Invalid lobby code");
       if (!this.members.some((m) => m.id === id))
         this.members.push({
@@ -592,7 +598,9 @@ async function hostGame(page: Page) {
   await expect(page.getByTestId("mission-row-999")).toBeVisible();
 }
 async function joinGame(page: Page, room: SteamRoom) {
-  await page.getByLabel("Invite code", { exact: true }).fill(room.lobbyId);
+  await page
+    .getByLabel("6-digit invite code", { exact: true })
+    .fill(room.inviteCode);
   await page.getByRole("button", { name: "Join", exact: true }).click();
 }
 async function openSaves(page: Page) {
@@ -692,7 +700,7 @@ for (const [width, theme] of [
       "Back",
     );
     const [field, join] = await Promise.all([
-      entry.getByLabel("Invite code", { exact: true }).boundingBox(),
+      entry.getByLabel("6-digit invite code", { exact: true }).boundingBox(),
       entry.getByRole("button", { name: "Join", exact: true }).boundingBox(),
     ]);
     // The code and Join share one row.
@@ -719,7 +727,7 @@ for (const [width, theme] of [
     await expect(page.getByText("Invite code copied")).toBeVisible();
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe(room.lobbyId);
+      .toBe(room.inviteCode);
     await expect(
       page.getByRole("button", { name: "Invite a friend to start" }),
     ).toHaveCount(0);
@@ -1336,7 +1344,7 @@ async function expectClockInViewport(page: Page) {
             bottom: button.bottom - icon.bottom,
             buttonHeight: button.height,
             glyph: element.querySelector("path")?.getAttribute("d"),
-            tone: `${owner.getAttribute("aria-pressed")} ${getComputedStyle(element).color}`,
+            tone: `${owner.getAttribute("data-active-speed") === "true"} ${getComputedStyle(element).color}`,
           };
         }),
       };
@@ -1348,11 +1356,11 @@ async function expectClockInViewport(page: Page) {
     expect(icons.length).toBeGreaterThan(0);
     expect(new Set(icons.map((icon) => icon.glyph)).size).toBe(1);
     // One neutral tone per surface: who chose a speed is in the description, not in colour.
-    for (const pressed of ["true", "false"])
+    for (const active of ["true", "false"])
       expect(
         new Set(
           icons
-            .filter((icon) => icon.tone.startsWith(pressed))
+            .filter((icon) => icon.tone.startsWith(active))
             .map((icon) => icon.tone),
         ).size,
       ).toBeLessThanOrEqual(1);
@@ -1384,11 +1392,10 @@ async function expectClockMeaning(
     1,
   );
   const fill = (element: Element) => getComputedStyle(element).backgroundColor;
-  // Your own selection is the filled segment.
-  expect(await selected.evaluate(fill)).not.toBe("rgba(0, 0, 0, 0)");
-  // The shared clock's speed wears the pulsing ring, drawn in its label's colour: status,
-  // not the interaction blue, unless it shares the filled segment.
-  const ring = await active.evaluate((element) => {
+  // The actual game speed is the filled segment.
+  expect(await active.evaluate(fill)).not.toBe("rgba(0, 0, 0, 0)");
+  // Your request has a quiet static ring, even while someone else holds the clock.
+  const ring = await selected.evaluate((element) => {
     const style = getComputedStyle(element, "::before");
     const button = element.getBoundingClientRect();
     const label = element
@@ -1410,7 +1417,7 @@ async function expectClockMeaning(
   });
   expect(ring.content).not.toBe("none");
   expect(ring.radius).toBe("50%");
-  expect(ring.animation).toBe("tutorialTargetPulse");
+  expect(ring.animation).toBe("none");
   expect(ring.color).toBe(ring.labelColor);
   // It sits inside the segment, around the lifted label, and clears the label's sides.
   expect(ring.top).toBeGreaterThanOrEqual(1);
@@ -1419,11 +1426,11 @@ async function expectClockMeaning(
   expect(ring.clearance).toBeGreaterThanOrEqual(2);
   if (selectedName !== activeName) {
     expect(
-      await selected.evaluate(
+      await active.evaluate(
         (element) => getComputedStyle(element, "::before").content,
       ),
     ).toBe("none");
-    expect(await active.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
+    expect(await selected.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
     await expect(selected).not.toHaveAttribute("aria-current");
   }
 }
@@ -1582,6 +1589,10 @@ test("multiplayer speed controls match normal dimensions in desktop and touch la
       .getByRole("button", { name: "pause", exact: true })
       .locator(".multiplayerSpeedPeers svg"),
   ).toHaveCount(3);
+  // Each paused player occupies exactly one marker, rather than also appearing at their vote.
+  await expect(
+    clock(pages[0]).locator(".multiplayerSpeedPeers svg"),
+  ).toHaveCount(3);
   await expectClockInViewport(pages[0]);
   for (const peer of pages.slice(1))
     await peer
@@ -1696,11 +1707,13 @@ for (const width of [1280, 390]) {
       .click();
     await expect.poll(() => room.invites).toEqual([room.host]);
     await capture("02-host-and-invite");
-    await guest.getByLabel("Invite code", { exact: true }).fill(room.lobbyId);
-    await expect(guest.getByLabel("Invite code", { exact: true })).toHaveValue(
-      room.lobbyId,
-    );
-    await guest.getByLabel("Invite code", { exact: true }).blur();
+    await guest
+      .getByLabel("6-digit invite code", { exact: true })
+      .fill(room.inviteCode);
+    await expect(
+      guest.getByLabel("6-digit invite code", { exact: true }),
+    ).toHaveValue(room.inviteCode);
+    await guest.getByLabel("6-digit invite code", { exact: true }).blur();
     await capture("03-join-with-code", guest);
     await guest.getByRole("button", { name: "Join", exact: true }).click();
     const roster = host.getByRole("list", { name: "Players", exact: true });

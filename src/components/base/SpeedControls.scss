@@ -27,13 +27,10 @@
     }
   }
 
-  // Co-op splits the single-player selection in two. Your own request is an interaction, so it
-  // takes the blue fill. The speed the shared clock actually runs at is status: like the
-  // single-player selected segment it is neutral text, circled by a neutral ring that pulses
-  // with the tutorial's slow rhythm. A blue pulsing ring would read as a tutorial target.
+  // Blue marks the actual shared speed; a quiet, static circle marks your request.
   .multiplayerSpeedToggles .MuiToggleButton-root {
     // The label and ring sit a little high, clearing the marker row on the bottom edge: the
-    // ring spans 2-32 px of a 40 px button and 4-34 px of a 44 px one, and only a middle
+    // ring spans 1-33 px of a 40 px button and 3-35 px of a 44 px one, and only a middle
     // marker (heads from 29 or 33 px) meets it, breaking it cleanly with its knockout.
     --clock-lift: 3px;
     --clock-ring: var(--font-color-primary);
@@ -55,12 +52,14 @@
       }
     }
 
-    &[data-active-speed="true"] {
-      color: var(--interactive-strong);
-    }
-
     &.Mui-selected,
     &.Mui-selected:hover {
+      background: transparent;
+      color: var(--font-color-primary);
+    }
+
+    &[data-active-speed="true"],
+    &[data-active-speed="true"]:hover {
       --clock-ring: var(--interactive-contrast);
       --clock-segment: var(--interactive-blue);
       background: var(--interactive-blue);
@@ -72,28 +71,18 @@
     }
 
     // One size wherever it moves, wide enough that 24× clears the stroke
-    &[data-active-speed="true"]::before {
-      --tutorial-glow: color-mix(in srgb, var(--clock-ring) 40%, transparent);
-      // Half the tutorial's reach keeps the glow inside the segment
-      --tutorial-pulse-spread: 4px;
+    &.Mui-selected::before {
       content: "";
       position: absolute;
       top: calc(50% - var(--clock-lift));
       left: 50%;
-      width: 30px;
-      height: 30px;
+      width: 32px;
+      height: 32px;
       box-sizing: border-box;
       transform: translate(-50%, -50%);
       border: 2px solid var(--clock-ring);
       border-radius: 50%;
       pointer-events: none;
-      animation: tutorialTargetPulse 10s ease-in-out infinite;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      &[data-active-speed="true"]::before {
-        animation: none;
-      }
     }
   }
 }

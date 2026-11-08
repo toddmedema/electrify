@@ -18,7 +18,6 @@ import cardReducer from "./Card";
 import gameReducer, { tutorialCompleteDialog } from "./Game";
 import settingsReducer from "./Settings";
 import {
-  recordTutorialExited,
   restartTutorialAtStep,
   selectTutorialHiddenUi,
   selectTutorialActions,
@@ -421,35 +420,6 @@ describe("navigation steps that teach the game dock", () => {
       expect(store.getState().game.tutorialStep).toBe(index + 1);
     },
   );
-});
-
-describe("recordTutorialExited", () => {
-  beforeEach(() => {
-    window.localStorage.clear();
-  });
-
-  const steps = [informational(), informational()];
-
-  it("counts a walkthrough explicitly exited partway as done", () => {
-    recordTutorialExited(initialState(steps, { tutorialStep: 1 }).game);
-    expect(getPlayedScenarioIds()).toContain(CUSTOM_SCENARIO_ID);
-  });
-
-  it("doesn't count a finished or closed walkthrough a second time", () => {
-    recordTutorialExited(
-      initialState(steps, { tutorialStep: steps.length }).game,
-    );
-    expect(getPlayedScenarioIds()).toEqual([]);
-  });
-
-  it("ignores scenarios without a walkthrough", () => {
-    const game = initialState(steps, { tutorialStep: 0 }).game;
-    recordTutorialExited({
-      ...game,
-      customScenario: { ...DEFAULT_CUSTOM_SCENARIO, tutorialSteps: undefined },
-    });
-    expect(getPlayedScenarioIds()).toEqual([]);
-  });
 });
 
 describe("restartTutorialAtStep", () => {

@@ -252,7 +252,8 @@ test.beforeEach(async ({ page }) => {
           document.documentElement.dataset.mockJoinedLobby = request.lobbyId;
           lobby = {
             ...lobby,
-            lobbyId: request.lobbyId,
+            lobbyId: "10977524123456789",
+            inviteCode: request.lobbyId,
             hostId: "76561198000000002",
             members: [
               { id: selfId, name: "Deck player" },
@@ -265,6 +266,7 @@ test.beforeEach(async ({ page }) => {
           lobby = {
             ...lobby,
             lobbyId: "10977524123456789",
+            inviteCode: "012345",
             hostId: selfId,
             members: [{ id: selfId, name: "Deck player" }],
             connected: [],
@@ -885,14 +887,17 @@ test("controller opens Workshop and enters a multiplayer invite with Steam text 
   await expect(
     page.getByRole("dialog", { name: "Play with friends", exact: true }),
   ).toBeVisible();
-  const code = page.getByRole("textbox", { name: "Invite code", exact: true });
+  const code = page.getByRole("textbox", {
+    name: "6-digit invite code",
+    exact: true,
+  });
   await select(page, code);
   await input(page, "confirm");
   await expect(page.locator("html")).toHaveAttribute(
     "data-mock-text-input",
-    /Invite code/,
+    /6-digit invite code/,
   );
-  await submitText(page, "10977524123456789", code);
+  await submitText(page, "012345", code);
   if (process.env.REVIEW_SCREENSHOT_DIR)
     await page.screenshot({
       path: path.join(
@@ -905,7 +910,7 @@ test("controller opens Workshop and enters a multiplayer invite with Steam text 
   await input(page, "confirm");
   await expect(page.locator("html")).toHaveAttribute(
     "data-mock-joined-lobby",
-    "10977524123456789",
+    "012345",
   );
   await expect(
     page.getByText("Waiting for Friend to choose a game…", { exact: true }),
