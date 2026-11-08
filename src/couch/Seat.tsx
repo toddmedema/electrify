@@ -16,6 +16,7 @@ import { change } from "../reducers/Settings";
 import { layoutChanged } from "../reducers/UI";
 import { registerMultiplayerRuntime } from "../multiplayer/Registry";
 import { CouchClient } from "./Client";
+import { seatPresentation } from "./Presentation";
 import type { SettingsType } from "../Types";
 import type { GameType } from "../Types";
 import type { EvidenceTargetType } from "../Types";
@@ -56,16 +57,7 @@ export default function CouchSeat() {
         event.generation === client.generation &&
         event.settings
       ) {
-        store.dispatch(
-          change({
-            theme: event.settings.theme,
-            textSize: event.settings.textSize,
-            units: event.settings.units,
-            tvMode: true,
-            tvInset: 0,
-            audioEnabled: false,
-          }),
-        );
+        store.dispatch(change(seatPresentation(event.settings)));
       } else if (
         event.kind === "evidence" &&
         event.generation === client.generation &&

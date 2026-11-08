@@ -49,6 +49,8 @@ async function data(spec: MatchSpec) {
     waitForLoad((done) => initWeather(location, done)),
   ]);
 }
+/** Flush due seat projections and report a local summary from the same authoritative world.
+ * Its date follows an active company, or the latest retired grid once the whole match has ended. */
 function publish() {
   clearTimeout(viewTimer);
   viewTimer = undefined;
@@ -148,6 +150,8 @@ function loop() {
     Math.max(0, TICK_MS[world.speed] - (performance.now() - started)),
   );
 }
+/** Load simulation data before creating or restoring the worker-owned world.
+ * Publish its baseline and checkpoint before scheduling ticks; local account hooks stay worker-owned. */
 async function startMatch(
   request: Extract<WorkerRequest, { kind: "create" | "restore" }>,
 ) {
@@ -185,6 +189,8 @@ async function startMatch(
   }, HOST_KEEPALIVE_MS);
   loop();
 }
+/** Apply host requests in worker message order and publish the resulting command receipts.
+ * Checkpoints follow previously accepted actions, with any requested pause applied before persistence. */
 function handle(request: WorkerRequest, running: World) {
   if (request.kind === "blockers") {
     if (request.requireReady)

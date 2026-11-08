@@ -59,6 +59,8 @@ const aliases: [keyof typeof paths, string[]][] = [
   ],
 ];
 
+/** Match harmless spelling variants of an actual physical-origin label.
+ * Preserve a bare minus sign because it identifies a Switch button, not a word separator. */
 function normalize(label: string) {
   const normalized = label.trim().toLowerCase();
   return normalized === "-" ? normalized : normalized.replace(/[-_\s]+/g, " ");

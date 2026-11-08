@@ -116,6 +116,8 @@ function snapshot(store: AppStore): SoundEventSnapshot {
   };
 }
 
+/** Bind feedback to this desktop lifetime and stop it on blur, disconnect or disposal.
+ * Account projection may continue during couch play, but unsupported per-seat haptics stay off. */
 export function startDesktopFeedback(store: AppStore) {
   const desktop = getDesktop();
   if (!desktop)

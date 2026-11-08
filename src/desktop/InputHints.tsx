@@ -58,6 +58,8 @@ function contextualHints(target: Element | null, gameplay: boolean): Hint[] {
   ];
 }
 
+/** Follow live device and focus context while retaining the disconnect-resume notice.
+ * Couch callers may keep the hint area's geometry stable when pointer input takes over. */
 export default function InputHints() {
   const state = useSyncExternalStore(
     subscribeInputPresentation,
@@ -120,6 +122,8 @@ export default function InputHints() {
   );
 }
 
+/** Resolve a binding from the supplied device frame without inferring it from an action name.
+ * Compact hints omit missing bindings; the complete legend can explicitly show them as unbound. */
 function glyphHint(
   [action, label]: Hint,
   glyphs: DesktopInputFrame["glyphs"],

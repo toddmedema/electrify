@@ -13,6 +13,8 @@ interface Runtime {
 }
 let runtime: Runtime | undefined;
 export const multiplayerRuntime = () => runtime;
+/** Replace the command owner for this document and reset its foreground-pause baseline.
+ * Native seats use application focus so sibling-view visibility cannot pause their companies. */
 export function registerMultiplayerRuntime(value: Runtime | undefined) {
   runtime = value;
   hidden =

@@ -150,6 +150,8 @@ export function ThemedApp(props: {
     height: window.innerHeight,
   }));
   useLayoutEffect(() => {
+    /** Apply shared text preferences once; native seat zoom already supplies TV magnification.
+     * Keeping seat display scale at one prevents multiplying the same presentation twice. */
     const apply = () => {
       const root = document.documentElement;
       root.dataset.tvLayout = String(tvMode);
@@ -283,6 +285,8 @@ function OfflineNotice(): React.JSX.Element | null {
   );
 }
 
+/** Own account, save and desktop-service subscriptions for the mounted shell.
+ * Isolated couch documents bootstrap separately so they cannot create solo service owners. */
 export default function App() {
   const scenarioRouteInitialized = useRef(false);
   /**

@@ -113,6 +113,8 @@ function useMissionRisk(
   return risk;
 }
 
+/** Prioritize active events or goal risks while keeping mission timing available for drill-down.
+ * Shared couch presentation uses eventsOnly to prevent one company's finances becoming match news. */
 export default function MissionSummary({
   game,
   upcoming = [],

@@ -13,6 +13,8 @@ export async function initializeDesktop(): Promise<void> {
   await initializeDesktopSaves();
 }
 
+/** Start one disposable service set, projecting only account observers onto the couch owner.
+ * Input and feedback keep the shell's real store rather than acting on another company's grid. */
 export function startDesktopServices(store: AppStore): () => void {
   const desktop = getDesktop();
   if (!desktop) return () => {};

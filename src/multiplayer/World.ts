@@ -111,6 +111,8 @@ export function setWorldBlockers(world: World, reasons: readonly string[]) {
   syncClock(world);
 }
 
+/** Derive the effective clock from active companies, readiness, pending choices and shell blockers.
+ * Retired companies cannot hold time; a running match uses the slowest remaining player request. */
 function syncClock(world: World) {
   const active = activeSeats(world);
   const blockers = shellBlockers.get(world) || [];

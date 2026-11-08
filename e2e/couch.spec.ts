@@ -907,6 +907,7 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
       )
       .digest("hex");
   const desktopBackdrop = couch.backdropRevision();
+  const desktopGeometry = JSON.stringify(couch.layout());
   const interfaceLayout = globalSettings.getByRole("group", {
     name: "Interface layout",
     exact: true,
@@ -918,13 +919,15 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
   await expectSharedSettings(globalSettings);
   await expectSettingsClearance(globalSettings);
   await expectSharedCaptionSize(page, p1, couch.layout()!.zoom);
-  await expect
-    .poll(couch.backdropRevision, {
-      message: "paused player capture refreshes after TV layout change",
-    })
-    .toBeGreaterThan(desktopBackdrop);
+  if (JSON.stringify(couch.layout()) !== desktopGeometry)
+    await expect
+      .poll(couch.backdropRevision, {
+        message: "changed native bounds refresh the paused player capture",
+      })
+      .toBeGreaterThan(desktopBackdrop);
   await expectPlayersPainted(page);
   const tvBackdrop = couch.backdropRevision();
+  const tvGeometry = JSON.stringify(couch.layout());
   await interfaceLayout
     .getByRole("button", { name: "Desktop", exact: true })
     .click();
@@ -932,7 +935,8 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
   await expectSharedSettings(globalSettings);
   await expectSettingsClearance(globalSettings);
   await expectSharedCaptionSize(page, p1, couch.layout()!.zoom);
-  await expect.poll(couch.backdropRevision).toBeGreaterThan(tvBackdrop);
+  if (JSON.stringify(couch.layout()) !== tvGeometry)
+    await expect.poll(couch.backdropRevision).toBeGreaterThan(tvBackdrop);
   await expectPlayersPainted(page);
   const previousBackdrop = await backdropHash();
   const originalTheme =
@@ -1103,4 +1107,138 @@ test("TV couch native promise failures return control to the main menu", async (
   await expect(
     page.getByRole("button", { name: "Play with friends", exact: true }),
   ).toBeVisible();
+});
+
+test("TV couch coalesces visual preferences without capturing audio changes", async ({
+  context,
+  page,
+}, info) => {
+  test.skip(
+    !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
+    "Preference capture behavior in each palette",
+  );
+  const couch = await createCouchFixture(context, page, { embedded: true });
+  await startCouch(page, couch);
+  const p1 = couch.seats.get("local-p1")!.page;
+  const p2 = couch.seats.get("local-p2")!.page;
+  for (const seat of [p1, p2])
+    await expect(seat.locator("#appbar:visible")).toBeVisible();
+  await runNormally(p1, p2);
+  await couch.input({ "202": ["menu"] });
+  await page
+    .getByRole("dialog", { name: "Game menu", exact: true })
+    .getByRole("button", { name: "Settings", exact: true })
+    .click();
+  const settings = page.getByRole("dialog", { name: "Settings", exact: true });
+  await expectSharedSettings(settings);
+  await expectPlayersPainted(page);
+  await couch.settleCaptures();
+  const baselineRefreshes = couch.refreshRequests();
+  const baselinePresentations = couch.presentationMessages();
+  const sound = settings.getByRole("switch", { name: "Sound", exact: true });
+  await sound.check();
+  await settings
+    .getByRole("slider", { name: "Music volume", exact: true })
+    .press("Home");
+  await settings
+    .getByRole("slider", { name: "Music volume", exact: true })
+    .press("ArrowRight");
+  await settings
+    .getByRole("slider", { name: "Effects volume", exact: true })
+    .press("Home");
+  await sound.uncheck();
+  await expect
+    .poll(couch.presentationMessages)
+    .toBeGreaterThan(baselinePresentations);
+  // Observe the deferred capture window before checking that audio did not
+  // schedule a refresh; the native bridge must still receive the preferences.
+  await page.waitForTimeout(500);
+  await couch.settleCaptures();
+  expect
+    .soft(
+      couch.refreshRequests(),
+      "sound and volume preferences do not recapture player screens",
+    )
+    .toBe(baselineRefreshes);
+
+  const baselineRevision = couch.backdropRevision();
+  const beforeVisual = couch.refreshRequests();
+  const snapshotHash = async () =>
+    createHash("sha256")
+      .update(
+        (await page
+          .locator('[data-couch-backdrop-seat="local-p1"]')
+          .getAttribute("src")) ?? "",
+      )
+      .digest("hex");
+  const beforeImage = await snapshotHash();
+  const finalTheme = info.project.use.colorScheme === "dark" ? "light" : "dark";
+  const finalThemeLabel = finalTheme === "dark" ? "Dark" : "Light";
+  const otherThemeLabel = finalTheme === "dark" ? "Light" : "Dark";
+  await settings.evaluate(
+    (dialog, choices) => {
+      const click = (name: string, label: string) => {
+        const group = dialog.querySelector(`[aria-label="${name}"]`);
+        const button = [
+          ...group!.querySelectorAll<HTMLButtonElement>("button"),
+        ].find((candidate) => candidate.textContent?.trim() === label);
+        if (!button) throw new Error(`Missing ${name}: ${label}`);
+        button.click();
+      };
+      // A burst traverses all visual fields before one paint. Later nonvisual
+      // updates must neither trigger screenshots nor cancel the pending visual one.
+      click("Appearance", choices.finalThemeLabel);
+      click("Text size", "Standard");
+      click("Units", "Imperial");
+      click("Appearance", choices.otherThemeLabel);
+      click("Text size", "Larger");
+      click("Units", "Metric");
+      click("Appearance", choices.finalThemeLabel);
+      click("Text size", "Large");
+      click("Units", "Imperial");
+      const audio = dialog.querySelector<HTMLInputElement>(
+        'input[aria-label="Sound"]',
+      )!;
+      audio.click();
+      audio.click();
+    },
+    { finalThemeLabel, otherThemeLabel },
+  );
+  for (const seat of [p1, p2]) {
+    await expect(seat.locator("html")).toHaveAttribute(
+      "data-theme",
+      finalTheme,
+    );
+    await expect(seat.locator("html")).toHaveAttribute(
+      "data-text-size",
+      "large",
+    );
+  }
+  await expect.poll(couch.refreshRequests).toBeGreaterThan(beforeVisual);
+  await expect.poll(couch.backdropRevision).toBeGreaterThan(baselineRevision);
+  await expect.poll(snapshotHash).not.toBe(beforeImage);
+  await expectPlayersPainted(page);
+  await page.waitForTimeout(500);
+  await couch.settleCaptures();
+  expect
+    .soft(
+      couch.refreshRequests(),
+      "one refresh captures the latest burst, including its final theme and text size",
+    )
+    .toBe(beforeVisual + 1);
+
+  // Units are visual even when they do not change the currently open forecast.
+  const beforeUnits = couch.refreshRequests();
+  const unitsRevision = couch.backdropRevision();
+  await settings
+    .getByRole("group", { name: "Units", exact: true })
+    .getByRole("button", { name: "Metric", exact: true })
+    .click();
+  await expect.poll(couch.refreshRequests).toBe(beforeUnits + 1);
+  await expect.poll(couch.backdropRevision).toBeGreaterThan(unitsRevision);
+  await expectPlayersPainted(page);
+  await settings.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(settings).toHaveCount(0);
+  for (const seat of [p1, p2])
+    await expect(clock(seat)).toHaveAttribute("data-active-speed", "NORMAL");
 });

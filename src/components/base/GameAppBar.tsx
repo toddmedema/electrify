@@ -295,6 +295,8 @@ function CompactGridStatus({
   );
 }
 
+/** Present the current company's money, grid status and requested shared-clock speed.
+ * Couch seats leave common calendar/menu chrome to the shell; memoized controls avoid tick churn. */
 export function GameAppBar(props: Props) {
   const steamAvailable = useDesktopState()?.steam.available;
   const {

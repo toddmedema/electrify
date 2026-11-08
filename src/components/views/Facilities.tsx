@@ -814,6 +814,8 @@ export function fleetChartHeight(width: number, height: number): number {
 }
 
 function useFleetChartHeight(): number {
+  /** Measure the plot in CSS pixels, applying text scale to TV design dimensions once.
+   * The couch reduction reserves fleet space before native view zoom magnifies the whole pane. */
   const measure = () => {
     const height = isTvLayout()
       ? Math.round(220 * getTextScale())

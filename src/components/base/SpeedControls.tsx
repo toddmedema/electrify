@@ -93,6 +93,8 @@ function playersAtSpeed(
   return `${selectionLabel(option)}: ${names.length ? names.join(", ") : "nobody"}`;
 }
 
+/** Keep a player's requested selection distinct from the clock's effective running speed.
+ * Shared-clock reselections are emitted too, preserving quick reversals and explicit readiness. */
 function speedOptions(
   { speed, onSpeedChange, desktop, multiplayer, disabled }: SpeedOptionsProps,
   descriptionId?: string,

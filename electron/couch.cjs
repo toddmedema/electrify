@@ -527,8 +527,12 @@ class CouchViews {
       throw error;
     }
   }
-  /** Revoke the old port generation before notifying recovery or accepting another capture. */
+  /**
+   * Revoke only the current seat generation. Removed views can still emit native
+   * exit callbacks after teardown or replacement and must not affect a new route.
+   */
   lost(seat, reason) {
+    if (this.seats.get(seat.id) !== seat) return;
     seat.port?.close();
     seat.port = undefined;
     // The old generation can never send another accepted command after reload/crash.
@@ -723,12 +727,14 @@ class CouchViews {
     this.opening = false;
     this.count = undefined;
     const windowAlive = !this.window.isDestroyed?.();
-    for (const seat of this.seats.values()) {
+    const closingSeats = [...this.seats.values()];
+    // Closing native resources can synchronously emit exit and port callbacks.
+    this.seats.clear();
+    for (const seat of closingSeats) {
       seat.port?.close();
       if (windowAlive) this.window.contentView.removeChildView(seat.view);
       if (!seat.view.webContents.isDestroyed()) seat.view.webContents.close();
     }
-    this.seats.clear();
     this.bindings.clear();
     this.setup = false;
     this.confirmOnly = false;

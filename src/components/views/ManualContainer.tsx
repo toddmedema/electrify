@@ -20,6 +20,8 @@ export const mapDispatchToProps = (
   ownProps?: { onBack?: () => void },
 ): DispatchProps => {
   return {
+    /** Clear the manual's link trail before returning to its caller or closing a shared modal.
+     * Modal ownership overrides card navigation while focus restoration still targets its trigger. */
     onBack: () => {
       dispatch(manualTrailCleared());
       if (ownProps?.onBack) ownProps.onBack();

@@ -296,6 +296,7 @@ export class CouchCoordinator {
       return true;
     }
     if (input.kind === "global-settings") {
+      if (this.state.phase !== "playing" || this.state.closing) return false;
       this.options.onSettings?.(seatId, generation, input.requestId);
       return true;
     }

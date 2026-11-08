@@ -62,6 +62,8 @@ export function gameToolForCard(card: CardNameType): GameTool | undefined {
     : GAME_TOOLS.find((tool) => tool.id === card)?.id;
 }
 
+/** Expose the same accessible tool actions in card navigation and the pane workspace.
+ * Couch docks can hide visible labels without changing names, tutorial restrictions or callbacks. */
 export default function Navigation({
   openTools,
   onToggle,

@@ -3,6 +3,8 @@ import type { Command, RoomView, Seat, World } from "../multiplayer/Types";
 
 /** Immutable campaign IDs. Device handles and account ownership never enter this namespace. */
 export const localSeatId = (position: number) => `local-p${position + 1}`;
+/** Accept only ordered logical seats with bounded company names, independent of hardware IDs.
+ * The native and worker owners share this fixed roster throughout save and resume. */
 export const isLocalRoster = (seats: Seat[]) =>
   seats.length >= 2 &&
   seats.length <= 4 &&

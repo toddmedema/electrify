@@ -18,6 +18,8 @@ export default function CouchMenu({
   onSettings: () => void;
   onQuit: () => void;
 }) {
+  /** Wrap real focus across menu choices for either keyboard or controller arrow events.
+   * Consume only unmodified navigation keys so native confirmation and dialog dismissal stay intact. */
   const navigate = (event: KeyboardEvent<HTMLDivElement>) => {
     if (
       event.defaultPrevented ||

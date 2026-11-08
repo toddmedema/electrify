@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import { getDesktop } from "../Desktop";
 import type { DesktopInputFrame } from "../Desktop";
+import { shallowEqual } from "react-redux";
 import type { MatchSpec, Seat, World } from "../multiplayer/Types";
 import { coopControls, registerCoopControls } from "../multiplayer/Registry";
 import { navigate } from "../reducers/Card";
@@ -26,6 +27,7 @@ import { tvDisplayScale, tvLayoutEnabled } from "../TvLayout";
 import { getScenario } from "../data/Scenarios";
 import { registerShutdownCheckpoint } from "../desktop/Shutdown";
 import type { CouchSummary } from "./Protocol";
+import { seatPresentation } from "./Presentation";
 import SettingsContainer from "../components/views/SettingsContainer";
 import { beginCouchPlatform } from "./Platform";
 import { nextControllerSeat } from "./Bindings";
@@ -255,6 +257,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       setDiscarding(false);
     }
   };
+  /** Open shared evidence in an active, connected company without competing with a modal request. */
   const showEvidence = (target: EvidenceTargetType) => {
     if (globalRequest.current) return;
     const state = current.current;
@@ -275,6 +278,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         message: { kind: "evidence", generation, target },
       });
   };
+  /** Gate every company while the requesting route confirms a single whole-world save and exit. */
   const requestExit = (seatId: string) => {
     if (globalRequest.current || current.current.busy) return;
     globalRequest.current = {
@@ -727,6 +731,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       const worker = createMultiplayerWorker();
       const owner = new CouchCoordinator(worker, {
         onAccountView: (view) => platform.current?.publish(view),
+        /** Keep common calendar/event presentation separate from private company command replies. */
         onSharedView: (view) => {
           if (view.game) setCommonGame(view.game);
         },
@@ -736,6 +741,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           };
           setSaveTime(result.updatedAt);
         },
+        /** Correlate one leave decision with its route, rejecting requests that would stack dialogs. */
         onLeave: (seatId, generation, message) => {
           if (globalRequest.current) {
             owner.resolveLeave(
@@ -762,6 +768,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           setDiscarding(false);
           setExitOwner(seatId);
         },
+        /** Preserve request identity while shared Settings and its gameplay gate belong to everyone. */
         onSettings: (seatId, generation, requestId) => {
           if (globalRequest.current) return;
           globalRequest.current = {
@@ -776,11 +783,13 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         },
         onMenu: (seatId, generation, requestId) =>
           openMenu(seatId, generation, requestId),
+        /** Promote worker faults to session recovery so ordinary dialog dismissal cannot resume play. */
         onError: (message: string) => {
           setError(message);
           if (coordinator.current?.getSnapshot().phase === "faulted")
             setSessionFault(true);
         },
+        /** Recover active companies once each; retired companies no longer hold up their partners. */
         onSeatLost: (seatId) => {
           if (
             !current.current.summary?.players.find(
@@ -791,6 +800,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
               value.includes(seatId) ? value : [...value, seatId],
             );
         },
+        /** Release retired companies' controller blockers while retaining all other session blockers. */
         onSummary: (value) => {
           setSummary(value);
           value.players
@@ -810,6 +820,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           stop();
           reject(new Error("The shared game did not finish preparing"));
         }, 60000);
+        /** Settle native startup only after the worker publishes a playing baseline, or a terminal fault. */
         const sync = () => {
           const state = owner.getSnapshot();
           if (state.phase === "playing" && state.summary) {
@@ -904,14 +915,33 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   }, [stage, ready]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     let previous = store.getState().settings;
-    return store.subscribe(() => {
+    let live = true;
+    let revision = 0;
+    let refreshTimer: number | undefined;
+    let paintFrame: number | undefined;
+    /** Superseded preferences must not refresh an old image or reopen a disposed overlay. */
+    const cancelRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      if (paintFrame !== undefined) cancelAnimationFrame(paintFrame);
+      refreshTimer = undefined;
+      paintFrame = undefined;
+    };
+    const stop = store.subscribe(() => {
       const state = store.getState();
       if (settingsOwner && state.card.name !== "SETTINGS")
         cancelGlobal("Settings closed");
       if (manualOwner && state.card.name !== "MANUAL")
         cancelGlobal("Manual closed");
       if (previous === state.settings) return;
+      const visualChange = !shallowEqual(
+        seatPresentation(previous),
+        seatPresentation(state.settings),
+      );
       previous = state.settings;
+      const lifecycle = starts.current;
+      const owner = overlayOwner.current;
+      const currentRevision = visualChange ? ++revision : revision;
+      if (visualChange) cancelRefresh();
       const sent = [...routes.current].map(([seatId, generation]) =>
         request({
           kind: "send",
@@ -922,19 +952,46 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       );
       void Promise.all(sent)
         .then(() => {
-          // Let each company apply the new presentation before refreshing its
-          // paused image behind the settings controls.
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              if (mounted.current && overlayOwner.current)
-                void request({ kind: "refresh-overlay" }).catch((failure) =>
-                  setError(String(failure)),
-                );
+          if (!visualChange) return;
+          /** A superseded preference, overlay owner or world cannot request another frame capture. */
+          const current = () =>
+            live &&
+            mounted.current &&
+            lifecycle === starts.current &&
+            currentRevision === revision &&
+            !!owner &&
+            owner === overlayOwner.current;
+          if (!current()) return;
+          // Collapse rapid preference changes, then let both company documents
+          // paint their final presentation before capturing the paused screens.
+          refreshTimer = window.setTimeout(() => {
+            if (!current()) return;
+            paintFrame = requestAnimationFrame(() => {
+              if (!current()) return;
+              paintFrame = requestAnimationFrame(() => {
+                if (current())
+                  void request({ kind: "refresh-overlay" }).catch((failure) => {
+                    if (current()) setError(String(failure));
+                  });
+              });
             });
-          });
+          }, 120);
         })
-        .catch((failure) => setError(String(failure)));
+        .catch((failure) => {
+          if (
+            live &&
+            mounted.current &&
+            lifecycle === starts.current &&
+            currentRevision === revision
+          )
+            setError(String(failure));
+        });
     });
+    return () => {
+      live = false;
+      stop();
+      cancelRefresh();
+    };
   }, [settingsOwner, manualOwner]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const active = globalRequest.current;
@@ -980,7 +1037,9 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           ),
         )?.id ?? "local-p1")
       : undefined);
-  overlayOwner.current = globalOwner;
+  useLayoutEffect(() => {
+    overlayOwner.current = globalOwner;
+  }, [globalOwner]);
   useEffect(() => {
     if (stage !== "play") return;
     if (!globalOwner) setBackdrop(undefined);

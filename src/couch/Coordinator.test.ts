@@ -36,6 +36,7 @@ function fixture(
   onAccountView = jest.fn(),
   onMenu = jest.fn(),
   onSharedView = jest.fn(),
+  onSettings = jest.fn(),
 ) {
   jest.useFakeTimers();
   let world: World;
@@ -95,6 +96,7 @@ function fixture(
     onAccountView,
     onMenu,
     onSharedView,
+    onSettings,
   });
   const messages: Record<string, SeatEvent[]> = {};
   const clients = seats.map((seat) => {
@@ -126,6 +128,7 @@ function fixture(
     onAccountView,
     onMenu,
     onSharedView,
+    onSettings,
     world: () => world,
     dispose,
   };
@@ -735,3 +738,36 @@ it("keeps shared presentation on an active company after P1 retires without chan
     f.dispose();
   }
 });
+
+it.each(["global-menu", "global-settings"] as const)(
+  "accepts %s only during live play outside the closing checkpoint",
+  async (kind) => {
+    const f = fixture();
+    const callback = kind === "global-menu" ? f.onMenu : f.onSettings;
+    const request = { kind, requestId: "global-request" };
+    let saving: Promise<void> | undefined;
+    try {
+      expect(f.coordinator.receive("local-p2", 0, request)).toBe(false);
+      expect(
+        f.coordinator.receive("local-p2", 1, {
+          ...request,
+          sender: "local-p1",
+        }),
+      ).toBe(false);
+      expect(f.coordinator.receive("local-p2", 1, request)).toBe(true);
+      expect(callback).toHaveBeenCalledTimes(1);
+      saving = f.coordinator.save(true);
+      expect(f.coordinator.getSnapshot().closing).toBe(true);
+      expect(f.coordinator.receive("local-p2", 1, request)).toBe(false);
+      expect(callback).toHaveBeenCalledTimes(1);
+      await saving;
+      f.worker.onerror?.();
+      expect(f.coordinator.getSnapshot().phase).toBe("faulted");
+      expect(f.coordinator.receive("local-p2", 1, request)).toBe(false);
+      expect(callback).toHaveBeenCalledTimes(1);
+    } finally {
+      await saving?.catch(() => {});
+      f.dispose();
+    }
+  },
+);

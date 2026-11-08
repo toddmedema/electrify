@@ -60,6 +60,8 @@ const mapDispatchToProps = (
     },
     // Mirrors Manual: Settings can now be reached mid-game too, so back has to return wherever
     // the player came from rather than always dropping them at the main menu
+    /** Let a shared modal owner close Settings without navigating a company's card history.
+     * Standalone Settings retains its ordinary return-to-caller navigation. */
     onBack: () => {
       if (ownProps?.onBack) ownProps.onBack();
       else dispatch(navigateBack());

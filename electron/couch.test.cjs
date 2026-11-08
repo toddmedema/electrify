@@ -732,3 +732,42 @@ test("closing after native window destruction still disposes every seat and port
   assert.equal(manager.seats.size, 0);
   assert.equal(events.length, before);
 });
+
+test("late renderer exits cannot revoke a replacement or publish after teardown", async () => {
+  const { manager, views, events } = fixture();
+  await manager.open({ seats });
+  const oldView = views[0];
+  manager.close();
+  const closedEvents = events.length;
+  oldView.webContents.emit("render-process-gone");
+  assert.equal(events.length, closedEvents);
+  await manager.open({ seats });
+  const current = manager.seats.get("local-p1");
+  const generation = current.generation;
+  const before = events.length;
+  oldView.webContents.emit("render-process-gone");
+  assert.equal(events.length, before);
+  assert.equal(manager.seats.get("local-p1"), current);
+  assert.equal(current.generation, generation);
+  current.view.webContents.emit("render-process-gone");
+  assert.equal(events.at(-1).kind, "seat-lost");
+  assert.equal(events.at(-1).generation, generation);
+  assert.equal(events.at(-1).reason, "renderer-crash");
+  assert.ok(current.generation > generation);
+  manager.close();
+});
+
+test("intentional teardown retires seat routes before synchronous native exit callbacks", async () => {
+  const { manager, views, events } = fixture();
+  await manager.open({ seats });
+  for (const view of views) {
+    const close = view.webContents.close;
+    view.webContents.close = () => {
+      view.webContents.emit("render-process-gone");
+      close();
+    };
+  }
+  manager.close();
+  assert.ok(views.every((view) => view.closed));
+  assert.equal(events.filter((event) => event.kind === "seat-lost").length, 0);
+});

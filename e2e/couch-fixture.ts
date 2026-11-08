@@ -39,6 +39,9 @@ export interface CouchFixture<Actor extends Page | Frame> {
   checkpoint: () => World | undefined;
   layout: () => CouchLayout | undefined;
   backdropRevision: () => number;
+  refreshRequests: () => number;
+  presentationMessages: () => number;
+  settleCaptures: () => Promise<void>;
   cancelledText: () => readonly string[];
   failNextNative: (kind: "setup" | "list-saves" | "close") => void;
   input: (actions: Record<string, DesktopInputAction[]>) => Promise<void>;
@@ -101,6 +104,15 @@ export async function createCouchFixture(
   let readyCaptureId = 0;
   let overlayCommitted = false;
   let captureQueue = Promise.resolve();
+  let refreshRequests = 0;
+  let presentationMessages = 0;
+  const settleCaptures = async () => {
+    for (;;) {
+      const pending = captureQueue;
+      await pending;
+      if (pending === captureQueue) return;
+    }
+  };
   const cancelledText: string[] = [];
   const failNextNative = new Set<string>();
   const iframeId = (id: string) => `couch-fixture-${id}`;
@@ -355,6 +367,7 @@ export async function createCouchFixture(
           }
           return false;
         case "refresh-overlay":
+          refreshRequests++;
           scheduleCapture();
           return {
             available: true,
@@ -370,7 +383,9 @@ export async function createCouchFixture(
             route &&
             route.generation === raw.generation &&
             !actorClosed(route.page)
-          )
+          ) {
+            if ((raw.message as { kind?: string })?.kind === "presentation")
+              presentationMessages++;
             await route.page.evaluate(
               (detail) =>
                 window.dispatchEvent(
@@ -378,6 +393,7 @@ export async function createCouchFixture(
                 ),
               raw.message,
             );
+          }
           return;
         }
         case "open": {
@@ -579,6 +595,9 @@ export async function createCouchFixture(
     checkpoint: () => saved,
     layout: () => layout,
     backdropRevision: () => readyCaptureId,
+    refreshRequests: () => refreshRequests,
+    presentationMessages: () => presentationMessages,
+    settleCaptures,
     cancelledText: () => cancelledText,
     failNextNative: (kind) => {
       failNextNative.add(kind);
@@ -587,11 +606,7 @@ export async function createCouchFixture(
       // Native capturePage never changes the shell's DOM. Embedded capture
       // temporarily suppresses only that outer DOM, so finish its capture work
       // before resolving semantic keyboard scope or focus for a controller frame.
-      for (;;) {
-        const pending = captureQueue;
-        await pending;
-        if (pending === captureQueue) break;
-      }
+      await settleCaptures();
       // Main selects routes before asynchronous renderer handlers bind a joining device.
       const sampledBindings = new Map(bindings);
       const sampledPlaying = playing;

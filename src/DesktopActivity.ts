@@ -95,6 +95,8 @@ export function startDesktopActivity(
     }
     return activity;
   };
+  /** Advance each run's high-water marks even on restored or inactive baselines.
+   * Only new live highlights enter the native queue, so resume and opt-in cannot replay history. */
   const update = () => {
     const current = store.getState();
     const activity = publish(current);

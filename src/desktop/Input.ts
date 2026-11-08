@@ -114,6 +114,8 @@ export function startDesktopInput(
         present({ active: false, connected: false, glyphs: {} });
       });
   };
+  /** Change the owning seat's requested speed, preserving its last running choice and ready-up intent.
+   * Solo input activates only the speed buttons available in the current layout. */
   const speed = (action: "pause" | "speedUp" | "speedDown") => {
     if (window.electrifyCouch?.role === "seat") {
       const clock = store.getState().game.multiplayer?.clock;
@@ -232,6 +234,8 @@ export function startDesktopInput(
     charts[next].focus();
     revealControl(charts[next]);
   };
+  /** Apply controller intent to real focused controls in this document's current input scope.
+   * Couch menu actions cross the authenticated shell route; company tool actions remain local. */
   const act = (action: DesktopInputAction) => {
     const scope = inputScope();
     if (action === "menu" || action === "menuAlt") {
