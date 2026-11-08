@@ -1,0 +1,40 @@
+# Electrify
+
+> A free electricity strategy game about running a utility: build power plants, balance supply and demand, and manage reliability, costs, and emissions.
+
+## Start here
+
+- [About the game](https://electrifygame.com/about.html): Background, sources, and contact.
+- [Scenario directory](https://electrifygame.com/scenarios.html): Every official challenge and Legacy campaign chapter, with links to play.
+- [How Electrify plays](https://electrifygame.com/power-grid-simulator.html): A guide for new players.
+- [Classroom resources](https://electrifygame.com/classroom.html): Lesson plan and printable worksheet.
+
+## Official scenarios
+
+These pages describe playable simulations. Legacy chapters belong to one continuing campaign, and their play links open campaign setup.
+
+- [Deep Freeze](https://electrifygame.com/scenarios/deep-freeze.html): A grid built for Texas heat is about to face a very different test. You have four years to prepare for the February 2021 freeze.
+- [Data Center Boom](https://electrifygame.com/scenarios/data-center-boom.html): The data centers arrive in 2026. Their power needs are much bigger than your small city utility, and residents still need affordable electricity.
+- [Carbon Fee](https://electrifygame.com/scenarios/carbon-fee.html): Coal helped build your company. Now every tonne of emissions comes with a bill, and replacing the old fleet will take time and money.
+- [The Shale Boom](https://electrifygame.com/scenarios/the-shale-boom.html): Cheap gas looks like an opportunity. A power plant is a long commitment to a fuel price that can change much faster.
+- [Paradise](https://electrifygame.com/scenarios/paradise.html): There is plenty of sun and wind. There is also an imported-oil bill, and no neighboring grid to call when local supply falls short.
+- [Rise of Renewables](https://electrifygame.com/scenarios/rise-of-renewables.html): Clean power is getting cheaper. Demand is growing too. Waiting for a better deal has a cost of its own.
+- [Hurricane Season](https://electrifygame.com/scenarios/hurricane-season.html): A storm can take several power plants out of service at once. Build a Puerto Rico grid with enough room to recover.
+- [The End of an Era](https://electrifygame.com/scenarios/the-end-of-an-era.html): Your company's coal plants are getting old. Their replacements need years to build, and competitors are ready to take the customers you lose.
+- [Heatwave + Drought](https://electrifygame.com/scenarios/heatwave-and-drought.html): Cooling demand rises just as the water runs low. Hydro produces less, and hot rivers limit nuclear cooling too.
+- [Sudden Nuclear Shutdown](https://electrifygame.com/scenarios/sudden-nuclear-shutdown.html): Your biggest reactor will stop producing power. It will stay offline for the rest of your term. Have something ready to take its place.
+- [Wildfire Emergency](https://electrifygame.com/scenarios/wildfire-emergency.html): Most of your spare power comes from somewhere else. In early 2025, wildfire will cut the capacity of your northern connection by 90%.
+- [Load Shedding](https://electrifygame.com/scenarios/load-shedding.html): The coal fleet keeps breaking down. Diesel can cover some of the gap, but it cannot make the problem cheap to ignore.
+- [The River Runs Dry](https://electrifygame.com/scenarios/the-river-runs-dry.html): A full reservoir makes the opening years look comfortable. An El Niño drought will test a grid built around the Zambezi.
+- [Delhi Summer](https://electrifygame.com/scenarios/delhi-summer.html): Every summer needs more cooling. The heat also cuts power plant output, and a late monsoon delays the relief you were counting on.
+- [Across the Valley](https://electrifygame.com/scenarios/across-the-valley.html): The utility across the valley is for sale. Buying it brings more customers, more equipment and more obligations than the purchase price alone suggests.
+- [Chernobyl: Recovery](https://electrifygame.com/scenarios/chernobyl-recovery.html): March 1986. The disaster is one month away. Your task is to restore electricity service while paying for a damaged reactor that will never produce power again.
+- [First Light (1882–1901)](https://electrifygame.com/scenarios/legacy-first-light.html): One small coal plant. One hundred customers. Start a utility in 1882 and leave the next generation a company worth inheriting.
+- [Beyond the Dynamo (1902–1921)](https://electrifygame.com/scenarios/legacy-beyond-the-dynamo.html): Electricity is becoming a bigger business. Grow the customer base without leaving your successor a pile of debt.
+- [Affordable Growth (1922–1941)](https://electrifygame.com/scenarios/legacy-affordable-growth.html): The company has grown. Now keep electricity affordable as more people depend on it.
+- [Everybody Plugs In (1942–1961)](https://electrifygame.com/scenarios/legacy-everybody-plugs-in.html): More homes and businesses need electricity. Build enough room for growth before a busy grid becomes a fragile one.
+- [The Power You Don't Build (1962–1981)](https://electrifygame.com/scenarios/legacy-the-power-you-dont-build.html): The oil shocks are coming. Help homes and businesses use less electricity, and find out what that saves your utility.
+- [The Price of Power (1982–2001)](https://electrifygame.com/scenarios/legacy-the-price-of-power.html): Imported power is part of the plan. When regional supply tightens, your company needs both electricity and cash to fall back on.
+- [The Sun Moves the Peak (2002–2021)](https://electrifygame.com/scenarios/legacy-the-sun-moves-the-peak.html): Solar can change the shape of your supply chart. The hard hours may be waiting on the other side of sunset.
+- [Renew the Grid (2022–2041)](https://electrifygame.com/scenarios/legacy-renew-the-grid.html): More customers need electricity, and old oil equipment is losing its usefulness. Replace the legacy you no longer want to pass on.
+- [A Different Kind of Growth (2042–2061)](https://electrifygame.com/scenarios/legacy-a-different-kind-of-growth.html): The final generation inherits nearly two centuries of decisions. Meet growing demand while keeping the whole term within a carbon budget.
