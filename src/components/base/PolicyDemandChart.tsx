@@ -1,11 +1,40 @@
 import * as React from "react";
 import { Box } from "@mui/material";
 import UPlotChart from "./UPlotChart";
-import { chartPalette } from "../../Theme";
+import ChartLegend from "./ChartLegend";
+import { chartPalette, getThemeVersion, subscribeThemeMode } from "../../Theme";
 import { formatWatts } from "../../helpers/Format";
 import { DESIGN_WIDTH, MAX_CHART_SCALE } from "./UPlotHelpers";
 
 const CHART_HEIGHT = 140;
+// The changed plan's dash, shared by the plotted series and its legend swatch.
+const CHANGED_DASH = [6, 4];
+
+/** The key to PolicyDemandChart, drawn with the plotted lines' own colours and dash. */
+export function PolicyDemandLegend({
+  labels = ["Current plan", "With this change"],
+}: {
+  labels?: [string, string];
+}) {
+  React.useSyncExternalStore(
+    subscribeThemeMode,
+    getThemeVersion,
+    getThemeVersion,
+  );
+  const palette = chartPalette();
+  return (
+    <ChartLegend
+      items={[
+        { name: labels[0], color: palette.demand, dash: "none" },
+        {
+          name: labels[1],
+          color: palette.supply,
+          dash: CHANGED_DASH.join(" "),
+        },
+      ]}
+    />
+  );
+}
 
 /**
  * Holds the chart's exact footprint while the estimate is computed. UPlotChart scales its height
@@ -94,7 +123,7 @@ export default function PolicyDemandChart({
           {
             label: labels[1],
             stroke: chartPalette().supply,
-            dash: [6, 4],
+            dash: CHANGED_DASH,
             width: 2,
           },
         ],

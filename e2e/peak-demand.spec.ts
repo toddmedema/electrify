@@ -30,7 +30,7 @@ for (const theme of ["light", "dark"]) {
       await window.selectOption(offer === "Time-of-use tariff" ? "22" : "9");
       await expect(dialog).toContainText(
         offer === "Time-of-use tariff"
-          ? "Use shifts to 02:00-05:00"
+          ? "Use shifts to 02:00–05:00"
           : "Half of demand from factories, mines and data centers drops 20%",
       );
       // The workspace header has no contextual help. Its foreground game menu

@@ -695,23 +695,28 @@ export function GameAppBar(props: Props) {
   );
 }
 
+// The mapped props are compared shallowly, so the active save keeps one object per id and name
+// rather than a fresh one on every store update.
+let activeSaveCache: StateProps["activeSave"];
+function selectActiveSave(state: AppStateType): StateProps["activeSave"] {
+  const id = state.saves?.activeId;
+  if (!id) return undefined;
+  const name =
+    state.saves?.entries.find((entry) => entry.id === id)?.name ||
+    state.saves?.pendingName ||
+    "Current game";
+  if (activeSaveCache?.id !== id || activeSaveCache.name !== name)
+    activeSaveCache = { id, name };
+  return activeSaveCache;
+}
+
 const mapStateToProps = (state: AppStateType): StateProps => ({
   activeEvents: selectActiveEventGroups(state),
   upcomingEvents: selectUpcomingStoryEvents(state),
   game: state.game,
   evidenceRequest: state.ui.evidenceRequest,
   facilityDragActive: state.ui.facilityDragActive,
-  activeSave: state.saves?.activeId
-    ? {
-        id: state.saves.activeId,
-        name:
-          state.saves.entries.find(
-            (entry) => entry.id === state.saves?.activeId,
-          )?.name ||
-          state.saves.pendingName ||
-          "Current game",
-      }
-    : undefined,
+  activeSave: selectActiveSave(state),
   saveState: state.saves?.saveState,
   savedAt: state.saves?.savedAt,
   saveError: state.saves?.saveError,

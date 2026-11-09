@@ -150,7 +150,7 @@ export default function UtilityOfferDialog({
             ? "Valley’s inherited nuclear purchase has expired."
             : game.date.year >= 2017
               ? `Valley’s nuclear purchase is now ${formatWatts(nuclear.deliverableW)} deliverable, reduced in January 2017.`
-              : "Valley’s nuclear purchase falls from 152 to 76 MW deliverable in January 2017."
+              : `Valley’s nuclear purchase falls from ${formatWatts(152e6)} to ${formatWatts(76e6)} deliverable in January 2017.`
           : "Ridge has steadier industrial demand, with greater exposure to gas prices and wind."}
       </Typography>
       <Typography component="h3" variant="subtitle2" sx={{ mt: 2 }}>

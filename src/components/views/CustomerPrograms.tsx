@@ -85,6 +85,7 @@ import {
   pendingLabel,
 } from "../../helpers/PolicyStatus";
 import PolicyDemandChart, {
+  PolicyDemandLegend,
   PolicyDemandChartPlaceholder,
 } from "../base/PolicyDemandChart";
 import { generateForecastTimeline } from "../../reducers/Game";
@@ -630,7 +631,7 @@ function PolicyProgramDetail({
                 }}
                 helperText={
                   selected === "timeOfUse"
-                    ? `Use shifts to ${policyWindowLabel((startHour + 4) % 24, 3).replace("–", "-")}`
+                    ? `Use shifts to ${policyWindowLabel((startHour + 4) % 24, 3)}`
                     : undefined
                 }
               >
@@ -657,9 +658,7 @@ function PolicyProgramDetail({
             <Alert severity="error">{error}</Alert>
           ) : (
             <>
-              <Typography variant="body2">
-                Current plan ━ · With this change ┄
-              </Typography>
+              <PolicyDemandLegend />
               {result ? (
                 <PolicyDemandChart
                   current={result.current}

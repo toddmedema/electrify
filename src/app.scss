@@ -914,8 +914,9 @@ $topbar_height: 56px;
   align-items: center;
   gap: $space-3;
   min-height: 50px;
-  padding: 0 max($space-2, env(safe-area-inset-right)) 0
-    max($space-2, env(safe-area-inset-left));
+  // The same 16px gutter as the header above it.
+  padding: 0 max($space-4, env(safe-area-inset-right)) 0
+    max($space-4, env(safe-area-inset-left));
   border-bottom: $border_accent;
 }
 
@@ -923,11 +924,15 @@ $topbar_height: 56px;
   display: flex;
   align-items: baseline;
   gap: $space-1;
+  // Room for the widest common size, so the slider track doesn't shift as the value changes.
+  min-width: 6.5ch;
   white-space: nowrap;
 }
 
 .constructionCapacitySlider.MuiSlider-root {
   min-width: 80px;
+  // Half a coarse-pointer thumb overhangs the track; keep it clear of the size label.
+  margin-inline: $space-1;
 }
 
 .constructionSortButton {
@@ -941,8 +946,6 @@ $topbar_height: 56px;
 @media screen and (min-width: $phone_width) {
   .constructionControls {
     gap: $space-4;
-    padding-left: max($space-4, env(safe-area-inset-left));
-    padding-right: max($space-4, env(safe-area-inset-right));
   }
 }
 
@@ -2262,7 +2265,7 @@ $pane_header_height: 48px;
 }
 
 .generatorComparisonRemove.MuiIconButton-root {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   justify-self: end;
   color: var(--font-color-faded);
@@ -2282,10 +2285,14 @@ $pane_header_height: 48px;
   }
 }
 
+// Icon, name and remove share the first row; the figures take the full width beneath, so a
+// narrow tray wraps them at their own separators rather than into one-word fragments.
 .generatorComparisonChoice {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
+  // Chips of different heights share a top edge rather than centring their rows.
+  align-content: start;
   column-gap: 8px;
   padding: 8px;
   border: 1px solid var(--border-tile);
@@ -2293,13 +2300,32 @@ $pane_header_height: 48px;
   background: var(--bg-primary);
 
   img {
-    grid-row: 1 / span 3;
+    grid-row: 1;
     width: 34px;
     height: 34px;
   }
 
   .MuiTypography-root {
     min-width: 0;
+  }
+
+  .MuiTypography-caption {
+    grid-column: 1 / -1;
+  }
+}
+
+// Three chips across a narrow side tool leave no room for the name between icon and remove:
+// it drops below them instead of colliding with the remove button.
+.generatorComparisonChoice {
+  container-type: inline-size;
+
+  .nowrap {
+    white-space: nowrap;
+  }
+}
+@container (max-width: 159px) {
+  .generatorComparisonChoice > .MuiTypography-body2 {
+    grid-column: 1 / -1;
   }
 }
 
@@ -5281,7 +5307,14 @@ $homeSmokeCycle: 5.6s;
     gap: 12px;
     padding: 0 12px 8px;
   }
+  // Label, value and note share row tracks across the card, so a label that wraps lowers every
+  // value beside it rather than leaving the values at different heights.
   .buildOptionMetric {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    // Its own tracks sit flush; the card's 12px gap still separates rows of metrics.
+    row-gap: 0;
     min-width: 0;
   }
   .buildOptionSparkline {
