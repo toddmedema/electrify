@@ -528,7 +528,7 @@ test("location constraints keep Play valid only where the starting fleet is viab
 
   const play = page
     .locator(".customSetupActions")
-    .getByRole("button", { name: "Play", exact: true });
+    .getByRole("button", { name: "Start game", exact: true });
   await expect(play).toBeEnabled();
   await page.getByRole("combobox", { name: "Facility type" }).click();
   await page.getByRole("option", { name: "Geothermal" }).click();

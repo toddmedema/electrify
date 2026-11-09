@@ -176,7 +176,6 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
           ? `${completed ? "Review" : "Start"} ${name}`
           : `View ${name} details`
       }
-      showChevron={!isTutorial}
       avatar={
         <Badge
           overlap="circular"

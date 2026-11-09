@@ -149,7 +149,7 @@ test("history stays below priorities in a short pane without duplicate upcoming 
   await page.keyboard.press("Escape");
   await page
     .locator(".customSetupActions")
-    .getByRole("button", { name: "Play", exact: true })
+    .getByRole("button", { name: "Start game", exact: true })
     .click();
   await page
     .locator("#navfooter")

@@ -89,22 +89,27 @@ function renderLibrary(overrides: Partial<SaveLibraryState> = {}) {
   };
 }
 
+const savedTimeFormat: Intl.DateTimeFormatOptions = {
+  dateStyle: "medium",
+  timeStyle: "short",
+};
+
 beforeEach(() => jest.clearAllMocks());
 
 it("shows game date, difficulty and location above the saved date and time", () => {
   renderLibrary();
   const row = screen.getByRole("article", { name: "Wind experiment" });
   expect(
-    within(row).getByText("Jun 2035 - Manager - Ontario"),
+    within(row).getByText("Jun 2035 · Medium · Ontario"),
   ).toBeInTheDocument();
   expect(within(row).queryByText("Rise of Renewables")).not.toBeInTheDocument();
   expect(within(row).queryByText("In progress")).not.toBeInTheDocument();
   const time = within(row).getByLabelText(
-    `Saved ${new Date(entry().savedAt).toLocaleString()}`,
+    `Saved ${new Date(entry().savedAt).toLocaleString(undefined, savedTimeFormat)}`,
   );
   expect(time).toHaveAttribute("datetime", entry().savedAt);
   expect(time).toHaveTextContent(
-    `Saved ${new Date(entry().savedAt).toLocaleString()}`,
+    `Saved ${new Date(entry().savedAt).toLocaleString(undefined, savedTimeFormat)}`,
   );
 });
 

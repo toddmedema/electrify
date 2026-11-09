@@ -17,7 +17,7 @@ test("chart-heavy controls remain responsive during pointer gestures", async ({
   await page.getByRole("button", { name: "View Custom Game details" }).click();
   await page
     .locator(".customSetupActions")
-    .getByRole("button", { name: "Play", exact: true })
+    .getByRole("button", { name: "Start game", exact: true })
     .click();
 
   // A divider drag used to destroy and reconstruct every visible uPlot on every pointer step.

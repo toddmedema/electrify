@@ -11,7 +11,7 @@ function showLink() {
       <ManualLink entry={MANUAL_ENTRY.POWER_AND_ENERGY} />
     </Provider>,
   );
-  return screen.getByRole("button", { name: "What is Power and Energy?" });
+  return screen.getByRole("button", { name: "What is Power and energy?" });
 }
 
 // Runs the hover delay, then the fade the preview leaves on

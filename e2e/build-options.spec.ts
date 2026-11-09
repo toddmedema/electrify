@@ -535,7 +535,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("option", { name: "2030", exact: true }).click();
     await page
       .locator(".customSetupActions")
-      .getByRole("button", { name: "Play", exact: true })
+      .getByRole("button", { name: "Start game", exact: true })
       .click();
     await expect(page.locator("#appbar:visible").first()).toBeVisible();
     const build = await openBuild(page);

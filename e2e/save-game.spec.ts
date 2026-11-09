@@ -1,6 +1,7 @@
 import path from "path";
 import { openSavedGames } from "./layout";
 import { expect, test, Page } from "./fixtures";
+import { difficultyLabel } from "../src/Constants";
 import { decodeSave } from "../src/SaveEncoding";
 import type { SaveGameType } from "../src/Types";
 import { copySavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
@@ -66,7 +67,7 @@ for (const theme of ["light", "dark"]) {
       original.metadata.scenarioName,
     );
     const subtitle = originalRow.getByText(
-      `${original.metadata.date.month} ${original.metadata.date.year} - ${original.metadata.difficulty} - ${original.metadata.locationName}`,
+      `${original.metadata.date.month} ${original.metadata.date.year} · ${difficultyLabel(original.metadata.difficulty)} · ${original.metadata.locationName}`,
       { exact: true },
     );
     await expect(subtitle).toBeVisible();
@@ -105,7 +106,10 @@ for (const theme of ["light", "dark"]) {
       }),
     ).toBe(true);
     await expect(originalRow.locator("time")).toHaveText(
-      `Saved ${new Date(original.metadata.savedAt).toLocaleString()}`,
+      `Saved ${new Date(original.metadata.savedAt).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })}`,
     );
     await expect(originalRow).not.toContainText("In progress");
     await expect(page.getByText(/Currently open/)).toHaveCount(0);

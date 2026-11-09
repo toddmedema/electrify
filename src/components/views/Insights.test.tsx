@@ -723,9 +723,9 @@ describe("Insights layers", () => {
       </Provider>,
     );
     await user.click(
-      screen.getByRole("button", { name: "What is Reserve Capacity?" }),
+      screen.getByRole("button", { name: "What is Reserve capacity?" }),
     );
-    expect(store.getState().ui.manualHelpEntry).toBe("Reserve Capacity");
+    expect(store.getState().ui.manualHelpEntry).toBe("Reserve capacity");
   });
 
   it("points every chart layer at a manual entry that exists", () => {

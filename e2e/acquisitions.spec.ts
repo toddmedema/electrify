@@ -265,7 +265,7 @@ for (const theme of ["light", "dark"] as const) {
       });
       await expect(
         manual.getByRole("heading", {
-          name: "Interest Rates & Inflation",
+          name: "Interest rates & inflation",
           exact: true,
         }),
       ).toBeVisible();

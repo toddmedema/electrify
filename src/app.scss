@@ -396,7 +396,7 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
   }
 }
 
-.keyboardMenu :focus {
+.keyboardMenu :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -616,6 +616,12 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
     min-height: 48px;
     min-width: 0;
     padding: 8px 12px;
+    white-space: nowrap;
+  }
+  @media screen and (max-width: ($phone_width - 1px)) {
+    .MuiTab-root {
+      padding-inline: 8px;
+    }
   }
 }
 .achievementList {
@@ -3133,7 +3139,8 @@ $pane_header_height: 48px;
     position: absolute;
     img {
       width: 100%;
-      max-width: $absmaxdimension;
+      // The home menu's logo width, so loading hands off without the logo jumping in size.
+      max-width: 680px;
       margin: auto;
       display: block;
     }
@@ -3460,6 +3467,29 @@ $pane_header_height: 48px;
     text-align: center;
   }
 
+  // Facility cards line up with the settings column at every width, not just side by side.
+  .customSetupFacilities .build-list-item {
+    margin-inline: 0;
+  }
+
+  .customSetupLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .customSeedField {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .MuiTextField-root {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+  }
+
   @media #{$pane_media} {
     .customSetupColumns {
       display: grid;
@@ -3474,11 +3504,6 @@ $pane_header_height: 48px;
     }
 
     .customSetupFacilities {
-      .build-list-item {
-        margin-right: 0;
-        margin-left: 0;
-      }
-
       .customFacilityPicker {
         justify-content: flex-start;
         padding-right: 0;
@@ -3539,9 +3564,9 @@ $pane_header_height: 48px;
       background: transparent;
       color: $font_color_primary;
 
+      // Flush with the cards below: a negative inset let the button's fill overhang them.
       .MuiButton-root {
         flex: 0 0 auto;
-        margin-right: -8px;
         text-transform: none;
       }
     }
@@ -6897,6 +6922,11 @@ $programs_column: 800px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  // Keep the Back button's focus ring clear of the title it sits beside.
+  .MuiIconButton-root + .screenHeaderTitle {
+    margin-left: $space-2;
   }
 }
 

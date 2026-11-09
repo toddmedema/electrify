@@ -197,16 +197,16 @@ describe("deep linking into a manual entry", () => {
   it("carries the entry through navigation", () => {
     const state = cardReducer(
       undefined,
-      navigate({ name: "MANUAL", entry: "Total Cost of Energy" }),
+      navigate({ name: "MANUAL", entry: "Total cost of energy" }),
     );
     expect(state.name).toBe("MANUAL");
-    expect(state.entry).toBe("Total Cost of Energy");
+    expect(state.entry).toBe("Total cost of energy");
   });
 
   it("doesn't reopen the last deep link on a later plain visit", () => {
     const deepLinked = cardReducer(
       undefined,
-      navigate({ name: "MANUAL", entry: "Ramp Rate" }),
+      navigate({ name: "MANUAL", entry: "Ramp rate" }),
     );
     const back = cardReducer(deepLinked, navigateBack());
     expect(back.entry).toBeUndefined();
@@ -220,10 +220,10 @@ describe("contextual manual help", () => {
   });
   it("keeps the catalog paused when help closes and restores speed only on leaving the catalog", () => {
     const catalog = gameReducer(running("FAST"), navigate("BUILD_STORAGE"));
-    const reading = gameReducer(catalog, manualHelpOpen("Power and Energy"));
+    const reading = gameReducer(catalog, manualHelpOpen("Power and energy"));
     const related = gameReducer(
       reading,
-      manualHelpOpen("Round-trip Efficiency"),
+      manualHelpOpen("Round-trip efficiency"),
     );
     const returned = gameReducer(related, manualHelpClose());
     expect(returned.speed).toBe("PAUSED");
@@ -232,7 +232,7 @@ describe("contextual manual help", () => {
   it("pauses running Insights, blocks speed changes, and restores its prior speed", () => {
     const reading = gameReducer(
       running("NORMAL"),
-      manualHelpOpen("Reserve Capacity"),
+      manualHelpOpen("Reserve capacity"),
     );
     expect(reading.speed).toBe("PAUSED");
     expect(gameReducer(reading, setSpeed("FAST")).speed).toBe("PAUSED");
