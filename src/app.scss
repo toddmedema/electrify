@@ -3770,11 +3770,17 @@ $pane_header_height: 48px;
     }
   }
 
-  // Sized to the caption's 16 px line, in the label's faded tone
+  // Centred on the caption's 16 px line, in the label's faded tone. Flex
+  // centring holds across fonts, where a baseline offset drifts.
+  .facilityStat dt:has(> .facilityStatIcon) {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
   .facilityStatIcon {
+    flex-shrink: 0;
     font-size: 14px;
-    margin-right: 4px;
-    vertical-align: -2px;
   }
 
   .facilityStatValue {
