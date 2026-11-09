@@ -210,7 +210,8 @@ const STATUS_TOOLTIP_MS = 2500;
 const STATUS_WORD: Record<Exclude<GridHealthState, "stable">, string> = {
   "low-reserve": "Low",
   "at-limit": "Limit",
-  "blackout-ahead": "Soon",
+  // Names the coming problem; "Soon" alone did not say what was coming.
+  "blackout-ahead": "Short",
   blackout: "Blackout",
 };
 

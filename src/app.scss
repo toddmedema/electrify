@@ -51,10 +51,11 @@
   --border-selected: #aaccec;
   --border-subtle: #dfe5ec;
   /* The diagonal on a reverse-flow row bar. It is the channel that tells a reverse bar from
-     a forward one, so it has to clear 3:1 against the 0.18 tint it sits on: 3.20:1 here.
+     a forward one, so it has to clear 3:1 against the neutral --flow-fill it sits on (about
+     4.3:1 here). It stays neutral: interaction blue made a charging battery read as selected.
      Nothing that dark can sit under the row's label, which is why the hatch is confined to a
      band below the text rather than painted across the whole fill. */
-  --flow-hatch: rgba(0, 132, 248, 0.8);
+  --flow-hatch: color-mix(in srgb, var(--font-color-primary) 60%, transparent);
   // Forward flow behind every fleet row: one neutral tint, so rows read as one system
   --flow-fill: color-mix(in srgb, var(--font-color-primary) 7%, transparent);
   --border-strong: #a4b0bd;
@@ -133,8 +134,8 @@
   --bg-selected: #132f46;
   --border-selected: #285f86;
   --border-subtle: #202b38;
-  /* Going lighter rather than darker against the near-black row: 3.40:1 on the same tint */
-  --flow-hatch: rgba(144, 202, 249, 0.55);
+  /* Going lighter rather than darker against the near-black row: about 5:1 on the same fill */
+  --flow-hatch: color-mix(in srgb, var(--font-color-primary) 55%, transparent);
   --border-strong: #48586b;
   --border-tile: #2b3948;
   --font-color-primary: #e6edf5;
@@ -1002,12 +1003,23 @@ $topbar_height: 56px;
 }
 
 // Stack cash and date on narrow phones so the year stays visible beside all four speed choices.
+// Three stacked lines set tight, with the date at caption size, keep at least 4px clear of the
+// 56px toolbar's edges.
 @media screen and (max-width: ($narrow_phone_width - 1px)) {
   #topbar .gameStatus {
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
-    line-height: 1.2;
+    line-height: 1.1;
+  }
+
+  #topbar .gameStatus .gameStatusValue.weak {
+    font-size: var(--font-size-caption);
+  }
+
+  #topbar .gameStatus .gameBalance,
+  #topbar .gameStatus .gameMonthlyProfit {
+    line-height: 1.1;
   }
 }
 
@@ -2575,11 +2587,14 @@ $pane_header_height: 48px;
   }
 }
 
+// A lifted row is opaque, so its text never collides with the row it passes over.
 .facilityRow.dragging,
 .transmissionLine.dragging {
   outline: 1px solid var(--interactive-blue);
   outline-offset: -1px;
   border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  box-shadow: 0 4px 12px var(--shadow-ring);
 }
 
 .scenarioDossier {
@@ -3971,6 +3986,8 @@ $pane_header_height: 48px;
   // Selection uses a surface change; every enabled speed remains a blue control.
   .speedToggles {
     .MuiToggleButton-root {
+      // Equal segments, so the selection doesn't shift with each label's width.
+      min-width: 48px;
       padding: $space-1 $space-3;
       border-color: var(--border-tile);
       color: var(--interactive-strong);
@@ -3991,6 +4008,20 @@ $pane_header_height: 48px;
       &.Mui-disabled {
         color: $font_color_faded;
       }
+    }
+
+    // Coarse pointers floor every control at 44px; speed segments keep their equal 48px.
+    @media (pointer: coarse) {
+      .MuiToggleButton-root {
+        min-width: 48px !important;
+      }
+    }
+
+    // The faint selected fill alone falls short of 3:1, so a solid bar and heavier label mark
+    // the running speed. Co-op draws its own markers along that edge instead.
+    &:not(.multiplayerSpeedToggles) .MuiToggleButton-root.Mui-selected {
+      box-shadow: inset 0 -2px 0 var(--interactive-strong);
+      font-weight: 700;
     }
   }
 
@@ -4239,7 +4270,7 @@ $pane_header_height: 48px;
   }
 
   .outputProgressBar {
-    // One neutral tint for forward flow on every row; reverse flow sets its own inline
+    // One neutral tint for flow in either direction; the reverse hatch carries direction
     background-color: var(--flow-fill);
     position: absolute;
     inset: 0;

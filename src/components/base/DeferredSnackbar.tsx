@@ -40,6 +40,12 @@ export default function DeferredSnackbar({
         overModal ? { vertical: "top", horizontal: "center" } : anchorOrigin
       }
       open={!!props.open && (!modal || !!overModal)}
+      // MUI stacks toasts above modals, so an open Select menu or popover (also at the modal
+      // level) sat under the toast. Below that level, above the app bar, drawers and tutorial
+      // HUD instead; a toast over a dialog still needs the higher layer.
+      sx={
+        overModal ? undefined : { zIndex: (theme) => theme.zIndex.modal - 40 }
+      }
     />
   );
 }
