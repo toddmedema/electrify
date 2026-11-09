@@ -81,7 +81,8 @@ it("shows the score so far beside where the current pace ends it", () => {
   renderDetails({ ...game, monthlyHistory });
   const outlook = screen.getByRole("region", { name: "Score outlook" });
   expect(outlook).toHaveTextContent("Score now");
-  expect(outlook).toHaveTextContent("Projected final");
+  // This fleet is projected to lose, so the full-term figure is labelled as hypothetical
+  expect(outlook).toHaveTextContent("If the run continued");
   expect(
     screen.getByRole("region", { name: "Score breakdown" }),
   ).toHaveTextContent(/TWh supplied/i);
@@ -123,6 +124,9 @@ it("keeps one concise loss line under the score chart and removes redundant goal
     screen.getByRole("img", { name: /Projected loss periods shaded/ }),
   ).toBeInTheDocument();
   expect(screen.getAllByText(/Projected loss:/)).toHaveLength(1);
+  // The run would end early, so the full-term score is labelled as hypothetical
+  expect(outlook).toHaveTextContent("If the run continued");
+  expect(outlook).not.toHaveTextContent("Projected final");
   expect(status).toContainHTML("<strong>Projected loss:</strong>");
   expect(status).toHaveClass("insightsWarning");
   expect(within(status).getByTestId("WarningAmberIcon")).toBeInTheDocument();

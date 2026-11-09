@@ -218,7 +218,7 @@ it("surfaces the researched Uri outcome metrics", () => {
     }),
     expect.objectContaining({
       label: "Electricity rate · before → after",
-      value: "$0.09/kWh → $0.1/kWh",
+      value: "$0.090/kWh → $0.100/kWh",
     }),
     expect.objectContaining({
       label: "Cash stayed above $0 through Mar 2021",
@@ -245,7 +245,7 @@ it("retains native connection metrics before and after arrival without waiting f
     },
     {
       label: "Electricity rate",
-      value: "$0.1/kWh → $0.12/kWh",
+      value: "$0.100/kWh → $0.120/kWh",
       concept: "rate",
     },
   ]);
@@ -263,7 +263,7 @@ it("retains native connection metrics before and after arrival without waiting f
     },
     {
       label: "Electricity rate",
-      value: "$0.1/kWh → $0.12/kWh",
+      value: "$0.100/kWh → $0.120/kWh",
       concept: "rate",
     },
   ]);

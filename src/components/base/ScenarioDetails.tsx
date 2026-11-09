@@ -150,7 +150,12 @@ function ScoreOutlook({
         </div>
         {!ended && (
           <div>
-            <dt>Projected final</dt>
+            {/* A projected loss ends the run early, so the full-term score is hypothetical */}
+            <dt>
+              {outlook?.status === "loss"
+                ? "If the run continued"
+                : "Projected final"}
+            </dt>
             <dd>
               {projection ? formatScore(projection.final) : "—"}
               {change !== 0 && (
