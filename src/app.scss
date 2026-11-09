@@ -1003,8 +1003,8 @@ $topbar_height: 56px;
 }
 
 // Stack cash and date on narrow phones so the year stays visible beside all four speed choices.
-// Three stacked lines set tight, with the date at caption size, keep at least 4px clear of the
-// 56px toolbar's edges.
+// Three stacked lines clear the 56px toolbar's edges by nearly 4px: cash and date keep line boxes
+// tall enough for their glyphs, and the profit between them is set solid at caption size.
 @media screen and (max-width: ($narrow_phone_width - 1px)) {
   #topbar .gameStatus {
     flex-direction: column;
@@ -1013,13 +1013,21 @@ $topbar_height: 56px;
     line-height: 1.1;
   }
 
+  #topbar .gameStatus .gameBalance {
+    line-height: 1.25;
+  }
+
+  #topbar .gameStatus .gameMonthlyProfit,
   #topbar .gameStatus .gameStatusValue.weak {
     font-size: var(--font-size-caption);
   }
 
-  #topbar .gameStatus .gameBalance,
   #topbar .gameStatus .gameMonthlyProfit {
-    line-height: 1.1;
+    line-height: 1;
+  }
+
+  #topbar .gameStatus .gameStatusValue.weak {
+    line-height: 1.2;
   }
 }
 

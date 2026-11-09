@@ -74,7 +74,7 @@ export function RunDebrief({
   debrief: VictoryDebriefType;
   scenarioId?: number;
   outcome: VictoryType["outcome"];
-  /** The ending already stated above the debrief, so an objective doesn't repeat it */
+  /** The ending already stated above the debrief, so a lone objective doesn't repeat it */
   leadMessage?: string;
 }): React.JSX.Element {
   const units = useUnits();
@@ -133,6 +133,9 @@ export function RunDebrief({
             Objectives
           </Typography>
           {objectiveResults.map((result) => {
+            // With one objective the ending above already gives its reason; with several,
+            // each keeps its own so the player can tell which one the ending meant.
+            const repeatsLead = objectiveResults.length === 1;
             const first =
               "fromMonth" in result.objective
                 ? result.objective.fromMonth
@@ -186,15 +189,16 @@ export function RunDebrief({
                 <Typography component="p" variant="body2">
                   {objectiveObservedText(result)}
                 </Typography>
-                {result.reason && !leadMessage?.includes(result.reason) && (
-                  <Typography
-                    component="p"
-                    variant="body2"
-                    color="text.secondary"
-                  >
-                    {result.reason}
-                  </Typography>
-                )}
+                {result.reason &&
+                  !(repeatsLead && leadMessage?.includes(result.reason)) && (
+                    <Typography
+                      component="p"
+                      variant="body2"
+                      color="text.secondary"
+                    >
+                      {result.reason}
+                    </Typography>
+                  )}
               </Box>
             );
           })}

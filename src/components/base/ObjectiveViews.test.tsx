@@ -135,6 +135,34 @@ it("dates a built-in scenario's objectives and doesn't repeat the ending already
   expect(region).not.toHaveTextContent(bills.reason!);
 });
 
+it("keeps each objective's reason when several objectives share the debrief", () => {
+  const other: ObjectiveResult = {
+    ...bills,
+    id: "other",
+    label: "Limit bills",
+  };
+  render(
+    <RunDebrief
+      outcome="fired"
+      leadMessage={`You were fired. ${bills.reason}`}
+      debrief={{
+        startingFleet: [],
+        finalFleet: [],
+        startingCash: 0,
+        finalCash: 0,
+        finalCustomers: 0,
+        reliability: 1,
+        unservedWh: 0,
+        kgco2e: 0,
+        highlights: [],
+        objectiveResults: [bills, other],
+      }}
+    />,
+  );
+  const region = screen.getByRole("region", { name: "Objective results" });
+  expect(within(region).getAllByText(bills.reason!)).toHaveLength(2);
+});
+
 for (const view of ["live", "saved"] as const) {
   it.each(["completed", "fired", "bankrupt"] as const)(
     `${view} results show objectives only when the mission failed (%s)`,
