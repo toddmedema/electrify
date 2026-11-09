@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import type { Frame, Locator, Page } from "@playwright/test";
+import type { Frame, Locator, Page, Route } from "@playwright/test";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { createCouchFixture } from "./couch-fixture";
@@ -38,8 +38,87 @@ async function startCouch<Actor extends Page | Frame>(
     .getByRole("dialog")
     .getByRole("button", { name: "Start for everyone", exact: true });
   await expect(start).toBeDisabled();
+  const openReplies = await couch.settledNativeRequests("open");
   await couch.input({ "101": ["confirm"], "202": ["confirm"] });
   await expect.poll(() => couch.seats.size).toBe(2);
+  // The fixture publishes seat actors before navigating them. The open reply
+  // follows both navigations and attachments; map size alone is not readiness.
+  await expect
+    .poll(() => couch.settledNativeRequests("open"))
+    .toBe(openReplies + 1);
+  for (const [id, { page: seat }] of couch.seats) {
+    await expect(seat.locator("html")).toHaveAttribute("data-couch-seat", id);
+    await expect(seat.locator("#appbar:visible")).toBeVisible();
+  }
+}
+
+for (const nativeBindings of [false, true]) {
+  test(`TV couch startup waits for delayed P2 navigation (native bindings=${nativeBindings})`, async ({
+    context,
+    page,
+  }, info) => {
+    test.skip(
+      !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
+      "Seat startup readiness in both palettes and transports",
+    );
+    const couch = nativeBindings
+      ? await createCouchFixture(context, page, { nativeBindings: true })
+      : await createCouchFixture(context, page);
+    let documentReleased = false;
+    let releaseDocument!: () => void;
+    const heldDocument = new Promise<void>((resolve) => {
+      releaseDocument = resolve;
+    });
+    let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+    await context.route(/\?couchSeat=local-p2&generation=/, async (route) => {
+      // Fault injection only: make the real second-seat document slower than
+      // the map-size poll. Startup must await readiness, not an assumed delay.
+      releaseTimer = setTimeout(() => {
+        documentReleased = true;
+        releaseDocument();
+      }, 1000);
+      await heldDocument;
+      await route.continue();
+    });
+    try {
+      await startCouch(page, couch);
+      const openReplies = await couch.settledNativeRequests("open");
+      await info.attach("startup-readiness", {
+        body: JSON.stringify({
+          documentReleased,
+          openReplies,
+          seats: [...couch.seats].map(([id, route]) => ({
+            id,
+            generation: route.generation,
+            url: route.page.url(),
+          })),
+        }),
+        contentType: "application/json",
+      });
+      expect(documentReleased).toBe(true);
+      expect(openReplies).toBe(1);
+      const p1 = couch.seats.get("local-p1")!.page;
+      const p2 = couch.seats.get("local-p2")!.page;
+      await couch.input({ "101": ["menu"] });
+      const menu = page.getByRole("dialog", { name: "Game menu", exact: true });
+      await expect(menu).toBeVisible();
+      await menu
+        .getByRole("button", { name: "Return to game", exact: true })
+        .click();
+      await expect(menu).toHaveCount(0);
+      await couch.input({ "202": ["build"] });
+      await expect(
+        p2.getByRole("region", { name: "Build", exact: true }),
+      ).toBeVisible();
+      await expect(
+        p1.getByRole("region", { name: "Build", exact: true }),
+      ).toHaveCount(0);
+    } finally {
+      clearTimeout(releaseTimer);
+      releaseDocument();
+      await context.unrouteAll({ behavior: "wait" });
+    }
+  });
 }
 
 const speedControls = (seat: Page | Frame) =>
@@ -1241,4 +1320,464 @@ test("TV couch coalesces visual preferences without capturing audio changes", as
   await expect(settings).toHaveCount(0);
   for (const seat of [p1, p2])
     await expect(clock(seat)).toHaveAttribute("data-active-speed", "NORMAL");
+});
+
+for (const committed of [false, true]) {
+  test(`TV couch rejected controller binding retries without false ownership (native committed=${committed})`, async ({
+    context,
+    page,
+  }, info) => {
+    test.skip(
+      !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
+      "Binding recovery in both palettes",
+    );
+    const couch = await createCouchFixture(context, page);
+    await page.goto("/");
+    await page
+      .getByRole("button", { name: "Play with friends", exact: true })
+      .click();
+    await page.getByRole("button", { name: "On this TV", exact: true }).click();
+    const setup = page.getByRole("dialog", {
+      name: "On this TV · Two players",
+      exact: true,
+    });
+    await expect(setup).toBeVisible();
+    await couch.input({ "202": ["confirm"] });
+    await expect(
+      setup.getByText("Controller joined", { exact: true }),
+    ).toHaveCount(1);
+    const nativeBefore = couch.nativeBindings();
+    expect(nativeBefore).toEqual({ "local-p1": "202" });
+    const pending = couch.deferNextBind(committed);
+    await couch.input({ "101": ["confirm"] });
+    await pending.requested;
+    await expect
+      .soft(setup.getByText("Controller joined", { exact: true }))
+      .toHaveCount(1);
+    await expect
+      .soft(setup.getByRole("button", { name: "Choose a game", exact: true }))
+      .toBeDisabled();
+    await couch.input({ "101": ["confirm"] });
+    expect(couch.bindAttempts()).toHaveLength(2);
+    pending.settle("reject");
+    await expect
+      .soft(setup.getByRole("alert"))
+      .toHaveText(
+        `Error: Fixture bind failure${committed ? ". Native routing changed but recovery did not finish. Press Confirm again." : ""}`,
+      );
+    await expect
+      .soft(setup.getByText("Controller joined", { exact: true }))
+      .toHaveCount(1);
+    await expect
+      .soft(setup.getByRole("button", { name: "Choose a game", exact: true }))
+      .toBeDisabled();
+    expect(couch.nativeBindings()).toEqual(
+      committed ? { ...nativeBefore, "local-p2": "101" } : nativeBefore,
+    );
+    await couch.input({ "101": ["confirm"] });
+    await expect.poll(() => couch.bindAttempts().length).toBe(3);
+    await expect(
+      setup.getByText("Controller joined", { exact: true }),
+    ).toHaveCount(2);
+    await expect(
+      setup.getByRole("button", { name: "Choose a game", exact: true }),
+    ).toBeEnabled();
+    expect(couch.nativeBindings()).toEqual({
+      "local-p1": "202",
+      "local-p2": "101",
+    });
+  });
+}
+
+for (const outcome of ["resolve", "reject"] as const) {
+  test(`TV couch stale controller binding ${outcome} cannot affect a new setup`, async ({
+    context,
+    page,
+  }, info) => {
+    test.skip(
+      info.project.name !== "tv-1080-light",
+      "Lifecycle guard is independent of palette",
+    );
+    const couch = await createCouchFixture(context, page);
+    await page.goto("/");
+    const open = async () => {
+      const replies = await couch.settledNativeRequests("setup");
+      await page
+        .getByRole("button", { name: "Play with friends", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "On this TV", exact: true })
+        .click();
+      const setup = page.getByRole("dialog", {
+        name: "On this TV · Two players",
+        exact: true,
+      });
+      await expect(setup).toBeVisible();
+      await expect
+        .poll(() => couch.settledNativeRequests("setup"))
+        .toBe(replies + 1);
+      return setup;
+    };
+    const setup = await open();
+    const pending = couch.deferNextBind(true);
+    await couch.input({ "101": ["confirm"] });
+    await pending.requested;
+    // The explicit close finishes first; hold the unmount cleanup at its real
+    // asynchronous transport boundary while the next setup accepts input.
+    const closing = couch.deferNativeClose(2);
+    const closeReplies = await couch.settledNativeRequests("close");
+    await setup.getByRole("button", { name: "Back", exact: true }).click();
+    await closing.requested;
+    const newer = await open();
+    const fresh = couch.deferNextBind(true);
+    await couch.input({ "202": ["confirm"] });
+    await fresh.requested;
+    expect(couch.nativeBindings()).toEqual({ "local-p1": "202" });
+    closing.settle();
+    await expect
+      .poll(() => couch.settledNativeRequests("close"))
+      .toBe(closeReplies + 2);
+    expect
+      .soft(couch.nativeBindings(), "old close cannot revoke the fresh binding")
+      .toEqual({ "local-p1": "202" });
+    fresh.settle("resolve");
+    await expect(
+      newer.getByText("Controller joined", { exact: true }),
+    ).toHaveCount(1);
+    pending.settle(outcome);
+    // The native reply is released before this second real event/frame reaches the shell.
+    await couch.input({});
+    await expect(newer.getByRole("alert")).toHaveCount(0);
+    await expect(
+      newer.getByText("Controller joined", { exact: true }),
+    ).toHaveCount(1);
+    expect(couch.nativeBindings()).toEqual({ "local-p1": "202" });
+    await couch.input({ "101": ["confirm"] });
+    await expect(
+      newer.getByText("Controller joined", { exact: true }),
+    ).toHaveCount(2);
+    expect(couch.nativeBindings()).toEqual({
+      "local-p1": "202",
+      "local-p2": "101",
+    });
+  });
+}
+
+test("TV couch play controller binding recovery preserves the other company and renderer blocker", async ({
+  context,
+  page,
+}, info) => {
+  test.skip(
+    !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
+    "Live controller recovery in both palettes",
+  );
+  const couch = await createCouchFixture(context, page);
+  await startCouch(page, couch);
+  const p1 = couch.seats.get("local-p1")!.page;
+  const p2 = couch.seats.get("local-p2")!.page;
+  // Native seat creation precedes the shell's final startup reply. Exercise the
+  // real menu, whose owner waits for startup, before sending replacement input.
+  const gameMenu = page.getByRole("dialog", { name: "Game menu", exact: true });
+  await expect
+    .poll(async () => {
+      if (await gameMenu.isVisible()) return true;
+      await couch.input({ "101": ["menu"] });
+      return gameMenu.isVisible();
+    })
+    .toBe(true);
+  await gameMenu
+    .getByRole("button", { name: "Return to game", exact: true })
+    .click();
+  await expect(gameMenu).toHaveCount(0);
+  await couch.setConnected({ "101": false, "303": true });
+  const paused = page.getByRole("dialog", {
+    name: "TV session paused",
+    exact: true,
+  });
+  await expect(paused).toBeVisible();
+  const pending = couch.deferNextBind(true);
+  await couch.input({ "303": ["confirm"] });
+  await pending.requested;
+  await couch.setConnected({ "202": false });
+  await expect
+    .soft(
+      paused.getByText(
+        "P1 Utility: controller disconnected. Reconnect its assigned controller.",
+        { exact: true },
+      ),
+    )
+    .toBeVisible();
+  await expect(
+    paused.getByText(
+      "P2 Utility: controller disconnected. Reconnect its assigned controller.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  pending.settle("reject");
+  await couch.setConnected({ "202": true });
+  await expect
+    .soft(
+      paused.getByText(
+        "P1 Utility: controller disconnected. Reconnect its assigned controller.",
+        { exact: true },
+      ),
+    )
+    .toBeVisible();
+  expect(couch.nativeBindings()).toEqual({
+    "local-p1": "303",
+    "local-p2": "202",
+  });
+  await couch.input({ "303": ["confirm"] });
+  await expect.poll(() => couch.bindAttempts().length).toBe(4);
+  await expect(paused).toHaveCount(0);
+  await couch.input({ "303": ["build"] });
+  await expect(
+    p1.getByRole("region", { name: "Build", exact: true }),
+  ).toBeVisible();
+  await expect(
+    p2.getByRole("region", { name: "Build", exact: true }),
+  ).toHaveCount(0);
+  await couch.input({ "303": ["back"] });
+  await expect(
+    p1.getByRole("region", { name: "Build", exact: true }),
+  ).toHaveCount(0);
+  const lost = couch.seats.get("local-p2")!;
+  await page.evaluate(
+    ({ generation }) => {
+      window.dispatchEvent(
+        new CustomEvent("couchNativeEvent", {
+          detail: {
+            kind: "seat-lost",
+            seatId: "local-p2",
+            generation,
+            reason: "regression route loss",
+          },
+        }),
+      );
+    },
+    { generation: lost.generation },
+  );
+  await expect(
+    paused.getByRole("button", { name: "Restore P2 Utility", exact: true }),
+  ).toBeVisible();
+  await couch.setConnected({ "303": false, "404": true });
+  await couch.input({ "404": ["confirm"] });
+  await expect
+    .poll(() => couch.nativeBindings())
+    .toEqual({ "local-p1": "404", "local-p2": "202" });
+  await expect(
+    paused.getByText(
+      "P1 Utility: controller disconnected. Reconnect its assigned controller.",
+      { exact: true },
+    ),
+  ).toHaveCount(0);
+  await expect(
+    paused.getByRole("button", { name: "Restore P2 Utility", exact: true }),
+  ).toBeVisible();
+});
+
+for (const statusFailure of [false, true]) {
+  test(`TV couch retries native-owned P2 after partial reload failure and P1 loss (status unavailable=${statusFailure})`, async ({
+    context,
+    page,
+  }, info) => {
+    test.skip(
+      !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
+      "Real native binding recovery in both palettes",
+    );
+    const couch = await createCouchFixture(context, page, {
+      nativeBindings: true,
+    });
+    await startCouch(page, couch);
+    const gameMenu = page.getByRole("dialog", {
+      name: "Game menu",
+      exact: true,
+    });
+    await expect
+      .poll(async () => {
+        if (await gameMenu.isVisible()) return true;
+        await couch.input({ "101": ["menu"] });
+        return gameMenu.isVisible();
+      })
+      .toBe(true);
+    await gameMenu
+      .getByRole("button", { name: "Return to game", exact: true })
+      .click();
+    await expect(gameMenu).toHaveCount(0);
+    const original = couch.nativeEvidence().topology;
+    expect(original["local-p1"].hasPort).toBe(true);
+    expect(original["local-p2"].hasPort).toBe(true);
+    const statusReplies = await couch.settledNativeRequests("status");
+    await couch.setConnected({ "202": false, "404": true });
+    couch.failNextNativeReload("local-p2");
+    if (statusFailure) couch.failNextNative("status");
+    await couch.input({ "404": ["confirm"] });
+    await expect
+      .poll(() => couch.settledNativeRequests("status"))
+      .toBe(statusReplies + 1);
+    expect(couch.nativeBindings()).toEqual({
+      "local-p1": "101",
+      "local-p2": "404",
+    });
+    const failed = couch.nativeEvidence();
+    expect(failed.errors).toEqual(["Error: Fixture native reload failure"]);
+    expect(failed.topology["local-p2"].generation).toBeGreaterThan(
+      original["local-p2"].generation,
+    );
+    expect(failed.topology["local-p2"].hasPort).toBe(false);
+    const paused = page.getByRole("dialog", {
+      name: "TV session paused",
+      exact: true,
+    });
+    await expect(
+      paused.getByRole("button", { name: "Restore P2 Utility", exact: true }),
+    ).toBeVisible();
+    await expect(
+      paused.getByText(
+        "P2 Utility: controller disconnected. Reconnect its assigned controller.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await couch.setConnected({ "101": false });
+    await expect(
+      paused.getByText(
+        "P1 Utility: controller disconnected. Reconnect its assigned controller.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await couch.input({ "404": ["confirm"] });
+    await expect
+      .poll(() => couch.settledNativeRequests("status"))
+      .toBe(statusReplies + 2);
+    const expectedErrors = ["Error: Fixture native reload failure"];
+    if (statusFailure) {
+      // The first status was unavailable, so this attempt discovers ownership
+      // through the actual native exclusivity rejection and a recovered status.
+      expect(couch.bindAttempts().at(-1)).toEqual({
+        seatId: "local-p1",
+        controllerId: "404",
+      });
+      expectedErrors.push(
+        "Error: That controller already owns another company",
+      );
+      expect(couch.nativeEvidence().errors).toEqual(expectedErrors);
+      expect(couch.nativeEvidence().topology["local-p2"]).toEqual(
+        failed.topology["local-p2"],
+      );
+      await couch.input({ "404": ["confirm"] });
+      await expect
+        .poll(() => couch.settledNativeRequests("status"))
+        .toBe(statusReplies + 3);
+    }
+    expect
+      .soft(couch.bindAttempts().at(-1))
+      .toEqual({ seatId: "local-p2", controllerId: "404" });
+    expect(couch.nativeEvidence().errors).toEqual(expectedErrors);
+    expect(couch.nativeBindings()).toEqual({
+      "local-p1": "101",
+      "local-p2": "404",
+    });
+    await expect(
+      paused.getByText(
+        "P2 Utility: controller disconnected. Reconnect its assigned controller.",
+        { exact: true },
+      ),
+    ).toHaveCount(0);
+    await expect(
+      paused.getByRole("button", { name: "Restore P2 Utility", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      paused.getByText(
+        "P1 Utility: controller disconnected. Reconnect its assigned controller.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    const recoveredP2 = couch.nativeEvidence().topology["local-p2"];
+    expect(recoveredP2.hasPort).toBe(true);
+    expect(recoveredP2.generation).toBeGreaterThan(
+      failed.topology["local-p2"].generation,
+    );
+    expect(couch.nativeEvidence().topology["local-p1"]).toEqual(
+      original["local-p1"],
+    );
+    await couch.setConnected({ "303": true });
+    await couch.input({ "303": ["confirm"] });
+    await expect
+      .poll(() => couch.nativeBindings())
+      .toEqual({ "local-p1": "303", "local-p2": "404" });
+    await expect(paused).toHaveCount(0);
+    const p1 = couch.seats.get("local-p1")!.page;
+    const p2 = couch.seats.get("local-p2")!.page;
+    await couch.input({ "404": ["build"] });
+    await expect(
+      p2.getByRole("region", { name: "Build", exact: true }),
+    ).toBeVisible();
+    await expect(
+      p1.getByRole("region", { name: "Build", exact: true }),
+    ).toHaveCount(0);
+    expect(couch.nativeEvidence().topology["local-p2"]).toEqual(recoveredP2);
+    expect(couch.nativeEvidence().calls.inputFrame).toBeGreaterThan(0);
+    expect(couch.nativeEvidence().calls.bind).toBe(statusFailure ? 6 : 5);
+  });
+}
+
+test("TV couch keeps controller input usable when one backdrop capture stalls", async ({
+  context,
+  page,
+}, info) => {
+  test.skip(
+    !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
+    "Bounded native capture behavior in both palettes",
+  );
+  const couch = await createCouchFixture(context, page, {
+    nativeBindings: true,
+  });
+  await startCouch(page, couch);
+  const p1 = couch.seats.get("local-p1")!.page;
+  const p2 = couch.seats.get("local-p2")!.page;
+  for (const seat of [p1, p2])
+    await expect(seat.locator("#appbar:visible")).toBeVisible();
+  await couch.settleCaptures();
+  const revision = couch.backdropRevision();
+  // A real pending font request blocks screenshot preparation in every browser
+  // world. Native capture failure must omit only that seat, not trap input.
+  let stalledFont: Route | undefined;
+  await p1.route("**/couch-capture-stall.woff2", (route) => {
+    stalledFont = route;
+  });
+  await p1.evaluate(() => {
+    const font = new FontFace(
+      "CouchCaptureStall",
+      "url('/couch-capture-stall.woff2')",
+    );
+    document.fonts.add(font);
+    void font.load().catch(() => {});
+  });
+  await expect.poll(() => !!stalledFont).toBe(true);
+  await expect
+    .poll(() => p1.evaluate(() => document.fonts.status))
+    .toBe("loading");
+  try {
+    await couch.input({ "101": ["menu"] });
+    const menu = page.getByRole("dialog", { name: "Game menu", exact: true });
+    await expect(menu).toBeVisible();
+    await expect.poll(couch.backdropRevision).toBeGreaterThan(revision);
+    await expect(
+      page.locator('[data-couch-backdrop-seat="local-p1"]'),
+    ).toHaveCount(0);
+    await expect(
+      page.locator('[data-couch-backdrop-seat="local-p2"]'),
+    ).toBeVisible();
+    await couch.input({ "101": ["back"] });
+    await expect(menu).toHaveCount(0);
+    await couch.input({ "202": ["build"] });
+    await expect(
+      p2.getByRole("region", { name: "Build", exact: true }),
+    ).toBeVisible();
+    await expect(
+      p1.getByRole("region", { name: "Build", exact: true }),
+    ).toHaveCount(0);
+  } finally {
+    await stalledFont?.abort();
+  }
 });

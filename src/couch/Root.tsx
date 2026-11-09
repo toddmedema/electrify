@@ -30,7 +30,8 @@ import type { CouchSummary } from "./Protocol";
 import { seatPresentation } from "./Presentation";
 import SettingsContainer from "../components/views/SettingsContainer";
 import { beginCouchPlatform } from "./Platform";
-import { nextControllerSeat } from "./Bindings";
+import type { BindingFailure } from "./Bindings";
+import { nextControllerSeat, settleBindingFailures } from "./Bindings";
 import type { EvidenceTargetType, GameType } from "../Types";
 import CouchToolbar from "./Toolbar";
 import CouchBackdrop from "./Backdrop";
@@ -114,6 +115,10 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const platform = useRef<ReturnType<typeof beginCouchPlatform>>();
   const mounted = useRef(false);
   const starts = useRef(0);
+  const bindingAttempts = useRef(
+    new Map<string, { epoch: number; controllerId: string }>(),
+  );
+  const bindingFailures = useRef(new Map<string, BindingFailure>());
   const leaveRequest = useRef<{
     seatId: string;
     generation: number;
@@ -153,6 +158,102 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     exitOwner,
     busy,
     devices,
+  };
+
+  /** Native may change routing before a later reload fails. Keep the affected company
+   * unready until an acknowledged attempt matches current native status; never restore
+   * an old routing snapshot or release another company's recovery blocker. */
+  const bindController = async (seat: Seat, controllerId: string) => {
+    const attempt = { epoch: starts.current, controllerId };
+    const owner = coordinator.current;
+    let nativeOwner: string | undefined;
+    bindingAttempts.current.set(seat.id, attempt);
+    const pending = { ...current.current.bindings };
+    delete pending[seat.id];
+    current.current.bindings = pending;
+    setBindings(pending);
+    setReady((value) => value.filter((id) => id !== seat.id));
+    const isCurrent = () =>
+      mounted.current &&
+      starts.current === attempt.epoch &&
+      coordinator.current === owner &&
+      bindingAttempts.current.get(seat.id) === attempt;
+    try {
+      let acknowledged = false;
+      let bindFailure: unknown;
+      try {
+        await request({ kind: "bind", seatId: seat.id, controllerId });
+        acknowledged = true;
+      } catch (failure) {
+        bindFailure = failure;
+      }
+      if (!isCurrent()) return;
+      const status = (await request({ kind: "status" })) as {
+        bindings?: Record<string, string>;
+        devices?: Device[];
+      };
+      if (!isCurrent()) return;
+      nativeOwner = current.current.seats.find(
+        (candidate) => status.bindings?.[candidate.id] === controllerId,
+      )?.id;
+      if (!acknowledged) {
+        const reason =
+          bindFailure instanceof Error
+            ? bindFailure.message
+            : String(bindFailure);
+        throw new Error(
+          `${reason}${status.bindings?.[seat.id] === controllerId ? ". Native routing changed but recovery did not finish. Press Confirm again." : ""}`,
+        );
+      }
+      if (
+        status.bindings?.[seat.id] !== controllerId ||
+        !status.devices?.some(
+          (device) => device.id === controllerId && device.connected,
+        ) ||
+        !current.current.devices.some(
+          (device) => device.id === controllerId && device.connected,
+        )
+      ) {
+        throw new Error(
+          "The controller assignment could not be confirmed. Press Confirm again.",
+        );
+      }
+      const accepted = { ...current.current.bindings, [seat.id]: controllerId };
+      current.current.bindings = accepted;
+      setBindings(accepted);
+      const cleared = settleBindingFailures(
+        bindingFailures.current,
+        attempt.epoch,
+        seat.id,
+        controllerId,
+      );
+      if (cleared.length)
+        setError((value) => (cleared.includes(value) ? "" : value));
+      if (
+        owner &&
+        owner === coordinator.current &&
+        current.current.stage === "play"
+      ) {
+        owner.setBlocker(`controller:${seat.id}`, null);
+        owner.requireReady(
+          `${seat.name}: replacement controller assigned. Everyone select a speed to resume.`,
+        );
+      }
+    } catch (failure) {
+      if (isCurrent()) {
+        const message = String(failure);
+        bindingFailures.current.set(seat.id, {
+          epoch: attempt.epoch,
+          message,
+          controllerId,
+          nativeOwner,
+        });
+        setError(message);
+      }
+    } finally {
+      if (bindingAttempts.current.get(seat.id) === attempt)
+        bindingAttempts.current.delete(seat.id);
+    }
   };
 
   /** Revoke pending starts and leave the shell even if native teardown fails.
@@ -450,38 +551,43 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
             );
           }
         }
+        for (const [id, attempt] of bindingAttempts.current) {
+          if (attempt.epoch !== starts.current)
+            bindingAttempts.current.delete(id);
+        }
         for (const device of next) {
           if (!device.actions.includes("confirm")) continue;
+          if (
+            [...bindingAttempts.current.values()].some(
+              (attempt) => attempt.controllerId === device.id,
+            )
+          )
+            continue;
           const assigned = Object.entries(state.bindings).find(
             ([, id]) => id === device.id,
           )?.[0];
-          if (!assigned && (state.stage === "join" || state.stage === "play")) {
+          if (
+            !assigned &&
+            !state.busy &&
+            (state.stage === "join" || state.stage === "play")
+          ) {
+            // A rejected reload can leave native ownership ahead of accepted UI state.
+            // Use it only to retry that company; acceptance still requires a fresh ack.
+            const nativeOwner = [...bindingFailures.current.values()].find(
+              (failure) =>
+                failure.epoch === starts.current &&
+                failure.controllerId === device.id &&
+                failure.nativeOwner !== undefined,
+            )?.nativeOwner;
             const free = nextControllerSeat(
               state.seats,
               state.bindings,
               connected,
               retired,
+              nativeOwner,
+              new Set(bindingAttempts.current.keys()),
             );
-            if (free) {
-              state.bindings = { ...state.bindings, [free.id]: device.id };
-              setBindings(state.bindings);
-              void request({
-                kind: "bind",
-                seatId: free.id,
-                controllerId: device.id,
-              })
-                .then(() => {
-                  coordinator.current?.setBlocker(
-                    `controller:${free.id}`,
-                    null,
-                  );
-                  if (state.stage === "play")
-                    coordinator.current?.requireReady(
-                      `${free.name}: replacement controller assigned. Everyone select a speed to resume.`,
-                    );
-                })
-                .catch((failure) => setError(String(failure)));
-            }
+            if (free) void bindController(free, device.id);
           } else if (assigned && state.stage === "confirm") {
             setReady((value) =>
               value.includes(assigned) ? value : [...value, assigned],
@@ -1180,6 +1286,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
                     void request({ kind: "read-save", id: slot.id })
                       .then(async (value) => {
                         const world = value as World;
+                        starts.current++;
                         await request({ kind: "reset-bindings" });
                         setSaved(world);
                         setSaveTime(slot.updatedAt);
