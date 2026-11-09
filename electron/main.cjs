@@ -650,7 +650,7 @@ function openExternal(url) {
       "discord.com",
     ];
     if (!allowed.includes(parsed.hostname)) return;
-    openExternalUrl(shell, parsed.href);
+    openExternalUrl(shell, parsed.href, { dialog });
   } catch {
     // Ignore malformed or unapproved external URLs.
   }

@@ -57,3 +57,68 @@ test("Linux depot builds open links through xdg-open with the host environment",
     assert.deepEqual(opened, [["shell", href]]);
   }
 });
+
+test("all exact runtime entries are removed while other path entries retain their order", () => {
+  const env = {
+    ELECTRIFY_RUNTIME_LIB: "/depot/lib",
+    LD_LIBRARY_PATH: ":/depot/lib:/host/lib::/depot/lib:/depot/lib-extra:",
+  };
+  assert.deepEqual(hostEnvironment(env), {
+    LD_LIBRARY_PATH: ":/host/lib::/depot/lib-extra:",
+  });
+  assert.equal(env.ELECTRIFY_RUNTIME_LIB, "/depot/lib");
+  assert.deepEqual(
+    hostEnvironment({
+      ELECTRIFY_RUNTIME_LIB: "/depot/lib",
+      LD_LIBRARY_PATH: "/depot/lib::/depot/lib",
+    }),
+    {},
+  );
+});
+
+for (const code of [1, 4, null]) {
+  for (const response of [0, 1]) {
+    test(`xdg-open exit ${code} requires explicit retry (response ${response})`, async () => {
+      const opened = [];
+      const prompts = [];
+      const child = Object.assign(new EventEmitter(), { unref() {} });
+      const href = "https://electrifygame.com/";
+      openExternalUrl({ openExternal: (url) => opened.push(url) }, href, {
+        env: { ELECTRIFY_RUNTIME_LIB: "/depot/lib" },
+        platform: "linux",
+        launch: () => child,
+        dialog: {
+          showMessageBox: async (options) => {
+            prompts.push(options);
+            return { response };
+          },
+        },
+      });
+      child.emit("spawn");
+      child.emit("exit", code);
+      child.emit("error", new Error("late failure"));
+      assert.deepEqual(opened, []);
+      assert.equal(prompts.length, 1);
+      assert.equal(prompts[0].defaultId, 0);
+      assert.equal(prompts[0].cancelId, 0);
+      await new Promise(setImmediate);
+      assert.deepEqual(opened, response === 1 ? [href] : []);
+    });
+  }
+}
+
+test("successful xdg-open exits do not prompt or retry", () => {
+  const child = Object.assign(new EventEmitter(), { unref() {} });
+  openExternalUrl(
+    { openExternal: () => assert.fail("unexpected retry") },
+    "https://electrifygame.com/",
+    {
+      env: { ELECTRIFY_RUNTIME_LIB: "/depot/lib" },
+      platform: "linux",
+      launch: () => child,
+      dialog: { showMessageBox: () => assert.fail("unexpected prompt") },
+    },
+  );
+  child.emit("spawn");
+  child.emit("exit", 0);
+});
