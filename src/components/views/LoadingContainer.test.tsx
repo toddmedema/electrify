@@ -1,3 +1,4 @@
+import { initWeather } from "../../data/Weather";
 import cardReducer, {
   initialCard,
   navigate,
@@ -115,7 +116,7 @@ it.each([start.type, resume.type, launchRun.type])(
 it("names the place and the remedy for a weather download failure, logging the cause", () => {
   const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
   try {
-    const raw = "Could not load the weather for SF: Failed to fetch";
+    const raw = "Could not fetch the weather for SF: Failed to fetch";
     expect(weatherFailureMessage(raw, "San Francisco, CA")).toBe(
       "Could not load the weather for San Francisco, CA. Check your connection and try again.",
     );
@@ -123,6 +124,59 @@ it("names the place and the remedy for a weather download failure, logging the c
     const other = '"x" is not a location id weather can be loaded for';
     expect(weatherFailureMessage(other, "Anywhere")).toBe(other);
   } finally {
+    warn.mockRestore();
+  }
+});
+
+it.each([404, 503])(
+  "preserves HTTP %s weather failures without connection advice",
+  async (status) => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status });
+    try {
+      const failure = await new Promise<string | undefined>((resolve) =>
+        initWeather("SF", resolve),
+      );
+      expect(weatherFailureMessage(failure!, "San Francisco, CA")).toBe(
+        `Could not load the weather for SF: ${status} fetching SF's weather file`,
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  },
+);
+
+it("preserves weather decoding failures without connection advice", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    arrayBuffer: async () => new ArrayBuffer(0),
+  });
+  try {
+    const failure = await new Promise<string | undefined>((resolve) =>
+      initWeather("SF", resolve),
+    );
+    expect(weatherFailureMessage(failure!, "San Francisco, CA")).toBe(
+      "Could not load the weather for SF: Weather file is 0 bytes, too short to be one",
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+it("gives connection advice when the weather fetch rejects", async () => {
+  const originalFetch = global.fetch;
+  const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+  global.fetch = jest.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+  try {
+    const failure = await new Promise<string | undefined>((resolve) =>
+      initWeather("SF", resolve),
+    );
+    expect(weatherFailureMessage(failure!, "San Francisco, CA")).toBe(
+      "Could not load the weather for San Francisco, CA. Check your connection and try again.",
+    );
+  } finally {
+    global.fetch = originalFetch;
     warn.mockRestore();
   }
 });

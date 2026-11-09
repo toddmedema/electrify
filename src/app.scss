@@ -7376,7 +7376,7 @@ img[src$="/transmission.svg"] {
   .insights .MuiToolbar-root.insightsTrackHeader {
     flex-flow: row nowrap !important;
 
-    > h6 {
+    > h3 {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -8323,7 +8323,7 @@ option {
 
 .insights .MuiToolbar-root.insightsTrackHeader {
   flex-flow: row nowrap !important;
-  > h6 {
+  > h3 {
     flex: 0 1 auto;
     min-width: 0;
     overflow: hidden;

@@ -29,7 +29,7 @@ export function weatherFailureMessage(
   failure: string,
   locationName: string,
 ): string {
-  if (!failure.startsWith("Could not load the weather")) return failure;
+  if (!failure.startsWith("Could not fetch the weather")) return failure;
   console.warn(failure);
   return `Could not load the weather for ${locationName}. Check your connection and try again.`;
 }
