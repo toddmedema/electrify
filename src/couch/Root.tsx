@@ -30,7 +30,8 @@ import type { CouchSummary } from "./Protocol";
 import { seatPresentation } from "./Presentation";
 import SettingsContainer from "../components/views/SettingsContainer";
 import { beginCouchPlatform } from "./Platform";
-import { nextControllerSeat } from "./Bindings";
+import type { BindingFailure } from "./Bindings";
+import { nextControllerSeat, settleBindingFailures } from "./Bindings";
 import type { EvidenceTargetType, GameType } from "../Types";
 import CouchToolbar from "./Toolbar";
 import CouchBackdrop from "./Backdrop";
@@ -117,17 +118,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const bindingAttempts = useRef(
     new Map<string, { epoch: number; controllerId: string }>(),
   );
-  const bindingFailures = useRef(
-    new Map<
-      string,
-      {
-        epoch: number;
-        message: string;
-        controllerId: string;
-        nativeOwner?: string;
-      }
-    >(),
-  );
+  const bindingFailures = useRef(new Map<string, BindingFailure>());
   const leaveRequest = useRef<{
     seatId: string;
     generation: number;
@@ -230,15 +221,14 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       const accepted = { ...current.current.bindings, [seat.id]: controllerId };
       current.current.bindings = accepted;
       setBindings(accepted);
-      for (const [failedSeat, failure] of bindingFailures.current) {
-        if (
-          failure.epoch === attempt.epoch &&
-          (failedSeat === seat.id || failure.controllerId === controllerId)
-        ) {
-          setError((value) => (value === failure.message ? "" : value));
-          bindingFailures.current.delete(failedSeat);
-        }
-      }
+      const cleared = settleBindingFailures(
+        bindingFailures.current,
+        attempt.epoch,
+        seat.id,
+        controllerId,
+      );
+      if (cleared.length)
+        setError((value) => (cleared.includes(value) ? "" : value));
       if (
         owner &&
         owner === coordinator.current &&

@@ -29,3 +29,32 @@ export function nextControllerSeat(
     ? undefined
     : seats.find((seat) => !pending.has(seat.id));
 }
+
+export interface BindingFailure {
+  epoch: number;
+  message: string;
+  controllerId: string;
+  nativeOwner?: string;
+}
+
+/** After native accepts `controllerId` for `seatId`, drop this epoch's failures for that
+ * company or controller and return their messages. Native routes one controller per
+ * company, so a different controller's retained ownership of `seatId` is now stale and
+ * must stop pinning that controller's retry to an accepted company. */
+export function settleBindingFailures(
+  failures: Map<string, BindingFailure>,
+  epoch: number,
+  seatId: string,
+  controllerId: string,
+): string[] {
+  const cleared: string[] = [];
+  for (const [failedSeat, failure] of failures) {
+    if (failure.epoch !== epoch) continue;
+    if (failedSeat === seatId || failure.controllerId === controllerId) {
+      cleared.push(failure.message);
+      failures.delete(failedSeat);
+    } else if (failure.nativeOwner === seatId)
+      failures.set(failedSeat, { ...failure, nativeOwner: undefined });
+  }
+  return cleared;
+}

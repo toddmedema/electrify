@@ -1,4 +1,4 @@
-import { nextControllerSeat } from "./Bindings";
+import { nextControllerSeat, settleBindingFailures } from "./Bindings";
 import { localSeatId } from "./Protocol";
 
 const roster = (count: number) =>
@@ -174,5 +174,48 @@ describe.each([2, 3, 4])("%i-company controller recovery", (count) => {
       ),
     ).toBeUndefined();
     expect(retired).toEqual(new Set(seats.map((seat) => seat.id)));
+  });
+});
+
+describe("binding failure settlement", () => {
+  const failure = (controllerId: string, nativeOwner?: string, epoch = 1) => ({
+    epoch,
+    message: `Error: ${controllerId} failed`,
+    controllerId,
+    nativeOwner,
+  });
+
+  it("releases a stale native owner when another controller is accepted there", () => {
+    const seats = roster(2);
+    const failures = new Map([
+      // C was rejected on P2 while native still routed it to P1.
+      [seats[1].id, failure("C", seats[0].id)],
+    ]);
+    expect(settleBindingFailures(failures, 1, seats[0].id, "D")).toEqual([]);
+    expect(failures.get(seats[1].id)?.nativeOwner).toBeUndefined();
+    // With the stale hint gone, C can claim the remaining free company.
+    expect(
+      nextControllerSeat(
+        seats,
+        { [seats[0].id]: "D" },
+        new Set(["C", "D"]),
+        new Set(),
+        failures.get(seats[1].id)?.nativeOwner,
+      ),
+    ).toBe(seats[1]);
+  });
+
+  it("clears this epoch's failures for the accepted company or controller only", () => {
+    const seats = roster(3);
+    const failures = new Map([
+      [seats[0].id, failure("A")],
+      [seats[1].id, failure("B", seats[1].id)],
+      [seats[2].id, failure("B", undefined, 0)],
+    ]);
+    expect(settleBindingFailures(failures, 1, seats[1].id, "A")).toEqual([
+      "Error: A failed",
+      "Error: B failed",
+    ]);
+    expect([...failures.keys()]).toEqual([seats[2].id]);
   });
 });
