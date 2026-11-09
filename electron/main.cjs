@@ -29,6 +29,7 @@ const { CouchViews } = require("./couch.cjs");
 const { LocalCoopSaveStore } = require("./local-coop-storage.cjs");
 const { SteamService } = require("./steam.cjs");
 const { reserveSteamOverlayHotkey } = require("./steam-overlay.cjs");
+const { openExternalUrl } = require("./external.cjs");
 const { SteamMultiplayer, lobbyFromArgs } = require("./steam-multiplayer.cjs");
 const { ModStore } = require("./mods.cjs");
 const { SteamWorkshop } = require("./steam-workshop.cjs");
@@ -649,7 +650,7 @@ function openExternal(url) {
       "discord.com",
     ];
     if (!allowed.includes(parsed.hostname)) return;
-    void shell.openExternal(parsed.href);
+    openExternalUrl(shell, parsed.href);
   } catch {
     // Ignore malformed or unapproved external URLs.
   }

@@ -1080,6 +1080,7 @@ export class MultiplayerSession {
         lobby: {
           ...this.state.lobby,
           lobbyId: undefined,
+          inviteCode: undefined,
           hostId: undefined,
           members: [],
           connected: [],

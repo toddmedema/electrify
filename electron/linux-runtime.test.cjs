@@ -41,7 +41,7 @@ function fixture(t) {
   }
   fs.writeFileSync(
     path.join(depot, "Electrify"),
-    '#!/bin/sh\nprintf "%s\\n" "$LD_LIBRARY_PATH" "$@"\n',
+    '#!/bin/sh\nprintf "%s\\n" "$LD_LIBRARY_PATH" "$ELECTRIFY_RUNTIME_LIB" "$@"\n',
     { mode: 0o755 },
   );
   return {
@@ -77,6 +77,7 @@ test(
         .split("\n");
       assert.deepEqual(lines, [
         path.join(f.depot, "lib") + (previous ? `:${previous}` : ""),
+        path.join(f.depot, "lib"),
         "two words",
         "+connect_lobby",
         "109775242999999999",

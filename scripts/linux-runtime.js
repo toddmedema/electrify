@@ -32,6 +32,8 @@ const launcher = `#!/bin/sh
 set -eu
 depot_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 export LD_LIBRARY_PATH="$depot_dir/lib\${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# Lets the game keep these libraries out of programs it opens, such as the browser.
+export ELECTRIFY_RUNTIME_LIB="$depot_dir/lib"
 exec "$depot_dir/Electrify.bin" "$@"
 `;
 const digest = (bytes) =>
