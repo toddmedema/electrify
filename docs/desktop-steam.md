@@ -54,6 +54,23 @@ executable does not produce a working game. Steam installs the unpacked depot; p
 run npm, download dependencies, or install Electron themselves. Linux ARM and Windows ARM are
 not supported by the pinned Steam binding.
 
+Linux depots bundle NSS, NSPR, SQLite and NSS's loadable modules/checksums from the Ubuntu 22.04
+build host, with redistribution notices and license texts in `lib/`. Install `libnss3`, `libnspr4`
+and `libsqlite3-0` on that build host before packaging. The `Electrify` launcher sets a process-local
+library path and executes `Electrify.bin`; it preserves Steam's library path and all launch arguments.
+Players using Steam on NixOS should not need `programs.steam.extraPackages = [ nspr nss ];`.
+Packaging verifies the manifest and runs `ldd` against the executable and bundled libraries,
+including proof that NSS/NSPR resolve inside the depot. CI's packaged Linux launch uses this wrapper.
+This is intended for Steam's Linux environment, not direct execution outside NixOS's Steam FHS.
+
+Steam builds select X11/XWayland before enabling the overlay's in-process GPU. This supports
+[Steam's overlay](https://github.com/ValveSoftware/steam-for-linux/issues/8020) and avoids the
+[Electron 44 Wayland shutdown deadlock](https://github.com/electerm/electerm/issues/4654).
+Shift-Tab is withheld from Chromium in every game view so it cannot also move focus or trigger a
+modal focus trap. If Steam reports that its overlay is disabled, Invite friends shows an error
+with the invite-code alternative. Validate both Shift-Tab and Invite friends, clean Quit, and the
+bundled libraries on a real NixOS Steam install with the extraPackages workaround removed.
+
 The Mac app requires macOS 13 Ventura or later, matching the
 [Electron 44 minimum](https://www.electronjs.org/blog/electron-44-0). The package's
 `LSMinimumSystemVersion` is set to `13.0`; Steam store requirements must use that same minimum.
@@ -528,10 +545,13 @@ through Valve's normal review process.
 
 ## Realtime Steam co-op
 
-**Play with friends** on the desktop title screen offers **Host a game** or joining with an
-invite code. Hosting opens a friends-only Steam lobby and goes straight to the normal selection
+**Play with friends** on the desktop title screen offers **Host a game** or joining with a
+six-digit invite code (including leading zeroes). Hosting opens an invisible Steam lobby and goes straight to the normal selection
 screens, where the top bar's **Invite friends** opens Steam's invitation overlay and **Copy invite
-code** copies the full numeric lobby code. Two to four players can join or leave at any time before
+code** copies the six-digit code. Code lookup searches worldwide; missing or colliding codes
+produce an error rather than joining an arbitrary lobby. Native Steam invitations still use the
+full 64-bit lobby ID. Invisible lobbies support lookup without advertising a public game browser;
+friends-only lobbies cannot be found by Steam's lobby search. Two to four players can join or leave at any time before
 the start. The host picks any authored scenario or a custom game. Guests follow the host's screen,
 scenario, difficulty and custom settings read-only, and mark **Ready** for exactly what is shown;
 any change by the host clears it. **Start for everyone** launches that scenario for the lobby once
@@ -550,10 +570,11 @@ company has retired, with a results table and **Back to lobby** for the host.
 The host's worker runs every grid on one clock. Multiplayer uses the normal game view, including
 the full build catalog, storage, policies, forecasts, rate controls and facility management.
 Each player selects their own speed; the shared clock runs at the slowest selection. Your own
-selection is the filled segment, and the game's active speed carries a slowly pulsing ring.
-Other players' person markers sit along the bottom of the speed they chose, filling each button
+selection has a static circle, and the game's active speed is the solid blue segment.
+Other players' person markers sit along the bottom of their effective speed, filling each button
 from the left. Names, selections and pause reasons remain in accessible descriptions and hover
-text.
+text. Temporarily paused players appear only under Pause; their requested speed is retained for
+resuming. The controller Pause action also readies an online player after a safety stop.
 Opening the build screen, reading a notification, opening settings, or putting the game
 in the background pauses everyone without changing anyone's selection. Closing the interruption
 restores the slowest remaining speed. Manual pause stays selected until that player changes it.

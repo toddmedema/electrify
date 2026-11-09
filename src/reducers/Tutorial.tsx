@@ -5,7 +5,6 @@ import { getNextTutorial, getScenario, TUTORIALS } from "../data/Scenarios";
 import type { AppDispatch } from "../Store";
 import {
   AppStateType,
-  GameType,
   GameToolType,
   TutorialStepChangeType,
   TutorialStepType,
@@ -75,18 +74,6 @@ export function restartTutorialAtStep(
   dispatch(quit());
   dispatch(start(scenarioId));
   dispatch(delta({ tutorialStep }));
-}
-
-/** Records an explicit tutorial Exit, without counting a completed walkthrough twice. */
-export function recordTutorialExited(game: GameType): void {
-  const steps = getScenario(
-    game.scenarioId,
-    game.customScenario,
-  )?.tutorialSteps;
-  if (!steps || game.tutorialStep >= steps.length) {
-    return;
-  }
-  recordScenarioPlayed(game.scenarioId);
 }
 
 // Moves a live walkthrough between two steps, whether a HUD button or a satisfied gate

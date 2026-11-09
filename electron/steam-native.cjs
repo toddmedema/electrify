@@ -18,6 +18,7 @@ const DECLARATIONS = {
     "bool SteamAPI_ISteamUserStats_SetStatInt32(void *, const char *, int32_t)",
   storeStats: "bool SteamAPI_ISteamUserStats_StoreStats(void *)",
   utils: "void * SteamAPI_SteamUtils_v010()",
+  overlayEnabled: "bool SteamAPI_ISteamUtils_IsOverlayEnabled(void *)",
   friends: "void * SteamAPI_SteamFriends_v017()",
   user: "void * SteamAPI_SteamUser_v023()",
   online: "bool SteamAPI_ISteamUser_BLoggedOn(void *)",

@@ -25,7 +25,7 @@ test("tapping 1x carries a running clock into Mission 1's final step", async ({
   ).toHaveAttribute("aria-pressed", "true");
 });
 
-test("Exit returns directly to the main menu and remembers the tutorial visit", async ({
+test("Exit returns directly to the main menu and leaves the unfinished tutorial available", async ({
   page,
 }) => {
   await reachStartTimeStep(page);
@@ -39,13 +39,11 @@ test("Exit returns directly to the main menu and remembers the tutorial visit", 
   ).toBeVisible();
   await expect(page.locator(".snackbarContent")).toBeHidden();
   await page.getByRole("button", { name: "Play", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Choose a game" }),
-  ).toBeVisible();
+  await expect(page.getByText("Welcome to Electrify")).toBeVisible();
 });
 
 for (const explicitlyExit of [false, true]) {
-  test(`main menu records completion only after explicit Exit (exit=${explicitlyExit})`, async ({
+  test(`main menu does not record an unfinished tutorial (exit=${explicitlyExit})`, async ({
     page,
   }) => {
     await reachStartTimeStep(page);
@@ -70,12 +68,6 @@ for (const explicitlyExit of [false, true]) {
         .click();
     }
     await page.getByRole("button", { name: "Play", exact: true }).click();
-    if (explicitlyExit) {
-      await expect(
-        page.getByRole("heading", { name: "Choose a game" }),
-      ).toBeVisible();
-    } else {
-      await expect(page.getByText("Welcome to Electrify")).toBeVisible();
-    }
+    await expect(page.getByText("Welcome to Electrify")).toBeVisible();
   });
 }

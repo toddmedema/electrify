@@ -154,17 +154,21 @@ export default function Lobby({
               <Divider>or join a friend</Divider>
               <div className="coopJoinRow">
                 <TextField
-                  label="Invite code"
+                  label="6-digit invite code"
                   value={code}
                   onChange={(event) => setCode(event.target.value.trim())}
                   slotProps={{
-                    htmlInput: { inputMode: "numeric", maxLength: 20 },
+                    htmlInput: {
+                      inputMode: "numeric",
+                      pattern: "[0-9]{6}",
+                      maxLength: 6,
+                    },
                   }}
                 />
                 <Button
                   variant="outlined"
                   disabled={
-                    !lobby.available || busy || !/^[0-9]{17,20}$/.test(code)
+                    !lobby.available || busy || !/^[0-9]{6}$/.test(code)
                   }
                   onClick={() => run(() => session.join(code))}
                 >

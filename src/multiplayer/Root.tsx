@@ -148,7 +148,7 @@ export default function MultiplayerRoot() {
   }, [session, syncCoop]);
 
   const copyCode = useCallback(() => {
-    const code = session.getSnapshot().lobby.lobbyId;
+    const code = session.getSnapshot().lobby.inviteCode;
     if (!code) return;
     const shown = () =>
       store.dispatch(

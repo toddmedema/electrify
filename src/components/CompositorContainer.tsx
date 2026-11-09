@@ -2,7 +2,7 @@ import { activeScenario } from "../helpers/GameSelectors";
 import type { AppDispatch } from "../Store";
 import { connect } from "react-redux";
 import { quit } from "../reducers/Game";
-import { changeTutorialStep, recordTutorialExited } from "../reducers/Tutorial";
+import { changeTutorialStep } from "../reducers/Tutorial";
 import { dialogClose, snackbarClose } from "../reducers/UI";
 import {
   AppStateType,
@@ -56,7 +56,6 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       changeTutorialStep(dispatch, change);
     },
     onTutorialEnd(_tutorialSteps: TutorialStepType[] | undefined): void {
-      dispatch((_dispatch, getState) => recordTutorialExited(getState().game));
       dispatch(quit());
     },
   };

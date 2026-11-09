@@ -480,79 +480,88 @@ it("reveals fleet charts before focusing them when a compact tool covers the fle
   expect(screen.getByRole("img", { name: "Supply chart" })).toHaveFocus();
 });
 
-it("routes a couch seat's speed and readiness semantically when duplicate clock controls are absent", async () => {
-  Object.defineProperty(window, "electrifyCouch", {
-    configurable: true,
-    value: { role: "seat", seatId: "local-p2" },
-  });
-  const clock = (
-    selectedSpeed: "PAUSED" | "NORMAL" | "FAST",
-    readyRequired = false,
-  ) => {
-    store.dispatch(
-      delta({
-        inGame: true,
-        multiplayer: {
-          seat: "local-p2",
-          clock: {
-            activeSpeed: "PAUSED",
-            selectedSpeed,
-            readyRequired,
-            ready: !readyRequired,
-            reason: "",
-            players: [],
+it.each(["seat", "online"])(
+  "routes %s speed and readiness through the shared clock",
+  async (role) => {
+    Object.defineProperty(window, "electrifyCouch", {
+      configurable: true,
+      value: role === "seat" ? { role: "seat", seatId: "local-p2" } : undefined,
+    });
+    const clock = (
+      selectedSpeed: "PAUSED" | "NORMAL" | "FAST",
+      readyRequired = false,
+    ) => {
+      store.dispatch(
+        delta({
+          inGame: true,
+          multiplayer: {
+            seat: "local-p2",
+            clock: {
+              activeSpeed: "PAUSED",
+              selectedSpeed,
+              readyRequired,
+              ready: !readyRequired,
+              reason: "",
+              players: [],
+            },
           },
-        },
-      }),
+        }),
+      );
+    };
+    clock("PAUSED", true);
+    store.dispatch(navigate("FACILITIES"));
+    const runtime = {
+      foregroundMode: "application" as const,
+      command: jest.fn(),
+      submit: jest.fn().mockResolvedValue(undefined),
+      activity: jest.fn(),
+      leave: jest.fn().mockResolvedValue(undefined),
+    };
+    registerMultiplayerRuntime(runtime);
+    render(
+      <main className="base_main">
+        <div className="gameWorkspace">
+          <button className="gameMenuButton">Menu</button>
+        </div>
+      </main>,
     );
-  };
-  clock("PAUSED", true);
-  store.dispatch(navigate("FACILITIES"));
-  const runtime = {
-    foregroundMode: "application" as const,
-    command: jest.fn(),
-    submit: jest.fn().mockResolvedValue(undefined),
-    activity: jest.fn(),
-    leave: jest.fn().mockResolvedValue(undefined),
-  };
-  registerMultiplayerRuntime(runtime);
-  render(
-    <main className="base_main">
-      <div className="gameWorkspace">
-        <button className="gameMenuButton">Menu</button>
-      </div>
-    </main>,
-  );
-  expect(
-    screen.queryByRole("button", { name: /speed/i }),
-  ).not.toBeInTheDocument();
-  const f = bridge();
-  stop = startDesktopInput(store, f.desktop);
-  await act(async () => Promise.resolve());
-  f.emit({ actions: ["pause"] });
-  expect(runtime.command).toHaveBeenLastCalledWith({
-    kind: "speed",
-    speed: "NORMAL",
-  });
-  clock("NORMAL");
-  f.emit({ actions: ["speedUp"] });
-  expect(runtime.command).toHaveBeenLastCalledWith({
-    kind: "speed",
-    speed: "FAST",
-  });
-  clock("FAST");
-  f.emit({ actions: ["speedDown"] });
-  expect(runtime.command).toHaveBeenLastCalledWith({
-    kind: "speed",
-    speed: "NORMAL",
-  });
-  clock("NORMAL");
-  f.emit({ actions: ["pause"] });
-  expect(runtime.command).toHaveBeenLastCalledWith({
-    kind: "speed",
-    speed: "PAUSED",
-  });
-});
+    expect(
+      screen.queryByRole("button", { name: /speed/i }),
+    ).not.toBeInTheDocument();
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await act(async () => Promise.resolve());
+    f.emit({ actions: ["pause"] });
+    expect(runtime.command).toHaveBeenLastCalledWith({
+      kind: "speed",
+      speed: "NORMAL",
+    });
+    clock("NORMAL", true);
+    f.emit({ actions: ["pause"] });
+    expect(runtime.command).toHaveBeenLastCalledWith({
+      kind: "speed",
+      speed: "NORMAL",
+    });
+    clock("NORMAL");
+    f.emit({ actions: ["speedUp"] });
+    expect(runtime.command).toHaveBeenLastCalledWith({
+      kind: "speed",
+      speed: "FAST",
+    });
+    clock("FAST");
+    f.emit({ actions: ["speedDown"] });
+    expect(runtime.command).toHaveBeenLastCalledWith({
+      kind: "speed",
+      speed: "NORMAL",
+    });
+    clock("NORMAL");
+    f.emit({ actions: ["pause"] });
+    expect(runtime.command).toHaveBeenLastCalledWith({
+      kind: "speed",
+      speed: "PAUSED",
+    });
+  },
+);
 
 it.each(["menu", "menuAlt"] as const)(
   "opens the shared couch menu from %s even while a company dialog owns local focus",

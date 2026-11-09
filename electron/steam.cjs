@@ -14,6 +14,7 @@ const {
 const { SteamActivity } = require("./steam-activity.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
+const { enableSteamOverlay } = require("./steam-overlay.cjs");
 const {
   SteamNativeDialogs,
   loadDialogFunctions,
@@ -76,7 +77,7 @@ class SteamService {
       }
       // Configure the overlay before Chromium creates its graphics context. The binding
       // forces repaint while idle, as required for Steam's overlay with a browser UI.
-      steamworks.electronEnableSteamOverlay();
+      enableSteamOverlay(app, steamworks);
       this.client = initializeBinding(config.appId);
       this.identity = {
         steamId: this.client.localplayer.getSteamId().steamId64.toString(),
@@ -345,8 +346,15 @@ class SteamService {
   }
 
   openFriends() {
-    if (!this.client) throw new Error("The Steam overlay is unavailable");
+    this.requireOverlay();
     this.client.overlay.activateDialog(0);
+  }
+
+  requireOverlay() {
+    if (!this.client || !this.native?.overlayEnabled(this.native.utils()))
+      throw new Error(
+        "The Steam overlay is unavailable. Enable it in Steam, or share the invite code to play with friends.",
+      );
   }
 
   setActivity(input) {

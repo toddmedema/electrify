@@ -138,10 +138,10 @@ test("temporary pauses keep chosen speeds and identify the cause without a statu
     "Paused: Player 2: Building capacity",
   );
   expect(
-    within(screen.getByRole("button", { name: "normal speed" })).getByTestId(
+    within(screen.getByRole("button", { name: "normal speed" })).queryByTestId(
       "speed-peer-NORMAL-2",
     ),
-  ).toBeInTheDocument();
+  ).not.toBeInTheDocument();
 });
 
 test("the active speed and your selection share one button when they agree", () => {

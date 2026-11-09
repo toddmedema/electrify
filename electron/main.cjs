@@ -28,6 +28,8 @@ const { atomicWrite, readJson, DesktopSaveStore } = require("./storage.cjs");
 const { CouchViews } = require("./couch.cjs");
 const { LocalCoopSaveStore } = require("./local-coop-storage.cjs");
 const { SteamService } = require("./steam.cjs");
+const { reserveSteamOverlayHotkey } = require("./steam-overlay.cjs");
+const { openExternalUrl } = require("./external.cjs");
 const { SteamMultiplayer, lobbyFromArgs } = require("./steam-multiplayer.cjs");
 const { ModStore } = require("./mods.cjs");
 const { SteamWorkshop } = require("./steam-workshop.cjs");
@@ -75,6 +77,8 @@ if (
       config.appId > 2147483647))
 )
   throw new Error("A Steam build needs its real Steam App ID");
+
+reserveSteamOverlayHotkey(app, config.mode === "steam");
 
 // Take the lock before Steam starts: a second launch must not initialize the SDK, replace
 // the running game's rich presence, or clear it again while it exits.
@@ -646,7 +650,7 @@ function openExternal(url) {
       "discord.com",
     ];
     if (!allowed.includes(parsed.hostname)) return;
-    void shell.openExternal(parsed.href);
+    openExternalUrl(shell, parsed.href, { dialog });
   } catch {
     // Ignore malformed or unapproved external URLs.
   }
