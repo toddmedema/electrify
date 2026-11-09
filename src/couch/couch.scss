@@ -18,6 +18,10 @@ html[data-couch-seat] {
     outline: 3px solid var(--focus-ring) !important;
     outline-offset: -3px;
   }
+  // That ring sits inside the border box, where a filled button's own blue would swallow it
+  &[data-controller-input="true"] .MuiButton-contained:focus {
+    outline-color: var(--interactive-contrast) !important;
+  }
 }
 .couchBand {
   position: fixed;
@@ -62,7 +66,7 @@ html[data-couch-shell-active="true"]
       background: transparent;
     }
     &.MuiButton-text.MuiButton-colorPrimary:focus {
-      background: var(--interactive-strong);
+      background: var(--interactive-blue);
       color: var(--interactive-contrast);
       outline: none !important;
     }

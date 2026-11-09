@@ -84,7 +84,7 @@
   gap: 2px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
   background: transparent;
   font-size: 12px;
   line-height: 16px;
@@ -97,11 +97,11 @@
   @media (hover: hover) and (pointer: fine) {
     &:hover {
       background: var(--bg-sunken);
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
     }
   }
   &.gameDockActionOpen {
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
     border-color: var(--border-selected);
     background: var(--bg-selected);
   }

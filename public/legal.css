@@ -1,8 +1,8 @@
 :root {
   color-scheme: light dark;
   --brand: #0084f8;
-  --brand-strong: #0967b8;
-  --brand-deep: #064a87;
+  --brand-strong: #0084f8;
+  --brand-deep: #1565c0;
   --brand-wash: rgba(0, 132, 248, 0.1);
   --page: #f2f7fb;
   --surface: #ffffff;

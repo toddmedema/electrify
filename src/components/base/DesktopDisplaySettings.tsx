@@ -157,7 +157,7 @@ export default function DesktopDisplaySettings(): React.JSX.Element {
               borderRadius: 4,
               border: "1px solid var(--border-strong)",
               background: "var(--bg-raised)",
-              color: "var(--interactive-strong)",
+              color: "var(--interactive-blue)",
               font: "inherit",
               maxWidth: "100%",
             }}

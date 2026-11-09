@@ -6,13 +6,13 @@
     .MuiToggleButton-root {
       padding: 4px 12px;
       border-color: var(--border-tile);
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
       font-size: var(--font-size-caption);
       line-height: 1.4;
 
       &.Mui-selected {
         background: var(--bg-selected);
-        color: var(--interactive-strong);
+        color: var(--interactive-blue);
 
         @media (hover: hover) and (pointer: fine) {
           &:hover {
