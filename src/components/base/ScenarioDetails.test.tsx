@@ -125,7 +125,11 @@ it("keeps one concise loss line under the score chart and removes redundant goal
   expect(screen.getAllByText(/Projected loss:/)).toHaveLength(1);
   expect(status).toContainHTML("<strong>Projected loss:</strong>");
   expect(status).toHaveClass("insightsWarning");
-  expect(within(status).getByTestId("WarningAmberIcon")).toBeInTheDocument();
+  // The game's shared danger glyph, not a one-off warning triangle
+  expect(
+    // eslint-disable-next-line testing-library/no-node-access
+    status.querySelector('[data-concept="danger"]'),
+  ).toBeInTheDocument();
   const conditions = screen.getByRole("region", { name: "Goals" });
   expect(conditions).not.toHaveTextContent(
     /Projected miss|Projected to meet|Projected loss/,
