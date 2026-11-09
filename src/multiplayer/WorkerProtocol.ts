@@ -9,13 +9,20 @@ export type WorkerRequest =
   | { kind: "heartbeat" }
   | {
       kind: "create";
+      local?: boolean;
       spec: MatchSpec;
       seats: Seat[];
       matchId: string;
       epoch: string;
     }
   /** seats hands each saved company, in saved order, to the player resuming it. */
-  | { kind: "restore"; world: unknown; epoch: string; seats?: Seat[] }
+  | {
+      kind: "restore";
+      world: unknown;
+      epoch: string;
+      seats?: Seat[];
+      local?: boolean;
+    }
   | {
       kind: "command";
       sender: string;
@@ -23,6 +30,13 @@ export type WorkerRequest =
       allowReady?: boolean;
     }
   | { kind: "disconnect"; sender: string }
+  /** Shell-only lifecycle state; never exposed through a seat port. */
+  | {
+      kind: "blockers";
+      reasons: string[];
+      requireReady?: boolean;
+      readyReason?: string;
+    }
   | {
       kind: "checkpoint";
       requestId?: string;
@@ -30,6 +44,7 @@ export type WorkerRequest =
       suspended?: boolean;
     };
 export type WorkerResponse =
+  | { kind: "summary"; summary: import("../couch/Protocol").CouchSummary }
   | { kind: "views"; views: Record<string, RoomView> }
   | { kind: "keepalive"; matchId: string; epoch: string; revision: number }
   | { kind: "checkpoint"; world: World; requestId?: string }

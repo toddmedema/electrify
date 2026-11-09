@@ -9,6 +9,7 @@ import {
   subscribeInputPresentation,
 } from "./InputPresentation";
 import { editableTextControl } from "./InputText";
+import ControllerGlyph from "./ControllerGlyph";
 import "./Input.scss";
 
 const menuHints: [DesktopInputAction, string][] = [
@@ -57,6 +58,8 @@ function contextualHints(target: Element | null, gameplay: boolean): Hint[] {
   ];
 }
 
+/** Follow live device and focus context while retaining the disconnect-resume notice.
+ * Couch callers may keep the hint area's geometry stable when pointer input takes over. */
 export default function InputHints() {
   const state = useSyncExternalStore(
     subscribeInputPresentation,
@@ -72,7 +75,9 @@ export default function InputHints() {
     document.addEventListener("focusin", update);
     return () => document.removeEventListener("focusin", update);
   }, []);
-  if (!state.active && !state.pausedAfterDisconnect) return null;
+  const showActions =
+    state.connected && (state.active || !!window.electrifyCouch);
+  if (!showActions && !state.pausedAfterDisconnect) return null;
   const hints = tvMode
     ? contextualHints(focused, state.context === "Gameplay")
     : state.context === "Gameplay"
@@ -89,7 +94,7 @@ export default function InputHints() {
             Game paused. Select a speed to resume when ready.
           </p>
         )}
-        {state.active && state.connected && (
+        {showActions && (
           <div className="controllerHintActions">
             {hints.map((hint) => glyphHint(hint, state.glyphs))}
             {tvMode && (
@@ -117,18 +122,50 @@ export default function InputHints() {
   );
 }
 
-function glyphHint([action, label]: Hint, glyphs: DesktopInputFrame["glyphs"]) {
+/** Resolve a binding from the supplied device frame without inferring it from an action name.
+ * Compact hints omit missing bindings; the complete legend can explicitly show them as unbound. */
+function glyphHint(
+  [action, label]: Hint,
+  glyphs: DesktopInputFrame["glyphs"],
+  showUnbound = false,
+) {
   const glyph = glyphs[action];
-  if (!glyph) return null;
+  if (!glyph && !showUnbound) return null;
   return (
     <span className="controllerHint" key={action}>
-      {glyph.image ? (
-        <img src={glyph.image} alt={glyph.label} />
+      {glyph ? (
+        <ControllerGlyph glyph={glyph} />
       ) : (
-        <span className="controllerHintBinding">{glyph.label}</span>
+        <span className="controllerHintBinding">Unbound</span>
       )}
       <span>{label}</span>
     </span>
+  );
+}
+
+/** One complete legend in the shared menu, with the requesting controller's bindings. */
+export function ControlsLegend({
+  glyphs,
+}: {
+  glyphs: DesktopInputFrame["glyphs"];
+}) {
+  const hints: Hint[] = [
+    ["up", "Move up"],
+    ["down", "Move down"],
+    ["left", "Move left"],
+    ["right", "Move right"],
+    ["confirm", "Select"],
+    ["back", "Back"],
+    ["menu", "Game menu"],
+    ...gameHints.slice(3),
+  ];
+  return (
+    <aside className="couchControlsLegend" aria-label="Controller controls">
+      <strong>Controls</strong>
+      <div className="controllerHintActions">
+        {hints.map((hint) => glyphHint(hint, glyphs, true))}
+      </div>
+    </aside>
   );
 }
 

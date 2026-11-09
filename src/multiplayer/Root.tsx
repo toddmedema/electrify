@@ -35,10 +35,22 @@ import { runSaveTransition } from "../SaveSession";
 import HostConnectionWarning from "./HostConnectionWarning";
 import { selectionKey } from "./Browse";
 import { coopSelection, hostSelection, isBrowseCard } from "./Choosing";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+} from "@mui/material";
+import CouchRoot from "../couch/Root";
 
 /** Session lifetime follows the app; entering the normal game can unmount the main menu. */
 export default function MultiplayerRoot() {
   const [open, setOpen] = useState(false);
+  const [methodOpen, setMethodOpen] = useState(false);
+  const [couchOpen, setCouchOpen] = useState(false);
+  const localSession = useRef(false);
+  localSession.current = couchOpen;
   const [savesOpen, setSavesOpen] = useState(false);
   // The host has opened the scenario screens for the lobby; guests follow once it publishes.
   const choosing = useRef(false);
@@ -60,6 +72,7 @@ export default function MultiplayerRoot() {
 
   /** Choosing together ends with the lobby; scenario screens go back to single player. */
   const syncCoop = useCallback(() => {
+    if (localSession.current) return;
     const current = session.getSnapshot();
     const app = store.getState();
     const { lobby, browse, view, pendingCampaign } = current;
@@ -135,7 +148,7 @@ export default function MultiplayerRoot() {
   }, [session, syncCoop]);
 
   const copyCode = useCallback(() => {
-    const code = session.getSnapshot().lobby.lobbyId;
+    const code = session.getSnapshot().lobby.inviteCode;
     if (!code) return;
     const shown = () =>
       store.dispatch(
@@ -171,7 +184,16 @@ export default function MultiplayerRoot() {
   }, [session]);
 
   useEffect(() => {
-    registerLobbyOpener(() => setOpen(true));
+    registerLobbyOpener(() => {
+      const couch = getDesktop()?.couchRequest;
+      if (!couch) return setOpen(true);
+      void couch({ kind: "status" })
+        .then((status) => {
+          if ((status as { preview?: boolean })?.preview) setMethodOpen(true);
+          else setOpen(true);
+        })
+        .catch(() => setOpen(true));
+    });
     let live = true,
       initialized = false,
       loading = false;
@@ -381,6 +403,38 @@ export default function MultiplayerRoot() {
 
   return (
     <>
+      <Dialog open={methodOpen} onClose={() => setMethodOpen(false)}>
+        <DialogTitle>Play with friends</DialogTitle>
+        <DialogContent>Choose where to play together.</DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMethodOpen(false)}>Back</Button>
+          <Button
+            onClick={() => {
+              setMethodOpen(false);
+              setOpen(true);
+            }}
+          >
+            Online
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setMethodOpen(false);
+              setCouchOpen(true);
+            }}
+          >
+            On this TV
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {couchOpen && (
+        <CouchRoot
+          onClose={() => {
+            setCouchOpen(false);
+            syncCoop();
+          }}
+        />
+      )}
       <HostConnectionWarning
         waiting={hasView && state.waitingForHost}
         onReconnect={reconnect}

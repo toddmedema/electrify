@@ -94,6 +94,65 @@ it("interprets mod debriefs from completed facts and marks a missing-history nei
   );
 });
 
+it("retains authored deep-freeze debrief observations after all three months complete", () => {
+  const scenario = modScenario({
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "freeze-debrief-fixture",
+    title: "Freeze debrief",
+    creator: "Creator",
+    version: "1",
+    description: "Recorded freeze results.",
+    baseScenarioId: 999,
+    seed: 42,
+    officialArcs: [],
+    scenario: { startingCustomers: 10000, cash: 1e9, durationMonths: 6 },
+    objectives: [],
+    events: [],
+    debriefReports: [
+      { id: "freeze", kind: "deepFreeze", fromMonth: 1, throughMonth: 3 },
+    ],
+  });
+  const game = createGame({
+    scenarioId: 999,
+    scenario,
+    seed: 42,
+    weatherHazardsEnabled: false,
+  });
+  while (game.date.monthsElapsed < 3) tickState(game);
+  const months = game.monthlyHistory;
+  expect(months).toHaveLength(3);
+  const metrics = buildVictoryDebrief(
+    scenario,
+    summarizeHistory(months),
+    game.facilities,
+    [],
+    months,
+    game.dollarsPerkWh,
+    game.worldEvents.occurrences,
+  ).scenarioMetrics;
+  expect(metrics).toEqual(
+    expect.arrayContaining([
+      {
+        label: "Largest shortage during the freeze",
+        value: expect.stringMatching(/W$/),
+        concept: "supply",
+      },
+      {
+        label: "Electricity rate · before → after",
+        value: expect.stringMatching(/¢\/kWh → .*¢\/kWh$/),
+        concept: "rate",
+      },
+      {
+        label: "Cash stayed above $0 through the recovery month",
+        value: "Yes",
+        concept: "money",
+      },
+    ]),
+  );
+  expect(metrics).toHaveLength(4);
+});
+
 it("captures a plain then-versus-now story and the latest meaningful beats", () => {
   const scenario = SCENARIOS.find((candidate) => candidate.id === 100)!;
   const events = [
@@ -209,20 +268,8 @@ it("surfaces the researched Uri outcome metrics", () => {
 
   expect(debrief.scenarioMetrics).toEqual([
     expect.objectContaining({
-      label: "Demand not met during Winter Storm Uri · Feb 2021",
+      label: "Demand not met during Winter Storm Uri",
       value: "100MWh",
-    }),
-    expect.objectContaining({
-      label: "Largest shortage during Winter Storm Uri",
-      value: "100MW",
-    }),
-    expect.objectContaining({
-      label: "Electricity rate · before → after",
-      value: "$0.09/kWh → $0.1/kWh",
-    }),
-    expect.objectContaining({
-      label: "Cash stayed above $0 through Mar 2021",
-      value: "Yes",
     }),
   ]);
 });
@@ -245,7 +292,7 @@ it("retains native connection metrics before and after arrival without waiting f
     },
     {
       label: "Electricity rate",
-      value: "$0.1/kWh → $0.12/kWh",
+      value: "10¢/kWh → 12¢/kWh",
       concept: "rate",
     },
   ]);
@@ -263,7 +310,7 @@ it("retains native connection metrics before and after arrival without waiting f
     },
     {
       label: "Electricity rate",
-      value: "$0.1/kWh → $0.12/kWh",
+      value: "10¢/kWh → 12¢/kWh",
       concept: "rate",
     },
   ]);
@@ -293,24 +340,9 @@ it("retains each native Uri observation when a run ends before recovery", () => 
   ).scenarioMetrics;
   expect(result).toEqual([
     {
-      label: "Demand not met during Winter Storm Uri · Feb 2021",
+      label: "Demand not met during Winter Storm Uri",
       value: "100MWh",
       concept: "blackout",
-    },
-    {
-      label: "Largest shortage during Winter Storm Uri",
-      value: "100MW",
-      concept: "supply",
-    },
-    {
-      label: "Electricity rate · before → after",
-      value: "Not reached",
-      concept: "rate",
-    },
-    {
-      label: "Cash stayed above $0 through Mar 2021",
-      value: "Not reached",
-      concept: "money",
     },
   ]);
   const unreached = buildVictoryDebrief(
@@ -320,13 +352,13 @@ it("retains each native Uri observation when a run ends before recovery", () => 
     [],
     [before],
   ).scenarioMetrics;
-  expect(unreached).toHaveLength(4);
+  expect(unreached).toHaveLength(1);
   expect(unreached!.every((metric) => metric.value === "Not reached")).toBe(
     true,
   );
 });
 
-it("derives native review dates from the resolved starting year", () => {
+it("reads Uri observations from the resolved starting year", () => {
   const scenario = {
     ...SCENARIOS.find((candidate) => candidate.id === 107)!,
     startingYear: 2037,
@@ -349,13 +381,8 @@ it("derives native review dates from the resolved starting year", () => {
     months,
   ).scenarioMetrics;
   expect(metrics).toContainEqual({
-    label: "Demand not met during Winter Storm Uri · Feb 2041",
+    label: "Demand not met during Winter Storm Uri",
     value: "0Wh",
     concept: "blackout",
-  });
-  expect(metrics).toContainEqual({
-    label: "Cash stayed above $0 through Mar 2041",
-    value: "Yes",
-    concept: "money",
   });
 });

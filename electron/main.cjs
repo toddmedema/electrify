@@ -1,6 +1,8 @@
 const {
   app,
   BrowserWindow,
+  WebContentsView,
+  MessageChannelMain,
   dialog,
   ipcMain,
   protocol,
@@ -23,7 +25,11 @@ const {
   validateScore,
 } = require("./runtime.cjs");
 const { atomicWrite, readJson, DesktopSaveStore } = require("./storage.cjs");
+const { CouchViews } = require("./couch.cjs");
+const { LocalCoopSaveStore } = require("./local-coop-storage.cjs");
 const { SteamService } = require("./steam.cjs");
+const { reserveSteamOverlayHotkey } = require("./steam-overlay.cjs");
+const { openExternalUrl } = require("./external.cjs");
 const { SteamMultiplayer, lobbyFromArgs } = require("./steam-multiplayer.cjs");
 const { ModStore } = require("./mods.cjs");
 const { SteamWorkshop } = require("./steam-workshop.cjs");
@@ -72,6 +78,8 @@ if (
 )
   throw new Error("A Steam build needs its real Steam App ID");
 
+reserveSteamOverlayHotkey(app, config.mode === "steam");
+
 // Take the lock before Steam starts: a second launch must not initialize the SDK, replace
 // the running game's rich presence, or clear it again while it exits.
 const primaryInstance = app.requestSingleInstanceLock();
@@ -87,8 +95,14 @@ if (primaryInstance)
       (process.env.ELECTRIFY_TEST === "1" ||
         process.env.ELECTRIFY_OFFLINE === "1"),
   );
+const couchPreviewEnabled =
+  (!app.isPackaged && process.env.ELECTRIFY_TEST === "1") ||
+  process.env.ELECTRIFY_COUCH_PREVIEW === "1";
 let window;
 let saves;
+let couch;
+let localSaves;
+let couchTextRequest;
 let preferences;
 let quitting = false;
 let finalizingQuit = false;
@@ -148,11 +162,30 @@ function state() {
   };
 }
 
+/**
+ * Cancel any company-owned text request before releasing native company views.
+ * This also runs during shell teardown, when the window may already be destroyed.
+ */
+function closeCouch() {
+  if (couchTextRequest) {
+    couchTextRequest = undefined;
+    steam.textInput?.finish({ status: "cancelled" });
+  }
+  couch?.close();
+}
+
+/**
+ * Publish current desktop capabilities only while the shell can receive events.
+ */
 function publishState() {
   if (window && !window.isDestroyed())
     window.webContents.send("desktop:state-changed", state());
 }
 
+/**
+ * Apply the same focus, power and native-dialog gates to Steam Input and every renderer.
+ * Company views must stop accepting input whenever the shared shell loses game focus.
+ */
 function publishGameFocus() {
   steam.setInputEnabled(
     !!window &&
@@ -175,15 +208,32 @@ function publishGameFocus() {
         !quitRequested &&
         power.phase === "awake",
     );
+  couch?.foreground(
+    !!window &&
+      !window.isDestroyed() &&
+      window.isFocused() &&
+      !steam.overlayActive &&
+      !steam.textInput?.active &&
+      !steam.dialogs?.active &&
+      !quitRequested &&
+      power.phase === "awake",
+  );
 }
-steam.onOverlayChanged = publishGameFocus;
+const publishOriginalGameFocus = publishGameFocus;
+steam.onOverlayChanged = publishOriginalGameFocus;
 
+/**
+ * Advance the power generation and gate native input before notifying shell and seats.
+ * Focus is recalculated afterward so waking cannot bypass an active modal or quit.
+ */
 function publishPower(phase) {
   power = { phase, generation: power.generation + 1 };
   // Gate native input before notifying the renderer, even if the OS keeps our window focused.
   steam.setInputEnabled(false);
   if (window && !window.isDestroyed())
     window.webContents.send("desktop:power-changed", { ...power });
+  for (const seat of couch?.seats.values() ?? [])
+    seat.view.webContents.send("desktop:power-changed", { ...power });
   publishGameFocus();
 }
 
@@ -361,7 +411,14 @@ handle("desktop:friends", () => {
 });
 handle("desktop:activity", (activity) => steam.setActivity(activity));
 handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
-handle("desktop:input-context", (context) => steam.setInputContext(context));
+handle("desktop:input-context", (context) => {
+  if (couch?.active()) {
+    if (!couch.setup && !couch.overlayOwner)
+      return { connected: false, actions: [], glyphs: {} };
+    return couch.shellContext(context);
+  }
+  return steam.setInputContext(context);
+});
 handle("desktop:text-input", (input) => {
   if (
     !window?.isFocused() ||
@@ -411,6 +468,159 @@ function multiplayerRequest(input) {
   return steam.multiplayer.request(input);
 }
 handle("desktop:multiplayer", multiplayerRequest);
+handle("desktop:couch", async (input) => {
+  if (!input || typeof input !== "object")
+    throw new Error("Invalid local session request");
+  switch (input.kind) {
+    case "status":
+      return {
+        ...(couch?.status() ?? { available: false, devices: [] }),
+        preview: couchPreviewEnabled,
+      };
+    case "setup":
+      if (!couchPreviewEnabled)
+        throw new Error(
+          "On this TV is a development preview pending controller and hardware acceptance",
+        );
+      if (!couch?.status().available)
+        throw new Error(
+          "Steam Input is unavailable. Start through Steam with installed controller bindings, including Offline Mode.",
+        );
+      if (couch.seats.size) throw new Error("A local session is already open");
+      couch.setup = true;
+      steam.input?.setDeviceMode(true);
+      steam.input?.setContext("Menu");
+      for (const device of couch.devices) steam.input?.releaseDevice(device.id);
+      return couch.status();
+    case "setup-confirm":
+      if (typeof input.value !== "boolean")
+        throw new Error("Invalid setup confirmation mode");
+      couch.confirmOnly = input.value;
+      return couch.status();
+    case "open":
+      if (!couchPreviewEnabled)
+        throw new Error(
+          "On this TV is a development preview pending controller and hardware acceptance",
+        );
+      return couch.open(input);
+    case "close":
+      closeCouch();
+      return couch.status();
+    case "reset-bindings":
+      if (couch.seats.size)
+        throw new Error("The company roster is frozen during a match");
+      for (const device of couch.devices) steam.input?.releaseDevice(device.id);
+      couch.bindings.clear();
+      return couch.status();
+    case "bind":
+      return couch.bind(input.seatId, input.controllerId);
+    case "send":
+      return couch.send(input);
+    case "layout":
+      return couch.relayout(
+        input.options ?? {
+          bandHeight: input.bandHeight,
+          zoom: input.zoom,
+          inset: input.inset,
+          gutter: input.gutter,
+        },
+      );
+    case "overlay": {
+      const shared = input.shared ?? false;
+      if (typeof shared !== "boolean")
+        throw new Error("Invalid shared dialog mode");
+      return couch.overlay(
+        input.seatId ?? (input.open ? input.ownerSeatId : null),
+        shared && !couchTextRequest && !steam.textInput?.active,
+      );
+    }
+    case "overlay-ready":
+      return couch.overlayReady(input.version, input.captureId);
+    case "refresh-overlay":
+      return couch.refreshOverlay();
+    case "reload-seat":
+      return couch.reload(input.seatId);
+    case "cancel-text":
+      if (
+        typeof input.requestId !== "string" ||
+        couchTextRequest?.id !== input.requestId
+      )
+        return false;
+      steam.textInput?.finish({ status: "cancelled" });
+      return true;
+    case "list-saves":
+      return localSaves.list();
+    case "read-save":
+      return localSaves.select(input.id);
+    case "write-save":
+      return localSaves.save(input.world);
+    case "delete-save":
+      return localSaves.remove(input.id);
+    default:
+      throw new Error("Unknown local session request");
+  }
+});
+ipcMain.handle("couch:state", (event) => {
+  if (!couch?.identify(event)) throw new Error("Untrusted local seat request");
+  return state();
+});
+ipcMain.handle("couch:input-context", (event, context) => {
+  const seat = couch?.identify(event);
+  if (!seat) throw new Error("Untrusted local seat request");
+  return couch.setContext(seat, context);
+});
+ipcMain.handle("couch:text-input", async (event, input) => {
+  const seat = couch?.identify(event);
+  if (!seat) throw new Error("Untrusted local seat request");
+  if (
+    couchTextRequest ||
+    couch.overlayOwner ||
+    !window.isFocused() ||
+    steam.overlayActive ||
+    steam.dialogs?.active ||
+    quitRequested ||
+    power.phase !== "awake"
+  )
+    return { status: "unavailable" };
+  const request = {
+    seatId: seat.id,
+    generation: seat.generation,
+    id: crypto.randomUUID(),
+  };
+  couchTextRequest = request;
+  couch.overlay(seat.id);
+  request.overlayVersion = couch.overlayVersion;
+  window.webContents.send("desktop:couch-event", {
+    kind: "global-text",
+    open: true,
+    ...request,
+  });
+  try {
+    const result = await steam.showTextInput(input);
+    if (
+      couch.seats.get(seat.id) !== seat ||
+      seat.generation !== request.generation
+    )
+      return { status: "cancelled" };
+    return result;
+  } finally {
+    if (couchTextRequest === request) {
+      couchTextRequest = undefined;
+      if (
+        couch.overlayVersion === request.overlayVersion &&
+        couch.seats.get(seat.id) === seat &&
+        seat.generation === request.generation
+      )
+        couch.overlay(null);
+      window.webContents.send("desktop:couch-event", {
+        kind: "global-text",
+        open: false,
+        ...request,
+      });
+    }
+  }
+});
+
 ipcMain.on("desktop:ready-to-quit", (event, success) => {
   if (
     !trustedSender(event, window) ||
@@ -440,7 +650,7 @@ function openExternal(url) {
       "discord.com",
     ];
     if (!allowed.includes(parsed.hostname)) return;
-    void shell.openExternal(parsed.href);
+    openExternalUrl(shell, parsed.href, { dialog });
   } catch {
     // Ignore malformed or unapproved external URLs.
   }
@@ -458,56 +668,12 @@ function openSteamPage(url) {
   openExternal(url);
 }
 
-async function createWindow() {
-  if (!fs.existsSync(path.join(root, "index.html")))
-    throw new Error("Run npm run desktop:build before opening Electrify");
-  const display = screen.getPrimaryDisplay();
-  try {
-    preferences = normalizeDisplay(readJson(preferenceFile, null), display);
-  } catch {
-    preferences = normalizeDisplay(null, display);
-  }
-  saves = new DesktopSaveStore(app.getPath("userData"), steam);
-  modStore = new ModStore(app.getPath("userData"), {
-    appId: config.appId,
-    workshop: () => {
-      if (!steam.state().online || !steam.dispatcher) return null;
-      workshop ??= new SteamWorkshop(steam, config.appId);
-      return workshop;
-    },
-    chooseFile: () =>
-      steam.withNativeDialog(async () => {
-        const result = await dialog.showOpenDialog(window, {
-          title: "Import data-only scenario mod",
-          properties: ["openFile"],
-          filters: [{ name: "Scenario package", extensions: ["json"] }],
-        });
-        return result.canceled ? undefined : result.filePaths[0];
-      }),
-    chooseSave: () =>
-      steam.withNativeDialog(async () => {
-        const result = await dialog.showSaveDialog(window, {
-          title: "Save scenario mod template",
-          defaultPath: "scenario.json",
-          filters: [{ name: "Scenario package", extensions: ["json"] }],
-        });
-        return result.canceled ? undefined : result.filePath;
-      }),
-    openUrl: openSteamPage,
-  });
-  // Upload stages from an earlier session; a failure is logged and never blocks launch.
-  void modStore.cleanupStages();
-  steam.configureScoreQueue(saves.directory);
-  steam.configureAchievements(saves.directory, config.appId);
-  if (steam.state().online) {
-    try {
-      multiplayerRequest({ kind: "state" });
-    } catch (error) {
-      console.warn(`Steam multiplayer unavailable: ${error.message}`);
-    }
-  }
-  const player = steam.state().steamId || "offline";
-  const isolatedSession = session.fromPartition(`persist:electrify-${player}`);
+/**
+ * Create a partition restricted to bundled resources, with browser permissions denied.
+ * Its protocol serves verified asset paths with the shared CSP and media byte ranges.
+ */
+async function prepareBundledSession(partition) {
+  const isolatedSession = session.fromPartition(partition);
   isolatedSession.setPermissionRequestHandler(
     (_contents, _permission, callback) => callback(false),
   );
@@ -558,6 +724,65 @@ async function createWindow() {
       return new Response("Bundled asset unavailable", { status: 404 });
     }
   });
+  return isolatedSession;
+}
+
+/**
+ * Create the desktop shell and its isolated services from the packaged renderer.
+ * Native close, crash and resize handlers retain ownership of company-view cleanup.
+ */
+async function createWindow() {
+  if (!fs.existsSync(path.join(root, "index.html")))
+    throw new Error("Run npm run desktop:build before opening Electrify");
+  const display = screen.getPrimaryDisplay();
+  try {
+    preferences = normalizeDisplay(readJson(preferenceFile, null), display);
+  } catch {
+    preferences = normalizeDisplay(null, display);
+  }
+  saves = new DesktopSaveStore(app.getPath("userData"), steam);
+  modStore = new ModStore(app.getPath("userData"), {
+    appId: config.appId,
+    workshop: () => {
+      if (!steam.state().online || !steam.dispatcher) return null;
+      workshop ??= new SteamWorkshop(steam, config.appId);
+      return workshop;
+    },
+    chooseFile: () =>
+      steam.withNativeDialog(async () => {
+        const result = await dialog.showOpenDialog(window, {
+          title: "Import data-only scenario mod",
+          properties: ["openFile"],
+          filters: [{ name: "Scenario package", extensions: ["json"] }],
+        });
+        return result.canceled ? undefined : result.filePaths[0];
+      }),
+    chooseSave: () =>
+      steam.withNativeDialog(async () => {
+        const result = await dialog.showSaveDialog(window, {
+          title: "Save scenario mod template",
+          defaultPath: "scenario.json",
+          filters: [{ name: "Scenario package", extensions: ["json"] }],
+        });
+        return result.canceled ? undefined : result.filePath;
+      }),
+    openUrl: openSteamPage,
+  });
+  // Upload stages from an earlier session; a failure is logged and never blocks launch.
+  void modStore.cleanupStages();
+  steam.configureScoreQueue(saves.directory);
+  steam.configureAchievements(saves.directory, config.appId);
+  if (steam.state().online) {
+    try {
+      multiplayerRequest({ kind: "state" });
+    } catch (error) {
+      console.warn(`Steam multiplayer unavailable: ${error.message}`);
+    }
+  }
+  const player = steam.state().steamId || "offline";
+  const isolatedSession = await prepareBundledSession(
+    `persist:electrify-${player}`,
+  );
   window = new BrowserWindow({
     title: "Electrify",
     width: preferences.width,
@@ -625,21 +850,73 @@ async function createWindow() {
     // A crashed renderer can't answer the save handshake; don't make Quit wait for it.
     rendererReady = false;
     rendererCrashed = true;
+    closeCouch();
     steam.setInputEnabled(false);
     if (quitRequested && !finalizingQuit) void quitFailure();
   });
   window.on("blur", publishGameFocus);
   window.on("focus", publishGameFocus);
   window.webContents.on("did-start-loading", () => {
+    closeCouch();
     rendererReady = false;
     steam.setInputEnabled(false);
   });
   const inputManifest = app.isPackaged
     ? path.join(process.resourcesPath, "steam-input", "actions.vdf")
     : path.join(app.getAppPath(), "steamworks", "input", "actions.vdf");
+  couch = new CouchViews({
+    window,
+    WebContentsView,
+    MessageChannelMain,
+    prepareSession: prepareBundledSession,
+    preload: path.join(__dirname, "couch-preload.cjs"),
+    url: APP_URL,
+    publish: (event) => {
+      if (
+        event.kind === "seat-lost" &&
+        couchTextRequest?.seatId === event.seatId &&
+        couchTextRequest.generation === event.generation
+      )
+        steam.textInput?.finish({ status: "cancelled" });
+      window.webContents.send("desktop:couch-event", event);
+    },
+    input: () => steam.input,
+  });
+  localSaves = new LocalCoopSaveStore(
+    saves.directory,
+    steam.state().steamId || "offline",
+    require("./coop-codec.cjs"),
+  );
+  window.on("resize", () => {
+    if (couch?.seats.size) couch.relayout();
+  });
+  window.on("enter-full-screen", () => {
+    if (couch?.seats.size) couch.relayout();
+  });
+  window.on("leave-full-screen", () => {
+    if (couch?.seats.size) couch.relayout();
+  });
+  screen.on?.("display-metrics-changed", () => {
+    if (couch?.seats.size) couch.relayout();
+  });
   steam.configureInput(inputManifest, (frame) => {
-    if (window && !window.isDestroyed() && rendererReady)
+    if (window && !window.isDestroyed() && rendererReady && !couch?.active())
       window.webContents.send("desktop:input-event", frame);
+  });
+  steam.input?.setDevicePublisher((devices) => {
+    couch.inputFrame(devices);
+    if (
+      couchTextRequest &&
+      devices.some(
+        (device) =>
+          !device.connected &&
+          device.id === couch.bindings.get(couchTextRequest.seatId),
+      )
+    )
+      steam.textInput?.finish({ status: "cancelled" });
+    if (steam.textInput?.active) return;
+    const shellFrame = couch.shellFrame(devices);
+    if (shellFrame) window.webContents.send("desktop:input-event", shellFrame);
   });
   window.on("leave-full-screen", () => {
     if (displayUpdating) return;
@@ -698,6 +975,7 @@ async function createWindow() {
   }, 5000);
   steamTimer.unref();
   window.once("closed", () => {
+    closeCouch();
     steam.input?.dispose();
     clearInterval(steamTimer);
     clearTimeout(resizeTimer);

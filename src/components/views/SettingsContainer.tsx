@@ -21,7 +21,10 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
+const mapDispatchToProps = (
+  dispatch: AppDispatch,
+  ownProps?: { onBack?: () => void },
+): DispatchProps => {
   return {
     onLogin: (options) => {
       void login(options);
@@ -57,8 +60,11 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     // Mirrors Manual: Settings can now be reached mid-game too, so back has to return wherever
     // the player came from rather than always dropping them at the main menu
+    /** Let a shared modal owner close Settings without navigating a company's card history.
+     * Standalone Settings retains its ordinary return-to-caller navigation. */
     onBack: () => {
-      dispatch(navigateBack());
+      if (ownProps?.onBack) ownProps.onBack();
+      else dispatch(navigateBack());
     },
   };
 };

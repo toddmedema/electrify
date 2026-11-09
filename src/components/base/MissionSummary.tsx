@@ -74,6 +74,7 @@ function useMissionRisk(
   game: GameType,
   mission: MissionStatus,
   upcoming: UpcomingStoryEventType[],
+  enabled = true,
 ): MissionRisk | undefined {
   const scope = game.runIdentity ?? game.location ?? game.monthlyHistory;
   const last = React.useRef<{
@@ -82,9 +83,13 @@ function useMissionRisk(
     month: number;
   }>();
   const [, landed] = React.useReducer((count: number) => count + 1, 0);
-  React.useEffect(() => subscribeProjection(landed), []);
+  React.useEffect(
+    () => (enabled ? subscribeProjection(landed) : undefined),
+    [enabled],
+  );
   const now = currentTick(game);
   const defer =
+    enabled &&
     !!now &&
     (!!last.current || typeof Worker !== "undefined") &&
     !projectionReady(game) &&
@@ -95,31 +100,62 @@ function useMissionRisk(
     readsProjection(last.current?.risk)
       ? last.current?.risk
       : undefined;
-  const risk = defer
-    ? previousRisk
-    : selectMissionRisk(game, upcoming, mission);
+  const risk = !enabled
+    ? undefined
+    : defer
+      ? previousRisk
+      : selectMissionRisk(game, upcoming, mission);
   React.useEffect(() => {
+    if (!enabled) return;
     last.current = { risk, scope, month: game.date.monthsElapsed };
     if (defer && now) requestProjection(game, now);
   });
   return risk;
 }
 
+/** Prioritize active events or goal risks while keeping mission timing available for drill-down.
+ * Shared couch presentation uses eventsOnly to prevent one company's finances becoming match news. */
 export default function MissionSummary({
   game,
   upcoming = [],
   activeEvents = [],
   onActiveEvents,
   onEvidence,
+  eventsOnly = false,
 }: {
   game: GameType;
   upcoming?: UpcomingStoryEventType[];
   activeEvents?: ActiveEventGroupType[];
   onActiveEvents?: () => void;
   onEvidence?: (target: EvidenceTargetType) => void;
+  /** The shared couch bar reports common events, rather than one company's risk. */
+  eventsOnly?: boolean;
 }) {
   const mission = getMissionStatus(game);
-  const risk = useMissionRisk(game, mission, upcoming);
+  const companyRisk = useMissionRisk(game, mission, upcoming, !eventsOnly);
+  const nextEvent = eventsOnly
+    ? upcoming
+        .filter(
+          (event) =>
+            event.startsMinute !== undefined &&
+            event.startsMinute > game.date.minute,
+        )
+        .slice()
+        .sort(
+          (a, b) =>
+            a.startsMinute! - b.startsMinute! || a.key.localeCompare(b.key),
+        )[0]
+    : undefined;
+  const risk = eventsOnly
+    ? nextEvent
+      ? {
+          id: `event:${nextEvent.key}`,
+          label: `Announced event: ${nextEvent.title || nextEvent.label}`,
+          shortLabel: `Upcoming: ${nextEvent.title || nextEvent.label}`,
+          target: { card: "INSIGHTS" as const, eventKey: nextEvent.key },
+        }
+      : undefined
+    : companyRisk;
   const phone = useMediaQuery("(max-width:599px)", { noSsr: true });
   // The grid readout beside this already reports a shortage happening right now.
   const active = activeEvents[0];
@@ -182,6 +218,7 @@ export default function MissionSummary({
               <span className="missionRiskText statusLabel">{shortLabel}</span>
             </Button>
           ) : (
+            !eventsOnly &&
             mission.headline &&
             mission.headline.id !== "decisions" && (
               <span

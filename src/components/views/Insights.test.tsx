@@ -27,6 +27,7 @@ import { createGame } from "../../testing/Simulator";
 import { loadSimData } from "../../testing/SimData";
 import {
   cacheProjection,
+  forecastViewportBounds,
   ProjectionView,
   selectProjection,
 } from "../../helpers/Projection";
@@ -245,6 +246,16 @@ jest.mock("../base/ChartFinances", () => ({
       id={id}
       data-testid={id}
       data-visible-title={hideTitle ? "" : title}
+      data-history-points={
+        timeline?.filter(
+          (point) => (point as { projected: boolean }).projected === false,
+        ).length
+      }
+      data-projected-points={
+        timeline?.filter(
+          (point) => (point as { projected: boolean }).projected === true,
+        ).length
+      }
       data-inspected-value={format?.(123456)}
       data-axis-value={(formatAxis || format)?.(123456)}
       data-sync-key={syncKey}
@@ -1120,19 +1131,19 @@ describe("Insights layers", () => {
     expect(
       screen.queryByText(/Monthly forecast ranges show/),
     ).not.toBeInTheDocument();
+    expect(labelledButton("Fit full timeline")).toBeDisabled();
+    await user.click(labelledButton("Zoom in"));
     await user.click(labelledButton("Fit full timeline"));
-    expect(
-      screen.getByLabelText("Displayed date range: 2020–39"),
-    ).toBeVisible();
-    // Already wider than the scenario: nothing further out to go to.
+    expect(supply).toHaveAttribute("data-domain", JSON.stringify(initial));
+    expect(labelledButton("Fit full timeline")).toBeDisabled();
     expect(labelledButton("Zoom out")).toBeDisabled();
   });
 
-  it.each([1, 12, 60, 192, 0])(
-    "opens on the scenario span, with a 20-year fallback for duration %s",
-    (durationMonths) => {
+  it.each([1, 12, 60, 192, 240, 300, 0])(
+    "fits the scenario span, capped at 20 years, for duration %s",
+    async (durationMonths) => {
       const game = overviewGame;
-      const months = durationMonths || 20 * 12;
+      const months = Math.min(durationMonths || 240, 240);
       renderInsights(100, {
         ...game,
         scenarioId: CUSTOM_SCENARIO_ID,
@@ -1147,6 +1158,91 @@ describe("Insights layers", () => {
         JSON.stringify([0, months * MINUTES_PER_MONTH]),
       );
       expect(labelledButton("Zoom out")).toBeDisabled();
+      if (months > 1) {
+        await user.click(labelledButton("Zoom in"));
+        await user.click(labelledButton("Fit full timeline"));
+      }
+      expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+        "data-domain",
+        JSON.stringify([0, months * MINUTES_PER_MONTH]),
+      );
+      expect(labelledButton("Fit full timeline")).toBeDisabled();
+    },
+  );
+
+  it.each([144, 300, 0])(
+    "fits from scenario start after time has elapsed, for duration %s",
+    async (durationMonths) => {
+      renderInsights(100, {
+        ...overviewGame,
+        date: getDateFromMinute(
+          120 * MINUTES_PER_MONTH,
+          overviewGame.startingYear,
+        ),
+        scenarioId: CUSTOM_SCENARIO_ID,
+        customScenario: {
+          ...getScenario(100)!,
+          id: CUSTOM_SCENARIO_ID,
+          durationMonths,
+        },
+      });
+      expect(labelledButton("Zoom out")).toBeDisabled();
+      await user.click(labelledButton("Zoom in"));
+      await user.click(labelledButton("Fit full timeline"));
+      expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+        "data-domain",
+        JSON.stringify([
+          0,
+          Math.min(durationMonths || 240, 240) * MINUTES_PER_MONTH,
+        ]),
+      );
+      expect(labelledButton("Fit full timeline")).toBeDisabled();
+    },
+  );
+
+  it.each([
+    [1, 118],
+    [2, 119],
+  ])(
+    "fits the active successor term with a 20-year span for generation %s",
+    async (generationIndex, scenarioId) => {
+      const first = createGame({ scenarioId: 117 });
+      const termStartMonth = generationIndex * 240;
+      const game = {
+        ...first,
+        scenarioId,
+        date: getDateFromMinute(
+          (termStartMonth + 6) * MINUTES_PER_MONTH,
+          first.startingYear,
+        ),
+        campaign: {
+          ...first.campaign!,
+          generationIndex,
+          termStartMonth,
+        },
+      };
+      cacheProjection(game, {
+        ...overviewProjection,
+        domain: {
+          ...overviewProjection.domain,
+          x: forecastViewportBounds(game),
+        },
+      });
+      renderInsights(scenarioId, game);
+      await user.click(labelledButton("Zoom in"));
+      await user.click(labelledButton("Fit full timeline"));
+      const domain = [
+        termStartMonth * MINUTES_PER_MONTH,
+        (termStartMonth + 240) * MINUTES_PER_MONTH,
+      ];
+      expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+        "data-domain",
+        JSON.stringify(domain),
+      );
+      expect(domain[1] - domain[0]).toBe(240 * MINUTES_PER_MONTH);
+      expect(game.date.minute).toBeGreaterThanOrEqual(domain[0]);
+      expect(game.date.minute).toBeLessThan(domain[1]);
+      expect(labelledButton("Fit full timeline")).toBeDisabled();
     },
   );
 
@@ -1744,6 +1840,7 @@ describe("Insights layers", () => {
     const game = gameWithHistory();
     renderInsights(100, game);
 
+    await user.click(labelledButton("Zoom in"));
     await user.click(labelledButton("Fit full timeline"));
 
     expect(
@@ -1754,13 +1851,15 @@ describe("Insights layers", () => {
     ).toBeVisible();
     expect(screen.getByText("Profit", { selector: "h3" })).toBeVisible();
     expect(screen.getByText("Fuel Prices", { selector: "h3" })).toBeVisible();
+    const profit = screen.getByTestId("chartInsightsProfitPlot");
+    expect(profit).toHaveAttribute("data-history-points", "3");
     expect(
-      Number(
-        screen
-          .getByTestId("chartInsightsProfitPlot")
-          .getAttribute("data-points"),
-      ),
-    ).toBeGreaterThan(240);
+      Number(profit.getAttribute("data-projected-points")),
+    ).toBeGreaterThan(0);
+    expect(profit).toHaveAttribute(
+      "data-domain",
+      JSON.stringify([0, getScenario(100)!.durationMonths * MINUTES_PER_MONTH]),
+    );
     expect(
       Number(
         screen.getByTestId("supply-demand-chart").getAttribute("data-points"),

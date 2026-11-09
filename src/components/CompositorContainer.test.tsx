@@ -1,3 +1,7 @@
+import { store } from "../Store";
+import { getPlayedScenarioIds } from "../LocalStorage";
+import { delta } from "../reducers/Game";
+import { TUTORIALS } from "../data/Scenarios";
 import { UnknownAction } from "@reduxjs/toolkit";
 import { SCENARIOS } from "../data/Scenarios";
 import { reprioritizeFacility, togglePauseFacility } from "../reducers/Game";
@@ -275,4 +279,14 @@ describe("walkthrough steps", () => {
       });
     });
   });
+});
+
+it("exiting an unfinished tutorial does not mark it complete", () => {
+  window.localStorage.clear();
+  store.dispatch(
+    delta({ inGame: true, scenarioId: TUTORIALS[0].id, tutorialStep: 1 }),
+  );
+  mapDispatchToProps(store.dispatch).onTutorialEnd(TUTORIALS[0].tutorialSteps);
+  expect(store.getState().game.inGame).toBe(false);
+  expect(getPlayedScenarioIds()).not.toContain(TUTORIALS[0].id);
 });

@@ -2164,33 +2164,6 @@ $pane_header_height: 48px;
     border: none;
     z-index: 0; /* fixes bug with psuedo element z-index not working as expected */
   }
-
-  #yearProgressBar {
-    // Overlay the app bar's lower edge without adding a gap before the pane headers. The box
-    // hangs below the edge by its bottom padding, so the line itself sits on the status bar's
-    // bottom border rather than floating just above it.
-    position: absolute;
-    inset: auto 0 -4px;
-    // Retain breathing room around the line for the tutorial's target ring.
-    padding: 4px 0;
-    pointer-events: none;
-    z-index: 100;
-
-    // A permanent track, so the bar reads as elapsed time rather than a stray rule.
-    &::before {
-      content: "";
-      position: absolute;
-      inset: 4px 0;
-      height: 1px;
-      background: var(--border-subtle);
-    }
-
-    .yearProgressFill {
-      position: relative;
-      height: 1px;
-      background: $font_color_faded;
-    }
-  }
 }
 
 .base_main.pageEnter {
@@ -3765,7 +3738,6 @@ $pane_header_height: 48px;
 
     .missionMeta {
       display: block;
-      margin-top: 2px;
       color: $font_color_faded;
     }
 
@@ -3784,6 +3756,37 @@ $pane_header_height: 48px;
       .MuiChip-label {
         padding: 0 8px;
       }
+    }
+  }
+
+  .missionCatalogItem {
+    .MuiCardHeader-content {
+      min-width: 0;
+    }
+
+    .MuiCardHeader-title {
+      font-size: var(--font-size-subtitle);
+      line-height: 1.5rem;
+    }
+
+    .MuiCardHeader-subheader {
+      margin-top: 4px;
+      font-size: var(--font-size-body2);
+      line-height: 1.25rem;
+    }
+
+    .missionCatalogSummary {
+      display: block;
+    }
+
+    .missionMeta {
+      margin-top: 4px;
+      font-size: var(--font-size-caption);
+      line-height: 1.25rem;
+    }
+
+    .missionThemeTag {
+      line-height: 1.25rem;
     }
   }
 
@@ -3989,120 +3992,6 @@ $pane_header_height: 48px;
 
     .MuiSlider-markLabel {
       font-size: var(--font-size-caption);
-    }
-  }
-
-  // Which speed the clock is running at, said as a selection rather than as three enabled
-  // buttons and one greyed-out one - disabled reads as "you can't have this", not "you're on it"
-  // Selection uses a surface change; every enabled speed remains a blue control.
-  .speedToggles {
-    .MuiToggleButton-root {
-      // Equal segments, so the selection doesn't shift with each label's width.
-      min-width: 48px;
-      padding: $space-1 $space-3;
-      border-color: var(--border-tile);
-      color: var(--interactive-strong);
-      font-size: var(--font-size-caption);
-      line-height: 1.4;
-
-      &.Mui-selected {
-        background: var(--bg-selected);
-        color: var(--interactive-strong);
-
-        @media (hover: hover) and (pointer: fine) {
-          &:hover {
-            background: var(--bg-selected);
-          }
-        }
-      }
-
-      &.Mui-disabled {
-        color: $font_color_faded;
-      }
-    }
-
-    // Coarse pointers floor every control at 44px; speed segments keep their equal 48px.
-    @media (pointer: coarse) {
-      .MuiToggleButton-root {
-        min-width: 48px !important;
-      }
-    }
-
-    // The faint selected fill alone falls short of 3:1, so a solid bar and heavier label mark
-    // the running speed. Co-op draws its own markers along that edge instead.
-    &:not(.multiplayerSpeedToggles) .MuiToggleButton-root.Mui-selected {
-      box-shadow: inset 0 -2px 0 var(--interactive-strong);
-      font-weight: 700;
-    }
-  }
-
-  // Co-op splits the single-player selection in two. Your own request is an interaction, so it
-  // takes the blue fill. The speed the shared clock actually runs at is status: like the
-  // single-player selected segment it is neutral text, circled by a neutral ring that pulses
-  // with the tutorial's slow rhythm. A blue pulsing ring would read as a tutorial target.
-  .multiplayerSpeedToggles .MuiToggleButton-root {
-    // The label and ring sit a little high, clearing the marker row on the bottom edge: the
-    // ring spans 2-32 px of a 40 px button and 4-34 px of a 44 px one, and only a middle
-    // marker (heads from 29 or 33 px) meets it, breaking it cleanly with its knockout.
-    --clock-lift: 3px;
-    --clock-ring: var(--font-color-primary);
-    // What a marker's knockout outline matches, so the ring breaks cleanly behind a marker
-    --clock-segment: var(--bg-primary);
-
-    .multiplayerSpeedLabel {
-      transform: translateY(calc(-1 * var(--clock-lift)));
-    }
-
-    .multiplayerSpeedPeers svg {
-      color: $font_color_faded;
-
-      path {
-        stroke: var(--clock-segment);
-        stroke-width: 4px; // 1 px outside the 12 px glyph
-        stroke-linejoin: round;
-        paint-order: stroke;
-      }
-    }
-
-    &[data-active-speed="true"] {
-      color: var(--interactive-strong);
-    }
-
-    &.Mui-selected,
-    &.Mui-selected:hover {
-      --clock-ring: var(--interactive-contrast);
-      --clock-segment: var(--interactive-blue);
-      background: var(--interactive-blue);
-      color: var(--interactive-contrast);
-
-      .multiplayerSpeedPeers svg {
-        color: var(--interactive-contrast);
-      }
-    }
-
-    // One size wherever it moves, wide enough that 24× clears the stroke
-    &[data-active-speed="true"]::before {
-      --tutorial-glow: color-mix(in srgb, var(--clock-ring) 40%, transparent);
-      // Half the tutorial's reach keeps the glow inside the segment
-      --tutorial-pulse-spread: 4px;
-      content: "";
-      position: absolute;
-      top: calc(50% - var(--clock-lift));
-      left: 50%;
-      width: 30px;
-      height: 30px;
-      box-sizing: border-box;
-      transform: translate(-50%, -50%);
-      border: 2px solid var(--clock-ring);
-      border-radius: 50%;
-      pointer-events: none;
-      animation: tutorialTargetPulse 10s ease-in-out infinite;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      &[data-active-speed="true"]::before {
-        animation: none;
-      }
     }
   }
 

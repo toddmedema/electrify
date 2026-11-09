@@ -864,6 +864,7 @@ export class MultiplayerSession {
           }
           return;
         }
+        if (data.kind === "summary") return;
         if (data.kind === "keepalive") {
           for (const id of this.state.lobby.connected)
             if (id !== this.state.lobby.selfId)
@@ -1079,6 +1080,7 @@ export class MultiplayerSession {
         lobby: {
           ...this.state.lobby,
           lobbyId: undefined,
+          inviteCode: undefined,
           hostId: undefined,
           members: [],
           connected: [],

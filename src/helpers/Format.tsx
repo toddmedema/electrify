@@ -64,7 +64,8 @@ export function formatAbbreviatedNumber(
     ({ divisor }) => Math.abs(value) >= divisor / 2,
   );
   const scaled = unit ? value / unit.divisor : value;
-  const integerDigits = Math.abs(scaled).toString().split(".")[0].length;
+  const integerDigits =
+    Math.abs(scaled) < 1 ? 0 : Math.abs(scaled).toString().split(".")[0].length;
   return (
     formatDecimalNumber(scaled, {
       digits: totalDigits ? Math.max(totalDigits - integerDigits, 0) : digits,
@@ -77,6 +78,11 @@ export function formatAbbreviatedNumber(
 /** Fixed decimals for display, preserving genuine negative values and trailing zeroes. */
 export function formatFixed(value: number, digits: number): string {
   return withoutNegativeZero(value.toFixed(digits));
+}
+
+/** Electricity prices in cents per kWh, with at most one decimal place. */
+export function formatRateCompact(dollarsPerKWh: number): string {
+  return `${Number(formatFixed(dollarsPerKWh * 100, 1))}¢`;
 }
 
 /**

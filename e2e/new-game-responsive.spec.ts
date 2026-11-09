@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { reviewScreenshot } from "./review-screenshot";
 
 const REVIEW_VIEWPORTS = new Set([
   "desktop-chromium",
@@ -112,6 +113,13 @@ test("game picker prioritizes one lesson and filters the challenge catalog", asy
     page.getByRole("button", { name: "View Data Center Boom details" }),
   ).toHaveCount(0);
   await expect(page.getByLabel("Deep Freeze themes")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "View Heatwave + Drought details" })
+    .scrollIntoViewIfNeeded();
+  await reviewScreenshot(page, {
+    path: testInfo.outputPath("challenge-weather-catalog.png"),
+    animations: "disabled",
+  });
 
   await page.getByRole("button", { name: "All challenges" }).click();
   await expect(page.getByLabel("Deep Freeze themes")).toContainText(

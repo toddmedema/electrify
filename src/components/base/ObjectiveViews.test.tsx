@@ -54,7 +54,7 @@ it("shows the owning verdict and Optional meaning in Mission Status without subs
   const rules = screen.getByRole("region", { name: "Goals" });
   expect(within(rules).getByText("Keep bills affordable")).toBeInTheDocument();
   expect(within(rules).getByText("Optional")).toBeInTheDocument();
-  expect(rules).toHaveTextContent("Bills ≤$0.1/kWh each month");
+  expect(rules).toHaveTextContent("Bills ≤10¢/kWh each month");
   expect(within(rules).queryByText(bills.definition)).not.toBeInTheDocument();
   expect(within(rules).queryByText(bills.reason!)).not.toBeInTheDocument();
   expect(rules).not.toHaveTextContent(/Highest|months completed|Recorded:/);
@@ -98,7 +98,7 @@ it("renders stored objective debrief facts and unavailability without re-evaluat
   );
   expect(region).toHaveTextContent(bills.definition);
   expect(region).toHaveTextContent("Months 1–2");
-  expect(region).toHaveTextContent("$0.1/kWh (above goal)");
+  expect(region).toHaveTextContent("10¢/kWh (above goal)");
 });
 
 it("dates a built-in scenario's objectives and doesn't repeat the ending already stated", () => {

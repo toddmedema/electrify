@@ -1,3 +1,4 @@
+import { installSimulationHooks } from "../achievements/SimulationHooks";
 import { initEconomy } from "../data/Economy";
 import { initFuelPrices } from "../data/FuelPrices";
 import { initWeather } from "../data/Weather";
@@ -11,6 +12,7 @@ import {
   pauseWorld,
   restoreWorld,
   savedMatchSpec,
+  setWorldBlockers,
   stepWorld,
 } from "../multiplayer/World";
 import { ViewPublication } from "../multiplayer/ViewPublication";
@@ -27,6 +29,7 @@ import type {
 
 const worker = globalThis as unknown as Worker;
 let world: World | undefined;
+let local = false;
 let busy = false;
 let faulted = false;
 let lastControlHeartbeat = performance.now();
@@ -46,13 +49,46 @@ async function data(spec: MatchSpec) {
     waitForLoad((done) => initWeather(location, done)),
   ]);
 }
+/** Flush due seat projections and report a local summary from the same authoritative world.
+ * Its date follows an active company, or the latest retired grid once the whole match has ended. */
 function publish() {
   clearTimeout(viewTimer);
   viewTimer = undefined;
   viewDue = Infinity;
   if (!world) return;
   const views = publication.take(world, performance.now());
-  if (Object.keys(views).length) post({ kind: "views", views });
+  if (Object.keys(views).length) {
+    post({ kind: "views", views });
+    if (local) {
+      // A retired P1 freezes. The shared calendar must follow a company still playing.
+      const game =
+        world.grids.find((_grid, i) => !world!.outcomes[world!.seats[i].id]) ||
+        world.grids.reduce((latest, grid) =>
+          grid.date.minute > latest.date.minute ? grid : latest,
+        );
+      post({
+        kind: "summary",
+        summary: {
+          matchId: world.matchId,
+          epoch: world.epoch,
+          revision: world.revision,
+          date: game.date,
+          speed: world.speed,
+          reason: world.reason,
+          readyRequired: world.readyRequired,
+          ready: [...world.ready],
+          players: world.seats.map((seat) => ({
+            ...seat,
+            selectedSpeed: world!.selectedSpeeds[seat.id],
+            pauseReason: world!.activities[seat.id],
+            retired: !!world!.outcomes[seat.id],
+          })),
+          complete: world.seats.every((seat) => !!world!.outcomes[seat.id]),
+          outcomes: world.outcomes,
+        },
+      });
+    }
+  }
 }
 function requestViews(options?: Parameters<ViewPublication["request"]>[2]) {
   if (!world) return;
@@ -114,10 +150,17 @@ function loop() {
     Math.max(0, TICK_MS[world.speed] - (performance.now() - started)),
   );
 }
+/** Load simulation data before creating or restoring the worker-owned world.
+ * Publish its baseline and checkpoint before scheduling ticks; local account hooks stay worker-owned. */
 async function startMatch(
   request: Extract<WorkerRequest, { kind: "create" | "restore" }>,
 ) {
   busy = true;
+  local = !!request.local;
+  if (local) {
+    const { achievementHooks } = await import("../achievements/Achievements");
+    installSimulationHooks(achievementHooks);
+  }
   if (request.kind === "create") {
     await data(request.spec);
     world = createWorld(
@@ -146,8 +189,20 @@ async function startMatch(
   }, HOST_KEEPALIVE_MS);
   loop();
 }
+/** Apply host requests in worker message order and publish the resulting command receipts.
+ * Checkpoints follow previously accepted actions, with any requested pause applied before persistence. */
 function handle(request: WorkerRequest, running: World) {
-  if (request.kind === "command") {
+  if (request.kind === "blockers") {
+    if (request.requireReady)
+      pauseWorld(
+        running,
+        request.readyReason ||
+          request.reasons.join(" · ") ||
+          "Ready up before resuming",
+      );
+    setWorldBlockers(running, request.reasons);
+    requestViews({ force: true });
+  } else if (request.kind === "command") {
     const previousSpeed = running.speed;
     const error = applyCommand(
       running,

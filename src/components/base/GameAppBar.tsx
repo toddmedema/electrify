@@ -4,8 +4,6 @@ import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import {
   ClickAwayListener,
-  IconButton,
-  Menu,
   MenuItem,
   Toolbar,
   Tooltip,
@@ -14,7 +12,6 @@ import {
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import FlashOnIcon from "@mui/icons-material/FlashOn";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import {
   deriveExpandedSummary,
   formatHour,
@@ -59,6 +56,9 @@ import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus } from "./useMenuKeys";
 import { createSelector } from "@reduxjs/toolkit";
+import GameMenu from "./GameMenu";
+import { GameDate, YearProgressBar } from "./GameCalendar";
+import "./GameAppBar.scss";
 
 /**
  * The game's global state: cash, monthly profit, the date, speed, year progress,
@@ -297,6 +297,8 @@ function CompactGridStatus({
   );
 }
 
+/** Present the current company's money, grid status and requested shared-clock speed.
+ * Couch seats leave common calendar/menu chrome to the shell; memoized controls avoid tick churn. */
 export function GameAppBar(props: Props) {
   const steamAvailable = useDesktopState()?.steam.available;
   const {
@@ -320,7 +322,6 @@ export function GameAppBar(props: Props) {
     null,
   );
   const online = useOnline();
-  const connectionDescriptionId = React.useId();
   // The Scenario tool opens by navigation (see evidenceCard); there is nothing in it to point at
   React.useEffect(() => {
     if (evidenceRequest?.target === "mission-details" && !facilityDragActive) {
@@ -366,6 +367,7 @@ export function GameAppBar(props: Props) {
         ?.focus({ preventScroll: true });
     }
   }, [singleRow]);
+  const couchSeat = !!window.electrifyCouch;
   const multiplayer = game.multiplayer;
   const inMultiplayer = !!multiplayer;
   const clock = multiplayer?.clock;
@@ -395,16 +397,18 @@ export function GameAppBar(props: Props) {
    */
   // Layout and speed availability must use the same media-query snapshot during resize.
   const desktop = singleRow || tvMode;
+  const speedDisabled = !!multiplayer?.ending;
   const speedOptions = React.useMemo(
     () =>
       buildSpeedOptions({
         speed,
         onSpeedChange,
         desktop,
+        disabled: speedDisabled,
         multiplayer: sharedClockSpeedProps(multiplayer),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [speed, onSpeedChange, desktop, clock, multiplayer?.seat],
+    [speed, onSpeedChange, desktop, speedDisabled, clock, multiplayer?.seat],
   );
   // A window narrowed below desktop width loses the ULTRA button, so it can't stay the selected
   // speed. Re-checked whenever the speed changes too: a card that paused the clock can restore
@@ -417,66 +421,48 @@ export function GameAppBar(props: Props) {
 
   const menu = React.useMemo(
     () => (
-      <>
-        <IconButton
-          data-settings-trigger
-          data-saves-trigger
-          data-achievements-trigger
-          data-manual-trigger
-          className="gameMenuButton"
-          onClick={handleMenuClick}
-          aria-label="menu"
-          aria-describedby={online ? undefined : connectionDescriptionId}
-          edge="start"
-          color="primary"
-          size="large"
+      <GameMenu
+        anchorEl={menuAnchorEl}
+        online={online}
+        onOpen={handleMenuClick}
+        onClose={handleMenuClose}
+      >
+        <MenuItem onClick={onManual}>Manual</MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (window.electrifyCouch) {
+              handleMenuClose();
+              window.electrifyCouch.post({
+                kind: "global-settings",
+                requestId: crypto.randomUUID(),
+              });
+            } else onSettings();
+          }}
         >
-          <MoreVertIcon />
-          {!online && (
-            <>
-              <span className="offlineDot" aria-hidden="true" />
-              <span id={connectionDescriptionId} className="srOnly">
-                Offline: saving to this device only
-              </span>
-            </>
-          )}
-        </IconButton>
-        <Menu
-          id="gameCardMenu"
-          anchorEl={menuAnchorEl}
-          keepMounted
-          open={Boolean(menuAnchorEl)}
-          onClose={handleMenuClose}
-        >
-          {/* The app-wide offline banner would cover the game, so it is said here instead */}
-          {!online && (
-            <MenuItem disabled className="gameMenuOffline">
-              <span className="offlineDot" aria-hidden="true" />
-              Offline: saving to this device only
-            </MenuItem>
-          )}
-          <MenuItem onClick={onManual}>Manual</MenuItem>
-          <MenuItem onClick={onSettings}>Settings</MenuItem>
-          {!steamAvailable && (
-            <MenuItem onClick={props.onAchievements}>Achievements</MenuItem>
-          )}
-          {!inMultiplayer && (
-            <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
-          )}
-          <MenuItem onClick={() => openWindow(FEEDBACK_URL)}>
-            Send feedback
-          </MenuItem>
-          {/* Mid-tutorial, the thing a player who has seen enough wants is the next tutorial,
+          Settings
+        </MenuItem>
+        {!steamAvailable && (
+          <MenuItem onClick={props.onAchievements}>Achievements</MenuItem>
+        )}
+        {!inMultiplayer && (
+          <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
+        )}
+        <MenuItem onClick={() => openWindow(FEEDBACK_URL)}>
+          Send feedback
+        </MenuItem>
+        {/* Mid-tutorial, the thing a player who has seen enough wants is the next tutorial,
               not the scenario list they would have to go back through to reach it */}
-          {nextTutorial && (
-            <MenuItem onClick={() => onNextTutorial(nextTutorial.id)}>
-              Next tutorial
-            </MenuItem>
-          )}
-          <MenuItem onClick={handleQuit}>
-            {isTutorial ? "Main menu" : "Save & Quit"}
+        {nextTutorial && (
+          <MenuItem onClick={() => onNextTutorial(nextTutorial.id)}>
+            Next tutorial
           </MenuItem>
-          {process.env.REACT_APP_DESKTOP === "true" && isDesktopApp() && (
+        )}
+        <MenuItem onClick={handleQuit}>
+          {isTutorial ? "Main menu" : "Save & Quit"}
+        </MenuItem>
+        {process.env.REACT_APP_DESKTOP === "true" &&
+          isDesktopApp() &&
+          !window.electrifyCouch && (
             <MenuItem
               onClick={() => {
                 handleMenuClose();
@@ -486,14 +472,12 @@ export function GameAppBar(props: Props) {
               Quit
             </MenuItem>
           )}
-        </Menu>
-      </>
+      </GameMenu>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       menuAnchorEl,
       online,
-      connectionDescriptionId,
       onManual,
       onSettings,
       props.onSavedGames,
@@ -530,7 +514,6 @@ export function GameAppBar(props: Props) {
       ? stableGridSummary(game, now)
       : `${gridHealth.label}, ${gridHealth.metric}`;
 
-  const yearProgress = `Year ${date.year}: ${Math.round(date.percentOfYear * 100)}% elapsed`;
   const statusRow = (
     <div className="gameStatusBar">
       {compactStatus ? (
@@ -570,7 +553,7 @@ export function GameAppBar(props: Props) {
         </div>
       )}
       {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
-      {!isTutorial && (
+      {!isTutorial && !couchSeat && (
         <MissionSummary
           game={game}
           upcoming={props.upcomingEvents}
@@ -586,7 +569,7 @@ export function GameAppBar(props: Props) {
     <div id="appbar" className={singleRow ? "appbarSingleRow" : undefined}>
       <div id="topbar">
         <Toolbar className={inBlackout ? "blackout-pulsing" : ""}>
-          {menu}
+          {!couchSeat && menu}
           <Typography variant="h6" component="div" className="gameStatus">
             <span className="gameBalance">
               <span
@@ -619,15 +602,7 @@ export function GameAppBar(props: Props) {
                 </Typography>
               </Tooltip>
             </span>
-            <span className="weak gameStatusValue">
-              {/* One inline run, so the flex gap doesn't open before the comma. */}
-              <span>
-                {date.month} {date.year}
-                {bigScreen && (
-                  <span className="gameStatusHour">, {formatHour(date)}</span>
-                )}
-              </span>
-            </span>
+            {!couchSeat && <GameDate date={date} showTime={bigScreen} />}
           </Typography>
           {singleRow && statusRow}
           <div id="speedChangeButtons">{speedOptions}</div>
@@ -680,19 +655,7 @@ export function GameAppBar(props: Props) {
       <span className="srOnly" aria-live="polite">
         {gridHealth.announcement}
       </span>
-      <div
-        id="yearProgressBar"
-        role="progressbar"
-        aria-label={yearProgress}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(date.percentOfYear * 100)}
-      >
-        <div
-          className="yearProgressFill"
-          style={{ width: `${date.percentOfYear * 100}%` }}
-        />
-      </div>
+      {!couchSeat && <YearProgressBar date={date} />}
     </div>
   );
 }

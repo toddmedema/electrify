@@ -1,0 +1,38 @@
+.couchSharedToolbar {
+  width: 100%;
+  min-width: 0;
+
+  #topbar > .MuiToolbar-root {
+    gap: 16px;
+    flex-wrap: wrap !important;
+    padding-block: 8px;
+  }
+  #topbar .couchCalendar {
+    flex: 0 0 auto;
+    margin: 0;
+    min-width: 0;
+  }
+  // Match the player's grid status after native zoom, while retaining the shell's
+  // shared type ramp and its independently applied TV presentation scale.
+  #topbar .couchCalendar .gameStatusValue.weak,
+  .couchSharedMission .missionRiskText,
+  .couchSharedMission .missionSummaryMonths.MuiButton-root {
+    font-size: calc(var(--font-size-caption) * var(--couch-status-scale));
+  }
+  .gameStatus .gameStatusHour {
+    display: inline;
+  }
+  .couchSharedMission {
+    flex: 1 1 20rem;
+    min-width: 0;
+    margin: 0;
+    border: 0;
+    background: none;
+    .missionSummary {
+      border: 0;
+      padding: 0;
+      width: 100%;
+      background: none;
+    }
+  }
+}

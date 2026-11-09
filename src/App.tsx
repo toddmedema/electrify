@@ -136,7 +136,9 @@ function setupStorage(document: Document) {
  * Inside the Provider because it reads the setting from the store, and above everything else
  * because a palette change has to reach the whole tree.
  */
-function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
+export function ThemedApp(props: {
+  children: React.JSX.Element;
+}): React.JSX.Element {
   const choice: ThemeChoiceType = useAppSelector(
     (state) => state.settings.theme,
   );
@@ -148,6 +150,8 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
     height: window.innerHeight,
   }));
   useLayoutEffect(() => {
+    /** Apply shared text preferences once; native seat zoom already supplies TV magnification.
+     * Keeping seat display scale at one prevents multiplying the same presentation twice. */
     const apply = () => {
       const root = document.documentElement;
       root.dataset.tvLayout = String(tvMode);
@@ -157,7 +161,9 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
       );
       applyTextSize(
         textSize,
-        tvMode ? tvDisplayScale(tvScale, window.innerHeight) : 1,
+        tvMode && !window.electrifyCouch
+          ? tvDisplayScale(tvScale, window.innerHeight)
+          : 1,
       );
     };
     apply();
@@ -279,6 +285,8 @@ function OfflineNotice(): React.JSX.Element | null {
   );
 }
 
+/** Own account, save and desktop-service subscriptions for the mounted shell.
+ * Isolated couch documents bootstrap separately so they cannot create solo service owners. */
 export default function App() {
   const scenarioRouteInitialized = useRef(false);
   /**
@@ -434,8 +442,13 @@ export default function App() {
     let achievementsLive = true;
     void import(
       /* webpackChunkName: "achievements" */ "./achievements/Runtime"
-    ).then(({ startAchievementServices }) => {
-      if (achievementsLive) stopAchievements = startAchievementServices(store);
+    ).then(async ({ startAchievementServices }) => {
+      const account =
+        process.env.REACT_APP_DESKTOP === "true"
+          ? (await import("./couch/Platform")).withCouchPlatform(store)
+          : store;
+      if (achievementsLive)
+        stopAchievements = startAchievementServices(account);
     });
 
     const desktop =

@@ -25,9 +25,10 @@ html[data-controller-input="true"] .MuiButtonBase-root:has(> input:focus) {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  img {
+  .controllerGlyph {
     width: 24px;
     height: 24px;
+    flex-shrink: 0;
     object-fit: contain;
   }
 }

@@ -3,6 +3,16 @@ const path = require("node:path");
 const { buildVersion, writeBuildVersion } = require("./build-version");
 const { verifyEditionBundle } = require("./verify-edition-bundle");
 
+const site = spawnSync(
+  process.execPath,
+  [path.join(__dirname, "site/generate.js"), "--check"],
+  {
+    stdio: "inherit",
+  },
+);
+if (site.error) throw site.error;
+if (site.status !== 0) process.exit(site.status || 1);
+
 const version = buildVersion();
 const output = process.env.BUILD_PATH || "build";
 const result = spawnSync(

@@ -113,8 +113,10 @@ function summarize(log) {
   return jobs;
 }
 
-// Playwright titles look like "[mobile-390px] › e2e/x.spec.ts:12:5 › title"; configs with a
-// single unnamed project omit the bracket.
+/**
+ * Turn failed suite names into commands that preserve their coverage and renderer gates.
+ * Native-window failures stay CI-only; browser retries rebuild web after desktop suites.
+ */
 function reproduce(tests) {
   const commands = new Set();
   const browserCommands = new Set();
@@ -136,7 +138,7 @@ function reproduce(tests) {
       commands.add(
         `${spec}:${line} runs only in CI (native windows); read its trace in the diagnostics artifact`,
       );
-    else if (spec === "e2e/steam-input.spec.ts")
+    else if (["e2e/steam-input.spec.ts", "e2e/couch.spec.ts"].includes(spec))
       commands.add("npm run check -- --steps steam-input");
     else if (["e2e/multiplayer.spec.ts", "e2e/mods.spec.ts"].includes(spec))
       commands.add("npm run check -- --steps multiplayer");

@@ -19,7 +19,7 @@ if (productionRoot)
 // The renderer is unchanged: only the sandboxed native input/save bridge is replaced.
 export default defineConfig({
   ...base,
-  testMatch: "steam-input.spec.ts",
+  testMatch: ["steam-input.spec.ts", "couch.spec.ts"],
   testIgnore: [],
   outputDir,
   reporter: [

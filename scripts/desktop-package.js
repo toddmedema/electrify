@@ -10,6 +10,7 @@ const {
 } = require("./desktop-verify");
 const { verifyEditionBundle } = require("./verify-edition-bundle");
 const { preserveRuntimeNotices } = require("./runtime-notices");
+const { bundleLinuxRuntime } = require("./linux-runtime");
 
 async function signMacAdHoc(options) {
   return require("@electron/osx-sign").signAsync({
@@ -156,6 +157,7 @@ async function desktopPackage() {
           platform,
         ),
         afterPack: (context) => {
+          if (platform === "linux") bundleLinuxRuntime(context.appOutDir);
           if (mac) {
             const sdk = path.join(
               context.appOutDir,

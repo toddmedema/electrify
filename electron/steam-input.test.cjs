@@ -151,10 +151,11 @@ test("manifest supplies unique, localized actions and every default layout binds
     for (const preset of presets) {
       const context = value(preset, "name");
       const bound = new Set();
+      const byInput = new Map();
       for (const [id] of value(preset, "group_source_bindings")) {
         const group = groups.find((candidate) => value(candidate, "id") === id);
         assert.ok(group, `${file} preset references a missing group`);
-        for (const [, input] of value(group, "inputs")) {
+        for (const [inputName, input] of value(group, "inputs")) {
           const binding = value(
             value(value(value(input, "activators"), "Full_Press"), "bindings"),
             "binding",
@@ -167,11 +168,32 @@ test("manifest supplies unique, localized actions and every default layout binds
           assert.equal(match[1], context);
           assert.ok(names.has(match[2]), `${file} unknown action ${match[2]}`);
           bound.add(match[2]);
+          byInput.set(inputName, match[2]);
         }
       }
       assert.deepEqual(
         [...bound].sort(),
         ACTION_SETS[context].map((action) => `${context}_${action}`).sort(),
+      );
+      assert.equal(
+        byInput.get("button_escape"),
+        `${context}_menu`,
+        `${file} Start opens the game menu`,
+      );
+      assert.equal(
+        byInput.get("button_menu"),
+        `${context}_menuAlt`,
+        `${file} View/Select has its own couch menu action`,
+      );
+      assert.equal(
+        byInput.get("button_a"),
+        `${context}_confirm`,
+        `${file} A stays Confirm`,
+      );
+      assert.equal(
+        byInput.get("button_b"),
+        `${context}_back`,
+        `${file} B remains local Back`,
       );
     }
   }
@@ -367,4 +389,97 @@ test("optional native symbol failures do not disable other Steam APIs", () => {
 
 test("every SteamInput006 export and its returned bool struct resolves in the pinned SDK", () => {
   assert.ok(loadInputFunctions());
+});
+
+test("couch input retains same-frame device actions and independent contexts", () => {
+  const { input, state, poll } = fixture();
+  const devices = [];
+  input.setDevicePublisher((frame) => devices.push(frame));
+  input.setDeviceMode(true);
+  state.controllers = [1n, 2n];
+  input.setDeviceContext("1", "Gameplay");
+  input.setDeviceContext("2", "Menu");
+  poll();
+  poll();
+  state.down = new Set(["Gameplay_confirm", "Menu_confirm"]);
+  poll();
+  assert.deepEqual(
+    devices.at(-1).map((frame) => [frame.id, frame.actions]),
+    [
+      ["1", ["confirm"]],
+      ["2", ["confirm"]],
+    ],
+  );
+  poll();
+  state.down.clear();
+  poll();
+  state.controllers = [1n];
+  state.down.add("Gameplay_confirm");
+  poll();
+  assert.deepEqual(
+    devices.at(-1).map((frame) => [frame.id, frame.connected, frame.actions]),
+    [
+      ["1", true, ["confirm"]],
+      ["2", false, []],
+    ],
+  );
+  input.dispose();
+});
+
+test("replacement and global dialog release barriers disarm held controls per device", () => {
+  const { input, state, poll } = fixture();
+  const devices = [];
+  input.setDevicePublisher((frame) => devices.push(frame));
+  input.setDeviceMode(true);
+  poll();
+  poll();
+  state.down.add("Menu_confirm");
+  poll();
+  assert.deepEqual(devices.at(-1)[0].actions, ["confirm"]);
+  input.releaseDevice("1");
+  const before = devices.length;
+  poll();
+  poll();
+  assert.equal(devices.length, before);
+  state.down.clear();
+  poll();
+  state.down.add("Menu_confirm");
+  poll();
+  assert.deepEqual(devices.at(-1)[0].actions, ["confirm"]);
+  input.dispose();
+});
+
+test("per-device glyph PNGs are serialized only on origin refresh, not every input poll", () => {
+  const f = fixture();
+  const devices = [];
+  let serialized = 0;
+  f.input.setDevicePublisher((frames) => devices.push(frames));
+  f.input.readGlyphs = () => {
+    const glyphs = {
+      confirm: {
+        label: f.state.origin === 1 ? "A" : "Cross",
+        image: "data:image/png;base64," + "a".repeat(120000),
+      },
+    };
+    return {
+      ...glyphs,
+      toJSON: () => {
+        serialized++;
+        return glyphs;
+      },
+    };
+  };
+  f.poll(1001);
+  const count = serialized;
+  const published = devices.length;
+  for (let i = 0; i < 20; i++) f.poll(10);
+  assert.equal(serialized, count);
+  assert.equal(devices.length, published);
+  f.state.origin = 2;
+  f.poll(1001);
+  assert.equal(devices.length, published + 1);
+  assert.equal(devices.at(-1)[0].glyphs.confirm.label, "Cross");
+  f.state.controllers = [];
+  f.poll();
+  assert.equal(devices.at(-1)[0].disconnected, true);
 });

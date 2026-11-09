@@ -10,7 +10,7 @@ interface MotionState {
   speed: SpeedType;
 }
 
-/** Animate the time guide independently; native chart data still updates at each tick. */
+/** Lead the native history reveal by up to one tick without redrawing chart data. */
 export function productionChartMotion(getState: () => MotionState) {
   const active = () => getState().speed === "SLOW";
   let host: HTMLElement;
@@ -22,7 +22,6 @@ export function productionChartMotion(getState: () => MotionState) {
   let pointerInside = false;
   let drawnX = 0;
   let targetX = 0;
-  let startedAt = 0;
   let lastMinute: number | undefined;
   let lastGeometry = "";
   let lastData: uPlot.AlignedData | undefined;
@@ -75,9 +74,6 @@ export function productionChartMotion(getState: () => MotionState) {
       if (!canAnimate()) snap();
       return;
     }
-    const now = performance.now();
-    // Finish the prior step with the native tick, tolerating a small scheduling skew.
-    const previousX = now - startedAt >= TICK_MS.SLOW * 0.9 ? targetX : drawnX;
     const advance =
       lastMinute !== undefined &&
       state.minute - lastMinute === TICK_MINUTES &&
@@ -85,8 +81,9 @@ export function productionChartMotion(getState: () => MotionState) {
       canAnimate();
     cancel();
     targetX = u.valToPos(state.minute, "x", true) / ratio;
-    let fromX = advance ? previousX : targetX;
-    startedAt = now;
+    let nextX = advance
+      ? u.valToPos(state.minute + TICK_MINUTES, "x", true) / ratio
+      : targetX;
     if (geometry !== lastGeometry)
       Object.assign(marker.style, {
         top: `${top / ratio}px`,
@@ -102,18 +99,18 @@ export function productionChartMotion(getState: () => MotionState) {
     if (label.style.left !== labelOffset) label.style.left = labelOffset;
     // Keep the clamped label still at either edge; resume motion once it fits around Now.
     if (
-      fromX < left / ratio + halfWidth ||
-      targetX > (left + width) / ratio - halfWidth
+      targetX < left / ratio + halfWidth ||
+      nextX > (left + width) / ratio - halfWidth
     )
-      fromX = targetX;
-    setPosition(fromX);
-    if (advance && fromX !== targetX) {
-      const midpoint = (fromX + targetX) / 2;
-      const endpoint = targetX;
+      nextX = targetX;
+    setPosition(targetX);
+    if (advance && nextX !== targetX) {
+      const midpoint = (targetX + nextX) / 2;
+      const endpoint = nextX;
       timers = [
         window.setTimeout(() => setPosition(midpoint), TICK_MS.SLOW / 2),
-        // The next native tick normally commits the endpoint. This is only a fallback
-        // for a delayed tick; leave a small gap so it does not publish a duplicate frame.
+        // The next native tick catches the history reveal up to the guide. If it is
+        // delayed, finish this step and wait rather than predicting beyond one tick.
         window.setTimeout(() => setPosition(endpoint), TICK_MS.SLOW * 1.1),
       ];
     }

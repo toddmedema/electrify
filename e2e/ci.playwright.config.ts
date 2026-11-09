@@ -36,6 +36,7 @@ const layout = [
   "campaign.spec.ts",
   "sign-in.spec.ts",
   "learning-pages.spec.ts",
+  "scenario-pages.spec.ts",
   "ui-chart-build-polish.spec.ts",
   "multiline-text.spec.ts",
   "modal-layout.spec.ts",
