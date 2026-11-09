@@ -63,17 +63,18 @@
   --font-color-primary: #172334;
   --font-color-faded: #576574;
   --font-color-disabled: #bdbdbd; /* grey400 */
-  --interactive-contrast: #f5f5f5;
+  /* The label on an --interactive-blue fill. Pure white takes the logo blue to 3.7:1, where
+     #f5f5f5 manages only 3.4:1 */
+  --interactive-contrast: #ffffff;
   --interactive-blue: #0084f8; /* the logo blue - 3.7:1 on white */
-  /* blue800, primaryDarkColor in Theme.tsx: a fill that carries small label text, 5.3:1 under
-     --interactive-contrast where the logo blue manages only 3.4:1 */
-  --interactive-strong: #1565c0;
   // Neutral list sparklines: fuel colours would compete with blue's "interactive" meaning
   --spark-stroke: #546e7a; /* blueGray600 */
   --spark-fill: rgba(84, 110, 122, 0.12);
   --spark-baseline: #90a4ae; /* blueGray300 */
   --spark-marker-fill: #ffffff; /* The card paper, so the hollow dot cuts the line */
-  --interactive-tint: rgba(0, 132, 248, 0.5);
+  /* The hover wash behind a blue icon or number badge. Light enough that the logo blue still
+     clears 3:1 against it (3.1:1 over white), so the mark stays visible while the row is hovered */
+  --interactive-tint: rgba(0, 132, 248, 0.14);
   // The bright head of the glint that circles the tutorial ring
   --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 64%, white);
   --tutorial-glow: color-mix(in srgb, var(--interactive-blue) 60%, transparent);
@@ -147,7 +148,6 @@
      6.6:1 on --bg-primary, 6.9:1 under the #0a0a0a button label. The logo's dark twins
      (logo-dark.svg, logo-home-dark.svg) are painted in this blue, as is LOGO_BLUE.dark. */
   --interactive-blue: #629be1;
-  --interactive-strong: var(--interactive-blue);
   --spark-stroke: #9aa9ba;
   --spark-fill: rgba(154, 169, 186, 0.16);
   --spark-baseline: rgba(148, 163, 184, 0.34);
@@ -420,7 +420,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   #centeredMenu
   :is(.mainActions, .resourceActions, .discoveryActions)
   .MuiButton-root:focus {
-  background-color: var(--interactive-strong);
+  background-color: var(--interactive-blue);
   color: var(--interactive-contrast);
   // The fill carries selection, including when a controller moves real focus.
   outline: none !important;
@@ -457,13 +457,13 @@ html[data-touch-input="true"]:not([data-controller-input="true"]) #menuCard {
 
   // Keep the next action prominent while tapping resources or returning from another screen.
   #centeredMenu .mainActions .MuiButton-root:first-child {
-    background-color: var(--interactive-strong);
+    background-color: var(--interactive-blue);
     color: var(--interactive-contrast);
 
     &[data-touch-pressed] {
       background-color: color-mix(
         in srgb,
-        var(--interactive-strong) 88%,
+        var(--interactive-blue) 88%,
         var(--font-color-primary)
       );
     }
@@ -1974,7 +1974,7 @@ $pane_header_height: 48px;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--interactive-strong);
+  background: var(--interactive-blue);
   color: var(--interactive-contrast);
   font-size: var(--font-size-caption);
   font-weight: 600;
@@ -3240,7 +3240,7 @@ $pane_header_height: 48px;
 
     .MuiIconButton-root,
     .MuiButton-root {
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
     }
 
     box-sizing: border-box;
@@ -3628,7 +3628,7 @@ $pane_header_height: 48px;
     gap: 2px;
     padding: 8px 8px;
     border-radius: var(--radius-md);
-    background: var(--interactive-strong);
+    background: var(--interactive-blue);
     color: var(--interactive-contrast);
     font-size: var(--font-size-caption);
     font-weight: 600;
@@ -3847,6 +3847,19 @@ $pane_header_height: 48px;
     }
   }
 
+  // Centred on the caption's 16 px line, in the label's faded tone. Flex
+  // centring holds across fonts, where a baseline offset drifts.
+  .facilityStat dt:has(> .facilityStatIcon) {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .facilityStatIcon {
+    flex-shrink: 0;
+    font-size: 14px;
+  }
+
   .facilityStatValue {
     font-size: var(--font-size-body2);
     line-height: 20px;
@@ -4031,7 +4044,7 @@ $pane_header_height: 48px;
     min-height: var(--control-size);
     padding-inline: 8px;
     margin: -5px -8px -5px 0;
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
   }
 
   .eventHistoryFilterCheck {
@@ -4102,7 +4115,7 @@ $pane_header_height: 48px;
       cursor: pointer;
 
       .eventLogIcon {
-        color: var(--interactive-strong);
+        color: var(--interactive-blue);
       }
 
       &:hover,
@@ -5023,14 +5036,14 @@ $homeSmokeCycle: 5.6s;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-md);
     background: var(--bg-raised);
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
     font: inherit;
     cursor: pointer;
   }
 
   button:first-child {
-    border-color: var(--interactive-strong);
-    background: var(--interactive-strong);
+    border-color: var(--interactive-blue);
+    background: var(--interactive-blue);
     color: var(--interactive-contrast);
   }
 
@@ -5424,7 +5437,7 @@ $homeSmokeCycle: 5.6s;
   }
 
   a {
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
     text-decoration-skip-ink: auto;
@@ -5446,7 +5459,7 @@ $homeSmokeCycle: 5.6s;
     }
 
     &:focus-visible {
-      outline: 2px solid var(--interactive-strong);
+      outline: 2px solid var(--interactive-blue);
       outline-offset: 1px;
       text-decoration-color: currentColor;
     }
@@ -5704,7 +5717,7 @@ $homeSmokeCycle: 5.6s;
   .facilityChevron {
     flex-shrink: 0;
     width: 20px;
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
   }
 }
 .base_main .facilityDisclosure .facility {
@@ -6195,7 +6208,7 @@ $homeSmokeCycle: 5.6s;
   font-weight: 600;
 }
 .insights .insightsTrackActions .MuiIconButton-root:not(.Mui-disabled) {
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
 }
 .insights .insightsRateMetricLabel,
 .insights .insightsRateMarkMobile {
@@ -7016,7 +7029,7 @@ $programs_column: 800px;
 
 // Catalog rows open detail screens; the chevron carries their blue interaction affordance.
 .rowChevron.MuiSvgIcon-root {
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
   font-size: 1.25rem;
 }
 
@@ -7323,8 +7336,10 @@ img[src$="/transmission.svg"] {
   display: flex;
   line-height: 0;
 
+  // The check badge carries "stable"; the bolt keeps the text colour rather than fading
   .gridHealthStableBolt {
     font-size: 1.375rem;
+    color: inherit;
   }
 
   // A ring in the row's own surface colour cuts the check out of the bolt behind it.
@@ -7473,7 +7488,7 @@ img[src$="/transmission.svg"] {
     gap: var(--space-2) var(--space-4);
 
     .dataCenterSetupPowerValue {
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
       font-size: var(--font-size-display);
       font-weight: var(--font-weight-emphasis);
       font-variant-numeric: tabular-nums;
@@ -7577,7 +7592,7 @@ img[src$="/transmission.svg"] {
       top: 24px;
       width: 7px;
       height: 7px;
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
       border-right: 2px solid currentColor;
       border-bottom: 2px solid currentColor;
       transform: rotate(-45deg);
@@ -7604,7 +7619,7 @@ img[src$="/transmission.svg"] {
     }
 
     a {
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
       text-decoration-thickness: 1px;
       text-underline-offset: 2px;
     }
@@ -7874,12 +7889,6 @@ img[src$="/transmission.svg"] {
   font-size: var(--font-size-caption-sm);
   font-weight: 600;
 
-  // A cluster's count is small text on the fill, so it takes the stronger blue
-  &.cluster {
-    background: var(--interactive-strong);
-    background-clip: padding-box;
-  }
-
   &.marker {
     background: transparent;
 
@@ -8148,7 +8157,7 @@ img[src$="/transmission.svg"] {
 
 // Native selects keep the trigger blue while their option list uses readable body text.
 select:not(:disabled) {
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
 }
 option {
   color: var(--font-color-primary);
@@ -8160,7 +8169,7 @@ option {
   min-width: var(--control-size);
   min-height: var(--control-size);
   margin-left: 4px;
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
   flex-shrink: 0;
 }
 // The (?) follows the expand control straight away, left-aligned in the header with it; only the
@@ -8168,7 +8177,7 @@ option {
 .insightsTrackHeader .manual-link {
   flex-shrink: 0;
   margin-left: 4px;
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
 }
 .fuelFilter {
   display: flex;
@@ -8203,7 +8212,7 @@ option {
     }
   }
   .MuiButton-root[aria-pressed="true"] {
-    border-color: var(--interactive-strong);
+    border-color: var(--interactive-blue);
     background: var(--bg-selected);
     font-weight: 700;
   }
@@ -8258,7 +8267,7 @@ option {
     gap: 4px;
     .manual-link {
       flex-shrink: 0;
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
     }
   }
   .insightsViewportToolbar {
@@ -8386,7 +8395,7 @@ option {
   white-space: nowrap;
   border-radius: var(--radius-sm);
   padding: 4px 8px;
-  background: var(--interactive-strong);
+  background: var(--interactive-blue);
   color: var(--interactive-contrast);
   font-size: var(--font-size-caption);
 }
@@ -8410,7 +8419,7 @@ option {
   flex-shrink: 0;
   width: 40px;
   height: 20px;
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
 }
 .facilityRowHeader > .facilitySelectionCheckbox.MuiCheckbox-root {
   position: absolute;
@@ -8422,7 +8431,7 @@ option {
   padding: 10px;
   color: var(--font-color-faded);
   &.Mui-checked {
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
   }
 }
 .facilityContextMenu .MuiMenuItem-root {

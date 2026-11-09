@@ -13,9 +13,7 @@ import {
   Typography,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
-import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
-import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import RemoveIcon from "@mui/icons-material/Remove";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
@@ -30,7 +28,10 @@ import {
   DragStart,
   NotDraggingStyle,
 } from "@hello-pangea/dnd";
-import FacilityContextMenu, { FacilityMenuTarget } from "./FacilityContextMenu";
+import FacilityContextMenu, {
+  FacilityMenuTarget,
+  facilityActionIcon,
+} from "./FacilityContextMenu";
 import { facilityGroupMoves } from "./FacilitySelection";
 import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
@@ -256,7 +257,7 @@ function FacilityActions(props: {
         <Button
           className="facilityCancelConstruction"
           variant="outlined"
-          startIcon={<CancelIcon />}
+          startIcon={facilityActionIcon("cancelUpgrade")}
           aria-label={"Cancel upgrade of " + facilityDisplayName(facility)}
           onClick={() => onCancelRetrofit(facility.id)}
         >
@@ -266,9 +267,7 @@ function FacilityActions(props: {
       {!underConstruction && !upgrading && !permanentlyShutdown && (
         <Button
           variant="outlined"
-          startIcon={
-            <ConceptIcon concept={facility.paused ? "play" : "pause"} />
-          }
+          startIcon={facilityActionIcon(facility.paused ? "resume" : "pause")}
           aria-label={
             facility.paused
               ? "Resume " + facilityDisplayName(facility)
@@ -291,7 +290,9 @@ function FacilityActions(props: {
             underConstruction ? "facilityCancelConstruction" : undefined
           }
           variant="outlined"
-          startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
+          startIcon={facilityActionIcon(
+            underConstruction ? "cancelConstruction" : "sell",
+          )}
           aria-label={
             (underConstruction ? "Cancel construction of " : "Sell ") +
             facilityDisplayName(facility)

@@ -2,7 +2,6 @@ import * as React from "react";
 import { Badge, Button, Tooltip } from "@mui/material";
 import HistoryIcon from "@mui/icons-material/History";
 import InsertChartIcon from "@mui/icons-material/InsertChart";
-import GroupsIcon from "@mui/icons-material/Groups";
 import ErrorIcon from "@mui/icons-material/Error";
 import { useAppSelector, useAppDispatch } from "../../Store";
 import { CardNameType, CardType, GameToolType } from "../../Types";
@@ -35,7 +34,7 @@ export const GAME_TOOLS: {
     id: "PROGRAMS",
     label: "Programs",
     triggerId: "programsNav",
-    icon: <GroupsIcon />,
+    icon: <ConceptIcon concept="customers" />,
   },
   {
     id: "INSIGHTS",

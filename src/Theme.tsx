@@ -271,10 +271,10 @@ export function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// What contained primary buttons darken to on hover. MUI passes this straight into a CSS custom
-// property, so it has to be a real CSS color: an invalid one drops the background to transparent
-// and leaves the light contrastText label sitting unreadable on the page behind it. blue800 also
-// clears 4.5:1 against that label, so hovering is the more legible of the two states.
+// What contained primary buttons darken to on hover in light mode. MUI passes this straight into
+// a CSS custom property, so it has to be a real CSS color: an invalid one drops the background to
+// transparent and leaves the light contrastText label sitting unreadable on the page behind it.
+// blue800 also clears 4.5:1 against that label, so hovering is the more legible of the two states.
 export const primaryDarkColor = blue[800];
 export const disabledColor = grey[100];
 
@@ -321,6 +321,9 @@ export function createAppTheme(mode: ThemeModeType): Theme {
     return cached;
   }
   const palette = CHART_PALETTES[mode];
+  // Where a filled primary control goes on hover: darker than the logo blue on light, lighter
+  // than it on dark, so the response is a change in value on either palette.
+  const interactiveHover = mode === "dark" ? "#7eaee9" : primaryDarkColor;
   const built = createTheme({
     palette: {
       mode,
@@ -329,9 +332,10 @@ export function createAppTheme(mode: ThemeModeType): Theme {
         // MUI's saturated blue ramp: hover lightens to oklch(0.74 0.1 254), 8.6:1 under the label
         light: mode === "dark" ? "#bbd3f2" : disabledColor,
         main: palette.interactive,
-        dark: mode === "dark" ? "#7eaee9" : primaryDarkColor,
-        // Dark's primary is a pale blue, so the label on a filled button is the page behind it
-        contrastText: mode === "dark" ? "#0a0a0a" : grey[100],
+        dark: interactiveHover,
+        // Dark's primary is a pale blue, so the label on a filled button is the page behind it.
+        // Light's is the logo blue, under which white manages 3.7:1 and grey100 only 3.4:1.
+        contrastText: mode === "dark" ? "#0a0a0a" : "#ffffff",
       },
       secondary: amber,
       success: { main: mode === "dark" ? green[400] : green[800] },
@@ -393,19 +397,16 @@ export function createAppTheme(mode: ThemeModeType): Theme {
             fontWeight: 600,
             textTransform: "none",
             touchAction: "manipulation",
+            // The same shield for a filled button's fill and hover, and for the same reason.
             "&.MuiButton-contained.MuiButton-colorPrimary:not(.Mui-disabled)": {
-              // A deeper interaction blue carries small white labels in light mode.
-              backgroundColor:
-                mode === "light" ? primaryDarkColor : palette.interactive,
-              "&:hover": {
-                backgroundColor: mode === "light" ? blue[900] : "#7eaee9",
-              },
+              backgroundColor: palette.interactive,
+              "&:hover": { backgroundColor: interactiveHover },
             },
+            // Equal to MUI's default (primary.main), restated on purpose: these selectors outrank
+            // the plain `color` that stylesheets and sx put on a button, so every text and
+            // outlined button reads as the interactive blue wherever it sits.
             "&.MuiButton-text.MuiButton-colorPrimary:not(.Mui-disabled), &.MuiButton-outlined.MuiButton-colorPrimary:not(.Mui-disabled)":
-              {
-                color:
-                  mode === "light" ? primaryDarkColor : palette.interactive,
-              },
+              { color: palette.interactive },
           },
         },
       },
@@ -414,7 +415,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
         styleOverrides: {
           root: {
             "&:not(.Mui-disabled)": {
-              color: mode === "light" ? primaryDarkColor : palette.interactive,
+              color: palette.interactive,
             },
             // Grouped borders overlap by one pixel; keep the selected edge on top.
             "&.Mui-selected": { zIndex: 1 },
@@ -450,13 +451,13 @@ export function createAppTheme(mode: ThemeModeType): Theme {
             paddingTop: 8,
             paddingBottom: 8,
             "&:not(.Mui-disabled)": {
-              color: mode === "light" ? primaryDarkColor : palette.interactive,
+              color: palette.interactive,
             },
           },
           standard: { paddingLeft: 8 },
           icon: {
             "&:not(.Mui-disabled)": {
-              color: mode === "light" ? primaryDarkColor : palette.interactive,
+              color: palette.interactive,
             },
           },
         },
@@ -480,7 +481,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiAccordionSummary: {
         styleOverrides: {
           expandIconWrapper: {
-            color: mode === "light" ? primaryDarkColor : palette.interactive,
+            color: palette.interactive,
             ".Mui-disabled &": { color: "var(--font-color-faded)" },
           },
         },
@@ -504,14 +505,14 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiCheckbox: {
         styleOverrides: {
           root: {
-            "&:not(.Mui-disabled)": { color: "var(--interactive-strong)" },
+            "&:not(.Mui-disabled)": { color: "var(--interactive-blue)" },
           },
         },
       },
       MuiRadio: {
         styleOverrides: {
           root: {
-            "&:not(.Mui-disabled)": { color: "var(--interactive-strong)" },
+            "&:not(.Mui-disabled)": { color: "var(--interactive-blue)" },
           },
         },
       },
@@ -523,7 +524,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
               color: "var(--font-color-faded)",
             },
             "&.Mui-checked:not(.Mui-disabled)": {
-              color: "var(--interactive-strong)",
+              color: "var(--interactive-blue)",
             },
           },
         },
@@ -624,7 +625,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
             textTransform: "none",
             fontWeight: 600,
             "&:not(.Mui-disabled)": {
-              color: mode === "light" ? primaryDarkColor : palette.interactive,
+              color: palette.interactive,
               opacity: 1,
             },
           },

@@ -54,6 +54,8 @@ type EventHistoryFilterType =
 const EVENT_HISTORY_FILTERS: {
   value: EventHistoryFilterType;
   label: string;
+  // Matches the glyph the filter's rows show, so the menu previews what it keeps
+  concept: ConceptNameType;
   emptyMessage?: string;
   kinds: GameEventKindType[];
 }[] = [
@@ -61,24 +63,28 @@ const EVENT_HISTORY_FILTERS: {
     // Scenario stories, wildfires and weather hazards all log as world events
     value: "WORLD",
     label: "World events",
+    concept: KIND_CONCEPTS.WORLD_EVENT,
     emptyMessage: "No world or weather events yet.",
     kinds: ["WORLD_EVENT"],
   },
   {
     value: "BLACKOUTS",
     label: "Blackouts",
+    concept: KIND_CONCEPTS.BLACKOUT,
     emptyMessage: "No blackout events yet.",
     kinds: ["BLACKOUT", "BLACKOUT_OVER"],
   },
   {
     value: "PROJECTS",
     label: "Projects",
+    concept: KIND_CONCEPTS.BUILD,
     emptyMessage: "No project events yet.",
     kinds: ["BUILD", "CONSTRUCTION", "SELL"],
   },
   {
     value: "MARKET_FINANCE",
     label: "Market & finance",
+    concept: KIND_CONCEPTS.LOAN,
     emptyMessage: "No market or finance events yet.",
     kinds: ["FUEL_PRICE", "FUEL_CROSSOVER", "LOAN"],
   },
@@ -330,7 +336,9 @@ export default function EventLog(props: Props): React.JSX.Element {
                     )
                   }
                 >
-                  Show all events
+                  <ListItemIcon className="eventHistoryFilterCheck" />
+                  <ListItemIcon />
+                  <ListItemText>Show all events</ListItemText>
                 </MenuItem>
                 {EVENT_HISTORY_FILTERS.map((filter) => (
                   <MenuItem
@@ -351,10 +359,23 @@ export default function EventLog(props: Props): React.JSX.Element {
                         <CheckIcon fontSize="small" />
                       )}
                     </ListItemIcon>
+                    <ListItemIcon>
+                      <ConceptIcon
+                        concept={filter.concept}
+                        fontSize="small"
+                        // Neutral here: a red blackout glyph would read as a live alarm
+                        color="inherit"
+                        decorative
+                      />
+                    </ListItemIcon>
                     <ListItemText>{filter.label}</ListItemText>
                   </MenuItem>
                 ))}
-                <MenuItem onClick={() => setFilterAnchor(null)}>Done</MenuItem>
+                <MenuItem onClick={() => setFilterAnchor(null)}>
+                  <ListItemIcon className="eventHistoryFilterCheck" />
+                  <ListItemIcon />
+                  <ListItemText>Done</ListItemText>
+                </MenuItem>
               </Menu>
             </header>
             {events.length === 0 && (

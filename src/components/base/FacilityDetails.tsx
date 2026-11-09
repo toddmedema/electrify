@@ -56,6 +56,7 @@ import {
 } from "../../Types";
 import HydroWaterSection from "./HydroWaterSection";
 import Sparkline from "./Sparkline";
+import ConceptIcon, { ConceptNameType } from "./ConceptIcon";
 import { MONTHS } from "../../Constants";
 
 /**
@@ -83,15 +84,32 @@ export interface Props {
 
 interface StatProps {
   label: string;
+  // The game's glyph for what this number measures, drawn ahead of the label
+  concept?: ConceptNameType;
   value: React.ReactNode;
   // Profit is the one number here that means something different either side of zero
   tone?: "good" | "bad";
+}
+
+// The label names the stat in words; the glyph only helps the eye find it again
+function StatIcon(props: { concept: ConceptNameType }): React.JSX.Element {
+  return (
+    <ConceptIcon
+      concept={props.concept}
+      className="facilityStatIcon"
+      color="inherit"
+      decorative
+      monochrome
+      style={{ width: 14, height: 14 }}
+    />
+  );
 }
 
 const Stat = React.memo(function Stat(props: StatProps): React.JSX.Element {
   return (
     <div className="facilityStat">
       <Typography variant="caption" color="textSecondary" component="dt">
+        {props.concept && <StatIcon concept={props.concept} />}
         {props.label}
       </Typography>
       <Typography
@@ -353,7 +371,11 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
       {underConstruction && (
         <section className="facilityDetailSection" aria-label="Construction">
           <dl className="facilityStats">
-            <Stat label="Capacity" value={formatWatts(facility.peakW)} />
+            <Stat
+              label="Capacity"
+              concept="supply"
+              value={formatWatts(facility.peakW)}
+            />
             {storage && (
               <Stat
                 label="Energy capacity"
@@ -380,7 +402,11 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             Operation
           </Typography>
           <dl className="facilityStats">
-            <Stat label="Capacity" value={formatWatts(facility.peakW)} />
+            <Stat
+              label="Capacity"
+              concept="supply"
+              value={formatWatts(facility.peakW)}
+            />
             {!storage && maxOutputFactor < 1 && (
               <Stat
                 label="Current max output"
@@ -405,6 +431,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             {storage && (
               <Stat
                 label="Charge"
+                concept="storage"
                 value={formatWattHoursOfPeak(storage.currentWh, storage.peakWh)}
               />
             )}
@@ -435,6 +462,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             {hazard && (
               <Stat
                 label={hazard.label}
+                concept="severeWeather"
                 value={
                   <span className="facilityStatWarning">
                     {formatPercent(hazard.availableFraction)} available
@@ -469,6 +497,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             />
             <Stat
               label="Lifetime profit"
+              concept="money"
               value={`${lifetime.profit > 0 ? "+" : ""}${formatMoneyConcise(lifetime.profit)}`}
               tone={
                 lifetime.profit < 0
@@ -532,6 +561,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                   color="textSecondary"
                   component="dt"
                 >
+                  <StatIcon concept="fuel" />
                   {fuel} price, {trend.length}mo
                 </Typography>
                 <dd className="facilityTrend">

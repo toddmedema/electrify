@@ -11,7 +11,6 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import FlashOnIcon from "@mui/icons-material/FlashOn";
 import {
   deriveExpandedSummary,
   formatHour,
@@ -276,7 +275,11 @@ function CompactGridStatus({
             <span className="gridHealthStatusIcon" aria-hidden="true">
               {health.state === "stable" ? (
                 <>
-                  <FlashOnIcon className="gridHealthStableBolt" />
+                  <ConceptIcon
+                    concept="supply"
+                    className="gridHealthStableBolt"
+                    decorative
+                  />
                   <CheckCircleIcon className="gridHealthStableCheck" />
                 </>
               ) : (

@@ -15,16 +15,16 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import GroupsIcon from "@mui/icons-material/Groups";
 import EnergySavingsLeafIcon from "@mui/icons-material/EnergySavingsLeaf";
 import SolarPowerIcon from "@mui/icons-material/SolarPower";
 import ScheduleIcon from "@mui/icons-material/Schedule";
-import FactoryIcon from "@mui/icons-material/Factory";
+import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing";
 import ThermostatIcon from "@mui/icons-material/Thermostat";
 import ElectricCarIcon from "@mui/icons-material/ElectricCar";
 import BatteryChargingFullIcon from "@mui/icons-material/BatteryChargingFull";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import NavigableCardRow from "../base/NavigableCardRow";
+import ConceptIcon from "../base/ConceptIcon";
 import {
   cancelPolicy,
   closePolicyDecision,
@@ -99,7 +99,8 @@ const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
   efficiency: EnergySavingsLeafIcon,
   solar: SolarPowerIcon,
   timeOfUse: ScheduleIcon,
-  curtailment: FactoryIcon,
+  // Not the factory glyph: that one means "generator" throughout the game
+  curtailment: PrecisionManufacturingIcon,
   thermal: ThermostatIcon,
   evCharging: ElectricCarIcon,
   battery: BatteryChargingFullIcon,
@@ -848,7 +849,9 @@ export function ProgramsScreen({
         <header className="constructionHeader">
           <CatalogTitleBar
             disableGutters
-            icon={<GroupsIcon fontSize="small" aria-hidden />}
+            icon={
+              <ConceptIcon concept="customers" fontSize="small" decorative />
+            }
             title={
               // Phones abbreviate the title so it still shares a line with close
               <>
