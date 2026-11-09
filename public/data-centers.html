@@ -146,6 +146,8 @@
                Costs = expensesFuel + expensesOM; emissions = kgco2e / 1000.
                Exact: 682.1 / 182.1 MW, $448.30 / $523.85 million,
                6.1448 / 7.2192 million tonnes; shown to 2 significant digits.
+               Change = (campus - none) / none from the exact values, also to
+               2 significant digits: -73%, +17%, +17%.
                Both runs completed with no invariant violations or unserved
                energy; their opening facilities and first 12 months were equal.
                Rerunning at 100 MW reproduced the earlier 100 MW figures.
@@ -175,11 +177,15 @@
                   <span class="comparison-table__label" aria-hidden="true"
                     >No new campus</span
                   >680 MW
+                  <span class="comparison-table__arrow" aria-hidden="true"
+                    >→</span
+                  >
                 </td>
                 <td role="cell" headers="margin-row growth-column">
                   <span class="comparison-table__label" aria-hidden="true"
                     >500 MW campus</span
                   >180 MW
+                  <span class="comparison-table__change">(−73%)</span>
                 </td>
               </tr>
               <tr role="row">
@@ -190,11 +196,15 @@
                   <span class="comparison-table__label" aria-hidden="true"
                     >No new campus</span
                   >$450 million
+                  <span class="comparison-table__arrow" aria-hidden="true"
+                    >→</span
+                  >
                 </td>
                 <td role="cell" headers="cost-row growth-column">
                   <span class="comparison-table__label" aria-hidden="true"
                     >500 MW campus</span
                   >$520 million
+                  <span class="comparison-table__change">(+17%)</span>
                 </td>
               </tr>
               <tr role="row">
@@ -205,11 +215,15 @@
                   <span class="comparison-table__label" aria-hidden="true"
                     >No new campus</span
                   >6.1 million tonnes CO₂e
+                  <span class="comparison-table__arrow" aria-hidden="true"
+                    >→</span
+                  >
                 </td>
                 <td role="cell" headers="emissions-row growth-column">
                   <span class="comparison-table__label" aria-hidden="true"
                     >500 MW campus</span
                   >7.2 million tonnes CO₂e
+                  <span class="comparison-table__change">(+17%)</span>
                 </td>
               </tr>
             </tbody>
@@ -228,13 +242,12 @@
               Under <strong>How much extra power?</strong>, set 0 MW and choose
               <strong>Start exploring</strong>.
             </li>
-            <li>Return to the setup and repeat with 500 MW.</li>
+            <li><strong>Repeat with 500 MW.</strong></li>
           </ol>
           <p class="comparison-note">
-            Zero added demand keeps existing customers, including existing data
-            centers. The new campus draws constant power, while the game uses
-            one representative day per month. This exercise cannot forecast a
-            real project’s reliability or local bills.
+            The new campus draws constant power, while the game uses one
+            representative day per month. This exercise cannot forecast a real
+            project’s reliability or local bills.
           </p>
         </section>
 
