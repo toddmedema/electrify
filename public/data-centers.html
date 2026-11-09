@@ -101,13 +101,10 @@
       <section class="hero hero--illustrated" aria-labelledby="page-title">
         <div class="hero__inner">
           <div class="hero__copy">
-            <p class="eyebrow">Data centers and your community</p>
             <h1 id="page-title">Can your grid keep up?</h1>
             <p class="hero__lede">
-              A new data center needs power around the clock. Where will it come
-              from, what will it cost, and who has to plan for it? Run an
-              example grid in Electrify and see what it takes to supply that
-              extra electricity.
+              Electrify can help you understand the impacts of potential data
+              center projects in your community.
             </p>
             <div class="hero__actions">
               <a class="button button--primary" href="/?dataCenters=1"
@@ -142,7 +139,7 @@
                calibrateDataCenterScenario(Austin, 2026, published customer profile),
                configureDataCenterGrowth with 0 / 500e6 W, opening 2027.
                runSimulation for 24 months, strategy none; sum the 12 2027 months.
-               Spare supply = lowest minimumSupplyMarginW of those months.
+               Smallest reserve = lowest minimumSupplyMarginW of those months.
                Costs = expensesFuel + expensesOM; emissions = kgco2e / 1000.
                Exact: 682.1 / 182.1 MW, $448.30 / $523.85 million,
                6.1448 / 7.2192 million tonnes; shown to 2 significant digits.
@@ -159,7 +156,7 @@
           >
             <thead role="rowgroup">
               <tr role="row">
-                <th scope="col" role="columnheader">Modeled result in 2027</th>
+                <th scope="col" role="columnheader"></th>
                 <th scope="col" role="columnheader" id="baseline-column">
                   No new campus
                 </th>
@@ -171,7 +168,7 @@
             <tbody role="rowgroup">
               <tr role="row">
                 <th scope="row" role="rowheader" id="margin-row">
-                  Smallest spare supply
+                  Smallest reserve
                 </th>
                 <td role="cell" headers="margin-row baseline-column">
                   <span class="comparison-table__label" aria-hidden="true"
@@ -242,7 +239,10 @@
               Under <strong>How much extra power?</strong>, set 0 MW and choose
               <strong>Start exploring</strong>.
             </li>
-            <li><strong>Repeat with 500 MW.</strong></li>
+            <li>
+              Play until 2028 or later to see the impact, then
+              <strong>repeat with 500 MW</strong>.
+            </li>
           </ol>
           <p class="comparison-note">
             The new campus draws constant power, while the game uses one
@@ -258,13 +258,10 @@
               Which power plants and grid upgrades must be ready when the campus
               opens?
             </li>
+            <li>Who will pay for the new infrastructure and expenses?</li>
             <li>
-              Who will pay for the new infrastructure and ongoing electricity
-              use?
-            </li>
-            <li>
-              What supplies power on a windless night, and how does a
-              clean-energy promise account for those hours?
+              Where does the power come from on a windless night, and how does a
+              clean-energy promise account for that?
             </li>
           </ul>
           <div class="panel__actions">
