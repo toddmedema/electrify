@@ -61,6 +61,10 @@ html[data-tv-layout="true"] {
   &[data-controller-input="true"] :is(button, .MuiButtonBase-root):focus {
     outline-offset: -0.1667rem;
   }
+  // That ring sits inside the border box, where a filled button's own blue would swallow it
+  &[data-controller-input="true"] .MuiButton-contained:focus {
+    outline-color: var(--interactive-contrast) !important;
+  }
   &[data-controller-input="true"] .MuiSwitch-root {
     &:focus-within {
       outline: 0.1667rem solid var(--focus-ring) !important;
@@ -631,7 +635,7 @@ html[data-tv-layout="true"] {
     display: flex;
     align-items: center;
     cursor: pointer;
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
     font-weight: 600;
   }
   .tvBuildContext .chartLegend {
