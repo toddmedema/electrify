@@ -612,9 +612,7 @@ describe("data-center debrief feedback", () => {
       label: "Months with blackouts after Data Centers arrived",
       unit: "months",
     });
-    expect(metric(result, "electricityRate").value).toBe(
-      "$0.100/kWh → $0.200/kWh",
-    );
+    expect(metric(result, "electricityRate").value).toBe("$0.1/kWh → $0.2/kWh");
     expect(result.importance).toBe("NOTABLE");
   });
 
@@ -626,9 +624,7 @@ describe("data-center debrief feedback", () => {
         endingRateDollarsPerKWh: 0,
       }),
     );
-    expect(metric(result, "electricityRate").value).toBe(
-      "$0.200/kWh → $0.000/kWh",
-    );
+    expect(metric(result, "electricityRate").value).toBe("$0.2/kWh → $0/kWh");
     expect(result.importance).toBe("ROUTINE");
   });
 
@@ -769,7 +765,7 @@ describe("catalog debrief observations before the term ends", () => {
     });
     expect(metric(partial, "electricityRate")).toMatchObject({
       available: true,
-      value: "$0.100/kWh → $0.120/kWh",
+      value: "$0.1/kWh → $0.12/kWh",
     });
     const strict = interpretRuleReport(report, inputs);
     expect(strict.available).toBe(false);
@@ -793,7 +789,7 @@ describe("catalog debrief observations before the term ends", () => {
       expect(metric(result, "blackoutMonths").available).toBe(false);
       expect(metric(result, "electricityRate")).toMatchObject({
         available: true,
-        value: "$0.100/kWh → $0.120/kWh",
+        value: "$0.1/kWh → $0.12/kWh",
       });
     }
   });

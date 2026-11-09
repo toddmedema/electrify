@@ -320,11 +320,8 @@ function billedRate(month: MonthlyHistoryType): number | undefined {
   return nonnegative(rate) ? rate : undefined;
 }
 
-// Rates under a dollar keep all three decimals, so a before/after pair reads at one precision
-// ("$0.100/kWh → $0.128/kWh", not "$0.1/kWh → $0.128/kWh").
 function rateText(rate: number): string {
-  const fixed = formatFixed(rate, 3);
-  return `$${Math.abs(rate) < 1 ? fixed : fixed.replace(/0+$/, "").replace(/\.$/, "")}/kWh`;
+  return `$${formatFixed(rate, 3).replace(/0+$/, "").replace(/\.$/, "")}/kWh`;
 }
 
 function dataCenterMetrics(

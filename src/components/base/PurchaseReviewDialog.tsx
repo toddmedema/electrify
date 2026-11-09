@@ -136,6 +136,9 @@ export default function PurchaseReviewDialog(
   const cashDetailId = React.useId();
   const loanDisabled =
     submitting || !!props.loanDisabled || cash < financedCashDue;
+  // The loan takes the emphasis only when it is the one way forward; ignoring `submitting`
+  // keeps the buttons from swapping weight mid-submit.
+  const loanLeads = cashShort && !props.loanDisabled && cash >= financedCashDue;
 
   const submit = async (financed: boolean, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -253,7 +256,7 @@ export default function PurchaseReviewDialog(
           )}
           <Button
             color="primary"
-            variant={cashShort ? "outlined" : "contained"}
+            variant={loanLeads ? "outlined" : "contained"}
             disabled={cashDisabled}
             aria-describedby={cashShort ? cashDetailId : undefined}
             onClick={(event) => submit(false, event)}
@@ -265,7 +268,7 @@ export default function PurchaseReviewDialog(
           <Button
             id={props.loanButtonId}
             color="primary"
-            variant={cashShort ? "contained" : "outlined"}
+            variant={loanLeads ? "contained" : "outlined"}
             disabled={loanDisabled}
             onClick={(event) => submit(true, event)}
             startIcon={<ConceptIcon concept="finances" fontSize="small" />}

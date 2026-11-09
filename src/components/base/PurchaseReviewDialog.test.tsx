@@ -83,6 +83,13 @@ describe("PurchaseReviewDialog", () => {
     expect(button("Take loan")).toHaveClass("MuiButton-contained");
   });
 
+  it("leaves neither choice emphasised over a disabled loan when neither is affordable", () => {
+    const { button } = renderDialog({ cash: 100000 });
+    expect(button("Take loan")).toBeDisabled();
+    expect(button("Take loan")).toHaveClass("MuiButton-outlined");
+    expect(button("Pay cash")).toHaveClass("MuiButton-contained");
+  });
+
   it("keeps cash as the lead choice when it is affordable", () => {
     const { button } = renderDialog({ cash: 1e9 });
     expect(screen.queryByText(/more cash needed/)).toBeNull();

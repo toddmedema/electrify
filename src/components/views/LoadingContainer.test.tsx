@@ -10,6 +10,7 @@ import { store } from "../../Store";
 import {
   restoreLoadedTutorial,
   restoreTutorialAfterLoading,
+  weatherFailureMessage,
 } from "./LoadingContainer";
 
 it("restores a capstone's authored pane after rebuilding its scenario", () => {
@@ -110,3 +111,18 @@ it.each([start.type, resume.type, launchRun.type])(
     expect(cardReducer(back, navigateBack()).name).toBe("FACILITIES");
   },
 );
+
+it("names the place and the remedy for a weather download failure, logging the cause", () => {
+  const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const raw = "Could not load the weather for SF: Failed to fetch";
+    expect(weatherFailureMessage(raw, "San Francisco, CA")).toBe(
+      "Could not load the weather for San Francisco, CA. Check your connection and try again.",
+    );
+    expect(warn).toHaveBeenCalledWith(raw);
+    const other = '"x" is not a location id weather can be loaded for';
+    expect(weatherFailureMessage(other, "Anywhere")).toBe(other);
+  } finally {
+    warn.mockRestore();
+  }
+});

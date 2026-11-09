@@ -4,10 +4,8 @@ import {
   getRawSolarIrradianceWM2,
   getWeather,
   hasOffshoreWind,
-  initWeather,
   initWeatherFromRows,
 } from "./Weather";
-import { LOCATIONS } from "../Constants";
 
 // Weather rows are looked up by position, one row per hour, with DAYS_PER_MONTH = 1 -- so a
 // single year of data is 12 months x 24 hours. The fixture starts at 1980, the first year the
@@ -528,31 +526,5 @@ describe("getWeather", () => {
         }
       }
     });
-  });
-});
-
-describe("initWeather", () => {
-  it("names the place and the remedy when the download fails, keeping the cause in the log", async () => {
-    const originalFetch = global.fetch;
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-    global.fetch = jest.fn(() =>
-      Promise.reject(new TypeError("Failed to fetch")),
-    );
-    try {
-      const failure = await new Promise<string | undefined>((resolve) =>
-        initWeather("PIT", resolve),
-      );
-      expect(failure).toBe(
-        `Could not load the weather for ${LOCATIONS.PIT.name}. Check your connection and try again.`,
-      );
-      expect(failure).not.toContain("Failed to fetch");
-      expect(warn).toHaveBeenCalledWith(
-        "Weather load failed for PIT:",
-        expect.any(TypeError),
-      );
-    } finally {
-      global.fetch = originalFetch;
-      warn.mockRestore();
-    }
   });
 });

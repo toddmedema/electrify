@@ -58,6 +58,7 @@ import {
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus } from "./useMenuKeys";
+import { createSelector } from "@reduxjs/toolkit";
 
 /**
  * The game's global state: cash, monthly profit, the date, speed, year progress,
@@ -698,18 +699,21 @@ export function GameAppBar(props: Props) {
 
 // The mapped props are compared shallowly, so the active save keeps one object per id and name
 // rather than a fresh one on every store update.
-let activeSaveCache: StateProps["activeSave"];
-function selectActiveSave(state: AppStateType): StateProps["activeSave"] {
-  const id = state.saves?.activeId;
-  if (!id) return undefined;
-  const name =
-    state.saves?.entries.find((entry) => entry.id === id)?.name ||
-    state.saves?.pendingName ||
-    "Current game";
-  if (activeSaveCache?.id !== id || activeSaveCache.name !== name)
-    activeSaveCache = { id, name };
-  return activeSaveCache;
-}
+const selectActiveSave = createSelector(
+  [
+    (state: AppStateType) => state.saves?.activeId,
+    (state: AppStateType) => {
+      const id = state.saves?.activeId;
+      return id
+        ? state.saves?.entries.find((entry) => entry.id === id)?.name ||
+            state.saves?.pendingName ||
+            "Current game"
+        : undefined;
+    },
+  ],
+  (id, name): StateProps["activeSave"] =>
+    id && name ? { id, name } : undefined,
+);
 
 const mapStateToProps = (state: AppStateType): StateProps => ({
   activeEvents: selectActiveEventGroups(state),

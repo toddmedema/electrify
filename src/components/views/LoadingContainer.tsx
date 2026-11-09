@@ -21,6 +21,19 @@ import {
 import { AppStateType, GameType, TutorialStepType } from "../../Types";
 import Loading, { DispatchProps, StateProps } from "./Loading";
 
+/**
+ * The player-facing form of a weather download failure: where, and what to do. The loader's own
+ * message (with the fetch error) stays in the log. Other failures pass through unchanged.
+ */
+export function weatherFailureMessage(
+  failure: string,
+  locationName: string,
+): string {
+  if (!failure.startsWith("Could not load the weather")) return failure;
+  console.warn(failure);
+  return `Could not load the weather for ${locationName}. Check your connection and try again.`;
+}
+
 export function restoreTutorialAfterLoading(
   dispatch: Dispatch<UnknownAction>,
   tutorialSteps: TutorialStepType[],
@@ -136,7 +149,13 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           .then(async () => {
             if (!isCurrentLoadingGeneration(request)) return;
             await Promise.all([
-              waitForLoad((done) => initWeather(location, done)),
+              waitForLoad((done) =>
+                initWeather(location, (failure) =>
+                  done(
+                    failure && weatherFailureMessage(failure, location.name),
+                  ),
+                ),
+              ),
               waitForLoad(initFuelPrices),
               waitForLoad(initEconomy),
             ]);

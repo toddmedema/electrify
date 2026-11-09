@@ -3,7 +3,7 @@ import { DAYS_PER_MONTH, DAYS_PER_YEAR, EQUATOR_RADIANCE } from "../Constants";
 import { DateType, LocationType, RawWeatherType } from "../Types";
 import { normalAt, randomAt, RANDOM_STREAM } from "../helpers/Math";
 import { getSunriseSunset } from "../helpers/DateTime";
-import { getLocation, isValidLocationId } from "../helpers/Locations";
+import { isValidLocationId } from "../helpers/Locations";
 import { decodeWeather } from "./WeatherBinary";
 import { simulationDataRequest } from "../helpers/SimulationDataIntegrity";
 import { pow } from "../helpers/Pow";
@@ -377,15 +377,7 @@ export function initWeather(
       done();
     })
     .catch((e: Error) => {
-      // The player sees where and what to do; the underlying cause stays in the log.
-      console.warn(`Weather load failed for ${localId}:`, e);
-      const name =
-        typeof location === "string"
-          ? (getLocation(location)?.name ?? location)
-          : location.name;
-      done(
-        `Could not load the weather for ${name}. Check your connection and try again.`,
-      );
+      done(`Could not load the weather for ${localId}: ${e.message}`);
     });
 }
 
