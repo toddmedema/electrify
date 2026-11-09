@@ -26,9 +26,9 @@ for (const layout of [
       .click();
     if (layout.pane) {
       await expect(page.getByRole("heading", { name: "Goals" })).toBeVisible();
-      await expect(
-        page.locator(".operationsGoals > .eventLogItem"),
-      ).toHaveCount(3);
+      await expect(page.locator(".operationsGoals .eventLogItem")).toHaveCount(
+        3,
+      );
       await page.locator(".eventHistory").scrollIntoViewIfNeeded();
       await expect(
         page.getByRole("button", { name: "Filter event history, All events" }),

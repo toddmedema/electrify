@@ -18,7 +18,7 @@ const expectInsightSpacing = async (insights: Locator) => {
     const timeRow = element.querySelector(".insightsViewportToolbar")!;
     const rail = element.querySelector(".insightEventRail")!;
     const chip = rail.querySelector(".insightEventChip")!;
-    const chartTitle = element.querySelector(".insightsTrackHeader h6")!;
+    const chartTitle = element.querySelector(".insightsTrackHeader h3")!;
     const panelTitle = element
       .closest(".gameToolPanel")!
       .querySelector(".gameToolHeader h2")!;

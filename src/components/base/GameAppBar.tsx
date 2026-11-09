@@ -586,7 +586,7 @@ export function GameAppBar(props: Props) {
       <div id="topbar">
         <Toolbar className={inBlackout ? "blackout-pulsing" : ""}>
           {menu}
-          <Typography variant="h6" className="gameStatus">
+          <Typography variant="h6" component="div" className="gameStatus">
             <span className="gameBalance">
               <span
                 className={`gameStatusValue${now.cash < 0 ? " gameCashNegative" : ""}`}

@@ -3321,6 +3321,8 @@ $pane_header_height: 48px;
     // A label on the page rather than a band across it: it shares the page's surface, opaque
     // so nothing scrolling beneath a pinned label shows through its narrow strip
     .manual-group {
+      // A heading element (h2) for the group, without the heading's default margins
+      margin: 0;
       padding-inline: 0;
       background: var(--bg-primary);
       line-height: 32px;
@@ -3701,7 +3703,8 @@ $pane_header_height: 48px;
 
       &.Mui-selected {
         border-color: $interactive_blue !important;
-        color: $interactive_blue;
+        // The stronger blue keeps the small label above 4.5:1 on the selected tint.
+        color: var(--interactive-strong);
         font-weight: 600;
       }
     }
@@ -4194,6 +4197,11 @@ $pane_header_height: 48px;
     background: transparent;
 
     &.actionable {
+      box-sizing: border-box;
+      width: 100%;
+      color: inherit;
+      font: inherit;
+      text-align: inherit;
       cursor: pointer;
 
       .eventLogIcon {
@@ -6285,7 +6293,7 @@ $homeSmokeCycle: 5.6s;
   font-size: var(--font-size-subtitle);
   font-weight: 600;
 }
-.insights .insightsTrackHeader > h6 {
+.insights .insightsTrackHeader > .MuiTypography-h6 {
   font-size: var(--font-size-subtitle);
   font-weight: 600;
 }

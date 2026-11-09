@@ -99,6 +99,8 @@ export default function BuildOptionCard(
 
   return (
     <Card
+      // Every catalog renders these cards as the items of its list.
+      component="li"
       className={[
         "build-list-item buildOption",
         props.className,

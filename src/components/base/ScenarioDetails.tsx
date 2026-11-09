@@ -241,7 +241,13 @@ export default function ScenarioDetails(): React.JSX.Element | null {
       id="scenarioPane"
       game={game}
     >
-      <div className="scrollable">
+      {/* Focusable so a keyboard can scroll it; mostly text, with few controls to tab through */}
+      <div
+        className="scrollable"
+        tabIndex={0}
+        role="region"
+        aria-label="Scenario details"
+      >
         <ScenarioDetailsContent game={game} scenario={scenario} />
       </div>
     </GameCard>

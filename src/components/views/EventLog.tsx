@@ -234,7 +234,11 @@ export default function EventLog(props: Props): React.JSX.Element {
               aria-labelledby="upcomingEventsTitle"
             >
               <header className="eventLogSectionHeader">
-                <Typography id="upcomingEventsTitle" variant="subtitle2">
+                <Typography
+                  id="upcomingEventsTitle"
+                  component="h3"
+                  variant="subtitle2"
+                >
                   Upcoming events
                 </Typography>
               </header>
@@ -268,7 +272,11 @@ export default function EventLog(props: Props): React.JSX.Element {
             aria-labelledby="eventHistoryTitle"
           >
             <header className="eventLogSectionHeader">
-              <Typography id="eventHistoryTitle" variant="subtitle2">
+              <Typography
+                id="eventHistoryTitle"
+                component="h3"
+                variant="subtitle2"
+              >
                 Event history
               </Typography>
               <Tooltip

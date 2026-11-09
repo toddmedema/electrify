@@ -110,7 +110,7 @@ import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
-import { temperatureUnit } from "../../helpers/Units";
+import { largeMassUnit, temperatureUnit } from "../../helpers/Units";
 import { UnitsContext } from "../base/UnitsContext";
 import {
   HISTORY_METRIC_KEYS,
@@ -1293,6 +1293,18 @@ export default class Insights extends React.Component<Props, State> {
     );
   }
 
+  // Escape inside the layer editor closes just the editor, returning focus to its toggle; the
+  // workspace's own Escape (close the whole pane) skips a handled event.
+  private closeLayersOnEscape = (event: React.KeyboardEvent) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    if (!this.state.layersOpen) return;
+    event.preventDefault();
+    this.setState({ layersOpen: false });
+    document
+      .getElementById("insightsLayersButton")
+      ?.focus({ preventScroll: true });
+  };
+
   private renderLayerPanel(projection: ProjectionView) {
     if (!this.state.layersOpen) {
       return null;
@@ -1303,6 +1315,7 @@ export default class Insights extends React.Component<Props, State> {
         id="insightsLayerPanel"
         className="insightsLayerPanel"
         aria-label="Data layers"
+        onKeyDown={this.closeLayersOnEscape}
       >
         {GROUPS.map((group) => {
           const layers = INSIGHT_LAYERS.filter(
@@ -1311,7 +1324,9 @@ export default class Insights extends React.Component<Props, State> {
           );
           return (
             <div className="insightsLayerGroup" key={group}>
-              <Typography variant="subtitle2">{group}</Typography>
+              <Typography component="h3" variant="subtitle2">
+                {group}
+              </Typography>
               {layers.map((layer) => (
                 <FormControlLabel
                   key={layer.id}
@@ -1944,10 +1959,12 @@ export default class Insights extends React.Component<Props, State> {
         aria-label={`${definition.label} evidence`}
       >
         <Toolbar className="insightsTrackHeader">
-          <Typography variant="h6">
+          <Typography component="h3" variant="h6">
             {id === "weather"
               ? `Temperature (${temperatureUnit(this.context as UnitSystemType)})`
-              : definition.label}
+              : id === "emissions"
+                ? `Emissions (${largeMassUnit(this.context as UnitSystemType)} CO₂e)`
+                : definition.label}
           </Typography>
           {isChartLayer(id) && (
             <>
@@ -1975,7 +1992,10 @@ export default class Insights extends React.Component<Props, State> {
             </>
           )}
           {this.state.layersOpen && (
-            <span className="insightsTrackActions">
+            <span
+              className="insightsTrackActions"
+              onKeyDown={this.closeLayersOnEscape}
+            >
               <IconButton
                 size="small"
                 aria-label={`Move ${definition.label} up`}
@@ -2392,6 +2412,7 @@ export default class Insights extends React.Component<Props, State> {
                     }
                     aria-expanded={this.state.layersOpen}
                     aria-controls="insightsLayerPanel"
+                    onKeyDown={this.closeLayersOnEscape}
                   >
                     {this.state.layersOpen ? "Done" : "Layers"}
                   </Button>

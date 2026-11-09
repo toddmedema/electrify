@@ -217,9 +217,9 @@ test("custom setup uses side-by-side settings and facilities only in two-pane la
 }, testInfo) => {
   await openCustomSetup(page);
   // Measure the settled setup, not its translated position during the outgoing card transition.
-  await expect(page.getByRole("list", { name: "Available games" })).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByRole("region", { name: "Available games" }),
+  ).toHaveCount(0);
 
   const settings = page.getByRole("region", { name: "Game setup" });
   const facilities = page.getByRole("region", { name: "Facilities" });
