@@ -20,7 +20,7 @@ export function difficultyLockReason(
 ): string | undefined {
   const index = DIFFICULTY_IDS.indexOf(difficulty);
   if (index <= DIFFICULTY_IDS.indexOf(unlockedThrough)) return undefined;
-  return `Complete a scenario on ${DIFFICULTY_LABELS[DIFFICULTY_IDS[index - 1]]} to unlock ${DIFFICULTY_LABELS[difficulty]}.`;
+  return `Complete an official non-tutorial scenario on ${DIFFICULTY_LABELS[DIFFICULTY_IDS[index - 1]]} to unlock ${DIFFICULTY_LABELS[difficulty]}.`;
 }
 
 /** Resolve stale preferences before both previewing and starting a new run. */

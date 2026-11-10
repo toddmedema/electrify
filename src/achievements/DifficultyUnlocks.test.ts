@@ -54,10 +54,10 @@ it("does not skip missing rungs or advance for repeated wins at the same difficu
 it("explains the preceding rung for every locked level", () => {
   expect(difficultyLockReason("Intern", "Intern")).toBeUndefined();
   expect(difficultyLockReason("Employee", "Intern")).toBe(
-    "Complete a scenario on Beginner to unlock Easy.",
+    "Complete an official non-tutorial scenario on Beginner to unlock Easy.",
   );
   expect(difficultyLockReason("CEO", "Intern")).toBe(
-    "Complete a scenario on Hard to unlock Expert.",
+    "Complete an official non-tutorial scenario on Hard to unlock Expert.",
   );
   expect(difficultyLockReason("CEO", "CEO")).toBeUndefined();
 });
