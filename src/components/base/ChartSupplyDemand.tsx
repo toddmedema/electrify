@@ -280,6 +280,8 @@ function buildOptions({
       },
     ];
   };
+  let nowFill: string | undefined;
+  let nowHalfWidth: number | undefined;
   return {
     width: 0, // set by UPlotChart
     height: 0,
@@ -377,17 +379,20 @@ function buildOptions({
             const ratio = uPlot.pxRatio;
             u.ctx.save();
             u.ctx.font = chartFont(ratio);
-            u.ctx.fillStyle =
+            // Resolved on the first draw only: UPlotChart rebuilds these options (and so
+            // this closure) on theme, text-size and font-ready changes.
+            nowFill ??=
               getComputedStyle(document.documentElement).getPropertyValue(
                 "--cursor-line",
               ) || tickLabelFill();
+            u.ctx.fillStyle = nowFill;
             u.ctx.textAlign = "center";
             u.ctx.textBaseline = "alphabetic";
-            const halfWidth = u.ctx.measureText("Now").width / 2;
+            nowHalfWidth ??= u.ctx.measureText("Now").width / 2;
             const x = Math.max(
-              u.bbox.left + halfWidth,
+              u.bbox.left + nowHalfWidth,
               Math.min(
-                u.bbox.left + u.bbox.width - halfWidth,
+                u.bbox.left + u.bbox.width - nowHalfWidth,
                 u.valToPos(now, "x", true),
               ),
             );

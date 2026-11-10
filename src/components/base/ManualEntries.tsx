@@ -898,7 +898,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           you've made 1 megawatt-hour (MWh).
         </p>
         <p>
-          Your power bill uses kilowatt-hours (kWh); 1,000 kWh is a MWh. A
+          Your power bill uses kilowatt-hours (kWh); 1,000 kWh make 1 MWh. A
           typical US home uses about 10 MWh a year. A terawatt-hour (TWh) is a
           million MWh.
         </p>
@@ -968,9 +968,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Surplus only sells leftover electricity after serving customers and
           charging{" "}
           <EntryLink to={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}>storage</EntryLink>
-          . All profitable also increases running plants when current prices
-          exceed added fuel, variable operating and carbon costs. It does not
-          start plants for export or sell stored water or electricity. Later
+          . All profitable also raises output from running plants when current
+          prices exceed added fuel, variable operating and carbon costs. It does
+          not start plants for export or sell stored water or electricity. Later
           ramp-down costs can still occur when prices fall. None disables
           exports.
         </p>
@@ -1111,8 +1111,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           retention can be a mission requirement, but adds no points.
         </p>
         <p>
-          Only completed missions earn leaderboard ranks and personal bests. Log
-          in to submit one.
+          Only completed missions earn leaderboard ranks and personal bests.
+          Sign in to submit one.
         </p>
         <p>Investor-owned points:</p>
         <table className="points">

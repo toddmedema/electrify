@@ -17,6 +17,7 @@ import {
   failSaveLoading,
   getLoadingGeneration,
   isCurrentLoadingGeneration,
+  quitSavedGame,
 } from "../../SaveSession";
 import { AppStateType, GameType, TutorialStepType } from "../../Types";
 import Loading, { DispatchProps, StateProps } from "./Loading";
@@ -93,6 +94,7 @@ let loadListeners: Array<{
 
 export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
+    onExit: () => void quitSavedGame({ toScenarioList: true }),
     load: async (
       game: GameType,
       onProgress: (message: string) => void,

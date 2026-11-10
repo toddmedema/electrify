@@ -296,7 +296,53 @@ describe("Settings", () => {
     ).toBe(button);
     await userEvent.click(button);
 
+    expect(mockedClearAppCache).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole("dialog", {
+      name: "Clear cache and reload?",
+    });
+    expect(
+      within(dialog).getByText(/Saved games are kept/),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Clear and reload" }),
+    );
+
     expect(mockedClearAppCache).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not clear the cache when the confirmation is cancelled", async () => {
+    renderSettings();
+    await userEvent.click(screen.getByRole("button", { name: "Clear cache" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Clear cache and reload?",
+    });
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    );
+
+    expect(mockedClearAppCache).not.toHaveBeenCalled();
+  });
+
+  it("blocks clearing the cache while offline", async () => {
+    const online = jest.spyOn(window.navigator, "onLine", "get");
+    online.mockReturnValue(false);
+    try {
+      renderSettings();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Clear cache" }),
+      );
+      const dialog = await screen.findByRole("dialog", {
+        name: "Clear cache and reload?",
+      });
+      expect(
+        within(dialog).getByText(/Reconnect before clearing the cache/),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByRole("button", { name: "Clear and reload" }),
+      ).toBeDisabled();
+    } finally {
+      online.mockRestore();
+    }
   });
 
   it("opens credits and restores the Settings footer after closing", async () => {

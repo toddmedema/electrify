@@ -128,12 +128,15 @@ function MissionSectionHeader(
 }
 
 // MUI's filled CheckCircle cuts its tick out of the disc, so whatever sits behind the badge
-// shows through it. A solid white tick reads as "done" on every avatar, in both palettes.
+// shows through it. A tick in the on-blue contrast colour reads as "done" on every avatar, in both palettes.
 function CompletedCheckIcon(props: React.ComponentProps<typeof SvgIcon>) {
   return (
     <SvgIcon {...props}>
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-      <path d="M10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8z" fill="#fff" />
+      <path
+        d="M10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8z"
+        fill="var(--interactive-contrast)"
+      />
     </SvgIcon>
   );
 }

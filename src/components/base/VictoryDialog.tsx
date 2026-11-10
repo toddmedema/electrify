@@ -196,7 +196,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             >
               <GoogleSignIn
                 centered
-                label="Log in to join the leaderboard"
+                label="Sign in to join the leaderboard"
                 variant="text"
                 size="small"
                 onSignIn={onLogin}

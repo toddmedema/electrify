@@ -171,7 +171,7 @@ export function readProjection(
   game: GameType,
   now: TickPresentFutureType,
 ): ProjectionView {
-  const projection = selectProjection(game, now);
+  const projection = selectProjection(game, now, signature(game));
   // A synchronous initial/new-run render supersedes any older worker snapshot too.
   cancelPending();
   pending = undefined;

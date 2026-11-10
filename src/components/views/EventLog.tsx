@@ -111,6 +111,39 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
+// The history does not change with the tick, so it skips rendering while its list is the same
+const EventHistoryList = React.memo(function EventHistoryList({
+  events,
+  onSelect,
+}: {
+  events: GameEventType[];
+  onSelect: (target?: StoryActionTargetType) => void;
+}): React.JSX.Element {
+  return (
+    <ul className="eventLogList">
+      {events.map((event: GameEventType) => (
+        <EventCard
+          className={`kind-${event.kind} importance-${event.importance || "ROUTINE"}`}
+          key={event.id}
+          icon={
+            <ConceptIcon
+              concept={event.concept || KIND_CONCEPTS[event.kind]}
+              fontSize="small"
+            />
+          }
+          heading={event.title}
+          meta={event.label}
+          onActivate={
+            event.actionTarget ? () => onSelect(event.actionTarget) : undefined
+          }
+        >
+          {event.message}
+        </EventCard>
+      ))}
+    </ul>
+  );
+});
+
 export default function EventLog(props: Props): React.JSX.Element {
   const operations = isPaneLayout() && !!props.game;
   const multiplayer = props.game?.multiplayer;
@@ -163,8 +196,16 @@ export default function EventLog(props: Props): React.JSX.Element {
     : activeFilters.length
       ? activeFilters.map((filter) => filter.label).join(", ")
       : "No event types selected";
-  const visibleEvents = events.filter((event) =>
-    activeFilters.some((filter) => filter.kinds.includes(event.kind)),
+  const visibleEvents = React.useMemo(
+    () =>
+      events.filter((event) =>
+        EVENT_HISTORY_FILTERS.some(
+          (filter) =>
+            historyFilters.includes(filter.value) &&
+            filter.kinds.includes(event.kind),
+        ),
+      ),
+    [events, historyFilters],
   );
   // An effect may only return a cleanup function. Redux dispatch returns the dispatched action,
   // so the expression-bodied form returned an object here; React later tried to call that object
@@ -414,29 +455,7 @@ export default function EventLog(props: Props): React.JSX.Element {
                 Events for {companyName}.
               </Typography>
             )}
-            <ul className="eventLogList">
-              {visibleEvents.map((event: GameEventType) => (
-                <EventCard
-                  className={`kind-${event.kind} importance-${event.importance || "ROUTINE"}`}
-                  key={event.id}
-                  icon={
-                    <ConceptIcon
-                      concept={event.concept || KIND_CONCEPTS[event.kind]}
-                      fontSize="small"
-                    />
-                  }
-                  heading={event.title}
-                  meta={event.label}
-                  onActivate={
-                    event.actionTarget
-                      ? () => onSelect(event.actionTarget)
-                      : undefined
-                  }
-                >
-                  {event.message}
-                </EventCard>
-              ))}
-            </ul>
+            <EventHistoryList events={visibleEvents} onSelect={onSelect} />
           </section>
         </div>
       </div>

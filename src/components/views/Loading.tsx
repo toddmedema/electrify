@@ -18,6 +18,7 @@ export interface DispatchProps {
     onProgress: (message: string) => void,
     onError: (message: string) => void,
   ) => void;
+  onExit: () => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -68,7 +69,11 @@ export default class Loading extends React.PureComponent<Props, LoadingState> {
           <LoadingLogo />
         </div>
         {this.state.error ? (
-          <Stack spacing={2} sx={{ px: 3, textAlign: "center", maxWidth: 420 }}>
+          <Stack
+            spacing={2}
+            role="alert"
+            sx={{ px: 3, textAlign: "center", maxWidth: 420 }}
+          >
             <Typography component="h1" variant="h6">
               We couldn't prepare this grid
             </Typography>
@@ -82,6 +87,7 @@ export default class Loading extends React.PureComponent<Props, LoadingState> {
             <Button variant="contained" onClick={this.beginLoad}>
               Retry
             </Button>
+            <Button onClick={this.props.onExit}>Back to missions</Button>
           </Stack>
         ) : (
           <Stack spacing={2} sx={{ alignItems: "center" }}>

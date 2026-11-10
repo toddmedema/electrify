@@ -599,7 +599,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
 }
 .achievementAccount {
   box-sizing: border-box;
-  margin-top: 20px;
+  margin-top: 24px;
   padding: 16px;
   display: flex;
   align-items: center;
@@ -631,7 +631,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   list-style: none;
 }
 .achievementRow {
-  padding: 20px 0;
+  padding: 16px 0;
   display: flex;
   align-items: flex-start;
   gap: 16px;
@@ -782,7 +782,8 @@ table,
 .screenHeaderTitle,
 .paneHeader h6,
 .insightsHeader h6,
-.constructionTitle .iconLabel {
+.constructionTitle .iconLabel,
+.gameToolHeader h2 {
   font-weight: 650;
   letter-spacing: -0.02em;
 }
@@ -1958,11 +1959,17 @@ $pane_header_height: 48px;
   white-space: nowrap;
   cursor: pointer;
 
-  &:hover,
   &:focus-visible,
   &.active {
     border-color: var(--border-selected);
     background: var(--interactive-tint);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: var(--border-selected);
+      background: var(--interactive-tint);
+    }
   }
 }
 
@@ -2492,7 +2499,7 @@ $pane_header_height: 48px;
 
 // The date is a quiet reference beside the money.
 #topbar .gameStatusValue.weak {
-  font-size: 14px;
+  font-size: var(--font-size-body2);
   font-weight: 400;
 }
 
@@ -4118,19 +4125,33 @@ $pane_header_height: 48px;
         color: var(--interactive-blue);
       }
 
-      &:hover,
       &:focus-visible {
         background: var(--interactive-tint);
+        outline-offset: -2px;
       }
 
-      &:focus-visible {
-        outline-offset: -2px;
+      @media (hover: hover) and (pointer: fine) {
+        &:hover {
+          background: var(--interactive-tint);
+        }
       }
     }
 
     &.importance-CRITICAL {
       border-left: 4px solid $blackout_red;
       background: var(--blackout-tint);
+
+      &.actionable {
+        &:focus-visible {
+          background: var(--blackout-tint);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+          &:hover {
+            background: var(--blackout-tint);
+          }
+        }
+      }
     }
   }
 
@@ -5449,7 +5470,7 @@ $homeSmokeCycle: 5.6s;
   .manual-entry-link {
     text-decoration-line: underline;
     text-decoration-color: color-mix(in srgb, currentColor 65%, transparent);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     transition: text-decoration-color 120ms ease-out;
 
     @media (hover: hover) and (pointer: fine) {
@@ -5459,8 +5480,6 @@ $homeSmokeCycle: 5.6s;
     }
 
     &:focus-visible {
-      outline: 2px solid var(--interactive-blue);
-      outline-offset: 1px;
       text-decoration-color: currentColor;
     }
 
@@ -5860,6 +5879,10 @@ $homeSmokeCycle: 5.6s;
     line-height: 20px;
     text-transform: none;
   }
+
+  .facilityActionNote {
+    align-self: center;
+  }
 }
 
 @media (pointer: coarse) {
@@ -5953,6 +5976,7 @@ $homeSmokeCycle: 5.6s;
   left: 0;
   border-radius: inherit;
   background: var(--font-color-faded);
+  overflow: hidden;
   transition: width 200ms linear;
 }
 .transmissionFleet {
@@ -6392,7 +6416,7 @@ $programs_column: 800px;
   }
   &[data-wide] dd {
     font-size: var(--font-size-body1);
-    font-weight: 500;
+    font-weight: 600;
   }
 }
 .customerProgramFactDetail.MuiTypography-root {
@@ -7435,21 +7459,22 @@ img[src$="/transmission.svg"] {
 .facilityDisclosure .constructionProgressFill::before {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 35%;
   background: linear-gradient(
     90deg,
     transparent,
     var(--tutorial-glint),
     transparent
   );
-  background-size: 35% 100%;
-  background-repeat: no-repeat;
+  will-change: transform;
   animation: construction-sweep 2.8s ease-in-out infinite;
 }
 @keyframes construction-sweep {
   0% {
-    background-position: -55% 0;
+    transform: translateX(-102%);
     opacity: 0;
   }
   20% {
@@ -7459,7 +7484,7 @@ img[src$="/transmission.svg"] {
     opacity: 0.7;
   }
   100% {
-    background-position: 155% 0;
+    transform: translateX(288%);
     opacity: 0;
   }
 }
@@ -8214,7 +8239,6 @@ option {
   .MuiButton-root[aria-pressed="true"] {
     border-color: var(--interactive-blue);
     background: var(--bg-selected);
-    font-weight: 700;
   }
   // What the fuels are stacked against. It sits among the controls but is no control, so it
   // is quieter than they are and has no pressed state

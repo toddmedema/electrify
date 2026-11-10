@@ -217,7 +217,7 @@ export const SCENARIOS: ScenarioType[] = [
         continueOnClick: "#chartSupplyDemand",
         action: "Tap the supply and demand chart",
         content: (
-          <TutorialPrompt text="Variable shows solar output; Dispatchable shows coal. Their top edge is total supply. Keep it at or above the demand line, or the city goes dark." />
+          <TutorialPrompt text="Variable is weather-driven power, here solar. Dispatchable is power you control, here coal. Their top edge is total supply. Keep it at or above the demand line, or the city goes dark." />
         ),
       },
       {
@@ -974,7 +974,7 @@ export const SCENARIOS: ScenarioType[] = [
         content: (
           <div>
             <TutorialPrompt text="Buying: “Shortages only” covers customer shortages; “Shortages + Charging” also charges storage after customers are supplied." />
-            <TutorialPrompt text="Selling: “Surplus only” sells leftover power; “All profitable” also increases running plants when prices exceed added costs." />
+            <TutorialPrompt text="Selling: “Surplus only” sells leftover power; “All profitable” also raises output from running plants when prices exceed added costs." />
             <TutorialPrompt text="“None” turns off either direction." />
           </div>
         ),
@@ -1065,7 +1065,7 @@ export const SCENARIOS: ScenarioType[] = [
           successMessage:
             "You learned how to buy backup power and sell surplus electricity through interties.",
           failureMessage:
-            "The grid has not safely used both directions yet. Choose “Shortages only” for Buying and “Surplus only” for Selling, keep Solar on, and run time.",
+            "You haven't both bought and sold power yet. Choose “Shortages only” for Buying and “Surplus only” for Selling, keep Solar on, and run time.",
         },
       },
       {
@@ -1075,7 +1075,7 @@ export const SCENARIOS: ScenarioType[] = [
         nextLabel: "Inspect shortage safely",
         onNext: () => beginIntertieStress(),
         content: (
-          <TutorialPrompt text="Your neighbor will have only 150 MW to spare before seasonal limits. Continue to inspect safely with time paused, then restore your existing gas backup." />
+          <TutorialPrompt text="Your neighbor will have only 150 MW to spare before seasonal limits. Continue with time paused to inspect the shortage, then restore your gas backup." />
         ),
       },
       {

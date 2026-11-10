@@ -435,7 +435,7 @@ export const CARBON_FEE_RULES: OfficialScenarioRuleDefinition = {
       hidePreview: true,
       messageByDifficulty: byDifficulty(
         (difficulty) =>
-          `The carbon fee rises to $${CARBON_FEE_BALANCE[difficulty]} per ton in January 2024. Coal faces the biggest increase.`,
+          `The carbon fee rises to $${CARBON_FEE_BALANCE[difficulty]} per tonne in January 2024. Coal faces the biggest increase.`,
       ),
       attributesByDifficulty: facts((difficulty) => ({
         feePerTon: CARBON_FEE_BALANCE[difficulty],
@@ -446,7 +446,7 @@ export const CARBON_FEE_RULES: OfficialScenarioRuleDefinition = {
       previewTitle: "Carbon fee rising",
       messageByDifficulty: byDifficulty(
         (difficulty) =>
-          `The carbon fee is now $${CARBON_FEE_BALANCE[difficulty]} per ton, raising coal and gas running costs.`,
+          `The carbon fee is now $${CARBON_FEE_BALANCE[difficulty]} per tonne, raising coal and gas running costs.`,
       ),
       attributesByDifficulty: facts((difficulty) => ({
         feePerTon: CARBON_FEE_BALANCE[difficulty],
@@ -544,7 +544,7 @@ export const SHALE_BOOM_RULES: OfficialScenarioRuleDefinition = {
       previewTitle: "Gas prices falling",
       messageByDifficulty: byDifficulty(
         (difficulty) =>
-          `A regional shale glut puts local gas ${Math.round((1 - SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier) * 100)}% below the national price through Feb 2016.`,
+          `A regional shale glut puts local gas ${Math.round((1 - SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier) * 100)}% below the national price through February 2016.`,
       ),
       attributesByDifficulty: facts((difficulty) => ({
         boomGasMultiplier: SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier,
@@ -610,7 +610,7 @@ export const PARADISE_RULES: OfficialScenarioRuleDefinition = {
       {
         id: "visitor-warning",
         title: "Visitor surge forecast",
-        message: "Visitors expected to raise electricity use.",
+        message: "Visitors are expected to raise electricity use.",
         startMonth: 22,
         visibility: "forecast",
       },
@@ -647,7 +647,7 @@ export const PARADISE_RULES: OfficialScenarioRuleDefinition = {
       {
         id: "oil-shock",
         title: "Fuel delivery delayed",
-        message: "Oil prices rise through Nov 2013.",
+        message: "Oil prices rise through November 2013.",
         startMonth: 117,
         durationMonths: 3,
         visibility: "forecast",
@@ -682,7 +682,7 @@ export const PARADISE_RULES: OfficialScenarioRuleDefinition = {
       hidePreview: true,
       messageByDifficulty: byDifficulty(
         (difficulty) =>
-          `Visitors expected to raise electricity use ${Math.round((PARADISE_BALANCE[difficulty].visitorDemand - 1) * 100)}% from May 2006 through October 2007.`,
+          `Visitors are expected to raise electricity use ${Math.round((PARADISE_BALANCE[difficulty].visitorDemand - 1) * 100)}% from May 2006 through October 2007.`,
       ),
       source: source("customers", "NOTABLE", SUPPLY_DEMAND_TARGET),
     },
@@ -713,7 +713,7 @@ export const PARADISE_RULES: OfficialScenarioRuleDefinition = {
       previewTitle: "Possible fuel delivery delays",
       messageByDifficulty: byDifficulty(
         (difficulty) =>
-          `Oil prices rise ${Math.round((PARADISE_BALANCE[difficulty].oilShock - 1) * 100)}% through Nov 2013.`,
+          `Oil prices rise ${Math.round((PARADISE_BALANCE[difficulty].oilShock - 1) * 100)}% through November 2013.`,
       ),
       attributesByDifficulty: facts((difficulty) => ({
         oilMultiplier: PARADISE_BALANCE[difficulty].oilShock,
@@ -797,14 +797,14 @@ export const RENEWABLES_RULES: OfficialScenarioRuleDefinition = {
         id: "clean-tech-load-warning",
         title: "Factory growth forecast",
         message:
-          "New factories expected to raise electricity use from 2012 through 2013.",
+          "New factories are expected to raise electricity use from 2012 through 2013.",
         startMonth: 115,
         visibility: "forecast",
       },
       {
         id: "clean-tech-load",
         title: "New factories open",
-        message: "Electricity usage rises through Dec 2013.",
+        message: "Electricity use rises through December 2013.",
         startMonth: 121,
         durationMonths: 24,
         visibility: "forecast",
@@ -842,7 +842,7 @@ export const RENEWABLES_RULES: OfficialScenarioRuleDefinition = {
       hidePreview: true,
       messageByDifficulty: byDifficulty(
         (difficulty) =>
-          `New solar projects costing ${Math.round((1 - RENEWABLES_BALANCE[difficulty].solarBuildCost) * 100)}% less and wind ${Math.round((1 - RENEWABLES_BALANCE[difficulty].windBuildCost) * 100)}% less from January 2009. Existing projects keep their price.`,
+          `New solar projects will cost ${Math.round((1 - RENEWABLES_BALANCE[difficulty].solarBuildCost) * 100)}% less and wind ${Math.round((1 - RENEWABLES_BALANCE[difficulty].windBuildCost) * 100)}% less from January 2009. Existing projects keep their price.`,
       ),
       source: source("build", "NOTABLE", GENERATOR_TARGET),
     },
@@ -862,7 +862,7 @@ export const RENEWABLES_RULES: OfficialScenarioRuleDefinition = {
       hidePreview: true,
       messageByDifficulty: byDifficulty(
         (difficulty) =>
-          `New factories expected to raise electricity use ${Math.round((RENEWABLES_BALANCE[difficulty].demandLoad - 1) * 100)}% from 2012 through 2013.`,
+          `New factories are expected to raise electricity use ${Math.round((RENEWABLES_BALANCE[difficulty].demandLoad - 1) * 100)}% from 2012 through 2013.`,
       ),
       source: source("customers", "NOTABLE", SUPPLY_DEMAND_TARGET),
     },
@@ -870,7 +870,7 @@ export const RENEWABLES_RULES: OfficialScenarioRuleDefinition = {
       previewTitle: "New factories opening",
       messageByDifficulty: byDifficulty(
         (difficulty) =>
-          `Electricity usage rises ${Math.round((RENEWABLES_BALANCE[difficulty].demandLoad - 1) * 100)}% through Dec 2013.`,
+          `Electricity use rises ${Math.round((RENEWABLES_BALANCE[difficulty].demandLoad - 1) * 100)}% through December 2013.`,
       ),
       attributesByDifficulty: facts((difficulty) => ({
         demandMultiplier: RENEWABLES_BALANCE[difficulty].demandLoad,
@@ -917,7 +917,7 @@ export const HEATWAVE_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
         id: "seasonal-warning",
         title: "A hot, dry summer ahead",
         message:
-          "June–August 2026 heat raising demand as drought cuts hydro and nuclear output. Build generation and storage.",
+          "Heat in June–August 2026 will raise demand as drought cuts hydro and nuclear output. Build generation and storage.",
         startMonth: 7,
         visibility: "forecast",
       },
@@ -934,9 +934,9 @@ export const HEATWAVE_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
         durationMonths: 1,
         visibility: "forecast" as const,
         preview: [
-          "Heat raising demand as drought limits hydro and nuclear output.",
-          "Drought tightening hydro and nuclear limits as demand rises further.",
-          "Demand climbing further as hydro and nuclear output reach seasonal lows.",
+          "Heat will raise demand as drought limits hydro and nuclear output.",
+          "Drought will tighten hydro and nuclear limits as demand rises further.",
+          "Demand will climb further as hydro and nuclear output reach seasonal lows.",
         ][step],
         effects: {
           temperatureOffsetC: 4 + step * 2,
@@ -982,7 +982,7 @@ export const HEATWAVE_DROUGHT_RULES: OfficialScenarioRuleDefinition = {
       hidePreview: true,
       messageByDifficulty: byDifficulty(
         (difficulty) =>
-          `June–August 2026 heat raising demand as drought cuts hydro and nuclear output. Build generation and storage. ${buildLeadTimeHint(difficulty)}`,
+          `Heat in June–August 2026 will raise demand as drought cuts hydro and nuclear output. Build generation and storage. ${buildLeadTimeHint(difficulty)}`,
       ),
       source: source("forecast", "NOTABLE", SUPPLY_DEMAND_TARGET),
     },

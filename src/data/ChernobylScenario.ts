@@ -27,7 +27,7 @@ export const CHERNOBYL_SCENARIO: ScenarioType = {
   summary:
     "March 1986: Chernobyl's disaster is one month away. Restore service and earn the best score you can.",
   threat:
-    "Blackouts will cost you points but don't end the game in this scenario. You'll need to avoid bankruptcy while paying for cleanup on the unsellable damaged reactor.",
+    "Blackouts cost points here but don't end the game. Avoid bankruptcy while paying for cleanup of the damaged reactor, which you can't sell.",
   themes: ["Energy transition"],
   ownership: "Public",
   startingYear: 1986,

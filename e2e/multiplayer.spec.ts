@@ -2670,7 +2670,7 @@ async function buyNativeBackup(page: Page, peakW: number, rate: number) {
     );
     await expect(price).toHaveAttribute(
       "aria-valuetext",
-      /^\$0\.1 per kilowatt hour/,
+      /^\$0\.1 per kilowatt-hour/,
     );
   } else await expect(price).toHaveAttribute("aria-valuenow", String(rate));
   await page.keyboard.press("Escape");

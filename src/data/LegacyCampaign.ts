@@ -535,7 +535,7 @@ export function legacyRuleDefinitions(
       events.push({
         id: "bootleg-fire",
         title: "Wildfire cuts northern imports",
-        message: `Northern imports are limited to ${Math.round(context.northCapacityMW * 0.25 * 100) / 100} MW through August. This regional limit is fixed from the term's opening allocation. Use local supply, storage, or another connection.`,
+        message: `Northern imports are limited to ${Math.round(context.northCapacityMW * 0.25 * 100) / 100} MW through August. Use local supply, storage, or another connection.`,
         preview:
           "Northern imports will be restricted during July and August 2021. This advance warning is a gameplay allowance.",
         visibility: "forecast",
