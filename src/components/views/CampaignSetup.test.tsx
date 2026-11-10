@@ -28,10 +28,9 @@ it("shows nine continuous CEO terms and starts only after the player chooses", (
   });
   expect(screen.queryByText(/Your first grid:/)).not.toBeInTheDocument();
   expect(
-    screen.getByText(
-      "Lead one utility through nine 20-year CEO terms. Inspired by Northern California history.",
-    ),
+    screen.getByText("Inspired by Northern California history."),
   ).toBeVisible();
+  expect(screen.queryByText(/nine 20-year CEO terms/)).not.toBeInTheDocument();
   expect(screen.queryByText(/The game pauses/)).not.toBeInTheDocument();
   expect(screen.queryByText(/Northern California ·/)).not.toBeInTheDocument();
   expect(onStart).not.toHaveBeenCalled();
