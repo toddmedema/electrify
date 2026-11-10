@@ -52,6 +52,7 @@ import {
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus } from "./useMenuKeys";
+import { createSelector } from "@reduxjs/toolkit";
 import GameMenu from "./GameMenu";
 import { GameDate, YearProgressBar } from "./GameCalendar";
 import "./GameAppBar.scss";
@@ -207,7 +208,8 @@ const STATUS_TOOLTIP_MS = 2500;
 const STATUS_WORD: Record<Exclude<GridHealthState, "stable">, string> = {
   "low-reserve": "Low",
   "at-limit": "Limit",
-  "blackout-ahead": "Soon",
+  // Names the coming problem; "Soon" alone did not say what was coming.
+  "blackout-ahead": "Short",
   blackout: "Blackout",
 };
 
@@ -593,7 +595,7 @@ export function GameAppBar(props: Props) {
       <div id="topbar">
         <Toolbar className={inBlackout ? "blackout-pulsing" : ""}>
           {!couchSeat && menu}
-          <Typography variant="h6" className="gameStatus">
+          <Typography variant="h6" component="div" className="gameStatus">
             <span className="gameBalance">
               <span
                 className={`gameStatusValue${now.cash < 0 ? " gameCashNegative" : ""}`}
@@ -683,21 +685,23 @@ export function GameAppBar(props: Props) {
   );
 }
 
-let activeSaveCache: { id: string; name: string } | undefined;
-// Keeps the object's identity while the save is unchanged, so the bar's shallow prop
-// comparison does not see a new value after every unrelated store action.
-function activeSaveFor(state: AppStateType): Props["activeSave"] {
-  const id = state.saves?.activeId;
-  if (!id) return undefined;
-  const name =
-    state.saves?.entries.find((entry) => entry.id === id)?.name ||
-    state.saves?.pendingName ||
-    "Current game";
-  if (activeSaveCache?.id !== id || activeSaveCache.name !== name) {
-    activeSaveCache = { id, name };
-  }
-  return activeSaveCache;
-}
+// The mapped props are compared shallowly, so the active save keeps one object per id and name
+// rather than a fresh one on every store update.
+const selectActiveSave = createSelector(
+  [
+    (state: AppStateType) => state.saves?.activeId,
+    (state: AppStateType) => {
+      const id = state.saves?.activeId;
+      return id
+        ? state.saves?.entries.find((entry) => entry.id === id)?.name ||
+            state.saves?.pendingName ||
+            "Current game"
+        : undefined;
+    },
+  ],
+  (id, name): StateProps["activeSave"] =>
+    id && name ? { id, name } : undefined,
+);
 
 const mapStateToProps = (state: AppStateType): StateProps => ({
   activeEvents: selectActiveEventGroups(state),
@@ -705,7 +709,7 @@ const mapStateToProps = (state: AppStateType): StateProps => ({
   game: state.game,
   evidenceRequest: state.ui.evidenceRequest,
   facilityDragActive: state.ui.facilityDragActive,
-  activeSave: activeSaveFor(state),
+  activeSave: selectActiveSave(state),
   saveState: state.saves?.saveState,
   savedAt: state.saves?.savedAt,
   saveError: state.saves?.saveError,

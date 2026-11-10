@@ -225,6 +225,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             debrief={victory.debrief}
             scenarioId={victory.scenarioId}
             outcome={victory.outcome}
+            leadMessage={endMessage}
           />
         )}
       </DialogContent>

@@ -51,10 +51,11 @@
   --border-selected: #aaccec;
   --border-subtle: #dfe5ec;
   /* The diagonal on a reverse-flow row bar. It is the channel that tells a reverse bar from
-     a forward one, so it has to clear 3:1 against the 0.18 tint it sits on: 3.20:1 here.
+     a forward one, so it has to clear 3:1 against the neutral --flow-fill it sits on (about
+     4.3:1 here). It stays neutral: interaction blue made a charging battery read as selected.
      Nothing that dark can sit under the row's label, which is why the hatch is confined to a
      band below the text rather than painted across the whole fill. */
-  --flow-hatch: rgba(0, 132, 248, 0.8);
+  --flow-hatch: color-mix(in srgb, var(--font-color-primary) 60%, transparent);
   // Forward flow behind every fleet row: one neutral tint, so rows read as one system
   --flow-fill: color-mix(in srgb, var(--font-color-primary) 7%, transparent);
   --border-strong: #a4b0bd;
@@ -134,8 +135,8 @@
   --bg-selected: #132f46;
   --border-selected: #285f86;
   --border-subtle: #202b38;
-  /* Going lighter rather than darker against the near-black row: 3.40:1 on the same tint */
-  --flow-hatch: rgba(144, 202, 249, 0.55);
+  /* Going lighter rather than darker against the near-black row: about 5:1 on the same fill */
+  --flow-hatch: color-mix(in srgb, var(--font-color-primary) 55%, transparent);
   --border-strong: #48586b;
   --border-tile: #2b3948;
   --font-color-primary: #e6edf5;
@@ -396,7 +397,7 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
   }
 }
 
-.keyboardMenu :focus {
+.keyboardMenu :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -616,6 +617,12 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
     min-height: 48px;
     min-width: 0;
     padding: 8px 12px;
+    white-space: nowrap;
+  }
+  @media screen and (max-width: ($phone_width - 1px)) {
+    .MuiTab-root {
+      padding-inline: 8px;
+    }
   }
 }
 .achievementList {
@@ -909,8 +916,9 @@ $topbar_height: 56px;
   align-items: center;
   gap: $space-3;
   min-height: 50px;
-  padding: 0 max($space-2, env(safe-area-inset-right)) 0
-    max($space-2, env(safe-area-inset-left));
+  // The same 16px gutter as the header above it.
+  padding: 0 max($space-4, env(safe-area-inset-right)) 0
+    max($space-4, env(safe-area-inset-left));
   border-bottom: $border_accent;
 }
 
@@ -918,11 +926,15 @@ $topbar_height: 56px;
   display: flex;
   align-items: baseline;
   gap: $space-1;
+  // Room for the widest common size, so the slider track doesn't shift as the value changes.
+  min-width: 6.5ch;
   white-space: nowrap;
 }
 
 .constructionCapacitySlider.MuiSlider-root {
   min-width: 80px;
+  // Half a coarse-pointer thumb overhangs the track; keep it clear of the size label.
+  margin-inline: $space-1;
 }
 
 .constructionSortButton {
@@ -936,8 +948,6 @@ $topbar_height: 56px;
 @media screen and (min-width: $phone_width) {
   .constructionControls {
     gap: $space-4;
-    padding-left: max($space-4, env(safe-area-inset-left));
-    padding-right: max($space-4, env(safe-area-inset-right));
   }
 }
 
@@ -994,11 +1004,30 @@ $topbar_height: 56px;
 }
 
 // Stack cash and date on narrow phones so the year stays visible beside all four speed choices.
+// Three stacked lines clear the 56px toolbar's edges by nearly 4px: cash and date keep line boxes
+// tall enough for their glyphs, and the profit between them is set solid at caption size.
 @media screen and (max-width: ($narrow_phone_width - 1px)) {
   #topbar .gameStatus {
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
+    line-height: 1.1;
+  }
+
+  #topbar .gameStatus .gameBalance {
+    line-height: 1.25;
+  }
+
+  #topbar .gameStatus .gameMonthlyProfit,
+  #topbar .gameStatus .gameStatusValue.weak {
+    font-size: var(--font-size-caption);
+  }
+
+  #topbar .gameStatus .gameMonthlyProfit {
+    line-height: 1;
+  }
+
+  #topbar .gameStatus .gameStatusValue.weak {
     line-height: 1.2;
   }
 }
@@ -2236,7 +2265,7 @@ $pane_header_height: 48px;
 }
 
 .generatorComparisonRemove.MuiIconButton-root {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   justify-self: end;
   color: var(--font-color-faded);
@@ -2256,10 +2285,14 @@ $pane_header_height: 48px;
   }
 }
 
+// Icon, name and remove share the first row; the figures take the full width beneath, so a
+// narrow tray wraps them at their own separators rather than into one-word fragments.
 .generatorComparisonChoice {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
+  // Chips of different heights share a top edge rather than centring their rows.
+  align-content: start;
   column-gap: 8px;
   padding: 8px;
   border: 1px solid var(--border-tile);
@@ -2267,13 +2300,32 @@ $pane_header_height: 48px;
   background: var(--bg-primary);
 
   img {
-    grid-row: 1 / span 3;
+    grid-row: 1;
     width: 34px;
     height: 34px;
   }
 
   .MuiTypography-root {
     min-width: 0;
+  }
+
+  .MuiTypography-caption {
+    grid-column: 1 / -1;
+  }
+}
+
+// Three chips across a narrow side tool leave no room for the name between icon and remove:
+// it drops below them instead of colliding with the remove button.
+.generatorComparisonChoice {
+  container-type: inline-size;
+
+  .nowrap {
+    white-space: nowrap;
+  }
+}
+@container (max-width: 159px) {
+  .generatorComparisonChoice > .MuiTypography-body2 {
+    grid-column: 1 / -1;
   }
 }
 
@@ -2523,11 +2575,14 @@ $pane_header_height: 48px;
   }
 }
 
+// A lifted row is opaque, so its text never collides with the row it passes over.
 .facilityRow.dragging,
 .transmissionLine.dragging {
   outline: 1px solid var(--interactive-blue);
   outline-offset: -1px;
   border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  box-shadow: 0 4px 12px var(--shadow-ring);
 }
 
 .scenarioDossier {
@@ -3113,7 +3168,8 @@ $pane_header_height: 48px;
     position: absolute;
     img {
       width: 100%;
-      max-width: $absmaxdimension;
+      // The home menu's logo width, so loading hands off without the logo jumping in size.
+      max-width: 680px;
       margin: auto;
       display: block;
     }
@@ -3253,6 +3309,8 @@ $pane_header_height: 48px;
     // A label on the page rather than a band across it: it shares the page's surface, opaque
     // so nothing scrolling beneath a pinned label shows through its narrow strip
     .manual-group {
+      // A heading element (h2) for the group, without the heading's default margins
+      margin: 0;
       padding-inline: 0;
       background: var(--bg-primary);
       line-height: 32px;
@@ -3440,6 +3498,29 @@ $pane_header_height: 48px;
     text-align: center;
   }
 
+  // Facility cards line up with the settings column at every width, not just side by side.
+  .customSetupFacilities .build-list-item {
+    margin-inline: 0;
+  }
+
+  .customSetupLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .customSeedField {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .MuiTextField-root {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+  }
+
   @media #{$pane_media} {
     .customSetupColumns {
       display: grid;
@@ -3454,11 +3535,6 @@ $pane_header_height: 48px;
     }
 
     .customSetupFacilities {
-      .build-list-item {
-        margin-right: 0;
-        margin-left: 0;
-      }
-
       .customFacilityPicker {
         justify-content: flex-start;
         padding-right: 0;
@@ -3519,9 +3595,9 @@ $pane_header_height: 48px;
       background: transparent;
       color: $font_color_primary;
 
+      // Flush with the cards below: a negative inset let the button's fill overhang them.
       .MuiButton-root {
         flex: 0 0 auto;
-        margin-right: -8px;
         text-transform: none;
       }
     }
@@ -3615,7 +3691,8 @@ $pane_header_height: 48px;
 
       &.Mui-selected {
         border-color: $interactive_blue !important;
-        color: $interactive_blue;
+        // The stronger blue keeps the small label above 4.5:1 on the selected tint.
+        color: var(--interactive-strong);
         font-weight: 600;
       }
     }
@@ -4037,6 +4114,11 @@ $pane_header_height: 48px;
     background: transparent;
 
     &.actionable {
+      box-sizing: border-box;
+      width: 100%;
+      color: inherit;
+      font: inherit;
+      text-align: inherit;
       cursor: pointer;
 
       .eventLogIcon {
@@ -4127,7 +4209,7 @@ $pane_header_height: 48px;
   }
 
   .outputProgressBar {
-    // One neutral tint for forward flow on every row; reverse flow sets its own inline
+    // One neutral tint for flow in either direction; the reverse hatch carries direction
     background-color: var(--flow-fill);
     position: absolute;
     inset: 0;
@@ -5195,7 +5277,14 @@ $homeSmokeCycle: 5.6s;
     gap: 12px;
     padding: 0 12px 8px;
   }
+  // Label, value and note share row tracks across the card, so a label that wraps lowers every
+  // value beside it rather than leaving the values at different heights.
   .buildOptionMetric {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    // Its own tracks sit flush; the card's 12px gap still separates rows of metrics.
+    row-gap: 0;
     min-width: 0;
   }
   .buildOptionSparkline {
@@ -6138,7 +6227,7 @@ $homeSmokeCycle: 5.6s;
   font-size: var(--font-size-subtitle);
   font-weight: 600;
 }
-.insights .insightsTrackHeader > h6 {
+.insights .insightsTrackHeader > .MuiTypography-h6 {
   font-size: var(--font-size-subtitle);
   font-weight: 600;
 }
@@ -6840,6 +6929,11 @@ $programs_column: 800px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  // Keep the Back button's focus ring clear of the title it sits beside.
+  .MuiIconButton-root + .screenHeaderTitle {
+    margin-left: $space-2;
+  }
 }
 
 // The cloud backup explanation beside the Saved games title (base/CloudSyncIndicator). The
@@ -7321,7 +7415,7 @@ img[src$="/transmission.svg"] {
   .insights .MuiToolbar-root.insightsTrackHeader {
     flex-flow: row nowrap !important;
 
-    > h6 {
+    > h3 {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -8262,7 +8356,7 @@ option {
 
 .insights .MuiToolbar-root.insightsTrackHeader {
   flex-flow: row nowrap !important;
-  > h6 {
+  > h3 {
     flex: 0 1 auto;
     min-width: 0;
     overflow: hidden;
@@ -8440,11 +8534,6 @@ option {
     .purchaseReviewCancel,
     [role="status"] {
       grid-column: 1 / -1;
-    }
-
-    // Keeps the cash shortfall note next to the buttons it explains, below Cancel
-    [role="note"] {
-      order: 0;
     }
 
     .MuiButton-root {

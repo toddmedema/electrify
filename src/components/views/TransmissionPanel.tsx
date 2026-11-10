@@ -860,7 +860,12 @@ export default function TransmissionPanel({
           >
             <Droppable droppableId="interties">
               {(droppable) => (
-                <div ref={droppable.innerRef} {...droppable.droppableProps}>
+                <div
+                  ref={droppable.innerRef}
+                  {...droppable.droppableProps}
+                  role="list"
+                  aria-label="Interties"
+                >
                   {state.lines.map((line, index) => {
                     const acquisitionTarget = isUtilityExpansionGame(game)
                       ? acquisitionTargetForCorridor(line.corridorId)
@@ -1006,6 +1011,7 @@ export default function TransmissionPanel({
                           <div
                             ref={provided.innerRef}
                             {...provided.draggableProps}
+                            role="listitem"
                             style={{
                               userSelect: "none",
                               ...provided.draggableProps.style,

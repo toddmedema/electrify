@@ -131,12 +131,14 @@ export default function PurchaseReviewDialog(
   );
   const cashDue = buildCost + cashOnlyFee;
   const financedCashDue = loan.downpayment + cashOnlyFee;
+  const cashShort = !props.cashDisabled && cash < cashDue;
   const cashDisabled = submitting || !!props.cashDisabled || cash < cashDue;
-  // Pay cash is dead only for want of cash: say so, and make the working loan the lead action
-  const cashShortfall = !props.cashDisabled && cash < cashDue;
-  const shortfallId = React.useId();
+  const cashDetailId = React.useId();
   const loanDisabled =
     submitting || !!props.loanDisabled || cash < financedCashDue;
+  // The loan takes the emphasis only when it is the one way forward; ignoring `submitting`
+  // keeps the buttons from swapping weight mid-submit.
+  const loanLeads = cashShort && !props.loanDisabled && cash >= financedCashDue;
 
   const submit = async (financed: boolean, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -160,7 +162,17 @@ export default function PurchaseReviewDialog(
       value:
         props.paymentSummary?.cash.value ??
         `${formatMoneyConcise(cashDue)} now`,
-      detail: props.paymentSummary?.cash.detail,
+      // A disabled Pay cash says why: the shortfall, beside the price it falls short of.
+      detail:
+        [
+          props.paymentSummary?.cash.detail,
+          cashShort
+            ? `${formatMoneyConcise(cashDue - cash)} more cash needed.`
+            : undefined,
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined,
+      detailId: cashDetailId,
     },
     {
       concept: "finances",
@@ -242,31 +254,21 @@ export default function PurchaseReviewDialog(
               {props.cancelLabel}
             </Button>
           )}
-          {cashShortfall && (
-            <Typography
-              id={shortfallId}
-              variant="caption"
-              color="textSecondary"
-              role="note"
-              sx={{ order: -1, mr: "auto", minWidth: 0, gridColumn: "1 / -1" }}
-            >
-              {`Paying cash needs ${formatMoneyConcise(cashDue)} · you have ${formatMoneyConcise(cash)}`}
-            </Typography>
-          )}
           <Button
             color="primary"
-            variant={cashShortfall ? "outlined" : "contained"}
+            variant={loanLeads ? "outlined" : "contained"}
             disabled={cashDisabled}
-            aria-describedby={cashShortfall ? shortfallId : undefined}
+            aria-describedby={cashShort ? cashDetailId : undefined}
             onClick={(event) => submit(false, event)}
             startIcon={<ConceptIcon concept="money" fontSize="small" />}
           >
             Pay cash
           </Button>
+          {/* When cash can't cover it, the loan is the one way forward and takes the emphasis. */}
           <Button
             id={props.loanButtonId}
             color="primary"
-            variant={cashShortfall ? "contained" : "outlined"}
+            variant={loanLeads ? "contained" : "outlined"}
             disabled={loanDisabled}
             onClick={(event) => submit(true, event)}
             startIcon={<ConceptIcon concept="finances" fontSize="small" />}

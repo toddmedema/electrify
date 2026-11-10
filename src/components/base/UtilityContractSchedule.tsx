@@ -59,9 +59,9 @@ export default function UtilityContractSchedule({
         !!plan.supplyChanges.length &&
         plan.buildMonths !== undefined && (
           <Typography variant="caption" color="textSecondary">
-            A 150 MW combined-cycle gas plant takes {plan.buildMonths} months at
-            today’s quote. Compare capacity, technology and lead time with your
-            demand forecast.
+            A {formatWatts(150e6)} combined-cycle gas plant takes{" "}
+            {plan.buildMonths} months at today’s quote. Compare capacity,
+            technology and lead time with your demand forecast.
           </Typography>
         )}
     </Box>

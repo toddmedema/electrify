@@ -401,7 +401,7 @@ export default function Manual(props: Props): React.JSX.Element {
           }
           return (
             <React.Fragment key={group}>
-              <ListSubheader component="div" className="manual-group">
+              <ListSubheader component="h2" className="manual-group">
                 {group}
               </ListSubheader>
               {entries.map(renderEntry)}

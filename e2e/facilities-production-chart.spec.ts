@@ -204,7 +204,7 @@ for (const theme of ["light", "dark"]) {
     await image.press("Escape");
     await page.mouse.move(0, 0);
     // Clear the keyboard focus ring for the review image.
-    await page.getByRole("heading", { level: 6 }).first().click();
+    await image.evaluate((element) => (element as HTMLElement).blur());
     await page.evaluate(() => document.fonts.ready);
     if (process.env.REVIEW_SCREENSHOT_DIR) {
       await page.screenshot({

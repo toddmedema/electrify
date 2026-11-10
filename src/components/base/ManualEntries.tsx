@@ -78,29 +78,29 @@ export const MANUAL_ENTRY = {
   ACCOUNTING_LIFETIME: "Accounting lifetime",
   PROJECT_SITES: "Project sites",
   CUSTOMER_PROGRAMS: "Customer programs",
-  HOW_TO_PLAY: "How to Play",
-  BASELOAD_VS_PEAKER: "Baseload vs Peaker",
+  HOW_TO_PLAY: "How to play",
+  BASELOAD_VS_PEAKER: "Baseload vs peaker",
   BLACKOUTS: "Blackouts",
   BTU: "BTU and MMBTU",
-  CAPACITY_FACTOR: "Capacity Factor",
-  CARBON_FEE: "Carbon Fee",
-  CUSTOMERS: "Customers, Demand & Pricing",
+  CAPACITY_FACTOR: "Capacity factor",
+  CARBON_FEE: "Carbon fee",
+  CUSTOMERS: "Customers, demand & pricing",
   EMISSIONS: "Emissions and CO2e",
   FORECASTS: "Insights & data layers",
-  HYDROPOWER: "Hydropower & Reservoirs",
-  INTEREST_RATES: "Interest Rates & Inflation",
-  KEYBOARD_SHORTCUTS: "Keyboard Shortcuts",
-  PRIORITIZING_GENERATORS: "Prioritizing Generators",
-  RAMP_RATE: "Ramp Rate",
+  HYDROPOWER: "Hydropower & reservoirs",
+  INTEREST_RATES: "Interest rates & inflation",
+  KEYBOARD_SHORTCUTS: "Keyboard shortcuts",
+  PRIORITIZING_GENERATORS: "Prioritizing generators",
+  RAMP_RATE: "Ramp rate",
   RATES: "Rates",
-  POWER_AND_ENERGY: "Power and Energy",
-  RESERVE_CAPACITY: "Reserve Capacity",
+  POWER_AND_ENERGY: "Power and energy",
+  RESERVE_CAPACITY: "Reserve capacity",
   INTERTIES: "Interties",
-  ROUND_TRIP_EFFICIENCY: "Round-trip Efficiency",
+  ROUND_TRIP_EFFICIENCY: "Round-trip efficiency",
   SCORE: "Score",
-  SYMBOLS: "Symbol Guide",
-  TOTAL_COST_OF_ENERGY: "Total Cost of Energy",
-  WEATHER_DAMAGE: "Weather Damage",
+  SYMBOLS: "Symbol guide",
+  TOTAL_COST_OF_ENERGY: "Total cost of energy",
+  WEATHER_DAMAGE: "Weather damage",
 } as const;
 
 export type ManualEntryTitleType =
@@ -115,7 +115,7 @@ export interface ManualEntryType {
   // prose is searched automatically -- see manualEntryText below -- so this is only for the
   // words that aren't there.
   keywords?: string;
-  // Pins the entry above the grouped list. Only "How to Play" uses it; a new player shouldn't
+  // Pins the entry above the grouped list. Only "How to play" uses it; a new player shouldn't
   // have to scroll past the glossary to find the overview.
   pinned?: boolean;
 }
@@ -710,7 +710,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </ul>
         <p>
           Forecasts use one day per month (see{" "}
-          <EntryLink to={MANUAL_ENTRY.HOW_TO_PLAY}>How to Play</EntryLink>), so
+          <EntryLink to={MANUAL_ENTRY.HOW_TO_PLAY}>How to play</EntryLink>), so
           they can't test a week of clouds or still air.
         </p>
       </div>

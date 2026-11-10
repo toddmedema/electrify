@@ -492,7 +492,7 @@ for (const [theme, winning] of [
     if (winning) {
       await advanceExampleTo(
         page,
-        appbar.getByRole("heading").filter({ hasText: "Feb 2026" }),
+        appbar.locator(".gameStatus").filter({ hasText: "Feb 2026" }),
       );
       await appbar.getByRole("button", { name: "pause", exact: true }).click();
       const scenario = page.getByRole("region", {

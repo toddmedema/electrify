@@ -142,6 +142,8 @@ interface State {
   multiyear: boolean;
   monthly: boolean;
   currentMinute: number | null;
+  /** The present, even off the chart's edges, so the tooltip can tell forecast from record */
+  nowMinute: number | undefined;
 }
 
 // Faded far enough that the highlighted band is unmistakably the subject, but not so far
@@ -214,7 +216,11 @@ function tooltip(idx: number, state: State): string {
   let header: string;
   if (state.monthly) {
     const date = getDateFromMinute(state.minutes[idx], state.startingYear);
-    header = `${date.month} ${date.year} average`;
+    // A month that starts after now is the forecast's average, not a recorded one.
+    header =
+      state.nowMinute !== undefined && state.minutes[idx] > state.nowMinute
+        ? `${date.month} ${date.year} · forecast average`
+        : `${date.month} ${date.year} average`;
   } else {
     header = formatMinuteAsTooltipHeader(
       state.minutes[idx],
@@ -296,6 +302,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
       startingYear,
       multiyear,
       monthly,
+      nowMinute: currentMinute,
       // A line on the chart's edge says nothing, and just thickens the frame
       currentMinute:
         currentMinute === undefined ||

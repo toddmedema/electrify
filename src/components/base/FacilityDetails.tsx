@@ -362,7 +362,8 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   return (
     <div className="facilityDetails">
       {facility.hydroSiteId && (
-        <Typography variant="body2">
+        // Clear of the expanded header above and the first section's rule below
+        <Typography variant="body2" sx={{ pt: 1.5, pb: 1 }}>
           Site:{" "}
           {HYDRO_SITES[facility.hydroSiteId]?.name || facility.hydroSiteId}
         </Typography>

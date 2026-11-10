@@ -33,7 +33,10 @@ interface LoadingState {
 function LoadingLogo(): React.JSX.Element {
   const dark = useTheme().palette.mode === "dark";
   return (
-    <img src={dark ? "images/logo-dark.svg" : "images/logo.svg"} alt="Logo" />
+    <img
+      src={dark ? "images/logo-dark.svg" : "images/logo.svg"}
+      alt="Electrify"
+    />
   );
 }
 

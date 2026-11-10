@@ -1,6 +1,9 @@
 import { TickPresentFutureType } from "../../Types";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { supplyDemandMonthlyRanges } from "./ChartSupplyDemandRanges";
+import {
+  formatWattRange,
+  supplyDemandMonthlyRanges,
+} from "./ChartSupplyDemandRanges";
 
 const tick = (minute: number, supplyW: number, demandW: number) =>
   ({ minute, supplyW, demandW }) as TickPresentFutureType;
@@ -62,4 +65,11 @@ it("does not infer a shortage from noncoincident supply and demand extrema", () 
       .peakShortfall,
   ).toBe(0);
   expect(supplyDemandMonthlyRanges([], 0)).toEqual([]);
+});
+
+describe("formatWattRange", () => {
+  it("reads one value when both ends format the same, and a range otherwise", () => {
+    expect(formatWattRange(130e6, 130.2e6)).toBe("130MW");
+    expect(formatWattRange(120e6, 130e6)).toBe("120MW–130MW");
+  });
 });

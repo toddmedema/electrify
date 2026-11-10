@@ -577,7 +577,7 @@ describe("GameAppBar", () => {
         const status = screen.getByRole("button", {
           name: `Current grid status: ${summary}`,
         });
-        expect(status).toHaveTextContent(/^(Low|Limit|Soon|Blackout)$/);
+        expect(status).toHaveTextContent(/^(Low|Limit|Short|Blackout)$/);
         expect(screen.queryByText(summary)).not.toBeInTheDocument();
         fireEvent.click(status);
         expect(

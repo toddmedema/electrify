@@ -33,7 +33,7 @@ export function parseChallengeUrl(href: string): ChallengeRoute | undefined {
   }
   if (!url.searchParams.has("challenge")) return;
   const failed: ChallengeRoute = {
-    error: "This challenge link is invalid. Choose a current mission.",
+    error: "This challenge link is invalid. Choose a current game.",
   };
   if (
     href.length > MAX_CHALLENGE_URL ||
