@@ -5,6 +5,7 @@ import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import ChartSupplyDemandRanges, {
   formatWattRange,
   monthlyShortfalls,
+  shortfallsWithin,
   supplyDemandMonthlyRanges,
 } from "./ChartSupplyDemandRanges";
 import UPlotChart from "./UPlotChart";
@@ -128,6 +129,50 @@ describe("monthlyShortfalls", () => {
     expect(monthlyShortfalls([])).toEqual([]);
   });
 
+  it("cuts a bar at the midpoint to its neighbours so it never reaches into their hover span", () => {
+    // The forecast begins a third of the way through month 1, so its first point sits closer
+    // to month 2's point than half a month away; month 3 is short and a full month from its
+    // neighbour.
+    const start = month(1) + MINUTES_PER_MONTH / 3;
+    const ranges = supplyDemandMonthlyRanges(
+      [
+        tick(month(0), 100, 100),
+        tick(start, 50, 100),
+        tick(month(2), 150, 100),
+        tick(month(3), 50, 100),
+      ],
+      start,
+    );
+    const [first, last] = monthlyShortfalls(ranges);
+    // Half a month back, where the recorded point is farther; short of half a month ahead,
+    // where the next month's point is closer.
+    expect(first.from).toBe(start - MINUTES_PER_MONTH / 2);
+    expect(first.to).toBe((start + month(2)) / 2);
+    expect(first.to - start).toBeLessThan(MINUTES_PER_MONTH / 2);
+    // Evenly spaced neighbours leave the usual half month either side.
+    expect(last.from).toBe(month(3) - MINUTES_PER_MONTH / 2);
+    expect(last.to).toBe(month(3) + MINUTES_PER_MONTH / 2);
+    // Every point's own bar covers it, and no bar covers a different point.
+    for (const range of ranges) {
+      const covering = monthlyShortfalls(ranges).filter(
+        ({ from, to }) => range.minute >= from && range.minute <= to,
+      );
+      expect(covering).toHaveLength(range.peakShortfall > 0 ? 1 : 0);
+    }
+  });
+
+  it("keeps only the bars that reach into the plotted domain", () => {
+    const bars = [
+      { from: 0, to: 10, severity: 1 },
+      { from: 10, to: 20, severity: 1 },
+      { from: 20, to: 30, severity: 1 },
+    ];
+    expect(shortfallsWithin(bars, [10, 20])).toEqual([bars[1]]);
+    expect(shortfallsWithin(bars, [5, 12])).toEqual([bars[0], bars[1]]);
+    expect(shortfallsWithin(bars, [30, 40])).toEqual([]);
+    expect(shortfallsWithin([], [0, 10])).toEqual([]);
+  });
+
   it("scales severity with the peak shortfall against that month's peak demand and caps it", () => {
     const [mild, total] = monthlyShortfalls(
       supplyDemandMonthlyRanges(
@@ -217,6 +262,18 @@ describe("ChartSupplyDemandRanges", () => {
     expect(drawnChartProps([tick(0, 150, 100)]).ariaLabel).toContain(
       "No forecast months with unmet demand",
     );
+  });
+
+  it("announces only the marked months inside the plotted domain", () => {
+    // The viewport slice keeps one tick past its edge. This one is a month and a half beyond
+    // the 0 to 4 month domain, so its bar starts after the edge and paints nothing.
+    expect(
+      drawnChartProps([
+        tick(0, 150, 100),
+        tick(MINUTES_PER_MONTH, 80, 100),
+        tick(5.5 * MINUTES_PER_MONTH, 80, 100),
+      ]).ariaLabel,
+    ).toContain("1 forecast month with unmet demand marked");
   });
 });
 

@@ -135,7 +135,11 @@ import PowerExchangeSummary, {
   LivePowerExchangeSummary,
 } from "../base/PowerExchangeSummary";
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
-import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
+import ChartSupplyDemandRanges, {
+  monthlyShortfalls,
+  shortfallsWithin,
+  supplyDemandMonthlyRanges,
+} from "../base/ChartSupplyDemandRanges";
 import ChartMonthlySpareCapacity from "../base/ChartMonthlySpareCapacity";
 import { getTutorialStep } from "../../data/Scenarios";
 import { ToolScrollMemory } from "../base/GameToolMemory";
@@ -1681,21 +1685,34 @@ export default class Insights extends React.Component<Props, State> {
           break;
         case "supplyDemand": {
           // Beyond two years the chart aggregates to monthly ranges, whose shortfall markers
-          // are derived from those ranges rather than from the hourly blackout spans.
+          // are derived from those ranges rather than from the hourly blackout spans. The
+          // legend follows the markers that reach into the viewport, not the hourly shortfall
+          // total, so a mark on the plot always has its key.
           const rangedSupplyDemand =
             projection.domain.x[1] - projection.domain.x[0] >
             24 * MINUTES_PER_MONTH;
+          const unmetDemandMarked =
+            rangedSupplyDemand &&
+            shortfallsWithin(
+              monthlyShortfalls(
+                supplyDemandMonthlyRanges(
+                  projection.supplyDemandTimeline,
+                  projection.forecast[0]?.minute,
+                ),
+              ),
+              projection.domain.x,
+            ).length > 0;
           body = (
             <>
               <ChartLegend
                 items={[
                   { name: "Supply", color: chartPalette().supply, dash: "20" },
                   { name: "Demand", color: chartPalette().demand, dash: "20" },
-                  ...(rangedSupplyDemand && projection.shortfall
+                  ...(unmetDemandMarked
                     ? [{ name: "Unmet demand", color: chartPalette().blackout }]
                     : []),
                 ]}
-                {...(rangedSupplyDemand && projection.shortfall
+                {...(unmetDemandMarked
                   ? {
                       note: "Bands span each month's lowest to highest hour. A taller red bar means a larger peak shortfall in at least one hour.",
                     }

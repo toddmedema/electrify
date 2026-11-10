@@ -78,23 +78,38 @@ export function supplyDemandMonthlyRanges(
  * The forecast months with unmet demand, read from the same ranges the chart plots so a marker
  * and its tooltip can never disagree. Recorded months are averages of delivered energy and are
  * not marked. uPlot snaps the cursor to the nearest month's point, so a month owns the half
- * month either side of it rather than the calendar month that starts there.
+ * month either side of it, cut at the midpoint to a neighbouring point where that is closer
+ * (the first forecast month starts mid-month), rather than the calendar month that starts there.
  */
 export function monthlyShortfalls(ranges: MonthlyRange[]): ShortfallBar[] {
-  return ranges.flatMap((range) =>
-    range.projected && range.peakShortfall > 0
-      ? [
-          {
-            from: range.minute - MINUTES_PER_MONTH / 2,
-            to: range.minute + MINUTES_PER_MONTH / 2,
-            severity:
-              range.demandMax > 0
-                ? Math.min(1, range.peakShortfall / range.demandMax)
-                : 1,
-          },
-        ]
-      : [],
-  );
+  const half = MINUTES_PER_MONTH / 2;
+  return ranges.flatMap((range, index) => {
+    if (!range.projected || range.peakShortfall <= 0) return [];
+    const previous = ranges[index - 1];
+    const next = ranges[index + 1];
+    return [
+      {
+        from: previous
+          ? Math.max(range.minute - half, (previous.minute + range.minute) / 2)
+          : range.minute - half,
+        to: next
+          ? Math.min(range.minute + half, (range.minute + next.minute) / 2)
+          : range.minute + half,
+        severity:
+          range.demandMax > 0
+            ? Math.min(1, range.peakShortfall / range.demandMax)
+            : 1,
+      },
+    ];
+  });
+}
+
+/** The bars that reach into the plotted x domain; a bar wholly outside it is not on screen. */
+export function shortfallsWithin(
+  bars: ShortfallBar[],
+  [from, to]: [number, number],
+): ShortfallBar[] {
+  return bars.filter((bar) => bar.to > from && bar.from < to);
 }
 
 interface State {
@@ -198,6 +213,8 @@ export default function ChartSupplyDemandRanges(
 ) {
   const ranges = supplyDemandMonthlyRanges(props.timeline, props.currentMinute);
   const shortfalls = monthlyShortfalls(ranges);
+  // The plot clips to the domain, so only the marks that reach into it are announced.
+  const marked = shortfallsWithin(shortfalls, props.domain.x).length;
   const isProjected = ranges.map((range) => range.projected);
   const data: uPlot.AlignedData = [ranges.map((range) => range.minute)];
   for (const key of [
@@ -215,7 +232,7 @@ export default function ChartSupplyDemandRanges(
   return (
     <UPlotChart<State>
       id="chartForecastSupplyDemand"
-      ariaLabel={`Monthly ranges of estimated electricity supply and demand. ${shortfalls.length ? `${shortfalls.length} forecast ${shortfalls.length === 1 ? "month" : "months"} with unmet demand marked` : "No forecast months with unmet demand"}`}
+      ariaLabel={`Monthly ranges of estimated electricity supply and demand. ${marked ? `${marked} forecast ${marked === 1 ? "month" : "months"} with unmet demand marked` : "No forecast months with unmet demand"}`}
       formatSummaryValue={formatWatts}
       height={props.height}
       state={{

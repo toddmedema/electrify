@@ -323,6 +323,8 @@ jest.mock("../base/ChartForecastSupplyDemand", () => ({
   },
 }));
 jest.mock("../base/ChartSupplyDemandRanges", () => ({
+  // Insights reads the real marker helpers to key its legend to what the chart would draw.
+  ...jest.requireActual("../base/ChartSupplyDemandRanges"),
   __esModule: true,
   default: ({ syncKey, timeline, domain, currentMinute }: ChartMockProps) => {
     mockSupplyDemandPaints++;
@@ -1302,6 +1304,28 @@ describe("Insights layers", () => {
       }
     },
   );
+
+  it("keys the unmet demand legend to the shortfall markers on the plot, not the hourly total", () => {
+    // The hourly forecast total for the viewport can be empty while a marker reaches into it, as
+    // when the tick behind the marker lies just outside the viewport.
+    const shortfall = jest
+      .spyOn(
+        Insights.prototype as unknown as {
+          rangeShortfall: () => ProjectionView["shortfall"];
+        },
+        "rangeShortfall",
+      )
+      .mockReturnValue(undefined);
+    try {
+      const game = createGame({ scenarioId: 100 });
+      game.facilities = [];
+      renderInsights(100, game);
+      expect(screen.getByText("Unmet demand")).toBeInTheDocument();
+      expect(screen.getByText(/A taller red bar means/)).toBeInTheDocument();
+    } finally {
+      shortfall.mockRestore();
+    }
+  });
 
   it("sizes the forecast shortfall to the displayed range", async () => {
     const game = createGame({ scenarioId: 100 });
