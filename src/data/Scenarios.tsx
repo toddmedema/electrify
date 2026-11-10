@@ -364,6 +364,15 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
+        target: "#chartSupplyDemand",
+        action: "Watch demand change from month to month",
+        content: (
+          <TutorialPrompt text="The chart shows one day per month, so it changes as time moves forward. Demand shifts with the seasons: more heating in winter, more cooling in summer." />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         action: "Order a second generator of a different type",
         content: (
           <TutorialPrompt text="Compare output timing and running costs. Choose a plant that complements your grid." />
@@ -477,7 +486,18 @@ export const SCENARIOS: ScenarioType[] = [
         },
         action: "Drag Coal above Pumped Hydro",
         content: (
-          <TutorialPrompt text="Drag Coal’s handle above Pumped Hydro so spare generation can charge it. Then try a new grid with only a coal plant." />
+          <TutorialPrompt text="Drag Coal’s handle above Pumped Hydro so spare generation can charge it." />
+        ),
+      },
+      {
+        // Entering the capstone rebuilds the grid, so name that before it happens instead of
+        // letting the fleet change under the player the moment their drag lands
+        card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
+        nextLabel: "Start final challenge",
+        action: "Restart for the final challenge",
+        content: (
+          <TutorialPrompt text="The next step starts a new grid with only a coal plant. Then you’ll build storage to cover its peaks." />
         ),
       },
       {
@@ -1098,6 +1118,15 @@ export const SCENARIOS: ScenarioType[] = [
           ),
         content: (
           <TutorialPrompt text="Open the gas plant and resume it before running time. Keep Solar on too." />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        action: "Get ready to supply a limited month",
+        // Time stays locked until the capstone begins
+        phase: "INTERTIE_STRESS_INSPECT",
+        content: (
+          <TutorialPrompt text="Time is still paused. The next step lets it run while the neighbor’s supply stays limited." />
         ),
       },
       {

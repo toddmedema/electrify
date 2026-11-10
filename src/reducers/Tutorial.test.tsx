@@ -144,7 +144,7 @@ function tutorialStore(
 }
 
 describe("tutorialGateMiddleware", () => {
-  it.each([5])(
+  it.each([2, 5])(
     "keeps mission %s on its reset disclosure even while time runs",
     (id) => {
       const steps = getScenario(id)!.tutorialSteps!;

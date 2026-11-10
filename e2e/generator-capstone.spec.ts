@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
 import { sortBuildCatalog } from "./layout";
 
@@ -44,6 +45,14 @@ for (const theme of ["light", "dark"]) {
     await hud.getByRole("button", { name: "Next", exact: true }).click();
     await page.getByRole("button", { name: "fast speed", exact: true }).click();
     await expect(hud).toContainText("Read the year progress bar");
+    await hud.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(hud).toContainText("Watch demand change from month to month");
+    await expect(hud).toContainText("Demand shifts with the seasons");
+    await expect(page.locator(".snackbar")).toBeHidden();
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`generator-demand-step-${theme}.png`),
+      animations: "disabled",
+    });
     await hud.getByRole("button", { name: "Next", exact: true }).click();
     await expect(hud).toContainText(
       "Order a second generator of a different type",

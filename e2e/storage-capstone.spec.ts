@@ -49,6 +49,15 @@ for (const theme of ["light", "dark"]) {
     await hud.getByRole("button", { name: "Next", exact: true }).click();
     await expect(hud).toContainText("Drag Coal above Pumped Hydro");
     await dragCoalAbovePumpedHydro(page);
+    await expect(hud).toContainText("Restart for the final challenge");
+    await expect(page.locator(".snackbar")).toBeHidden();
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`storage-restart-briefing-${theme}.png`),
+      animations: "disabled",
+    });
+    await hud
+      .getByRole("button", { name: "Start final challenge", exact: true })
+      .click();
     await expect(hud).toContainText("Build storage to cover peak demand");
     await expect(page.locator(".facilityRow")).toHaveCount(1);
     await page.locator(".button-buildFacility").click();
