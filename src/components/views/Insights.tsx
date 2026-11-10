@@ -1300,9 +1300,7 @@ export default class Insights extends React.Component<Props, State> {
     if (!this.state.layersOpen) return;
     event.preventDefault();
     this.setState({ layersOpen: false });
-    document
-      .getElementById("insightsLayersButton")
-      ?.focus({ preventScroll: true });
+    document.getElementById("insightsLayersButton")?.focus();
   };
 
   private renderLayerPanel(projection: ProjectionView) {

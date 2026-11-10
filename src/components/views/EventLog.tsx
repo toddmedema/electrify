@@ -192,7 +192,11 @@ export default function EventLog(props: Props): React.JSX.Element {
             aria-labelledby="ongoingEventsTitle"
           >
             <header className="eventLogSectionHeader">
-              <Typography id="ongoingEventsTitle" variant="subtitle2">
+              <Typography
+                id="ongoingEventsTitle"
+                component="h3"
+                variant="subtitle2"
+              >
                 Ongoing events
               </Typography>
             </header>
