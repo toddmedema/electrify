@@ -136,4 +136,18 @@ it("explains the board cap instead of offering a price that cannot be applied", 
   );
   expect(dialog.message).toContain("Even the maximum rate");
   expect(dialog.action).toBeUndefined();
+  expect(dialog.title).toBe("Low on cash");
+  expect(dialog.secondaryLabel).toBe("Go bankrupt");
+});
+
+it("does not call a decline bankruptcy when current rates cover costs", () => {
+  const game = createGame({ scenarioId: 100, seed: 123 });
+  currentTick(game)!.cash = 90_000;
+  game.dollarsPerkWh = 10;
+  store.dispatch(resume(game));
+  store.dispatch(loaded());
+  store.dispatch(offerLowCashWarning());
+  const dialog = store.getState().ui.dialog;
+  expect(dialog.message).toContain("Current rates cover this month's costs.");
+  expect(dialog.secondaryLabel).toBe("Keep current rates");
 });

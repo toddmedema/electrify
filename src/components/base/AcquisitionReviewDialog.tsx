@@ -75,8 +75,8 @@ export default function AcquisitionReviewDialog({
     ? !nuclear
       ? "Valley’s inherited nuclear purchase has expired."
       : game.date.year >= 2017
-        ? `Valley’s nuclear contract is now ${formatWatts(nuclear.nominalW)} (${formatWatts(nuclear.deliverableW)} deliverable), reduced in January 2017.`
-        : "Valley’s nuclear contract falls from 160MW to 80MW in January 2017 (152MW to 76MW deliverable)."
+        ? `Valley’s nuclear purchase is now ${formatWatts(nuclear.nominalW)} (${formatWatts(nuclear.deliverableW)} deliverable), reduced in January 2017.`
+        : "Valley’s nuclear purchase falls from 160 to 80 MW in January 2017 (152 to 76 MW deliverable)."
     : "";
 
   return (

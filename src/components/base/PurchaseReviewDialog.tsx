@@ -132,6 +132,9 @@ export default function PurchaseReviewDialog(
   const cashDue = buildCost + cashOnlyFee;
   const financedCashDue = loan.downpayment + cashOnlyFee;
   const cashDisabled = submitting || !!props.cashDisabled || cash < cashDue;
+  // Pay cash is dead only for want of cash: say so, and make the working loan the lead action
+  const cashShortfall = !props.cashDisabled && cash < cashDue;
+  const shortfallId = React.useId();
   const loanDisabled =
     submitting || !!props.loanDisabled || cash < financedCashDue;
 
@@ -239,10 +242,22 @@ export default function PurchaseReviewDialog(
               {props.cancelLabel}
             </Button>
           )}
+          {cashShortfall && (
+            <Typography
+              id={shortfallId}
+              variant="caption"
+              color="textSecondary"
+              role="note"
+              sx={{ order: -1, mr: "auto", minWidth: 0, gridColumn: "1 / -1" }}
+            >
+              {`Paying cash needs ${formatMoneyConcise(cashDue)} · you have ${formatMoneyConcise(cash)}`}
+            </Typography>
+          )}
           <Button
             color="primary"
-            variant="contained"
+            variant={cashShortfall ? "outlined" : "contained"}
             disabled={cashDisabled}
+            aria-describedby={cashShortfall ? shortfallId : undefined}
             onClick={(event) => submit(false, event)}
             startIcon={<ConceptIcon concept="money" fontSize="small" />}
           >
@@ -251,7 +266,7 @@ export default function PurchaseReviewDialog(
           <Button
             id={props.loanButtonId}
             color="primary"
-            variant="outlined"
+            variant={cashShortfall ? "contained" : "outlined"}
             disabled={loanDisabled}
             onClick={(event) => submit(true, event)}
             startIcon={<ConceptIcon concept="finances" fontSize="small" />}

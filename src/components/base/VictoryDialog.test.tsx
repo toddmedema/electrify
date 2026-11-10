@@ -120,7 +120,7 @@ describe("VictoryDialog", () => {
       expect(checkbox).not.toBeChecked();
       if (mailingList) await userEvent.click(checkbox);
       await userEvent.click(
-        screen.getByRole("button", { name: "Log in to join the leaderboard" }),
+        screen.getByRole("button", { name: "Sign in to join the leaderboard" }),
       );
       expect(onLogin).toHaveBeenCalledWith({ mailingList });
     },

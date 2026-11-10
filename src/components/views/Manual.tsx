@@ -382,7 +382,7 @@ export default function Manual(props: Props): React.JSX.Element {
         }}
       >
         {matches.length === 0 && (
-          <div className="manual-empty">
+          <div className="manual-empty" role="status">
             <Typography variant="body1">
               No entries match "{searchTerm}".
             </Typography>
@@ -408,6 +408,14 @@ export default function Manual(props: Props): React.JSX.Element {
             </React.Fragment>
           );
         })}
+        {/* Last, so the list's first-child gutter stays on the first entry */}
+        {searching && matches.length > 0 && (
+          <span className="srOnly" role="status">
+            {matches.length === 1
+              ? "1 entry matches."
+              : `${matches.length} entries match.`}
+          </span>
+        )}
       </List>
     </ScreenPage>
   );

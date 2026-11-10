@@ -12,12 +12,10 @@ import {
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import {
-  deriveExpandedSummary,
   formatHour,
   getDateFromMinute,
   getTimeFromTimeline,
   MINUTES_PER_MONTH,
-  summarizeTimeline,
 } from "../../helpers/DateTime";
 import { projectedShortfall } from "../../helpers/MissionStatus";
 import {
@@ -298,8 +296,40 @@ function CompactGridStatus({
   );
 }
 
+/**
+ * This month's profit, bit-identical to deriveExpandedSummary(summarizeTimeline(...)).profit
+ * but without the rest of the month summary: the same fields, summed in timeline order from
+ * zero, then associated the way deriveExpandedSummary does.
+ */
+export function monthProfit(
+  timeline: TickPresentFutureType[],
+  monthsElapsed: number,
+): number {
+  let revenue = 0;
+  let fuel = 0;
+  let om = 0;
+  let carbon = 0;
+  let interest = 0;
+  let policy = 0;
+  let imports = 0;
+  for (let i = 0; i < timeline.length; i++) {
+    const t = timeline[i];
+    if (Math.floor(t.minute / MINUTES_PER_MONTH) !== monthsElapsed) continue;
+    revenue += t.revenue;
+    fuel += t.expensesFuel;
+    om += t.expensesOM;
+    carbon += t.expensesCarbonFee;
+    interest += t.expensesInterest;
+    policy += t.expensesPolicy || 0;
+    imports += t.expensesImports || 0;
+  }
+  const expenses = fuel + om + carbon + interest + (policy || 0);
+  return revenue - (expenses + (imports || 0));
+}
+
 /** Present the current company's money, grid status and requested shared-clock speed.
  * Couch seats leave common calendar/menu chrome to the shell; memoized controls avoid tick churn. */
+
 export function GameAppBar(props: Props) {
   const steamAvailable = useDesktopState()?.steam.available;
   const {
@@ -337,16 +367,8 @@ export function GameAppBar(props: Props) {
   const singleRow = wideRow && !tvMode;
   const roomForStatusText = useMediaQuery("(min-width:600px)", { noSsr: true });
   const monthlyProfit = React.useMemo(
-    () =>
-      deriveExpandedSummary(
-        summarizeTimeline(
-          game.timeline,
-          game.startingYear,
-          (tick) =>
-            Math.floor(tick.minute / MINUTES_PER_MONTH) === date.monthsElapsed,
-        ),
-      ).profit,
-    [game.timeline, game.startingYear, date.monthsElapsed],
+    () => monthProfit(game.timeline, date.monthsElapsed),
+    [game.timeline, date.monthsElapsed],
   );
   // Crossing the breakpoint moves the status row to another parent, which remounts its
   // controls; a player tabbed onto one keeps their place rather than dropping to the page.
@@ -661,23 +683,29 @@ export function GameAppBar(props: Props) {
   );
 }
 
+let activeSaveCache: { id: string; name: string } | undefined;
+// Keeps the object's identity while the save is unchanged, so the bar's shallow prop
+// comparison does not see a new value after every unrelated store action.
+function activeSaveFor(state: AppStateType): Props["activeSave"] {
+  const id = state.saves?.activeId;
+  if (!id) return undefined;
+  const name =
+    state.saves?.entries.find((entry) => entry.id === id)?.name ||
+    state.saves?.pendingName ||
+    "Current game";
+  if (activeSaveCache?.id !== id || activeSaveCache.name !== name) {
+    activeSaveCache = { id, name };
+  }
+  return activeSaveCache;
+}
+
 const mapStateToProps = (state: AppStateType): StateProps => ({
   activeEvents: selectActiveEventGroups(state),
   upcomingEvents: selectUpcomingStoryEvents(state),
   game: state.game,
   evidenceRequest: state.ui.evidenceRequest,
   facilityDragActive: state.ui.facilityDragActive,
-  activeSave: state.saves?.activeId
-    ? {
-        id: state.saves.activeId,
-        name:
-          state.saves.entries.find(
-            (entry) => entry.id === state.saves?.activeId,
-          )?.name ||
-          state.saves.pendingName ||
-          "Current game",
-      }
-    : undefined,
+  activeSave: activeSaveFor(state),
   saveState: state.saves?.saveState,
   savedAt: state.saves?.savedAt,
   saveError: state.saves?.saveError,

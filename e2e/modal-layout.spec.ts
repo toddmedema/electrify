@@ -182,7 +182,7 @@ for (const theme of ["light", "dark"]) {
       const dialog = page.getByRole("dialog");
       await expectDialogToFit(dialog);
       await dialog
-        .getByRole("button", { name: "Nevermind", exact: true })
+        .getByRole("button", { name: "Never mind", exact: true })
         .click();
       await expect(dialog).toHaveCount(0);
       await row.locator(".facilityRetrofit button").click();

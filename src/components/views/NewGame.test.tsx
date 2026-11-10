@@ -322,7 +322,7 @@ describe("NewGame", () => {
     );
   });
 
-  it("marks completed lessons with a solid white check", () => {
+  it("marks completed lessons with a solid contrast-colour check", () => {
     recordPlayed(TUTORIALS[0].id);
     /* eslint-disable testing-library/no-container, testing-library/no-node-access --
        The badge's painted tick is the behaviour under test; SVG paths carry no accessible text */
@@ -336,7 +336,7 @@ describe("NewGame", () => {
     /* eslint-enable testing-library/no-container, testing-library/no-node-access */
     // The disc keeps the badge's primary colour; the tick is painted, not cut out of it
     expect(disc).not.toHaveAttribute("fill");
-    expect(tick).toHaveAttribute("fill", "#fff");
+    expect(tick).toHaveAttribute("fill", "var(--interactive-contrast)");
   });
 
   it("starts the recommended tutorial and opens challenge and custom details", () => {

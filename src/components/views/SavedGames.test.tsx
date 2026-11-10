@@ -108,6 +108,12 @@ it("shows game date, difficulty and location above the saved date and time", () 
   );
 });
 
+it("drops the time label while the current save is in flight", () => {
+  renderLibrary({ activeId: entry().id, saveState: "saving" });
+  const row = screen.getByRole("article", { name: "Wind experiment" });
+  expect(within(row).getByText("Saving…")).not.toHaveAttribute("aria-label");
+});
+
 it("preserves player-authored titles and completed outcomes", () => {
   renderLibrary({
     entries: [

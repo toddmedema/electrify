@@ -383,8 +383,9 @@ export function cacheProjection(
 export function selectProjection(
   game: GameType,
   now: TickPresentFutureType,
+  // Callers that already hold this game's signature pass it to skip rebuilding it
+  key: string = projectionSignature(game),
 ): ProjectionView {
-  const key = projectionSignature(game);
   // History identity is stable during ordinary ticks, but changes on restart or save import,
   // even when both runs happen to have the same seed, decisions and month count.
   if (

@@ -170,6 +170,13 @@ describe("Manual", () => {
       "href",
       "https://forms.gle/nSpkVzcFcXMQMMgb9",
     );
+    expect(screen.getByRole("status")).toHaveTextContent(/No entries match/);
+  });
+
+  it("announces the result count while searching", async () => {
+    renderManual();
+    await search("blackout");
+    expect(screen.getByRole("status")).toHaveTextContent(/entr(y|ies) match/);
   });
 
   it("clears the search from the adornment button", async () => {

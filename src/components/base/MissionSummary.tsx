@@ -16,6 +16,7 @@ import ConceptIcon from "./ConceptIcon";
 import {
   projectionReady,
   requestProjection,
+  signature,
   subscribeProjection,
 } from "./DeferredProjection";
 
@@ -104,7 +105,7 @@ function useMissionRisk(
     ? undefined
     : defer
       ? previousRisk
-      : selectMissionRisk(game, upcoming, mission);
+      : selectMissionRisk(game, upcoming, mission, signature(game));
   React.useEffect(() => {
     if (!enabled) return;
     last.current = { risk, scope, month: game.date.monthsElapsed };

@@ -62,6 +62,24 @@ describe("PurchaseReviewDialog", () => {
     expect(button("Take loan")).toBeDisabled();
   });
 
+  it("explains a disabled Pay cash and leads with the loan", () => {
+    const { button } = renderDialog();
+    const caption = screen.getByRole("note");
+    expect(caption).toHaveTextContent(
+      `Paying cash needs ${formatMoneyConcise(2000000)} · you have ${formatMoneyConcise(1000000)}`,
+    );
+    expect(button("Pay cash")).toHaveAttribute("aria-describedby", caption.id);
+    expect(button("Take loan")).toHaveClass("MuiButton-contained");
+    expect(button("Pay cash")).toHaveClass("MuiButton-outlined");
+  });
+
+  it("keeps cash dominant and silent when it is affordable", () => {
+    const { button } = renderDialog({ cash: 5000000 });
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(button("Pay cash")).toHaveClass("MuiButton-contained");
+    expect(button("Take loan")).toHaveClass("MuiButton-outlined");
+  });
+
   it("offers an affordable loan and submits it once however quickly it is clicked", () => {
     const { button, onPurchase } = renderDialog();
     expect(button("Pay cash")).toBeDisabled();

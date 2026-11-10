@@ -133,7 +133,7 @@ export const END_OF_ERA_RULES: OfficialScenarioRuleDefinition = {
         id: "aging-warning",
         title: "Aging coal warning",
         message:
-          "Coal plants that reach 30 years of age in two years will face a temporary output limit. Prepare replacement power.",
+          "In two years, coal plants at least 30 years old will face a temporary output limit. Prepare replacement power.",
         startMonth: 49,
         visibility: "forecast",
       },
@@ -250,7 +250,7 @@ export const END_OF_ERA_RULES: OfficialScenarioRuleDefinition = {
       messageByDifficulty: copyByDifficulty(
         END_OF_ERA_BALANCE,
         (balance) =>
-          `Coal running costs rising ${Math.round((balance.coalOM - 1) * 100)}% in January 1995.`,
+          `Coal running costs will rise ${Math.round((balance.coalOM - 1) * 100)}% in January 1995.`,
       ),
       source: {
         kind: "WORLD_EVENT",
@@ -486,7 +486,7 @@ export const NUCLEAR_TRIP_RULES: OfficialScenarioRuleDefinition = {
         id: "contingency-review",
         title: "Backup-power review",
         message:
-          "Your largest reactor may shut down between July 2026 and January 2027. Simulate and prepare for the impact by pausing the nuclear generator while the game is paused.",
+          "Your largest reactor may shut down between July 2026 and January 2027. To see the impact, pause the game, then pause the reactor.",
         startMonth: 2,
         visibility: "forecast",
       },
@@ -525,7 +525,7 @@ export const NUCLEAR_TRIP_RULES: OfficialScenarioRuleDefinition = {
       messageByDifficulty: copyByDifficulty(
         HURRICANE_BALANCE,
         () =>
-          "Your largest reactor may shut down between July 2026 and January 2027. Simulate and prepare for the impact by pausing the nuclear generator while the game is paused.",
+          "Your largest reactor may shut down between July 2026 and January 2027. To see the impact, pause the game, then pause the reactor.",
       ),
       source: {
         kind: "WORLD_EVENT",

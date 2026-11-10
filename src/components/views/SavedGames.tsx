@@ -432,7 +432,11 @@ export default function SavedGames(): React.JSX.Element {
                   <time
                     dateTime={save.savedAt}
                     title={timestamp}
-                    aria-label={`Saved ${timestamp}`}
+                    aria-label={
+                      current && saves.saveState === "saving"
+                        ? undefined
+                        : `Saved ${timestamp}`
+                    }
                   >
                     {current && saves.saveState === "saving"
                       ? "Saving…"

@@ -249,7 +249,18 @@ function FacilityActions(props: {
     onCancelRetrofit,
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
-  if (permanentlyShutdown && facility.saleRestricted) return null;
+  if (permanentlyShutdown && facility.saleRestricted)
+    return (
+      <div className="facilityActions">
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          className="facilityActionNote"
+        >
+          This plant can't be sold.
+        </Typography>
+      </div>
+    );
   return (
     <div className="facilityActions">
       {upgrading && !permanentlyShutdown && onCancelRetrofit && (
@@ -284,7 +295,15 @@ function FacilityActions(props: {
           </span>
         </Button>
       )}
-      {!facility.saleRestricted && (
+      {facility.saleRestricted ? (
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          className="facilityActionNote"
+        >
+          This plant can't be sold.
+        </Typography>
+      ) : (
         <Button
           className={
             underConstruction ? "facilityCancelConstruction" : undefined
@@ -679,6 +698,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             // from also landing on the row behind it and toggling the selection
             <ConfirmDialog
               open
+              destructive
               isolateClicks
               title={
                 <>
@@ -690,7 +710,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                   facility?
                 </>
               }
-              cancelLabel="Nevermind"
+              cancelLabel="Never mind"
               confirmLabel={underConstruction ? "Cancel construction" : "Sell"}
               onCancel={toggleDialog}
               onConfirm={() => {
@@ -908,8 +928,12 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   private previewFocus: HTMLButtonElement | null = null;
   private menuFocus: HTMLButtonElement | null = null;
 
+  // Read once: the hint flag only ever flips to true, and one query list tracks the pointer
+  private bulkHintSeen = getStorageBoolean(BULK_HINT_SEEN_KEY, false);
+  private finePointer: MediaQueryList | null = null;
+
   private mouseEnabled = () =>
-    window.matchMedia("(any-pointer: fine)").matches &&
+    (this.finePointer ??= window.matchMedia("(any-pointer: fine)")).matches &&
     !(
       this.props.game.inGame &&
       activeScenario(this.props.game)?.tutorialSteps?.[
@@ -1233,11 +1257,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   }
 
   public componentDidUpdate() {
-    if (
-      this.state.ids.length > 1 &&
-      !getStorageBoolean(BULK_HINT_SEEN_KEY, false)
-    )
+    if (this.state.ids.length > 1 && !this.bulkHintSeen) {
+      this.bulkHintSeen = true;
       setStorageKeyValue(BULK_HINT_SEEN_KEY, true);
+    }
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
   }
@@ -1406,7 +1429,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                     </span>
                     {game.facilities.length >= HINT_MIN_FACILITIES &&
                       !activeScenario(game)?.tutorialSteps &&
-                      !getStorageBoolean(BULK_HINT_SEEN_KEY, false) && (
+                      !this.bulkHintSeen && (
                         <span>
                           Shift-click a range · Ctrl/⌘-click to add ·
                           Right-click for actions

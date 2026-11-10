@@ -775,7 +775,13 @@ export default function CustomGame(props: Props): React.JSX.Element {
                         disabled={guest}
                         variant="standard"
                         placeholder="Random"
-                        slotProps={{ htmlInput: { "aria-label": "Seed" } }}
+                        slotProps={{
+                          htmlInput: {
+                            "aria-label": "Seed",
+                            inputMode: "numeric",
+                            pattern: "[0-9]*",
+                          },
+                        }}
                         value={scenario.seed === undefined ? "" : scenario.seed}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                           const digits = e.target.value.replace(/[^0-9]/g, "");

@@ -490,6 +490,9 @@ describe("the fleet list", () => {
     );
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveAccessibleName("Sell 40MW Oil A facility?");
+    expect(
+      within(dialog).getByRole("button", { name: "Never mind" }),
+    ).toHaveFocus();
     await user.click(within(dialog).getByRole("button", { name: "Sell" }));
     expect(onSell).toHaveBeenCalledWith(oil.id);
   });
@@ -1906,6 +1909,7 @@ it("hides sale for a retained facility while leaving its operating controls avai
   expect(
     screen.getByRole("button", { name: `Pause ${facility.name}` }),
   ).toBeEnabled();
+  expect(screen.getByText("This plant can't be sold.")).toBeInTheDocument();
   expect(onSell).not.toHaveBeenCalled();
 });
 
@@ -1940,5 +1944,6 @@ it("removes an already-paused reactor's resume control when its permanent shutdo
   expect(
     screen.queryByRole("button", { name: "Sell Chernobyl Unit 4" }),
   ).not.toBeInTheDocument();
+  expect(screen.getByText("This plant can't be sold.")).toBeInTheDocument();
   expect(view.onTogglePause).not.toHaveBeenCalled();
 });

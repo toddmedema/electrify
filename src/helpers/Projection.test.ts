@@ -18,6 +18,7 @@ import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import {
   cacheProjection,
   ProjectionView,
+  projectionSignature,
   selectProjection,
 } from "./Projection";
 import { cashRunwayMonths } from "./MissionStatus";
@@ -267,4 +268,13 @@ it("reuses a running company forecast between decisions and month rollovers", ()
   game.date = getDateFromMinute(MINUTES_PER_MONTH, game.startingYear);
   expect(selectProjection(game, game.timeline[0])).not.toBe(initial);
   expect(generate).toHaveBeenCalledTimes(2);
+});
+
+test("an explicit key gives the same cached projection as the computed one", () => {
+  const game = createGame({ scenarioId: 101 });
+  const now = game.timeline[0];
+  const projection = selectProjection(game, now);
+  expect(selectProjection(game, now, projectionSignature(game))).toBe(
+    projection,
+  );
 });

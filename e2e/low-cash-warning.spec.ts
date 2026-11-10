@@ -70,8 +70,16 @@ for (const theme of ["light", "dark"] as const) {
     // Once the new month starts, low cash can ask again.
     await page.getByRole("button", { name: "fast speed", exact: true }).click();
     await expect(dialog).toBeVisible();
+    // The seed decides whether the accepted rise covers next month, and the message and the
+    // decline label must agree about it.
+    const second = await dialog.locator(".MuiDialogContent-root").innerText();
     await dialog
-      .getByRole("button", { name: "Go bankrupt", exact: true })
+      .getByRole("button", {
+        name: second.includes("to avoid bankruptcy")
+          ? "Go bankrupt"
+          : "Keep current rates",
+        exact: true,
+      })
       .click();
     await page.getByRole("button", { name: "pause", exact: true }).click();
     const after = (await readSavedGame(page))!;

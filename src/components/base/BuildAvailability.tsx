@@ -108,7 +108,7 @@ export function getBuildAvailability(options: {
       buildable: false,
       secondaryText: (
         <div>
-          This project size is not available with technology in this year.
+          This size can't be built with this year's technology.
           <br />
           Maximum available size: <strong>{options.maxSizeLabel}</strong>
         </div>

@@ -102,18 +102,22 @@ test("scheduled data-center connections appear and update when the schedule chan
       }),
     ]),
   );
-  game.loadAdditions = [
-    { ...game.loadAdditions[0], id: "phase-one", peakW: 50000000 },
-    {
-      ...game.loadAdditions[0],
-      id: "phase-two",
-      peakW: 50000000,
-      startsYear: 2028,
-    },
-  ];
-  const phased = selectUpcomingStoryEvents({ game } as AppStateType).filter(
-    (event) => event.key.startsWith("load:"),
-  );
+  // Store state is immutable, so each change arrives as a new game object
+  const scheduled = {
+    ...game,
+    loadAdditions: [
+      { ...game.loadAdditions[0], id: "phase-one", peakW: 50000000 },
+      {
+        ...game.loadAdditions[0],
+        id: "phase-two",
+        peakW: 50000000,
+        startsYear: 2028,
+      },
+    ],
+  };
+  const phased = selectUpcomingStoryEvents({
+    game: scheduled,
+  } as AppStateType).filter((event) => event.key.startsWith("load:"));
   expect(phased.map((event) => event.startsMinute)).toEqual(
     [72, 96].map((month) => month * MINUTES_PER_MONTH),
   );
@@ -122,9 +126,12 @@ test("scheduled data-center connections appear and update when the schedule chan
       (event) => event.message === "Demand rising as new load connects.",
     ),
   ).toBe(true);
-  game.date = getDateFromMinute(72 * MINUTES_PER_MONTH, game.startingYear);
+  const later = {
+    ...scheduled,
+    date: getDateFromMinute(72 * MINUTES_PER_MONTH, game.startingYear),
+  };
   expect(
-    selectUpcomingStoryEvents({ game } as AppStateType)
+    selectUpcomingStoryEvents({ game: later } as AppStateType)
       .filter((event) => event.key.startsWith("load:"))
       .map((event) => event.key),
   ).toEqual(["load:phase-two"]);
