@@ -10,7 +10,7 @@ and unexpected events put your plans to the test.
 
 ## Run locally
 
-Install **Node.js 24** and **[Git LFS](https://git-lfs.com/)**, then:
+Install **Node.js 26** and **[Git LFS](https://git-lfs.com/)**, then:
 
 ```sh
 git clone https://github.com/toddmedema/electrify.git

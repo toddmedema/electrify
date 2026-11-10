@@ -15,7 +15,7 @@ and complete ten-second checkpoint persistence remain in place.
 
 ## Reproduce
 
-Use Node 24 with the lockfile dependencies installed:
+Use Node 26 with the lockfile dependencies installed:
 
 ```sh
 node scripts/perf/multiplayer-network.js > network-results.json

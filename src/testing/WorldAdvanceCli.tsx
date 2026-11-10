@@ -48,7 +48,7 @@ function advance(file: string, throughMonth: number) {
 // Keep the one-shot CLI for direct reproduction. Playwright keeps this same Jest test alive
 // over IPC, amortizing the transform/import cost while every request runs all assertions above.
 function serve(): Promise<void> {
-  // Jest replaces both global process and require("process"); Node 24 exposes the real IPC.
+  // Jest replaces both global process and require("process"); Node 26 exposes the real IPC.
   const ipc = process.getBuiltinModule("process");
   return new Promise((resolve) => {
     const receive = (message: {

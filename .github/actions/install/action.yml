@@ -8,7 +8,7 @@ inputs:
     default: full
   node-version:
     description: Node version; keep in step with deploy-prod.yml.
-    default: 24.14.0
+    default: 26.13.0
 runs:
   using: composite
   steps:

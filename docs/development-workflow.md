@@ -1,6 +1,6 @@
 # Local development coordination
 
-Start with Node 24, `npm ci`, and `npm run check:assets`. Before editing, run
+Start with Node 26, `npm ci`, and `npm run check:assets`. Before editing, run
 `npm run task -- claim`. Codex uses its chat ID automatically; other tools can set
 `ELECTRIFY_TASK_ID` or pass an ID to the claim command. A different task must use
 another worktree. `npm run task -- status` shows the owner; release your claim with

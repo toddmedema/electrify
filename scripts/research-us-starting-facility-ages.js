@@ -1,4 +1,4 @@
-// Node 24. Rebuild the US state age cohorts from the pinned public EIA-860 inventory.
+// Node 26. Rebuild the US state age cohorts from the pinned public EIA-860 inventory.
 // Usage: node scripts/research-us-starting-facility-ages.js [path/to/eia8602024.zip]
 // The source download is cached under .tmp, outside the checked-in snapshot.
 const fs = require("node:fs");

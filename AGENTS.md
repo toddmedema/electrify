@@ -6,7 +6,7 @@ files are large, so broad rewrites create expensive review diffs.
 
 ## Start here
 
-- Use Node 24. Install exactly the lockfile with `npm ci` in a new checkout or when the lockfile
+- Use Node 26. Install exactly the lockfile with `npm ci` in a new checkout or when the lockfile
   changes; reuse that install across turns while it still matches the lockfile.
 - Reserve the checkout before editing with `npm run task -- claim` (Codex supplies the chat ID;
   otherwise pass an ID or set `ELECTRIFY_TASK_ID`). If another task owns it, use an isolated

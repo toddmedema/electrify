@@ -919,7 +919,7 @@ customer retention and private fleet/loan progress before discarding those field
 the same estimated-weather owner and the same opening-fleet/trailing-year story context.
 Hydro and intertie outlooks retain their full forecast paths.
 
-Reproduce the paired calculation benchmark with Node 24 and the matching install:
+Reproduce the paired calculation benchmark with Node 26 and the matching install:
 
 ```sh
 npm run perf:build-forecast

@@ -6,7 +6,7 @@ Cloud storage and leaderboards; the web edition continues to use Firebase.
 
 ## Build and test
 
-Use Node 24 and the committed lockfile. Fetch Git LFS assets before building; the packaging
+Use Node 26 and the committed lockfile. Fetch Git LFS assets before building; the packaging
 verification refuses pointer files and missing public assets.
 
 ```sh
@@ -36,7 +36,7 @@ account or App ID:
 npm run desktop:pack:offline
 ```
 
-Build on the target OS and architecture using its native Node 24 installation and `npm ci`.
+Build on the target OS and architecture using its native Node 26 installation and `npm ci`.
 Mac builds require Apple Silicon (ARM64). Packaging rejects other Mac architectures, removes
 unused architectures from the pinned Steam SDK library with `lipo`, and verifies the signed
 app executable is ARM64-only. Native runtime bytes are checked before signing. The installed

@@ -58,7 +58,7 @@ function fixture(t) {
   };
   const verify = () =>
     checkDependencies(root, {
-      nodeVersion: "24.14.0",
+      nodeVersion: "26.13.0",
       platform: "darwin",
       arch: "arm64",
     });
@@ -77,10 +77,8 @@ test("preflight accepts the exact full install, including a pristine lazy Electr
 
 test("preflight rejects unsupported Node and missing install metadata before work starts", (t) => {
   const { root, verify } = fixture(t);
-  assert.throws(
-    () => checkDependencies(root, { nodeVersion: "22.14.0" }),
-    /Node 24/,
-  );
+  for (const nodeVersion of ["22.14.0", "24.22.2", "27.0.0"])
+    assert.throws(() => checkDependencies(root, { nodeVersion }), /Node 26/);
   fs.rmSync(path.join(root, "node_modules/.package-lock.json"));
   assert.throws(verify, /node_modules.*package-lock.*npm ci/);
 });
@@ -203,7 +201,7 @@ test("preflight selects the Linux libc package without requiring the other libc"
   save();
   assert.equal(
     checkDependencies(root, {
-      nodeVersion: "24.14.0",
+      nodeVersion: "26.13.0",
       platform: "linux",
       arch: "x64",
       libc: "glibc",
@@ -213,7 +211,7 @@ test("preflight selects the Linux libc package without requiring the other libc"
   assert.throws(
     () =>
       checkDependencies(root, {
-        nodeVersion: "24.14.0",
+        nodeVersion: "26.13.0",
         platform: "linux",
         arch: "x64",
         libc: "musl",
