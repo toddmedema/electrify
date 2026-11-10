@@ -138,7 +138,8 @@ describe("EventLog", () => {
     expect(() => view.unmount()).not.toThrow();
   });
 
-  it("renders authored upcoming phases with timing and a keyboard action", () => {
+  it("renders authored upcoming phases with timing and a keyboard action", async () => {
+    const user = userEvent.setup();
     const onSelect = jest.fn();
     render(
       <EventLog
@@ -166,10 +167,11 @@ describe("EventLog", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText("Event history")).toBeVisible();
     expect(screen.getByText("Jan 2014")).toBeVisible();
+    // A real button inside the list item, not a list item playing one
+    expect(row.tagName).toBe("BUTTON");
+    expect(screen.getAllByRole("listitem").length).toBeGreaterThan(0);
     row.focus();
-    row.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-    );
+    await user.keyboard("{Enter}");
     expect(onSelect).toHaveBeenCalledWith({
       card: "INSIGHTS",
       layer: "FUEL_PRICES",

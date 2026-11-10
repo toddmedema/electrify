@@ -242,7 +242,7 @@ it("follows an inline link out of the search results and focuses its expanded he
   );
   expect(screen.getByLabelText("Search the manual")).toHaveValue("");
   const heading = screen.getByRole("button", {
-    name: "Power and Energy",
+    name: "Power and energy",
     expanded: true,
   });
   expect(heading).toHaveFocus();
@@ -264,7 +264,7 @@ it("refocuses and scrolls to the entry already in focus after search hid it", as
     await userEvent.click(screen.getByRole("link", { name: "power rating" }));
     expect(screen.getByLabelText("Search the manual")).toHaveValue("");
     const heading = screen.getByRole("button", {
-      name: "Power and Energy",
+      name: "Power and energy",
       expanded: true,
     });
     expect(heading).toHaveFocus();

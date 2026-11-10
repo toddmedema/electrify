@@ -345,7 +345,13 @@ describe("the fleet list", () => {
       </React.StrictMode>
     );
     const { rerender, unmount } = render(pane());
-    const list = screen.getByRole("list");
+    // The scroller wraps the plants-and-storage list along with its section labels.
+    const fleet = screen.getByRole("list", { name: "Plants and storage" });
+    // eslint-disable-next-line testing-library/no-node-access
+    const list = fleet.parentElement!;
+    expect(within(fleet).getAllByRole("listitem")).toHaveLength(
+      initial.facilities.length,
+    );
     list.style.overflowY = "auto";
     list.style.lineHeight = "24px";
     Object.defineProperties(list, {

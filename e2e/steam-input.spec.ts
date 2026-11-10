@@ -775,7 +775,7 @@ test("controller chooses an autocomplete city and starts a custom game", async (
     page,
     page
       .locator(".customSetupActions")
-      .getByRole("button", { name: "Play", exact: true }),
+      .getByRole("button", { name: "Start game", exact: true }),
   );
   await input(page, "confirm");
   await expect(page.locator("#appbar:visible")).toBeVisible();

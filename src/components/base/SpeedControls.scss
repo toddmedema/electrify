@@ -4,6 +4,8 @@
   // Selection uses a surface change; every enabled speed remains a blue control.
   .speedToggles {
     .MuiToggleButton-root {
+      // Equal segments, so the selection doesn't shift with each label's width.
+      min-width: 48px;
       padding: 4px 12px;
       border-color: var(--border-tile);
       color: var(--interactive-blue);
@@ -24,6 +26,20 @@
       &.Mui-disabled {
         color: var(--font-color-faded);
       }
+    }
+
+    // Coarse pointers floor every control at 44px; speed segments keep their equal 48px.
+    @media (pointer: coarse) {
+      .MuiToggleButton-root {
+        min-width: 48px !important;
+      }
+    }
+
+    // The faint selected fill alone falls short of 3:1, so a solid bar and heavier label mark
+    // the running speed. Co-op draws its own markers along that edge instead.
+    &:not(.multiplayerSpeedToggles) .MuiToggleButton-root.Mui-selected {
+      box-shadow: inset 0 -2px 0 var(--interactive-strong);
+      font-weight: 700;
     }
   }
 

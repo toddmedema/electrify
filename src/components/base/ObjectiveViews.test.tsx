@@ -10,6 +10,8 @@ import { RunDebrief } from "./RunResult";
 import VictoryDialog from "./VictoryDialog";
 import SavedResultDialog from "./SavedResultDialog";
 import type { VictoryType } from "../../Types";
+import { getScenario } from "../../data/Scenarios";
+import { objectiveGoalText } from "../../helpers/ObjectivePresentation";
 
 const bills: ObjectiveResult = {
   objective: {
@@ -97,6 +99,68 @@ it("renders stored objective debrief facts and unavailability without re-evaluat
   expect(region).toHaveTextContent(bills.definition);
   expect(region).toHaveTextContent("Months 1–2");
   expect(region).toHaveTextContent("10¢/kWh (above goal)");
+});
+
+it("dates a built-in scenario's objectives and doesn't repeat the ending already stated", () => {
+  const scenario = getScenario(100)!;
+  render(
+    <RunDebrief
+      outcome="fired"
+      scenarioId={100}
+      leadMessage={`You were fired. ${bills.reason}`}
+      debrief={{
+        startingFleet: [],
+        finalFleet: [],
+        startingCash: 0,
+        finalCash: 0,
+        finalCustomers: 0,
+        reliability: 1,
+        unservedWh: 0,
+        kgco2e: 0,
+        highlights: [],
+        objectiveResults: [bills],
+      }}
+    />,
+  );
+  const region = screen.getByRole("region", { name: "Objective results" });
+  expect(region).toHaveTextContent(
+    objectiveGoalText(
+      bills.objective,
+      scenario.startingYear,
+      scenario.durationMonths,
+      (scenario.startingMonth ?? 1) - 1,
+    ),
+  );
+  expect(region).not.toHaveTextContent(/Months? \d/);
+  expect(region).not.toHaveTextContent(bills.reason!);
+});
+
+it("keeps each objective's reason when several objectives share the debrief", () => {
+  const other: ObjectiveResult = {
+    ...bills,
+    id: "other",
+    label: "Limit bills",
+  };
+  render(
+    <RunDebrief
+      outcome="fired"
+      leadMessage={`You were fired. ${bills.reason}`}
+      debrief={{
+        startingFleet: [],
+        finalFleet: [],
+        startingCash: 0,
+        finalCash: 0,
+        finalCustomers: 0,
+        reliability: 1,
+        unservedWh: 0,
+        kgco2e: 0,
+        highlights: [],
+        objectiveResults: [bills, other],
+      }}
+    />,
+  );
+  const region = screen.getByRole("region", { name: "Objective results" });
+  expect(within(region).getAllByText(bills.reason!)).toHaveLength(2);
 });
 
 for (const view of ["live", "saved"] as const) {

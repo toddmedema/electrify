@@ -19,6 +19,8 @@ import { resumeSavedGame } from "../../SaveSession";
 import { startWithSaveGuard } from "./StartGame";
 import NewGameDetails from "./NewGameDetails";
 
+const flushTextButton = { "&&": { ml: -1 } } as const;
+
 export default function ChallengeLanding() {
   const unlockedThrough = useUnlockedDifficulty();
   const href = useAppSelector((s) => s.ui.challengeHref);
@@ -69,14 +71,20 @@ export default function ChallengeLanding() {
           >
             {" "}
             {route?.scenarioId !== undefined
-              ? "Open current mission"
-              : "Choose a mission"}
+              ? "Open current game"
+              : "Choose a game"}
           </Button>
+          {/* Text buttons start flush with the message rather than indented by their padding;
+            the doubled selector outranks the Stack's margin reset. */}
           {(saved || game.inGame) && (
-            <Button onClick={continueGame}>Continue saved game</Button>
+            <Button onClick={continueGame} sx={flushTextButton}>
+              Continue saved game
+            </Button>
           )}
           {route?.scenarioId !== undefined && (
-            <Button onClick={leave}>Back to missions</Button>
+            <Button onClick={leave} sx={flushTextButton}>
+              Back to games
+            </Button>
           )}
         </Stack>
       </ScreenPage>

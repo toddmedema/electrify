@@ -316,6 +316,8 @@ export function getMonthlyClimatology(
   };
 }
 
+class WeatherFetchError extends Error {}
+
 /**
  * Downloads a location's record, for the browser. Offline play is covered by the service worker,
  * which caches the scenario's weather (see helpers/OfflineData).
@@ -359,12 +361,16 @@ export function initWeather(
       fetch(
         `/data/weather/${id}.bin`,
         simulationDataRequest(`/data/weather/${id}.bin`),
-      ).then((response: Response) => {
-        if (!response.ok) {
-          throw new Error(`${response.status} fetching ${id}'s weather file`);
-        }
-        return response.arrayBuffer().then((buffer) => ({ id, buffer }));
-      }),
+      )
+        .catch((error: Error) => {
+          throw new WeatherFetchError(error.message);
+        })
+        .then((response: Response) => {
+          if (!response.ok) {
+            throw new Error(`${response.status} fetching ${id}'s weather file`);
+          }
+          return response.arrayBuffer().then((buffer) => ({ id, buffer }));
+        }),
     ),
   )
     .then((loaded) => {
@@ -377,7 +383,9 @@ export function initWeather(
       done();
     })
     .catch((e: Error) => {
-      done(`Could not load the weather for ${localId}: ${e.message}`);
+      done(
+        `Could not ${e instanceof WeatherFetchError ? "fetch" : "load"} the weather for ${localId}: ${e.message}`,
+      );
     });
 }
 

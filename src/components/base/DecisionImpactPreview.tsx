@@ -7,6 +7,8 @@ export interface DecisionImpactFactType {
   label: string;
   value: string;
   detail?: string;
+  /** Lets a control point at this explanation with aria-describedby */
+  detailId?: string;
   help?: React.ReactNode;
 }
 
@@ -44,6 +46,7 @@ export default function DecisionImpactPreview({
               </Typography>
               {fact.detail && (
                 <Typography
+                  id={fact.detailId}
                   className="decisionImpactFactDetail"
                   variant="caption"
                   color="textSecondary"

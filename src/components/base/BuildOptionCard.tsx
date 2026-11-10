@@ -63,6 +63,10 @@ export default function BuildOptionCard(
 ): React.JSX.Element {
   const [expanded, setExpanded] = React.useState(false);
   const { name, sizeAction, context, metrics, details } = props;
+  const warningId = React.useId();
+  // A disabled Review says why through the visible shortfall rather than staying silent.
+  const describedBy =
+    props.review?.disabled && props.warning ? warningId : undefined;
   const reviewButton = props.review && (
     <Button
       id={props.review.id}
@@ -74,6 +78,7 @@ export default function BuildOptionCard(
       disabled={props.review.disabled}
       startIcon={<ConceptIcon concept="buy" fontSize="small" />}
       aria-label={props.review.ariaLabel}
+      aria-describedby={describedBy}
     >
       Review
     </Button>
@@ -94,6 +99,8 @@ export default function BuildOptionCard(
 
   return (
     <Card
+      // Every catalog renders these cards as the items of its list.
+      component="li"
       className={[
         "build-list-item buildOption",
         props.className,
@@ -116,6 +123,7 @@ export default function BuildOptionCard(
             subheader: {
               component: "div",
               className: "buildOptionHeaderWarning",
+              id: warningId,
             },
           }),
         }}
@@ -143,6 +151,7 @@ export default function BuildOptionCard(
           {props.warning && !warningInHeader && (
             <Typography
               component="div"
+              id={warningId}
               className="buildOptionWarning"
               color="textSecondary"
             >

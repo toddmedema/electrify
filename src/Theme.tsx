@@ -143,8 +143,6 @@ interface ChartPaletteType {
   historicFill: string;
   blackout: string;
   temperature: string;
-  /** The temperature line's punch is too thin for the axis labels naming it */
-  temperatureAxis: string;
   wind: string;
   offshoreWind: string;
   precipitation: string;
@@ -204,7 +202,6 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     historicFill: blue[50],
     blackout: red[800], // darker than red[500] so the translucent band reads on white
     temperature: red[500],
-    temperatureAxis: red[800],
     // The weather chart draws wind in the same blue the wind generators are drawn in
     wind: FUEL_COLORS.light.Wind,
     offshoreWind: FUEL_COLORS.light["Offshore Wind"],
@@ -241,7 +238,6 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     historicFill: withAlpha("#6ab8f7", 0.16),
     blackout: "#ff6b6b",
     temperature: "#ff8a80",
-    temperatureAxis: "#ff8a80",
     wind: FUEL_COLORS.dark.Wind,
     offshoreWind: FUEL_COLORS.dark["Offshore Wind"],
     precipitation: blue[300],

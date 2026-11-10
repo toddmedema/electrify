@@ -647,7 +647,11 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 <TableHead>
                   <TableRow>
                     <TableCell colSpan={scoreColumnCount}>
-                      <Typography id="leaderboard-title" variant="h6">
+                      <Typography
+                        id="leaderboard-title"
+                        component="h2"
+                        variant="h6"
+                      >
                         {leaderboardExpanded
                           ? "Leaderboard — All levels"
                           : `Leaderboard — ${DIFFICULTY_LABELS[game.difficulty]}`}

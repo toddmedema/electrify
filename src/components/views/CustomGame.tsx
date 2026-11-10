@@ -26,6 +26,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
 import ScreenPage from "../base/ScreenPage";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
+import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import LocationPicker from "../base/LocationPicker";
 import ConceptIcon from "../base/ConceptIcon";
 import InfoDialog from "../base/InfoDialog";
@@ -610,15 +611,17 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   </TableRow>
                   <TableRow>
                     <TableCell>
-                      Ownership&nbsp;
-                      <IconButton
-                        onClick={() => setVictoryDialogOpen(true)}
-                        aria-label="Goals"
-                        color="primary"
-                        size="small"
-                      >
-                        <InfoIcon />
-                      </IconButton>
+                      <span className="customSetupLabel">
+                        Ownership
+                        <IconButton
+                          onClick={() => setVictoryDialogOpen(true)}
+                          aria-label="Goals for each ownership type"
+                          color="primary"
+                          size="small"
+                        >
+                          <InfoIcon />
+                        </IconButton>
+                      </span>
                     </TableCell>
                     <TableCell>
                       <Select
@@ -717,15 +720,17 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   </TableRow>
                   <TableRow>
                     <TableCell>
-                      Carbon fee&nbsp;
-                      <IconButton
-                        onClick={() => setFeeDialogOpen(true)}
-                        aria-label="What is a carbon fee?"
-                        color="primary"
-                        size="small"
-                      >
-                        <InfoIcon />
-                      </IconButton>
+                      <span className="customSetupLabel">
+                        Carbon fee
+                        <IconButton
+                          onClick={() => setFeeDialogOpen(true)}
+                          aria-label="What is a carbon fee?"
+                          color="primary"
+                          size="small"
+                        >
+                          <InfoIcon />
+                        </IconButton>
+                      </span>
                     </TableCell>
                     <TableCell>
                       <Select
@@ -770,28 +775,37 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     <TableCell>
                       {/* Everything random in a run - weather, fuel prices - comes from the seed, so
                     the same seed and settings produce the same game */}
-                      <TextField
-                        id="seed"
-                        disabled={guest}
-                        variant="standard"
-                        placeholder="Random"
-                        slotProps={{ htmlInput: { "aria-label": "Seed" } }}
-                        value={scenario.seed === undefined ? "" : scenario.seed}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          const digits = e.target.value.replace(/[^0-9]/g, "");
-                          change({
-                            seed: digits === "" ? undefined : Number(digits),
-                          });
-                        }}
-                      />
-                      <IconButton
-                        onClick={() => change({ seed: newSeed() })}
-                        aria-label="Random seed"
-                        color="primary"
-                        size="small"
-                      >
-                        <CasinoIcon />
-                      </IconButton>
+                      <div className="customSeedField">
+                        <TextField
+                          id="seed"
+                          disabled={guest}
+                          variant="standard"
+                          placeholder="Random"
+                          slotProps={{ htmlInput: { "aria-label": "Seed" } }}
+                          value={
+                            scenario.seed === undefined ? "" : scenario.seed
+                          }
+                          onChange={(
+                            e: React.ChangeEvent<HTMLInputElement>,
+                          ) => {
+                            const digits = e.target.value.replace(
+                              /[^0-9]/g,
+                              "",
+                            );
+                            change({
+                              seed: digits === "" ? undefined : Number(digits),
+                            });
+                          }}
+                        />
+                        <IconButton
+                          onClick={() => change({ seed: newSeed() })}
+                          aria-label="Random seed"
+                          color="primary"
+                          size="small"
+                        >
+                          <CasinoIcon />
+                        </IconButton>
+                      </div>
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -1018,9 +1032,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
             />
           ) : (
             <Button
+              className="scenarioStartButton"
               size="large"
               variant="contained"
               color="primary"
+              startIcon={<PlayCircleIcon />}
               disabled={unavailable.length > 0 || !!hydroSetup.error}
               onClick={() =>
                 onStart({
@@ -1029,7 +1045,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                 })
               }
             >
-              Play
+              Start game
             </Button>
           )}
         </div>

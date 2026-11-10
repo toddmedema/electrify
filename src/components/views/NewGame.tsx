@@ -114,7 +114,11 @@ function MissionSectionHeader(
   props: MissionSectionHeaderProps,
 ): React.JSX.Element {
   return (
-    <ListSubheader disableSticky className="missionSectionHeader">
+    <ListSubheader
+      component="div"
+      disableSticky
+      className="missionSectionHeader"
+    >
       <Typography component="h2" variant="subtitle2" sx={{ fontWeight: 600 }}>
         {props.children}
       </Typography>
@@ -176,7 +180,6 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
           ? `${completed ? "Review" : "Start"} ${name}`
           : `View ${name} details`
       }
-      showChevron={!isTutorial}
       avatar={
         <Badge
           overlap="circular"
@@ -343,8 +346,11 @@ export default function NewGame(props: Props): React.JSX.Element {
       onBack={props.onBack}
     >
       <CoopBrowseBar coop={props.coop} offerSaves />
+      {/* Sections of headed groups rather than one list, so it is a labelled region. */}
       <List
         dense
+        component="div"
+        role="region"
         className="scrollable cardList missionList"
         aria-label="Available games"
       >

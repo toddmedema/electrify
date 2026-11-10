@@ -1,4 +1,3 @@
-import { isLegacyCampaignScenario } from "../../data/LegacyCampaign";
 import { getScenario } from "../../data/Scenarios";
 import { Box, Typography } from "@mui/material";
 import { VictoryDebriefType, VictoryType } from "../../Types";
@@ -70,20 +69,23 @@ export function RunDebrief({
   debrief,
   scenarioId,
   outcome,
+  leadMessage,
 }: {
   debrief: VictoryDebriefType;
   scenarioId?: number;
   outcome: VictoryType["outcome"];
+  /** The ending already stated above the debrief, so a lone objective doesn't repeat it */
+  leadMessage?: string;
 }): React.JSX.Element {
   const units = useUnits();
   const objectiveResults =
     outcome === "bankrupt" || outcome === "fired"
       ? debrief.objectiveResults
       : undefined;
+  // Dates rather than month indexes wherever the scenario's calendar is known; a custom game's
+  // scenario isn't recorded with the result, so it keeps the month count.
   const scenario =
-    scenarioId === undefined || !isLegacyCampaignScenario(scenarioId)
-      ? undefined
-      : getScenario(scenarioId);
+    scenarioId === undefined ? undefined : getScenario(scenarioId);
   const reliability = `${(debrief.reliability * 100).toFixed(debrief.reliability >= 0.999 ? 2 : 1)}%`;
   const metrics = [
     { concept: "supply" as const, label: "served", value: reliability },
@@ -131,6 +133,9 @@ export function RunDebrief({
             Objectives
           </Typography>
           {objectiveResults.map((result) => {
+            // With one objective the ending above already gives its reason; with several,
+            // each keeps its own so the player can tell which one the ending meant.
+            const repeatsLead = objectiveResults.length === 1;
             const first =
               "fromMonth" in result.objective
                 ? result.objective.fromMonth
@@ -163,17 +168,15 @@ export function RunDebrief({
                   {objectiveDefinitionText(result)}
                 </Typography>
                 <Typography component="p" variant="body2">
-                  {result.objective.checkpoint ? (
-                    scenario === undefined ? (
-                      objectiveTargetText(result.objective)
-                    ) : (
-                      objectiveGoalText(
-                        result.objective,
-                        scenario.startingYear,
-                        scenario.durationMonths,
-                        (scenario.startingMonth ?? 1) - 1,
-                      )
+                  {scenario !== undefined ? (
+                    objectiveGoalText(
+                      result.objective,
+                      scenario.startingYear,
+                      scenario.durationMonths,
+                      (scenario.startingMonth ?? 1) - 1,
                     )
+                  ) : result.objective.checkpoint ? (
+                    objectiveTargetText(result.objective)
                   ) : (
                     <>
                       {objectiveTargetText(result.objective)} ·{" "}
@@ -186,15 +189,16 @@ export function RunDebrief({
                 <Typography component="p" variant="body2">
                   {objectiveObservedText(result)}
                 </Typography>
-                {result.reason && (
-                  <Typography
-                    component="p"
-                    variant="body2"
-                    color="text.secondary"
-                  >
-                    {result.reason}
-                  </Typography>
-                )}
+                {result.reason &&
+                  !(repeatsLead && leadMessage?.includes(result.reason)) && (
+                    <Typography
+                      component="p"
+                      variant="body2"
+                      color="text.secondary"
+                    >
+                      {result.reason}
+                    </Typography>
+                  )}
               </Box>
             );
           })}

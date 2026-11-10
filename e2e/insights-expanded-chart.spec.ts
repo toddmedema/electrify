@@ -309,7 +309,7 @@ test("every chart header keeps its help button beside the expand control, even w
         const header = track.querySelector(".insightsTrackHeader")!;
         return {
           layer: track.getAttribute("data-layer"),
-          title: box("h6"),
+          title: box(".insightsTrackHeader .MuiTypography-h6"),
           expand: box(".insightsExpandChart"),
           help: box(".insightsTrackHeader .manual-link"),
           actions: box(".insightsTrackActions"),

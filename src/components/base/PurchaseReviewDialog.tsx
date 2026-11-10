@@ -131,9 +131,14 @@ export default function PurchaseReviewDialog(
   );
   const cashDue = buildCost + cashOnlyFee;
   const financedCashDue = loan.downpayment + cashOnlyFee;
+  const cashShort = !props.cashDisabled && cash < cashDue;
   const cashDisabled = submitting || !!props.cashDisabled || cash < cashDue;
+  const cashDetailId = React.useId();
   const loanDisabled =
     submitting || !!props.loanDisabled || cash < financedCashDue;
+  // The loan takes the emphasis only when it is the one way forward; ignoring `submitting`
+  // keeps the buttons from swapping weight mid-submit.
+  const loanLeads = cashShort && !props.loanDisabled && cash >= financedCashDue;
 
   const submit = async (financed: boolean, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -157,7 +162,17 @@ export default function PurchaseReviewDialog(
       value:
         props.paymentSummary?.cash.value ??
         `${formatMoneyConcise(cashDue)} now`,
-      detail: props.paymentSummary?.cash.detail,
+      // A disabled Pay cash says why: the shortfall, beside the price it falls short of.
+      detail:
+        [
+          props.paymentSummary?.cash.detail,
+          cashShort
+            ? `${formatMoneyConcise(cashDue - cash)} more cash needed.`
+            : undefined,
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined,
+      detailId: cashDetailId,
     },
     {
       concept: "finances",
@@ -241,17 +256,19 @@ export default function PurchaseReviewDialog(
           )}
           <Button
             color="primary"
-            variant="contained"
+            variant={loanLeads ? "outlined" : "contained"}
             disabled={cashDisabled}
+            aria-describedby={cashShort ? cashDetailId : undefined}
             onClick={(event) => submit(false, event)}
             startIcon={<ConceptIcon concept="money" fontSize="small" />}
           >
             Pay cash
           </Button>
+          {/* When cash can't cover it, the loan is the one way forward and takes the emphasis. */}
           <Button
             id={props.loanButtonId}
             color="primary"
-            variant="outlined"
+            variant={loanLeads ? "contained" : "outlined"}
             disabled={loanDisabled}
             onClick={(event) => submit(true, event)}
             startIcon={<ConceptIcon concept="finances" fontSize="small" />}

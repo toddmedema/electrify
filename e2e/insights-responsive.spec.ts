@@ -18,7 +18,7 @@ const expectInsightSpacing = async (insights: Locator) => {
     const timeRow = element.querySelector(".insightsViewportToolbar")!;
     const rail = element.querySelector(".insightEventRail")!;
     const chip = rail.querySelector(".insightEventChip")!;
-    const chartTitle = element.querySelector(".insightsTrackHeader h6")!;
+    const chartTitle = element.querySelector(".insightsTrackHeader h3")!;
     const panelTitle = element
       .closest(".gameToolPanel")!
       .querySelector(".gameToolHeader h2")!;
@@ -422,7 +422,9 @@ test("insights header controls stay aligned in one compact row", async ({
         tracks.map((track) => {
           const header = track.querySelector(".insightsTrackHeader")!;
           const headerBox = header.getBoundingClientRect();
-          const titleBox = header.querySelector("h6")!.getBoundingClientRect();
+          const titleBox = header
+            .querySelector(".MuiTypography-h6")!
+            .getBoundingClientRect();
           const actions = header.querySelector(".insightsTrackActions");
           const contentBoxes = [
             titleBox,

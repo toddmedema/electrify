@@ -12,7 +12,7 @@ const expectRightInsets = async (insights: Locator) => {
         Math.max(
           ...elements.flatMap((track) => {
             const bounds = track.getBoundingClientRect();
-            const title = track.querySelector(".insightsTrackHeader h6")!;
+            const title = track.querySelector(".insightsTrackHeader h3")!;
             const inset = title.getBoundingClientRect().left - bounds.left;
             return Array.from(track.querySelectorAll(".u-over"), (plot) =>
               Math.abs(

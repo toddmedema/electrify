@@ -66,8 +66,8 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       forecastMonthAxis(scale, getState),
       yAxis(scale, {
         grid: true,
-        label: `Heat (${temperatureUnit(getState().units)})`,
-        stroke: chartPalette().temperatureAxis,
+        // Neutral like every other axis: red already means a shortage or harm
+        label: `Temperature (${temperatureUnit(getState().units)})`,
         values: (_u, splits) => splits.map((t) => String(Math.round(t))),
       }),
     ],

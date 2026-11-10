@@ -561,6 +561,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
+          role="listitem"
           className={`facilityRow${selected ? " selected" : ""}${props.bulkSelected ? " bulkSelected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
           onContextMenu={(event) => props.onContextMenu(facility.id, event)}
           data-fuel={fuel}
@@ -1416,8 +1417,11 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                 )}
               </div>
             )}
+            {/* The scroller holds section labels and the intertie fleet as well as rows, so the
+              lists are the drag-and-drop containers inside it rather than the scroller itself. */}
             <List
               dense
+              component="div"
               className="scrollable unifiedFacilitiesList"
               data-group-dragging={this.state.groupDragging || undefined}
               onKeyDown={this.onSelectionKeyDown}
@@ -1440,7 +1444,12 @@ export default class Facilities extends React.Component<Props, SelectionState> {
               >
                 <Droppable droppableId="droppable">
                   {(provided) => (
-                    <div {...provided.droppableProps} ref={provided.innerRef}>
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      role="list"
+                      aria-label="Plants and storage"
+                    >
                       {game.facilities.map(
                         (g: FacilityOperatingType, i: number) => (
                           <FacilityListItem

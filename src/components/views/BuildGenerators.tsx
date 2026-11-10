@@ -13,6 +13,7 @@ import {
   Typography,
   IconButton,
 } from "@mui/material";
+import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
@@ -394,9 +395,12 @@ export function GeneratorBuildItem(
       : undefined;
 
   const compareAction = props.onCompare && canBuild && (
+    // A toggle keeps its name and quiet weight; the check and pressed state carry the selection,
+    // so Review stays the card's one emphasised action.
     <Button
       size="small"
-      variant={props.compared ? "contained" : "text"}
+      variant="text"
+      startIcon={props.compared ? <CheckIcon fontSize="small" /> : undefined}
       aria-pressed={props.compared}
       aria-label={`Compare ${generator.name}`}
       disabled={props.compareDisabled && !props.compared}
@@ -845,14 +849,35 @@ function GeneratorComparison(props: {
             >
               <CloseIcon fontSize="small" />
             </IconButton>
+            {/* A separator stays with the figure before it, so a narrow chip never starts a
+              line with "·" */}
             <Typography variant="caption">
-              {formatMoneyConcise(generator.buildCost)} ·{" "}
-              {formatBuildMonths(generator.yearsToBuild)}
+              <span className="nowrap">
+                {formatMoneyConcise(generator.buildCost)} ·
+              </span>{" "}
+              <span className="nowrap">
+                {formatBuildMonths(generator.yearsToBuild)}
+              </span>
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              {props.forecastPending && !props.outputShapes.get(generator.name)
-                ? "Calculating output and energy costs…"
-                : `${formatWatts(generator.peakW * typicalCapacityFactor(generator, props.outputShapes.get(generator.name)))} typical · ${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
+              {props.forecastPending &&
+              !props.outputShapes.get(generator.name) ? (
+                "Calculating output and energy costs…"
+              ) : (
+                <>
+                  {formatWatts(
+                    generator.peakW *
+                      typicalCapacityFactor(
+                        generator,
+                        props.outputShapes.get(generator.name),
+                      ),
+                  )}{" "}
+                  typical{"\u00a0·"}{" "}
+                  <span className="nowrap">
+                    {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
+                  </span>
+                </>
+              )}
             </Typography>
           </div>
         ))}

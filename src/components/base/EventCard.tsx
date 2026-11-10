@@ -34,22 +34,9 @@ export default function EventCard({
   children,
   ...rest
 }: Props): React.JSX.Element {
-  return (
-    <Component
-      {...rest}
-      className={`eventLogItem${onActivate ? " actionable" : ""}${className ? ` ${className}` : ""}`}
-      title={tooltip}
-      onClick={onActivate}
-      onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
-        rest.onKeyDown?.(e);
-        if (onActivate && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          onActivate();
-        }
-      }}
-      role={onActivate ? "button" : undefined}
-      tabIndex={onActivate ? 0 : undefined}
-    >
+  const itemClassName = `eventLogItem${onActivate ? " actionable" : ""}${className ? ` ${className}` : ""}`;
+  const content = (
+    <>
       <span className="eventLogIcon">{icon}</span>
       <span>
         {heading && <strong>{heading}</strong>}
@@ -73,6 +60,26 @@ export default function EventCard({
           {meta}
         </Typography>
       )}
+    </>
+  );
+  if (!onActivate)
+    return (
+      <Component {...rest} className={itemClassName} title={tooltip}>
+        {content}
+      </Component>
+    );
+  // A list item keeps its list semantics and holds a real button, rather than becoming a button
+  // itself; the button carries the card's styles.
+  return (
+    <Component {...rest} className="eventLogEntry">
+      <button
+        type="button"
+        className={itemClassName}
+        title={tooltip}
+        onClick={onActivate}
+      >
+        {content}
+      </button>
     </Component>
   );
 }
