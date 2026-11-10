@@ -9,9 +9,12 @@ export const HOST_WAITING_MESSAGE =
 export default function HostConnectionWarning({
   waiting,
   onReconnect,
+  onDisconnect,
 }: {
   waiting: boolean;
   onReconnect: () => void;
+  /** Leaves the match, for a host that is not coming back. */
+  onDisconnect: () => void;
 }) {
   const dialog = useAppSelector((state) => state.ui.dialog);
   const ownedAction = useRef<() => void>();
@@ -40,8 +43,10 @@ export default function HostConnectionWarning({
         closeText: "OK",
         actionLabel: "Reconnect",
         action: ownedAction.current,
+        secondaryLabel: "Disconnect",
+        secondaryAction: onDisconnect,
       }),
     );
-  }, [waiting, dialog, onReconnect]);
+  }, [waiting, dialog, onReconnect, onDisconnect]);
   return null;
 }

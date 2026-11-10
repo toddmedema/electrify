@@ -386,7 +386,8 @@ class SteamRoom {
         !this.members.some((member) => member.id === id) ||
         !this.members.some((member) => member.id === input.to)
       )
-        throw new Error("Player disconnected");
+        // The wording of the native transport, so the renderer is tested against what it really sees.
+        throw new Error("Player is disconnected");
       // Native Steam transport consumes heartbeats before publishing renderer events.
       if (input.payload.kind === "heartbeat") return;
       await this.event(input.to, {
@@ -1621,6 +1622,37 @@ async function saveAndQuit(page: Page) {
     page.getByRole("button", { name: "Play with friends", exact: true }),
   ).toBeVisible();
 }
+
+test("a guest who lost the host can disconnect from the connection notice", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const guest = pages[1];
+  const guestId = room.members[1].id;
+  await expect(guest.locator(".facilities:visible")).toBeVisible();
+  // The native layer tells both endpoints that their channel closed.
+  room.dropped.add(guestId);
+  await room.event(room.host, { kind: "disconnected", sender: guestId });
+  await room.publish();
+  await room.event(guestId, { kind: "disconnected", sender: room.host });
+  const notice = guest.getByRole("dialog", {
+    name: "Multiplayer",
+    exact: true,
+  });
+  await expect(notice).toContainText("Connection lost");
+  await expect(
+    notice.getByRole("button", { name: "Reconnect", exact: true }),
+  ).toBeVisible();
+  await notice.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await expect(
+    guest.getByRole("button", { name: "Play with friends", exact: true }),
+  ).toBeVisible();
+  await expect(notice).toBeHidden();
+  await expect
+    .poll(() => room.members.some((member) => member.id === guestId))
+    .toBe(false);
+  expect(errors).toEqual([]);
+});
 
 test("custom setup waits for host settings before a guest can mark Ready", async ({
   browser,
