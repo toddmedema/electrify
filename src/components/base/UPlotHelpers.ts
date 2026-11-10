@@ -631,6 +631,82 @@ export function bandsPlugin(
   };
 }
 
+/** One stretch of x with unmet demand, and how large the worst of it was (0 to 1). */
+export interface ShortfallBar {
+  from: number;
+  to: number;
+  severity: number;
+}
+
+const SHORTFALL_BAR_MIN_PX = 4;
+const SHORTFALL_BAR_MAX_PX = 16;
+const SHORTFALL_BAR_MIN_WIDTH_PX = 2;
+
+/**
+ * Device-pixel rectangles for shortfall bars, shortest first. Every bar hangs from the top of
+ * the plot, so painting the tallest last leaves the largest shortfall visible even where
+ * months are narrower than a pixel and several land in the same column.
+ */
+export function shortfallBarRects(
+  bars: Array<{ x0: number; x1: number; severity: number }>,
+  pxRatio: number,
+): Array<{ x: number; width: number; height: number }> {
+  const minWidth = SHORTFALL_BAR_MIN_WIDTH_PX * pxRatio;
+  return bars
+    .map(({ x0, x1, severity }) => {
+      // Snapped outward to whole device pixels so neighbouring months leave no anti-aliased
+      // seam; a month narrower than the minimum is widened around its own centre instead.
+      const left = Math.floor(x0);
+      const right = Math.ceil(x1);
+      const widened = right - left < minWidth;
+      const clamped = Math.min(1, Math.max(0, severity));
+      return {
+        x: widened ? Math.floor((x0 + x1) / 2 - minWidth / 2) : left,
+        width: widened ? Math.ceil(minWidth) : right - left,
+        height:
+          (SHORTFALL_BAR_MIN_PX +
+            (SHORTFALL_BAR_MAX_PX - SHORTFALL_BAR_MIN_PX) * clamped) *
+          pxRatio,
+      };
+    })
+    .sort((a, b) => a.height - b.height);
+}
+
+/**
+ * Bars along the top of the plot for the stretches that ran short, taller for a larger peak
+ * shortfall. A full-height wash would claim the whole stretch was dark, which an aggregated
+ * chart cannot know; the bar says only that it happened, and how badly at worst.
+ */
+export function shortfallBarsPlugin(
+  getBars: () => ShortfallBar[],
+  color: string,
+): uPlot.Plugin {
+  return {
+    hooks: {
+      draw: (u: uPlot) => {
+        const bars = getBars();
+        if (bars.length === 0) {
+          return;
+        }
+        u.ctx.save();
+        clipToPlot(u);
+        u.ctx.fillStyle = color;
+        for (const { x, width, height } of shortfallBarRects(
+          bars.map((bar) => ({
+            x0: u.valToPos(bar.from, "x", true),
+            x1: u.valToPos(bar.to, "x", true),
+            severity: bar.severity,
+          })),
+          uPlot.pxRatio,
+        )) {
+          u.ctx.fillRect(x, u.bbox.top, width, height);
+        }
+        u.ctx.restore();
+      },
+    },
+  };
+}
+
 /** The "you are here" line dividing recorded history from the forecast. */
 export function verticalLinePlugin(
   getX: () => number | null,

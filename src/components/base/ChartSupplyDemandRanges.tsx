@@ -7,11 +7,11 @@ import { chartPalette, withAlpha } from "../../Theme";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
   anchoredForecastPaths,
-  bandsPlugin,
   FORECAST_RIGHT_PAD,
   forecastMonthAxis,
   padRange,
-  spansFromEdges,
+  ShortfallBar,
+  shortfallBarsPlugin,
   splitPastProjected,
   yAxis,
 } from "./UPlotHelpers";
@@ -24,7 +24,11 @@ interface MonthlyRange {
   supplyMax: number;
   demandMin: number;
   demandMax: number;
+  /** The largest shortfall in any one hour; supply and demand extrema need not coincide. */
   peakShortfall: number;
+  /** Hours in the month's day with demand above supply, and hours modeled. */
+  shortSamples: number;
+  samples: number;
 }
 
 /** Aggregate every modeled hour, keeping past monthly averages separate from forecast ranges. */
@@ -51,6 +55,8 @@ export function supplyDemandMonthlyRanges(
         previous.peakShortfall,
         tick.demandW - tick.supplyW,
       );
+      previous.samples++;
+      if (tick.demandW > tick.supplyW) previous.shortSamples++;
     } else {
       ranges.push({
         minute: tick.minute,
@@ -60,10 +66,35 @@ export function supplyDemandMonthlyRanges(
         demandMin: tick.demandW,
         demandMax: tick.demandW,
         peakShortfall: Math.max(0, tick.demandW - tick.supplyW),
+        shortSamples: tick.demandW > tick.supplyW ? 1 : 0,
+        samples: 1,
       });
     }
   }
   return ranges;
+}
+
+/**
+ * The forecast months with unmet demand, read from the same ranges the chart plots so a marker
+ * and its tooltip can never disagree. Recorded months are averages of delivered energy and are
+ * not marked. uPlot snaps the cursor to the nearest month's point, so a month owns the half
+ * month either side of it rather than the calendar month that starts there.
+ */
+export function monthlyShortfalls(ranges: MonthlyRange[]): ShortfallBar[] {
+  return ranges.flatMap((range) =>
+    range.projected && range.peakShortfall > 0
+      ? [
+          {
+            from: range.minute - MINUTES_PER_MONTH / 2,
+            to: range.minute + MINUTES_PER_MONTH / 2,
+            severity:
+              range.demandMax > 0
+                ? Math.min(1, range.peakShortfall / range.demandMax)
+                : 1,
+          },
+        ]
+      : [],
+  );
 }
 
 interface State {
@@ -71,7 +102,7 @@ interface State {
   domain: SupplyDemandProps["domain"];
   startingYear: number;
   multiyear: boolean;
-  blackoutSpans: Array<[number, number]>;
+  shortfalls: ShortfallBar[];
 }
 
 function forecastRangePaths(pastIndex: number): uPlot.Series.PathBuilder {
@@ -135,7 +166,9 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       { series: [7, 5], fill: withAlpha(palette.demand, 0.06) },
       { series: [8, 6], fill: withAlpha(palette.demand, 0.06) },
     ],
-    plugins: [bandsPlugin(() => getState().blackoutSpans, palette.blackout)],
+    plugins: [
+      shortfallBarsPlugin(() => getState().shortfalls, palette.blackout),
+    ],
   };
 }
 
@@ -153,13 +186,18 @@ function tooltip(index: number, state: State): string {
   if (!range.projected) {
     return `${period} · recorded average\nSupply: ${formatWatts(range.supplyMin)}\nDemand: ${formatWatts(range.demandMin)}`;
   }
-  return `${period} · forecast range\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\nPeak shortfall: ${formatWatts(range.peakShortfall)}`;
+  const shortfall =
+    range.peakShortfall > 0
+      ? `Peak shortfall: ${formatWatts(range.peakShortfall)}\nShort in ${range.shortSamples} of ${range.samples} modeled hours`
+      : "No shortfall";
+  return `${period} · forecast range\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\n${shortfall}`;
 }
 
 export default function ChartSupplyDemandRanges(
-  props: Omit<SupplyDemandProps, "multiyear">,
+  props: Omit<SupplyDemandProps, "multiyear" | "blackouts">,
 ) {
   const ranges = supplyDemandMonthlyRanges(props.timeline, props.currentMinute);
+  const shortfalls = monthlyShortfalls(ranges);
   const isProjected = ranges.map((range) => range.projected);
   const data: uPlot.AlignedData = [ranges.map((range) => range.minute)];
   for (const key of [
@@ -177,7 +215,7 @@ export default function ChartSupplyDemandRanges(
   return (
     <UPlotChart<State>
       id="chartForecastSupplyDemand"
-      ariaLabel="Monthly ranges of estimated electricity supply and demand"
+      ariaLabel={`Monthly ranges of estimated electricity supply and demand. ${shortfalls.length ? `${shortfalls.length} forecast ${shortfalls.length === 1 ? "month" : "months"} with unmet demand marked` : "No forecast months with unmet demand"}`}
       formatSummaryValue={formatWatts}
       height={props.height}
       state={{
@@ -185,7 +223,7 @@ export default function ChartSupplyDemandRanges(
         domain: props.domain,
         startingYear: props.startingYear,
         multiyear: true,
-        blackoutSpans: spansFromEdges(props.blackouts),
+        shortfalls,
       }}
       data={data}
       seriesLabels={[

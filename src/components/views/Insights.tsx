@@ -1679,21 +1679,32 @@ export default class Insights extends React.Component<Props, State> {
             </>
           );
           break;
-        case "supplyDemand":
+        case "supplyDemand": {
+          // Beyond two years the chart aggregates to monthly ranges, whose shortfall markers
+          // are derived from those ranges rather than from the hourly blackout spans.
+          const rangedSupplyDemand =
+            projection.domain.x[1] - projection.domain.x[0] >
+            24 * MINUTES_PER_MONTH;
           body = (
             <>
               <ChartLegend
                 items={[
                   { name: "Supply", color: chartPalette().supply, dash: "20" },
                   { name: "Demand", color: chartPalette().demand, dash: "20" },
+                  ...(rangedSupplyDemand && projection.shortfall
+                    ? [{ name: "Unmet demand", color: chartPalette().blackout }]
+                    : []),
                 ]}
+                {...(rangedSupplyDemand && projection.shortfall
+                  ? {
+                      note: "Bands span each month's lowest to highest hour. A taller red bar means a larger peak shortfall in at least one hour.",
+                    }
+                  : {})}
               />
-              {projection.domain.x[1] - projection.domain.x[0] >
-              24 * MINUTES_PER_MONTH ? (
+              {rangedSupplyDemand ? (
                 <ChartSupplyDemandRanges
                   height={160}
                   timeline={projection.supplyDemandTimeline}
-                  blackouts={projection.blackouts}
                   domain={projection.domain}
                   startingYear={game.startingYear}
                   currentMinute={projection.forecast[0]?.minute}
@@ -1741,6 +1752,7 @@ export default class Insights extends React.Component<Props, State> {
             </>
           );
           break;
+        }
         case "powerExchange":
           body = (
             <>

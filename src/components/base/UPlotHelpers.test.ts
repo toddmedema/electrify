@@ -11,6 +11,7 @@ import {
   yAxis,
   niceSplits,
   patternFill,
+  shortfallBarRects,
   zeroLinePlugin,
 } from "./UPlotHelpers";
 import { applyTextSize } from "../../TextSize";
@@ -418,4 +419,47 @@ it("uses positive zero for axis ticks crossing a small negative lower bound", ()
 
 it("does not retain negative zero in a degenerate axis", () => {
   expect(niceSplits(-0, -0)).toEqual([0]);
+});
+
+describe("shortfallBarRects", () => {
+  it("makes a larger shortfall a taller bar, with a visible floor and a ceiling", () => {
+    const heights = shortfallBarRects(
+      [
+        { x0: 0, x1: 10, severity: 0 },
+        { x0: 20, x1: 30, severity: 0.5 },
+        { x0: 40, x1: 50, severity: 1 },
+        { x0: 60, x1: 70, severity: 7 },
+      ],
+      1,
+    ).map((rect) => rect.height);
+    expect(heights).toEqual([4, 10, 16, 16]);
+  });
+
+  it("paints the tallest last so a pixel shared by several months shows the worst one", () => {
+    const rects = shortfallBarRects(
+      [
+        { x0: 10, x1: 10.4, severity: 0.9 },
+        { x0: 10.2, x1: 10.6, severity: 0.1 },
+      ],
+      1,
+    );
+    expect(rects.map((rect) => rect.height)).toEqual(
+      [...rects.map((rect) => rect.height)].sort((a, b) => a - b),
+    );
+    expect(rects.at(-1)!.height).toBeGreaterThan(rects[0].height);
+  });
+
+  it("keeps a month narrower than a pixel visible and snaps edges to whole pixels", () => {
+    const [thin, wide] = shortfallBarRects(
+      [
+        { x0: 5.4, x1: 5.6, severity: 0 },
+        { x0: 20.3, x1: 30.2, severity: 0.1 },
+      ],
+      2,
+    );
+    expect(thin.width).toBeGreaterThanOrEqual(4);
+    expect(Number.isInteger(thin.x)).toBe(true);
+    expect(wide.x).toBe(20);
+    expect(wide.width).toBe(11);
+  });
 });
