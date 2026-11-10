@@ -2,12 +2,17 @@ import { parseChallengeUrl } from "./helpers/Challenge";
 import { delta as uiDelta } from "./reducers/UI";
 import { logEvent } from "./Globals";
 import ScenarioChoiceDialog from "./components/base/ScenarioChoiceDialog";
-import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
+import {
+  ThemeProvider,
+  StyledEngineProvider,
+  createTheme,
+} from "@mui/material/styles";
 import {
   lazy,
   Suspense,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -28,6 +33,8 @@ import {
 
 import {
   customEventFromSearch,
+  campaignSetupUrl,
+  isLegacyCampaignSearch,
   isDataCenterSetupSearch,
   scenarioDetailsUrl,
   scenarioFromSearch,
@@ -51,6 +58,7 @@ import { ThemeChoiceType } from "./Types";
 import { InstallPromptProvider } from "./components/base/InstallAppButton";
 import type { DesktopPowerState } from "./Desktop";
 import { applyTextSize } from "./TextSize";
+import { normalizeTvInset, tvDisplayScale, tvLayoutEnabled } from "./TvLayout";
 import { getDesktop, isDesktopApp } from "./Desktop";
 
 const AchievementNotifications = lazy(
@@ -128,14 +136,44 @@ function setupStorage(document: Document) {
  * Inside the Provider because it reads the setting from the store, and above everything else
  * because a palette change has to reach the whole tree.
  */
-function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
+export function ThemedApp(props: {
+  children: React.JSX.Element;
+}): React.JSX.Element {
   const choice: ThemeChoiceType = useAppSelector(
     (state) => state.settings.theme,
   );
-  const textSize = useAppSelector((state) => state.settings.textSize);
+  const settings = useAppSelector((state) => state.settings);
+  const { textSize, tvScale, tvInset } = settings;
+  const tvMode = tvLayoutEnabled(settings);
+  const [viewport, setViewport] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
   useLayoutEffect(() => {
-    applyTextSize(textSize);
-  }, [textSize]);
+    /** Apply shared text preferences once; native seat zoom already supplies TV magnification.
+     * Keeping seat display scale at one prevents multiplying the same presentation twice. */
+    const apply = () => {
+      const root = document.documentElement;
+      root.dataset.tvLayout = String(tvMode);
+      root.style.setProperty(
+        "--tv-inset",
+        tvMode ? `${normalizeTvInset(tvInset)}vmin` : "0px",
+      );
+      applyTextSize(
+        textSize,
+        tvMode && !window.electrifyCouch
+          ? tvDisplayScale(tvScale, window.innerHeight)
+          : 1,
+      );
+    };
+    apply();
+    const resize = () => {
+      apply();
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, [textSize, tvMode, tvScale, tvInset]);
   // "System" is a standing instruction rather than a value, and the system can change its mind
   // while the game is open - at sunset, on a schedule, or because the player just flipped it
   const [systemDark, setSystemDark] = useState(prefersDarkMode);
@@ -194,9 +232,35 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
     };
   }, [mode]);
 
-  return (
-    <ThemeProvider theme={createAppTheme(mode)}>{props.children}</ThemeProvider>
+  const theme = useMemo(
+    () =>
+      tvMode
+        ? createTheme(createAppTheme(mode), {
+            components: {
+              MuiPopover: {
+                defaultProps: {
+                  marginThreshold: Math.ceil(
+                    (Math.min(viewport.width, viewport.height) *
+                      normalizeTvInset(tvInset)) /
+                      100,
+                  ),
+                },
+              },
+              MuiMenu: {
+                defaultProps: {
+                  marginThreshold: Math.ceil(
+                    (Math.min(viewport.width, viewport.height) *
+                      normalizeTvInset(tvInset)) /
+                      100,
+                  ),
+                },
+              },
+            },
+          })
+        : createAppTheme(mode),
+    [mode, tvMode, tvInset, viewport],
   );
+  return <ThemeProvider theme={theme}>{props.children}</ThemeProvider>;
 }
 
 /**
@@ -221,6 +285,8 @@ function OfflineNotice(): React.JSX.Element | null {
   );
 }
 
+/** Own account, save and desktop-service subscriptions for the mounted shell.
+ * Isolated couch documents bootstrap separately so they cannot create solo service owners. */
 export default function App() {
   const scenarioRouteInitialized = useRef(false);
   /**
@@ -266,10 +332,24 @@ export default function App() {
         );
         store.dispatch(navigate({ name: "CUSTOM_GAME", url }));
       }
+      const legacyCampaign =
+        !challenge &&
+        !dataCenterSetup &&
+        customEvent === undefined &&
+        isLegacyCampaignSearch(window.location.search);
+      if (legacyCampaign) {
+        const url = campaignSetupUrl();
+        getHistoryApi().replaceState(null, "", scenarioListUrl());
+        store.dispatch(
+          navigate({ name: "NEW_GAME", skipBrowserHistory: true }),
+        );
+        store.dispatch(navigate({ name: "CAMPAIGN", url }));
+      }
       const sharedScenario =
         !challenge &&
         !dataCenterSetup &&
         customEvent === undefined &&
+        !legacyCampaign &&
         scenarioFromSearch(window.location.search);
       if (sharedScenario) {
         const detailsUrl = scenarioDetailsUrl(sharedScenario.id);
@@ -302,6 +382,13 @@ export default function App() {
       if (customEventFromSearch(window.location.search) !== undefined) {
         store.dispatch(
           navigate({ name: "CUSTOM_GAME", skipBrowserHistory: true }),
+        );
+        e.preventDefault();
+        return;
+      }
+      if (isLegacyCampaignSearch(window.location.search)) {
+        store.dispatch(
+          navigate({ name: "CAMPAIGN", skipBrowserHistory: true }),
         );
         e.preventDefault();
         return;
@@ -355,8 +442,13 @@ export default function App() {
     let achievementsLive = true;
     void import(
       /* webpackChunkName: "achievements" */ "./achievements/Runtime"
-    ).then(({ startAchievementServices }) => {
-      if (achievementsLive) stopAchievements = startAchievementServices(store);
+    ).then(async ({ startAchievementServices }) => {
+      const account =
+        process.env.REACT_APP_DESKTOP === "true"
+          ? (await import("./couch/Platform")).withCouchPlatform(store)
+          : store;
+      if (achievementsLive)
+        stopAchievements = startAchievementServices(account);
     });
 
     const desktop =

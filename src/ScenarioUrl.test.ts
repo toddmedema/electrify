@@ -1,5 +1,7 @@
 import {
   customEventFromSearch,
+  campaignSetupUrl,
+  isLegacyCampaignSearch,
   isDataCenterSetupSearch,
   scenarioDetailsUrl,
   scenarioFromSearch,
@@ -7,6 +9,33 @@ import {
 } from "./ScenarioUrl";
 
 describe("scenario URLs", () => {
+  it("routes native campaign generations to the shared setup without treating them as challenges", () => {
+    expect(isLegacyCampaignSearch("?campaign=legacy")).toBe(true);
+    for (let id = 117; id <= 125; id++) {
+      expect(isLegacyCampaignSearch(`?scenario=${id}`)).toBe(true);
+      expect(scenarioFromSearch(`?scenario=${id}`)).toBeUndefined();
+    }
+    for (const search of [
+      "?campaign=fall",
+      "?campaign=true",
+      "?scenario=118oops",
+      "?scenario=126",
+      "?scenario=111",
+    ])
+      expect(isLegacyCampaignSearch(search)).toBe(false);
+    expect(
+      campaignSetupUrl({ pathname: "/play", search: "?scenario=123&perf=1" }),
+    ).toBe("/play?perf=1&campaign=legacy");
+    expect(
+      scenarioListUrl({ pathname: "/play", search: "?campaign=legacy&perf=1" }),
+    ).toBe("/play?perf=1");
+    expect(
+      scenarioDetailsUrl(111, {
+        pathname: "/play",
+        search: "?campaign=legacy",
+      }),
+    ).toBe("/play?scenario=111");
+  });
   it("opens guided data-center setup only for the explicit route", () => {
     expect(isDataCenterSetupSearch("?dataCenters=1")).toBe(true);
     expect(isDataCenterSetupSearch("?campaign=fall&dataCenters=1")).toBe(true);

@@ -30,6 +30,12 @@ export const offerLowCashWarning = (): AppThunk => (dispatch, getState) => {
     return;
 
   const quote = lowCashRateQuote(game);
+  // The opening utility is far smaller than modern scenarios. Its cash balance can
+  // stay below the modern warning threshold while comfortably paying its bills.
+  if (game.campaign && quote.projectedCash >= 0) {
+    dispatch(delta({ lowCashWarningMonth: game.date.monthsElapsed }));
+    return;
+  }
   const rate = quote.dollarsPerkWh;
   const increase =
     rate !== null && game.dollarsPerkWh > 0
@@ -48,7 +54,7 @@ export const offerLowCashWarning = (): AppThunk => (dispatch, getState) => {
   dispatch(
     dialogOpen({
       open: true,
-      title: "Low on cash. Raise rates?",
+      title: rate !== null ? "Low on cash. Raise rates?" : "Low on cash",
       message,
       notCancellable: true,
       actionLabel: rate !== null ? "Raise rates" : undefined,
@@ -59,7 +65,8 @@ export const offerLowCashWarning = (): AppThunk => (dispatch, getState) => {
               dispatch(dialogClose());
             }
           : undefined,
-      secondaryLabel: "Go bankrupt",
+      secondaryLabel:
+        quote.projectedCash < 0 ? "Go bankrupt" : "Keep current rates",
       secondaryAction: () => dispatch(dialogClose()),
     }),
   );
@@ -72,6 +79,16 @@ export default function LowCashWarning() {
     shallowEqual,
   );
   React.useEffect(() => {
+    // The thunk's own first early-outs, checked before the whole-document query
+    const { game } = state;
+    const cash = currentTick(game)?.cash;
+    if (
+      !game.inGame ||
+      cash === undefined ||
+      cash >= LOW_CASH_THRESHOLD ||
+      game.lowCashWarningMonth === game.date.monthsElapsed
+    )
+      return;
     if (!document.querySelector('[role="dialog"]'))
       dispatch(offerLowCashWarning());
   }, [dispatch, state]);

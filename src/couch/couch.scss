@@ -1,0 +1,121 @@
+html[data-couch-shell-active="true"] {
+  body,
+  .appFrame {
+    background: var(--bg-sunken);
+  }
+  .appFrameBody,
+  .controllerHints {
+    display: none;
+  }
+}
+html[data-couch-seat] {
+  .MuiButton-root,
+  .MuiToggleButton-root,
+  .MuiIconButton-root {
+    min-height: 40px;
+  }
+  &[data-controller-input="true"] :focus {
+    outline: 3px solid var(--focus-ring) !important;
+    outline-offset: -3px;
+  }
+  // That ring sits inside the border box, where a filled button's own blue would swallow it
+  &[data-controller-input="true"] .MuiButton-contained:focus {
+    outline-color: var(--interactive-contrast) !important;
+  }
+}
+.couchBand {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 1100;
+  box-sizing: border-box;
+  padding: 0;
+  background: var(--bg-raised);
+  color: var(--font-color-primary);
+  border-bottom: 1px solid var(--border-subtle);
+  min-height: 4px;
+}
+.couchBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+  user-select: none;
+  background: var(--bg-sunken);
+  img {
+    position: absolute;
+    object-fit: fill;
+  }
+}
+html[data-couch-shell-active="true"]
+  .couchDialogWithControls
+  .MuiDialog-container {
+  box-sizing: border-box;
+  padding-bottom: var(--couch-controls-height, 160px);
+}
+.couchSettingsDialog .MuiDialog-paper > .screenPage {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.couchPauseMenu {
+  padding: 24px;
+  align-items: center;
+  .MuiButton-root {
+    width: min(100%, 208px);
+    transition: none;
+    &:hover {
+      background: transparent;
+    }
+    &.MuiButton-text.MuiButton-colorPrimary:focus {
+      background: var(--interactive-blue);
+      color: var(--interactive-contrast);
+      outline: none !important;
+    }
+  }
+}
+html[data-tv-layout="true"] {
+  .couchPauseDialog .MuiDialog-paper {
+    max-width: calc(24rem + 48px);
+  }
+  .couchPauseMenu .MuiButton-root {
+    width: min(100%, 24rem);
+  }
+}
+.couchControlsLegend {
+  position: fixed;
+  z-index: 1400;
+  inset: auto 0 0;
+  box-sizing: border-box;
+  padding: 12px 24px;
+  color: var(--font-color-primary);
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border-subtle);
+  max-height: 40vh;
+  overflow: auto;
+  strong {
+    display: block;
+    margin-bottom: 8px;
+  }
+  .controllerHintActions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px 16px;
+  }
+}
+.couchMenuNotice {
+  position: fixed;
+  bottom: 40vh;
+  left: 24px;
+  z-index: 1400;
+}
+.couchRoster {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+.couchCompanyResult {
+  padding: 16px;
+  button {
+    min-height: 40px;
+  }
+}

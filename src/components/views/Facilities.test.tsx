@@ -111,7 +111,7 @@ function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
   ref?: React.RefObject<Facilities>,
-): Handlers {
+): Handlers & { rerenderGame: (game: GameType) => void } {
   const handlers: Handlers = {
     onTogglePause: jest.fn(),
     onPause: jest.fn(),
@@ -122,7 +122,7 @@ function renderFacilities(
     onCancelRetrofit: jest.fn(),
   };
   const store = configureStore({ reducer: { ui: uiReducer } });
-  function ControlledFacilities() {
+  function ControlledFacilities({ game }: { game: GameType }) {
     const [selected, setSelected] = React.useState(selectedFacilityId);
     return (
       <Facilities
@@ -149,10 +149,13 @@ function renderFacilities(
       />
     );
   }
-  render(<ControlledFacilities />, {
+  const view = render(<ControlledFacilities game={game} />, {
     wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
   });
-  return handlers;
+  return {
+    ...handlers,
+    rerenderGame: (next) => view.rerender(<ControlledFacilities game={next} />),
+  };
 }
 
 // Address inspection targets by their class; asking for a role by name computes an accessible
@@ -342,7 +345,13 @@ describe("the fleet list", () => {
       </React.StrictMode>
     );
     const { rerender, unmount } = render(pane());
-    const list = screen.getByRole("list");
+    // The scroller wraps the plants-and-storage list along with its section labels.
+    const fleet = screen.getByRole("list", { name: "Plants and storage" });
+    // eslint-disable-next-line testing-library/no-node-access
+    const list = fleet.parentElement!;
+    expect(within(fleet).getAllByRole("listitem")).toHaveLength(
+      initial.facilities.length,
+    );
     list.style.overflowY = "auto";
     list.style.lineHeight = "24px";
     Object.defineProperties(list, {
@@ -452,8 +461,18 @@ describe("the fleet list", () => {
     ).toBe(true);
   });
 
+  // Mission 6 pairs its coal plant with a small solar plant, so keep just the coal plant
+  function onePlantFleet(): GameType {
+    const game = createGame({ scenarioId: 5 });
+    game.facilities = game.facilities.filter(
+      (facility) => facility.fuel === "Coal",
+    );
+    expect(game.facilities).toHaveLength(1);
+    return game;
+  }
+
   it("can pause the only facility in a fleet", async () => {
-    const onePlant = createGame({ scenarioId: 5 });
+    const onePlant = onePlantFleet();
     const { onPause } = renderFacilities(onePlant, null);
     const facility = onePlant.facilities[0];
     await user.click(
@@ -477,12 +496,15 @@ describe("the fleet list", () => {
     );
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveAccessibleName("Sell 40MW Oil A facility?");
+    expect(
+      within(dialog).getByRole("button", { name: "Never mind" }),
+    ).toHaveFocus();
     await user.click(within(dialog).getByRole("button", { name: "Sell" }));
     expect(onSell).toHaveBeenCalledWith(oil.id);
   });
 
   it("can sell the only facility left in a fleet", async () => {
-    const onePlant = createGame({ scenarioId: 5 });
+    const onePlant = onePlantFleet();
     const { onSell } = renderFacilities(onePlant, onePlant.facilities[0].id);
     const facility = onePlant.facilities[0];
 
@@ -552,7 +574,7 @@ describe("weather hazards in the fleet", () => {
       id: 3,
       name: "Solar",
       fuel: "Sun",
-      resilience: { hailResistant: false },
+      resilience: { solarTrackers: false },
     } as FacilityOperatingType);
     return state;
   }
@@ -655,34 +677,6 @@ describe("weather hazards in the fleet", () => {
       "aria-label",
       `Inspect ${gas.name}, Extreme cold, 55% available`,
     );
-  });
-
-  it("offers hail-resistant panels from the details and confirms before paying", async () => {
-    const state = gameWithSolar();
-    const cost = retrofitCost(state.facilities[2], state, "hailResistant")!;
-    const { onRetrofit, onSelect } = renderFacilities(state, 3);
-
-    const details = screen.getByRole("region", { name: "Upgrades" });
-    expect(details).not.toHaveTextContent("Standard panels");
-    await user.click(
-      within(details).getByRole("button", {
-        name: `Add hail-resistant panels · ${formatMoneyConcise(cost)}`,
-      }),
-    );
-    const dialog = screen.getByRole("dialog", {
-      name: "Add hail-resistant panels to Solar?",
-    });
-    expect(dialog).not.toHaveTextContent("cash now");
-    await user.click(
-      within(dialog).getByRole("button", {
-        name: `Pay ${formatMoneyConcise(cost)}`,
-      }),
-    );
-    expect(onRetrofit).toHaveBeenCalledWith({
-      facilityId: 3,
-      upgrade: "hailResistant",
-    });
-    expect(onSelect).not.toHaveBeenCalled();
   });
 });
 
@@ -1132,6 +1126,66 @@ describe("unified connections", () => {
     expect(building).not.toHaveTextContent("Import available now");
     expect(building).toHaveTextContent("Typical price");
   });
+
+  it.each([
+    ["PAUSED", "true"],
+    ["FAST", "false"],
+  ] as const)(
+    "draws an intertie under construction with the same row anatomy as a plant (clock %s)",
+    (speed, paused) => {
+      const game = connectedGame();
+      game.speed = speed;
+      const plant = game.facilities[0];
+      plant.yearsToBuild = 2;
+      plant.yearsToBuildLeft = 1;
+      // Half built, with a year to go: the same reading as the plant above
+      game.transmission!.lines[1].minuteCreated -= 12 * MINUTES_PER_MONTH;
+      renderFacilities(game, null);
+      /* eslint-disable testing-library/no-node-access */
+      const plantRow = document.querySelector(
+        `.facilityRow[data-facility="${plant.name}"]`,
+      )!;
+      const lineRow = document.querySelectorAll(".transmissionLine")[1];
+      const parts = (row: Element) => ({
+        header: row.querySelector(".facilityRowHeader")!,
+        text: row.querySelector(".facilityText")!,
+        status: row.querySelector(".facilityStatus")!,
+        detail: row.querySelector(".facilityStatusDetail")!,
+        bar: row.querySelector(".constructionProgress")!,
+        fill: row.querySelector(".constructionProgressFill")!,
+        badge: row.querySelector(
+          '.facilityActivity [data-concept="construction"]',
+        ),
+      });
+      const [plantParts, lineParts] = [parts(plantRow), parts(lineRow)];
+
+      // Same words, in the same two pieces: the reading, then the time left
+      expect(plantParts.status).toHaveTextContent("Building 50%");
+      expect(lineParts.status).toHaveTextContent("Building 50%");
+      expect(plantParts.detail).toHaveTextContent("· 12 months left");
+      expect(lineParts.detail).toHaveTextContent("· 12 months left");
+
+      // The meter is the same decorative element, a child of the row's text, so one rule can
+      // pin it across the foot of the whole header whatever kind of row it is in
+      for (const row of [plantParts, lineParts]) {
+        expect(row.bar.parentElement).toBe(row.text);
+        expect(row.header).toContainElement(row.bar as HTMLElement);
+        expect(row.bar).toHaveAttribute("aria-hidden", "true");
+        expect(row.bar).toHaveAttribute("data-paused", paused);
+        // Sized only: colour comes from the stylesheet, not from the row
+        expect(row.fill.getAttribute("style")).toBe("width: 50%;");
+        expect(row.badge).not.toBeNull();
+      }
+
+      // And so is everything around it, element for element and class for class
+      const skeleton = (element: Element) =>
+        Array.from(element.querySelectorAll("*"))
+          .map((node) => `${node.tagName}.${node.getAttribute("class")}`)
+          .join(" ");
+      expect(skeleton(lineParts.text)).toBe(skeleton(plantParts.text));
+      /* eslint-enable testing-library/no-node-access */
+    },
+  );
 });
 
 it.each([false, true])(
@@ -1787,17 +1841,18 @@ describe("mouse facility selection", () => {
 
   it("confirms the combined price of upgrades and blocks a cash shortfall", async () => {
     const game = fleet();
+    game.scenarioId = 107;
     game.facilities = game.facilities.slice(0, 2).map(
       (f) =>
         ({
           ...f,
-          name: "Solar",
-          fuel: "Sun",
+          name: "Gas",
+          fuel: "Natural Gas",
           resilience: undefined,
         }) as FacilityOperatingType,
     );
     const total = game.facilities.reduce(
-      (sum, f) => sum + retrofitCost(f, game, "hailResistant")!,
+      (sum, f) => sum + retrofitCost(f, game, "coldWeatherPackage")!,
       0,
     );
     getTimeFromTimeline(game.date.minute, game.timeline)!.cash = total - 1;
@@ -1807,7 +1862,7 @@ describe("mouse facility selection", () => {
     fireEvent.contextMenu(rows()[0]);
     expect(
       screen.getByRole("menuitem", {
-        name: /^Add hail-resistant panels \(2\)/,
+        name: /^Add cold-weather package \(2\)/,
       }),
     ).toHaveAttribute("aria-disabled", "true");
     cleanup();
@@ -1818,11 +1873,11 @@ describe("mouse facility selection", () => {
     fireEvent.contextMenu(rows()[0]);
     await user.click(
       screen.getByRole("menuitem", {
-        name: /^Add hail-resistant panels \(2\)/,
+        name: /^Add cold-weather package \(2\)/,
       }),
     );
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("Offline for one month");
+    expect(dialog).toHaveTextContent("90% of capacity available for a month");
     expect(view.onRetrofit).not.toHaveBeenCalled();
     await user.click(
       within(dialog).getByRole("button", {
@@ -1830,8 +1885,8 @@ describe("mouse facility selection", () => {
       }),
     );
     expect(utils.onRetrofit.mock.calls).toEqual([
-      [{ facilityId: 1, upgrade: "hailResistant" }],
-      [{ facilityId: 2, upgrade: "hailResistant" }],
+      [{ facilityId: 1, upgrade: "coldWeatherPackage" }],
+      [{ facilityId: 2, upgrade: "coldWeatherPackage" }],
     ]);
   });
 });
@@ -1847,4 +1902,54 @@ describe("fleetChartHeight", () => {
   ])("sizes a %ix%i window to %ipx", (width, height, expected) => {
     expect(fleetChartHeight(width, height)).toBe(expected);
   });
+});
+
+it("hides sale for a retained facility while leaving its operating controls available", () => {
+  const game = cloneDeep(createGame({ scenarioId: 100 }));
+  const facility = game.facilities[0];
+  facility.saleRestricted = true;
+  const { onSell } = renderFacilities(game, facility.id);
+  expect(
+    screen.queryByRole("button", { name: `Sell ${facility.name}` }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: `Pause ${facility.name}` }),
+  ).toBeEnabled();
+  expect(screen.getByText("This plant can't be sold.")).toBeInTheDocument();
+  expect(onSell).not.toHaveBeenCalled();
+});
+
+it("removes an already-paused reactor's resume control when its permanent shutdown starts", () => {
+  const opening = createGame({ scenarioId: 126 });
+  const unit = opening.facilities.find(
+    (facility) => facility.startingAssetId === "chernobyl-unit-4",
+  )!;
+  unit.paused = true;
+  const view = renderFacilities(opening, unit.id);
+  expect(
+    screen.getByRole("button", { name: "Resume Chernobyl Unit 4" }),
+  ).toBeEnabled();
+
+  const april = cloneDeep(opening);
+  while (april.date.monthNumber === 3) tickState(april);
+  // Paused plants can retain an internal spin-down setpoint without delivering electricity.
+  april.facilities.find((facility) => facility.id === unit.id)!.currentW =
+    400e6;
+  view.rerenderGame(april);
+
+  expect(
+    screen.getByRole("button", { name: /^Inspect Chernobyl Unit 4/ }),
+  ).toHaveTextContent("0/1GW · 0% · paused");
+
+  expect(
+    screen.queryByRole("button", { name: "Resume Chernobyl Unit 4" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Pause Chernobyl Unit 4" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Sell Chernobyl Unit 4" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText("This plant can't be sold.")).toBeInTheDocument();
+  expect(view.onTogglePause).not.toHaveBeenCalled();
 });

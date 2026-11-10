@@ -2,10 +2,16 @@ import * as React from "react";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GameType } from "../../Types";
+import {
+  CUSTOM_SCENARIO_ID,
+  DEFAULT_CUSTOM_SCENARIO,
+  getScenario,
+} from "../../data/Scenarios";
 import NewGameDetails, { Props } from "./NewGameDetails";
 import { login } from "../../Globals";
 import { DesktopBridge } from "../../Desktop";
-import { ScoreType } from "../../Types";
+import { DIFFICULTY_IDS } from "../../Constants";
+import { DifficultyType, ScoreType } from "../../Types";
 
 const mockGetDocs = jest.fn();
 const mockDesktopScores = jest.fn();
@@ -52,6 +58,87 @@ function props(overrides: Partial<Props> = {}): Props {
     ...overrides,
   };
 }
+
+describe("NewGameDetails briefing", () => {
+  beforeEach(() => {
+    mockGetDocs.mockResolvedValue({ docs: [] });
+  });
+  // Lets the leaderboard request settle so no state update lands after the test
+  const boardLoaded = () =>
+    screen.findByText("Complete this mission to join the leaderboard");
+
+  it("describes the scenario once, flags its one risk and keeps goals a tap away", async () => {
+    const scenario = getScenario(110)!;
+    render(
+      <NewGameDetails
+        {...props({
+          game: { scenarioId: 110, difficulty: "Employee" } as GameType,
+        })}
+      />,
+    );
+
+    await boardLoaded();
+    expect(
+      screen.getByRole("heading", { name: scenario.name }),
+    ).toBeInTheDocument();
+    // The same sentence the scenario list shows, and no second goal blurb beside it
+    expect(screen.getAllByText(scenario.summary!)).toHaveLength(1);
+    expect(screen.queryByText("Your goal")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Goals" })).toBeNull();
+    const watchOut = screen.getByRole("note");
+    expect(watchOut).toHaveTextContent(`Watch out${scenario.threat}`);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Goals and scoring" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Goals" });
+    expect(
+      within(dialog).getByRole("region", { name: "Requirements" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("region", { name: "Scoring" }),
+    ).toBeInTheDocument();
+  });
+
+  it("invents no warning for a mission that authors none", async () => {
+    const tutorial = getScenario(0)!;
+    expect(tutorial.threat).toBeUndefined();
+    render(
+      <NewGameDetails
+        {...props({
+          game: { scenarioId: 0, difficulty: "Employee" } as GameType,
+        })}
+      />,
+    );
+
+    await boardLoaded();
+    expect(screen.getByText(tutorial.summary!)).toBeInTheDocument();
+    expect(screen.queryByRole("note")).toBeNull();
+    expect(screen.queryByText("Watch out")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Goals and scoring" }),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves the subtitle out rather than repeating the title when there is no description", async () => {
+    const { summary: _summary, ...undescribed } = DEFAULT_CUSTOM_SCENARIO;
+    render(
+      <NewGameDetails
+        {...props({
+          game: {
+            scenarioId: CUSTOM_SCENARIO_ID,
+            customScenario: undescribed,
+            difficulty: "Employee",
+          } as GameType,
+        })}
+      />,
+    );
+
+    await boardLoaded();
+    expect(screen.getAllByText(undescribed.name)).toHaveLength(1);
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+});
 
 describe("NewGameDetails leaderboard", () => {
   it.each([false, true])(
@@ -125,44 +212,32 @@ describe("NewGameDetails leaderboard", () => {
     expect(onDelta).toHaveBeenCalledWith({ difficulty: "CEO" });
   });
 
-  it("keeps the board's space while a new difficulty loads and returns fewer scores", async () => {
-    mockGetDocs.mockResolvedValueOnce({
-      docs: Array.from({ length: 3 }, (_, index) => ({
-        data: () => ({
-          displayName: `Player ${index + 1}`,
-          score: 500 - index,
-        }),
-      })),
-    });
+  it("keeps the board's space when the difficulty chosen has fewer scores", async () => {
+    respond(({ difficulty }) =>
+      difficulty === "Employee"
+        ? Array.from({ length: 3 }, (_, index) =>
+            scoreRow(`Player ${index + 1}`, 500 - index),
+          )
+        : [],
+    );
     const { rerender } = render(<NewGameDetails {...props()} />);
     await screen.findByText("Player 3");
+    await flush();
     const board = screen.getByRole("region", { name: "Leaderboard — Easy" });
     jest
       .spyOn(board, "getBoundingClientRect")
       .mockReturnValue({ height: 360 } as DOMRect);
-    let finish!: (value: { docs: [] }) => void;
-    mockGetDocs.mockReturnValueOnce(
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
-    );
 
     rerender(<NewGameDetails {...props({ game: game("CEO") })} />);
-    await screen.findByText("Loading...");
+    expect(
+      screen.getByText("Complete this mission to join the leaderboard"),
+    ).toBeInTheDocument();
     expect(board).toHaveStyle({ minHeight: "360px" });
     expect(screen.queryByText("Player 3")).not.toBeInTheDocument();
-
-    await act(async () => {
-      finish({ docs: [] });
-    });
-    await screen.findByText("Complete this mission to join the leaderboard");
-    expect(board).toHaveStyle({ minHeight: "360px" });
   });
 
   it("puts the player's best score in the score column", async () => {
-    mockGetDocs.mockResolvedValueOnce({ docs: [] }).mockResolvedValueOnce({
-      docs: [{ data: () => ({ score: 432, uid: "player" }) }],
-    });
+    respond(({ uid }) => (uid ? [scoreRow("Me", 432, { uid })] : []));
 
     render(<NewGameDetails {...props({ uid: "player" })} />);
 
@@ -179,38 +254,25 @@ describe("NewGameDetails leaderboard", () => {
   });
 
   it("shows all difficulties and their labels only on the expanded board", async () => {
-    mockGetDocs
-      .mockResolvedValueOnce({
-        docs: Array.from({ length: 5 }, (_, index) => ({
-          data: () => ({
-            score: 500 - index,
-            displayName: `Player ${index + 1}`,
-            difficulty: "Employee",
-          }),
-        })),
-      })
-      .mockResolvedValueOnce({
-        docs: [
-          {
-            data: () => ({
-              score: 900,
-              displayName: "Expert Player",
-              difficulty: "CEO",
-            }),
-          },
-          {
-            data: () => ({
-              score: 800,
-              displayName: "Beginner Player",
-              difficulty: "Intern",
-            }),
-          },
-        ],
-      });
+    respond(({ difficulty }) =>
+      difficulty === undefined
+        ? [
+            scoreRow("Expert Player", 900, { difficulty: "CEO" }),
+            scoreRow("Beginner Player", 800, { difficulty: "Intern" }),
+          ]
+        : difficulty === "Employee"
+          ? Array.from({ length: 12 }, (_, index) =>
+              scoreRow(`Player ${index + 1}`, 500 - index, {
+                difficulty: "Employee",
+              }),
+            )
+          : [],
+    );
     render(<NewGameDetails {...props()} />);
 
-    await screen.findByText("Player 3");
-    expect(screen.queryByText("Player 4")).toBeNull();
+    // A difficulty's board shows its top ten, and no more even if the source returned extra
+    await screen.findByText("Player 10");
+    expect(screen.queryByText("Player 11")).toBeNull();
     expect(screen.queryByRole("columnheader", { name: "Level" })).toBeNull();
     await userEvent.click(
       screen.getByRole("button", { name: "View all scores" }),
@@ -229,9 +291,10 @@ describe("NewGameDetails leaderboard", () => {
     expect(
       screen.getByRole("row", { name: /Beginner Player 800 Beginner/ }),
     ).toBeInTheDocument();
+    // One filtered query per difficulty read up front; the all-levels board adds none
     expect(
       mockWhere.mock.calls.filter(([field]) => field === "difficulty"),
-    ).toHaveLength(1);
+    ).toHaveLength(DIFFICULTY_IDS.length);
   });
 
   it("uses Steam friends scores and ignores a stale global response on the expanded board", async () => {
@@ -276,3 +339,432 @@ describe("NewGameDetails leaderboard", () => {
     ).toEqual(["Leaderboard — All levels", "#", "Name", "Score", "Level"]);
   });
 });
+
+describe("NewGameDetails reads every difficulty up front", () => {
+  const topRow = (difficulty: unknown) => scoreRow(`Top ${difficulty}`, 500);
+  const gameFor = (scenarioId: number, difficulty: DifficultyType): GameType =>
+    ({ scenarioId, difficulty }) as GameType;
+  const hostCoop: NonNullable<Props["coop"]> = {
+    role: "host",
+    hostName: "Host",
+    players: [
+      { id: "host", name: "Host", host: true, connected: true, ready: true },
+    ],
+    ready: true,
+    starting: false,
+  };
+
+  beforeEach(() => {
+    mockGetDocs.mockResolvedValue({ docs: [] });
+    mockPrefetchScenarioData.mockClear();
+    mockWhere.mockClear();
+  });
+  afterEach(() => {
+    delete window.electrifyDesktop;
+    jest.restoreAllMocks();
+  });
+
+  it("asks for each difficulty's top rows once, in the indexed query shape, then switches without asking again", async () => {
+    respond(({ difficulty }) => [topRow(difficulty)]);
+    const { rerender } = render(<NewGameDetails {...props()} />);
+    await screen.findByText("Top Employee");
+    await flush();
+
+    const asks = mockGetDocs.mock.calls.map(([built]) => asked(built));
+    expect(asks.map((ask) => ask.difficulty).sort()).toEqual(
+      [...DIFFICULTY_IDS].sort(),
+    );
+    for (const ask of asks) {
+      // Each difficulty's board shows its top ten, so ten is all it reads
+      expect(ask).toMatchObject({ scenarioId: 100, limit: 10, uid: undefined });
+      expect(ask.fields).toEqual([
+        "scoreVersion",
+        "outcome",
+        "scenarioId",
+        "difficulty",
+      ]);
+    }
+    expect(mockGetDocs.mock.calls[0][0]).toContainEqual(["score", "desc"]);
+
+    for (const difficulty of DIFFICULTY_IDS) {
+      rerender(<NewGameDetails {...props({ game: game(difficulty) })} />);
+      // No waiting: the board is already here
+      expect(screen.getByText(`Top ${difficulty}`)).toBeInTheDocument();
+      expect(screen.queryByText("Loading...")).toBeNull();
+    }
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length);
+  });
+
+  it("shows Loading... for a difficulty chosen before its board arrives, until it does", async () => {
+    const slow = deferred<ScoreType[]>();
+    respond(({ difficulty }) =>
+      difficulty === "CEO" ? slow.promise : [topRow(difficulty)],
+    );
+    const { rerender } = render(<NewGameDetails {...props()} />);
+    await screen.findByText("Top Employee");
+    await flush();
+
+    rerender(<NewGameDetails {...props({ game: game("CEO") })} />);
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(screen.queryByText("Top Employee")).toBeNull();
+    // The slow one doesn't hold up the rest
+    rerender(<NewGameDetails {...props({ game: game("Manager") })} />);
+    expect(screen.getByText("Top Manager")).toBeInTheDocument();
+
+    rerender(<NewGameDetails {...props({ game: game("CEO") })} />);
+    await act(async () => {
+      slow.resolve([scoreRow("Top CEO", 700)]);
+    });
+    expect(screen.getByText("Top CEO")).toBeInTheDocument();
+    expect(screen.queryByText("Loading...")).toBeNull();
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length);
+  });
+
+  it("keeps one difficulty that fails from affecting the others", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    respond(({ difficulty }) => {
+      if (difficulty === "Manager") throw new Error("offline");
+      return [topRow(difficulty)];
+    });
+    const { rerender } = render(
+      <NewGameDetails {...props({ game: game("Manager") })} />,
+    );
+    const failure = "Couldn't load the high scores right now.";
+    expect(await screen.findByText(failure)).toBeInTheDocument();
+    await flush();
+
+    for (const difficulty of ["Employee", "CEO"] as const) {
+      rerender(<NewGameDetails {...props({ game: game(difficulty) })} />);
+      expect(screen.getByText(`Top ${difficulty}`)).toBeInTheDocument();
+      expect(screen.queryByText(failure)).toBeNull();
+    }
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length);
+
+    // Choosing the failed one asks again, for it alone
+    rerender(<NewGameDetails {...props({ game: game("Manager") })} />);
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(await screen.findByText(failure)).toBeInTheDocument();
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length + 1);
+    expect(asked(mockGetDocs.mock.calls.at(-1)?.[0]).difficulty).toBe(
+      "Manager",
+    );
+  });
+
+  it("recovers a failed difficulty when it is chosen again", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    let managerAsks = 0;
+    respond(({ difficulty }) => {
+      if (difficulty === "Manager" && managerAsks++ === 0)
+        throw new Error("offline");
+      return [topRow(difficulty)];
+    });
+    const { rerender } = render(<NewGameDetails {...props()} />);
+    await screen.findByText("Top Employee");
+    await flush();
+
+    rerender(<NewGameDetails {...props({ game: game("Manager") })} />);
+    expect(await screen.findByText("Top Manager")).toBeInTheDocument();
+    expect(screen.queryByText(/Couldn't load/)).toBeNull();
+  });
+
+  it("keeps Your best through difficulty changes, with one query per difficulty", async () => {
+    // Each difficulty's best is distinct: 101 for Beginner up to 105 for Expert
+    const bestAt = (difficulty?: DifficultyType) =>
+      101 + DIFFICULTY_IDS.indexOf(difficulty as DifficultyType);
+    respond(({ difficulty, uid }) =>
+      uid
+        ? [scoreRow("Me", bestAt(difficulty), { uid })]
+        : [topRow(difficulty)],
+    );
+    const { rerender } = render(
+      <NewGameDetails {...props({ uid: "player" })} />,
+    );
+    await screen.findByRole("row", { name: /Your best 102/ });
+    await flush();
+
+    for (const difficulty of DIFFICULTY_IDS) {
+      rerender(
+        <NewGameDetails
+          {...props({ uid: "player", game: game(difficulty) })}
+        />,
+      );
+      expect(
+        screen.getByRole("row", { name: `Your best ${bestAt(difficulty)}` }),
+      ).toBeInTheDocument();
+    }
+    const asks = mockGetDocs.mock.calls.map(([built]) => asked(built));
+    const mine = asks.filter((ask) => ask.uid === "player");
+    expect(mine.map((ask) => ask.difficulty).sort()).toEqual(
+      [...DIFFICULTY_IDS].sort(),
+    );
+    expect(mine.every((ask) => ask.limit === 1)).toBe(true);
+    expect(asks).toHaveLength(DIFFICULTY_IDS.length * 2);
+
+    // Signing out drops them; signing in again reads each difficulty once more
+    rerender(<NewGameDetails {...props()} />);
+    expect(screen.queryByText("Your best")).toBeNull();
+    rerender(<NewGameDetails {...props({ uid: "player" })} />);
+    await screen.findByRole("row", { name: /Your best 102/ });
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length * 3);
+  });
+
+  it("reads every difficulty again for a new scenario and ignores answers about the old one", async () => {
+    const oldBoard = deferred<ScoreType[]>();
+    respond(({ scenarioId, difficulty, uid }) => {
+      if (scenarioId === 100 && difficulty === "CEO" && !uid)
+        return oldBoard.promise;
+      return uid
+        ? [scoreRow("Me", Number(scenarioId), { uid })]
+        : [scoreRow(`S${scenarioId} ${difficulty}`, 500)];
+    });
+    const { rerender } = render(
+      <NewGameDetails
+        {...props({ uid: "player", game: gameFor(100, "Employee") })}
+      />,
+    );
+    await screen.findByText("S100 Employee");
+    await screen.findByRole("row", { name: "Your best 100" });
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length * 2);
+
+    rerender(
+      <NewGameDetails
+        {...props({ uid: "player", game: gameFor(101, "Employee") })}
+      />,
+    );
+    await screen.findByText("S101 Employee");
+    await screen.findByRole("row", { name: "Your best 101" });
+    await flush();
+    const asks = mockGetDocs.mock.calls.map(([built]) => asked(built));
+    const forNew = asks.filter((ask) => ask.scenarioId === 101);
+    expect(forNew).toHaveLength(DIFFICULTY_IDS.length * 2);
+    expect(forNew.filter((ask) => ask.uid)).toHaveLength(DIFFICULTY_IDS.length);
+
+    rerender(
+      <NewGameDetails
+        {...props({ uid: "player", game: gameFor(101, "CEO") })}
+      />,
+    );
+    expect(screen.getByText("S101 CEO")).toBeInTheDocument();
+    await act(async () => {
+      oldBoard.resolve([scoreRow("S100 CEO", 500)]);
+    });
+    expect(screen.queryByText("S100 CEO")).toBeNull();
+    expect(screen.getByText("S101 CEO")).toBeInTheDocument();
+  });
+
+  it("reads every Steam difficulty again when the scope changes and ignores answers from the old scope", async () => {
+    window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
+    const oldGlobal = deferred<ScoreType[]>();
+    const steamRow = (displayName: string): ScoreType =>
+      scoreRow(displayName, 500, { uid: "steam:2", difficulty: "Employee" });
+    mockDesktopScores.mockImplementation(
+      async (_scenarioId: number, difficulty: string, scope: string) =>
+        scope === "global" && difficulty === "CEO"
+          ? oldGlobal.promise
+          : [steamRow(`${scope} ${difficulty}`)],
+    );
+    const { rerender } = render(
+      <NewGameDetails {...props({ uid: "steam:1" })} />,
+    );
+    await screen.findByText("global Employee");
+    await flush();
+    const reads = (scope: string) =>
+      mockDesktopScores.mock.calls
+        .filter((call) => call[2] === scope)
+        .map(([, difficulty, , rows]) => ({ difficulty, rows }));
+
+    // Steam is asked for just the top ten each board shows
+    expect(reads("global")).toHaveLength(DIFFICULTY_IDS.length);
+    expect(reads("global").every(({ rows }) => rows === 10)).toBe(true);
+    expect(reads("player")).toHaveLength(DIFFICULTY_IDS.length);
+    rerender(
+      <NewGameDetails {...props({ uid: "steam:1", game: game("VP") })} />,
+    );
+    expect(screen.getByText("global VP")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Friends" }));
+    await screen.findByText("friends VP");
+    await flush();
+    expect(
+      reads("friends")
+        .map(({ difficulty }) => difficulty)
+        .sort(),
+    ).toEqual([...DIFFICULTY_IDS].sort());
+    // Your best doesn't depend on the scope, and nothing else was asked
+    expect(reads("player")).toHaveLength(DIFFICULTY_IDS.length);
+    expect(reads("global")).toHaveLength(DIFFICULTY_IDS.length);
+
+    rerender(
+      <NewGameDetails {...props({ uid: "steam:1", game: game("CEO") })} />,
+    );
+    expect(screen.getByText("friends CEO")).toBeInTheDocument();
+    await act(async () => {
+      oldGlobal.resolve([steamRow("stale global")]);
+    });
+    expect(screen.queryByText("stale global")).toBeNull();
+    expect(screen.getByText("friends CEO")).toBeInTheDocument();
+    expect(mockGetDocs).not.toHaveBeenCalled();
+  });
+
+  it("ignores every answer that arrives after it unmounts", async () => {
+    const pending = deferred<ScoreType[]>();
+    respond(() => pending.promise);
+    const instance = React.createRef<NewGameDetails>();
+    const { unmount } = render(
+      <NewGameDetails ref={instance} {...props({ uid: "player" })} />,
+    );
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length * 2);
+    const setState = jest.spyOn(instance.current!, "setState");
+    unmount();
+
+    await act(async () => {
+      pending.resolve([scoreRow("Late", 1)]);
+    });
+    expect(setState).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "a friend challenge",
+      {
+        challenge: {
+          run: {
+            scenarioId: 100,
+            seed: 1,
+            difficulty: "Employee",
+            compatibilityId: "test",
+          },
+          target: 500,
+        },
+      },
+    ],
+    ["a co-op lobby", { coop: hostCoop }],
+  ] as [string, Partial<Props>][])(
+    "reads nothing for %s, which shows no board",
+    async (_name, extra) => {
+      render(<NewGameDetails {...props({ uid: "player", ...extra })} />);
+      await flush();
+      expect(mockGetDocs).not.toHaveBeenCalled();
+      expect(screen.queryByRole("region", { name: /Leaderboard/ })).toBeNull();
+    },
+  );
+
+  it("reads the boards once the co-op lobby that hid them ends", async () => {
+    respond(({ difficulty, uid }) =>
+      uid ? [scoreRow("Me", 321, { uid })] : [topRow(difficulty)],
+    );
+    const { rerender } = render(
+      <NewGameDetails {...props({ uid: "player", coop: hostCoop })} />,
+    );
+    await flush();
+    expect(mockGetDocs).not.toHaveBeenCalled();
+
+    rerender(<NewGameDetails {...props({ uid: "player" })} />);
+    await screen.findByText("Top Employee");
+    await screen.findByRole("row", { name: "Your best 321" });
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length * 2);
+  });
+
+  it("still loads the all-levels board only when it is asked for", async () => {
+    respond(({ difficulty }) =>
+      difficulty === undefined
+        ? [scoreRow("Everyone", 900, { difficulty: "CEO" })]
+        : [topRow(difficulty)],
+    );
+    render(<NewGameDetails {...props()} />);
+    await screen.findByText("Top Employee");
+    await flush();
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "View all scores" }),
+    );
+    await screen.findByText("Everyone");
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length + 1);
+    expect(asked(mockGetDocs.mock.calls.at(-1)?.[0])).toMatchObject({
+      difficulty: undefined,
+      limit: 50,
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Show this level" }),
+    );
+    expect(screen.getByText("Top Employee")).toBeInTheDocument();
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length + 1);
+  });
+});
+
+// The query builders echo their arguments (Jest resets their implementations before each test), so
+// that a getDocs mock can read which board it was asked for.
+beforeEach(() => {
+  const firestore = jest.requireMock("firebase/firestore") as Record<
+    string,
+    jest.Mock
+  >;
+  firestore.collection.mockReturnValue("scores");
+  for (const builder of ["query", "orderBy", "limit"])
+    firestore[builder].mockImplementation((...args: unknown[]) => args);
+  mockWhere.mockImplementation((field: string, op: string, value: unknown) => ({
+    field,
+    op,
+    value,
+  }));
+});
+
+interface AskedQuery {
+  scenarioId?: number;
+  difficulty?: DifficultyType;
+  uid?: string;
+  limit?: number;
+  fields: string[];
+}
+
+function asked(built: unknown): AskedQuery {
+  const parts = built as unknown[];
+  const filters = parts.filter(
+    (part): part is { field: string; value: never } =>
+      typeof part === "object" && part !== null && !Array.isArray(part),
+  );
+  const value = (field: string) =>
+    filters.find((filter) => filter.field === field)?.value;
+  const limited = parts.find(
+    (part) => Array.isArray(part) && part.length === 1,
+  );
+  return {
+    scenarioId: value("scenarioId"),
+    difficulty: value("difficulty"),
+    uid: value("uid"),
+    limit: (limited as [number] | undefined)?.[0],
+    fields: filters.map((filter) => filter.field),
+  };
+}
+
+/** Answers each Firestore query from what it asks for. */
+function respond(
+  answer: (asked: AskedQuery) => ScoreType[] | Promise<ScoreType[]>,
+) {
+  mockGetDocs.mockImplementation(async (built: unknown) => ({
+    docs: (await answer(asked(built))).map((score) => ({ data: () => score })),
+  }));
+}
+
+/** Lets every answer already on its way land, so a test can then act on a settled screen. */
+function flush() {
+  return act(() => new Promise<void>((done) => setTimeout(done, 0)));
+}
+
+function scoreRow(
+  displayName: string,
+  score: number,
+  extra: Partial<ScoreType> = {},
+): ScoreType {
+  return { displayName, score, ...extra } as ScoreType;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}

@@ -23,7 +23,11 @@ beforeEach(() => {
     .spyOn(HTMLElement.prototype, "getClientRects")
     .mockReturnValue([{}] as unknown as DOMRectList);
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  delete document.documentElement.dataset.tvLayout;
+  delete document.documentElement.dataset.controllerInput;
+  jest.restoreAllMocks();
+});
 
 it("selects the first action before the menu can paint", () => {
   function ReturningMenu() {
@@ -219,4 +223,21 @@ it("keeps the main menu at the top when a screen requests focus on its old trigg
   } finally {
     jest.useRealTimers();
   }
+});
+
+it("lets TV controller directions follow rendered rows while physical keyboard menu keys stay linear", () => {
+  document.documentElement.dataset.tvLayout = "true";
+  document.documentElement.dataset.controllerInput = "true";
+  render(
+    <Menu>
+      <button>Play</button>
+      <button>Settings</button>
+    </Menu>,
+  );
+  const play = screen.getByRole("button", { name: "Play" });
+  fireEvent.keyDown(play, { key: "ArrowRight" });
+  expect(play).toHaveFocus();
+  delete document.documentElement.dataset.controllerInput;
+  fireEvent.keyDown(play, { key: "ArrowRight" });
+  expect(screen.getByRole("button", { name: "Settings" })).toHaveFocus();
 });

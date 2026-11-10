@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { unlockedDifficulty } from "./DifficultyUnlocks";
 import { achievementJournal } from "./Journal";
 
 export function useAchievements() {
@@ -7,4 +8,8 @@ export function useAchievements() {
     achievementJournal.getSnapshot,
     achievementJournal.getSnapshot,
   );
+}
+
+export function useUnlockedDifficulty() {
+  return unlockedDifficulty(useAchievements().progress);
 }

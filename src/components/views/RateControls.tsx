@@ -13,6 +13,7 @@ import {
   currentTick,
 } from "../../helpers/GameSelectors";
 import { getRateInflationIndex } from "../../data/Economy";
+import { legacyMarketReferenceRate } from "../../helpers/LegacyCampaign";
 import { getDateFromMinute, summarizeHistory } from "../../helpers/DateTime";
 import {
   customerMarketSizeAt,
@@ -21,7 +22,7 @@ import {
   publicRateCap,
   publicTargetRate,
 } from "../../helpers/Customers";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise, formatRateCompact } from "../../helpers/Format";
 import { formatCustomerChange } from "../../helpers/HistoryMetrics";
 import {
   PUBLIC_RATE_POINTS_PER_CENT,
@@ -34,10 +35,6 @@ import {
   subscribeProjection,
 } from "../base/DeferredProjection";
 import "./Programs.scss";
-
-function formatRateCompact(rate: number): string {
-  return `${Number((rate * 100).toFixed(1))}¢`;
-}
 
 /** Axis labels read in cents below a dollar, so they fit beneath the slider. */
 function formatRateAxis(rate: number): string {
@@ -151,10 +148,15 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     if (!investorOwned && now && !projectionReady(game))
       requestProjection(game, now);
   }, [game, now, investorOwned]);
+  const pastTotals = React.useMemo(
+    () => summarizeHistory(game.monthlyHistory),
+    [game.monthlyHistory],
+  );
   if (!now) return null;
   const scenario = activeScenarioOrDefault(game);
+  const referenceRate = legacyMarketReferenceRate(game, scenario);
   const marketRate = getMarketRate(
-    scenario.dollarsPerkWh,
+    referenceRate,
     game.date,
     game.startingYear,
     game.seed,
@@ -165,7 +167,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     currentRate: game.dollarsPerkWh,
     marketRateAt: (tick) =>
       getMarketRate(
-        scenario.dollarsPerkWh,
+        referenceRate,
         getDateFromMinute(
           game.date.minute + tick * TICK_MINUTES,
           game.startingYear,
@@ -191,17 +193,16 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     game.seed,
   );
   const targetRate = publicTargetRate(
-    scenario.dollarsPerkWh,
+    referenceRate,
     game.date,
     game.startingYear,
     game.seed,
   );
-  // Tutorials and multiplayer matches set their own rates, so only a solo public run can
-  // follow inflation.
-  const canFollow = !investor && !scenario.tutorialSteps && !game.multiplayer;
+  // Tutorials and multiplayer matches set their own rates.
+  const canFollow = !scenario.tutorialSteps && !game.multiplayer;
   const following = canFollow && !!game.rateFollowsInflation;
   const max = publicRateCap(
-    scenario.dollarsPerkWh,
+    referenceRate,
     game.date,
     game.startingYear,
     game.seed,
@@ -212,12 +213,11 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
   // year, even near the end of a run, so the figure means the same thing every time. The
   // sign is the sign of target minus rate: a rate above target reads as a loss every year it
   // is in force, no matter what the lifetime average did last period.
-  const pastTotals = summarizeHistory(game.monthlyHistory);
   const nextSupplyWh = estimate.current?.supplyWh;
   const hasEstimate = nextSupplyWh !== undefined;
   const rateScore = (rate: number) =>
     publicRateYearContribution(
-      scenario.dollarsPerkWh,
+      referenceRate,
       pastTotals,
       { supplyWh: nextSupplyWh ?? 0 },
       rate,
@@ -270,8 +270,8 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     now.customers,
   );
   const rateSummary = investor
-    ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-    : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; ${following ? "adjusting with inflation each January; " : ""}${hasEstimate ? `estimated rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
+    ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt-hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
+    : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt-hour; target ${formatMoneyConcise(targetRate)}; ${following ? "adjusting with inflation each January; " : ""}${hasEstimate ? `estimated rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
   const rateScoreClass = `insightsRateScore ${
     rateScore(game.dollarsPerkWh) > 0
       ? "good"
@@ -296,7 +296,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
         </span>
       </span>
       {investor ? (
-        <span className="insightsRateMetric">
+        <span className="insightsRateMetric insightsRateMetricCustomers">
           <span className="insightsRateMetricLabel">Customers/mo</span>
           <strong className="insightsRateMetricValue">
             {formattedCustomerChange}
@@ -378,8 +378,8 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
           }
           getAriaValueText={(rate) =>
             investor || !hasEstimate
-              ? `${formatMoneyConcise(rate)} per kilowatt hour`
-              : `${formatMoneyConcise(rate)} per kilowatt hour${following && rate === targetRate ? ", matches target" : ""}, rate score ${formatRateScore(rateScore(rate))} over the next year`
+              ? `${formatMoneyConcise(rate)} per kilowatt-hour`
+              : `${formatMoneyConcise(rate)} per kilowatt-hour${following && rate === targetRate ? ", matches target" : ""}, rate score ${formatRateScore(rateScore(rate))} over the next year`
           }
           marks={marks}
           min={0}

@@ -155,16 +155,9 @@ export class SoundEffects {
   }
 
   private playNow(effect: SoundEffectType) {
-    // A cue follows a player action often enough to unlock a suspended mobile AudioContext. For
-    // automatic cues, resume() is harmless and lets the next gesture restore the context.
-    if (this.context.state === "suspended") {
-      void this.context.resume().then(() => {
-        if (!this.paused && this.volume > 0) {
-          this.schedule(effect);
-        }
-      });
-      return;
-    }
+    // Context unlocking belongs to the gesture/foreground lifecycle. Don't queue stale automatic
+    // alerts behind a browser's pending autoplay permission.
+    if (this.context.state !== "running") return;
     this.schedule(effect);
   }
 

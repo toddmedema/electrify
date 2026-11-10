@@ -9,11 +9,11 @@ import { LOCATIONS } from "../Constants";
 import {
   getWeatherHazardProfile,
   HAIL_MAX_DAMAGED_FRACTION,
-  HAIL_RESISTANT_DAMAGE_FACTOR,
 } from "../data/Hazards";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { randomAt, RANDOM_STREAM } from "./Math";
 import { storyHash } from "../data/WorldEvents";
+import { getWeather, initWeatherFromRows } from "../data/Weather";
 import {
   applyDefaultResilience,
   COLD_DEFINITION_ID,
@@ -240,6 +240,39 @@ describe("representativeMinTempC", () => {
     const base = representativeMinTempC(date, 1);
     expect(representativeMinTempC(date, 1, -6)).toBeCloseTo(base - 6, 9);
   });
+
+  it("uses modeled weather only when the campaign opts in", () => {
+    initWeatherFromRows(
+      "cold-campaign",
+      Array.from({ length: 40 * 12 * 24 }, (_, index) => ({
+        YEAR: 1980 + Math.floor(index / (12 * 24)),
+        MONTH: (Math.floor(index / 24) % 12) + 1,
+        TEMP_C: -10 - (index % 24),
+        CLOUD_PCT: 50,
+        WIND_KPH: 12,
+        PRECIP_MM: 1,
+      })),
+    );
+    const date = getDateFromMinute(
+      (1979 - 1882) * 12 * MINUTES_PER_MONTH,
+      1882,
+    );
+    const coldest = Math.min(
+      ...Array.from(
+        { length: 24 },
+        (_, hour) =>
+          getWeather(
+            { ...date, hourOfDay: hour, minuteOfDay: hour * 60 },
+            1,
+            0,
+            undefined,
+            true,
+          ).TEMP_C,
+      ),
+    );
+    expect(representativeMinTempC(date, 1)).toBe(0);
+    expect(representativeMinTempC(date, 1, -6, true)).toBe(coldest - 6);
+  });
 });
 
 describe("sampleHailImpacts", () => {
@@ -280,22 +313,6 @@ describe("sampleHailImpacts", () => {
     expect(sampleHailImpacts({ game: reversed, key })).toEqual(
       sampleHailImpacts({ game, key }),
     );
-  });
-
-  it("breaks less of a hail-resistant array from the same storm", () => {
-    const standard = gameAt(DENVER, [facility(1, "Sun")]);
-    const key = keyHitting(standard, [1]);
-    const resistant = gameAt(DENVER, [
-      facility(1, "Sun", { resilience: { hailResistant: true } }),
-    ]);
-    const [a] = sampleHailImpacts({ game: standard, key });
-    const [b] = sampleHailImpacts({ game: resistant, key });
-    expect(b.hailResistant).toBe(true);
-    expect(b.damagedFraction).toBeCloseTo(
-      a.damagedFraction * HAIL_RESISTANT_DAMAGE_FACTOR,
-      12,
-    );
-    expect(b.repairDays).toBeLessThanOrEqual(a.repairDays);
   });
 });
 
@@ -367,10 +384,8 @@ describe("replacementValue", () => {
 });
 
 describe("retrofitCost", () => {
-  it("prices retrofits at half as much again as building them in", () => {
+  it("offers winterization for an eligible gas plant", () => {
     const game = gameAt(DENVER);
-    // Hail uses replacement value; targeted winterization follows capacity.
-    expect(retrofitCost(facility(1, "Sun"), game, "hailResistant")).toBe(4.5e6);
     expect(
       retrofitCost(facility(1, "Natural Gas"), game, "coldWeatherPackage"),
     ).toBe(300000);
@@ -397,13 +412,15 @@ describe("retrofitCost", () => {
   it("is not offered for the wrong technology, twice, or without the hazard", () => {
     const game = gameAt(DENVER);
     expect(
-      retrofitCost(facility(1, "Natural Gas"), game, "hailResistant"),
+      retrofitCost(facility(1, "Sun"), game, "coldWeatherPackage"),
     ).toBeUndefined();
     expect(
       retrofitCost(
-        facility(1, "Sun", { resilience: { hailResistant: true } }),
+        facility(1, "Natural Gas", {
+          resilience: { coldWeatherPackage: true },
+        }),
         game,
-        "hailResistant",
+        "coldWeatherPackage",
       ),
     ).toBeUndefined();
     expect(
@@ -419,8 +436,8 @@ describe("retrofitCost", () => {
 describe("retrofitCost under construction", () => {
   it("is not offered until the facility is operating", () => {
     const game = gameAt(DENVER);
-    const building = facility(1, "Sun", { yearsToBuildLeft: 0.5 });
-    expect(retrofitCost(building, game, "hailResistant")).toBeUndefined();
+    const building = facility(1, "Natural Gas", { yearsToBuildLeft: 0.5 });
+    expect(retrofitCost(building, game, "coldWeatherPackage")).toBeUndefined();
     expect(
       facilityResilienceSummary(game, building)!.retrofitCost,
     ).toBeUndefined();
@@ -429,13 +446,6 @@ describe("retrofitCost under construction", () => {
 
 describe("retrofittedResilience", () => {
   it("installs the upgrade and re-rates a gas plant for its location", () => {
-    expect(
-      retrofittedResilience(
-        facility(1, "Sun"),
-        gameAt(DENVER),
-        "hailResistant",
-      ),
-    ).toEqual({ hailResistant: true });
     expect(
       retrofittedResilience(
         facility(1, "Natural Gas", {
@@ -449,40 +459,30 @@ describe("retrofittedResilience", () => {
 });
 
 describe("resilience build options", () => {
-  it("offers trackers and hail-resistant solar, both off by default", () => {
+  it("offers only trackers for solar, off by default", () => {
     const game = gameAt(DENVER);
     const options = resilienceBuildOptions(quote("Sun"), game);
-    expect(options.map((option) => option.upgrade)).toEqual([
-      "solarTrackers",
-      "hailResistant",
-    ]);
+    expect(options.map((option) => option.upgrade)).toEqual(["solarTrackers"]);
     expect(options[0]).toMatchObject({
       defaultSelected: false,
       selected: false,
       extraBuildCost: 3.5e6,
     });
-    expect(options[1]).toMatchObject({
-      defaultSelected: false,
-      selected: false,
-      extraBuildCost: 1.5e6,
-    });
     expect(applyDefaultResilience(quote("Sun"), game)).toMatchObject({
       buildCost: 50_000_000,
-      resilience: { solarTrackers: false, hailResistant: false },
+      resilience: { solarTrackers: false },
     });
   });
 
-  it("prices both solar options together and records the tracker hail stow", () => {
-    const both = withResilienceOptions(quote("Sun"), gameAt(DENVER), {
+  it("prices solar trackers and records their hail stow", () => {
+    const tracked = withResilienceOptions(quote("Sun"), gameAt(DENVER), {
       solarTrackers: true,
-      hailResistant: true,
     });
-    expect(both.buildCost).toBe(55_000_000);
-    expect(both.resilienceExtraBuildCost).toBe(5e6);
+    expect(tracked.buildCost).toBe(53_500_000);
+    expect(tracked.resilienceExtraBuildCost).toBe(3.5e6);
     // 2020 predates Hail Pro-75's steeper stow
-    expect(both.resilience).toEqual({
+    expect(tracked.resilience).toEqual({
       solarTrackers: true,
-      hailResistant: true,
       trackerHailDamageFactor: 0.5,
     });
     const later = gameAt(DENVER, [], { date: getDateFromMinute(0, 2025) });
@@ -490,7 +490,7 @@ describe("resilience build options", () => {
       withResilienceOptions(quote("Sun"), later, { solarTrackers: true })
         .resilience?.trackerHailDamageFactor,
     ).toBe(0.25);
-    expect(withResilienceOptions(both, gameAt(DENVER), {}).buildCost).toBe(
+    expect(withResilienceOptions(tracked, gameAt(DENVER), {}).buildCost).toBe(
       50_000_000,
     );
   });
@@ -565,7 +565,7 @@ describe("resilience build options", () => {
       expect(retrofitCost(gas, game, "coldWeatherPackage")).toBeUndefined();
       expect(facilityResilienceSummary(game, gas)).toBeUndefined();
       // Solar is unaffected.
-      expect(optionFor(quote("Sun"), game, "hailResistant")).toBeDefined();
+      expect(optionFor(quote("Sun"), game, "solarTrackers")).toBeDefined();
     });
     // Still offered where cold is plausible, including an unrecorded high-latitude city.
     [
@@ -690,27 +690,6 @@ describe("facilityHazardStatus", () => {
 });
 
 describe("facilityResilienceSummary", () => {
-  it("summarizes solar hardening and retrofit", () => {
-    const sun = facility(1, "Sun");
-    const summary = facilityResilienceSummary(gameAt(DENVER), sun)!;
-    expect(summary).toMatchObject({
-      upgrade: "hailResistant",
-      label: "Standard panels",
-      installed: false,
-      retrofitCost: 4.5e6,
-      replacementValue: 1e8,
-    });
-    const hardened = facility(2, "Sun", {
-      resilience: { hailResistant: true },
-    });
-    expect(facilityResilienceSummary(gameAt(DENVER), hardened)).toMatchObject({
-      label: "Hail-resistant panels",
-      installed: true,
-      detail: "Breaks less in a hailstorm.",
-      retrofitCost: undefined,
-    });
-  });
-
   it("reports installed protection even where no new upgrade is offered", () => {
     const gas = facility(1, "Natural Gas", {
       resilience: { coldWeatherPackage: true, designMinTempC: -30 },

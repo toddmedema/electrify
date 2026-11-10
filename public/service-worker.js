@@ -4,12 +4,31 @@ const WEATHER_INDEX = "/data/weather/index.json";
 const OFFLINE_DATA_REVISION = "/__offline-data-revision";
 // Generated from public/images at build time (scripts/generate-icon-manifest.js).
 const ICON_MANIFEST = "/icons.json";
+// Audio paths are not content-hashed and cached tracks are never revalidated. Replacing an
+// audio file at the same path requires a CACHE_VERSION bump so existing installs get new bytes.
+const AUDIO_FILES = [
+  "/audio/menu/quiet-current.wav",
+  "/audio/intro/intro.mp3",
+  "/audio/menu/select.wav",
+  "/audio/menu/confirm.wav",
+  "/audio/menu/back.wav",
+  "/audio/basic/low.mp3",
+  "/audio/basic/medium.mp3",
+  "/audio/basic/high.mp3",
+];
 const MARKET_DATA = ["/data/FuelPricesRaw.csv", "/data/EconomyRaw.csv"];
+// Create React App's list of the current build's hashed bundles.
+const ASSET_MANIFEST = "/asset-manifest.json";
+// "/" is not listed: cacheBuild() stores it once the bundles it references are safely cached.
 const APP_SHELL = [
-  "/",
   "/manifest.json",
+  "/fonts/inter/inter.css",
+  "/fonts/inter/InterVariable.woff2",
+  "/fonts/inter/InterVariable-Italic.woff2",
   "/images/logo.svg",
   "/images/logo-dark.svg",
+  "/images/logo-home.svg",
+  "/images/logo-home-dark.svg",
   "/images/icon/192x192.png",
   "/images/icon/512x512.png",
   WEATHER_INDEX,
@@ -81,6 +100,47 @@ async function fetchAndCache(cache, url, durable = false, retainWrite) {
   if (retainWrite) retainWrite(stored);
   else await stored; // Offline sync still requires durable completion before advancing its revision.
   return response.clone();
+}
+
+/**
+ * Store every bundle of the deployed build before advancing the cached page, so an offline launch
+ * always gets HTML whose scripts, styles and lazy screens are all available. This file does not
+ * change with each deploy, so the page also requests this on launch; hashed names mean only what
+ * is missing is downloaded. Once "/" moves on, bundles from earlier builds are unreachable.
+ */
+async function cacheBuild() {
+  const cache = await caches.open(CACHE_VERSION);
+  const manifestResponse = await fetch(ASSET_MANIFEST, { cache: "no-cache" });
+  if (!manifestResponse.ok) {
+    throw new Error(`${manifestResponse.status} fetching ${ASSET_MANIFEST}`);
+  }
+  const { files, entrypoints } = await manifestResponse.json();
+  const assets = Object.values(files).filter(
+    (file) => file.startsWith("/static/") && !/\.(map|txt)$/.test(file),
+  );
+  const missing = (
+    await Promise.all(
+      assets.map(async (url) => ({ url, cached: await cache.match(url) })),
+    )
+  )
+    .filter(({ cached }) => !cached)
+    .map(({ url }) => url);
+  await Promise.all(missing.map((url) => fetchAndCache(cache, url, true)));
+
+  const page = await fetch("/", { cache: "no-cache" });
+  const html = await page.clone().text();
+  // A deploy in progress can pair this manifest with HTML from a different build.
+  if (!page.ok || !entrypoints.every((file) => html.includes(file))) {
+    throw new Error("The deployed page does not match its asset manifest");
+  }
+  await cache.put("/", page);
+
+  const current = new Set(assets);
+  const stale = (await cache.keys()).filter((request) => {
+    const { pathname } = new URL(request.url);
+    return pathname.startsWith("/static/") && !current.has(pathname);
+  });
+  await Promise.all(stale.map((request) => cache.delete(request)));
 }
 
 /** Fill any holes for one scenario without refreshing data that is already available offline. */
@@ -172,9 +232,11 @@ async function syncOfflineData() {
       : weatherUrls.filter((url) => !cachedUrls.has(url));
 
   const downloads = await Promise.allSettled(
-    [...MARKET_DATA, ...weatherToFetch].map((url) =>
-      fetchAndCache(cache, url, true),
-    ),
+    [
+      ...MARKET_DATA,
+      ...weatherToFetch,
+      ...AUDIO_FILES.filter((url) => !cachedUrls.has(url)),
+    ].map((url) => fetchAndCache(cache, url, true)),
   );
   if (downloads.every((result) => result.status === "fulfilled")) {
     try {
@@ -187,7 +249,10 @@ async function syncOfflineData() {
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL)),
+    caches
+      .open(CACHE_VERSION)
+      .then((cache) => cache.addAll(APP_SHELL))
+      .then(cacheBuild),
   );
 });
 
@@ -213,6 +278,9 @@ self.addEventListener("message", (event) => {
     event.waitUntil(cacheScenarioData(event.data.locationIds));
   } else if (event.data?.type === "CACHE_ICONS") {
     event.waitUntil(cacheIcons());
+  } else if (event.data?.type === "CACHE_BUILD") {
+    // Offline launches and partial deploys simply keep the last complete build.
+    event.waitUntil(cacheBuild().catch(() => undefined));
   }
 });
 
@@ -227,9 +295,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    const network = fetch(request);
-    event.waitUntil(cacheNetworkResponse(network, "/"));
-    event.respondWith(network.catch(() => caches.match("/")));
+    event.respondWith(fetch(request).catch(() => caches.match("/")));
     return;
   }
 
@@ -252,6 +318,17 @@ self.addEventListener("fetch", (event) => {
       ),
     );
     event.respondWith(verified);
+    return;
+  }
+
+  if (url.pathname.startsWith("/audio/")) {
+    // Large tracks are cache-first; replacing them follows the CACHE_VERSION rule above.
+    const result = caches.match(request).then(async (cached) => {
+      if (cached) return cached;
+      return fetchAndCache(await caches.open(CACHE_VERSION), request);
+    });
+    event.waitUntil(result.catch(() => undefined));
+    event.respondWith(result);
     return;
   }
 

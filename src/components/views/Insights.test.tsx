@@ -13,7 +13,11 @@ import cloneDeep from "lodash.clonedeep";
 import * as React from "react";
 import { flushSync } from "react-dom";
 import { Provider } from "react-redux";
-import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import {
+  EMPTY_HISTORY,
+  MINUTES_PER_MONTH,
+  getDateFromMinute,
+} from "../../helpers/DateTime";
 import { CUSTOM_SCENARIO_ID, getScenario } from "../../data/Scenarios";
 import * as GameModule from "../../reducers/Game";
 import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
@@ -23,6 +27,7 @@ import { createGame } from "../../testing/Simulator";
 import { loadSimData } from "../../testing/SimData";
 import {
   cacheProjection,
+  forecastViewportBounds,
   ProjectionView,
   selectProjection,
 } from "../../helpers/Projection";
@@ -30,9 +35,12 @@ import { GameType, TickPresentFutureType } from "../../Types";
 import Insights, {
   INSIGHT_PRESETS,
   INSIGHT_LAYERS,
+  INSIGHT_LAYER_MANUAL,
   MAX_CUSTOM_INSIGHT_PRESETS,
+  isChartLayer,
   withRequiredLayers,
 } from "./Insights";
+import { manualEntryByTitle } from "../base/ManualHelpPopover";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
 
 jest.mock("../base/GameCard", () => ({
@@ -45,6 +53,8 @@ jest.mock("../base/GameCard", () => ({
 interface ChartMockProps {
   currentMinute?: number;
   selectedFuel?: string;
+  fuels?: string[];
+  highlightFuel?: string;
   title?: string;
   hideTitle?: boolean;
   format?: (value: number) => number | string;
@@ -59,10 +69,41 @@ const domainValue = (domain?: ChartMockProps["domain"]) =>
   JSON.stringify(Array.isArray(domain) ? domain : domain?.x);
 
 let mockSupplyDemandPaints = 0;
+// Bottom to top of the supply stack, as forecastFuels orders it
+let mockSupplyFuels: string[] = [];
 
 // Restore real timers even when a test that fakes them fails partway
 afterEach(() => {
   jest.useRealTimers();
+  mockSupplyFuels = [];
+});
+
+it("extends the full planning horizon when a successor takes over, including restored views", () => {
+  const first = createGame({ scenarioId: 117 });
+  const props = {
+    game: first,
+    selectedFacilityId: null,
+    facilityDragActive: false,
+  };
+  const initial = new Insights(props);
+  const offset = 240 * MINUTES_PER_MONTH;
+  const game = {
+    ...first,
+    scenarioId: 118,
+    date: getDateFromMinute(offset, first.startingYear),
+    campaign: { ...first.campaign!, generationIndex: 1, termStartMonth: 240 },
+  };
+  const next = { ...props, game };
+  const successor = new Insights(next);
+  expect(successor.state.viewport[1]).toBe(480 * MINUTES_PER_MONTH);
+  expect(
+    Insights.getDerivedStateFromProps(next, initial.state)?.viewport?.[1],
+  ).toBe(480 * MINUTES_PER_MONTH);
+  const restored = new Insights({
+    ...next,
+    savedViewport: { month: 240, viewport: [0, offset] },
+  });
+  expect(restored.state.viewport[1]).toBe(480 * MINUTES_PER_MONTH);
 });
 
 it("keeps first worker startup and long worker recovery out of the Insights render", () => {
@@ -205,6 +246,16 @@ jest.mock("../base/ChartFinances", () => ({
       id={id}
       data-testid={id}
       data-visible-title={hideTitle ? "" : title}
+      data-history-points={
+        timeline?.filter(
+          (point) => (point as { projected: boolean }).projected === false,
+        ).length
+      }
+      data-projected-points={
+        timeline?.filter(
+          (point) => (point as { projected: boolean }).projected === true,
+        ).length
+      }
       data-inspected-value={format?.(123456)}
       data-axis-value={(formatAxis || format)?.(123456)}
       data-sync-key={syncKey}
@@ -242,9 +293,16 @@ jest.mock("../base/ChartForecastDemandByType", () => ({
 }));
 jest.mock("../base/ChartForecastSupplyByFuel", () => ({
   __esModule: true,
-  forecastFuels: () => [],
-  default: ({ syncKey }: ChartMockProps) => (
-    <div role="img" data-chart="supply-by-fuel" data-sync-key={syncKey} />
+  forecastFuels: () => mockSupplyFuels,
+  default: ({ syncKey, fuels, highlightFuel }: ChartMockProps) => (
+    <div
+      role="img"
+      aria-label="Supply by fuel inspection"
+      data-chart="supply-by-fuel"
+      data-sync-key={syncKey}
+      data-fuels={fuels?.join(",")}
+      data-highlight={highlightFuel || ""}
+    />
   ),
 }));
 jest.mock("../base/ChartForecastSupplyDemand", () => ({
@@ -316,6 +374,32 @@ jest.mock("../base/ChartForecastWeather", () => ({
             (timeline[0] as { minute: number }).minute
           : undefined
       }
+    />
+  ),
+}));
+
+jest.mock("../base/ChartForecastPowerExchange", () => ({
+  __esModule: true,
+  default: ({
+    syncKey,
+    timeline,
+    domain,
+    currentMinute,
+  }: Omit<ChartMockProps, "timeline"> & {
+    timeline?: Array<{ transmissionCapacityW?: number }>;
+  }) => (
+    <div
+      role="img"
+      aria-label="Power exchange inspection"
+      data-chart="power-exchange"
+      data-sync-key={syncKey}
+      data-points={timeline?.length}
+      data-domain={domainValue(domain)}
+      data-forecast-start={currentMinute}
+      data-line-capacity={Math.max(
+        0,
+        ...(timeline || []).map((tick) => tick.transmissionCapacityW || 0),
+      )}
     />
   ),
 }));
@@ -537,6 +621,8 @@ function storeCustomPreset(name: string) {
 
 describe("Insights layers", () => {
   let overviewProjection: ProjectionView;
+  let exchangeGame: GameType;
+  let exchangeProjection: ProjectionView;
   beforeAll(() => {
     // Layer/preset controls share immutable real inputs and a real forecast. Cache
     // regression cases still create independent games with distinct history identities.
@@ -546,6 +632,21 @@ describe("Insights layers", () => {
       () => {},
     );
   });
+  // The same for a grid with an open intertie, whose forecast carries the exchange. Stored
+  // Energy and Water only appear for fleets that have storage and hydro, so it claims both.
+  // Its own hook, so a second twenty-year forecast has its own time allowance.
+  beforeAll(() => {
+    exchangeGame = createNextState(gameWithOpenIntertie(), () => {});
+    loadSimData(exchangeGame.location);
+    exchangeProjection = createNextState(
+      {
+        ...selectProjection(exchangeGame, exchangeGame.timeline[0]),
+        hasStorage: true,
+        hasHydro: true,
+      },
+      () => {},
+    );
+  }, 60_000);
   beforeEach(() => {
     localStorage.clear();
     // Other cases play different seeds and locations. Reusing the immutable game
@@ -554,22 +655,102 @@ describe("Insights layers", () => {
     cacheProjection(overviewGame, overviewProjection);
   });
 
-  it("offers chart expansion beside plotted layers, never summaries", () => {
+  it("offers every chart an expand control with its help button right after it, and tables neither", () => {
     localStorage.setItem(
       "insightsLayers",
       JSON.stringify(INSIGHT_LAYERS.map((layer) => layer.id)),
     );
-    renderInsights();
-    const tracks = screen.getAllByRole("region", { name: / evidence$/ });
-    for (const track of tracks) {
-      const name = track.getAttribute("aria-label")!.replace(/ evidence$/, "");
-      const expand = within(track).queryByRole("button", {
-        name: `Expand ${name} chart`,
+    cacheProjection(exchangeGame, exchangeProjection);
+    renderInsights(100, exchangeGame);
+    const tracks = screen
+      .getAllByRole("region", { name: / evidence$/ })
+      .map((track) => {
+        const name = track
+          .getAttribute("aria-label")!
+          .replace(/ evidence$/, "");
+        return {
+          track,
+          name,
+          layer: INSIGHT_LAYERS.find((l) => l.label === name)!,
+        };
       });
-      expect(expand !== null).toBe(
-        !["Power exchange", "Finance details"].includes(name),
-      );
+    expect(tracks).toHaveLength(INSIGHT_LAYERS.length);
+    const tables = tracks.filter(({ layer }) => !isChartLayer(layer.id));
+    expect(tables.map(({ name }) => name)).toEqual(["Finance details"]);
+    for (const { track } of tables) {
+      expect(
+        within(track).queryByRole("button", { name: /^(Expand|What is) / }),
+      ).toBeNull();
     }
+    const charts = tracks.flatMap(({ track, name, layer }) =>
+      isChartLayer(layer.id) ? [{ track, name, id: layer.id }] : [],
+    );
+    expect(charts).toHaveLength(INSIGHT_LAYERS.length - tables.length);
+    for (const { track, name, id } of charts) {
+      // Nothing interactive sits between the two, and both follow the title
+      const [expand, help] = within(track).getAllByRole("button");
+      expect(expand).toHaveAccessibleName(`Expand ${name} chart`);
+      expect(help).toHaveAccessibleName(`What is ${INSIGHT_LAYER_MANUAL[id]}?`);
+      const [title] = within(track).getAllByRole("heading", { level: 3 });
+      expect(
+        title.compareDocumentPosition(expand) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        expand.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+  });
+
+  it("keeps the help button beside the expand control while layers are being edited", async () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["cash", "profit"]));
+    renderInsights();
+    await user.click(labelledButton(/Layers/));
+    const track = screen.getByRole("region", { name: "Cash evidence" });
+    expect(
+      within(track)
+        .getAllByRole("button")
+        .slice(0, 5)
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual([
+      "Expand Cash chart",
+      "What is Insights & data layers?",
+      "Move Cash up",
+      "Move Cash down",
+      "Remove Cash",
+    ]);
+  });
+
+  it("opens the manual page chosen for the layer", async () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["spareCapacity"]));
+    const store = configureStore({ reducer: { ui: uiReducer } });
+    renderUI(
+      <Provider store={store}>
+        <Insights
+          game={overviewGame}
+          selectedFacilityId={null}
+          facilityDragActive={false}
+        />
+      </Provider>,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "What is Reserve capacity?" }),
+    );
+    expect(store.getState().ui.manualHelpEntry).toBe("Reserve capacity");
+  });
+
+  it("points every chart layer at a manual entry that exists", () => {
+    const charts: string[] = [];
+    const missing: string[] = [];
+    for (const { id } of INSIGHT_LAYERS) {
+      if (!isChartLayer(id)) continue;
+      charts.push(id);
+      if (!manualEntryByTitle(INSIGHT_LAYER_MANUAL[id])) missing.push(id);
+    }
+    expect(missing).toEqual([]);
+    expect(Object.keys(INSIGHT_LAYER_MANUAL).sort()).toEqual(charts.sort());
+    // The finance table has no plot to explain
+    expect(isChartLayer("financeDetails")).toBe(false);
   });
 
   it("keeps fuel selection and time zoom when expanding and closing a chart", async () => {
@@ -589,6 +770,10 @@ describe("Insights layers", () => {
     act(() => expand.focus());
     fireEvent.click(expand);
     const dialog = screen.getByRole("dialog", { name: "Fuel Prices" });
+    // The title names the dialog on its own; the help button beside it doesn't join the name
+    expect(
+      within(dialog).getByRole("button", { name: "What is Fuel costs?" }),
+    ).toBeVisible();
     expect(
       within(dialog).getByRole("button", { name: "Coal" }),
     ).toHaveAttribute("aria-pressed", "true");
@@ -614,6 +799,67 @@ describe("Insights layers", () => {
       date!,
     );
     expect(localStorage.getItem("insightsLayers")).toBe(layers);
+    expect(screen.getByRole("button", { name: "All fuels" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("narrows supply by fuel with the same selectable key as fuel prices", () => {
+    mockSupplyFuels = ["Coal", "Natural Gas", "Wind"];
+    localStorage.setItem("insightsLayers", JSON.stringify(["supplyByFuel"]));
+    renderInsights();
+    const key = screen.getByRole("group", { name: "Show supply by fuel" });
+    // Top of the stack first, as the bands read, then what they are stacked against
+    expect(
+      within(key)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["All fuels", "Wind", "Natural Gas", "Coal"]);
+    expect(within(key).getByText("Demand")).toBeVisible();
+    expect(
+      within(key).queryByRole("button", { name: "Demand" }),
+    ).not.toBeInTheDocument();
+    const chart = () =>
+      screen.getByRole("img", { name: "Supply by fuel inspection" });
+    expect(chart()).toHaveAttribute("data-fuels", "Coal,Natural Gas,Wind");
+    expect(
+      within(key).getByRole("button", { name: "All fuels" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(within(key).getByRole("button", { name: "Natural Gas" }));
+    expect(chart()).toHaveAttribute("data-fuels", "Natural Gas");
+    expect(
+      within(key).getByRole("button", { name: "Natural Gas" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(key).getByRole("button", { name: "All fuels" }),
+    ).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(within(key).getByRole("button", { name: "All fuels" }));
+    expect(chart()).toHaveAttribute("data-fuels", "Coal,Natural Gas,Wind");
+  });
+
+  it("returns supply by fuel to every fuel once the chosen one leaves the forecast", () => {
+    mockSupplyFuels = ["Coal", "Wind"];
+    localStorage.setItem("insightsLayers", JSON.stringify(["supplyByFuel"]));
+    const { rerender } = renderInsights();
+    fireEvent.click(screen.getByRole("button", { name: "Coal" }));
+    expect(
+      screen.getByRole("img", { name: "Supply by fuel inspection" }),
+    ).toHaveAttribute("data-fuels", "Coal");
+    mockSupplyFuels = ["Wind"];
+    // Selecting a facility is what makes the pane draw again
+    rerender(
+      <Insights
+        game={overviewGame}
+        selectedFacilityId={-1}
+        facilityDragActive={false}
+      />,
+    );
+    expect(
+      screen.getByRole("img", { name: "Supply by fuel inspection" }),
+    ).toHaveAttribute("data-fuels", "Wind");
     expect(screen.getByRole("button", { name: "All fuels" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -658,13 +904,8 @@ describe("Insights layers", () => {
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("Overview");
-    const headings = screen.getAllByRole("heading", { level: 6 });
-    const expected = [
-      "Insights",
-      "Supply & Demand",
-      "Cash",
-      "Emissions (CO₂e)",
-    ];
+    const headings = screen.getAllByRole("heading", { level: 3 });
+    const expected = ["Supply & Demand", "Cash", "Emissions (tonnes CO₂e)"];
     expect(headings).toHaveLength(expected.length);
     expected.forEach((label, index) =>
       expect(headings[index]).toHaveTextContent(label),
@@ -682,6 +923,52 @@ describe("Insights layers", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("closes only the layer editor on Escape and returns focus to its toggle", async () => {
+    renderInsights();
+    const outer = jest.fn();
+    document.addEventListener("keydown", outer);
+    try {
+      await user.click(labelledButton(/Layers/));
+      const panel = screen.getByRole("region", { name: "Data layers" });
+      within(panel).getAllByRole("checkbox")[0].focus();
+      await user.keyboard("{Escape}");
+      expect(
+        screen.queryByRole("region", { name: "Data layers" }),
+      ).not.toBeInTheDocument();
+      expect(labelledButton(/Layers/)).toHaveFocus();
+      // The workspace's pane-closing handler sees the Escape as already handled.
+      expect(outer).toHaveBeenCalledWith(
+        expect.objectContaining({ key: "Escape", defaultPrevented: true }),
+      );
+    } finally {
+      document.removeEventListener("keydown", outer);
+    }
+  });
+
+  it("checks required tutorial layers when the selected preset omits them", async () => {
+    renderInsights(4);
+    await user.click(labelledButton(/Layers/));
+
+    const expectRequiredLayers = () => {
+      for (const name of ["Profit", "Finance details"]) {
+        const checkbox = labelledCheckbox(name);
+        expect(checkbox).toBeChecked();
+        expect(checkbox).toBeDisabled();
+        expect(screen.getByRole("heading", { name })).toBeVisible();
+      }
+      expect(labelledCheckbox("Supply & Demand")).toBeChecked();
+      expect(labelledCheckbox("Supply & Demand")).toBeEnabled();
+      expect(labelledCheckbox("Revenue")).not.toBeChecked();
+    };
+    expectRequiredLayers();
+    await choosePreset("Profitability");
+    await choosePreset("Overview");
+    expectRequiredLayers();
+    expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual(
+      INSIGHT_PRESETS.overview.layers,
+    );
+  });
+
   it("adds monthly lowest spare capacity to Reliability and lets players toggle the layer", async () => {
     renderInsights();
     await choosePreset("Reliability");
@@ -691,9 +978,12 @@ describe("Insights layers", () => {
     expect(
       within(track).getByRole("img", { name: /Monthly lowest reserve/ }),
     ).toBeInTheDocument();
-    const headings = screen.getAllByRole("heading", { level: 6 });
-    expect(headings[1]).toHaveTextContent("Supply & Demand");
-    expect(headings[2]).toHaveTextContent("Lowest reserve");
+    // The tooltip names each month as recorded or projected; no key repeats it
+    expect(within(track).queryByText("Recorded")).not.toBeInTheDocument();
+    expect(within(track).queryByText("Projected")).not.toBeInTheDocument();
+    const headings = screen.getAllByRole("heading", { level: 3 });
+    expect(headings[0]).toHaveTextContent("Supply & Demand");
+    expect(headings[1]).toHaveTextContent("Lowest reserve");
     await user.click(labelledButton(/Layers/));
     await user.click(
       screen.getByRole("checkbox", {
@@ -841,19 +1131,19 @@ describe("Insights layers", () => {
     expect(
       screen.queryByText(/Monthly forecast ranges show/),
     ).not.toBeInTheDocument();
+    expect(labelledButton("Fit full timeline")).toBeDisabled();
+    await user.click(labelledButton("Zoom in"));
     await user.click(labelledButton("Fit full timeline"));
-    expect(
-      screen.getByLabelText("Displayed date range: 2020–39"),
-    ).toBeVisible();
-    // Already wider than the scenario: nothing further out to go to.
+    expect(supply).toHaveAttribute("data-domain", JSON.stringify(initial));
+    expect(labelledButton("Fit full timeline")).toBeDisabled();
     expect(labelledButton("Zoom out")).toBeDisabled();
   });
 
-  it.each([1, 12, 60, 192, 0])(
-    "opens on the scenario span, with a 20-year fallback for duration %s",
-    (durationMonths) => {
+  it.each([1, 12, 60, 192, 240, 300, 0])(
+    "fits the scenario span, capped at 20 years, for duration %s",
+    async (durationMonths) => {
       const game = overviewGame;
-      const months = durationMonths || 20 * 12;
+      const months = Math.min(durationMonths || 240, 240);
       renderInsights(100, {
         ...game,
         scenarioId: CUSTOM_SCENARIO_ID,
@@ -868,6 +1158,91 @@ describe("Insights layers", () => {
         JSON.stringify([0, months * MINUTES_PER_MONTH]),
       );
       expect(labelledButton("Zoom out")).toBeDisabled();
+      if (months > 1) {
+        await user.click(labelledButton("Zoom in"));
+        await user.click(labelledButton("Fit full timeline"));
+      }
+      expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+        "data-domain",
+        JSON.stringify([0, months * MINUTES_PER_MONTH]),
+      );
+      expect(labelledButton("Fit full timeline")).toBeDisabled();
+    },
+  );
+
+  it.each([144, 300, 0])(
+    "fits from scenario start after time has elapsed, for duration %s",
+    async (durationMonths) => {
+      renderInsights(100, {
+        ...overviewGame,
+        date: getDateFromMinute(
+          120 * MINUTES_PER_MONTH,
+          overviewGame.startingYear,
+        ),
+        scenarioId: CUSTOM_SCENARIO_ID,
+        customScenario: {
+          ...getScenario(100)!,
+          id: CUSTOM_SCENARIO_ID,
+          durationMonths,
+        },
+      });
+      expect(labelledButton("Zoom out")).toBeDisabled();
+      await user.click(labelledButton("Zoom in"));
+      await user.click(labelledButton("Fit full timeline"));
+      expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+        "data-domain",
+        JSON.stringify([
+          0,
+          Math.min(durationMonths || 240, 240) * MINUTES_PER_MONTH,
+        ]),
+      );
+      expect(labelledButton("Fit full timeline")).toBeDisabled();
+    },
+  );
+
+  it.each([
+    [1, 118],
+    [2, 119],
+  ])(
+    "fits the active successor term with a 20-year span for generation %s",
+    async (generationIndex, scenarioId) => {
+      const first = createGame({ scenarioId: 117 });
+      const termStartMonth = generationIndex * 240;
+      const game = {
+        ...first,
+        scenarioId,
+        date: getDateFromMinute(
+          (termStartMonth + 6) * MINUTES_PER_MONTH,
+          first.startingYear,
+        ),
+        campaign: {
+          ...first.campaign!,
+          generationIndex,
+          termStartMonth,
+        },
+      };
+      cacheProjection(game, {
+        ...overviewProjection,
+        domain: {
+          ...overviewProjection.domain,
+          x: forecastViewportBounds(game),
+        },
+      });
+      renderInsights(scenarioId, game);
+      await user.click(labelledButton("Zoom in"));
+      await user.click(labelledButton("Fit full timeline"));
+      const domain = [
+        termStartMonth * MINUTES_PER_MONTH,
+        (termStartMonth + 240) * MINUTES_PER_MONTH,
+      ];
+      expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+        "data-domain",
+        JSON.stringify(domain),
+      );
+      expect(domain[1] - domain[0]).toBe(240 * MINUTES_PER_MONTH);
+      expect(game.date.minute).toBeGreaterThanOrEqual(domain[0]);
+      expect(game.date.minute).toBeLessThan(domain[1]);
+      expect(labelledButton("Fit full timeline")).toBeDisabled();
     },
   );
 
@@ -1120,7 +1495,7 @@ describe("Insights layers", () => {
 
     renderInsights(112, game);
 
-    expect(screen.getAllByRole("heading", { level: 6 })[1]).toHaveTextContent(
+    expect(screen.getAllByRole("heading", { level: 3 })[0]).toHaveTextContent(
       "Power exchange",
     );
     const exchange = screen.getByRole("region", {
@@ -1133,6 +1508,87 @@ describe("Insights layers", () => {
     expect(localStorage.getItem("insightsLayers")).toBe(
       JSON.stringify(["cash", "supplyDemand"]),
     );
+  });
+
+  it("keeps Mission 7's exchange checked across presets without changing saved layers", async () => {
+    const savedLayers = JSON.stringify(INSIGHT_PRESETS.reliability.layers);
+    localStorage.setItem("insightsLayers", savedLayers);
+    localStorage.setItem("insightsActivePreset", "reliability");
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 112 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    renderInsights(112, game);
+    expect(
+      screen.getByRole("combobox", { name: "Insight preset" }),
+    ).toHaveTextContent("Reliability");
+    await user.click(labelledButton(/Layers/));
+    const exchange = labelledCheckbox("Power exchange");
+    expect(exchange).toBeChecked();
+    expect(exchange).toBeDisabled();
+
+    await choosePreset("Overview");
+    const overviewExchange = labelledCheckbox("Power exchange");
+    expect(overviewExchange).toBeChecked();
+    expect(overviewExchange).toBeDisabled();
+    expect(
+      screen.getByRole("heading", { name: "Power exchange" }),
+    ).toBeVisible();
+    expect(localStorage.getItem("insightsLayers")).toBe(savedLayers);
+    expect(localStorage.getItem("insightsActivePreset")).toBe("reliability");
+  });
+
+  it("plots the exchange over the forecast's own time axis, beside the current reading", () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
+    cacheProjection(exchangeGame, exchangeProjection);
+    renderInsights(100, exchangeGame);
+
+    const exchange = screen.getByRole("region", {
+      name: "Power exchange evidence",
+    });
+    // The reading of what is flowing now stays, but is no longer the whole layer
+    expect(within(exchange).getByText("Power flowing")).toBeVisible();
+    expect(within(exchange).getByText("Available capacity")).toBeVisible();
+    const chart = within(exchange).getByRole("img", {
+      name: "Power exchange inspection",
+    });
+    expect(chart).toHaveAttribute("data-sync-key", "insights");
+    expect(Number(chart.getAttribute("data-points"))).toBeGreaterThan(100);
+    expect(Number(chart.getAttribute("data-line-capacity"))).toBeGreaterThan(0);
+    // The same viewport the other layers share, and the same marker for where the forecast starts
+    const [from, to] = JSON.parse(chart.getAttribute("data-domain")!);
+    expect(to).toBeGreaterThan(from);
+    expect(chart).toHaveAttribute("data-forecast-start", "0");
+  });
+
+  it("expands the power exchange like any other chart, with its help button in the header", async () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
+    cacheProjection(exchangeGame, exchangeProjection);
+    renderInsights(100, exchangeGame);
+
+    const expand = screen.getByRole("button", {
+      name: "Expand Power exchange chart",
+    });
+    act(() => expand.focus());
+    fireEvent.click(expand);
+    const dialog = screen.getByRole("dialog", { name: "Power exchange" });
+    expect(
+      within(dialog).getByRole("img", { name: "Power exchange inspection" }),
+    ).toHaveAttribute("data-sync-key", "insights-expanded");
+    expect(
+      within(dialog).getByRole("button", { name: "What is Interties?" }),
+    ).toBeVisible();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(expand).toHaveFocus();
   });
 
   it("scrolls the power exchange into view on the phone step that points to it", () => {
@@ -1187,8 +1643,8 @@ describe("Insights layers", () => {
     renderInsights();
     await choosePreset("Profitability");
 
-    expect(screen.getByText("Profit", { selector: "h6" })).toBeVisible();
-    expect(screen.getByText("Fuel Prices", { selector: "h6" })).toBeVisible();
+    expect(screen.getByText("Profit", { selector: "h3" })).toBeVisible();
+    expect(screen.getByText("Fuel Prices", { selector: "h3" })).toBeVisible();
     screen
       .getAllByRole("img")
       .forEach((chart) =>
@@ -1206,15 +1662,15 @@ describe("Insights layers", () => {
     expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual(layers);
     view.unmount();
     view = renderInsights();
-    expect(screen.getByText("Revenue", { selector: "h6" })).toBeVisible();
+    expect(screen.getByText("Revenue", { selector: "h3" })).toBeVisible();
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("OverviewEdited");
     const headings = screen
-      .getAllByRole("heading", { level: 6 })
+      .getAllByRole("heading", { level: 3 })
       .map((heading) => heading.textContent);
     expect(headings.indexOf("Revenue")).toBeLessThan(
-      headings.indexOf("Emissions (CO₂e)"),
+      headings.indexOf("Emissions (tonnes CO₂e)"),
     );
 
     await user.click(labelledButton("Preset actions"));
@@ -1227,10 +1683,10 @@ describe("Insights layers", () => {
     view.unmount();
 
     renderInsights();
-    expect(screen.getByText("Revenue", { selector: "h6" })).toBeVisible();
+    expect(screen.getByText("Revenue", { selector: "h3" })).toBeVisible();
     expect(
       screen
-        .getAllByRole("heading", { level: 6 })
+        .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent),
     ).toEqual(headings);
     expect(
@@ -1245,7 +1701,7 @@ describe("Insights layers", () => {
     );
     await user.click(screen.getByRole("button", { name: "Restore" }));
 
-    expect(screen.queryByText("Revenue", { selector: "h6" })).toBeNull();
+    expect(screen.queryByText("Revenue", { selector: "h3" })).toBeNull();
     const restoredLibrary = JSON.parse(
       localStorage.getItem("insightsPresetLibrary") || "{}",
     );
@@ -1261,7 +1717,7 @@ describe("Insights layers", () => {
       screen.getByRole("menuitem", { name: "Reset to default" }),
     );
     await user.click(screen.getByRole("button", { name: "Restore" }));
-    expect(screen.queryByText("Revenue", { selector: "h6" })).toBeNull();
+    expect(screen.queryByText("Revenue", { selector: "h3" })).toBeNull();
     await user.click(labelledButton("Preset actions"));
     expect(
       screen.getByRole("menuitem", { name: "Save changes" }),
@@ -1384,23 +1840,26 @@ describe("Insights layers", () => {
     const game = gameWithHistory();
     renderInsights(100, game);
 
+    await user.click(labelledButton("Zoom in"));
     await user.click(labelledButton("Fit full timeline"));
 
     expect(
       screen.queryByRole("region", { name: "Electricity pricing" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText("Supply & Demand", { selector: "h6" }),
+      screen.getByText("Supply & Demand", { selector: "h3" }),
     ).toBeVisible();
-    expect(screen.getByText("Profit", { selector: "h6" })).toBeVisible();
-    expect(screen.getByText("Fuel Prices", { selector: "h6" })).toBeVisible();
+    expect(screen.getByText("Profit", { selector: "h3" })).toBeVisible();
+    expect(screen.getByText("Fuel Prices", { selector: "h3" })).toBeVisible();
+    const profit = screen.getByTestId("chartInsightsProfitPlot");
+    expect(profit).toHaveAttribute("data-history-points", "3");
     expect(
-      Number(
-        screen
-          .getByTestId("chartInsightsProfitPlot")
-          .getAttribute("data-points"),
-      ),
-    ).toBeGreaterThan(240);
+      Number(profit.getAttribute("data-projected-points")),
+    ).toBeGreaterThan(0);
+    expect(profit).toHaveAttribute(
+      "data-domain",
+      JSON.stringify([0, getScenario(100)!.durationMonths * MINUTES_PER_MONTH]),
+    );
     expect(
       Number(
         screen.getByTestId("supply-demand-chart").getAttribute("data-points"),
@@ -1503,9 +1962,33 @@ describe("Insights layers", () => {
     expect(
       screen.queryByRole("checkbox", { name: "Power exchange" }),
     ).toBeNull();
-    expect(screen.queryByText("Power exchange", { selector: "h6" })).toBeNull();
+    expect(screen.queryByText("Power exchange", { selector: "h3" })).toBeNull();
   });
 });
+
+function gameWithOpenIntertie(): GameType {
+  const game = cloneDeep(
+    gameReducer(
+      createGame({ scenarioId: 100, seed: 61 }),
+      buildTransmissionLine({
+        corridorId: "california-north",
+        financed: true,
+      }),
+    ),
+  );
+  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  return game;
+}
+
+// Label queries avoid repeatedly computing every MUI checkbox's accessible name.
+// Check accessibility explicitly so a hidden labelled input still fails the contract.
+function labelledCheckbox(label: string): HTMLElement {
+  const checkbox = screen.getByLabelText(label, {
+    selector: 'input[type="checkbox"]',
+  });
+  expect(isInaccessible(checkbox)).toBe(false);
+  return checkbox;
+}
 
 function labelledButton(label: string | RegExp): HTMLElement {
   const button = screen.getByLabelText(label, {

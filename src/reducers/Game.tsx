@@ -1,3 +1,18 @@
+import { getLegacyBuildBounds, isLegacyEraGame } from "../data/LegacyEra";
+import {
+  LEGACY_CAMPAIGN_ID,
+  LEGACY_GENERATION_MONTHS,
+  LEGACY_GENERATIONS,
+  legacyGenerationTitle,
+  isLegacyCampaignScenario,
+} from "../data/LegacyCampaign";
+import {
+  initializeLegacyCampaign,
+  legacyGenerationContext,
+  legacyCompletedMonths,
+  legacyMonthOffset,
+  legacyMarketReferenceRate,
+} from "../helpers/LegacyCampaign";
 import {
   isBuyingRule,
   isSellingRule,
@@ -33,6 +48,7 @@ import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { validScenarioMod } from "../helpers/ScenarioMod";
 import {
   scenarioRules,
+  needsObjectiveEnergyMeters,
   scenarioRulesIdentity,
   isOfficialCatalogRules,
 } from "../helpers/ScenarioRules";
@@ -113,6 +129,7 @@ import {
   customerBillingRate,
   emptyPolicies,
   policyAvailable,
+  policyAllowedForGame,
   validPolicyChange,
   samePolicyChoice,
   isOperatingPolicy,
@@ -164,6 +181,9 @@ import {
 } from "../helpers/DateTime";
 import {
   facilityCashBack,
+  facilityMaintenanceCost,
+  facilityPermanentlyShutdown,
+  getTotalDebt,
   getCreditInputs,
   getCreditPremium,
   purchaseTerms,
@@ -190,6 +210,7 @@ import {
 } from "../helpers/Customers";
 import {
   formatMoneyConcise,
+  formatRateCompact,
   formatWatts,
   formatWattHours,
 } from "../helpers/Format";
@@ -201,9 +222,8 @@ import {
   startingDollarRevenue,
   totalScore,
 } from "../helpers/Scoring";
-import { formatLargeMass } from "../helpers/Units";
 import { buildStartedMessage } from "../helpers/BuildConsequences";
-import { buildVictoryDebrief } from "../helpers/Debrief";
+import { buildVictoryDebrief, fleetCapacity } from "../helpers/Debrief";
 import {
   buildStoryPeriodSnapshot,
   buildStorySnapshot,
@@ -246,6 +266,7 @@ import { DEMAND_TYPES, demandByTypeAt } from "../data/DemandProfiles";
 import { combineStoryEffects, resolveStoryAtDate } from "../data/WorldEvents";
 import { getRawSolarIrradianceWM2, getWeather } from "../data/Weather";
 import { createWeatherForecast } from "../helpers/WeatherForecast";
+import type { OutputWeatherTick } from "../helpers/ExpectedOutput";
 import { COLD_MAX_GAS_PRICE_MULTIPLIER } from "../data/Hazards";
 import {
   activeWeatherHazardsFor,
@@ -434,6 +455,7 @@ let speedBeforeCloudSavePrompt: SpeedType | undefined;
 // paused even if a dialog or card opens or closes before the page returns.
 let speedBeforeHidden: SpeedType | undefined;
 const BLOCKING_CARDS = new Set([
+  "CAMPAIGN",
   "MAIN_MENU",
   "ACHIEVEMENTS",
   "SAVED_GAMES",
@@ -889,9 +911,6 @@ function trimWorldEventRecords(state: GameType) {
   trimWorldEventOccurrences(state);
 }
 
-// Below this share of the solar fleet, hail on hail-resistant panels is logged without pausing.
-const NEGLIGIBLE_RESISTANT_HAIL_SHARE = 0.05;
-
 function formatDays(days: number): string {
   return `${days} day${days === 1 ? "" : "s"}`;
 }
@@ -956,7 +975,6 @@ function recordHailStorm(state: GameType, key: string, startsMinute: number) {
       damagedFraction: impact.damagedFraction,
       repairDays: impact.repairDays,
       repairCost: impact.repairCost,
-      hailResistant: impact.hailResistant,
       oneTimeCost: impact.repairCost,
       oneTimeCostMinute: chargeMinute,
     },
@@ -980,23 +998,18 @@ function recordHailStorm(state: GameType, key: string, startsMinute: number) {
   const share = solarW > 0 ? damagedW / solarW : 0;
   const repairCost = impacts.reduce((total, i) => total + i.repairCost, 0);
   const repairDays = Math.max(...impacts.map((i) => i.repairDays));
-  const negligible =
-    impacts.every((i) => i.hailResistant) &&
-    share < NEGLIGIBLE_RESISTANT_HAIL_SHARE;
   const percent = Math.max(1, Math.round(share * 100));
   const terms = `Repairs cost ${formatMoneyConcise(repairCost)} and take about ${formatDays(repairDays)}.`;
-  const message = negligible
-    ? `Hail-resistant panels held damage to ${percent}% of your solar fleet. ${terms}`
-    : `Hail damaged ${percent}% of your solar fleet. ${terms}`;
+  const message = `Hail damaged ${percent}% of your solar fleet. ${terms}`;
   logGameEvent(state, "WORLD_EVENT", message, {
-    importance: negligible ? "NOTABLE" : "CRITICAL",
+    importance: "CRITICAL",
     actionTarget: { card: "FACILITIES", view: "FLEET" },
-    title: negligible ? "Minor hail damage" : "Hail damage",
+    title: "Hail damage",
     concept: "severeWeather",
     storyPhaseKey: key,
-    turningPointPriority: negligible ? undefined : 110,
+    turningPointPriority: 110,
     reportedKey: key,
-    pause: !negligible,
+    pause: true,
   });
 }
 
@@ -1010,6 +1023,7 @@ function recordColdSnap(
     state.date,
     state.seed,
     storyEffectsAt(state.date, state).temperatureOffsetC || 0,
+    isLegacyEraGame(state),
   );
   const impact = resolveColdImpact({ game: state, key, minTempC });
   if (!impact) return false;
@@ -1501,6 +1515,7 @@ function foregroundSpeed(state: GameType): SpeedType {
 }
 
 function setForegroundSpeed(state: GameType, speed: SpeedType) {
+  if (state.campaign?.pendingHandover) speed = "PAUSED";
   if (speedBeforeCloudSavePrompt !== undefined) {
     speedBeforeCloudSavePrompt = speed;
   } else if (speedBeforeHidden !== undefined) {
@@ -1594,6 +1609,8 @@ export const gameSlice = createSlice({
         policyPause: _policyPause,
         scenarioChoicePause: _scenarioChoicePause,
         objectiveProgress: _objectiveProgress,
+        campaign: _campaign,
+        rulesChanged: _rulesChanged,
         ...payload
       } = action.payload;
       if (
@@ -1632,6 +1649,7 @@ export const gameSlice = createSlice({
       }
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
+      delete state.campaign;
       delete state.desktopAchievements;
       delete state.lowCashWarningMonth;
       delete state.objectiveProgress;
@@ -1653,6 +1671,10 @@ export const gameSlice = createSlice({
       state.seed = a.seed !== undefined ? a.seed : newSeed();
       const scenario =
         getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
+      if (isLegacyCampaignScenario(scenario.id) && state.customScenario)
+        throw new Error(
+          "Campaign generations require the trusted native setup.",
+        );
       if (scenario.id === CUSTOM_SCENARIO_ID && scenario.rules !== undefined)
         throw new Error(
           "Community rules require a validated Modded · Unranked snapshot.",
@@ -1702,7 +1724,11 @@ export const gameSlice = createSlice({
       const startingCustomers = checkpoint?.startingCustomers ?? a.customers;
       const startingFacilities = checkpoint?.facilities ?? a.facilities;
       const startingRate = checkpoint?.dollarsPerkWh ?? scenario.dollarsPerkWh;
-      state.date = getDateFromMinute(0, scenario.startingYear);
+      state.startingMonth = scenario.startingMonth;
+      state.date = getDateFromMinute(
+        ((scenario.startingMonth ?? 1) - 1) * MINUTES_PER_MONTH,
+        scenario.startingYear,
+      );
       state.startingYear = scenario.startingYear;
       // A company on day one has no track record, no debt and nothing but cash, so it borrows at
       // whatever prime was in the year the scenario opens -- 4.75% in 2019, 21.5% in 1980. It is
@@ -1718,7 +1744,10 @@ export const gameSlice = createSlice({
       state.dollarsPerkWh = startingRate;
       state.customerRate = startingRate;
       // A tutorial checkpoint's rate is part of its lesson, so it stays where it was authored.
-      state.rateFollowsInflation = !checkpoint && canFollowInflation(state);
+      state.rateFollowsInflation =
+        !checkpoint &&
+        scenario.ownership === "Public" &&
+        canFollowInflation(state);
       state.customerMarketSize = startingCustomers * CUSTOMER_MARKET_MULTIPLIER;
       initializeGameObjectiveProgress(state);
       state.startingDemandScale = scenario.startingDemandScale ?? 1;
@@ -1791,13 +1820,32 @@ export const gameSlice = createSlice({
               initialReservoirFraction,
               hydroAssignments[startingIndex],
             );
-            if (label || search.assetId) {
+            if (
+              label ||
+              search.assetId ||
+              search.cashBackMultiplier !== undefined ||
+              search.saleRestricted !== undefined ||
+              search.maintenanceObligation !== undefined ||
+              search.permanentShutdownMonth !== undefined
+            ) {
               const built = state.facilities.find(
                 ({ id }) => !existingIds.has(id),
               );
               if (built) {
                 if (label) built.name = label;
                 if (search.assetId) built.startingAssetId = search.assetId;
+                if (search.cashBackMultiplier !== undefined)
+                  built.cashBackMultiplier = search.cashBackMultiplier;
+                if (search.saleRestricted !== undefined)
+                  built.saleRestricted = search.saleRestricted;
+                if (search.maintenanceObligation !== undefined)
+                  built.maintenanceObligation = {
+                    ...search.maintenanceObligation,
+                  };
+                if (search.permanentShutdownMonth !== undefined)
+                  built.permanentShutdownMonth = search.permanentShutdownMonth;
+                if (facilityPermanentlyShutdown(built, state.date.minute))
+                  built.paused = true;
               }
             }
           } else {
@@ -1817,13 +1865,33 @@ export const gameSlice = createSlice({
                 initialAgeYears,
                 initialReservoirFraction,
               );
-              if (label || search.assetId) {
+              if (
+                label ||
+                search.assetId ||
+                search.cashBackMultiplier !== undefined ||
+                search.saleRestricted !== undefined ||
+                search.maintenanceObligation !== undefined ||
+                search.permanentShutdownMonth !== undefined
+              ) {
                 const built = state.facilities.find(
                   ({ id }) => !existingIds.has(id),
                 );
                 if (built) {
                   if (label) built.name = label;
                   if (search.assetId) built.startingAssetId = search.assetId;
+                  if (search.cashBackMultiplier !== undefined)
+                    built.cashBackMultiplier = search.cashBackMultiplier;
+                  if (search.saleRestricted !== undefined)
+                    built.saleRestricted = search.saleRestricted;
+                  if (search.maintenanceObligation !== undefined)
+                    built.maintenanceObligation = {
+                      ...search.maintenanceObligation,
+                    };
+                  if (search.permanentShutdownMonth !== undefined)
+                    built.permanentShutdownMonth =
+                      search.permanentShutdownMonth;
+                  if (facilityPermanentlyShutdown(built, state.date.minute))
+                    built.paused = true;
                 }
               }
             } else {
@@ -1934,6 +2002,112 @@ export const gameSlice = createSlice({
       // Establish the comparison before time moves. A fleet that was already dearer on day one
       // has not crossed anything; the first monthly ordering change is the event.
       state.fuelCostSnapshot = currentFuelCosts(state);
+      if (state.scenarioId === LEGACY_CAMPAIGN_ID && !state.customScenario) {
+        if (a.cash === scenario.cash) {
+          const steam = state.facilities.find(
+            (facility) => facility.startingAssetId === "legacy-first-steam",
+          );
+          if (steam) {
+            const month = summarizeTimeline(
+              state.timeline,
+              state.startingYear,
+              undefined,
+              needsObjectiveEnergyMeters(state),
+            );
+            const operatingOutlay =
+              month.expensesFuel +
+              month.expensesOM +
+              month.expensesInterest +
+              (month.expensesPolicy ?? 0);
+            const cash =
+              purchaseTerms(steam.buildCost, true, state.interestRate)
+                .amountDue +
+              6 * operatingOutlay;
+            state.timeline = generateNewTimeline(
+              state,
+              cash,
+              startingCustomers,
+            );
+          }
+        }
+        initializeLegacyCampaign(
+          state,
+          startingCustomers,
+          fleetCapacity(state.facilities),
+        );
+        initializeGameObjectiveProgress(state);
+      }
+    },
+    continueLegacyCampaign: (state) => {
+      const campaign = state.campaign;
+      if (
+        !campaign?.pendingHandover ||
+        campaign.generationIndex >= LEGACY_GENERATIONS.length - 1 ||
+        legacyCompletedMonths(state) !== LEGACY_GENERATION_MONTHS
+      )
+        return;
+      const now = getTimeFromTimeline(state.date.minute, state.timeline);
+      if (!now) return;
+      const cash = now.cash;
+      const customers = now.customers;
+      const closingEffects = storyEffectsAt(
+        getDateFromMinute(state.date.minute - TICK_MINUTES, state.startingYear),
+        state,
+      );
+      campaign.inheritedDemandMultiplier *=
+        closingEffects.demandMultiplier ?? 1;
+      const nextIndex = campaign.generationIndex + 1;
+      state.scenarioId = LEGACY_GENERATIONS[nextIndex].scenarioId;
+      const isCampaignReceipt = (key: string) =>
+        LEGACY_GENERATIONS.some((generation) =>
+          key.startsWith(`story:${generation.scenarioId}:legacy-generation-`),
+        );
+      state.worldEvents = {
+        active: state.worldEvents.active.filter(
+          (event) => !isCampaignReceipt(event.key),
+        ),
+        occurrences: state.worldEvents.occurrences.filter(
+          (event) => !isCampaignReceipt(event.key),
+        ),
+        checkedKeys: state.worldEvents.checkedKeys.filter(
+          (key) => !isCampaignReceipt(key),
+        ),
+      };
+      campaign.pendingHandover = false;
+      campaign.generationIndex = nextIndex;
+      campaign.termStartMonth = nextIndex * LEGACY_GENERATION_MONTHS;
+      storyEffectsCache.clear();
+      state.timeline = generateNewTimeline(state, cash, customers);
+      Object.assign(
+        campaign,
+        legacyGenerationContext(
+          state,
+          nextIndex,
+          customers,
+          fleetCapacity(state.facilities),
+        ),
+      );
+      if (
+        LEGACY_GENERATIONS[nextIndex].startYear >= 1962 &&
+        !state.transmission
+      )
+        state.transmission = emptyTransmissionState();
+      initializeGameObjectiveProgress(state);
+      delete state.runIdentity;
+      delete state.challenge;
+      state.timeline = generateNewTimeline(state, cash, customers);
+      updateWorldEvents(state);
+      state.timeline = reforecastSupply(state);
+      setForegroundSpeed(state, "PAUSED");
+      logGameEvent(
+        state,
+        "WORLD_EVENT",
+        `A new CEO takes over for ${LEGACY_GENERATIONS[nextIndex].startYear}–${LEGACY_GENERATIONS[nextIndex].startYear + 19}. Your company and its commitments continue.`,
+        {
+          title: legacyGenerationTitle(LEGACY_GENERATIONS[nextIndex]),
+          importance: "NOTABLE",
+        },
+      );
     },
     buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {
       applyBuildFacility(state, action.payload);
@@ -2106,9 +2280,18 @@ export const gameSlice = createSlice({
       };
     });
     builder.addCase(start, (state, action) => {
+      if (isLegacyCampaignScenario(action.payload))
+        return {
+          ...cloneDeep(initialGame),
+          difficulty: state.difficulty,
+          scenarioId: LEGACY_CAMPAIGN_ID,
+          startingYear: LEGACY_GENERATIONS[0].startYear,
+          date: getDateFromMinute(0, LEGACY_GENERATIONS[0].startYear),
+        };
       delete state.desktopAchievements;
       state.runIdentity = undefined;
       state.challenge = undefined;
+      delete state.rulesChanged;
       state.scenarioId = action.payload;
       // An empty timeline is how the loading screen tells a new game from a resumed one, so make
       // that true by construction rather than by whichever paths happen to lead here
@@ -2141,6 +2324,29 @@ export const gameSlice = createSlice({
       return restored;
     });
     builder.addCase(loaded, (state) => {
+      // A continued run's stored future belongs to another simulation. Once the data tables have
+      // loaded, recompute every future stage under this runtime while retaining the frame already
+      // played and all history. Repeating this on later loads also handles subsequent rule changes
+      // after the original shareable identity has been removed.
+      if (state.rulesChanged) {
+        state.timeline = reforecastWeatherAndPrices(state, false, true);
+        state.timeline = reforecastDemand(
+          state,
+          1,
+          [],
+          [],
+          [],
+          undefined,
+          true,
+        );
+        state.timeline = reforecastSupply(
+          state,
+          true,
+          TICK_MINUTES,
+          undefined,
+          true,
+        );
+      }
       // Saves carry the commitment forecast, so this only runs for one that somehow lacks it.
       // Rebuild just that metadata after the data tables have loaded, and keep every recorded
       // value: a full reforecast re-dispatches the tick that already happened, rewriting its
@@ -2155,7 +2361,7 @@ export const gameSlice = createSlice({
           !hasPreparedGeneratorCommitment(currentTick, facility.id)
         );
       });
-      if (needsCommitmentForecast) {
+      if (!state.rulesChanged && needsCommitmentForecast) {
         const forecast = reforecastSupply(state, true);
         state.timeline = original(state.timeline)!.map((tick, i) => {
           const recorded = { ...tick };
@@ -2306,6 +2512,7 @@ export const gameSlice = createSlice({
 
 export const {
   tick,
+  continueLegacyCampaign,
   delta,
   initGame,
   buildFacility,
@@ -2324,6 +2531,16 @@ export const {
   setSpeed,
   markEventsRead,
 } = gameSlice.actions;
+
+/** Begin the same native setup path used by ordinary runs, with the chosen difficulty. */
+export function startLegacyCampaign(
+  dispatch: (action: { type: string; payload?: unknown }) => unknown,
+  difficulty: DifficultyType,
+): void {
+  dispatch(quit(undefined));
+  dispatch(delta({ difficulty, customScenario: undefined }));
+  dispatch(start(LEGACY_CAMPAIGN_ID));
+}
 
 // Re-exported so that everything still imports the game's actions from one place
 export { start, loaded, quit, resume };
@@ -2498,6 +2715,41 @@ function applyBuildFacility(
   )
     return false;
   const requested = payload.facility;
+  if (isLegacyCampaignScenario(state.scenarioId) && !state.customScenario) {
+    // Era/date limits belong to the command owner as well as the shopping UI.
+    if (isStorage(requested)) {
+      const legal = STORAGE(state, requested.peakWh).find(
+        (quote) => quote.name === requested.name,
+      );
+      if (
+        !legal?.available ||
+        !requested.available ||
+        requested.peakWh > legal.maxPeakWh
+      )
+        return false;
+    } else {
+      const bounds = getLegacyBuildBounds(state);
+      if (bounds && requested.peakW < bounds.minW) return false;
+      const legal = GENERATORS(
+        state,
+        requested.peakW,
+        state.timeline.map((tick) => tick.windKph),
+        state.timeline.map((tick) => tick.solarIrradianceWM2),
+        state.timeline.flatMap((tick) =>
+          tick.windOffshoreKph === undefined ? [] : [tick.windOffshoreKph],
+        ),
+        state.timeline.map((tick) => tick.windAirborneKph),
+      ).find((quote) => quote.name === requested.name);
+      if (
+        !legal?.available ||
+        !requested.available ||
+        requested.peakW > legal.maxPeakW ||
+        requested.btuPerWh !== legal.btuPerWh ||
+        requested.spinMinutes !== legal.spinMinutes
+      )
+        return false;
+    }
+  }
   // Validate future shopping quotes as carefully as current catalog entries.
   if (
     requested.name === "Iron-Air Battery" &&
@@ -2565,7 +2817,7 @@ function applyBuildFacility(
 
 function applySellFacility(state: GameType, id: number): boolean {
   const sold = state.facilities.find((g: FacilityOperatingType) => g.id === id);
-  if (!sold) return false;
+  if (!sold || sold.saleRestricted) return false;
   logGameEvent(
     state,
     sold.yearsToBuildLeft > 0 ? "BUILD" : "SELL",
@@ -2606,7 +2858,8 @@ function applySellFacility(state: GameType, id: number): boolean {
 
 function applyTogglePauseFacility(state: GameType, id: number): boolean {
   const facility = state.facilities.find((item) => item.id === id);
-  if (!facility) return false;
+  if (!facility || facilityPermanentlyShutdown(facility, state.date.minute))
+    return false;
   const before = facility.paused ? "paused" : "operating";
   facility.paused = !facility.paused;
   recordMeaningfulDecision(state, {
@@ -2922,9 +3175,7 @@ function applyUpgradeTransmissionLine(
 /** The retrofit's name as it reads mid-sentence, e.g. "a cold-weather package". */
 function retrofitLabel(upgrade: FacilityUpgradeType): string {
   if (upgrade === "combinedCycle") return "combined-cycle generation";
-  return upgrade === "hailResistant"
-    ? "hail-resistant panels"
-    : "a cold-weather package";
+  return "a cold-weather package";
 }
 
 /**
@@ -3005,11 +3256,7 @@ function applyRetrofitFacility(
     },
   );
   // Levers are lowercase kebab-case; saves reject anything else.
-  const lever = conversion
-    ? "combined-cycle"
-    : payload.upgrade === "hailResistant"
-      ? "hail-resistant"
-      : "cold-weather-package";
+  const lever = conversion ? "combined-cycle" : "cold-weather-package";
   if (!bulk)
     recordMeaningfulDecision(state, {
       lever: `resilience:${facility.id}:${lever}`,
@@ -3050,9 +3297,7 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
   const lever =
     upgrade.upgrade === "combinedCycle"
       ? "combined-cycle"
-      : upgrade.upgrade === "hailResistant"
-        ? "hail-resistant"
-        : "cold-weather-package";
+      : "cold-weather-package";
   recordMeaningfulDecision(state, {
     lever: `resilience:${facility.id}:${lever}`,
     label: `Cancel upgrade of ${facility.name}`,
@@ -3315,7 +3560,13 @@ function applyPolicyEdit(
     state.date.monthsElapsed !==
       Math.floor(state.date.minute / MINUTES_PER_MONTH) ||
     payload.month !== state.date.monthsElapsed + 1 ||
-    payload.month >= scenario.durationMonths
+    payload.month >= scenario.durationMonths + legacyMonthOffset(state)
+  )
+    return false;
+  if (
+    !cancel &&
+    payload.tier === "On" &&
+    !policyAllowedForGame(state, payload.id, payload.month)
   )
     return false;
   const existing = state.policies?.programs[payload.id];
@@ -3380,29 +3631,23 @@ function applyPolicyEdit(
 }
 
 /**
- * Whether this run's rate can follow inflation at all: solo public utilities only. Investor-owned
- * and multiplayer companies, and tutorials, set their own rates.
+ * Whether this run's rate can follow inflation: solo utilities outside tutorials.
  */
 function canFollowInflation(state: GameType): boolean {
   const scenario = getScenario(state.scenarioId, state.customScenario);
-  return (
-    !!scenario &&
-    scenario.ownership === "Public" &&
-    !scenario.tutorialSteps &&
-    !state.multiplayer
-  );
+  return !!scenario && !scenario.tutorialSteps && !state.multiplayer;
 }
 
 /**
  * Whether the rate moves with inflation: the saved setting, honoured only where following is
- * allowed, so an edited save cannot inflate an investor's or a multiplayer company's rate.
+ * allowed, so an edited save cannot change tutorial or multiplayer pricing.
  */
 function followsInflation(state: GameType): boolean {
   return !!state.rateFollowsInflation && canFollowInflation(state);
 }
 
 /**
- * The rate a following public utility charges at `date`: the current rate carried forward by
+ * The rate a following utility charges at `date`: the current rate carried forward by
  * whatever inflation has passed since now, mirroring the live rollover's January step.
  */
 function inflationAdjustedRateAt(state: GameType, date: DateType): number {
@@ -3588,6 +3833,12 @@ function tickWorkingState(state: GameType): GameType {
     eventLog: [...state.eventLog],
     reportedEventKeys: [...state.reportedEventKeys],
     utilityExpansion: cloneDeep(state.utilityExpansion),
+    ...(state.campaign && {
+      campaign: {
+        ...state.campaign,
+        completedTerms: [...state.campaign.completedTerms],
+      },
+    }),
     commissionedHydroSiteIds: [...state.commissionedHydroSiteIds],
     ...(state.blackout && { blackout: { ...state.blackout } }),
     ...(state.tutorialIntertieStress && {
@@ -3600,7 +3851,8 @@ function tickWorkingState(state: GameType): GameType {
 function completedMonthCount(state: GameType): number {
   const latest = state.monthlyHistory[0];
   return Math.max(
-    state.objectiveProgress?.completedMonths ?? 0,
+    legacyMonthOffset(state),
+    (state.objectiveProgress?.completedMonths ?? 0) + legacyMonthOffset(state),
     latest ? (latest.year - state.startingYear) * 12 + latest.month : 0,
   );
 }
@@ -3697,6 +3949,10 @@ export function* tickStatePhases(
     state.speed = "PAUSED";
     return;
   }
+  if (state.campaign?.pendingHandover) {
+    state.speed = "PAUSED";
+    return;
+  }
   const speedBeforeTick = foregroundSpeed(state);
   const stressWasActive = !!state.tutorialIntertieStress?.active;
   if (pendingScenarioChoice(state)) {
@@ -3760,8 +4016,12 @@ export function* tickStatePhases(
       delete state.blackout;
     }
     if (!state.multiplayer && inBlackout !== wasInBlackout) {
+      const retainsCustomers = getScenario(
+        state.scenarioId,
+        state.customScenario,
+      )?.retainCustomersDuringShortages;
       const message = inBlackout
-        ? `${BLACKOUT_TOAST_PREFIX} ${formatWatts(now.demandW - now.supplyW)} short. Customers leave while it lasts. Build more supply, or resume a paused plant.`
+        ? `${BLACKOUT_TOAST_PREFIX} ${formatWatts(now.demandW - now.supplyW)} short. ${retainsCustomers ? "Blackouts reduce your score." : "Customers leave while it lasts."} Build more supply, or resume a paused plant.`
         : BLACKOUT_OVER_TOAST;
       setTimeout(() => {
         // Pausing a plant is the usual way into a blackout, and it raises its own "Paused X /
@@ -3789,7 +4049,14 @@ export function* tickStatePhases(
       // Record final history for the month, then generate the new timeline
       // Observe the same settled frames as history, before rollover.
       onCompletedMonth?.(state.timeline);
-      history.unshift(summarizeTimeline(state.timeline, state.startingYear));
+      history.unshift(
+        summarizeTimeline(
+          state.timeline,
+          state.startingYear,
+          undefined,
+          needsObjectiveEnergyMeters(state),
+        ),
+      );
       recordGameObjectiveMonth(state, history[0]);
       // Reprice the company's credit off the year that just closed, before the forecast is built
       // against it. Operating results reprice monthly; new borrowing reprices immediately.
@@ -3868,7 +4135,10 @@ export function* tickStatePhases(
           const failure = runFailure(state, scenario, history, now, false);
           const month = state.date.monthsElapsed;
           if (failure) state.multiplayer.ending = { ...failure, month };
-          else if (month >= (scenario.durationMonths || 12 * 20))
+          else if (
+            month >=
+            (scenario.durationMonths || 12 * 20) + legacyMonthOffset(state)
+          )
             state.multiplayer.ending = {
               outcome: "completed",
               title: scenario.endTitle || "Mission complete!",
@@ -3892,7 +4162,9 @@ export function* tickStatePhases(
       // and rules the player gave themselves - would be scored against each other as if they
       // were the same scenario. Mods always run as the custom scenario, so this also excludes
       // them from scores and completion records.
-      const ranked = scenario.id !== CUSTOM_SCENARIO_ID;
+      const ranked =
+        scenario.id !== CUSTOM_SCENARIO_ID &&
+        !isLegacyCampaignScenario(scenario.id);
       const modded = !!state.customScenario?.mod;
 
       /**
@@ -3932,20 +4204,38 @@ export function* tickStatePhases(
           state.worldEvents.occurrences,
           gameObjectiveResults(state),
         );
+        if (state.campaign) {
+          debrief.startingCash = state.campaign.openingCash;
+          debrief.startingFleet = cloneDeep(state.campaign.openingFleet);
+        }
+        // History counts playable months and spans the whole career in a campaign.
+        const tenureMonths = history.length;
         debrief.scenarioMetrics = [
           {
             concept: "money",
             label:
               scenario.ownership === "Investor"
                 ? "final net worth"
-                : "lifetime rate (starting-year $/kWh)",
+                : `lifetime rate · ${state.startingYear} dollars`,
             value:
               scenario.ownership === "Investor"
                 ? formatMoneyConcise(summary.netWorth)
                 : summary.supplyWh > 0
-                  ? `$${(startingDollarRevenue(history, state.startingYear, state.seed) / (summary.supplyWh / 1000)).toFixed(3)}`
+                  ? `${formatRateCompact(startingDollarRevenue(history, state.startingYear, state.seed) / (summary.supplyWh / 1000))}/kWh`
                   : "No electricity supplied",
           },
+          ...(outcome === "completed"
+            ? []
+            : [
+                {
+                  concept: "time" as const,
+                  label: "tenure",
+                  value:
+                    tenureMonths >= 12
+                      ? `${Math.floor(tenureMonths / 12)} ${tenureMonths < 24 ? "year" : "years"}`
+                      : `${tenureMonths} ${tenureMonths === 1 ? "month" : "months"}`,
+                },
+              ]),
           ...(debrief.scenarioMetrics ?? []),
         ];
 
@@ -3965,8 +4255,8 @@ export function* tickStatePhases(
             scenarioId: scoredScenarioId,
             outcome,
           });
-        // Bind the outcome before the reducer returns. The middleware persists the final
-        // Redux snapshot afterwards; no delayed callback can target a different live save.
+        // Bind the outcome before the reducer returns. The middleware retires this run's
+        // save afterwards; no delayed callback can target a different live save.
         if (saveEffects) {
           saveEffects.outcome(
             cloneDeep({
@@ -4025,7 +4315,8 @@ export function* tickStatePhases(
         }, 1);
       };
 
-      const termMonths = scenario.durationMonths || 12 * 20;
+      const termMonths =
+        (scenario.durationMonths || 12 * 20) + legacyMonthOffset(state);
       const failure = runFailure(state, scenario, history, now, isTutorial);
 
       desktopSimulationHooks()?.month(
@@ -4035,20 +4326,10 @@ export function* tickStatePhases(
 
       if (failure) {
         const summary = summarizeHistory(history);
-        const yearsSurvived = state.date.year - state.startingYear;
-        const durationSurvived =
-          yearsSurvived > 0
-            ? `${yearsSurvived} ${yearsSurvived === 1 ? "year" : "years"}`
-            : `${state.date.monthsElapsed} ${state.date.monthsElapsed === 1 ? "month" : "months"}`;
         const failureMessage = () =>
-          `${
-            failure.outcome === "bankrupt"
-              ? "You've run out of money."
-              : failure.reason
-          }
-                You survived for ${durationSurvived},
-                earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of greenhouse gases, measured as CO2e.`;
+          failure.outcome === "bankrupt"
+            ? "You've run out of money."
+            : failure.reason || "The utility board ended your term.";
 
         // Tutorials are intentionally unscored even when completed, so retain their guided
         // failure dialog rather than putting one tutorial attempt on the global leaderboard.
@@ -4080,7 +4361,70 @@ export function* tickStatePhases(
           );
         }
       } else if (
-        state.date.monthsElapsed === (scenario.durationMonths || 12 * 20) &&
+        state.campaign &&
+        legacyCompletedMonths(state) === LEGACY_GENERATION_MONTHS &&
+        state.campaign.completedTerms.length === state.campaign.generationIndex
+      ) {
+        const campaign = state.campaign;
+        const termHistory = history.filter(
+          (month) =>
+            (month.year - state.startingYear) * 12 + month.month - 1 >=
+            campaign.termStartMonth,
+        );
+        const summary = summarizeHistory(termHistory);
+        const objectiveResults = cloneDeep(gameObjectiveResults(state));
+        const debrief = buildVictoryDebrief(
+          scenario,
+          summary,
+          state.facilities,
+          state.eventLog,
+          termHistory,
+          state.dollarsPerkWh,
+          state.worldEvents.occurrences,
+          objectiveResults,
+        );
+        const closingFrame =
+          getTimeFromTimeline(state.date.minute, state.timeline) ?? now;
+        debrief.startingCash = campaign.openingCash;
+        debrief.startingFleet = cloneDeep(campaign.openingFleet);
+        debrief.finalCash = closingFrame.cash;
+        debrief.finalCustomers = closingFrame.customers;
+        campaign.completedTerms.push({
+          generationIndex: campaign.generationIndex,
+          scenarioId: state.scenarioId,
+          openingCustomers: campaign.openingCustomers,
+          referenceRate: campaign.referenceRate,
+          peakMW: campaign.peakMW,
+          northCapacityMW: campaign.northCapacityMW,
+          debtAllowance: campaign.debtAllowance,
+          goalRateIndex: campaign.goalRateIndex,
+          goalCostIndex: campaign.goalCostIndex,
+          emissionsBudgetTonnes: campaign.emissionsBudgetTonnes,
+          inheritedDemandMultiplier: campaign.inheritedDemandMultiplier,
+          closingCash: closingFrame.cash,
+          closingCustomers: closingFrame.customers,
+          closingDebt: getTotalDebt([
+            ...state.facilities,
+            ...(state.transmission?.lines ?? []),
+          ]),
+          objectiveProgress: cloneDeep(state.objectiveProgress!),
+          objectiveResults,
+          debrief,
+        });
+        setForegroundSpeed(state, "PAUSED");
+        if (campaign.generationIndex < LEGACY_GENERATIONS.length - 1) {
+          campaign.pendingHandover = true;
+        } else {
+          finishScoredRun(
+            summary,
+            "completed",
+            "Campaign complete!",
+            "Your utility has completed nine CEO generations, from 1882 through 2061.",
+          );
+        }
+      } else if (
+        state.date.monthsElapsed ===
+          (scenario.durationMonths || 12 * 20) + legacyMonthOffset(state) &&
         !activeTutorialCapstone
       ) {
         // Success: Survived duration
@@ -4174,7 +4518,7 @@ function getDemandW(
     customers: prev.customers,
     customerRate: now.customerRate,
     marketRate: getMarketRate(
-      scenario.dollarsPerkWh,
+      legacyMarketReferenceRate(game, scenario),
       date,
       game.startingYear,
       game.seed,
@@ -4184,7 +4528,10 @@ function getDemandW(
     tickScale,
   });
   // A current-frame reforecast is not another customer-growth interval.
-  if (game.utilityExpansion && now.minute === game.date.minute) {
+  if (
+    (game.utilityExpansion || game.campaign) &&
+    now.minute === game.date.minute
+  ) {
     const current = getTimeFromTimeline(game.date.minute, game.timeline);
     now.customers = current?.customers ?? prev.customers;
     now.customerRate = current?.customerRate ?? prev.customerRate;
@@ -4201,7 +4548,10 @@ function getDemandW(
     profile?.demandShapeExponent ?? game.demandShapeExponent ?? 1,
   );
   const effects = storyEffectsAt(date, game);
-  const baselineDemandW = baselineW * (effects.demandMultiplier || 1);
+  const baselineDemandW =
+    baselineW *
+    (effects.demandMultiplier || 1) *
+    (game.campaign?.inheritedDemandMultiplier ?? 1);
   now.demandByType = demandByTypeAt(
     baselineDemandW,
     date,
@@ -4282,13 +4632,30 @@ function getDemandW(
   );
 }
 
-function reforecastWeatherAndPrices(
-  state: GameType,
-  forecastWeather = false,
-): TickPresentFutureType[] {
+type ResourceWeatherFields = Pick<
+  TickPresentFutureType,
+  | "solarIrradianceWM2"
+  | "windKph"
+  | "windAirborneKph"
+  | "temperatureC"
+  | "precipitationMm"
+  | "snowpackMm"
+  | "hydroRunoffMm"
+  | "windOffshoreKph"
+>;
+
+/** Weather and basin inputs shared by full simulation and catalog resource forecasts. */
+function createResourceWeatherReader(state: GameType, forecastWeather = false) {
+  const modeledPast = isLegacyEraGame(state);
   const weatherAt = forecastWeather
-    ? createWeatherForecast(state.date, state.seed, state.location.id)
-    : (date: DateType) => getWeather(date, state.seed);
+    ? createWeatherForecast(
+        state.date,
+        state.seed,
+        state.location.id,
+        modeledPast,
+      )
+    : (date: DateType) =>
+        getWeather(date, state.seed, 0, undefined, modeledPast);
   // Resource forecasts are also shown before the player builds a hydro plant.
   const hasHydro =
     (getViableLocationCount(state.location, "Hydro") || 0) > 0 ||
@@ -4296,54 +4663,118 @@ function reforecastWeatherAndPrices(
   const watershedId = state.location.watershedId || state.location.id;
   const watershedWeatherAt =
     forecastWeather && hasHydro
-      ? createWeatherForecast(state.date, state.seed, watershedId)
-      : undefined;
+      ? createWeatherForecast(state.date, state.seed, watershedId, modeledPast)
+      : modeledPast && hasHydro
+        ? (date: DateType) =>
+            getWeather(date, state.seed, 0, watershedId, modeledPast)
+        : undefined;
   const hydrologyByMonth = new Map<
     string,
     ReturnType<typeof getHydroConditions>
   >();
+  return (
+    date: DateType,
+    effects: WorldEventEffectsType,
+    target: ResourceWeatherFields = {
+      solarIrradianceWM2: 0,
+      windKph: 0,
+      windAirborneKph: 0,
+      temperatureC: 0,
+      precipitationMm: 0,
+      snowpackMm: 0,
+      hydroRunoffMm: 0,
+    },
+  ) => {
+    const weather = weatherAt(date);
+    const hydroKey = `${date.year}-${date.monthNumber}`;
+    let hydrology = hydrologyByMonth.get(hydroKey);
+    if (!hydrology) {
+      hydrology = hasHydro
+        ? getHydroConditions(
+            date,
+            state.seed,
+            0,
+            watershedId,
+            watershedWeatherAt,
+          )
+        : {
+            precipitationMm: 0,
+            snowpackMm: 0,
+            runoffMm: 0,
+            rainMm: 0,
+            meltMm: 0,
+          };
+      hydrologyByMonth.set(hydroKey, hydrology);
+    }
+    target.solarIrradianceWM2 = getRawSolarIrradianceWM2(
+      date,
+      state.location,
+      weather.CLOUD_PCT,
+    );
+    target.windKph = weather.WIND_KPH;
+    target.windAirborneKph = getAirborneWindReferenceKph(weather.WIND_KPH);
+    target.temperatureC = weather.TEMP_C + (effects.temperatureOffsetC || 0);
+    target.precipitationMm = hydrology.precipitationMm;
+    target.snowpackMm = hydrology.snowpackMm;
+    target.hydroRunoffMm =
+      hydrology.runoffMm * (effects.hydroRunoffMultiplier ?? 1);
+    if (weather.WIND_OFFSHORE_KPH === undefined) {
+      delete target.windOffshoreKph;
+    } else {
+      target.windOffshoreKph = weather.WIND_OFFSHORE_KPH;
+    }
+    return target;
+  };
+}
+
+/** Catalog quotes consume resource availability, without demand, dispatch or financial passes. */
+export function generateResourceForecast(
+  readOnlyState: GameType,
+  ticks = TICKS_PER_YEAR * 3,
+): OutputWeatherTick[] {
+  if (isDraft(readOnlyState)) readOnlyState = current(readOnlyState);
+  // Match the full forecast's story context, including its trailing-year observations. The
+  // weather stage reads the opening fleet; later dispatch passes never change these readings.
+  const state = {
+    ...readOnlyState,
+    monthlyHistory: readOnlyState.monthlyHistory.slice(0, 12),
+  };
+  const resourceAt = createResourceWeatherReader(state, true);
+  return Array.from({ length: ticks }, (_, index) => {
+    const minute = state.date.minute + index * TICK_MINUTES;
+    const date = getDateFromMinute(minute, state.startingYear);
+    const resources = resourceAt(date, storyEffectsAt(date, state));
+    return {
+      minute,
+      windKph: resources.windKph,
+      windOffshoreKph: resources.windOffshoreKph,
+      windAirborneKph: resources.windAirborneKph,
+      solarIrradianceWM2: resources.solarIrradianceWM2,
+      hydroRunoffMm: resources.hydroRunoffMm,
+      // Full timelines have no per-technology override here. Keep the compact worker output's
+      // explicit undefined property, rather than introducing a new resource interpretation.
+      renewableCapacityFactors: undefined,
+    };
+  });
+}
+
+function reforecastWeatherAndPrices(
+  state: GameType,
+  forecastWeather = false,
+  preserveCurrentFrame = false,
+): TickPresentFutureType[] {
+  const resourceAt = createResourceWeatherReader(state, forecastWeather);
   return state.timeline.map((t: TickPresentFutureType) => {
-    if (t.minute >= state.date.minute) {
+    if (
+      t.minute >= state.date.minute &&
+      !(preserveCurrentFrame && t.minute === state.date.minute)
+    ) {
       const date = getDateFromMinute(t.minute, state.startingYear);
-      const weather = weatherAt(date);
       const effects = storyEffectsAt(date, state);
-      const fuelPrices = getEffectiveFuelPrices(date, state, effects);
-      const hydroKey = `${date.year}-${date.monthNumber}`;
-      let hydrology = hydrologyByMonth.get(hydroKey);
-      if (!hydrology) {
-        hydrology = hasHydro
-          ? getHydroConditions(
-              date,
-              state.seed,
-              0,
-              watershedId,
-              watershedWeatherAt,
-            )
-          : {
-              precipitationMm: 0,
-              snowpackMm: 0,
-              runoffMm: 0,
-              rainMm: 0,
-              meltMm: 0,
-            };
-        hydrologyByMonth.set(hydroKey, hydrology);
-      }
       const forecast = {
         ...t,
-        ...fuelPrices,
-        solarIrradianceWM2: getRawSolarIrradianceWM2(
-          date,
-          state.location,
-          weather.CLOUD_PCT,
-        ),
-        windKph: weather.WIND_KPH,
-        windAirborneKph: getAirborneWindReferenceKph(weather.WIND_KPH),
-        temperatureC: weather.TEMP_C + (effects.temperatureOffsetC || 0),
+        ...getEffectiveFuelPrices(date, state, effects),
         storedWh: 0,
-        precipitationMm: hydrology.precipitationMm,
-        snowpackMm: hydrology.snowpackMm,
-        hydroRunoffMm:
-          hydrology.runoffMm * (effects.hydroRunoffMultiplier ?? 1),
         hydroReservoirWh: 0,
         hydroReservoirCapacityWh: 0,
         hydroSpillWh: 0,
@@ -4353,11 +4784,9 @@ function reforecastWeatherAndPrices(
         storageDischargeW: 0,
         supplyByFuel: {} as FuelProductionType,
       } as TickPresentFutureType;
-      if (weather.WIND_OFFSHORE_KPH === undefined) {
-        delete forecast.windOffshoreKph;
-      } else {
-        forecast.windOffshoreKph = weather.WIND_OFFSHORE_KPH;
-      }
+      // Reuse the full tick instead of allocating and spreading an intermediate resource row.
+      // Offshore readings are appended last, as in the original full-timeline serializer.
+      resourceAt(date, effects, forecast);
       return forecast;
     }
     return t;
@@ -4524,8 +4953,13 @@ function* supplyFacilitiesFinancesPhases(
   advanceConstruction = true,
 ): Generator<PeerPlan, TickPresentFutureType, PeerSettlement | undefined> {
   const { facilities } = state;
+  // Compare each settled/forecast tick, not the rollover clock that may already be next month.
+  for (const facility of facilities)
+    if (facilityPermanentlyShutdown(facility, now.minute))
+      facility.paused = true;
   const noElapsed =
     (state.utilityExpansion ||
+      (isLegacyCampaignScenario(state.scenarioId) && !state.customScenario) ||
       state.transmission?.buyingRule === "SHORTAGES_AND_STORAGE") &&
     (preRoll || !advanceConstruction)
       ? {
@@ -5662,26 +6096,32 @@ function* supplyFacilitiesFinancesPhases(
       // incurs no variable O&M while it is disconnected from dispatch.
       const deliveredW = g.paused ? 0 : Math.max(0, g.currentW);
       const generatedWh = (deliveredW / ticksPerHour) * GAME_TO_REAL_YEARS;
-      let facilityOM = 0;
-      if (g.paused) {
-        // paused facilities only pay half of their operating costs
-        facilityOM += g.annualOperatingCost / ticksPerYear / 2;
-      } else {
-        facilityOM += g.annualOperatingCost / ticksPerYear;
-      }
-      facilityOM +=
-        (generatedWh / 1000000) * (g.variableOperatingCostPerMWh || 0);
       const started = startedFacilityIds.has(g.id);
-      if (started) {
-        // One simulated day stands for the average month. The visible off-to-on edge therefore
-        // represents the same daily start repeated throughout that month.
-        facilityOM += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
+      const mandatoryMaintenance = facilityMaintenanceCost(g, now.minute);
+      let facilityOM = 0;
+      if (mandatoryMaintenance !== undefined) {
+        // This nominal obligation survives pause/output changes and replaces reactor operating upkeep.
+        facilityOM = mandatoryMaintenance / ticksPerMonth;
+      } else {
+        if (g.paused) {
+          // paused facilities only pay half of their operating costs
+          facilityOM += g.annualOperatingCost / ticksPerYear / 2;
+        } else {
+          facilityOM += g.annualOperatingCost / ticksPerYear;
+        }
+        facilityOM +=
+          (generatedWh / 1000000) * (g.variableOperatingCostPerMWh || 0);
+        if (started) {
+          // One simulated day stands for the average month. The visible off-to-on edge therefore
+          // represents the same daily start repeated throughout that month.
+          facilityOM += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
+        }
+        facilityOM *=
+          ((g.fuel &&
+            tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
+            1) *
+          (costIndexNow / (g.costIndexAtBuild || 1));
       }
-      facilityOM *=
-        ((g.fuel &&
-          tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
-          1) *
-        (costIndexNow / (g.costIndexAtBuild || 1));
       facilityExpenses += facilityOM;
       expensesOM += facilityOM;
       const fuel = g.fuel && FUELS[g.fuel];
@@ -5854,11 +6294,13 @@ function* supplyFacilitiesFinancesPhases(
   // there -- a lost game turned into a corrupted one, with no way back to a number
   const percentDemandUnfulfilled =
     demandWh > 0 ? (demandWh - supplyWh) / demandWh : 0;
-  const organicGrowthRate =
-    ORGANIC_GROWTH_MAX_ANNUAL -
-    difficulty.blackoutPenalty * percentDemandUnfulfilled;
   const scenario =
     getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
+  const organicGrowthRate =
+    ORGANIC_GROWTH_MAX_ANNUAL -
+    (scenario.retainCustomersDuringShortages
+      ? 0
+      : difficulty.blackoutPenalty * percentDemandUnfulfilled);
 
   // Save new financial info
   now.customerRate = updateCustomerRate(
@@ -5870,7 +6312,7 @@ function* supplyFacilitiesFinancesPhases(
     customers: prev.customers,
     customerRate: now.customerRate,
     marketRate: getMarketRate(
-      scenario.dollarsPerkWh,
+      legacyMarketReferenceRate(state, scenario),
       tickDate,
       state.startingYear,
       state.seed,

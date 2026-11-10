@@ -16,14 +16,13 @@ function nonNegative(value: unknown): value is number {
 }
 
 const FACILITY_UPGRADES: readonly FacilityUpgradeType[] = [
-  "hailResistant",
   "coldWeatherPackage",
   "solarTrackers",
   "combinedCycle",
 ];
 
 const RESILIENCE_FIELDS_BY_FUEL: Readonly<Record<string, readonly string[]>> = {
-  Sun: ["hailResistant", "solarTrackers", "trackerHailDamageFactor"],
+  Sun: ["solarTrackers", "trackerHailDamageFactor"],
   "Natural Gas": ["coldWeatherPackage", "designMinTempC"],
   Coal: ["coldWeatherPackage"],
   Uranium: ["coldWeatherPackage"],

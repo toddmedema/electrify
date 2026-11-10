@@ -9,7 +9,7 @@ import {
   packageDigest,
 } from "./ModSchema";
 import { DIFFICULTY_IDS } from "../Constants";
-import { getDateFromMinute } from "../helpers/DateTime";
+import { MINUTES_PER_MONTH, getDateFromMinute } from "../helpers/DateTime";
 import { getScenarioLocation } from "../helpers/Locations";
 import {
   getHydroInventoryKey,
@@ -151,6 +151,25 @@ function resolveModSetup(input: unknown) {
     seed,
     startingYear,
     ...(overrides.location ? { locationId: overrides.location.id } : {}),
+    ...(!startingFleet
+      ? {
+          facilities: base.facilities.map((asset) => ({
+            ...asset,
+            ...(asset.maintenanceObligation
+              ? {
+                  maintenanceObligation: {
+                    ...asset.maintenanceObligation,
+                    monthlyCost: inEraMoney(
+                      asset.maintenanceObligation.monthlyCost,
+                      startingYear,
+                      base.startingYear,
+                    ),
+                  },
+                }
+              : {}),
+          })),
+        }
+      : {}),
     ...(startingFleet
       ? {
           facilities: startingFleet.map((asset, index) => ({
@@ -284,11 +303,25 @@ function resolveMod(
       namespace: { kind: "mod" as const, id: pack.id },
       seed,
       startingYear,
-      durationMonths,
+      durationMonths: durationMonths + (resolved.startingMonth ?? 1) - 1,
       startingPeakW,
       startingAssetIds: resolved.facilities.map((f) => f.assetId!),
       inheritedObjectiveIds: inherited.map((o) => o.id),
     };
+  // Authored goal months share the package's January calendar; no evidence exists before opening.
+  const firstPlayable = resolved.startingMonth ?? 1;
+  for (const [index, objective] of definitions.objectives.entries()) {
+    const field = "fromMonth" in objective ? "fromMonth" : "deadlineMonth";
+    const first =
+      "fromMonth" in objective ? objective.fromMonth : objective.deadlineMonth;
+    if (first < firstPlayable)
+      diagnostics.push({
+        code: "objective-before-opening",
+        path: `objectives[${index}].${field}`,
+        severity: "error",
+        message: `This objective starts before the first playable month, ${firstPlayable}. Move its window to the opening month or later.`,
+      });
+  }
   let rules: CompiledScenarioRules | undefined;
   const compiledByDifficulty: Partial<
     Record<DifficultyType, CompiledScenarioRules>
@@ -381,6 +414,9 @@ function resolveMod(
     parameters: {
       baseScenarioId,
       startingYear,
+      ...(resolved.startingMonth === undefined
+        ? {}
+        : { startingMonth: resolved.startingMonth }),
       durationMonths,
       seed,
       difficulty,
@@ -513,7 +549,10 @@ function resolvedScenarioDiagnostics(
   const startingFuels = new Set<string>();
   for (const difficulty of difficulties) {
     const state = {
-      date: getDateFromMinute(0, scenario.startingYear),
+      date: getDateFromMinute(
+        ((scenario.startingMonth ?? 1) - 1) * MINUTES_PER_MONTH,
+        scenario.startingYear,
+      ),
       startingYear: scenario.startingYear,
       difficulty,
       feePerKgCO2e: scenario.feePerKgCO2e,

@@ -14,6 +14,7 @@ const {
 const { SteamActivity } = require("./steam-activity.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
+const { enableSteamOverlay } = require("./steam-overlay.cjs");
 const {
   SteamNativeDialogs,
   loadDialogFunctions,
@@ -30,6 +31,10 @@ const {
   loadTextInputFunctions,
   validateTextInput,
 } = require("./steam-text-input.cjs");
+const {
+  loadPresentationFunctions,
+  steamPresentation,
+} = require("./steam-presentation.cjs");
 
 const CLOUD_PREFIX = /^electrify\/device-[a-f0-9]{32}\.json$/;
 const MAX_CLOUD_FILE_BYTES = 100 * 1024 * 1024;
@@ -72,13 +77,14 @@ class SteamService {
       }
       // Configure the overlay before Chromium creates its graphics context. The binding
       // forces repaint while idle, as required for Steam's overlay with a browser UI.
-      steamworks.electronEnableSteamOverlay();
+      enableSteamOverlay(app, steamworks);
       this.client = initializeBinding(config.appId);
       this.identity = {
         steamId: this.client.localplayer.getSteamId().steamId64.toString(),
         displayName: this.client.localplayer.getName(),
       };
       this.native = loadFunctions();
+      this.presentation = loadPresentationFunctions();
       this.user = this.native.user();
       this.activity = new SteamActivity(
         this.native,
@@ -155,6 +161,9 @@ class SteamService {
       online,
       cloudEnabled,
       timelineSupported: !!this.activity?.supported,
+      presentation: this.client
+        ? steamPresentation(this.presentation)
+        : undefined,
       ...this.identity,
     };
   }
@@ -337,8 +346,15 @@ class SteamService {
   }
 
   openFriends() {
-    if (!this.client) throw new Error("The Steam overlay is unavailable");
+    this.requireOverlay();
     this.client.overlay.activateDialog(0);
+  }
+
+  requireOverlay() {
+    if (!this.client || !this.native?.overlayEnabled(this.native.utils()))
+      throw new Error(
+        "The Steam overlay is unavailable. Enable it in Steam, or share the invite code to play with friends.",
+      );
   }
 
   setActivity(input) {

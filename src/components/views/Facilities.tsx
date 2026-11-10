@@ -1,3 +1,5 @@
+import { isTvLayout } from "../../TvLayout";
+import { getTextScale, subscribeTextSize } from "../../TextSize";
 import * as React from "react";
 import {
   Avatar,
@@ -8,13 +10,10 @@ import {
   List,
   ListItem,
   ListItemAvatar,
-  ListItemText,
   Typography,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
-import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
-import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import RemoveIcon from "@mui/icons-material/Remove";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
@@ -29,7 +28,10 @@ import {
   DragStart,
   NotDraggingStyle,
 } from "@hello-pangea/dnd";
-import FacilityContextMenu, { FacilityMenuTarget } from "./FacilityContextMenu";
+import FacilityContextMenu, {
+  FacilityMenuTarget,
+  facilityActionIcon,
+} from "./FacilityContextMenu";
 import { facilityGroupMoves } from "./FacilitySelection";
 import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
@@ -45,7 +47,10 @@ import {
   RetrofitFacilityAction,
   EvidenceRequestType,
 } from "../../Types";
-import { facilityCashBack } from "../../helpers/Financials";
+import {
+  facilityCashBack,
+  facilityPermanentlyShutdown,
+} from "../../helpers/Financials";
 import { storyOutputMultiplier } from "../../helpers/Story";
 import {
   formatMoneyConcise,
@@ -57,6 +62,8 @@ import {
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import FlowBar from "../base/FlowBar";
+import FacilityRowText from "../base/FacilityRowText";
+import { constructionStatus } from "../base/ConstructionProgress";
 import { getStorageBoolean, setStorageKeyValue } from "../../LocalStorage";
 import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import FacilityDetails from "../base/FacilityDetails";
@@ -226,6 +233,7 @@ const RESERVOIR_WARNING_FRACTION = 0.2;
 function FacilityActions(props: {
   facility: FacilityOperatingType;
   upgrading: boolean;
+  permanentlyShutdown: boolean;
   onPause: DispatchProps["onPause"];
   onTogglePause: DispatchProps["onTogglePause"];
   onCancelRetrofit?: DispatchProps["onCancelRetrofit"];
@@ -237,29 +245,40 @@ function FacilityActions(props: {
     onPause,
     onTogglePause,
     upgrading,
+    permanentlyShutdown,
     onCancelRetrofit,
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
+  if (permanentlyShutdown && facility.saleRestricted)
+    return (
+      <div className="facilityActions">
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          className="facilityActionNote"
+        >
+          This plant can't be sold.
+        </Typography>
+      </div>
+    );
   return (
     <div className="facilityActions">
-      {upgrading && onCancelRetrofit && (
+      {upgrading && !permanentlyShutdown && onCancelRetrofit && (
         // Refunds in full and returns the plant to service at once, so it needs no confirmation
         <Button
           className="facilityCancelConstruction"
           variant="outlined"
-          startIcon={<CancelIcon />}
+          startIcon={facilityActionIcon("cancelUpgrade")}
           aria-label={"Cancel upgrade of " + facilityDisplayName(facility)}
           onClick={() => onCancelRetrofit(facility.id)}
         >
           <span className="facilityActionLabel">Cancel upgrade</span>
         </Button>
       )}
-      {!underConstruction && !upgrading && (
+      {!underConstruction && !upgrading && !permanentlyShutdown && (
         <Button
           variant="outlined"
-          startIcon={
-            <ConceptIcon concept={facility.paused ? "play" : "pause"} />
-          }
+          startIcon={facilityActionIcon(facility.paused ? "resume" : "pause")}
           aria-label={
             facility.paused
               ? "Resume " + facilityDisplayName(facility)
@@ -276,20 +295,34 @@ function FacilityActions(props: {
           </span>
         </Button>
       )}
-      <Button
-        className={underConstruction ? "facilityCancelConstruction" : undefined}
-        variant="outlined"
-        startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
-        aria-label={
-          (underConstruction ? "Cancel construction of " : "Sell ") +
-          facilityDisplayName(facility)
-        }
-        onClick={onOpenSell}
-      >
-        <span className="facilityActionLabel">
-          {underConstruction ? "Cancel construction" : "Sell"}
-        </span>
-      </Button>
+      {facility.saleRestricted ? (
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          className="facilityActionNote"
+        >
+          This plant can't be sold.
+        </Typography>
+      ) : (
+        <Button
+          className={
+            underConstruction ? "facilityCancelConstruction" : undefined
+          }
+          variant="outlined"
+          startIcon={facilityActionIcon(
+            underConstruction ? "cancelConstruction" : "sell",
+          )}
+          aria-label={
+            (underConstruction ? "Cancel construction of " : "Sell ") +
+            facilityDisplayName(facility)
+          }
+          onClick={onOpenSell}
+        >
+          <span className="facilityActionLabel">
+            {underConstruction ? "Cancel construction" : "Sell"}
+          </span>
+        </Button>
+      )}
     </div>
   );
 }
@@ -303,8 +336,10 @@ const MemoizedFacilityActions = React.memo(
       previous.facility.id === next.facility.id &&
       previous.facility.name === next.facility.name &&
       previous.facility.paused === next.facility.paused &&
+      previous.facility.saleRestricted === next.facility.saleRestricted &&
       previousUnderConstruction === nextUnderConstruction &&
       previous.upgrading === next.upgrading &&
+      previous.permanentlyShutdown === next.permanentlyShutdown &&
       previous.onCancelRetrofit === next.onCancelRetrofit &&
       previous.onPause === next.onPause &&
       previous.onTogglePause === next.onTogglePause &&
@@ -338,6 +373,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     )
   );
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const permanentlyShutdown = facilityPermanentlyShutdown(
+    facility,
+    game.date.minute,
+  );
+  const outputW = permanentlyShutdown ? 0 : facility.currentW;
   const installing = underConstruction
     ? undefined
     : upgradeInProgress(facility);
@@ -407,7 +447,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   // bar backwards off its own left edge and read as an idle battery.
   const outputFraction =
     facility.peakW > 0
-      ? Math.max(-1, Math.min(1, facility.currentW / facility.peakW))
+      ? Math.max(-1, Math.min(1, outputW / facility.peakW))
       : 0;
   // The row's second line has to stay one line on a 360px phone, so it leads with the reading
   // and the state and leaves anything else to a trailing detail that truncates first. Rated
@@ -427,14 +467,14 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   let reading = "";
   let detail: React.ReactNode = null;
   if (underConstruction) {
-    const monthsLeft = Math.ceil(props.facility.yearsToBuildLeft * 12);
-    const percentBuilt = Math.round(builtFraction * 100);
-    reading = `Building ${percentBuilt}%`;
-    detail = `${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
+    ({ reading, detail } = constructionStatus(
+      builtFraction,
+      facility.yearsToBuildLeft,
+    ));
   } else if (upgrading) {
     const daysLeft = upgradeDaysLeft(installing!, game.date.minute);
     reading = partialUpgrade
-      ? formatWattsOfPeak(facility.currentW, facility.peakW)
+      ? formatWattsOfPeak(outputW, facility.peakW)
       : `Upgrading ${Math.round(builtFraction * 100)}%`;
     detail = (
       <>
@@ -450,7 +490,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } else if (facility.peakWh) {
     reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
-    reading = formatWattsOfPeak(facility.currentW, facility.peakW);
+    reading = formatWattsOfPeak(outputW, facility.peakW);
     // A reservoir row's percentage would read as how full it is, which its gauge already shows.
     if (!(fuel === "Hydro" && facility.reservoirCapacityWh))
       reading += ` · ${Math.round(Math.abs(outputFraction) * 100)}%`;
@@ -540,6 +580,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
+          role="listitem"
           className={`facilityRow${selected ? " selected" : ""}${props.bulkSelected ? " bulkSelected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
           onContextMenu={(event) => props.onContextMenu(facility.id, event)}
           data-fuel={fuel}
@@ -596,65 +637,39 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             >
               <ListItem className="facility" component="span">
                 {reorderDisabled && icon}
-                <span className="facilityText">
-                  <ListItemText
-                    slotProps={{
-                      primary: { component: "span" },
-                      secondary: { component: "span" },
-                    }}
-                    primary={
-                      <>
-                        <span className="facilityName">
-                          {facilityDisplayName(facility)}
-                        </span>
-                        {ready && (
-                          <span className="facilityReadyLabel">Ready</span>
-                        )}
-                        {storyOutputMultiplier < 1 && (
-                          <Chip
-                            className="storyDerateBadge"
-                            color="warning"
-                            size="small"
-                            label={`${Math.round(storyOutputMultiplier * 100)}% limit`}
-                            aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
-                          />
-                        )}
-                      </>
-                    }
-                    secondary={
-                      <>
-                        {hazardStatus && !underConstruction && (
-                          <HazardStatusLead status={hazardStatus} />
-                        )}
-                        <span className="facilityStatus">{status}</span>
-                        {detail && (
-                          <span className="facilityStatusDetail">
-                            <span
-                              className="facilityStatusSeparator"
-                              aria-hidden="true"
-                            >
-                              {" · "}
-                            </span>
-                            {detail}
-                          </span>
-                        )}
-                      </>
-                    }
-                  />
-                  {/* The percentage is already in the text; this only makes it glanceable */}
-                  {(underConstruction || upgrading) && (
-                    <span
-                      className="constructionProgress"
-                      data-paused={game.speed === "PAUSED"}
-                      aria-hidden
-                    >
-                      <span
-                        className="constructionProgressFill"
-                        style={{ width: `${builtFraction * 100}%` }}
-                      />
-                    </span>
-                  )}
-                </span>
+                <FacilityRowText
+                  name={
+                    <>
+                      <span className="facilityName">
+                        {facilityDisplayName(facility)}
+                      </span>
+                      {ready && (
+                        <span className="facilityReadyLabel">Ready</span>
+                      )}
+                      {storyOutputMultiplier < 1 && (
+                        <Chip
+                          className="storyDerateBadge"
+                          color="warning"
+                          size="small"
+                          label={`${Math.round(storyOutputMultiplier * 100)}% limit`}
+                          aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
+                        />
+                      )}
+                    </>
+                  }
+                  lead={
+                    hazardStatus && !underConstruction ? (
+                      <HazardStatusLead status={hazardStatus} />
+                    ) : undefined
+                  }
+                  status={status}
+                  detail={detail}
+                  progress={
+                    underConstruction || upgrading
+                      ? { builtFraction, paused: game.speed === "PAUSED" }
+                      : undefined
+                  }
+                />
                 {props.selectionEnabled && (
                   <span className="facilitySelectionSlot" aria-hidden>
                     {props.bulkSelected && !props.showCheckboxes && (
@@ -684,6 +699,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             // from also landing on the row behind it and toggling the selection
             <ConfirmDialog
               open
+              destructive
               isolateClicks
               title={
                 <>
@@ -695,7 +711,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                   facility?
                 </>
               }
-              cancelLabel="Nevermind"
+              cancelLabel="Never mind"
               confirmLabel={underConstruction ? "Cancel construction" : "Sell"}
               onCancel={toggleDialog}
               onConfirm={() => {
@@ -736,6 +752,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             <MemoizedFacilityActions
               facility={facility}
               upgrading={upgrading}
+              permanentlyShutdown={permanentlyShutdown}
               onPause={onPause}
               onTogglePause={onTogglePause}
               onCancelRetrofit={props.onCancelRetrofit}
@@ -818,13 +835,29 @@ export function fleetChartHeight(width: number, height: number): number {
   return Math.round(compactHeight * 0.85);
 }
 
+/**
+ * Keep chart height synchronized with window and text-size changes.
+ * Couch panes reserve 20% of the usual plot height for the rest of each company's fleet.
+ */
 function useFleetChartHeight(): number {
-  const measure = () => fleetChartHeight(window.innerWidth, window.innerHeight);
+  /** Measure the plot in CSS pixels, applying text scale to TV design dimensions once.
+   * The couch reduction reserves fleet space before native view zoom magnifies the whole pane. */
+  const measure = () => {
+    const height = isTvLayout()
+      ? Math.round(220 * getTextScale())
+      : fleetChartHeight(window.innerWidth, window.innerHeight);
+    // Split-screen keeps the daily plot 20% shorter to leave room for the fleet.
+    return window.electrifyCouch ? Math.round(height * 0.8) : height;
+  };
   const [height, setHeight] = React.useState(measure);
   React.useEffect(() => {
     const resize = () => setHeight(measure());
     window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
+    const stop = subscribeTextSize(resize);
+    return () => {
+      window.removeEventListener("resize", resize);
+      stop();
+    };
   }, []);
   return height;
 }
@@ -896,8 +929,12 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   private previewFocus: HTMLButtonElement | null = null;
   private menuFocus: HTMLButtonElement | null = null;
 
+  // Read once: the hint flag only ever flips to true, and one query list tracks the pointer
+  private bulkHintSeen = getStorageBoolean(BULK_HINT_SEEN_KEY, false);
+  private finePointer: MediaQueryList | null = null;
+
   private mouseEnabled = () =>
-    window.matchMedia("(any-pointer: fine)").matches &&
+    (this.finePointer ??= window.matchMedia("(any-pointer: fine)")).matches &&
     !(
       this.props.game.inGame &&
       activeScenario(this.props.game)?.tutorialSteps?.[
@@ -1221,11 +1258,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   }
 
   public componentDidUpdate() {
-    if (
-      this.state.ids.length > 1 &&
-      !getStorageBoolean(BULK_HINT_SEEN_KEY, false)
-    )
+    if (this.state.ids.length > 1 && !this.bulkHintSeen) {
+      this.bulkHintSeen = true;
       setStorageKeyValue(BULK_HINT_SEEN_KEY, true);
+    }
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
   }
@@ -1394,7 +1430,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                     </span>
                     {game.facilities.length >= HINT_MIN_FACILITIES &&
                       !activeScenario(game)?.tutorialSteps &&
-                      !getStorageBoolean(BULK_HINT_SEEN_KEY, false) && (
+                      !this.bulkHintSeen && (
                         <span>
                           Shift-click a range · Ctrl/⌘-click to add ·
                           Right-click for actions
@@ -1404,8 +1440,11 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                 )}
               </div>
             )}
+            {/* The scroller holds section labels and the intertie fleet as well as rows, so the
+              lists are the drag-and-drop containers inside it rather than the scroller itself. */}
             <List
               dense
+              component="div"
               className="scrollable unifiedFacilitiesList"
               data-group-dragging={this.state.groupDragging || undefined}
               onKeyDown={this.onSelectionKeyDown}
@@ -1428,7 +1467,12 @@ export default class Facilities extends React.Component<Props, SelectionState> {
               >
                 <Droppable droppableId="droppable">
                   {(provided) => (
-                    <div {...provided.droppableProps} ref={provided.innerRef}>
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      role="list"
+                      aria-label="Plants and storage"
+                    >
                       {game.facilities.map(
                         (g: FacilityOperatingType, i: number) => (
                           <FacilityListItem

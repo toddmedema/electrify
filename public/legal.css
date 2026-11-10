@@ -1,8 +1,8 @@
 :root {
   color-scheme: light dark;
   --brand: #0084f8;
-  --brand-strong: #0967b8;
-  --brand-deep: #064a87;
+  --brand-strong: #0084f8;
+  --brand-deep: #1565c0;
   --brand-wash: rgba(0, 132, 248, 0.1);
   --page: #f2f7fb;
   --surface: #ffffff;
@@ -895,7 +895,9 @@ a:hover {
   color: var(--text-muted);
 }
 
-.comparison-table__label {
+.comparison-table__label,
+.comparison-table__arrow,
+.comparison-table__change {
   display: none;
 }
 
@@ -957,13 +959,33 @@ a:hover {
     font-weight: 750;
   }
 
+  /* A paired comparison reads as one line per row: "before → after (change)". */
   .comparison-table--paired tbody tr {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0 1rem 0.75rem;
   }
 
   .comparison-table--paired tbody th {
-    grid-column: 1 / -1;
+    margin: 0 -1rem 0.75rem;
+  }
+
+  .comparison-table--paired tbody td {
+    display: inline-block;
+    padding: 0;
+    vertical-align: top;
+  }
+
+  .comparison-table--paired .comparison-table__label {
+    display: none;
+  }
+
+  .comparison-table--paired .comparison-table__arrow,
+  .comparison-table--paired .comparison-table__change {
+    display: inline;
+  }
+
+  .comparison-table--paired .comparison-table__change {
+    color: var(--text);
+    font-weight: 750;
   }
 }
 

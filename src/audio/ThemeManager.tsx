@@ -3,314 +3,139 @@ import {
   MUSIC_FADE_SECONDS,
   MUSIC_GAME_VOLUME,
   MUSIC_INTENSITY_MAX,
+  MUSIC_LOW_RESERVE_PRESSURE_MAX,
   MusicDefinition,
 } from "../Constants";
 import { AudioNode } from "./AudioNode";
+import { pow } from "../helpers/Pow";
 
-/* Notes on audio implementation:
-- intensity 0 stops music, 1 selects the menu loop, and 2-10 adds pressure to the gameplay mix.
-  The current game state selects the theme; waiting in a menu never advances to gameplay music.
-- some people say that exponentialRampToValueAtTime sounds better than linear ramping;
-  after several experiments, I've decided it actually sounds worse for our use case.
-- gameplay files are purposefully longer than their listed durationMs for their reverb tails.
-  The menu WAV has an exact loop boundary and repeats natively on the audio clock.
-- audio.enabled only changes from detecting incompatibility, or user changing the setting
-  and so behaves like an all-stop since it's unlikely to be turned back on that session
-  - for example, if this is initialized with audio disabled, it does not load audio files -
-    but, if you turn on audio later in the session, it'll download them at that time
-- audio.paused may change at any time (such as minimizing / returning to the tab),
-  so it behaves like pause / resume
-- pause / resume keeps its place in the theme rather than starting it over. Buffer sources are
-  single-use, so resuming rebuilds them and seeks in; the position is tracked here at the theme
-  level rather than per node, since the stems have to stay aligned with each other.
-*/
+// Web Audio gains are amplitude ratios: -15 dB is 10^(-15/20), about 17.8% gain.
+const MUSIC_HIGH_LOW_RESERVE_GAIN = pow(10, -15 / 20);
 
 export const MUSIC_PRESSURE_HOLD_MS = 8000;
 export const MUSIC_PRESSURE_ATTACK_SECONDS = 3;
 export const MUSIC_PRESSURE_RELEASE_SECONDS = 10;
+// A long pause tail would overlap a second copy of the song after a quick mute/unmute.
+export const MUSIC_PAUSE_FADE_SECONDS = 0.05;
 
+/** Owns scene changes and mixing. Repetition belongs entirely to the native audio clock. */
 export class ThemeManager {
-  private context: AudioContext;
-  private nodes: {
-    [key: string]: AudioNode;
-  };
-  private active: string[];
-
-  private intensity: number;
-  private paused: boolean;
-  private theme: MusicDefinition;
-  private timeout: ReturnType<typeof setTimeout> | null = null;
-  private loopResumeListener: (() => void) | null = null;
+  private intensity = 0;
+  private paused = false;
+  private theme: MusicDefinition = MUSIC_DEFINITIONS.menu;
+  private active: AudioNode[] = [];
+  private themeStartedAt: number | null = null;
+  private resumeOffsetSeconds = 0;
   private recoveryTimeout: ReturnType<typeof setTimeout> | null = null;
   private mixedPressure = 0;
   private transitionEndsAt = 0;
-  // Context time at which the current theme would have started playing from its first sample, or
-  // null when nothing is playing. Backdated when a theme starts part-way through, so that the
-  // elapsed position is always currentTime - themeStartedAt.
-  private themeStartedAt: number | null = null;
-  private resumeOffsetSeconds: number = 0;
 
   constructor(
-    context: AudioContext,
-    nodes: { [key: string]: AudioNode },
-    intensity: number = 0,
-  ) {
-    this.context = context;
-    this.nodes = nodes;
-    this.active = [];
-    for (const k of Object.keys(this.nodes)) {
-      if (this.nodes[k].isPlaying()) {
-        this.active.push(k);
-      }
-    }
-    this.theme = MUSIC_DEFINITIONS.menu;
-    this.paused = false;
-    this.intensity = intensity;
-  }
+    private context: AudioContext,
+    private nodes: Record<string, AudioNode>,
+  ) {}
 
+  /** Save the decoded playhead and silence every source, including outgoing crossfades. */
   public pause() {
-    if (this.paused) {
-      return;
-    }
+    if (this.paused) return;
     this.paused = true;
-    // Stamp our place in the theme before fadeOut() tears the sources down. Taken at the moment
-    // pause is requested, so the fade-out tail -- which keeps sounding for up to
-    // MUSIC_FADE_SECONDS after this -- repeats under the fade-in on the way back.
-    // Repeating that brief tail under a fade reads as natural.
     this.resumeOffsetSeconds = this.elapsedInTheme();
     this.clearRecovery();
-    this.fadeOut();
-  }
-
-  // How far into the current theme we are, in seconds. Zero when nothing is playing, or when the
-  // loop timer ran long enough that we are past the end of the theme and starting it over is the
-  // only sensible position.
-  private elapsedInTheme(): number {
-    if (this.themeStartedAt === null) {
-      return 0;
-    }
-    const elapsed = this.context.currentTime - this.themeStartedAt;
-    if (this.theme.loop && elapsed > 0) {
-      return elapsed % (this.theme.durationMs / 1000);
-    }
-    if (elapsed <= 0 || elapsed >= this.theme.durationMs / 1000) {
-      return 0;
-    }
-    return elapsed;
-  }
-
-  private fadeOut() {
-    if (this.timeout !== null) {
-      clearTimeout(this.timeout);
-      this.timeout = null;
-    }
-    if (this.loopResumeListener !== null) {
-      this.context.removeEventListener("statechange", this.loopResumeListener);
-      this.loopResumeListener = null;
-    }
-    // Every caller of this is ending the current playback, so there is no longer a position to
-    // measure against -- loopTheme sets it again when it starts the next one.
+    Object.values(this.nodes).forEach((node) =>
+      node.stopAll(MUSIC_PAUSE_FADE_SECONDS),
+    );
+    this.active = [];
     this.themeStartedAt = null;
-    for (const i of this.active) {
-      if (this.nodes[i] && this.nodes[i].isPlaying()) {
-        this.nodes[i].fadeOut(MUSIC_FADE_SECONDS, true);
-      }
-    }
   }
 
-  public isPaused(): boolean {
-    return this.paused;
+  /** Restart the selected scene at its saved playhead with the latest grid pressure. */
+  public resume() {
+    if (!this.paused) return;
+    this.paused = false;
+    this.mixedPressure = this.pressure();
+    if (this.intensity > 0) this.start(this.resumeOffsetSeconds, 0.1);
   }
 
+  /** Measure progress modulo the decoded loop so pauses across a boundary resume in place. */
+  private elapsedInTheme(): number {
+    if (this.themeStartedAt === null || !this.active.length) return 0;
+    // Use decoded samples, not an independently authored timer or rounded MP3 duration.
+    return (
+      Math.max(0, this.context.currentTime - this.themeStartedAt) %
+      this.active[0].duration
+    );
+  }
+
+  /** Fade the current scene and clear its playhead before choosing another scene. */
+  private stop(seconds = MUSIC_FADE_SECONDS) {
+    this.active.forEach((node) => node.fadeOut(seconds));
+    this.active = [];
+    this.themeStartedAt = null;
+  }
+
+  /** Select silence, menu or gameplay, updating pressure without restarting the same scene. */
   public setIntensity(intensity: number) {
     intensity = Number.isFinite(intensity)
       ? Math.min(MUSIC_INTENSITY_MAX, Math.max(0, intensity))
       : 0;
-    if (intensity !== this.intensity) {
-      this.playAtIntensity(intensity);
-    }
-  }
-
-  // Starts the music with a new theme, fading out any existing music
-  // If no theme specified, uses existing music (for example, resuming from a pause)
-  // offsetSeconds seeks into the theme, so that a resume picks up where the pause left off
-  private startTheme(
-    theme: MusicDefinition = this.theme,
-    offsetSeconds: number = 0,
-  ) {
-    this.fadeOut();
-    this.theme = theme;
-    this.resumeOffsetSeconds = offsetSeconds;
-    this.transitionEndsAt = this.context.currentTime + MUSIC_FADE_SECONDS;
-    this.loopTheme(true, offsetSeconds);
-  }
-
-  public resume() {
-    if (!this.paused) {
-      return;
-    }
-    this.paused = false;
-    if (this.intensity === 0) {
-      return;
-    }
-    const offsetSeconds = this.resumeOffsetSeconds;
-    this.resumeOffsetSeconds = 0;
-    this.mixedPressure = this.pressure();
-    this.startTheme(this.theme, offsetSeconds);
-  }
-
-  private playAtIntensity(newIntensity: number) {
-    const old = this.intensity;
-    this.intensity = newIntensity;
-    if (newIntensity === 0) {
-      // Stopping music
+    if (intensity === this.intensity) return;
+    const previous = this.intensity;
+    this.intensity = intensity;
+    if (intensity === 0) {
       this.clearRecovery();
-      this.fadeOut();
-      this.active = [];
-    } else {
-      const theme =
-        newIntensity === 1 ? MUSIC_DEFINITIONS.menu : MUSIC_DEFINITIONS.basic;
-      if (old === 0 || theme !== this.theme) {
-        this.clearRecovery();
-        this.mixedPressure = this.pressure();
-        this.startTheme(theme);
-      } else if (!this.paused) {
-        this.updateTheme();
-      }
-    }
-  }
-
-  private generateTracks(): string[] {
-    const theme = this.theme;
-    return theme.tracks.map((i: string) => {
-      return `${theme.directory}${i}`;
-    });
-  }
-
-  public getActiveInstrument(instrument: string): string | null {
-    for (const a of this.active) {
-      if (a.indexOf(instrument) !== -1) {
-        return a;
-      }
-    }
-    return null;
-  }
-
-  // Kick off a copy of the existing music theme
-  // Doesn't stop the current music nodes (lets them stop naturally for reverb)
-  // offsetSeconds starts every track that far in, for resuming a theme part-way through
-  private loopTheme(newTheme: boolean = false, offsetSeconds: number = 0) {
-    if (this.paused) {
+      this.stop();
+      this.resumeOffsetSeconds = 0;
       return;
     }
-    const theme = this.theme;
-    this.active = this.generateTracks();
-    // One clock reading shared by every track in the theme: the stems are written to play on top
-    // of each other, so reading the clock per track would let them drift apart by however long
-    // the loop below takes to run.
-    const startAt = this.context.currentTime;
+    const theme =
+      intensity === 1 ? MUSIC_DEFINITIONS.menu : MUSIC_DEFINITIONS.basic;
+    if (previous === 0 || theme !== this.theme) {
+      this.clearRecovery();
+      this.stop();
+      this.theme = theme;
+      this.resumeOffsetSeconds = 0;
+      this.mixedPressure = this.pressure();
+      if (!this.paused)
+        this.start(
+          0,
+          previous === 0 && intensity === 1 ? 0.1 : MUSIC_FADE_SECONDS,
+        );
+    } else if (!this.paused) {
+      this.updateTheme();
+    }
+  }
+
+  /** Start every stem at one future audio-clock time and a shared decoded offset. */
+  private start(offsetSeconds = 0, fadeSeconds = MUSIC_FADE_SECONDS) {
+    // Schedule every stem slightly ahead on one clock, so creating nodes cannot stagger them.
+    const startAt = this.context.currentTime + 0.02;
     this.themeStartedAt = startAt - offsetSeconds;
-    theme.tracks.forEach((track: string) => {
-      let file = this.getActiveInstrument(track);
-      const active = this.intensity > 0 || Boolean(file);
-      file = file || `${theme.directory}${track}`;
-
-      // Add silent tracks to the active set
-      if (!active) {
-        this.active.push(file);
-      }
-
-      const node = this.nodes[file];
-      if (!node) {
-        // Every file a theme names is loaded up front, and a failure there is already reported
-        // by loadAudioFiles -- so reaching this means MUSIC_DEFINITIONS names a track that
-        // getAllMusicFiles never fetched, which is a content bug rather than a runtime hiccup.
-        console.warn(`No audio node for ${file}; skipping that track`);
-        return;
-      }
-
-      // Determine initial & target volume
-      const targetVolume = active ? this.trackVolume(track) : 0;
-      const initialVolume = newTheme || !active ? 0 : targetVolume;
-      node.playOnce(
-        initialVolume,
-        targetVolume,
-        offsetSeconds,
-        startAt,
-        theme.loop,
-      );
+    this.transitionEndsAt = startAt + fadeSeconds;
+    this.active = this.theme.tracks.map((track) => {
+      const node = this.nodes[`${this.theme.directory}${track}`];
+      node.play(this.trackVolume(track), offsetSeconds, startAt, fadeSeconds);
+      return node;
     });
-
-    // The menu WAV is an exact loop, with no encoder padding or reverb tail to overlap.
-    // Web Audio repeats it on its own sample clock, including in throttled background tabs.
-    if (theme.loop) {
-      return;
-    }
-
-    this.scheduleLoop();
-  }
-
-  private scheduleLoop() {
-    if (this.themeStartedAt === null || this.paused || this.theme.loop) {
-      return;
-    }
-    // JavaScript timers can keep advancing while the browser's audio clock is suspended.
-    // Wait for that clock to restart rather than polling a nearly finished track in a loop.
-    if (this.context.state !== "running") {
-      if (this.context.state !== "closed") {
-        const onStateChange = () => {
-          if (
-            this.context.state !== "running" &&
-            this.context.state !== "closed"
-          ) {
-            return;
-          }
-          this.context.removeEventListener("statechange", onStateChange);
-          this.loopResumeListener = null;
-          this.scheduleLoop();
-        };
-        this.loopResumeListener = onStateChange;
-        this.context.addEventListener("statechange", onStateChange);
-      }
-      return;
-    }
-
-    // A timer is only a wake-up: the playhead decides when the theme has actually finished.
-    // Backdating themeStartedAt on resume also keeps this deadline at the original loop boundary.
-    const remainingMs =
-      (this.themeStartedAt +
-        this.theme.durationMs / 1000 -
-        this.context.currentTime) *
-      1000;
-    if (remainingMs <= 0) {
-      this.loopTheme();
-      return;
-    }
-    this.timeout = setTimeout(
-      () => {
-        this.timeout = null;
-        this.scheduleLoop();
-      },
-      Math.max(1, Math.ceil(remainingMs)),
-    );
   }
 
   private pressure(): number {
     return Math.max(0, (this.intensity - 2) / (MUSIC_INTENSITY_MAX - 2));
   }
 
+  /** Bring in the high layer at low reserves, reaching full gain only during blackouts. */
   private trackVolume(track: string): number {
     if (this.theme === MUSIC_DEFINITIONS.menu) {
       return 1;
     }
-    // Keep every authored layer at 85% when stable. Lift the urgent high layer first, then the
-    // medium and low layers, reaching the original ceiling together in a severe blackout.
     const pressure = this.mixedPressure;
-    const lift = track.startsWith("high")
-      ? Math.sqrt(pressure)
-      : track.startsWith("low")
-        ? pressure * pressure
-        : pressure;
+    if (track.startsWith("high")) {
+      if (pressure === 0) return 0;
+      return pressure <= MUSIC_LOW_RESERVE_PRESSURE_MAX
+        ? MUSIC_HIGH_LOW_RESERVE_GAIN
+        : 1;
+    }
+    // Keep the supporting layers at 85% when calm, lifting them as pressure rises.
+    const lift = track.startsWith("low") ? pressure * pressure : pressure;
     return MUSIC_GAME_VOLUME + (1 - MUSIC_GAME_VOLUME) * lift;
   }
 
@@ -321,6 +146,7 @@ export class ThemeManager {
     }
   }
 
+  /** Retarget stem gains without shortening an in-progress scene transition. */
   private updateMix(seconds: number) {
     // Grid changes during the scene fade must not shorten the five-second arrival.
     const duration = Math.max(
@@ -335,6 +161,7 @@ export class ThemeManager {
     });
   }
 
+  /** Respond to worsening pressure immediately and hold brief recoveries before fading down. */
   private updateTheme() {
     const pressure = this.pressure();
     if (pressure >= this.mixedPressure) {

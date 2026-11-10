@@ -151,7 +151,9 @@ for (const theme of ["light", "dark"] as const) {
           .click();
         const dialog = page.getByRole("dialog", { name: /^Build / });
         await expect(dialog).toBeVisible();
-        await expect(page.locator(".MuiDialog-root")).toHaveCSS("opacity", "1");
+        await expect(
+          page.locator(".MuiDialog-root").filter({ has: dialog }),
+        ).toHaveCSS("opacity", "1");
         await expectDialogToFit(dialog);
         const content = dialog.locator(".MuiDialogContent-root");
         expect(
@@ -171,7 +173,7 @@ for (const theme of ["light", "dark"] as const) {
         expect(title.x + title.width + 7).toBeLessThanOrEqual(close.x);
         if (name === "Solar") {
           const description = dialog.getByText(
-            "Follows the sun for about 20% more morning and evening power.",
+            "Follows the sun for about 20% more energy a year, mostly in the morning and evening.",
             { exact: true },
           );
           await expect(description).toBeVisible();

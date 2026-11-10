@@ -137,6 +137,138 @@ for (const theme of ["light", "dark"] as const) {
     }
   });
 
+  test(`plant and intertie rows under construction look alike in ${theme}`, async ({
+    page,
+  }) => {
+    test.setTimeout(120000);
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=100");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const pane = page.locator(".facilities:visible");
+    const facilities = page.getByRole("button", {
+      name: "Facilities",
+      exact: true,
+    });
+    await openPane(pane, facilities);
+    await openBuild(page);
+    await page.getByRole("tab", { name: "Generators", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Review purchase of Solar", exact: true })
+      .click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Pay cash" })
+      .click();
+    await openBuild(page);
+    await page.getByRole("tab", { name: "Interties", exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: "Review purchase of Pacific Northwest intertie",
+      })
+      .click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Take loan" })
+      .click();
+    await openPane(pane, facilities);
+    const plant = pane.locator('.facilityRow[data-facility="Solar"]');
+    const line = pane.locator(".transmissionLine").first();
+    await expect(plant).toContainText(/Building \d+%/);
+    await expect(line).toContainText(/Building \d+%/);
+    // Let the purchase snackbar go, so nothing covers the rows being measured
+    await page.mouse.move(0, 0);
+    await expect(page.locator(".snackbarContent")).toBeHidden();
+
+    // Everything about how the row reads: the meter's placement and colours against its own
+    // header, and the typography of the name and the two halves of the status line. Fill widths
+    // and the words themselves differ between rows; nothing else should.
+    const look = (row: Locator) =>
+      row.evaluate((element) => {
+        const text = [
+          "font-size",
+          "font-weight",
+          "line-height",
+          "color",
+          "font-variant-numeric",
+          "text-transform",
+          "letter-spacing",
+        ];
+        const styles = (selector: string, properties: string[]) => {
+          const target = element.querySelector(selector)!;
+          return Object.fromEntries(
+            properties.map((name) => [
+              name,
+              getComputedStyle(target).getPropertyValue(name),
+            ]),
+          );
+        };
+        const header = element
+          .querySelector(".facilityRowHeader")!
+          .getBoundingClientRect();
+        const bar = element
+          .querySelector(".constructionProgress")!
+          .getBoundingClientRect();
+        const fill = element.querySelector(".constructionProgressFill")!;
+        return {
+          rowHeight: header.height,
+          meter: {
+            // Flush with both edges and the foot of the header, not the text column
+            leftInset: bar.left - header.left,
+            rightInset: header.right - bar.right,
+            bottomInset: header.bottom - bar.bottom,
+            height: bar.height,
+            ...styles(".constructionProgress", ["background-color"]),
+            fill: getComputedStyle(fill).backgroundColor,
+            sweep: getComputedStyle(fill, "::before").animationName,
+            sweepState: getComputedStyle(fill, "::before").animationPlayState,
+          },
+          name: styles(".facilityName", text),
+          status: styles(".facilityStatus", text),
+          detail: styles(".facilityStatusDetail", text),
+        };
+      });
+    const paused = await look(line);
+    expect(paused).toEqual(await look(plant));
+    expect(paused.meter).toMatchObject({
+      leftInset: 0,
+      rightInset: 0,
+      bottomInset: 0,
+      height: 4,
+      sweepState: "paused",
+    });
+
+    // Both meters sweep while the clock runs, and the rows keep their size and place
+    // when construction completes
+    const speed = (name: string) =>
+      page
+        .locator("#appbar:visible")
+        .getByRole("button", { name, exact: true })
+        .first();
+    await speed("fast speed").click();
+    await expect
+      .poll(async () => (await look(line)).meter.sweepState)
+      .toBe("running");
+    expect((await look(line)).meter).toEqual((await look(plant)).meter);
+    await expect(async () => {
+      if ((await speed("pause").getAttribute("aria-pressed")) === "true") {
+        await speed("fast speed").click();
+      }
+      await expect(pane).not.toContainText("Building", { timeout: 1000 });
+    }).toPass({ timeout: 90000 });
+    await speed("pause").click();
+    await expect(speed("pause")).toHaveAttribute("aria-pressed", "true");
+    for (const row of [plant, line]) {
+      const height = await row
+        .locator(".facilityRowHeader")
+        .evaluate((header) => header.getBoundingClientRect().height);
+      expect(height).toBeCloseTo(paused.rowHeight, 0);
+    }
+  });
+
   test(`intertie construction controls and motion in ${theme}`, async ({
     page,
   }, testInfo) => {
@@ -188,7 +320,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(page.getByRole("dialog")).toContainText(
       "after settling the outstanding loan",
     );
-    await page.getByRole("button", { name: "Nevermind", exact: true }).click();
+    await page.getByRole("button", { name: "Never mind", exact: true }).click();
     const speed = (name: string) =>
       page
         .locator("#appbar:visible")

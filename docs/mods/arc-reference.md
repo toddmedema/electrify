@@ -2,20 +2,22 @@
 
 Use these phase, choice and load IDs when importing bundled challenge arcs with `officialArcs`.
 
-Month 1 is the receiving grid's January opening; offsets start at 0. Dates include preparation time, and ranges show every possible onset. Durations use Easy (Employee); check Author report for other difficulties and your grid's resolved load sizes and costs. An arc with no preparation lead, choices or permanent loads omits that section.
+Month 1 is January of the receiving grid's starting year; offsets start at 0. The Chernobyl base opens in March at offset 2; its first playable month is calendar month 3. Dates include preparation time, and ranges show every possible onset. Durations use Easy (Employee); check Author report for other difficulties and your grid's resolved load sizes and costs. An arc with no preparation lead, choices or permanent loads omits that section.
+
+Imported phases marked Through run end remain active until the receiving term ends, including a longer customized term.
 
 Conditions use `{arc: scenarioId, choiceId, optionIds}`; load replacements use `{arc: scenarioId, loadId}`. With `includeChoices: false`, each choice takes its listed free response automatically, including any grant and associated rules.
 
 ## 100 · Carbon Fee
 
-| Phase ID            | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID            | Relocated offset | Calendar month | Active duration (Easy) |
 | ------------------- | ---------------- | -------------- | ---------------------- |
 | `published-ratchet` | 12               | 13             | Message only           |
 | `ratchet-onset`     | 48               | 49             | 96 months              |
 
 ## 101 · Rise of Renewables
 
-| Phase ID                  | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID                  | Relocated offset | Calendar month | Active duration (Easy) |
 | ------------------------- | ---------------- | -------------- | ---------------------- |
 | `bridge-contracts`        | 0                | 1              | 144 months             |
 | `manufacturing-warning`   | 72               | 73             | Message only           |
@@ -26,7 +28,7 @@ Conditions use `{arc: scenarioId, choiceId, optionIds}`; load replacements use `
 
 ## 102 · The End of an Era
 
-| Phase ID             | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID             | Relocated offset | Calendar month | Active duration (Easy) |
 | -------------------- | ---------------- | -------------- | ---------------------- |
 | `aging-warning`      | 48               | 49             | Message only           |
 | `aging-derate`       | 72               | 73             | 24 months              |
@@ -37,7 +39,7 @@ Conditions use `{arc: scenarioId, choiceId, optionIds}`; load replacements use `
 
 ## 103 · The Shale Boom
 
-| Phase ID                | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID                | Relocated offset | Calendar month | Active duration (Easy) |
 | ----------------------- | ---------------- | -------------- | ---------------------- |
 | `regional-glut-warning` | 12               | 13             | Message only           |
 | `regional-glut`         | 48               | 49             | 74 months              |
@@ -48,7 +50,7 @@ Conditions use `{arc: scenarioId, choiceId, optionIds}`; load replacements use `
 
 ## 104 · Hurricane Season
 
-| Phase ID      | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID      | Relocated offset | Calendar month | Active duration (Easy) |
 | ------------- | ---------------- | -------------- | ---------------------- |
 | `outlook`     | 60               | 61             | Message only           |
 | `landfall`    | 101–106          | 102–107        | 3 months               |
@@ -58,7 +60,7 @@ Conditions use `{arc: scenarioId, choiceId, optionIds}`; load replacements use `
 
 Preparation lead: 12 months.
 
-| Phase ID              | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID              | Relocated offset | Calendar month | Active duration (Easy) |
 | --------------------- | ---------------- | -------------- | ---------------------- |
 | `visitor-warning`     | 33               | 34             | Message only           |
 | `visitor-peak`        | 40               | 41             | 18 months              |
@@ -84,7 +86,7 @@ This arc has no timed phases; its load and decision are listed below.
 
 ## 107 · Deep Freeze
 
-| Phase ID | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID | Relocated offset | Calendar month | Active duration (Easy) |
 | -------- | ---------------- | -------------- | ---------------------- |
 | `uri`    | 49               | 50             | 1 month                |
 | `thaw`   | 50               | 51             | Message only           |
@@ -97,7 +99,7 @@ This arc has no timed phases; its load and decision are listed below.
 
 Preparation lead: 12 months.
 
-| Phase ID           | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID           | Relocated offset | Calendar month | Active duration (Easy) |
 | ------------------ | ---------------- | -------------- | ---------------------- |
 | `seasonal-warning` | 18               | 19             | Message only           |
 | `heatwave-month-1` | 41               | 42             | 1 month                |
@@ -109,7 +111,7 @@ Preparation lead: 12 months.
 
 Preparation lead: 12 months.
 
-| Phase ID             | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID             | Relocated offset | Calendar month | Active duration (Easy) |
 | -------------------- | ---------------- | -------------- | ---------------------- |
 | `contingency-review` | 13               | 14             | Message only           |
 | `trip`               | 42–48            | 43–49          | 48 months              |
@@ -118,7 +120,7 @@ Preparation lead: 12 months.
 
 Preparation lead: 24 months.
 
-| Phase ID    | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID    | Relocated offset | Calendar month | Active duration (Easy) |
 | ----------- | ---------------- | -------------- | ---------------------- |
 | `readiness` | 25               | 26             | Message only           |
 | `outage`    | 36               | 37             | 2 months               |
@@ -128,7 +130,7 @@ Preparation lead: 24 months.
 
 Preparation lead: 24 months.
 
-| Phase ID              | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID              | Relocated offset | Calendar month | Active duration (Easy) |
 | --------------------- | ---------------- | -------------- | ---------------------- |
 | `maintenance-backlog` | 30               | 31             | Message only           |
 | `availability-step-1` | 36               | 37             | 12 months              |
@@ -140,7 +142,7 @@ Preparation lead: 24 months.
 
 Preparation lead: 24 months.
 
-| Phase ID              | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID              | Relocated offset | Calendar month | Active duration (Easy) |
 | --------------------- | ---------------- | -------------- | ---------------------- |
 | `poor-rains-forecast` | 32               | 33             | Message only           |
 | `reservoir-step-1`    | 36               | 37             | 6 months               |
@@ -156,7 +158,7 @@ Preparation lead: 24 months.
 
 Preparation lead: 36 months.
 
-| Phase ID         | Relocated offset | Playable month | Active duration (Easy) |
+| Phase ID         | Relocated offset | Calendar month | Active duration (Easy) |
 | ---------------- | ---------------- | -------------- | ---------------------- |
 | `summer-outlook` | 38               | 39             | Message only           |
 | `summer-peak-1`  | 40               | 41             | 3 months               |
@@ -167,3 +169,12 @@ Preparation lead: 36 months.
 ## 116 · Across the Valley
 
 This arc adds no global shocks. Use Across the Valley as the base to retain operating areas, utility portfolios and acquisition contracts.
+
+## 126 · Chernobyl: Recovery
+
+| Phase ID             | Relocated offset | Calendar month | Active duration (Easy) |
+| -------------------- | ---------------- | -------------- | ---------------------- |
+| `disaster`           | 3                | 4              | 6 months               |
+| `unit-one-returns`   | 9                | 10             | 1 month                |
+| `unit-two-returns`   | 10               | 11             | 13 months              |
+| `unit-three-returns` | 23               | 24             | Through run end        |

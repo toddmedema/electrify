@@ -1,3 +1,4 @@
+import { unlockAllDifficulties } from "./difficulty-fixture";
 import { expect, Page, Browser } from "@playwright/test";
 import { gzipSync } from "node:zlib";
 import fs from "node:fs/promises";
@@ -12,6 +13,7 @@ import type {
   NativeEvent,
   NativeRequest,
   SharedSaveLibrary,
+  WireMessage,
 } from "../src/multiplayer/Native";
 import type { RoomView, World } from "../src/multiplayer/Types";
 import { verifyMenuKeyboard } from "./menu-keyboard";
@@ -229,6 +231,29 @@ class SteamRoom {
   >();
   members: LobbyState["members"] = [];
   checkpoint?: World;
+  private saveResults = new Map<
+    string,
+    Extract<WireMessage, { kind: "save-result" }>
+  >();
+  async saveCheckpoint(sender: string) {
+    const requestId = crypto.randomUUID();
+    try {
+      await this.request(sender, {
+        kind: "send",
+        to: this.host,
+        payload: { kind: "save-request", requestId },
+      });
+      // The real host worker and bridge persist the world before this correlated reply.
+      await expect
+        .poll(() => this.saveResults.get(requestId))
+        .toEqual({
+          kind: "save-result",
+          requestId,
+        });
+    } finally {
+      this.saveResults.delete(requestId);
+    }
+  }
   campaignName = "Friends campaign";
   campaignCloudState: SharedSaveLibrary["cloudState"] = "ready";
   campaignWarning?: string;
@@ -242,6 +267,7 @@ class SteamRoom {
   dropped = new Set<string>();
   host = "76561198000000001";
   lobbyId = "109775242999999999";
+  inviteCode = "012345";
   private async transportFailure(id: string, error: unknown) {
     if (this.transportErrors.length) return;
     const message = `${id}: ${error instanceof Error ? error.message : String(error)}`;
@@ -258,6 +284,7 @@ class SteamRoom {
       selfId: id,
       hostId: member ? this.host : undefined,
       lobbyId: member ? this.lobbyId : undefined,
+      inviteCode: member ? this.inviteCode : undefined,
       members: member ? [...this.members] : [],
       connected:
         !member || this.dropped.has(id)
@@ -330,7 +357,11 @@ class SteamRoom {
   async request(id: string, input: NativeRequest): Promise<unknown> {
     if (input.kind === "state") return this.state(id);
     if (input.kind === "create" || input.kind === "join") {
-      if (input.kind === "join" && input.lobbyId !== this.lobbyId)
+      if (
+        input.kind === "join" &&
+        input.lobbyId !== this.inviteCode &&
+        input.lobbyId !== this.lobbyId
+      )
         throw new Error("Invalid lobby code");
       if (!this.members.some((m) => m.id === id))
         this.members.push({
@@ -355,7 +386,8 @@ class SteamRoom {
         !this.members.some((member) => member.id === id) ||
         !this.members.some((member) => member.id === input.to)
       )
-        throw new Error("Player disconnected");
+        // The wording of the native transport, so the renderer is tested against what it really sees.
+        throw new Error("Player is disconnected");
       // Native Steam transport consumes heartbeats before publishing renderer events.
       if (input.payload.kind === "heartbeat") return;
       await this.event(input.to, {
@@ -363,11 +395,16 @@ class SteamRoom {
         sender: id,
         payload: input.payload,
       });
+      if (input.payload.kind === "save-result")
+        this.saveResults.set(input.payload.requestId, input.payload);
       return;
     }
     if (input.kind === "checkpoint") {
       this.checkpoint = input.world;
-      await this.publish();
+      // Native persistence returns before renderer notifications finish decoding.
+      // Slow delivery must not block the session's queue of locally durable saves.
+      // deliver() records live transport failures and ignores normal closed-page teardown.
+      void this.publish().catch(() => undefined);
       return this.state(id);
     }
     if (input.kind === "read-checkpoint") return this.checkpoint;
@@ -442,6 +479,7 @@ class SteamRoom {
       permissions: ["clipboard-read", "clipboard-write"],
     });
     const page = await context.newPage();
+    await unlockAllDifficulties(page);
     page.on("request", (request) => {
       if (new URL(request.url()).pathname.startsWith("/audio/"))
         this.audioRequests.push(request.url());
@@ -561,7 +599,9 @@ async function hostGame(page: Page) {
   await expect(page.getByTestId("mission-row-999")).toBeVisible();
 }
 async function joinGame(page: Page, room: SteamRoom) {
-  await page.getByLabel("Invite code", { exact: true }).fill(room.lobbyId);
+  await page
+    .getByLabel("6-digit invite code", { exact: true })
+    .fill(room.inviteCode);
   await page.getByRole("button", { name: "Join", exact: true }).click();
 }
 async function openSaves(page: Page) {
@@ -661,7 +701,7 @@ for (const [width, theme] of [
       "Back",
     );
     const [field, join] = await Promise.all([
-      entry.getByLabel("Invite code", { exact: true }).boundingBox(),
+      entry.getByLabel("6-digit invite code", { exact: true }).boundingBox(),
       entry.getByRole("button", { name: "Join", exact: true }).boundingBox(),
     ]);
     // The code and Join share one row.
@@ -688,7 +728,7 @@ for (const [width, theme] of [
     await expect(page.getByText("Invite code copied")).toBeVisible();
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe(room.lobbyId);
+      .toBe(room.inviteCode);
     await expect(
       page.getByRole("button", { name: "Invite a friend to start" }),
     ).toHaveCount(0);
@@ -1274,59 +1314,64 @@ async function startSharedGame(browser: Browser, count: number) {
 }
 
 async function expectClockInViewport(page: Page) {
-  const bounds = await page
-    .locator(".speedToggles:visible")
-    .last()
-    .evaluate((element) => {
-      const rect = element.getBoundingClientRect();
-      return {
-        left: rect.left,
-        right: rect.right,
-        width: innerWidth,
-        overflow: document.documentElement.scrollWidth - innerWidth,
-      };
-    });
-  expect(bounds.left).toBeGreaterThanOrEqual(0);
-  expect(bounds.right).toBeLessThanOrEqual(bounds.width + 1);
-  expect(bounds.overflow).toBeLessThanOrEqual(1);
   await expect(
     page.getByRole("button", { name: /Player speeds;/ }),
   ).toHaveCount(0);
-  const icons = await clock(page)
-    .locator(".multiplayerSpeedPeers svg")
-    .evaluateAll((elements) =>
-      elements.map((element) => {
-        const icon = element.getBoundingClientRect();
-        const button = element.closest("button")!.getBoundingClientRect();
-        return {
-          left: icon.left - button.left,
-          right: button.right - icon.right,
-          top: icon.top - button.top,
-          bottom: button.bottom - icon.bottom,
-          buttonHeight: button.height,
-          glyph: element.querySelector("path")?.getAttribute("d"),
-          tone: `${element.closest("button")!.getAttribute("aria-pressed")} ${getComputedStyle(element).color}`,
-        };
-      }),
-    );
-  expect(new Set(icons.map((icon) => icon.glyph)).size).toBe(
-    icons.length ? 1 : 0,
-  );
-  // One neutral tone per surface: who chose a speed is in the description, not in colour.
-  for (const pressed of ["true", "false"])
-    expect(
-      new Set(
-        icons
-          .filter((icon) => icon.tone.startsWith(pressed))
-          .map((icon) => icon.tone),
-      ).size,
-    ).toBeLessThanOrEqual(1);
-  for (const { buttonHeight, glyph: _glyph, tone: _tone, ...icon } of icons) {
-    for (const inset of Object.values(icon))
-      expect(inset).toBeGreaterThanOrEqual(0);
-    expect(icon.top).toBeGreaterThanOrEqual(buttonHeight / 2);
-    expect(icon.bottom).toBeLessThanOrEqual(3);
-  }
+  // Responsive renders can replace markers between Playwright calls. Query and measure
+  // the current group and its descendants together, including their live ownership.
+  await expect(async () => {
+    const { attached, bounds, icons } = await clock(page).evaluate((root) => {
+      const rect = root.getBoundingClientRect();
+      return {
+        attached: root.isConnected,
+        bounds: {
+          left: rect.left,
+          right: rect.right,
+          width: innerWidth,
+          overflow: document.documentElement.scrollWidth - innerWidth,
+        },
+        icons: Array.from(
+          root.querySelectorAll(".multiplayerSpeedPeers svg"),
+        ).map((element) => {
+          const owner = element.closest("button");
+          if (!element.isConnected || !owner || !root.contains(owner))
+            throw new Error("A speed peer marker has no live owning button");
+          const icon = element.getBoundingClientRect();
+          const button = owner.getBoundingClientRect();
+          return {
+            left: icon.left - button.left,
+            right: button.right - icon.right,
+            top: icon.top - button.top,
+            bottom: button.bottom - icon.bottom,
+            buttonHeight: button.height,
+            glyph: element.querySelector("path")?.getAttribute("d"),
+            tone: `${owner.getAttribute("data-active-speed") === "true"} ${getComputedStyle(element).color}`,
+          };
+        }),
+      };
+    });
+    expect(attached).toBe(true);
+    expect(bounds.left).toBeGreaterThanOrEqual(0);
+    expect(bounds.right).toBeLessThanOrEqual(bounds.width + 1);
+    expect(bounds.overflow).toBeLessThanOrEqual(1);
+    expect(icons.length).toBeGreaterThan(0);
+    expect(new Set(icons.map((icon) => icon.glyph)).size).toBe(1);
+    // One neutral tone per surface: who chose a speed is in the description, not in colour.
+    for (const active of ["true", "false"])
+      expect(
+        new Set(
+          icons
+            .filter((icon) => icon.tone.startsWith(active))
+            .map((icon) => icon.tone),
+        ).size,
+      ).toBeLessThanOrEqual(1);
+    for (const { buttonHeight, glyph: _glyph, tone: _tone, ...icon } of icons) {
+      for (const inset of Object.values(icon))
+        expect(inset).toBeGreaterThanOrEqual(0);
+      expect(icon.top).toBeGreaterThanOrEqual(buttonHeight / 2);
+      expect(icon.bottom).toBeLessThanOrEqual(3);
+    }
+  }).toPass({ timeout: 20000 });
 }
 
 async function expectClockMeaning(
@@ -1348,11 +1393,10 @@ async function expectClockMeaning(
     1,
   );
   const fill = (element: Element) => getComputedStyle(element).backgroundColor;
-  // Your own selection is the filled segment.
-  expect(await selected.evaluate(fill)).not.toBe("rgba(0, 0, 0, 0)");
-  // The shared clock's speed wears the pulsing ring, drawn in its label's colour: status,
-  // not the interaction blue, unless it shares the filled segment.
-  const ring = await active.evaluate((element) => {
+  // The actual game speed is the filled segment.
+  expect(await active.evaluate(fill)).not.toBe("rgba(0, 0, 0, 0)");
+  // Your request has a quiet static ring, even while someone else holds the clock.
+  const ring = await selected.evaluate((element) => {
     const style = getComputedStyle(element, "::before");
     const button = element.getBoundingClientRect();
     const label = element
@@ -1374,7 +1418,7 @@ async function expectClockMeaning(
   });
   expect(ring.content).not.toBe("none");
   expect(ring.radius).toBe("50%");
-  expect(ring.animation).toBe("tutorialTargetPulse");
+  expect(ring.animation).toBe("none");
   expect(ring.color).toBe(ring.labelColor);
   // It sits inside the segment, around the lifted label, and clears the label's sides.
   expect(ring.top).toBeGreaterThanOrEqual(1);
@@ -1383,11 +1427,11 @@ async function expectClockMeaning(
   expect(ring.clearance).toBeGreaterThanOrEqual(2);
   if (selectedName !== activeName) {
     expect(
-      await selected.evaluate(
+      await active.evaluate(
         (element) => getComputedStyle(element, "::before").content,
       ),
     ).toBe("none");
-    expect(await active.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
+    expect(await selected.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
     await expect(selected).not.toHaveAttribute("aria-current");
   }
 }
@@ -1546,6 +1590,10 @@ test("multiplayer speed controls match normal dimensions in desktop and touch la
       .getByRole("button", { name: "pause", exact: true })
       .locator(".multiplayerSpeedPeers svg"),
   ).toHaveCount(3);
+  // Each paused player occupies exactly one marker, rather than also appearing at their vote.
+  await expect(
+    clock(pages[0]).locator(".multiplayerSpeedPeers svg"),
+  ).toHaveCount(3);
   await expectClockInViewport(pages[0]);
   for (const peer of pages.slice(1))
     await peer
@@ -1574,6 +1622,78 @@ async function saveAndQuit(page: Page) {
     page.getByRole("button", { name: "Play with friends", exact: true }),
   ).toBeVisible();
 }
+
+test("a guest who lost the host can disconnect from the connection notice", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const guest = pages[1];
+  const guestId = room.members[1].id;
+  await expect(guest.locator(".facilities:visible")).toBeVisible();
+  // The native layer tells both endpoints that their channel closed.
+  room.dropped.add(guestId);
+  await room.event(room.host, { kind: "disconnected", sender: guestId });
+  await room.publish();
+  await room.event(guestId, { kind: "disconnected", sender: room.host });
+  const notice = guest.getByRole("dialog", {
+    name: "Multiplayer",
+    exact: true,
+  });
+  await expect(notice).toContainText("Connection lost");
+  await expect(
+    notice.getByRole("button", { name: "Reconnect", exact: true }),
+  ).toBeVisible();
+  await notice.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await expect(
+    guest.getByRole("button", { name: "Play with friends", exact: true }),
+  ).toBeVisible();
+  await expect(notice).toBeHidden();
+  await expect
+    .poll(() => room.members.some((member) => member.id === guestId))
+    .toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test("custom setup waits for host settings before a guest can mark Ready", async ({
+  browser,
+}) => {
+  const room = new SteamRoom();
+  const host = await room.player(browser, 0);
+  const guest = await room.player(browser, 1);
+  await hostGame(host);
+  await joinGame(guest, room);
+  // The card is mirrored before its lazy editor publishes the seeded custom settings.
+  // Hold that editor on the host while the guest opens its own copy normally.
+  let releaseEditor = () => {};
+  const editor = new Promise<void>((resolve) => {
+    releaseEditor = resolve;
+  });
+  await host.route("**/static/js/*.chunk.js", async (route) => {
+    await editor;
+    await route.continue();
+  });
+  try {
+    await host.getByTestId("mission-row-999").click();
+    await expect(
+      guest.getByRole("heading", { name: "Custom setup", exact: true }),
+    ).toBeVisible();
+    await expect(
+      guest.getByRole("button", { name: /^(I'm ready|Receiving scenario…)$/ }),
+    ).toBeDisabled();
+  } finally {
+    releaseEditor();
+  }
+  const ready = guest.getByRole("button", { name: "I'm ready", exact: true });
+  await expect(ready).toBeEnabled();
+  await ready.click();
+  await expect(
+    host
+      .getByRole("list", { name: "Players", exact: true })
+      .last()
+      .getByRole("img", { name: "Ready", exact: true }),
+  ).toBeVisible();
+  expect(room.transportErrors).toEqual([]);
+});
 
 for (const width of [1280, 390]) {
   test(`multiplayer creation and resume walkthrough at ${width}px`, async ({
@@ -1619,11 +1739,13 @@ for (const width of [1280, 390]) {
       .click();
     await expect.poll(() => room.invites).toEqual([room.host]);
     await capture("02-host-and-invite");
-    await guest.getByLabel("Invite code", { exact: true }).fill(room.lobbyId);
-    await expect(guest.getByLabel("Invite code", { exact: true })).toHaveValue(
-      room.lobbyId,
-    );
-    await guest.getByLabel("Invite code", { exact: true }).blur();
+    await guest
+      .getByLabel("6-digit invite code", { exact: true })
+      .fill(room.inviteCode);
+    await expect(
+      guest.getByLabel("6-digit invite code", { exact: true }),
+    ).toHaveValue(room.inviteCode);
+    await guest.getByLabel("6-digit invite code", { exact: true }).blur();
     await capture("03-join-with-code", guest);
     await guest.getByRole("button", { name: "Join", exact: true }).click();
     const roster = host.getByRole("list", { name: "Players", exact: true });
@@ -1939,13 +2061,26 @@ for (const count of [2, 4]) {
       room.dropped.add(dropped);
       await room.event(room.host, { kind: "disconnected", sender: dropped });
       await room.publish();
+      // A lost peer channel notifies both native endpoints, including the guest's host link.
+      await room.event(buyerId, { kind: "disconnected", sender: room.host });
       await expect(clock(pages[0])).toHaveAttribute(
         "data-active-speed",
         "PAUSED",
       );
-      await buyer.evaluate(() =>
-        window.electrifyDesktop!.multiplayerRequest!({ kind: "reconnect" }),
-      );
+      // Reconnect through the notification action: the raw bridge call leaves its
+      // blocking dialog open and keeps this player's activity at Reading notification.
+      const disconnected = buyer.getByRole("dialog", {
+        name: "Multiplayer",
+        exact: true,
+      });
+      await expect(disconnected).toBeVisible();
+      await disconnected
+        .getByRole("button", { name: "Reconnect", exact: true })
+        .click();
+      await expect(disconnected).toBeHidden();
+      await expect
+        .poll(() => room.state(buyerId).connected)
+        .toEqual([room.host]);
       for (const page of pages) await ready(page);
       if (count === 4) {
         await buyer.setViewportSize({ width: 360, height: 844 });
@@ -2534,13 +2669,20 @@ async function buyNativeBackup(page: Page, peakW: number, rate: number) {
       exact: true,
     })
     .click();
-  await page
-    .getByRole("dialog")
+  const purchase = page.getByRole("dialog", { name: /^Build / });
+  await purchase
     .getByRole("button", { name: "Take loan", exact: true })
     .click();
-  await expect(
-    page.getByRole("region", { name: "Build", exact: true }),
-  ).toHaveCount(0);
+  await expect(purchase).toBeHidden();
+  const build = page.getByRole("region", { name: "Build", exact: true });
+  // Desktop rails support repeated purchases; compact sheets close after a purchase.
+  if (page.viewportSize()!.width >= 1024) {
+    await expect(build).toBeVisible();
+    await build
+      .getByRole("button", { name: "Close Build", exact: true })
+      .click();
+  }
+  await expect(build).toHaveCount(0);
   const programs = page.getByRole("region", { name: "Programs", exact: true });
   await openPane(
     programs,
@@ -2560,7 +2702,7 @@ async function buyNativeBackup(page: Page, peakW: number, rate: number) {
     );
     await expect(price).toHaveAttribute(
       "aria-valuetext",
-      /^\$0\.1 per kilowatt hour/,
+      /^\$0\.1 per kilowatt-hour/,
     );
   } else await expect(price).toHaveAttribute("aria-valuenow", String(rate));
   await page.keyboard.press("Escape");
@@ -2736,6 +2878,8 @@ for (const scenarioId of [106, 107] as const) {
       await expect
         .poll(() => room.views.get(guestId)?.game?.date.monthsElapsed)
         .toBe(dueMonth);
+      // Inspect a completed save, rather than waiting for the periodic autosave timer.
+      await room.saveCheckpoint(guestId);
       await expect
         .poll(() =>
           room.checkpoint?.grids.map((game) => game.date.monthsElapsed),
@@ -2862,6 +3006,7 @@ for (const scenarioId of [106, 107] as const) {
         await expect(chart).toHaveAttribute("aria-label", /demand|supply/i);
         await page.keyboard.press("Escape");
       }
+      await room.saveCheckpoint(guestId);
       await expect
         .poll(() =>
           room.checkpoint?.grids.map(

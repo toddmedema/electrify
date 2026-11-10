@@ -138,7 +138,9 @@ export function formatModArcReference(arcs: ArcReference[]): string {
     "",
     "Use these phase, choice and load IDs when importing bundled challenge arcs with `officialArcs`.",
     "",
-    "Month 1 is the receiving grid's January opening; offsets start at 0. Dates include preparation time, and ranges show every possible onset. Durations use Easy (Employee); check Author report for other difficulties and your grid's resolved load sizes and costs. An arc with no preparation lead, choices or permanent loads omits that section.",
+    "Month 1 is January of the receiving grid's starting year; offsets start at 0. The Chernobyl base opens in March at offset 2; its first playable month is calendar month 3. Dates include preparation time, and ranges show every possible onset. Durations use Easy (Employee); check Author report for other difficulties and your grid's resolved load sizes and costs. An arc with no preparation lead, choices or permanent loads omits that section.",
+    "",
+    "Imported phases marked Through run end remain active until the receiving term ends, including a longer customized term.",
     "",
     "Conditions use `{arc: scenarioId, choiceId, optionIds}`; load replacements use `{arc: scenarioId, loadId}`. With `includeChoices: false`, each choice takes its listed free response automatically, including any grant and associated rules.",
     "",
@@ -151,7 +153,7 @@ export function formatModArcReference(arcs: ArcReference[]): string {
           : []),
         arc.phases.length
           ? [
-              "| Phase ID | Relocated offset | Playable month | Active duration (Easy) |",
+              "| Phase ID | Relocated offset | Calendar month | Active duration (Easy) |",
               "| --- | --- | --- | --- |",
               ...arc.phases.map(
                 (phase) =>

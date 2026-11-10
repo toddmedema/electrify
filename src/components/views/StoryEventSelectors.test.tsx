@@ -69,6 +69,7 @@ test("mod-only upcoming events use previews and keep surprises hidden without im
   const game = createGame({ scenarioId: 999, scenario, seed: 42 });
   const before = JSON.stringify(game);
   const events = selectUpcomingStoryEvents({ game } as AppStateType);
+  expect(selectUpcomingStoryEvents({ game } as AppStateType)).toBe(events);
   expect(events.map((event) => [event.title, event.message])).toEqual([
     ["Output limit", "Output will fall."],
   ]);
@@ -226,6 +227,12 @@ test("custom story forecasts appear without scheduled load additions", () => {
   ]);
   expect(upcoming[0].message).not.toMatch(/[\d%$]/);
 
-  game.customScenario = { ...game.customScenario!, eventScenarioIds: [] };
-  expect(selectUpcomingStoryEvents({ game } as AppStateType)).toEqual([]);
+  // Store state is immutable, so a change arrives as a new game object
+  const without = {
+    ...game,
+    customScenario: { ...game.customScenario!, eventScenarioIds: [] },
+  };
+  expect(
+    selectUpcomingStoryEvents({ game: without } as unknown as AppStateType),
+  ).toEqual([]);
 });

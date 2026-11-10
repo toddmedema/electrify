@@ -113,8 +113,10 @@ function summarize(log) {
   return jobs;
 }
 
-// Playwright titles look like "[mobile-390px] › e2e/x.spec.ts:12:5 › title"; configs with a
-// single unnamed project omit the bracket.
+/**
+ * Turn failed suite names into commands that preserve their coverage and renderer gates.
+ * Native-window failures stay CI-only; browser retries rebuild web after desktop suites.
+ */
 function reproduce(tests) {
   const commands = new Set();
   const browserCommands = new Set();
@@ -136,7 +138,7 @@ function reproduce(tests) {
       commands.add(
         `${spec}:${line} runs only in CI (native windows); read its trace in the diagnostics artifact`,
       );
-    else if (spec === "e2e/steam-input.spec.ts")
+    else if (["e2e/steam-input.spec.ts", "e2e/couch.spec.ts"].includes(spec))
       commands.add("npm run check -- --steps steam-input");
     else if (["e2e/multiplayer.spec.ts", "e2e/mods.spec.ts"].includes(spec))
       commands.add("npm run check -- --steps multiplayer");
@@ -309,6 +311,40 @@ function history(limit = "100") {
   }
 }
 
+// A job that never gets a runner has no logs; its check annotations hold the cause.
+function printRunnerDiagnostics(job, id, attempt) {
+  try {
+    const detail = JSON.parse(
+      gh(["api", `repos/{owner}/{repo}/actions/jobs/${job.databaseId}`]),
+    );
+    if (String(detail.run_id) !== String(id) || detail.run_attempt !== attempt)
+      throw new Error("Job metadata belongs to a different run or attempt");
+    print(
+      `  Runner: ${detail.runner_id ? detail.runner_name : "not assigned"} (requested: ${detail.labels.join(", ")})`,
+    );
+    const pages = JSON.parse(
+      gh([
+        "api",
+        "--paginate",
+        "--slurp",
+        `${detail.check_run_url}/annotations`,
+      ]),
+    );
+    const annotations = new Set(
+      pages
+        .flat()
+        .map(
+          ({ annotation_level, message }) => `${annotation_level}: ${message}`,
+        ),
+    );
+    for (const annotation of annotations) print(`  ${annotation}`);
+  } catch (error) {
+    print(
+      `  Could not read runner diagnostics: ${error.message.split("\n")[0]}`,
+    );
+  }
+}
+
 function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--history") {
     if (argv.length > 2)
@@ -340,30 +376,47 @@ function main(argv = process.argv.slice(2)) {
   } catch {
     // Not in a checkout; the summary still applies.
   }
-  const failedJobs = run.jobs.filter((job) => job.conclusion === "failure");
-  for (const job of failedJobs) {
+  if (run.conclusion === "success") return;
+  const unsuccessfulJobs = run.jobs.filter(
+    (job) => job.status === "completed" && job.conclusion !== "success",
+  );
+  for (const job of unsuccessfulJobs) {
     const steps = job.steps
       .filter((step) => step.conclusion === "failure")
       .map((step) => step.name);
-    print(`\nFAILED ${job.name}: ${steps.join("; ") || "(no step)"}`);
+    const outcome =
+      job.conclusion === "failure"
+        ? "FAILED"
+        : (job.conclusion || "unknown").toUpperCase();
+    print(
+      `\n${outcome} ${job.name}: ${steps.join("; ") || "(no failed step)"}`,
+    );
+    print(job.url);
+    printRunnerDiagnostics(job, id, run.attempt);
   }
   if (run.status !== "completed") {
     const pending = run.jobs.filter((job) => job.status !== "completed");
     print(
       `\nStill running: ${pending.map((job) => job.name).join(", ")}. Wait with: gh run watch ${id} --exit-status`,
     );
-    if (!failedJobs.length) process.exit(2);
+    if (!unsuccessfulJobs.length) process.exit(2);
   }
-  if (run.conclusion === "success") return;
-  if (!failedJobs.length) {
-    print("\nNo failed jobs to report yet.");
+  if (!unsuccessfulJobs.length) {
+    print("\nNo unsuccessful completed jobs to report.");
     process.exitCode = run.status === "completed" ? 1 : 2;
     return;
   }
   // Failed logs are available only once the run, or that job, has finished.
   let log = "";
   try {
-    log = gh(["run", "view", id, "--log-failed"]);
+    log = gh([
+      "run",
+      "view",
+      id,
+      "--attempt",
+      String(run.attempt),
+      "--log-failed",
+    ]);
   } catch (error) {
     print(`\nCould not read failed logs yet: ${error.message.split("\n")[0]}`);
   }
@@ -386,7 +439,7 @@ function main(argv = process.argv.slice(2)) {
   print(
     "\nFull logs: gh run view " +
       id +
-      " --log-failed. Fix the cause, run the matching local gate, push, and check again.",
+      ` --attempt ${run.attempt} --log-failed. Fix the cause, run the matching local gate, push, and check again.`,
   );
   process.exitCode = 1;
 }
@@ -398,4 +451,4 @@ if (require.main === module)
     console.error(error.message);
     process.exitCode = 1;
   }
-module.exports = { summarize, reproduce, parseLine, summarizeHistory };
+module.exports = { main, summarize, reproduce, parseLine, summarizeHistory };

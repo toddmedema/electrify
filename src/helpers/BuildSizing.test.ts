@@ -19,6 +19,13 @@ describe("size slider", () => {
     expect(buildSizeOptions(4, 37, 4e6)).toEqual([]);
   });
 
+  it("offers positive historical sizes and an exact small hydro site limit", () => {
+    expect(buildSizeOptions(-14, -5, 500000)).toEqual([
+      50000, 60000, 70000, 80000, 90000, 100000, 200000, 300000, 400000, 500000,
+    ]);
+    expect(buildSizeOptions(-14, -2, 750000).at(-1)).toBe(750000);
+  });
+
   it("handles downpayment boundaries, fixed costs and unaffordable minimums", () => {
     const sizes = buildSizeOptions(0, 4, 5e6);
     const quote = (size: number) => 2e6 + size;
@@ -36,7 +43,7 @@ describe("size slider", () => {
   });
 
   it("round-trips every tick", () => {
-    for (let tick = 0; tick <= 37; tick++) {
+    for (let tick = -14; tick <= 37; tick++) {
       expect(wToSliderTick(sliderTickToW(tick))).toBe(tick);
     }
   });

@@ -34,7 +34,12 @@ import { clearAppCache } from "../../helpers/Cache";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus, useMenuKeys } from "../base/useMenuKeys";
+import ConfirmDialog from "../base/ConfirmDialog";
 const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
+const TvLayoutSettings =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? React.lazy(() => import("../base/TvLayoutSettings"))
+    : () => null;
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
     ? React.lazy(() => import("../base/DesktopDisplaySettings"))
@@ -194,6 +199,17 @@ function VolumeSlider(props: {
 
 export default function Settings(props: Props): React.JSX.Element {
   const [creditsOpen, setCreditsOpen] = React.useState(false);
+  const [clearCacheOpen, setClearCacheOpen] = React.useState(false);
+  const [online, setOnline] = React.useState(() => navigator.onLine);
+  React.useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
   const canInstallApp = useCanInstallApp();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
   const desktop = useDesktopState();
@@ -381,6 +397,7 @@ export default function Settings(props: Props): React.JSX.Element {
                   </Typography>
                 }
               >
+                <TvLayoutSettings />
                 <DesktopDisplaySettings />
               </React.Suspense>
             </SettingsGroup>
@@ -554,12 +571,35 @@ export default function Settings(props: Props): React.JSX.Element {
               <Button
                 variant="text"
                 size="small"
-                onClick={() => void clearAppCache()}
+                onClick={() => setClearCacheOpen(true)}
               >
                 Clear cache
               </Button>
             )}
           </Stack>
+          <ConfirmDialog
+            open={clearCacheOpen}
+            destructive
+            title="Clear cache and reload?"
+            confirmLabel="Clear and reload"
+            confirmDisabled={!online}
+            onCancel={() => setClearCacheOpen(false)}
+            onConfirm={() => {
+              setClearCacheOpen(false);
+              void clearAppCache();
+            }}
+          >
+            <Typography>
+              Downloaded game files are removed and the page reloads. You need
+              an internet connection to load the game again. Saved games are
+              kept.
+            </Typography>
+            {!online && (
+              <Typography sx={{ mt: 1 }}>
+                You're offline. Reconnect before clearing the cache.
+              </Typography>
+            )}
+          </ConfirmDialog>
           {creditsOpen && (
             <React.Suspense fallback={null}>
               <CreditsDialog onClose={() => setCreditsOpen(false)} />

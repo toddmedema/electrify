@@ -18,7 +18,7 @@ const expectInsightSpacing = async (insights: Locator) => {
     const timeRow = element.querySelector(".insightsViewportToolbar")!;
     const rail = element.querySelector(".insightEventRail")!;
     const chip = rail.querySelector(".insightEventChip")!;
-    const chartTitle = element.querySelector(".insightsTrackHeader h6")!;
+    const chartTitle = element.querySelector(".insightsTrackHeader h3")!;
     const panelTitle = element
       .closest(".gameToolPanel")!
       .querySelector(".gameToolHeader h2")!;
@@ -139,6 +139,48 @@ for (const theme of ["light", "dark"] as const) {
       "background-color",
       chartSurface,
     );
+  });
+
+  test(`fit full timeline restores the scenario horizon in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+    }, theme);
+    await page.goto("/?scenario=100");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const insights = page.locator(".insights:visible");
+    await openPane(
+      insights,
+      page.getByRole("button", { name: "Insights", exact: true }),
+    );
+    await expect(insights.locator(".uplot").first()).toBeVisible();
+    const dateRange = insights.getByLabel(/Displayed date range:/);
+    const fit = insights.getByRole("button", { name: "Fit full timeline" });
+    await expect(dateRange).toHaveAttribute(
+      "aria-label",
+      "Displayed date range: 2020–31",
+    );
+    await expect(fit).toBeDisabled();
+    await insights.getByRole("button", { name: "Zoom in" }).click();
+    await expect(fit).toBeEnabled();
+    await fit.click();
+    await expect(dateRange).toHaveAttribute(
+      "aria-label",
+      "Displayed date range: 2020–31",
+    );
+    await expect(fit).toBeDisabled();
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `fit-timeline-${info.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
   });
 
   test(`upcoming scenario events stay usable across insight viewports in ${theme}`, async ({
@@ -380,7 +422,9 @@ test("insights header controls stay aligned in one compact row", async ({
         tracks.map((track) => {
           const header = track.querySelector(".insightsTrackHeader")!;
           const headerBox = header.getBoundingClientRect();
-          const titleBox = header.querySelector("h6")!.getBoundingClientRect();
+          const titleBox = header
+            .querySelector(".MuiTypography-h6")!
+            .getBoundingClientRect();
           const actions = header.querySelector(".insightsTrackActions");
           const contentBoxes = [
             titleBox,
@@ -470,7 +514,11 @@ test("insights header controls stay aligned in one compact row", async ({
       const trackHeaderBox = await trackHeader.boundingBox();
       expect(trackHeaderBox).not.toBeNull();
       await expect(trackHeader.locator(".insightsTrackActions")).toHaveCount(0);
-      expect(trackHeaderBox!.height).toBeLessThanOrEqual(45);
+      // One row: the title and its expand and help controls at their touch height, with the
+      // header's 8px inset above and below. A second row would make it about 104.
+      expect(trackHeaderBox!.height).toBeLessThanOrEqual(
+        minimumControlHeight + 16,
+      );
     }
   }
 
@@ -506,10 +554,14 @@ test("insights header controls stay aligned in one compact row", async ({
       "Displayed date range: 2020–31",
     );
     await expect(dateRange).toHaveCSS("font-size", "14px");
+    await expect(
+      page.getByRole("button", { name: "Fit full timeline" }),
+    ).toBeDisabled();
+    await page.getByRole("button", { name: "Zoom in" }).click();
     await page.getByRole("button", { name: "Fit full timeline" }).click();
     await expect(dateRange).toHaveAttribute(
       "aria-label",
-      "Displayed date range: 2020–39",
+      "Displayed date range: 2020–31",
     );
     expect(
       await dateRange.evaluate(

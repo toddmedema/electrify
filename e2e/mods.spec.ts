@@ -1,3 +1,4 @@
+import { unlockAllDifficulties } from "./difficulty-fixture";
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -8,6 +9,7 @@ import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import { openPane } from "./layout";
 import { verifyMenuKeyboard } from "./menu-keyboard";
 import { readSavedGame } from "./save-fixture";
+import { gameObjectiveResults } from "../src/helpers/ObjectiveRules";
 import type { DesktopInputFrame } from "../src/Desktop";
 
 declare global {
@@ -490,7 +492,7 @@ for (const [theme, winning] of [
     if (winning) {
       await advanceExampleTo(
         page,
-        appbar.getByRole("heading").filter({ hasText: "Feb 2026" }),
+        appbar.locator(".gameStatus").filter({ hasText: "Feb 2026" }),
       );
       await appbar.getByRole("button", { name: "pause", exact: true }).click();
       const scenario = page.getByRole("region", {
@@ -520,13 +522,16 @@ for (const [theme, winning] of [
     });
     await advanceExampleTo(page, result);
     const evidence = result.getByRole("region", { name: "Mission results" });
-    await expect(
-      result.getByRole("region", { name: "Objective results" }),
-    ).toContainText("Retain your starting customers");
-    if (!winning)
+    const objectives = result.getByRole("region", {
+      name: "Objective results",
+    });
+    await expect(objectives).toHaveCount(winning ? 0 : 1);
+    if (!winning) {
+      await expect(objectives).toContainText("Retain your starting customers");
       await expect(result).toContainText(
         "You served less than 95% of demand for 3 months in a row",
       );
+    }
     await expect(result).toContainText(
       "Modded run · not ranked and no achievements.",
     );
@@ -598,6 +603,13 @@ test("desktop menu keyboard navigation includes Mods between Manual and Settings
 async function dismissToast(page: Page) {
   const toast = page.locator(".snackbarContent");
   await expect(toast).toBeVisible();
+  const dismiss = toast.getByRole("button", { name: "Dismiss notification" });
+  if (await dismiss.isVisible()) {
+    await dismiss.click();
+    await expect(toast).toBeHidden();
+    return;
+  }
+  await toast.click({ trial: true });
   const box = (await toast.boundingBox())!;
   // Compact layouts dismiss toasts by swiping rather than showing a close button.
   await page.mouse.move(box.x + 24, box.y + box.height / 2);
@@ -1042,6 +1054,14 @@ for (const [theme, requiredBills] of [
             required: requiredBills,
           },
         ],
+        debriefReports: [
+          {
+            id: "freeze-feedback",
+            kind: "deepFreeze",
+            fromMonth: 1,
+            throughMonth: 3,
+          },
+        ],
       }),
     };
     await mockDesktop(page, false, theme, [entry]);
@@ -1064,7 +1084,7 @@ for (const [theme, requiredBills] of [
       "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
     );
     await expect(rules).toContainText(
-      "Bills ≤$0/kWh each month · Jan–Feb 2020",
+      "Bills ≤0¢/kWh each month · Jan–Feb 2020",
     );
     await expect(rules).not.toContainText(
       /Recorded:|months completed|Not started/,
@@ -1089,7 +1109,7 @@ for (const [theme, requiredBills] of [
         /months completed|At least one completed month/,
       );
       await expect(rules).toContainText(
-        "Bills ≤$0/kWh each month · Jan–Feb 2020",
+        "Bills ≤0¢/kWh each month · Jan–Feb 2020",
       );
       await expect(rules.getByText("Optional", { exact: true })).toBeVisible();
       await expect(
@@ -1104,7 +1124,7 @@ for (const [theme, requiredBills] of [
       await scrollEvidenceIntoView(goal);
       await expect(goal).toBeInViewport({ ratio: 1 });
       await expect(
-        rules.getByText("Bills ≤$0/kWh each month · Jan–Feb 2020", {
+        rules.getByText("Bills ≤0¢/kWh each month · Jan–Feb 2020", {
           exact: true,
         }),
       ).toBeInViewport({ ratio: 1 });
@@ -1116,28 +1136,67 @@ for (const [theme, requiredBills] of [
       await appbar
         .getByRole("button", { name: "fast speed", exact: true })
         .click();
+      await expect(appbar).toContainText("Mar 2020", { timeout: 30000 });
+      await appbar.getByRole("button", { name: "pause", exact: true }).click();
+      const recorded = (await readSavedGame(page))!;
+      expect(recorded.date.monthsElapsed).toBe(2);
+      expect(gameObjectiveResults(recorded)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "bills",
+            required: false,
+            status: "failed",
+            observedMonths: 2,
+            requiredMonths: 2,
+          }),
+          expect.objectContaining({
+            id: "supply",
+            required: true,
+            status: "completed",
+            observedMonths: 2,
+            requiredMonths: 2,
+          }),
+        ]),
+      );
+      await appbar
+        .getByRole("button", { name: "fast speed", exact: true })
+        .click();
     }
     const result = page.getByRole("dialog", {
       name: requiredBills ? "Mission objective missed" : "Mission complete",
       exact: true,
     });
     await expect(result).toBeVisible({ timeout: 60000 });
+    if (!requiredBills) {
+      const feedback = result.getByRole("region", {
+        name: "Mission results",
+        exact: true,
+      });
+      await expect(feedback).toContainText(
+        "Largest shortage during the freeze",
+      );
+      await expect(feedback).toContainText("Electricity rate · before → after");
+      await expect(feedback).toContainText(
+        "Cash stayed above $0 through the recovery month",
+      );
+    }
     const evidence = result.getByRole("region", {
       name: "Objective results",
     });
-    await expect(evidence).toContainText(
-      `Keep bills affordable · ${requiredBills ? "Required" : "Optional"} · Failed`,
-    );
-    await expect(evidence).toContainText(
-      "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
-    );
-    await expect(evidence).toContainText("Months 1–2");
-    await expect(evidence).toContainText(
-      "At least one completed month billed more than the starting-year rate ceiling.",
-    );
-    await expect(evidence).toContainText(
-      requiredBills ? "1/2 months completed" : "2/2 months completed",
-    );
+    await expect(evidence).toHaveCount(requiredBills ? 1 : 0);
+    if (requiredBills) {
+      await expect(evidence).toContainText(
+        "Keep bills affordable · Required · Failed",
+      );
+      await expect(evidence).toContainText(
+        "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
+      );
+      await expect(evidence).toContainText("Months 1–2");
+      await expect(evidence).toContainText(
+        "At least one completed month billed more than the starting-year rate ceiling.",
+      );
+      await expect(evidence).toContainText("1/2 months completed");
+    }
     await expect(result).toContainText(
       "Modded run · not ranked and no achievements.",
     );
@@ -1145,21 +1204,41 @@ for (const [theme, requiredBills] of [
     // Ordinary notices defer behind the result dialog; wait for their exit
     // transition instead of swiping a toast that is already disappearing.
     await expect(page.locator(".snackbarContent")).toBeHidden();
-    const goal = evidence
-      .getByText("Keep bills affordable", { exact: false })
-      .first();
+    const goal = requiredBills
+      ? evidence.getByText("Keep bills affordable", { exact: false }).first()
+      : result
+          .getByRole("region", { name: "Mission results" })
+          .getByText("served", { exact: true });
     await scrollEvidenceIntoView(goal);
     await expect(goal).toBeInViewport({ ratio: 1 });
-    await expect(
-      evidence.getByText(
-        "At least one completed month billed more than the starting-year rate ceiling.",
-        { exact: true },
-      ),
-    ).toBeInViewport({ ratio: 1 });
+    if (requiredBills) {
+      await expect(
+        evidence.getByText(
+          "At least one completed month billed more than the starting-year rate ceiling.",
+          { exact: true },
+        ),
+      ).toBeInViewport({ ratio: 1 });
+    }
     await expect(
       page.locator("iframe#webpack-dev-server-client-overlay"),
     ).toHaveCount(0);
     expect(await noHorizontalScroll(page)).toBe(true);
+    if (!requiredBills) {
+      const shortage = result
+        .getByRole("region", { name: "Mission results", exact: true })
+        .locator(".victoryMetric")
+        .filter({ hasText: "Largest shortage during the freeze" });
+      await scrollEvidenceIntoView(shortage);
+      await expect(shortage).toBeInViewport({ ratio: 1 });
+      await expect(
+        result.getByText("Electricity rate · before → after", { exact: true }),
+      ).toBeInViewport({ ratio: 1 });
+      await expect(
+        result.getByText("Cash stayed above $0 through the recovery month", {
+          exact: true,
+        }),
+      ).toBeInViewport({ ratio: 1 });
+    }
     await screenshot(
       page,
       `mod-objective-${requiredBills ? "failure" : "success"}-${page.viewportSize()!.width}-${theme}.png`,
@@ -2006,3 +2085,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(report).toBeHidden();
   });
 }
+
+test.beforeEach(async ({ page }) => {
+  await unlockAllDifficulties(page);
+});

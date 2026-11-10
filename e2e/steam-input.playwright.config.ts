@@ -19,7 +19,7 @@ if (productionRoot)
 // The renderer is unchanged: only the sandboxed native input/save bridge is replaced.
 export default defineConfig({
   ...base,
-  testMatch: "steam-input.spec.ts",
+  testMatch: ["steam-input.spec.ts", "couch.spec.ts"],
   testIgnore: [],
   outputDir,
   reporter: [
@@ -50,6 +50,17 @@ export default defineConfig({
         colorScheme: "light",
       },
     },
+    ...([1080, 2160] as const).flatMap((height) =>
+      (["light", "dark"] as const).map((colorScheme) => ({
+        name: `tv-${height}-${colorScheme}`,
+        grep: /TV /,
+        use: {
+          browserName: "chromium" as const,
+          viewport: { width: (height * 16) / 9, height },
+          colorScheme,
+        },
+      })),
+    ),
     ...base
       .projects!.filter((project) =>
         ["mobile-390px", "mobile-360px"].includes(project.name!),

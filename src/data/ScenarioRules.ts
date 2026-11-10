@@ -133,8 +133,29 @@ export interface RuleChoice {
   requiresChoice?: RuleCondition;
   options: RuleOption[];
 }
-type ObjectiveBase = { id: string; label: string; required?: boolean };
+type ObjectiveBase = {
+  id: string;
+  label: string;
+  required?: boolean;
+  /** Judge once at the deadline/window end; completed checkpoints stay complete. */
+  checkpoint?: true;
+};
 type ObjectiveWindow = { fromMonth: number; throughMonth: number };
+type MeasuredObjective =
+  | (ObjectiveWindow & {
+      metric: "financialCoverage";
+      basis: "revenue" | "cash";
+      minCoverage: number;
+    })
+  | { metric: "customerCount"; minCustomers: number; deadlineMonth: number }
+  | (ObjectiveWindow & { metric: "reserveMargin"; minReserveW: number })
+  | (ObjectiveWindow & { metric: "efficiencySavings"; minShare: number })
+  | (ObjectiveWindow & {
+      metric: "demandServedShare";
+      minShare: number;
+      /** Local time, start inclusive and end exclusive. */
+      hours?: [17, 21];
+    });
 export type RuleObjective = ObjectiveBase &
   (
     | {
@@ -157,12 +178,18 @@ export type RuleObjective = ObjectiveBase &
       })
     | { metric: "utilityOwnership"; targets: string[]; deadlineMonth: number }
     | { metric: "assetRetirement"; assetIds: string[]; deadlineMonth: number }
-    | { metric: "fuelRetirement"; fuel: FuelNameType; deadlineMonth: number }
+    | {
+        metric: "fuelRetirement";
+        fuel: FuelNameType;
+        deadlineMonth: number;
+        commissionedBeforeYear?: number;
+      }
     | (ObjectiveWindow & {
         metric: "monthlyBilledRate";
         maxDollarsPerKWh: number;
       })
     | (ObjectiveWindow & { metric: "monthEndDebt"; maxDebtDollars: number })
+    | MeasuredObjective
   );
 export interface RuleArc {
   scenarioId: number;
@@ -261,12 +288,18 @@ export type CompiledRuleObjective = ObjectiveBase & {
       })
     | { metric: "utilityOwnership"; targets: string[]; deadlineMonth: number }
     | { metric: "assetRetirement"; assetIds: string[]; deadlineMonth: number }
-    | { metric: "fuelRetirement"; fuel: FuelNameType; deadlineMonth: number }
+    | {
+        metric: "fuelRetirement";
+        fuel: FuelNameType;
+        deadlineMonth: number;
+        commissionedBeforeYear?: number;
+      }
     | (ObjectiveWindow & {
         metric: "monthlyBilledRate";
         maxDollarsPerKWh: number;
       })
     | (ObjectiveWindow & { metric: "monthEndDebt"; maxDebt: number })
+    | MeasuredObjective
   );
 export interface CompiledScenarioRules {
   runtimeVersion: 1;

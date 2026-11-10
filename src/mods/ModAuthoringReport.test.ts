@@ -232,6 +232,21 @@ test("the common author report has all difficulty values, actual peak and additi
   }
 });
 
+test("player setup facts use the shared compact power readout", () => {
+  const scenario = modScenario(
+    prepared(),
+    undefined,
+    "Employee",
+    437538367.547,
+  );
+  const setup = modPlayerFacts(scenario).sections.find(
+    (section) => section.id === "setup",
+  )!;
+  expect(
+    setup.rows.find((row) => row.label === "Starting peak demand")!.value,
+  ).toBe("438MW");
+});
+
 test("independent semantic compilation errors become an invalid report rather than a thrown snapshot error", () => {
   const pack = prepared();
   pack.events![0].effects!.hydroInflowMultiplier = 0.05;
@@ -335,4 +350,30 @@ test("player facts clear zero signs without changing valid negative modifiers", 
   const monthly = author.sections.find((section) => section.id === "monthly")!;
   expect(monthly.rows[0].value).toContain("Temperature: -0.001 °C");
   expect(Object.is(scenario.facilities[0].initialAgeYears, -0)).toBe(true);
+});
+
+test("Chernobyl author facts show the actual March term and recovery reliability rule", () => {
+  const pack = validateMod({
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "recovery-facts",
+    title: "Recovery facts",
+    creator: "Author",
+    version: "1",
+    description: "Recover power.",
+    baseScenarioId: 126,
+  });
+  loadSimData(getScenarioLocation(modResolvedSetup(pack))!);
+  const report = buildModAuthorReport(pack);
+  expect(report.valid).toBe(true);
+  const setup = report.sections.find((section) => section.id === "setup")!.rows;
+  expect(
+    setup.find((row) => row.label === "Era and duration")!.value,
+  ).toContain("Mar 1986–Feb 1991");
+  const objectives = report.sections.find(
+    (section) => section.id === "objectives",
+  )!.rows;
+  expect(
+    objectives.find((row) => row.label === "Reliability")!.value,
+  ).toContain("No minimum reliability requirement");
 });

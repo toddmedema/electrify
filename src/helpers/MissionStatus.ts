@@ -22,6 +22,7 @@ import { selectProjection } from "./Projection";
 import { isUtilityExpansionGame } from "./ExpansionContext";
 import { MONTHS } from "../Constants";
 import { utilityServiceGap } from "./UtilityPlanning";
+import { legacyCompletedMonths, legacyMonthOffset } from "./LegacyCampaign";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import {
   objectiveDefinitionText,
@@ -67,16 +68,19 @@ function objectiveRequirement(
   result: ObjectiveResult,
   startingYear: number,
   durationMonths: number,
+  monthOffset = 0,
 ): MissionRequirement {
   const objective = result.objective;
   const last =
     "throughMonth" in objective
       ? objective.throughMonth
-      : objective.metric === "fuelRetirement"
+      : objective.metric === "fuelRetirement" && !objective.checkpoint
         ? durationMonths - 1
         : objective.deadlineMonth;
   const first =
     "fromMonth" in objective ? objective.fromMonth : objective.deadlineMonth;
+  const firstCalendarMonth = first + monthOffset;
+  const lastCalendarMonth = last + monthOffset;
   const statuses = {
     pending: "pending",
     inProgress: "in-progress",
@@ -84,7 +88,9 @@ function objectiveRequirement(
     failed: "failed",
     unverifiable: "unknown",
   } as const;
-  const target = objectiveTargetText(objective);
+  const target = objective.checkpoint
+    ? objectiveGoalText(objective, startingYear, durationMonths, monthOffset)
+    : objectiveTargetText(objective);
   const current = objectiveObservedText(result);
   const observed =
     result.observed === undefined
@@ -98,11 +104,20 @@ function objectiveRequirement(
     required: result.required,
     reason: result.reason,
     current,
-    target: objectiveGoalText(objective, startingYear, durationMonths),
+    target: objectiveGoalText(
+      objective,
+      startingYear,
+      durationMonths,
+      monthOffset,
+    ),
     compact: `${result.required ? "" : "Optional · "}${compact}${result.status === "unverifiable" ? " · incomplete history" : ""}`,
-    timing: `Completed months ${(first % 12) + 1}/${startingYear + Math.floor(first / 12)}–${(last % 12) + 1}/${startingYear + Math.floor(last / 12)}${result.required ? "" : "; optional, does not end the run"}`,
+    timing: objective.checkpoint
+      ? last === durationMonths - 1
+        ? "Checked at term end."
+        : `Checked at the end of ${MONTHS[lastCalendarMonth % 12]} ${startingYear + Math.floor(lastCalendarMonth / 12)}.`
+      : `Completed months ${(firstCalendarMonth % 12) + 1}/${startingYear + Math.floor(firstCalendarMonth / 12)}–${(lastCalendarMonth % 12) + 1}/${startingYear + Math.floor(lastCalendarMonth / 12)}${result.required ? "" : "; optional, does not end the run"}`,
     status: statuses[result.status],
-    deadline: startingYear * 12 + last + 1,
+    deadline: startingYear * 12 + lastCalendarMonth + 1,
   };
 }
 
@@ -110,12 +125,19 @@ function objectiveRequirement(
 export function getMissionStatus(game: GameType) {
   const scenario = activeScenario(game);
   const duration = scenario?.durationMonths || 240;
-  const monthsRemaining = Math.max(0, duration - game.date.monthsElapsed);
+  const monthsRemaining = Math.max(0, duration - legacyCompletedMonths(game));
+  const termMonthOffset = legacyMonthOffset(game);
   const currentMonth = absoluteMonth(game.date.year, game.date.monthNumber);
   const history = completedMissionHistory(game);
   const now = currentTick(game);
   const requirements: MissionRequirement[] = gameObjectiveResults(game).map(
-    (result) => objectiveRequirement(result, game.startingYear, duration),
+    (result) =>
+      objectiveRequirement(
+        result,
+        game.startingYear,
+        duration,
+        termMonthOffset,
+      ),
   );
   requirements.push({
     id: "cash",
@@ -140,35 +162,36 @@ export function getMissionStatus(game: GameType) {
       (row, index) =>
         absoluteMonth(row.year, row.month) === currentMonth - index - 1,
     );
-  requirements.push({
-    id: "survival",
-    label: "Keep power flowing",
-    compact: `Avoid 3 consecutive months < ${firingThreshold} served (${
-      latest.length
-        ? latest
+  if (!scenario?.reliabilityFailureDisabled)
+    requirements.push({
+      id: "survival",
+      label: "Keep power flowing",
+      compact: `Avoid 3 consecutive months < ${firingThreshold} served (${
+        latest.length
+          ? latest
+              .slice()
+              .reverse()
+              .map((row) => formatServed(demandServed(row)))
+              .join(", ")
+          : "no completed months"
+      })`,
+      current: latest.length
+        ? `Last ${latest.length === 1 ? "month" : `${latest.length} months`}: ${latest
             .slice()
             .reverse()
             .map((row) => formatServed(demandServed(row)))
-            .join(", ")
-        : "no completed months"
-    })`,
-    current: latest.length
-      ? `Last ${latest.length === 1 ? "month" : `${latest.length} months`}: ${latest
-          .slice()
-          .reverse()
-          .map((row) => formatServed(demandServed(row)))
-          .join(" · ")}`
-      : "No completed months",
-    target: reliabilityRuleText(game.difficulty),
-    timing:
-      "Checked at month end; current ticks are not completed-month results",
-    status: consecutive
-      ? hasChronicBlackouts(latest, game.difficulty)
-        ? "failed"
-        : "in-progress"
-      : "unknown",
-    deadline: currentMonth + 1,
-  });
+            .join(" · ")}`
+        : "No completed months",
+      target: reliabilityRuleText(game.difficulty),
+      timing:
+        "Checked at month end; current ticks are not completed-month results",
+      status: consecutive
+        ? hasChronicBlackouts(latest, game.difficulty)
+          ? "failed"
+          : "in-progress"
+        : "unknown",
+      deadline: currentMonth + 1,
+    });
   const prominent = requirements
     .map((item, index) => ({ item, index }))
     .filter(
@@ -198,8 +221,9 @@ export function getMissionStatus(game: GameType) {
       monthsRemaining === 0
         ? "Term complete. The recorded final outcome is authoritative; missing history is not verifiable."
         : undefined,
-    scoreNote:
-      "Score contributions are separate from these victory and survival requirements.",
+    scoreNote: scenario?.reliabilityFailureDisabled
+      ? `Restore service to earn points. Blackouts reduce your score${scenario.retainCustomersDuringShortages ? "" : " and drive customers away"}, but do not end the run.`
+      : "Score contributions are separate from these victory and survival requirements.",
   };
 }
 
@@ -246,11 +270,14 @@ export function projectedShortfall(
  * on hand before being read. Only deviations from the original within-month cash path are
  * carried along; ordinary operating cash flow is already included in the projected balances.
  */
-export function cashRunwayMonths(game: GameType): number | undefined {
+export function cashRunwayMonths(
+  game: GameType,
+  projectionKey?: string,
+): number | undefined {
   const now = currentTick(game);
   // Negative cash now has its own, more urgent warning; this one is about the months ahead
   if (!now || now.cash < 0) return undefined;
-  const projection = selectProjection(game, now);
+  const projection = selectProjection(game, now, projectionKey);
   const expectedCash =
     getTimeFromTimeline(game.date.minute, projection.cashBaseline)?.cash ??
     projection.startingCash;
@@ -267,6 +294,7 @@ export function selectMissionRisk(
   game: GameType,
   upcoming: UpcomingStoryEventType[] = [],
   suppliedStatus?: ReturnType<typeof getMissionStatus>,
+  projectionKey?: string,
 ): MissionRisk | undefined {
   const now = currentTick(game);
   if (
@@ -303,10 +331,10 @@ export function selectMissionRisk(
     };
   // A shortage later in today's operating sample is reported by the grid readout beside this
   // (see getGridHealth), the same way a shortage happening now is.
-  const runway = cashRunwayMonths(game);
+  const runway = cashRunwayMonths(game, projectionKey);
   const gap =
     isUtilityExpansionGame(game) && now
-      ? utilityServiceGap(game, selectProjection(game, now))
+      ? utilityServiceGap(game, selectProjection(game, now, projectionKey))
       : undefined;
   const gapMonth = gap
     ? (gap.year - game.startingYear) * 12 + gap.month - 1

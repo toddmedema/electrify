@@ -78,29 +78,29 @@ export const MANUAL_ENTRY = {
   ACCOUNTING_LIFETIME: "Accounting lifetime",
   PROJECT_SITES: "Project sites",
   CUSTOMER_PROGRAMS: "Customer programs",
-  HOW_TO_PLAY: "How to Play",
-  BASELOAD_VS_PEAKER: "Baseload vs Peaker",
+  HOW_TO_PLAY: "How to play",
+  BASELOAD_VS_PEAKER: "Baseload vs peaker",
   BLACKOUTS: "Blackouts",
   BTU: "BTU and MMBTU",
-  CAPACITY_FACTOR: "Capacity Factor",
-  CARBON_FEE: "Carbon Fee",
-  CUSTOMERS: "Customers, Demand & Pricing",
+  CAPACITY_FACTOR: "Capacity factor",
+  CARBON_FEE: "Carbon fee",
+  CUSTOMERS: "Customers, demand & pricing",
   EMISSIONS: "Emissions and CO2e",
   FORECASTS: "Insights & data layers",
-  HYDROPOWER: "Hydropower & Reservoirs",
-  INTEREST_RATES: "Interest Rates & Inflation",
-  KEYBOARD_SHORTCUTS: "Keyboard Shortcuts",
-  PRIORITIZING_GENERATORS: "Prioritizing Generators",
-  RAMP_RATE: "Ramp Rate",
+  HYDROPOWER: "Hydropower & reservoirs",
+  INTEREST_RATES: "Interest rates & inflation",
+  KEYBOARD_SHORTCUTS: "Keyboard shortcuts",
+  PRIORITIZING_GENERATORS: "Prioritizing generators",
+  RAMP_RATE: "Ramp rate",
   RATES: "Rates",
-  POWER_AND_ENERGY: "Power and Energy",
-  RESERVE_CAPACITY: "Reserve Capacity",
+  POWER_AND_ENERGY: "Power and energy",
+  RESERVE_CAPACITY: "Reserve capacity",
   INTERTIES: "Interties",
-  ROUND_TRIP_EFFICIENCY: "Round-trip Efficiency",
+  ROUND_TRIP_EFFICIENCY: "Round-trip efficiency",
   SCORE: "Score",
-  SYMBOLS: "Symbol Guide",
-  TOTAL_COST_OF_ENERGY: "Total Cost of Energy",
-  WEATHER_DAMAGE: "Weather Damage",
+  SYMBOLS: "Symbol guide",
+  TOTAL_COST_OF_ENERGY: "Total cost of energy",
+  WEATHER_DAMAGE: "Weather damage",
 } as const;
 
 export type ManualEntryTitleType =
@@ -115,7 +115,7 @@ export interface ManualEntryType {
   // prose is searched automatically -- see manualEntryText below -- so this is only for the
   // words that aren't there.
   keywords?: string;
-  // Pins the entry above the grouped list. Only "How to Play" uses it; a new player shouldn't
+  // Pins the entry above the grouped list. Only "How to play" uses it; a new player shouldn't
   // have to scroll past the glossary to find the overview.
   pinned?: boolean;
 }
@@ -641,7 +641,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.FORECASTS,
     group: "Gameplay",
     keywords:
-      "projection supply demand fuel prices weather peak shortage layers presets temperature",
+      "projection supply demand fuel prices weather peak shortage layers presets temperature power exchange imports exports profit revenue expenses cash",
     entry: (
       <div>
         <p>
@@ -672,6 +672,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             charging and exports.
           </li>
           <li>
+            <strong>Power exchange:</strong> Imports plot above zero and exports
+            below. Quiet stretches mean you neither fell short nor had extra to
+            sell.
+          </li>
+          <li>
             <strong>Stored Energy:</strong> What's left in batteries and{" "}
             <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>reservoirs</EntryLink>.
             Power ratings limit how quickly you can use it.
@@ -679,6 +684,20 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <li>
             <strong>Fuel Prices:</strong> History and estimates. Prices can
             jump, so check before building fuel-burning plants.
+          </li>
+          <li>
+            <strong>Profit, Revenue, Expenses and Cash:</strong> Recorded
+            months, then estimates. Your{" "}
+            <EntryLink to={MANUAL_ENTRY.RATES}>rate</EntryLink> sets revenue;{" "}
+            <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>
+              operating costs
+            </EntryLink>
+            , <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>fuel</EntryLink>,{" "}
+            <EntryLink to={MANUAL_ENTRY.CARBON_FEE}>carbon fees</EntryLink> and{" "}
+            <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>
+              loan payments
+            </EntryLink>{" "}
+            make up expenses.
           </li>
           <li>
             <strong>Temperature</strong> and{" "}
@@ -691,7 +710,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </ul>
         <p>
           Forecasts use one day per month (see{" "}
-          <EntryLink to={MANUAL_ENTRY.HOW_TO_PLAY}>How to Play</EntryLink>), so
+          <EntryLink to={MANUAL_ENTRY.HOW_TO_PLAY}>How to play</EntryLink>), so
           they can't test a week of clouds or still air.
         </p>
       </div>
@@ -852,6 +871,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           rivals, or above it to earn more from each while some leave. The
           market rate rises with{" "}
           <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>inflation</EntryLink>.
+          Enable Follow inflation to raise your own rate each January too.
+          Choosing a rate by hand turns it off.
         </p>
         <p>
           <strong>Publicly owned:</strong> Customers can't switch utilities.
@@ -877,7 +898,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           you've made 1 megawatt-hour (MWh).
         </p>
         <p>
-          Your power bill uses kilowatt-hours (kWh); 1,000 kWh is a MWh. A
+          Your power bill uses kilowatt-hours (kWh); 1,000 kWh make 1 MWh. A
           typical US home uses about 10 MWh a year. A terawatt-hour (TWh) is a
           million MWh.
         </p>
@@ -924,9 +945,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           A warning marks hours when reserve falls below 10%, and{" "}
           <EntryLink to={MANUAL_ENTRY.FORECASTS}>forecasts</EntryLink> show
-          where that's coming. That's the game's threshold, not a real
-          reliability standard, and staying above it doesn't guarantee you'll
-          avoid <EntryLink to={MANUAL_ENTRY.BLACKOUTS}>blackouts</EntryLink>.
+          where that's coming.
         </p>
       </div>
     ),
@@ -949,9 +968,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Surplus only sells leftover electricity after serving customers and
           charging{" "}
           <EntryLink to={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}>storage</EntryLink>
-          . All profitable also increases running plants when current prices
-          exceed added fuel, variable operating and carbon costs. It does not
-          start plants for export or sell stored water or electricity. Later
+          . All profitable also raises output from running plants when current
+          prices exceed added fuel, variable operating and carbon costs. It does
+          not start plants for export or sell stored water or electricity. Later
           ramp-down costs can still occur when prices fall. None disables
           exports.
         </p>
@@ -1092,8 +1111,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           retention can be a mission requirement, but adds no points.
         </p>
         <p>
-          Only completed missions earn leaderboard ranks and personal bests. Log
-          in to submit one.
+          Only completed missions earn leaderboard ranks and personal bests.
+          Sign in to submit one.
         </p>
         <p>Investor-owned points:</p>
         <table className="points">
@@ -1201,7 +1220,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.WEATHER_DAMAGE,
     group: "Gameplay",
     keywords:
-      "hail storm freeze cold snap winterization repair resilience retrofit hardening hail-resistant panels cold-weather package solar trackers downtime",
+      "hail storm freeze cold snap winterization repair resilience retrofit hardening cold-weather package solar trackers downtime",
     entry: (
       <div>
         <p>
@@ -1223,16 +1242,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           </li>
         </ul>
         <p>
-          <strong>Protection:</strong> When building, add hail-resistant panels
-          to solar, or a cold-weather package to gas. The package is only
-          offered where winters get cold enough to matter. It halves cold losses
-          and is rated to <ColdPackageRating />, or colder in cold climates.
+          <strong>Protection:</strong> When building, add a cold-weather package
+          to gas. The package is only offered where winters get cold enough to
+          matter. It halves cold losses and is rated to <ColdPackageRating />,
+          or colder in cold climates.
         </p>
         <p>
-          Adding either later from the facility&apos;s details costs 50% more.
-          Hail retrofits take the plant offline for a month; winterizing keeps
-          90% of capacity available during a month of staged work. You can
-          cancel before it starts for a full refund.
+          Adding a cold-weather package later from the facility&apos;s details
+          costs 50% more. Winterizing keeps 90% of capacity available during a
+          month of staged work. Cancel before completion for a full refund.
         </p>
         <p>
           In Deep Freeze, gas, coal, nuclear and wind plants can be winterized
@@ -1241,7 +1259,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           <strong>Solar trackers</strong> (from 2014, only when building) turn
-          panels to follow the sun, adding about 20% more power a year, mostly
+          panels to follow the sun, adding about 20% more energy a year, mostly
           in the morning and evening (a higher{" "}
           <EntryLink to={MANUAL_ENTRY.CAPACITY_FACTOR}>
             capacity factor

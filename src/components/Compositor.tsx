@@ -38,7 +38,6 @@ import DataCenterGuide from "./base/DataCenterGuide";
 import LowCashWarning from "./base/LowCashWarning";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
 import SaveTransitionDialog from "./base/SaveTransitionDialog";
-import CustomGameContainer from "./views/CustomGameContainer";
 import DataCenterSetupContainer from "./views/DataCenterSetupContainer";
 import LoadingContainer from "./views/LoadingContainer";
 import MainMenuContainer from "./views/MainMenuContainer";
@@ -46,8 +45,9 @@ import ManualHelpPopover from "./base/ManualHelpPopover";
 import ManualContainer from "./views/ManualContainer";
 import NewGameContainer from "./views/NewGameContainer";
 import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
+import CampaignSetupContainer from "./views/CampaignSetupContainer";
+import CampaignHandoverContainer from "./base/CampaignHandoverContainer";
 import SettingsContainer from "./views/SettingsContainer";
-import SavedGames from "./views/SavedGames";
 import { navigate, navigateBack } from "../reducers/Card";
 import {
   reprioritizeFacility,
@@ -68,6 +68,15 @@ import {
 } from "./base/SwipeDismiss";
 import { isDesktopScreen, isSideToolLayout } from "../Globals";
 import { store } from "../Store";
+
+const CustomGameContainer = React.lazy(
+  () =>
+    import(/* webpackChunkName: "custom-game" */ "./views/CustomGameContainer"),
+);
+
+const SavedGames = React.lazy(
+  () => import(/* webpackChunkName: "saved-games" */ "./views/SavedGames"),
+);
 
 const AchievementGallery = React.lazy(() =>
   import(
@@ -345,6 +354,7 @@ const tutorialCompletionSx = {
 } as const;
 
 export default class Compositor extends React.Component<Props, {}> {
+  private workspaceMemory = { run: -1, values: new Map<string, unknown>() };
   private removeShortcuts?: () => void;
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
   private snackbarContentRef = React.createRef<HTMLDivElement>();
@@ -483,7 +493,11 @@ export default class Compositor extends React.Component<Props, {}> {
   };
 
   private renderCard(): React.JSX.Element {
-    if (isGameCard(this.props.card.name)) return <GameWorkspace />;
+    const run = this.props.ui.evidenceRunId ?? 0;
+    if (this.workspaceMemory.run !== run)
+      this.workspaceMemory = { run, values: new Map() };
+    if (isGameCard(this.props.card.name))
+      return <GameWorkspace key={run} memory={this.workspaceMemory.values} />;
     switch (this.props.card.name) {
       case "SETTINGS":
         return <SettingsContainer />;
@@ -494,7 +508,11 @@ export default class Compositor extends React.Component<Props, {}> {
           </React.Suspense>
         );
       case "SAVED_GAMES":
-        return <SavedGames />;
+        return (
+          <React.Suspense fallback={<p role="status">Loading saved games…</p>}>
+            <SavedGames />
+          </React.Suspense>
+        );
       case "MODS":
         return (
           <React.Suspense fallback={<p role="status">Loading mods…</p>}>
@@ -511,10 +529,16 @@ export default class Compositor extends React.Component<Props, {}> {
         return <NewGameContainer />;
       case "NEW_GAME_DETAILS":
         return <NewGameDetailsContainer />;
+      case "CAMPAIGN":
+        return <CampaignSetupContainer />;
       case "CHALLENGE":
         return <ChallengeLanding />;
       case "CUSTOM_GAME":
-        return <CustomGameContainer />;
+        return (
+          <React.Suspense fallback={<p role="status">Loading custom game…</p>}>
+            <CustomGameContainer />
+          </React.Suspense>
+        );
       case "DATA_CENTER_SETUP":
         return <DataCenterSetupContainer />;
       default:
@@ -800,6 +824,7 @@ export default class Compositor extends React.Component<Props, {}> {
         {/* Connected, so they still update when shouldComponentUpdate blocks this component --
             neither is driven by the current card, and both can open over any of them */}
         <VictoryDialogContainer />
+        <CampaignHandoverContainer />
         <SaveTransitionDialog />
         <DisplayNameDialogContainer />
         <AudioContainer />

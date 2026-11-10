@@ -3,10 +3,14 @@ import * as React from "react";
 import {
   DialogContentText,
   Divider,
+  ListItemIcon,
+  ListItemText,
   ListSubheader,
   Menu,
   MenuItem,
 } from "@mui/material";
+import CancelIcon from "@mui/icons-material/Cancel";
+import ConceptIcon from "../base/ConceptIcon";
 import {
   FacilityOperatingType,
   GameType,
@@ -18,7 +22,10 @@ import {
 } from "../../helpers/Hazards";
 import { gasConversionQuote } from "../../helpers/GasConversion";
 import { currentCash } from "../../helpers/GameSelectors";
-import { facilityCashBack } from "../../helpers/Financials";
+import {
+  facilityCashBack,
+  facilityPermanentlyShutdown,
+} from "../../helpers/Financials";
 import { formatFacilitySize, formatMoneyConcise } from "../../helpers/Format";
 import ConfirmDialog from "../base/ConfirmDialog";
 import type { DispatchProps } from "./Facilities";
@@ -36,6 +43,30 @@ type ActionKey =
   | "cancelConstruction"
   | "sell"
   | RetrofitFacilityAction["upgrade"];
+/**
+ * One glyph per facility action, shared by the row buttons and this menu so a player who has
+ * used one recognizes the other. Upgrades are building work, so they take the build glyph.
+ */
+export function facilityActionIcon(
+  key: ActionKey,
+  fontSize: "small" | "medium" = "medium",
+): React.ReactElement {
+  switch (key) {
+    case "pause":
+      return <ConceptIcon concept="pause" fontSize={fontSize} decorative />;
+    case "resume":
+      return <ConceptIcon concept="play" fontSize={fontSize} decorative />;
+    case "cancelUpgrade":
+    case "cancelConstruction":
+      return <CancelIcon fontSize={fontSize} />;
+    // Selling returns cash, as the event log's sale rows already show; it isn't a delete
+    case "sell":
+      return <ConceptIcon concept="money" fontSize={fontSize} decorative />;
+    default:
+      return <ConceptIcon concept="build" fontSize={fontSize} decorative />;
+  }
+}
+
 interface FleetAction {
   key: ActionKey;
   label: string;
@@ -49,16 +80,12 @@ function actionsFor(
   facilities: FacilityOperatingType[],
 ): FleetAction[] {
   const operating = facilities.filter(
-    (f) => f.yearsToBuildLeft <= 0 && !isUpgradingAt(f, game.date.minute),
+    (f) =>
+      f.yearsToBuildLeft <= 0 &&
+      !isUpgradingAt(f, game.date.minute) &&
+      !facilityPermanentlyShutdown(f, game.date.minute),
   );
   const upgrades: FleetAction[] = [
-    {
-      key: "hailResistant",
-      label: "Add hail-resistant panels",
-      facilities: [],
-      cost: 0,
-      confirm: true,
-    },
     {
       key: "coldWeatherPackage",
       label: "Add cold-weather package",
@@ -75,6 +102,7 @@ function actionsFor(
     },
   ];
   for (const facility of facilities) {
+    if (facilityPermanentlyShutdown(facility, game.date.minute)) continue;
     const resilience = facilityResilienceSummary(game, facility);
     const conversion = gasConversionQuote(facility, game);
     for (const action of upgrades) {
@@ -105,18 +133,26 @@ function actionsFor(
     {
       key: "cancelUpgrade",
       label: "Cancel upgrade",
-      facilities: facilities.filter((f) => !!f.upgradeInProgress),
+      facilities: facilities.filter(
+        (f) =>
+          !!f.upgradeInProgress &&
+          !facilityPermanentlyShutdown(f, game.date.minute),
+      ),
     },
     {
       key: "cancelConstruction",
       label: "Cancel construction",
-      facilities: facilities.filter((f) => f.yearsToBuildLeft > 0),
+      facilities: facilities.filter(
+        (f) => f.yearsToBuildLeft > 0 && !f.saleRestricted,
+      ),
       confirm: true,
     },
     {
       key: "sell",
       label: "Sell",
-      facilities: facilities.filter((f) => f.yearsToBuildLeft <= 0),
+      facilities: facilities.filter(
+        (f) => f.yearsToBuildLeft <= 0 && !f.saleRestricted,
+      ),
       confirm: true,
     },
   ];
@@ -197,7 +233,7 @@ export default function FacilityContextMenu(props: {
   return (
     <>
       <Menu
-        open={!!target && selected.length > 0}
+        open={!!target && selected.length > 0 && offered.length > 0}
         onClose={props.onClose}
         anchorReference="anchorPosition"
         anchorPosition={
@@ -229,7 +265,12 @@ export default function FacilityContextMenu(props: {
               else execute(action);
             }}
           >
-            {actionLabel(action, selected.length > 1)}
+            <ListItemIcon>
+              {facilityActionIcon(action.key, "small")}
+            </ListItemIcon>
+            <ListItemText>
+              {actionLabel(action, selected.length > 1)}
+            </ListItemText>
           </MenuItem>,
         ])}
         {offered.some(
@@ -250,7 +291,7 @@ export default function FacilityContextMenu(props: {
               ? `Pay ${formatMoneyConcise(cost)}`
               : confirmation.label
           }
-          cancelLabel="Nevermind"
+          cancelLabel="Never mind"
           confirmDisabled={!affected.length || shortfall > 0}
           destructive={cost === undefined}
           onCancel={() => setPending(null)}
@@ -270,9 +311,7 @@ export default function FacilityContextMenu(props: {
               <DialogContentText>
                 {confirmation.key === "combinedCycle"
                   ? "Use less gas for the same power. Six months offline; slower starts and 45% minimum output afterward."
-                  : confirmation.key === "coldWeatherPackage"
-                    ? "Staged installation keeps 90% of capacity available for a month. Improves protection against extreme cold."
-                    : "Offline for one month. Less damage from future hail; current repairs still need to finish."}{" "}
+                  : "Staged installation keeps 90% of capacity available for a month. Improves protection against extreme cold."}{" "}
                 Cancel before completion for a full refund.
               </DialogContentText>
               {shortfall > 0 && (

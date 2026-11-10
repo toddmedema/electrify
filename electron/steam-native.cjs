@@ -18,6 +18,7 @@ const DECLARATIONS = {
     "bool SteamAPI_ISteamUserStats_SetStatInt32(void *, const char *, int32_t)",
   storeStats: "bool SteamAPI_ISteamUserStats_StoreStats(void *)",
   utils: "void * SteamAPI_SteamUtils_v010()",
+  overlayEnabled: "bool SteamAPI_ISteamUtils_IsOverlayEnabled(void *)",
   friends: "void * SteamAPI_SteamFriends_v017()",
   user: "void * SteamAPI_SteamUser_v023()",
   online: "bool SteamAPI_ISteamUser_BLoggedOn(void *)",
@@ -63,7 +64,6 @@ function nativeLibraryPath(platform = process.platform, arch = process.arch) {
   const location = {
     "win32:x64": "dist/win64/steam_api64.dll",
     "linux:x64": "dist/linux64/libsteam_api.so",
-    "darwin:x64": "dist/osx/libsteam_api.dylib",
     "darwin:arm64": "dist/osx/libsteam_api.dylib",
   }[`${platform}:${arch}`];
   if (!location)
@@ -78,7 +78,6 @@ function nativeBindingPath(platform = process.platform, arch = process.arch) {
   const location = {
     "win32:x64": "dist/win64/steamworksjs.win32-x64-msvc.node",
     "linux:x64": "dist/linux64/steamworksjs.linux-x64-gnu.node",
-    "darwin:x64": "dist/osx/steamworksjs.darwin-x64.node",
     "darwin:arm64": "dist/osx/steamworksjs.darwin-arm64.node",
   }[`${platform}:${arch}`];
   if (!location)

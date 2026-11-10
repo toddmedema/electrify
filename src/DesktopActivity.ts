@@ -4,7 +4,8 @@ import type {
   DesktopBridge,
   DesktopTimelineEvent,
 } from "./Desktop";
-import { SCENARIOS } from "./data/Scenarios";
+import { getScenario } from "./data/Scenarios";
+import { legacyCompletedMonths } from "./helpers/LegacyCampaign";
 import type { GameEventType } from "./Types";
 
 type ActivityStore = Pick<AppStore, "getState" | "subscribe">;
@@ -16,19 +17,20 @@ export function desktopActivity(state: RootState): DesktopActivity {
   const timelineEnabled = !!state.settings.steamTimelineEnabled;
   if (card.name === "LOADING" || saves.transitioning)
     return { phase: "loading", timelineEnabled };
-  const phase = ui.victory
-    ? ui.victory.outcome === "completed"
+  const ending = ui.victory ?? game.multiplayer?.ending;
+  const phase = ending
+    ? ending.outcome === "completed"
       ? "victory"
       : "ended"
     : !game.inGame || card.name === "MAIN_MENU"
       ? "menu"
       : game.speed === "PAUSED" ||
-          ["SETTINGS", "MANUAL", "MODS"].includes(card.name)
+          ["SETTINGS", "MANUAL", "MODS", "CAMPAIGN"].includes(card.name)
         ? "paused"
         : "playing";
   if (phase === "menu") return { phase, timelineEnabled };
   const scenarioId = ui.victory?.scenarioId ?? game.scenarioId;
-  const scenario = SCENARIOS.find(({ id }) => id === scenarioId);
+  const scenario = getScenario(scenarioId, game.customScenario);
   const durationMonths =
     scenario?.durationMonths ?? game.customScenario?.durationMonths ?? 12;
   const totalYears = Math.min(
@@ -43,7 +45,7 @@ export function desktopActivity(state: RootState): DesktopActivity {
     Math.max(
       1,
       Number.isFinite(game.date.monthsElapsed)
-        ? Math.floor(game.date.monthsElapsed / 12) + 1
+        ? Math.floor(legacyCompletedMonths(game) / 12) + 1
         : 1,
     ),
   );
@@ -93,6 +95,8 @@ export function startDesktopActivity(
     }
     return activity;
   };
+  /** Advance each run's high-water marks even on restored or inactive baselines.
+   * Only new live highlights enter the native queue, so resume and opt-in cannot replay history. */
   const update = () => {
     const current = store.getState();
     const activity = publish(current);
@@ -138,14 +142,16 @@ export function startDesktopActivity(
       }
     }
     highWater.set(runId, Math.max(seen, latest));
-    const victory = current.ui.victory;
+    const victory = current.ui.victory ?? game.multiplayer?.ending;
+    const previousVictory =
+      previous.ui.victory ?? previous.game.multiplayer?.ending;
     if (victory?.outcome === "completed") {
       if (
         enabled &&
         !reset &&
         previous.settings.steamTimelineEnabled &&
         !current.saves.transitioning &&
-        previous.ui.victory !== victory &&
+        previousVictory !== victory &&
         !victories.has(runId)
       )
         send("victory", "victory");
@@ -165,7 +171,10 @@ export function startDesktopActivity(
     runKey(previous),
     Math.max(0, ...previous.game.eventLog.map(({ id }) => id)),
   );
-  if (previous.ui.victory?.outcome === "completed")
+  if (
+    (previous.ui.victory ?? previous.game.multiplayer?.ending)?.outcome ===
+    "completed"
+  )
     victories.add(runKey(previous));
   publish(previous);
   const unsubscribe = store.subscribe(update);

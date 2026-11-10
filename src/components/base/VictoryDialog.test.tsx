@@ -78,6 +78,42 @@ beforeEach(() => {
 });
 
 describe("VictoryDialog", () => {
+  it("makes a campaign restart explicit and keeps it outside the leaderboard", async () => {
+    const onRetry = jest.fn();
+    const victory = aVictory({
+      scenarioId: 122,
+      scenarioName: "The Price of Power",
+      outcome: "bankrupt",
+    });
+    renderDialog({ victory, onRetry });
+    expect(
+      screen.getByText("Restarting begins a new campaign in 1882."),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "Result leaderboard" }),
+    ).not.toBeInTheDocument();
+    expect(mockFetchGlobalRank).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Restart campaign" }),
+    );
+    expect(onRetry).toHaveBeenCalledWith(victory);
+  });
+  it.each([
+    ["completed", true],
+    ["bankrupt", false],
+    ["fired", false],
+    [undefined, false],
+  ] as const)(
+    "only offers result sharing after a win (%s)",
+    (outcome, shareExpected) => {
+      renderDialog({ victory: aVictory({ outcome }) });
+      const share = screen.queryByRole("button", {
+        name: /Share result|Challenge a friend/,
+      });
+      expect(share !== null).toBe(shareExpected);
+    },
+  );
+
   it.each([false, true])(
     "passes mailing-list choice %s from the result invitation",
     async (mailingList) => {
@@ -174,7 +210,7 @@ describe("VictoryDialog", () => {
           kgco2e: 2000000000,
           scenarioMetrics: [
             {
-              label: "Demand not met during Winter Storm Uri · Feb 2021",
+              label: "Demand not met during Winter Storm Uri",
               value: "12GWh",
               concept: "blackout",
             },
@@ -197,32 +233,27 @@ describe("VictoryDialog", () => {
     expect(screen.getByText("$510M")).toBeInTheDocument();
     expect(screen.queryByText("$330M")).not.toBeInTheDocument();
     expect(
-      screen.getByText("Demand not met during Winter Storm Uri · Feb 2021"),
+      screen.getByText("Demand not met during Winter Storm Uri"),
     ).toBeInTheDocument();
     expect(screen.getByText("12GWh")).toBeInTheDocument();
     expect(screen.queryByText("Construction complete: Solar")).toBeNull();
   });
 
-  it("fills in the global rank once it resolves", async () => {
-    mockFetchGlobalRank.mockResolvedValue(4);
-    renderDialog();
-    expect(await screen.findByText(/#4 across all levels/)).toBeInTheDocument();
-    expect(mockFetchGlobalRank).toHaveBeenCalledWith(101, 812, "CEO");
-  });
-
-  it("drops the rank line rather than the dialog when the query fails", async () => {
-    const warn = jest
-      .spyOn(console, "warn")
-      .mockImplementation(() => undefined);
-    mockFetchGlobalRank.mockRejectedValue(new Error("unavailable"));
-    renderDialog();
-
-    await waitFor(() =>
-      expect(screen.queryByText(/across all levels/)).not.toBeInTheDocument(),
-    );
-    expect(screen.getByText(/800 electricity supplied/)).toBeInTheDocument();
-    warn.mockRestore();
-  });
+  it.each([undefined, 640, 900])(
+    "keeps the personal-best line free of global rank (previous best: %s)",
+    (previousBest) => {
+      mockFetchGlobalRank.mockResolvedValue(1);
+      renderDialog({ victory: aVictory({ previousBest }) });
+      expect(
+        screen.getByText(
+          previousBest === 900 ? "Personal best 900" : "New personal best",
+          { exact: true },
+        ),
+      ).toBeVisible();
+      expect(screen.queryByText(/across all levels|globally|#1/)).toBeNull();
+      expect(mockFetchGlobalRank).not.toHaveBeenCalled();
+    },
+  );
 
   // previousBest is read when the run ends, before the score write, so it is the run before this
   // one rather than the one just finished

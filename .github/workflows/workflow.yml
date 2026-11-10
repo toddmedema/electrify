@@ -70,7 +70,9 @@ jobs:
     name: ${{ matrix.label }} build
     needs: build
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    # Time spent queued for a hosted macOS runner counts against this limit, so packaging has its
+    # own, tighter one below.
+    timeout-minutes: 60
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.tmp/electron-cache
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.tmp/electron-builder-cache
@@ -90,14 +92,12 @@ jobs:
             arch: x64
             depot: win32-x64
             directory: win-unpacked
-          # One universal app serves Intel and Apple Silicon Macs. This Apple Silicon host
-          # packages and verifies both slices.
-          - label: macOS universal
+          - label: macOS ARM64
             runner: macos-15
             platform: darwin
             arch: arm64
-            depot: darwin-universal
-            directory: mac-universal
+            depot: darwin-arm64
+            directory: mac-arm64
     steps:
       - uses: actions/checkout@v7
         with:
@@ -122,8 +122,12 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: desktop-renderer
+      - name: Install redistributable Linux runtime inputs
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libnss3 libnspr4 libsqlite3-0
       - name: Package and verify native depot
-        run: npm run desktop:pack:offline -- --skip-build --platform ${{ matrix.platform }} --arch ${{ matrix.platform == 'darwin' && 'universal' || matrix.arch }}
+        timeout-minutes: 15
+        run: npm run desktop:pack:offline -- --skip-build --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
       - name: Save native packaging downloads
         if: "!cancelled() && steps.native-cache.outputs.cache-hit != 'true'"
         uses: actions/cache/save@v6

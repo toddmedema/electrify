@@ -16,6 +16,9 @@ import userEvent from "@testing-library/user-event";
 import FacilityDetails from "./FacilityDetails";
 import { UnitsContext } from "./UnitsContext";
 
+// A dam's water section links to the manual, which reads the store; these tests have none
+jest.mock("./ManualLink", () => () => null);
+
 // Carbon Fee: a non-tutorial game in San Francisco, starting with a gas plant
 function carbonFee(): GameType {
   return createGame({ scenarioId: 100 });
@@ -36,13 +39,13 @@ function coldGame(): GameType {
   return game;
 }
 
-function withSolar(game: GameType, hailResistant = false) {
+function withSolar(game: GameType) {
   const solar = {
     ...cloneDeep(game.facilities[0]),
     id: 3,
     name: "Solar",
     fuel: "Sun",
-    resilience: { hailResistant },
+    resilience: { solarTrackers: false },
   } as FacilityOperatingType;
   game.facilities.push(solar);
   return solar;
@@ -122,13 +125,13 @@ describe("weather resilience details", () => {
   });
 
   it("says how much cash a retrofit still needs and ties it to the button", () => {
-    const game = carbonFee();
-    const solar = withSolar(game);
-    const cost = retrofitCost(solar, game, "hailResistant")!;
+    const game = coldGame();
+    const gas = game.facilities[0];
+    const cost = retrofitCost(gas, game, "coldWeatherPackage")!;
     game.timeline[0].cash = cost - 1000000;
-    showDetails(game, solar);
+    showDetails(game, gas);
     const button = within(section()).getByRole("button", {
-      name: /^Add hail-resistant panels/,
+      name: /^Add cold-weather package/,
     });
     expect(button).toBeDisabled();
     expect(button).toHaveAccessibleDescription(
@@ -137,13 +140,13 @@ describe("weather resilience details", () => {
   });
 
   it("disables Pay when cash falls short while the dialog is open", () => {
-    const game = carbonFee();
-    const solar = withSolar(game);
-    const cost = retrofitCost(solar, game, "hailResistant")!;
-    const { onRetrofit, rerender } = showDetails(game, solar);
+    const game = coldGame();
+    const gas = game.facilities[0];
+    const cost = retrofitCost(gas, game, "coldWeatherPackage")!;
+    const { onRetrofit, rerender } = showDetails(game, gas);
     fireEvent.click(
       within(section()).getByRole("button", {
-        name: /^Add hail-resistant panels/,
+        name: /^Add cold-weather package/,
       }),
     );
     const poorer = cloneDeep(game);
@@ -159,23 +162,22 @@ describe("weather resilience details", () => {
     expect(onRetrofit).not.toHaveBeenCalled();
   });
 
-  it("confirms a hail retrofit and moves focus after paying", () => {
-    const game = carbonFee();
-    const solar = withSolar(game);
-    const cost = retrofitCost(solar, game, "hailResistant")!;
-    const { onRetrofit } = showDetails(game, solar);
+  it("confirms a winterization retrofit and moves focus after paying", () => {
+    const game = coldGame();
+    const gas = game.facilities[0];
+    const cost = retrofitCost(gas, game, "coldWeatherPackage")!;
+    const { onRetrofit } = showDetails(game, gas);
     fireEvent.click(
       within(section()).getByRole("button", {
-        name: `Add hail-resistant panels · ${formatMoneyConcise(cost)}`,
+        name: `Add cold-weather package · ${formatMoneyConcise(cost)}`,
       }),
     );
     const dialog = screen.getByRole("dialog", {
-      name: "Add hail-resistant panels to Solar?",
+      name: `Add cold-weather package to ${gas.name}?`,
     });
-    expect(dialog).toHaveTextContent("Less damage from future hail.");
-    // The plant's downtime, the premium over building it in and the way out
+    // Staged work, the premium over building it in and the way out
     expect(dialog).toHaveTextContent(
-      "Solar goes offline for a month while it's installed. Adding it now costs 50% more than building it in. Cancel before it's done for a full refund.",
+      "Staged installation keeps 90% of capacity available for a month. Adding it now costs 50% more than building it in. Cancel before it's done for a full refund.",
     );
     expect(dialog).not.toHaveTextContent("cash now");
     fireEvent.click(
@@ -184,8 +186,8 @@ describe("weather resilience details", () => {
       }),
     );
     expect(onRetrofit).toHaveBeenCalledWith({
-      facilityId: solar.id,
-      upgrade: "hailResistant",
+      facilityId: gas.id,
+      upgrade: "coldWeatherPackage",
     });
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByRole("heading", { name: "Upgrades" })).toHaveFocus();
@@ -223,21 +225,6 @@ describe("weather resilience details", () => {
     );
   });
 
-  it("says a retrofit does not speed up current hail repairs", async () => {
-    const game = carbonFee();
-    const solar = withSolar(game);
-    outage(game, solar, true, 0.7);
-    showDetails(game, solar);
-    await userEvent.click(
-      within(section()).getByRole("button", {
-        name: /^Add hail-resistant panels/,
-      }),
-    );
-    expect(screen.getByRole("dialog")).toHaveTextContent(
-      "Doesn't speed up current repairs.",
-    );
-  });
-
   it("reports a retrofit being installed and offers no second one", () => {
     const game = coldGame();
     const gas = game.facilities[0];
@@ -256,20 +243,19 @@ describe("weather resilience details", () => {
     ).toBeNull();
   });
 
-  it("names trackers on a tracked solar farm", () => {
+  it("describes tracker gain as annual energy on a tracked solar farm", () => {
     const game = carbonFee();
     const solar = withSolar(game);
     solar.resilience = {
-      hailResistant: false,
       solarTrackers: true,
       trackerHailDamageFactor: 0.5,
     };
     showDetails(game, solar);
     expect(section()).toHaveTextContent(
-      "Solar trackersAbout 20% more morning and evening power.",
+      "Solar trackersAbout 20% more energy a year, mostly in the morning and evening.",
     );
     expect(section()).toHaveTextContent(
-      "About 20% more morning and evening power.",
+      "About 20% more energy a year, mostly in the morning and evening.",
     );
   });
 
@@ -288,9 +274,7 @@ describe("weather resilience details", () => {
       screen.getByRole("region", { name: "Economics" }),
     ).toBeInTheDocument();
     view.rerender(details(game, solar, jest.fn()));
-    expect(
-      screen.queryByRole("button", { name: /^Add hail-resistant panels/ }),
-    ).toBeNull();
+    expect(screen.queryByRole("region", { name: "Upgrades" })).toBeNull();
   });
 
   it("gives design temperatures in the player's units with a true minus", async () => {
@@ -311,14 +295,6 @@ describe("weather resilience details", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent(
       "Rated to \u221222°F instead of 18°F; halves remaining cold losses and deep-freeze losses.",
     );
-  });
-
-  it("reports installed protection and stops offering it", () => {
-    const game = carbonFee();
-    const solar = withSolar(game, true);
-    showDetails(game, solar);
-    expect(section()).toHaveTextContent("Hail-resistant panels");
-    expect(within(section()).queryByRole("button")).toBeNull();
   });
 
   it("reports an active hail outage and when repairs finish", () => {
@@ -469,4 +445,83 @@ describe("weather resilience details", () => {
     showDetails(game, gas || withSolar(game));
     expect(screen.queryByRole("region", { name: "Upgrades" })).toBeNull();
   });
+});
+
+describe("fixed upkeep", () => {
+  // Heatwave + Drought starts with a dam, a solar farm, a wind farm and a battery: none of them
+  // pays per MWh, so their annual cost is the only upkeep and was missing from the details
+  it.each([
+    ["Hydro", (f: FacilityOperatingType) => f.fuel === "Hydro"],
+    ["Solar", (f: FacilityOperatingType) => f.fuel === "Sun"],
+    ["Wind", (f: FacilityOperatingType) => f.fuel === "Wind"],
+    ["Battery", (f: FacilityOperatingType) => f.name === "Battery"],
+  ])("lists a %s facility's annual upkeep", (_name, matches) => {
+    const game = createGame({ scenarioId: 108 });
+    const facility = game.facilities.find(matches)!;
+    expect(facility.variableOperatingCostPerMWh).toBeUndefined();
+    expect(facility.annualOperatingCost).toBeGreaterThan(0);
+    showDetails(game, facility);
+    const economics = screen.getByRole("region", { name: "Economics" });
+    expect(economics).toHaveTextContent(
+      `Fixed upkeep${formatMoneyConcise(facility.annualOperatingCost)}/yr`,
+    );
+    expect(economics).not.toHaveTextContent("Variable upkeep");
+  });
+
+  it("still lists the variable part beside it for a fuel plant", () => {
+    const game = carbonFee();
+    const gas = game.facilities[0];
+    expect(gas.variableOperatingCostPerMWh).toBeDefined();
+    showDetails(game, gas);
+    const economics = screen.getByRole("region", { name: "Economics" });
+    expect(economics).toHaveTextContent(
+      `Fixed upkeep${formatMoneyConcise(gas.annualOperatingCost)}/yr`,
+    );
+    expect(economics).toHaveTextContent("Variable upkeep");
+  });
+});
+
+it("shows the monthly cleanup charge without ordinary upkeep", () => {
+  const game = carbonFee();
+  const facility = game.facilities[0];
+  facility.paused = true;
+  facility.maintenanceObligation = {
+    startsMonth: 1,
+    monthlyCost: 2e6,
+    reason: "Cleanup and recovery",
+  };
+  render(
+    <FacilityDetails
+      facility={facility}
+      date={game.date}
+      seed={game.seed}
+      location={game.location}
+      game={game}
+    />,
+  );
+  expect(screen.getByText("Cleanup and recovery")).toBeInTheDocument();
+  expect(screen.getByText("$2M/mo", { exact: false })).toBeInTheDocument();
+  expect(screen.queryByText("Fixed upkeep")).not.toBeInTheDocument();
+});
+
+it("dates a cleanup charge before it begins", () => {
+  const game = createGame({ scenarioId: 126 });
+  const unit = game.facilities.find(
+    (facility) => facility.startingAssetId === "chernobyl-unit-4",
+  )!;
+  showDetails(game, unit);
+  expect(
+    screen.getByText("$250M/mo · $3B/yr from Apr 1986", { exact: false }),
+  ).toBeInTheDocument();
+});
+
+it("hides retrofit actions after permanent shutdown", () => {
+  const game = coldGame();
+  const facility = game.facilities[0];
+  facility.permanentShutdownMonth = 1;
+  facility.paused = true;
+  showDetails(game, facility);
+  expect(
+    screen.queryByRole("region", { name: "Upgrades" }),
+  ).not.toBeInTheDocument();
 });

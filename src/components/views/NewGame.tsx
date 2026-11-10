@@ -42,6 +42,7 @@ import {
   ScenarioType,
 } from "../../Types";
 import CoopBrowseBar from "../base/CoopBrowseBar";
+import { isLegacyCampaignScenario } from "../../data/LegacyCampaign";
 
 export interface StateProps {
   game: GameType;
@@ -52,6 +53,7 @@ export interface StateProps {
 export interface DispatchProps {
   onBack: () => void;
   onCustomGame: () => void;
+  onCampaign?: () => void;
   /** Desktop builds with mod support: open the installed community scenarios. */
   onCommunityScenarios?: () => void;
   onDetails: (delta: Partial<GameType>) => void;
@@ -82,7 +84,12 @@ const CHALLENGE_SORTS: Array<{
 ];
 
 function scenarioEndYear(scenario: ScenarioType): number {
-  return scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
+  return (
+    scenario.startingYear +
+    Math.floor(
+      ((scenario.startingMonth ?? 1) - 1 + scenario.durationMonths - 1) / 12,
+    )
+  );
 }
 
 interface MissionListItemProps {
@@ -107,7 +114,11 @@ function MissionSectionHeader(
   props: MissionSectionHeaderProps,
 ): React.JSX.Element {
   return (
-    <ListSubheader disableSticky className="missionSectionHeader">
+    <ListSubheader
+      component="div"
+      disableSticky
+      className="missionSectionHeader"
+    >
       <Typography component="h2" variant="subtitle2" sx={{ fontWeight: 600 }}>
         {props.children}
       </Typography>
@@ -117,12 +128,15 @@ function MissionSectionHeader(
 }
 
 // MUI's filled CheckCircle cuts its tick out of the disc, so whatever sits behind the badge
-// shows through it. A solid white tick reads as "done" on every avatar, in both palettes.
+// shows through it. A tick in the on-blue contrast colour reads as "done" on every avatar, in both palettes.
 function CompletedCheckIcon(props: React.ComponentProps<typeof SvgIcon>) {
   return (
     <SvgIcon {...props}>
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-      <path d="M10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8z" fill="#fff" />
+      <path
+        d="M10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8z"
+        fill="var(--interactive-contrast)"
+      />
     </SvgIcon>
   );
 }
@@ -138,9 +152,8 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
     isTutorial || s.id === CUSTOM_SCENARIO_ID ? (
       s.summary
     ) : (
-      <span>
-        {s.summary}
-        <br />
+      <>
+        <span className="missionCatalogSummary">{s.summary}</span>
         <span className="missionMeta">
           {location.name} · {s.startingYear}–{scenarioEndYear(s)}
         </span>
@@ -158,18 +171,18 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
             ))}
           </span>
         )}
-      </span>
+      </>
     );
   return (
     <NavigableCardRow
       testId={`mission-row-${s.id}`}
+      className="missionCatalogItem"
       onOpen={readOnly ? undefined : onSelect}
       ariaLabel={
         isTutorial
           ? `${completed ? "Review" : "Start"} ${name}`
           : `View ${name} details`
       }
-      showChevron={!isTutorial}
       avatar={
         <Badge
           overlap="circular"
@@ -193,7 +206,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
         </Badge>
       }
       title={<span>{name}</span>}
-      description={<span>{summary}</span>}
+      description={summary}
     />
   );
 }
@@ -255,7 +268,9 @@ export default function NewGame(props: Props): React.JSX.Element {
   const ids = Object.keys(playCounts).map(Number);
   const completedTutorials = TUTORIALS.filter((s) => ids.includes(s.id)).length;
   const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
-  const scenarios = SCENARIOS.filter((s) => !s.tutorialSteps).sort(
+  const scenarios = SCENARIOS.filter(
+    (s) => !s.tutorialSteps && !isLegacyCampaignScenario(s.id),
+  ).sort(
     (a, b) =>
       b.startingYear - a.startingYear ||
       scenarioEndYear(b) - scenarioEndYear(a),
@@ -334,8 +349,11 @@ export default function NewGame(props: Props): React.JSX.Element {
       onBack={props.onBack}
     >
       <CoopBrowseBar coop={props.coop} offerSaves />
+      {/* Sections of headed groups rather than one list, so it is a labelled region. */}
       <List
         dense
+        component="div"
+        role="region"
         className="scrollable cardList missionList"
         aria-label="Available games"
       >
@@ -398,6 +416,29 @@ export default function NewGame(props: Props): React.JSX.Element {
                 ))}
               </div>
             )}
+          </>
+        )}
+        {!props.coop && (
+          <>
+            <MissionSectionHeader>Campaign</MissionSectionHeader>
+            <div className="groupedList">
+              <NavigableCardRow
+                testId="legacy-campaign-entry"
+                avatar={<Avatar src="/images/coal.svg" alt="" />}
+                title="Legacy campaign"
+                description={
+                  <span>
+                    Build one utility across nine generations.
+                    <br />
+                    <span className="missionMeta">
+                      1882–2061 · 20 years per CEO
+                    </span>
+                  </span>
+                }
+                ariaLabel="View legacy campaign"
+                onOpen={props.onCampaign}
+              />
+            </div>
           </>
         )}
         <MissionSectionHeader

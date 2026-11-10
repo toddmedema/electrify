@@ -10,12 +10,12 @@ import { purchaseTerms } from "./Financials";
 export const DEFAULT_BUILD_SIZE = 500000000;
 
 /**
- * The build catalogs' size slider. Starting at 1M, each tick increments the leading digit, and
- * when it overflows a zero is added instead (1 → 2MW, 9 → 10MW, 10 → 20MW).
+ * Each tick increments the leading digit and then its magnitude. Tick zero is 1 MW;
+ * negative ticks use the same sequence for historical plants smaller than a megawatt.
  */
 export function sliderTickToW(tick: number): number {
   const exponent = Math.floor(tick / 9) + 6;
-  const frontNumber = (tick % 9) + 1;
+  const frontNumber = (((tick % 9) + 9) % 9) + 1;
   return frontNumber * pow(10, exponent);
 }
 

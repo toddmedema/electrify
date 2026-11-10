@@ -8,6 +8,42 @@ import * as DeferredProjection from "./DeferredProjection";
 
 afterEach(() => jest.restoreAllMocks());
 
+it("keeps the successor's scenario forecast open after the first 240 months", () => {
+  const first = createGame({ scenarioId: 117 });
+  const offset = 240 * DateTime.MINUTES_PER_MONTH;
+  const game = {
+    ...first,
+    scenarioId: 118,
+    date: DateTime.getDateFromMinute(offset, first.startingYear),
+    campaign: { ...first.campaign!, generationIndex: 1, termStartMonth: 240 },
+    timeline: first.timeline.map((tick) => ({
+      ...tick,
+      minute: tick.minute + offset,
+    })),
+    monthlyHistory: [],
+  };
+  const originalWorker = global.Worker;
+  global.Worker = jest.fn() as unknown as typeof Worker;
+  jest.spyOn(DeferredProjection, "projectionReady").mockReturnValue(false);
+  jest
+    .spyOn(DeferredProjection, "requestProjection")
+    .mockImplementation(() => undefined);
+  try {
+    renderDetails(game);
+    const outlook = screen.getByRole("region", { name: "Score outlook" });
+    expect(outlook).toHaveTextContent("Score now");
+    expect(outlook).toHaveTextContent("Projected final");
+    expect(
+      screen.getByRole("status", { name: "Scenario forecast" }),
+    ).toHaveTextContent("Updating forecast");
+    expect(screen.getByRole("region", { name: "Goals" })).not.toHaveTextContent(
+      "1921",
+    );
+  } finally {
+    global.Worker = originalWorker;
+  }
+});
+
 function renderDetails(game = createGame({ scenarioId: 103 })) {
   return render(
     <ScenarioDetailsContent game={game} scenario={activeScenario(game)!} />,
@@ -45,7 +81,8 @@ it("shows the score so far beside where the current pace ends it", () => {
   renderDetails({ ...game, monthlyHistory });
   const outlook = screen.getByRole("region", { name: "Score outlook" });
   expect(outlook).toHaveTextContent("Score now");
-  expect(outlook).toHaveTextContent("Projected final");
+  // This fleet is projected to lose, so the full-term figure is labelled as hypothetical
+  expect(outlook).toHaveTextContent("If the run continued");
   expect(
     screen.getByRole("region", { name: "Score breakdown" }),
   ).toHaveTextContent(/TWh supplied/i);
@@ -87,9 +124,16 @@ it("keeps one concise loss line under the score chart and removes redundant goal
     screen.getByRole("img", { name: /Projected loss periods shaded/ }),
   ).toBeInTheDocument();
   expect(screen.getAllByText(/Projected loss:/)).toHaveLength(1);
+  // The run would end early, so the full-term score is labelled as hypothetical
+  expect(outlook).toHaveTextContent("If the run continued");
+  expect(outlook).not.toHaveTextContent("Projected final");
   expect(status).toContainHTML("<strong>Projected loss:</strong>");
   expect(status).toHaveClass("insightsWarning");
-  expect(within(status).getByTestId("WarningAmberIcon")).toBeInTheDocument();
+  // The game's shared danger glyph, not a one-off warning triangle
+  expect(
+    // eslint-disable-next-line testing-library/no-node-access
+    status.querySelector('[data-concept="danger"]'),
+  ).toBeInTheDocument();
   const conditions = screen.getByRole("region", { name: "Goals" });
   expect(conditions).not.toHaveTextContent(
     /Projected miss|Projected to meet|Projected loss/,

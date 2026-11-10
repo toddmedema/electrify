@@ -311,3 +311,20 @@ it("stops for quit and accepts a fresh user gesture after cancellation without a
   expect(mockHapticPulse).toHaveBeenCalledTimes(3);
   h.stop();
 });
+
+it("stops browser vibration for the whole couch session, including setup and global dialogs", () => {
+  const { beginCouchPlatform } =
+    require("../couch/Platform") as typeof import("../couch/Platform");
+  const h = harness();
+  h.complete(1);
+  expect(mockHapticPulse).toHaveBeenCalledTimes(1);
+  const couch = beginCouchPlatform();
+  expect(mockHapticStop).toHaveBeenCalled();
+  h.stop.controllerCue("confirm");
+  h.complete(2);
+  expect(mockHapticPulse).toHaveBeenCalledTimes(1);
+  couch.dispose();
+  h.complete(3);
+  expect(mockHapticPulse).toHaveBeenCalledTimes(2);
+  h.stop();
+});

@@ -1,0 +1,37 @@
+html[data-couch-seat] #appbar #topbar {
+  .MuiToolbar-root {
+    // Keep both money figures together; a narrow player pane can put speeds below.
+    flex-wrap: wrap !important;
+  }
+
+  .gameStatus {
+    min-width: max-content;
+    overflow: visible;
+  }
+
+  .gameBalance {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+}
+
+// Keep every readout and all five co-op speed choices legible at 360 px.
+// When they cannot share a row, move the clock below instead of clipping profit.
+@media (max-width: 599px) {
+  #topbar .MuiToolbar-root:has(> .gameStatus):has(.multiplayerSpeedToggles) {
+    flex-wrap: wrap !important;
+    row-gap: 4px;
+    padding-bottom: 4px;
+
+    .gameStatus {
+      min-width: max-content;
+      overflow: visible;
+    }
+
+    #speedChangeButtons {
+      margin-left: auto;
+    }
+  }
+}

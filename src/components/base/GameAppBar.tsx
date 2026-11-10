@@ -1,10 +1,9 @@
+import { useTvLayout } from "../../TvLayout";
 import { FEEDBACK_URL } from "../../CommunityLinks";
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import {
   ClickAwayListener,
-  IconButton,
-  Menu,
   MenuItem,
   Toolbar,
   Tooltip,
@@ -12,15 +11,11 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import FlashOnIcon from "@mui/icons-material/FlashOn";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import {
-  deriveExpandedSummary,
   formatHour,
   getDateFromMinute,
   getTimeFromTimeline,
   MINUTES_PER_MONTH,
-  summarizeTimeline,
 } from "../../helpers/DateTime";
 import { projectedShortfall } from "../../helpers/MissionStatus";
 import {
@@ -57,9 +52,13 @@ import {
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus } from "./useMenuKeys";
+import { createSelector } from "@reduxjs/toolkit";
+import GameMenu from "./GameMenu";
+import { GameDate, YearProgressBar } from "./GameCalendar";
+import "./GameAppBar.scss";
 
 /**
- * The game's global state: cash, monthly profit on wide screens, the date, speed, year progress,
+ * The game's global state: cash, monthly profit, the date, speed, year progress,
  * and whether the lights are currently out.
  *
  * This used to live inside whichever pane happened to be showing, which on desktop meant all of
@@ -67,7 +66,7 @@ import { restoreMenuFocus } from "./useMenuKeys";
  * so it spans the app instead -- one bar above the panes on desktop, and the card's own header
  * on a phone, where there is only ever one pane anyway.
  *
- * Narrower windows stack it in two rows: cash, date and speed above, then the grid readout and
+ * Narrower windows stack it in two rows: cash, profit, date and speed above, then the grid readout and
  * the mission. Once the workspace has room for side columns those rows fold into one bar, in the
  * order a player checks them: cash, profit and date, the grid, the mission (the only part that
  * gives up width), then the speed controls pinned right where they always are.
@@ -209,7 +208,8 @@ const STATUS_TOOLTIP_MS = 2500;
 const STATUS_WORD: Record<Exclude<GridHealthState, "stable">, string> = {
   "low-reserve": "Low",
   "at-limit": "Limit",
-  "blackout-ahead": "Soon",
+  // Names the coming problem; "Soon" alone did not say what was coming.
+  "blackout-ahead": "Short",
   blackout: "Blackout",
 };
 
@@ -273,7 +273,11 @@ function CompactGridStatus({
             <span className="gridHealthStatusIcon" aria-hidden="true">
               {health.state === "stable" ? (
                 <>
-                  <FlashOnIcon className="gridHealthStableBolt" />
+                  <ConceptIcon
+                    concept="supply"
+                    className="gridHealthStableBolt"
+                    decorative
+                  />
                   <CheckCircleIcon className="gridHealthStableCheck" />
                 </>
               ) : (
@@ -293,6 +297,40 @@ function CompactGridStatus({
     </div>
   );
 }
+
+/**
+ * This month's profit, bit-identical to deriveExpandedSummary(summarizeTimeline(...)).profit
+ * but without the rest of the month summary: the same fields, summed in timeline order from
+ * zero, then associated the way deriveExpandedSummary does.
+ */
+export function monthProfit(
+  timeline: TickPresentFutureType[],
+  monthsElapsed: number,
+): number {
+  let revenue = 0;
+  let fuel = 0;
+  let om = 0;
+  let carbon = 0;
+  let interest = 0;
+  let policy = 0;
+  let imports = 0;
+  for (let i = 0; i < timeline.length; i++) {
+    const t = timeline[i];
+    if (Math.floor(t.minute / MINUTES_PER_MONTH) !== monthsElapsed) continue;
+    revenue += t.revenue;
+    fuel += t.expensesFuel;
+    om += t.expensesOM;
+    carbon += t.expensesCarbonFee;
+    interest += t.expensesInterest;
+    policy += t.expensesPolicy || 0;
+    imports += t.expensesImports || 0;
+  }
+  const expenses = fuel + om + carbon + interest + (policy || 0);
+  return revenue - (expenses + (imports || 0));
+}
+
+/** Present the current company's money, grid status and requested shared-clock speed.
+ * Couch seats leave common calendar/menu chrome to the shell; memoized controls avoid tick churn. */
 
 export function GameAppBar(props: Props) {
   const steamAvailable = useDesktopState()?.steam.available;
@@ -317,7 +355,6 @@ export function GameAppBar(props: Props) {
     null,
   );
   const online = useOnline();
-  const connectionDescriptionId = React.useId();
   // The Scenario tool opens by navigation (see evidenceCard); there is nothing in it to point at
   React.useEffect(() => {
     if (evidenceRequest?.target === "mission-details" && !facilityDragActive) {
@@ -327,23 +364,13 @@ export function GameAppBar(props: Props) {
 
   const bigScreen = isBigScreen();
   // Tracks resizes even while paused, when the bar otherwise has no reason to re-render.
-  const singleRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
-  const showProfit = useMediaQuery("(min-width:700px)", { noSsr: true });
+  const tvMode = useTvLayout();
+  const wideRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
+  const singleRow = wideRow && !tvMode;
   const roomForStatusText = useMediaQuery("(min-width:600px)", { noSsr: true });
   const monthlyProfit = React.useMemo(
-    () =>
-      showProfit
-        ? deriveExpandedSummary(
-            summarizeTimeline(
-              game.timeline,
-              game.startingYear,
-              (tick) =>
-                Math.floor(tick.minute / MINUTES_PER_MONTH) ===
-                date.monthsElapsed,
-            ),
-          ).profit
-        : 0,
-    [showProfit, game.timeline, game.startingYear, date.monthsElapsed],
+    () => monthProfit(game.timeline, date.monthsElapsed),
+    [game.timeline, date.monthsElapsed],
   );
   // Crossing the breakpoint moves the status row to another parent, which remounts its
   // controls; a player tabbed onto one keeps their place rather than dropping to the page.
@@ -365,6 +392,7 @@ export function GameAppBar(props: Props) {
         ?.focus({ preventScroll: true });
     }
   }, [singleRow]);
+  const couchSeat = !!window.electrifyCouch;
   const multiplayer = game.multiplayer;
   const inMultiplayer = !!multiplayer;
   const clock = multiplayer?.clock;
@@ -393,17 +421,19 @@ export function GameAppBar(props: Props) {
    * entirely on the frames in between, which is where a good quarter of the frame budget went.
    */
   // Layout and speed availability must use the same media-query snapshot during resize.
-  const desktop = singleRow;
+  const desktop = singleRow || tvMode;
+  const speedDisabled = !!multiplayer?.ending;
   const speedOptions = React.useMemo(
     () =>
       buildSpeedOptions({
         speed,
         onSpeedChange,
         desktop,
+        disabled: speedDisabled,
         multiplayer: sharedClockSpeedProps(multiplayer),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [speed, onSpeedChange, desktop, clock, multiplayer?.seat],
+    [speed, onSpeedChange, desktop, speedDisabled, clock, multiplayer?.seat],
   );
   // A window narrowed below desktop width loses the ULTRA button, so it can't stay the selected
   // speed. Re-checked whenever the speed changes too: a card that paused the clock can restore
@@ -416,66 +446,48 @@ export function GameAppBar(props: Props) {
 
   const menu = React.useMemo(
     () => (
-      <>
-        <IconButton
-          data-settings-trigger
-          data-saves-trigger
-          data-achievements-trigger
-          data-manual-trigger
-          className="gameMenuButton"
-          onClick={handleMenuClick}
-          aria-label="menu"
-          aria-describedby={online ? undefined : connectionDescriptionId}
-          edge="start"
-          color="primary"
-          size="large"
+      <GameMenu
+        anchorEl={menuAnchorEl}
+        online={online}
+        onOpen={handleMenuClick}
+        onClose={handleMenuClose}
+      >
+        <MenuItem onClick={onManual}>Manual</MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (window.electrifyCouch) {
+              handleMenuClose();
+              window.electrifyCouch.post({
+                kind: "global-settings",
+                requestId: crypto.randomUUID(),
+              });
+            } else onSettings();
+          }}
         >
-          <MoreVertIcon />
-          {!online && (
-            <>
-              <span className="offlineDot" aria-hidden="true" />
-              <span id={connectionDescriptionId} className="srOnly">
-                Offline: saving to this device only
-              </span>
-            </>
-          )}
-        </IconButton>
-        <Menu
-          id="gameCardMenu"
-          anchorEl={menuAnchorEl}
-          keepMounted
-          open={Boolean(menuAnchorEl)}
-          onClose={handleMenuClose}
-        >
-          {/* The app-wide offline banner would cover the game, so it is said here instead */}
-          {!online && (
-            <MenuItem disabled className="gameMenuOffline">
-              <span className="offlineDot" aria-hidden="true" />
-              Offline: saving to this device only
-            </MenuItem>
-          )}
-          <MenuItem onClick={onManual}>Manual</MenuItem>
-          <MenuItem onClick={onSettings}>Settings</MenuItem>
-          {!steamAvailable && (
-            <MenuItem onClick={props.onAchievements}>Achievements</MenuItem>
-          )}
-          {!inMultiplayer && (
-            <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
-          )}
-          <MenuItem onClick={() => openWindow(FEEDBACK_URL)}>
-            Send feedback
-          </MenuItem>
-          {/* Mid-tutorial, the thing a player who has seen enough wants is the next tutorial,
+          Settings
+        </MenuItem>
+        {!steamAvailable && (
+          <MenuItem onClick={props.onAchievements}>Achievements</MenuItem>
+        )}
+        {!inMultiplayer && (
+          <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
+        )}
+        <MenuItem onClick={() => openWindow(FEEDBACK_URL)}>
+          Send feedback
+        </MenuItem>
+        {/* Mid-tutorial, the thing a player who has seen enough wants is the next tutorial,
               not the scenario list they would have to go back through to reach it */}
-          {nextTutorial && (
-            <MenuItem onClick={() => onNextTutorial(nextTutorial.id)}>
-              Next tutorial
-            </MenuItem>
-          )}
-          <MenuItem onClick={handleQuit}>
-            {isTutorial ? "Main menu" : "Save & Quit"}
+        {nextTutorial && (
+          <MenuItem onClick={() => onNextTutorial(nextTutorial.id)}>
+            Next tutorial
           </MenuItem>
-          {process.env.REACT_APP_DESKTOP === "true" && isDesktopApp() && (
+        )}
+        <MenuItem onClick={handleQuit}>
+          {isTutorial ? "Main menu" : "Save & Quit"}
+        </MenuItem>
+        {process.env.REACT_APP_DESKTOP === "true" &&
+          isDesktopApp() &&
+          !window.electrifyCouch && (
             <MenuItem
               onClick={() => {
                 handleMenuClose();
@@ -485,14 +497,12 @@ export function GameAppBar(props: Props) {
               Quit
             </MenuItem>
           )}
-        </Menu>
-      </>
+      </GameMenu>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       menuAnchorEl,
       online,
-      connectionDescriptionId,
       onManual,
       onSettings,
       props.onSavedGames,
@@ -529,7 +539,6 @@ export function GameAppBar(props: Props) {
       ? stableGridSummary(game, now)
       : `${gridHealth.label}, ${gridHealth.metric}`;
 
-  const yearProgress = `Year ${date.year}: ${Math.round(date.percentOfYear * 100)}% elapsed`;
   const statusRow = (
     <div className="gameStatusBar">
       {compactStatus ? (
@@ -569,7 +578,7 @@ export function GameAppBar(props: Props) {
         </div>
       )}
       {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
-      {!isTutorial && (
+      {!isTutorial && !couchSeat && (
         <MissionSummary
           game={game}
           upcoming={props.upcomingEvents}
@@ -585,14 +594,14 @@ export function GameAppBar(props: Props) {
     <div id="appbar" className={singleRow ? "appbarSingleRow" : undefined}>
       <div id="topbar">
         <Toolbar className={inBlackout ? "blackout-pulsing" : ""}>
-          {menu}
-          <Typography variant="h6" className="gameStatus">
-            <span
-              className={`gameStatusValue${now.cash < 0 ? " gameCashNegative" : ""}`}
-            >
-              {formatMoneyStable(now.cash)}
-            </span>
-            {showProfit && (
+          {!couchSeat && menu}
+          <Typography variant="h6" component="div" className="gameStatus">
+            <span className="gameBalance">
+              <span
+                className={`gameStatusValue${now.cash < 0 ? " gameCashNegative" : ""}`}
+              >
+                {formatMoneyStable(now.cash)}
+              </span>
               <Tooltip title="Current month forecast: revenue minus operating expenses, including interest and imports.">
                 <Typography
                   // Tutorials lock navigation, so the figure opens nothing there.
@@ -617,16 +626,8 @@ export function GameAppBar(props: Props) {
                   {formatMoneyStable(monthlyProfit)}/mo
                 </Typography>
               </Tooltip>
-            )}
-            <span className="weak gameStatusValue">
-              {/* One inline run, so the flex gap doesn't open before the comma. */}
-              <span>
-                {date.month} {date.year}
-                {bigScreen && (
-                  <span className="gameStatusHour">, {formatHour(date)}</span>
-                )}
-              </span>
             </span>
+            {!couchSeat && <GameDate date={date} showTime={bigScreen} />}
           </Typography>
           {singleRow && statusRow}
           <div id="speedChangeButtons">{speedOptions}</div>
@@ -679,22 +680,28 @@ export function GameAppBar(props: Props) {
       <span className="srOnly" aria-live="polite">
         {gridHealth.announcement}
       </span>
-      <div
-        id="yearProgressBar"
-        role="progressbar"
-        aria-label={yearProgress}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(date.percentOfYear * 100)}
-      >
-        <div
-          className="yearProgressFill"
-          style={{ width: `${date.percentOfYear * 100}%` }}
-        />
-      </div>
+      {!couchSeat && <YearProgressBar date={date} />}
     </div>
   );
 }
+
+// The mapped props are compared shallowly, so the active save keeps one object per id and name
+// rather than a fresh one on every store update.
+const selectActiveSave = createSelector(
+  [
+    (state: AppStateType) => state.saves?.activeId,
+    (state: AppStateType) => {
+      const id = state.saves?.activeId;
+      return id
+        ? state.saves?.entries.find((entry) => entry.id === id)?.name ||
+            state.saves?.pendingName ||
+            "Current game"
+        : undefined;
+    },
+  ],
+  (id, name): StateProps["activeSave"] =>
+    id && name ? { id, name } : undefined,
+);
 
 const mapStateToProps = (state: AppStateType): StateProps => ({
   activeEvents: selectActiveEventGroups(state),
@@ -702,17 +709,7 @@ const mapStateToProps = (state: AppStateType): StateProps => ({
   game: state.game,
   evidenceRequest: state.ui.evidenceRequest,
   facilityDragActive: state.ui.facilityDragActive,
-  activeSave: state.saves?.activeId
-    ? {
-        id: state.saves.activeId,
-        name:
-          state.saves.entries.find(
-            (entry) => entry.id === state.saves?.activeId,
-          )?.name ||
-          state.saves.pendingName ||
-          "Current game",
-      }
-    : undefined,
+  activeSave: selectActiveSave(state),
   saveState: state.saves?.saveState,
   savedAt: state.saves?.savedAt,
   saveError: state.saves?.saveError,

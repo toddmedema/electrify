@@ -4,7 +4,10 @@ import {
   reservoirOutlook,
   ReservoirOutlookPoint,
 } from "../../helpers/HydroOutlook";
-import { generateForecastTimeline } from "../../reducers/Game";
+import {
+  generateForecastTimeline,
+  generateResourceForecast,
+} from "../../reducers/Game";
 import type { GameType, TickPresentFutureType } from "../../Types";
 import type { OutputWeatherTick } from "../../helpers/ExpectedOutput";
 
@@ -70,33 +73,9 @@ export function computeOutlook<K extends OutlookKind>(
   if (kind === "build") {
     let result = buildForecasts.get(game);
     if (!result) {
-      const timeline = generateForecastTimeline(
-        game,
-        now.cash,
-        now.customers,
-        TICKS_PER_YEAR * 3,
-      );
+      const timeline = generateResourceForecast(game);
       result = {
-        // Do not clone thousands of unused finance/dispatch properties back to the UI.
-        timeline: timeline.map(
-          ({
-            minute,
-            windKph,
-            windOffshoreKph,
-            windAirborneKph,
-            solarIrradianceWM2,
-            hydroRunoffMm,
-            renewableCapacityFactors,
-          }) => ({
-            minute,
-            windKph,
-            windOffshoreKph,
-            windAirborneKph,
-            solarIrradianceWM2,
-            hydroRunoffMm,
-            renewableCapacityFactors,
-          }),
-        ),
+        timeline,
         windSpeeds: timeline.map((tick) => tick.windKph),
         offshoreWindSpeeds: timeline.flatMap((tick) =>
           tick.windOffshoreKph === undefined ? [] : [tick.windOffshoreKph],

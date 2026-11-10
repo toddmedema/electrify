@@ -16,7 +16,7 @@ The 34,936-record input is pinned to
 and SHA-256
 `4b1f93e0fd93664f18684d9b05d0a52ed9658c6a8cf0d21ff2520791379ba7fc`.
 
-Run `node scripts/research-starting-facility-ages.js` with Node 24 to regenerate
+Run `node scripts/research-starting-facility-ages.js` with Node 26 to regenerate
 the snapshot. The script caches the download in the operating system's temporary
 directory. Use `--input <csv-path>` for an existing download; both paths verify the
 same checksum. Format the resulting JSON with Prettier.
@@ -106,7 +106,7 @@ inventory](https://www.eia.gov/electricity/data/eia860/), covering all 28 suppor
 US states. The [archived source ZIP](https://www.eia.gov/electricity/data/eia860/archive/xls/eia8602024.zip)
 is pinned to SHA-256
 `0aaae04812cd4ab87a3e346bdf93848a3cc15053fd4dc2a4cf82d2aeac95f12b`.
-Run `node scripts/research-us-starting-facility-ages.js` with Node 24, optionally
+Run `node scripts/research-us-starting-facility-ages.js` with Node 26, optionally
 passing the path to that ZIP. Downloads stay under the ignored
 `.tmp/starting-age-research/` directory. Format the resulting JSON with Prettier.
 

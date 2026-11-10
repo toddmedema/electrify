@@ -139,6 +139,13 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   };
 }
 
+/** A range as formatted; one value when both ends round to the same reading. */
+export function formatWattRange(min: number, max: number): string {
+  const low = formatWatts(min);
+  const high = formatWatts(max);
+  return low === high ? low : `${low}–${high}`;
+}
+
 function tooltip(index: number, state: State): string {
   const range = state.ranges[index];
   const date = getDateFromMinute(range.minute, state.startingYear);
@@ -146,7 +153,7 @@ function tooltip(index: number, state: State): string {
   if (!range.projected) {
     return `${period} · recorded average\nSupply: ${formatWatts(range.supplyMin)}\nDemand: ${formatWatts(range.demandMin)}`;
   }
-  return `${period} · forecast range\nSupply: ${formatWatts(range.supplyMin)}–${formatWatts(range.supplyMax)}\nDemand: ${formatWatts(range.demandMin)}–${formatWatts(range.demandMax)}\nPeak shortfall: ${formatWatts(range.peakShortfall)}`;
+  return `${period} · forecast range\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\nPeak shortfall: ${formatWatts(range.peakShortfall)}`;
 }
 
 export default function ChartSupplyDemandRanges(

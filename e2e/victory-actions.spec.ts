@@ -1,5 +1,6 @@
+import { unlockAllDifficulties } from "./difficulty-fixture";
 import { openPane } from "./layout";
-import { editSavedGame, readSavedGame } from "./save-fixture";
+import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
 import path from "path";
 import { expect, test, Page } from "./fixtures";
@@ -21,6 +22,7 @@ import {
   buildStorySnapshot,
 } from "../src/helpers/Story";
 import { parseSave } from "../src/SaveGame";
+import { ruleChoices } from "../src/helpers/ScenarioRuleDependencies";
 import type { GameType } from "../src/Types";
 
 /** Exercise populated standings through the real native-score adapter, without a native window. */
@@ -50,7 +52,7 @@ async function installLeaderboardFixture(page: Page, currentRank: number) {
           online: true,
           cloudEnabled: false,
           steamId,
-          displayName: "Daniel McEntee",
+          displayName: "Current operator",
         },
       }),
       setDisplay: async () => display,
@@ -76,7 +78,7 @@ async function installLeaderboardFixture(page: Page, currentRank: number) {
                 {
                   ...submitted,
                   steamId,
-                  displayName: "Daniel McEntee",
+                  displayName: "Current operator",
                   rank,
                 },
               ]
@@ -230,6 +232,16 @@ for (const { theme, native, currentRank } of [
       .click();
     const dialog = page.getByRole("dialog", { name: "Mission complete" });
     await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByRole("region", { name: "Objective results" }),
+    ).toHaveCount(0);
+    await expect(dialog.locator(".victoryStanding")).not.toContainText(
+      /across all levels|globally/,
+    );
+    await expect.poll(() => readSaveRecords(page)).toEqual([]);
+    await expect(
+      dialog.locator(".victoryMetric").filter({ hasText: "tenure" }),
+    ).toHaveCount(0);
     const leaderboard = dialog.getByRole("region", {
       name: "Leaderboard · Hard",
     });
@@ -249,10 +261,11 @@ for (const { theme, native, currentRank } of [
     await expect(
       dialog.getByRole("region", { name: "Mission results" }),
     ).toContainText("final net worth");
-    const popup = page.locator(".achievementToastPanel");
+    const popup = page.locator(".achievementToastPanel").first();
     if (!nativeBoard) {
       await expect(popup).toBeVisible();
-      await expect(popup).toContainText("Staying Power");
+      // Prerequisite wins already earned Staying Power; this run earns Four Nines.
+      await expect(popup).toContainText("Four Nines");
       await expect
         .poll(() =>
           popup.evaluate((el) => {
@@ -275,7 +288,7 @@ for (const { theme, native, currentRank } of [
       await expect(leaderboard.getByRole("columnheader")).toHaveCount(0);
       await expect(
         leaderboard.getByRole("row", { name: "This run" }),
-      ).toContainText(`${currentRank.toLocaleString("en-US")}Daniel McEntee`);
+      ).toContainText(`${currentRank.toLocaleString("en-US")}Current operator`);
       await expect(
         leaderboard
           .getByRole("row", { name: "This run" })
@@ -357,6 +370,24 @@ for (const { theme, native, currentRank } of [
     await expectDialogToFit(preview);
     await preview.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(preview).toHaveCount(0);
+    if (theme === "dark" && !native) {
+      await newGame.click();
+      await page.getByRole("button", { name: "Back", exact: true }).click();
+      await expect(
+        page.getByRole("button", { name: "Play", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Continue", exact: true }),
+      ).toHaveCount(0);
+      await page.reload();
+      await expect(
+        page.getByRole("button", { name: "Play", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Continue", exact: true }),
+      ).toHaveCount(0);
+      return;
+    }
     await playAgain.click();
     await expect(dialog).not.toBeVisible();
     await expect(page.locator("#appbar:visible").first()).toBeVisible();
@@ -365,6 +396,132 @@ for (const { theme, native, currentRank } of [
     expect(restarted.scenarioId).toBe(101);
     expect(restarted.difficulty).toBe("VP");
     expect(restarted.date.monthsElapsed).toBe(0);
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`Uri victory shows only the lifetime rate in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await installLeaderboardFixture(page, 47);
+    await page.goto("/?scenario=107");
+    await page.getByRole("button", { name: "Hard", exact: true }).click();
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await page
+      .getByRole("button", { name: "fast speed", exact: true })
+      .first()
+      .click();
+    await expect(
+      page.locator("#appbar:visible .gameStatusValue.weak"),
+    ).not.toContainText("Jan 2017");
+    await page
+      .getByRole("button", { name: "pause", exact: true })
+      .first()
+      .click();
+    await editSavedGame(page, (save) => {
+      const game = save.game;
+      const realMonth = game.monthlyHistory[0];
+      expect(realMonth).toBeDefined();
+      // Hold nominal customer bills at 9.9¢; the lifetime score still uses 2017 dollars.
+      game.monthlyHistory = Array.from({ length: 83 }, (_, index) => ({
+        ...realMonth,
+        year: game.startingYear + Math.floor((82 - index) / 12),
+        month: ((82 - index) % 12) + 1,
+        revenue: (realMonth.supplyWh / 1000) * 0.099,
+        revenueExports: 0,
+        revenueGrants: 0,
+      }));
+      const offset = 83 * MINUTES_PER_MONTH - game.timeline[0].minute;
+      for (const tick of game.timeline) tick.minute += offset;
+      game.date = getDateFromMinute(
+        84 * MINUTES_PER_MONTH - 15,
+        game.startingYear,
+      );
+      game.dollarsPerkWh = 0.099;
+      game.meaningfulDecisions = [
+        {
+          key: "rate",
+          lever: "rate",
+          label: "Changed the retail rate",
+          month: 1,
+          kind: "rate",
+          before: "$0.09/kWh",
+          after: "$0.099/kWh",
+        },
+      ];
+      rebuildCompletionEvidence(game);
+      // The native save also needs the no-cost preparation decision that precedes Uri.
+      const choice = ruleChoices(scenarioRules(getScenario(107), game)!).find(
+        (choice) => choice.options.some((option) => option.id === "standard"),
+      )!;
+      const option = choice.options.find((option) => option.id === "standard")!;
+      game.worldEvents.occurrences.push({
+        key: choice.key,
+        definitionId: choice.key,
+        startsMinute: choice.dueMonth * MINUTES_PER_MONTH,
+        endsMinute: choice.dueMonth * MINUTES_PER_MONTH,
+        attributes: {
+          choice: option.id,
+          cost: option.cost,
+          upfrontGrant: option.grant,
+          scenarioChoice: true,
+        },
+        effects: {},
+        title: choice.title,
+        message: option.message,
+      });
+      expect(parseSave(save)).not.toBeNull();
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page
+      .locator("#appbar:visible")
+      .getByRole("button", { name: "normal speed", exact: true })
+      .first()
+      .click();
+    const dialog = page.getByRole("dialog", { name: "After the thaw" });
+    await expect(dialog).toBeVisible();
+    const metrics = dialog.locator(".victoryMetric");
+    await expect(metrics).toHaveCount(6);
+    await expect(
+      metrics.filter({
+        hasText: /tenure|Cash stayed above|Largest shortage|Billed rate/,
+      }),
+    ).toHaveCount(0);
+    const demand = metrics.filter({
+      hasText: "Demand not met during Winter Storm Uri",
+    });
+    await expect(demand.locator("span")).toHaveText(
+      "Demand not met during Winter Storm Uri",
+    );
+    await expect(metrics.filter({ hasText: /rate/i })).toHaveCount(1);
+    const lifetime = metrics.filter({
+      hasText: "lifetime rate · 2017 dollars",
+    });
+    await expect(lifetime.locator("strong")).toHaveText(/^[\d.]+¢\/kWh$/);
+    expect(
+      parseFloat((await lifetime.locator("strong").textContent())!),
+    ).toBeLessThan(9.9);
+    const popup = page.locator(".achievementToastPanel").first();
+    while (await popup.isVisible())
+      await popup.getByRole("button", { name: /^Dismiss/ }).click();
+    await expectDialogToFit(dialog);
+    await metrics.last().scrollIntoViewIfNeeded();
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await expect(dialog.locator("..")).toHaveCSS("opacity", "1");
+      await page.mouse.move(0, 0);
+      await dialog.screenshot({
+        animations: "disabled",
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `uri-victory-${info.project.name}-${theme}.png`,
+        ),
+      });
+    }
   });
 }
 
@@ -405,6 +562,9 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
     .click();
   const failure = page.getByRole("dialog", { name: "Bankrupt!" });
   await expect(failure).toBeVisible();
+  await expect(
+    failure.getByRole("button", { name: /Share result|Challenge a friend/ }),
+  ).toHaveCount(0);
   await expect(failure).toContainText(
     "Complete the mission to join the leaderboard and set a personal best.",
   );
@@ -485,10 +645,23 @@ test("shared reliability rule ends the run at the third completed month", async 
     .click();
   const failure = page.getByRole("dialog", { name: "Fired!", exact: true });
   await expect(failure).toBeVisible();
+  await expect(
+    failure.getByRole("button", { name: /Share result|Challenge a friend/ }),
+  ).toHaveCount(0);
   await expect(failure).toContainText(
     "You served less than 99.5% of demand for 3 months in a row, so the utility board ended your term.",
   );
-  await expect(failure).toContainText("You survived for 3 months");
+  await expect(
+    failure.locator(".victoryMetric").filter({ hasText: "tenure" }),
+  ).toContainText("3 months");
+  await expect(failure.locator(".victoryMetric")).toHaveCount(6);
+  const rate = failure
+    .locator(".victoryMetric")
+    .filter({ hasText: "lifetime rate" });
+  await expect(rate.locator("strong")).toHaveText(/^[\d.]+¢\/kWh$/);
+  await expect(failure).not.toContainText("starting-year");
+  await expect(failure).not.toContainText("You survived");
+  await expect.poll(() => readSaveRecords(page)).toEqual([]);
   await expect(failure).not.toContainText("Report unavailable");
   await expect(
     failure.getByRole("region", { name: "Objective results" }),
@@ -507,4 +680,23 @@ test("shared reliability rule ends the run at the third completed month", async 
       ),
     });
   }
+  await failure.getByRole("button", { name: "New game", exact: true }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Continue", exact: true }),
+  ).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Continue", exact: true }),
+  ).toHaveCount(0);
+});
+
+test.beforeEach(async ({ page }) => {
+  await unlockAllDifficulties(page);
 });

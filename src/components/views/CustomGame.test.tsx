@@ -119,7 +119,7 @@ it("shows an accessible Year 1 outlook and starts with its preview seed", () => 
   expect(screen.getByText("Deficit forecast")).toBeInTheDocument();
   expect(screen.getByText("97%")).toBeInTheDocument();
   expect(screen.getByText("Up to 180MW short")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start game" }));
   expect(onStart).toHaveBeenCalledWith(
     expect.objectContaining({ seed: request.seed }),
   );
@@ -145,7 +145,7 @@ it("keeps Play available when the optional outlook fails", () => {
   );
 
   expect(screen.getByText("Year 1 outlook unavailable.")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Play" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Start game" })).toBeEnabled();
 });
 
 it.each(["startup", "postMessage"])(
@@ -181,7 +181,7 @@ it.each(["startup", "postMessage"])(
     expect(
       screen.getByRole("region", { name: "Year 1 outlook" }),
     ).toHaveAttribute("aria-busy", "false");
-    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start game" }));
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(failedWorker.terminate).toHaveBeenCalledTimes(
       failure === "postMessage" ? 1 : 0,
@@ -271,7 +271,7 @@ it("does not forecast a facility that is unavailable in the selected year", () =
   expect(
     screen.getByText("Fix the facility issue to calculate an outlook."),
   ).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Play" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Start game" })).toBeDisabled();
   expect(mockCreateForecastWorker).not.toHaveBeenCalled();
 });
 
@@ -289,7 +289,7 @@ it("re-quotes starting cash when the starting year changes", () => {
 
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "Starting year" }));
   fireEvent.click(screen.getByRole("option", { name: "2080" }));
-  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start game" }));
 
   const inflation = getFuelEscalation(2080) / getFuelEscalation(2020);
   const expectedCash = Number((500000000 * inflation).toPrecision(2));
@@ -315,7 +315,7 @@ it("quotes electricity rates at the prices of a historical starting year", () =>
   expect(
     screen.queryByRole("combobox", { name: "Electricity rate" }),
   ).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start game" }));
 
   expect(onStart).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -358,7 +358,7 @@ it("scales starting nameplate capacity with starting customers", () => {
   fireEvent.change(screen.getByRole("slider", { name: "Starting customers" }), {
     target: { value: 2000000 },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start game" }));
 
   const scenario = onStart.mock.calls[0][0];
   expect(scenario.facilities).toEqual([
@@ -391,7 +391,7 @@ it("commits the complete location object when a map marker is selected", () => {
   expect(
     screen.getByRole("combobox", { name: "Search playable cities" }),
   ).toHaveValue(LOCATIONS.HNL.name);
-  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start game" }));
 
   expect(onStart).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -435,7 +435,7 @@ it("preserves and exposes a playable custom location that is absent from the cat
     screen.getByRole("button", { name: "Select Unlisted Grid" }),
   ).toHaveAttribute("aria-pressed", "true");
 
-  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start game" }));
   expect(onStart).toHaveBeenCalledWith(
     expect.objectContaining({
       locationId: customLocation.id,
@@ -471,7 +471,7 @@ it("offers researched Hydro maxima below 100MW and rejects oversized starting fl
   ).toBe(true);
   fireEvent.click(options[0]);
   fireEvent.click(screen.getByRole("button", { name: "Add facility" }));
-  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start game" }));
   expect(onStart).toHaveBeenCalledWith(
     expect.objectContaining({
       facilities: [
@@ -498,5 +498,5 @@ it("offers researched Hydro maxima below 100MW and rejects oversized starting fl
   expect(screen.getByRole("alert")).toHaveTextContent(
     "Choose a smaller plant or another location",
   );
-  expect(screen.getByRole("button", { name: "Play" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Start game" })).toBeDisabled();
 });

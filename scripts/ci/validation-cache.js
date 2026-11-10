@@ -58,9 +58,9 @@ const auditedLoaders = {
     "45853089d8c7dd3cc9fd22ec54db57e2bcb729c3c21226e7c5d0212516f6da5f",
   // nativeBindingPath resolves only the platform's installed steamworks binary.
   "electron/steam-native.cjs":
-    "5dbd747ecb6eb2c6f56c8b91254abea6ac83328e40d863bc8a99ed1cbf754702",
+    "20cdebbcd5cc621bb9bd8ed8428be7e686924cb3ffe1eb92746ba97bb806b4a9",
   "electron/steam-native.test.cjs":
-    "fda8913723f0e6d3bbde2858d0b808018b0396ce024e17c8527a461f09cc71de",
+    "bf9284da8d16c6c3248f9ee85bcf05dd8a5916c7ac66b30af21c3402a7c75314",
   // devServerConfigPath comes from the literal CRA package require.resolve.
   "scripts/start.js":
     "b71762b40a2b08d20b21eb885fc0b71bbd7f35ec752dba53016699e3e1be62bd",

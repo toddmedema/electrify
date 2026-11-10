@@ -15,6 +15,7 @@ import {
   formatWatts,
   formatWattHours,
   formatFixed,
+  formatRateCompact,
 } from "./Format";
 import { customerSalesRevenue } from "./Scoring";
 import { MONTH_NAMES } from "../Constants";
@@ -321,7 +322,7 @@ function billedRate(month: MonthlyHistoryType): number | undefined {
 }
 
 function rateText(rate: number): string {
-  return `$${formatFixed(rate, 3).replace(/0+$/, "").replace(/\.$/, "")}/kWh`;
+  return `${formatRateCompact(rate)}/kWh`;
 }
 
 function dataCenterMetrics(
@@ -381,6 +382,7 @@ function freezeMetrics(
     unserved: "Demand not met during the freeze",
     shortage: "Largest shortage during the freeze",
     cash: "Cash stayed above $0 through the recovery month",
+    rate: "Electricity rate · before → after",
   },
 ): RuleReportMetric[] {
   return [
@@ -393,15 +395,11 @@ function freezeMetrics(
     facts.beforeRate !== undefined && facts.afterRate !== undefined
       ? metric(
           "electricityRate",
-          "Electricity rate · before → after",
+          labels.rate,
           "text",
           `${rateText(facts.beforeRate)} → ${rateText(facts.afterRate)}`,
         )
-      : missingMetric(
-          "electricityRate",
-          "Electricity rate · before → after",
-          "text",
-        ),
+      : missingMetric("electricityRate", labels.rate, "text"),
     facts.cashStayedPositive !== undefined
       ? metric(
           "cashStayedPositive",
@@ -464,9 +462,10 @@ function catalogDebriefReport(
     month(report.throughMonth),
   );
   const metrics = freezeMetrics(facts, {
-    unserved: `Demand not met during ${name} · ${calendar(impactMonth)}`,
+    unserved: `Demand not met during ${name}`,
     shortage: `Largest shortage during ${name}`,
     cash: `Cash stayed above $0 through ${calendar(report.throughMonth)}`,
+    rate: `Billed rate · ${calendar(report.fromMonth)} → ${calendar(report.throughMonth)}`,
   });
   if (metrics.some((item) => !item.available))
     return unavailable(

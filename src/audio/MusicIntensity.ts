@@ -1,4 +1,5 @@
 import { GameType } from "../Types";
+import { MUSIC_LOW_RESERVE_PRESSURE_MAX } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 
 /** Live grid pressure only: forecasts and old blackout events must not make a healthy grid tense. */
@@ -18,5 +19,11 @@ export function musicIntensityForGame(game: GameType): number {
   const reserveRatio =
     (now.reserveW ?? now.supplyW - now.demandW) / now.demandW;
   // Match the toolbar's 10% low-reserve boundary, building tension before an actual shortage.
-  return Math.max(0, Math.min(0.5, (1 - reserveRatio / 0.1) * 0.5));
+  return Math.max(
+    0,
+    Math.min(
+      MUSIC_LOW_RESERVE_PRESSURE_MAX,
+      (1 - reserveRatio / 0.1) * MUSIC_LOW_RESERVE_PRESSURE_MAX,
+    ),
+  );
 }

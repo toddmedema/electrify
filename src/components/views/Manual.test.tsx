@@ -170,6 +170,13 @@ describe("Manual", () => {
       "href",
       "https://forms.gle/nSpkVzcFcXMQMMgb9",
     );
+    expect(screen.getByRole("status")).toHaveTextContent(/No entries match/);
+  });
+
+  it("announces the result count while searching", async () => {
+    renderManual();
+    await search("blackout");
+    expect(screen.getByRole("status")).toHaveTextContent(/entr(y|ies) match/);
   });
 
   it("clears the search from the adornment button", async () => {
@@ -242,7 +249,7 @@ it("follows an inline link out of the search results and focuses its expanded he
   );
   expect(screen.getByLabelText("Search the manual")).toHaveValue("");
   const heading = screen.getByRole("button", {
-    name: "Power and Energy",
+    name: "Power and energy",
     expanded: true,
   });
   expect(heading).toHaveFocus();
@@ -264,7 +271,7 @@ it("refocuses and scrolls to the entry already in focus after search hid it", as
     await userEvent.click(screen.getByRole("link", { name: "power rating" }));
     expect(screen.getByLabelText("Search the manual")).toHaveValue("");
     const heading = screen.getByRole("button", {
-      name: "Power and Energy",
+      name: "Power and energy",
       expanded: true,
     });
     expect(heading).toHaveFocus();

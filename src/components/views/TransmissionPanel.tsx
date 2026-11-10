@@ -34,6 +34,7 @@ import {
   FormControl,
   InputLabel,
   List,
+  ListItem,
   MenuItem,
   Select,
   Typography,
@@ -110,6 +111,8 @@ import {
 import BuildMetric from "../base/BuildMetric";
 import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
 import FlowBar from "../base/FlowBar";
+import FacilityRowText from "../base/FacilityRowText";
+import { constructionStatus } from "../base/ConstructionProgress";
 import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
@@ -857,7 +860,12 @@ export default function TransmissionPanel({
           >
             <Droppable droppableId="interties">
               {(droppable) => (
-                <div ref={droppable.innerRef} {...droppable.droppableProps}>
+                <div
+                  ref={droppable.innerRef}
+                  {...droppable.droppableProps}
+                  role="list"
+                  aria-label="Interties"
+                >
                   {state.lines.map((line, index) => {
                     const acquisitionTarget = isUtilityExpansionGame(game)
                       ? acquisitionTargetForCorridor(line.corridorId)
@@ -907,8 +915,10 @@ export default function TransmissionPanel({
                     const builtFraction = building
                       ? elapsedYears / (elapsedYears + line.yearsToBuildLeft)
                       : 1;
-                    const monthsLeft = Math.ceil(line.yearsToBuildLeft * 12);
-                    const constructionLabel = `Building ${Math.round(builtFraction * 100)}% · ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
+                    const construction = building
+                      ? constructionStatus(builtFraction, line.yearsToBuildLeft)
+                      : undefined;
+                    // Dims the whole icon, badge included, the way a plant's icon is dimmed
                     const constructionStyle = building
                       ? { opacity: theme.palette.action.disabledOpacity }
                       : undefined;
@@ -952,8 +962,8 @@ export default function TransmissionPanel({
                     // the visible direction word, so speech input can name what the screen shows.
                     const flowDescription = utilityOwned
                       ? "acquired utility"
-                      : building
-                        ? constructionLabel
+                      : construction
+                        ? construction.label
                         : line.paused
                           ? "paused"
                           : direction === "IDLE"
@@ -963,16 +973,20 @@ export default function TransmissionPanel({
                     // summary uses, so exporting never borrows a battery's up/down "charging" arrow.
                     // Decorative: the reading and the button's name already say it.
                     const icon = (
-                      <span className="transmissionIcon">
+                      <span
+                        className="transmissionIcon"
+                        style={constructionStyle}
+                      >
                         <img
                           className="transmissionListIcon facilityRowIcon"
-                          style={constructionStyle}
                           src="/images/transmission.svg"
                           alt=""
                         />
-                        {!building && !utilityOwned && (
+                        {!utilityOwned && (
                           <span className="facilityActivity" aria-hidden>
-                            {line.paused ? (
+                            {building ? (
+                              <ConceptIcon concept="construction" />
+                            ) : line.paused ? (
                               <ConceptIcon concept="pause" />
                             ) : direction === "IMPORTING" ? (
                               <ArrowBackIcon />
@@ -997,6 +1011,7 @@ export default function TransmissionPanel({
                           <div
                             ref={provided.innerRef}
                             {...provided.draggableProps}
+                            role="listitem"
                             style={{
                               userSelect: "none",
                               ...provided.draggableProps.style,
@@ -1030,73 +1045,65 @@ export default function TransmissionPanel({
                                   )
                                 }
                               >
-                                {(reorderDisabled || utilityOwned) && icon}
-                                <span className="transmissionLineText">
-                                  <span className="transmissionLineName">
-                                    <span className="facilityName">
-                                      {utilityOwned
-                                        ? `Owned · ${acquisitionTarget.name}`
-                                        : line.name}
-                                    </span>
-                                    {restricted &&
-                                      !building &&
-                                      !utilityOwned && (
-                                        <Chip
-                                          className="storyDerateBadge"
-                                          color="warning"
-                                          size="small"
-                                          label={`${Math.round(retainedCapacity * 100)}% limit`}
-                                          aria-label={`Temporarily limited to ${Math.round(retainedCapacity * 100)}% of rated capacity`}
-                                        />
-                                      )}
-                                  </span>
-                                  <Typography
-                                    component="span"
-                                    variant="body2"
-                                    color="textSecondary"
-                                  >
-                                    {building ? (
-                                      constructionLabel
-                                    ) : (
-                                      <span className="transmissionLineFlow">
-                                        {utilityOwned
+                                {/* The same row anatomy as a plant: icon, FacilityRowText, chevron */}
+                                <ListItem className="facility" component="span">
+                                  {(reorderDisabled || utilityOwned) && icon}
+                                  <FacilityRowText
+                                    name={
+                                      <>
+                                        <span className="facilityName">
+                                          {utilityOwned
+                                            ? `Owned · ${acquisitionTarget.name}`
+                                            : line.name}
+                                        </span>
+                                        {restricted &&
+                                          !building &&
+                                          !utilityOwned && (
+                                            <Chip
+                                              className="storyDerateBadge"
+                                              color="warning"
+                                              size="small"
+                                              label={`${Math.round(retainedCapacity * 100)}% limit`}
+                                              aria-label={`Temporarily limited to ${Math.round(retainedCapacity * 100)}% of rated capacity`}
+                                            />
+                                          )}
+                                      </>
+                                    }
+                                    status={
+                                      construction
+                                        ? construction.reading
+                                        : utilityOwned
                                           ? "Acquired utility"
                                           : line.paused
                                             ? "Paused"
-                                            : `${word} ${flowReading}`}
-                                      </span>
+                                            : `${word} ${flowReading}`
+                                    }
+                                    detail={construction?.detail}
+                                    progress={
+                                      building
+                                        ? {
+                                            builtFraction,
+                                            paused: game.speed === "PAUSED",
+                                          }
+                                        : undefined
+                                    }
+                                  >
+                                    {availableAcquisition && (
+                                      <Typography
+                                        component="span"
+                                        variant="caption"
+                                        color="primary"
+                                        className="utilityAcquisitionHint"
+                                      >
+                                        Acquisition available
+                                      </Typography>
                                     )}
-                                  </Typography>
-                                  {availableAcquisition && (
-                                    <Typography
-                                      component="span"
-                                      variant="caption"
-                                      color="primary"
-                                      className="utilityAcquisitionHint"
-                                    >
-                                      Acquisition available
-                                    </Typography>
-                                  )}
-                                  {building && (
-                                    <span
-                                      className="constructionProgress"
-                                      data-paused={game.speed === "PAUSED"}
-                                      aria-hidden
-                                    >
-                                      <span
-                                        className="constructionProgressFill"
-                                        style={{
-                                          width: `${builtFraction * 100}%`,
-                                          background: "var(--interactive-blue)",
-                                        }}
-                                      />
-                                    </span>
-                                  )}
-                                </span>
-                                <ChevronDownGlyph
-                                  className="facilityChevron"
-                                  aria-hidden
-                                />
+                                  </FacilityRowText>
+                                  <ChevronDownGlyph
+                                    className="facilityChevron"
+                                    aria-hidden
+                                  />
+                                </ListItem>
                               </button>
                             </div>
                             {availableAcquisition && onAcquire && (
@@ -1126,8 +1133,9 @@ export default function TransmissionPanel({
                                 {cancelLine?.id === line.id && (
                                   <ConfirmDialog
                                     open
+                                    destructive
                                     title={`Cancel construction of ${line.name}?`}
-                                    cancelLabel="Nevermind"
+                                    cancelLabel="Never mind"
                                     confirmLabel="Cancel construction"
                                     onCancel={() => setCancelLine(null)}
                                     onConfirm={() => {

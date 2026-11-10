@@ -138,8 +138,14 @@ function revealMenu(entrance: HTMLElement): void {
       cleanup,
     );
   }
-  if (document.activeElement === document.body)
-    menu
-      ?.querySelector<HTMLElement>("[data-main-action]")
-      ?.focus({ preventScroll: true });
+  const main = menu?.querySelector<HTMLElement>("[data-main-action]");
+  const focusMain = () => {
+    if (document.activeElement === document.body)
+      main?.focus({ preventScroll: true });
+  };
+  focusMain();
+  // Reduced motion shortens transitions rather than removing them, so the restored visibility
+  // only takes effect once that transition starts and ends over the next two frames.
+  if (main && document.activeElement === document.body)
+    window.requestAnimationFrame(() => window.requestAnimationFrame(focusMain));
 }

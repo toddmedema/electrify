@@ -16,7 +16,7 @@ steps, expected and actual behavior, and the device and browser where the proble
 
 ## Setup notes
 
-Use Node.js 24; check with `node --version`. A version manager such as
+Use Node.js 26; check with `node --version`. A version manager such as
 [nvm](https://github.com/nvm-sh/nvm) can help when switching between projects.
 Use `npm ci` to install the committed lockfile in a new checkout or after it
 changes, and reuse that installation while it still matches.

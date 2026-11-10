@@ -23,9 +23,13 @@ async function expectChartAxesInView(dialog: Locator) {
   }
 }
 
-async function expectMobileFuelLegend(container: Locator, page: Page) {
+async function expectMobileFuelLegend(
+  container: Locator,
+  page: Page,
+  name = "Show fuel prices",
+) {
   if (page.viewportSize()!.width > 600) return;
-  const legend = container.getByRole("group", { name: "Show fuel prices" });
+  const legend = container.getByRole("group", { name });
   await expect(legend.getByText("Show", { exact: true })).toBeHidden();
   await expect
     .poll(() =>
@@ -51,6 +55,166 @@ async function expectMobileFuelLegend(container: Locator, page: Page) {
       ),
     ).toBeLessThanOrEqual(1);
   }
+}
+
+/**
+ * The supply stack's key is the fuel price chart's selectable one, so it is held to the same
+ * touch targets and kept inside its pane; it also names demand without making it a choice.
+ */
+async function expectSelectableFuelKey(
+  container: Locator,
+  page: Page,
+  name: string,
+) {
+  const key = container.getByRole("group", { name });
+  await expect(key).toBeVisible();
+  await expect(
+    key.getByRole("button", { name: "All fuels", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(key.getByText("Demand", { exact: true })).toBeVisible();
+  await expect(
+    key.getByRole("button", { name: "Demand", exact: true }),
+  ).toHaveCount(0);
+  const minimumHeight = await page.evaluate(() =>
+    matchMedia("(pointer: coarse)").matches ? 44 : 40,
+  );
+  for (const button of await key.getByRole("button").all()) {
+    const bounds = (await button.boundingBox())!;
+    expect(bounds.height).toBeGreaterThanOrEqual(minimumHeight);
+    expect(
+      await button.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+  }
+  expect(
+    await key.evaluate((element) => element.scrollWidth - element.clientWidth),
+  ).toBeLessThanOrEqual(1);
+}
+
+async function expectLegendLayout(container: Locator) {
+  const legends = container.locator(".chartLegend");
+  expect(await legends.count()).toBeGreaterThan(0);
+  for (const legend of await legends.all()) {
+    const geometry = await legend.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        left: bounds.left,
+        right: bounds.right,
+        overflow: element.scrollWidth - element.clientWidth,
+        items: Array.from(element.querySelectorAll(".chartLegendItem")).map(
+          (item) => {
+            const pair = item.getBoundingClientRect();
+            const swatch = item
+              .querySelector(".chartLegendSwatch")!
+              .getBoundingClientRect();
+            const label = item
+              .querySelector(".chartLegendLabel")!
+              .getBoundingClientRect();
+            return {
+              left: pair.left,
+              right: pair.right,
+              top: pair.top,
+              bottom: pair.bottom,
+              sampleWidth: swatch.width,
+              sampleGap: label.left - swatch.right,
+            };
+          },
+        ),
+      };
+    });
+    expect(
+      geometry.overflow,
+      "legend stays inside its pane",
+    ).toBeLessThanOrEqual(1);
+    expect(
+      geometry.items[0].left - geometry.left,
+      "legend follows the heading's 16px content inset",
+    ).toBeCloseTo(16, 0);
+    for (const [index, item] of geometry.items.entries()) {
+      expect(item.right).toBeLessThanOrEqual(geometry.right - 15);
+      expect(
+        item.sampleWidth,
+        "series samples never shrink",
+      ).toBeGreaterThanOrEqual(8);
+      expect(item.sampleGap, "sample stays close to its own label").toBeCloseTo(
+        8,
+        0,
+      );
+      const previous = geometry.items[index - 1];
+      if (!previous) continue;
+      if (Math.abs(previous.top - item.top) <= 1) {
+        expect(
+          item.left - previous.right,
+          "series are clearly separated",
+        ).toBeGreaterThanOrEqual(16);
+      } else {
+        expect(
+          item.top - previous.bottom,
+          "wrapped rows retain breathing room",
+        ).toBeGreaterThanOrEqual(7);
+      }
+    }
+  }
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`chart legends align and wrap in ${theme} with Larger text`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("textSize", "larger");
+      localStorage.setItem(
+        "insightsLayers",
+        JSON.stringify([
+          "supplyDemand",
+          "demandByType",
+          "supplyByFuel",
+          "water",
+        ]),
+      );
+    }, theme);
+    await page.goto("/?scenario=108");
+    await page.getByRole("button", { name: "Start game" }).click();
+    const insights = page.locator(".insights:visible");
+    await openPane(
+      insights,
+      page.getByRole("button", { name: "Insights", exact: true }),
+    );
+    await expect(insights.locator(".uplot").first()).toBeVisible();
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.mouse.move(0, 0);
+      await insights.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `legends-${info.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+    await expectLegendLayout(insights);
+    for (const name of [
+      "Supply & Demand",
+      "Demand by use",
+      "Supply by Fuel",
+      "Water",
+    ]) {
+      await insights
+        .getByRole("button", { name: `Expand ${name} chart`, exact: true })
+        .click();
+      const dialog = page.getByRole("dialog", { name, exact: true });
+      if (name === "Supply by Fuel") {
+        await expectSelectableFuelKey(dialog, page, "Show supply by fuel");
+      } else {
+        await expectLegendLayout(dialog);
+      }
+      await expectChartAxesInView(dialog);
+      await dialog.getByRole("button", { name: `Close ${name} chart` }).click();
+      await expect(dialog).toHaveCount(0);
+    }
+  });
 }
 
 test("expanded chart axes and fuel controls fit with Larger text after resizing", async ({
@@ -104,6 +268,131 @@ test("expanded chart axes and fuel controls fit with Larger text after resizing"
     await dialog.getByRole("button", { name: `Close ${name} chart` }).click();
     await expect(dialog).toHaveCount(0);
   }
+});
+
+test("every chart header keeps its help button beside the expand control, even while layers are edited", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify([
+        "supplyDemand",
+        "spareCapacity",
+        "fuelPrices",
+        "water",
+        "inflationInterest",
+        "cash",
+      ]),
+    );
+  });
+  await page.goto("/?scenario=108");
+  await page.getByRole("button", { name: "Start game" }).click();
+  const insights = page.locator(".insights:visible");
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
+  const tracks = insights.locator(".insightsTrack");
+  await expect(tracks.first()).toBeVisible();
+  const measure = () =>
+    tracks.evaluateAll((elements) =>
+      elements.map((track) => {
+        const box = (selector: string) => {
+          const element = track.querySelector(selector);
+          if (!element) return null;
+          const { left, right, top, bottom, width, height } =
+            element.getBoundingClientRect();
+          return { left, right, top, bottom, width, height };
+        };
+        const header = track.querySelector(".insightsTrackHeader")!;
+        return {
+          layer: track.getAttribute("data-layer"),
+          title: box(".insightsTrackHeader .MuiTypography-h6"),
+          expand: box(".insightsExpandChart"),
+          help: box(".insightsTrackHeader .manual-link"),
+          actions: box(".insightsTrackActions"),
+          overflow: header.scrollWidth - header.clientWidth,
+          helpCount: header.querySelectorAll(".manual-link").length,
+        };
+      }),
+    );
+  const minimum = await page.evaluate(() =>
+    matchMedia("(pointer: coarse)").matches ? 44 : 40,
+  );
+  const expectHeaders = async (editing: boolean) => {
+    const headers = await measure();
+    expect(headers.length).toBeGreaterThanOrEqual(5);
+    for (const {
+      layer,
+      title,
+      expand,
+      help,
+      actions,
+      overflow,
+      helpCount,
+    } of headers) {
+      const where = `${layer}${editing ? " while editing" : ""}`;
+      expect(helpCount, `${where} has exactly one help button`).toBe(1);
+      expect(expand && help && title, `${where} header controls`).toBeTruthy();
+      // Left-aligned: the help button follows the expand control by a small gap, not the edge
+      expect(help!.left - expand!.right, `${where} gap`).toBeGreaterThanOrEqual(
+        0,
+      );
+      expect(help!.left - expand!.right, `${where} gap`).toBeLessThanOrEqual(8);
+      expect(
+        Math.abs(help!.top - expand!.top),
+        `${where} row`,
+      ).toBeLessThanOrEqual(1);
+      expect(help!.width, `${where} target width`).toBeGreaterThanOrEqual(
+        minimum,
+      );
+      expect(help!.height, `${where} target height`).toBeGreaterThanOrEqual(
+        minimum,
+      );
+      expect(
+        title!.right,
+        `${where} title clears the controls`,
+      ).toBeLessThanOrEqual(expand!.left + 1);
+      expect(overflow, `${where} header overflow`).toBeLessThanOrEqual(1);
+      if (editing) {
+        expect(actions, `${where} actions`).toBeTruthy();
+        // After the help button on its row, or on the row beneath when a narrow header needs it
+        expect(
+          actions!.left >= help!.right - 1 || actions!.top >= help!.bottom - 1,
+          `${where} actions follow`,
+        ).toBe(true);
+        expect(
+          actions!.right,
+          `${where} actions stay on the screen`,
+        ).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+      } else {
+        expect(actions).toBeNull();
+      }
+    }
+  };
+  await expectHeaders(false);
+  await insights.getByRole("button", { name: /^Layers \(/ }).click();
+  await expectHeaders(true);
+  await insights.getByRole("button", { name: "Done choosing layers" }).click();
+
+  // The expanded view carries the same button, and the entry opens over it
+  await insights
+    .getByRole("button", { name: "Expand Fuel Prices chart" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Fuel Prices", exact: true });
+  const help = dialog.getByRole("button", { name: "What is Fuel costs?" });
+  await expect(help).toBeVisible();
+  await help.click();
+  const manual = page.getByRole("dialog", { name: "Manual help" });
+  await expect(
+    manual.getByRole("heading", { name: "Fuel costs", exact: true }),
+  ).toBeVisible();
+  await manual.getByRole("button", { name: "close", exact: true }).click();
+  await expect(manual).toBeHidden();
+  await dialog.getByRole("button", { name: "Close Fuel Prices chart" }).click();
+  await expect(dialog).toHaveCount(0);
 });
 
 for (const theme of ["light", "dark"] as const) {
@@ -183,6 +472,22 @@ for (const theme of ["light", "dark"] as const) {
     await expect(chart).not.toHaveAccessibleName(
       /Biomass|Natural Gas|Oil|Uranium/,
     );
+    const navigation = dialog.getByRole("region", {
+      name: "Chart time navigation",
+    });
+    const date = (await navigation
+      .getByLabel(/^Displayed date range:/)
+      .boundingBox())!;
+    for (const button of await navigation.getByRole("button").all()) {
+      const box = (await button.boundingBox())!;
+      expect(
+        Math.abs(box.y + box.height / 2 - date.y - date.height / 2),
+        "date range and navigation buttons share one row",
+      ).toBeLessThanOrEqual(1);
+      const size = (await navigation.boundingBox())!.width <= 700 ? 44 : 40;
+      expect(box.width).toBe(size);
+      expect(box.height).toBe(size);
+    }
     await expect(dialog.locator(".uplot")).toBeVisible();
     await expectChartAxesInView(dialog);
     await expectMobileFuelLegend(dialog, page);

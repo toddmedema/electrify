@@ -7,6 +7,11 @@ import { createGame } from "../../testing/Simulator";
 import { activeScenario } from "../../helpers/GameSelectors";
 import { ScenarioDetailsContent } from "./ScenarioDetails";
 import { RunDebrief } from "./RunResult";
+import VictoryDialog from "./VictoryDialog";
+import SavedResultDialog from "./SavedResultDialog";
+import type { VictoryType } from "../../Types";
+import { getScenario } from "../../data/Scenarios";
+import { objectiveGoalText } from "../../helpers/ObjectivePresentation";
 
 const bills: ObjectiveResult = {
   objective: {
@@ -49,7 +54,7 @@ it("shows the owning verdict and Optional meaning in Mission Status without subs
   const rules = screen.getByRole("region", { name: "Goals" });
   expect(within(rules).getByText("Keep bills affordable")).toBeInTheDocument();
   expect(within(rules).getByText("Optional")).toBeInTheDocument();
-  expect(rules).toHaveTextContent("Bills ≤$0.1/kWh each month");
+  expect(rules).toHaveTextContent("Bills ≤10¢/kWh each month");
   expect(within(rules).queryByText(bills.definition)).not.toBeInTheDocument();
   expect(within(rules).queryByText(bills.reason!)).not.toBeInTheDocument();
   expect(rules).not.toHaveTextContent(/Highest|months completed|Recorded:/);
@@ -68,6 +73,7 @@ it("renders stored objective debrief facts and unavailability without re-evaluat
   };
   render(
     <RunDebrief
+      outcome="fired"
       debrief={{
         startingFleet: [],
         finalFleet: [],
@@ -92,5 +98,117 @@ it("renders stored objective debrief facts and unavailability without re-evaluat
   );
   expect(region).toHaveTextContent(bills.definition);
   expect(region).toHaveTextContent("Months 1–2");
-  expect(region).toHaveTextContent("$0.10000000000001/kWh");
+  expect(region).toHaveTextContent("10¢/kWh (above goal)");
 });
+
+it("dates a built-in scenario's objectives and doesn't repeat the ending already stated", () => {
+  const scenario = getScenario(100)!;
+  render(
+    <RunDebrief
+      outcome="fired"
+      scenarioId={100}
+      leadMessage={`You were fired. ${bills.reason}`}
+      debrief={{
+        startingFleet: [],
+        finalFleet: [],
+        startingCash: 0,
+        finalCash: 0,
+        finalCustomers: 0,
+        reliability: 1,
+        unservedWh: 0,
+        kgco2e: 0,
+        highlights: [],
+        objectiveResults: [bills],
+      }}
+    />,
+  );
+  const region = screen.getByRole("region", { name: "Objective results" });
+  expect(region).toHaveTextContent(
+    objectiveGoalText(
+      bills.objective,
+      scenario.startingYear,
+      scenario.durationMonths,
+      (scenario.startingMonth ?? 1) - 1,
+    ),
+  );
+  expect(region).not.toHaveTextContent(/Months? \d/);
+  expect(region).not.toHaveTextContent(bills.reason!);
+});
+
+it("keeps each objective's reason when several objectives share the debrief", () => {
+  const other: ObjectiveResult = {
+    ...bills,
+    id: "other",
+    label: "Limit bills",
+  };
+  render(
+    <RunDebrief
+      outcome="fired"
+      leadMessage={`You were fired. ${bills.reason}`}
+      debrief={{
+        startingFleet: [],
+        finalFleet: [],
+        startingCash: 0,
+        finalCash: 0,
+        finalCustomers: 0,
+        reliability: 1,
+        unservedWh: 0,
+        kgco2e: 0,
+        highlights: [],
+        objectiveResults: [bills, other],
+      }}
+    />,
+  );
+  const region = screen.getByRole("region", { name: "Objective results" });
+  expect(within(region).getAllByText(bills.reason!)).toHaveLength(2);
+});
+
+for (const view of ["live", "saved"] as const) {
+  it.each(["completed", "fired", "bankrupt"] as const)(
+    `${view} results show objectives only when the mission failed (%s)`,
+    (outcome) => {
+      const result: VictoryType & { outcome: typeof outcome } = {
+        scenarioId: 100,
+        scenarioName: "Carbon Fee",
+        difficulty: "CEO",
+        score: 812,
+        breakdown: { supply: 812 },
+        ranked: false,
+        outcome,
+        debrief: {
+          startingFleet: [],
+          finalFleet: [],
+          startingCash: 0,
+          finalCash: 0,
+          finalCustomers: 0,
+          reliability: 1,
+          unservedWh: 0,
+          kgco2e: 0,
+          highlights: [],
+          objectiveResults: [bills],
+        },
+      };
+      render(
+        view === "saved" ? (
+          <SavedResultDialog result={result} onClose={() => undefined} />
+        ) : (
+          <VictoryDialog
+            victory={result}
+            loggedIn={false}
+            onClose={() => undefined}
+            onQuit={() => undefined}
+            onRetry={() => undefined}
+            onShared={() => undefined}
+            onShareFailed={() => undefined}
+          />
+        ),
+      );
+      expect(
+        screen.getByRole("region", { name: "Mission results" }),
+      ).toBeVisible();
+      expect(
+        screen.queryAllByRole("region", { name: "Objective results" }),
+      ).toHaveLength(outcome === "completed" ? 0 : 1);
+    },
+  );
+}

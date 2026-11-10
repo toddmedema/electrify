@@ -48,10 +48,10 @@ export default function UtilitySupplyPlan({
       )}
       {plan.buildMonths !== undefined && (
         <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-          For comparison, a 150 MW combined-cycle gas plant ordered now takes{" "}
-          {plan.buildMonths} months. Other sizes, technologies and customer
-          programs have different lead times. Compare their capacity and
-          completion dates with the forecast.
+          For comparison, a {formatWatts(150e6)} combined-cycle gas plant
+          ordered now takes {plan.buildMonths} months. Other sizes, technologies
+          and customer programs have different lead times. Compare their
+          capacity and completion dates with the forecast.
         </Typography>
       )}
       <Box component="ul" sx={{ pl: 2.5, my: 1, "& li": { mb: 1 } }}>

@@ -31,10 +31,32 @@ for (const theme of ["light", "dark"] as const) {
         });
       await expect(
         page.getByText(
-          /Serving less than 95% of demand for 3 months in a row ends the run./,
+          /Serving less than 90% of demand for 3 months in a row ends the run./,
         ),
       ).toBeVisible();
       await expect(page.locator("#menuCard")).toHaveCount(0);
+      {
+        // One description under the title, one warning, and goals behind a labelled button
+        const dossier = page.locator(".scenarioDossier");
+        await expect(dossier.getByText("Your goal")).toHaveCount(0);
+        await expect(dossier.getByRole("note")).toContainText("Watch out");
+        const goals = dossier.getByRole("button", {
+          name: "Goals and scoring",
+          exact: true,
+        });
+        const coarse = await page.evaluate(
+          () => matchMedia("(pointer: coarse)").matches,
+        );
+        expect((await goals.boundingBox())!.height).toBeGreaterThanOrEqual(
+          coarse ? 44 : 40,
+        );
+        await expect(goals).toBeInViewport();
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth - innerWidth,
+          ),
+        ).toBeLessThanOrEqual(0);
+      }
       if (
         process.env.REVIEW_SCREENSHOT_DIR &&
         scenario.id === 111 &&
@@ -48,7 +70,9 @@ for (const theme of ["light", "dark"] as const) {
         });
       }
       {
-        await page.getByRole("button", { name: "Goals", exact: true }).click();
+        await page
+          .getByRole("button", { name: "Goals and scoring", exact: true })
+          .click();
         const briefing = page.getByRole("dialog");
         await expect(briefing.locator("..")).toHaveCSS("opacity", "1");
         const requirements = briefing.getByRole("region", {
@@ -68,7 +92,7 @@ for (const theme of ["light", "dark"] as const) {
           );
         }
         await expect(requirements).toContainText(
-          "Serving less than 95% of demand for 3 months in a row ends the run.",
+          "Serving less than 90% of demand for 3 months in a row ends the run.",
         );
         await expect(briefing).not.toContainText("build or upgrade the grid");
         await expectDialogToFit(briefing);
@@ -138,7 +162,7 @@ for (const theme of ["light", "dark"] as const) {
         await expect(dialog).not.toContainText("Invest in the grid");
       }
       await expect(dialog).toContainText(
-        "Serving less than 95% of demand for 3 months in a row ends the run.",
+        "Serving less than 90% of demand for 3 months in a row ends the run.",
       );
       await expect(
         dialog.getByRole("region", { name: "Goals" }),

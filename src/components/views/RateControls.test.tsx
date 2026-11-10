@@ -1,6 +1,11 @@
 import * as React from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { EMPTY_HISTORY } from "../../helpers/DateTime";
+import {
+  EMPTY_HISTORY,
+  getDateFromMinute,
+  MINUTES_PER_MONTH,
+} from "../../helpers/DateTime";
+import { getRateInflationIndex } from "../../data/Economy";
 import { CUSTOM_SCENARIO_ID, getScenario } from "../../data/Scenarios";
 import { createGame } from "../../testing/Simulator";
 import { GameType } from "../../Types";
@@ -11,6 +16,36 @@ import RateControls from "./RateControls";
 function renderRates(scenarioId = 100, game = createGame({ scenarioId })) {
   return render(<RateControls game={game} onDelta={() => undefined} />);
 }
+
+test("a later CEO's market benchmark and rate range use the frozen campaign dollar basis", () => {
+  const first = createGame({ scenarioId: 117 });
+  const offset = 480 * MINUTES_PER_MONTH;
+  const date = getDateFromMinute(offset, first.startingYear);
+  const game = {
+    ...first,
+    scenarioId: 119,
+    date,
+    dollarsPerkWh: 0.05,
+    campaign: {
+      ...first.campaign!,
+      generationIndex: 2,
+      termStartMonth: 480,
+      referenceRate:
+        0.05 / getRateInflationIndex(date, first.startingYear, first.seed),
+    },
+    timeline: first.timeline.map((tick) => ({
+      ...tick,
+      minute: tick.minute + offset,
+    })),
+  };
+  renderRates(119, game);
+  expect(
+    screen.getByRole("region", { name: "Electricity pricing" }),
+  ).toHaveAccessibleDescription(/market rate \$0.05;/);
+  expect(
+    Number(screen.getByRole("slider").getAttribute("aria-valuemax")),
+  ).toBeCloseTo(0.1);
+});
 
 test("shows pricing and the market benchmark without a customer-program requirement", () => {
   renderRates(3);
@@ -296,9 +331,20 @@ it("offers a public utility a switch to follow inflation, off once a rate is cho
   expect(onDelta).toHaveBeenLastCalledWith({ rateFollowsInflation: true });
 });
 
-it("doesn't offer an investor-owned utility inflation to follow", () => {
-  renderRates(100);
-  expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+it("offers investor-owned utilities an opt-in switch to follow inflation", () => {
+  const onDelta = jest.fn();
+  render(
+    <RateControls game={createGame({ scenarioId: 100 })} onDelta={onDelta} />,
+  );
+  const follow = screen.getByRole("switch", { name: "Follow inflation" });
+  expect(follow).not.toBeChecked();
+  fireEvent.click(follow);
+  expect(onDelta).toHaveBeenCalledWith({ rateFollowsInflation: true });
+});
+
+it("keeps inflation following out of tutorials", () => {
+  renderRates(0);
+  expect(screen.queryByRole("switch", { name: "Follow inflation" })).toBeNull();
 });
 
 it("keeps keyboard focus on the slider across committed rate steps", () => {

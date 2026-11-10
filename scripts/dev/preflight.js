@@ -82,8 +82,8 @@ function checkDependencies(
       : undefined,
   } = {},
 ) {
-  if (!/^v?24\./.test(nodeVersion))
-    throw new Error("Use Node 24 for Electrify");
+  if (!/^v?26\./.test(nodeVersion))
+    throw new Error("Use Node 26 for Electrify");
   const lock = read(root, "package-lock.json");
   const installed = read(root, "node_modules/.package-lock.json");
   if (

@@ -881,6 +881,45 @@ test("Programs keeps points visible through monthly forecast refreshes", async (
   }
 });
 
+test("pricing keeps changing customer forecasts on one line", async ({
+  page,
+}, info) => {
+  await startGame(page, "dark");
+  await page.locator("#programsNav").click();
+  const pricing = page.getByRole("region", { name: "Electricity pricing" });
+  await expect(pricing).toBeVisible();
+  await settleSheets(page);
+  const rate = pricing.getByRole("slider");
+  for (const key of ["Home", "End", "ArrowLeft", "ArrowLeft", "ArrowLeft"]) {
+    await rate.press(key);
+    const metric = pricing.locator(".insightsRateMetric").last();
+    const value = metric.locator(".insightsRateMetricValue");
+    await expect(value).toContainText(/^[+-]?\d.*\(.*%\)$/);
+    const geometry = await value.evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return {
+        lines: range.getClientRects().length,
+        overflow: element.scrollWidth - element.clientWidth,
+      };
+    });
+    expect(geometry.lines).toBe(1);
+    expect(geometry.overflow).toBeLessThanOrEqual(1);
+    expect(
+      await pricing
+        .locator(".insightsRateMetrics")
+        .evaluate((element) => element.scrollWidth - element.clientWidth),
+    ).toBeLessThanOrEqual(1);
+  }
+  await settleSheets(page);
+  await pricing.getByRole("heading", { name: "Electricity pricing" }).click();
+  await page.mouse.move(0, 0);
+  await reviewScreenshot(page, {
+    path: info.outputPath("pricing-customer-forecast.png"),
+    animations: "disabled",
+  });
+});
+
 test("Programs owns pricing and Build keeps purchase dialogs above its sheet", async ({
   page,
 }, testInfo) => {
@@ -1155,14 +1194,52 @@ for (const theme of ["light", "dark"] as const) {
     for (const width of [700, 699, 390, 360]) {
       await page.setViewportSize({ width, height: 800 });
       const profit = appbar.getByLabel(/^Monthly profit forecast/);
-      if (width >= 700) await expect(profit).toBeVisible();
-      else await expect(profit).toHaveCount(0);
+      await expect(profit).toBeVisible();
       expect(
         await appbar.evaluate(
           (element) => element.scrollWidth - element.clientWidth,
         ),
       ).toBeLessThanOrEqual(1);
     }
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`phone profit stacks beneath cash and opens finances in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(!info.project.use.hasTouch || page.viewportSize()!.width >= 700);
+    await startGame(page, theme, 111);
+    const appbar = page.locator("#appbar");
+    const cash = appbar.locator(".gameStatusValue").first();
+    const profit = appbar.getByLabel(/^Monthly profit forecast/);
+    await expect(profit).toBeVisible();
+    await expect(profit).toHaveText(/^[+−-]?\$[\d.,]+[KMBT]?\/mo$/);
+    const [cashBox, profitBox, dateBox, speedsBox] = await Promise.all([
+      cash.boundingBox(),
+      profit.boundingBox(),
+      appbar.locator(".gameStatusValue.weak").boundingBox(),
+      appbar.locator("#speedChangeButtons").boundingBox(),
+    ]);
+    expect(profitBox!.y).toBeGreaterThanOrEqual(cashBox!.y + cashBox!.height);
+    expect(Math.abs(profitBox!.x - cashBox!.x)).toBeLessThanOrEqual(1);
+    expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(speedsBox!.x);
+    expect(profitBox!.x + profitBox!.width).toBeLessThanOrEqual(speedsBox!.x);
+    expect(
+      await appbar.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    await page.mouse.move(0, 0);
+    await reviewScreenshot(page, {
+      path: info.outputPath(`phone-profit-${theme}.png`),
+      animations: "disabled",
+    });
+    await profit.click();
+    await expect(
+      page.getByRole("region", { name: "Insights", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.locator('.insights [data-layer="financeDetails"]'),
+    ).toBeInViewport();
   });
 }
 

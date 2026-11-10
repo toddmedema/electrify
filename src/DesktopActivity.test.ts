@@ -63,6 +63,24 @@ const flush = async () => {
   for (let i = 0; i < 30; i++) await Promise.resolve();
 };
 
+it("reports the successor's year within its own twenty-year CEO term", () => {
+  const state = fixture().store.getState();
+  const successor = {
+    ...state,
+    game: {
+      ...state.game,
+      scenarioId: 118,
+      date: { ...state.game.date, monthsElapsed: 252 },
+      campaign: { termStartMonth: 240 },
+    },
+  } as RootState;
+  expect(desktopActivity(successor)).toMatchObject({
+    scenarioId: 118,
+    year: 2,
+    totalYears: 20,
+  });
+});
+
 it("publishes bounded progress and phases without private custom or victory names", () => {
   const { store } = fixture();
   const initial = store.getState();

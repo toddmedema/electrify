@@ -6,7 +6,7 @@ Cloud storage and leaderboards; the web edition continues to use Firebase.
 
 ## Build and test
 
-Use Node 24 and the committed lockfile. Fetch Git LFS assets before building; the packaging
+Use Node 26 and the committed lockfile. Fetch Git LFS assets before building; the packaging
 verification refuses pointer files and missing public assets.
 
 ```sh
@@ -36,24 +36,40 @@ account or App ID:
 npm run desktop:pack:offline
 ```
 
-Build on the target OS using its native Node 24 installation and `npm ci`. Windows and Linux
-packaging rejects cross-host or cross-architecture builds: Koffi installs a native package for
-the host, and each depot must contain the correct Steam SDK and Electron binaries. On macOS,
-either an Apple Silicon or an Intel Mac builds one universal app containing both architectures.
-Packaging installs the other architecture's locked Koffi package before it merges the two
-builds, and checks that the signed executable contains both `arm64` and `x86_64` slices.
+Build on the target OS and architecture using its native Node 26 installation and `npm ci`.
+Mac builds require Apple Silicon (ARM64). Packaging rejects other Mac architectures, removes
+unused architectures from the pinned Steam SDK library with `lipo`, and verifies the signed
+app executable is ARM64-only. Native runtime bytes are checked before signing. The installed
+dependency sources remain intact.
 
-| Target            | Depot under `dist/desktop/` | Executable inside the depot              | CI runner        |
-| ----------------- | --------------------------- | ---------------------------------------- | ---------------- |
-| Windows x64       | `win-unpacked/`             | `Electrify.exe`                          | `windows-latest` |
-| Linux x64         | `linux-unpacked/`           | `Electrify`                              | `ubuntu-22.04`   |
-| macOS (universal) | `mac-universal/`            | `Electrify.app/Contents/MacOS/Electrify` | `macos-15`       |
+| Target      | Depot under `dist/desktop/` | Executable inside the depot              | CI runner        |
+| ----------- | --------------------------- | ---------------------------------------- | ---------------- |
+| Windows x64 | `win-unpacked/`             | `Electrify.exe`                          | `windows-latest` |
+| Linux x64   | `linux-unpacked/`           | `Electrify`                              | `ubuntu-22.04`   |
+| macOS ARM64 | `mac-arm64/`                | `Electrify.app/Contents/MacOS/Electrify` | `macos-15`       |
 
 On macOS, open `Electrify.app`; on Linux, run `./Electrify` from the depot. Ship the **entire
 directory or app bundle**, including native libraries and Chromium resources. Copying only the
 executable does not produce a working game. Steam installs the unpacked depot; players do not
 run npm, download dependencies, or install Electron themselves. Linux ARM and Windows ARM are
 not supported by the pinned Steam binding.
+
+Linux depots bundle NSS, NSPR, SQLite and NSS's loadable modules/checksums from the Ubuntu 22.04
+build host, with redistribution notices and license texts in `lib/`. Install `libnss3`, `libnspr4`
+and `libsqlite3-0` on that build host before packaging. The `Electrify` launcher sets a process-local
+library path and executes `Electrify.bin`; it preserves Steam's library path and all launch arguments.
+Players using Steam on NixOS should not need `programs.steam.extraPackages = [ nspr nss ];`.
+Packaging verifies the manifest and runs `ldd` against the executable and bundled libraries,
+including proof that NSS/NSPR resolve inside the depot. CI's packaged Linux launch uses this wrapper.
+This is intended for Steam's Linux environment, not direct execution outside NixOS's Steam FHS.
+
+Steam builds select X11/XWayland before enabling the overlay's in-process GPU. This supports
+[Steam's overlay](https://github.com/ValveSoftware/steam-for-linux/issues/8020) and avoids the
+[Electron 44 Wayland shutdown deadlock](https://github.com/electerm/electerm/issues/4654).
+Shift-Tab is withheld from Chromium in every game view so it cannot also move focus or trigger a
+modal focus trap. If Steam reports that its overlay is disabled, Invite friends shows an error
+with the invite-code alternative. Validate both Shift-Tab and Invite friends, clean Quit, and the
+bundled libraries on a real NixOS Steam install with the extraPackages workaround removed.
 
 The Mac app requires macOS 13 Ventura or later, matching the
 [Electron 44 minimum](https://www.electronjs.org/blog/electron-44-0). The package's
@@ -116,33 +132,23 @@ Remove-Item Env:STEAM_APP_ID
 
 The same command works on each native host; in POSIX shells use
 `STEAM_APP_ID=YOUR_ELECTRIFY_APP_ID npm run desktop:pack`. It refuses a missing App ID. Create
-separate Windows, Linux and macOS depots with matching launch settings. Steam has one macOS
-platform and does not choose depots by CPU architecture, so the single universal app serves
-both Intel and Apple Silicon Macs. Set Windows to `Electrify.exe`, Linux to `Electrify`, and
+separate Windows, Linux and Apple Silicon macOS depots with matching launch settings.
+Set Windows to `Electrify.exe`, Linux to `Electrify`, and
 macOS to `Electrify.app`. Publish the Steamworks changes and assign the build to a private
 testing branch. This repository does not publish a Steam depot or configure your partner account.
 
 ### macOS compatibility metadata
 
-Steam's "Your current macOS version is unable to run 32-bit games" warning can appear even
-when the installed app is universal. Steam uses published partner metadata to identify
-64-bit Mac support; packaging or uploading a new depot does not set that metadata.
+The macOS desktop build supports Apple Silicon on macOS 13 Ventura or later. Publish that
+same requirement in the Steam store page and the application's supported-platform settings;
+Intel Mac compatibility must not be advertised. Rebuilding or uploading a depot does not
+update the published compatibility metadata.
 
-In Electrify's **Edit Steamworks Settings → Application → General → Supported Operating
-Systems**, enable **macOS** and **64 Bit Binaries Included** (or **64 Bit (Intel) Binaries
-Included**, depending on the label). Enable **Apple Silicon Binaries Included** when offered:
-the universal app contains both `x86_64` and `arm64`. Save and publish the Steamworks changes.
-See [Valve's macOS platform guidance](https://partner.steamgames.com/doc/store/application/platforms).
-
-Keep the macOS launch option pointed at `Electrify.app` and the universal Mac depot included
-in the testing account's package and selected branch. After Steam receives the published
-settings, confirm that the library warning has disappeared and launch the installed build
-on an Apple Silicon Mac. Check an Intel Mac before release as well. A warning disappearing
-confirms the compatibility metadata; launching the installed game verifies the depot.
-
-Rebuilding the app alone cannot clear this warning. The packaging verifier already requires
-both 64-bit executable slices and their native Steam dependencies. If launch still fails
-after the metadata correction, investigate that failure separately.
+Keep the macOS launch option pointed at `Electrify.app` and include the ARM64 Mac depot in the
+testing account's package and selected branch. Confirm that the available Apple Silicon
+compatibility settings match the uploaded build, then test a fresh Steam install on an Apple
+Silicon Mac. See [Valve's platform setup guidance](https://partner.steamgames.com/doc/store/application/platforms)
+for publishing platform settings, depots and system requirements.
 
 ### macOS signing and notarization
 
@@ -155,7 +161,7 @@ SDK/overlay injection required by Valve, and omit Apple's app-sandbox entitlemen
 renderer sandbox remains enabled. Packaging checks native bytes before signing, then verifies
 the signed app with `codesign --verify --deep --strict` and checks every game asset again. Before
 uploading, confirm notarization and its offline ticket with `xcrun stapler validate Electrify.app`,
-and test a fresh Steam install on both an Apple Silicon and an Intel Mac. Windows signing uses
+and test a fresh Steam install on an Apple Silicon Mac. Windows signing uses
 the configured release certificate or signing provider; offline CI does not sign the executable.
 
 Steam has to be installed and logged in at least once to establish a player's ownership and
@@ -335,6 +341,12 @@ X to open Build, Y or Start to pause/resume, bumpers for panes, triggers for cha
 stick's up/down directions for speed. Steam's displayed origins describe the equivalent inputs
 on other controllers and follow player customization.
 
+In couch co-op, Start/Menu and Select/View toggle a centered shared menu and pause
+every company. Either controller can navigate the menu and shared Settings, which
+apply to all players. Each player pane has its own speed selector. B stays local
+Back during play; the full Controls legend appears along the bottom while the
+shared menu, Settings or Manual is open.
+
 Confirming an editable text field opens Steam's gamepad text editor. Submitted text follows the
 field's normal validation and React change handling; cancelling preserves the original value.
 Controller actions are suspended while the editor is open and require release before continuing.
@@ -397,6 +409,46 @@ gate. Old wake acknowledgements cannot unlock a later sleep. The game stays paus
 player resumes it; closing a purchase, help, or other blocking screen cannot restore an earlier
 running speed. Multiplayer sleep also preserves the shared save and requires consent to continue.
 A wake checkpoint failure uses the existing visible save error and retry path.
+
+### TV layout
+
+The desktop title screen offers an explicit TV layout before starting a game. The same
+preference is available in Settings, where players can return to the desktop layout, adjust
+TV scale, and add a screen-edge inset. These preferences stay on this device; connecting a
+controller does not select TV layout automatically.
+
+Before a layout has been chosen, Big Picture on a PC or a Remote Play TV client offers a
+title-screen suggestion. Accepting enables TV layout; declining or dismissing keeps desktop
+layout. Both choices are remembered across launches and take precedence over later detection.
+Big Picture alone never prompts on a Steam Deck (or when its hardware identity is unavailable),
+so handheld play keeps the desktop layout. Docked Deck players can select TV layout manually;
+a Deck streaming to a Remote Play TV can receive the same suggestion as a PC. The optional
+native queries use SteamUtils010 and SteamRemotePlay002 from the bundled SDK and fail without
+affecting local play. No detection path changes the layout without player approval.
+
+TV layout keeps one active tool and the essential game status visible. Its shared scale covers
+text, charts, controls and controller glyphs. Build keeps comparison and forecast information
+inside the active view, and controller hints follow the current control with full controls help
+available separately. Existing chart, slider, text-entry and reorder controls retain their own
+navigation, nested Back and confirmation behavior.
+
+Headless controller checks exercise the renderer and native bridge mock. They do not establish
+couch-distance readability, overscan behavior, physical-controller compatibility or Steam binding
+delivery. Before release, test a private build on real 1080p and 4K TVs in both themes:
+
+- Enable TV layout from the title screen using only a controller. Adjust scale and inset,
+  relaunch, and verify device-local persistence and the option to return to desktop layout.
+- With no saved layout choice, launch through Big Picture on a PC and stream to a Remote Play
+  TV. Check that the suggestion is readable before TV scaling, waits for a choice, and remembers
+  either answer after relaunch. Handheld Deck play must keep desktop layout without a Big Picture
+  suggestion; verify manual TV selection still works when docked.
+- Complete tutorial → build/resize → pricing/programs → charts/events → save/reload. Check
+  chart values and explanatory details without hover, directional destinations, and focus and
+  scroll position when returning to a tool.
+- Verify cash, clock/speed, grid state and goals remain readable at couch distance. Repeat
+  with the largest text and TV scale, the largest inset, long event choices and text entry.
+- Test remapped glyphs, nested Back, a held Confirm across purchase review, disconnect/reconnect,
+  and recovery through the Steam overlay. Disconnect must leave the game paused until resumed.
 
 ### Steam Deck release acceptance
 
@@ -493,10 +545,13 @@ through Valve's normal review process.
 
 ## Realtime Steam co-op
 
-**Play with friends** on the desktop title screen offers **Host a game** or joining with an
-invite code. Hosting opens a friends-only Steam lobby and goes straight to the normal selection
+**Play with friends** on the desktop title screen offers **Host a game** or joining with a
+six-digit invite code (including leading zeroes). Hosting opens an invisible Steam lobby and goes straight to the normal selection
 screens, where the top bar's **Invite friends** opens Steam's invitation overlay and **Copy invite
-code** copies the full numeric lobby code. Two to four players can join or leave at any time before
+code** copies the six-digit code. Code lookup searches worldwide; missing or colliding codes
+produce an error rather than joining an arbitrary lobby. Native Steam invitations still use the
+full 64-bit lobby ID. Invisible lobbies support lookup without advertising a public game browser;
+friends-only lobbies cannot be found by Steam's lobby search. Two to four players can join or leave at any time before
 the start. The host picks any authored scenario or a custom game. Guests follow the host's screen,
 scenario, difficulty and custom settings read-only, and mark **Ready** for exactly what is shown;
 any change by the host clears it. **Start for everyone** launches that scenario for the lobby once
@@ -515,10 +570,11 @@ company has retired, with a results table and **Back to lobby** for the host.
 The host's worker runs every grid on one clock. Multiplayer uses the normal game view, including
 the full build catalog, storage, policies, forecasts, rate controls and facility management.
 Each player selects their own speed; the shared clock runs at the slowest selection. Your own
-selection is the filled segment, and the game's active speed carries a slowly pulsing ring.
-Other players' person markers sit along the bottom of the speed they chose, filling each button
+selection has a static circle, and the game's active speed is the solid blue segment.
+Other players' person markers sit along the bottom of their effective speed, filling each button
 from the left. Names, selections and pause reasons remain in accessible descriptions and hover
-text.
+text. Temporarily paused players appear only under Pause; their requested speed is retained for
+resuming. The controller Pause action also readies an online player after a safety stop.
 Opening the build screen, reading a notification, opening settings, or putting the game
 in the background pauses everyone without changing anyone's selection. Closing the interruption
 restores the slowest remaining speed. Manual pause stays selected until that player changes it.

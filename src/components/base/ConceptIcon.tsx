@@ -1,5 +1,6 @@
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
+import BatteryChargingFullIcon from "@mui/icons-material/BatteryChargingFull";
 import BoltIcon from "@mui/icons-material/Bolt";
 import BuildIcon from "@mui/icons-material/Build";
 import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
@@ -123,35 +124,53 @@ export interface ConceptIconProps {
   concept: ConceptNameType;
   fontSize?: "small" | "medium" | "large";
   style?: React.CSSProperties;
+  className?: string;
+  // Overrides the concept's own tone, e.g. "inherit" where a status badge supplies the colour
+  color?: "inherit" | "success" | "error" | "warning";
+  // Drops the concept's name when visible text beside it already says it. MUI already hides its
+  // SVG glyphs from assistive technology, so this mainly empties the storage image's alt text.
+  decorative?: boolean;
+  // Draws storage as a one-colour glyph instead of the battery illustration, for spots too small
+  // or too quiet for full colour such as stat labels
+  monochrome?: boolean;
 }
 
 export default function ConceptIcon({
   concept,
   fontSize = "medium",
   style,
+  className,
+  color,
+  decorative = false,
+  monochrome = false,
 }: ConceptIconProps): React.JSX.Element {
   const label = CONCEPT_LABELS[concept];
-  if (concept === "storage") {
+  const classes = className ? `conceptIcon ${className}` : "conceptIcon";
+  const a11y = decorative
+    ? { "aria-hidden": true as const }
+    : { "aria-label": label };
+  if (concept === "storage" && !monochrome) {
     const px = IMG_SIZES[fontSize];
     return (
       <img
         src="/images/battery.svg"
-        alt={label}
-        aria-label={label}
+        alt={decorative ? "" : label}
+        {...a11y}
         data-concept={concept}
-        className="conceptIcon"
+        className={classes}
         style={{ width: px, height: px, ...style }}
       />
     );
   }
-  const Icon = CONCEPT_ICONS[concept];
+  const Icon =
+    concept === "storage" ? BatteryChargingFullIcon : CONCEPT_ICONS[concept];
   return (
     <Icon
-      className="conceptIcon"
-      aria-label={label}
+      className={classes}
+      {...a11y}
       data-concept={concept}
       fontSize={fontSize}
-      color={CONCEPT_COLORS[concept]}
+      color={color ?? CONCEPT_COLORS[concept]}
       style={style}
     />
   );

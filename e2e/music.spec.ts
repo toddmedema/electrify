@@ -1,117 +1,18 @@
+import { installMusicAudit } from "./music-audit";
 import { expect, Page, test } from "./fixtures";
 import { writeFile } from "node:fs/promises";
-
-declare global {
-  interface Window {
-    electrifyMusicDocument: string;
-    electrifyMusicDecodes: {
-      bytes: number;
-      sampleRate: number;
-      state: "decoding" | "decoded" | "error";
-      elapsedMs?: number;
-      error?: string;
-    }[];
-    electrifyMusicStarts: { duration: number; loop: boolean; offset: number }[];
-    electrifyMusicPlayback: {
-      source: AudioBufferSourceNode;
-      startTime: number;
-      offset: number;
-      stopped: boolean;
-      ended: boolean;
-    }[];
-  }
-}
 
 // Let the real audio clock run before the first gesture in headless Chromium.
 // These tests exercise playback continuity rather than browser autoplay permission.
 test.use({
   launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] },
 });
-// Startup decodes three six-minute stems before the menu source can start.
+// Readiness checks include three six-minute stems before gameplay assertions.
 // Leave room for that setup on CI without relaxing any navigation assertion.
 test.setTimeout(90000);
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.clear();
-    localStorage.setItem("audioEnabled", "true");
-    localStorage.setItem(
-      "plays",
-      JSON.stringify({
-        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
-      }),
-    );
-    window.electrifyMusicDocument = crypto.randomUUID();
-    window.electrifyMusicDecodes = [];
-    window.electrifyMusicStarts = [];
-    window.electrifyMusicPlayback = [];
-    const decode = AudioContext.prototype.decodeAudioData;
-    AudioContext.prototype.decodeAudioData = function (
-      this: AudioContext,
-      ...args: Parameters<AudioContext["decodeAudioData"]>
-    ) {
-      const entry: Window["electrifyMusicDecodes"][number] = {
-        bytes: args[0].byteLength,
-        sampleRate: this.sampleRate,
-        state: "decoding",
-      };
-      window.electrifyMusicDecodes.push(entry);
-      const startedAt = performance.now();
-      const pending = decode.apply(this, args);
-      void pending.then(
-        () => {
-          entry.state = "decoded";
-          entry.elapsedMs = performance.now() - startedAt;
-        },
-        (error: unknown) => {
-          entry.state = "error";
-          entry.elapsedMs = performance.now() - startedAt;
-          entry.error = String(error);
-        },
-      );
-      return pending;
-    };
-    const start = AudioBufferSourceNode.prototype.start;
-    AudioBufferSourceNode.prototype.start = function (
-      this: AudioBufferSourceNode,
-      ...args: Parameters<AudioBufferSourceNode["start"]>
-    ) {
-      if (this.buffer && this.buffer.duration > 20) {
-        window.electrifyMusicStarts.push({
-          duration: this.buffer.duration,
-          loop: this.loop,
-          offset: args[1] || 0,
-        });
-        const playback = {
-          source: this,
-          startTime: Math.max(this.context.currentTime, args[0] || 0),
-          offset: args[1] || 0,
-          stopped: false,
-          ended: false,
-        };
-        window.electrifyMusicPlayback.push(playback);
-        this.addEventListener(
-          "ended",
-          () => {
-            playback.ended = true;
-          },
-          { once: true },
-        );
-      }
-      start.apply(this, args);
-    };
-    const stop = AudioBufferSourceNode.prototype.stop;
-    AudioBufferSourceNode.prototype.stop = function (
-      this: AudioBufferSourceNode,
-      ...args: Parameters<AudioBufferSourceNode["stop"]>
-    ) {
-      const playback = window.electrifyMusicPlayback.find(
-        (entry) => entry.source === this,
-      );
-      if (playback) playback.stopped = true;
-      stop.apply(this, args);
-    };
-  });
+  await installMusicAudit(page);
 });
 
 test.afterEach(async ({ page }, testInfo) => {
@@ -245,8 +146,8 @@ test("starting a game selects the existing song and quitting restores the menu l
     window.electrifyMusicStarts.slice(1),
   );
   for (const music of gameplay) {
-    expect(music.loop).toBe(false);
-    expect(music.duration).toBeGreaterThan(392);
+    expect(music.loop).toBe(true);
+    expect(music.duration).toBeGreaterThan(391);
     expect(music.offset).toBe(0);
   }
   await page.locator(".gameMenuButton").click();
@@ -360,5 +261,30 @@ test("a suspended audio clock does not restart gameplay early", async ({
       [...contexts].map((context) => (context as AudioContext).resume()),
     );
   });
+  await expectContinuousMusic(page, before);
+});
+
+test("first tutorial keeps its sources through the real native song boundary", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expectMenuMusic(page);
+  await page.evaluate(() => {
+    localStorage.removeItem("plays");
+    window.electrifyMusicSeekTail = true;
+  });
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.locator(".tutorialHud")).toBeVisible();
+  await expect
+    .poll(async () => (await playbackSnapshot(page)).active.length)
+    .toBe(3);
+  const before = await playbackSnapshot(page);
+  const durations = before.starts.slice(-3).map((entry) => entry.duration);
+  expect(new Set(durations).size).toBe(1);
+  await expect
+    .poll(async () => (await playbackSnapshot(page)).active[0]?.position)
+    .toBeGreaterThan(durations[0] + 0.3);
+  await expectContinuousMusic(page, before);
+  await page.getByRole("button", { name: "Next", exact: true }).click();
   await expectContinuousMusic(page, before);
 });

@@ -18,7 +18,7 @@ import { createGame } from "../../testing/Simulator";
 import * as ExpectedOutput from "../../helpers/ExpectedOutput";
 import * as GameReducer from "../../reducers/Game";
 import * as Facilities from "../../data/Facilities";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { SCENARIOS } from "../../data/Scenarios";
 import { formatMoneyConcise } from "../../helpers/Format";
 import {
@@ -30,8 +30,128 @@ import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
 import { purchaseTerms } from "../../helpers/Financials";
 import { computeOutlook } from "../base/OutlookForecast";
 import type { EvidenceRequestType } from "../../Types";
+import { LEGACY_SCENARIOS } from "../../data/LegacyCampaign";
 
 jest.mock("../base/ManualLink", () => () => null);
+
+it("buys a sub-megawatt generator through the campaign's ordinary size and loan controls", () => {
+  const game = createGame({
+    scenarioId: 117,
+    scenario: LEGACY_SCENARIOS[0],
+    seed: 611,
+  });
+  game.timeline = game.timeline.map((tick) => ({ ...tick, cash: 1000000 }));
+  const onBuildGenerator = jest.fn();
+  render(
+    <BuildGenerators
+      game={game}
+      onBack={jest.fn()}
+      onBuildGenerator={onBuildGenerator}
+    />,
+  );
+  const slider = screen.getByRole("slider");
+  expect(slider).toHaveAttribute("min", "-14");
+  expect(slider).toHaveAttribute("max", "-5");
+  fireEvent.change(slider, { target: { value: "-14" } });
+  expect(slider).toHaveAttribute("aria-valuetext", "50kW");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Coal" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Take loan" }));
+  expect(onBuildGenerator.mock.calls[0][0].peakW).toBe(50000);
+  expect(onBuildGenerator.mock.calls[0][1]).toBe(true);
+});
+
+it("buys the early 750 kW hydro site without expanding the steam size range", () => {
+  const game = createGame({ scenarioId: 117, seed: 611 });
+  const offset = 13 * 12 * MINUTES_PER_MONTH;
+  game.date = getDateFromMinute(offset, game.startingYear);
+  game.timeline = game.timeline.map((tick) => ({
+    ...tick,
+    minute: tick.minute + offset,
+    cash: 1e9,
+  }));
+  expect(getHydroAvailability(game, 100000).selected?.maxPeakW).toBe(750000);
+  const onBuild = jest.fn();
+  render(
+    <BuildGenerators
+      game={game}
+      onBack={jest.fn()}
+      onBuildGenerator={onBuild}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
+  const slider = screen.getByRole("slider");
+  expect(slider).toHaveAttribute("max", "-5");
+  expect(slider).toHaveAttribute("aria-valuetext", "500kW");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Hydro" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(onBuild).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Hydro", peakW: 750000 }),
+    false,
+  );
+});
+
+it("discards an early site shortcut at the later minimum and hides sites below it", () => {
+  const game = createGame({ scenarioId: 117, seed: 611 });
+  const memory = new Map<string, unknown>();
+  const onBuild = jest.fn();
+  const catalog = () => (
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        onBack={jest.fn()}
+        onBuildGenerator={onBuild}
+      />
+    </GameToolMemoryContext.Provider>
+  );
+  const moveTo = (year: number) => {
+    const minute = (year - game.startingYear) * 12 * MINUTES_PER_MONTH;
+    game.timeline = game.timeline.map((tick) => ({
+      ...tick,
+      minute: tick.minute - game.date.minute + minute,
+      cash: 1e9,
+    }));
+    game.date = getDateFromMinute(minute, game.startingYear);
+  };
+  moveTo(1895);
+  const { unmount: unmountEarly } = render(catalog());
+  fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
+  unmountEarly();
+  moveTo(1942);
+  game.scenarioId = 120;
+  const { unmount: unmountLater } = render(catalog());
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Hydro" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(onBuild).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Hydro", peakW: 1000000 }),
+    false,
+  );
+  unmountLater();
+  game.commissionedHydroSiteIds = [
+    "legacy-sierra-upper-river",
+    "legacy-sierra-valley-reservoir",
+    "legacy-sierra-regional-reservoir",
+  ];
+  expect(getHydroAvailability(game, 1000000).largest?.maxPeakW).toBe(750000);
+  render(catalog());
+  const hydro = screen.getByText(
+    (_text, element) => element?.getAttribute("data-build-option") === "Hydro",
+  );
+  expect(
+    within(hydro).queryByRole("button", { name: "Use site maximum" }),
+  ).toBeNull();
+  expect(
+    within(hydro).queryByRole("button", { name: "Use max size" }),
+  ).toBeNull();
+  expect(
+    within(hydro).getByRole("button", { name: "Review purchase of Hydro" }),
+  ).toBeDisabled();
+});
 
 it.each([false, true])(
   "resizes an unaffordable generator to the largest affordable slider size (live cash: %s)",
@@ -204,10 +324,12 @@ describe("the three-year build forecast", () => {
   const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
   let timeline: jest.SpyInstance;
   beforeEach(() => {
-    timeline = jest.spyOn(GameReducer, "generateForecastTimeline");
+    timeline = jest.spyOn(GameReducer, "generateResourceForecast");
   });
   afterEach(() => {
-    timeline.mockRestore();
+    // Restore quote spies even when an earlier assertion fails, so they cannot leak into
+    // the next test with their implementation reset by Jest.
+    jest.restoreAllMocks();
   });
 
   // What a player reads off the screen: all of its text and every typical-year sparkline
@@ -294,13 +416,8 @@ describe("the three-year build forecast", () => {
     );
     // StrictMode renders twice; the second render reuses the first one's forecast
     expect(timeline).toHaveBeenCalledTimes(1);
-    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-    expect(timeline).toHaveBeenCalledWith(
-      game,
-      now.cash,
-      now.customers,
-      TICKS_PER_YEAR * 3,
-    );
+    expect(timeline).toHaveBeenCalledWith(game);
+    expect(timeline.mock.results[0].value).toHaveLength(TICKS_PER_YEAR * 3);
 
     const generators = jest.spyOn(Facilities, "GENERATORS");
     const slider = screen.getByRole("slider");
@@ -337,7 +454,7 @@ describe("the three-year build forecast", () => {
     // Equal inputs do not need another simulation.
     view.rerender(<BuildGenerators game={{ ...game }} {...callbacks} />);
     expect(timeline).toHaveBeenCalledTimes(1);
-    // And a changed input reaches it: here the cash the forecast starts from
+    // A changed paused snapshot still reaches the resource forecast through its existing key.
     const richer = {
       ...game,
       timeline: game.timeline.map((tick) =>
@@ -348,7 +465,7 @@ describe("the three-year build forecast", () => {
     };
     view.rerender(<BuildGenerators game={richer} {...callbacks} />);
     await waitFor(() => expect(timeline).toHaveBeenCalledTimes(2));
-    expect(timeline.mock.calls[1][1]).toBe(1e12);
+    expect(timeline.mock.calls[1][0]).toBe(richer);
   });
 
   it("refreshes running quotes at month boundaries and after fleet decisions", async () => {
@@ -360,7 +477,7 @@ describe("the three-year build forecast", () => {
     expect(timeline).toHaveBeenCalledTimes(1);
     for (let i = 0; i < 96; i++)
       game = createNextState(game, (draft) => GameReducer.tickState(draft));
-    // Discard the reducer's own rollover forecast calls; measure only the catalog.
+    // Measure the monthly refresh independently of the opening catalog calculation.
     timeline.mockClear();
     view.rerender(<BuildGenerators game={game} {...callbacks} />);
     await waitFor(() => expect(timeline).toHaveBeenCalledTimes(1));
@@ -431,7 +548,9 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).not.toBeInTheDocument();
   expect(screen.queryByText("$11.9M/yr")).not.toBeInTheDocument();
   expect(screen.queryByText("Flexible power")).toBeNull();
-  expect(screen.queryByText(/Typical output/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(/Average output over a year/),
+  ).not.toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Show Natural Gas Peaker details" }),
   );
@@ -464,14 +583,18 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   );
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).not.toHaveTextContent("What changes");
-  expect(impact).toHaveTextContent("Cash purchase");
+  expect(impact).toHaveTextContent("Cash option");
+  expect(impact).not.toHaveTextContent("Cash purchase");
   expect(impact).toHaveTextContent(
     /Loan option.* \+ .*\/mo \(\d+\.\d+% for 30 years\)/,
   );
-  expect(impact).toHaveTextContent("Estimated upkeep");
+  expect(impact).toHaveTextContent("Maintenance");
+  expect(impact).not.toHaveTextContent("Estimated upkeep");
+  expect(impact).not.toHaveTextContent("loan payments");
   expect(impact).toHaveTextContent("Online in");
-  expect(impact).toHaveTextContent("Typical output");
-  expect(impact).toHaveTextContent("weather may limit it");
+  expect(impact).toHaveTextContent("Average output over a year");
+  expect(impact).not.toHaveTextContent("Typical output");
+  expect(impact).not.toHaveTextContent("weather may limit it");
   expect(impact).not.toHaveTextContent("largest forecast shortage");
   expect(impact).not.toHaveTextContent("Loan:");
   expect(
@@ -486,6 +609,40 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   // starve its timer on a busy CI worker.
   await waitForElementToBeRemoved(dialog);
 }, 15000);
+
+it.each([
+  ["Solar", /Direct emissions\s*None/],
+  ["Wind", /Direct emissions\s*None/],
+  ["Natural Gas Peaker", /Direct emissions\s*[\d.,]+\s*\w+\/MWh/],
+])(
+  "reports %s direct emissions as a rate, or None when it burns nothing",
+  (name, emissions) => {
+    const game = createGame({ scenarioId: 111, difficulty: "CEO" });
+    const generator = GENERATORS(game, 100e6, [], []).find(
+      (candidate) => candidate.name === name,
+    )!;
+    render(
+      <GeneratorBuildItem
+        cash={1000000000}
+        date={game.date}
+        interestRate={game.interestRate}
+        generator={generator}
+        location={game.location}
+        seed={game.seed}
+        onBuild={jest.fn()}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: `Review purchase of ${name}` }),
+    );
+    const impact = screen.getByRole("region", { name: "Expected impact" });
+    expect(impact).toHaveTextContent(emissions);
+    expect(impact).not.toHaveTextContent("No direct emissions modeled");
+    // A weather-driven plant's maximum is already in the title, so no subtext repeats it
+    expect(impact).not.toHaveTextContent("weather may limit it");
+    expect(impact).not.toHaveTextContent("loan payments");
+  },
+);
 
 it("shows Coal's start charge without the representative-day breakdown", () => {
   const game = createGame({ scenarioId: 111, difficulty: "CEO" });
@@ -1028,30 +1185,7 @@ describe("weather hardening in the purchase dialog", () => {
     ).toBeNull();
   });
 
-  it("offers hail-resistant solar as an opt-in that follows the quoted price", () => {
-    const onBuild = showBuildList();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Review purchase of Solar" }),
-    );
-    const dialog = screen.getByRole("dialog");
-    const option = within(dialog).getByRole("checkbox", {
-      name: /^Hail-resistant panels \+\$/,
-    });
-    expect(option).not.toBeChecked();
-    fireEvent.click(option);
-    fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
-    const [quote] = onBuild.mock.calls[0];
-    expect(quote.resilience).toEqual({
-      hailResistant: true,
-      solarTrackers: false,
-    });
-    expect(quote.resilienceExtraBuildCost).toBeGreaterThan(0);
-    expect(option).toHaveAccessibleName(
-      `Hail-resistant panels +${formatMoneyConcise(quote.resilienceExtraBuildCost)}`,
-    );
-  });
-
-  it("offers solar trackers at build, pitched on morning and evening output", () => {
+  it("offers solar trackers at build, described by annual energy gain", () => {
     const onBuild = showBuildList();
     fireEvent.click(
       screen.getByRole("button", { name: "Review purchase of Solar" }),
@@ -1062,14 +1196,13 @@ describe("weather hardening in the purchase dialog", () => {
     });
     expect(option).not.toBeChecked();
     expect(option).toHaveAccessibleDescription(
-      /more morning and evening power.*Stows in hail\. Can't be added later\./,
+      /20% more energy a year.*morning and evening.*Stows in hail\. Can't be added later\./,
     );
     fireEvent.click(option);
     fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
     const [quote] = onBuild.mock.calls[0];
     expect(quote.resilience).toMatchObject({
       solarTrackers: true,
-      hailResistant: false,
     });
     expect(quote.resilience.trackerHailDamageFactor).toBeGreaterThan(0);
   });
@@ -1208,6 +1341,38 @@ it("opens at the fleet average and remembers the player's chosen generator size"
   view.unmount();
   render(catalog());
   expect(screen.getByRole("slider")).toHaveAccessibleName(/300MW/);
+});
+
+it("opens late campaign construction near inherited demand and remembers later size choices", () => {
+  const game = createGame({ scenarioId: 117, seed: 611 });
+  const offset = (1962 - 1882) * 12 * MINUTES_PER_MONTH;
+  game.scenarioId = 121;
+  game.date = getDateFromMinute(offset, game.startingYear);
+  game.campaign!.peakMW = 1.2;
+  game.timeline = game.timeline.map((tick) => ({
+    ...tick,
+    minute: tick.minute + offset,
+    cash: 1e9,
+  }));
+  const memory = new Map<string, unknown>();
+  const catalog = () => (
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        onBack={jest.fn()}
+        onBuildGenerator={jest.fn()}
+      />
+    </GameToolMemoryContext.Provider>
+  );
+  const view = render(catalog());
+  const slider = screen.getByRole("slider");
+  expect(slider).toHaveAttribute("aria-valuetext", "2MW");
+  expect(slider).toHaveAttribute("min", "0");
+  expect(slider).toHaveAttribute("max", "34");
+  fireEvent.keyDown(slider, { key: "ArrowRight" });
+  view.unmount();
+  render(catalog());
+  expect(screen.getByRole("slider")).toHaveAttribute("aria-valuetext", "3MW");
 });
 
 it.each([undefined, "Natural Gas"] as const)(

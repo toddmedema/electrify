@@ -1,9 +1,12 @@
 import { projectAuthoredRunReference } from "../helpers/RunIdentity";
 import { createNextState as produce } from "@reduxjs/toolkit";
+import cloneDeep from "lodash.clonedeep";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
 import { getPlayedScenarioIds } from "../LocalStorage";
 import { createGame } from "../testing/Simulator";
+import { parseSave, serializeSave } from "../SaveGame";
+import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 import {
   loaded,
   hasChronicBlackouts,
@@ -110,6 +113,9 @@ describe("ending a scenario from inside the reducer", () => {
     expect(victory?.scenarioName).toBe("A Test Run");
     expect(state.meaningfulDecisions).toEqual([]);
     expect(victory?.outcome).toBe("completed");
+    expect(victory?.debrief?.scenarioMetrics).not.toContainEqual(
+      expect.objectContaining({ label: "tenure" }),
+    );
     expect(Object.keys(victory?.breakdown || {}).length).toBeGreaterThan(0);
     expect(victory?.debrief).toEqual(
       expect.objectContaining({
@@ -123,6 +129,26 @@ describe("ending a scenario from inside the reducer", () => {
     expect(victory?.ranked).toBe(false);
     // Opening the score screen stops the clock, the way any other dialog does
     expect(getStore().getState().game.speed).toBe("PAUSED");
+  });
+
+  it("shows the public lifetime rate in cents with its starting-dollar basis", () => {
+    getStore().dispatch(quit());
+    const scenario = customScenario({
+      durationMonths: 2,
+      startingMonth: 3,
+      ownership: "Public",
+      dollarsPerkWh: 0.099,
+    });
+    let state = createGame({ scenarioId: CUSTOM_SCENARIO_ID, scenario });
+    while (state.date.monthsElapsed < 4) state = tick(state);
+    jest.runOnlyPendingTimers();
+    expect(
+      getStore().getState().ui.victory?.debrief?.scenarioMetrics,
+    ).toContainEqual({
+      concept: "money",
+      label: `lifetime rate · ${state.startingYear} dollars`,
+      value: "9.9¢/kWh",
+    });
   });
 
   /**
@@ -155,6 +181,59 @@ describe("ending a scenario from inside the reducer", () => {
     // An authored scenario is the case that reads the previous best and submits a score
     expect(victory?.ranked).toBe(true);
   });
+
+  it.each(["schema-only", "changed-rules"])(
+    "preserves leaderboard eligibility and completion credit after a %s save upgrade",
+    (upgrade) => {
+      const submitHighscore = jest.spyOn(User, "submitHighscore");
+      getStore().dispatch(quit());
+      window.localStorage.removeItem("plays");
+      const scenario = SCENARIOS.find((s) => s.id === 100)!;
+      const duration = scenario.durationMonths!;
+      const state = createGame({
+        scenarioId: scenario.id,
+        difficulty: "Intern",
+        initialBuild: { name: "Natural Gas CC", peakW: 500e6, financed: true },
+      });
+      while (state.date.monthsElapsed < duration - 1) tickState(state);
+      const raw = JSON.parse(JSON.stringify(serializeSave(state)));
+      raw.schemaVersion = 8;
+      if (upgrade === "changed-rules")
+        raw.game.runIdentity.compatibilityId = `rules-1-${"0".repeat(64)}`;
+      const migrated = parseSave(raw);
+      expect(migrated).not.toBeNull();
+      expect(migrated!.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+      expect(migrated!.game.rulesChanged).toBe(
+        upgrade === "changed-rules" ? true : undefined,
+      );
+      expect(getPlayedScenarioIds()).not.toContain(scenario.id);
+      playOutOnTheStore(migrated!.game, duration);
+      jest.runOnlyPendingTimers();
+      const victory = getStore().getState().ui.victory;
+      expect(victory?.outcome).toBe("completed");
+      expect({
+        ranked: victory?.ranked,
+        submissions: submitHighscore.mock.calls.map(([submission]) => ({
+          scenarioId: submission.scenarioId,
+          difficulty: submission.difficulty,
+          score: submission.score,
+          outcome: submission.outcome,
+        })),
+        completed: getPlayedScenarioIds().includes(scenario.id),
+      }).toEqual({
+        ranked: true,
+        submissions: [
+          {
+            scenarioId: scenario.id,
+            difficulty: "Intern",
+            score: victory!.score,
+            outcome: "completed",
+          },
+        ],
+        completed: true,
+      });
+    },
+  );
 
   it("goes bankrupt without reading the revoked draft", () => {
     // No cash and free electricity: operating the fleet puts it under within a month
@@ -214,6 +293,12 @@ describe("ending a scenario from inside the reducer", () => {
       }),
     );
     expect(victory?.debrief?.finalCustomers).toEqual(expect.any(Number));
+    expect(victory?.debrief?.scenarioMetrics).toContainEqual({
+      concept: "time",
+      label: "tenure",
+      value: "1 month",
+    });
+    expect(victory?.endMessage).not.toContain("You survived");
     expect(submitHighscore).not.toHaveBeenCalled();
   });
 
@@ -344,5 +429,49 @@ describe("finishing a tutorial", () => {
     expect(completed.ui.snackbar.open).toBe(false);
     expect(completed.game.speed).toBe("PAUSED");
     expect(getPlayedScenarioIds()).toContain(tutorial.id);
+  });
+
+  it("lets storage construction outlast two years and completes after a fully supplied day", () => {
+    window.localStorage.clear();
+    const mission = TUTORIALS.find((scenario) => scenario.id === 2)!;
+    const capstoneIndex = mission.tutorialSteps!.findIndex(
+      (step) => step.capstone,
+    );
+    const objective = mission.tutorialSteps![capstoneIndex].capstone!;
+    let state = createGame({
+      scenarioId: mission.id,
+      scenario: { ...mission, facilities: objective.checkpoint!.facilities! },
+      difficulty: "Employee",
+      initialBuild: { name: "Pumped Hydro", peakWh: 1e9, financed: true },
+    });
+    state.tutorialStep = capstoneIndex;
+    expect(
+      state.facilities.find((facility) => facility.name === "Pumped Hydro")!
+        .yearsToBuildLeft,
+    ).toBeGreaterThan(2);
+    while (state.date.monthsElapsed < 23) state = tick(state);
+
+    playOutOnTheStore(state, 24);
+    jest.runOnlyPendingTimers();
+    const continuing = getStore().getState();
+    expect(continuing.game.tutorialStep).toBe(capstoneIndex);
+    expect(continuing.ui.dialog.open).toBe(false);
+    expect(getPlayedScenarioIds()).not.toContain(mission.id);
+
+    const forecast = cloneDeep(continuing.game);
+    for (
+      let i = 0;
+      i < 1200 && !objective.success({ ...continuing, game: forecast });
+      i++
+    ) {
+      tickState(forecast);
+    }
+    expect(objective.success({ ...continuing, game: forecast })).toBe(true);
+    playOutOnTheStore(continuing.game, forecast.date.monthsElapsed);
+    jest.runOnlyPendingTimers();
+    expect(getStore().getState().ui.dialog).toEqual(
+      expect.objectContaining({ open: true, tutorialComplete: true }),
+    );
+    expect(getPlayedScenarioIds()).toContain(mission.id);
   });
 });

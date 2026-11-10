@@ -333,31 +333,22 @@ export const NAV_CARDS = [
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const NAVIGATION_DEBOUNCE_MS = 600;
 export const MUSIC_INTENSITY_MAX = 10;
+// Reserve pressure occupies 0–0.5; live blackouts are above this range.
+export const MUSIC_LOW_RESERVE_PRESSURE_MAX = 0.5;
 
 export interface MusicDefinition {
   directory: string;
   tracks: string[];
-  durationMs: number;
-  loop?: boolean;
-  minIntensity: number;
-  maxIntensity: number;
 }
 
 export const MUSIC_DEFINITIONS: { [key: string]: MusicDefinition } = {
   menu: {
     directory: "menu/",
     tracks: ["quiet-current.wav"],
-    durationMs: (1924364 / 44100) * 1000,
-    loop: true,
-    minIntensity: 1,
-    maxIntensity: 1,
   },
   basic: {
     directory: "basic/",
     tracks: ["low.mp3", "medium.mp3", "high.mp3"],
-    durationMs: 392119,
-    minIntensity: 0,
-    maxIntensity: MUSIC_INTENSITY_MAX,
   },
 };
 

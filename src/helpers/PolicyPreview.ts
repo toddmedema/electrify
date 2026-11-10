@@ -6,7 +6,11 @@ import {
   MINUTES_PER_MONTH,
   summarizeTimeline,
 } from "./DateTime";
-import { emptyPolicies, samePolicyChoice } from "./Policies";
+import {
+  emptyPolicies,
+  samePolicyChoice,
+  policyAllowedForGame,
+} from "./Policies";
 import { TICK_MINUTES } from "../Constants";
 
 export function previewPolicy(
@@ -14,6 +18,10 @@ export function previewPolicy(
   change: PolicyChangeType,
   month: number,
 ) {
+  if (change.tier === "On" && !policyAllowedForGame(game, change.id, month))
+    throw new Error(
+      "This customer program is not available in this campaign era",
+    );
   const draft = cloneDeep(game);
   draft.policies ??= emptyPolicies(game.date.monthsElapsed);
   const program = draft.policies.programs[change.id];

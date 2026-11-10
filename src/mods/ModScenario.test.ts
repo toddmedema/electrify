@@ -11,7 +11,13 @@ import { DEFAULT_CUSTOM_SCENARIO, SCENARIOS } from "../data/Scenarios";
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import { inEraMoney } from "../data/FuelPrices";
 import { inEraRate } from "../data/RetailRates";
-import { modRuntimeDigest, modSetupDigest } from "../helpers/ScenarioMod";
+import { CHERNOBYL_SCENARIO } from "../data/ChernobylScenario";
+import { runMonths } from "../testing/SimulationTestHelpers";
+import {
+  validScenarioMod,
+  modRuntimeDigest,
+  modSetupDigest,
+} from "../helpers/ScenarioMod";
 import { standardCustomRate } from "../helpers/CustomScenarioEvents";
 import { policyTotalCost } from "../helpers/Policies";
 import { serializeSave, parseSave } from "../SaveGame";
@@ -461,3 +467,44 @@ test.each(SCENARIOS.filter((s) => !s.tutorialSteps))(
     ).not.toThrow();
   },
 );
+
+test("Chernobyl mod bases preserve their March recovery contract and deterministic saves", () => {
+  const scenario = modScenario({
+    ...fixture(),
+    baseScenarioId: CHERNOBYL_SCENARIO.id,
+  });
+  expect(scenario).toMatchObject({
+    startingMonth: 3,
+    durationMonths: 60,
+    reliabilityFailureDisabled: true,
+    retainCustomersDuringShortages: true,
+  });
+  expect(scenario.mod!.parameters).toMatchObject({
+    startingMonth: 3,
+    durationMonths: 60,
+  });
+  expect(scenario.mod!.rules.durationMonths).toBe(62);
+  expect(validScenarioMod(scenario.mod)).toBe(true);
+  const game = createGame({ scenarioId: 999, scenario, seed: 42 });
+  expect(game.date).toMatchObject({ monthNumber: 3, year: 1986 });
+  expect(
+    game.facilities
+      .filter((facility) => facility.fuel === "Uranium")
+      .map((facility) => facility.cashBackMultiplier),
+  ).toEqual([0, 0, 0, 0]);
+  expect(parseSave(roundTrip(game))).not.toBeNull();
+  runMonths(game, 2);
+  expect(parseSave(roundTrip(game))).not.toBeNull();
+  expect(
+    game.worldEvents.occurrences.some((event) =>
+      event.key.includes(":disaster"),
+    ),
+  ).toBe(true);
+  const longest = modScenario({
+    ...fixture(),
+    baseScenarioId: CHERNOBYL_SCENARIO.id,
+    scenario: { durationMonths: 1200 },
+  });
+  expect(longest.mod!.rules.durationMonths).toBe(1202);
+  expect(validScenarioMod(longest.mod, longest)).toBe(true);
+});

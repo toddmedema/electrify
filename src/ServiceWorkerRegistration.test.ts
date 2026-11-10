@@ -76,7 +76,10 @@ describe("registerServiceWorker", () => {
 
     jest.advanceTimersByTime(BACKGROUND_CACHE_DELAY_MS);
     await flush();
-    expect(messageTypes(sw.postMessage)).toEqual(["CACHE_ICONS"]);
+    expect(messageTypes(sw.postMessage)).toEqual([
+      "CACHE_BUILD",
+      "CACHE_ICONS",
+    ]);
   });
 
   it("also syncs every weather location for an installed app", async () => {
@@ -89,9 +92,24 @@ describe("registerServiceWorker", () => {
     await flush();
 
     expect(messageTypes(sw.postMessage).sort()).toEqual([
+      "CACHE_BUILD",
       "CACHE_ICONS",
       "SYNC_OFFLINE_DATA",
     ]);
+  });
+
+  it("caches audio and data immediately when this session installs, and retries on reconnection", async () => {
+    const sw = fakeWindow();
+    restore = sw.restore;
+    registerServiceWorker(sw.win);
+    await flush();
+    sw.fire("appinstalled");
+    await flush();
+    expect(messageTypes(sw.postMessage)).toContain("SYNC_OFFLINE_DATA");
+    sw.postMessage.mockClear();
+    sw.fire("online");
+    await flush();
+    expect(messageTypes(sw.postMessage)).toContain("SYNC_OFFLINE_DATA");
   });
 
   it("re-requests icons when connectivity returns", async () => {
@@ -106,7 +124,9 @@ describe("registerServiceWorker", () => {
     await flush();
 
     expect(messageTypes(sw.postMessage)).toEqual([
+      "CACHE_BUILD",
       "CACHE_ICONS",
+      "CACHE_BUILD",
       "CACHE_ICONS",
     ]);
   });

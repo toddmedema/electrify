@@ -78,7 +78,7 @@ it("labels optional goals and explains their actual units without making them a 
       "Affordable practice",
     ),
   ).toBeNull();
-  expect(screen.getByText(/Bills ≤\$0.123456789\/kWh/)).toBeInTheDocument();
+  expect(screen.getByText(/Bills ≤12.3¢\/kWh/)).toBeInTheDocument();
   expect(
     screen.getByText("Stretch goals; not required to win."),
   ).toBeInTheDocument();
@@ -112,4 +112,22 @@ it("explains the CEO reliability limit", () => {
   expect(screen.getByText(/Serving less than/)).toHaveTextContent(
     "Serving less than 99.5% of demand for 3 months in a row ends the run.",
   );
+});
+
+it("explains recovery scoring without a reliability loss threshold", () => {
+  render(
+    <VictoryConditions
+      scenario={{ ...SCENARIOS[0], reliabilityFailureDisabled: true }}
+      difficulty="CEO"
+    />,
+  );
+  expect(
+    screen.getByText(/No minimum reliability requirement/),
+  ).toHaveTextContent(
+    "Blackouts reduce your score and drive customers away, but do not end the run.",
+  );
+  expect(screen.queryByText(/Serving less than/)).not.toBeInTheDocument();
+  expect(
+    screen.getByText(/Finish the term without bankruptcy/),
+  ).toBeInTheDocument();
 });

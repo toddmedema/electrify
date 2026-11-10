@@ -1,7 +1,7 @@
 # Steam achievement icons
 
 `uploads/` contains an achieved color icon and an unachieved grayscale icon for
-every entry in `src/achievements/AchievementCatalog.json` (36 achievements, 72 PNGs).
+every entry in `src/achievements/AchievementCatalog.json` (37 achievements, 74 PNGs).
 `upload-map.json` maps stable Steam API names to both files, English display copy,
 the original SVG and its SHA-256 digest. These reuse the game's existing artwork.
 
@@ -20,7 +20,7 @@ grayscale. See the official
 [achievement setup and icon instructions](https://partner.steamgames.com/doc/features/achievements/ach_guide)
 (checked October 21, 2026).
 
-With Node 24, the locked `npm ci` install, real Git LFS assets and Playwright
+With Node 26, the locked `npm ci` install, real Git LFS assets and Playwright
 Chromium installed, regenerate from the repository root:
 
 ```powershell

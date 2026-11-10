@@ -8,6 +8,7 @@ import {
   ownedUtility,
 } from "../helpers/Expansion";
 import { validHydroClaims } from "../data/HydroSites";
+import { getTotalDebt } from "../helpers/Financials";
 import {
   GAME_TO_REAL_YEARS,
   TICKS_PER_HOUR,
@@ -161,6 +162,14 @@ const FINITE_MONTH_FIELDS: MonthFieldType[] = [
 export class InvariantCollector {
   private violations: ViolationType[] = [];
   private countByRule: { [rule: string]: number } = {};
+  private previousLoanBalance?: { minute: number; principal: number };
+
+  /** Observe real debt movement, including a final payment whose closing balance is zero. */
+  observeLoanBalance(minute: number, principal: number) {
+    const previous = this.previousLoanBalance;
+    this.previousLoanBalance = { minute, principal };
+    return previous;
+  }
 
   add(rule: string, when: string, detail: string) {
     this.countByRule[rule] = (this.countByRule[rule] || 0) + 1;
@@ -438,8 +447,14 @@ export function checkTick(
     }
   }
 
-  // Cash moves only by the tick's own revenue and expenses. Loan principal is spent but not
-  // recorded on the tick, so the expected value is a range bounded by the outstanding payments.
+  // Principal is a balance-sheet movement rather than an expense. Consecutive observations
+  // supply its actual change; inspecting only closing loans would miss the final payment.
+  const principal = getTotalDebt([
+    ...state.facilities,
+    ...(state.transmission?.lines ?? []),
+    ...(state.utilityExpansion?.loans ?? []),
+  ]);
+  const previousLoan = collector.observeLoanBalance(now.minute, principal);
   if (prev && !builtThisTick && isFinite_(now.cash) && isFinite_(prev.cash)) {
     const expenses =
       now.expensesFuel +
@@ -472,7 +487,12 @@ export function checkTick(
         0,
       ) ?? 0);
     const upperBound = prev.cash + now.revenue - expenses;
-    const lowerBound = upperBound - maxPrincipal;
+    const observedPrincipal =
+      previousLoan?.minute === prev.minute &&
+      previousLoan.principal >= principal
+        ? previousLoan.principal - principal
+        : undefined;
+    const lowerBound = upperBound - (observedPrincipal ?? maxPrincipal);
     if (
       now.cash > upperBound + CASH_ROUNDING_TOLERANCE ||
       now.cash < lowerBound - CASH_ROUNDING_TOLERANCE

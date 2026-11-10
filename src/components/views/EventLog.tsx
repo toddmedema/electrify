@@ -54,6 +54,8 @@ type EventHistoryFilterType =
 const EVENT_HISTORY_FILTERS: {
   value: EventHistoryFilterType;
   label: string;
+  // Matches the glyph the filter's rows show, so the menu previews what it keeps
+  concept: ConceptNameType;
   emptyMessage?: string;
   kinds: GameEventKindType[];
 }[] = [
@@ -61,24 +63,28 @@ const EVENT_HISTORY_FILTERS: {
     // Scenario stories, wildfires and weather hazards all log as world events
     value: "WORLD",
     label: "World events",
+    concept: KIND_CONCEPTS.WORLD_EVENT,
     emptyMessage: "No world or weather events yet.",
     kinds: ["WORLD_EVENT"],
   },
   {
     value: "BLACKOUTS",
     label: "Blackouts",
+    concept: KIND_CONCEPTS.BLACKOUT,
     emptyMessage: "No blackout events yet.",
     kinds: ["BLACKOUT", "BLACKOUT_OVER"],
   },
   {
     value: "PROJECTS",
     label: "Projects",
+    concept: KIND_CONCEPTS.BUILD,
     emptyMessage: "No project events yet.",
     kinds: ["BUILD", "CONSTRUCTION", "SELL"],
   },
   {
     value: "MARKET_FINANCE",
     label: "Market & finance",
+    concept: KIND_CONCEPTS.LOAN,
     emptyMessage: "No market or finance events yet.",
     kinds: ["FUEL_PRICE", "FUEL_CROSSOVER", "LOAN"],
   },
@@ -104,6 +110,39 @@ export interface DispatchProps {
 }
 
 export interface Props extends StateProps, DispatchProps {}
+
+// The history does not change with the tick, so it skips rendering while its list is the same
+const EventHistoryList = React.memo(function EventHistoryList({
+  events,
+  onSelect,
+}: {
+  events: GameEventType[];
+  onSelect: (target?: StoryActionTargetType) => void;
+}): React.JSX.Element {
+  return (
+    <ul className="eventLogList">
+      {events.map((event: GameEventType) => (
+        <EventCard
+          className={`kind-${event.kind} importance-${event.importance || "ROUTINE"}`}
+          key={event.id}
+          icon={
+            <ConceptIcon
+              concept={event.concept || KIND_CONCEPTS[event.kind]}
+              fontSize="small"
+            />
+          }
+          heading={event.title}
+          meta={event.label}
+          onActivate={
+            event.actionTarget ? () => onSelect(event.actionTarget) : undefined
+          }
+        >
+          {event.message}
+        </EventCard>
+      ))}
+    </ul>
+  );
+});
 
 export default function EventLog(props: Props): React.JSX.Element {
   const operations = isPaneLayout() && !!props.game;
@@ -157,8 +196,16 @@ export default function EventLog(props: Props): React.JSX.Element {
     : activeFilters.length
       ? activeFilters.map((filter) => filter.label).join(", ")
       : "No event types selected";
-  const visibleEvents = events.filter((event) =>
-    activeFilters.some((filter) => filter.kinds.includes(event.kind)),
+  const visibleEvents = React.useMemo(
+    () =>
+      events.filter((event) =>
+        EVENT_HISTORY_FILTERS.some(
+          (filter) =>
+            historyFilters.includes(filter.value) &&
+            filter.kinds.includes(event.kind),
+        ),
+      ),
+    [events, historyFilters],
   );
   // An effect may only return a cleanup function. Redux dispatch returns the dispatched action,
   // so the expression-bodied form returned an object here; React later tried to call that object
@@ -186,7 +233,11 @@ export default function EventLog(props: Props): React.JSX.Element {
             aria-labelledby="ongoingEventsTitle"
           >
             <header className="eventLogSectionHeader">
-              <Typography id="ongoingEventsTitle" variant="subtitle2">
+              <Typography
+                id="ongoingEventsTitle"
+                component="h3"
+                variant="subtitle2"
+              >
                 Ongoing events
               </Typography>
             </header>
@@ -234,7 +285,11 @@ export default function EventLog(props: Props): React.JSX.Element {
               aria-labelledby="upcomingEventsTitle"
             >
               <header className="eventLogSectionHeader">
-                <Typography id="upcomingEventsTitle" variant="subtitle2">
+                <Typography
+                  id="upcomingEventsTitle"
+                  component="h3"
+                  variant="subtitle2"
+                >
                   Upcoming events
                 </Typography>
               </header>
@@ -268,7 +323,11 @@ export default function EventLog(props: Props): React.JSX.Element {
             aria-labelledby="eventHistoryTitle"
           >
             <header className="eventLogSectionHeader">
-              <Typography id="eventHistoryTitle" variant="subtitle2">
+              <Typography
+                id="eventHistoryTitle"
+                component="h3"
+                variant="subtitle2"
+              >
                 Event history
               </Typography>
               <Tooltip
@@ -322,7 +381,9 @@ export default function EventLog(props: Props): React.JSX.Element {
                     )
                   }
                 >
-                  Show all events
+                  <ListItemIcon className="eventHistoryFilterCheck" />
+                  <ListItemIcon />
+                  <ListItemText>Show all events</ListItemText>
                 </MenuItem>
                 {EVENT_HISTORY_FILTERS.map((filter) => (
                   <MenuItem
@@ -343,10 +404,23 @@ export default function EventLog(props: Props): React.JSX.Element {
                         <CheckIcon fontSize="small" />
                       )}
                     </ListItemIcon>
+                    <ListItemIcon>
+                      <ConceptIcon
+                        concept={filter.concept}
+                        fontSize="small"
+                        // Neutral here: a red blackout glyph would read as a live alarm
+                        color="inherit"
+                        decorative
+                      />
+                    </ListItemIcon>
                     <ListItemText>{filter.label}</ListItemText>
                   </MenuItem>
                 ))}
-                <MenuItem onClick={() => setFilterAnchor(null)}>Done</MenuItem>
+                <MenuItem onClick={() => setFilterAnchor(null)}>
+                  <ListItemIcon className="eventHistoryFilterCheck" />
+                  <ListItemIcon />
+                  <ListItemText>Done</ListItemText>
+                </MenuItem>
               </Menu>
             </header>
             {events.length === 0 && (
@@ -381,29 +455,7 @@ export default function EventLog(props: Props): React.JSX.Element {
                 Events for {companyName}.
               </Typography>
             )}
-            <ul className="eventLogList">
-              {visibleEvents.map((event: GameEventType) => (
-                <EventCard
-                  className={`kind-${event.kind} importance-${event.importance || "ROUTINE"}`}
-                  key={event.id}
-                  icon={
-                    <ConceptIcon
-                      concept={event.concept || KIND_CONCEPTS[event.kind]}
-                      fontSize="small"
-                    />
-                  }
-                  heading={event.title}
-                  meta={event.label}
-                  onActivate={
-                    event.actionTarget
-                      ? () => onSelect(event.actionTarget)
-                      : undefined
-                  }
-                >
-                  {event.message}
-                </EventCard>
-              ))}
-            </ul>
+            <EventHistoryList events={visibleEvents} onSelect={onSelect} />
           </section>
         </div>
       </div>

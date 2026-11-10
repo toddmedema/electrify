@@ -210,7 +210,7 @@ test("a received snapshot shows author claims and announced facts while keeping 
   ).toHaveTextContent(pack.description);
   expect(
     screen.getByRole("region", { name: "Resolved setup" }),
-  ).toHaveTextContent("14 MW");
+  ).toHaveTextContent("14MW");
   expect(screen.queryByText("Preparing baseline forecast…")).toBeNull();
   const timeline = screen.getByRole("region", { name: "Announced timeline" });
   expect(timeline).toHaveTextContent("Announced cost support");

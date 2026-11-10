@@ -217,9 +217,9 @@ test("custom setup uses side-by-side settings and facilities only in two-pane la
 }, testInfo) => {
   await openCustomSetup(page);
   // Measure the settled setup, not its translated position during the outgoing card transition.
-  await expect(page.getByRole("list", { name: "Available games" })).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByRole("region", { name: "Available games" }),
+  ).toHaveCount(0);
 
   const settings = page.getByRole("region", { name: "Game setup" });
   const facilities = page.getByRole("region", { name: "Facilities" });
@@ -528,7 +528,7 @@ test("location constraints keep Play valid only where the starting fleet is viab
 
   const play = page
     .locator(".customSetupActions")
-    .getByRole("button", { name: "Play", exact: true });
+    .getByRole("button", { name: "Start game", exact: true });
   await expect(play).toBeEnabled();
   await page.getByRole("combobox", { name: "Facility type" }).click();
   await page.getByRole("option", { name: "Geothermal" }).click();

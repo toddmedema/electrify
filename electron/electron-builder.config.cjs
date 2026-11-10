@@ -33,6 +33,8 @@ module.exports = {
     "node_modules/steamworks.js/**/*",
     "node_modules/koffi/**/*",
     "node_modules/@koromix/koffi-*/**/*",
+    "!node_modules/steamworks.js/dist/osx/steamworksjs.darwin-x64.node",
+    "!node_modules/@koromix/koffi-darwin-x64{,/**/*}",
   ],
   win: {
     target: [{ target: "dir", arch: ["x64"] }],
@@ -45,13 +47,7 @@ module.exports = {
     icon: "public/images/icon/512x512.png",
   },
   mac: {
-    // One app for Intel and Apple Silicon: Steam has a single macOS platform and does not
-    // choose depots by CPU architecture.
-    target: [{ target: "dir", arch: ["universal"] }],
-    // Both architecture passes bundle identical copies of every native module slice (the
-    // universal Steam SDK, both steamworks.js bindings and both Koffi packages).
-    x64ArchFiles:
-      "Contents/Resources/app.asar.unpacked/node_modules/{steamworks.js/dist/osx/*,@koromix/koffi-darwin-*/**/*}",
+    target: [{ target: "dir", arch: ["arm64"] }],
     category: "public.app-category.simulation-games",
     icon: "public/images/icon/512x512.png",
     minimumSystemVersion: "13.0",

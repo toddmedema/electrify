@@ -32,6 +32,7 @@ import {
   resumeSavedGame,
   retryCurrentSave,
 } from "../../SaveSession";
+import { difficultyLabel } from "../../Constants";
 import { SaveMetadata, SavedRunResult, SaveStatus } from "../../Types";
 import ScreenPage from "../base/ScreenPage";
 import RenameSaveDialog from "../base/RenameSaveDialog";
@@ -372,9 +373,12 @@ export default function SavedGames(): React.JSX.Element {
           {filtered.map((save) => {
             const current = save.id === saves.activeId && inGame;
             const resumable = isResumableStatus(save.status);
-            const timestamp = new Date(save.savedAt).toLocaleString();
+            const timestamp = new Date(save.savedAt).toLocaleString(undefined, {
+              dateStyle: "medium",
+              timeStyle: "short",
+            });
             const title = save.name;
-            const subtitle = `${save.date.month} ${save.date.year} - ${save.difficulty} - ${save.locationName}`;
+            const subtitle = `${save.date.month} ${save.date.year} · ${difficultyLabel(save.difficulty)} · ${save.locationName}`;
             return (
               <Paper
                 key={save.id}
@@ -432,7 +436,11 @@ export default function SavedGames(): React.JSX.Element {
                   <time
                     dateTime={save.savedAt}
                     title={timestamp}
-                    aria-label={`Saved ${timestamp}`}
+                    aria-label={
+                      current && saves.saveState === "saving"
+                        ? undefined
+                        : `Saved ${timestamp}`
+                    }
                   >
                     {current && saves.saveState === "saving"
                       ? "Saving…"
@@ -580,7 +588,7 @@ export default function SavedGames(): React.JSX.Element {
             Cancel
           </Button>
           <Button
-            color="primary"
+            color="error"
             variant="contained"
             disabled={busy}
             onClick={() => void deleteGame()}

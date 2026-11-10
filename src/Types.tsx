@@ -9,7 +9,8 @@ import type { Action } from "@reduxjs/toolkit";
 import type { IntertieArchetypeIdType } from "./data/IntertieArchetypes";
 import type { SavedCommitmentMetadata } from "./helpers/Commitment";
 
-export type AudioLoadingType = "UNLOADED" | "LOADING" | "ERROR" | "LOADED";
+export type AudioLoadingType =
+  "UNLOADED" | "LOADING" | "ERROR" | "UNSUPPORTED" | "LOADED";
 
 export type MonthType =
   | "Jan"
@@ -201,6 +202,7 @@ export interface DifficultyMultipliersType {
 }
 
 export type CardNameType =
+  | "CAMPAIGN"
   | "BUILD_GENERATORS"
   | "BUILD_STORAGE"
   | "BUILD_INTERTIES"
@@ -425,7 +427,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     customerBatteryLossWh?: number;
     rooftopSurplusW?: number;
     // Home and business load before rebate programs, and what efficiency and rooftop solar removed
-    // from it this tick. Present only while a rebate program has installed anything.
+    // from it this tick. Campaigns also meter eligible load and zero savings with programs off.
     rebateEligibleW?: number;
     efficiencySavedW?: number;
     rooftopSolarW?: number;
@@ -470,6 +472,11 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
   month: number;
   supplyWh: number; // total
   demandWh: number; // total
+  /** Campaign meters; absent historical observations remain unverifiable, never inferred as zero. */
+  efficiencySavedWh?: number;
+  efficiencyEligibleWh?: number; // Gross Residential + Commercial demand before efficiency/rooftop.
+  eveningDemandWh?: number; // Demand from 17:00 inclusive to 21:00 exclusive.
+  eveningUnservedWh?: number;
   // Persisted simulation facts used by story checkpoints. These are deliberately raw totals,
   // not narrative classifications such as "reliable" or "gas-heavy".
   deliveredWhByFuel: FuelProductionType;
@@ -533,9 +540,23 @@ export function isStorage<T extends { peakWh?: number }>(
   return facility.peakWh !== undefined;
 }
 
+/** Fixed nominal upkeep that remains payable even when its inherited plant is paused. */
+export interface FacilityMaintenanceObligationType {
+  /** January-anchored calendar month, 1-based. */
+  startsMonth: number;
+  monthlyCost: number;
+  reason: string;
+}
+
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
   startingAssetId?: string;
+  /** Transfer restrictions on inherited assets; absent means ordinary resale value. */
+  cashBackMultiplier?: number;
+  saleRestricted?: boolean;
+  maintenanceObligation?: FacilityMaintenanceObligationType;
+  /** Permanent disconnection from this January-anchored calendar month (1-based). */
+  permanentShutdownMonth?: number;
   id: number; // Monotonically increasing
   // Signed for storage: negative while charging
   currentW: number;
@@ -821,22 +842,8 @@ export interface TutorialStepChangeType {
   currentCard: CardNameType;
 }
 
-export type ScenarioBriefingToneType =
-  "transition" | "boom" | "island" | "innovation" | "storm" | "legacy";
-
 export type ScenarioThemeType =
   "Extreme weather" | "Energy transition" | "Rapid growth";
-
-/**
- * The authored promise of a scenario, kept beside its simulation setup so the mission list and
- * briefing screen tell the same story. Each scenario's dedicated icon supplies the visual tone.
- */
-export interface ScenarioBriefingType {
-  tone: ScenarioBriefingToneType;
-  fantasy: string;
-  objective: string;
-  threat: string;
-}
 
 /** Facility catalog names a data-only scenario mod may adjust. */
 export type ModFacilityNameType =
@@ -885,6 +892,7 @@ export interface ScenarioModType {
   parameters: {
     baseScenarioId: number;
     startingYear: number;
+    startingMonth?: number;
     durationMonths: number;
     seed: number;
     difficulty: DifficultyType;
@@ -927,8 +935,10 @@ export interface ScenarioType {
   // game, since the player may eventually pick a place no table knows about. When it's set it
   // wins over locationId; getScenarioLocation is the one place that resolves the two.
   location?: LocationType;
+  /** The one description of the scenario: the list card and the game details subtitle both show it. */
   summary?: string;
-  briefing?: ScenarioBriefingType;
+  /** The one risk worth flagging before play, shown as "Watch out" on the game details screen. */
+  threat?: string;
   // Player-facing browse categories. A challenge may appear in more than one theme.
   themes?: ScenarioThemeType[];
   // Lower numbers appear first in the compact recommendations; omitted challenges follow.
@@ -945,12 +955,18 @@ export interface ScenarioType {
   // this off and draws a fresh seed each play; only the custom game screen sets it
   seed?: number;
   startingYear: number;
+  /** First playable calendar month, 1–12; omitted means January. */
+  startingMonth?: number;
+  /** Recovery terms keep service scoring without blackout dismissal. */
+  reliabilityFailureDisabled?: boolean;
   cash: number;
   // When absent, the location profile supplies the starting grid size.
   startingCustomers?: number;
   // Customer count and utility-scale load are not interchangeable. Authored scenarios can
   // calibrate the ordinary customer-driven baseline; otherwise the location profile is enough.
   startingDemandScale?: number;
+  /** Captive recovery territories retain their service obligation during blackouts. */
+  retainCustomersDuringShortages?: boolean;
   /** Optional weather/daily peak calibration; 1 preserves the original demand shape. */
   demandShapeExponent?: number;
   // Absolute loads owned by this scenario. A Data Centers schedule replaces the generic regional
@@ -971,6 +987,12 @@ export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
   /** Catalog identity of the original asset; never transferred to a replacement. */
   assetId?: string;
   initialAgeYears?: number;
+  /** Fraction of depreciated value transferable on sale, from 0 to 1. */
+  cashBackMultiplier?: number;
+  saleRestricted?: boolean;
+  maintenanceObligation?: FacilityMaintenanceObligationType;
+  /** Permanent disconnection from this January-anchored calendar month (1-based). */
+  permanentShutdownMonth?: number;
   /**
    * Share of its reservoir a starting hydro plant holds on the opening tick. Defaults to the
    * neutral half-pool. A scenario that opens on a known lake level, or in a hemisphere whose
@@ -1051,12 +1073,10 @@ export type StoryAttributeValueType =
   string | number | boolean | string[] | number[];
 
 export type WeatherHazardType = "HAIL" | "EXTREME_COLD";
-export type ResilienceUpgradeType =
-  "hailResistant" | "coldWeatherPackage" | "solarTrackers";
+export type ResilienceUpgradeType = "coldWeatherPackage" | "solarTrackers";
 
 /** Weather hardening on one facility. Each field only applies to the fuel noted beside it. */
 export interface FacilityResilienceType {
-  hailResistant?: boolean; // "Sun" only
   // "Sun" only, and only at build: single-axis trackers that follow the sun and stow in hail
   solarTrackers?: boolean;
   // "Sun" with trackers: the share of hail damage a tracked array still takes, fixed at build by
@@ -1292,6 +1312,48 @@ export interface AcquireUtilityAction {
   financed: boolean;
   quoteKey: string;
 }
+/** One bounded CEO generation, retaining its own verifiable completed-month evidence. */
+export interface LegacyCampaignTermType {
+  generationIndex: number;
+  scenarioId: number;
+  openingCustomers: number;
+  referenceRate: number;
+  peakMW: number;
+  northCapacityMW: number;
+  debtAllowance: number;
+  goalRateIndex: number;
+  goalCostIndex: number;
+  emissionsBudgetTonnes: number;
+  inheritedDemandMultiplier: number;
+  closingCash: number;
+  closingCustomers: number;
+  closingDebt: number;
+  objectiveProgress: ObjectiveProgress;
+  objectiveResults: ObjectiveResult[];
+  debrief: VictoryDebriefType;
+}
+
+/** The physical simulation clock remains continuous; only CEO evidence uses local months. */
+export interface LegacyCampaignType {
+  version: 1;
+  generationIndex: number;
+  termStartMonth: number;
+  openingCustomers: number;
+  referenceRate: number;
+  peakMW: number;
+  northCapacityMW: number;
+  debtAllowance: number;
+  /** Frozen conversion from internal anchors to this term's final-year nominal dollars. */
+  goalRateIndex: number;
+  goalCostIndex: number;
+  emissionsBudgetTonnes: number;
+  inheritedDemandMultiplier: number;
+  openingCash: number;
+  openingFleet: VictoryFleetCapacityType[];
+  completedTerms: LegacyCampaignTermType[];
+  pendingHandover: boolean;
+}
+
 export interface GameType {
   utilityExpansion?: UtilityExpansionState;
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
@@ -1333,6 +1395,8 @@ export interface GameType {
   desktopAchievements?: import("./achievements/SimulationHooks").AchievementProgress;
   runIdentity?: RunIdentity;
   challenge?: ChallengeInvitation;
+  /** Progress continued under different simulation rules; refresh future forecasts on load. */
+  rulesChanged?: boolean;
   policies?: PoliciesType;
   policyPause?: { token: string; speed: SpeedType };
   /** Presentation speed restored after the pending scenario decision. */
@@ -1343,13 +1407,14 @@ export interface GameType {
   // The scenario the player assembled on the custom game screen. Authored scenarios live in
   // SCENARIOS, this one only ever exists here, so every lookup has to go through getScenario()
   customScenario?: ScenarioType;
+  campaign?: LegacyCampaignType;
   location: LocationType;
   speed: SpeedType;
   inGame: boolean;
   feePerKgCO2e: number;
   dollarsPerkWh: number;
   /**
-   * A public utility's rate follows inflation, stepping up each January until the player sets
+   * A utility's rate can follow inflation, stepping up each January until the player sets
    * one by hand. Absent in saves from before the option existed, which keep the rate they chose.
    */
   rateFollowsInflation?: boolean;
@@ -1378,6 +1443,8 @@ export interface GameType {
   };
   date: DateType;
   startingYear: number;
+  /** Opening calendar month; the simulation clock remains anchored to January. */
+  startingMonth?: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
   /** Completed-month objective facts, retained independently of presentation history. */
@@ -1437,6 +1504,10 @@ export interface SettingsType {
   theme: ThemeChoiceType;
   // Device preference: old settings and saved fixtures use the standard size.
   textSize?: TextSizeType;
+  // TV presentation belongs to this device, independently of saved campaigns.
+  tvMode?: boolean;
+  tvScale?: number;
+  tvInset?: number;
 }
 
 export interface DialogType {

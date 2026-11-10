@@ -78,3 +78,16 @@ it("shows the dialog's own feedback straight away, clear of its actions", () => 
     "MuiSnackbar-anchorOriginTopCenter",
   );
 });
+
+it("sits below open menus and popovers unless it is a dialog's own feedback", () => {
+  /* eslint-disable testing-library/no-node-access */
+  const view = render(<Toast />);
+  const layer = () =>
+    getComputedStyle(
+      screen.getByText("Paused Coal").closest(".MuiSnackbar-root")!,
+    ).zIndex;
+  expect(layer()).toBe("1260");
+  view.rerender(<Toast overModal />);
+  expect(layer()).toBe("1400");
+  /* eslint-enable testing-library/no-node-access */
+});

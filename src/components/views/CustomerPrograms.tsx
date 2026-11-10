@@ -15,16 +15,16 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import GroupsIcon from "@mui/icons-material/Groups";
 import EnergySavingsLeafIcon from "@mui/icons-material/EnergySavingsLeaf";
 import SolarPowerIcon from "@mui/icons-material/SolarPower";
 import ScheduleIcon from "@mui/icons-material/Schedule";
-import FactoryIcon from "@mui/icons-material/Factory";
+import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing";
 import ThermostatIcon from "@mui/icons-material/Thermostat";
 import ElectricCarIcon from "@mui/icons-material/ElectricCar";
 import BatteryChargingFullIcon from "@mui/icons-material/BatteryChargingFull";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import NavigableCardRow from "../base/NavigableCardRow";
+import ConceptIcon from "../base/ConceptIcon";
 import {
   cancelPolicy,
   closePolicyDecision,
@@ -58,6 +58,7 @@ import {
   buildoutMonthsDone,
   emptyPolicies,
   policyAvailable,
+  policyAllowedForGame,
   policyBudget,
   policyTotalCost,
   programCustomers,
@@ -84,6 +85,7 @@ import {
   pendingLabel,
 } from "../../helpers/PolicyStatus";
 import PolicyDemandChart, {
+  PolicyDemandLegend,
   PolicyDemandChartPlaceholder,
 } from "../base/PolicyDemandChart";
 import { generateForecastTimeline } from "../../reducers/Game";
@@ -97,7 +99,8 @@ const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
   efficiency: EnergySavingsLeafIcon,
   solar: SolarPowerIcon,
   timeOfUse: ScheduleIcon,
-  curtailment: FactoryIcon,
+  // Not the factory glyph: that one means "generator" throughout the game
+  curtailment: PrecisionManufacturingIcon,
   thermal: ThermostatIcon,
   evCharging: ElectricCarIcon,
   battery: BatteryChargingFullIcon,
@@ -530,14 +533,16 @@ function ProgramList({
       {policiesOn &&
         section(
           "Reduce overall demand",
-          BUILDOUT_IDS.filter((id) => !finished(id)).map(choice),
+          BUILDOUT_IDS.filter(
+            (id) => policyAllowedForGame(game, id) && !finished(id),
+          ).map(choice),
         )}
       {policiesOn &&
         section(
           "Offset peak demand",
-          [...POLICY_IDS.filter(isOperatingPolicy), ...FLEXIBILITY_IDS].map(
-            choice,
-          ),
+          [...POLICY_IDS.filter(isOperatingPolicy), ...FLEXIBILITY_IDS]
+            .filter((id) => policyAllowedForGame(game, id))
+            .map(choice),
         )}
       {policiesOn &&
         section("Completed", POLICY_IDS.filter(finished).map(choice))}
@@ -627,7 +632,7 @@ function PolicyProgramDetail({
                 }}
                 helperText={
                   selected === "timeOfUse"
-                    ? `Use shifts to ${policyWindowLabel((startHour + 4) % 24, 3).replace("–", "-")}`
+                    ? `Use shifts to ${policyWindowLabel((startHour + 4) % 24, 3)}`
                     : undefined
                 }
               >
@@ -654,9 +659,7 @@ function PolicyProgramDetail({
             <Alert severity="error">{error}</Alert>
           ) : (
             <>
-              <Typography variant="body2">
-                Current plan ━ · With this change ┄
-              </Typography>
+              <PolicyDemandLegend />
               {result ? (
                 <PolicyDemandChart
                   current={result.current}
@@ -846,7 +849,9 @@ export function ProgramsScreen({
         <header className="constructionHeader">
           <CatalogTitleBar
             disableGutters
-            icon={<GroupsIcon fontSize="small" aria-hidden />}
+            icon={
+              <ConceptIcon concept="customers" fontSize="small" decorative />
+            }
             title={
               // Phones abbreviate the title so it still shares a line with close
               <>

@@ -34,7 +34,7 @@ function indexAt(game: GameType, minute: number) {
   );
 }
 
-describe("public utility rate following inflation", () => {
+describe("utility rate following inflation", () => {
   it.each([false, true])(
     "forecasts the rate's January inflation step without changing the live rate (customer flexibility: %s)",
     (flexibility) => {
@@ -128,38 +128,70 @@ describe("public utility rate following inflation", () => {
     expect(manual.dollarsPerkWh).toBe(0.12);
   });
 
-  it("keeps the current rate when following is turned back on, then adjusts it with inflation", () => {
-    const manual = gameReducer(
-      createGame({ scenarioId: PUBLIC_ID }),
-      delta({ dollarsPerkWh: 0.12 }),
-    );
-    const resumed = gameReducer(manual, delta({ rateFollowsInflation: true }));
-    expect(resumed.rateFollowsInflation).toBe(true);
-    // No snap to the target: 12 cents stays in force.
-    expect(resumed.dollarsPerkWh).toBe(0.12);
-    // The January step then carries the hand-set rate forward with inflation.
-    const live = cloneDeep(resumed);
-    runMonths(live, 13);
-    const index = getRateInflationIndex(
-      live.date,
-      live.startingYear,
-      live.seed,
-    );
-    expect(index).not.toBe(1);
-    expect(live.dollarsPerkWh).toBe(0.12 * index);
-  });
+  it.each([PUBLIC_ID, INVESTOR_ID])(
+    "keeps the current rate when following resumes, then adjusts it with inflation (scenario %s)",
+    (scenarioId) => {
+      const manual = gameReducer(
+        createGame({ scenarioId }),
+        delta({ dollarsPerkWh: 0.12 }),
+      );
+      const resumed = gameReducer(
+        manual,
+        delta({ rateFollowsInflation: true }),
+      );
+      expect(resumed.rateFollowsInflation).toBe(true);
+      // No snap to the target: 12 cents stays in force.
+      expect(resumed.dollarsPerkWh).toBe(0.12);
+      // The January step then carries the hand-set rate forward with inflation.
+      const live = cloneDeep(resumed);
+      runMonths(live, 13);
+      const index = getRateInflationIndex(
+        live.date,
+        live.startingYear,
+        live.seed,
+      );
+      expect(index).not.toBe(1);
+      expect(live.dollarsPerkWh).toBe(0.12 * index);
+    },
+  );
 
-  it("cannot follow inflation without a public target", () => {
+  it("lets an investor opt in without changing the current rate", () => {
     const game = createGame({ scenarioId: INVESTOR_ID });
     const next = gameReducer(game, delta({ rateFollowsInflation: true }));
-    expect(next.rateFollowsInflation).toBe(false);
+    expect(next.rateFollowsInflation).toBe(true);
     expect(next.dollarsPerkWh).toBe(game.dollarsPerkWh);
+    const now = next.timeline[0];
+    const forecast = generateNewTimeline(
+      next,
+      now.cash,
+      now.customers,
+      13 * 24,
+      60,
+    );
+    expect(forecast[12 * 24].customerBillingRate).toBe(
+      game.dollarsPerkWh * indexAt(game, forecast[12 * 24].minute),
+    );
+    const manual = gameReducer(next, delta({ dollarsPerkWh: 0.12 }));
+    expect(manual.rateFollowsInflation).toBe(false);
   });
+
+  it.each(["tutorial", "multiplayer"])(
+    "rejects enabling inflation following in %s",
+    (kind) => {
+      const game = createGame({
+        scenarioId: kind === "tutorial" ? 0 : INVESTOR_ID,
+      });
+      if (kind === "multiplayer") game.multiplayer = { seat: "host" };
+      const next = gameReducer(game, delta({ rateFollowsInflation: true }));
+      expect(next.rateFollowsInflation).toBe(false);
+      expect(next.dollarsPerkWh).toBe(game.dollarsPerkWh);
+    },
+  );
 
   it("ignores a saved follow setting on a run that cannot follow inflation", () => {
     // parseSave accepts the boolean on any run, so an edited save can carry it.
     const game = {
-      ...createGame({ scenarioId: INVESTOR_ID }),
+      ...createGame({ scenarioId: 0 }),
       rateFollowsInflation: true,
     };
     const rate = game.dollarsPerkWh;

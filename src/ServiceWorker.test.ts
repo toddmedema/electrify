@@ -1,5 +1,5 @@
-import { readFileSync } from "fs";
-import { resolve } from "path";
+import { readFileSync, readdirSync } from "fs";
+import { resolve, sep } from "path";
 import { runInNewContext } from "vm";
 import { createHash, webcrypto } from "crypto";
 
@@ -49,6 +49,7 @@ function worker() {
   const cacheMatch = jest
     .fn<Promise<WorkerResponse | undefined>, [string]>()
     .mockResolvedValue(undefined);
+  const addAll = jest.fn().mockResolvedValue(undefined);
   const open = jest.fn().mockResolvedValue({ put, match: cacheMatch });
   runInNewContext(workerSource, {
     URL,
@@ -68,6 +69,7 @@ function worker() {
   return {
     fetch,
     put,
+    addAll,
     match,
     cacheMatch,
     open,
@@ -87,6 +89,14 @@ function worker() {
         waitUntil: (promise) => work.push(promise),
       });
       return { result: result!, work };
+    },
+    install() {
+      const work: Promise<unknown>[] = [];
+      handlers.get("install")!({
+        data: undefined,
+        waitUntil: (promise: Promise<unknown>) => work.push(promise),
+      });
+      return work;
     },
     message(data: unknown) {
       const work: Promise<unknown>[] = [];
@@ -111,62 +121,63 @@ it("serves cached assets offline and handles the background refresh failure", as
   await expect(Promise.all(event.work)).resolves.toEqual([undefined]);
 });
 
-it.each(["cors", "navigate"])(
-  "keeps cache writes alive without delaying the %s response",
-  async (mode) => {
-    const sw = worker();
-    const fresh = response();
-    sw.fetch.mockResolvedValue(fresh);
-    let finishWrite!: () => void;
-    let startWrite!: () => void;
-    const startedWrite = new Promise<void>((resolve) => {
-      startWrite = resolve;
-    });
-    sw.put.mockImplementation(
-      () =>
-        new Promise<void>((resolve) => {
-          finishWrite = resolve;
-          startWrite();
-        }),
-    );
-    const event = sw.request(mode);
-    expect(await event.result).toBe(fresh);
-    expect(event.work).toHaveLength(1);
-    let finished = false;
-    const lifetime = Promise.all(event.work).then(() => {
-      finished = true;
-    });
-    await startedWrite;
-    expect(sw.put).toHaveBeenCalledTimes(1);
-    expect(finished).toBe(false);
-    finishWrite();
-    await lifetime;
-    expect(finished).toBe(true);
-  },
-);
-
-it.each(["cors", "navigate"])(
-  "returns network responses when %s cache writes fail",
-  async (mode) => {
-    const sw = worker();
-    const fresh = response();
-    sw.fetch.mockResolvedValue(fresh);
-    sw.put.mockRejectedValue(new Error("quota exceeded"));
-    const event = sw.request(mode);
-    expect(await event.result).toBe(fresh);
-    await expect(Promise.all(event.work)).resolves.toEqual([undefined]);
-  },
-);
-
-it("preserves the cached app shell when navigation returns a server error", async () => {
+it("keeps cache writes alive without delaying the response", async () => {
   const sw = worker();
-  const failure = response(false);
-  sw.fetch.mockResolvedValue(failure);
-  const event = sw.request("navigate");
-  expect(await event.result).toBe(failure);
-  await Promise.all(event.work);
-  expect(sw.put).not.toHaveBeenCalled();
+  const fresh = response();
+  sw.fetch.mockResolvedValue(fresh);
+  let finishWrite!: () => void;
+  let startWrite!: () => void;
+  const startedWrite = new Promise<void>((resolve) => {
+    startWrite = resolve;
+  });
+  sw.put.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        finishWrite = resolve;
+        startWrite();
+      }),
+  );
+  const event = sw.request();
+  expect(await event.result).toBe(fresh);
+  expect(event.work).toHaveLength(1);
+  let finished = false;
+  const lifetime = Promise.all(event.work).then(() => {
+    finished = true;
+  });
+  await startedWrite;
+  expect(sw.put).toHaveBeenCalledTimes(1);
+  expect(finished).toBe(false);
+  finishWrite();
+  await lifetime;
+  expect(finished).toBe(true);
 });
+
+it("returns network responses when cache writes fail", async () => {
+  const sw = worker();
+  const fresh = response();
+  sw.fetch.mockResolvedValue(fresh);
+  sw.put.mockRejectedValue(new Error("quota exceeded"));
+  const event = sw.request();
+  expect(await event.result).toBe(fresh);
+  await expect(Promise.all(event.work)).resolves.toEqual([undefined]);
+});
+
+it.each([
+  ["a server error", false, "/"],
+  ["the deployed page", true, "/"],
+  ["a static page", true, "/privacy.html"],
+])(
+  "leaves the cached app shell alone when navigation returns %s",
+  async (_, ok, path) => {
+    const sw = worker();
+    const network = response(ok);
+    sw.fetch.mockResolvedValue(network);
+    const event = sw.request("navigate", path);
+    expect(await event.result).toBe(network);
+    await Promise.all(event.work);
+    expect(sw.put).not.toHaveBeenCalled();
+  },
+);
 
 it("falls back to the app shell for offline navigation", async () => {
   const sw = worker();
@@ -213,9 +224,13 @@ function dataWorker() {
   sw.open.mockResolvedValue({
     put: sw.put,
     match: sw.cacheMatch,
+    addAll: sw.addAll,
+    delete: async (request: FetchRequest) => entries.delete(path(request)),
     keys: async () =>
       [...entries.keys()].map((key) => ({
         url: `https://electrify.test${key}`,
+        method: "GET",
+        mode: "cors",
       })),
   });
   return { ...sw, entries, path };
@@ -395,6 +410,115 @@ describe("SYNC_OFFLINE_DATA", () => {
       ).toHaveLength(2);
     },
   );
+});
+
+describe("cacheBuild", () => {
+  const css = "/static/css/main.new.css";
+  const js = "/static/js/main.new.js";
+  const chunk = "/static/js/menu.new.chunk.js";
+  const manifest = {
+    files: {
+      "main.css": css,
+      "main.js": js,
+      "menu.js": chunk,
+      "index.html": "/index.html",
+      "main.js.map": `${js}.map`,
+      "license.txt": `${js}.LICENSE.txt`,
+    },
+    entrypoints: ["static/css/main.new.css", "static/js/main.new.js"],
+  };
+  const newPage = `<link href="/${manifest.entrypoints[0]}"><script src="/${manifest.entrypoints[1]}">`;
+
+  function buildWorker({
+    page = newPage,
+    missing = "",
+  }: { page?: string; missing?: string } = {}) {
+    const sw = dataWorker();
+    sw.entries.set("/", response(true, "old page"));
+    sw.entries.set("/static/css/main.old.css", response(true, "old css"));
+    sw.fetch.mockImplementation(async (request) => {
+      const path = sw.path(request);
+      if (path === "/asset-manifest.json") return jsonResponse(manifest);
+      if (path === "/") return response(true, page);
+      if (path === missing) throw new Error("offline");
+      return response(true, path);
+    });
+    return sw;
+  }
+  const fetched = (sw: ReturnType<typeof buildWorker>) =>
+    sw.fetch.mock.calls.map(([request]) => sw.path(request));
+
+  it.each([
+    ["install", (sw: ReturnType<typeof buildWorker>) => sw.install()],
+    [
+      "launch",
+      (sw: ReturnType<typeof buildWorker>) =>
+        sw.message({ type: "CACHE_BUILD" }),
+    ],
+  ])(
+    "stores the whole build on %s, then replaces the page and older bundles",
+    async (_, run) => {
+      const sw = buildWorker();
+      await Promise.all(run(sw));
+
+      expect(sw.entries.has(css) && sw.entries.has(js)).toBe(true);
+      expect(sw.entries.has(chunk)).toBe(true);
+      expect(await sw.entries.get("/")!.text()).toBe(newPage);
+      expect(sw.entries.has("/static/css/main.old.css")).toBe(false);
+      expect(fetched(sw).filter((path) => /map|txt|index/.test(path))).toEqual(
+        [],
+      );
+    },
+  );
+
+  it("adds the fonts and logos the first screen needs on install", async () => {
+    const sw = buildWorker();
+    await Promise.all(sw.install());
+    const shell = sw.addAll.mock.calls[0][0];
+    expect(shell).toEqual(
+      expect.arrayContaining([
+        "/fonts/inter/inter.css",
+        "/fonts/inter/InterVariable.woff2",
+        "/images/logo-home.svg",
+        "/images/logo-home-dark.svg",
+      ]),
+    );
+    expect(shell).not.toContain("/");
+  });
+
+  it("downloads only bundles it does not already have", async () => {
+    const sw = buildWorker();
+    sw.entries.set(css, response(true, "kept"));
+    await Promise.all(sw.message({ type: "CACHE_BUILD" }));
+    expect(fetched(sw)).not.toContain(css);
+    expect(await sw.entries.get(css)!.text()).toBe("kept");
+  });
+
+  it.each([
+    ["a bundle fails to download", { missing: css }],
+    ["the page is from another build", { page: "<script src=/other.js>" }],
+  ])("keeps the last complete page and bundles when %s", async (_, options) => {
+    const sw = buildWorker(options);
+    await expect(
+      Promise.all(sw.message({ type: "CACHE_BUILD" })),
+    ).resolves.toEqual([undefined]);
+    expect(await sw.entries.get("/")!.text()).toBe("old page");
+    expect(sw.entries.has("/static/css/main.old.css")).toBe(true);
+  });
+
+  it("fails installation rather than activating without a complete build", async () => {
+    const sw = buildWorker({ missing: js });
+    await expect(Promise.all(sw.install())).rejects.toThrow("offline");
+  });
+
+  it("ignores launches with no manifest to read", async () => {
+    const sw = buildWorker();
+    sw.fetch.mockRejectedValue(new Error("offline"));
+    await Promise.all(sw.message({ type: "CACHE_BUILD" }));
+    sw.fetch.mockResolvedValue(response(false));
+    await Promise.all(sw.message({ type: "CACHE_BUILD" }));
+    expect(await sw.entries.get("/")!.text()).toBe("old page");
+  });
 });
 
 describe("CACHE_ICONS", () => {
@@ -639,4 +763,59 @@ describe("CACHE_ICONS", () => {
       "/images/transmission.svg",
     ]);
   });
+});
+
+it("prepares every shipped audio file for offline play even before sound has been enabled", async () => {
+  const sw = dataWorker();
+  sw.fetch.mockImplementation(async (request) =>
+    sw.path(request) === "/data/weather/index.json"
+      ? jsonResponse({ cities: {} })
+      : response(),
+  );
+  await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
+  const audio = readdirSync(resolve(process.cwd(), "public/audio"), {
+    recursive: true,
+  }) as string[];
+  const files = audio
+    .filter((file) => /\.(mp3|wav)$/.test(file))
+    .map((file) => `/audio/${file.split(sep).join("/")}`);
+  expect(files.length).toBeGreaterThan(0);
+  for (const file of files) expect(sw.entries.has(file)).toBe(true);
+});
+
+it("serves cached audio without a background re-download", async () => {
+  const sw = dataWorker();
+  sw.entries.set("/audio/basic/low.mp3", response(true, "music"));
+  const event = sw.request("cors", "/audio/basic/low.mp3");
+  expect(await (await event.result).text()).toBe("music");
+  await Promise.all(event.work);
+  expect(sw.fetch).not.toHaveBeenCalled();
+});
+
+it("retries an incomplete offline audio cache and does not re-download stored tracks", async () => {
+  const sw = dataWorker();
+  const missing = "/audio/basic/low.mp3";
+  sw.fetch.mockImplementation(async (request) => {
+    if (sw.path(request) === "/data/weather/index.json")
+      return jsonResponse({ cities: {} });
+    if (sw.path(request) === missing) throw new Error("offline");
+    return response();
+  });
+  await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
+  expect(sw.entries.has("/__offline-data-revision")).toBe(false);
+  expect(sw.entries.has(missing)).toBe(false);
+  expect(sw.entries.has("/audio/basic/high.mp3")).toBe(true);
+  sw.fetch.mockImplementation(async (request) =>
+    sw.path(request) === "/data/weather/index.json"
+      ? jsonResponse({ cities: {} })
+      : response(),
+  );
+  await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
+  expect(sw.entries.has(missing)).toBe(true);
+  expect(sw.entries.has("/__offline-data-revision")).toBe(true);
+  expect(
+    sw.fetch.mock.calls.filter(
+      ([request]) => sw.path(request) === "/audio/basic/high.mp3",
+    ),
+  ).toHaveLength(1);
 });

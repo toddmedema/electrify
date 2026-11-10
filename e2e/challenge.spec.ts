@@ -1,3 +1,5 @@
+import { waitForSettled } from "./layout";
+import { unlockAllDifficulties } from "./difficulty-fixture";
 import path from "path";
 import { expect, test, Page } from "./fixtures";
 import manifest from "../src/data/RunCompatibility.json";
@@ -26,6 +28,7 @@ async function savedGame(page: Page) {
   return (await readSavedGame(page))!;
 }
 test.beforeEach(async ({ page }) => {
+  await unlockAllDifficulties(page);
   await page.addInitScript(() => {
     localStorage.setItem("audioEnabled", "false");
   });
@@ -85,6 +88,10 @@ test("an active run stays paused while browsing and cancelling a challenge", asy
     .getByRole("button", { name: "View Custom Game details", exact: true })
     .click();
   await expect(
+    page.getByRole("heading", { name: "Custom setup", exact: true }),
+  ).toBeVisible();
+  await waitForSettled(page, "main.base_main");
+  await expect(
     page.getByRole("button", { name: "Back", exact: true }),
   ).toHaveCount(1);
   await page.getByRole("button", { name: "Back", exact: true }).click();
@@ -127,7 +134,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     await expect(
       page.getByRole("button", {
-        name: "Log in to join the leaderboard",
+        name: "Sign in to join the leaderboard",
         exact: true,
       }),
     ).toHaveCount(0);

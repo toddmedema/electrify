@@ -14,10 +14,9 @@ import {
 } from "../../helpers/Challenge";
 import { logEvent } from "../../Globals";
 import ShareIcon from "@mui/icons-material/Share";
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import ConceptIcon from "./ConceptIcon";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import { VictoryType } from "../../Types";
-import { fetchGlobalRank } from "../../reducers/User";
 import { canShare, shareText } from "../../helpers/Share";
 import { formatScore } from "../../helpers/Format";
 import { ResultScore, resultTitle, RunDebrief } from "./RunResult";
@@ -26,6 +25,7 @@ import SignInButtons from "./SignInButtons";
 import { SCENARIOS } from "../../data/Scenarios";
 import ResultLeaderboard from "./ResultLeaderboard";
 import { SCORE_VERSION } from "../../helpers/Scoring";
+import { isLegacyCampaignScenario } from "../../data/LegacyCampaign";
 
 export interface StateProps {
   victory: VictoryType | null;
@@ -45,54 +45,15 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-/**
- * The end of a run: the score breakdown, how it compares to the player's own best, where it lands
- * on the global board, and a way to tell someone about it.
- *
- * The breakdown renders the moment the dialog opens and never waits on anything. The rank is a
- * network read and the personal best depends on being logged in, so both are enrichment that
- * appears when (and if) it can -- a Firestore hiccup must not cost the player their score screen.
- */
+/** Score and debrief render immediately; the leaderboard owns its network loading state. */
 export default function VictoryDialog(props: Props): React.JSX.Element {
   const { victory, loggedIn, onClose, onQuit } = props;
   const [preview, setPreview] = React.useState(false);
   const [sharing, setSharing] = React.useState(false);
-  const [rank, setRank] = React.useState<number | undefined>(undefined);
-  const [rankFailed, setRankFailed] = React.useState(false);
-
-  // Identity rather than the object, so re-renders while the dialog is open don't refetch
-  const scenarioId = victory?.scenarioId;
-  const score = victory?.score;
-  const ranked = Boolean(victory?.ranked && victory?.outcome === "completed");
-  const difficulty = victory?.difficulty;
-
-  React.useEffect(() => {
-    if (scenarioId === undefined || score === undefined || !ranked) {
-      return;
-    }
-    setRank(undefined);
-    setRankFailed(false);
-    // Guarded rather than cancelled: an aggregate read that lands after the player has closed the
-    // dialog must not set state on an unmounted tree
-    let live = true;
-    // The web board ranks by score alone; Steam keeps a board per difficulty.
-    fetchGlobalRank(scenarioId, score, difficulty)
-      .then((position) => {
-        if (live) {
-          setRank(position);
-        }
-      })
-      .catch((err) => {
-        console.warn("Couldn't work out your rank: ", err);
-        if (live) {
-          setRankFailed(true);
-        }
-      });
-    return () => {
-      live = false;
-    };
-  }, [scenarioId, score, ranked, difficulty]);
-
+  const campaign = isLegacyCampaignScenario(victory?.scenarioId);
+  const ranked = Boolean(
+    !campaign && victory?.ranked && victory?.outcome === "completed",
+  );
   if (!victory) {
     // Rendered closed rather than not at all, so MUI can animate the dialog out
     return <Dialog open={false} />;
@@ -155,10 +116,11 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               aria-hidden
             />
           ) : (
-            <EmojiEventsIcon
+            <ConceptIcon
+              concept="goal"
               color="warning"
-              sx={{ fontSize: 44 }}
-              aria-hidden
+              style={{ fontSize: 44 }}
+              decorative
             />
           )}
           <Typography variant="h5" component="span" sx={{ fontWeight: 600 }}>
@@ -170,6 +132,15 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         {endMessage && (
           <Typography variant="body1" gutterBottom sx={{ textAlign: "center" }}>
             {endMessage}
+          </Typography>
+        )}
+        {campaign && failed && (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ textAlign: "center", mb: 2 }}
+          >
+            Restarting begins a new campaign in 1882.
           </Typography>
         )}
         <ResultScore result={victory} />
@@ -211,15 +182,6 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             ) : (
               <span>Personal best {formatScore(previousBest as number)}</span>
             )}
-            {!rankFailed && rank !== undefined && (
-              <span>
-                {" "}
-                · #{formatScore(rank)}{" "}
-                {process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()
-                  ? "globally"
-                  : "across all levels"}
-              </span>
-            )}
           </Typography>
         )}
         {ranked &&
@@ -237,7 +199,8 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               <SignInButtons />
             </Typography>
           )}
-        {victory.outcome === "completed" &&
+        {!campaign &&
+          victory.outcome === "completed" &&
           victory.scoreVersion === SCORE_VERSION &&
           !victory.modded &&
           SCENARIOS.some(
@@ -253,43 +216,58 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               displayName={props.displayName}
             />
           )}
-        {victory.debrief && <RunDebrief debrief={victory.debrief} />}
+        {victory.debrief && (
+          <RunDebrief
+            debrief={victory.debrief}
+            scenarioId={victory.scenarioId}
+            outcome={victory.outcome}
+            leadMessage={endMessage}
+          />
+        )}
       </DialogContent>
       <DialogActions
         className="victoryDialogActions"
         disableSpacing
         sx={{ px: { xs: 2, sm: 3 }, pb: 2 }}
       >
-        <div className="victoryUtilityActions">
-          {canShare() && (
-            <Button
-              color="primary"
-              startIcon={<ShareIcon />}
-              onClick={() => setPreview(true)}
-            >
-              {shared.challenge ? "Challenge a friend" : "Share result"}
-            </Button>
-          )}
-          {!failed && (
+        {!failed && (
+          <div className="victoryUtilityActions">
+            {victory.outcome === "completed" && canShare() && (
+              <Button
+                color="primary"
+                startIcon={<ShareIcon />}
+                onClick={() => setPreview(true)}
+              >
+                {shared.challenge ? "Challenge a friend" : "Share result"}
+              </Button>
+            )}
             <Button color="primary" onClick={onClose}>
               Keep playing
             </Button>
-          )}
-        </div>
+          </div>
+        )}
         <div className="victoryNextActions">
           <Button
             color="primary"
             variant={failed ? "text" : "outlined"}
             onClick={failed ? onQuit : () => props.onRetry(victory)}
           >
-            {failed ? "New game" : "Play again"}
+            {failed
+              ? "New game"
+              : campaign
+                ? "Play campaign again"
+                : "Play again"}
           </Button>
           <Button
             color="primary"
             variant="contained"
             onClick={failed ? () => props.onRetry(victory) : onQuit}
           >
-            {failed ? "Try again" : "New game"}
+            {failed
+              ? campaign
+                ? "Restart campaign"
+                : "Try again"
+              : "New game"}
           </Button>
         </div>
       </DialogActions>

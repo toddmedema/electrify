@@ -59,7 +59,7 @@ for (const theme of ["light", "dark"] as const) {
     // Just the entry, beside the term, rather than the whole manual over the decision
     await expect(
       manual.getByRole("heading", {
-        name: "Interest Rates & Inflation",
+        name: "Interest rates & inflation",
         exact: true,
       }),
     ).toBeVisible();

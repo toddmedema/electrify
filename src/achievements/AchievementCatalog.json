@@ -220,9 +220,16 @@
     "scenarioId": 116
   },
   {
+    "id": "CHERNOBYL_RECOVERY",
+    "name": "Chernobyl: Recovery",
+    "description": "Successfully finish Chernobyl: Recovery on any difficulty.",
+    "icon": "chernobyl-recovery",
+    "scenarioId": 126
+  },
+  {
     "id": "MASTER_OF_THE_GRID",
     "name": "Master of the Grid",
-    "description": "Successfully finish all 15 official scenarios on CEO.",
+    "description": "Successfully finish all 16 official scenarios on CEO.",
     "icon": "achievement-master-of-the-grid"
   },
   {

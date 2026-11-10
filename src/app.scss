@@ -51,10 +51,11 @@
   --border-selected: #aaccec;
   --border-subtle: #dfe5ec;
   /* The diagonal on a reverse-flow row bar. It is the channel that tells a reverse bar from
-     a forward one, so it has to clear 3:1 against the 0.18 tint it sits on: 3.20:1 here.
+     a forward one, so it has to clear 3:1 against the neutral --flow-fill it sits on (about
+     4.3:1 here). It stays neutral: interaction blue made a charging battery read as selected.
      Nothing that dark can sit under the row's label, which is why the hatch is confined to a
      band below the text rather than painted across the whole fill. */
-  --flow-hatch: rgba(0, 132, 248, 0.8);
+  --flow-hatch: color-mix(in srgb, var(--font-color-primary) 60%, transparent);
   // Forward flow behind every fleet row: one neutral tint, so rows read as one system
   --flow-fill: color-mix(in srgb, var(--font-color-primary) 7%, transparent);
   --border-strong: #a4b0bd;
@@ -62,17 +63,18 @@
   --font-color-primary: #172334;
   --font-color-faded: #576574;
   --font-color-disabled: #bdbdbd; /* grey400 */
-  --interactive-contrast: #f5f5f5;
+  /* The label on an --interactive-blue fill. Pure white takes the logo blue to 3.7:1, where
+     #f5f5f5 manages only 3.4:1 */
+  --interactive-contrast: #ffffff;
   --interactive-blue: #0084f8; /* the logo blue - 3.7:1 on white */
-  /* blue800, primaryDarkColor in Theme.tsx: a fill that carries small label text, 5.3:1 under
-     --interactive-contrast where the logo blue manages only 3.4:1 */
-  --interactive-strong: #1565c0;
   // Neutral list sparklines: fuel colours would compete with blue's "interactive" meaning
   --spark-stroke: #546e7a; /* blueGray600 */
   --spark-fill: rgba(84, 110, 122, 0.12);
   --spark-baseline: #90a4ae; /* blueGray300 */
   --spark-marker-fill: #ffffff; /* The card paper, so the hollow dot cuts the line */
-  --interactive-tint: rgba(0, 132, 248, 0.5);
+  /* The hover wash behind a blue icon or number badge. Light enough that the logo blue still
+     clears 3:1 against it (3.1:1 over white), so the mark stays visible while the row is hovered */
+  --interactive-tint: rgba(0, 132, 248, 0.14);
   // The bright head of the glint that circles the tutorial ring
   --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 64%, white);
   --tutorial-glow: color-mix(in srgb, var(--interactive-blue) 60%, transparent);
@@ -133,8 +135,8 @@
   --bg-selected: #132f46;
   --border-selected: #285f86;
   --border-subtle: #202b38;
-  /* Going lighter rather than darker against the near-black row: 3.40:1 on the same tint */
-  --flow-hatch: rgba(144, 202, 249, 0.55);
+  /* Going lighter rather than darker against the near-black row: about 5:1 on the same fill */
+  --flow-hatch: color-mix(in srgb, var(--font-color-primary) 55%, transparent);
   --border-strong: #48586b;
   --border-tile: #2b3948;
   --font-color-primary: #e6edf5;
@@ -146,7 +148,6 @@
      6.6:1 on --bg-primary, 6.9:1 under the #0a0a0a button label. The logo's dark twins
      (logo-dark.svg, logo-home-dark.svg) are painted in this blue, as is LOGO_BLUE.dark. */
   --interactive-blue: #629be1;
-  --interactive-strong: var(--interactive-blue);
   --spark-stroke: #9aa9ba;
   --spark-fill: rgba(154, 169, 186, 0.16);
   --spark-baseline: rgba(148, 163, 184, 0.34);
@@ -396,7 +397,7 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
   }
 }
 
-.keyboardMenu :focus {
+.keyboardMenu :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -419,7 +420,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   #centeredMenu
   :is(.mainActions, .resourceActions, .discoveryActions)
   .MuiButton-root:focus {
-  background-color: var(--interactive-strong);
+  background-color: var(--interactive-blue);
   color: var(--interactive-contrast);
   // The fill carries selection, including when a controller moves real focus.
   outline: none !important;
@@ -456,13 +457,13 @@ html[data-touch-input="true"]:not([data-controller-input="true"]) #menuCard {
 
   // Keep the next action prominent while tapping resources or returning from another screen.
   #centeredMenu .mainActions .MuiButton-root:first-child {
-    background-color: var(--interactive-strong);
+    background-color: var(--interactive-blue);
     color: var(--interactive-contrast);
 
     &[data-touch-pressed] {
       background-color: color-mix(
         in srgb,
-        var(--interactive-strong) 88%,
+        var(--interactive-blue) 88%,
         var(--font-color-primary)
       );
     }
@@ -598,7 +599,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
 }
 .achievementAccount {
   box-sizing: border-box;
-  margin-top: 20px;
+  margin-top: 24px;
   padding: 16px;
   display: flex;
   align-items: center;
@@ -616,6 +617,12 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
     min-height: 48px;
     min-width: 0;
     padding: 8px 12px;
+    white-space: nowrap;
+  }
+  @media screen and (max-width: ($phone_width - 1px)) {
+    .MuiTab-root {
+      padding-inline: 8px;
+    }
   }
 }
 .achievementList {
@@ -624,7 +631,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   list-style: none;
 }
 .achievementRow {
-  padding: 20px 0;
+  padding: 16px 0;
   display: flex;
   align-items: flex-start;
   gap: 16px;
@@ -681,15 +688,32 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   left: auto;
   right: max(16px, env(safe-area-inset-right));
   // The measured tab bar already includes the safe area it pads for.
-  bottom: calc(
+  --achievement-bottom: calc(
     16px +
       max(var(--achievement-nav-clearance, 0px), env(safe-area-inset-bottom))
   );
+  bottom: var(--achievement-bottom);
   width: min(384px, calc(100vw - 32px));
   max-width: none;
 }
+.achievementToastStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-height: calc(
+    100dvh - var(--achievement-bottom) - max(16px, env(safe-area-inset-top))
+  );
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  // A tall stack scrolls vertically on touch screens; sideways swipes still dismiss cards.
+  &.isScrollable .achievementToastPanel {
+    touch-action: pan-y;
+  }
+}
 .achievementToastPanel {
   display: flex;
+  flex-shrink: 0;
   position: relative;
   // Swipe it away like a toast; the release animates the snap back
   touch-action: none;
@@ -758,7 +782,8 @@ table,
 .screenHeaderTitle,
 .paneHeader h6,
 .insightsHeader h6,
-.constructionTitle .iconLabel {
+.constructionTitle .iconLabel,
+.gameToolHeader h2 {
   font-weight: 650;
   letter-spacing: -0.02em;
 }
@@ -768,7 +793,8 @@ table,
   font-weight: 650;
 }
 
-.srOnly {
+.srOnly,
+.visuallyHidden {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
@@ -890,8 +916,9 @@ $topbar_height: 56px;
   align-items: center;
   gap: $space-3;
   min-height: 50px;
-  padding: 0 max($space-2, env(safe-area-inset-right)) 0
-    max($space-2, env(safe-area-inset-left));
+  // The same 16px gutter as the header above it.
+  padding: 0 max($space-4, env(safe-area-inset-right)) 0
+    max($space-4, env(safe-area-inset-left));
   border-bottom: $border_accent;
 }
 
@@ -899,11 +926,15 @@ $topbar_height: 56px;
   display: flex;
   align-items: baseline;
   gap: $space-1;
+  // Room for the widest common size, so the slider track doesn't shift as the value changes.
+  min-width: 6.5ch;
   white-space: nowrap;
 }
 
 .constructionCapacitySlider.MuiSlider-root {
   min-width: 80px;
+  // Half a coarse-pointer thumb overhangs the track; keep it clear of the size label.
+  margin-inline: $space-1;
 }
 
 .constructionSortButton {
@@ -917,8 +948,6 @@ $topbar_height: 56px;
 @media screen and (min-width: $phone_width) {
   .constructionControls {
     gap: $space-4;
-    padding-left: max($space-4, env(safe-area-inset-left));
-    padding-right: max($space-4, env(safe-area-inset-right));
   }
 }
 
@@ -975,11 +1004,30 @@ $topbar_height: 56px;
 }
 
 // Stack cash and date on narrow phones so the year stays visible beside all four speed choices.
+// Three stacked lines clear the 56px toolbar's edges by nearly 4px: cash and date keep line boxes
+// tall enough for their glyphs, and the profit between them is set solid at caption size.
 @media screen and (max-width: ($narrow_phone_width - 1px)) {
   #topbar .gameStatus {
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
+    line-height: 1.1;
+  }
+
+  #topbar .gameStatus .gameBalance {
+    line-height: 1.25;
+  }
+
+  #topbar .gameStatus .gameMonthlyProfit,
+  #topbar .gameStatus .gameStatusValue.weak {
+    font-size: var(--font-size-caption);
+  }
+
+  #topbar .gameStatus .gameMonthlyProfit {
+    line-height: 1;
+  }
+
+  #topbar .gameStatus .gameStatusValue.weak {
     line-height: 1.2;
   }
 }
@@ -1250,6 +1298,12 @@ $topbar_height: 56px;
     color: var(--warning-icon);
   }
 }
+.gameStatusBar .missionSummary.statusWarning {
+  .missionRiskButton.MuiButton-root,
+  .missionSummaryMonths.MuiButton-root {
+    color: inherit;
+  }
+}
 
 // Remove the inline SVG's baseline space so its visual center matches the adjacent label.
 .statusIcon {
@@ -1497,12 +1551,12 @@ $pane_header_height: 48px;
 .powerExchangeHero {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 
   img {
-    width: 48px;
-    height: 48px;
-    flex: 0 0 48px;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
   }
 }
 
@@ -1619,11 +1673,13 @@ $pane_header_height: 48px;
   height: 40px;
 }
 
+// The reading of what is flowing now, sitting above the chart of what flowed and will flow. Kept
+// compact so the chart stays what the layer shows.
 .powerExchangeSummary {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px 16px 16px;
+  gap: 8px;
+  padding: 0 16px 8px;
 }
 
 // Touch keeps the full 44px Build target, which the 52px touch header holds with 4px either side
@@ -1903,11 +1959,17 @@ $pane_header_height: 48px;
   white-space: nowrap;
   cursor: pointer;
 
-  &:hover,
   &:focus-visible,
   &.active {
     border-color: var(--border-selected);
     background: var(--interactive-tint);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: var(--border-selected);
+      background: var(--interactive-tint);
+    }
   }
 }
 
@@ -1919,7 +1981,7 @@ $pane_header_height: 48px;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--interactive-strong);
+  background: var(--interactive-blue);
   color: var(--interactive-contrast);
   font-size: var(--font-size-caption);
   font-weight: 600;
@@ -2109,33 +2171,6 @@ $pane_header_height: 48px;
     border: none;
     z-index: 0; /* fixes bug with psuedo element z-index not working as expected */
   }
-
-  #yearProgressBar {
-    // Overlay the app bar's lower edge without adding a gap before the pane headers. The box
-    // hangs below the edge by its bottom padding, so the line itself sits on the status bar's
-    // bottom border rather than floating just above it.
-    position: absolute;
-    inset: auto 0 -4px;
-    // Retain breathing room around the line for the tutorial's target ring.
-    padding: 4px 0;
-    pointer-events: none;
-    z-index: 100;
-
-    // A permanent track, so the bar reads as elapsed time rather than a stray rule.
-    &::before {
-      content: "";
-      position: absolute;
-      inset: 4px 0;
-      height: 1px;
-      background: var(--border-subtle);
-    }
-
-    .yearProgressFill {
-      position: relative;
-      height: 1px;
-      background: $font_color_faded;
-    }
-  }
 }
 
 .base_main.pageEnter {
@@ -2230,7 +2265,7 @@ $pane_header_height: 48px;
 }
 
 .generatorComparisonRemove.MuiIconButton-root {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   justify-self: end;
   color: var(--font-color-faded);
@@ -2250,10 +2285,14 @@ $pane_header_height: 48px;
   }
 }
 
+// Icon, name and remove share the first row; the figures take the full width beneath, so a
+// narrow tray wraps them at their own separators rather than into one-word fragments.
 .generatorComparisonChoice {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
+  // Chips of different heights share a top edge rather than centring their rows.
+  align-content: start;
   column-gap: 8px;
   padding: 8px;
   border: 1px solid var(--border-tile);
@@ -2261,13 +2300,32 @@ $pane_header_height: 48px;
   background: var(--bg-primary);
 
   img {
-    grid-row: 1 / span 3;
+    grid-row: 1;
     width: 34px;
     height: 34px;
   }
 
   .MuiTypography-root {
     min-width: 0;
+  }
+
+  .MuiTypography-caption {
+    grid-column: 1 / -1;
+  }
+}
+
+// Three chips across a narrow side tool leave no room for the name between icon and remove:
+// it drops below them instead of colliding with the remove button.
+.generatorComparisonChoice {
+  container-type: inline-size;
+
+  .nowrap {
+    white-space: nowrap;
+  }
+}
+@container (max-width: 159px) {
+  .generatorComparisonChoice > .MuiTypography-body2 {
+    grid-column: 1 / -1;
   }
 }
 
@@ -2379,6 +2437,14 @@ $pane_header_height: 48px;
   width: 100%;
   min-width: 0;
 }
+.chartCaption {
+  padding: 0.25rem 1rem;
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-emphasis);
+  line-height: 1.4;
+  text-align: center;
+}
 .chartTooltipContext {
   margin-top: 8px;
   padding-top: 8px;
@@ -2395,6 +2461,11 @@ $pane_header_height: 48px;
 
 .uplot {
   background: var(--chart-surface);
+}
+
+.uplot .u-over {
+  // Charts share the page's vertical gesture; horizontal motion still inspects the data.
+  touch-action: pan-y;
 }
 
 // The crosshair marking which x the tooltip is reporting, lighter than the data it crosses
@@ -2428,7 +2499,7 @@ $pane_header_height: 48px;
 
 // The date is a quiet reference beside the money.
 #topbar .gameStatusValue.weak {
-  font-size: 14px;
+  font-size: var(--font-size-body2);
   font-weight: 400;
 }
 
@@ -2447,19 +2518,43 @@ $pane_header_height: 48px;
   border-radius: 50%;
 }
 
-// The demand overlay is a dashed line rather than a filled band, so its key looks like one
-.chartLegendSwatch-demand {
-  height: 0;
-  border-top: 2px dashed $font_color_primary;
-  border-radius: 0;
-}
-
 // Line-chart keys carry the series' dash pattern, since that's what tells them apart
 .chartLegendSwatch-line {
   width: 20px;
   height: 4px;
   border-radius: 0;
   overflow: visible;
+}
+
+// Insights keys share the heading's content edge. Keep each sample with its label,
+// with more space between series than within a pair, even when a dense key wraps.
+.insightsTrackBody,
+.expandedChartBody {
+  .chartLegend {
+    gap: 8px 16px;
+    padding: 0 16px 8px;
+    font-weight: 400;
+    letter-spacing: normal;
+  }
+  .chartLegendItem {
+    gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+  }
+  .chartLegendLabel {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .chartLegendSwatch {
+    flex-shrink: 0;
+  }
+  .chartLegendSwatch-line {
+    width: 24px;
+  }
+  .chartLegendSwatch-line line {
+    stroke-width: 2;
+  }
 }
 
 .closableDialogTitle {
@@ -2480,11 +2575,14 @@ $pane_header_height: 48px;
   }
 }
 
+// A lifted row is opaque, so its text never collides with the row it passes over.
 .facilityRow.dragging,
 .transmissionLine.dragging {
   outline: 1px solid var(--interactive-blue);
   outline-offset: -1px;
   border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  box-shadow: 0 4px 12px var(--shadow-ring);
 }
 
 .scenarioDossier {
@@ -2508,30 +2606,43 @@ $pane_header_height: 48px;
   text-align: center;
 }
 
-.scenarioBriefingFacts {
-  display: grid;
-  gap: 0;
-  margin-top: 4px;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-  text-align: left;
+// The description's two companions, both quieter than the Start action below: the way into the
+// goals (a text button, blue for interaction) and the one risk to watch for (amber for warning).
+.scenarioBriefing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.scenarioBriefingFact {
+// A tinted note rather than a filled alert: the amber is soft enough that the text keeps the
+// page's full contrast, while the label and icon carry the deeper amber on their own.
+.scenarioWatchOut {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   gap: 12px;
-  padding: 12px 2px;
-  border-top: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 560px;
+  padding: 12px 16px;
+  border: 1px solid
+    color-mix(in srgb, var(--warning-dot) 55%, var(--bg-primary));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning-fill) 28%, var(--bg-primary));
+  text-align: left;
 
-  &:first-child {
-    border-top: 0;
+  .conceptIcon {
+    color: var(--warning-icon);
+    // Lines the glyph up with the label's first line
+    margin-top: -2px;
   }
 
   .MuiTypography-overline {
+    color: var(--warning-icon);
     font-weight: 600;
     line-height: 1.2;
+    margin-bottom: 4px;
   }
 }
 
@@ -2555,18 +2666,6 @@ $pane_header_height: 48px;
   width: 100%;
 }
 
-// A short phone keeps the one action in reach above the long briefing.
-@media (max-width: 599px) and (max-height: 700px) {
-  .scenarioStartControls {
-    position: sticky;
-    bottom: 0;
-    z-index: 2;
-    padding-block: 8px;
-    background: var(--bg-primary);
-    border-top: 1px solid var(--border-subtle);
-  }
-}
-
 .difficultyPicker {
   min-width: 0;
 
@@ -2578,9 +2677,15 @@ $pane_header_height: 48px;
   .MuiToggleButton-root {
     min-width: 0;
     flex: 1;
+    gap: 4px;
     padding: 4px 8px;
     font-size: var(--font-size-caption);
     line-height: 1.25;
+  }
+
+  .difficultyLocked.MuiToggleButton-root {
+    color: var(--font-color-faded);
+    background: var(--bg-raised);
   }
 
   .difficultyDescription {
@@ -2690,6 +2795,19 @@ $pane_header_height: 48px;
   white-space: nowrap;
 }
 
+.gameBalance {
+  display: contents;
+}
+
+@media (max-width: 699px) {
+  #topbar .gameBalance {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.2;
+  }
+}
+
 @media (max-width: $tablet_width) {
   .scenarioDossierIcon {
     width: 88px;
@@ -2707,6 +2825,7 @@ $pane_header_height: 48px;
   }
 
   .difficultyPicker .MuiToggleButton-root {
+    flex-direction: column;
     padding-inline: 2px;
   }
 }
@@ -2928,8 +3047,57 @@ $pane_header_height: 48px;
   }
 }
 
-// For things that use size() / get recalulcated on larger displays
+// Keep scale-dependent declarations together so breakpoints do not replay static styles.
+@mixin scaledStyling() {
+  .gameStatus {
+    gap: size(small);
+  }
+
+  .gameStatusValue,
+  .iconLabel {
+    gap: size(tiny);
+  }
+
+  #logo {
+    top: size(large);
+    left: size(large);
+    right: size(large);
+  }
+
+  #manual > :first-child {
+    margin-top: size(base);
+  }
+
+  #gameSetupTable {
+    margin: size(large) auto;
+  }
+
+  .cardList {
+    padding-top: size(base) !important;
+  }
+
+  // The catalog shares cardList but stays flush at every scale. Reapply its override too.
+  .missionList {
+    padding-top: 0 !important;
+  }
+
+  .selectedFacilitySummary {
+    padding: size(small) 16px;
+  }
+
+  .version {
+    margin-top: size(large);
+  }
+
+  .storyDerateBadge {
+    margin-left: size(small);
+  }
+}
+
+// Emit the base rules once. Only scaledStyling() is replayed at the larger size maps.
 @mixin styling() {
+  @include scaledStyling();
+
   // The vocabulary introduced by the missions stays attached to the same concepts in the live
   // interface. Text remains beside it for first-time recognition and screen magnification.
   .gameStatus,
@@ -2940,13 +3108,7 @@ $pane_header_height: 48px;
   }
 
   .gameStatus {
-    gap: size(small);
     min-width: 0;
-  }
-
-  .gameStatusValue,
-  .iconLabel {
-    gap: size(tiny);
   }
 
   .conceptLegend {
@@ -3004,12 +3166,10 @@ $pane_header_height: 48px;
   // ===============================================
   #logo {
     position: absolute;
-    top: size(large);
-    left: size(large);
-    right: size(large);
     img {
       width: 100%;
-      max-width: $absmaxdimension;
+      // The home menu's logo width, so loading hands off without the logo jumping in size.
+      max-width: 680px;
       margin: auto;
       display: block;
     }
@@ -3087,7 +3247,7 @@ $pane_header_height: 48px;
 
     .MuiIconButton-root,
     .MuiButton-root {
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
     }
 
     box-sizing: border-box;
@@ -3120,10 +3280,6 @@ $pane_header_height: 48px;
     // the first child instead, where it doesn't affect pinning.
     padding-top: 0 !important;
 
-    > :first-child {
-      margin-top: size(base);
-    }
-
     figure {
       margin: $space-4 0;
     }
@@ -3153,6 +3309,8 @@ $pane_header_height: 48px;
     // A label on the page rather than a band across it: it shares the page's surface, opaque
     // so nothing scrolling beneath a pinned label shows through its narrow strip
     .manual-group {
+      // A heading element (h2) for the group, without the heading's default margins
+      margin: 0;
       padding-inline: 0;
       background: var(--bg-primary);
       line-height: 32px;
@@ -3256,7 +3414,6 @@ $pane_header_height: 48px;
   }
 
   #gameSetupTable {
-    margin: size(large) auto;
     width: auto;
 
     tr {
@@ -3341,6 +3498,29 @@ $pane_header_height: 48px;
     text-align: center;
   }
 
+  // Facility cards line up with the settings column at every width, not just side by side.
+  .customSetupFacilities .build-list-item {
+    margin-inline: 0;
+  }
+
+  .customSetupLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .customSeedField {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .MuiTextField-root {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+  }
+
   @media #{$pane_media} {
     .customSetupColumns {
       display: grid;
@@ -3355,11 +3535,6 @@ $pane_header_height: 48px;
     }
 
     .customSetupFacilities {
-      .build-list-item {
-        margin-right: 0;
-        margin-left: 0;
-      }
-
       .customFacilityPicker {
         justify-content: flex-start;
         padding-right: 0;
@@ -3398,14 +3573,11 @@ $pane_header_height: 48px;
 
   .cardList {
     background: inherit;
-    padding-top: size(base) !important;
     padding-bottom: 20px; /* for devices with with bottom bars */
     height: 100%;
   }
 
   .missionList {
-    padding-top: 0 !important;
-
     .MuiListSubheader-root {
       padding: 16px 0 8px;
       line-height: 1.35;
@@ -3423,9 +3595,9 @@ $pane_header_height: 48px;
       background: transparent;
       color: $font_color_primary;
 
+      // Flush with the cards below: a negative inset let the button's fill overhang them.
       .MuiButton-root {
         flex: 0 0 auto;
-        margin-right: -8px;
         text-transform: none;
       }
     }
@@ -3463,7 +3635,7 @@ $pane_header_height: 48px;
     gap: 2px;
     padding: 8px 8px;
     border-radius: var(--radius-md);
-    background: var(--interactive-strong);
+    background: var(--interactive-blue);
     color: var(--interactive-contrast);
     font-size: var(--font-size-caption);
     font-weight: 600;
@@ -3519,7 +3691,8 @@ $pane_header_height: 48px;
 
       &.Mui-selected {
         border-color: $interactive_blue !important;
-        color: $interactive_blue;
+        // The stronger blue keeps the small label above 4.5:1 on the selected tint.
+        color: var(--interactive-strong);
         font-weight: 600;
       }
     }
@@ -3572,7 +3745,6 @@ $pane_header_height: 48px;
 
     .missionMeta {
       display: block;
-      margin-top: 2px;
       color: $font_color_faded;
     }
 
@@ -3591,6 +3763,37 @@ $pane_header_height: 48px;
       .MuiChip-label {
         padding: 0 8px;
       }
+    }
+  }
+
+  .missionCatalogItem {
+    .MuiCardHeader-content {
+      min-width: 0;
+    }
+
+    .MuiCardHeader-title {
+      font-size: var(--font-size-subtitle);
+      line-height: 1.5rem;
+    }
+
+    .MuiCardHeader-subheader {
+      margin-top: 4px;
+      font-size: var(--font-size-body2);
+      line-height: 1.25rem;
+    }
+
+    .missionCatalogSummary {
+      display: block;
+    }
+
+    .missionMeta {
+      margin-top: 4px;
+      font-size: var(--font-size-caption);
+      line-height: 1.25rem;
+    }
+
+    .missionThemeTag {
+      line-height: 1.25rem;
     }
   }
 
@@ -3649,6 +3852,19 @@ $pane_header_height: 48px;
     dd {
       margin: 0;
     }
+  }
+
+  // Centred on the caption's 16 px line, in the label's faded tone. Flex
+  // centring holds across fonts, where a baseline offset drifts.
+  .facilityStat dt:has(> .facilityStatIcon) {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .facilityStatIcon {
+    flex-shrink: 0;
+    font-size: 14px;
   }
 
   .facilityStatValue {
@@ -3799,109 +4015,6 @@ $pane_header_height: 48px;
     }
   }
 
-  // Which speed the clock is running at, said as a selection rather than as three enabled
-  // buttons and one greyed-out one - disabled reads as "you can't have this", not "you're on it"
-  // Selection uses a surface change; every enabled speed remains a blue control.
-  .speedToggles {
-    .MuiToggleButton-root {
-      padding: $space-1 $space-3;
-      border-color: var(--border-tile);
-      color: var(--interactive-strong);
-      font-size: var(--font-size-caption);
-      line-height: 1.4;
-
-      &.Mui-selected {
-        background: var(--bg-selected);
-        color: var(--interactive-strong);
-
-        @media (hover: hover) and (pointer: fine) {
-          &:hover {
-            background: var(--bg-selected);
-          }
-        }
-      }
-
-      &.Mui-disabled {
-        color: $font_color_faded;
-      }
-    }
-  }
-
-  // Co-op splits the single-player selection in two. Your own request is an interaction, so it
-  // takes the blue fill. The speed the shared clock actually runs at is status: like the
-  // single-player selected segment it is neutral text, circled by a neutral ring that pulses
-  // with the tutorial's slow rhythm. A blue pulsing ring would read as a tutorial target.
-  .multiplayerSpeedToggles .MuiToggleButton-root {
-    // The label and ring sit a little high, clearing the marker row on the bottom edge: the
-    // ring spans 2-32 px of a 40 px button and 4-34 px of a 44 px one, and only a middle
-    // marker (heads from 29 or 33 px) meets it, breaking it cleanly with its knockout.
-    --clock-lift: 3px;
-    --clock-ring: var(--font-color-primary);
-    // What a marker's knockout outline matches, so the ring breaks cleanly behind a marker
-    --clock-segment: var(--bg-primary);
-
-    .multiplayerSpeedLabel {
-      transform: translateY(calc(-1 * var(--clock-lift)));
-    }
-
-    .multiplayerSpeedPeers svg {
-      color: $font_color_faded;
-
-      path {
-        stroke: var(--clock-segment);
-        stroke-width: 4px; // 1 px outside the 12 px glyph
-        stroke-linejoin: round;
-        paint-order: stroke;
-      }
-    }
-
-    &[data-active-speed="true"] {
-      color: var(--interactive-strong);
-    }
-
-    &.Mui-selected,
-    &.Mui-selected:hover {
-      --clock-ring: var(--interactive-contrast);
-      --clock-segment: var(--interactive-blue);
-      background: var(--interactive-blue);
-      color: var(--interactive-contrast);
-
-      .multiplayerSpeedPeers svg {
-        color: var(--interactive-contrast);
-      }
-    }
-
-    // One size wherever it moves, wide enough that 24× clears the stroke
-    &[data-active-speed="true"]::before {
-      --tutorial-glow: color-mix(in srgb, var(--clock-ring) 40%, transparent);
-      // Half the tutorial's reach keeps the glow inside the segment
-      --tutorial-pulse-spread: 4px;
-      content: "";
-      position: absolute;
-      top: calc(50% - var(--clock-lift));
-      left: 50%;
-      width: 30px;
-      height: 30px;
-      box-sizing: border-box;
-      transform: translate(-50%, -50%);
-      border: 2px solid var(--clock-ring);
-      border-radius: 50%;
-      pointer-events: none;
-      animation: tutorialTargetPulse 10s ease-in-out infinite;
-    }
-
-    // The next segment paints over an outset focus ring unless the focused one is raised
-    &:focus-visible {
-      z-index: 2;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      &[data-active-speed="true"]::before {
-        animation: none;
-      }
-    }
-  }
-
   // The run's own record of itself. A list rather than a table: the lines are one clause each,
   // and the only column they share is when they happened
   .eventLogList {
@@ -3938,7 +4051,7 @@ $pane_header_height: 48px;
     min-height: var(--control-size);
     padding-inline: 8px;
     margin: -5px -8px -5px 0;
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
   }
 
   .eventHistoryFilterCheck {
@@ -4001,25 +4114,44 @@ $pane_header_height: 48px;
     background: transparent;
 
     &.actionable {
+      box-sizing: border-box;
+      width: 100%;
+      color: inherit;
+      font: inherit;
+      text-align: inherit;
       cursor: pointer;
 
       .eventLogIcon {
-        color: var(--interactive-strong);
+        color: var(--interactive-blue);
       }
 
-      &:hover,
       &:focus-visible {
         background: var(--interactive-tint);
+        outline-offset: -2px;
       }
 
-      &:focus-visible {
-        outline-offset: -2px;
+      @media (hover: hover) and (pointer: fine) {
+        &:hover {
+          background: var(--interactive-tint);
+        }
       }
     }
 
     &.importance-CRITICAL {
       border-left: 4px solid $blackout_red;
       background: var(--blackout-tint);
+
+      &.actionable {
+        &:focus-visible {
+          background: var(--blackout-tint);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+          &:hover {
+            background: var(--blackout-tint);
+          }
+        }
+      }
     }
   }
 
@@ -4067,23 +4199,17 @@ $pane_header_height: 48px;
 
   // Which money is the selected facility's, above the chart that shows the company's
   .selectedFacilitySummary {
-    padding: size(small) 16px;
     background: var(--bg-selected);
     border-bottom: 1px solid var(--border-selected);
-  }
-
-  .chartLegendItem-muted {
-    opacity: 0.35;
   }
 
   .version {
     text-align: center;
     opacity: 0.7;
-    margin-top: size(large);
   }
 
   .outputProgressBar {
-    // One neutral tint for forward flow on every row; reverse flow sets its own inline
+    // One neutral tint for flow in either direction; the reverse hatch carries direction
     background-color: var(--flow-fill);
     position: absolute;
     inset: 0;
@@ -4125,7 +4251,6 @@ $pane_header_height: 48px;
 
   .storyDerateBadge {
     height: 20px;
-    margin-left: size(small);
     vertical-align: text-bottom;
 
     .MuiChip-label {
@@ -4300,16 +4425,13 @@ $pane_header_height: 48px;
 // Keep native tutorial paragraphs on the HUD's existing body scale.
 .tutorialHud .tutorialPrompt {
   margin: 4px 0 0;
+  // Hang the explanation off the action's text (20px icon + 8px gap).
+  padding-left: 28px;
   color: $font_color_primary;
   font-family: var(--font-family);
   font-size: var(--font-size-body1);
   font-weight: 400;
   line-height: 20px;
-}
-
-// Hang the explanation off the action's text (20px icon + 8px gap).
-.tutorialHud .tutorialPrompt {
-  padding-left: 28px;
 }
 
 // A separate clipped layer keeps the sweep behind the HUD without changing its scrolling.
@@ -4459,10 +4581,11 @@ $pane_header_height: 48px;
 @media screen and (min-width: $fold_pane_min_width) {
   .tutorialHud {
     display: grid;
-    grid-template-areas: "header content footer";
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    // Keep Exit on the left and the step counter beside Back/Next at every width.
+    grid-template-areas: "exit content step back next";
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     align-items: start;
-    column-gap: 24px;
+    column-gap: $space-2;
     row-gap: 0;
     padding-top: calc(8px + env(safe-area-inset-top));
     padding-bottom: 12px;
@@ -4475,28 +4598,13 @@ $pane_header_height: 48px;
   }
 
   .tutorialHudHeader {
-    grid-area: header;
+    grid-area: step;
   }
 
   // Centers the 20px action line in the header's and footer's 40px line
   .tutorialHudContent {
     grid-area: content;
     padding-top: 12px;
-  }
-
-  .tutorialHudFooter {
-    grid-area: footer;
-  }
-
-  // The phone's arrangement at every width: Exit quiet on the left, the step count beside the
-  // primary action on the right, so the controls never swap sides as the window changes.
-  .tutorialHud {
-    grid-template-areas: "exit content step back next";
-    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
-    column-gap: $space-2;
-  }
-
-  .tutorialHudContent {
     margin-left: $space-4;
     margin-right: $space-4;
   }
@@ -4515,10 +4623,6 @@ $pane_header_height: 48px;
 
   .tutorialHudFooterSpacer {
     display: none;
-  }
-
-  .tutorialHudHeader {
-    grid-area: step;
   }
 
   .tutorialHudHeader h2 {
@@ -4749,7 +4853,7 @@ $sizemap: (
 @media screen and (min-width: $abswidthmax),
   screen and (min-height: $absheightmax) {
   // Use the new desktop values defined above, only at this size
-  @include styling();
+  @include scaledStyling();
 
   body,
   html,
@@ -4784,7 +4888,7 @@ $sizemap: (
 );
 
 @media screen and (min-width: $desktop_breakpoint) {
-  @include styling();
+  @include scaledStyling();
 
   // The panes don't render one at this width -- all three destinations are already on screen.
   // Kept as a backstop for the frame between a window crossing the breakpoint and the
@@ -4953,14 +5057,14 @@ $homeSmokeCycle: 5.6s;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-md);
     background: var(--bg-raised);
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
     font: inherit;
     cursor: pointer;
   }
 
   button:first-child {
-    border-color: var(--interactive-strong);
-    background: var(--interactive-strong);
+    border-color: var(--interactive-blue);
+    background: var(--interactive-blue);
     color: var(--interactive-contrast);
   }
 
@@ -5173,7 +5277,14 @@ $homeSmokeCycle: 5.6s;
     gap: 12px;
     padding: 0 12px 8px;
   }
+  // Label, value and note share row tracks across the card, so a label that wraps lowers every
+  // value beside it rather than leaving the values at different heights.
   .buildOptionMetric {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    // Its own tracks sit flush; the card's 12px gap still separates rows of metrics.
+    row-gap: 0;
     min-width: 0;
   }
   .buildOptionSparkline {
@@ -5347,7 +5458,7 @@ $homeSmokeCycle: 5.6s;
   }
 
   a {
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
     text-decoration-skip-ink: auto;
@@ -5359,7 +5470,7 @@ $homeSmokeCycle: 5.6s;
   .manual-entry-link {
     text-decoration-line: underline;
     text-decoration-color: color-mix(in srgb, currentColor 65%, transparent);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     transition: text-decoration-color 120ms ease-out;
 
     @media (hover: hover) and (pointer: fine) {
@@ -5369,8 +5480,6 @@ $homeSmokeCycle: 5.6s;
     }
 
     &:focus-visible {
-      outline: 2px solid var(--interactive-strong);
-      outline-offset: 1px;
       text-decoration-color: currentColor;
     }
 
@@ -5457,48 +5566,12 @@ $homeSmokeCycle: 5.6s;
     min-height: 44px;
   }
 }
-.transmissionLine {
-  > summary {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    min-height: 44px;
-    cursor: pointer;
-    list-style: none;
-  }
-  > summary::-webkit-details-marker {
-    display: none;
-  }
-  > summary::after {
-    content: "+";
-    color: var(--interactive-strong);
-  }
-  &[open] > summary::after {
-    content: "−";
-  }
-  .transmissionLineText {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-width: 0;
-    gap: 4px;
-  }
-}
 .transmissionLineDetails {
   padding: 0 16px 16px 68px;
   display: grid;
   gap: 8px;
 }
 @media (max-width: ($phone_width - 1px)) {
-  .transmissionLine > summary {
-    gap: 8px;
-    padding: 12px;
-    flex-wrap: wrap;
-  }
-  .transmissionLine .transmissionLineText {
-    flex-basis: calc(100% - 64px);
-  }
   .transmissionLineDetails {
     padding: 0 12px 12px;
   }
@@ -5663,7 +5736,7 @@ $homeSmokeCycle: 5.6s;
   .facilityChevron {
     flex-shrink: 0;
     width: 20px;
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
   }
 }
 .base_main .facilityDisclosure .facility {
@@ -5806,6 +5879,10 @@ $homeSmokeCycle: 5.6s;
     line-height: 20px;
     text-transform: none;
   }
+
+  .facilityActionNote {
+    align-self: center;
+  }
 }
 
 @media (pointer: coarse) {
@@ -5899,32 +5976,15 @@ $homeSmokeCycle: 5.6s;
   left: 0;
   border-radius: inherit;
   background: var(--font-color-faded);
+  overflow: hidden;
   transition: width 200ms linear;
 }
 .transmissionFleet {
   margin-top: 0;
 }
-.transmissionLine > .facilityRowHeader > .facilityDisclosure {
-  gap: 8px;
-  padding: 12px 16px;
-}
-.transmissionLine .facilityDragHandle + .facilityDisclosure {
-  padding-left: 8px;
-}
+// A row without a grip carries its icon inside the disclosure, as a plant row does.
 .transmissionLine .facilityDisclosure .transmissionListIcon {
   margin-right: 8px;
-}
-.transmissionLine .transmissionLineName {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  white-space: nowrap;
-  font-size: var(--font-size-subtitle);
-  font-weight: 600;
-}
-.transmissionLine .MuiChip-root {
-  margin: 0;
 }
 .transmissionLine .transmissionLineDetails {
   padding: 0 16px 16px;
@@ -6079,6 +6139,9 @@ $homeSmokeCycle: 5.6s;
   position: relative;
   border-top: 1px solid var(--border-subtle);
 }
+.MuiDialog-paper .MuiDialogActions-root.campaignHandoverActions {
+  border-top: 0;
+}
 // A fade says there is more above the sticky actions. It follows the content's scroll timeline,
 // which is inactive when nothing scrolls, so a dialog that fits shows none.
 .MuiDialog-paper .MuiDialogContent-root + .MuiDialogActions-root::before {
@@ -6164,12 +6227,12 @@ $homeSmokeCycle: 5.6s;
   font-size: var(--font-size-subtitle);
   font-weight: 600;
 }
-.insights .insightsTrackHeader > h6 {
+.insights .insightsTrackHeader > .MuiTypography-h6 {
   font-size: var(--font-size-subtitle);
   font-weight: 600;
 }
 .insights .insightsTrackActions .MuiIconButton-root:not(.Mui-disabled) {
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
 }
 .insights .insightsRateMetricLabel,
 .insights .insightsRateMarkMobile {
@@ -6353,7 +6416,7 @@ $programs_column: 800px;
   }
   &[data-wide] dd {
     font-size: var(--font-size-body1);
-    font-weight: 500;
+    font-weight: 600;
   }
 }
 .customerProgramFactDetail.MuiTypography-root {
@@ -6471,15 +6534,6 @@ $programs_column: 800px;
   .decisionImpactFactDetail {
     grid-column: 1;
   }
-  .transmissionLine > .facilityRowHeader > .facilityDisclosure {
-    flex-wrap: wrap;
-  }
-  .transmissionLine .transmissionLineText {
-    flex-basis: calc(100% - 80px);
-  }
-  .transmissionLine .facilityChevron {
-    margin-left: auto;
-  }
   .insights .insightsRateMetric {
     padding: 0 8px;
   }
@@ -6500,40 +6554,6 @@ $programs_column: 800px;
 .facilitySectionFlow {
   min-width: 0;
   font-variant-numeric: tabular-nums;
-}
-.transmissionLine > .facilityRowHeader > .facilityDisclosure {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 20px;
-  align-items: center;
-  gap: 8px;
-  // The flow bar is painted behind the row, so everything on top of it needs a stacking
-  // context of its own -- the same lift facility rows give their text and actions.
-  position: relative;
-  overflow: hidden;
-  > *:not(.outputProgressBar) {
-    position: relative;
-    z-index: 1;
-  }
-}
-.transmissionLine
-  > .facilityRowHeader
-  > .facilityDragHandle
-  + .facilityDisclosure {
-  // The icon is already inside the reorder target, leaving text and the chevron.
-  grid-template-columns: minmax(0, 1fr) 20px;
-}
-// Reading and rating share one unit, so the pair shouldn't jitter as the flow moves
-.transmissionLineFlow {
-  font-variant-numeric: tabular-nums;
-}
-.transmissionLine .transmissionLineText {
-  min-width: 0;
-}
-.transmissionLine .transmissionLineText > .MuiTypography-body2 {
-  font-size: var(--font-size-caption);
-}
-.transmissionLine .facilityChevron {
-  margin-left: 0;
 }
 
 @media (pointer: coarse) {
@@ -6909,6 +6929,11 @@ $programs_column: 800px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  // Keep the Back button's focus ring clear of the title it sits beside.
+  .MuiIconButton-root + .screenHeaderTitle {
+    margin-left: $space-2;
+  }
 }
 
 // The cloud backup explanation beside the Saved games title (base/CloudSyncIndicator). The
@@ -7028,7 +7053,7 @@ $programs_column: 800px;
 
 // Catalog rows open detail screens; the chevron carries their blue interaction affordance.
 .rowChevron.MuiSvgIcon-root {
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
   font-size: 1.25rem;
 }
 
@@ -7335,8 +7360,10 @@ img[src$="/transmission.svg"] {
   display: flex;
   line-height: 0;
 
+  // The check badge carries "stable"; the bolt keeps the text colour rather than fading
   .gridHealthStableBolt {
     font-size: 1.375rem;
+    color: inherit;
   }
 
   // A ring in the row's own surface colour cuts the check out of the bolt behind it.
@@ -7354,11 +7381,11 @@ img[src$="/transmission.svg"] {
 
 // Size navigation before the pane observer runs, so reopening preserves its scroll position.
 @container insights (max-width: 700px) {
-  .insights .insightsViewportDate {
+  .insightsViewportDate {
     font-size: var(--font-size-body2);
   }
 
-  .insights .insightsViewportToolbar {
+  .insightsViewportToolbar {
     height: auto;
     min-height: 44px;
     flex-wrap: nowrap;
@@ -7366,7 +7393,7 @@ img[src$="/transmission.svg"] {
     padding: 0 8px 0 16px;
   }
 
-  .insights .insightsViewportButtons {
+  .insightsViewportButtons {
     flex-basis: 220px;
     gap: 0;
 
@@ -7388,7 +7415,7 @@ img[src$="/transmission.svg"] {
   .insights .MuiToolbar-root.insightsTrackHeader {
     flex-flow: row nowrap !important;
 
-    > h6 {
+    > h3 {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -7432,21 +7459,22 @@ img[src$="/transmission.svg"] {
 .facilityDisclosure .constructionProgressFill::before {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 35%;
   background: linear-gradient(
     90deg,
     transparent,
     var(--tutorial-glint),
     transparent
   );
-  background-size: 35% 100%;
-  background-repeat: no-repeat;
+  will-change: transform;
   animation: construction-sweep 2.8s ease-in-out infinite;
 }
 @keyframes construction-sweep {
   0% {
-    background-position: -55% 0;
+    transform: translateX(-102%);
     opacity: 0;
   }
   20% {
@@ -7456,7 +7484,7 @@ img[src$="/transmission.svg"] {
     opacity: 0.7;
   }
   100% {
-    background-position: 155% 0;
+    transform: translateX(288%);
     opacity: 0;
   }
 }
@@ -7485,7 +7513,7 @@ img[src$="/transmission.svg"] {
     gap: var(--space-2) var(--space-4);
 
     .dataCenterSetupPowerValue {
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
       font-size: var(--font-size-display);
       font-weight: var(--font-weight-emphasis);
       font-variant-numeric: tabular-nums;
@@ -7589,7 +7617,7 @@ img[src$="/transmission.svg"] {
       top: 24px;
       width: 7px;
       height: 7px;
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
       border-right: 2px solid currentColor;
       border-bottom: 2px solid currentColor;
       transform: rotate(-45deg);
@@ -7616,7 +7644,7 @@ img[src$="/transmission.svg"] {
     }
 
     a {
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
       text-decoration-thickness: 1px;
       text-underline-offset: 2px;
     }
@@ -7886,12 +7914,6 @@ img[src$="/transmission.svg"] {
   font-size: var(--font-size-caption-sm);
   font-weight: 600;
 
-  // A cluster's count is small text on the fill, so it takes the stronger blue
-  &.cluster {
-    background: var(--interactive-strong);
-    background-clip: padding-box;
-  }
-
   &.marker {
     background: transparent;
 
@@ -7931,18 +7953,6 @@ img[src$="/transmission.svg"] {
   background: var(--bg-primary);
   box-shadow: 0 1px 4px var(--shadow-ring);
   z-index: 3;
-}
-
-.visuallyHidden {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
 }
 
 @media screen and (max-width: ($fold_pane_min_width - 1px)) {
@@ -8172,7 +8182,7 @@ img[src$="/transmission.svg"] {
 
 // Native selects keep the trigger blue while their option list uses readable body text.
 select:not(:disabled) {
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
 }
 option {
   color: var(--font-color-primary);
@@ -8184,44 +8194,65 @@ option {
   min-width: var(--control-size);
   min-height: var(--control-size);
   margin-left: 4px;
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
   flex-shrink: 0;
 }
-.fuelPriceFilter {
+// The (?) follows the expand control straight away, left-aligned in the header with it; only the
+// layer-editing actions are pushed to the trailing edge
+.insightsTrackHeader .manual-link {
+  flex-shrink: 0;
+  margin-left: 4px;
+  color: var(--interactive-blue);
+}
+.fuelFilter {
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 4px 16px 8px;
   font-size: var(--font-size-body2);
   container-type: inline-size;
-  container-name: fuel-prices;
-  .fuelPriceFilterLabel {
+  container-name: fuel-filter;
+  .fuelFilterLabel {
     margin-right: 4px;
     color: var(--font-color-faded);
   }
-  .fuelPriceFilterOptions {
+  .fuelFilterOptions {
     display: flex;
     flex: 1;
     flex-wrap: wrap;
     min-width: 0;
     gap: 4px;
   }
-  .MuiButton-root {
+  .MuiButton-root,
+  .fuelFilterOverlay {
     gap: 8px;
     padding: 4px 8px;
     min-height: var(--control-size);
     border: 1px solid transparent;
     color: var(--font-color-primary);
-    &[aria-pressed="true"] {
-      border-color: var(--interactive-strong);
-      background: var(--bg-selected);
-      font-weight: 700;
-    }
     svg {
       width: 40px;
       height: 6px;
       flex-shrink: 0;
     }
+  }
+  .MuiButton-root[aria-pressed="true"] {
+    border-color: var(--interactive-blue);
+    background: var(--bg-selected);
+  }
+  // What the fuels are stacked against. It sits among the controls but is no control, so it
+  // is quieter than they are and has no pressed state
+  .fuelFilterOverlay {
+    display: inline-flex;
+    align-items: center;
+    color: var(--font-color-faded);
+  }
+  .fuelFilterFill {
+    display: inline-block;
+    width: 16px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
   }
 }
 .insightsChartDialog {
@@ -8234,6 +8265,8 @@ option {
     border-radius: 0;
   }
   .MuiDialog-paper {
+    container-type: inline-size;
+    container-name: insights;
     background: var(--chart-surface);
   }
   .expandedChartTitle {
@@ -8251,17 +8284,19 @@ option {
       flex-shrink: 0;
     }
   }
+  // The title and its (?) stay together at the leading edge; the close button keeps the other
+  .expandedChartHeading {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    .manual-link {
+      flex-shrink: 0;
+      color: var(--interactive-blue);
+    }
+  }
   .insightsViewportToolbar {
     flex-shrink: 0;
     max-width: none;
-  }
-  .insightsViewportButtons {
-    .insightsViewportButton,
-    .MuiIconButton-root {
-      width: var(--control-size);
-      height: var(--control-size);
-      flex-basis: var(--control-size);
-    }
   }
   .expandedChartContent {
     display: flex;
@@ -8281,31 +8316,29 @@ option {
       flex-shrink: 0;
     }
   }
-  .fuelPriceFilter .MuiButton-root {
+  .fuelFilter .MuiButton-root {
     font-size: var(--font-size-body1);
   }
-  .chartLegend,
   .chartTooltip {
     font-size: var(--font-size-body1);
   }
   .chartLegend {
-    padding: 8px 16px;
-  }
-  .chartLegendSwatch-line {
-    width: 32px;
+    padding-top: 8px;
+    font-size: var(--font-size-body2);
   }
 }
 
-// Three named controls per row keep the fuel key to two rows on phones and narrow panes.
-// The sample sits above its name so the dash pattern stays long enough to recognize.
-@container fuel-prices (max-width: 568px) {
-  .fuelPriceFilterLabel {
+// Three named controls per row keep the fuel key short on phones and narrow panes. The sample
+// sits above its name so the dash pattern stays long enough to recognize.
+@container fuel-filter (max-width: 568px) {
+  .fuelFilterLabel {
     display: none;
   }
-  .fuelPriceFilter .fuelPriceFilterOptions {
+  .fuelFilter .fuelFilterOptions {
     display: grid;
     grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr));
-    .MuiButton-root {
+    .MuiButton-root,
+    .fuelFilterOverlay {
       flex-direction: column;
       justify-content: center;
       gap: 4px;
@@ -8321,27 +8354,21 @@ option {
   }
 }
 
-@media (max-width: 600px) {
-  .insightsChartDialog .insightsViewportToolbar {
-    height: auto;
-    flex-wrap: wrap;
-    padding: 8px 16px;
-    .insightsViewportDate {
-      flex: 1 0 100%;
-      white-space: normal;
-    }
-  }
-}
-
 .insights .MuiToolbar-root.insightsTrackHeader {
   flex-flow: row nowrap !important;
-  > h6 {
+  > h3 {
     flex: 0 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+// With the layer editor open the header also carries the move and remove actions. Where title,
+// expand, help and actions don't share a row, the actions drop to their own rather than the title
+// being cut to a stub; each control keeps its full touch target.
+.insights .MuiToolbar-root.insightsTrackHeader:has(> .insightsTrackActions) {
+  flex-wrap: wrap !important;
 }
 
 // Mouse selection remains separate from the one expanded inspection row.
@@ -8392,7 +8419,7 @@ option {
   white-space: nowrap;
   border-radius: var(--radius-sm);
   padding: 4px 8px;
-  background: var(--interactive-strong);
+  background: var(--interactive-blue);
   color: var(--interactive-contrast);
   font-size: var(--font-size-caption);
 }
@@ -8416,7 +8443,7 @@ option {
   flex-shrink: 0;
   width: 40px;
   height: 20px;
-  color: var(--interactive-strong);
+  color: var(--interactive-blue);
 }
 .facilityRowHeader > .facilitySelectionCheckbox.MuiCheckbox-root {
   position: absolute;
@@ -8428,7 +8455,7 @@ option {
   padding: 10px;
   color: var(--font-color-faded);
   &.Mui-checked {
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
   }
 }
 .facilityContextMenu .MuiMenuItem-root {
@@ -8495,6 +8522,7 @@ option {
 
 .utilityAcquisitionHint {
   display: block;
+  margin-top: 4px;
 }
 
 @media (max-width: 390px) {

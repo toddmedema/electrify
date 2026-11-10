@@ -146,6 +146,19 @@ describe("facilityCashBack", () => {
       6,
     );
   });
+
+  it("respects inherited transfer restrictions without forgiving debt", () => {
+    expect(facilityCashBack(aFacility({ cashBackMultiplier: 0 }))).toBe(0);
+    expect(facilityCashBack(aFacility({ cashBackMultiplier: 0.25 }))).toBe(
+      250000,
+    );
+    expect(
+      facilityCashBack(
+        aFacility({ cashBackMultiplier: 0, loanAmountLeft: 400000 }),
+      ),
+    ).toBe(-400000);
+    expect(facilityCashBack(aFacility())).toBe(1000000);
+  });
 });
 
 describe("LCWH", () => {

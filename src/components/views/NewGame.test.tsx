@@ -2,12 +2,14 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../../data/Scenarios";
 import { GameType } from "../../Types";
 import NewGame, { Props } from "./NewGame";
+import { isLegacyCampaignScenario } from "../../data/LegacyCampaign";
 
 function props(overrides: Partial<Props> = {}): Props {
   return {
     game: {} as GameType,
     onBack: jest.fn(),
     onCustomGame: jest.fn(),
+    onCampaign: jest.fn(),
     onDetails: jest.fn(),
     onTutorial: jest.fn(),
     ...overrides,
@@ -37,6 +39,43 @@ const viewAllTutorialsName = `View all ${TUTORIALS.length}`;
 
 describe("NewGame", () => {
   beforeEach(() => localStorage.clear());
+
+  it("opens the campaign between lessons and challenges without listing its generations as challenges", () => {
+    const onCampaign = jest.fn();
+    render(<NewGame {...props({ onCampaign })} />);
+
+    expect(
+      screen
+        .getAllByRole("heading", { level: 2 })
+        .map((heading) => heading.textContent),
+    ).toEqual(["Learn the basics", "Campaign", "Challenges", "Custom game"]);
+    fireEvent.click(
+      screen.getByRole("button", { name: "View legacy campaign" }),
+    );
+    expect(onCampaign).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
+    expect(
+      challengeRows().every(
+        (row) =>
+          !isLegacyCampaignScenario(
+            Number(row.dataset.testid!.replace("mission-row-", "")),
+          ),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps the single-player campaign out of a co-op lobby", () => {
+    render(
+      <NewGame
+        {...props({
+          coop: { role: "host", players: [] } as unknown as Props["coop"],
+        })}
+      />,
+    );
+    expect(
+      screen.queryByTestId("legacy-campaign-entry"),
+    ).not.toBeInTheDocument();
+  });
 
   it("starts with one next lesson and three varied challenge recommendations", () => {
     render(<NewGame {...props()} />);
@@ -117,7 +156,8 @@ describe("NewGame", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
     const scenariosNewestFirst = SCENARIOS.filter(
-      (scenario) => !scenario.tutorialSteps,
+      (scenario) =>
+        !scenario.tutorialSteps && !isLegacyCampaignScenario(scenario.id),
     ).sort(
       (a, b) =>
         b.startingYear - a.startingYear ||
@@ -133,6 +173,20 @@ describe("NewGame", () => {
     );
     expect(screen.getByLabelText("Deep Freeze themes")).toHaveTextContent(
       "Extreme weather",
+    );
+  });
+
+  it("describes each challenge with the one sentence its details screen shows", () => {
+    render(<NewGame {...props()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
+    SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
+      (scenario) => {
+        expect([
+          scenario.name,
+          screen.getByTestId(`mission-row-${scenario.id}`).textContent,
+        ]).toEqual([scenario.name, expect.stringContaining(scenario.summary!)]);
+      },
     );
   });
 
@@ -180,9 +234,10 @@ describe("NewGame", () => {
     fireEvent.click(screen.getByRole("button", { name: "Newest first" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Shortest first" }));
     const shortestDuration = Math.min(
-      ...SCENARIOS.filter((scenario) => !scenario.tutorialSteps).map(
-        (scenario) => scenario.durationMonths,
-      ),
+      ...SCENARIOS.filter(
+        (scenario) =>
+          !scenario.tutorialSteps && !isLegacyCampaignScenario(scenario.id),
+      ).map((scenario) => scenario.durationMonths),
     );
     const firstScenarioId = Number(
       challengeRows()[0].dataset.testid!.replace("mission-row-", ""),
@@ -267,7 +322,7 @@ describe("NewGame", () => {
     );
   });
 
-  it("marks completed lessons with a solid white check", () => {
+  it("marks completed lessons with a solid contrast-colour check", () => {
     recordPlayed(TUTORIALS[0].id);
     /* eslint-disable testing-library/no-container, testing-library/no-node-access --
        The badge's painted tick is the behaviour under test; SVG paths carry no accessible text */
@@ -281,7 +336,7 @@ describe("NewGame", () => {
     /* eslint-enable testing-library/no-container, testing-library/no-node-access */
     // The disc keeps the badge's primary colour; the tick is painted, not cut out of it
     expect(disc).not.toHaveAttribute("fill");
-    expect(tick).toHaveAttribute("fill", "#fff");
+    expect(tick).toHaveAttribute("fill", "var(--interactive-contrast)");
   });
 
   it("starts the recommended tutorial and opens challenge and custom details", () => {

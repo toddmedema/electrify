@@ -1,3 +1,9 @@
+import { useUnlockedDifficulty } from "../../achievements/useAchievements";
+import {
+  unlockedDifficulty,
+  difficultyLockReason,
+} from "../../achievements/DifficultyUnlocks";
+import { achievementJournal } from "../../achievements/Journal";
 import { Button, Stack, Typography } from "@mui/material";
 import ScreenPage from "../base/ScreenPage";
 import { store, useAppSelector } from "../../Store";
@@ -13,7 +19,10 @@ import { resumeSavedGame } from "../../SaveSession";
 import { startWithSaveGuard } from "./StartGame";
 import NewGameDetails from "./NewGameDetails";
 
+const flushTextButton = { "&&": { ml: -1 } } as const;
+
 export default function ChallengeLanding() {
+  const unlockedThrough = useUnlockedDifficulty();
   const href = useAppSelector((s) => s.ui.challengeHref);
   const game = useAppSelector((s) => s.game);
   const route = parseChallengeUrl(href || window.location.href);
@@ -62,14 +71,20 @@ export default function ChallengeLanding() {
           >
             {" "}
             {route?.scenarioId !== undefined
-              ? "Open current mission"
-              : "Choose a mission"}
+              ? "Open current game"
+              : "Choose a game"}
           </Button>
+          {/* Text buttons start flush with the message rather than indented by their padding;
+            the doubled selector outranks the Stack's margin reset. */}
           {(saved || game.inGame) && (
-            <Button onClick={continueGame}>Continue saved game</Button>
+            <Button onClick={continueGame} sx={flushTextButton}>
+              Continue saved game
+            </Button>
           )}
           {route?.scenarioId !== undefined && (
-            <Button onClick={leave}>Back to missions</Button>
+            <Button onClick={leave} sx={flushTextButton}>
+              Back to games
+            </Button>
           )}
         </Stack>
       </ScreenPage>
@@ -84,11 +99,19 @@ export default function ChallengeLanding() {
         difficulty: invitation.run.difficulty,
       }}
       challenge={invitation}
+      unlockedThrough={unlockedThrough}
       onContinue={saved || game.inGame ? continueGame : undefined}
       onBack={leave}
       onDelta={() => undefined}
       onStart={() =>
         startWithSaveGuard(store.dispatch, () => {
+          if (
+            difficultyLockReason(
+              invitation.run.difficulty,
+              unlockedDifficulty(achievementJournal.getSnapshot().progress),
+            )
+          )
+            return;
           const identity = expandAuthoredRunReference(invitation.run);
           if (!identity) return;
           logEvent("challenge_accept", { scenarioId: identity.scenarioId });

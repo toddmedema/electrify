@@ -28,7 +28,7 @@ The model separates a utility's purchased transmission access from the regional 
 
 ## Reproducing the report
 
-Use Node 24 after `npm ci`:
+Use Node 26 after `npm ci`:
 
 ```sh
 CI=true INTERTIE_REPORT_OUTPUT=/private/tmp/intertie-report.json node node_modules/react-scripts/bin/react-scripts.js test --watchAll=false --runInBand --testMatch '**/src/testing/IntertieBalanceReport.tsx'

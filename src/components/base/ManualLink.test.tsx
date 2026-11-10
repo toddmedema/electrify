@@ -11,7 +11,7 @@ function showLink() {
       <ManualLink entry={MANUAL_ENTRY.POWER_AND_ENERGY} />
     </Provider>,
   );
-  return screen.getByRole("button", { name: "What is Power and Energy?" });
+  return screen.getByRole("button", { name: "What is Power and energy?" });
 }
 
 // Runs the hover delay, then the fade the preview leaves on
@@ -22,6 +22,12 @@ function settle() {
 
 function preview() {
   return screen.queryByRole("dialog", { name: "Manual preview" });
+}
+
+// A real mouse reports entering the link, then moving over it
+function hover(link: HTMLElement) {
+  fireEvent.pointerEnter(link, { pointerType: "mouse" });
+  fireEvent.pointerMove(link, { pointerType: "mouse" });
 }
 
 // jsdom has no PointerEvent, so fireEvent would build a plain Event and drop pointerType
@@ -47,7 +53,7 @@ describe("ManualLink", () => {
 
   it("previews its entry while a mouse rests on it and hides it on leaving", () => {
     const link = showLink();
-    fireEvent.pointerEnter(link, { pointerType: "mouse" });
+    hover(link);
     expect(preview()).toBeNull();
     act(() => jest.advanceTimersByTime(300));
     expect(preview()).toHaveTextContent("how fast electricity is produced");
@@ -65,23 +71,42 @@ describe("ManualLink", () => {
     expect(preview()).toBeNull();
   });
 
+  it("ignores a (?) that arrives beneath a mouse that hasn't moved", () => {
+    const link = showLink();
+    fireEvent.pointerEnter(link, { pointerType: "mouse" });
+    settle();
+    expect(preview()).toBeNull();
+    fireEvent.pointerMove(link, { pointerType: "mouse" });
+    settle();
+    expect(preview()).not.toBeNull();
+  });
+
+  it("keeps its open delay running while the mouse keeps moving", () => {
+    const link = showLink();
+    hover(link);
+    act(() => jest.advanceTimersByTime(200));
+    fireEvent.pointerMove(link, { pointerType: "mouse" });
+    act(() => jest.advanceTimersByTime(100));
+    expect(preview()).not.toBeNull();
+  });
+
   it("consumes Escape before workspace navigation and suppresses hover until leaving", () => {
     const link = showLink();
     const workspaceEscape = jest.fn();
     document.addEventListener("keydown", workspaceEscape);
     try {
-      fireEvent.pointerEnter(link, { pointerType: "mouse" });
+      hover(link);
       settle();
       expect(preview()).not.toBeNull();
       fireEvent.keyDown(document.body, { key: "Escape" });
       settle();
       expect(preview()).toBeNull();
       expect(workspaceEscape).not.toHaveBeenCalled();
-      fireEvent.pointerEnter(link, { pointerType: "mouse" });
+      hover(link);
       settle();
       expect(preview()).toBeNull();
       fireEvent.pointerLeave(link, { pointerType: "mouse" });
-      fireEvent.pointerEnter(link, { pointerType: "mouse" });
+      hover(link);
       settle();
       expect(preview()).not.toBeNull();
     } finally {
@@ -91,7 +116,7 @@ describe("ManualLink", () => {
 
   it("leaves touch to the tap, which pins the entry open", () => {
     const link = showLink();
-    fireEvent.pointerEnter(link, { pointerType: "touch" });
+    fireEvent.pointerMove(link, { pointerType: "touch" });
     settle();
     expect(preview()).toBeNull();
     fireEvent.click(link);
@@ -102,7 +127,7 @@ describe("ManualLink", () => {
 
   it("gives way to the pinned entry when clicked mid-hover", () => {
     const link = showLink();
-    fireEvent.pointerEnter(link, { pointerType: "mouse" });
+    hover(link);
     fireEvent.click(link);
     settle();
     expect(preview()).toBeNull();
@@ -112,12 +137,12 @@ describe("ManualLink", () => {
     act(() => {
       store.dispatch(manualHelpClose());
     });
-    fireEvent.pointerEnter(link, { pointerType: "mouse" });
+    hover(link);
     settle();
     expect(preview()).toBeNull();
     // Once the mouse has really left, hovering previews again
     fireEvent.pointerLeave(link, { pointerType: "mouse" });
-    fireEvent.pointerEnter(link, { pointerType: "mouse" });
+    hover(link);
     settle();
     expect(preview()).not.toBeNull();
   });

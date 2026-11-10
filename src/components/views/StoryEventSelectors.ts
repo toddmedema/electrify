@@ -34,9 +34,24 @@ export interface UpcomingStoryEventType {
 let upcomingCache:
   { key: string; events: UpcomingStoryEventType[] } | undefined;
 const NO_UPCOMING: UpcomingStoryEventType[] = [];
+// The result depends only on the game, and store state is immutable, so the same game object
+// always has the same answer; this skips rebuilding the key for each subscriber on each tick.
+let lastGame: AppStateType["game"] | undefined;
+let lastEvents: UpcomingStoryEventType[] | undefined;
 
 /** The one presentation-ready source shared by Events and forecast Insights. */
 export function selectUpcomingStoryEvents(
+  state: AppStateType,
+): UpcomingStoryEventType[] {
+  const game = state.game;
+  if (game === lastGame && lastEvents) return lastEvents;
+  const events = computeUpcomingStoryEvents(state);
+  lastGame = game;
+  lastEvents = events;
+  return events;
+}
+
+function computeUpcomingStoryEvents(
   state: AppStateType,
 ): UpcomingStoryEventType[] {
   const game = state.game;

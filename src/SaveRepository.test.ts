@@ -8,7 +8,15 @@ import type { SaveLease, SaveMetadata, VictoryType } from "./Types";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
 import { createGame } from "./testing/Simulator";
 import { runMonths } from "./testing/SimulationTestHelpers";
-import reducer, { buildTransmissionLine, tickState } from "./reducers/Game";
+import reducer, {
+  buildTransmissionLine,
+  continueLegacyCampaign,
+  tickState,
+} from "./reducers/Game";
+import {
+  firstCompany,
+  closingCompany,
+} from "./testing/LegacyCampaignProtocolFixtures";
 import { acquireUtility } from "./reducers/GameActions";
 import { acquisitionQuote } from "./helpers/Expansion";
 import { copyOfficialGame } from "./testing/OfficialScenarioExecutionFixtures";
@@ -74,6 +82,60 @@ describe("SaveRepository", () => {
       writerToken,
     });
   }
+
+  it("continues one campaign save across a native generation ID without accepting another company's evidence", async () => {
+    const closed = closingCompany();
+    await repository.create({
+      id: "first",
+      name: "Legacy utility",
+      save: serializeSave(closed),
+      scenarioName: "First Light",
+      writerToken: "tab-one",
+    });
+    const otherCompany = reducer(closingCompany(101), continueLegacyCampaign());
+    expect(parseSave(serializeSave(otherCompany))).not.toBeNull();
+    await expect(
+      repository.writeSnapshot(
+        lease(),
+        serializeSave(otherCompany),
+        "Beyond the Dynamo",
+      ),
+    ).rejects.toMatchObject({ code: "invalid" });
+    await expect(
+      repository.writeSnapshot(
+        lease(),
+        serializeSave(fakeSaveGame()),
+        "Rise of Renewables",
+      ),
+    ).rejects.toMatchObject({ code: "invalid" });
+    const successor = reducer(closed, continueLegacyCampaign());
+    const written = await repository.writeSnapshot(
+      lease(),
+      serializeSave(successor),
+      "Beyond the Dynamo",
+    );
+    expect(written.scenarioId).toBe(118);
+    expect((await repository.read("first")).save.game.campaign).toEqual(
+      successor.campaign,
+    );
+  });
+
+  it("can flush a handover when a debounced write skipped the paused boundary snapshot", async () => {
+    await repository.create({
+      id: "first",
+      name: "Legacy utility",
+      save: serializeSave(firstCompany()),
+      scenarioName: "First Light",
+      writerToken: "tab-one",
+    });
+    const successor = reducer(closingCompany(), continueLegacyCampaign());
+    const written = await repository.writeSnapshot(
+      lease(),
+      serializeSave(successor),
+      "Beyond the Dynamo",
+    );
+    expect(written.scenarioId).toBe(118);
+  });
 
   it("persists and reopens a raw first-year rollover with inactive battery meters", async () => {
     const game = createGame({
@@ -268,6 +330,37 @@ describe("SaveRepository", () => {
       code: "incompatible",
     });
     expect(await repository.readRaw("first")).toEqual(original);
+  });
+
+  it("opens a prior-release device save without rewriting it until a successful checkpoint", async () => {
+    const game = createGame({ scenarioId: 101, seed: 31337 });
+    await repository.create({
+      id: "first",
+      name: "Before the update",
+      save: serializeSave(game),
+      scenarioName: "Rise of Renewables",
+      writerToken: "tab-one",
+    });
+    await mutateStoredPayload((payload) => {
+      const save = payload.save as ReturnType<typeof serializeSave>;
+      save.schemaVersion = 8;
+      save.game.runIdentity!.compatibilityId = `rules-1-${"a".repeat(64)}`;
+    });
+    const original = await repository.readRaw("first");
+    const opened = await repository.read("first");
+    expect(opened.save.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(opened.save.game.rulesChanged).toBe(true);
+    expect(opened.save.game.runIdentity).toBeUndefined();
+    expect(opened.save.game.facilities).toEqual(game.facilities);
+    expect(opened.save.game.date).toEqual(game.date);
+    expect(await repository.readRaw("first")).toEqual(original);
+
+    await repository.writeSnapshot(lease(), opened.save, "Rise of Renewables");
+    expect(await repository.readRaw("first")).not.toEqual(original);
+    const reopened = await repository.read("first");
+    expect(reopened.save).toEqual(opened.save);
+    expect(reopened.metadata.revision).toBe(2);
+    expect(reopened.save.game.rulesChanged).toBe(true);
   });
 
   it("acquires metadata, payload and revision atomically and excludes other live writers", async () => {

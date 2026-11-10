@@ -174,7 +174,7 @@ for (const theme of ["light", "dark"] as const) {
           expect(layout.height).toBeLessThanOrEqual(layout.line + 1);
         }
       } else {
-        await expect(metrics).not.toContainText("Typical output");
+        await expect(metrics).not.toContainText("Average output over a year");
         const sparklines = page.locator(".buildOptionSparkline svg");
         await expect(sparklines).toHaveCount(await cards.count());
         const strokes = await sparklines.evaluateAll((lines) =>
@@ -328,7 +328,8 @@ for (const theme of ["light", "dark"] as const) {
       await expectContinuousDialogSurface(dialog);
       const cashValue = dialog
         .locator(".decisionImpactFact")
-        .filter({ hasText: /^Cash purchase/ })
+        // Generators call it the cash option; storage still calls it a cash purchase
+        .filter({ hasText: /^Cash (option|purchase)/ })
         .locator(".decisionImpactFactValue");
       const loanFact = dialog
         .locator(".decisionImpactFact")
@@ -486,7 +487,7 @@ for (const theme of ["light", "dark"] as const) {
     const maxSize = battery.getByRole("button", { name: "Use max size" });
     await expect(maxSize).toBeVisible();
     await expect(battery.locator(".MuiCardHeader-root")).toContainText(
-      "This project size is not available",
+      "This size can't be built",
     );
     await expect(battery.locator(".buildOptionWarning")).toHaveCount(0);
     expect(
@@ -534,7 +535,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("option", { name: "2030", exact: true }).click();
     await page
       .locator(".customSetupActions")
-      .getByRole("button", { name: "Play", exact: true })
+      .getByRole("button", { name: "Start game", exact: true })
       .click();
     await expect(page.locator("#appbar:visible").first()).toBeVisible();
     const build = await openBuild(page);
@@ -601,5 +602,45 @@ for (const theme of ["light", "dark"] as const) {
         ),
       )
       .toBe(true);
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`solar purchase offers only trackers in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=108");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const build = await openBuild(page);
+    await build.getByRole("tab", { name: "Generators", exact: true }).click();
+    await build.getByRole("slider", { name: /^Capacity/ }).press("Home");
+    await build
+      .getByRole("button", { name: "Review purchase of Solar", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("checkbox")).toHaveCount(1);
+    const option = dialog.getByRole("checkbox", { name: /^Solar trackers/ });
+    await expect(option).not.toBeChecked();
+    await option.check();
+    await expect(option).toBeChecked();
+    if (
+      process.env.REVIEW_SCREENSHOT_DIR &&
+      ((theme === "dark" && info.project.name === "desktop-chromium") ||
+        (theme === "light" && info.project.name === "mobile-390px"))
+    ) {
+      await dialog.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `solar-build-options-${info.project.name}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+    await dialog.getByRole("button", { name: "close", exact: true }).click();
   });
 }

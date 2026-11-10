@@ -2,6 +2,7 @@ import path from "path";
 import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
+import { readSavedGame } from "./save-fixture";
 
 test("public pricing shows the rate score and the customer retention objective", async ({
   page,
@@ -156,5 +157,61 @@ for (const theme of ["light", "dark"]) {
       path: testInfo.outputPath(`customer-precision-${theme}.png`),
       animations: "disabled",
     });
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`investor pricing can follow inflation in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=100");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const programs = page.getByRole("region", {
+      name: "Programs",
+      exact: true,
+    });
+    await openPane(
+      programs,
+      page.getByRole("button", { name: "Programs", exact: true }),
+    );
+    const pricing = programs.getByRole("region", {
+      name: "Electricity pricing",
+    });
+    const follow = pricing.getByRole("switch", { name: "Follow inflation" });
+    await expect(follow).not.toBeChecked();
+    await follow.check();
+    await expect(follow).toBeChecked();
+    await expect
+      .poll(async () => (await readSavedGame(page))?.rateFollowsInflation)
+      .toBe(true);
+    await expect(pricing).toContainText("Market");
+    expect(
+      await programs
+        .locator(".customerProgramsBody")
+        .evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    const label = await pricing
+      .getByText("Follow inflation", { exact: true })
+      .boundingBox();
+    expect(label!.height).toBeLessThanOrEqual(24);
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await pricing.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `investor-pricing-${info.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+    await pricing.getByRole("slider").press("ArrowRight");
+    await expect(follow).not.toBeChecked();
+    await expect
+      .poll(async () => (await readSavedGame(page))?.rateFollowsInflation)
+      .toBe(false);
   });
 }

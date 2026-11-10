@@ -687,6 +687,76 @@ export function baselinePlugin(stroke: string): uPlot.Plugin {
   };
 }
 
+/**
+ * A rule across the plot at zero, for a chart whose series run to either side of it. Drawn after
+ * the series so a filled area cannot cover it.
+ */
+export function zeroLinePlugin(stroke: string): uPlot.Plugin {
+  return {
+    hooks: {
+      draw: (u: uPlot) => {
+        const y = u.valToPos(0, "y", true);
+        u.ctx.save();
+        clipToPlot(u);
+        u.ctx.strokeStyle = stroke;
+        u.ctx.lineWidth = uPlot.pxRatio;
+        u.ctx.setLineDash([]);
+        u.ctx.beginPath();
+        u.ctx.moveTo(u.bbox.left, y);
+        u.ctx.lineTo(u.bbox.left + u.bbox.width, y);
+        u.ctx.stroke();
+        u.ctx.restore();
+      },
+    },
+  };
+}
+
+/**
+ * The line texture a flow of power is filled with: vertical rules for power arriving over an
+ * intertie, diagonal ones for storage. The texture lets a series be told apart without its
+ * colour, and the tile is built on first use because it needs the canvas the plot draws on.
+ *
+ * `opaque` lays a solid chart-surface wash under the texture, for a load that allocates the
+ * production beneath it and must not let that tint bleed through.
+ */
+export function patternFill(
+  kind: "hatch" | "vertical",
+  opaque = false,
+): uPlot.Series["fill"] {
+  const palette = chartPalette();
+  let pattern: CanvasPattern | null = null;
+  return (u) => {
+    if (!pattern) {
+      const tile = document.createElement("canvas");
+      const ratio = uPlot.pxRatio;
+      tile.width = tile.height = 16 * ratio;
+      const ctx = tile.getContext("2d")!;
+      ctx.scale(ratio, ratio);
+      if (opaque) {
+        ctx.fillStyle = palette.background;
+        ctx.fillRect(0, 0, 16, 16);
+      }
+      ctx.fillStyle = palette.powerFlowFill;
+      ctx.fillRect(0, 0, 16, 16);
+      ctx.strokeStyle = palette.powerFlowPattern;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      if (kind === "hatch") {
+        ctx.moveTo(-8, 16);
+        ctx.lineTo(16, -8);
+        ctx.moveTo(8, 16);
+        ctx.lineTo(16, 8);
+      } else {
+        ctx.moveTo(8.5, 0);
+        ctx.lineTo(8.5, 16);
+      }
+      ctx.stroke();
+      pattern = u.ctx.createPattern(tile, "repeat");
+    }
+    return pattern || palette.powerFlowFill;
+  };
+}
+
 /** Scenario-event onset markers shared by the stacked Insight charts. */
 export function eventMarkersPlugin(
   getMarkers: () => ChartEventMarker[],
@@ -694,6 +764,24 @@ export function eventMarkersPlugin(
   fontScale = 1,
 ): uPlot.Plugin {
   return {
+    opts: (_plot, options) => {
+      const padding: uPlot.Padding = options.padding
+        ? [...options.padding]
+        : [null, null, null, null];
+      const originalTop = padding[0];
+      // Give event numbers a row above the data instead of painting over chart captions
+      // or the series. Every stacked chart reserves the same band, even when panned.
+      padding[0] = (plot, side, sides, cycle) => {
+        const top =
+          typeof originalTop === "function"
+            ? originalTop(plot, side, sides, cycle)
+            : (originalTop ?? 0);
+        return (
+          top + (getMarkers().length ? 24 * getTextScale() * fontScale : 0)
+        );
+      };
+      options.padding = padding;
+    },
     hooks: {
       draw: (u: uPlot) => {
         const domainMin = u.scales.x.min;
@@ -709,8 +797,10 @@ export function eventMarkersPlugin(
           return;
         }
         const scale = canvasScale(u);
+        const markerScale = uPlot.pxRatio * getTextScale() * fontScale;
         const palette = chartPalette();
         const activeKey = getActiveKey();
+        u.ctx.save();
         u.ctx.save();
         clipToPlot(u);
         u.ctx.setLineDash([4 * scale, 3 * scale]);
@@ -724,56 +814,87 @@ export function eventMarkersPlugin(
           u.ctx.moveTo(x, u.bbox.top);
           u.ctx.lineTo(x, u.bbox.top + u.bbox.height);
           u.ctx.stroke();
-
-          const radius = 8 * scale * fontScale;
-          const badgeY = u.bbox.top + radius + 2 * scale;
+        }
+        u.ctx.restore();
+        const radius = 8 * markerScale;
+        const badgeY = u.bbox.top - 12 * markerScale;
+        // Match the rail's numbers without letting close event dates paint over one another.
+        // A compact range shares one badge; the onset guides below retain every real date.
+        u.ctx.font = chartFont(1, (12 * markerScale) / getTextScale());
+        const groupBadge = (events: ChartEventMarker[]) => {
+          const numbers = events.map((event) => event.number);
+          const consecutive = numbers.every(
+            (number, index) => number === numbers[0] + index,
+          );
+          const label =
+            numbers.length > 1 && consecutive
+              ? `${numbers[0]}–${numbers.at(-1)}`
+              : numbers.join(", ");
+          const width = Math.max(
+            radius * 2,
+            u.ctx.measureText(label).width + 8 * markerScale,
+          );
+          const center =
+            (u.valToPos(events[0].x, "x", true) +
+              u.valToPos(events.at(-1)!.x, "x", true)) /
+            2;
+          const x = Math.max(
+            u.bbox.left + width / 2,
+            Math.min(
+              u.bbox.left + u.bbox.width - width / 2,
+              Math.round(center) + 0.5,
+            ),
+          );
+          return { events, label, width, x };
+        };
+        const groups: ReturnType<typeof groupBadge>[] = [];
+        for (const marker of [...markers].sort((a, b) => a.x - b.x)) {
+          let group = groupBadge([marker]);
+          while (groups.length) {
+            const previous = groups.at(-1)!;
+            if (
+              previous.x + previous.width / 2 + 4 * markerScale <
+              group.x - group.width / 2
+            )
+              break;
+            groups.pop();
+            group = groupBadge([...previous.events, ...group.events]);
+          }
+          groups.push(group);
+        }
+        for (const group of groups) {
+          const active = group.events.some(
+            (marker) => marker.key === activeKey,
+          );
           u.ctx.globalAlpha = 1;
           u.ctx.setLineDash([]);
           u.ctx.fillStyle = palette.background;
           u.ctx.strokeStyle = palette.interactive;
           u.ctx.lineWidth = (active ? 2 : 1) * uPlot.pxRatio;
+          for (const marker of group.events) {
+            u.ctx.beginPath();
+            u.ctx.moveTo(group.x, badgeY + radius);
+            u.ctx.lineTo(u.valToPos(marker.x, "x", true), u.bbox.top);
+            u.ctx.stroke();
+          }
           u.ctx.beginPath();
-          u.ctx.arc(x, badgeY, radius, 0, Math.PI * 2);
+          if (group.width <= radius * 2)
+            u.ctx.arc(group.x, badgeY, radius, 0, Math.PI * 2);
+          else
+            u.ctx.roundRect(
+              group.x - group.width / 2,
+              badgeY - radius,
+              group.width,
+              radius * 2,
+              radius,
+            );
           u.ctx.fill();
           u.ctx.stroke();
           u.ctx.fillStyle = palette.interactive;
-          // The badge geometry already contains the selected text scale.
-          u.ctx.font = chartFont(1, (10 * scale * fontScale) / getTextScale());
           u.ctx.textAlign = "center";
           u.ctx.textBaseline = "middle";
-          u.ctx.fillText(String(marker.number), x, badgeY);
-          u.ctx.setLineDash([4 * scale, 3 * scale]);
+          u.ctx.fillText(group.label, group.x, badgeY);
         }
-        u.ctx.restore();
-      },
-    },
-  };
-}
-
-/**
- * A caption over the plot, which the finance charts carry instead of a legend. Centred on the
- * plot rather than on a fixed offset, since the y axis is only as wide as its labels and so a
- * chart of percentages and a chart of dollars no longer start in the same place.
- */
-export function titlePlugin(
-  getTitle: () => string,
-  designY: number,
-  fontScale = 1,
-): uPlot.Plugin {
-  return {
-    hooks: {
-      draw: (u: uPlot) => {
-        const title = getTitle();
-        if (!title) {
-          return;
-        }
-        const scale = canvasScale(u);
-        u.ctx.save();
-        u.ctx.font = chartFont(uPlot.pxRatio, 14 * fontScale);
-        u.ctx.fillStyle = chartPalette().legendText;
-        u.ctx.textAlign = "center";
-        u.ctx.textBaseline = "middle";
-        u.ctx.fillText(title, u.bbox.left + u.bbox.width / 2, designY * scale);
         u.ctx.restore();
       },
     },

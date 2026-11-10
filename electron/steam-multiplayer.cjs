@@ -16,6 +16,15 @@ const DECLARATIONS = {
   relay: "void SteamAPI_ISteamNetworkingUtils_InitRelayNetworkAccess(void *)",
   create: "uint64_t SteamAPI_ISteamMatchmaking_CreateLobby(void *, int, int)",
   join: "uint64_t SteamAPI_ISteamMatchmaking_JoinLobby(void *, uint64_t)",
+  list: "uint64_t SteamAPI_ISteamMatchmaking_RequestLobbyList(void *)",
+  stringFilter:
+    "void SteamAPI_ISteamMatchmaking_AddRequestLobbyListStringFilter(void *, const char *, const char *, int)",
+  distanceFilter:
+    "void SteamAPI_ISteamMatchmaking_AddRequestLobbyListDistanceFilter(void *, int)",
+  resultLimit:
+    "void SteamAPI_ISteamMatchmaking_AddRequestLobbyListResultCountFilter(void *, int)",
+  lobbyByIndex:
+    "uint64_t SteamAPI_ISteamMatchmaking_GetLobbyByIndex(void *, int)",
   leave: "void SteamAPI_ISteamMatchmaking_LeaveLobby(void *, uint64_t)",
   members:
     "int SteamAPI_ISteamMatchmaking_GetNumLobbyMembers(void *, uint64_t)",
@@ -69,8 +78,9 @@ const LOBBY_ENTER_SIZE = WIN32_PACKING ? 24 : 20;
 const LOBBY_ENTER_RESPONSE_OFFSET = 16;
 // EChatRoomEnterResponse::k_EChatRoomEnterResponseSuccess.
 const CHAT_ROOM_ENTER_SUCCESS = 1;
-// ELobbyType::k_ELobbyTypeFriendsOnly, and the largest co-op match.
-const LOBBY_TYPE_FRIENDS_ONLY = 1;
+// Invisible lobbies support code lookup without appearing in friends' lobby lists.
+// Friends-only lobbies cannot be returned by RequestLobbyList.
+const LOBBY_TYPE_INVISIBLE = 3;
 const MAX_LOBBY_MEMBERS = 4;
 // EResult::k_EResultOK and k_EResultLimitExceeded (the send queue is full; retry later).
 const RESULT_OK = 1;
@@ -128,6 +138,7 @@ const MESSAGE_MAGIC = "ELM2";
 const SCENARIO_MAGIC = "ELS1";
 const ID = /^[0-9]{17}$/;
 const LOBBY_ID = /^[0-9]{17,20}$/;
+const INVITE_CODE = /^[0-9]{6}$/;
 function lobbyFromArgs(args) {
   const index = args.indexOf("+connect_lobby");
   const id = index < 0 ? "" : args[index + 1];
@@ -393,6 +404,7 @@ class SteamMultiplayer {
       available: true,
       inviteLobbyId: this.pendingInvite,
       lobbyId: this.lobby?.toString(),
+      inviteCode: this.inviteCode,
       hostId: this.hostId,
       selfId: this.service.identity.steamId,
       members: this.roster || [],
@@ -437,13 +449,38 @@ class SteamMultiplayer {
       };
     });
   }
+  async findCode(code) {
+    // ELobbyComparisonEqual = 0; worldwide distance = 3. Two results let us
+    // reject a collision instead of silently connecting to the wrong friend's game.
+    this.api.stringFilter(this.matchmaking, "electrify", "realtime-v1", 0);
+    this.api.stringFilter(this.matchmaking, "invite-code", code, 0);
+    this.api.distanceFilter(this.matchmaking, 3);
+    this.api.resultLimit(this.matchmaking, 2);
+    const result = await this.dispatcher.callResult(
+      this.api.list(this.matchmaking),
+      { callback: 510, size: 4 }, // LobbyMatchList_t: uint32 m_nLobbiesMatching
+    );
+    return Array.from({ length: Math.min(2, result.readUInt32LE(0)) }, (_, i) =>
+      this.api.lobbyByIndex(this.matchmaking, i),
+    );
+  }
   async create(rules) {
     if (!RULES.test(rules)) throw new Error("Invalid game version");
     this.leave();
+    let code;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const candidate = crypto.randomInt(1000000).toString().padStart(6, "0");
+      if (!(await this.findCode(candidate)).length) {
+        code = candidate;
+        break;
+      }
+    }
+    if (!code)
+      throw new Error("Steam could not allocate an invite code. Try again.");
     const result = await this.dispatcher.callResult(
       this.api.create(
         this.matchmaking,
-        LOBBY_TYPE_FRIENDS_ONLY,
+        LOBBY_TYPE_INVISIBLE,
         MAX_LOBBY_MEMBERS,
       ),
       { callback: LOBBY_CREATED_CALLBACK, size: LOBBY_CREATED_SIZE },
@@ -452,9 +489,18 @@ class SteamMultiplayer {
       throw new Error("Steam could not create the lobby");
     this.lobby = result.readBigUInt64LE(LOBBY_CREATED_LOBBY_OFFSET);
     this.hostId = this.service.identity.steamId;
-    this.api.setData(this.matchmaking, this.lobby, "electrify", "realtime-v1");
-    this.api.setData(this.matchmaking, this.lobby, "rules", rules);
-    this.api.setData(this.matchmaking, this.lobby, "host", this.hostId);
+    for (const [key, value] of Object.entries({
+      electrify: "realtime-v1",
+      rules,
+      host: this.hostId,
+      "invite-code": code,
+    })) {
+      if (!this.api.setData(this.matchmaking, this.lobby, key, value)) {
+        this.leave();
+        throw new Error("Steam could not publish the invite code. Try again.");
+      }
+    }
+    this.inviteCode = code;
     this.listener = this.api.listen(this.sockets, 0, 0, null);
     if (!this.listener) {
       this.leave();
@@ -466,12 +512,23 @@ class SteamMultiplayer {
   }
   async join(id, rules) {
     if (
-      !LOBBY_ID.test(id) ||
+      typeof id !== "string" ||
+      !(INVITE_CODE.test(id) || LOBBY_ID.test(id)) ||
       BigInt(id) > 18446744073709551615n ||
       !RULES.test(rules)
     )
       throw new Error("Enter a valid lobby code");
     this.leave();
+    if (INVITE_CODE.test(id)) {
+      const matches = await this.findCode(id);
+      if (matches.length !== 1)
+        throw new Error(
+          matches.length
+            ? "This invite code is ambiguous. Ask your friend to host again."
+            : "No game found. Check the six-digit code and ask your friend to keep the lobby open.",
+        );
+      id = matches[0].toString();
+    }
     const lobby = BigInt(id);
     const result = await this.dispatcher.callResult(
       this.api.join(this.matchmaking, lobby),
@@ -499,6 +556,8 @@ class SteamMultiplayer {
       );
     }
     this.error = undefined;
+    const code = this.api.data(this.matchmaking, lobby, "invite-code");
+    this.inviteCode = INVITE_CODE.test(code) ? code : undefined;
     this.refresh();
     this.connectHost();
     return this.state();
@@ -871,6 +930,7 @@ class SteamMultiplayer {
     if (this.listener) this.api.closeListen(this.sockets, this.listener);
     if (this.lobby) this.api.leave(this.matchmaking, this.lobby);
     this.lobby = undefined;
+    this.inviteCode = undefined;
     this.listener = undefined;
     this.hostId = undefined;
     this.roster = [];
@@ -929,8 +989,9 @@ class SteamMultiplayer {
         this.allowed = null;
         return this.state();
       case "invite":
-        if (this.lobby)
-          this.api.invite(this.service.native.friends(), this.lobby);
+        if (!this.lobby) throw new Error("Host a game before inviting friends");
+        this.service.requireOverlay();
+        this.api.invite(this.service.native.friends(), this.lobby);
         return;
       case "lock":
         if (

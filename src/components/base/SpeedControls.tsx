@@ -4,11 +4,13 @@ import PauseIcon from "@mui/icons-material/Pause";
 import PersonIcon from "@mui/icons-material/Person";
 import { TICK_MS } from "../../Constants";
 import { GameType, SpeedType } from "../../Types";
+import "./SpeedControls.scss";
 
 export interface SpeedOptionsProps {
   speed: SpeedType;
   onSpeedChange: (speed: SpeedType) => void;
   desktop: boolean;
+  disabled?: boolean;
   multiplayer?: MultiplayerSpeedOptionsProps;
 }
 
@@ -66,7 +68,7 @@ function describeSharedClock(
     })
     .join(". ");
   const reason = multiplayer.reason ? `${multiplayer.reason}. ` : "";
-  return `Game speed: ${selectionLabel(multiplayer.activeSpeed)}. Your selection: ${selectionLabel(speed)}. ${reason}${players}.${resume ? " Select a speed to resume." : ""}`;
+  return `Game speed: ${selectionLabel(multiplayer.activeSpeed)}. Your selection: ${selectionLabel(speed)}. The slowest player sets the game speed. Any paused player pauses everyone. ${reason}${players}.${resume ? " Select a speed to resume." : ""}`;
 }
 
 /** Hovering a shared-clock speed names every player at it, by their Steam name. */
@@ -77,8 +79,7 @@ function playersAtSpeed(
   const names = multiplayer.players
     .filter(
       (player) =>
-        player.selectedSpeed === option ||
-        (option === "PAUSED" && !!player.pauseReason),
+        (player.pauseReason ? "PAUSED" : player.selectedSpeed) === option,
     )
     .map((player) => {
       const you = player.id === multiplayer.selfId ? " (you)" : "";
@@ -91,8 +92,10 @@ function playersAtSpeed(
   return `${selectionLabel(option)}: ${names.length ? names.join(", ") : "nobody"}`;
 }
 
+/** Keep a player's requested selection distinct from the clock's effective running speed.
+ * Shared-clock reselections are emitted too, preserving quick reversals and explicit readiness. */
 function speedOptions(
-  { speed, onSpeedChange, desktop, multiplayer }: SpeedOptionsProps,
+  { speed, onSpeedChange, desktop, multiplayer, disabled }: SpeedOptionsProps,
   descriptionId?: string,
 ): React.JSX.Element {
   const resume = !!multiplayer?.readyRequired && !multiplayer.ready;
@@ -106,6 +109,7 @@ function speedOptions(
           multiplayer ? "speedToggles multiplayerSpeedToggles" : "speedToggles"
         }
         exclusive
+        disabled={disabled}
         size="small"
         value={speed}
         onChange={(_event, next: SpeedType | null) => {
@@ -134,8 +138,8 @@ function speedOptions(
             multiplayer?.players.filter(
               (player) =>
                 player.id !== multiplayer.selfId &&
-                (player.selectedSpeed === option ||
-                  (option === "PAUSED" && !!player.pauseReason)),
+                (player.pauseReason ? "PAUSED" : player.selectedSpeed) ===
+                  option,
             ) || [];
           return (
             <ToggleButton
@@ -161,7 +165,7 @@ function speedOptions(
                   sx={{ position: "absolute", inset: 0, pointerEvents: "none" }}
                 >
                   {/* One neutral marker per other player, filling slots from the left on a
-                      12 px pitch about the centre, so the side slots clear the active ring.
+                      12 px pitch about the centre, so the side slots clear your selection ring.
                       Who chose what is in the title and description, not marker colour. */}
                   {peers.map((player, slot) => (
                     <PersonIcon

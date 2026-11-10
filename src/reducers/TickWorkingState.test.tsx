@@ -173,34 +173,33 @@ describe("live tick working state", () => {
     expect(actual.eventLog).not.toBe(state.eventLog);
   });
 
-  it.each<FacilityUpgradeType>([
-    "hailResistant",
-    "coldWeatherPackage",
-    "combinedCycle",
-  ])("isolates a completed %s retrofit", (upgrade) => {
-    const state = createGame({ scenarioId: 104, seed: 61 });
-    const facility = state.facilities.find(
-      (item) => item.gasCycle === "simple",
-    )!;
-    facility.upgradeInProgress = {
-      upgrade,
-      cost: 1,
-      startsMinute: 0,
-      completesMinute: TICK_MINUTES,
-    };
-    const before = mutableCopy(state);
-    const expected = mutableCopy(state);
-    tickState(expected);
-    freeze(state, true);
+  it.each<FacilityUpgradeType>(["coldWeatherPackage", "combinedCycle"])(
+    "isolates a completed %s retrofit",
+    (upgrade) => {
+      const state = createGame({ scenarioId: 104, seed: 61 });
+      const facility = state.facilities.find(
+        (item) => item.gasCycle === "simple",
+      )!;
+      facility.upgradeInProgress = {
+        upgrade,
+        cost: 1,
+        startsMinute: 0,
+        completesMinute: TICK_MINUTES,
+      };
+      const before = mutableCopy(state);
+      const expected = mutableCopy(state);
+      tickState(expected);
+      freeze(state, true);
 
-    const actual = draftTick(state);
+      const actual = draftTick(state);
 
-    expectSameState(actual, expected);
-    expectSameState(state, before);
-    expect(
-      actual.facilities.find((item) => item.id === facility.id),
-    ).not.toHaveProperty("upgradeInProgress");
-  });
+      expectSameState(actual, expected);
+      expectSameState(state, before);
+      expect(
+        actual.facilities.find((item) => item.id === facility.id),
+      ).not.toHaveProperty("upgradeInProgress");
+    },
+  );
 
   it("isolates completion of the tutorial intertie exercise and its forecast", () => {
     const state = createGame({ scenarioId: 112, seed: 61 });

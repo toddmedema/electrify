@@ -99,6 +99,31 @@ it("waits behind another prompt and never offers above the threshold", () => {
   expect(store.getState().ui.dialog.open).toBe(false);
 });
 
+it("lets a small campaign utility operate until its actual forecast needs a rate increase", () => {
+  const game = createGame({ scenarioId: 117, seed: 123 });
+  expect(currentTick(game)!.cash).toBeLessThan(100_000);
+  store.dispatch(resume(game));
+  store.dispatch(loaded());
+  store.dispatch(offerLowCashWarning());
+  expect(store.getState().ui.dialog.open).toBe(false);
+  expect(store.getState().game.lowCashWarningMonth).toBe(0);
+
+  store.dispatch(delta({ dollarsPerkWh: 0 }));
+  const cashStarved = { ...store.getState().game };
+  cashStarved.date = { ...cashStarved.date, monthsElapsed: 1 };
+  cashStarved.timeline = cashStarved.timeline.map((tick) => ({
+    ...tick,
+    cash: 1,
+  }));
+  store.dispatch(resume(cashStarved));
+  store.dispatch(loaded());
+  store.dispatch(offerLowCashWarning());
+  expect(store.getState().ui.dialog.title).toBe("Low on cash. Raise rates?");
+  expect(store.getState().ui.dialog.message).toContain(
+    "to avoid bankruptcy this month.",
+  );
+});
+
 it("explains the board cap instead of offering a price that cannot be applied", () => {
   const game = createGame({ scenarioId: 104, seed: 123 });
   currentTick(game)!.cash = -1e12;
@@ -111,4 +136,18 @@ it("explains the board cap instead of offering a price that cannot be applied", 
   );
   expect(dialog.message).toContain("Even the maximum rate");
   expect(dialog.action).toBeUndefined();
+  expect(dialog.title).toBe("Low on cash");
+  expect(dialog.secondaryLabel).toBe("Go bankrupt");
+});
+
+it("does not call a decline bankruptcy when current rates cover costs", () => {
+  const game = createGame({ scenarioId: 100, seed: 123 });
+  currentTick(game)!.cash = 90_000;
+  game.dollarsPerkWh = 10;
+  store.dispatch(resume(game));
+  store.dispatch(loaded());
+  store.dispatch(offerLowCashWarning());
+  const dialog = store.getState().ui.dialog;
+  expect(dialog.message).toContain("Current rates cover this month's costs.");
+  expect(dialog.secondaryLabel).toBe("Keep current rates");
 });

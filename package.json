@@ -30,7 +30,7 @@
     "@testing-library/user-event": "^14.6.6",
     "@types/jest": "^27.5.2",
     "@types/lodash.clonedeep": "^4.5.9",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.0.0",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@types/react-transition-group": "^4.4.12",
@@ -50,7 +50,7 @@
     "test:once": "node scripts/dev/run.js jest test --watchAll=false",
     "test:ci": "node scripts/dev/run.js jest test --watchAll=false --coverage --testMatch=\"**/src/**/*.{spec,test}.{js,jsx,ts,tsx}\" --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=\"\\.sim\\.test\\.\"",
     "test:sim": "node scripts/dev/run.js jest test --watchAll=false --testMatch=\"**/src/**/*.sim.test.{ts,tsx}\"",
-    "test:ci-tools": "node --test --test-concurrency=4 scripts/ci/*.test.js",
+    "test:ci-tools": "node --test --test-concurrency=2 scripts/ci/*.test.js",
     "test:ci-all": "node scripts/dev/run.js ci-tests",
     "test:ci-coverage": "node scripts/ci/coverage.js test-results 1",
     "test:e2e": "node scripts/dev/run.js playwright test --config e2e/playwright.config.ts",
@@ -61,16 +61,17 @@
     "mods:arcs": "node scripts/mods-arcs.js",
     "premods:arcs": "npm run compatibility:generate",
     "perf:bench": "node scripts/dev/run.js bench",
+    "perf:build-forecast": "node scripts/dev/run.js jest test --watchAll=false --runInBand --testMatch=\"**/src/testing/BuildForecastBench.tsx\"",
     "perf:bundle": "node scripts/perf/bundle-size.js",
     "perf:rebaseline": "node scripts/perf/rebaseline.js",
     "fetch-weather": "node scripts/fetch-weather.js",
     "update-weather": "node scripts/update-weather.js",
     "fetch-watersheds": "node scripts/fetch-watersheds.js",
     "eject": "react-scripts eject",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\"",
-    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\" --max-warnings=0",
-    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\" --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"site/**/*.{js,json}\" \"public/scenarios.css\" \"e2e/**/*.ts\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"site/**/*.{js,json}\" \"public/scenarios.css\" \"e2e/**/*.ts\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"site/**/*.js\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\" --max-warnings=0",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"site/**/*.js\" \"electron/**/*.cjs\" \"firebase/functions/**/*.cjs\" --fix",
     "typecheck": "node scripts/dev/run.js types",
     "check": "node scripts/dev/run.js check",
     "check:ci": "node scripts/dev/run.js check --ci",
@@ -82,6 +83,8 @@
     "deploy": "./scripts/deploy.sh",
     "compatibility:generate": "node scripts/run-compatibility.js",
     "icons:generate": "node scripts/generate-icon-manifest.js",
+    "site:generate": "node scripts/site/generate.js",
+    "site:check": "node scripts/site/generate.js --check",
     "achievements:artwork": "node steamworks/achievement-artwork/export.cjs",
     "desktop:build": "node scripts/dev/run.js desktop-build",
     "desktop:start": "electron .",
@@ -316,7 +319,7 @@
     ]
   },
   "engines": {
-    "node": ">= 24 < 25"
+    "node": ">= 26 < 27"
   },
   "jest": {
     "extraGlobals": [

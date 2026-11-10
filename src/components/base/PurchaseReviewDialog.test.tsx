@@ -72,6 +72,31 @@ describe("PurchaseReviewDialog", () => {
     expect(onPurchase).toHaveBeenCalledWith(true);
   });
 
+  it("explains a disabled cash purchase and leads with the loan instead", () => {
+    const { button } = renderDialog();
+    const shortfall = `${formatMoneyConcise(1000000)} more cash needed.`;
+    expect(screen.getByText(shortfall)).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Pay cash" }),
+    ).toHaveAccessibleDescription(shortfall);
+    expect(button("Pay cash")).toHaveClass("MuiButton-outlined");
+    expect(button("Take loan")).toHaveClass("MuiButton-contained");
+  });
+
+  it("leaves neither choice emphasised over a disabled loan when neither is affordable", () => {
+    const { button } = renderDialog({ cash: 100000 });
+    expect(button("Take loan")).toBeDisabled();
+    expect(button("Take loan")).toHaveClass("MuiButton-outlined");
+    expect(button("Pay cash")).toHaveClass("MuiButton-contained");
+  });
+
+  it("keeps cash as the lead choice when it is affordable", () => {
+    const { button } = renderDialog({ cash: 1e9 });
+    expect(screen.queryByText(/more cash needed/)).toBeNull();
+    expect(button("Pay cash")).toHaveClass("MuiButton-contained");
+    expect(button("Take loan")).toHaveClass("MuiButton-outlined");
+  });
+
   it("keeps transaction fees cash-only for both payment choices", () => {
     const { button } = renderDialog({ cash: 450000, cashOnlyFee: 100000 });
     const terms = purchaseTerms(2000000, true, 0.05);

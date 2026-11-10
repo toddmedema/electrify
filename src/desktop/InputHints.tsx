@@ -1,9 +1,15 @@
-import { useSyncExternalStore } from "react";
-import type { DesktopInputAction } from "../Desktop";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { Button } from "@mui/material";
+import { useAppDispatch } from "../Store";
+import { dialogOpen } from "../reducers/GameActions";
+import { useTvLayout } from "../TvLayout";
+import type { DesktopInputAction, DesktopInputFrame } from "../Desktop";
 import {
   getInputPresentation,
   subscribeInputPresentation,
 } from "./InputPresentation";
+import { editableTextControl } from "./InputText";
+import ControllerGlyph from "./ControllerGlyph";
 import "./Input.scss";
 
 const menuHints: [DesktopInputAction, string][] = [
@@ -24,42 +30,177 @@ const gameHints: [DesktopInputAction, string][] = [
   ["previousChart", "Previous chart"],
   ["nextChart", "Next chart"],
 ];
+type Hint = [DesktopInputAction, string];
+function contextualHints(target: Element | null, gameplay: boolean): Hint[] {
+  if (target?.matches('input[type="range"],[role="slider"]'))
+    return [
+      ["left", "Adjust value"],
+      ["down", "Next control"],
+      ["back", "Back"],
+    ];
+  if (target?.matches('.accessibleChart > [role="img"]'))
+    return [
+      ["confirm", "Inspect time"],
+      ["left", "Read points"],
+      ["back", "Close details"],
+    ];
+  if (target?.matches("[data-rfd-drag-handle-draggable-id]"))
+    return [
+      ["confirm", "Lift / drop"],
+      ["up", "Move priority"],
+      ["back", "Cancel reorder"],
+    ];
+  return [
+    ["down", "Navigate"],
+    ["confirm", editableTextControl(target) ? "Edit text" : "Select"],
+    ["back", gameplay ? "Back / menu" : "Back"],
+    ...(gameplay ? [["pause", "Pause / resume"] as Hint] : []),
+  ];
+}
+
+/** Follow live device and focus context while retaining the disconnect-resume notice.
+ * Couch callers may keep the hint area's geometry stable when pointer input takes over. */
 export default function InputHints() {
   const state = useSyncExternalStore(
     subscribeInputPresentation,
     getInputPresentation,
   );
-  if (!state.active && !state.pausedAfterDisconnect) return null;
+  const tvMode = useTvLayout();
+  const dispatch = useAppDispatch();
+  const [focused, setFocused] = useState<Element | null>(
+    document.activeElement,
+  );
+  useEffect(() => {
+    const update = () => setFocused(document.activeElement);
+    document.addEventListener("focusin", update);
+    return () => document.removeEventListener("focusin", update);
+  }, []);
+  const showActions =
+    state.connected && (state.active || !!window.electrifyCouch);
+  if (!showActions && !state.pausedAfterDisconnect) return null;
+  const hints = tvMode
+    ? contextualHints(focused, state.context === "Gameplay")
+    : state.context === "Gameplay"
+      ? gameHints
+      : menuHints;
   return (
-    <aside className="controllerHints" aria-label="Controller controls">
-      {state.pausedAfterDisconnect && (
-        <p role="status">
-          {state.connected
-            ? "Controller reconnected."
-            : "Controller disconnected."}{" "}
-          Game paused. Select a speed to resume when ready.
-        </p>
+    <>
+      <aside className="controllerHints" aria-label="Controller controls">
+        {state.pausedAfterDisconnect && (
+          <p role="status">
+            {state.connected
+              ? "Controller reconnected."
+              : "Controller disconnected."}{" "}
+            Game paused. Select a speed to resume when ready.
+          </p>
+        )}
+        {showActions && (
+          <div className="controllerHintActions">
+            {hints.map((hint) => glyphHint(hint, state.glyphs))}
+            {tvMode && (
+              <Button
+                className="controllerHelpButton"
+                onClick={() =>
+                  dispatch(
+                    dialogOpen({
+                      open: true,
+                      title: "Controller controls",
+                      message: <FullControlsHelp />,
+                      closeText: "Close controls",
+                      focusCancel: true,
+                    }),
+                  )
+                }
+              >
+                All controls
+              </Button>
+            )}
+          </div>
+        )}
+      </aside>
+    </>
+  );
+}
+
+/** Resolve a binding from the supplied device frame without inferring it from an action name.
+ * Compact hints omit missing bindings; the complete legend can explicitly show them as unbound. */
+function glyphHint(
+  [action, label]: Hint,
+  glyphs: DesktopInputFrame["glyphs"],
+  showUnbound = false,
+) {
+  const glyph = glyphs[action];
+  if (!glyph && !showUnbound) return null;
+  return (
+    <span className="controllerHint" key={action}>
+      {glyph ? (
+        <ControllerGlyph glyph={glyph} />
+      ) : (
+        <span className="controllerHintBinding">Unbound</span>
       )}
-      {state.active && state.connected && (
-        <div className="controllerHintActions">
-          {(state.context === "Gameplay" ? gameHints : menuHints).map(
-            ([action, label]) => {
-              const glyph = state.glyphs[action];
-              if (!glyph) return null;
-              return (
-                <span key={action} className="controllerHint">
-                  {glyph.image ? (
-                    <img src={glyph.image} alt={glyph.label} />
-                  ) : (
-                    <span className="controllerHintBinding">{glyph.label}</span>
-                  )}
-                  <span>{label}</span>
-                </span>
-              );
-            },
-          )}
-        </div>
-      )}
+      <span>{label}</span>
+    </span>
+  );
+}
+
+/** One complete legend in the shared menu, with the requesting controller's bindings. */
+export function ControlsLegend({
+  glyphs,
+}: {
+  glyphs: DesktopInputFrame["glyphs"];
+}) {
+  const hints: Hint[] = [
+    ["up", "Move up"],
+    ["down", "Move down"],
+    ["left", "Move left"],
+    ["right", "Move right"],
+    ["confirm", "Select"],
+    ["back", "Back"],
+    ["menu", "Game menu"],
+    ...gameHints.slice(3),
+  ];
+  return (
+    <aside className="couchControlsLegend" aria-label="Controller controls">
+      <strong>Controls</strong>
+      <div className="controllerHintActions">
+        {hints.map((hint) => glyphHint(hint, glyphs, true))}
+      </div>
     </aside>
+  );
+}
+
+/** The existing app dialog owns pause, Back and focus restoration; glyphs stay live when remapped. */
+function FullControlsHelp() {
+  const state = useSyncExternalStore(
+    subscribeInputPresentation,
+    getInputPresentation,
+  );
+  const allHints: Hint[] = [
+    ["up", "Move up"],
+    ["down", "Move down"],
+    ["left", "Move left"],
+    ["right", "Move right"],
+    ...gameHints.slice(1),
+  ];
+  return (
+    <>
+      <p>
+        Use the directional controls to follow visible rows. In a slider, Left
+        and Right adjust the value; Up and Down move to another control.
+      </p>
+      <div className="controllerHelpGrid">
+        {allHints.map((hint) => (
+          <div key={hint[0]} tabIndex={0} className="controllerHelpRow">
+            {glyphHint(hint, state.glyphs)}
+          </div>
+        ))}
+      </div>
+      <p>
+        Select a chart to inspect values without a pointer. Back closes chart
+        details, then the current tool, then opens the game menu. Select a
+        reorder grip to lift or drop a facility; directional controls move it,
+        and Back cancels.
+      </p>
+    </>
   );
 }

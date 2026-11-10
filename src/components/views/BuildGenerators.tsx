@@ -1,3 +1,4 @@
+import { useTvLayout } from "../../TvLayout";
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
@@ -12,6 +13,7 @@ import {
   Typography,
   IconButton,
 } from "@mui/material";
+import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
@@ -97,6 +99,7 @@ import { getScenario, getTutorialStep } from "../../data/Scenarios";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import useBuildRowReveal from "../base/useBuildRowReveal";
+import { getLegacyBuildBounds } from "../../data/LegacyEra";
 import Sparkline from "../base/Sparkline";
 
 function percent(fraction: number): string {
@@ -350,12 +353,10 @@ export function GeneratorBuildItem(
       case "solarTrackers":
         return [
           {
-            text: "Follows the sun for about 20% more morning and evening power.",
+            text: "Follows the sun for about 20% more energy a year, mostly in the morning and evening.",
           },
           { text: "Stows in hail. Can't be added later." },
         ];
-      case "hailResistant":
-        return [];
       default: {
         if (!props.withResilience) return [];
         const standardMinTempC =
@@ -394,9 +395,12 @@ export function GeneratorBuildItem(
       : undefined;
 
   const compareAction = props.onCompare && canBuild && (
+    // A toggle keeps its name and quiet weight; the check and pressed state carry the selection,
+    // so Review stays the card's one emphasised action.
     <Button
       size="small"
-      variant={props.compared ? "contained" : "text"}
+      variant="text"
+      startIcon={props.compared ? <CheckIcon fontSize="small" /> : undefined}
       aria-pressed={props.compared}
       aria-label={`Compare ${generator.name}`}
       disabled={props.compareDisabled && !props.compared}
@@ -698,12 +702,9 @@ export function GeneratorBuildItem(
         loanMonths={facilityLoanMonths(quote.lifespanYears)}
         cashDisabled={!buildable}
         loanDisabled={!buildable}
+        cashLabel="Cash option"
+        upkeepLabel="Maintenance"
         upkeepPerMonth={estimatedAnnualOperatingCost(quote) / 12}
-        upkeepDetail={
-          fuelPrices[generator.fuel]
-            ? "Plus fuel and loan payments."
-            : "Plus loan payments."
-        }
         onlineInMonths={Math.round(generator.yearsToBuild * 12)}
         onPurchase={(financed) => {
           props.onBuild(financed, hasOptions ? resilienceSelection : undefined);
@@ -770,7 +771,7 @@ export function GeneratorBuildItem(
         extraFacts={[
           {
             concept: "supply",
-            label: "Typical output",
+            label: "Average output over a year",
             // The selected quote's trackers add their morning and evening energy
             value: `+${formatWatts(
               typicalOutputW *
@@ -778,9 +779,9 @@ export function GeneratorBuildItem(
                   ? TRACKER_ANNUAL_ENERGY_MULTIPLIER
                   : 1),
             )}`,
-            detail: waterShape
-              ? `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`
-              : `${formatWatts(generator.peakW)} max; weather may limit it.`,
+            ...(waterShape && {
+              detail: `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`,
+            }),
           },
           ...(sites
             ? [
@@ -801,7 +802,7 @@ export function GeneratorBuildItem(
             value:
               kgCO2ePerMWh > 0
                 ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
-                : "No direct emissions modeled",
+                : "None",
           },
         ]}
       />
@@ -848,14 +849,35 @@ function GeneratorComparison(props: {
             >
               <CloseIcon fontSize="small" />
             </IconButton>
+            {/* A separator stays with the figure before it, so a narrow chip never starts a
+              line with "·" */}
             <Typography variant="caption">
-              {formatMoneyConcise(generator.buildCost)} ·{" "}
-              {formatBuildMonths(generator.yearsToBuild)}
+              <span className="nowrap">
+                {formatMoneyConcise(generator.buildCost)} ·
+              </span>{" "}
+              <span className="nowrap">
+                {formatBuildMonths(generator.yearsToBuild)}
+              </span>
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              {props.forecastPending && !props.outputShapes.get(generator.name)
-                ? "Calculating output and energy costs…"
-                : `${formatWatts(generator.peakW * typicalCapacityFactor(generator, props.outputShapes.get(generator.name)))} typical · ${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
+              {props.forecastPending &&
+              !props.outputShapes.get(generator.name) ? (
+                "Calculating output and energy costs…"
+              ) : (
+                <>
+                  {formatWatts(
+                    generator.peakW *
+                      typicalCapacityFactor(
+                        generator,
+                        props.outputShapes.get(generator.name),
+                      ),
+                  )}{" "}
+                  typical{"\u00a0·"}{" "}
+                  <span className="nowrap">
+                    {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
+                  </span>
+                </>
+              )}
             </Typography>
           </div>
         ))}
@@ -901,9 +923,15 @@ export type Props = StateProps & DispatchProps;
 
 function BuildGenerators(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
+  const tvMode = useTvLayout();
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
   const { game, onBack } = props;
+  const legacyBounds = getLegacyBuildBounds(game);
+  const minTick = legacyBounds ? wToSliderTick(legacyBounds.minW) : 0;
+  const maxTick = legacyBounds ? wToSliderTick(legacyBounds.maxW) : 34;
+  const clampSizeTick = (tick: number) =>
+    Math.max(minTick, Math.min(maxTick, tick));
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readCash = useBuildCashReader(now?.cash ?? 0);
   const listRef = useToolScroll<HTMLUListElement>("generators.scroll");
@@ -911,16 +939,36 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const [sliderTick, setSliderTick] = useToolState<number>(
     "generators.size",
     () =>
-      Math.max(
-        0,
-        Math.min(34, wToSliderTick(averageBuildSize(game.facilities, false))),
+      clampSizeTick(
+        wToSliderTick(
+          legacyBounds && game.date.year >= 1942
+            ? legacyBounds.defaultW
+            : game.facilities.length
+              ? averageBuildSize(game.facilities, false)
+              : (legacyBounds?.defaultW ??
+                averageBuildSize(game.facilities, false)),
+        ),
       ),
   );
+  // A generation change can keep this tool's saved choice outside the next era's range.
+  const shownSliderTick = clampSizeTick(sliderTick);
   // Sizes between slider ticks, chosen per generator: hydro's site maximum or a technology's cap
   const [exactSizes, setExactSizes] = useToolState<Record<string, number>>(
     "generators.exactSizes",
     {},
   );
+  // A remembered site/technology shortcut can outlive the era's minimum project size.
+  // Hydro may exceed the global slider maximum because its physical site owns that limit.
+  const shownExactSizes = legacyBounds
+    ? Object.fromEntries(
+        Object.entries(exactSizes).filter(
+          ([name, size]) =>
+            Number.isFinite(size) &&
+            size >= legacyBounds.minW &&
+            (name === "Hydro" || size <= legacyBounds.maxW),
+        ),
+      )
+    : exactSizes;
   const [sort, setSort] = useToolState<GeneratorSortKey>(
     "generators.sort",
     "buildCost",
@@ -960,11 +1008,17 @@ function BuildGenerators(props: Props): React.JSX.Element {
   } = forecast ?? EMPTY_FORECAST;
   const hydroAvailability = getHydroAvailability(
     game,
-    exactSizes.Hydro ?? sliderTickToW(sliderTick),
+    shownExactSizes.Hydro ?? sliderTickToW(shownSliderTick),
   );
+  const hydroSiteMaximum =
+    hydroAvailability.selected ?? hydroAvailability.largest;
+  const canUseSiteMaximum =
+    !legacyBounds ||
+    !hydroSiteMaximum ||
+    hydroSiteMaximum.maxPeakW >= legacyBounds.minW;
   const minimumGenerators = GENERATORS(
     game,
-    sliderTickToW(0),
+    sliderTickToW(minTick),
     windSpeeds,
     solarIrradiances,
     offshoreWindSpeeds,
@@ -972,17 +1026,17 @@ function BuildGenerators(props: Props): React.JSX.Element {
   );
   const shownGenerators = GENERATORS(
     game,
-    sliderTickToW(sliderTick),
+    sliderTickToW(shownSliderTick),
     windSpeeds,
     solarIrradiances,
     offshoreWindSpeeds,
     airborneWindSpeeds,
   )
     .map((generator) =>
-      exactSizes[generator.name] !== undefined
+      shownExactSizes[generator.name] !== undefined
         ? GENERATORS(
             game,
-            exactSizes[generator.name],
+            shownExactSizes[generator.name],
             windSpeeds,
             solarIrradiances,
             offshoreWindSpeeds,
@@ -1082,6 +1136,16 @@ function BuildGenerators(props: Props): React.JSX.Element {
     );
   };
 
+  const comparison = (
+    <GeneratorComparison
+      generators={comparedGenerators}
+      outputShapes={outputShapes}
+      forecastPending={!forecast}
+      onClear={() => setComparedNames([])}
+      onRemove={toggleCompare}
+    />
+  );
+
   return (
     <div
       className="flexContainer screenCatalog"
@@ -1099,10 +1163,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
           </Typography>
         )}
       <ConstructionBuildHeader
-        capacity={valueLabelFormat(sliderTick)}
-        sliderValue={sliderTick}
-        sliderMin={0}
-        sliderMax={34}
+        capacity={valueLabelFormat(shownSliderTick)}
+        sliderValue={shownSliderTick}
+        sliderValueText={valueLabelFormat}
+        sliderMin={minTick}
+        sliderMax={maxTick}
         sort={sort}
         sortOptions={sortOptions}
         onSliderChange={(value) => {
@@ -1117,14 +1182,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
           Calculating output and energy costs…
         </Typography>
       )}
-      <GeneratorComparison
-        generators={comparedGenerators}
-        outputShapes={outputShapes}
-        forecastPending={!forecast}
-        onClear={() => setComparedNames([])}
-        onRemove={toggleCompare}
-      />
+      {!tvMode && comparison}
       <List ref={listRef} dense className="scrollable cardList">
+        {tvMode && comparedGenerators.length > 0 && (
+          <li className="tvComparisonItem">{comparison}</li>
+        )}
         {generators.map((g: GeneratorShoppingType) => {
           const advantages = [
             g.buildCost === lowestBuildCost ? "Lowest upfront cost" : undefined,
@@ -1144,40 +1206,51 @@ function BuildGenerators(props: Props): React.JSX.Element {
                 hydroAvailability={
                   g.name === "Hydro" ? hydroAvailability : undefined
                 }
-                onUseSiteMaximum={(peakW) => {
-                  revealResizedRow(g.name);
-                  setSliderTick(wToSliderTick(peakW));
-                  setExactSizes((sizes) => ({ ...sizes, Hydro: peakW }));
-                }}
-                onUseMaxSize={(peakW) => {
-                  const limit =
-                    g.name === "Hydro"
-                      ? Math.min(
-                          peakW,
-                          hydroAvailability.largest?.maxPeakW ?? peakW,
-                        )
-                      : peakW;
-                  const size =
-                    largestAffordableBuildSize(
-                      buildSizeOptions(0, 34, limit),
-                      readCash(),
-                      (capacity) => {
-                        const candidate = GENERATORS(
-                          game,
-                          capacity,
-                          windSpeeds,
-                          solarIrradiances,
-                          offshoreWindSpeeds,
-                          airborneWindSpeeds,
-                        ).find((item) => item.name === g.name)!;
-                        return withResilienceOptions(candidate, game, {})
-                          .buildCost;
-                      },
-                    ) ?? limit;
-                  revealResizedRow(g.name);
-                  setSliderTick(Math.max(0, wToSliderTick(size)));
-                  setExactSizes((sizes) => ({ ...sizes, [g.name]: size }));
-                }}
+                onUseSiteMaximum={
+                  canUseSiteMaximum
+                    ? (peakW) => {
+                        revealResizedRow(g.name);
+                        setSliderTick(clampSizeTick(wToSliderTick(peakW)));
+                        setExactSizes((sizes) => ({ ...sizes, Hydro: peakW }));
+                      }
+                    : undefined
+                }
+                onUseMaxSize={
+                  legacyBounds && g.maxPeakW < legacyBounds.minW
+                    ? undefined
+                    : (peakW) => {
+                        const limit =
+                          g.name === "Hydro"
+                            ? Math.min(
+                                peakW,
+                                hydroAvailability.largest?.maxPeakW ?? peakW,
+                              )
+                            : peakW;
+                        const size =
+                          largestAffordableBuildSize(
+                            buildSizeOptions(minTick, maxTick, limit),
+                            readCash(),
+                            (capacity) => {
+                              const candidate = GENERATORS(
+                                game,
+                                capacity,
+                                windSpeeds,
+                                solarIrradiances,
+                                offshoreWindSpeeds,
+                                airborneWindSpeeds,
+                              ).find((item) => item.name === g.name)!;
+                              return withResilienceOptions(candidate, game, {})
+                                .buildCost;
+                            },
+                          ) ?? limit;
+                        revealResizedRow(g.name);
+                        setSliderTick(clampSizeTick(wToSliderTick(size)));
+                        setExactSizes((sizes) => ({
+                          ...sizes,
+                          [g.name]: size,
+                        }));
+                      }
+                }
                 date={game.date}
                 seed={game.seed}
                 location={game.location}

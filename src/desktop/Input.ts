@@ -1,3 +1,5 @@
+import { revealControl } from "../components/base/RevealControl";
+import { isTvLayout } from "../TvLayout";
 import type { AppStore } from "../Store";
 import type {
   DesktopBridge,
@@ -112,7 +114,33 @@ export function startDesktopInput(
         present({ active: false, connected: false, glyphs: {} });
       });
   };
+  /** Change the owning seat's requested speed, preserving its last running choice and ready-up intent.
+   * Solo input activates only the speed buttons available in the current layout. */
   const speed = (action: "pause" | "speedUp" | "speedDown") => {
+    const clock = store.getState().game.multiplayer?.clock;
+    if (clock) {
+      const speeds = ["PAUSED", "SLOW", "NORMAL", "FAST", "ULTRA"] as const;
+      const selected = clock?.selectedSpeed ?? "PAUSED";
+      if (selected !== "PAUSED") runningSpeed = selected;
+      const index = Math.max(0, speeds.indexOf(selected));
+      const next =
+        action === "pause"
+          ? selected === "PAUSED" || (clock?.readyRequired && !clock.ready)
+            ? (speeds.find((value) => value === runningSpeed) ?? "NORMAL")
+            : "PAUSED"
+          : speeds[
+              Math.max(
+                0,
+                Math.min(
+                  speeds.length - 1,
+                  index + (action === "speedUp" ? 1 : -1),
+                ),
+              )
+            ];
+      releasePause();
+      store.dispatch(setSpeed(next));
+      return;
+    }
     const buttons = speedButtons();
     if (!buttons.length) return;
     const selected = buttons.find(
@@ -146,7 +174,11 @@ export function startDesktopInput(
     );
     const active =
       document.activeElement?.closest<HTMLElement>("[data-game-tool]")?.dataset
-        .gameTool;
+        .gameTool ??
+      (isTvLayout()
+        ? document.querySelector<HTMLElement>(".gameToolPanel:not([hidden])")
+            ?.dataset.gameTool
+        : undefined);
     const opened = buttons.findIndex(
       (button) => button.getAttribute("aria-controls") === `tool-${active}`,
     );
@@ -157,14 +189,14 @@ export function startDesktopInput(
       const fleet = document.querySelector<HTMLElement>(
         ".base_main:not([inert]) .gameFleet",
       );
-      if (fleet) visibleControls(fleet)[0]?.focus();
+      if (fleet && !isTvLayout()) visibleControls(fleet)[0]?.focus();
     } else {
       const button = buttons[next - 1];
       const panelId = button.getAttribute("aria-controls");
       if (!panelId) button.click();
       const id = panelId ?? button.getAttribute("aria-controls");
       const panel = id ? document.getElementById(id) : null;
-      if (panel) visibleControls(panel)[0]?.focus();
+      if (panel && !isTvLayout()) visibleControls(panel)[0]?.focus();
     }
   };
   const chart = (delta: number) => {
@@ -200,15 +232,27 @@ export function startDesktopInput(
           : charts.length - 1
         : (current + delta + charts.length) % charts.length;
     charts[next].focus();
-    charts[next].scrollIntoView?.({
-      block: "nearest",
-      inline: "nearest",
-      behavior: "instant",
-    });
+    revealControl(charts[next]);
   };
+  /** Apply controller intent to real focused controls in this document's current input scope.
+   * Couch menu actions cross the authenticated shell route; company tool actions remain local. */
   const act = (action: DesktopInputAction) => {
     const scope = inputScope();
-    if (["up", "down", "left", "right"].includes(action)) {
+    if (action === "menu" || action === "menuAlt") {
+      if (window.electrifyCouch?.role === "seat")
+        window.electrifyCouch.post({
+          kind: "global-menu",
+          requestId: crypto.randomUUID(),
+        });
+      else if (document.querySelector("[data-couch-shell]"))
+        window.dispatchEvent(new CustomEvent("electrify:couch-menu"));
+      else {
+        if (action === "menu" && context === "Gameplay") speed("pause");
+        else act("back");
+        return;
+      }
+      feedback("confirm");
+    } else if (["up", "down", "left", "right"].includes(action)) {
       const textControl = focusedTextControl();
       moveInputFocus(action as "up" | "down" | "left" | "right");
       choosingTextOption =
@@ -270,13 +314,19 @@ export function startDesktopInput(
       const blocked = overlay(scope);
       const cardBefore = store.getState().card;
       if (!backInput() && !blocked && store.getState().card === cardBefore) {
-        if (gameplay())
-          document
-            .querySelector<HTMLElement>(
-              ".base_main:not([inert]) .gameMenuButton",
-            )
-            ?.click();
-        else
+        if (gameplay()) {
+          if (window.electrifyCouch?.role === "seat")
+            window.electrifyCouch.post({
+              kind: "global-menu",
+              requestId: crypto.randomUUID(),
+            });
+          else
+            document
+              .querySelector<HTMLElement>(
+                ".base_main:not([inert]) .gameMenuButton",
+              )
+              ?.click();
+        } else
           controls()
             .find((button) => button.getAttribute("aria-label") === "Back")
             ?.click();
@@ -302,7 +352,7 @@ export function startDesktopInput(
       !ready ||
       editingText ||
       !foreground ||
-      document.visibilityState === "hidden" ||
+      (!window.electrifyCouch && document.visibilityState === "hidden") ||
       store.getState().saves.transitioning ||
       !frame.connected ||
       !frame.actions.length
@@ -339,6 +389,16 @@ export function startDesktopInput(
     "[role=dialog],[role=menu],[role=listbox],.MuiModal-root,.base_main,.gameWorkspace";
   const observer = new MutationObserver((mutations) => {
     if (
+      isTvLayout() &&
+      getInputPresentation().active &&
+      mutations.some(
+        (mutation) =>
+          mutation.type === "childList" &&
+          mutation.target.contains(document.activeElement),
+      )
+    )
+      scheduleReveal();
+    if (
       mutations.some((mutation) =>
         mutation.type === "attributes"
           ? (mutation.target as Element).matches(surfaceSelector)
@@ -361,8 +421,47 @@ export function startDesktopInput(
     attributes: true,
     attributeFilter: ["aria-hidden", "hidden", "inert"],
   });
+  // TV text, disclosure and chart layout can settle after focus moves. Keep that actual
+  // control exposed as its ancestors resize, without changing focus or a remembered scroll.
+  let revealFrame: number | undefined;
+  function scheduleReveal() {
+    if (revealFrame !== undefined) return;
+    revealFrame = requestAnimationFrame(() => {
+      revealFrame = undefined;
+      const target = document.activeElement;
+      if (
+        isTvLayout() &&
+        getInputPresentation().active &&
+        target instanceof HTMLElement &&
+        inputScope().contains(target)
+      )
+        revealControl(target);
+    });
+  }
+  const revealObserver =
+    typeof ResizeObserver === "function"
+      ? new ResizeObserver(scheduleReveal)
+      : undefined;
+  const trackFocus = () => {
+    revealObserver?.disconnect();
+    const target = document.activeElement;
+    if (!isTvLayout() || !(target instanceof HTMLElement)) return;
+    for (
+      let element: HTMLElement | null = target;
+      element;
+      element = element.parentElement
+    )
+      revealObserver?.observe(element);
+  };
+  document.addEventListener("focusin", trackFocus);
   const pointer = (event: Event) => {
     if (!event.isTrusted) return;
+    // The hints own an explicit help action. Keep its trigger mounted through activation.
+    if (
+      event.target instanceof Element &&
+      event.target.closest(".controllerHints")
+    )
+      return;
     choosingTextOption = null;
     delete document.documentElement.dataset.controllerInput;
     present({ active: false });
@@ -395,6 +494,9 @@ export function startDesktopInput(
     live = false;
     if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);
     observer.disconnect();
+    revealObserver?.disconnect();
+    if (revealFrame !== undefined) cancelAnimationFrame(revealFrame);
+    document.removeEventListener("focusin", trackFocus);
     stopInput();
     stopFocus();
     stopQuit();

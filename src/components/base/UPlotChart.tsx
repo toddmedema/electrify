@@ -1,3 +1,4 @@
+import { isTvLayout, useTvLayout } from "../../TvLayout";
 import * as React from "react";
 import { withoutNegativeZero } from "../../helpers/Format";
 import uPlot from "uplot";
@@ -16,6 +17,7 @@ import { ChartAxisAlignmentContext } from "./ChartAxisAlignment";
 import {
   ChartViewportContext,
   ChartViewportRange,
+  clampChartViewport,
   panChartViewport,
   rangesEqual,
   zoomChartViewport,
@@ -90,6 +92,20 @@ const TOOLTIP_OFFSET = 8;
 // pointer move; uPlot can resize its existing canvas cheaply in the meantime.
 const RESIZE_SETTLE_MS = 120;
 
+function keyboardTvTooltipTarget(
+  target: EventTarget | null,
+  keyboardSelected: boolean,
+): boolean {
+  // Only TV keyboard details move outside uPlot's pointer surface. Ordinary
+  // charts must still let a mouse landing on their tooltip take over inspection.
+  return (
+    isTvLayout() &&
+    keyboardSelected &&
+    target instanceof Element &&
+    !!target.closest(".chartTooltip")
+  );
+}
+
 function tooltipPlugin<S>(
   getState: () => S,
   getLabel: () => ((idx: number, state: S) => string) | undefined,
@@ -103,6 +119,14 @@ function tooltipPlugin<S>(
   let context: HTMLDivElement;
   let columns: Array<{ total: HTMLElement; rows: HTMLDivElement }>;
   let dismiss: (event: KeyboardEvent) => void;
+  let touchStart: (event: TouchEvent) => void;
+  let touchMove: (event: TouchEvent) => void;
+  let touchEnd: (event: TouchEvent) => void;
+  let cancelTouch: (event: Event) => void;
+  let outsidePointer: (event: PointerEvent) => void;
+  let restoreMouseHover: () => void;
+  let touchId: number | undefined;
+  let touchingPlot = false;
   // A synced chart moves its cursor when a neighbour is hovered, which is the point -- but it
   // should not also open a tooltip over data the pointer isn't anywhere near
   let hovering = !hoverOnly;
@@ -132,6 +156,8 @@ function tooltipPlugin<S>(
           // events so it can scroll, so a fast pointer landing on it would otherwise strand the
           // cursor and leave the tooltip behind; hand those moves back to the plot instead.
           el.addEventListener("mousemove", (event) => {
+            if (keyboardTvTooltipTarget(event.target, keyboardSelected()))
+              return;
             const bounds = u.over.getBoundingClientRect();
             u.setCursor({
               left: event.clientX - bounds.left,
@@ -143,6 +169,80 @@ function tooltipPlugin<S>(
           };
           document.addEventListener("keydown", dismiss);
         }
+        const inspectTouch = (touch: Touch) => {
+          hovering = true;
+          const bounds = u.over.getBoundingClientRect();
+          u.setCursor({
+            left: Math.max(
+              0,
+              Math.min(bounds.width - 1, touch.clientX - bounds.left),
+            ),
+            top: Math.max(
+              0,
+              Math.min(bounds.height - 1, touch.clientY - bounds.top),
+            ),
+          });
+        };
+        touchStart = (event) => {
+          if (event.touches.length !== 1) {
+            touchId = undefined;
+            hovering = false;
+            if (el) el.style.display = "none";
+            return;
+          }
+          // A new gesture inside the breakdown scrolls its contents instead of moving it.
+          touchingPlot = !el?.contains(event.target as Node);
+          if (!touchingPlot) return;
+          touchId = event.touches[0].identifier;
+          inspectTouch(event.touches[0]);
+        };
+        touchMove = (event) => {
+          if (!touchingPlot) return;
+          // One finger keeps native vertical scrolling; two fingers own chart zoom.
+          if (event.touches.length > 1) {
+            event.preventDefault();
+            return;
+          }
+          if (touchId === undefined) return;
+          const touch = Array.from(event.touches).find(
+            (touch) => touch.identifier === touchId,
+          );
+          if (touch) inspectTouch(touch);
+        };
+        touchEnd = (event) => {
+          if (!event.touches.length) touchingPlot = false;
+          touchId = undefined;
+        };
+        cancelTouch = (event) => {
+          // Scrolling the breakdown cancels its own pointer, not chart inspection.
+          if (el?.contains(event.target as Node)) return;
+          // Native scrolling cancels pointer events while touch events may keep arriving.
+          touchingPlot = false;
+          touchId = undefined;
+          hovering = false;
+          dismissDetails();
+        };
+        outsidePointer = (event) => {
+          if (
+            el?.style.display === "block" &&
+            !u.over.contains(event.target as Node) &&
+            !el.contains(event.target as Node)
+          ) {
+            dismissDetails();
+          }
+        };
+        document.addEventListener("pointerdown", outsidePointer, true);
+        u.over.addEventListener("touchstart", touchStart, { passive: true });
+        u.over.addEventListener("touchmove", touchMove, { passive: false });
+        u.over.addEventListener("touchend", touchEnd);
+        u.over.addEventListener("touchcancel", cancelTouch);
+        u.over.addEventListener("pointercancel", cancelTouch);
+        restoreMouseHover = () => {
+          hovering = true;
+        };
+        // uPlot updates its cursor during mousemove. Restore ordinary mouse inspection
+        // first, even when the mouse was already over this plot before a touch gesture.
+        u.over.addEventListener("mousemove", restoreMouseHover, true);
         if (hoverOnly) {
           u.over.addEventListener("mouseenter", () => {
             hovering = true;
@@ -180,28 +280,63 @@ function tooltipPlugin<S>(
           });
           context.textContent = groups.slice(2).join("\n\n");
           context.hidden = !context.textContent;
-          el.style.maxWidth = `${u.over.clientWidth}px`;
         } else {
           el.textContent = text;
         }
+        // Couch-scale event/axis rows can leave a shallow data plot. Keyboard inspection
+        // may use the complete chart surface so every selected value remains readable.
+        const host = isTvLayout() && keyboardSelected() ? u.root : u.over;
+        if (el.parentElement !== host) host.appendChild(el);
+        el.style.maxWidth = `${host.clientWidth}px`;
         el.style.display = "block";
-        el.style.maxHeight = `${u.over.clientHeight}px`;
+        el.style.maxHeight = `${host.clientHeight}px`;
         el.style.overflowY = "auto";
         // Kept inside the plot, the way Victory's constrainToVisibleArea tooltip was
-        const left = u.cursor.left!;
-        const top = u.cursor.top!;
-        const flipX =
-          left + TOOLTIP_OFFSET + el.offsetWidth > u.over.clientWidth;
+        const plotBounds = u.over.getBoundingClientRect();
+        const hostBounds = host.getBoundingClientRect();
+        const left = u.cursor.left! + plotBounds.left - hostBounds.left;
+        const top = u.cursor.top! + plotBounds.top - hostBounds.top;
+        const flipX = left + TOOLTIP_OFFSET + el.offsetWidth > host.clientWidth;
         const flipY =
-          top + TOOLTIP_OFFSET + el.offsetHeight > u.over.clientHeight;
-        el.style.left = `${Math.max(0, Math.min(u.over.clientWidth - el.offsetWidth, flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET))}px`;
-        el.style.top = `${Math.max(0, Math.min(u.over.clientHeight - el.offsetHeight, flipY ? top - TOOLTIP_OFFSET - el.offsetHeight : top + TOOLTIP_OFFSET))}px`;
+          top + TOOLTIP_OFFSET + el.offsetHeight > host.clientHeight;
+        el.style.left = `${Math.max(0, Math.min(host.clientWidth - el.offsetWidth, flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET))}px`;
+        el.style.top = `${Math.max(0, Math.min(host.clientHeight - el.offsetHeight, flipY ? top - TOOLTIP_OFFSET - el.offsetHeight : top + TOOLTIP_OFFSET))}px`;
       },
-      destroy: () => {
+      destroy: (u: uPlot) => {
+        document.removeEventListener("pointerdown", outsidePointer, true);
+        u.over.removeEventListener("touchstart", touchStart);
+        u.over.removeEventListener("touchmove", touchMove);
+        u.over.removeEventListener("touchend", touchEnd);
+        u.over.removeEventListener("touchcancel", cancelTouch);
+        u.over.removeEventListener("pointercancel", cancelTouch);
+        u.over.removeEventListener("mousemove", restoreMouseHover, true);
         if (dismiss) document.removeEventListener("keydown", dismiss);
       },
     },
   };
+}
+
+function tvChartHeight(root: HTMLElement | null, requested: number): number {
+  if (!isTvLayout()) return requested;
+  // Stacked evidence needs room for its heading, legend and event row as well as its axes.
+  let height = root?.closest(".insightsTracks")
+    ? Math.min(requested, 200 * getTextScale())
+    : requested;
+  for (
+    let parent = root?.parentElement;
+    parent;
+    parent = parent.parentElement
+  ) {
+    if (
+      /(auto|scroll)/.test(getComputedStyle(parent).overflowY) &&
+      parent.clientHeight > 0
+    )
+      height = Math.min(
+        height,
+        Math.max(1, parent.clientHeight - 16 * getTextScale()),
+      );
+  }
+  return height;
 }
 
 export default function UPlotChart<S>(
@@ -209,6 +344,9 @@ export default function UPlotChart<S>(
 ): React.JSX.Element {
   const { ariaLabel, id, height, state, data, structureKey, syncKey } = props;
   const controllerInput = useControllerInput();
+  const tvMode = useTvLayout();
+  const interactiveTooltip =
+    props.interactiveTooltip || (controllerInput && !!props.tooltip);
   const presentation = React.useContext(ChartPresentationContext);
   const presentationRef = React.useRef(presentation);
   presentationRef.current = presentation;
@@ -217,6 +355,20 @@ export default function UPlotChart<S>(
   const viewport = React.useContext(ChartViewportContext);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const plotRef = React.useRef<uPlot | null>(null);
+  const gestureScrollRef = React.useRef<{
+    element: HTMLElement;
+    top: number;
+    overflowAnchor: string;
+    observer: MutationObserver;
+  }>();
+  const anchorGestureScroll = React.useCallback(() => {
+    const scroll = gestureScrollRef.current;
+    const plot = plotRef.current;
+    if (scroll && plot) {
+      scroll.element.scrollTop +=
+        plot.over.getBoundingClientRect().top - scroll.top;
+    }
+  }, []);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
   const dataUpdateRef = React.useRef<
     ((plot: uPlot, data: uPlot.AlignedData) => void) | undefined
@@ -340,6 +492,7 @@ export default function UPlotChart<S>(
     let resizeFrame: number | undefined;
     let settleTimer: ReturnType<typeof setTimeout> | undefined;
     let nextWidth = 0;
+    let measuredHeight = 0;
 
     const resizeExistingPlot = () => {
       resizeFrame = undefined;
@@ -353,9 +506,12 @@ export default function UPlotChart<S>(
           1,
           Math.round(
             presentationRef.current?.height ??
-              (exactHeightRef.current
-                ? heightRef.current || 300
-                : (heightRef.current || 300) * chartScale(nextWidth)),
+              tvChartHeight(
+                root,
+                exactHeightRef.current
+                  ? heightRef.current || 300
+                  : (heightRef.current || 300) * chartScale(nextWidth),
+              ),
           ),
         ),
       });
@@ -365,10 +521,23 @@ export default function UPlotChart<S>(
       // Floor fractional flex widths so uPlot's explicit canvas width can never
       // round a pixel wider than the pane that owns it.
       nextWidth = Math.floor(root.getBoundingClientRect().width);
-      if (nextWidth <= 0 || nextWidth === measuredWidthRef.current) {
+      const nextHeight = Math.round(
+        presentationRef.current?.height ??
+          tvChartHeight(
+            root,
+            exactHeightRef.current
+              ? heightRef.current || 300
+              : (heightRef.current || 300) * chartScale(nextWidth),
+          ),
+      );
+      if (
+        nextWidth <= 0 ||
+        (nextWidth === measuredWidthRef.current &&
+          nextHeight === measuredHeight)
+      )
         return;
-      }
       measuredWidthRef.current = nextWidth;
+      measuredHeight = nextHeight;
 
       // There is no canvas to resize on first layout, so build it immediately. Once it exists,
       // coalesce ResizeObserver bursts into one cheap setSize per animation frame and reserve
@@ -391,6 +560,14 @@ export default function UPlotChart<S>(
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
+    // A disclosure or TV chrome can change the available height without changing plot width.
+    if (tvMode)
+      for (
+        let parent = root.parentElement;
+        parent;
+        parent = parent.parentElement
+      )
+        observer.observe(parent);
     return () => {
       observer.disconnect();
       if (resizeFrame !== undefined) {
@@ -400,8 +577,32 @@ export default function UPlotChart<S>(
         clearTimeout(settleTimer);
       }
     };
-  }, []);
+  }, [tvMode]);
 
+  const plotLayout = React.useMemo(
+    () => ({
+      width,
+      height,
+      structureKey,
+      themeVersion,
+      textScale,
+      fontReady,
+      axisAlignment,
+      presentation,
+      tvMode,
+    }),
+    [
+      width,
+      height,
+      structureKey,
+      themeVersion,
+      textScale,
+      fontReady,
+      axisAlignment,
+      presentation,
+      tvMode,
+    ],
+  );
   React.useLayoutEffect(() => {
     // A width of zero means the pane has not been laid out yet (and, incidentally, that we are
     // in jsdom); the ResizeObserver above builds the plot as soon as there is somewhere to put
@@ -421,9 +622,10 @@ export default function UPlotChart<S>(
         dataUpdateRef.current = update;
       },
     });
-    const built = presentation
-      ? expandedChartOptions(options, presentation.fontScale)
-      : options;
+    const built =
+      presentation || tvMode
+        ? expandedChartOptions(options, presentation?.fontScale ?? 1)
+        : options;
     const alignedAxis = axisAlignment?.register(() =>
       plotRef.current?.redraw(true, true),
     );
@@ -452,7 +654,10 @@ export default function UPlotChart<S>(
           1,
           Math.round(
             presentation?.height ??
-              (height || 300) * (props.exactHeight ? 1 : scale),
+              tvChartHeight(
+                rootRef.current,
+                (height || 300) * (props.exactHeight ? 1 : scale),
+              ),
           ),
         ),
         // Only x is synced: these charts plot watts against watt-hours against dollars, so
@@ -505,18 +710,9 @@ export default function UPlotChart<S>(
       drawnRef.current = null;
       dataUpdateRef.current = undefined;
     };
-    // Data changes go through setData below; only size, shape and palette rebuild
+    // Data updates stay in place; every plot replacement shares this lifecycle with viewport/gestures.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    width,
-    height,
-    structureKey,
-    themeVersion,
-    textScale,
-    fontReady,
-    axisAlignment,
-    presentation,
-  ]);
+  }, [plotLayout]);
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {
@@ -532,17 +728,9 @@ export default function UPlotChart<S>(
         min: viewport.range[0],
         max: viewport.range[1],
       });
+      anchorGestureScroll();
     }
-  }, [
-    viewport,
-    width,
-    height,
-    structureKey,
-    themeVersion,
-    textScale,
-    fontReady,
-    presentation,
-  ]);
+  }, [viewport, plotLayout, anchorGestureScroll]);
 
   React.useLayoutEffect(() => {
     const plot = plotRef.current;
@@ -551,16 +739,64 @@ export default function UPlotChart<S>(
       return;
     }
     const over = plot.over;
-    over.style.touchAction = "pan-y";
     let liveRange = currentViewport.range;
     let frame: number | undefined;
     let pending: ChartViewportRange | undefined;
     let wheelTimer: ReturnType<typeof setTimeout> | undefined;
-    const pointers = new Map<number, { x: number; y: number }>();
-    let drag:
-      | { id: number; x: number; y: number; active: boolean; touch: boolean }
+    let scrollReleaseFrame: number | undefined;
+    let drag: { id: number; x: number } | undefined;
+    const ownedTouchIds = new Set<number>();
+    let pinch:
+      | {
+          ids: [number, number];
+          distance: number;
+          anchor: number;
+          range: ChartViewportRange;
+        }
       | undefined;
-    let pinchDistance: number | undefined;
+
+    const releaseScroll = () => {
+      if (scrollReleaseFrame !== undefined)
+        cancelAnimationFrame(scrollReleaseFrame);
+      scrollReleaseFrame = undefined;
+      const scroll = gestureScrollRef.current;
+      if (scroll) {
+        scroll.observer.disconnect();
+        scroll.element.style.overflowAnchor = scroll.overflowAnchor;
+      }
+      gestureScrollRef.current = undefined;
+    };
+    const holdScroll = () => {
+      if (scrollReleaseFrame !== undefined)
+        cancelAnimationFrame(scrollReleaseFrame);
+      scrollReleaseFrame = undefined;
+      if (gestureScrollRef.current) return;
+      for (
+        let parent = over.parentElement;
+        parent;
+        parent = parent.parentElement
+      ) {
+        if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY)) {
+          const observer = new MutationObserver(anchorGestureScroll);
+          gestureScrollRef.current = {
+            element: parent,
+            top: over.getBoundingClientRect().top,
+            overflowAnchor: parent.style.overflowAnchor,
+            observer,
+          };
+          parent.style.overflowAnchor = "none";
+          // A neighboring chart can fill its height after React's initial range layout.
+          // Follow those node and size updates only while the player holds this plot.
+          observer.observe(parent, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["style"],
+          });
+          break;
+        }
+      }
+    };
 
     const schedule = (range: ChartViewportRange) => {
       liveRange = range;
@@ -632,65 +868,108 @@ export default function UPlotChart<S>(
         commit();
       }, 160);
     };
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.button !== 0) return;
-      if (viewportRef.current) liveRange = viewportRef.current.range;
-      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      if (pointers.size >= 2) {
-        const [a, b] = [...pointers.values()];
-        pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
-        drag = undefined;
-        pointers.forEach((_pointer, id) => over.setPointerCapture?.(id));
-        event.preventDefault();
+    const plotTouches = (event: TouchEvent) =>
+      Array.from(event.touches).filter((touch) =>
+        ownedTouchIds.has(touch.identifier),
+      );
+    const startPinch = (touches: Touch[]) => {
+      const [a, b] = touches;
+      if (!a || !b) return;
+      holdScroll();
+      pinch = {
+        ids: [a.identifier, b.identifier],
+        distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+        anchor: point((a.clientX + b.clientX) / 2),
+        range: liveRange,
+      };
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      for (const touch of Array.from(event.changedTouches)) {
+        if (touch.target instanceof Node && over.contains(touch.target))
+          ownedTouchIds.add(touch.identifier);
+      }
+      const touches = plotTouches(event);
+      if (touches.length < 2) return;
+      // Cancel native scrolling/zoom before it can take over this gesture. Touch events
+      // supply both positions together; individual pointer moves would invent a pinch
+      // between the two halves of an otherwise parallel two-finger swipe.
+      event.preventDefault();
+      if (!pinch) {
+        liveRange = viewportRef.current?.range ?? liveRange;
+        startPinch(touches);
+      }
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const touches = plotTouches(event);
+      if (touches.length < 2) return;
+      event.preventDefault();
+      const value = viewportRef.current;
+      if (!value) return;
+      if (!pinch) {
+        startPinch(touches);
         return;
       }
+      const gesture = pinch;
+      const a = touches.find((touch) => touch.identifier === gesture.ids[0]);
+      const b = touches.find((touch) => touch.identifier === gesture.ids[1]);
+      if (!a || !b) return;
+      const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      if (!distance || !gesture.distance) return;
+      const zoomed = zoomChartViewport(
+        value.bounds,
+        gesture.range,
+        value.minSpan,
+        gesture.distance / distance,
+        gesture.anchor,
+      );
+      const span = zoomed[1] - zoomed[0];
+      const anchorValue =
+        gesture.range[0] +
+        (gesture.range[1] - gesture.range[0]) * gesture.anchor;
+      const min = anchorValue - span * point((a.clientX + b.clientX) / 2);
+      schedule(
+        clampChartViewport(value.bounds, [min, min + span], value.minSpan),
+      );
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      const remaining = plotTouches(event);
+      for (const id of ownedTouchIds) {
+        if (!remaining.some((touch) => touch.identifier === id))
+          ownedTouchIds.delete(id);
+      }
+      if (!pinch) return;
+      if (
+        pinch.ids.every((id) =>
+          remaining.some((touch) => touch.identifier === id),
+        )
+      )
+        return;
+      commit();
+      pinch = undefined;
+      if (event.type !== "touchcancel") startPinch(remaining);
+      // Keep the anchor through the final React layout, including an unpainted pending range.
+      if (!pinch) scrollReleaseFrame = requestAnimationFrame(releaseScroll);
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      // Touch navigation belongs to the paired touch stream above. In particular,
+      // pointercancel from browser gesture arbitration must not finish a touch pinch.
+      if (event.pointerType === "touch" || event.button !== 0) return;
+      if (viewportRef.current) liveRange = viewportRef.current.range;
+
       drag = {
         id: event.pointerId,
         x: event.clientX,
-        y: event.clientY,
-        active: event.pointerType !== "touch",
-        touch: event.pointerType === "touch",
       };
-      if (!drag.touch) over.setPointerCapture?.(event.pointerId);
+      over.setPointerCapture?.(event.pointerId);
     };
     const onPointerMove = (event: PointerEvent) => {
-      if (pointers.has(event.pointerId)) {
-        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      }
       const value = viewportRef.current;
       if (!value) return;
-      if (pinchDistance !== undefined && pointers.size >= 2) {
-        const [a, b] = [...pointers.values()];
-        const distance = Math.hypot(a.x - b.x, a.y - b.y);
-        if (distance > 0) {
-          event.preventDefault();
-          schedule(
-            zoomChartViewport(
-              value.bounds,
-              liveRange,
-              value.minSpan,
-              pinchDistance / distance,
-              point((a.x + b.x) / 2),
-            ),
-          );
-          pinchDistance = distance;
-        }
-        return;
-      }
       if (!drag || drag.id !== event.pointerId) return;
       const deltaX = event.clientX - drag.x;
-      const deltaY = event.clientY - drag.y;
-      if (!drag.active) {
-        if (Math.abs(deltaY) >= Math.abs(deltaX) || Math.abs(deltaX) < 8) {
-          return;
-        }
-        drag.active = true;
-        over.setPointerCapture?.(event.pointerId);
-      }
       if (rangesEqual(value.bounds, liveRange)) return;
       event.preventDefault();
       drag.x = event.clientX;
-      drag.y = event.clientY;
       schedule(
         panChartViewport(
           value.bounds,
@@ -702,14 +981,12 @@ export default function UPlotChart<S>(
       );
     };
     const onPointerEnd = (event: PointerEvent) => {
-      const interacted = pinchDistance !== undefined || !!drag?.active;
-      pointers.delete(event.pointerId);
-      if (pointers.size < 2) pinchDistance = undefined;
-      if (drag?.id === event.pointerId) drag = undefined;
+      if (!drag || drag.id !== event.pointerId) return;
+      drag = undefined;
       if (over.hasPointerCapture?.(event.pointerId)) {
         over.releasePointerCapture(event.pointerId);
       }
-      if (interacted) commit();
+      commit();
     };
     const onDoubleClick = (event: MouseEvent) => {
       event.preventDefault();
@@ -717,14 +994,22 @@ export default function UPlotChart<S>(
     };
 
     over.addEventListener("wheel", onWheel, { passive: false });
+    over.addEventListener("touchstart", onTouchStart, { passive: false });
+    over.addEventListener("touchmove", onTouchMove, { passive: false });
+    over.addEventListener("touchend", onTouchEnd);
+    over.addEventListener("touchcancel", onTouchEnd);
     over.addEventListener("pointerdown", onPointerDown);
     over.addEventListener("pointermove", onPointerMove);
     over.addEventListener("pointerup", onPointerEnd);
     over.addEventListener("pointercancel", onPointerEnd);
     over.addEventListener("dblclick", onDoubleClick);
     return () => {
-      over.style.touchAction = "";
+      ownedTouchIds.clear();
       over.removeEventListener("wheel", onWheel);
+      over.removeEventListener("touchstart", onTouchStart);
+      over.removeEventListener("touchmove", onTouchMove);
+      over.removeEventListener("touchend", onTouchEnd);
+      over.removeEventListener("touchcancel", onTouchEnd);
       over.removeEventListener("pointerdown", onPointerDown);
       over.removeEventListener("pointermove", onPointerMove);
       over.removeEventListener("pointerup", onPointerEnd);
@@ -732,20 +1017,13 @@ export default function UPlotChart<S>(
       over.removeEventListener("dblclick", onDoubleClick);
       if (frame !== undefined) cancelAnimationFrame(frame);
       if (wheelTimer) clearTimeout(wheelTimer);
+      releaseScroll();
     };
-  }, [
-    width,
-    height,
-    structureKey,
-    themeVersion,
-    textScale,
-    viewportEnabled,
-    fontReady,
-    presentation,
-  ]);
+  }, [viewportEnabled, plotLayout, anchorGestureScroll]);
 
   React.useLayoutEffect(() => {
-    plotRef.current?.redraw();
+    // Event rows can appear when a new projection is ready; recompute their reserved padding.
+    plotRef.current?.redraw(true, true);
   }, [annotations]);
 
   const selectPoint = (index: number) => {
@@ -771,7 +1049,7 @@ export default function UPlotChart<S>(
 
   return (
     <div className="accessibleChart">
-      {props.interactiveTooltip && (
+      {interactiveTooltip && (
         <span id={instructionsId} className="srOnly">
           {controllerInput
             ? "Select to inspect a time. Use Left and Right to read points. Back closes the tooltip."
@@ -783,12 +1061,19 @@ export default function UPlotChart<S>(
         ref={rootRef}
         role="img"
         aria-label={accessibleLabel}
-        tabIndex={props.interactiveTooltip ? 0 : undefined}
-        aria-describedby={props.interactiveTooltip ? instructionsId : undefined}
-        onBlur={props.interactiveTooltip ? closeDetails : undefined}
+        tabIndex={interactiveTooltip ? 0 : undefined}
+        aria-describedby={interactiveTooltip ? instructionsId : undefined}
+        onBlur={props.tooltip ? closeDetails : undefined}
         onPointerDownCapture={
-          props.interactiveTooltip
+          props.tooltip
             ? (event) => {
+                if (
+                  keyboardTvTooltipTarget(
+                    event.target,
+                    selectedPointRef.current !== null,
+                  )
+                )
+                  return;
                 pointerPositionRef.current = {
                   x: event.clientX,
                   y: event.clientY,
@@ -798,8 +1083,15 @@ export default function UPlotChart<S>(
             : undefined
         }
         onPointerMoveCapture={
-          props.interactiveTooltip
+          props.tooltip
             ? (event) => {
+                if (
+                  keyboardTvTooltipTarget(
+                    event.target,
+                    selectedPointRef.current !== null,
+                  )
+                )
+                  return;
                 const previous = pointerPositionRef.current;
                 pointerPositionRef.current = {
                   x: event.clientX,
@@ -820,7 +1112,7 @@ export default function UPlotChart<S>(
             : undefined
         }
         onKeyDown={
-          props.interactiveTooltip
+          interactiveTooltip
             ? (event) => {
                 const current =
                   selectedPoint ?? plotRef.current?.cursor.idx ?? 0;
@@ -862,7 +1154,7 @@ export default function UPlotChart<S>(
           overflow: "hidden",
         }}
       />
-      {props.interactiveTooltip && (
+      {interactiveTooltip && (
         <span
           className="srOnly"
           role="status"

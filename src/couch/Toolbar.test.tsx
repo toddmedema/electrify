@@ -1,0 +1,131 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
+import { ThemeProvider } from "@mui/material/styles";
+import { createAppTheme } from "../Theme";
+import { createGame } from "../testing/Simulator";
+import CouchToolbar, { CouchToolbarProps } from "./Toolbar";
+
+function props(overrides: Partial<CouchToolbarProps> = {}): CouchToolbarProps {
+  return {
+    game: createGame({ scenarioId: 101 }),
+    menuOpen: false,
+    onMenuClose: jest.fn(),
+    onManual: jest.fn(),
+    onSettings: jest.fn(),
+    onSaveQuit: jest.fn(),
+    ...overrides,
+  };
+}
+
+function show(value: CouchToolbarProps) {
+  return render(
+    <ThemeProvider theme={createAppTheme("light")}>
+      <CouchToolbar {...value} />
+    </ThemeProvider>,
+  );
+}
+
+it("shows one shared calendar while speed controls stay in the player panes", () => {
+  const value = props();
+  show(value);
+  expect(screen.queryByRole("button", { name: "menu" })).toBeNull();
+  expect(screen.getByRole("progressbar")).toHaveAttribute(
+    "aria-valuenow",
+    String(Math.round(value.game.date.percentOfYear * 100)),
+  );
+  expect(
+    screen.getByText(`${value.game.date.month} ${value.game.date.year}`, {
+      exact: false,
+    }),
+  ).toBeVisible();
+  expect(screen.queryAllByRole("group", { name: /speed/ })).toHaveLength(0);
+  expect(screen.queryByText(/On this TV|Unranked|Last local save/)).toBeNull();
+  expect(
+    screen.queryByRole("button", { name: "Save & Quit for everyone" }),
+  ).toBeNull();
+});
+
+it("shows common upcoming events even when the first company has a cash warning", () => {
+  const value = props({
+    upcoming: [
+      {
+        key: "shared-event",
+        startsMinute: 1000000,
+        title: "Carbon fee rising",
+        label: "Expected next year",
+        message: "Prepare for a carbon fee.",
+      },
+    ],
+  });
+  value.game.timeline[0].cash = -1;
+  show(value);
+  expect(
+    screen.getByRole("button", { name: /Upcoming: Carbon fee rising/ }),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: /months left/ })).toBeVisible();
+  expect(screen.queryByRole("button", { name: /Cash out/ })).toBeNull();
+});
+
+it("shows the shared floating menu with Return to game first and delegates its actions", () => {
+  const value = props({ menuOpen: true });
+  show(value);
+  const menu = screen.getByRole("dialog", { name: "Game menu" });
+  expect(
+    within(menu)
+      .getAllByRole("button")
+      .map((button) => button.textContent),
+  ).toEqual(["Return to game", "Manual", "Settings", "Quit"]);
+  fireEvent.click(within(menu).getByRole("button", { name: "Settings" }));
+  expect(value.onSettings).toHaveBeenCalledTimes(1);
+  fireEvent.click(within(menu).getByRole("button", { name: "Manual" }));
+  expect(value.onManual).toHaveBeenCalledTimes(1);
+  fireEvent.click(within(menu).getByRole("button", { name: "Quit" }));
+  expect(value.onSaveQuit).toHaveBeenCalledTimes(1);
+  fireEvent.click(within(menu).getByRole("button", { name: "Return to game" }));
+  expect(value.onMenuClose).toHaveBeenCalledTimes(1);
+});
+
+it("moves menu selection using the same real focus as the controller", () => {
+  show(props({ menuOpen: true }));
+  const resume = screen.getByRole("button", { name: "Return to game" });
+  resume.focus();
+  fireEvent.keyDown(resume, { key: "ArrowDown" });
+  const manual = screen.getByRole("button", { name: "Manual" });
+  expect(manual).toHaveFocus();
+  fireEvent.keyDown(manual, { key: "ArrowUp" });
+  expect(resume).toHaveFocus();
+});
+
+it("keeps the controller legend accessible inside the active menu modal only while open", () => {
+  const value = props();
+  function ControlledMenu() {
+    const [open, setOpen] = useState(true);
+    return (
+      <CouchToolbar
+        {...value}
+        menuOpen={open}
+        onMenuClose={() => setOpen(false)}
+        menuFooter={
+          <aside aria-label="Controller controls">
+            Right stick: change speed
+          </aside>
+        }
+      />
+    );
+  }
+  render(
+    <ThemeProvider theme={createAppTheme("light")}>
+      <ControlledMenu />
+    </ThemeProvider>,
+  );
+  expect(screen.getByRole("dialog", { name: "Game menu" })).toBeVisible();
+  expect(
+    screen.getByRole("complementary", { name: "Controller controls" }),
+  ).toBeVisible();
+  fireEvent.keyDown(screen.getByRole("dialog", { name: "Game menu" }), {
+    key: "Escape",
+  });
+  expect(
+    screen.queryByRole("complementary", { name: "Controller controls" }),
+  ).toBeNull();
+});

@@ -14,6 +14,9 @@ import {
 } from "./testing/SaveTestHelpers";
 import type { SaveFileType, ScenarioType } from "./Types";
 import { validateSaveFileEnvelope } from "./SaveModel";
+import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
+import { createGame } from "./testing/Simulator";
+import { projectAuthoredRunReference } from "./helpers/RunIdentity";
 
 describe("SaveFile", () => {
   it("uses a sanitized player name for filenames", () => {
@@ -96,6 +99,36 @@ describe("SaveFile", () => {
         "shapes",
       );
       expect(roundTrip(exported)).toEqual(exported);
+    });
+    it("imports a packed prior-release save with progress intact and a repeatable current export", () => {
+      const game = createGame({ scenarioId: 101, seed: 31337 });
+      game.challenge = {
+        run: projectAuthoredRunReference(game.runIdentity)!,
+        target: 400,
+      };
+      const raw = JSON.parse(
+        JSON.stringify(
+          encodeSaveFile(
+            fakeSaveFile({
+              save: serializeSave(game),
+            }),
+          ),
+        ),
+      );
+      raw.save.schemaVersion = 8;
+      raw.save.game.runIdentity.compatibilityId = `rules-1-${"a".repeat(64)}`;
+      raw.save.game.challenge.run.compatibilityId =
+        raw.save.game.runIdentity.compatibilityId;
+      const original = JSON.stringify(raw);
+      const imported = validateSaveFileEnvelope(raw, parseSave);
+      expect(imported.save.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+      expect(imported.save.game.rulesChanged).toBe(true);
+      expect(imported.save.game.runIdentity).toBeUndefined();
+      expect(imported.save.game.challenge).toBeUndefined();
+      expect(imported.save.game.facilities).toEqual(game.facilities);
+      expect(imported.save.game.date).toEqual(game.date);
+      expect(JSON.stringify(raw)).toBe(original);
+      expect(roundTrip(imported)).toEqual(imported);
     });
     it("round trips completed and terminal results without account metadata", () => {
       for (const outcome of ["completed", "bankrupt", "fired"] as const) {

@@ -10,6 +10,8 @@ import {
   xAxis,
   yAxis,
   niceSplits,
+  patternFill,
+  zeroLinePlugin,
 } from "./UPlotHelpers";
 import { applyTextSize } from "../../TextSize";
 
@@ -126,6 +128,93 @@ it("draws the baseline solid after a dashed forecast across the whole plot", () 
   expect(ctx.stroke).toHaveBeenCalledTimes(1);
 });
 
+it("draws the zero rule solid across the plot, clipped to it", () => {
+  let dash = [8, 4];
+  const ctx = {
+    save: jest.fn(),
+    restore: jest.fn(),
+    beginPath: jest.fn(),
+    rect: jest.fn(),
+    clip: jest.fn(),
+    setLineDash: (value: number[]) => {
+      dash = value;
+    },
+    moveTo: jest.fn(),
+    lineTo: jest.fn(),
+    stroke: jest.fn(() => expect(dash).toEqual([])),
+  };
+  const plot = {
+    bbox: { left: 20, top: 10, width: 300, height: 100 },
+    ctx,
+    valToPos: (value: number, scale: string, canvas: boolean) => {
+      expect([value, scale, canvas]).toEqual([0, "y", true]);
+      return 40;
+    },
+  } as unknown as uPlot;
+  (zeroLinePlugin("black").hooks!.draw as (plot: uPlot) => void)(plot);
+  expect(ctx.rect).toHaveBeenCalledWith(20, 10, 300, 100);
+  expect(ctx.moveTo).toHaveBeenCalledWith(20, 40);
+  expect(ctx.lineTo).toHaveBeenCalledWith(320, 40);
+  expect(ctx.stroke).toHaveBeenCalledTimes(1);
+});
+
+describe("patternFill", () => {
+  const strokes: Array<Array<[number, number]>> = [];
+  const originalCreate = document.createElement.bind(document);
+  beforeEach(() => {
+    strokes.length = 0;
+    jest.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      if (tag !== "canvas") return originalCreate(tag);
+      let path: Array<[number, number]> = [];
+      const ctx = {
+        scale: jest.fn(),
+        fillRect: jest.fn(),
+        beginPath: jest.fn(() => (path = [])),
+        moveTo: (x: number, y: number) => path.push([x, y]),
+        lineTo: (x: number, y: number) => path.push([x, y]),
+        stroke: () => strokes.push(path),
+      };
+      return {
+        getContext: () => ctx,
+      } as unknown as HTMLCanvasElement;
+    });
+  });
+  afterEach(() => jest.restoreAllMocks());
+  const draw = (kind: "hatch" | "vertical") => {
+    const pattern = {} as CanvasPattern;
+    const createPattern = jest.fn(() => pattern);
+    const fill = patternFill(kind) as (u: uPlot) => unknown;
+    const u = { ctx: { createPattern } } as unknown as uPlot;
+    return { result: fill(u), again: fill(u), createPattern, pattern };
+  };
+
+  it("tells a vertical rule from a diagonal one, and builds each tile once", () => {
+    const vertical = draw("vertical");
+    expect(vertical.result).toBe(vertical.pattern);
+    expect(vertical.again).toBe(vertical.pattern);
+    expect(vertical.createPattern).toHaveBeenCalledTimes(1);
+    expect(strokes[0]).toEqual([
+      [8.5, 0],
+      [8.5, 16],
+    ]);
+
+    strokes.length = 0;
+    draw("hatch");
+    expect(strokes[0]).toEqual([
+      [-8, 16],
+      [16, -8],
+      [8, 16],
+      [16, 8],
+    ]);
+  });
+
+  it("falls back to the flat wash when the canvas can't make a pattern", () => {
+    const fill = patternFill("vertical") as (u: uPlot) => unknown;
+    const u = { ctx: { createPattern: () => null } } as unknown as uPlot;
+    expect(typeof fill(u)).toBe("string");
+  });
+});
+
 describe("eventMarkersPlugin", () => {
   it("draws numbered in-domain event markers and skips events outside the plot", () => {
     const ctx = {
@@ -141,9 +230,10 @@ describe("eventMarkersPlugin", () => {
       setLineDash: jest.fn(),
       stroke: jest.fn(),
       lineTo: jest.fn(),
+      measureText: jest.fn((text: string) => ({ width: text.length * 7 })),
     } as unknown as CanvasRenderingContext2D;
     const plot = {
-      bbox: { left: 0, top: 0, width: 100, height: 80 },
+      bbox: { left: 0, top: 40, width: 100, height: 80 },
       ctx,
       scales: { x: { min: 0, max: 10 } },
       valToPos: (value: number) => value * 10,
@@ -159,16 +249,75 @@ describe("eventMarkersPlugin", () => {
 
     (plugin.hooks!.draw as (plot: uPlot) => void)(plot);
 
-    expect(ctx.moveTo).toHaveBeenCalledWith(50.5, 0);
-    expect(ctx.moveTo).toHaveBeenCalledTimes(1);
-    expect(ctx.fillText).toHaveBeenCalledWith("1", 50.5, 10);
+    const options = {
+      width: 350,
+      height: 160,
+      padding: [10, 0, 0, 0],
+    } as uPlot.Options;
+    plugin.opts!(plot, options);
+    const topPadding = options.padding![0] as (...args: unknown[]) => number;
+    expect(topPadding(plot, 0, [], 0)).toBe(34);
+    expect(ctx.moveTo).toHaveBeenCalledWith(50.5, 40);
+    expect(ctx.moveTo).toHaveBeenCalledTimes(2);
+    expect(ctx.fillText).toHaveBeenCalledWith("1", 50.5, 28);
+    // The badge's lower edge stays above the data, in its reserved event row.
+    expect(ctx.arc).toHaveBeenCalledWith(50.5, 28, 8, 0, Math.PI * 2);
     expect(ctx.fillText).not.toHaveBeenCalledWith(
       "2",
       expect.any(Number),
       expect.any(Number),
     );
-    expect(ctx.save).toHaveBeenCalledTimes(1);
-    expect(ctx.restore).toHaveBeenCalledTimes(1);
+    expect(ctx.save).toHaveBeenCalledTimes(2);
+    expect(ctx.restore).toHaveBeenCalledTimes(2);
+  });
+
+  it("merges close and edge-clamped badges in one row while keeping true onset guides", () => {
+    const groupStrokeWidths: number[] = [];
+    const ctx = {
+      arc: jest.fn(),
+      roundRect: jest.fn(function (this: CanvasRenderingContext2D) {
+        groupStrokeWidths.push(this.lineWidth);
+      }),
+      beginPath: jest.fn(),
+      clip: jest.fn(),
+      fill: jest.fn(),
+      fillText: jest.fn(),
+      measureText: (text: string) => ({ width: text.length * 7 }),
+      moveTo: jest.fn(),
+      rect: jest.fn(),
+      restore: jest.fn(),
+      save: jest.fn(),
+      setLineDash: jest.fn(),
+      stroke: jest.fn(),
+      lineTo: jest.fn(),
+    } as unknown as CanvasRenderingContext2D;
+    const plot = {
+      bbox: { left: 0, top: 40, width: 100, height: 80 },
+      ctx,
+      scales: { x: { min: 0, max: 10 } },
+      valToPos: (value: number) => value * 10,
+      width: 350,
+    } as unknown as uPlot;
+    const plugin = eventMarkersPlugin(
+      () => [
+        { key: "freeze", x: 0, number: 1 },
+        { key: "recovery", x: 0.25, number: 2 },
+        { key: "nearby", x: 2.5, number: 3 },
+        { key: "later", x: 9.9, number: 4 },
+      ],
+      () => "recovery",
+    );
+    (plugin.hooks.draw as (plot: uPlot) => void)(plot);
+    expect(ctx.fillText).toHaveBeenCalledTimes(2);
+    expect(ctx.fillText).toHaveBeenCalledWith("1–3", 14.5, 28);
+    expect(ctx.fillText).toHaveBeenCalledWith("4", 92, 28);
+    expect(ctx.moveTo).toHaveBeenCalledWith(0.5, 40);
+    expect(ctx.moveTo).toHaveBeenCalledWith(3.5, 40);
+    expect(ctx.moveTo).toHaveBeenCalledWith(25.5, 40);
+    expect(ctx.roundRect).toHaveBeenCalledTimes(1);
+    expect(groupStrokeWidths).toEqual([2]);
+    expect(ctx.arc).toHaveBeenCalledTimes(1);
+    expect(ctx.arc).toHaveBeenCalledWith(92, 28, 8, 0, Math.PI * 2);
   });
 });
 

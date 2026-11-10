@@ -64,7 +64,7 @@ test("custom scenario events compose and persist without overflowing setup", asy
   });
   await page
     .locator(".customSetupActions")
-    .getByRole("button", { name: "Play", exact: true })
+    .getByRole("button", { name: "Start game", exact: true })
     .click();
   await expect(page.locator("#appbar:visible").first()).toBeVisible({
     timeout: 30000,

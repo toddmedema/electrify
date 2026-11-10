@@ -13,7 +13,9 @@ import {
   facilityCashBack,
   facilityEquivalentCycles,
   facilityLifetime,
+  facilityMaintenanceCost,
   facilityOutputFactor,
+  facilityPermanentlyShutdown,
 } from "../../helpers/Financials";
 import {
   formatPercent,
@@ -39,7 +41,6 @@ import {
   coldPackageEffect,
   dayCount,
   formatDesignTemperature,
-  resilienceActionLabel,
   resilienceName,
 } from "./WeatherResilienceText";
 import { RETROFIT_COST_MULTIPLIER } from "../../data/Hazards";
@@ -55,6 +56,8 @@ import {
 } from "../../Types";
 import HydroWaterSection from "./HydroWaterSection";
 import Sparkline from "./Sparkline";
+import ConceptIcon, { ConceptNameType } from "./ConceptIcon";
+import { MONTHS } from "../../Constants";
 
 /**
  * What a selected facility has actually been doing: how hard it has run, what a MWh out of it
@@ -81,15 +84,32 @@ export interface Props {
 
 interface StatProps {
   label: string;
+  // The game's glyph for what this number measures, drawn ahead of the label
+  concept?: ConceptNameType;
   value: React.ReactNode;
   // Profit is the one number here that means something different either side of zero
   tone?: "good" | "bad";
+}
+
+// The label names the stat in words; the glyph only helps the eye find it again
+function StatIcon(props: { concept: ConceptNameType }): React.JSX.Element {
+  return (
+    <ConceptIcon
+      concept={props.concept}
+      className="facilityStatIcon"
+      color="inherit"
+      decorative
+      monochrome
+      style={{ width: 14, height: 14 }}
+    />
+  );
 }
 
 const Stat = React.memo(function Stat(props: StatProps): React.JSX.Element {
   return (
     <div className="facilityStat">
       <Typography variant="caption" color="textSecondary" component="dt">
+        {props.concept && <StatIcon concept={props.concept} />}
         {props.label}
       </Typography>
       <Typography
@@ -165,7 +185,6 @@ function WeatherResilienceSection(props: {
       headingRef.current?.focus();
     }
   }, [focusHeading]);
-  const hail = summary.upgrade === "hailResistant";
   const cost = summary.retrofitCost;
   const cash = currentCash(game);
   const shortfall = cost === undefined ? 0 : Math.max(0, cost - cash);
@@ -174,28 +193,20 @@ function WeatherResilienceSection(props: {
   const designMinTempC =
     facility.resilience?.designMinTempC ?? STANDARD_GAS_DESIGN_MIN_TEMP_C;
   const detail =
-    hail || facility.fuel !== "Natural Gas"
+    facility.fuel !== "Natural Gas"
       ? summary.detail
       : `Rated to ${formatDesignTemperature(designMinTempC, units)}`;
-  const actionLabel = resilienceActionLabel(summary.upgrade);
+  const actionLabel = "Add cold-weather package";
   const retrofitted = canOffer
     ? retrofittedResilience(facility, game, summary.upgrade)
     : undefined;
   const hazard = facilityHazardStatus(game, facility);
   const installing = upgradeInProgress(facility);
   const activeOutage =
-    hazard && (hazard.hazard === "HAIL") === hail
-      ? hail
-        ? "Doesn't speed up current repairs."
-        : "Doesn't end this month's cold outage."
+    hazard?.hazard === "EXTREME_COLD"
+      ? "Doesn't end this month's cold outage."
       : undefined;
-  if (
-    !summary.installed &&
-    !facility.resilience?.solarTrackers &&
-    !installing &&
-    !canOffer
-  )
-    return <></>;
+  if (!summary.installed && !installing && !canOffer) return <></>;
   return (
     <section className="facilityDetailSection" aria-label="Upgrades">
       <Typography
@@ -213,16 +224,6 @@ function WeatherResilienceSection(props: {
           </Typography>
           <Typography variant="body2" color="textSecondary">
             {detail}
-          </Typography>
-        </div>
-      )}
-      {facility.resilience?.solarTrackers && (
-        <div className="facilityResilienceSummary">
-          <Typography variant="body2" className="facilityStatValue">
-            Solar trackers
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            About 20% more morning and evening power.
           </Typography>
         </div>
       )}
@@ -268,15 +269,13 @@ function WeatherResilienceSection(props: {
           }}
         >
           <DialogContentText>
-            {hail
-              ? "Less damage from future hail."
-              : facility.fuel !== "Natural Gas"
-                ? "Permanently halves this plant’s output losses in the deep freeze."
-                : coldPackageEffect(
-                    retrofitted?.designMinTempC ?? designMinTempC,
-                    designMinTempC,
-                    units,
-                  )}
+            {facility.fuel !== "Natural Gas"
+              ? "Permanently halves this plant’s output losses in the deep freeze."
+              : coldPackageEffect(
+                  retrofitted?.designMinTempC ?? designMinTempC,
+                  designMinTempC,
+                  units,
+                )}
           </DialogContentText>
           <DialogContentText>
             {summary.upgrade === "coldWeatherPackage"
@@ -307,6 +306,10 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const storage = isStorage(facility) ? facility : undefined;
   const accentColor = facilityColor(fuel);
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const permanentlyShutdown = facilityPermanentlyShutdown(
+    facility,
+    date.minute,
+  );
   const isHydro = fuel === "Hydro" && !!facility.reservoirCapacityWh;
   const ageYears = facilityAgeYears(facility, date.minute);
   const outputFactor = facilityOutputFactor(facility, date.minute);
@@ -359,7 +362,8 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   return (
     <div className="facilityDetails">
       {facility.hydroSiteId && (
-        <Typography variant="body2">
+        // Clear of the expanded header above and the first section's rule below
+        <Typography variant="body2" sx={{ pt: 1.5, pb: 1 }}>
           Site:{" "}
           {HYDRO_SITES[facility.hydroSiteId]?.name || facility.hydroSiteId}
         </Typography>
@@ -367,7 +371,11 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
       {underConstruction && (
         <section className="facilityDetailSection" aria-label="Construction">
           <dl className="facilityStats">
-            <Stat label="Capacity" value={formatWatts(facility.peakW)} />
+            <Stat
+              label="Capacity"
+              concept="supply"
+              value={formatWatts(facility.peakW)}
+            />
             {storage && (
               <Stat
                 label="Energy capacity"
@@ -394,7 +402,11 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             Operation
           </Typography>
           <dl className="facilityStats">
-            <Stat label="Capacity" value={formatWatts(facility.peakW)} />
+            <Stat
+              label="Capacity"
+              concept="supply"
+              value={formatWatts(facility.peakW)}
+            />
             {!storage && maxOutputFactor < 1 && (
               <Stat
                 label="Current max output"
@@ -419,6 +431,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             {storage && (
               <Stat
                 label="Charge"
+                concept="storage"
                 value={formatWattHoursOfPeak(storage.currentWh, storage.peakWh)}
               />
             )}
@@ -449,6 +462,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             {hazard && (
               <Stat
                 label={hazard.label}
+                concept="severeWeather"
                 value={
                   <span className="facilityStatWarning">
                     {formatPercent(hazard.availableFraction)} available
@@ -483,6 +497,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             />
             <Stat
               label="Lifetime profit"
+              concept="money"
               value={`${lifetime.profit > 0 ? "+" : ""}${formatMoneyConcise(lifetime.profit)}`}
               tone={
                 lifetime.profit < 0
@@ -498,22 +513,46 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 value={formatMoneyConcise(facility.loanAmountLeft)}
               />
             )}
-            {variableOperatingCostPerMWh !== undefined && (
+            {/* Every operating facility pays this, whether or not it also pays per MWh: solar,
+                wind and batteries have a fixed cost only */}
+            {facilityMaintenanceCost(facility, date.minute) === undefined && (
               <Stat
                 label="Fixed upkeep"
                 value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
               />
             )}
-            {variableOperatingCostPerMWh !== undefined && (
+            {variableOperatingCostPerMWh !== undefined &&
+              facilityMaintenanceCost(facility, date.minute) === undefined && (
+                <Stat
+                  label="Variable upkeep"
+                  value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh`}
+                />
+              )}
+            {facility.costPerStart !== undefined &&
+              facilityMaintenanceCost(facility, date.minute) === undefined && (
+                <Stat
+                  label="Non-fuel start cost"
+                  value={`${formatMoneyConcise(facility.costPerStart)}/start`}
+                />
+              )}
+            {facility.maintenanceObligation && (
               <Stat
-                label="Variable upkeep"
-                value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh`}
-              />
-            )}
-            {facility.costPerStart !== undefined && (
-              <Stat
-                label="Non-fuel start cost"
-                value={`${formatMoneyConcise(facility.costPerStart)}/start`}
+                label={facility.maintenanceObligation.reason}
+                value={
+                  <>
+                    {formatMoneyConcise(
+                      facility.maintenanceObligation.monthlyCost,
+                    )}
+                    /mo ·{" "}
+                    {formatMoneyConcise(
+                      facility.maintenanceObligation.monthlyCost * 12,
+                    )}
+                    /yr
+                    {facilityMaintenanceCost(facility, date.minute) ===
+                      undefined &&
+                      ` from ${MONTHS[(facility.maintenanceObligation.startsMonth - 1) % 12]} ${(props.game?.startingYear ?? date.year - Math.floor(date.monthsElapsed / 12)) + Math.floor((facility.maintenanceObligation.startsMonth - 1) / 12)}`}
+                  </>
+                }
               />
             )}
             {trend.length > 1 && fuel && (
@@ -523,6 +562,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                   color="textSecondary"
                   component="dt"
                 >
+                  <StatIcon concept="fuel" />
                   {fuel} price, {trend.length}mo
                 </Typography>
                 <dd className="facilityTrend">
@@ -545,14 +585,14 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           </dl>
         </section>
       )}
-      {props.game && (
+      {props.game && !permanentlyShutdown && (
         <GasConversion
           facility={facility}
           game={props.game}
           onRetrofit={props.onRetrofit}
         />
       )}
-      {resilience && props.game && (
+      {resilience && props.game && !permanentlyShutdown && (
         <WeatherResilienceSection
           facility={facility}
           game={props.game}

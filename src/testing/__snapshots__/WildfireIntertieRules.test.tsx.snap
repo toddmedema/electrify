@@ -1,11 +1,11 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`native 111 keeps its redesigned grid, intertie phases and previews on CEO 1`] = `"06fc0865a5a2e5a6486457d38c50b2a1185e324d2b4d044cb6f59a854d641811"`;
+exports[`native 111 keeps its redesigned grid, intertie phases and previews on CEO 1`] = `"64a1623a645084fed088c78082a1e7ed3fb2de0bc8fad8e9d21a1522ead41326"`;
 
-exports[`native 111 keeps its redesigned grid, intertie phases and previews on Employee 1`] = `"fed7ff9f247e9d8210dcdf869d58c489dbdcc422c6669f6dd0a01d8e4f6d21ae"`;
+exports[`native 111 keeps its redesigned grid, intertie phases and previews on Employee 1`] = `"553441ee33bcb365bd0899a304eb601184e33b073fb07149a1da564e46f32304"`;
 
-exports[`native 111 keeps its redesigned grid, intertie phases and previews on Intern 1`] = `"9fc0e484791dfa519ba08d72b3a70f224e19a276a06f7905977e68ef3396d175"`;
+exports[`native 111 keeps its redesigned grid, intertie phases and previews on Intern 1`] = `"b4ef757605f013ff83cd43209a7607c451548969c0d739d4b68bf748db4e849c"`;
 
-exports[`native 111 keeps its redesigned grid, intertie phases and previews on Manager 1`] = `"dfa18d0854c6736b65e9b716a50750b46a4f0587235ea9103cfe8ab0a1966fe1"`;
+exports[`native 111 keeps its redesigned grid, intertie phases and previews on Manager 1`] = `"627e8fa8413143ac03d1ba0aac80322599f1ab82580a9fffab1dad432a34b6fd"`;
 
-exports[`native 111 keeps its redesigned grid, intertie phases and previews on VP 1`] = `"cf53d03f8e533fd9a21f9217a1691265a573b42d6ce7fe9b15d6df613654309e"`;
+exports[`native 111 keeps its redesigned grid, intertie phases and previews on VP 1`] = `"da88b7bf9f5303e6ada3f554398e2c1dd1952803b2e0d3e69451690612c72a53"`;

@@ -37,17 +37,18 @@ import SaveIcon from "@mui/icons-material/Save";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import {
   DerivedHistoryKeysType,
+  FuelNameType,
   GameType,
   MonthlyHistoryType,
   PricedFuelNameType,
   TickPresentFutureType,
   UnitSystemType,
 } from "../../Types";
+import { PRICED_FUELS } from "../../Constants";
 import {
   deriveExpandedSummary,
   EMPTY_HISTORY,
@@ -84,6 +85,7 @@ import {
   chartPalette,
   demandTypeColors,
   fuelColors,
+  fuelDashArrays,
   waterDashArrays,
 } from "../../Theme";
 import ChartForecastDemandByType, {
@@ -91,10 +93,12 @@ import ChartForecastDemandByType, {
 } from "../base/ChartForecastDemandByType";
 import ChartFinances from "../base/ChartFinances";
 import ManualLink from "../base/ManualLink";
-import { MANUAL_ENTRY } from "../base/ManualEntries";
-import FuelPriceFilter from "../base/FuelPriceFilter";
+import ConceptIcon from "../base/ConceptIcon";
+import { MANUAL_ENTRY, ManualEntryTitleType } from "../base/ManualEntries";
+import FuelFilter from "../base/FuelFilter";
 import { ExpandedChartPresentation } from "../base/ChartPresentationContext";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
+import ChartForecastPowerExchange from "../base/ChartForecastPowerExchange";
 import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
 import ChartForecastSupplyByFuel, {
@@ -106,7 +110,7 @@ import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
-import { temperatureUnit } from "../../helpers/Units";
+import { largeMassUnit, temperatureUnit } from "../../helpers/Units";
 import { UnitsContext } from "../base/UnitsContext";
 import {
   HISTORY_METRIC_KEYS,
@@ -215,6 +219,43 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "water", label: "Water", group: "Environment", availability: "hydro" },
 ] as const;
 
+/** Layers that are a table of figures, not a plot: no expand control and no help button. */
+const TABLE_LAYERS = ["financeDetails"] as const;
+export type ChartLayerId = Exclude<
+  InsightLayerId,
+  (typeof TABLE_LAYERS)[number]
+>;
+
+export function isChartLayer(id: InsightLayerId): id is ChartLayerId {
+  return !(TABLE_LAYERS as readonly InsightLayerId[]).includes(id);
+}
+
+/**
+ * The manual page behind each chart's (?). Keyed by layer, so adding a chart without choosing a
+ * page fails to compile. Where a quantity has its own entry the chart opens it; the rest open
+ * Insights & data layers, which describes them.
+ */
+export const INSIGHT_LAYER_MANUAL: Record<ChartLayerId, ManualEntryTitleType> =
+  {
+    supplyDemand: MANUAL_ENTRY.FORECASTS,
+    spareCapacity: MANUAL_ENTRY.RESERVE_CAPACITY,
+    powerExchange: MANUAL_ENTRY.INTERTIES,
+    demandByType: MANUAL_ENTRY.CUSTOMERS,
+    supplyByFuel: MANUAL_ENTRY.FORECASTS,
+    storage: MANUAL_ENTRY.POWER_AND_ENERGY,
+    customers: MANUAL_ENTRY.CUSTOMERS,
+    profit: MANUAL_ENTRY.FORECASTS,
+    revenue: MANUAL_ENTRY.RATES,
+    expenses: MANUAL_ENTRY.OPERATING_COSTS,
+    cash: MANUAL_ENTRY.FORECASTS,
+    fuelPrices: MANUAL_ENTRY.FUEL_COSTS,
+    inflationInterest: MANUAL_ENTRY.INTEREST_RATES,
+    emissions: MANUAL_ENTRY.EMISSIONS,
+    solarCapacityFactor: MANUAL_ENTRY.CAPACITY_FACTOR,
+    weather: MANUAL_ENTRY.FORECASTS,
+    water: MANUAL_ENTRY.HYDROPOWER,
+  };
+
 export type DefaultInsightPresetId =
   "overview" | "reliability" | "profitability" | "growth" | "decarbonization";
 
@@ -315,6 +356,7 @@ interface State {
   expandedLayer?: InsightLayerId;
   expandedPlaceholderHeight: number;
   selectedPriceFuel?: PricedFuelNameType;
+  selectedSupplyFuel?: FuelNameType;
   temporaryLayer?: InsightLayerId;
   layers: InsightLayerId[];
   preset: InsightPresetId;
@@ -329,6 +371,7 @@ interface State {
   viewport: ChartViewportRange;
   // The game month the viewport was last advanced to
   viewportMonth: number;
+  viewportTermStartMonth: number;
   viewportAnnouncement: string;
 }
 
@@ -337,7 +380,9 @@ const VIEWPORT_PAN_FRACTION = 0.25;
 
 function scenarioEndMinute(game: GameType): number | undefined {
   const months = activeScenario(game)?.durationMonths;
-  return months ? months * MINUTES_PER_MONTH : undefined;
+  return months
+    ? (months + (game.campaign?.termStartMonth ?? 0)) * MINUTES_PER_MONTH
+    : undefined;
 }
 
 // Begin with the scenario's planning horizon; unbounded games use twenty years.
@@ -690,6 +735,7 @@ export default class Insights extends React.Component<Props, State> {
         ? this.restoredViewport(props.savedViewport)
         : initialViewport(props.game),
       viewportMonth: props.game.date.monthsElapsed,
+      viewportTermStartMonth: props.game.campaign?.termStartMonth ?? 0,
       viewportAnnouncement: "",
     };
   }
@@ -707,6 +753,21 @@ export default class Insights extends React.Component<Props, State> {
     state: State,
   ): Partial<State> | null {
     const month = props.game.date.monthsElapsed;
+    const termStart = props.game.campaign?.termStartMonth ?? 0;
+    if (termStart !== state.viewportTermStartMonth) {
+      const duration = activeScenario(props.game)?.durationMonths ?? 240;
+      const previousEnd =
+        (state.viewportTermStartMonth + duration) * MINUTES_PER_MONTH;
+      const viewport: ChartViewportRange =
+        state.viewport[1] === previousEnd
+          ? [state.viewport[0], scenarioEndMinute(props.game)!]
+          : state.viewport;
+      return {
+        viewport,
+        viewportMonth: month,
+        viewportTermStartMonth: termStart,
+      };
+    }
     if (month === state.viewportMonth) return null;
     const advanced = advanceViewport(
       props.game,
@@ -831,9 +892,14 @@ export default class Insights extends React.Component<Props, State> {
   }
 
   private restoredViewport(origin: SavedViewport): ChartViewportRange {
+    const termStart = this.props.game.campaign?.termStartMonth ?? 0;
+    const viewport: ChartViewportRange =
+      termStart > 0 && origin.viewport[1] === termStart * MINUTES_PER_MONTH
+        ? [origin.viewport[0], scenarioEndMinute(this.props.game)!]
+        : origin.viewport;
     return advanceViewport(
       this.props.game,
-      origin.viewport,
+      viewport,
       this.props.game.date.monthsElapsed - origin.month,
     );
   }
@@ -1227,6 +1293,16 @@ export default class Insights extends React.Component<Props, State> {
     );
   }
 
+  // Escape inside the layer editor closes just the editor, returning focus to its toggle; the
+  // workspace's own Escape (close the whole pane) skips a handled event.
+  private closeLayersOnEscape = (event: React.KeyboardEvent) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    if (!this.state.layersOpen) return;
+    event.preventDefault();
+    this.setState({ layersOpen: false });
+    document.getElementById("insightsLayersButton")?.focus();
+  };
+
   private renderLayerPanel(projection: ProjectionView) {
     if (!this.state.layersOpen) {
       return null;
@@ -1237,6 +1313,7 @@ export default class Insights extends React.Component<Props, State> {
         id="insightsLayerPanel"
         className="insightsLayerPanel"
         aria-label="Data layers"
+        onKeyDown={this.closeLayersOnEscape}
       >
         {GROUPS.map((group) => {
           const layers = INSIGHT_LAYERS.filter(
@@ -1245,14 +1322,19 @@ export default class Insights extends React.Component<Props, State> {
           );
           return (
             <div className="insightsLayerGroup" key={group}>
-              <Typography variant="subtitle2">{group}</Typography>
+              <Typography component="h3" variant="subtitle2">
+                {group}
+              </Typography>
               {layers.map((layer) => (
                 <FormControlLabel
                   key={layer.id}
                   control={
                     <Checkbox
                       id={`insightsLayer${layer.id[0].toUpperCase()}${layer.id.slice(1)}`}
-                      checked={this.state.layers.includes(layer.id)}
+                      checked={
+                        required.includes(layer.id) ||
+                        this.state.layers.includes(layer.id)
+                      }
                       disabled={required.includes(layer.id)}
                       onChange={() => this.toggleLayer(layer.id)}
                     />
@@ -1377,6 +1459,21 @@ export default class Insights extends React.Component<Props, State> {
       [0, scenarioEndMinute(this.props.game) ?? 20 * 12 * MINUTES_PER_MONTH],
       minSpan,
     );
+    // Successor scenarios share a continuous campaign clock but own a new term.
+    const termStartMinute =
+      (this.props.game.campaign?.termStartMonth ?? 0) * MINUTES_PER_MONTH;
+    const cappedEndMinute = termStartMinute + 20 * 12 * MINUTES_PER_MONTH;
+    const fullTimelineRange = clampChartViewport(
+      bounds,
+      [
+        termStartMinute,
+        Math.min(
+          scenarioEndMinute(this.props.game) ?? cappedEndMinute,
+          cappedEndMinute,
+        ),
+      ],
+      minSpan,
+    );
     const span = range[1] - range[0];
     const rangeLabel = viewportLabel(range, this.props.game.startingYear);
     const setRange = (next: ChartViewportRange) =>
@@ -1434,8 +1531,11 @@ export default class Insights extends React.Component<Props, State> {
             full || rangesEqual(scenarioRange, range),
             () => setRange(scenarioRange),
           )}
-          {iconButton("Fit full timeline", <FitScreenIcon />, full, () =>
-            setRange(bounds),
+          {iconButton(
+            "Fit full timeline",
+            <FitScreenIcon />,
+            rangesEqual(fullTimelineRange, range),
+            () => setRange(fullTimelineRange),
           )}
           {iconButton("Zoom in", <ZoomInIcon />, span <= minSpan, () =>
             setRange(
@@ -1458,8 +1558,8 @@ export default class Insights extends React.Component<Props, State> {
           )}
         </div>
         <span id={hintId} className="srOnly">
-          Pinch or use the zoom controls to zoom. Swipe, drag, or use the pan
-          controls to move through time.
+          Drag a finger to inspect values. Pinch to zoom. Drag with two fingers
+          or a mouse to move through time, or use the zoom and pan controls.
         </span>
         <span className="srOnly" aria-live="polite">
           {this.state.viewportAnnouncement}
@@ -1560,16 +1660,6 @@ export default class Insights extends React.Component<Props, State> {
         case "spareCapacity":
           body = (
             <>
-              <ChartLegend
-                items={[
-                  { name: "Recorded", color: chartPalette().supply },
-                  {
-                    name: "Projected",
-                    color: chartPalette().supply,
-                    dash: "4,4",
-                  },
-                ]}
-              />
               <ChartMonthlySpareCapacity
                 height={140}
                 past={projection.financePast}
@@ -1629,7 +1719,12 @@ export default class Insights extends React.Component<Props, State> {
                   role="note"
                   aria-label={`Forecast shortfall for ${projection.shortfall.label}: about ${formatWattHours(Number(projection.shortfall.wh.toPrecision(2)))} of demand unmet, about ${formatWatts(Number(projection.shortfall.peakW.toPrecision(2)))} peak`}
                 >
-                  <WarningAmberIcon fontSize="small" aria-hidden="true" />
+                  <ConceptIcon
+                    concept="danger"
+                    fontSize="small"
+                    color="inherit"
+                    decorative
+                  />
                   <span>
                     <strong>Shortfall, {projection.shortfall.label}:</strong> ~
                     {formatWattHours(
@@ -1647,10 +1742,25 @@ export default class Insights extends React.Component<Props, State> {
           );
           break;
         case "powerExchange":
-          body = this.props.live ? (
-            <LivePowerExchangeSummary />
-          ) : (
-            <PowerExchangeSummary game={game} now={currentTick(game)!} />
+          body = (
+            <>
+              {/* What is crossing the lines right now; the chart carries the rest of the time */}
+              {this.props.live ? (
+                <LivePowerExchangeSummary />
+              ) : (
+                <PowerExchangeSummary game={game} now={currentTick(game)!} />
+              )}
+              <ChartForecastPowerExchange
+                height={140}
+                timeline={projection.timeline}
+                domain={{ x: projection.domain.x }}
+                startingYear={game.startingYear}
+                multiyear={multiyear}
+                syncKey={syncKey}
+                currentMinute={projection.forecast[0]?.minute}
+                transmission={game.transmission}
+              />
+            </>
           );
           break;
         case "demandByType": {
@@ -1686,18 +1796,30 @@ export default class Insights extends React.Component<Props, State> {
           );
           break;
         }
-        case "supplyByFuel":
+        case "supplyByFuel": {
+          // A fuel that has left the forecast can no longer be the one chosen
+          const selectedFuel = fuels.find(
+            (fuel) => fuel === this.state.selectedSupplyFuel,
+          );
           body = (
             <>
-              <ChartLegend
-                items={[
-                  ...[...fuels].reverse().map((fuel) => ({
-                    name: fuel,
-                    color: fuelColors()[fuel],
-                    muted: !!highlightFuel && fuel !== highlightFuel,
-                  })),
-                  { name: "Demand", color: "", rule: true },
-                ]}
+              <FuelFilter
+                label="Show supply by fuel"
+                // Top of the stack first, so the key reads in the order the bands do
+                fuels={[...fuels].reverse()}
+                selectedFuel={selectedFuel}
+                onChange={(selectedSupplyFuel) =>
+                  this.setState({ selectedSupplyFuel })
+                }
+                sample={(fuel) => ({ kind: "fill", color: fuelColors()[fuel] })}
+                overlay={{
+                  name: "Demand",
+                  sample: {
+                    kind: "line",
+                    color: chartPalette().demand,
+                    dash: "4,2",
+                  },
+                }}
               />
               <ChartForecastSupplyByFuel
                 height={140}
@@ -1705,14 +1827,16 @@ export default class Insights extends React.Component<Props, State> {
                 domain={{ x: projection.domain.x }}
                 startingYear={game.startingYear}
                 multiyear={multiyear}
-                fuels={fuels}
+                fuels={selectedFuel ? [selectedFuel] : fuels}
                 syncKey={syncKey}
-                highlightFuel={highlightFuel}
+                // One band alone has nothing to be faded against
+                highlightFuel={selectedFuel ? undefined : highlightFuel}
                 currentMinute={projection.forecast[0]?.minute}
               />
             </>
           );
           break;
+        }
         case "storage":
           body = (
             <ChartForecastStorage
@@ -1728,11 +1852,18 @@ export default class Insights extends React.Component<Props, State> {
         case "fuelPrices":
           body = (
             <>
-              <FuelPriceFilter
+              <FuelFilter
+                label="Show fuel prices"
+                fuels={PRICED_FUELS}
                 selectedFuel={this.state.selectedPriceFuel}
                 onChange={(selectedPriceFuel) =>
                   this.setState({ selectedPriceFuel })
                 }
+                sample={(fuel) => ({
+                  kind: "line",
+                  color: fuelColors()[fuel],
+                  dash: fuelDashArrays[fuel],
+                })}
               />
               <ChartForecastFuelPrices
                 selectedFuel={this.state.selectedPriceFuel}
@@ -1849,37 +1980,43 @@ export default class Insights extends React.Component<Props, State> {
         aria-label={`${definition.label} evidence`}
       >
         <Toolbar className="insightsTrackHeader">
-          <Typography variant="h6">
+          <Typography component="h3" variant="h6">
             {id === "weather"
               ? `Temperature (${temperatureUnit(this.context as UnitSystemType)})`
-              : definition.label}
-            {id === "powerExchange" && (
-              <ManualLink entry={MANUAL_ENTRY.INTERTIES} />
-            )}
+              : id === "emissions"
+                ? `Emissions (${largeMassUnit(this.context as UnitSystemType)} CO₂e)`
+                : definition.label}
           </Typography>
-          {id !== "powerExchange" && id !== "financeDetails" && (
-            <Tooltip title={`Expand ${definition.label} chart`}>
-              <IconButton
-                className="insightsExpandChart"
-                size="small"
-                aria-label={`Expand ${definition.label} chart`}
-                onClick={(event) =>
-                  this.setState({
-                    expandedLayer: id,
-                    expandedPlaceholderHeight:
-                      event.currentTarget
-                        .closest(".insightsTrack")
-                        ?.querySelector(".insightsTrackBody")
-                        ?.getBoundingClientRect().height || 0,
-                  })
-                }
-              >
-                <FullscreenIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+          {isChartLayer(id) && (
+            <>
+              <Tooltip title={`Expand ${definition.label} chart`}>
+                <IconButton
+                  className="insightsExpandChart"
+                  size="small"
+                  aria-label={`Expand ${definition.label} chart`}
+                  onClick={(event) =>
+                    this.setState({
+                      expandedLayer: id,
+                      expandedPlaceholderHeight:
+                        event.currentTarget
+                          .closest(".insightsTrack")
+                          ?.querySelector(".insightsTrackBody")
+                          ?.getBoundingClientRect().height || 0,
+                    })
+                  }
+                >
+                  <FullscreenIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              {/* Straight after the expand control, ahead of the layer-editing actions */}
+              <ManualLink entry={INSIGHT_LAYER_MANUAL[id]} />
+            </>
           )}
           {this.state.layersOpen && (
-            <span className="insightsTrackActions">
+            <span
+              className="insightsTrackActions"
+              onKeyDown={this.closeLayersOnEscape}
+            >
               <IconButton
                 size="small"
                 aria-label={`Move ${definition.label} up`}
@@ -2195,183 +2332,187 @@ export default class Insights extends React.Component<Props, State> {
               <Typography variant="h6">Insights</Typography>
             </Toolbar>
           </div>
-          <Toolbar className="insightsHeader">
-            <div className="insightsHeaderControls">
-              <div
-                className="insightsPresetControls"
-                role="group"
-                aria-label="Preset controls"
-              >
-                <Select
-                  id="insightsPreset"
-                  value={this.state.preset}
-                  onChange={(event: SelectChangeEvent<InsightPresetId>) => {
-                    const preset = event.target.value as InsightPresetId;
-                    if (preset !== "custom") {
-                      this.applyPreset(preset);
-                    }
-                  }}
-                  className="headerControl insightsPreset"
-                  aria-label="Insight preset"
-                  renderValue={() => (
-                    <span className="insightsPresetValue">
-                      <span className="insightsPresetName">
-                        {selectedPreset?.label || "Unsaved view"}
-                      </span>
-                      {this.state.presetDirty && selectedPreset && (
-                        <span
-                          className="insightsPresetEdited"
-                          role="status"
-                          aria-label="Unsaved changes"
-                        >
-                          Edited
-                        </span>
-                      )}
-                    </span>
-                  )}
+          <div className="insightsNavigation">
+            <Toolbar className="insightsHeader">
+              <div className="insightsHeaderControls">
+                <div
+                  className="insightsPresetControls"
+                  role="group"
+                  aria-label="Preset controls"
                 >
-                  {!!this.state.presetLibrary.custom.length && (
-                    <ListSubheader>Default presets</ListSubheader>
-                  )}
-                  {Object.entries(INSIGHT_PRESETS).map(([id, preset]) => (
-                    <MenuItem key={id} value={id} data-insight-preset={id}>
-                      {preset.label}
-                    </MenuItem>
-                  ))}
-                  {!!this.state.presetLibrary.custom.length && (
-                    <ListSubheader>Your presets</ListSubheader>
-                  )}
-                  {this.state.presetLibrary.custom.map((preset) => (
-                    <MenuItem
-                      key={preset.id}
-                      value={`saved:${preset.id}`}
-                      data-insight-preset={preset.id}
-                    >
-                      <span className="insightsPresetMenuName">
-                        {preset.name}
+                  <Select
+                    id="insightsPreset"
+                    value={this.state.preset}
+                    onChange={(event: SelectChangeEvent<InsightPresetId>) => {
+                      const preset = event.target.value as InsightPresetId;
+                      if (preset !== "custom") {
+                        this.applyPreset(preset);
+                      }
+                    }}
+                    className="headerControl insightsPreset"
+                    aria-label="Insight preset"
+                    renderValue={() => (
+                      <span className="insightsPresetValue">
+                        <span className="insightsPresetName">
+                          {selectedPreset?.label || "Unsaved view"}
+                        </span>
+                        {this.state.presetDirty && selectedPreset && (
+                          <span
+                            className="insightsPresetEdited"
+                            role="status"
+                            aria-label="Unsaved changes"
+                          >
+                            Edited
+                          </span>
+                        )}
                       </span>
-                    </MenuItem>
-                  ))}
-                  {this.state.preset === "custom" && (
-                    <MenuItem value="custom" disabled>
-                      Unsaved view
-                    </MenuItem>
-                  )}
-                </Select>
-                <Tooltip title="Rename, save a copy, restore, or delete">
-                  <IconButton
-                    className="insightsPresetActions"
-                    size="small"
-                    aria-label="Preset actions"
-                    aria-haspopup="menu"
-                    aria-controls={
-                      this.state.presetMenuAnchor
-                        ? "insightsPresetActionsMenu"
-                        : undefined
-                    }
-                    aria-expanded={!!this.state.presetMenuAnchor}
-                    onClick={(event) =>
-                      this.setState({ presetMenuAnchor: event.currentTarget })
-                    }
+                    )}
                   >
-                    <MoreVertIcon fontSize="small" />
-                  </IconButton>
+                    {!!this.state.presetLibrary.custom.length && (
+                      <ListSubheader>Default presets</ListSubheader>
+                    )}
+                    {Object.entries(INSIGHT_PRESETS).map(([id, preset]) => (
+                      <MenuItem key={id} value={id} data-insight-preset={id}>
+                        {preset.label}
+                      </MenuItem>
+                    ))}
+                    {!!this.state.presetLibrary.custom.length && (
+                      <ListSubheader>Your presets</ListSubheader>
+                    )}
+                    {this.state.presetLibrary.custom.map((preset) => (
+                      <MenuItem
+                        key={preset.id}
+                        value={`saved:${preset.id}`}
+                        data-insight-preset={preset.id}
+                      >
+                        <span className="insightsPresetMenuName">
+                          {preset.name}
+                        </span>
+                      </MenuItem>
+                    ))}
+                    {this.state.preset === "custom" && (
+                      <MenuItem value="custom" disabled>
+                        Unsaved view
+                      </MenuItem>
+                    )}
+                  </Select>
+                  <Tooltip title="Rename, save a copy, restore, or delete">
+                    <IconButton
+                      className="insightsPresetActions"
+                      size="small"
+                      aria-label="Preset actions"
+                      aria-haspopup="menu"
+                      aria-controls={
+                        this.state.presetMenuAnchor
+                          ? "insightsPresetActionsMenu"
+                          : undefined
+                      }
+                      aria-expanded={!!this.state.presetMenuAnchor}
+                      onClick={(event) =>
+                        this.setState({ presetMenuAnchor: event.currentTarget })
+                      }
+                    >
+                      <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </div>
+                <Tooltip
+                  title={`Customize charts: choose layers and reorder (${visible.length} shown)`}
+                >
+                  <Button
+                    id="insightsLayersButton"
+                    className="insightsLayerControls"
+                    size="small"
+                    onClick={() =>
+                      this.setState({ layersOpen: !this.state.layersOpen })
+                    }
+                    aria-label={
+                      this.state.layersOpen
+                        ? "Done choosing layers"
+                        : `Layers (${visible.length} shown)`
+                    }
+                    aria-expanded={this.state.layersOpen}
+                    aria-controls="insightsLayerPanel"
+                    onKeyDown={this.closeLayersOnEscape}
+                  >
+                    {this.state.layersOpen ? "Done" : "Layers"}
+                  </Button>
                 </Tooltip>
               </div>
-              <Tooltip
-                title={`Customize charts: choose layers and reorder (${visible.length} shown)`}
+              <Menu
+                id="insightsPresetActionsMenu"
+                className={this.state.compact ? "insightsCompact" : undefined}
+                anchorEl={this.state.presetMenuAnchor}
+                open={!!this.state.presetMenuAnchor}
+                onClose={() => this.setState({ presetMenuAnchor: null })}
               >
-                <Button
-                  id="insightsLayersButton"
-                  className="insightsLayerControls"
-                  size="small"
-                  onClick={() =>
-                    this.setState({ layersOpen: !this.state.layersOpen })
+                <MenuItem
+                  className="insightsPresetSaveMenuItem"
+                  disabled={
+                    !this.state.layers.length ||
+                    (this.state.preset !== "custom" &&
+                      !this.state.presetDirty) ||
+                    (this.state.preset === "custom" && customLimitReached)
                   }
-                  aria-label={
-                    this.state.layersOpen
-                      ? "Done choosing layers"
-                      : `Layers (${visible.length} shown)`
-                  }
-                  aria-expanded={this.state.layersOpen}
-                  aria-controls="insightsLayerPanel"
+                  onClick={() => {
+                    this.setState({ presetMenuAnchor: null }, () =>
+                      this.savePresetChanges(),
+                    );
+                  }}
                 >
-                  {this.state.layersOpen ? "Done" : "Layers"}
-                </Button>
-              </Tooltip>
-            </div>
-            <Menu
-              id="insightsPresetActionsMenu"
-              className={this.state.compact ? "insightsCompact" : undefined}
-              anchorEl={this.state.presetMenuAnchor}
-              open={!!this.state.presetMenuAnchor}
-              onClose={() => this.setState({ presetMenuAnchor: null })}
-            >
-              <MenuItem
-                className="insightsPresetSaveMenuItem"
-                disabled={
-                  !this.state.layers.length ||
-                  (this.state.preset !== "custom" && !this.state.presetDirty) ||
-                  (this.state.preset === "custom" && customLimitReached)
-                }
-                onClick={() => {
-                  this.setState({ presetMenuAnchor: null }, () =>
-                    this.savePresetChanges(),
-                  );
-                }}
-              >
-                <SaveIcon fontSize="small" />
-                {this.state.preset === "custom"
-                  ? "Save as new"
-                  : "Save changes"}
-              </MenuItem>
-              {this.state.preset !== "custom" && (
-                <MenuItem
-                  className="insightsPresetSaveAsMenuItem"
-                  disabled={customLimitReached || !this.state.layers.length}
-                  onClick={() => this.openPresetDialog("saveAs")}
-                >
-                  <AddIcon fontSize="small" />
-                  Save as new
+                  <SaveIcon fontSize="small" />
+                  {this.state.preset === "custom"
+                    ? "Save as new"
+                    : "Save changes"}
                 </MenuItem>
-              )}
-              {selectedCustom && (
-                <MenuItem
-                  className="insightsPresetRenameMenuItem"
-                  onClick={() => this.openPresetDialog("rename")}
-                >
-                  <EditOutlinedIcon fontSize="small" />
-                  Rename
-                </MenuItem>
-              )}
-              {selectedCustom && (
-                <MenuItem
-                  className="insightsPresetResetMenuItem"
-                  onClick={() => this.openPresetDialog("delete")}
-                >
-                  <DeleteOutlineIcon fontSize="small" />
-                  Delete custom
-                </MenuItem>
-              )}
-              {selectedDefault &&
-                (this.state.presetDirty ||
-                  this.state.presetLibrary.defaults[selectedDefault]) && (
+                {this.state.preset !== "custom" && (
                   <MenuItem
-                    className="insightsPresetResetMenuItem"
-                    onClick={() => this.openPresetDialog("restore")}
+                    className="insightsPresetSaveAsMenuItem"
+                    disabled={customLimitReached || !this.state.layers.length}
+                    onClick={() => this.openPresetDialog("saveAs")}
                   >
-                    <RefreshIcon fontSize="small" />
-                    Reset to default
+                    <AddIcon fontSize="small" />
+                    Save as new
                   </MenuItem>
                 )}
-            </Menu>
-          </Toolbar>
+                {selectedCustom && (
+                  <MenuItem
+                    className="insightsPresetRenameMenuItem"
+                    onClick={() => this.openPresetDialog("rename")}
+                  >
+                    <EditOutlinedIcon fontSize="small" />
+                    Rename
+                  </MenuItem>
+                )}
+                {selectedCustom && (
+                  <MenuItem
+                    className="insightsPresetResetMenuItem"
+                    onClick={() => this.openPresetDialog("delete")}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                    Delete custom
+                  </MenuItem>
+                )}
+                {selectedDefault &&
+                  (this.state.presetDirty ||
+                    this.state.presetLibrary.defaults[selectedDefault]) && (
+                    <MenuItem
+                      className="insightsPresetResetMenuItem"
+                      onClick={() => this.openPresetDialog("restore")}
+                    >
+                      <RefreshIcon fontSize="small" />
+                      Reset to default
+                    </MenuItem>
+                  )}
+              </Menu>
+            </Toolbar>
+            {this.renderViewportControls(
+              viewportBounds,
+              viewportRange,
+              minViewportSpan,
+            )}
+          </div>
           {this.renderLayerPanel(projection)}
-          {this.renderViewportControls(
-            viewportBounds,
-            viewportRange,
-            minViewportSpan,
-          )}
           {!!upcomingEvents.length && (
             <InsightEventRail
               events={upcomingEvents}
@@ -2420,12 +2561,21 @@ export default class Insights extends React.Component<Props, State> {
                       id="expanded-chart-heading"
                       className="expandedChartTitle"
                     >
-                      <span id="expanded-chart-title">
-                        {
-                          INSIGHT_LAYERS.find(
-                            (layer) => layer.id === this.state.expandedLayer,
-                          )!.label
-                        }
+                      <span className="expandedChartHeading">
+                        <span id="expanded-chart-title">
+                          {
+                            INSIGHT_LAYERS.find(
+                              (layer) => layer.id === this.state.expandedLayer,
+                            )!.label
+                          }
+                        </span>
+                        {isChartLayer(this.state.expandedLayer) && (
+                          <ManualLink
+                            entry={
+                              INSIGHT_LAYER_MANUAL[this.state.expandedLayer]
+                            }
+                          />
+                        )}
                       </span>
                       <IconButton
                         autoFocus

@@ -4,8 +4,14 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
-import { getTimeFromTimeline, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import {
+  deriveExpandedSummary,
+  getTimeFromTimeline,
+  MINUTES_PER_MONTH,
+  summarizeTimeline,
+} from "../../helpers/DateTime";
 import { TICK_MINUTES } from "../../Constants";
 import { formatMoneyStable } from "../../helpers/Format";
 import { ThemeProvider } from "@mui/material/styles";
@@ -13,10 +19,11 @@ import { createAppTheme } from "../../Theme";
 import userEvent from "@testing-library/user-event";
 import { createGame } from "../../testing/Simulator";
 import { modScenario } from "../../mods/ModScenario";
-import { TickPresentFutureType } from "../../Types";
+import { SpeedType, TickPresentFutureType } from "../../Types";
 import {
   GameAppBar,
   getGridHealth,
+  monthProfit,
   Props,
   reserveCapacityW,
   stableGridSummary,
@@ -75,6 +82,95 @@ afterEach(() => {
 });
 
 describe("GameAppBar", () => {
+  it.each<{ seat: string; selectedSpeed: SpeedType; selectedLabel: string }>([
+    { seat: "local-p1", selectedSpeed: "FAST", selectedLabel: "fast speed" },
+    {
+      seat: "local-p2",
+      selectedSpeed: "NORMAL",
+      selectedLabel: "normal speed",
+    },
+  ])(
+    "shows $seat's own speed controls beside company cash while common chrome stays in the shell",
+    ({ seat, selectedSpeed, selectedLabel }) => {
+      const previous = Object.getOwnPropertyDescriptor(
+        window,
+        "electrifyCouch",
+      );
+      Object.defineProperty(window, "electrifyCouch", {
+        configurable: true,
+        value: { role: "seat" },
+      });
+      try {
+        const game = createGame({ scenarioId: 101 });
+        game.inGame = true;
+        game.speed = "SLOW";
+        game.multiplayer = {
+          seat,
+          clock: {
+            activeSpeed: "SLOW",
+            selectedSpeed,
+            reason: "",
+            readyRequired: false,
+            ready: false,
+            players: [
+              { id: "local-p1", name: "North Power", selectedSpeed: "FAST" },
+              { id: "local-p2", name: "South Power", selectedSpeed: "NORMAL" },
+            ],
+          },
+        };
+        const onSpeedChange = jest.fn();
+        renderAppBar({ game, onSpeedChange });
+        expect(
+          screen.getByText(
+            formatMoneyStable(
+              getTimeFromTimeline(game.date.minute, game.timeline)!.cash,
+            ),
+          ),
+        ).toBeVisible();
+        expect(
+          screen.getByRole("button", {
+            name: /Current grid status:|Open the Reserve manual entry/,
+          }),
+        ).toBeVisible();
+        expect(screen.queryByRole("button", { name: "menu" })).toBeNull();
+        expect(screen.queryByLabelText("Mission progress")).toBeNull();
+        expect(screen.queryByRole("progressbar")).toBeNull();
+        const speeds = screen.getByRole("group", { name: "your game speed" });
+        expect(within(speeds).getAllByRole("button")).toHaveLength(5);
+        expect(
+          within(speeds).getByRole("button", { name: selectedLabel }),
+        ).toHaveAttribute("aria-pressed", "true");
+        expect(
+          within(speeds).getByRole("button", { name: "slow speed" }),
+        ).toHaveAttribute("aria-current", "true");
+        fireEvent.click(
+          within(speeds).getByRole("button", { name: "fast speed" }),
+        );
+        expect(onSpeedChange).toHaveBeenCalledWith("FAST");
+      } finally {
+        if (previous) Object.defineProperty(window, "electrifyCouch", previous);
+        else delete window.electrifyCouch;
+      }
+    },
+  );
+
+  it("disables speed changes after this company's multiplayer run ends", () => {
+    const game = createGame({ scenarioId: 101 });
+    game.inGame = true;
+    game.multiplayer = {
+      seat: "local-p1",
+      ending: { outcome: "bankrupt", title: "Bankrupt", month: 1 },
+    };
+    const onSpeedChange = jest.fn();
+    renderAppBar({ game, onSpeedChange });
+    const speeds = screen.getByRole("group", { name: "game speed" });
+    for (const button of within(speeds).getAllByRole("button")) {
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+    }
+    expect(onSpeedChange).not.toHaveBeenCalled();
+  });
+
   it.each([1, -1, 0])(
     "shows the current month profit forecast beside cash on desktop (%s)",
     (sign) => {
@@ -121,9 +217,9 @@ describe("GameAppBar", () => {
     },
   );
 
-  it("keeps the profit forecast out of the phone top bar", () => {
+  it("shows the profit forecast in the phone top bar", () => {
     renderAppBar();
-    expect(screen.queryByLabelText(/^Monthly profit forecast/)).toBeNull();
+    expect(screen.getByLabelText(/^Monthly profit forecast/)).toBeVisible();
   });
   it("opens the feedback form directly from the game menu", () => {
     const open = jest.spyOn(window, "open").mockImplementation(() => null);
@@ -481,7 +577,7 @@ describe("GameAppBar", () => {
         const status = screen.getByRole("button", {
           name: `Current grid status: ${summary}`,
         });
-        expect(status).toHaveTextContent(/^(Low|Limit|Soon|Blackout)$/);
+        expect(status).toHaveTextContent(/^(Low|Limit|Short|Blackout)$/);
         expect(screen.queryByText(summary)).not.toBeInTheDocument();
         fireEvent.click(status);
         expect(
@@ -660,4 +756,35 @@ describe("GameAppBar", () => {
       expect(onQuit).toHaveBeenCalledTimes(1);
     },
   );
+});
+
+test("monthProfit is exactly the profit of the month summary", () => {
+  const game = createGame({ scenarioId: 101 });
+  const base = game.timeline[0];
+  const month = 3;
+  const timeline: TickPresentFutureType[] = Array.from(
+    { length: 400 },
+    (_, i) => ({
+      ...base,
+      minute: (month - 1) * MINUTES_PER_MONTH + i * TICK_MINUTES * 7,
+      revenue: 1234.5678 + i * 0.1 + Math.sin(i) * 1e5,
+      expensesFuel: 987.654321 + i * 0.37,
+      expensesOM: 12.3456789 * (i + 1),
+      expensesCarbonFee: i % 3 ? 0.1 * i : 1e6 / (i + 1),
+      expensesInterest: 4567.891 / (i + 3),
+      expensesPolicy: i % 2 ? 0.3333333 * i : 0,
+      expensesImports: i % 5 ? 0 : 77.7777 * i + 0.01,
+    }),
+  );
+  for (const m of [month - 1, month, month + 1, 99]) {
+    expect(monthProfit(timeline, m)).toBe(
+      deriveExpandedSummary(
+        summarizeTimeline(
+          timeline,
+          game.startingYear,
+          (tick) => Math.floor(tick.minute / MINUTES_PER_MONTH) === m,
+        ),
+      ).profit,
+    );
+  }
 });

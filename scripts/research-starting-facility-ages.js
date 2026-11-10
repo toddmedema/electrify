@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* Regenerate representative starting-age cohorts from WRI GPPD v1.3.0.
- * Node 24; no dependencies. Downloads stay in the OS temporary directory.
+ * Node 26; no dependencies. Downloads stay in the OS temporary directory.
  * An existing CSV can be supplied with --input <path>; its checksum is verified.
  */
 const fs = require("node:fs/promises");

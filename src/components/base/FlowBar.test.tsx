@@ -20,6 +20,8 @@ describe("FlowBar", () => {
     expect(element).toHaveClass("reverseFlow");
     // Sized by width rather than scaleX, so the stylesheet's hatch isn't squashed with the fill
     expect(element.style.width).toBe("40%");
+    // The neutral stylesheet fill, not an interaction-blue tint that reads as a selected row
+    expect(element.style.backgroundColor).toBe("");
   });
 
   it("clamps beyond the rating rather than overflowing the row", () => {

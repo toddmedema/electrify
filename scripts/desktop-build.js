@@ -8,8 +8,8 @@ const { buildVersion, writeBuildVersion } = require("./build-version");
 function desktopBuild() {
   const version = buildVersion();
   const output = process.env.BUILD_PATH || "build";
-  if (Number(process.versions.node.split(".")[0]) !== 24)
-    throw new Error("Use Node 24 to build Electrify");
+  if (Number(process.versions.node.split(".")[0]) !== 26)
+    throw new Error("Use Node 26 to build Electrify");
   for (const script of [
     "scripts/run-compatibility.js",
     "scripts/generate-icon-manifest.js",

@@ -34,13 +34,35 @@ test.describe("learning pages without JavaScript", () => {
             await expect(cells).toHaveCount(2);
             const baseline = (await cells.nth(0).boundingBox())!;
             const campus = (await cells.nth(1).boundingBox())!;
-            expect(
-              Math.abs(baseline.y - campus.y),
-              "both comparison values stay on the same row",
-            ).toBeLessThanOrEqual(1);
-            expect(baseline.x + baseline.width).toBeLessThanOrEqual(
-              campus.x + 1,
+            // Phones read each row as one "before → after (change)" line without
+            // repeating the column names; wide screens keep the two columns.
+            const narrow = page.viewportSize()!.width <= 768;
+            const shown = (selector: string) =>
+              row.locator(`${selector}:visible`);
+            await expect(shown(".comparison-table__label")).toHaveCount(0);
+            await expect(shown(".comparison-table__arrow")).toHaveCount(
+              narrow ? 1 : 0,
             );
+            await expect(shown(".comparison-table__change")).toHaveCount(
+              narrow ? 1 : 0,
+            );
+            if (narrow) {
+              await expect(cells.nth(1)).toContainText(/\([−+]\d+%\)/);
+              // A long value may wrap, but "after" never precedes "before".
+              expect(campus.y).toBeGreaterThanOrEqual(baseline.y - 1);
+              if (campus.y < baseline.y + baseline.height / 2)
+                expect(baseline.x + baseline.width).toBeLessThanOrEqual(
+                  campus.x + 1,
+                );
+            } else {
+              expect(
+                Math.abs(baseline.y - campus.y),
+                "both comparison values stay on the same row",
+              ).toBeLessThanOrEqual(1);
+              expect(baseline.x + baseline.width).toBeLessThanOrEqual(
+                campus.x + 1,
+              );
+            }
           }
         }
         expect(

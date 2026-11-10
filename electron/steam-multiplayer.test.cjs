@@ -337,8 +337,123 @@ function fixture(directory = "unused-test-path") {
   );
   mp.lobby = 109775242999999999n;
   mp.hostId = service.identity.steamId;
-  return { mp, api, calls, events };
+  return { mp, api, calls, events, dispatcher, service };
 }
+
+function lobbyFixture(t) {
+  const f = fixture();
+  clearInterval(f.mp.timer);
+  t.after(() => f.mp.dispose());
+  const metadata = new Map();
+  const lobby = 109775242999999999n;
+  let matches = [];
+  Object.assign(f.api, {
+    stringFilter: (...args) => f.calls.push(["filter", ...args]),
+    distanceFilter: (...args) => f.calls.push(["distance", ...args]),
+    resultLimit: () => {},
+    list: () => "list",
+    lobbyByIndex: (_self, i) => matches[i],
+    create: (_self, type, count) => {
+      assert.equal(type, 3);
+      assert.equal(count, 4);
+      return "create";
+    },
+    join: (_self, id) => {
+      assert.equal(id, lobby);
+      return "join";
+    },
+    setData: (_self, _lobby, key, value) => {
+      metadata.set(key, value);
+      return true;
+    },
+    data: (_self, _lobby, key) => metadata.get(key) || "",
+    listen: () => 42,
+  });
+  f.dispatcher.callResult = async (handle, { callback, size }) => {
+    const result = Buffer.alloc(size);
+    if (handle === "list") {
+      assert.equal(callback, 510);
+      assert.equal(size, 4);
+      result.writeUInt32LE(matches.length);
+    } else if (handle === "create") {
+      assert.equal(callback, 513);
+      result.writeInt32LE(1);
+      result.writeBigUInt64LE(lobby, process.platform === "win32" ? 8 : 4);
+    } else {
+      assert.equal(callback, 504);
+      result.writeBigUInt64LE(lobby);
+      result.writeUInt32LE(1, 16);
+    }
+    return result;
+  };
+  return {
+    ...f,
+    metadata,
+    lobby,
+    matches: (value) => {
+      matches = value;
+    },
+  };
+}
+
+test("hosts publish a six-digit code and lookup preserves leading zeroes and full lobby IDs", async (t) => {
+  const f = lobbyFixture(t);
+  await f.mp.create("rules-v1");
+  assert.match(f.mp.state().inviteCode, /^[0-9]{6}$/);
+  assert.equal(f.metadata.get("invite-code"), f.mp.state().inviteCode);
+  f.matches([f.lobby]);
+  f.mp.connectHost = () => {};
+  await f.mp.join("012345", "rules-v1");
+  assert(
+    f.calls.some(
+      (call) =>
+        call[0] === "filter" &&
+        call[2] === "invite-code" &&
+        call[3] === "012345",
+    ),
+  );
+  assert(f.calls.some((call) => call[0] === "distance" && call[2] === 3));
+  assert.equal(f.mp.state().lobbyId, f.lobby.toString());
+  await f.mp.join(f.lobby.toString(), "rules-v1");
+  f.mp.leave();
+  assert.equal(f.mp.state().inviteCode, undefined);
+});
+
+test("code lookup rejects missing and ambiguous codes, malformed input and incompatible builds", async (t) => {
+  const f = lobbyFixture(t);
+  await assert.rejects(f.mp.join("12345", "rules-v1"), /valid lobby code/);
+  await assert.rejects(f.mp.join("123456", "rules-v1"), /No game found/);
+  f.matches([f.lobby, f.lobby + 1n]);
+  await assert.rejects(f.mp.join("123456", "rules-v1"), /ambiguous/);
+  f.matches([f.lobby]);
+  await assert.rejects(
+    f.mp.join("123456", "other-rules"),
+    /another game build/,
+  );
+  assert.equal(f.mp.state().lobbyId, undefined);
+});
+
+test("native invites validate overlay availability and pass the complete lobby ID", async (t) => {
+  const f = fixture();
+  t.after(() => f.mp.dispose());
+  let invited;
+  f.api.invite = (_friends, id) => {
+    invited = id;
+  };
+  f.service.requireOverlay = () => {
+    throw new Error("Enable the Steam overlay");
+  };
+  await assert.rejects(
+    f.mp.request({ kind: "invite" }),
+    /Enable the Steam overlay/,
+  );
+  assert.equal(invited, undefined);
+  f.service.requireOverlay = () => {};
+  await f.mp.request({ kind: "invite" });
+  assert.equal(invited, 109775242999999999n);
+  f.mp.leave();
+  await assert.rejects(f.mp.request({ kind: "invite" }), /Host a game/);
+});
 function pumpFrames(mp, api, frames) {
   clearInterval(mp.timer);
   mp.lastRefresh = Date.now();

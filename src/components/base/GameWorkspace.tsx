@@ -3,7 +3,11 @@ import { IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { BuildForecastProvider } from "./BuildForecast";
-import { GameToolMemoryContext } from "./GameToolMemory";
+import {
+  GameToolMemoryContext,
+  useToolFocusMemory,
+  useToolScroll,
+} from "./GameToolMemory";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import { selectTutorialActions } from "../../reducers/Tutorial";
@@ -27,6 +31,7 @@ import {
   GameBuildCompleteContext,
 } from "./GameWorkspaceContext";
 import "./GameWorkspace.scss";
+import { tvLayoutEnabled } from "../../TvLayout";
 
 type ToolSide = "decision" | "intelligence";
 const sideFor = (tool: GameTool): ToolSide =>
@@ -87,18 +92,25 @@ export function maxOpenTools(width: number) {
  * left of the fleet and intelligence tools right of it, each in action bar order, so opening
  * another never moves the ones already open.
  */
-export default function GameWorkspace() {
+export default function GameWorkspace({
+  memory,
+}: { memory?: Map<string, unknown> } = {}) {
   return (
     <BuildForecastProvider>
-      <Workspace />
+      <Workspace memory={memory} />
     </BuildForecastProvider>
   );
 }
 
-function Workspace() {
+function Workspace({
+  memory: sharedMemory,
+}: {
+  memory?: Map<string, unknown>;
+}) {
   const dispatch = useAppDispatch();
   const card = useAppSelector((state) => state.card.name);
   const active = gameToolForCard(card);
+  const tvMode = useAppSelector((state) => tvLayoutEnabled(state.settings));
   const tutorialActions = useAppSelector(selectTutorialActions);
   // Open tools, least recently opened first. The newest ones win when they don't all fit.
   const [remembered, setRemembered] = React.useState<GameTool[]>([]);
@@ -106,11 +118,18 @@ function Workspace() {
   const [buildCategory, setBuildCategory] =
     React.useState<CardNameType>("BUILD_GENERATORS");
   const headings = React.useRef(new Map<GameTool, HTMLHeadingElement>());
-  const memory = React.useRef(new Map<string, unknown>());
+  const localMemory = React.useRef(new Map<string, unknown>());
+  const memory = sharedMemory ?? localMemory.current;
+  const workspace = React.useRef<HTMLDivElement>(null);
+  useToolFocusMemory(workspace, memory, active ?? "fleet", tvMode);
   const [programBack, setProgramBack] = React.useState<() => void>();
   const retainFocus = React.useRef(false);
-  const layout = width >= SIDE_TOOL_MIN_WIDTH ? "side" : "sheet";
-  const capacity = maxOpenTools(width);
+  const layout = tvMode
+    ? "tv"
+    : width >= SIDE_TOOL_MIN_WIDTH
+      ? "side"
+      : "sheet";
+  const capacity = tvMode ? 1 : maxOpenTools(width);
   // Derive the newly requested tool immediately; remembering it in an effect must not flash
   // the previous rail or unmount the fleet during navigation.
   const tools: GameTool[] = (
@@ -220,10 +239,11 @@ function Workspace() {
     return () => document.removeEventListener("keydown", escape);
   });
   return (
-    <GameToolMemoryContext.Provider value={memory.current}>
+    <GameToolMemoryContext.Provider value={memory}>
       <GameWorkspaceContext.Provider value={true}>
         <div
           className="gameWorkspace"
+          ref={workspace}
           style={
             dockLeft === undefined
               ? undefined
@@ -250,6 +270,7 @@ function Workspace() {
           >
             <div
               className="gameFleet"
+              hidden={tvMode && !!active}
               style={
                 layout === "side" ? { gridColumn: left.length + 1 } : undefined
               }
@@ -308,7 +329,7 @@ function Workspace() {
                         <CloseIcon />
                       </IconButton>
                     </header>
-                    <div className="gameToolBody">
+                    <ToolBody tool={tool}>
                       {/* Hidden compact rails release decision pause tokens; the visible tool keeps
                       its DOM, input focus and scroll position when it moves into a side column. */}
                       {shown && (
@@ -318,7 +339,7 @@ function Workspace() {
                           {tool === "BUILD_GENERATORS" && (
                             <GameBuildCompleteContext.Provider
                               value={() => {
-                                if (layout === "sheet") close(tool);
+                                if (layout !== "side") close(tool);
                               }}
                             >
                               <BuildFacilities
@@ -342,7 +363,7 @@ function Workspace() {
                           {tool === "SCENARIO" && <ScenarioDetails />}
                         </GameToolCloseContext.Provider>
                       )}
-                    </div>
+                    </ToolBody>
                   </section>
                 );
               })}
@@ -358,5 +379,20 @@ function Workspace() {
         </div>
       </GameWorkspaceContext.Provider>
     </GameToolMemoryContext.Provider>
+  );
+}
+
+function ToolBody({
+  tool,
+  children,
+}: {
+  tool: GameTool;
+  children: React.ReactNode;
+}) {
+  const ref = useToolScroll<HTMLDivElement>(`workspace.${tool}.scroll`);
+  return (
+    <div className="gameToolBody" ref={ref}>
+      {children}
+    </div>
   );
 }
