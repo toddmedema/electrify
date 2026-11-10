@@ -57,9 +57,7 @@ for (const { width, height, colorScheme, reducedMotion, returning } of [
       });
       await page.reload();
       const entrance = page.locator("#appStartup");
-      await expect(entrance.getByRole("status")).toHaveText(
-        "Reticulating splines...",
-      );
+      await expect(entrance.getByRole("status")).toHaveText("Loading…");
       await expect(entrance.getByAltText("Electrify")).toBeVisible();
       await expect(page.locator("#menuCard")).toHaveCount(0);
       const bounds = await entrance.getByAltText("Electrify").boundingBox();

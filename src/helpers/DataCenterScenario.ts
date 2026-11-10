@@ -8,7 +8,11 @@ import {
   ScenarioType,
 } from "../Types";
 import { getDataCenterPowerMix } from "../data/DataCenterPowerMix";
-import { HYDRO_SITES, resolveHydroInventory } from "../data/HydroSites";
+import {
+  HYDRO_SITES,
+  offeredHydroSiteIds,
+  resolveHydroInventory,
+} from "../data/HydroSites";
 import { getStartingFacilityAge } from "../data/StartingFacilityAges";
 
 export const DATA_CENTER_SEED = 1062026;
@@ -92,7 +96,7 @@ export function createDataCenterScenario(
       const inventory = resolveHydroInventory(location);
       let remaining = peakW;
       if (inventory?.status === "researched") {
-        for (const id of inventory.siteIds) {
+        for (const id of offeredHydroSiteIds(inventory)) {
           if (!remaining) break;
           const capacity = Math.min(remaining, HYDRO_SITES[id].maxPeakW);
           facilities.push({ fuel: "Hydro", peakW: capacity, hydroSiteId: id });

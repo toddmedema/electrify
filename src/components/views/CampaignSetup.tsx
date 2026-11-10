@@ -40,10 +40,7 @@ export default function CampaignSetup({
             <Typography component="h2" variant="h5" sx={{ mb: 1 }}>
               One utility. Nine generations.
             </Typography>
-            <Typography>
-              Lead one utility through nine 20-year CEO terms. Inspired by
-              Northern California history.
-            </Typography>
+            <Typography>Inspired by Northern California history.</Typography>
           </Box>
           <Box
             component="section"

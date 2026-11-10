@@ -6,9 +6,8 @@ import { createGame } from "../../testing/Simulator";
 
 it("offers a way back to the mission list when loading fails", async () => {
   const onExit = jest.fn();
-  const load = jest.fn(
-    (_game, _progress: (m: string) => void, error: (m: string) => void) =>
-      error("Mission not found."),
+  const load = jest.fn((_game, error: (m: string) => void) =>
+    error("Mission not found."),
   );
   render(
     <Loading

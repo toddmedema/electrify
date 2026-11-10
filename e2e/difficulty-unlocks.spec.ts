@@ -44,7 +44,7 @@ for (const theme of ["light", "dark"]) {
     );
     const hint = page.locator(".difficultyLockHint");
     await expect(hint).toContainText(
-      "Complete an official scenario on Hard to unlock Expert.",
+      "Complete a scenario on Hard to unlock Expert.",
     );
     await expect(beginner).toHaveAttribute("aria-pressed", "true");
     await picker

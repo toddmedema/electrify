@@ -1,4 +1,8 @@
-import { resolveHydroInventory, isConventionalHydro } from "./HydroSites";
+import {
+  isConventionalHydro,
+  offeredHydroSiteIds,
+  resolveHydroInventory,
+} from "./HydroSites";
 import type { LocationType } from "../Types";
 import { hasGeothermalResource } from "./LocationProfiles";
 
@@ -323,7 +327,7 @@ export function getViableLocationCount(
     return location?.resources?.hydro === false
       ? 0
       : inventory?.status === "researched"
-        ? inventory.siteIds.length
+        ? offeredHydroSiteIds(inventory).length
         : 0;
   }
   if (facilityName === "Geothermal") {

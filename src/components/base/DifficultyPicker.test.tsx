@@ -119,7 +119,7 @@ it("keeps a locked select option from changing difficulty and explains its requi
   const expert = screen.getByRole("option", { name: "Expert, locked" });
   expect(expert).toHaveTextContent("on Hard to unlock Expert");
   expect(expert).toHaveAccessibleDescription(
-    "Complete an official scenario on Hard to unlock Expert.",
+    "Complete a scenario on Hard to unlock Expert.",
   );
   fireEvent.click(expert);
   expect(onChange).not.toHaveBeenCalled();
