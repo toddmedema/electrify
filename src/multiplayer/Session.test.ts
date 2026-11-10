@@ -2,7 +2,12 @@ import { modScenario } from "../mods/ModScenario";
 import { modBrowseSummary } from "./ModBrowse";
 import { selectionKey, validBrowseState } from "./Browse";
 import { utf8Bytes } from "../helpers/RuleIdentity";
-import { HOST_LEFT, MultiplayerSession } from "./Session";
+import {
+  CONNECTION_LOST,
+  HOST_LEFT,
+  MultiplayerSession,
+  isConnectionLoss,
+} from "./Session";
 import type { DesktopBridge } from "../Desktop";
 import type {
   LobbyState,
@@ -591,6 +596,23 @@ test("a command that loses a race with the host link drops is not a new failure"
   await settle();
   expect(f.session.getSnapshot().error).toBeUndefined();
   expect(f.session.getSnapshot().pending).toBe(true);
+  f.session.dispose();
+});
+test("only a lost connection counts as one, so other errors never offer a way out that skips the save", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  deliver(f, {});
+  f.event({ kind: "disconnected", sender: host });
+  expect(f.session.getSnapshot().error).toBe(CONNECTION_LOST);
+  expect(isConnectionLoss(f.session.getSnapshot().error)).toBe(true);
+  // Native lobby errors come only from its connection failures.
+  expect(isConnectionLoss(undefined, "The host left.")).toBe(true);
+  expect(isConnectionLoss("Multiplayer save failed: Disk full")).toBe(false);
+  expect(isConnectionLoss("Multiplayer save failed: Disk full", "x")).toBe(
+    false,
+  );
+  expect(isConnectionLoss("Not enough cash")).toBe(false);
+  expect(isConnectionLoss()).toBe(false);
   f.session.dispose();
 });
 test("players read the transport's message, never Electron's invoke wrapper", async () => {

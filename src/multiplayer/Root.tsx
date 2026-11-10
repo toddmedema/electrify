@@ -22,7 +22,7 @@ import {
   snackbarOpen,
 } from "../reducers/UI";
 import { registerShutdownCheckpoint } from "../desktop/Shutdown";
-import { HOST_LEFT, MultiplayerSession } from "./Session";
+import { HOST_LEFT, MultiplayerSession, isConnectionLoss } from "./Session";
 import {
   registerCoopControls,
   registerLobbyOpener,
@@ -372,8 +372,12 @@ export default function MultiplayerRoot() {
           store.dispatch(dialogClose());
           void session.reconnect();
         },
-        secondaryLabel: "Disconnect",
-        secondaryAction: disconnect,
+        // Only a lost connection leaves nothing to wait for. Other errors, such as a failed
+        // save, must not offer a way out that skips the host's checkpoint.
+        ...(isConnectionLoss(state.error, state.lobby.error) && {
+          secondaryLabel: "Disconnect",
+          secondaryAction: disconnect,
+        }),
       }),
     );
     session.dismissError();
