@@ -81,7 +81,11 @@ management or unsubscribe control.
    is a signup-form setting; use the welcome automation for these API signups.
    Apple's private relay rejects mail from unregistered senders, so also register
    the Mailchimp From domain or address under Sign in with Apple for Email
-   Communication and authenticate the sending domain with SPF or DKIM.
+   Communication. Publish an SPF record for that domain, but note that Mailchimp
+   normally sends from its own envelope-sender domain, so SPF alone will not
+   satisfy Apple. Configure Mailchimp custom DKIM authentication and verify that
+   the DKIM signature covers the From header and its domain exactly matches the
+   From domain.
 4. Install the server lockfile with `npm ci --prefix firebase/functions`, then
    deploy with
    `npx firebase-tools@15.32.1 deploy --only functions:mailing-list --project electrify-game`.
