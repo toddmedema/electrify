@@ -1368,7 +1368,8 @@ async function expectClockInViewport(page: Page) {
       for (const inset of Object.values(icon))
         expect(inset).toBeGreaterThanOrEqual(0);
       expect(icon.top).toBeGreaterThanOrEqual(buttonHeight / 2);
-      expect(icon.bottom).toBeLessThanOrEqual(3);
+      // Pips sit 8 px above the bottom edge, inside the thumb's footprint.
+      expect(icon.bottom).toBeLessThanOrEqual(10);
     }
   }).toPass({ timeout: 20000 });
 }
@@ -1392,47 +1393,98 @@ async function expectClockMeaning(
     1,
   );
   const fill = (element: Element) => getComputedStyle(element).backgroundColor;
-  // The actual game speed is the filled segment.
-  expect(await active.evaluate(fill)).not.toBe("rgba(0, 0, 0, 0)");
-  // Your request has a quiet static ring, even while someone else holds the clock.
-  const ring = await selected.evaluate((element) => {
-    const style = getComputedStyle(element, "::before");
-    const button = element.getBoundingClientRect();
-    const label = element
-      .querySelector(".multiplayerSpeedLabel")!
-      .getBoundingClientRect();
-    const size = parseFloat(style.width);
-    const centerY = button.top + element.clientTop + parseFloat(style.top);
-    return {
-      content: style.content,
-      radius: style.borderTopLeftRadius,
-      animation: style.animationName,
-      color: style.borderTopColor,
-      labelColor: getComputedStyle(element).color,
-      top: centerY - size / 2 - button.top,
-      bottom: button.bottom - (centerY + size / 2),
-      offCenter: Math.abs(label.top + label.height / 2 - centerY),
-      clearance: size - 2 * parseFloat(style.borderTopWidth) - label.width,
-    };
-  });
-  expect(ring.content).not.toBe("none");
-  expect(ring.radius).toBe("50%");
-  expect(ring.animation).toBe("none");
-  expect(ring.color).toBe(ring.labelColor);
-  // It sits inside the segment, around the lifted label, and clears the label's sides.
-  expect(ring.top).toBeGreaterThanOrEqual(1);
-  expect(ring.bottom).toBeGreaterThanOrEqual(1);
-  expect(ring.offCenter).toBeLessThanOrEqual(1);
-  expect(ring.clearance).toBeGreaterThanOrEqual(2);
-  if (selectedName !== activeName) {
-    expect(
-      await active.evaluate(
-        (element) => getComputedStyle(element, "::before").content,
-      ),
-    ).toBe("none");
-    expect(await selected.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
-    await expect(selected).not.toHaveAttribute("aria-current");
-  }
+  // The thumb is the group's ::before and sits under the actual speed, and under nothing else.
+  // It slides, so measure until it settles.
+  await expect(async () => {
+    const thumb = await clock(page).evaluate((group) => {
+      const style = getComputedStyle(group, "::before");
+      const target = group.querySelector('button[aria-current="true"]')!;
+      const groupBox = group.getBoundingClientRect();
+      const box = target.getBoundingClientRect();
+      const centre =
+        groupBox.left +
+        parseFloat(style.left) +
+        new DOMMatrix(style.transform).m41 +
+        parseFloat(style.width) / 2;
+      return {
+        background: style.backgroundColor,
+        offCentre: Math.abs(centre - (box.left + box.width / 2)),
+        inset: parseFloat(style.top),
+        height: parseFloat(style.height),
+        buttonHeight: box.height,
+      };
+    });
+    expect(thumb.background).not.toBe("rgba(0, 0, 0, 0)");
+    expect(thumb.offCentre).toBeLessThanOrEqual(1);
+    expect(thumb.inset).toBeGreaterThanOrEqual(4);
+    expect(thumb.height + 2 * thumb.inset).toBeCloseTo(thumb.buttonHeight, 0);
+  }).toPass({ timeout: 20000 });
+  // The thumb carries the actual speed, so the active button itself has no fill of its own.
+  expect(await active.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
+  // The label's colour eases in behind the thumb, so read until both have settled.
+  await expect(async () => {
+    const ring = await selected.evaluate((element) => {
+      const style = getComputedStyle(element, "::before");
+      const label = element
+        .querySelector(".multiplayerSpeedLabel")!
+        .getBoundingClientRect();
+      const button = element.getBoundingClientRect();
+      const height = parseFloat(style.height);
+      const centreY = parseFloat(style.top) + height / 2;
+      return {
+        content: style.content,
+        radius: parseFloat(style.borderTopLeftRadius),
+        height,
+        animation: style.animationName,
+        style: style.borderTopStyle,
+        color: style.borderTopColor,
+        labelColor: getComputedStyle(element).color,
+        top: parseFloat(style.top),
+        bottom: button.height - (parseFloat(style.top) + height),
+        // How far above the ring's centre the label sits, leaving room for the pips below it.
+        lift: centreY - (label.top - button.top + label.height / 2),
+        clearance:
+          parseFloat(style.width) -
+          2 * parseFloat(style.borderTopWidth) -
+          label.width,
+      };
+    });
+    if (selectedName === activeName) {
+      // Your request and the clock agree, so the thumb says both and the ring steps aside.
+      expect(ring.content).toBe("none");
+      return;
+    }
+    // Your request has a quiet static capsule ring, even while someone else holds the clock.
+    expect(ring.content).not.toBe("none");
+    expect(ring.radius).toBeGreaterThanOrEqual(ring.height / 2);
+    expect(ring.animation).toBe("none");
+    expect(ring.style).toBe("solid");
+    expect(ring.color).toBe(ring.labelColor);
+    // It matches the thumb's footprint and clears the label's sides.
+    expect(ring.top).toBeGreaterThanOrEqual(4);
+    expect(ring.bottom).toBeGreaterThanOrEqual(4);
+    expect(ring.lift).toBeGreaterThanOrEqual(1);
+    expect(ring.lift).toBeLessThanOrEqual(3);
+    expect(ring.clearance).toBeGreaterThanOrEqual(2);
+  }).toPass({ timeout: 20000 });
+  if (selectedName === activeName) return;
+  expect(
+    await active.evaluate(
+      (element) => getComputedStyle(element, "::before").content,
+    ),
+  ).toBe("none");
+  expect(await selected.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
+  await expect(selected).not.toHaveAttribute("aria-current");
+  // Waiting for you to confirm is a shape change, not a colour change: the ring turns dashed.
+  await clock(page).evaluate((group) =>
+    group.setAttribute("data-resume", "true"),
+  );
+  expect(
+    await selected.evaluate(
+      (element) => getComputedStyle(element, "::before").borderTopStyle,
+    ),
+  ).toBe("dashed");
+  await clock(page).evaluate((group) => group.removeAttribute("data-resume"));
 }
 
 async function verifySpeedLayouts(browser: Browser, pages: Page[]) {
@@ -1516,6 +1568,12 @@ async function verifySpeedLayouts(browser: Browser, pages: Page[]) {
           report.push({ width, theme, touch, catalog, buttons: actual });
         };
         await compare(false);
+        // The thumb glides into place instead of jumping, unless reduced motion is requested.
+        expect(
+          await clock(target).evaluate(
+            (group) => getComputedStyle(group, "::before").transitionDuration,
+          ),
+        ).toBe("0.32s");
         const capture = async (state = "") => {
           if (!process.env.MULTIPLAYER_SCREENSHOTS) return;
           await target.mouse.move(0, 0);
