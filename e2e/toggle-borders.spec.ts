@@ -1,6 +1,7 @@
 import { expect, Locator, test } from "./fixtures";
 import { DIFFICULTY_STORAGE_KEY, unlockedJournal } from "./difficulty-fixture";
 import { reviewScreenshot } from "./review-screenshot";
+import { contrastRatio } from "./contrast";
 
 async function expectContinuousBorder(button: Locator) {
   await expect(button).toHaveAttribute("aria-pressed", "true");
@@ -33,8 +34,46 @@ async function expectContinuousBorder(button: Locator) {
   ).toEqual([true, true]);
 }
 
+/** The speed control marks its selection with a thumb under the pressed segment, not a border. */
+async function expectThumbUnder(button: Locator) {
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+  await button.scrollIntoViewIfNeeded();
+  // The thumb glides and the label's colour eases in behind it, so read until both settle.
+  await expect(async () => {
+    const thumb = await button.evaluate((element) => {
+      const group = element.closest(".speedToggles")!;
+      const style = getComputedStyle(group, "::before");
+      const box = element.getBoundingClientRect();
+      const centre =
+        group.getBoundingClientRect().left +
+        parseFloat(style.left) +
+        new DOMMatrix(style.transform).m41 +
+        parseFloat(style.width) / 2;
+      return {
+        background: style.backgroundColor,
+        label: getComputedStyle(element).color,
+        offCentre: Math.abs(centre - (box.left + box.width / 2)),
+        // The thumb sits beneath the segment, so the label is what a tap lands on.
+        labelOnTop: element.contains(
+          document.elementFromPoint(box.left + box.width / 2, box.top + 8),
+        ),
+      };
+    });
+    expect(thumb.background).not.toBe("rgba(0, 0, 0, 0)");
+    expect(
+      thumb.offCentre,
+      "the thumb is under the pressed speed",
+    ).toBeLessThanOrEqual(1);
+    expect(thumb.labelOnTop, "the thumb never covers its label").toBe(true);
+    expect(
+      contrastRatio(thumb.label, thumb.background),
+      "the pressed label is readable on the thumb",
+    ).toBeGreaterThanOrEqual(4.5);
+  }).toPass({ timeout: 10000 });
+}
+
 for (const theme of ["light", "dark"]) {
-  test(`difficulty and speed keep continuous selected borders in ${theme}`, async ({
+  test(`difficulty keeps continuous selected borders and speed keeps its thumb in ${theme}`, async ({
     page,
   }, info) => {
     await page.addInitScript((mode) => {
@@ -83,7 +122,7 @@ for (const theme of ["light", "dark"]) {
     ]) {
       const button = speeds.getByRole("button", { name, exact: true });
       await button.click();
-      await expectContinuousBorder(button);
+      await expectThumbUnder(button);
     }
     await page.mouse.move(0, 0);
     await reviewScreenshot(page, {
