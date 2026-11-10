@@ -29,7 +29,9 @@ not provide an avatar; the player still chooses their own public leaderboard nam
 Hide My Email relay addresses are accepted as Firebase identities. There is no
 custom account-linking flow; players should use the same provider to return to
 their existing saves. If Firebase sends account emails, configure Apple's private
-email relay for the Firebase sender as well.
+email relay for the Firebase sender as well. The mailing-list signup also
+subscribes relay addresses, so Mailchimp's sender must be registered too; see
+[Production setup](#production-setup) step 3.
 
 See [Firebase's Apple authentication setup](https://firebase.google.com/docs/auth/web/apple).
 Local automated tests exercise provider selection, cancellation, retries, sharing,
@@ -77,16 +79,20 @@ management or unsubscribe control.
    subscribers. The signup API does **not** send a welcome email itself;
    [Mailchimp's final welcome email](https://mailchimp.com/help/enable-or-disable-final-welcome-email/)
    is a signup-form setting; use the welcome automation for these API signups.
+   Apple's private relay rejects mail from unregistered senders, so also register
+   the Mailchimp From domain or address under Sign in with Apple for Email
+   Communication and authenticate the sending domain with SPF or DKIM.
 4. Install the server lockfile with `npm ci --prefix firebase/functions`, then
    deploy with
    `npx firebase-tools@15.32.1 deploy --only functions:mailing-list --project electrify-game`.
    The production workflow also installs and deploys this function with Firestore
    before the web bundle. Both backend deployments must succeed before publishing
    the client; resolve the setup or deployment failure before retrying.
-5. With fresh Google and Apple test addresses, check the box and sign in. Verify exactly one
-   subscribed contact in Mailchimp and one welcome notification, without any
-   confirmation requirement. Test unchecked and cancelled sign-ins, repeat logins,
-   an existing subscriber and a prior unsubscribe. Verify that a signup failure
+5. With fresh Google and Apple test addresses, including an Apple Hide My Email
+   relay address, check the box and sign in. Verify exactly one
+   subscribed contact in Mailchimp and one welcome notification (delivered to the
+   relay address too), without any confirmation requirement. Test unchecked and
+   cancelled sign-ins, repeat logins, an existing subscriber and a prior unsubscribe. Verify that a signup failure
    still permits cloud saves. Remove test contacts afterward.
 
 Local tests mock Mailchimp and Firebase OAuth; they do not send emails. Live

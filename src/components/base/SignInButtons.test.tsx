@@ -48,7 +48,7 @@ it("allows switching providers after cancellation or failure", async () => {
     screen.getByRole("button", { name: "Sign in with Apple" }),
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Couldn't finish sign-in",
+    "Couldn't finish sign-in. Try again, or use the provider you used before.",
   );
   await userEvent.click(
     screen.getByRole("button", { name: "Sign in with Google" }),

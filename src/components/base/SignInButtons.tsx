@@ -67,7 +67,8 @@ export default function SignInButtons({
       </Box>
       {error && (
         <Typography role="alert" color="error" variant="body2" sx={{ mt: 1 }}>
-          Couldn't finish sign-in. Try again.
+          Couldn't finish sign-in. Try again, or use the provider you used
+          before.
         </Typography>
       )}
     </Box>
