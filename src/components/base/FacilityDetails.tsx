@@ -513,13 +513,14 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 value={formatMoneyConcise(facility.loanAmountLeft)}
               />
             )}
-            {variableOperatingCostPerMWh !== undefined &&
-              facilityMaintenanceCost(facility, date.minute) === undefined && (
-                <Stat
-                  label="Fixed upkeep"
-                  value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
-                />
-              )}
+            {/* Every operating facility pays this, whether or not it also pays per MWh: solar,
+                wind and batteries have a fixed cost only */}
+            {facilityMaintenanceCost(facility, date.minute) === undefined && (
+              <Stat
+                label="Fixed upkeep"
+                value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
+              />
+            )}
             {variableOperatingCostPerMWh !== undefined &&
               facilityMaintenanceCost(facility, date.minute) === undefined && (
                 <Stat
