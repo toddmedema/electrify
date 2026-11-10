@@ -11,7 +11,7 @@
  * CI.
  *
  * JavaScript arithmetic never fuses, so this line-for-line port of the fdlibm functions V8 ships
- * (Node 24.14.0) returns exactly what x86-64 `Math` returns, on every machine. Only `pow` lives
+ * (Node 26.13.0) returns exactly what x86-64 `Math` returns, on every machine. Only `pow` lives
  * elsewhere, in helpers/Pow, because V8 hands it to the C library instead. `Math.sqrt`, `abs`,
  * `floor`, `round`, `trunc`, `min`, `max` and `hypot` are exact or correctly rounded and stay safe.
  *

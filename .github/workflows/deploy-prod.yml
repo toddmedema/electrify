@@ -29,7 +29,7 @@ jobs:
       - name: Setup Node.js environment
         uses: actions/setup-node@v7
         with:
-          node-version: 24.14.0
+          node-version: 26.13.0
           cache: npm
 
       - run: npm ci
@@ -46,6 +46,10 @@ jobs:
       #
       # The secret is the JSON from Firebase Console -> Project settings ->
       # Service accounts -> Generate new private key, pasted whole.
+      # The deployed function's runtime comes from engines.node in firebase/functions/package.json,
+      # not from this job's Node. It stays on 24 because firebase-tools 15 only knows nodejs20, 22
+      # and 24 (Cloud Run functions has Node 26 in preview). The CLI warns about the mismatch and
+      # runs on this job's Node 26; move engines to 26 once firebase-tools accepts it.
       - name: Install mailing-list function dependencies
         run: npm ci --prefix firebase/functions
 

@@ -33,7 +33,7 @@ test("review summaries distinguish full validation, partial retries and stale so
     },
     gates: steps.map(({ id }) => ({ id, status: "passed" })),
     environment: {
-      node: "v24",
+      node: "v26",
       platform: "darwin",
       arch: "arm64",
       jestWorkers: 4,

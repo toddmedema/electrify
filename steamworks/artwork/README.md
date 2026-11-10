@@ -38,7 +38,7 @@ and the original Electrify wordmark without its tagline. The illustrations were
 created and edited with the built-in ImageGen tool. The app icon comes from
 `public/images/icon/1024x1024.png`.
 
-With Node 24, `npm ci` and Playwright Chromium installed, regenerate the exact-size
+With Node 26, `npm ci` and Playwright Chromium installed, regenerate the exact-size
 uploads from the repository root:
 
 ```sh

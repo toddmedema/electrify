@@ -18,7 +18,7 @@ _No content yet_
 
 ## Assumptions and Constraints
 
-- Use Node 24 and existing locked dependencies where practical.
+- Use Node 26 and existing locked dependencies where practical.
 - The production canonical origin is `https://electrifygame.com`.
 - Proposed build-only locations are `scripts/scenario-pages/` and `content/scenario-pages.json`; implementation may follow established repository naming conventions.
 - This foundation has no sibling sub-plan dependency and must be independently verifiable with fixtures; production content comes from two editorial sub-plans.

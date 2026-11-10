@@ -116,7 +116,7 @@ async function desktopPackage() {
     );
   if (platform !== process.platform || architecture !== process.arch)
     throw new Error(
-      "Build on the target platform and architecture with Node 24 and npm ci, so the matching native Steam bridge is installed and verified.",
+      "Build on the target platform and architecture with Node 26 and npm ci, so the matching native Steam bridge is installed and verified.",
     );
   if (!process.argv.includes("--skip-build")) desktopBuild();
   else if (!fs.existsSync("build/desktop-assets.json"))
