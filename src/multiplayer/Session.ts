@@ -80,6 +80,20 @@ export const CONNECTION_LOST =
  * refused command. Native lobby errors come only from its connection failures. */
 export const isConnectionLoss = (error?: string, lobbyError?: string) =>
   error === CONNECTION_LOST || (!error && !!lobbyError);
+/** Whether the notice for this error should offer Disconnect. A guest whose host link is gone
+ * has nothing to wait for and nothing to save with. A host's simulation keeps running through a
+ * lobby error and can still save, so it never gets an exit that skips its checkpoint. */
+export const offersDisconnect = ({
+  error,
+  lobbyError,
+  hostId,
+  selfId,
+}: {
+  error?: string;
+  lobbyError?: string;
+  hostId?: string;
+  selfId?: string;
+}) => !!hostId && hostId !== selfId && isConnectionLoss(error, lobbyError);
 
 /** Electron prefixes whatever the main process throws; a player should read only the message. */
 const IPC_ERROR_PREFIX = /^Error invoking remote method '[^']*': (?:Error: )?/;

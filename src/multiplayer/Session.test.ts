@@ -7,6 +7,7 @@ import {
   HOST_LEFT,
   MultiplayerSession,
   isConnectionLoss,
+  offersDisconnect,
 } from "./Session";
 import type { DesktopBridge } from "../Desktop";
 import type {
@@ -614,6 +615,26 @@ test("only a lost connection counts as one, so other errors never offer a way ou
   expect(isConnectionLoss("Not enough cash")).toBe(false);
   expect(isConnectionLoss()).toBe(false);
   f.session.dispose();
+});
+test("only a guest's lost connection offers Disconnect, never a host that can still save", () => {
+  const guestSide = { hostId: host, selfId: guest };
+  expect(offersDisconnect({ error: CONNECTION_LOST, ...guestSide })).toBe(true);
+  expect(offersDisconnect({ lobbyError: "The host left.", ...guestSide })).toBe(
+    true,
+  );
+  expect(offersDisconnect({ error: "Not enough cash", ...guestSide })).toBe(
+    false,
+  );
+  // A native lobby error can reach a host whose simulation keeps running.
+  const hostSide = { hostId: host, selfId: host };
+  expect(
+    offersDisconnect({
+      lobbyError: "Steam connection interrupted.",
+      ...hostSide,
+    }),
+  ).toBe(false);
+  expect(offersDisconnect({ error: CONNECTION_LOST, ...hostSide })).toBe(false);
+  expect(offersDisconnect({ error: CONNECTION_LOST })).toBe(false);
 });
 test("players read the transport's message, never Electron's invoke wrapper", async () => {
   const f = fixture();
