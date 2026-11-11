@@ -13,7 +13,10 @@ interface PowerSample {
   demandW: number;
 }
 
-export type ShortfallInterval = ShortfallBar;
+export type ShortfallInterval = ShortfallBar & {
+  /** A still-short terminal sample belongs to its interval; recovery endpoints do not. */
+  includeEnd?: boolean;
+};
 
 /** Read the same intervals that are shaded, retaining coincident rather than independent extrema. */
 export function shortfallIntervals(
@@ -21,13 +24,22 @@ export function shortfallIntervals(
   spans: Array<[number, number]>,
 ): ShortfallInterval[] {
   let index = 0;
+  const finalSample = timeline[timeline.length - 1];
   return spans.map(([from, to]) => {
     while (index < timeline.length && timeline[index].minute < from) index++;
     let peakW = 0;
     for (let i = index; i < timeline.length && timeline[i].minute <= to; i++) {
       peakW = Math.max(peakW, timeline[i].demandW - timeline[i].supplyW);
     }
-    return { from, to, peakShortfall: peakW };
+    return {
+      from,
+      to,
+      peakShortfall: peakW,
+      ...(finalSample?.minute === to &&
+      finalSample.demandW > finalSample.supplyW
+        ? { includeEnd: true }
+        : {}),
+    };
   });
 }
 
@@ -35,7 +47,10 @@ export function shortfallAt(
   intervals: readonly ShortfallInterval[],
   minute: number,
 ): ShortfallInterval | undefined {
-  return intervals.find(({ from, to }) => minute >= from && minute < to);
+  return intervals.find(
+    ({ from, to, includeEnd }) =>
+      minute >= from && (minute < to || (includeEnd && minute === to)),
+  );
 }
 
 /** Interpolate the plotted lines so even the sliver before the first short sample is inspectable. */

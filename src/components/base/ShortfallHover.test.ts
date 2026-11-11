@@ -23,12 +23,22 @@ const intervals = shortfallIntervals(timeline, [
 it("reports coincident peaks for distinct shaded intervals", () => {
   expect(intervals).toEqual([
     { from: 20, to: 150, peakShortfall: 40e6 },
-    { from: 260, to: 300, peakShortfall: 20e6 },
+    { from: 260, to: 300, peakShortfall: 20e6, includeEnd: true },
   ]);
   expect(shortfallAt(intervals, 21)).toBe(intervals[0]);
   expect(shortfallAt(intervals, 150)).toBeUndefined();
   expect(shortfallAt(intervals, 200)).toBeUndefined();
   expect(shortfallAt(intervals, 280)).toBe(intervals[1]);
+});
+
+it("retains a shortage at the final sample but excludes a recovered endpoint", () => {
+  expect(shortfallAt(intervals, 300)).toBe(intervals[1]);
+  expect(shortfallTooltip(timeline, intervals, 300)).toContain(
+    "Unmet demand: 20MW",
+  );
+  expect(shortfallAt(intervals, 300.1)).toBeUndefined();
+  const recovered = shortfallIntervals(timeline.slice(0, 4), [[20, 180]]);
+  expect(shortfallAt(recovered, 180)).toBeUndefined();
 });
 
 it("inspects inside a shortage even when the nearest sample has sufficient supply", () => {

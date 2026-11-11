@@ -176,7 +176,9 @@ async function completeMission(
   await expect(primary).toBeFocused();
   if (keepPlaying) {
     const fleetBefore = await page.locator(".facilityRow").allTextContents();
-    const clockBefore = await page.locator("#appbar").innerText();
+    const clock = page.locator("#appbar [data-game-minute]");
+    const minuteBefore = await clock.getAttribute("data-game-minute");
+    expect(minuteBefore).toMatch(/^\d+$/);
     await completionDialog
       .getByRole("button", { name: "Keep playing" })
       .click();
@@ -185,16 +187,14 @@ async function completeMission(
     expect(await page.locator(".facilityRow").allTextContents()).toEqual(
       fleetBefore,
     );
-    await expect(page.locator("#appbar")).toHaveText(clockBefore, {
-      useInnerText: true,
-    });
+    await expect(clock).toHaveAttribute("data-game-minute", minuteBefore!);
     await page.getByRole("button", { name: "normal speed" }).click();
     await expect(
       page.getByRole("button", { name: "pause", exact: true }),
     ).toBeVisible();
-    await expect(page.locator("#appbar")).not.toHaveText(clockBefore, {
-      useInnerText: true,
-    });
+    await expect
+      .poll(async () => Number(await clock.getAttribute("data-game-minute")))
+      .toBeGreaterThan(Number(minuteBefore));
     return;
   }
   await primary.click();
