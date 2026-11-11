@@ -1,3 +1,8 @@
+#appbar #speedChangeButtons {
+  // Keep the clock at the trailing edge even between the phone and wide desktop layouts.
+  margin-left: auto;
+}
+
 html[data-couch-seat] #appbar #topbar {
   .MuiToolbar-root {
     // Keep both money figures together; a narrow player pane can put speeds below.
@@ -28,10 +33,6 @@ html[data-couch-seat] #appbar #topbar {
     .gameStatus {
       min-width: max-content;
       overflow: visible;
-    }
-
-    #speedChangeButtons {
-      margin-left: auto;
     }
   }
 }

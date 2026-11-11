@@ -2204,8 +2204,17 @@ export const gameSlice = createSlice({
         state.location.id === incoming.location.id &&
         state.scenarioId === incoming.scenarioId &&
         state.startingYear === incoming.startingYear;
+      // The worker/transport clones every view. An unchanged four-player clock should not
+      // rebuild the speed controls on every ordinary snapshot while the player is clicking.
+      const clock =
+        sameGrid &&
+        JSON.stringify(state.multiplayer?.clock) ===
+          JSON.stringify(incoming.multiplayer?.clock)
+          ? state.multiplayer?.clock
+          : incoming.multiplayer?.clock;
       return {
         ...incoming,
+        multiplayer: incoming.multiplayer && { ...incoming.multiplayer, clock },
         // Completed months and the authored location are immutable. Keeping their identity lets
         // normal forecasts finish while authoritative tick snapshots continue to arrive.
         location: sameGrid ? state.location : incoming.location,
