@@ -95,6 +95,7 @@ import {
   siteCountLabel,
 } from "../base/BuildAvailability";
 import HydroPrimer, { useHydroPrimer } from "../base/HydroPrimer";
+import RemainingSites from "../base/RemainingSites";
 import { getScenario, getTutorialStep } from "../../data/Scenarios";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
@@ -482,8 +483,12 @@ export function GeneratorBuildItem(
           {props.hydroAvailability && (
             <Box ref={siteSummary} tabIndex={-1} sx={{ px: 2, pb: 1 }}>
               <Typography variant="body2">
-                {props.hydroAvailability.remaining.length} sites left ·{" "}
-                {props.hydroAvailability.eligible.length}{" "}
+                <RemainingSites sites={props.hydroAvailability.remaining}>
+                  {props.hydroAvailability.remaining.length === 1
+                    ? "1 site left"
+                    : `${props.hydroAvailability.remaining.length} sites left`}
+                </RemainingSites>{" "}
+                · {props.hydroAvailability.eligible.length}{" "}
                 {props.hydroAvailability.eligible.length === 1 ? "fits" : "fit"}
                 {props.hydroAvailability.largest &&
                   ` · largest: ${formatWatts(props.hydroAvailability.largest.maxPeakW, 6)}`}

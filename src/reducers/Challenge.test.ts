@@ -70,7 +70,7 @@ it.each([
       checkpoints.push(cloneDeep(left));
     }
     const errors = jest.fn();
-    await mapDispatchToProps(dispatch).load(accepted, jest.fn(), errors);
+    await mapDispatchToProps(dispatch).load(accepted, errors);
     mocks.forEach((mock) => mock.mockRestore());
     expect(errors).not.toHaveBeenCalled();
     expect(actions.some((a) => a.type === initGame.type)).toBe(true);

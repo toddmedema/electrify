@@ -34,3 +34,24 @@ export async function foregroundContrast(locator: Locator): Promise<number> {
     );
   });
 }
+
+/** WCAG contrast between two computed `rgb()` or `rgba()` colors, for text on a painted
+ * pseudo-element that foregroundContrast's ancestor walk cannot see. */
+export function contrastRatio(foreground: string, background: string): number {
+  const luminance = (rgb: string) => {
+    const [red, green, blue] = rgb
+      .match(/[\d.]+/g)!
+      .slice(0, 3)
+      .map((channel) => {
+        const value = Number(channel) / 255;
+        return value <= 0.04045
+          ? value / 12.92
+          : Math.pow((value + 0.055) / 1.055, 2.4);
+      });
+    return red * 0.2126 + green * 0.7152 + blue * 0.0722;
+  };
+  const [lighter, darker] = [luminance(foreground), luminance(background)].sort(
+    (a, b) => b - a,
+  );
+  return (lighter + 0.05) / (darker + 0.05);
+}

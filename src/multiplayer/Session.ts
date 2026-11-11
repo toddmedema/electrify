@@ -73,6 +73,17 @@ function validPendingCampaign(value: unknown): value is PendingCampaign {
 /** A guest's lobby closed before the match began, because its host left. */
 export const HOST_LEFT = "The host closed the lobby.";
 
+/** Electron prefixes whatever the main process throws; a player should read only the message. */
+const IPC_ERROR_PREFIX = /^Error invoking remote method '[^']*': (?:Error: )?/;
+/** The native transport's refusal to send to a peer with no live connection
+ * (`send` in electron/steam-multiplayer.cjs). */
+const PLAYER_DISCONNECTED = /\bPlayer is disconnected\b/;
+function playerFacing(error: unknown) {
+  if (!(error instanceof Error)) return error;
+  const message = error.message.replace(IPC_ERROR_PREFIX, "");
+  return message === error.message ? error : new Error(message);
+}
+
 export interface SessionState {
   lobby: LobbyState;
   view?: RoomView;
@@ -149,12 +160,14 @@ export class MultiplayerSession {
     this.state = { ...this.state, ...update };
     this.listeners.forEach((l) => l());
   }
-  private request(input: NativeRequest) {
+  private async request(input: NativeRequest) {
     if (!this.bridge.multiplayerRequest)
-      return Promise.reject(
-        new Error("Update the desktop game to play online"),
-      );
-    return this.bridge.multiplayerRequest(input);
+      throw new Error("Update the desktop game to play online");
+    try {
+      return await this.bridge.multiplayerRequest(input);
+    } catch (error) {
+      throw playerFacing(error);
+    }
   }
   private post(input: WorkerRequest) {
     this.worker?.postMessage(input);
@@ -505,6 +518,11 @@ export class MultiplayerSession {
   }
   private transmit() {
     if (!this.pending) return;
+    // A guest whose host link is down cannot deliver anything. The command stays pending and the
+    // pump resends it once the link returns; the lost connection is already reported once, so
+    // each retry must not raise another error.
+    const { hostId, connected } = this.state.lobby;
+    if (!this.worker && !(hostId && connected.includes(hostId))) return;
     this.lastSend = Date.now();
     if (this.worker)
       this.post({
@@ -518,7 +536,12 @@ export class MultiplayerSession {
         kind: "send",
         to: this.state.lobby.hostId!,
         payload: { kind: "command", envelope: this.pending },
-      }).catch((error) => this.update({ error: error.message }));
+      }).catch((error: Error) => {
+        // The link dropped between the last lobby update and this send. Its disconnect notice
+        // follows, and the command is resent on reconnect, so it is not a new failure.
+        if (!PLAYER_DISCONNECTED.test(error.message))
+          this.update({ error: error.message });
+      });
   }
   command(command: Command) {
     void this.submit(command).catch((error) =>
