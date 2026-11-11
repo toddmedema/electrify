@@ -121,7 +121,7 @@ for (const theme of ["light", "dark"]) {
         .click();
       await insights.getByRole("button", { name: /^Layers/ }).click();
       await insights
-        .getByRole("checkbox", { name: "Revenue", exact: true })
+        .getByRole("checkbox", { name: "Profit", exact: true })
         .click();
       await insights
         .getByRole("button", { name: "Done choosing layers", exact: true })

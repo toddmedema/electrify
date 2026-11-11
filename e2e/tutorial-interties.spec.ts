@@ -301,6 +301,11 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+  await page.mouse.move(0, 0);
+  await reviewScreenshot(page, {
+    path: testInfo.outputPath("intertie-capstone-briefing.png"),
+    animations: "disabled",
+  });
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Your turn 20 of 20" }),
