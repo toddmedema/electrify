@@ -111,8 +111,37 @@ Running-state complete-view payloads and changed-checkpoint traffic are unchange
 - Changed checkpoints still travel in full. Local checkpoint writes also remain in place, even
   when all guests have confirmed identical contents, to preserve each explicit save request's
   persistence and failure reporting.
-- Native send queues coalesce unsent views after encoding. A slow network can therefore still pay
-  for encoding a replaced frame. Moving that work behind a bounded queue is a possible later CPU
-  improvement if real transport measurements justify it.
+- Views and changed checkpoints still serialize their JSON on the main process. Compression now
+  runs asynchronously, and a peer keeps only one encoding plus its newest waiting view. A future
+  worker codec could also move JSON serialization off the main process if measurements justify it.
 
 No relay, cross-play transport or developer-operated server is introduced by this change.
+
+## Controls under competing video load (November 2026)
+
+Live-view and checkpoint deflate compression now use Node's asynchronous zlib API so Steam
+callbacks and renderer requests can proceed during compression. Waiting views coalesce before
+serialization; an encoding already in progress can finish, so sustained overload still makes
+progress. Encoded unsent views retain the existing queue coalescing. Completions check connection
+identity before enqueueing, including a reconnect with the same Steam ID. Compression errors still
+reach the caller. The framing, compression settings, size limits, numeric encoding and full-view
+protocol stay the same.
+
+The renderer also stops reapplying an unchanged game on session-only notifications, including the
+pending-command notification that runs before a command is transmitted. Ordinary cloned snapshots
+retain the shared clock's object identity while its values agree, so the speed buttons do not
+re-render on each five-Hz update. Changed player speeds, readiness and pause reasons still update.
+
+A local Node 26.13.0 arm64 measurement alternated six synchronous/asynchronous pairs, each encoding
+the same real 60-month grid payload three times. A queued event-loop callback ran after a median
+11.65 ms with synchronous deflate and 2.53 ms with asynchronous deflate (78% less blockage). The
+compressed payload was identical at 51,909 bytes. This isolates codec scheduling; it is not an
+end-to-end latency or physical-device guarantee. JSON serialization still takes main-process time.
+
+Native tests hold compression open while newer views and small messages arrive, verify bounded
+coalescing, failure propagation and reconnect cleanup, and round-trip the asynchronous output
+through the shipping decoder. Renderer tests protect the eliminated snapshot replays and clock
+identity. The headless multiplayer journey runs at 12× with sixfold renderer CPU throttling and a
+640×360, 30 fps local WebRTC stream, verifies that frames are actually encoded, and checks keyboard
+and pointer speed changes on both peers across a month boundary. It uses synthetic local video;
+real calls also depend on the device, call software and network.

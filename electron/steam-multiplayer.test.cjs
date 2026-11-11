@@ -7,6 +7,7 @@ const {
   DECLARATIONS,
   loadMultiplayerFunctions,
   encode,
+  encodeAsync,
   chunk,
   assemble,
   stringify,
@@ -61,6 +62,23 @@ test("shared bundles round-trip through bounded chunks in any order and validate
     for (const frame of [corrupt, ...frames.slice(1)])
       await assemble(damaged, frame);
   }, /checksum|Inconsistent/);
+});
+test("asynchronous compression uses the shipping frame format and preserves special numbers", async () => {
+  const source = {
+    kind: "view",
+    view: { cash: Infinity, rate: NaN, text: "grid".repeat(10000) },
+  };
+  const message = await encodeAsync(source);
+  assert.deepEqual(message.bytes, encode(source).bytes);
+  let decoded;
+  const pending = new Map();
+  for (const frame of framesFor(message))
+    decoded = (await assemble(pending, frame)) || decoded;
+  assert.deepEqual(decoded, source);
+  await assert.rejects(
+    async () => encodeAsync({ kind: "unknown" }),
+    /message kind/,
+  );
 });
 test("malformed frame lengths and incomplete message floods are rejected before allocation", () => {
   const message = encode({ kind: "view", view: { revision: 1 } }),
@@ -395,6 +413,123 @@ function lobbyFixture(t) {
     },
   };
 }
+
+test("view overload coalesces before encoding and leaves control messages available", async (t) => {
+  const { mp } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  const peer = { id: "76561198000000002", connected: true, queue: [] };
+  mp.connections.set(100, peer);
+  const encoding = [];
+  t.mock.method(
+    mp,
+    "encodeView",
+    (payload) =>
+      new Promise((resolve, reject) => {
+        encoding.push({
+          payload,
+          resolve: () => resolve(encode(payload)),
+          reject,
+        });
+      }),
+  );
+  const send = (revision) =>
+    mp.request({
+      kind: "send",
+      to: peer.id,
+      payload: { kind: "view", view: { revision } },
+    });
+  const first = send(1);
+  const obsolete = send(2);
+  const latest = send(3);
+  await obsolete;
+  assert.deepEqual(
+    encoding.map((request) => request.payload.view.revision),
+    [1],
+  );
+  await mp.request({
+    kind: "send",
+    to: peer.id,
+    payload: { kind: "heartbeat" },
+  });
+  assert.equal(peer.queue[0].kind, "heartbeat");
+  encoding[0].resolve();
+  await first;
+  assert.deepEqual(
+    encoding.map((request) => request.payload.view.revision),
+    [1, 3],
+  );
+  encoding[1].resolve();
+  await latest;
+  assert.deepEqual(
+    peer.queue.map((message) => message.kind),
+    ["heartbeat", "view"],
+  );
+  assert.deepEqual(await assemble(new Map(), chunk(peer.queue[1])), {
+    kind: "view",
+    view: { revision: 3 },
+  });
+});
+
+test("late view compression cannot revive a replaced connection and failures reject the sender", async (t) => {
+  const { mp } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  const peer = { id: "76561198000000002", connected: true, queue: [] };
+  mp.connections.set(100, peer);
+  let finish, fail;
+  t.mock.method(
+    mp,
+    "encodeView",
+    () =>
+      new Promise((resolve, reject) => {
+        finish = resolve;
+        fail = reject;
+      }),
+  );
+  const send = () =>
+    mp.request({
+      kind: "send",
+      to: peer.id,
+      payload: { kind: "view", view: {} },
+    });
+  const old = send();
+  const waiting = send();
+  const replacement = { ...peer, queue: [] };
+  delete replacement.pendingView;
+  delete replacement.encodingView;
+  mp.connections.set(100, replacement);
+  finish(encode({ kind: "view", view: {} }));
+  await Promise.all([old, waiting]);
+  assert.deepEqual(replacement.queue, []);
+  const broken = send();
+  fail(new Error("Compression failed"));
+  await assert.rejects(broken, /Compression failed/);
+  assert.deepEqual(replacement.queue, []);
+});
+
+test("a checkpoint compressed across a reconnect cannot enqueue on the replacement connection", async (t) => {
+  const { mp } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  const peer = { id: "76561198000000002", connected: true, queue: [] };
+  mp.connections.set(100, peer);
+  t.mock.method(mp, "persist", async () => "digest");
+  const zlib = require("node:zlib");
+  let finish;
+  t.mock.method(zlib, "deflateRaw", (json, done) => {
+    finish = () => done(null, zlib.deflateRawSync(json));
+  });
+  const checkpoint = mp.checkpoint({ schema: 3, seats: [] });
+  await Promise.resolve();
+  assert.equal(typeof finish, "function");
+  const replacement = { ...peer, queue: [] };
+  mp.connections.set(100, replacement);
+  finish();
+  await checkpoint;
+  assert.deepEqual(replacement.queue, []);
+  assert.equal(peer.checkpointDigest, undefined);
+});
 
 test("hosts publish a six-digit code and lookup preserves leading zeroes and full lobby IDs", async (t) => {
   const f = lobbyFixture(t);

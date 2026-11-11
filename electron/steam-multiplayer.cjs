@@ -159,7 +159,7 @@ function loadMultiplayerFunctions(
     ]),
   );
 }
-function encode(payload) {
+function messageJSON(payload) {
   if (!payload || !MESSAGE_KINDS.has(payload.kind))
     throw new Error("Invalid co-op message kind");
   if (payload.kind === "scenario") validScenarioMessage(payload);
@@ -173,7 +173,9 @@ function encode(payload) {
   );
   if (Buffer.byteLength(json) > MAX_BYTES)
     throw new Error("Co-op message is too large");
-  const bytes = zlib.deflateRawSync(json);
+  return json;
+}
+function encodedMessage(bytes, kind) {
   if (bytes.length > MAX_COMPRESSED)
     throw new Error("Co-op message is too large");
   return {
@@ -183,6 +185,26 @@ function encode(payload) {
     offset: 0,
     magic: kind === "scenario" ? SCENARIO_MAGIC : MESSAGE_MAGIC,
   };
+}
+function encode(payload) {
+  return encodedMessage(
+    zlib.deflateRawSync(messageJSON(payload)),
+    payload.kind,
+  );
+}
+/** Large live views must leave Steam's callback/IPC pump free to accept speed commands. */
+function encodeAsync(payload) {
+  return new Promise((resolve, reject) => {
+    const json = messageJSON(payload);
+    zlib.deflateRaw(json, (error, bytes) => {
+      if (error) return reject(error);
+      try {
+        resolve(encodedMessage(bytes, payload.kind));
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
 }
 function chunk(message) {
   const index = message.offset;
@@ -674,6 +696,51 @@ class SteamMultiplayer {
       throw new Error("Co-op connection is catching up");
     connection.queue.push(message);
   }
+  encodeView(payload) {
+    return encodeAsync(payload);
+  }
+  /** One compression per peer, plus the newest waiting view. Coalesce before serialization;
+   * a slow peer must not build an encoding backlog or delay small control messages. */
+  sendView(to, payload) {
+    const connection = [...this.connections.values()].find(
+      (c) => c.id === to && c.connected,
+    );
+    if (!connection || this.hostId !== this.service.identity.steamId)
+      throw new Error("Player is disconnected");
+    return new Promise((resolve, reject) => {
+      connection.pendingView?.resolve();
+      connection.pendingView = { payload, resolve, reject };
+      this.flushView(connection);
+    });
+  }
+  async flushView(connection) {
+    if (connection.encodingView || !connection.pendingView) return;
+    const request = connection.pendingView;
+    connection.pendingView = undefined;
+    connection.encodingView = true;
+    try {
+      const encoded = await this.encodeView(request.payload);
+      // A completed encode cannot enter a new connection with the same Steam ID.
+      if (
+        connection.connected &&
+        [...this.connections.values()].includes(connection)
+      )
+        this.send(connection.id, request.payload, encoded);
+      request.resolve();
+    } catch (error) {
+      if ([...this.connections.values()].includes(connection))
+        request.reject(error);
+      else request.resolve();
+    } finally {
+      connection.encodingView = false;
+      if ([...this.connections.values()].includes(connection))
+        void this.flushView(connection);
+      else {
+        connection.pendingView?.resolve();
+        connection.pendingView = undefined;
+      }
+    }
+  }
   refresh() {
     if (!this.lobby) return;
     this.roster = this.members();
@@ -719,7 +786,13 @@ class SteamMultiplayer {
     for (const c of this.connections.values())
       if (c.connected && c.savedDigest !== digest)
         try {
-          encoded ||= encode(payload);
+          encoded ||= await encodeAsync(payload);
+          if (
+            !c.connected ||
+            ![...this.connections.values()].includes(c) ||
+            this.hostId !== this.service.identity.steamId
+          )
+            continue;
           this.send(c.id, payload, encoded);
           c.checkpointDigest = digest;
           // A different queued save can replace the file that the previous receipt proved.
@@ -1005,7 +1078,9 @@ class SteamMultiplayer {
         this.allowed = new Set(input.ids);
         return;
       case "send":
-        return this.send(input.to, input.payload);
+        return input.payload?.kind === "view"
+          ? this.sendView(input.to, input.payload)
+          : this.send(input.to, input.payload);
       case "checkpoint":
         return this.checkpoint(input.world);
       case "read-checkpoint": {
@@ -1032,6 +1107,7 @@ module.exports = {
   loadMultiplayerFunctions,
   DECLARATIONS,
   encode,
+  encodeAsync,
   chunk,
   assemble,
   stringify,

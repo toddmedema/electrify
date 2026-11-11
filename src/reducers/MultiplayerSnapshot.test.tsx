@@ -3,6 +3,36 @@ import gameReducer, { tickState } from "./Game";
 import { multiplayerSnapshot } from "./GameActions";
 import { createGame } from "../testing/Simulator";
 
+test("ordinary network snapshots retain the speed-control subtree until the shared clock changes", () => {
+  const game = createGame({ scenarioId: 101, seed: 12345 });
+  game.multiplayer = {
+    seat: "host",
+    clock: {
+      activeSpeed: "FAST",
+      selectedSpeed: "FAST",
+      readyRequired: false,
+      ready: false,
+      players: [
+        { id: "host", name: "Host", selectedSpeed: "FAST" },
+        { id: "guest", name: "Guest", selectedSpeed: "FAST" },
+      ],
+    },
+  };
+  const initial = gameReducer(undefined, multiplayerSnapshot(game));
+  const tick = cloneDeep(initial);
+  tick.date.minute++;
+  const updated = gameReducer(initial, multiplayerSnapshot(tick));
+  expect(updated.multiplayer!.clock).toBe(initial.multiplayer!.clock);
+
+  const stopped = cloneDeep(updated);
+  stopped.multiplayer!.clock!.players[1].selectedSpeed = "PAUSED";
+  stopped.multiplayer!.clock!.activeSpeed = "PAUSED";
+  const paused = gameReducer(updated, multiplayerSnapshot(stopped));
+  expect(paused.multiplayer!.clock).not.toBe(updated.multiplayer!.clock);
+  expect(paused.multiplayer!.clock).toEqual(stopped.multiplayer!.clock);
+  expect(paused.speed).toBe("PAUSED");
+});
+
 test("live multiplayer ticks retain completed history and location so normal forecasts can finish", () => {
   const game = createGame({ scenarioId: 101, seed: 12345 });
   while (game.date.monthsElapsed < 1) tickState(game);

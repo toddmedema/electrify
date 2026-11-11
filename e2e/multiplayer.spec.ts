@@ -40,6 +40,7 @@ type SteamTestWindow = typeof window & {
     responses: { key: string; optionId: string }[];
   }[];
   nativeForecastReplies?: string[];
+  videoWorkload?: { frames: () => Promise<number>; stop: () => void };
 };
 
 test.afterEach(async ({ browser }) => {
@@ -1269,6 +1270,141 @@ test("desktop menu keyboard journey includes Play with friends in both direction
 
 const clock = (page: Page) =>
   page.locator(".multiplayerSpeedToggles:visible").last();
+
+test("12x multiplayer speed controls respond while video chat is encoding", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const host = pages[0];
+  const cdp = await host.context().newCDPSession(host);
+  // Reserve CPU headroom for the competing call, on a production desktop renderer too.
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
+  await host.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 360;
+    const context = canvas.getContext("2d")!;
+    let frame = 0;
+    const draw = () => {
+      for (let x = 0; x < 640; x += 20) {
+        context.fillStyle = `hsl(${(frame * 7 + x) % 360} 50% 50%)`;
+        context.fillRect(x, 0, 20, 360);
+      }
+      frame++;
+    };
+    draw();
+    const timer = window.setInterval(draw, 1000 / 30);
+    const stream = canvas.captureStream(30);
+    const sender = new RTCPeerConnection();
+    const receiver = new RTCPeerConnection();
+    const video = document.createElement("video");
+    video.muted = true;
+    video.autoplay = true;
+    // Exercise encoding, decoding and video presentation without covering the game controls.
+    Object.assign(video.style, {
+      position: "fixed",
+      width: "160px",
+      height: "90px",
+      bottom: "0",
+      right: "0",
+      pointerEvents: "none",
+    });
+    document.body.append(video);
+    receiver.ontrack = (event) => {
+      video.srcObject = event.streams[0];
+    };
+    sender.onicecandidate = (event) => {
+      if (event.candidate) void receiver.addIceCandidate(event.candidate);
+    };
+    receiver.onicecandidate = (event) => {
+      if (event.candidate) void sender.addIceCandidate(event.candidate);
+    };
+    stream.getTracks().forEach((track) => sender.addTrack(track, stream));
+    await sender.setLocalDescription(await sender.createOffer());
+    await receiver.setRemoteDescription(sender.localDescription!);
+    await receiver.setLocalDescription(await receiver.createAnswer());
+    await sender.setRemoteDescription(receiver.localDescription!);
+    (window as SteamTestWindow).videoWorkload = {
+      frames: async () => {
+        let encoded = 0;
+        (await sender.getStats()).forEach((report) => {
+          if (report.type === "outbound-rtp" && report.kind === "video")
+            encoded += report.framesEncoded ?? 0;
+        });
+        return encoded;
+      },
+      stop: () => {
+        clearInterval(timer);
+        stream.getTracks().forEach((track) => track.stop());
+        sender.close();
+        receiver.close();
+        video.remove();
+      },
+    };
+  });
+  const responses: { input: string; ms: number }[] = [];
+  const frames = () =>
+    host.evaluate(() => (window as SteamTestWindow).videoWorkload!.frames());
+  try {
+    await expect.poll(frames).toBeGreaterThan(10);
+    for (const page of pages) await ready(page);
+    for (const page of pages)
+      await clock(page)
+        .getByRole("button", { name: "fast speed", exact: true })
+        .click();
+    await expect(clock(host)).toHaveAttribute("data-active-speed", "FAST");
+    await expect
+      .poll(() => room.views.get("76561198000000002")?.game?.date.monthsElapsed)
+      .toBeGreaterThanOrEqual(1);
+    const encodedBefore = await frames();
+    for (const page of pages) {
+      for (const [key, speed] of [
+        ["1", "SLOW"],
+        ["3", "FAST"],
+        ["0", "PAUSED"],
+        ["3", "FAST"],
+      ]) {
+        const started = Date.now();
+        await page.keyboard.press(key);
+        for (const peer of pages)
+          await expect(clock(peer)).toHaveAttribute(
+            "data-active-speed",
+            speed,
+            { timeout: 3000 },
+          );
+        responses.push({ input: `key ${key}`, ms: Date.now() - started });
+      }
+      const started = Date.now();
+      await clock(page)
+        .getByRole("button", { name: "normal speed", exact: true })
+        .click({ timeout: 3000 });
+      for (const peer of pages)
+        await expect(clock(peer)).toHaveAttribute(
+          "data-active-speed",
+          "NORMAL",
+          { timeout: 3000 },
+        );
+      responses.push({ input: "click 3x", ms: Date.now() - started });
+      await page.keyboard.press("3");
+      for (const peer of pages)
+        await expect(clock(peer)).toHaveAttribute("data-active-speed", "FAST");
+    }
+    await expect.poll(frames).toBeGreaterThan(encodedBefore);
+    expect(errors).toEqual([]);
+    expect(room.transportErrors).toEqual([]);
+    await test.info().attach("speed-response-under-video-load", {
+      body: JSON.stringify(responses),
+      contentType: "application/json",
+    });
+  } finally {
+    await host.evaluate(() =>
+      (window as SteamTestWindow).videoWorkload!.stop(),
+    );
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    await cdp.detach();
+  }
+});
+
 async function ready(page: Page) {
   await clock(page)
     .getByRole("button", { name: "slow speed", exact: true })
