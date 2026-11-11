@@ -1692,15 +1692,16 @@ export default class Insights extends React.Component<Props, State> {
           const rangedSupplyDemand =
             projection.domain.x[1] - projection.domain.x[0] >
             24 * MINUTES_PER_MONTH;
+          // Share the hourly aggregation with the chart; the legend must not repeat it.
+          const monthlyRanges = rangedSupplyDemand
+            ? supplyDemandMonthlyRanges(
+                projection.supplyDemandTimeline,
+                projection.forecast[0]?.minute,
+              )
+            : [];
           const unmetDemandMarked =
-            rangedSupplyDemand &&
             shortfallsWithin(
-              monthlyShortfalls(
-                supplyDemandMonthlyRanges(
-                  projection.supplyDemandTimeline,
-                  projection.forecast[0]?.minute,
-                ),
-              ),
+              monthlyShortfalls(monthlyRanges),
               projection.domain.x,
             ).length > 0;
           body = (
@@ -1725,17 +1726,16 @@ export default class Insights extends React.Component<Props, State> {
                 ]}
                 {...(unmetDemandMarked
                   ? {
-                      note: "Bands span each month's lowest to highest hour. Red height is the share of demand unmet; full height is 100%.",
+                      note: "Bands span each month's lowest to highest hour. Red height shows peak shortfall on the same MW scale, capped at full height.",
                     }
                   : {})}
               />
               {rangedSupplyDemand ? (
                 <ChartSupplyDemandRanges
                   height={160}
-                  timeline={projection.supplyDemandTimeline}
+                  ranges={monthlyRanges}
                   domain={projection.domain}
                   startingYear={game.startingYear}
-                  currentMinute={projection.forecast[0]?.minute}
                   syncKey={syncKey}
                 />
               ) : (

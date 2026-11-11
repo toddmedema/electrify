@@ -12,6 +12,7 @@ import {
   niceSplits,
   patternFill,
   shortfallSkyline,
+  shortfallBarsPlugin,
   zeroLinePlugin,
 } from "./UPlotHelpers";
 import { applyTextSize } from "../../TextSize";
@@ -423,13 +424,13 @@ it("does not retain negative zero in a degenerate axis", () => {
 
 describe("shortfallSkyline", () => {
   const plot = { left: 10, width: 100, height: 200 };
-  const bar = (x0: number, x1: number, unmetShare: number) => ({
+  const bar = (x0: number, x1: number, heightShare: number) => ({
     x0,
     x1,
-    unmetShare,
+    heightShare,
   });
 
-  it("makes the plot's full height 100%, linearly, with the cap as the floor", () => {
+  it("scales linearly to the plot height, with the cap as the floor", () => {
     const heights = shortfallSkyline(
       [
         bar(10, 20, 0),
@@ -488,12 +489,47 @@ describe("shortfallSkyline", () => {
     ]);
   });
 
-  it("paints a cap rather than NaN for an unusable share, and never exceeds the plot", () => {
+  it("paints a cap rather than NaN for an unusable height, and never exceeds the plot", () => {
     expect(shortfallSkyline([bar(10, 20, NaN)], plot, 8, 2)).toEqual([
       { x: 10, width: 10, height: 8 },
     ]);
     expect(
       shortfallSkyline([bar(10, 20, 0.5)], { ...plot, height: 6 }, 8, 2),
     ).toEqual([{ x: 10, width: 10, height: 6 }]);
+  });
+});
+
+describe("shortfallBarsPlugin MW scale", () => {
+  it("uses the rendered Y span, follows scale changes and caps at full height", () => {
+    const ctx = {
+      save: jest.fn(),
+      restore: jest.fn(),
+      beginPath: jest.fn(),
+      rect: jest.fn(),
+      clip: jest.fn(),
+      fillRect: jest.fn(),
+    };
+    const plot = {
+      bbox: { left: 10, top: 20, width: 100, height: 300 },
+      ctx,
+      scales: { y: { min: 400e6, max: 1e9 } },
+      valToPos: (value: number) => value,
+    } as unknown as uPlot;
+    const plugin = shortfallBarsPlugin(
+      () => [{ from: 10, to: 20, peakShortfall: 200e6 }],
+      "red",
+    );
+    const draw = plugin.hooks!.drawClear as (plot: uPlot) => void;
+    draw(plot);
+    // 200 MW across the rendered 600 MW span is exactly a third of 300 pixels.
+    expect(ctx.fillRect).toHaveBeenCalledWith(10, 20, 10, 100);
+    ctx.fillRect.mockClear();
+    plot.scales.y.max = 800e6;
+    draw(plot);
+    expect(ctx.fillRect).toHaveBeenCalledWith(10, 20, 10, 150);
+    ctx.fillRect.mockClear();
+    plot.scales.y.max = 500e6;
+    draw(plot);
+    expect(ctx.fillRect).toHaveBeenCalledWith(10, 20, 10, 300);
   });
 });

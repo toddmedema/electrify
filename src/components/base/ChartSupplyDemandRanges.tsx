@@ -18,7 +18,7 @@ import {
 } from "./UPlotHelpers";
 import { Props as SupplyDemandProps } from "./ChartForecastSupplyDemand";
 
-interface MonthlyRange {
+export interface MonthlyRange {
   minute: number;
   projected: boolean;
   supplyMin: number;
@@ -117,7 +117,7 @@ export function monthlyShortfalls(ranges: MonthlyRange[]): MonthlyShortfall[] {
         to: next
           ? Math.min(range.minute + half, (range.minute + next.minute) / 2)
           : range.minute + half,
-        unmetShare: unmetShare(range),
+        peakShortfall: range.peakShortfall,
       },
     ];
   });
@@ -229,16 +229,19 @@ function tooltip(index: number, state: State): string {
 }
 
 export default function ChartSupplyDemandRanges(
-  props: Omit<SupplyDemandProps, "multiyear" | "blackouts">,
+  props: Omit<
+    SupplyDemandProps,
+    "multiyear" | "blackouts" | "timeline" | "currentMinute"
+  > & { ranges: MonthlyRange[] },
 ) {
-  const ranges = supplyDemandMonthlyRanges(props.timeline, props.currentMinute);
+  const { ranges } = props;
   const shortfalls = monthlyShortfalls(ranges);
   // The plot clips to the domain, so only the marks that reach into it are announced.
   const visible = shortfallsWithin(shortfalls, props.domain.x);
   const marked = visible.length;
   const worst = visible.reduce<MonthlyShortfall | undefined>(
     (deepest, bar) =>
-      !deepest || bar.unmetShare > deepest.unmetShare ? bar : deepest,
+      !deepest || bar.peakShortfall > deepest.peakShortfall ? bar : deepest,
     undefined,
   );
   const worstDate =
@@ -260,7 +263,7 @@ export default function ChartSupplyDemandRanges(
   return (
     <UPlotChart<State>
       id="chartForecastSupplyDemand"
-      ariaLabel={`Monthly ranges of estimated electricity supply and demand. ${worst && worstDate ? `${marked} forecast ${marked === 1 ? "month" : "months"} with unmet demand marked; the worst, ${worstDate.month} ${worstDate.year}, leaves ${formatUnmet(worst.unmetShare)} of demand unmet` : "No forecast months with unmet demand"}`}
+      ariaLabel={`Monthly ranges of estimated electricity supply and demand. ${worst && worstDate ? `${marked} forecast ${marked === 1 ? "month" : "months"} with unmet demand marked; the largest peak shortfall is ${formatWatts(worst.peakShortfall)} in ${worstDate.month} ${worstDate.year}` : "No forecast months with unmet demand"}`}
       formatSummaryValue={formatWatts}
       height={props.height}
       state={{

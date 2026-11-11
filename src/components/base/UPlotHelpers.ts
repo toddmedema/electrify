@@ -631,12 +631,11 @@ export function bandsPlugin(
   };
 }
 
-/** One stretch of x with unmet demand, and the share of that stretch's demand that went unmet. */
+/** One stretch of x with unmet demand and its largest coincident shortfall in watts. */
 export interface ShortfallBar {
   from: number;
   to: number;
-  /** 0 to 1; 1 means none of the demand was served. */
-  unmetShare: number;
+  peakShortfall: number;
 }
 
 /** A rectangle hanging from the top of the plot, in device pixels. */
@@ -652,13 +651,13 @@ const SHORTFALL_HEM_ALPHA = 0.7;
 
 /**
  * The silhouette of shortfall bars as non-overlapping device-pixel rectangles. A bar reaches
- * down the plot in proportion to its unmet share, so the full plot height is 100%, and is never
+ * down the plot in proportion to its height share, capped at the full height, and is never
  * shorter than the cap. Months can be narrower than a pixel, so several may land in one column;
  * each column keeps the tallest, and equal neighbours merge, so translucent shading never
  * stacks into false darkness and abutting bars leave no anti-aliased seam.
  */
 export function shortfallSkyline(
-  bars: Array<{ x0: number; x1: number; unmetShare: number }>,
+  bars: Array<{ x0: number; x1: number; heightShare: number }>,
   plot: { left: number; width: number; height: number },
   capPx: number,
   minWidth: number,
@@ -667,7 +666,7 @@ export function shortfallSkyline(
   const last = Math.ceil(plot.left + plot.width);
   const plotHeight = Math.round(plot.height);
   const heights = new Array<number>(Math.max(0, last - first)).fill(0);
-  for (const { x0, x1, unmetShare } of bars) {
+  for (const { x0, x1, heightShare } of bars) {
     // Snapped outward to whole pixels; a month narrower than the minimum is widened around its
     // own centre so a lone mild month stays visible.
     let left = Math.floor(x0);
@@ -676,8 +675,8 @@ export function shortfallSkyline(
       left = Math.floor((x0 + x1) / 2 - minWidth / 2);
       right = left + Math.ceil(minWidth);
     }
-    const share = Number.isFinite(unmetShare)
-      ? Math.min(1, Math.max(0, unmetShare))
+    const share = Number.isFinite(heightShare)
+      ? Math.min(1, Math.max(0, heightShare))
       : 0;
     const height = Math.min(
       plotHeight,
@@ -704,11 +703,11 @@ export function shortfallSkyline(
 }
 
 /**
- * Shading for the stretches that ran short, as tall as the share of demand left unmet: the
- * plot's full height is all of it. A dark cap marks the top, the original light wash fills down
- * to the share, and a hairline on the wash's lower edge makes that height readable against the
- * faint bands. It is painted before the axes and series, like a recession band, so it never
- * tints a line.
+ * Shading for the stretches that ran short, using the actual rendered Y span to give peak
+ * shortfall the same watts-to-pixels scale as the series, capped at full height. A dark cap
+ * marks the top, the original light wash fills down to the shortfall height, and a hairline on
+ * the wash's lower edge makes that height readable against the faint bands. Painted before
+ * the axes and series, like a recession band, it never tints a line.
  */
 export function shortfallBarsPlugin(
   getBars: () => ShortfallBar[],
@@ -723,13 +722,14 @@ export function shortfallBarsPlugin(
         }
         const { ctx, bbox } = u;
         const ratio = uPlot.pxRatio;
+        const ySpan = (u.scales.y.max ?? 0) - (u.scales.y.min ?? 0);
         const capPx = Math.round(SHORTFALL_CAP_PX * ratio);
         const hemPx = Math.max(1, Math.round(ratio));
         const rects = shortfallSkyline(
           bars.map((bar) => ({
             x0: u.valToPos(bar.from, "x", true),
             x1: u.valToPos(bar.to, "x", true),
-            unmetShare: bar.unmetShare,
+            heightShare: ySpan > 0 ? bar.peakShortfall / ySpan : 0,
           })),
           bbox,
           capPx,

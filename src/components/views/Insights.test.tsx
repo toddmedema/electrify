@@ -326,15 +326,21 @@ jest.mock("../base/ChartSupplyDemandRanges", () => ({
   // Insights reads the real marker helpers to key its legend to what the chart would draw.
   ...jest.requireActual("../base/ChartSupplyDemandRanges"),
   __esModule: true,
-  default: ({ syncKey, timeline, domain, currentMinute }: ChartMockProps) => {
+  default: ({
+    syncKey,
+    ranges,
+    domain,
+  }: React.ComponentProps<
+    typeof import("../base/ChartSupplyDemandRanges").default
+  >) => {
     mockSupplyDemandPaints++;
     return (
       <div
         role="img"
         data-testid="supply-demand-chart"
-        data-forecast-start={currentMinute}
+        data-forecast-start={ranges.find((range) => range.projected)?.minute}
         data-sync-key={syncKey}
-        data-points={timeline?.length}
+        data-points={ranges.length}
         data-domain={domainValue(domain)}
       />
     );
@@ -1322,7 +1328,9 @@ describe("Insights layers", () => {
       renderInsights(100, game);
       expect(screen.getByText("Unmet demand")).toBeInTheDocument();
       expect(
-        screen.getByText(/Red height is the share of demand unmet/),
+        screen.getByText(
+          /Red height shows peak shortfall on the same MW scale/,
+        ),
       ).toBeInTheDocument();
     } finally {
       shortfall.mockRestore();

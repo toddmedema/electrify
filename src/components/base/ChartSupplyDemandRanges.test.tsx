@@ -17,7 +17,7 @@ jest.mock("./UPlotChart", () => ({
 }));
 
 interface State {
-  shortfalls: Array<{ from: number; to: number; unmetShare: number }>;
+  shortfalls: Array<{ from: number; to: number; peakShortfall: number }>;
 }
 
 const tick = (minute: number, supplyW: number, demandW: number) =>
@@ -106,7 +106,7 @@ describe("monthlyShortfalls", () => {
         from: month(0) - MINUTES_PER_MONTH / 2,
         to: month(0) + MINUTES_PER_MONTH / 2,
         minute: month(0),
-        unmetShare: 10 / 600,
+        peakShortfall: 10,
       },
     ]);
   });
@@ -164,9 +164,9 @@ describe("monthlyShortfalls", () => {
 
   it("keeps only the bars that reach into the plotted domain", () => {
     const bars = [
-      { from: 0, to: 10, unmetShare: 1 },
-      { from: 10, to: 20, unmetShare: 1 },
-      { from: 20, to: 30, unmetShare: 1 },
+      { from: 0, to: 10, peakShortfall: 1 },
+      { from: 10, to: 20, peakShortfall: 1 },
+      { from: 20, to: 30, peakShortfall: 1 },
     ];
     expect(shortfallsWithin(bars, [10, 20])).toEqual([bars[1]]);
     expect(shortfallsWithin(bars, [5, 12])).toEqual([bars[0], bars[1]]);
@@ -174,7 +174,7 @@ describe("monthlyShortfalls", () => {
     expect(shortfallsWithin([], [0, 10])).toEqual([]);
   });
 
-  it("is the share of the month's demand left unmet, over every hour rather than the worst one", () => {
+  it("uses the peak coincident shortfall in watts, independently of how long it lasts", () => {
     const [mild, total, spread] = monthlyShortfalls(
       supplyDemandMonthlyRanges(
         [
@@ -190,9 +190,9 @@ describe("monthlyShortfalls", () => {
         0,
       ),
     );
-    expect(mild.unmetShare).toBeCloseTo(0.1);
-    expect(total.unmetShare).toBe(1);
-    expect(spread.unmetShare).toBeCloseTo(0.125);
+    expect(mild.peakShortfall).toBe(10);
+    expect(total.peakShortfall).toBe(100);
+    expect(spread.peakShortfall).toBe(50);
   });
 
   it("flags exactly the months the hourly shortfall helper flags", () => {
@@ -233,10 +233,9 @@ describe("ChartSupplyDemandRanges", () => {
   const drawnChartProps = (timeline: TickPresentFutureType[]) => {
     render(
       <ChartSupplyDemandRanges
-        timeline={timeline}
+        ranges={supplyDemandMonthlyRanges(timeline, 0)}
         domain={{ x: [0, 4 * MINUTES_PER_MONTH], y: [0, 300] }}
         startingYear={2020}
-        currentMinute={0}
       />,
     );
     return jest.mocked(UPlotChart).mock.calls.at(-1)![0];
@@ -264,7 +263,7 @@ describe("ChartSupplyDemandRanges", () => {
     });
   });
 
-  it("tells the share of demand unmet and served, matching the bar it sits under", () => {
+  it("keeps the energy share in the tooltip while the bar carries peak watts", () => {
     const props = drawnChartProps([
       tick(0, 150, 100),
       tick(MINUTES_PER_MONTH, 100, 100),
@@ -277,7 +276,7 @@ describe("ChartSupplyDemandRanges", () => {
     expect(text).toContain("Demand unmet: 10% (90% served)");
     expect(text).toContain("Peak shortfall: 20W");
     expect(text).not.toContain("hours");
-    expect(state.shortfalls[0].unmetShare).toBeCloseTo(0.1);
+    expect(state.shortfalls[0].peakShortfall).toBe(20);
     expect(props.tooltip!(0, state)).toContain("No shortfall");
   });
 
@@ -296,10 +295,20 @@ describe("ChartSupplyDemandRanges", () => {
       drawnChartProps([tick(0, 150, 100), tick(MINUTES_PER_MONTH, 80, 100)])
         .ariaLabel,
     ).toMatch(
-      /1 forecast month with unmet demand marked; the worst, \w+ 20\d\d, leaves 20% of demand unmet/,
+      /1 forecast month with unmet demand marked; the largest peak shortfall is 20W in \w+ 20\d\d/,
     );
     expect(drawnChartProps([tick(0, 150, 100)]).ariaLabel).toContain(
       "No forecast months with unmet demand",
+    );
+  });
+
+  it("announces the largest peak even when another month leaves a larger share unmet", () => {
+    const props = drawnChartProps([
+      tick(0, 0, 10),
+      tick(MINUTES_PER_MONTH, 980, 1000),
+    ]);
+    expect(props.ariaLabel).toContain(
+      "largest peak shortfall is 20W in Feb 2020",
     );
   });
 
