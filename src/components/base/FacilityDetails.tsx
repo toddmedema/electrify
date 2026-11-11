@@ -299,6 +299,12 @@ function WeatherResilienceSection(props: {
   );
 }
 
+/**
+ * The expanded body of one facility row: construction progress while it is being built, then its
+ * operation, its economics (lifetime results and upkeep) and the weather upgrades it can buy.
+ * Sections that do not apply to the facility, such as a dam's water or a plant's retrofits, are
+ * left out rather than shown empty.
+ */
 export default function FacilityDetails(props: Props): React.JSX.Element {
   const { facility, date, seed, location } = props;
   const lifetime = facilityLifetime(facility);
@@ -514,11 +520,16 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               />
             )}
             {/* Every operating facility pays this, whether or not it also pays per MWh: solar,
-                wind and batteries have a fixed cost only */}
+                wind and batteries have a fixed cost only. The tick in reducers/Game.tsx charges
+                a paused one half, so say so rather than showing the full rate as if it applied. */}
             {facilityMaintenanceCost(facility, date.minute) === undefined && (
               <Stat
                 label="Fixed upkeep"
-                value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
+                value={
+                  facility.paused
+                    ? `${formatMoneyConcise(facility.annualOperatingCost / 2)}/yr · half rate while paused`
+                    : `${formatMoneyConcise(facility.annualOperatingCost)}/yr`
+                }
               />
             )}
             {variableOperatingCostPerMWh !== undefined &&
