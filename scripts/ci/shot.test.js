@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const { UsageError, parseShotArgs, resolveBaseUrl } = require("../dev/shot");
 
 const cwd = path.resolve("checkout");
@@ -22,7 +23,6 @@ test("defaults photograph scenario 108 facilities at one small desktop size", ()
     outDir: path.join(cwd, ".tmp", "shots"),
     name: "s108-facilities",
     delay: 300,
-    pause: true,
     baseUrl: undefined,
   });
 });
@@ -41,12 +41,11 @@ test("lists, inline values and flags combine", () => {
     "--out",
     "elsewhere",
     "--delay=0",
-    "--no-pause",
     "--base-url",
     "http://127.0.0.1:3000",
   );
   assert.equal(options.route, "/?scenario=4");
-  assert.equal(options.name, "s4-insights");
+  assert.equal(options.name, "s4-insights-facilityrow-has-text-solar");
   assert.deepEqual(
     options.viewports.map(({ label }) => label),
     ["1280", "390", "360x700"],
@@ -60,7 +59,6 @@ test("lists, inline values and flags combine", () => {
   assert.equal(options.clip, ".facilityRow:has-text('Solar')");
   assert.equal(options.outDir, path.join(cwd, "elsewhere"));
   assert.equal(options.delay, 0);
-  assert.equal(options.pause, false);
   assert.equal(options.baseUrl, "http://127.0.0.1:3000");
 });
 
@@ -69,12 +67,30 @@ test("a bare route is photographed as is; naming a view starts the game from it"
   assert.equal(plain.route, "/manual?page=2");
   assert.equal(plain.game, false);
   assert.equal(plain.fullPage, true);
-  assert.equal(plain.name, "url-manual-page-2");
+  assert.equal(plain.name, "url-manual-page-2-full");
   const started = parse("--url", "/?scenario=9", "--view", "build");
   assert.equal(started.game, true);
   assert.equal(started.view, "build");
   assert.equal(started.name, "url-scenario-9-build");
   assert.equal(parse("--name", "Before fix!").name, "before-fix");
+});
+
+test("captures of one view get different file names unless a name is given", () => {
+  // Reviewers share one checkout and one output directory: a second clip or a full-page
+  // capture of the same scenario and view must not replace the first one's file.
+  const names = [
+    parse().name,
+    parse("--clip", ".facilityRow:has-text('Solar')").name,
+    parse("--clip", ".facilityRow:has-text('Wind')").name,
+    parse("--full-page").name,
+  ];
+  assert.deepEqual(names, [
+    "s108-facilities",
+    "s108-facilities-facilityrow-has-text-solar",
+    "s108-facilities-facilityrow-has-text-wind",
+    "s108-facilities-full",
+  ]);
+  assert.equal(parse("--clip", ".x", "--name", "before").name, "before");
 });
 
 test("help short-circuits validation", () => {
@@ -203,4 +219,82 @@ test("only a live server reserved by this checkout is found automatically", asyn
       source: "this checkout's running server",
     });
   });
+});
+
+function shotCommand(...args) {
+  return spawnSync(
+    process.execPath,
+    [path.resolve("scripts/dev/shot.js"), ...args],
+    { encoding: "utf8", windowsHide: true },
+  );
+}
+
+test("usage is printed on request, and mistakes exit with 2 before any browser starts", () => {
+  const help = shotCommand("--help");
+  assert.equal(help.status, 0);
+  assert.match(help.stdout, /--clip <selector>/);
+  const mistake = shotCommand("--view", "nowhere");
+  assert.equal(mistake.status, 2);
+  assert.match(mistake.stderr, /--view must be one of[\s\S]*--help/);
+});
+
+function listTests(config, filter, env = {}) {
+  const result = spawnSync(
+    process.execPath,
+    [
+      require.resolve("@playwright/test/cli"),
+      "test",
+      `--config=e2e/${config}`,
+      "--list",
+      "--reporter=json",
+      filter,
+    ],
+    {
+      encoding: "utf8",
+      maxBuffer: 20e6,
+      windowsHide: true,
+      env: { ...process.env, ...env },
+    },
+  );
+  return { status: result.status, ...JSON.parse(result.stdout) };
+}
+
+test("the runner config makes one capture per viewport and theme, named like the files", () => {
+  const request = {
+    ...parse("--viewports", "1280,390,500x600", "--theme", "light,dark"),
+    baseURL: "http://127.0.0.1:1",
+  };
+  const listing = listTests("shot.playwright.config.ts", "shot\\.run", {
+    ELECTRIFY_SHOT: JSON.stringify(request),
+  });
+  assert.equal(listing.status, 0);
+  assert.deepEqual(
+    listing.suites.flatMap((suite) =>
+      suite.specs.flatMap((spec) => spec.tests.map((t) => t.projectName)),
+    ),
+    ["1280", "390", "500x600"].flatMap((viewport) =>
+      ["light", "dark"].map((theme) => `${viewport}-${theme}`),
+    ),
+  );
+  assert.deepEqual(
+    [...new Set(listing.suites.map((suite) => suite.file))],
+    ["shot.run.ts"],
+  );
+});
+
+test("the screenshot runner is never part of an ordinary browser suite", () => {
+  // It is not a *.spec.ts, so no suite selects it. If one did, it would run in every project
+  // without a request to read and fail the pull request matrix.
+  for (const config of [
+    "playwright.config.ts",
+    "ci.playwright.config.ts",
+    "production.playwright.config.ts",
+    "desktop.playwright.config.ts",
+    "multiplayer.playwright.config.ts",
+    "steam-input.playwright.config.ts",
+  ]) {
+    const listing = listTests(config, "shot\\.run");
+    assert.deepEqual(listing.suites, [], config);
+    assert.match(listing.errors[0].message, /No tests found/, config);
+  }
 });

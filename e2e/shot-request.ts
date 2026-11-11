@@ -22,8 +22,6 @@ export interface ShotRequest {
   name: string;
   /** Milliseconds to let charts and transitions settle before capturing. */
   delay: number;
-  /** Pause the simulation so the capture does not change while it is taken. */
-  pause: boolean;
 }
 
 export function readShotRequest(env = process.env): ShotRequest {

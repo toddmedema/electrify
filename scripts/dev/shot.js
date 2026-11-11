@@ -37,13 +37,15 @@ One line per file is printed: absolute path, pixel size, file size.
   --url <path>          Photograph an arbitrary route such as /manual instead of a started
                         game. Add --view to start the game from that route and open a view.
   --out <dir>           Output directory (default ${DEFAULT_OUT.replaceAll("\\", "/")}, git-ignored).
-  --name <prefix>       File name prefix (default derived from scenario/view or the route).
+  --name <prefix>       File name prefix (default: scenario, view, --clip and --full-page, or
+                        the route), so shots of different components do not overwrite each other.
   --delay <ms>          Wait this long before capturing (default 300).
-  --no-pause            Leave the simulation running (it is paused by default).
   --base-url <url>      App to photograph. Otherwise E2E_BASE_URL, BASE_URL, or the dev server
                         that "npm start" is running in this checkout.
 
-Files are named <name>-<viewport>-<theme>.png.
+Files are named <name>-<viewport>-<theme>.png. The game is paused while it is captured. Each new
+game draws random weather, so figures such as reserve and income differ between runs: compare
+layout, not values.
 
 Start the app first, in the background: npm start (it prints "Reserved E2E_PORT=<port>").`;
 
@@ -67,7 +69,7 @@ const VALUE_OPTIONS = new Set([
   "base-url",
   "delay",
 ]);
-const FLAG_OPTIONS = new Set(["full-page", "no-pause", "help"]);
+const FLAG_OPTIONS = new Set(["full-page", "help"]);
 const ALIASES = { viewport: "viewports", themes: "theme" };
 
 function integer(name, value, min, max) {
@@ -171,12 +173,18 @@ function parseShotArgs(argv, { cwd = process.cwd() } = {}) {
     throw new UsageError(`--view must be one of ${VIEWS.join(", ")}`);
   // A bare route is photographed as is; naming a view asks to start the game and open it.
   const game = !hasUrl || raw.view !== undefined;
-  const name =
-    raw.name === undefined
-      ? hasUrl
-        ? `url-${slug(raw.url) || "root"}${game ? `-${view}` : ""}`
-        : `s${scenario}-${view}`
-      : slug(raw.name);
+  // Distinct captures of one view (another clip, full page) must not share a file name: parallel
+  // agents in one checkout would otherwise overwrite each other's evidence.
+  const derived = [
+    hasUrl
+      ? `url-${slug(raw.url) || "root"}${game ? `-${view}` : ""}`
+      : `s${scenario}-${view}`,
+    raw.clip === undefined ? "" : slug(raw.clip),
+    raw["full-page"] ? "full" : "",
+  ]
+    .filter(Boolean)
+    .join("-");
+  const name = raw.name === undefined ? derived : slug(raw.name);
   if (!name) throw new UsageError("--name needs letters or digits");
   return {
     help: false,
@@ -191,7 +199,6 @@ function parseShotArgs(argv, { cwd = process.cwd() } = {}) {
     name,
     delay:
       raw.delay === undefined ? 300 : integer("delay", raw.delay, 0, 30000),
-    pause: !raw["no-pause"],
     baseUrl: raw["base-url"],
   };
 }

@@ -39,14 +39,22 @@ test("capture", async ({ page, colorScheme }, info) => {
   }, colorScheme ?? "light");
   await page.goto(request.route);
   if (request.game) {
-    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const start = page.getByRole("button", { name: "Start game", exact: true });
+    // An unknown scenario id loads a page without this button; say so instead of letting the
+    // click run into the two-minute test timeout.
+    await expect(
+      start,
+      `${request.route} shows no "Start game" button (is the scenario id valid?)`,
+    ).toBeVisible();
+    await start.click();
     await expect(
       page.getByText("Starting your mission…", { exact: true }),
     ).toBeHidden();
-    if (request.pause) {
-      const pause = page.getByRole("button", { name: "pause", exact: true });
-      if (await pause.count()) await pause.first().click();
-    }
+    // A new game starts paused already; make sure, so the capture cannot change mid-delay.
+    const running = page
+      .getByRole("button", { name: "pause", exact: true })
+      .and(page.locator('[aria-pressed="false"]'));
+    if (await running.count()) await running.first().click();
     await openView(page, request.view);
   }
   if (request.delay) await page.waitForTimeout(request.delay);
