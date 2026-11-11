@@ -22,7 +22,7 @@ import {
   snackbarOpen,
 } from "../reducers/UI";
 import { registerShutdownCheckpoint } from "../desktop/Shutdown";
-import { HOST_LEFT, MultiplayerSession } from "./Session";
+import { HOST_LEFT, MultiplayerSession, offersDisconnect } from "./Session";
 import {
   registerCoopControls,
   registerLobbyOpener,
@@ -134,6 +134,13 @@ export default function MultiplayerRoot() {
     },
     [session],
   );
+
+  /** A connection notice's way out: leave now, keeping the last multiplayer save, because a lost
+   * connection may mean there is nobody to save with. */
+  const disconnect = useCallback(() => {
+    store.dispatch(dialogClose());
+    leaveLobby(true);
+  }, [leaveLobby]);
 
   /** The host shows the scenario screens to the lobby, which friends can join meanwhile. */
   const startChoosing = useCallback(() => {
@@ -365,10 +372,32 @@ export default function MultiplayerRoot() {
           store.dispatch(dialogClose());
           void session.reconnect();
         },
+        // Only a guest's lost connection leaves nothing to wait for. Other errors, such as a
+        // failed save, and the host, which can still save, never get a way out that skips the
+        // checkpoint.
+        ...(offersDisconnect({
+          error: state.error,
+          lobbyError: state.lobby.error,
+          hostId: state.lobby.hostId,
+          selfId: state.lobby.selfId,
+        }) && {
+          secondaryLabel: "Disconnect",
+          secondaryAction: disconnect,
+        }),
       }),
     );
     session.dismissError();
-  }, [session, state.error, state.lobby.error, hasView, coop, open]);
+  }, [
+    session,
+    state.error,
+    state.lobby.error,
+    state.lobby.hostId,
+    state.lobby.selfId,
+    hasView,
+    coop,
+    open,
+    disconnect,
+  ]);
 
   // Another company retiring is news while the rest of the lobby plays on.
   const results = useAppSelector((app) => app.game.multiplayer?.results);
@@ -438,6 +467,7 @@ export default function MultiplayerRoot() {
       <HostConnectionWarning
         waiting={hasView && state.waitingForHost}
         onReconnect={reconnect}
+        onDisconnect={disconnect}
       />
       {open && !state.view ? (
         <Lobby

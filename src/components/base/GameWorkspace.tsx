@@ -53,8 +53,15 @@ export function toolWidth(width: number) {
   );
 }
 
-/** Five 72px actions, their gaps, the dock's padding and border, and a margin each side. */
-const DOCK_CLEARANCE_WIDTH = 402;
+/** The dock's button width at this window width; keep in step with GameWorkspace.scss. */
+function dockButtonWidth(width: number): number {
+  return width >= 2200 ? 104 : width >= 1600 ? 88 : 72;
+}
+
+/** Five actions, their gaps, the dock's padding and border, and a margin each side. */
+export function dockClearanceWidth(width: number): number {
+  return 5 * dockButtonWidth(width) + 4 * 4 + 2 * 4 + 2 + 2 * 8;
+}
 
 /**
  * Where to centre the dock when the window centre would put it over a side tool: the middle of
@@ -68,7 +75,7 @@ export function dockCenter(
 ): number | undefined {
   const start = leftTools * tool;
   const end = width - rightTools * tool;
-  const half = DOCK_CLEARANCE_WIDTH / 2;
+  const half = dockClearanceWidth(width) / 2;
   return width / 2 - half >= start && width / 2 + half <= end
     ? undefined
     : (start + end) / 2;

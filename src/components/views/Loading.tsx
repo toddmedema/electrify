@@ -13,11 +13,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  load: (
-    game: GameType,
-    onProgress: (message: string) => void,
-    onError: (message: string) => void,
-  ) => void;
+  load: (game: GameType, onError: (message: string) => void) => void;
   onExit: () => void;
 }
 
@@ -25,7 +21,6 @@ export interface Props extends StateProps, DispatchProps {}
 
 interface LoadingState {
   error?: string;
-  progress: string;
 }
 
 // An <img> can't read the page's custom properties, so dark mode swaps in a copy of the logo
@@ -41,7 +36,7 @@ function LoadingLogo(): React.JSX.Element {
 }
 
 export default class Loading extends React.PureComponent<Props, LoadingState> {
-  public state: LoadingState = { progress: "Preparing your grid…" };
+  public state: LoadingState = {};
   private mounted = false;
 
   public componentDidMount() {
@@ -54,10 +49,9 @@ export default class Loading extends React.PureComponent<Props, LoadingState> {
   }
 
   private beginLoad = () => {
-    this.setState({ error: undefined, progress: "Preparing your grid…" });
+    this.setState({ error: undefined });
     this.props.load(
       this.props.game,
-      (progress) => this.mounted && this.setState({ progress }),
       (error) => this.mounted && this.setState({ error }),
     );
   };
@@ -92,7 +86,9 @@ export default class Loading extends React.PureComponent<Props, LoadingState> {
         ) : (
           <Stack spacing={2} sx={{ alignItems: "center" }}>
             <CircularProgress className="fadein-fast" size={60} />
-            <Typography role="status">{this.state.progress}</Typography>
+            {/* One message for the whole load: a fast local load otherwise flashes past each
+                stage and reads as several loading screens. */}
+            <Typography role="status">Starting your mission…</Typography>
           </Stack>
         )}
       </div>

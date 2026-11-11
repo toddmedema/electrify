@@ -269,7 +269,8 @@
     </div>
 
     <!-- Installed on web and desktop as soon as scripts run; handed off after the app commits
-         and at least 500ms have elapsed. Keep logo geometry in step with MainMenu. -->
+         and at least 500ms have elapsed. One screen with one message on every platform, so
+         nothing changes between first paint and the menu. Keep logo geometry in step with MainMenu. -->
     <template id="appStartupTemplate">
       <div id="appStartup">
         <div class="appStartupLogo">
@@ -301,7 +302,7 @@
             </svg>
           </div>
         </div>
-        <div data-startup-status role="status">Starting Electrify…</div>
+        <div data-startup-status role="status">Loading…</div>
       </div>
     </template>
     <script>
@@ -312,14 +313,10 @@
           document.documentElement.dataset.theme === "dark"
             ? "%PUBLIC_URL%/images/logo-home-dark.svg"
             : "%PUBLIC_URL%/images/logo-home.svg";
-        if (!(
-          window.electrifyDesktop && window.electrifyDesktop.apiVersion === 1
-        ))
-          entrance.querySelector("[data-startup-status]").textContent =
-            "Loading…";
         document.body.append(entrance);
-        document.getElementById("appStartup").dataset.startedAt =
-          String(performance.now());
+        document.getElementById("appStartup").dataset.startedAt = String(
+          performance.now(),
+        );
         template.remove();
       })();
     </script>

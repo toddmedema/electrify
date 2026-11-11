@@ -255,3 +255,238 @@ test("a multiplayer speed reversal is sent before the host acknowledges the firs
   fireEvent.click(screen.getByRole("button", { name: "slow speed" }));
   expect(onSpeedChange.mock.calls).toEqual([["NORMAL"], ["SLOW"]]);
 });
+
+const thumbVars = (group: HTMLElement) => ({
+  index: group.style.getPropertyValue("--speed-index"),
+  count: group.style.getPropertyValue("--speed-count"),
+});
+
+test("single-player's thumb sits under the selected speed and follows it", () => {
+  const { rerender } = render(
+    buildSpeedOptions({
+      speed: "NORMAL",
+      onSpeedChange: jest.fn(),
+      desktop: true,
+    }),
+  );
+  const group = screen.getByRole("group", { name: "game speed" });
+  // Pause, 1×, 3×, 12×, 24×: 3× is the third segment.
+  expect(thumbVars(group)).toEqual({ index: "2", count: "5" });
+  expect(screen.getByRole("button", { name: "normal speed" })).toHaveAttribute(
+    "data-thumb",
+    "true",
+  );
+  expect(
+    within(group)
+      .getAllByRole("button")
+      .filter((button) => button.hasAttribute("data-thumb")),
+  ).toHaveLength(1);
+  rerender(
+    buildSpeedOptions({
+      speed: "PAUSED",
+      onSpeedChange: jest.fn(),
+      desktop: true,
+    }),
+  );
+  expect(thumbVars(group).index).toBe("0");
+  expect(screen.getByRole("button", { name: "pause" })).toHaveAttribute(
+    "data-thumb",
+    "true",
+  );
+});
+
+test("a speed the layout does not offer leaves the thumb hidden, not on the wrong segment", () => {
+  render(
+    buildSpeedOptions({
+      speed: "ULTRA",
+      onSpeedChange: jest.fn(),
+      desktop: false,
+    }),
+  );
+  const group = screen.getByRole("group", { name: "game speed" });
+  expect(group).toHaveAttribute("data-no-thumb", "true");
+  expect(
+    within(group)
+      .getAllByRole("button")
+      .some((button) => button.hasAttribute("data-thumb")),
+  ).toBe(false);
+});
+
+test("the co-op thumb follows the clock while the pressed state follows your request", () => {
+  render(
+    buildSpeedOptions({
+      speed: "ULTRA",
+      onSpeedChange: jest.fn(),
+      desktop: false,
+      multiplayer,
+    }),
+  );
+  const group = screen.getByRole("group", { name: "your game speed" });
+  // The clock runs at 1×, so the thumb is under the second segment, not your 24×.
+  expect(thumbVars(group)).toEqual({ index: "1", count: "5" });
+  expect(screen.getByRole("button", { name: "slow speed" })).toHaveAttribute(
+    "data-thumb",
+    "true",
+  );
+  expect(
+    screen.getByRole("button", { name: "ultra speed" }),
+  ).not.toHaveAttribute("data-thumb");
+  expect(screen.getByRole("button", { name: "ultra speed" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
+test("a pause moves the co-op thumb to Pause without moving your pressed selection", () => {
+  render(
+    buildSpeedOptions({
+      speed: "ULTRA",
+      onSpeedChange: jest.fn(),
+      desktop: true,
+      multiplayer: {
+        ...multiplayer,
+        activeSpeed: "PAUSED",
+        reason: "Player 2: Building capacity",
+      },
+    }),
+  );
+  expect(
+    thumbVars(screen.getByRole("group", { name: "your game speed" })).index,
+  ).toBe("0");
+  expect(screen.getByRole("button", { name: "pause" })).toHaveAttribute(
+    "data-thumb",
+    "true",
+  );
+  expect(screen.getByRole("button", { name: "ultra speed" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
+test("peer pips stay centred whatever the count, in the order players took their slots", () => {
+  render(
+    buildSpeedOptions({
+      speed: "ULTRA",
+      onSpeedChange: jest.fn(),
+      desktop: true,
+      multiplayer: {
+        ...multiplayer,
+        players: [
+          { id: "1", name: "Player 1", selectedSpeed: "ULTRA" },
+          { id: "2", name: "Player 2", selectedSpeed: "SLOW" },
+          { id: "3", name: "Player 3", selectedSpeed: "SLOW" },
+          { id: "4", name: "Player 4", selectedSpeed: "SLOW" },
+        ],
+      },
+    }),
+  );
+  const pips = ["2", "3", "4"].map((id) =>
+    screen.getByTestId(`speed-peer-SLOW-${id}`),
+  );
+  // Centring is the stylesheet's job; each pip says its slot and how many share the segment.
+  expect(pips.map((pip) => pip.style.getPropertyValue("--slot"))).toEqual([
+    "0",
+    "1",
+    "2",
+  ]);
+  for (const pip of pips)
+    expect(pip.style.getPropertyValue("--peers")).toBe("3");
+});
+
+test("waiting to resume marks the group, and confirming a speed clears it", () => {
+  const props = {
+    speed: "ULTRA" as const,
+    onSpeedChange: jest.fn(),
+    desktop: true,
+    multiplayer: {
+      ...multiplayer,
+      activeSpeed: "PAUSED" as const,
+      readyRequired: true,
+    },
+  };
+  const { rerender } = render(buildSpeedOptions(props));
+  const group = screen.getByRole("group", { name: "your game speed" });
+  expect(group).toHaveAttribute("data-resume", "true");
+  // Your request stays on the button you picked: the dashed ring, not a moved selection.
+  expect(screen.getByRole("button", { name: "ultra speed" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  rerender(
+    buildSpeedOptions({
+      ...props,
+      multiplayer: { ...props.multiplayer, ready: true },
+    }),
+  );
+  expect(group).not.toHaveAttribute("data-resume");
+  // Single-player never waits on anyone.
+  rerender(
+    buildSpeedOptions({
+      speed: "NORMAL",
+      onSpeedChange: jest.fn(),
+      desktop: true,
+    }),
+  );
+  expect(screen.getByRole("group", { name: "game speed" })).not.toHaveAttribute(
+    "data-resume",
+  );
+});
+
+test("a status region speaks pauses and the resume prompt, never a plain running clock", () => {
+  const base = {
+    speed: "ULTRA" as const,
+    onSpeedChange: jest.fn(),
+    desktop: true,
+  };
+  const { rerender } = render(buildSpeedOptions({ ...base, multiplayer }));
+  expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  rerender(
+    buildSpeedOptions({
+      ...base,
+      multiplayer: {
+        ...multiplayer,
+        activeSpeed: "PAUSED",
+        reason: "Player 2: Building capacity",
+      },
+    }),
+  );
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Game paused: Player 2: Building capacity.",
+  );
+  rerender(
+    buildSpeedOptions({
+      ...base,
+      multiplayer: {
+        ...multiplayer,
+        activeSpeed: "PAUSED",
+        readyRequired: true,
+      },
+    }),
+  );
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Select a speed to resume.",
+  );
+  // Single-player has no shared clock to announce.
+  rerender(buildSpeedOptions({ ...base }));
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+});
+
+test("a disabled group says so for styling without losing its thumb", () => {
+  render(
+    buildSpeedOptions({
+      speed: "SLOW",
+      onSpeedChange: jest.fn(),
+      desktop: true,
+      disabled: true,
+      multiplayer,
+    }),
+  );
+  expect(
+    screen.getByRole("group", { name: "your game speed" }),
+  ).toHaveAttribute("data-disabled", "true");
+  expect(
+    screen
+      .getAllByRole("button")
+      .every((button) => button.hasAttribute("disabled")),
+  ).toBe(true);
+});

@@ -2,7 +2,13 @@ import { modScenario } from "../mods/ModScenario";
 import { modBrowseSummary } from "./ModBrowse";
 import { selectionKey, validBrowseState } from "./Browse";
 import { utf8Bytes } from "../helpers/RuleIdentity";
-import { HOST_LEFT, MultiplayerSession } from "./Session";
+import {
+  CONNECTION_LOST,
+  HOST_LEFT,
+  MultiplayerSession,
+  isConnectionLoss,
+  offersDisconnect,
+} from "./Session";
 import type { DesktopBridge } from "../Desktop";
 import type {
   LobbyState,
@@ -64,7 +70,8 @@ function fixture(isHost = false, deferLeave = false) {
     failLock = false,
     failFactory = false,
     failSave = false,
-    failLeave = false;
+    failLeave = false,
+    sendError: string | undefined;
   let releaseLeave = () => {};
   let checkpoint: World | null = null;
   let readGate = Promise.resolve();
@@ -100,6 +107,11 @@ function fixture(isHost = false, deferLeave = false) {
                 : member,
             ),
         };
+      // What Electron's invoke rejects with when the main process throws.
+      if (request.kind === "send" && sendError)
+        throw new Error(
+          `Error invoking remote method 'desktop:multiplayer': Error: ${sendError}`,
+        );
       if (request.kind === "lock" && failLock) throw new Error("Lock failed");
       if (request.kind === "leave" && deferLeave)
         await new Promise<void>((resolve) => {
@@ -147,6 +159,10 @@ function fixture(isHost = false, deferLeave = false) {
     },
     failLeave: () => {
       failLeave = true;
+    },
+    /** Every native send fails the way Electron reports a main-process throw. */
+    failSends: (message: string | undefined) => {
+      sendError = message;
     },
     startup: (failure?: "lock" | "factory" | "delayed") => {
       failLock = failure === "lock";
@@ -534,6 +550,100 @@ test("retry retains the same purchase sequence, acknowledgements stop retry, and
   expect(
     f.requests.filter((r) => r.kind === "send" && r.payload.kind === "command"),
   ).toHaveLength(2);
+  f.session.dispose();
+});
+const settle = async () => {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+};
+const lobbyWith = (connected: string[]): NativeEvent => ({
+  kind: "state",
+  state: {
+    available: true,
+    selfId: guest,
+    hostId: host,
+    lobbyId: "lobby",
+    members: [
+      { id: host, name: "Host" },
+      { id: guest, name: "Guest" },
+    ],
+    connected,
+  },
+});
+test("a guest's command waits out a lost host link instead of raising an error on every retry", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  deliver(f, {});
+  f.event(lobbyWith([]));
+  f.session.command({ kind: "speed", speed: "SLOW" });
+  jest.advanceTimersByTime(10_000);
+  await settle();
+  expect(sentCommands(f)).toHaveLength(0);
+  expect(f.session.getSnapshot().error).toBeUndefined();
+  expect(f.session.getSnapshot().pending).toBe(true);
+  // The same numbered command goes out as soon as the link returns, without the player acting.
+  f.event(lobbyWith([host]));
+  jest.advanceTimersByTime(1000);
+  expect(sentCommands(f)).toEqual([{ kind: "speed", speed: "SLOW" }]);
+  expect(f.session.getSnapshot().error).toBeUndefined();
+  f.session.dispose();
+});
+test("a command that loses a race with the host link drops is not a new failure", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  deliver(f, {});
+  f.failSends("Player is disconnected");
+  f.session.command({ kind: "speed", speed: "SLOW" });
+  jest.advanceTimersByTime(5000);
+  await settle();
+  expect(f.session.getSnapshot().error).toBeUndefined();
+  expect(f.session.getSnapshot().pending).toBe(true);
+  f.session.dispose();
+});
+test("only a lost connection counts as one, so other errors never offer a way out that skips the save", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  deliver(f, {});
+  f.event({ kind: "disconnected", sender: host });
+  expect(f.session.getSnapshot().error).toBe(CONNECTION_LOST);
+  expect(isConnectionLoss(f.session.getSnapshot().error)).toBe(true);
+  // Native lobby errors come only from its connection failures.
+  expect(isConnectionLoss(undefined, "The host left.")).toBe(true);
+  expect(isConnectionLoss("Multiplayer save failed: Disk full")).toBe(false);
+  expect(isConnectionLoss("Multiplayer save failed: Disk full", "x")).toBe(
+    false,
+  );
+  expect(isConnectionLoss("Not enough cash")).toBe(false);
+  expect(isConnectionLoss()).toBe(false);
+  f.session.dispose();
+});
+test("only a guest's lost connection offers Disconnect, never a host that can still save", () => {
+  const guestSide = { hostId: host, selfId: guest };
+  expect(offersDisconnect({ error: CONNECTION_LOST, ...guestSide })).toBe(true);
+  expect(offersDisconnect({ lobbyError: "The host left.", ...guestSide })).toBe(
+    true,
+  );
+  expect(offersDisconnect({ error: "Not enough cash", ...guestSide })).toBe(
+    false,
+  );
+  // A native lobby error can reach a host whose simulation keeps running.
+  const hostSide = { hostId: host, selfId: host };
+  expect(
+    offersDisconnect({
+      lobbyError: "Steam connection interrupted.",
+      ...hostSide,
+    }),
+  ).toBe(false);
+  expect(offersDisconnect({ error: CONNECTION_LOST, ...hostSide })).toBe(false);
+  expect(offersDisconnect({ error: CONNECTION_LOST })).toBe(false);
+});
+test("players read the transport's message, never Electron's invoke wrapper", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  deliver(f, {});
+  f.failSends("Co-op connection is catching up");
+  f.session.command({ kind: "speed", speed: "SLOW" });
+  await settle();
+  expect(f.session.getSnapshot().error).toBe("Co-op connection is catching up");
   f.session.dispose();
 });
 test("a fresh epoch discards the pending old purchase and starts command numbering again", async () => {

@@ -165,6 +165,6 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await expect(primary).toBeFocused();
   await primary.click();
   await expect(
-    page.getByRole("region", { name: "Step 1 of 9", exact: true }),
+    page.getByRole("region", { name: "Step 1 of 10", exact: true }),
   ).toBeVisible();
 });

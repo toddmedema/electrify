@@ -17,6 +17,7 @@ import type {
 } from "../src/multiplayer/Native";
 import type { RoomView, World } from "../src/multiplayer/Types";
 import { verifyMenuKeyboard } from "./menu-keyboard";
+import { reviewScreenshot } from "./review-screenshot";
 
 type SteamTestWindow = typeof window & {
   mockSteamDeliveries?: Set<Promise<void>>;
@@ -231,6 +232,7 @@ class SteamRoom {
   >();
   members: LobbyState["members"] = [];
   checkpoint?: World;
+  checkpointError?: string;
   private saveResults = new Map<
     string,
     Extract<WireMessage, { kind: "save-result" }>
@@ -386,7 +388,8 @@ class SteamRoom {
         !this.members.some((member) => member.id === id) ||
         !this.members.some((member) => member.id === input.to)
       )
-        throw new Error("Player disconnected");
+        // The wording of the native transport, so the renderer is tested against what it really sees.
+        throw new Error("Player is disconnected");
       // Native Steam transport consumes heartbeats before publishing renderer events.
       if (input.payload.kind === "heartbeat") return;
       await this.event(input.to, {
@@ -399,6 +402,7 @@ class SteamRoom {
       return;
     }
     if (input.kind === "checkpoint") {
+      if (this.checkpointError) throw new Error(this.checkpointError);
       this.checkpoint = input.world;
       // Native persistence returns before renderer notifications finish decoding.
       // Slow delivery must not block the session's queue of locally durable saves.
@@ -1368,7 +1372,8 @@ async function expectClockInViewport(page: Page) {
       for (const inset of Object.values(icon))
         expect(inset).toBeGreaterThanOrEqual(0);
       expect(icon.top).toBeGreaterThanOrEqual(buttonHeight / 2);
-      expect(icon.bottom).toBeLessThanOrEqual(3);
+      // Pips sit 8 px above the bottom edge, inside the thumb's footprint.
+      expect(icon.bottom).toBeLessThanOrEqual(10);
     }
   }).toPass({ timeout: 20000 });
 }
@@ -1392,47 +1397,98 @@ async function expectClockMeaning(
     1,
   );
   const fill = (element: Element) => getComputedStyle(element).backgroundColor;
-  // The actual game speed is the filled segment.
-  expect(await active.evaluate(fill)).not.toBe("rgba(0, 0, 0, 0)");
-  // Your request has a quiet static ring, even while someone else holds the clock.
-  const ring = await selected.evaluate((element) => {
-    const style = getComputedStyle(element, "::before");
-    const button = element.getBoundingClientRect();
-    const label = element
-      .querySelector(".multiplayerSpeedLabel")!
-      .getBoundingClientRect();
-    const size = parseFloat(style.width);
-    const centerY = button.top + element.clientTop + parseFloat(style.top);
-    return {
-      content: style.content,
-      radius: style.borderTopLeftRadius,
-      animation: style.animationName,
-      color: style.borderTopColor,
-      labelColor: getComputedStyle(element).color,
-      top: centerY - size / 2 - button.top,
-      bottom: button.bottom - (centerY + size / 2),
-      offCenter: Math.abs(label.top + label.height / 2 - centerY),
-      clearance: size - 2 * parseFloat(style.borderTopWidth) - label.width,
-    };
-  });
-  expect(ring.content).not.toBe("none");
-  expect(ring.radius).toBe("50%");
-  expect(ring.animation).toBe("none");
-  expect(ring.color).toBe(ring.labelColor);
-  // It sits inside the segment, around the lifted label, and clears the label's sides.
-  expect(ring.top).toBeGreaterThanOrEqual(1);
-  expect(ring.bottom).toBeGreaterThanOrEqual(1);
-  expect(ring.offCenter).toBeLessThanOrEqual(1);
-  expect(ring.clearance).toBeGreaterThanOrEqual(2);
-  if (selectedName !== activeName) {
-    expect(
-      await active.evaluate(
-        (element) => getComputedStyle(element, "::before").content,
-      ),
-    ).toBe("none");
-    expect(await selected.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
-    await expect(selected).not.toHaveAttribute("aria-current");
-  }
+  // The thumb is the group's ::before and sits under the actual speed, and under nothing else.
+  // It slides, so measure until it settles.
+  await expect(async () => {
+    const thumb = await clock(page).evaluate((group) => {
+      const style = getComputedStyle(group, "::before");
+      const target = group.querySelector('button[aria-current="true"]')!;
+      const groupBox = group.getBoundingClientRect();
+      const box = target.getBoundingClientRect();
+      const centre =
+        groupBox.left +
+        parseFloat(style.left) +
+        new DOMMatrix(style.transform).m41 +
+        parseFloat(style.width) / 2;
+      return {
+        background: style.backgroundColor,
+        offCentre: Math.abs(centre - (box.left + box.width / 2)),
+        inset: parseFloat(style.top),
+        height: parseFloat(style.height),
+        buttonHeight: box.height,
+      };
+    });
+    expect(thumb.background).not.toBe("rgba(0, 0, 0, 0)");
+    expect(thumb.offCentre).toBeLessThanOrEqual(1);
+    expect(thumb.inset).toBeGreaterThanOrEqual(4);
+    expect(thumb.height + 2 * thumb.inset).toBeCloseTo(thumb.buttonHeight, 0);
+  }).toPass({ timeout: 20000 });
+  // The thumb carries the actual speed, so the active button itself has no fill of its own.
+  expect(await active.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
+  // The label's colour eases in behind the thumb, so read until both have settled.
+  await expect(async () => {
+    const ring = await selected.evaluate((element) => {
+      const style = getComputedStyle(element, "::before");
+      const label = element
+        .querySelector(".multiplayerSpeedLabel")!
+        .getBoundingClientRect();
+      const button = element.getBoundingClientRect();
+      const height = parseFloat(style.height);
+      const centreY = parseFloat(style.top) + height / 2;
+      return {
+        content: style.content,
+        radius: parseFloat(style.borderTopLeftRadius),
+        height,
+        animation: style.animationName,
+        style: style.borderTopStyle,
+        color: style.borderTopColor,
+        labelColor: getComputedStyle(element).color,
+        top: parseFloat(style.top),
+        bottom: button.height - (parseFloat(style.top) + height),
+        // How far above the ring's centre the label sits, leaving room for the pips below it.
+        lift: centreY - (label.top - button.top + label.height / 2),
+        clearance:
+          parseFloat(style.width) -
+          2 * parseFloat(style.borderTopWidth) -
+          label.width,
+      };
+    });
+    if (selectedName === activeName) {
+      // Your request and the clock agree, so the thumb says both and the ring steps aside.
+      expect(ring.content).toBe("none");
+      return;
+    }
+    // Your request has a quiet static capsule ring, even while someone else holds the clock.
+    expect(ring.content).not.toBe("none");
+    expect(ring.radius).toBeGreaterThanOrEqual(ring.height / 2);
+    expect(ring.animation).toBe("none");
+    expect(ring.style).toBe("solid");
+    expect(ring.color).toBe(ring.labelColor);
+    // It matches the thumb's footprint and clears the label's sides.
+    expect(ring.top).toBeGreaterThanOrEqual(4);
+    expect(ring.bottom).toBeGreaterThanOrEqual(4);
+    expect(ring.lift).toBeGreaterThanOrEqual(1);
+    expect(ring.lift).toBeLessThanOrEqual(3);
+    expect(ring.clearance).toBeGreaterThanOrEqual(2);
+  }).toPass({ timeout: 20000 });
+  if (selectedName === activeName) return;
+  expect(
+    await active.evaluate(
+      (element) => getComputedStyle(element, "::before").content,
+    ),
+  ).toBe("none");
+  expect(await selected.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
+  await expect(selected).not.toHaveAttribute("aria-current");
+  // Waiting for you to confirm is a shape change, not a colour change: the ring turns dashed.
+  await clock(page).evaluate((group) =>
+    group.setAttribute("data-resume", "true"),
+  );
+  expect(
+    await selected.evaluate(
+      (element) => getComputedStyle(element, "::before").borderTopStyle,
+    ),
+  ).toBe("dashed");
+  await clock(page).evaluate((group) => group.removeAttribute("data-resume"));
 }
 
 async function verifySpeedLayouts(browser: Browser, pages: Page[]) {
@@ -1516,6 +1572,12 @@ async function verifySpeedLayouts(browser: Browser, pages: Page[]) {
           report.push({ width, theme, touch, catalog, buttons: actual });
         };
         await compare(false);
+        // The thumb glides into place instead of jumping, unless reduced motion is requested.
+        expect(
+          await clock(target).evaluate(
+            (group) => getComputedStyle(group, "::before").transitionDuration,
+          ),
+        ).toBe("0.32s");
         const capture = async (state = "") => {
           if (!process.env.MULTIPLAYER_SCREENSHOTS) return;
           await target.mouse.move(0, 0);
@@ -1621,6 +1683,125 @@ async function saveAndQuit(page: Page) {
     page.getByRole("button", { name: "Play with friends", exact: true }),
   ).toBeVisible();
 }
+
+async function reviewConnectionNotice(page: Page, state: string) {
+  if (!process.env.REVIEW_SCREENSHOT_DIR) return;
+  for (const width of [1280, 390, 360]) {
+    for (const theme of ["light", "dark"] as const) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await page.emulateMedia({ colorScheme: theme });
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await reviewScreenshot(page, {
+        path: test.info().outputPath(`${state}-${width}-${theme}.png`),
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
+  }
+}
+
+test("save failures, refused commands and native host errors never offer checkpoint-skipping Disconnect", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const host = pages[0];
+  const guestId = room.members[1].id;
+  await expect(host.locator(".facilities:visible")).toBeVisible();
+  // Exercise the real host worker's save failure through the native persistence boundary.
+  room.checkpointError = "Disk full";
+  await room.request(guestId, {
+    kind: "send",
+    to: room.host,
+    payload: { kind: "save-request", requestId: "failed-checkpoint" },
+  });
+  const notice = host.getByRole("dialog", { name: "Multiplayer", exact: true });
+  await expect(notice).toContainText("Multiplayer save failed: Disk full");
+  await expect(
+    notice.getByRole("button", { name: "Disconnect", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    notice.getByRole("button", { name: "Reconnect", exact: true }),
+  ).toBeVisible();
+  await reviewConnectionNotice(host, "save-failed");
+  await notice.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(notice).toBeHidden();
+  room.checkpointError = undefined;
+
+  // A native transport failure does not stop the host's local simulation or its ability to save.
+  await room.event(room.host, {
+    kind: "state",
+    state: {
+      ...room.state(room.host),
+      error: "Steam connection interrupted. Reconnect to continue.",
+    },
+  });
+  await expect(notice).toContainText("Steam connection interrupted");
+  await expect(
+    notice.getByRole("button", { name: "Disconnect", exact: true }),
+  ).toHaveCount(0);
+  await notice.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(notice).toBeHidden();
+  await room.saveCheckpoint(guestId);
+  expect(room.checkpoint).toBeDefined();
+  // Refusals also reach the guest through the host worker's normal command receipt.
+  const view = room.views.get(guestId)!;
+  await room.request(guestId, {
+    kind: "send",
+    to: room.host,
+    payload: {
+      kind: "command",
+      envelope: {
+        matchId: view.matchId,
+        epoch: view.epoch,
+        sequence: view.lastSequence + 1,
+        command: { kind: "rate", value: -1 },
+      },
+    },
+  });
+  const refused = pages[1].getByRole("dialog", {
+    name: "Multiplayer",
+    exact: true,
+  });
+  await expect(refused).toContainText("Choose a rate between");
+  await expect(
+    refused.getByRole("button", { name: "Disconnect", exact: true }),
+  ).toHaveCount(0);
+  expect(room.members).toHaveLength(2);
+  expect(errors).toEqual([]);
+  expect(room.transportErrors).toEqual([]);
+});
+
+test("a guest who lost the host can disconnect from the connection notice", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const guest = pages[1];
+  const guestId = room.members[1].id;
+  await expect(guest.locator(".facilities:visible")).toBeVisible();
+  // The native layer tells both endpoints that their channel closed.
+  room.dropped.add(guestId);
+  await room.event(room.host, { kind: "disconnected", sender: guestId });
+  await room.publish();
+  await room.event(guestId, { kind: "disconnected", sender: room.host });
+  const notice = guest.getByRole("dialog", {
+    name: "Multiplayer",
+    exact: true,
+  });
+  await expect(notice).toContainText("Connection lost");
+  await expect(
+    notice.getByRole("button", { name: "Reconnect", exact: true }),
+  ).toBeVisible();
+  await reviewConnectionNotice(guest, "connection-lost");
+  await notice.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await expect(
+    guest.getByRole("button", { name: "Play with friends", exact: true }),
+  ).toBeVisible();
+  await expect(notice).toBeHidden();
+  await expect
+    .poll(() => room.members.some((member) => member.id === guestId))
+    .toBe(false);
+  expect(errors).toEqual([]);
+});
 
 test("custom setup waits for host settings before a guest can mark Ready", async ({
   browser,

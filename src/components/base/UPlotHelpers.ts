@@ -631,6 +631,130 @@ export function bandsPlugin(
   };
 }
 
+/** One stretch of x with unmet demand and its largest coincident shortfall in watts. */
+export interface ShortfallBar {
+  from: number;
+  to: number;
+  peakShortfall: number;
+}
+
+/** A rectangle hanging from the top of the plot, in device pixels. */
+export interface ShortfallRect {
+  x: number;
+  width: number;
+  height: number;
+}
+
+const SHORTFALL_CAP_PX = 4;
+const SHORTFALL_HEM_ALPHA = 0.7;
+
+/**
+ * The silhouette of shortfall bars as non-overlapping device-pixel rectangles. A bar reaches
+ * down the plot in proportion to its height share, capped at the full height, and is never
+ * shorter than the cap. Months can be narrower than a pixel, so several may land in one column;
+ * each column keeps the tallest, and equal neighbours merge, so translucent shading never
+ * stacks into false darkness and abutting bars leave no anti-aliased seam. Coverage stays
+ * inside the original spans, including fractional edge pixels, to match the nearest-point hover.
+ */
+export function shortfallSkyline(
+  bars: Array<{ x0: number; x1: number; heightShare: number }>,
+  plot: { left: number; width: number; height: number },
+  capPx: number,
+): ShortfallRect[] {
+  const first = Math.floor(plot.left);
+  const last = Math.ceil(plot.left + plot.width);
+  const plotHeight = Math.round(plot.height);
+  const heights = new Array<number>(Math.max(0, last - first)).fill(0);
+  const spans: Array<[number, number]> = [];
+  for (const { x0, x1, heightShare } of bars) {
+    const left = Math.max(x0, plot.left);
+    const right = Math.min(x1, plot.left + plot.width);
+    if (right <= left) continue;
+    spans.push([left, right]);
+    const share = Number.isFinite(heightShare)
+      ? Math.min(1, Math.max(0, heightShare))
+      : 0;
+    const height = Math.min(
+      plotHeight,
+      Math.max(capPx, Math.round(share * plotHeight)),
+    );
+    for (let column = Math.floor(left); column < Math.ceil(right); column++) {
+      heights[column - first] = Math.max(heights[column - first], height);
+    }
+  }
+  const rects: ShortfallRect[] = [];
+  for (const [from, to] of mergeBandPixels(spans, 0)) {
+    for (let column = Math.floor(from); column < Math.ceil(to); column++) {
+      const x = Math.max(from, column);
+      const right = Math.min(to, column + 1);
+      const height = heights[column - first];
+      const previous = rects[rects.length - 1];
+      if (
+        previous &&
+        previous.height === height &&
+        previous.x + previous.width === x
+      ) {
+        previous.width = right - previous.x;
+      } else if (height > 0) {
+        rects.push({ x, width: right - x, height });
+      }
+    }
+  }
+  return rects;
+}
+
+/**
+ * Shading for the stretches that ran short, using the actual rendered Y span to give peak
+ * shortfall the same watts-to-pixels scale as the series, capped at full height. A dark cap
+ * marks the top, the original light wash fills down to the shortfall height, and a hairline on
+ * the wash's lower edge makes that height readable against the faint bands. Painted before
+ * the axes and series, like a recession band, it never tints a line.
+ */
+export function shortfallBarsPlugin(
+  getBars: () => ShortfallBar[],
+  color: string,
+): uPlot.Plugin {
+  return {
+    hooks: {
+      drawClear: (u: uPlot) => {
+        const bars = getBars();
+        if (bars.length === 0) {
+          return;
+        }
+        const { ctx, bbox } = u;
+        const ratio = uPlot.pxRatio;
+        const ySpan = (u.scales.y.max ?? 0) - (u.scales.y.min ?? 0);
+        const capPx = Math.round(SHORTFALL_CAP_PX * ratio);
+        const hemPx = Math.max(1, Math.round(ratio));
+        const rects = shortfallSkyline(
+          bars.map((bar) => ({
+            x0: u.valToPos(bar.from, "x", true),
+            x1: u.valToPos(bar.to, "x", true),
+            heightShare: ySpan > 0 ? bar.peakShortfall / ySpan : 0,
+          })),
+          bbox,
+          capPx,
+        );
+        const wash = withAlpha(color, chartPalette().bandAlpha);
+        const hem = withAlpha(color, SHORTFALL_HEM_ALPHA);
+        ctx.save();
+        clipToPlot(u);
+        for (const { x, width, height } of rects) {
+          if (height > capPx) {
+            ctx.fillStyle = wash;
+            ctx.fillRect(x, bbox.top, width, height);
+            ctx.fillStyle = hem;
+            ctx.fillRect(x, bbox.top + height - hemPx, width, hemPx);
+          }
+          ctx.fillStyle = color;
+          ctx.fillRect(x, bbox.top, width, capPx);
+        }
+        ctx.restore();
+      },
+    },
+  };
+}
+
 /** The "you are here" line dividing recorded history from the forecast. */
 export function verticalLinePlugin(
   getX: () => number | null,

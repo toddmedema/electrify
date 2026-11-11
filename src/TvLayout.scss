@@ -558,9 +558,9 @@ html[data-tv-layout="true"] {
     flex: 0 0 auto;
     margin-left: auto;
   }
-  .speedToggles .MuiToggleButton-root {
-    min-width: 2.75rem;
-    padding: 0.5rem;
+  .speedToggles {
+    --speed-segment: 3.25rem;
+    --speed-inset: 0.25rem;
   }
   .gameStatusBar {
     display: flex;

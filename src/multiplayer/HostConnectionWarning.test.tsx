@@ -11,9 +11,14 @@ afterEach(() => store.dispatch(dialogClose()));
 
 function warning(waiting = true) {
   const onReconnect = jest.fn();
+  const onDisconnect = jest.fn();
   const ui = (active: boolean) => (
     <Provider store={store}>
-      <HostConnectionWarning waiting={active} onReconnect={onReconnect} />
+      <HostConnectionWarning
+        waiting={active}
+        onReconnect={onReconnect}
+        onDisconnect={onDisconnect}
+      />
     </Provider>
   );
   const view = render(ui(waiting));
@@ -21,6 +26,7 @@ function warning(waiting = true) {
     ...view,
     waiting: (active: boolean) => view.rerender(ui(active)),
     onReconnect,
+    onDisconnect,
   };
 }
 
@@ -32,6 +38,16 @@ test("a fresh host view releases the temporary warning and its blocking dialog",
   });
   view.waiting(false);
   expect(store.getState().ui.dialog.open).toBe(false);
+  expect(view.onReconnect).not.toHaveBeenCalled();
+});
+
+test("the warning offers Disconnect beside Reconnect, for a host that is not coming back", () => {
+  const view = warning();
+  const { secondaryLabel, secondaryAction } = store.getState().ui.dialog;
+  expect(secondaryLabel).toBe("Disconnect");
+  expect(store.getState().ui.dialog.actionLabel).toBe("Reconnect");
+  secondaryAction!({} as React.MouseEvent<HTMLElement>);
+  expect(view.onDisconnect).toHaveBeenCalledTimes(1);
   expect(view.onReconnect).not.toHaveBeenCalled();
 });
 

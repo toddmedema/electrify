@@ -134,6 +134,7 @@ function summarize(gaps: FrameGap[], budgetMs: number, displayMs: number) {
 const journeys = [
   { name: "main panes", scenario: 103, pane: "facilities" },
   { name: "Insights", scenario: 103, pane: "insights" },
+  { name: "monthly shortfalls", scenario: 100, pane: "insights" },
   { name: "hydro outlook", scenario: 108, pane: "hydro" },
   { name: "intertie outlook", scenario: 101, pane: "intertie" },
 ] as const;
@@ -146,7 +147,7 @@ for (const journey of journeys) {
     test.skip(!desktop && testInfo.project.name !== "mobile-390px");
     // At desktop width both core panes are already mounted; a second identical sample would
     // add noise. The phone needs an independent run with its chart-heavy pane visible.
-    test.skip(desktop && journey.pane === "insights");
+    test.skip(desktop && journey.name === "Insights");
     test.setTimeout(120_000);
     const cpuRate = Number(process.env.E2E_CPU_RATE || "1");
     expect(Number.isFinite(cpuRate), "E2E_CPU_RATE must be finite").toBe(true);
@@ -183,6 +184,20 @@ for (const journey of journeys) {
         exact: true,
       }),
     );
+    if (journey.name === "monthly shortfalls") {
+      const insights = page.locator(".insights:visible");
+      // The scenario's twelve-year planning horizon selects monthly ranges rather than the
+      // short-range renderer. Wait for a real shortage forecast before recording its cost.
+      await expect(
+        insights.getByLabel(/^Displayed date range:/),
+      ).toHaveAttribute("aria-label", "Displayed date range: 2020–31");
+      const chart = insights.locator("#chartForecastSupplyDemand");
+      await expect(chart).toHaveAccessibleName(/largest peak shortfall/);
+      await expect(chart.locator("canvas")).toBeVisible();
+      await expect(insights.locator(".chartLegend").first()).toContainText(
+        "on the same MW scale",
+      );
+    }
     if (journey.pane === "hydro") {
       await page.locator('[data-facility="Hydro"] .facilityDisclosure').click();
       await expect(
