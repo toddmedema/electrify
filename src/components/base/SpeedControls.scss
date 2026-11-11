@@ -1,104 +1,212 @@
+// The speed control is a recessed capsule with one thumb under the speed the game is really
+// running at, so the clock is something that moves rather than five buttons that light up.
+// Single-player and co-op share it; co-op adds a ring for your own request and pips for the
+// other players. The thumb is positioned from --speed-index (set by SpeedControls.tsx) on a
+// fixed segment pitch, so it can never disagree with the button it sits under.
+:where(.speedToggles) {
+  // 46px segments, 230px for five: a touch narrower than the bordered buttons they replace
+  --speed-segment: 46px;
+  // The thumb, ring and hover wash all sit this far inside a segment, so they share one shape.
+  --speed-inset: 4px;
+  // Decelerates into place like a spring settling; reduced motion removes it below.
+  --speed-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  // Co-op labels sit this much high, leaving room under them for the other players' pips.
+  --speed-lift: 2px;
+}
+
 .base_main {
-  // Which speed the clock is running at, said as a selection rather than as three enabled
-  // buttons and one greyed-out one - disabled reads as "you can't have this", not "you're on it"
-  // Selection uses a surface change; every enabled speed remains a blue control.
-  .speedToggles {
-    .MuiToggleButton-root {
-      // Equal segments, so the selection doesn't shift with each label's width.
-      min-width: 48px;
-      padding: 4px 12px;
-      border-color: var(--border-tile);
-      color: var(--interactive-blue);
+  .speedToggles.MuiToggleButtonGroup-root {
+    position: relative;
+    isolation: isolate;
+    gap: 0;
+    border-radius: var(--radius-pill);
+    background: var(--speed-track);
+    // Drawn inside the box, so the channel has an edge on a white bar without adding a pixel.
+    box-shadow: inset 0 0 0 1px var(--border-tile);
+
+    // The thumb: the speed the game is actually running at. Only transform animates.
+    &::before {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      top: var(--speed-inset);
+      bottom: var(--speed-inset);
+      left: var(--speed-inset);
+      width: calc(var(--speed-segment) - 2 * var(--speed-inset));
+      border-radius: var(--radius-pill);
+      background: var(--speed-thumb);
+      transform: translateX(calc(var(--speed-index, 0) * var(--speed-segment)));
+      transition: transform 320ms var(--speed-ease);
+      pointer-events: none;
+    }
+
+    // A speed this layout doesn't offer has no segment to sit under.
+    &[data-no-thumb]::before {
+      display: none;
+    }
+
+    &[data-disabled] {
+      opacity: 0.6;
+    }
+
+    > .MuiToggleButtonGroup-grouped.MuiToggleButton-root {
+      position: relative;
+      z-index: 1;
+      flex: 0 0 var(--speed-segment);
+      box-sizing: border-box;
+      width: var(--speed-segment);
+      margin: 0;
+      // Content box = the thumb's footprint, which is what the hover wash is clipped to.
+      padding: var(--speed-inset);
+      border: 0;
+      border-radius: var(--radius-pill);
+      background: transparent;
+      background-clip: content-box;
+      color: var(--interactive-strong);
       font-size: var(--font-size-caption);
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
       line-height: 1.4;
+      // The label trails the thumb a beat, so the colour change reads as arriving with it.
+      transition: color 160ms var(--speed-ease) 60ms;
 
-      &.Mui-selected {
-        background: var(--bg-selected);
-        color: var(--interactive-blue);
+      &:hover {
+        background-color: transparent;
+      }
 
-        @media (hover: hover) and (pointer: fine) {
-          &:hover {
-            background: var(--bg-selected);
-          }
+      // Pressed: the label dims a little, in place of Material's ripple.
+      &:active {
+        opacity: 0.72;
+      }
+
+      @media (hover: hover) and (pointer: fine) {
+        &:hover:not([data-thumb="true"]) {
+          background-color: var(--interactive-tint);
         }
       }
 
-      &.Mui-disabled {
-        color: var(--font-color-faded);
+      .MuiSvgIcon-root {
+        font-size: 1.125rem; // 18px: a pause glyph that sits inside a 32px thumb, not against it
+      }
+
+      // Under the thumb: the label takes the thumb's ink and a little more weight, which
+      // together with the thumb's position carries "running here" without colour alone.
+      &[data-thumb="true"] {
+        color: var(--interactive-contrast);
+        font-weight: 600;
+      }
+
+      &.Mui-selected:not([data-thumb="true"]) {
+        background-color: transparent;
+        color: var(--interactive-strong);
+        font-weight: 600;
       }
     }
 
-    // Coarse pointers floor every control at 44px; speed segments keep their equal 48px.
-    @media (pointer: coarse) {
-      .MuiToggleButton-root {
-        min-width: 48px !important;
-      }
+    // Co-op: pips for the other players, centred along the bottom of the segment they chose.
+    .multiplayerSpeedLabel {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      transform: translateY(calc(-1 * var(--speed-lift)));
     }
 
-    // The faint selected fill alone falls short of 3:1, so a solid bar and heavier label mark
-    // the running speed. Co-op draws its own markers along that edge instead.
-    &:not(.multiplayerSpeedToggles) .MuiToggleButton-root.Mui-selected {
-      box-shadow: inset 0 -2px 0 var(--interactive-strong);
-      font-weight: 700;
+    .speedLabel {
+      display: contents;
+    }
+
+    .multiplayerSpeedPeers {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .multiplayerSpeedPip {
+      position: absolute;
+      bottom: 8px;
+      // 8px pitch about the segment's centre, whatever the number of peers
+      left: calc(50% + (var(--slot) - (var(--peers) - 1) / 2) * 8px);
+      width: 4px;
+      height: 4px;
+      transform: translateX(-50%);
+      color: var(--font-color-faded);
+      fill: currentColor;
+    }
+
+    [data-thumb="true"] .multiplayerSpeedPip {
+      color: var(--interactive-contrast);
+      opacity: 0.85;
+    }
+
+    // Your own request, whenever it isn't where the clock is. When the two agree the thumb says
+    // both and the ring steps aside, so an agreeing pair looks exactly like single-player.
+    &.multiplayerSpeedToggles
+      > .MuiToggleButton-root.Mui-selected:not([data-thumb="true"])::before {
+      content: "";
+      position: absolute;
+      inset: var(--speed-inset);
+      box-sizing: border-box;
+      border: 2px solid var(--interactive-strong);
+      border-radius: var(--radius-pill);
+      pointer-events: none;
+    }
+
+    // Still on your earlier pick but the clock is waiting for you: a dashed ring says the
+    // choice is remembered, not confirmed, by shape rather than by colour.
+    &[data-resume]
+      > .MuiToggleButton-root.Mui-selected:not([data-thumb="true"])::before {
+      border-style: dashed;
     }
   }
 
-  // Blue marks the actual shared speed; a quiet, static circle marks your request.
-  .multiplayerSpeedToggles .MuiToggleButton-root {
-    // The label and ring sit a little high, clearing the marker row on the bottom edge: the
-    // ring spans 1-33 px of a 40 px button and 3-35 px of a 44 px one, and only a middle
-    // marker (heads from 29 or 33 px) meets it, breaking it cleanly with its knockout.
-    --clock-lift: 3px;
-    --clock-ring: var(--font-color-primary);
-    // What a marker's knockout outline matches, so the ring breaks cleanly behind a marker
-    --clock-segment: var(--bg-primary);
-
-    .multiplayerSpeedLabel {
-      transform: translateY(calc(-1 * var(--clock-lift)));
-    }
-
-    .multiplayerSpeedPeers svg {
-      color: var(--font-color-faded);
-
-      path {
-        stroke: var(--clock-segment);
-        stroke-width: 4px; // 1 px outside the 12 px glyph
-        stroke-linejoin: round;
-        paint-order: stroke;
+  @media (prefers-reduced-motion: reduce) {
+    .speedToggles.MuiToggleButtonGroup-root {
+      &::before,
+      > .MuiToggleButtonGroup-grouped.MuiToggleButton-root {
+        transition: none;
       }
     }
+  }
 
-    &.Mui-selected,
-    &.Mui-selected:hover {
-      background: transparent;
-      color: var(--font-color-primary);
+  @media (prefers-contrast: more) {
+    .speedToggles.MuiToggleButtonGroup-root {
+      box-shadow: inset 0 0 0 1px var(--font-color-primary);
     }
+  }
 
-    &[data-active-speed="true"],
-    &[data-active-speed="true"]:hover {
-      --clock-ring: var(--interactive-contrast);
-      --clock-segment: var(--interactive-blue);
-      background: var(--interactive-blue);
-      color: var(--interactive-contrast);
+  // Windows high contrast replaces every colour, which would erase a background-only thumb.
+  @media (forced-colors: active) {
+    .speedToggles.MuiToggleButtonGroup-root {
+      forced-color-adjust: none;
+      background: Canvas;
+      box-shadow: inset 0 0 0 1px ButtonBorder;
 
-      .multiplayerSpeedPeers svg {
-        color: var(--interactive-contrast);
+      &::before {
+        background: Highlight;
       }
-    }
 
-    // One size wherever it moves, wide enough that 24× clears the stroke
-    &.Mui-selected::before {
-      content: "";
-      position: absolute;
-      top: calc(50% - var(--clock-lift));
-      left: 50%;
-      width: 32px;
-      height: 32px;
-      box-sizing: border-box;
-      transform: translate(-50%, -50%);
-      border: 2px solid var(--clock-ring);
-      border-radius: 50%;
-      pointer-events: none;
+      > .MuiToggleButtonGroup-grouped.MuiToggleButton-root {
+        color: ButtonText;
+
+        &[data-thumb="true"] {
+          color: HighlightText;
+        }
+      }
+
+      &.multiplayerSpeedToggles
+        > .MuiToggleButton-root.Mui-selected:not([data-thumb="true"])::before {
+        border-color: ButtonText;
+      }
+
+      .multiplayerSpeedPip {
+        color: ButtonText;
+        opacity: 1;
+      }
+
+      [data-thumb="true"] .multiplayerSpeedPip {
+        color: HighlightText;
+      }
     }
   }
 }

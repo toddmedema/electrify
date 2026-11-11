@@ -693,18 +693,33 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
     }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "NORMAL");
-  const activeStyle = await speedControls(p1)
-    .getByRole("button", { name: "normal speed", exact: true })
-    .evaluate((button) => {
-      const probe = document.createElement("span");
-      probe.style.color =
-        getComputedStyle(button).getPropertyValue("--interactive-blue");
-      button.appendChild(probe);
-      const expected = getComputedStyle(probe).color;
-      probe.remove();
-      return { actual: getComputedStyle(button).backgroundColor, expected };
-    });
-  expect(activeStyle.actual).toBe(activeStyle.expected);
+  // The clock's thumb, not the button, carries the fill: it sits under the running speed.
+  await expect
+    .poll(() =>
+      speedControls(p1)
+        .getByRole("button", { name: "normal speed", exact: true })
+        .evaluate((button) => {
+          const group = button.closest(".speedToggles")!;
+          const style = getComputedStyle(group, "::before");
+          const probe = document.createElement("span");
+          probe.style.color =
+            getComputedStyle(group).getPropertyValue("--speed-thumb");
+          group.appendChild(probe);
+          const expected = getComputedStyle(probe).color;
+          probe.remove();
+          const box = button.getBoundingClientRect();
+          const centre =
+            group.getBoundingClientRect().left +
+            parseFloat(style.left) +
+            new DOMMatrix(style.transform).m41 +
+            parseFloat(style.width) / 2;
+          return {
+            filled: style.backgroundColor === expected,
+            underButton: Math.abs(centre - (box.left + box.width / 2)) <= 1,
+          };
+        }),
+    )
+    .toEqual({ filled: true, underButton: true });
   await expect
     .poll(() =>
       speedControls(p1)
