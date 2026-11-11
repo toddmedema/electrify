@@ -45,7 +45,10 @@ test("lists, inline values and flags combine", () => {
     "http://127.0.0.1:3000",
   );
   assert.equal(options.route, "/?scenario=4");
-  assert.equal(options.name, "s4-insights-facilityrow-has-text-solar");
+  assert.match(
+    options.name,
+    /^s4-insights-facilityrow-has-text-solar-[a-f0-9]{12}$/,
+  );
   assert.deepEqual(
     options.viewports.map(({ label }) => label),
     ["1280", "390", "360x700"],
@@ -67,11 +70,11 @@ test("a bare route is photographed as is; naming a view starts the game from it"
   assert.equal(plain.route, "/manual?page=2");
   assert.equal(plain.game, false);
   assert.equal(plain.fullPage, true);
-  assert.equal(plain.name, "url-manual-page-2-full");
+  assert.match(plain.name, /^url-manual-page-2-[a-f0-9]{12}-full$/);
   const started = parse("--url", "/?scenario=9", "--view", "build");
   assert.equal(started.game, true);
   assert.equal(started.view, "build");
-  assert.equal(started.name, "url-scenario-9-build");
+  assert.match(started.name, /^url-scenario-9-[a-f0-9]{12}-build$/);
   assert.equal(parse("--name", "Before fix!").name, "before-fix");
 });
 
@@ -84,13 +87,31 @@ test("captures of one view get different file names unless a name is given", () 
     parse("--clip", ".facilityRow:has-text('Wind')").name,
     parse("--full-page").name,
   ];
-  assert.deepEqual(names, [
-    "s108-facilities",
-    "s108-facilities-facilityrow-has-text-solar",
-    "s108-facilities-facilityrow-has-text-wind",
-    "s108-facilities-full",
-  ]);
+  assert.deepEqual(
+    names.map((name) => name.replace(/-[a-f0-9]{12}$/, "")),
+    [
+      "s108-facilities",
+      "s108-facilities-facilityrow-has-text-solar",
+      "s108-facilities-facilityrow-has-text-wind",
+      "s108-facilities-full",
+    ],
+  );
   assert.equal(parse("--clip", ".x", "--name", "before").name, "before");
+});
+
+test("default names distinguish selectors and routes with the same readable slug", () => {
+  for (const [option, first, second] of [
+    [
+      "--clip",
+      ".facilityRow:has-text('Natural Gas Combined Cycle'):nth(0)",
+      ".facilityRow:has-text('Natural Gas Combined Cycle'):nth(1)",
+    ],
+    ["--clip", ".facilityRow > .name", ".facilityRow + .name"],
+    ["--url", "/manual?a=1", "/manual/a/1"],
+  ]) {
+    assert.notEqual(parse(option, first).name, parse(option, second).name);
+    assert.equal(parse(option, first).name, parse(option, first).name);
+  }
 });
 
 test("help short-circuits validation", () => {
@@ -107,6 +128,11 @@ test("mistakes name the option and are usage errors", () => {
     [["--clip", "x", "--full-page"], /cannot be combined/],
     [["--scenario", "1", "--url", "/"], /either --scenario or --url/],
     [["--url", "manual"], /--url must be a route/],
+    [["--url", "//example.com"], /--url must be a route/],
+    [["--url", "//electrify.invalid"], /--url must be a route/],
+    [["--url", "/\\example.com"], /--url must be a route/],
+    [["--url", "/\t/example.com"], /--url must be a route/],
+    [["--url", "///"], /--url must be a route/],
     [["--clip"], /--clip needs a value/],
     [["--clip", "--full-page"], /--clip needs a value/],
     [["--full-page=yes"], /does not take a value/],
@@ -191,6 +217,17 @@ test("an explicit URL wins, and an unreachable one is reported", async () => {
   });
 });
 
+test("an empty explicit base URL cannot fall back to another app", async () => {
+  await assert.rejects(
+    resolveBaseUrl({
+      flag: "",
+      env: { E2E_BASE_URL: "http://127.0.0.1:1234" },
+      probe: async () => true,
+    }),
+    /--base-url is not a URL/,
+  );
+});
+
 test("only a live server reserved by this checkout is found automatically", async () => {
   await withServer(async (port) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "shot-root-"));
@@ -253,9 +290,20 @@ function listTests(config, filter, env = {}) {
       encoding: "utf8",
       maxBuffer: 20e6,
       windowsHide: true,
-      env: { ...process.env, ...env },
+      // This checks discovery, not renderer artifacts. Hosted CPU jobs have no desktop build;
+      // runtime browser commands keep their normal production-bundle verification.
+      env: {
+        ...process.env,
+        GITHUB_ACTIONS: "false",
+        MULTIPLAYER_BUILD_DIR: "",
+        STEAM_INPUT_BUILD_DIR: "",
+        ELECTRIFY_SHOT: "",
+        ...env,
+      },
     },
   );
+  assert.ifError(result.error);
+  assert.ok(result.stdout.trim(), `${config}: ${result.stderr}`);
   return { status: result.status, ...JSON.parse(result.stdout) };
 }
 
@@ -294,6 +342,7 @@ test("the screenshot runner is never part of an ordinary browser suite", () => {
     "steam-input.playwright.config.ts",
   ]) {
     const listing = listTests(config, "shot\\.run");
+    assert.equal(listing.status, 1, config);
     assert.deepEqual(listing.suites, [], config);
     assert.match(listing.errors[0].message, /No tests found/, config);
   }

@@ -32,6 +32,12 @@ async function openView(page: Page, view: ShotRequest["view"]) {
 }
 
 test("capture", async ({ page, colorScheme }, info) => {
+  const file = path.join(
+    request.outDir,
+    `${request.name}-${info.project.name}.png`,
+  );
+  // A failed repeat capture must not leave the previous run's image looking current.
+  await fs.rm(file, { force: true });
   await page.addInitScript((mode) => {
     // The same preferences the specs set: a fixed theme and no audio.
     localStorage.setItem("theme", mode);
@@ -59,13 +65,10 @@ test("capture", async ({ page, colorScheme }, info) => {
   }
   if (request.delay) await page.waitForTimeout(request.delay);
 
-  const file = path.join(
-    request.outDir,
-    `${request.name}-${info.project.name}.png`,
-  );
   await fs.mkdir(request.outDir, { recursive: true });
-  const options = { path: file, animations: "disabled" as const };
+  const options = { animations: "disabled" as const };
   let note = "";
+  let png: Buffer;
   if (request.clip) {
     const matches = page.locator(request.clip);
     await expect(
@@ -74,10 +77,11 @@ test("capture", async ({ page, colorScheme }, info) => {
     ).toBeVisible();
     const count = await matches.count();
     if (count > 1) note = `  (first of ${count} matches)`;
-    await matches.first().screenshot(options);
-  } else await page.screenshot({ ...options, fullPage: request.fullPage });
+    png = await matches.first().screenshot(options);
+  } else
+    png = await page.screenshot({ ...options, fullPage: request.fullPage });
 
-  const png = await fs.readFile(file);
+  await fs.writeFile(file, png);
   // PNG header: width and height are the first two big-endian words after the signature.
   console.log(
     `${file}  ${png.readUInt32BE(16)}x${png.readUInt32BE(20)}  ${Math.max(1, Math.round(png.length / 1024))} KB${note}`,

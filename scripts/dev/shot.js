@@ -6,6 +6,7 @@
 // that updates those helpers updates screenshots too.
 const fs = require("node:fs");
 const path = require("node:path");
+const { createHash } = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { alive, coordinationRoot, readOwner } = require("./coordination");
 
@@ -128,6 +129,24 @@ function slug(text) {
     .slice(0, 40);
 }
 
+function captureSlug(text) {
+  // Keep paths readable without letting truncation or punctuation merge distinct captures.
+  return `${slug(text)}-${createHash("sha256").update(text).digest("hex").slice(0, 12)}`;
+}
+
+function isAppRoute(route) {
+  const origin = "http://electrify.invalid";
+  try {
+    return (
+      /^\/(?![\\/])/.test(route) &&
+      !/[\t\r\n]/.test(route) &&
+      new URL(route, origin).origin === origin
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Turn argv into a validated request. Pure: no environment, network or file access. */
 function parseShotArgs(argv, { cwd = process.cwd() } = {}) {
   const raw = {};
@@ -160,8 +179,8 @@ function parseShotArgs(argv, { cwd = process.cwd() } = {}) {
     throw new UsageError("use either --scenario or --url, not both");
   if (raw.clip !== undefined && raw["full-page"])
     throw new UsageError("--clip and --full-page cannot be combined");
-  if (hasUrl && !raw.url.startsWith("/"))
-    throw new UsageError('--url must be a route starting with "/"');
+  if (hasUrl && !isAppRoute(raw.url))
+    throw new UsageError('--url must be a route on the app starting with "/"');
   if (raw.clip !== undefined && !raw.clip.trim())
     throw new UsageError("--clip needs a non-empty selector");
   const scenario =
@@ -177,9 +196,9 @@ function parseShotArgs(argv, { cwd = process.cwd() } = {}) {
   // agents in one checkout would otherwise overwrite each other's evidence.
   const derived = [
     hasUrl
-      ? `url-${slug(raw.url) || "root"}${game ? `-${view}` : ""}`
+      ? `url-${captureSlug(raw.url)}${game ? `-${view}` : ""}`
       : `s${scenario}-${view}`,
-    raw.clip === undefined ? "" : slug(raw.clip),
+    raw.clip === undefined ? "" : captureSlug(raw.clip),
     raw["full-page"] ? "full" : "",
   ]
     .filter(Boolean)
@@ -288,7 +307,7 @@ async function resolveBaseUrl({
     ["--base-url", flag],
     ["E2E_BASE_URL", env.E2E_BASE_URL],
     ["BASE_URL", env.BASE_URL],
-  ].find(([, value]) => value);
+  ].find(([, value]) => value !== undefined);
   if (explicit) {
     const url = normalizeBaseUrl(explicit[1], explicit[0]);
     if (!(await probe(url)))
