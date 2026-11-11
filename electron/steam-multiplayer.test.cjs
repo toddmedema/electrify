@@ -1017,7 +1017,7 @@ test("unchanged checkpoints skip only connected peers that confirmed their queue
   }
 });
 
-test("checkpoints persist real files, including overlapping host saves and guest receipts", async () => {
+test("checkpoints persist real files and discard older compression that finishes last", async (t) => {
   const temporaryRoot = path.resolve(".tmp", "native-tests");
   fs.mkdirSync(temporaryRoot, { recursive: true });
   const directory = fs.mkdtempSync(path.join(temporaryRoot, "checkpoint-"));
@@ -1029,29 +1029,51 @@ test("checkpoints persist real files, including overlapping host saves and guest
     revision: 1,
     seats: [{ id: mp.service.identity.steamId }, { id: guest.id }],
   };
+  const zlib = require("node:zlib");
+  const encoding = [];
+  const started = [Promise.withResolvers(), Promise.withResolvers()];
+  const compression = t.mock.method(zlib, "deflateRaw", (json, done) => {
+    encoding.push({
+      payload: JSON.parse(json),
+      finish: () => done(null, zlib.deflateRawSync(json)),
+    });
+    started[encoding.length - 1].resolve();
+  });
   try {
     mp.connections.set(100, guest);
     await assert.rejects(
       mp.persist({ ...world, schema: 1 }),
       /Invalid multiplayer save/,
     );
-    await Promise.all([
-      mp.checkpoint(world),
-      mp.checkpoint({ ...world, revision: 2 }),
-    ]);
+    const first = mp.request({ kind: "checkpoint", world });
+    await started[0].promise;
+    const second = mp.request({
+      kind: "checkpoint",
+      world: { ...world, revision: 2 },
+    });
+    await started[1].promise;
     assert.equal((await mp.saves.select()).revision, 2);
-    assert.equal(guest.queue.length, 2);
+    encoding[1].finish();
+    await second;
+    encoding[0].finish();
+    await first;
+    compression.mock.restore();
+    assert.equal(guest.queue.length, 1, "obsolete compression cannot enqueue");
     const messages = await Promise.all(
       guest.queue.map((message) => assemble(new Map(), chunk(message))),
     );
     assert.deepEqual(
       messages.map((message) => message.world.revision),
-      [1, 2],
+      [2],
     );
-    await mp.receive(guest.id, { kind: "saved", digest: messages[0].digest });
+    await mp.receive(guest.id, {
+      kind: "saved",
+      digest: encoding[0].payload.digest,
+    });
     assert.equal(guest.savedDigest, undefined);
-    await mp.receive(guest.id, { kind: "saved", digest: messages[1].digest });
-    assert.equal(guest.savedDigest, messages[1].digest);
+    await mp.receive(guest.id, { kind: "saved", digest: messages[0].digest });
+    assert.equal(guest.savedDigest, messages[0].digest);
+    assert.equal(mp.sharedAt, mp.checkpointAt);
     guest.queue = [];
     await mp.checkpoint({ ...world, revision: 2 });
     assert.equal(guest.queue.length, 0);
@@ -1060,21 +1082,21 @@ test("checkpoints persist real files, including overlapping host saves and guest
     mp.hostId = guest.id;
     const savedFilename = mp.saves.filename;
     mp.saves.filename = directory; // Writing a library over this directory must fail.
-    await assert.rejects(mp.receive(guest.id, messages[1]));
+    await assert.rejects(mp.receive(guest.id, messages[0]));
     assert.equal(
       guest.queue.length,
       0,
       "failed persistence is never acknowledged",
     );
     mp.saves.filename = savedFilename;
-    await mp.receive(guest.id, messages[1]);
+    await mp.receive(guest.id, messages[0]);
     assert.equal(
       stringify(await mp.saves.select()),
-      stringify(messages[1].world),
+      stringify(messages[0].world),
     );
     assert.deepEqual(await assemble(new Map(), chunk(guest.queue[0])), {
       kind: "saved",
-      digest: messages[1].digest,
+      digest: messages[0].digest,
     });
   } finally {
     mp.dispose();

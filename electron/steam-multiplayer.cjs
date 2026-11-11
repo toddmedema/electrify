@@ -804,7 +804,9 @@ class SteamMultiplayer {
           if (
             !c.connected ||
             ![...this.connections.values()].includes(c) ||
-            this.hostId !== this.service.identity.steamId
+            this.hostId !== this.service.identity.steamId ||
+            // A newer local save may finish encoding first. Never replace it on the guest.
+            digest !== this.checkpointHash
           )
             continue;
           this.send(c.id, payload, encoded);
