@@ -441,15 +441,14 @@ describe("shortfallSkyline", () => {
       ],
       plot,
       8,
-      2,
     ).map((rect) => rect.height);
     expect(heights).toEqual([8, 50, 100, 200, 200]);
   });
 
   it("keeps the tallest of several months that share a pixel column", () => {
     expect(
-      shortfallSkyline([bar(10, 10.4, 0.9), bar(10.2, 10.6, 0.1)], plot, 8, 1),
-    ).toEqual([{ x: 10, width: 1, height: 180 }]);
+      shortfallSkyline([bar(10, 10.5, 0.9), bar(10.25, 10.75, 0.1)], plot, 8),
+    ).toEqual([{ x: 10, width: 0.75, height: 180 }]);
   });
 
   it("merges equal neighbours and joins unequal ones without a gap or an overlap", () => {
@@ -458,7 +457,6 @@ describe("shortfallSkyline", () => {
         [bar(10, 30, 0.5), bar(30, 50, 0.5), bar(50, 70, 0.25)],
         plot,
         8,
-        2,
       ),
     ).toEqual([
       { x: 10, width: 40, height: 100 },
@@ -466,12 +464,15 @@ describe("shortfallSkyline", () => {
     ]);
   });
 
-  it("widens a month narrower than the minimum around its centre and snaps to whole pixels", () => {
-    expect(shortfallSkyline([bar(40.4, 40.6, 0.1)], plot, 8, 4)).toEqual([
-      { x: 38, width: 4, height: 20 },
+  it("preserves fractional boundaries and gaps narrower than a pixel", () => {
+    expect(shortfallSkyline([bar(40.25, 40.5, 0.1)], plot, 8)).toEqual([
+      { x: 40.25, width: 0.25, height: 20 },
     ]);
-    expect(shortfallSkyline([bar(10.3, 19.7, 0.5)], plot, 8, 2)).toEqual([
-      { x: 10, width: 10, height: 100 },
+    expect(
+      shortfallSkyline([bar(10, 10.25, 0.9), bar(10.75, 11, 0.1)], plot, 8),
+    ).toEqual([
+      { x: 10, width: 0.25, height: 180 },
+      { x: 10.75, width: 0.25, height: 180 },
     ]);
   });
 
@@ -481,7 +482,6 @@ describe("shortfallSkyline", () => {
         [bar(0, 25, 0.5), bar(105, 130, 1), bar(200, 220, 1)],
         plot,
         8,
-        2,
       ),
     ).toEqual([
       { x: 10, width: 15, height: 100 },
@@ -490,11 +490,11 @@ describe("shortfallSkyline", () => {
   });
 
   it("paints a cap rather than NaN for an unusable height, and never exceeds the plot", () => {
-    expect(shortfallSkyline([bar(10, 20, NaN)], plot, 8, 2)).toEqual([
+    expect(shortfallSkyline([bar(10, 20, NaN)], plot, 8)).toEqual([
       { x: 10, width: 10, height: 8 },
     ]);
     expect(
-      shortfallSkyline([bar(10, 20, 0.5)], { ...plot, height: 6 }, 8, 2),
+      shortfallSkyline([bar(10, 20, 0.5)], { ...plot, height: 6 }, 8),
     ).toEqual([{ x: 10, width: 10, height: 6 }]);
   });
 });

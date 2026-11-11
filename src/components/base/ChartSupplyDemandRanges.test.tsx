@@ -9,7 +9,7 @@ import ChartSupplyDemandRanges, {
   supplyDemandMonthlyRanges,
 } from "./ChartSupplyDemandRanges";
 import UPlotChart from "./UPlotChart";
-import { spansFromEdges } from "./UPlotHelpers";
+import { shortfallSkyline, spansFromEdges } from "./UPlotHelpers";
 
 jest.mock("./UPlotChart", () => ({
   __esModule: true,
@@ -173,6 +173,43 @@ describe("monthlyShortfalls", () => {
     expect(shortfallsWithin(bars, [30, 40])).toEqual([]);
     expect(shortfallsWithin([], [0, 10])).toEqual([]);
   });
+
+  it.each([1, 2, 3])(
+    "keeps dense rasterized markers inside their hover spans at %ix pixel density",
+    (ratio) => {
+      const ranges = supplyDemandMonthlyRanges(
+        [
+          tick(month(0), 50, 100),
+          tick(month(1), 100, 100),
+          tick(month(2), 100, 100),
+        ],
+        0,
+      );
+      const position = (minute: number) =>
+        (40.4 + (minute / MINUTES_PER_MONTH) * 0.4) * ratio;
+      const [bar] = monthlyShortfalls(ranges);
+      const rects = shortfallSkyline(
+        [
+          {
+            x0: position(bar.from),
+            x1: position(bar.to),
+            heightShare: 0.5,
+          },
+        ],
+        { left: 0, width: 100 * ratio, height: 200 * ratio },
+        4 * ratio,
+      );
+      expect(rects.length).toBeGreaterThan(0);
+      for (const rect of rects) {
+        expect(rect.x).toBeGreaterThanOrEqual(position(bar.from));
+        expect(rect.x + rect.width).toBeLessThanOrEqual(position(bar.to));
+      }
+      const nextPoint = position(ranges[1].minute);
+      expect(
+        rects.some(({ x, width }) => nextPoint >= x && nextPoint < x + width),
+      ).toBe(false);
+    },
+  );
 
   it("uses the peak coincident shortfall in watts, independently of how long it lasts", () => {
     const [mild, total, spread] = monthlyShortfalls(

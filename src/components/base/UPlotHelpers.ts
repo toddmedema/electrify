@@ -646,7 +646,6 @@ export interface ShortfallRect {
 }
 
 const SHORTFALL_CAP_PX = 4;
-const SHORTFALL_MIN_WIDTH_PX = 2;
 const SHORTFALL_HEM_ALPHA = 0.7;
 
 /**
@@ -654,27 +653,24 @@ const SHORTFALL_HEM_ALPHA = 0.7;
  * down the plot in proportion to its height share, capped at the full height, and is never
  * shorter than the cap. Months can be narrower than a pixel, so several may land in one column;
  * each column keeps the tallest, and equal neighbours merge, so translucent shading never
- * stacks into false darkness and abutting bars leave no anti-aliased seam.
+ * stacks into false darkness and abutting bars leave no anti-aliased seam. Coverage stays
+ * inside the original spans, including fractional edge pixels, to match the nearest-point hover.
  */
 export function shortfallSkyline(
   bars: Array<{ x0: number; x1: number; heightShare: number }>,
   plot: { left: number; width: number; height: number },
   capPx: number,
-  minWidth: number,
 ): ShortfallRect[] {
   const first = Math.floor(plot.left);
   const last = Math.ceil(plot.left + plot.width);
   const plotHeight = Math.round(plot.height);
   const heights = new Array<number>(Math.max(0, last - first)).fill(0);
+  const spans: Array<[number, number]> = [];
   for (const { x0, x1, heightShare } of bars) {
-    // Snapped outward to whole pixels; a month narrower than the minimum is widened around its
-    // own centre so a lone mild month stays visible.
-    let left = Math.floor(x0);
-    let right = Math.ceil(x1);
-    if (right - left < minWidth) {
-      left = Math.floor((x0 + x1) / 2 - minWidth / 2);
-      right = left + Math.ceil(minWidth);
-    }
+    const left = Math.max(x0, plot.left);
+    const right = Math.min(x1, plot.left + plot.width);
+    if (right <= left) continue;
+    spans.push([left, right]);
     const share = Number.isFinite(heightShare)
       ? Math.min(1, Math.max(0, heightShare))
       : 0;
@@ -682,22 +678,27 @@ export function shortfallSkyline(
       plotHeight,
       Math.max(capPx, Math.round(share * plotHeight)),
     );
-    for (
-      let column = Math.max(left, first);
-      column < Math.min(right, last);
-      column++
-    ) {
+    for (let column = Math.floor(left); column < Math.ceil(right); column++) {
       heights[column - first] = Math.max(heights[column - first], height);
     }
   }
   const rects: ShortfallRect[] = [];
-  for (let start = 0; start < heights.length;) {
-    const height = heights[start];
-    let end = start + 1;
-    while (end < heights.length && heights[end] === height) end++;
-    if (height > 0)
-      rects.push({ x: first + start, width: end - start, height });
-    start = end;
+  for (const [from, to] of mergeBandPixels(spans, 0)) {
+    for (let column = Math.floor(from); column < Math.ceil(to); column++) {
+      const x = Math.max(from, column);
+      const right = Math.min(to, column + 1);
+      const height = heights[column - first];
+      const previous = rects[rects.length - 1];
+      if (
+        previous &&
+        previous.height === height &&
+        previous.x + previous.width === x
+      ) {
+        previous.width = right - previous.x;
+      } else if (height > 0) {
+        rects.push({ x, width: right - x, height });
+      }
+    }
   }
   return rects;
 }
@@ -733,7 +734,6 @@ export function shortfallBarsPlugin(
           })),
           bbox,
           capPx,
-          SHORTFALL_MIN_WIDTH_PX * ratio,
         );
         const wash = withAlpha(color, chartPalette().bandAlpha);
         const hem = withAlpha(color, SHORTFALL_HEM_ALPHA);
