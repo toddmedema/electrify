@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { run, cleanText } = require("../dev/pr-triage");
+const { run, cleanText, ghRunner } = require("../dev/pr-triage");
 
 // Local noon, so the local-date comparison for --expires is the same in every time zone.
 const NOW = new Date(2026, 10, 11, 12, 0, 0).getTime();
@@ -336,6 +336,31 @@ test("a PR that keeps failing is flagged for a human after three attempts, then 
   assert.equal(h.read("state.json")[7].needsHumanSha, null);
 });
 
+test("a flagged PR that turns green on the same commit is eligible again when a conflict appears", (t) => {
+  const h = harness(t);
+  const sha = "7".padEnd(40, "a");
+  fs.writeFileSync(
+    h.file("state.json"),
+    JSON.stringify({
+      7: { attempts: 3, needsHumanSha: sha, handledCommentIds: [] },
+    }),
+  );
+  // Still failing on the flagged commit: left alone.
+  assert.equal(h.triage([pr(7, failing("check"))]).stdout, "CLEAN 1 open PRs");
+  // A person re-ran CI and it passed: the flag and the attempts are cleared.
+  assert.equal(h.triage([pr(7)]).stdout, "CLEAN 1 open PRs");
+  assert.deepEqual(h.read("state.json")[7], {
+    attempts: 0,
+    needsHumanSha: null,
+    handledCommentIds: [],
+  });
+  // The base moved, the head did not: this is new work.
+  const { work } = h.list(
+    h.triage([pr(7, { mergeable: "CONFLICTING", mergeStateStatus: "DIRTY" })]),
+  );
+  assert.deepEqual(work[0].reasons, [{ type: "conflict" }]);
+});
+
 test("attempts reset when CI is fully green and conflict-free, not while unknown or pending", (t) => {
   const h = harness(t);
   const seed = (n) => ({
@@ -457,6 +482,86 @@ test("errors print one ERROR line, release the lock and leave state untouched", 
     /^ERROR --expires takes a date/,
   );
 });
+
+test("a GraphQL error response is an ERROR, not an empty repository", (t) => {
+  const h = harness(t);
+  const result = run(["--state-dir", h.directory], {
+    now: NOW,
+    runGh: () =>
+      JSON.stringify({ errors: [{ message: "Resource limits exceeded" }] }),
+  });
+  assert.deepEqual(
+    [result.code, result.stdout],
+    [1, "ERROR GraphQL: Resource limits exceeded"],
+  );
+  assert.deepEqual(fs.readdirSync(h.directory), []);
+});
+
+test("truncated lists are reported on stderr, never in the verdict", (t) => {
+  const h = harness(t);
+  const capped = pr(1, {
+    reviewThreads: { pageInfo: { hasPreviousPage: true }, nodes: [] },
+  });
+  const result = run(["--state-dir", h.directory, "--dry-run"], {
+    now: NOW,
+    runGh: () =>
+      JSON.stringify({
+        data: {
+          repository: {
+            pullRequests: {
+              pageInfo: { hasNextPage: true },
+              nodes: [capped],
+            },
+          },
+        },
+      }),
+  });
+  assert.equal(result.stdout, "CLEAN 1 open PRs");
+  assert.deepEqual(result.stderr, [
+    "warning: more than 100 open PRs; only the oldest 100 were checked",
+    "warning: #1: only the newest 100 review threads",
+  ]);
+});
+
+test("--finish releases the lock even when the pending record is unreadable", (t) => {
+  const h = harness(t);
+  fs.writeFileSync(h.file("lock"), "1");
+  fs.writeFileSync(h.file("pending.json"), "{truncated");
+  const result = run(["--state-dir", h.directory, "--finish"]);
+  assert.equal(result.code, 1);
+  assert.match(result.stdout, /^ERROR .*pending\.json is not valid JSON/);
+  assert.equal(fs.existsSync(h.file("lock")), false);
+});
+
+test(
+  "a hung gh fails the run with ERROR and releases the lock instead of holding it for 90 minutes",
+  { skip: process.platform === "win32" },
+  (t) => {
+    const h = harness(t);
+    const bin = path.join(h.directory, "bin");
+    fs.mkdirSync(bin);
+    // `exec` so the kill lands on the sleeping process itself, not a shell around it.
+    fs.writeFileSync(path.join(bin, "gh"), "#!/bin/sh\nexec sleep 30\n", {
+      mode: 0o755,
+    });
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${bin}${path.delimiter}${originalPath}`;
+    t.after(() => {
+      process.env.PATH = originalPath;
+    });
+    const started = Date.now();
+    const result = run(["--state-dir", h.directory], {
+      now: NOW,
+      runGh: ghRunner("octo/widgets", 1000),
+    });
+    assert.deepEqual(
+      [result.code, result.stdout],
+      [1, "ERROR gh api timed out after 1s"],
+    );
+    assert.ok(Date.now() - started < 10_000, "the hung gh was killed");
+    assert.deepEqual(fs.readdirSync(h.directory), ["bin"]);
+  },
+);
 
 test("excerpts drop markup, links and comments and stay short", () => {
   const text = cleanText(

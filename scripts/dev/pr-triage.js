@@ -20,8 +20,9 @@
  * Ownership: this script owns the lock and the state. A run that finds work leaves the lock held
  * and writes nothing else for it until `--finish`, which the caller runs once its subagents are
  * done (or have failed): it counts one attempt per dispatched CI or conflict PR, records the
- * emitted CodeRabbit comment IDs as handled, and removes the lock. Runs that find no work release
- * the lock themselves. State lives in --state-dir (default ~/.claude/pr-babysitter):
+ * emitted CodeRabbit comment IDs as handled, and removes the lock. Runs that find no work or fail
+ * (`gh` gets 60 seconds) release the lock themselves. State lives in --state-dir (default
+ * ~/.claude/pr-babysitter):
  *   state.json    { "<pr>": { attempts, needsHumanSha, handledCommentIds }, ... } plus any
  *                 other keys, which are preserved
  *   lock          epoch seconds; younger than 90 minutes means a previous run is in flight
@@ -53,6 +54,7 @@ const BOT = "coderabbitai";
 const MAX_ATTEMPTS = 3;
 const DEFAULT_MAX_WORK = 3;
 const LOCK_MAX_AGE_MS = 90 * 60 * 1000;
+const GH_TIMEOUT_MS = 60 * 1000;
 const HANDLED_LIMIT = 500;
 const EXCERPT_LENGTH = 320;
 const TITLE_LENGTH = 90;
@@ -80,7 +82,9 @@ comments(last:100){pageInfo{hasPreviousPage}nodes{databaseId author{login}body}}
 reviews(last:100){pageInfo{hasPreviousPage}nodes{databaseId author{login}body}}
 }}}}`;
 
-function ghRunner(repo) {
+// A hung `gh` must fail inside the caller's own tool timeout: a run killed from outside never
+// reaches the `finally` that releases the lock, and would block the next 90 minutes of runs.
+function ghRunner(repo, timeoutMs = GH_TIMEOUT_MS) {
   const env = repo ? { ...process.env, GH_REPO: repo } : process.env;
   return (args) => {
     try {
@@ -88,10 +92,16 @@ function ghRunner(repo) {
         encoding: "utf8",
         maxBuffer: 256 * 1024 * 1024,
         stdio: ["ignore", "pipe", "pipe"],
+        timeout: timeoutMs,
+        killSignal: "SIGKILL",
         windowsHide: true,
         env,
       });
     } catch (error) {
+      if (error.code === "ETIMEDOUT")
+        throw new Error(
+          `gh ${args[0]} timed out after ${Math.round(timeoutMs / 1000)}s`,
+        );
       const detail = String(error.stderr || error.message)
         .trim()
         .split("\n")[0];
@@ -221,7 +231,12 @@ function evaluatePr(pr, entry, options = {}) {
     !pending.length &&
     pr.mergeable === "MERGEABLE" &&
     pr.mergeStateStatus !== "DIRTY";
-  if (green) entry.attempts = 0;
+  if (green) {
+    // A person's re-run can turn a flagged PR green on the same commit; a conflict that appears
+    // later (the base moved) is then new work, not the failure already given up on.
+    entry.attempts = 0;
+    entry.needsHumanSha = null;
+  }
 
   // Failed checks only count once the rest of CI has finished: the fix then sees every failure,
   // and a PR is not redispatched while its CI is still running.
@@ -460,26 +475,30 @@ function survey(options, { runGh, now, stateDir }) {
 
 /** Record what the last work list dispatched, then release the lock. */
 function finish(stateDir) {
-  const pendingFile = path.join(stateDir, "pending.json");
-  const pending = readJson(pendingFile, null);
-  let recorded = 0;
-  if (pending) {
-    const stateFile = path.join(stateDir, "state.json");
-    const state = readJson(stateFile, {});
-    for (const item of pending.work || []) {
-      const entry = { ...freshEntry(), ...state[item.number] };
-      if (item.attempt) entry.attempts += 1;
-      entry.handledCommentIds = [
-        ...new Set([...entry.handledCommentIds, ...(item.commentIds || [])]),
-      ].slice(-HANDLED_LIMIT);
-      state[item.number] = entry;
-      recorded += 1;
+  try {
+    const pendingFile = path.join(stateDir, "pending.json");
+    const pending = readJson(pendingFile, null);
+    let recorded = 0;
+    if (pending) {
+      const stateFile = path.join(stateDir, "state.json");
+      const state = readJson(stateFile, {});
+      for (const item of pending.work || []) {
+        const entry = { ...freshEntry(), ...state[item.number] };
+        if (item.attempt) entry.attempts += 1;
+        entry.handledCommentIds = [
+          ...new Set([...entry.handledCommentIds, ...(item.commentIds || [])]),
+        ].slice(-HANDLED_LIMIT);
+        state[item.number] = entry;
+        recorded += 1;
+      }
+      writeJson(stateFile, state);
+      fs.rmSync(pendingFile, { force: true });
     }
-    writeJson(stateFile, state);
-    fs.rmSync(pendingFile, { force: true });
+    return { stdout: `FINISHED ${recorded} PRs recorded`, stderr: [] };
+  } finally {
+    // Even when the record cannot be read or written, the next run must not wait out the lock.
+    releaseLock(stateDir);
   }
-  releaseLock(stateDir);
-  return { stdout: `FINISHED ${recorded} PRs recorded`, stderr: [] };
 }
 
 /** Run the CLI. Everything outside the process is a parameter so tests can use fixtures. */
@@ -522,4 +541,5 @@ module.exports = {
   codeRabbitItems,
   acquireLock,
   cleanText,
+  ghRunner,
 };
