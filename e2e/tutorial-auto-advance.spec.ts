@@ -165,11 +165,13 @@ for (const mission of [
         await expect(hud).toContainText("Find customer growth");
       } else {
         await expect(hud).toContainText("Change the chart time period");
-        // A one-month tutorial is already at the minimum zoom and spans the whole scenario.
-        // Fit full timeline expands to the longer forecast rather than pressing disabled zoom.
+        // The one-month scenario already fits, so pan into the longer forecast instead.
+        const displayedRange = page.locator(".insightsViewportDate");
+        const beforeRange = await displayedRange.innerText();
         await page
-          .getByRole("button", { name: "Fit full timeline", exact: true })
+          .getByRole("button", { name: "Pan later", exact: true })
           .click();
+        await expect(displayedRange).not.toHaveText(beforeRange);
         await expect(hud).toContainText(
           "Tap Layers, or choose a preset question",
         );
