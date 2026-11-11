@@ -846,13 +846,20 @@ describe("transmission actions", () => {
       expect(state.tutorialIntertieStress?.active).toBe(true);
       const stressMinute = state.date.minute;
       expect(state.timeline.some((t) => t.demandW > t.supplyW)).toBe(true);
-      state.tutorialStep = steps.findIndex(
-        (step) => step.phase === "INTERTIE_STRESS_INSPECT",
-      );
-      state = cloneDeep(gameReducer(state, setSpeed("FAST")));
-      tickState(state);
-      expect(state.speed).toBe("PAUSED");
-      expect(state.date.minute).toBe(stressMinute);
+      // Every preparation step, including the manual briefing after restoring gas, must
+      // reject playback until the player explicitly enters the final capstone.
+      for (
+        let stepIndex = state.tutorialStep;
+        stepIndex < steps.length - 1;
+        stepIndex++
+      ) {
+        state.tutorialStep = stepIndex;
+        state = cloneDeep(gameReducer(state, setSpeed("FAST")));
+        expect(state.speed).toBe("PAUSED");
+        tickState(state);
+        expect(state.speed).toBe("PAUSED");
+        expect(state.date.minute).toBe(stressMinute);
+      }
       // The exercise is persistent, finite and validated.
       expect(
         parseSave(serializeSave(state))?.game.tutorialIntertieStress,

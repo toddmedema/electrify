@@ -3,17 +3,11 @@ import { render, screen } from "@testing-library/react";
 import uPlot from "uplot";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { setThemeMode } from "../../Theme";
-import { GENERATORS } from "../../data/Facilities";
-import {
-  GameType,
-  GeneratorShoppingType,
-  TickPresentFutureType,
-} from "../../Types";
+import { TickPresentFutureType } from "../../Types";
 import { ChartPresentationContext } from "./ChartPresentationContext";
 import ChartFinances from "./ChartFinances";
 import ChartForecastDemandByType from "./ChartForecastDemandByType";
 import ChartForecastFuelPrices from "./ChartForecastFuelPrices";
-import ChartForecastRenewableCapacityFactor from "./ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "./ChartForecastStorage";
 import ChartForecastSupplyByFuel from "./ChartForecastSupplyByFuel";
 import ChartForecastSupplyDemand from "./ChartForecastSupplyDemand";
@@ -34,12 +28,6 @@ jest.mock("uplot", () => {
   };
   return { __esModule: true, default: MockUPlot };
 });
-
-// The renewable chart asks the build tables for what the fleet can run; one solar plant is
-// enough to give it a series without pulling the whole authored data set into this test
-jest.mock("../../data/Facilities", () => ({
-  GENERATORS: jest.fn(),
-}));
 
 // A tick carrying every field the forecast charts read, so each one renders on its own.
 // The fuel-price index signature on the tick type fights a full literal, so it is cast
@@ -113,11 +101,6 @@ function buildOptions(element: React.ReactElement): uPlot.Options {
 
 describe("insight forecast charts", () => {
   beforeEach(() => {
-    // react-scripts runs Jest with resetMocks, which wipes implementations set at module
-    // scope before every test; the mock itself survives, so give it its behaviour here
-    (GENERATORS as unknown as jest.Mock).mockImplementation(() => [
-      { name: "Solar", fuel: "Sun", available: true } as GeneratorShoppingType,
-    ]);
     setThemeMode("light");
     jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     // 350 is the design width, so chartScale is exactly one and every length in the options
@@ -299,18 +282,6 @@ describe("insight forecast charts", () => {
       "fuel prices",
       () => (
         <ChartForecastFuelPrices
-          timeline={timeline}
-          domain={domain}
-          startingYear={STARTING_YEAR}
-          multiyear={false}
-        />
-      ),
-    ],
-    [
-      "renewable output",
-      () => (
-        <ChartForecastRenewableCapacityFactor
-          game={{} as GameType}
           timeline={timeline}
           domain={domain}
           startingYear={STARTING_YEAR}

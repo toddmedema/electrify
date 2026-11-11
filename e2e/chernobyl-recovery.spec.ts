@@ -132,8 +132,9 @@ for (const theme of ["light", "dark"] as const) {
     );
     await expect(unitFour.locator(".facilityDisclosure")).toBeVisible();
     await expect(unitFour.locator(".facilityDisclosure")).toContainText(
-      "0/1GW · 0% · paused",
+      "0/1 0GW · 0% · paused",
     );
+    await expect(unitFour.locator("s")).toHaveText("1");
     await expect(
       unitFour.getByRole("button", {
         name: "Sell Chernobyl Unit 4",
