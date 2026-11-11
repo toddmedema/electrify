@@ -17,7 +17,7 @@ jest.mock("./UPlotChart", () => ({
 }));
 
 interface State {
-  shortfalls: Array<{ from: number; to: number }>;
+  shortfalls: Array<{ from: number; to: number; unmetShare: number }>;
 }
 
 const tick = (minute: number, supplyW: number, demandW: number) =>
@@ -42,8 +42,8 @@ it("keeps brief extrema and actual coincident shortfalls in each forecast month"
       demandMin: 80,
       demandMax: 220,
       peakShortfall: 50,
-      shortSamples: 2,
-      samples: 3,
+      unmetSum: 70,
+      demandSum: 400,
     },
     {
       minute: MINUTES_PER_MONTH,
@@ -53,8 +53,8 @@ it("keeps brief extrema and actual coincident shortfalls in each forecast month"
       demandMin: 100,
       demandMax: 100,
       peakShortfall: 0,
-      shortSamples: 0,
-      samples: 1,
+      unmetSum: 0,
+      demandSum: 100,
     },
   ]);
 });
@@ -105,7 +105,8 @@ describe("monthlyShortfalls", () => {
       {
         from: month(0) - MINUTES_PER_MONTH / 2,
         to: month(0) + MINUTES_PER_MONTH / 2,
-        severity: 10 / 210,
+        minute: month(0),
+        unmetShare: 10 / 600,
       },
     ]);
   });
@@ -163,9 +164,9 @@ describe("monthlyShortfalls", () => {
 
   it("keeps only the bars that reach into the plotted domain", () => {
     const bars = [
-      { from: 0, to: 10, severity: 1 },
-      { from: 10, to: 20, severity: 1 },
-      { from: 20, to: 30, severity: 1 },
+      { from: 0, to: 10, unmetShare: 1 },
+      { from: 10, to: 20, unmetShare: 1 },
+      { from: 20, to: 30, unmetShare: 1 },
     ];
     expect(shortfallsWithin(bars, [10, 20])).toEqual([bars[1]]);
     expect(shortfallsWithin(bars, [5, 12])).toEqual([bars[0], bars[1]]);
@@ -173,15 +174,25 @@ describe("monthlyShortfalls", () => {
     expect(shortfallsWithin([], [0, 10])).toEqual([]);
   });
 
-  it("scales severity with the peak shortfall against that month's peak demand and caps it", () => {
-    const [mild, total] = monthlyShortfalls(
+  it("is the share of the month's demand left unmet, over every hour rather than the worst one", () => {
+    const [mild, total, spread] = monthlyShortfalls(
       supplyDemandMonthlyRanges(
-        [tick(month(0), 90, 100), tick(month(1), 0, 100)],
+        [
+          tick(month(0), 90, 100),
+          tick(month(1), 0, 100),
+          // One hour in four is half short: an eighth of the month's demand, though the worst
+          // hour is half of that hour's.
+          tick(month(2), 100, 100),
+          tick(month(2) + 60, 100, 100),
+          tick(month(2) + 120, 100, 100),
+          tick(month(2) + 180, 50, 100),
+        ],
         0,
       ),
     );
-    expect(mild.severity).toBeCloseTo(0.1);
-    expect(total.severity).toBe(1);
+    expect(mild.unmetShare).toBeCloseTo(0.1);
+    expect(total.unmetShare).toBe(1);
+    expect(spread.unmetShare).toBeCloseTo(0.125);
   });
 
   it("flags exactly the months the hourly shortfall helper flags", () => {
@@ -251,14 +262,42 @@ describe("ChartSupplyDemandRanges", () => {
       expect(text.includes("Peak shortfall")).toBe(marked[index]);
       expect(text.includes("No shortfall")).toBe(!marked[index]);
     });
-    expect(props.tooltip!(1, state)).toContain("Short in 1 of 2 modeled hours");
+  });
+
+  it("tells the share of demand unmet and served, matching the bar it sits under", () => {
+    const props = drawnChartProps([
+      tick(0, 150, 100),
+      tick(MINUTES_PER_MONTH, 100, 100),
+      tick(MINUTES_PER_MONTH + 60, 80, 100),
+      tick(2 * MINUTES_PER_MONTH, 150, 100),
+    ]);
+    const state = props.state as State;
+    const text = props.tooltip!(1, state);
+    // 20 of the month's 200 demanded is unmet.
+    expect(text).toContain("Demand unmet: 10% (90% served)");
+    expect(text).toContain("Peak shortfall: 20W");
+    expect(text).not.toContain("hours");
+    expect(state.shortfalls[0].unmetShare).toBeCloseTo(0.1);
+    expect(props.tooltip!(0, state)).toContain("No shortfall");
+  });
+
+  it("does not round a real shortfall down to nothing", () => {
+    const hours = Array.from({ length: 24 }, (_unused, hour) =>
+      tick(hour * 60, hour === 12 ? 999_900 : 1_000_000, 1_000_000),
+    );
+    const props = drawnChartProps(hours);
+    expect(props.tooltip!(0, props.state as State)).toContain(
+      "Demand unmet: <0.1% (99.9% served)",
+    );
   });
 
   it("states how many forecast months are marked for assistive technology", () => {
     expect(
       drawnChartProps([tick(0, 150, 100), tick(MINUTES_PER_MONTH, 80, 100)])
         .ariaLabel,
-    ).toContain("1 forecast month with unmet demand marked");
+    ).toMatch(
+      /1 forecast month with unmet demand marked; the worst, \w+ 20\d\d, leaves 20% of demand unmet/,
+    );
     expect(drawnChartProps([tick(0, 150, 100)]).ariaLabel).toContain(
       "No forecast months with unmet demand",
     );

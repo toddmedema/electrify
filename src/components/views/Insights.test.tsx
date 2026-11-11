@@ -1321,7 +1321,9 @@ describe("Insights layers", () => {
       game.facilities = [];
       renderInsights(100, game);
       expect(screen.getByText("Unmet demand")).toBeInTheDocument();
-      expect(screen.getByText(/A taller red bar means/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Red height is the share of demand unmet/),
+      ).toBeInTheDocument();
     } finally {
       shortfall.mockRestore();
     }

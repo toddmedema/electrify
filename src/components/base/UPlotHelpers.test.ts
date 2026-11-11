@@ -11,7 +11,7 @@ import {
   yAxis,
   niceSplits,
   patternFill,
-  shortfallBarRects,
+  shortfallSkyline,
   zeroLinePlugin,
 } from "./UPlotHelpers";
 import { applyTextSize } from "../../TextSize";
@@ -421,45 +421,79 @@ it("does not retain negative zero in a degenerate axis", () => {
   expect(niceSplits(-0, -0)).toEqual([0]);
 });
 
-describe("shortfallBarRects", () => {
-  it("makes a larger shortfall a taller bar, with a visible floor and a ceiling", () => {
-    const heights = shortfallBarRects(
-      [
-        { x0: 0, x1: 10, severity: 0 },
-        { x0: 20, x1: 30, severity: 0.5 },
-        { x0: 40, x1: 50, severity: 1 },
-        { x0: 60, x1: 70, severity: 7 },
-      ],
-      1,
-    ).map((rect) => rect.height);
-    expect(heights).toEqual([4, 10, 16, 16]);
+describe("shortfallSkyline", () => {
+  const plot = { left: 10, width: 100, height: 200 };
+  const bar = (x0: number, x1: number, unmetShare: number) => ({
+    x0,
+    x1,
+    unmetShare,
   });
 
-  it("paints the tallest last so a pixel shared by several months shows the worst one", () => {
-    const rects = shortfallBarRects(
+  it("makes the plot's full height 100%, linearly, with the cap as the floor", () => {
+    const heights = shortfallSkyline(
       [
-        { x0: 10, x1: 10.4, severity: 0.9 },
-        { x0: 10.2, x1: 10.6, severity: 0.1 },
+        bar(10, 20, 0),
+        bar(30, 40, 0.25),
+        bar(50, 60, 0.5),
+        bar(70, 80, 1),
+        bar(90, 100, 7),
       ],
-      1,
-    );
-    expect(rects.map((rect) => rect.height)).toEqual(
-      [...rects.map((rect) => rect.height)].sort((a, b) => a - b),
-    );
-    expect(rects.at(-1)!.height).toBeGreaterThan(rects[0].height);
-  });
-
-  it("keeps a month narrower than a pixel visible and snaps edges to whole pixels", () => {
-    const [thin, wide] = shortfallBarRects(
-      [
-        { x0: 5.4, x1: 5.6, severity: 0 },
-        { x0: 20.3, x1: 30.2, severity: 0.1 },
-      ],
+      plot,
+      8,
       2,
-    );
-    expect(thin.width).toBeGreaterThanOrEqual(4);
-    expect(Number.isInteger(thin.x)).toBe(true);
-    expect(wide.x).toBe(20);
-    expect(wide.width).toBe(11);
+    ).map((rect) => rect.height);
+    expect(heights).toEqual([8, 50, 100, 200, 200]);
+  });
+
+  it("keeps the tallest of several months that share a pixel column", () => {
+    expect(
+      shortfallSkyline([bar(10, 10.4, 0.9), bar(10.2, 10.6, 0.1)], plot, 8, 1),
+    ).toEqual([{ x: 10, width: 1, height: 180 }]);
+  });
+
+  it("merges equal neighbours and joins unequal ones without a gap or an overlap", () => {
+    expect(
+      shortfallSkyline(
+        [bar(10, 30, 0.5), bar(30, 50, 0.5), bar(50, 70, 0.25)],
+        plot,
+        8,
+        2,
+      ),
+    ).toEqual([
+      { x: 10, width: 40, height: 100 },
+      { x: 50, width: 20, height: 50 },
+    ]);
+  });
+
+  it("widens a month narrower than the minimum around its centre and snaps to whole pixels", () => {
+    expect(shortfallSkyline([bar(40.4, 40.6, 0.1)], plot, 8, 4)).toEqual([
+      { x: 38, width: 4, height: 20 },
+    ]);
+    expect(shortfallSkyline([bar(10.3, 19.7, 0.5)], plot, 8, 2)).toEqual([
+      { x: 10, width: 10, height: 100 },
+    ]);
+  });
+
+  it("clips to the plot and drops bars wholly outside it", () => {
+    expect(
+      shortfallSkyline(
+        [bar(0, 25, 0.5), bar(105, 130, 1), bar(200, 220, 1)],
+        plot,
+        8,
+        2,
+      ),
+    ).toEqual([
+      { x: 10, width: 15, height: 100 },
+      { x: 105, width: 5, height: 200 },
+    ]);
+  });
+
+  it("paints a cap rather than NaN for an unusable share, and never exceeds the plot", () => {
+    expect(shortfallSkyline([bar(10, 20, NaN)], plot, 8, 2)).toEqual([
+      { x: 10, width: 10, height: 8 },
+    ]);
+    expect(
+      shortfallSkyline([bar(10, 20, 0.5)], { ...plot, height: 6 }, 8, 2),
+    ).toEqual([{ x: 10, width: 10, height: 6 }]);
   });
 });

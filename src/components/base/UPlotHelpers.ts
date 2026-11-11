@@ -631,51 +631,84 @@ export function bandsPlugin(
   };
 }
 
-/** One stretch of x with unmet demand, and how large the worst of it was (0 to 1). */
+/** One stretch of x with unmet demand, and the share of that stretch's demand that went unmet. */
 export interface ShortfallBar {
   from: number;
   to: number;
-  severity: number;
+  /** 0 to 1; 1 means none of the demand was served. */
+  unmetShare: number;
 }
 
-const SHORTFALL_BAR_MIN_PX = 4;
-const SHORTFALL_BAR_MAX_PX = 16;
-const SHORTFALL_BAR_MIN_WIDTH_PX = 2;
+/** A rectangle hanging from the top of the plot, in device pixels. */
+export interface ShortfallRect {
+  x: number;
+  width: number;
+  height: number;
+}
+
+const SHORTFALL_CAP_PX = 4;
+const SHORTFALL_MIN_WIDTH_PX = 2;
+const SHORTFALL_HEM_ALPHA = 0.7;
 
 /**
- * Device-pixel rectangles for shortfall bars, shortest first. Every bar hangs from the top of
- * the plot, so painting the tallest last leaves the largest shortfall visible even where
- * months are narrower than a pixel and several land in the same column.
+ * The silhouette of shortfall bars as non-overlapping device-pixel rectangles. A bar reaches
+ * down the plot in proportion to its unmet share, so the full plot height is 100%, and is never
+ * shorter than the cap. Months can be narrower than a pixel, so several may land in one column;
+ * each column keeps the tallest, and equal neighbours merge, so translucent shading never
+ * stacks into false darkness and abutting bars leave no anti-aliased seam.
  */
-export function shortfallBarRects(
-  bars: Array<{ x0: number; x1: number; severity: number }>,
-  pxRatio: number,
-): Array<{ x: number; width: number; height: number }> {
-  const minWidth = SHORTFALL_BAR_MIN_WIDTH_PX * pxRatio;
-  return bars
-    .map(({ x0, x1, severity }) => {
-      // Snapped outward to whole device pixels so neighbouring months leave no anti-aliased
-      // seam; a month narrower than the minimum is widened around its own centre instead.
-      const left = Math.floor(x0);
-      const right = Math.ceil(x1);
-      const widened = right - left < minWidth;
-      const clamped = Math.min(1, Math.max(0, severity));
-      return {
-        x: widened ? Math.floor((x0 + x1) / 2 - minWidth / 2) : left,
-        width: widened ? Math.ceil(minWidth) : right - left,
-        height:
-          (SHORTFALL_BAR_MIN_PX +
-            (SHORTFALL_BAR_MAX_PX - SHORTFALL_BAR_MIN_PX) * clamped) *
-          pxRatio,
-      };
-    })
-    .sort((a, b) => a.height - b.height);
+export function shortfallSkyline(
+  bars: Array<{ x0: number; x1: number; unmetShare: number }>,
+  plot: { left: number; width: number; height: number },
+  capPx: number,
+  minWidth: number,
+): ShortfallRect[] {
+  const first = Math.floor(plot.left);
+  const last = Math.ceil(plot.left + plot.width);
+  const plotHeight = Math.round(plot.height);
+  const heights = new Array<number>(Math.max(0, last - first)).fill(0);
+  for (const { x0, x1, unmetShare } of bars) {
+    // Snapped outward to whole pixels; a month narrower than the minimum is widened around its
+    // own centre so a lone mild month stays visible.
+    let left = Math.floor(x0);
+    let right = Math.ceil(x1);
+    if (right - left < minWidth) {
+      left = Math.floor((x0 + x1) / 2 - minWidth / 2);
+      right = left + Math.ceil(minWidth);
+    }
+    const share = Number.isFinite(unmetShare)
+      ? Math.min(1, Math.max(0, unmetShare))
+      : 0;
+    const height = Math.min(
+      plotHeight,
+      Math.max(capPx, Math.round(share * plotHeight)),
+    );
+    for (
+      let column = Math.max(left, first);
+      column < Math.min(right, last);
+      column++
+    ) {
+      heights[column - first] = Math.max(heights[column - first], height);
+    }
+  }
+  const rects: ShortfallRect[] = [];
+  for (let start = 0; start < heights.length;) {
+    const height = heights[start];
+    let end = start + 1;
+    while (end < heights.length && heights[end] === height) end++;
+    if (height > 0)
+      rects.push({ x: first + start, width: end - start, height });
+    start = end;
+  }
+  return rects;
 }
 
 /**
- * Bars along the top of the plot for the stretches that ran short, taller for a larger peak
- * shortfall. A full-height wash would claim the whole stretch was dark, which an aggregated
- * chart cannot know; the bar says only that it happened, and how badly at worst.
+ * Shading for the stretches that ran short, as tall as the share of demand left unmet: the
+ * plot's full height is all of it. A dark cap marks the top, the original light wash fills down
+ * to the share, and a hairline on the wash's lower edge makes that height readable against the
+ * faint bands. It is painted before the axes and series, like a recession band, so it never
+ * tints a line.
  */
 export function shortfallBarsPlugin(
   getBars: () => ShortfallBar[],
@@ -683,25 +716,40 @@ export function shortfallBarsPlugin(
 ): uPlot.Plugin {
   return {
     hooks: {
-      draw: (u: uPlot) => {
+      drawClear: (u: uPlot) => {
         const bars = getBars();
         if (bars.length === 0) {
           return;
         }
-        u.ctx.save();
-        clipToPlot(u);
-        u.ctx.fillStyle = color;
-        for (const { x, width, height } of shortfallBarRects(
+        const { ctx, bbox } = u;
+        const ratio = uPlot.pxRatio;
+        const capPx = Math.round(SHORTFALL_CAP_PX * ratio);
+        const hemPx = Math.max(1, Math.round(ratio));
+        const rects = shortfallSkyline(
           bars.map((bar) => ({
             x0: u.valToPos(bar.from, "x", true),
             x1: u.valToPos(bar.to, "x", true),
-            severity: bar.severity,
+            unmetShare: bar.unmetShare,
           })),
-          uPlot.pxRatio,
-        )) {
-          u.ctx.fillRect(x, u.bbox.top, width, height);
+          bbox,
+          capPx,
+          SHORTFALL_MIN_WIDTH_PX * ratio,
+        );
+        const wash = withAlpha(color, chartPalette().bandAlpha);
+        const hem = withAlpha(color, SHORTFALL_HEM_ALPHA);
+        ctx.save();
+        clipToPlot(u);
+        for (const { x, width, height } of rects) {
+          if (height > capPx) {
+            ctx.fillStyle = wash;
+            ctx.fillRect(x, bbox.top, width, height);
+            ctx.fillStyle = hem;
+            ctx.fillRect(x, bbox.top + height - hemPx, width, hemPx);
+          }
+          ctx.fillStyle = color;
+          ctx.fillRect(x, bbox.top, width, capPx);
         }
-        u.ctx.restore();
+        ctx.restore();
       },
     },
   };

@@ -87,6 +87,7 @@ import {
   fuelColors,
   fuelDashArrays,
   waterDashArrays,
+  withAlpha,
 } from "../../Theme";
 import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
@@ -1709,12 +1710,22 @@ export default class Insights extends React.Component<Props, State> {
                   { name: "Supply", color: chartPalette().supply, dash: "20" },
                   { name: "Demand", color: chartPalette().demand, dash: "20" },
                   ...(unmetDemandMarked
-                    ? [{ name: "Unmet demand", color: chartPalette().blackout }]
+                    ? [
+                        {
+                          name: "Unmet demand",
+                          color: chartPalette().blackout,
+                          pattern: "cap" as const,
+                          fill: withAlpha(
+                            chartPalette().blackout,
+                            chartPalette().bandAlpha,
+                          ),
+                        },
+                      ]
                     : []),
                 ]}
                 {...(unmetDemandMarked
                   ? {
-                      note: "Bands span each month's lowest to highest hour. A taller red bar means a larger peak shortfall in at least one hour.",
+                      note: "Bands span each month's lowest to highest hour. Red height is the share of demand unmet; full height is 100%.",
                     }
                   : {})}
               />
