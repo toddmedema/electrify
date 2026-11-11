@@ -5,6 +5,7 @@ import {
   isGatedStep,
   ScenarioType,
   TUTORIAL_UI_SELECTORS,
+  TutorialStepType,
 } from "../Types";
 import { getScenarioLocation } from "../helpers/Locations";
 import { intertiesEnabledForScenario } from "./AdjacentMarkets";
@@ -132,7 +133,7 @@ describe("tutorial mission metadata", () => {
         peakW: 500000000,
       }),
     ]);
-    expect(interties.tutorialSteps).toHaveLength(19);
+    expect(interties.tutorialSteps).toHaveLength(20);
   });
 
   it("starts Forecasting with a small solar plant beside its coal plant", () => {
@@ -249,6 +250,96 @@ describe("tutorial step actions", () => {
         });
       });
     });
+  });
+
+  // A capstone is a new challenge, and a deed's last tap must not drop the player into it (or
+  // rebuild their grid) unannounced. A manual step before it says what is coming and lets them
+  // begin when ready. Missions 1, 4 and 5 are the exception: their last guided deed is the player
+  // starting the clock, which is the explicit start, and a Next there would leave the clock
+  // running toward the scenario's own end while they read.
+  const CLOCK_START_LEAD_INS = [
+    0, // Mission 1: Electricity
+    4, // Mission 4: Finances
+    3, // Mission 5: Pricing
+  ];
+  const capstoneLeadIns = TUTORIALS.flatMap((tutorial) =>
+    tutorial.tutorialSteps!.flatMap((step, index) =>
+      step.capstone
+        ? [
+            {
+              tutorial,
+              capstone: step,
+              before: tutorial.tutorialSteps![index - 1],
+            },
+          ]
+        : [],
+    ),
+  );
+  const isManual = (step: TutorialStepType) =>
+    !isGatedStep(step) && !step.continueOn && !step.continueOnClick;
+
+  it("introduces every capstone with a manual Next step", () => {
+    capstoneLeadIns
+      .filter(({ tutorial }) => !CLOCK_START_LEAD_INS.includes(tutorial.id))
+      .forEach(({ tutorial, before }) => {
+        expect({ mission: tutorial.name, manual: isManual(before) }).toEqual({
+          mission: tutorial.name,
+          manual: true,
+        });
+      });
+  });
+
+  it("limits the exception to a step that starts the clock", () => {
+    const started = (speed: string) =>
+      ({ game: { speed } }) as unknown as AppStateType;
+    capstoneLeadIns
+      .filter(({ tutorial }) => CLOCK_START_LEAD_INS.includes(tutorial.id))
+      .forEach(({ tutorial, before }) => {
+        expect({
+          mission: tutorial.name,
+          startsClock: before.advanceOn?.(started("SLOW")),
+          pausedCounts: before.advanceOn?.(started("PAUSED")),
+        }).toEqual({
+          mission: tutorial.name,
+          startsClock: true,
+          pausedCounts: false,
+        });
+      });
+  });
+
+  it("names the restart before a capstone that rebuilds the grid", () => {
+    const restarting = capstoneLeadIns.filter(
+      ({ capstone }) => !capstone.capstone!.preserveProgress,
+    );
+    expect(restarting.map(({ tutorial }) => tutorial.id)).toEqual([2, 5]);
+    restarting.forEach(({ before }) => {
+      expect(before.nextLabel).toBe("Start final challenge");
+    });
+  });
+
+  // On phones a named action takes a whole line, so the HUD drops Exit there and the game menu's
+  // "Main menu" is the way out. Hiding the menu on such a step would leave no way out at all.
+  it("keeps the game menu reachable on every named-action step", () => {
+    TUTORIALS.forEach((tutorial) =>
+      tutorial.tutorialSteps!.forEach((step, index) => {
+        if (!step.nextLabel) return;
+        expect({
+          mission: tutorial.name,
+          index,
+          hidesMenu: (step.hideUi || []).includes("menu"),
+        }).toEqual({ mission: tutorial.name, index, hidesMenu: false });
+      }),
+    );
+  });
+
+  it("explains monthly demand changes just before the generator capstone", () => {
+    const generators = capstoneLeadIns.find(
+      ({ tutorial }) => tutorial.id === 1,
+    )!;
+    expect(generators.before.target).toBe("#chartSupplyDemand");
+    expect((generators.before.content.props as { text: string }).text).toMatch(
+      /one day per month.*seasons/,
+    );
   });
 
   it("opens the first mission with a manual introduction before hands-on steps", () => {

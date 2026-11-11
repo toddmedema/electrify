@@ -4577,12 +4577,36 @@ $pane_header_height: 48px;
     font-size: var(--font-size-caption);
     font-weight: 400;
   }
-  .tutorialHud-namedAction {
-    grid-template-rows: minmax(0, 1fr) auto auto;
+  // A named action (such as "Start final challenge") is too wide to share a row, so it takes
+  // the full width. Exit and the step counter step aside instead of adding a row for
+  // themselves: the game menu still leaves the tutorial, and the counter stays in the
+  // accessibility tree because it names the region. Back, when there is one, shares the row.
+  .tutorialHud-namedAction .tutorialHudFooter > button:first-child {
+    display: none;
+  }
+  .tutorialHud-namedAction .tutorialHudHeader {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
   }
   .tutorialHud-namedAction .tutorialHudFooter > .tutorialHudNav:last-child {
-    grid-row: 3;
     grid-column: 1 / -1;
+  }
+  .tutorialHud-namedAction
+    .tutorialHudFooter
+    > .tutorialHudNav:not(:last-child) {
+    grid-column: 1;
+  }
+  .tutorialHud-namedAction
+    .tutorialHudFooter
+    > .tutorialHudNav:not(:last-child)
+    + .tutorialHudNav:last-child {
+    grid-column: 2 / -1;
   }
 }
 
