@@ -297,6 +297,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await expect(
     page.getByRole("heading", { name: "Step 19 of 20" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "fast speed" }).click();
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");

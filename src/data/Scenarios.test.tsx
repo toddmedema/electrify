@@ -257,7 +257,11 @@ describe("tutorial step actions", () => {
   // begin when ready. Missions 1, 4 and 5 are the exception: their last guided deed is the player
   // starting the clock, which is the explicit start, and a Next there would leave the clock
   // running toward the scenario's own end while they read.
-  const CLOCK_START_LEAD_INS = [0, 4, 3];
+  const CLOCK_START_LEAD_INS = [
+    0, // Mission 1: Electricity
+    4, // Mission 4: Finances
+    3, // Mission 5: Pricing
+  ];
   const capstoneLeadIns = TUTORIALS.flatMap((tutorial) =>
     tutorial.tutorialSteps!.flatMap((step, index) =>
       step.capstone
