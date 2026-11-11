@@ -80,9 +80,7 @@ for (const theme of ["light", "dark"]) {
     await expect(highlight).toBeVisible();
     await keyboardChart.press("Escape");
     await expect(highlight).toBeHidden();
-    await pane
-      .getByRole("button", { name: "Inspect Battery", exact: true })
-      .click();
+    await pane.getByRole("button", { name: /^Inspect Battery(?:,|$)/ }).click();
     const battery = pane.locator(
       '.facilityRow[data-facility="Battery"] .facilityDetails',
     );
