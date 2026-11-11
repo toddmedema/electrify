@@ -18,6 +18,7 @@ import cardReducer from "./Card";
 import gameReducer, { tutorialCompleteDialog } from "./Game";
 import settingsReducer from "./Settings";
 import {
+  changeTutorialStep,
   restartTutorialAtStep,
   selectTutorialHiddenUi,
   selectTutorialActions,
@@ -144,7 +145,7 @@ function tutorialStore(
 }
 
 describe("tutorialGateMiddleware", () => {
-  it.each([5])(
+  it.each([2, 5])(
     "keeps mission %s on its reset disclosure even while time runs",
     (id) => {
       const steps = getScenario(id)!.tutorialSteps!;
@@ -157,6 +158,20 @@ describe("tutorialGateMiddleware", () => {
       expect(store.getState().game.tutorialStep).toBe(preparation);
       expect(store.getState().game.speed).toBe("SLOW");
       expect(steps[preparation].nextLabel).toBe("Start final challenge");
+
+      const dispatch = jest.fn(store.dispatch);
+      changeTutorialStep(dispatch as never, {
+        fromStep: preparation,
+        toStep: preparation + 1,
+        tutorialSteps: steps,
+        scenarioId: id,
+        currentCard: store.getState().card.name,
+      });
+      expect(dispatch.mock.calls.map(([action]) => action)).toEqual([
+        { type: "game/quit", payload: undefined },
+        { type: "game/start", payload: id },
+        { type: "game/delta", payload: { tutorialStep: preparation + 1 } },
+      ]);
     },
   );
 

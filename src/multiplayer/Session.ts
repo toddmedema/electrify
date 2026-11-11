@@ -73,6 +73,28 @@ function validPendingCampaign(value: unknown): value is PendingCampaign {
 /** A guest's lobby closed before the match began, because its host left. */
 export const HOST_LEFT = "The host closed the lobby.";
 
+/** A guest's match lost its host mid-game; the connection notice shows this message. */
+export const CONNECTION_LOST =
+  "Connection lost. Reconnect to continue, or resume the multiplayer save in a new lobby.";
+/** Whether a shown error means the link to the host is gone, as opposed to a failed save or a
+ * refused command. Native lobby errors come only from its connection failures. */
+export const isConnectionLoss = (error?: string, lobbyError?: string) =>
+  error === CONNECTION_LOST || (!error && !!lobbyError);
+/** Whether the notice for this error should offer Disconnect. A guest whose host link is gone
+ * has nothing to wait for and nothing to save with. A host's simulation keeps running through a
+ * lobby error and can still save, so it never gets an exit that skips its checkpoint. */
+export const offersDisconnect = ({
+  error,
+  lobbyError,
+  hostId,
+  selfId,
+}: {
+  error?: string;
+  lobbyError?: string;
+  hostId?: string;
+  selfId?: string;
+}) => !!hostId && hostId !== selfId && isConnectionLoss(error, lobbyError);
+
 /** Electron prefixes whatever the main process throws; a player should read only the message. */
 const IPC_ERROR_PREFIX = /^Error invoking remote method '[^']*': (?:Error: )?/;
 /** The native transport's refusal to send to a peer with no live connection
@@ -267,8 +289,7 @@ export class MultiplayerSession {
       else if (!this.state.view) void this.hostLeft();
       else
         this.update({
-          error:
-            "Connection lost. Reconnect to continue, or resume the multiplayer save in a new lobby.",
+          error: CONNECTION_LOST,
         });
     } else if (event.kind === "message") {
       if (this.worker && event.payload.kind === "save-request") {

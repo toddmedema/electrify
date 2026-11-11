@@ -22,7 +22,7 @@ import {
   snackbarOpen,
 } from "../reducers/UI";
 import { registerShutdownCheckpoint } from "../desktop/Shutdown";
-import { HOST_LEFT, MultiplayerSession } from "./Session";
+import { HOST_LEFT, MultiplayerSession, offersDisconnect } from "./Session";
 import {
   registerCoopControls,
   registerLobbyOpener,
@@ -372,8 +372,18 @@ export default function MultiplayerRoot() {
           store.dispatch(dialogClose());
           void session.reconnect();
         },
-        secondaryLabel: "Disconnect",
-        secondaryAction: disconnect,
+        // Only a guest's lost connection leaves nothing to wait for. Other errors, such as a
+        // failed save, and the host, which can still save, never get a way out that skips the
+        // checkpoint.
+        ...(offersDisconnect({
+          error: state.error,
+          lobbyError: state.lobby.error,
+          hostId: state.lobby.hostId,
+          selfId: state.lobby.selfId,
+        }) && {
+          secondaryLabel: "Disconnect",
+          secondaryAction: disconnect,
+        }),
       }),
     );
     session.dismissError();
@@ -381,6 +391,8 @@ export default function MultiplayerRoot() {
     session,
     state.error,
     state.lobby.error,
+    state.lobby.hostId,
+    state.lobby.selfId,
     hasView,
     coop,
     open,

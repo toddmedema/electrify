@@ -49,6 +49,35 @@ for (const theme of ["light", "dark"]) {
     await hud.getByRole("button", { name: "Next", exact: true }).click();
     await expect(hud).toContainText("Drag Coal above Pumped Hydro");
     await dragCoalAbovePumpedHydro(page);
+    await expect(hud).toContainText("Restart for the final challenge");
+    if (testInfo.project.name.startsWith("mobile")) {
+      // The named button has its own line on a phone, so Exit and the step counter step aside
+      // rather than adding a row. The region keeps its name for assistive technology.
+      await expect(
+        hud.getByRole("button", { name: "Exit", exact: true }),
+      ).toBeHidden();
+      expect(
+        (await hud.locator(".tutorialHudHeader").boundingBox())!.width,
+      ).toBeLessThanOrEqual(1);
+      await expect(
+        page.getByRole("region", { name: "Step 7 of 8", exact: true }),
+      ).toBeVisible();
+      const [hudBox, startBox] = await Promise.all([
+        hud.boundingBox(),
+        hud
+          .getByRole("button", { name: "Start final challenge", exact: true })
+          .boundingBox(),
+      ]);
+      expect(startBox!.width).toBeGreaterThanOrEqual(hudBox!.width - 32);
+    }
+    await expect(page.locator(".snackbar")).toBeHidden();
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`storage-restart-briefing-${theme}.png`),
+      animations: "disabled",
+    });
+    await hud
+      .getByRole("button", { name: "Start final challenge", exact: true })
+      .click();
     await expect(hud).toContainText("Build storage to cover peak demand");
     await expect(page.locator(".facilityRow")).toHaveCount(1);
     await page.locator(".button-buildFacility").click();

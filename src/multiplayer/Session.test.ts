@@ -2,7 +2,13 @@ import { modScenario } from "../mods/ModScenario";
 import { modBrowseSummary } from "./ModBrowse";
 import { selectionKey, validBrowseState } from "./Browse";
 import { utf8Bytes } from "../helpers/RuleIdentity";
-import { HOST_LEFT, MultiplayerSession } from "./Session";
+import {
+  CONNECTION_LOST,
+  HOST_LEFT,
+  MultiplayerSession,
+  isConnectionLoss,
+  offersDisconnect,
+} from "./Session";
 import type { DesktopBridge } from "../Desktop";
 import type {
   LobbyState,
@@ -592,6 +598,43 @@ test("a command that loses a race with the host link drops is not a new failure"
   expect(f.session.getSnapshot().error).toBeUndefined();
   expect(f.session.getSnapshot().pending).toBe(true);
   f.session.dispose();
+});
+test("only a lost connection counts as one, so other errors never offer a way out that skips the save", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  deliver(f, {});
+  f.event({ kind: "disconnected", sender: host });
+  expect(f.session.getSnapshot().error).toBe(CONNECTION_LOST);
+  expect(isConnectionLoss(f.session.getSnapshot().error)).toBe(true);
+  // Native lobby errors come only from its connection failures.
+  expect(isConnectionLoss(undefined, "The host left.")).toBe(true);
+  expect(isConnectionLoss("Multiplayer save failed: Disk full")).toBe(false);
+  expect(isConnectionLoss("Multiplayer save failed: Disk full", "x")).toBe(
+    false,
+  );
+  expect(isConnectionLoss("Not enough cash")).toBe(false);
+  expect(isConnectionLoss()).toBe(false);
+  f.session.dispose();
+});
+test("only a guest's lost connection offers Disconnect, never a host that can still save", () => {
+  const guestSide = { hostId: host, selfId: guest };
+  expect(offersDisconnect({ error: CONNECTION_LOST, ...guestSide })).toBe(true);
+  expect(offersDisconnect({ lobbyError: "The host left.", ...guestSide })).toBe(
+    true,
+  );
+  expect(offersDisconnect({ error: "Not enough cash", ...guestSide })).toBe(
+    false,
+  );
+  // A native lobby error can reach a host whose simulation keeps running.
+  const hostSide = { hostId: host, selfId: host };
+  expect(
+    offersDisconnect({
+      lobbyError: "Steam connection interrupted.",
+      ...hostSide,
+    }),
+  ).toBe(false);
+  expect(offersDisconnect({ error: CONNECTION_LOST, ...hostSide })).toBe(false);
+  expect(offersDisconnect({ error: CONNECTION_LOST })).toBe(false);
 });
 test("players read the transport's message, never Electron's invoke wrapper", async () => {
   const f = fixture();

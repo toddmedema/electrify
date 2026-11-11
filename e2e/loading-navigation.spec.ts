@@ -46,7 +46,7 @@ test("a mission finishing its load cannot replace Achievements opened from a not
     await page.clock.resume();
     // This objective appears only after loaded() and its delayed restoration both finish.
     await expect(
-      page.getByRole("region", { name: "Step 1 of 9", exact: true }),
+      page.getByRole("region", { name: "Step 1 of 10", exact: true }),
     ).toBeVisible();
     await expect(
       page.getByText(`1 of ${catalog.length} unlocked`, { exact: true }),
@@ -63,7 +63,7 @@ test("a mission finishing its load cannot replace Achievements opened from a not
     await page.keyboard.press("Escape");
     await expect(page.locator(".facilities:visible")).toBeVisible();
     await expect(
-      page.getByRole("region", { name: "Step 1 of 9", exact: true }),
+      page.getByRole("region", { name: "Step 1 of 10", exact: true }),
     ).toBeVisible();
   } finally {
     release();
