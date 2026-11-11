@@ -2042,6 +2042,12 @@ $pane_header_height: 48px;
 .insights {
   container-type: inline-size;
   container-name: insights;
+
+  > .scrollable {
+    // Chart heights follow their width. Reserve classic scrollbar space so overflow cannot
+    // repeatedly narrow/shrink the charts, disappear, then widen/grow them again.
+    scrollbar-gutter: stable;
+  }
 }
 
 .insightsTracks {
