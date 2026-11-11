@@ -55,10 +55,30 @@ export default function SignInButtons({
             <Button
               key={provider}
               variant={variant}
+              color={provider === "apple" ? "inherit" : "primary"}
               disabled={disabled || !!busy}
               aria-label={label}
               onClick={() => void signIn(provider)}
-              sx={{ minWidth: 0, minHeight: 44, lineHeight: 1.4 }}
+              sx={[
+                { minWidth: 0, minHeight: 44, lineHeight: 1.4 },
+                provider === "apple" &&
+                  ((theme) => {
+                    // Apple's custom sign-in controls use black and white in both palettes.
+                    const dark = theme.palette.mode === "dark";
+                    const whiteBackground =
+                      variant === "contained" ? dark : !dark;
+                    const backgroundColor = whiteBackground ? "#fff" : "#000";
+                    const borderColor = dark ? "#fff" : "#000";
+                    return {
+                      "&:not(.Mui-disabled)": {
+                        color: whiteBackground ? "#000" : "#fff",
+                        backgroundColor,
+                        borderColor,
+                        "&:hover": { backgroundColor, borderColor },
+                      },
+                    };
+                  }),
+              ]}
             >
               {busy === provider ? "Signing in…" : label}
             </Button>

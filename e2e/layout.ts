@@ -16,6 +16,17 @@ export async function expectSignInButtonsToFit(scope: Page | Locator) {
   await expect(apple).toHaveCount(1);
   await expect(google).toBeVisible();
   await expect(apple).toBeVisible();
+  // Apple requires a black or white title and background for custom sign-in controls.
+  // Sharing enables sign-in after preparing its snapshot; allow its color transition to settle.
+  await expect(apple).toBeEnabled();
+  const blackOrWhite = /^rgb\((0, 0, 0|255, 255, 255)\)$/;
+  await expect(apple).toHaveCSS("color", blackOrWhite);
+  await expect(apple).toHaveCSS("background-color", blackOrWhite);
+  const appleColors = await apple.evaluate((button) => {
+    const style = getComputedStyle(button);
+    return [style.color, style.backgroundColor];
+  });
+  expect(appleColors[0]).not.toBe(appleColors[1]);
   // A leaderboard response can move the entire row between protocol calls. Read both
   // controls in one browser task so their geometry describes the same layout state.
   const layout = await scope
