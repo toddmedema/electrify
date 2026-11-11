@@ -22,8 +22,8 @@ const intervals = shortfallIntervals(timeline, [
 
 it("reports coincident peaks for distinct shaded intervals", () => {
   expect(intervals).toEqual([
-    { from: 20, to: 150, peakW: 40e6 },
-    { from: 260, to: 300, peakW: 20e6 },
+    { from: 20, to: 150, peakShortfall: 40e6 },
+    { from: 260, to: 300, peakShortfall: 20e6 },
   ]);
   expect(shortfallAt(intervals, 21)).toBe(intervals[0]);
   expect(shortfallAt(intervals, 150)).toBeUndefined();
@@ -45,44 +45,51 @@ it("inspects inside a shortage even when the nearest sample has sufficient suppl
   expect(unmetAt(timeline, 400)).toBe(20e6);
 });
 
-it("highlights the full interval at every cursor height and clears outside it", () => {
-  const over = document.createElement("div");
-  Object.defineProperties(over, {
-    clientWidth: { value: 300 },
-    clientHeight: { value: 100 },
-  });
-  const plot = {
-    over,
-    cursor: { left: 25, top: 1 },
-    posToVal: (value: number) => value,
-    valToPos: (value: number) => value,
-  } as unknown as uPlot;
-  const plugin = shortfallHoverPlugin(() => intervals);
-  const run = (name: keyof uPlot.Hooks.Arrays) => {
-    const hook = plugin.hooks![name];
-    (hook as (plot: uPlot) => void)(plot);
-  };
-  run("init");
-  const highlight = over.querySelector<HTMLElement>(
-    ".chartShortfallHighlight",
-  )!;
-  for (const top of [1, 50, 99]) {
-    plot.cursor.top = top;
+it.each([false, true])(
+  "highlights the full interval at every cursor height with scaled height %s",
+  (scaleHeight) => {
+    const over = document.createElement("div");
+    Object.defineProperties(over, {
+      clientWidth: { value: 300 },
+      clientHeight: { value: 100 },
+    });
+    const plot = {
+      over,
+      bbox: { height: 100 * (uPlot.pxRatio || 1) },
+      scales: { y: { min: 0, max: 100e6 } },
+      cursor: { left: 25, top: 1 },
+      posToVal: (value: number) => value,
+      valToPos: (value: number) => value,
+    } as unknown as uPlot;
+    const plugin = shortfallHoverPlugin(() => intervals, { scaleHeight });
+    const run = (name: keyof uPlot.Hooks.Arrays) => {
+      const hook = plugin.hooks![name];
+      (hook as (plot: uPlot) => void)(plot);
+    };
+    run("init");
+    const highlight = over.querySelector<HTMLElement>(
+      ".chartShortfallHighlight",
+    )!;
+    for (const top of [1, 50, 99]) {
+      plot.cursor.top = top;
+      run("setCursor");
+      expect(highlight.hidden).toBe(false);
+      expect(highlight.style.left).toBe("20px");
+      expect(highlight.style.width).toBe("130px");
+      expect(highlight.style.height).toBe(scaleHeight ? "40px" : "100%");
+    }
+    plot.cursor.left = 155;
     run("setCursor");
-    expect(highlight.hidden).toBe(false);
-    expect(highlight.style.left).toBe("20px");
-    expect(highlight.style.width).toBe("130px");
-  }
-  plot.cursor.left = 155;
-  run("setCursor");
-  expect(highlight.hidden).toBe(true);
-  plot.cursor.left = 280;
-  run("setCursor");
-  expect(highlight.style.left).toBe("260px");
-  expect(highlight.style.width).toBe("40px");
-  plot.cursor.top = -10;
-  run("setCursor");
-  expect(highlight.hidden).toBe(true);
-  run("destroy");
-  expect(over.children).toHaveLength(0);
-});
+    expect(highlight.hidden).toBe(true);
+    plot.cursor.left = 280;
+    run("setCursor");
+    expect(highlight.style.left).toBe("260px");
+    expect(highlight.style.width).toBe("40px");
+    expect(highlight.style.height).toBe(scaleHeight ? "20px" : "100%");
+    plot.cursor.top = -10;
+    run("setCursor");
+    expect(highlight.hidden).toBe(true);
+    run("destroy");
+    expect(over.children).toHaveLength(0);
+  },
+);

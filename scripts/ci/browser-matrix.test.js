@@ -64,6 +64,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "chart-touch.spec.ts",
       "chernobyl-recovery.spec.ts",
       "insights-expanded-chart.spec.ts",
+      "insights-shortfall.spec.ts",
       "build-generator-loading.spec.ts",
       "sign-in.spec.ts",
       "multiline-text.spec.ts",

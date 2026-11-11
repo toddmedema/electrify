@@ -1,6 +1,11 @@
 import uPlot from "uplot";
 import { chartPalette, withAlpha } from "../../Theme";
 import { formatWatts } from "../../helpers/Format";
+import {
+  ShortfallBar,
+  shortfallHeight,
+  SHORTFALL_CAP_PX,
+} from "./UPlotHelpers";
 
 interface PowerSample {
   minute: number;
@@ -8,11 +13,7 @@ interface PowerSample {
   demandW: number;
 }
 
-export interface ShortfallInterval {
-  from: number;
-  to: number;
-  peakW: number;
-}
+export type ShortfallInterval = ShortfallBar;
 
 /** Read the same intervals that are shaded, retaining coincident rather than independent extrema. */
 export function shortfallIntervals(
@@ -26,7 +27,7 @@ export function shortfallIntervals(
     for (let i = index; i < timeline.length && timeline[i].minute <= to; i++) {
       peakW = Math.max(peakW, timeline[i].demandW - timeline[i].supplyW);
     }
-    return { from, to, peakW };
+    return { from, to, peakShortfall: peakW };
   });
 }
 
@@ -59,13 +60,14 @@ export function shortfallTooltip(
 ): string {
   const interval = shortfallAt(intervals, minute);
   return interval
-    ? `\n\nUnmet demand: ${formatWatts(unmetAt(timeline, minute))}\nPeak shortfall: ${formatWatts(interval.peakW)}`
+    ? `\n\nUnmet demand: ${formatWatts(unmetAt(timeline, minute))}\nPeak shortfall: ${formatWatts(interval.peakShortfall)}`
     : "";
 }
 
 /** A full-height hit region follows x, independently of the nearest sample or pointer height. */
 export function shortfallHoverPlugin(
   getIntervals: () => readonly ShortfallInterval[],
+  { scaleHeight = false }: { scaleHeight?: boolean } = {},
 ): uPlot.Plugin {
   let highlight: HTMLDivElement;
   const update = (u: uPlot) => {
@@ -84,6 +86,17 @@ export function shortfallHoverPlugin(
     if (!interval) return;
     const from = Math.max(0, u.valToPos(interval.from, "x"));
     const to = Math.min(u.over.clientWidth, u.valToPos(interval.to, "x"));
+    if (scaleHeight) {
+      const ratio = uPlot.pxRatio || 1;
+      const ySpan = (u.scales.y.max ?? 0) - (u.scales.y.min ?? 0);
+      highlight.style.height = `${
+        shortfallHeight(
+          interval.peakShortfall / ySpan,
+          u.bbox.height,
+          Math.round(SHORTFALL_CAP_PX * ratio),
+        ) / ratio
+      }px`;
+    }
     highlight.style.left = `${from}px`;
     highlight.style.width = `${Math.max(1, to - from)}px`;
   };

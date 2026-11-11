@@ -15,7 +15,7 @@ export interface LegendItemType {
   /** SVG dash pattern, for series told apart by their line style as well as their colour */
   dash?: string | undefined;
   /** Matches a patterned area without borrowing the line styles used for forecasts. */
-  pattern?: "hatch" | "vertical";
+  pattern?: "hatch" | "vertical" | "cap";
   /** Quiet base wash behind the pattern. */
   fill?: string;
 }

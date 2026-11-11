@@ -32,6 +32,7 @@ const layout = [
   "toggle-borders.spec.ts",
   "chart-touch.spec.ts",
   "insights-expanded-chart.spec.ts",
+  "insights-shortfall.spec.ts",
   "build-generator-loading.spec.ts",
   "campaign.spec.ts",
   "sign-in.spec.ts",
