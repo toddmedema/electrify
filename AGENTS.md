@@ -85,6 +85,22 @@ For behavior changes and new guardrails, use the repo-local
 and demonstrate that its check catches a violation. Prefer types, owning APIs, lint rules,
 and behavioral tests over adding instructions here.
 
+## Agent efficiency
+
+Every turn re-reads the whole conversation, so many small turns and large images cost the most.
+
+- Batch independent lookups: several `rg -n` or `sed -n` calls in one command, or parallel tool
+  calls, instead of one lookup per turn.
+- Prefer DOM text, computed styles and test assertions to screenshots. When you need an image,
+  use `npm run shot` (see `npm run shot -- --help`) instead of a throwaway Playwright script: it
+  is headless, writes device-scale-1 PNGs, and `--clip <selector>` captures just the component.
+  It photographs the dev server that `npm start` is running in this checkout.
+- Look at each image once; do not reopen unchanged screenshots after later edits.
+- For any task that uses subagents, follow the
+  [multi-agent-work skill](.agents/skills/multi-agent-work/SKILL.md): one shared brief, capped
+  read-only reviewer findings, a fresh coder per cluster of about five findings, and a final
+  review of `git diff origin/master...`.
+
 ## Run compatibility manifest
 
 `src/data/RunCompatibility.json` is a generated, git-ignored identity of the game reducer's
@@ -123,6 +139,7 @@ untracked. Agents without a verified hook should format the files they changed b
 - When opening a pull request with user-visible UI changes, capture 1-3 screenshots of the
   finished interface and embed them in the pull request description. Choose views that clearly
   show the change, including both desktop and mobile layouts when responsive behavior is relevant.
+  `npm run shot` produces small, clipped captures at each width and theme.
 - Keep review screenshots in a temporary location and upload them with GitHub CLI 2.99 or newer
   using `gh pr create --attach`, `gh pr edit --attach`, or `gh pr comment --attach`. Do not commit
   screenshots that exist only to illustrate a pull request; GitHub-hosted attachments keep them
