@@ -6,8 +6,11 @@ files are large, so broad rewrites create expensive review diffs.
 
 ## Start here
 
-- Use Node 26. Install exactly the lockfile with `npm ci` in a new checkout or when the lockfile
-  changes; reuse that install across turns while it still matches the lockfile.
+- Use Node 26. Claude Code's SessionStart hook (`.claude/hooks/session-env.js`) puts an installed
+  Node 26 first on `PATH` when the default is older and defaults `ELECTRIFY_TASK_ID` to the
+  worktree name, so do not prefix commands with either; other tools set both themselves. Install
+  exactly the lockfile with `npm ci` in a new checkout or when the lockfile changes; reuse that
+  install across turns while it still matches the lockfile.
 - Reserve the checkout before editing with `npm run task -- claim` (Codex supplies the chat ID;
   otherwise pass an ID or set `ELECTRIFY_TASK_ID`). If another task owns it, use an isolated
   worktree. Release it with `npm run task -- release` when finished. See
@@ -44,6 +47,11 @@ files are large, so broad rewrites create expensive review diffs.
   `ELECTRIFY_CHECK_WORKERS` only for a measured need. The npm build/test/check commands queue
   heavy work across local worktrees; do not pause a running test process to make room. When using
   subagents, give them focused checks and let the integrating agent own the final full check.
+- Run commands that take over about two minutes (`check`, `check:ci`, `test:e2e`, `sim -- --all`)
+  in the background and wait for the harness's completion notification. Do not poll with `sleep`
+  or `until` loops or repeated `tail`: each poll re-reads the whole conversation. Read the result
+  once when the command finishes. If your tool cannot notify on completion, run it in the
+  foreground instead.
 - `npm run fix` applies every mechanical fix: it runs `lint:fix` and `format`. Review its diff; it
   does not fix types or tests.
 - Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` starts Jest's
@@ -206,38 +214,15 @@ untracked. Agents without a verified hook should format the files they changed b
 - Never make color or an icon the only carrier of meaning. Pair symbols and state colors with text;
   distinguish chart series with direct labels, patterns, or line styles as well as color.
 
-## Scenario writing
+## Task guidance skills
 
-- Keep event descriptions brief: lead with the main change the player needs to respond to,
-  usually in one short sentence. Do not narrate every simulation modifier.
-- Omit minor secondary cost changes (such as 8% higher running costs or a 10% fuel increase)
-  when a supply loss is the event's main consequence. Keep major price shocks, decision
-  tradeoffs, and timing that affects preparation or recovery.
-- Use direct wording: "Coal output is down to 67%." Avoid qualifiers such as "of nominal",
-  "normal maximum output", and "for the year" when the context already supplies the meaning.
-- Keep previews brief and in future tense; report exact effects and recorded outcomes in live
-  messages. Shortening copy must not change simulation effects, schedules, or seeded outcomes.
+Read the matching file before starting; each holds guidance only that task needs. Claude Code does
+not load `.agents/skills` by itself, and a tracked symlink to it would fail the validation cache.
 
-## Icon design
-
-- Match the existing scenario and facility icon system: use a `0 0 500 500` SVG view box, a bold
-  circular boundary where appropriate, flat fills, black outlines, and a small palette drawn from
-  nearby icons. Do not use text, gradients, filters, or a one-off illustration style.
-- Communicate one concept with a strong silhouette and the fewest useful shapes and anchor points.
-  Build on clean circles, straight segments, and simple curves; remove incidental detail rather
-  than relying on the full-size artwork to carry it.
-- Use the shared stroke hierarchy exactly: `40` for the outer boundary, `20` for primary interior
-  shapes, and `10` for secondary detail. Do not treat intermediate widths found in legacy icons as
-  precedent or use them to compensate for imprecise geometry.
-- Align geometry to deliberate centers, baselines, and axes. Use whole-number coordinates, mirror
-  symmetric elements from a shared axis, keep repeated elements equal in size and spacing, and
-  account for stroke extents so forms do not crowd or clip the canvas.
-- Design for the icon's actual 40-48 px UI size. Review the full-size SVG and rasterized small-size
-  previews on both light and dark backgrounds, checking silhouette, contrast, optical centering,
-  negative-space separation, and whether fine details merge or disappear.
-- Include concise SVG `<title>` and `<desc>` elements for scenario icons. Keep visible text labels
-  beside icons in the interface so first-time players and assistive-technology users do not have to
-  infer meaning from the artwork.
+- Writing or editing scenario, event and story copy:
+  [.agents/skills/scenario-writing/SKILL.md](.agents/skills/scenario-writing/SKILL.md).
+- Designing or revising scenario and facility icons:
+  [.agents/skills/icon-design/SKILL.md](.agents/skills/icon-design/SKILL.md).
 
 ## Guardrails
 
@@ -254,6 +239,10 @@ untracked. Agents without a verified hook should format the files they changed b
   or generator, and avoid formatting or rewriting them incidentally.
 
 ## Open Sprint Runtime Contract
+
+This section applies only to agents launched by the Open Sprint orchestrator, whose task prompt
+asks for a `.opensprint/active/<task-id>/result.json` payload. Interactive Claude Code and Codex
+sessions skip it and follow "Pull requests" above, including pushing and opening the PR.
 
 Open Sprint manages task state internally. Do not use external task CLIs.
 
