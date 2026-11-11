@@ -52,7 +52,7 @@ test("session status notifications do not replay a grid before sending the playe
   jest
     .mocked(MultiplayerSession)
     .mockImplementation(() => session as unknown as MultiplayerSession);
-  const mounted = render(
+  const { unmount } = render(
     <Provider store={store}>
       <MultiplayerRoot />
     </Provider>,
@@ -72,6 +72,7 @@ test("session status notifications do not replay a grid before sending the playe
       epoch: "epoch",
       revision: 1,
       speed: "PAUSED",
+      reason: "Paused",
       readyRequired: true,
       ready: [],
       disconnected: [],
@@ -89,5 +90,5 @@ test("session status notifications do not replay a grid before sending the playe
     view: { ...snapshot.view!, game: { ...game, dollarsPerkWh: 0.15 } },
   });
   expect(store.getState().game.dollarsPerkWh).toBe(0.15);
-  mounted.unmount();
+  unmount();
 });

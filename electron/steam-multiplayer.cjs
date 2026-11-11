@@ -687,6 +687,16 @@ class SteamMultiplayer {
       offset: 0,
       kind: payload?.kind,
     };
+    if (
+      (message.kind === "browse" && payload.browse?.phase === "browsing") ||
+      message.kind === "campaign" ||
+      message.kind === "scenario"
+    ) {
+      // Lobby/definition changes must not be followed by a late encode of the old game.
+      connection.viewGeneration = (connection.viewGeneration || 0) + 1;
+      connection.pendingView?.resolve();
+      connection.pendingView = undefined;
+    }
     // Views are self-contained: keep the latest unsent view, never an unbounded tick backlog.
     if (message.kind === "view")
       connection.queue = connection.queue.filter(
@@ -709,7 +719,12 @@ class SteamMultiplayer {
       throw new Error("Player is disconnected");
     return new Promise((resolve, reject) => {
       connection.pendingView?.resolve();
-      connection.pendingView = { payload, resolve, reject };
+      connection.pendingView = {
+        payload,
+        resolve,
+        reject,
+        generation: connection.viewGeneration || 0,
+      };
       this.flushView(connection);
     });
   }
@@ -718,18 +733,17 @@ class SteamMultiplayer {
     const request = connection.pendingView;
     connection.pendingView = undefined;
     connection.encodingView = true;
+    const current = () =>
+      connection.connected &&
+      [...this.connections.values()].includes(connection) &&
+      request.generation === (connection.viewGeneration || 0);
     try {
       const encoded = await this.encodeView(request.payload);
       // A completed encode cannot enter a new connection with the same Steam ID.
-      if (
-        connection.connected &&
-        [...this.connections.values()].includes(connection)
-      )
-        this.send(connection.id, request.payload, encoded);
+      if (current()) this.send(connection.id, request.payload, encoded);
       request.resolve();
     } catch (error) {
-      if ([...this.connections.values()].includes(connection))
-        request.reject(error);
+      if (current()) request.reject(error);
       else request.resolve();
     } finally {
       connection.encodingView = false;

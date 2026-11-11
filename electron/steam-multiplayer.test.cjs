@@ -453,6 +453,12 @@ test("view overload coalesces before encoding and leaves control messages availa
     payload: { kind: "heartbeat" },
   });
   assert.equal(peer.queue[0].kind, "heartbeat");
+  // The host periodically resends its playing selection; it must not cancel live views.
+  await mp.request({
+    kind: "send",
+    to: peer.id,
+    payload: { kind: "browse", browse: { phase: "playing" } },
+  });
   encoding[0].resolve();
   await first;
   assert.deepEqual(
@@ -463,9 +469,9 @@ test("view overload coalesces before encoding and leaves control messages availa
   await latest;
   assert.deepEqual(
     peer.queue.map((message) => message.kind),
-    ["heartbeat", "view"],
+    ["heartbeat", "browse", "view"],
   );
-  assert.deepEqual(await assemble(new Map(), chunk(peer.queue[1])), {
+  assert.deepEqual(await assemble(new Map(), chunk(peer.queue[2])), {
     kind: "view",
     view: { revision: 3 },
   });
@@ -507,6 +513,58 @@ test("late view compression cannot revive a replaced connection and failures rej
   await assert.rejects(broken, /Compression failed/);
   assert.deepEqual(replacement.queue, []);
 });
+
+for (const kind of ["browse", "campaign", "scenario"]) {
+  test(`${kind} fences old view encodes before the next game can start`, async (t) => {
+    const { mp } = fixture();
+    clearInterval(mp.timer);
+    t.after(() => mp.dispose());
+    const peer = { id: "76561198000000002", connected: true, queue: [] };
+    mp.connections.set(100, peer);
+    const encoding = [];
+    t.mock.method(
+      mp,
+      "encodeView",
+      (payload) =>
+        new Promise((resolve) => {
+          encoding.push(() => resolve(encode(payload)));
+        }),
+    );
+    const send = (revision) =>
+      mp.request({
+        kind: "send",
+        to: peer.id,
+        payload: { kind: "view", view: { revision } },
+      });
+    const old = send(1);
+    const obsolete = send(2);
+    const transition =
+      kind === "scenario"
+        ? { kind, selectionKey: "match", scenario: { id: 999 } }
+        : kind === "browse"
+          ? { kind, browse: { phase: "browsing" } }
+          : { kind };
+    await mp.request({ kind: "send", to: peer.id, payload: transition });
+    await obsolete;
+    const next = send(3);
+    encoding[0]();
+    await old;
+    assert.deepEqual(
+      peer.queue.map((message) => message.kind),
+      [kind],
+    );
+    encoding[1]();
+    await next;
+    assert.deepEqual(
+      peer.queue.map((message) => message.kind),
+      [kind, "view"],
+    );
+    assert.deepEqual(await assemble(new Map(), chunk(peer.queue[1])), {
+      kind: "view",
+      view: { revision: 3 },
+    });
+  });
+}
 
 test("a checkpoint compressed across a reconnect cannot enqueue on the replacement connection", async (t) => {
   const { mp } = fixture();

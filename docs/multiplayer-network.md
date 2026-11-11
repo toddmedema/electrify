@@ -124,8 +124,9 @@ callbacks and renderer requests can proceed during compression. Waiting views co
 serialization; an encoding already in progress can finish, so sustained overload still makes
 progress. Encoded unsent views retain the existing queue coalescing. Completions check connection
 identity before enqueueing, including a reconnect with the same Steam ID. Compression errors still
-reach the caller. The framing, compression settings, size limits, numeric encoding and full-view
-protocol stay the same.
+reach the caller. Lobby and scenario-definition transitions also discard older pending encodes so
+an old grid cannot reappear after returning to the lobby. The framing, compression settings, size
+limits, numeric encoding and full-view protocol stay the same.
 
 The renderer also stops reapplying an unchanged game on session-only notifications, including the
 pending-command notification that runs before a command is transmitted. Ordinary cloned snapshots

@@ -10,6 +10,7 @@ test("ordinary network snapshots retain the speed-control subtree until the shar
     clock: {
       activeSpeed: "FAST",
       selectedSpeed: "FAST",
+      reason: "",
       readyRequired: false,
       ready: false,
       players: [
