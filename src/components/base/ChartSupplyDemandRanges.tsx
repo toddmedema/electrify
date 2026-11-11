@@ -223,7 +223,7 @@ function tooltip(index: number, state: State): string {
   const share = unmetShare(range);
   const shortfall =
     range.peakShortfall > 0
-      ? `Demand unmet: ${formatUnmet(share)} (${share < 0.0005 ? "99.9%" : formatRequiredShare(1 - share)} served)\nPeak shortfall: ${formatWatts(range.peakShortfall)}`
+      ? `Demand unmet: ${formatUnmet(share)} (${share < 0.0005 ? ">99.9%" : formatRequiredShare(1 - share)} served)\nPeak shortfall: ${formatWatts(range.peakShortfall)}`
       : "No shortfall";
   return `${period} · forecast range\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\n${shortfall}`;
 }

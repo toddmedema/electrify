@@ -447,6 +447,7 @@ function viewportAnnouncement(
 function timelineWithin(
   timeline: TickPresentFutureType[],
   range: ChartViewportRange,
+  completeMonths = false,
 ): TickPresentFutureType[] {
   if (timeline.length <= 2) return timeline;
   let first = 0;
@@ -456,7 +457,7 @@ function timelineWithin(
     if (timeline[middle].minute < range[0]) first = middle + 1;
     else last = middle;
   }
-  const from = Math.max(0, first - 1);
+  let from = Math.max(0, first - 1);
   first = from;
   last = timeline.length;
   while (first < last) {
@@ -464,7 +465,24 @@ function timelineWithin(
     if (timeline[middle].minute <= range[1]) first = middle + 1;
     else last = middle;
   }
-  return timeline.slice(from, Math.min(timeline.length, first + 1));
+  let to = Math.min(timeline.length, first + 1);
+  if (completeMonths) {
+    // Keep every available hour in the edge months, including the neighbouring points used
+    // for clipping. Panning must not change a month's extrema, peak shortfall or unmet share.
+    const firstMonth = Math.floor(timeline[from].minute / MINUTES_PER_MONTH);
+    const lastMonth = Math.floor(timeline[to - 1].minute / MINUTES_PER_MONTH);
+    while (
+      from > 0 &&
+      Math.floor(timeline[from - 1].minute / MINUTES_PER_MONTH) === firstMonth
+    )
+      from--;
+    while (
+      to < timeline.length &&
+      Math.floor(timeline[to].minute / MINUTES_PER_MONTH) === lastMonth
+    )
+      to++;
+  }
+  return timeline.slice(from, to);
 }
 
 function sameLayers(left: InsightLayerId[], right: InsightLayerId[]): boolean {
@@ -2261,9 +2279,12 @@ export default class Insights extends React.Component<Props, State> {
       minViewportSpan,
     );
     const viewportTimeline = timelineWithin(projection.timeline, viewportRange);
+    const monthlySupplyDemand =
+      viewportRange[1] - viewportRange[0] > 24 * MINUTES_PER_MONTH;
     const viewportSupplyDemand = timelineWithin(
       projection.supplyDemandTimeline,
       viewportRange,
+      monthlySupplyDemand,
     );
     const viewportSampleInterval = Math.max(
       projection.projectionStepMinutes,
@@ -2278,10 +2299,9 @@ export default class Insights extends React.Component<Props, State> {
       viewportSampleInterval,
     );
     // Range bands must see every modeled hour so brief peaks and shortages survive aggregation.
-    const supplyDemandTimeline =
-      viewportRange[1] - viewportRange[0] > 24 * MINUTES_PER_MONTH
-        ? viewportSupplyDemand
-        : sampleForecastTimeline(viewportSupplyDemand, viewportSampleInterval);
+    const supplyDemandTimeline = monthlySupplyDemand
+      ? viewportSupplyDemand
+      : sampleForecastTimeline(viewportSupplyDemand, viewportSampleInterval);
     let viewportDomainMin = Number.POSITIVE_INFINITY;
     let viewportDomainMax = Number.NEGATIVE_INFINITY;
     for (const tick of supplyDemandTimeline) {

@@ -341,6 +341,7 @@ jest.mock("../base/ChartSupplyDemandRanges", () => ({
         data-forecast-start={ranges.find((range) => range.projected)?.minute}
         data-sync-key={syncKey}
         data-points={ranges.length}
+        data-ranges={JSON.stringify(ranges)}
         data-domain={domainValue(domain)}
       />
     );
@@ -1334,6 +1335,40 @@ describe("Insights layers", () => {
       ).toBeInTheDocument();
     } finally {
       shortfall.mockRestore();
+    }
+  });
+
+  it("keeps all available forecast hours in months cut by the viewport", () => {
+    const month = MINUTES_PER_MONTH;
+    const timeline = Array.from({ length: 32 * 24 }, (_unused, hour) => ({
+      ...overviewProjection.supplyDemandTimeline[0],
+      minute: hour * 60,
+      demandW: 100,
+      // These hours lie beyond opposite edges of the displayed viewport, within its edge months.
+      supplyW: hour === 24 + 1 || hour === 30 * 24 + 23 ? 50 : 100,
+    }));
+    cacheProjection(overviewGame, {
+      ...overviewProjection,
+      supplyDemandTimeline: timeline,
+    });
+    render(
+      <Insights
+        game={overviewGame}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        savedViewport={{
+          month: overviewGame.date.monthsElapsed,
+          viewport: [1.25 * month, 30.25 * month],
+        }}
+      />,
+    );
+    const ranges = JSON.parse(
+      screen.getByTestId("supply-demand-chart").getAttribute("data-ranges")!,
+    );
+    for (const minute of [month, 30 * month]) {
+      expect(
+        ranges.find((range: { minute: number }) => range.minute === minute),
+      ).toMatchObject({ peakShortfall: 50, unmetSum: 50, demandSum: 2400 });
     }
   });
 
