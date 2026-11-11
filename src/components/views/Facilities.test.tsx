@@ -292,9 +292,11 @@ describe("the fleet list", () => {
     expect(screen.queryByText("Non-fuel start cost")).toBeNull();
   });
 
-  it("labels a facility whose output is constrained by a world event", () => {
+  it("shows the available MW and explains only events limiting this facility", async () => {
     const constrained = createGame({ scenarioId: 104 });
     const facility = constrained.facilities[0];
+    facility.peakW = 300e6;
+    facility.currentW = 0;
     constrained.worldEvents.active = [
       {
         key: "story:104:hurricane-2008:landfall",
@@ -302,10 +304,20 @@ describe("the fleet list", () => {
         startsMinute: 0,
         endsMinute: MINUTES_PER_MONTH,
         attributes: {},
+        title: "Extreme heat",
         effects: {
           facilityOutputMultipliersById: { [String(facility.id)]: 0.6 },
           facilityOutputMultipliersByFuel: { [facility.fuel!]: 0.5 },
         },
+      },
+      {
+        key: "unrelated",
+        definitionId: "unrelated",
+        startsMinute: 0,
+        endsMinute: MINUTES_PER_MONTH,
+        attributes: {},
+        title: "Fuel shortage",
+        effects: { facilityOutputMultipliersById: { "-1": 0.5 } },
       },
     ];
     renderFacilities(constrained, null);
@@ -313,7 +325,42 @@ describe("the fleet list", () => {
     expect(
       screen.getByLabelText("Temporarily limited to 30% of rated output"),
     ).toBeInTheDocument();
+    expect(rows()[0]).toHaveTextContent("0/300 90MW");
+    expect(within(rows()[0]).getByText("300", { selector: "s" })).toBeVisible();
+    await user.hover(screen.getByText("30% limit"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "Limited due to Extreme heat",
+    );
+    expect(screen.getByRole("tooltip")).not.toHaveTextContent("Fuel shortage");
   });
+
+  it.each([0, 0.98, 1])(
+    "shows a %s output cap without changing nameplate MW",
+    (limit) => {
+      const state = createGame({ scenarioId: 104 });
+      const facility = state.facilities[0];
+      facility.peakW = 300e6;
+      facility.currentW = 0;
+      state.worldEvents.active = [
+        {
+          key: "limit",
+          definitionId: "limit",
+          startsMinute: 0,
+          endsMinute: MINUTES_PER_MONTH,
+          attributes: {},
+          effects: { facilityOutputMultipliersById: { [facility.id]: limit } },
+        },
+      ];
+      renderFacilities(state, null);
+      expect(rows()[0]).toHaveTextContent(
+        limit < 1 ? `0/300 ${300 * limit}MW` : "0/300MW",
+      );
+      expect(
+        within(rows()[0]).queryByText("300", { selector: "s" }) !== null,
+      ).toBe(limit < 1);
+      expect(facility.peakW).toBe(300e6);
+    },
+  );
 
   it("scrolls live wheel input with its units while preserving zoom and edge gestures", () => {
     const initial = cloneDeep(game);
@@ -1939,7 +1986,7 @@ it("removes an already-paused reactor's resume control when its permanent shutdo
 
   expect(
     screen.getByRole("button", { name: /^Inspect Chernobyl Unit 4/ }),
-  ).toHaveTextContent("0/1GW · 0% · paused");
+  ).toHaveTextContent("0/1 0GW · 0% · paused");
 
   expect(
     screen.queryByRole("button", { name: "Resume Chernobyl Unit 4" }),

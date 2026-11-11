@@ -99,7 +99,6 @@ import FuelFilter from "../base/FuelFilter";
 import { ExpandedChartPresentation } from "../base/ChartPresentationContext";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastPowerExchange from "../base/ChartForecastPowerExchange";
-import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
 import ChartForecastSupplyByFuel, {
   forecastFuels,
@@ -151,12 +150,9 @@ export type InsightLayerId =
   | "supplyByFuel"
   | "storage"
   | "fuelPrices"
-  | "solarCapacityFactor"
   | "water"
   | "weather"
   | "profit"
-  | "revenue"
-  | "expenses"
   | "cash"
   | "customers"
   | "emissions"
@@ -195,8 +191,6 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   },
   { id: "customers", label: "Customers", group: "Customers" },
   { id: "profit", label: "Profit", group: "Economics" },
-  { id: "revenue", label: "Revenue", group: "Economics" },
-  { id: "expenses", label: "Expenses", group: "Economics" },
   { id: "cash", label: "Cash", group: "Economics" },
   { id: "financeDetails", label: "Finance details", group: "Economics" },
   { id: "fuelPrices", label: "Fuel Prices", group: "Economics" },
@@ -208,11 +202,6 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   {
     id: "emissions",
     label: "Emissions (CO₂e)",
-    group: "Environment",
-  },
-  {
-    id: "solarCapacityFactor",
-    label: "Renewable output",
     group: "Environment",
   },
   { id: "weather", label: "Temperature", group: "Environment" },
@@ -245,13 +234,10 @@ export const INSIGHT_LAYER_MANUAL: Record<ChartLayerId, ManualEntryTitleType> =
     storage: MANUAL_ENTRY.POWER_AND_ENERGY,
     customers: MANUAL_ENTRY.CUSTOMERS,
     profit: MANUAL_ENTRY.FORECASTS,
-    revenue: MANUAL_ENTRY.RATES,
-    expenses: MANUAL_ENTRY.OPERATING_COSTS,
     cash: MANUAL_ENTRY.FORECASTS,
     fuelPrices: MANUAL_ENTRY.FUEL_COSTS,
     inflationInterest: MANUAL_ENTRY.INTEREST_RATES,
     emissions: MANUAL_ENTRY.EMISSIONS,
-    solarCapacityFactor: MANUAL_ENTRY.CAPACITY_FACTOR,
     weather: MANUAL_ENTRY.FORECASTS,
     water: MANUAL_ENTRY.HYDROPOWER,
   };
@@ -298,11 +284,11 @@ export const INSIGHT_PRESETS: Record<
   },
   profitability: {
     label: "Profitability",
-    layers: ["profit", "cash", "revenue", "expenses", "fuelPrices"],
+    layers: ["profit", "cash", "fuelPrices"],
   },
   growth: {
     label: "Growth & pricing",
-    layers: ["customers", "demandByType", "supplyDemand", "revenue", "profit"],
+    layers: ["customers", "demandByType", "supplyDemand", "profit"],
   },
   decarbonization: {
     label: "Cutting emissions",
@@ -625,8 +611,6 @@ const FINANCE_LAYER_METRICS: Partial<
   Record<InsightLayerId, HistoryMetricKeyType & DerivedHistoryKeysType>
 > = {
   profit: "profit",
-  revenue: "revenue",
-  expenses: "expenses",
   cash: "cash",
   customers: "customers",
   emissions: "kgco2e",
@@ -1875,19 +1859,6 @@ export default class Insights extends React.Component<Props, State> {
                 syncKey={syncKey}
               />
             </>
-          );
-          break;
-        case "solarCapacityFactor":
-          body = (
-            <ChartForecastRenewableCapacityFactor
-              game={game}
-              height={140}
-              timeline={projection.timeline}
-              domain={{ x: projection.domain.x }}
-              startingYear={game.startingYear}
-              multiyear={multiyear}
-              syncKey={syncKey}
-            />
           );
           break;
         case "water":
