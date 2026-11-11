@@ -76,8 +76,10 @@ one round. Only blockers go back to a fresh coder.
     --theme light,dark --clip ".facilityRow:has-text('Solar')"
   ```
 
-  It prints one line per PNG (default directory `.tmp/shots`). Look at each image once. Do not re-open unchanged shots after later edits. Stop `npm start`
-  when finished; it holds a validation reservation.
+  It prints one line per PNG (default directory `.tmp/shots`; the file name includes the clip, so
+  reviewers sharing a checkout do not overwrite each other). Each new game draws random weather,
+  so compare layout, not figures, between runs. Look at each image once. Do not re-open unchanged
+  shots after later edits. Stop `npm start` when finished; it holds a validation reservation.
 
 ## 6. Integration and models
 
