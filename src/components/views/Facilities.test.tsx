@@ -334,12 +334,18 @@ describe("the fleet list", () => {
     expect(screen.getByRole("tooltip")).not.toHaveTextContent("Fuel shortage");
   });
 
-  it.each([0, 0.98, 1])(
-    "shows a %s output cap without changing nameplate MW",
-    (limit) => {
+  it.each([
+    [300e6, 0, "0/300 0MW", "300"],
+    [300e6, 0.98, "0/300 294MW", "300"],
+    [300e6, 1, "0/300MW", "300"],
+    [1e9, 0.98, "0/1 0.98GW", "1"],
+    [1.234e9, 0.98, "0/1.234 1.209GW", "1.234"],
+  ] as const)(
+    "shows a %sW facility with a %s output cap without changing nameplate MW",
+    (peakW, limit, expected, rated) => {
       const state = createGame({ scenarioId: 104 });
       const facility = state.facilities[0];
-      facility.peakW = 300e6;
+      facility.peakW = peakW;
       facility.currentW = 0;
       state.worldEvents.active = [
         {
@@ -352,13 +358,11 @@ describe("the fleet list", () => {
         },
       ];
       renderFacilities(state, null);
-      expect(rows()[0]).toHaveTextContent(
-        limit < 1 ? `0/300 ${300 * limit}MW` : "0/300MW",
-      );
+      expect(rows()[0]).toHaveTextContent(expected);
       expect(
-        within(rows()[0]).queryByText("300", { selector: "s" }) !== null,
+        within(rows()[0]).queryByText(rated, { selector: "s" }) !== null,
       ).toBe(limit < 1);
-      expect(facility.peakW).toBe(300e6);
+      expect(facility.peakW).toBe(peakW);
     },
   );
 

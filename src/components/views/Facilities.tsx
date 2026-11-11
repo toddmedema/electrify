@@ -471,11 +471,14 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       : 1;
   const limited = storyOutputMultiplier < 1;
   const unit = getWattUnit(facility.peakW);
+  // Keep small derates visible on GW plants, with the same precision for both capacities.
   const outputReading = limited ? (
     <>
       {formatWattsOfPeak(outputW, facility.peakW).split("/")[0]}/
-      <s>{formatWattsInUnit(facility.peakW, unit).replace(/[^0-9.,]/g, "")}</s>{" "}
-      {formatWattsInUnit(facility.peakW * storyOutputMultiplier, unit)}
+      <s>
+        {formatWattsInUnit(facility.peakW, unit, 3).replace(/[^0-9.,]/g, "")}
+      </s>{" "}
+      {formatWattsInUnit(facility.peakW * storyOutputMultiplier, unit, 3)}
     </>
   ) : (
     formatWattsOfPeak(outputW, facility.peakW)

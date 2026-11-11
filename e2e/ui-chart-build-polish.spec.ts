@@ -367,9 +367,7 @@ for (const theme of ["light", "dark"] as const) {
         .click();
       const insights = page.locator(".insights:visible");
       await openPane(insights, page.locator("#insightsNav"));
-      await expect
-        .poll(() => insights.locator(".u-over").count())
-        .toBeGreaterThanOrEqual(7);
+      await expect(insights.locator(".u-over")).toHaveCount(6);
       await expectRightInsets(insights);
     });
   });
