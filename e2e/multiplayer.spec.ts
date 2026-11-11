@@ -1271,6 +1271,45 @@ test("desktop menu keyboard journey includes Play with friends in both direction
 const clock = (page: Page) =>
   page.locator(".multiplayerSpeedToggles:visible").last();
 
+test("multiplayer speed controls stay at the right edge in desktop and touch layouts", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 4);
+  for (const page of pages) await ready(page);
+  for (const width of [1440, 1280, 800, 390, 360]) {
+    const page = width < 600 ? pages[3] : pages[0];
+    await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
+    for (const theme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme: theme });
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await expectClockInViewport(page);
+      await expect(async () => {
+        const gap = await clock(page).evaluate((group) => {
+          const toolbar = group.closest(".MuiToolbar-root")!;
+          const edge =
+            toolbar.getBoundingClientRect().right -
+            parseFloat(getComputedStyle(toolbar).paddingRight);
+          return edge - group.getBoundingClientRect().right;
+        });
+        expect(Math.abs(gap)).toBeLessThanOrEqual(1);
+      }).toPass({ timeout: 20000 });
+      if (
+        (width === 1280 && theme === "light") ||
+        (width === 390 && theme === "dark")
+      ) {
+        await page.mouse.move(0, 0);
+        await expect(page.getByRole("tooltip")).toBeHidden();
+        await reviewScreenshot(page.locator("#appbar"), {
+          path: test.info().outputPath("speed-" + width + "-" + theme + ".png"),
+          animations: "disabled",
+        });
+      }
+    }
+  }
+  expect(errors).toEqual([]);
+  expect(room.transportErrors).toEqual([]);
+});
+
 test("12x multiplayer speed controls respond while video chat is encoding", async ({
   browser,
 }) => {
