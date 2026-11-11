@@ -1401,11 +1401,6 @@ describe("Insights layers", () => {
       game.facilities = [];
       renderInsights(100, game);
       expect(screen.getByText("Unmet demand")).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          /Red height shows peak shortfall on the same MW scale/,
-        ),
-      ).toBeInTheDocument();
     } finally {
       shortfall.mockRestore();
     }
@@ -1450,11 +1445,11 @@ describe("Insights layers", () => {
     game.facilities = [];
     renderInsights(100, game);
     const note = screen.getByRole("note", {
-      name: /^Forecast shortfall starting \d{4}:/,
+      name: /^Forecast shortfalls start \d{4}:/,
     });
     const startYear = /\d{4}/.exec(note.getAttribute("aria-label")!)![0];
     expect(note).toHaveTextContent(
-      new RegExp(`^Shortfall, starting ${startYear}:\\s*~.+ unmet · ~.+ peak$`),
+      new RegExp(`^Shortfalls start ${startYear}:\\s*~.+ unmet · ~.+ peak$`),
     );
     // The first shortfall hour is still to come, never before the scenario began.
     expect(Number(startYear)).toBeGreaterThanOrEqual(game.startingYear);
@@ -1464,7 +1459,7 @@ describe("Insights layers", () => {
     // The year is when the first shortfall begins, so zooming does not move it; the energy
     // unmet is what follows the displayed range.
     const zoomed = screen.getByRole("note", {
-      name: new RegExp(`^Forecast shortfall starting ${startYear}:`),
+      name: new RegExp(`^Forecast shortfalls start ${startYear}:`),
     });
     expect(zoomed).not.toHaveTextContent(wholeScenario!);
   });

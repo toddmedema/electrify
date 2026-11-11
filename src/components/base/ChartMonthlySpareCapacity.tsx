@@ -137,7 +137,7 @@ export default function ChartMonthlySpareCapacity(props: Props) {
   return (
     <UPlotChart<State>
       id="chartMonthlySpareCapacity"
-      ariaLabel="Monthly lowest reserve. Values below zero are a reserve deficit; positive reserve does not rule out a blackout"
+      ariaLabel="Monthly lowest reserve. Values below zero are a shortage; positive reserve does not rule out a blackout"
       formatSummaryValue={formatWatts}
       interactiveTooltip
       height={props.height}

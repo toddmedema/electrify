@@ -109,13 +109,9 @@ describe("formatReserveLine", () => {
     expect(formatReserveLine(0, "Lowest reserve")).toBe("Lowest reserve: 0W");
   });
 
-  it("labels reserve below zero as a reserve deficit and shows its size without a sign", () => {
-    expect(formatReserveLine(-8e6, "Reserve margin")).toBe(
-      "Reserve deficit: 8MW",
-    );
-    expect(formatReserveLine(-1.5e9, "Lowest reserve")).toBe(
-      "Reserve deficit: 1.5GW",
-    );
+  it("labels reserve below zero as a shortage and shows its size without a sign", () => {
+    expect(formatReserveLine(-8e6, "Reserve margin")).toBe("Shortage: 8MW");
+    expect(formatReserveLine(-1.5e9, "Lowest reserve")).toBe("Shortage: 1.5GW");
   });
 });
 

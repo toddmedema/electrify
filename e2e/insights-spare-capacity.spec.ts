@@ -32,10 +32,10 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(track).toBeVisible();
     await expect(track).toContainText(
-      "Lowest reserve in each month. Below zero is a reserve deficit.",
+      "Lowest reserve in each month. Below zero is a shortage.",
     );
     await expect(track.getByRole("img")).toHaveAccessibleName(
-      /Values below zero are a reserve deficit/,
+      /Values below zero are a shortage/,
     );
     await expect(track.locator("canvas")).toBeVisible();
     const chart = track.getByRole("img", {
@@ -49,7 +49,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(track.getByRole("status")).toContainText(
       "Projected monthly minimum",
     );
-    await expect(track.getByRole("status")).toContainText("Reserve deficit:");
+    await expect(track.getByRole("status")).toContainText("Shortage:");
     await chart.press("Escape");
     expect(
       await insights.evaluate(

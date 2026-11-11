@@ -1689,7 +1689,7 @@ export default class Insights extends React.Component<Props, State> {
                 component="p"
                 sx={{ mx: 2, my: 1, color: "text.secondary" }}
               >
-                Lowest reserve in each month. Below zero is a reserve deficit.
+                Lowest reserve in each month. Below zero is a shortage.
               </Typography>
             </>
           );
@@ -1734,11 +1734,6 @@ export default class Insights extends React.Component<Props, State> {
                       ]
                     : []),
                 ]}
-                {...(unmetDemandMarked
-                  ? {
-                      note: "Bands span each month's lowest to highest hour. Red height shows peak shortfall on the same MW scale, capped at full height.",
-                    }
-                  : {})}
               />
               {rangedSupplyDemand ? (
                 <ChartSupplyDemandRanges
@@ -1766,7 +1761,7 @@ export default class Insights extends React.Component<Props, State> {
                   className="insightsWarning"
                   variant="body2"
                   role="note"
-                  aria-label={`Forecast shortfall starting ${projection.shortfall.startYear}: about ${formatWattHours(Number(projection.shortfall.wh.toPrecision(2)))} of demand unmet, about ${formatWatts(Number(projection.shortfall.peakW.toPrecision(2)))} peak`}
+                  aria-label={`Forecast shortfalls start ${projection.shortfall.startYear}: about ${formatWattHours(Number(projection.shortfall.wh.toPrecision(2)))} of demand unmet, about ${formatWatts(Number(projection.shortfall.peakW.toPrecision(2)))} peak`}
                 >
                   <ConceptIcon
                     concept="danger"
@@ -1776,7 +1771,7 @@ export default class Insights extends React.Component<Props, State> {
                   />
                   <span>
                     <strong>
-                      Shortfall, starting {projection.shortfall.startYear}:
+                      Shortfalls start {projection.shortfall.startYear}:
                     </strong>{" "}
                     ~
                     {formatWattHours(

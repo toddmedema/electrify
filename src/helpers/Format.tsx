@@ -95,12 +95,12 @@ export function formatWatts(i: number, mantissa?: number): string {
 }
 
 /**
- * A labelled reserve reading. Negative values are reserve deficits, which include reachable
+ * A labelled reserve reading. Negative values are labelled "Shortage". Reserve includes reachable
  * headroom and can differ from unmet demand.
  */
 export function formatReserveLine(reserveW: number, label: string): string {
   return reserveW < 0
-    ? `Reserve deficit: ${formatWatts(-reserveW)}`
+    ? `Shortage: ${formatWatts(-reserveW)}`
     : `${label}: ${formatWatts(reserveW)}`;
 }
 
