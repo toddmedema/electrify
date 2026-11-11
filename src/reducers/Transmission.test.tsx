@@ -855,6 +855,7 @@ describe("transmission actions", () => {
       ) {
         state.tutorialStep = stepIndex;
         state = cloneDeep(gameReducer(state, setSpeed("FAST")));
+        expect(state.speed).toBe("PAUSED");
         tickState(state);
         expect(state.speed).toBe("PAUSED");
         expect(state.date.minute).toBe(stressMinute);
