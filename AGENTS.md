@@ -6,11 +6,9 @@ files are large, so broad rewrites create expensive review diffs.
 
 ## Start here
 
-- Use Node 26. Claude Code's SessionStart hook (`.claude/hooks/session-env.js`) puts an installed
-  Node 26 first on `PATH` when the default is not Node 26 and defaults `ELECTRIFY_TASK_ID` to the
-  worktree name, so do not prefix commands with either; other agents put Node 26 on `PATH` and
-  supply the task ID themselves. Install exactly the lockfile with `npm ci` in a new checkout or
-  when the lockfile changes; reuse that install across turns while it still matches the lockfile.
+- Use Node 26. Verify with `node --version` and put the installed Node 26 on `PATH` if needed.
+  Install exactly the lockfile with `npm ci` in a new checkout or when the lockfile changes;
+  reuse that install across turns while it still matches the lockfile.
 - Reserve the checkout before editing with `npm run task -- claim` (Codex supplies the chat ID;
   otherwise pass an ID or set `ELECTRIFY_TASK_ID`). If another task owns it, use an isolated
   worktree. Release it with `npm run task -- release` when finished. See
@@ -47,11 +45,6 @@ files are large, so broad rewrites create expensive review diffs.
   `ELECTRIFY_CHECK_WORKERS` only for a measured need. The npm build/test/check commands queue
   heavy work across local worktrees; do not pause a running test process to make room. When using
   subagents, give them focused checks and let the integrating agent own the final full check.
-- Run commands that take over about two minutes (`check`, `check:ci`, `test:e2e`, `sim -- --all`)
-  in the background and wait for the harness's completion notification. Do not poll with `sleep`
-  or `until` loops or repeated `tail`: each poll re-reads the whole conversation. Read the result
-  once when the command finishes. If your tool cannot notify on completion, run it in the
-  foreground with the longest timeout it allows.
 - `npm run fix` applies every mechanical fix: it runs `lint:fix` and `format`. Review its diff; it
   does not fix types or tests.
 - Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` starts Jest's
@@ -216,8 +209,7 @@ untracked. Agents without a verified hook should format the files they changed b
 
 ## Task guidance skills
 
-Read the matching file before starting; each holds guidance only that task needs. Claude Code does
-not load `.agents/skills` by itself, and a tracked symlink to it would fail the validation cache.
+Read the matching file before starting; each holds guidance only that task needs.
 
 - Writing or editing scenario, event and story copy:
   [.agents/skills/scenario-writing/SKILL.md](.agents/skills/scenario-writing/SKILL.md).

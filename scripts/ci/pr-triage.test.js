@@ -4,645 +4,426 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { run, cleanText, ghRunner } = require("../dev/pr-triage");
+const { run, summarizeChecks } = require("../dev/pr-triage");
 
-// Local noon, so the local-date comparison for --expires is the same in every time zone.
-const NOW = new Date(2026, 10, 11, 12, 0, 0).getTime();
-const MINUTE = 60 * 1000;
-const script = path.resolve("scripts/dev/pr-triage.js");
-
-const check = (name, status = "COMPLETED", conclusion = "SUCCESS") => ({
-  __typename: "CheckRun",
-  name,
-  status,
-  conclusion,
+const page = (nodes = [], endCursor = null) => ({
+  nodes,
+  pageInfo: { hasNextPage: endCursor !== null, endCursor },
 });
-const statusContext = (context, state) => ({
-  __typename: "StatusContext",
-  context,
-  state,
-});
-const comment = (id, login, body) => ({
-  databaseId: id,
+const feedback = (
+  id,
+  login = "toddmedema",
+  updatedAt = "2026-11-11T12:00:00Z",
+) => ({
+  id,
   author: { login },
-  body,
+  updatedAt,
 });
-const thread = (id, over = {}, login = "coderabbitai") => ({
-  isResolved: false,
-  isOutdated: false,
+const thread = (id, overrides = {}) => ({
+  id,
   path: "src/a.ts",
   line: 12,
-  comments: {
-    nodes: [comment(id, login, "**Potential issue**\n\nGuard the null case.")],
-  },
-  ...over,
+  isResolved: false,
+  isOutdated: false,
+  comments: page([feedback(`comment-${id}`)]),
+  ...overrides,
 });
-const withChecks = (...nodes) => ({
+const check = (id, overrides = {}) => ({
+  __typename: "CheckRun",
+  id,
+  name: id,
+  status: "COMPLETED",
+  conclusion: "SUCCESS",
+  startedAt: "2026-11-11T12:00:00Z",
+  completedAt: "2026-11-11T12:01:00Z",
+  ...overrides,
+});
+const pr = (number, overrides = {}) => ({
+  id: `pr-${number}`,
+  number,
+  url: `https://github.com/toddmedema/electrify/pull/${number}`,
+  isDraft: false,
+  headRefName: `branch-${number}`,
+  headRefOid: `head-${number}`,
+  baseRefOid: "base",
+  mergeable: "MERGEABLE",
+  mergeStateStatus: "CLEAN",
   commits: {
     nodes: [
       {
         commit: {
+          id: `commit-${number}`,
+          oid: `head-${number}`,
           statusCheckRollup: {
-            contexts: { pageInfo: { hasNextPage: false }, nodes },
+            state: "SUCCESS",
+            contexts: page([check("unit")]),
           },
         },
       },
     ],
   },
+  reviewThreads: page(),
+  comments: page(),
+  reviews: page(),
+  ...overrides,
 });
-const page = (nodes) => ({ pageInfo: { hasPreviousPage: false }, nodes });
-const pr = (number, over = {}) => ({
-  number,
-  title: `PR ${number}`,
-  isDraft: false,
-  headRefName: `branch-${number}`,
-  headRefOid: String(number).padEnd(40, "a"),
-  mergeable: "MERGEABLE",
-  mergeStateStatus: "CLEAN",
-  ...withChecks(check("lint")),
-  reviewThreads: page([]),
-  comments: page([]),
-  reviews: page([]),
-  ...over,
+const repository = (prs, cursor = null) => ({
+  repository: {
+    nameWithOwner: "toddmedema/electrify",
+    pullRequests: page(prs, cursor),
+  },
 });
-const failing = (...names) =>
-  withChecks(...names.map((n) => check(n, "COMPLETED", "FAILURE")));
-const outsideDiff = (count, style = ": ") =>
-  `<!-- coderabbit-ai-generated:v1 -->\n**Actionable comments posted: 1**\n<details>\n<summary>Outside diff range comments${style}${count}${style === " (" ? ")" : ""}</summary>\n\n` +
-  "`src/b.ts` `40-44`: **Handle the empty list.**\n\nThe loop assumes one item.\n</details>";
-const walkthrough =
-  "<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\n## Walkthrough\nChanges the chart.\n";
 
-function harness(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "electrify-triage-"));
-  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+function harness(
+  first,
+  next = () => assert.fail("unexpected follow-up request"),
+) {
   const calls = [];
-  const file = (name) => path.join(directory, name);
-  const read = (name) => JSON.parse(fs.readFileSync(file(name), "utf8"));
-  const triage = (prs, args = [], now = NOW) =>
-    run(["--state-dir", directory, ...args], {
-      now,
-      runGh: (ghArgs) => {
-        calls.push(ghArgs);
-        return JSON.stringify({
-          data: {
-            repository: {
-              pullRequests: { pageInfo: { hasNextPage: false }, nodes: prs },
-            },
-          },
-        });
-      },
-    });
-  const list = (result) => JSON.parse(result.stdout);
-  return { directory, calls, file, read, triage, list };
+  const runGh = (args) => {
+    assert.deepEqual(args.slice(0, 2), ["api", "graphql"]);
+    const values = Object.fromEntries(
+      args
+        .filter((_, i) => args[i - 1] === "-f")
+        .map((value) => {
+          const index = value.indexOf("=");
+          return [value.slice(0, index), value.slice(index + 1)];
+        }),
+    );
+    assert.doesNotMatch(
+      values.query,
+      /\bbody\b|\bdatabaseId\b|\bmutation\b/,
+      "polling uses metadata and opaque GraphQL IDs only",
+    );
+    calls.push(values);
+    return JSON.stringify({ data: calls.length === 1 ? first : next(values) });
+  };
+  return {
+    calls,
+    execute: () => run(["--repo", "toddmedema/electrify"], { runGh }),
+  };
 }
 
-test("a clean repository prints one line, writes nothing and leaves no lock", (t) => {
-  const h = harness(t);
-  const result = h.triage([pr(1), pr(2)]);
-  assert.deepEqual([result.code, result.stdout], [0, "CLEAN 2 open PRs"]);
-  assert.deepEqual(fs.readdirSync(h.directory), []);
-  assert.equal(h.calls.length, 1, "one gh call surveys every PR");
-});
-
-test("only failed, timed-out, startup-failed and action-required checks fail a PR", (t) => {
-  const h = harness(t);
-  const conclusions = [
-    ["a", "FAILURE"],
-    ["b", "TIMED_OUT"],
-    ["c", "STARTUP_FAILURE"],
-    ["d", "ACTION_REQUIRED"],
-    ["e", "CANCELLED"],
-    ["f", "SKIPPED"],
-    ["g", "NEUTRAL"],
-    ["h", "SUCCESS"],
-  ];
-  const result = h.triage([
-    pr(1, withChecks(...conclusions.map(([n, c]) => check(n, "COMPLETED", c)))),
-    pr(
-      2,
-      withChecks(
-        statusContext("ci/x", "FAILURE"),
-        statusContext("ci/y", "ERROR"),
-      ),
-    ),
-    pr(
-      3,
-      withChecks(
-        statusContext("ci/x", "SUCCESS"),
-        check("e", "COMPLETED", "CANCELLED"),
-      ),
-    ),
-  ]);
-  const { work } = h.list(result);
-  assert.deepEqual(
-    work.map((item) => [item.number, item.reasons]),
-    [
-      [1, [{ type: "ci", checks: ["a", "b", "c", "d"] }]],
-      [2, [{ type: "ci", checks: ["ci/x", "ci/y"] }]],
-    ],
-  );
-  assert.deepEqual(work[0], {
+test("a quiet repository produces compact metadata in one request", () => {
+  const h = harness(repository([pr(1), pr(2)]));
+  const result = h.execute();
+  assert.equal(result.code, 0);
+  const snapshot = JSON.parse(result.stdout);
+  assert.equal(snapshot.repository, "toddmedema/electrify");
+  assert.equal(snapshot.prs.length, 2);
+  assert.deepEqual(snapshot.prs[0], {
     number: 1,
-    title: "PR 1",
+    url: pr(1).url,
     branch: "branch-1",
-    headSha: "1".padEnd(40, "a"),
     draft: false,
-    reasons: work[0].reasons,
+    headSha: "head-1",
+    baseSha: "base",
+    mergeable: "MERGEABLE",
+    mergeStateStatus: "CLEAN",
+    ci: { state: "SUCCESS", failed: [], pending: [] },
+    threads: [],
+    comments: [],
+    reviews: [],
   });
-});
-
-test("failed checks wait until every other check has finished", (t) => {
-  const h = harness(t);
-  const mixed = withChecks(
-    check("a", "COMPLETED", "FAILURE"),
-    check("b", "IN_PROGRESS", null),
-  );
-  assert.equal(h.triage([pr(1, mixed)]).stdout, "CLEAN 1 open PRs");
-  const queued = withChecks(
-    check("a", "COMPLETED", "FAILURE"),
-    statusContext("ci/x", "PENDING"),
-  );
-  assert.equal(h.triage([pr(1, queued)]).stdout, "CLEAN 1 open PRs");
-  assert.equal(h.list(h.triage([pr(1, failing("a"))])).work.length, 1);
-});
-
-test("conflicts count when CONFLICTING or DIRTY, not while GitHub is still computing", (t) => {
-  const h = harness(t);
-  const result = h.triage([
-    pr(1, { mergeable: "CONFLICTING", mergeStateStatus: "DIRTY" }),
-    pr(2, { mergeable: "MERGEABLE", mergeStateStatus: "DIRTY" }),
-    pr(3, { mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }),
-    pr(4, { mergeable: "MERGEABLE", mergeStateStatus: "BLOCKED" }),
-  ]);
-  const { work } = h.list(result);
+  assert.equal(h.calls.length, 1);
   assert.deepEqual(
-    work.map((item) => [item.number, item.reasons]),
-    [
-      [1, [{ type: "conflict" }]],
-      [2, [{ type: "conflict" }]],
-    ],
+    [h.calls[0].owner, h.calls[0].repo],
+    ["toddmedema", "electrify"],
   );
 });
 
-test("CodeRabbit feedback: unresolved current threads and outside-diff sections, nothing else", (t) => {
-  const h = harness(t);
-  const feedback = () =>
-    pr(1, {
-      reviewThreads: page([
-        thread(10),
-        thread(11, { isResolved: true }),
-        thread(12, { isOutdated: true }),
-        thread(13, {}, "toddmedema"),
-        thread(14, { path: "docs/x.md", line: null }, "coderabbitai[bot]"),
-        thread(101),
-      ]),
-      comments: page([
-        comment(20, "coderabbitai", walkthrough),
-        comment(21, "toddmedema", outsideDiff(2)),
-      ]),
-      reviews: page([
-        comment(30, "coderabbitai", outsideDiff(2)),
-        comment(31, "coderabbitai", outsideDiff(3, " (")),
-        comment(32, "coderabbitai", outsideDiff(0)),
-        comment(33, "coderabbitai", "Nitpick comments: 4\nTrivial · Low value"),
-        comment(
-          34,
-          "coderabbitai",
-          "**Actionable comments posted: 2**\n(the findings are inline threads)",
-        ),
-        comment(35, "toddmedema", ""),
-      ]),
-    });
-  fs.writeFileSync(
-    h.file("state.json"),
-    JSON.stringify({
-      1: { attempts: 0, needsHumanSha: null, handledCommentIds: [101] },
-    }),
+test("CI distinguishes failures from pending, cancelled and skipped checks", () => {
+  const failed = [
+    "FAILURE",
+    "TIMED_OUT",
+    "STARTUP_FAILURE",
+    "ACTION_REQUIRED",
+  ].map((conclusion) => check(conclusion, { conclusion }));
+  const pending = [
+    check("queued", { status: "QUEUED", conclusion: null }),
+    check("running", { status: "IN_PROGRESS", conclusion: null }),
+  ];
+  for (const state of ["FAILURE", "ERROR", "PENDING", "EXPECTED"]) {
+    const item = {
+      __typename: "StatusContext",
+      id: state,
+      context: state,
+      state,
+      createdAt: "now",
+    };
+    (["FAILURE", "ERROR"].includes(state) ? failed : pending).push(item);
+  }
+  const ignored = ["SUCCESS", "NEUTRAL", "CANCELLED", "SKIPPED"].map(
+    (conclusion) => check(conclusion, { conclusion }),
   );
-  const [reason] = h.list(h.triage([feedback()])).work[0].reasons;
-  assert.equal(reason.type, "coderabbit");
   assert.deepEqual(
-    reason.comments.map(({ id, kind, where }) => [id, kind, where]),
-    [
-      [10, "thread", "src/a.ts:12"],
-      [14, "thread", "docs/x.md"],
-      [30, "review", "outside diff range (2)"],
-      [31, "review", "outside diff range (3)"],
-    ],
+    summarizeChecks([...failed, ...pending, ...ignored], "FAILURE"),
+    { state: "FAILURE", failed, pending },
   );
-  assert.equal(
-    reason.comments[0].excerpt,
-    "Potential issue Guard the null case.",
-  );
-  assert.match(reason.comments[2].excerpt, /Handle the empty list/);
 });
 
-test("nitpick-only reviews are work only with --nitpicks", (t) => {
-  const h = harness(t);
-  const nitpicks = pr(1, {
+test("reports both matching authors, edits, and outdated unresolved threads without deciding actionability", () => {
+  const item = pr(1, {
+    reviewThreads: page([
+      thread("resolved", { isResolved: true }),
+      thread("outdated", { isOutdated: true }),
+      thread("rabbit", {
+        comments: page([feedback("bot", "coderabbitai[bot]")]),
+      }),
+      thread("other-root", {
+        comments: page([feedback("other", "someone"), feedback("reply")]),
+      }),
+      thread("unrelated", { comments: page([feedback("other", "someone")]) }),
+    ]),
+    comments: page([
+      feedback("user"),
+      feedback("bot", "coderabbitai"),
+      feedback("other", "someone"),
+      { ...feedback("deleted"), author: null },
+    ]),
     reviews: page([
-      comment(
-        40,
-        "coderabbitai",
-        "<details><summary> Nitpick comments: 3</summary>\n`1-2`: **Trivial**\n</details>",
-      ),
+      feedback("review", "coderabbitai[bot]"),
+      feedback("edited", "toddmedema", "later"),
     ]),
   });
-  assert.equal(h.triage([nitpicks]).stdout, "CLEAN 1 open PRs");
-  const [reason] = h.list(h.triage([nitpicks], ["--nitpicks"])).work[0].reasons;
+  const result = harness(repository([item])).execute();
+  assert.equal(result.code, 0);
+  const [snapshot] = JSON.parse(result.stdout).prs;
   assert.deepEqual(
-    reason.comments.map(({ id, where }) => [id, where]),
-    [[40, "nitpicks (3)"]],
+    snapshot.threads.map(({ id }) => id),
+    ["outdated", "rabbit", "other-root"],
   );
+  assert.equal(snapshot.threads[0].outdated, true);
+  assert.equal(snapshot.threads[2].comments[0].id, "reply");
+  assert.deepEqual(
+    snapshot.comments.map(({ id }) => id),
+    ["user", "bot"],
+  );
+  assert.equal(snapshot.reviews[1].updatedAt, "later");
 });
 
-test("a run with work holds the lock; --finish records attempts and comment IDs and releases it", (t) => {
-  const h = harness(t);
-  const prs = () => [
-    pr(1, failing("check")),
-    pr(2, { reviewThreads: page([thread(50)]) }),
-    pr(3, { ...failing("check"), reviewThreads: page([thread(60)]) }),
-  ];
-  const first = h.triage(prs());
-  assert.deepEqual(
-    h.list(first).work.map((item) => item.number),
-    [1, 2, 3],
+test("paginates PRs, checks, threads, thread replies, comments and reviews", () => {
+  const item = pr(1);
+  item.commits.nodes[0].commit.statusCheckRollup.contexts = page(
+    Array.from({ length: 100 }, (_, i) => check(`success-${i}`)),
+    "checks-next",
   );
-  assert.equal(fs.existsSync(h.file("lock")), true);
-  assert.equal(h.triage(prs()).stdout, "SKIPPED previous run in flight");
-  assert.equal(h.calls.length, 1, "a skipped run never calls gh");
-
-  assert.equal(
-    run(["--state-dir", h.directory, "--finish"]).stdout,
-    "FINISHED 3 PRs recorded",
+  item.comments = page(
+    Array.from({ length: 100 }, (_, i) => feedback(`other-${i}`, "other")),
+    "comments-next",
   );
-  assert.equal(fs.existsSync(h.file("lock")), false);
-  assert.equal(fs.existsSync(h.file("pending.json")), false);
-  assert.deepEqual(h.read("state.json"), {
-    1: { attempts: 1, needsHumanSha: null, handledCommentIds: [] },
-    2: { attempts: 0, needsHumanSha: null, handledCommentIds: [50] },
-    3: { attempts: 1, needsHumanSha: null, handledCommentIds: [60] },
+  item.reviews = page(
+    Array.from({ length: 100 }, (_, i) => feedback(`review-${i}`, "other")),
+    "reviews-next",
+  );
+  item.reviewThreads = page(
+    Array.from({ length: 100 }, (_, i) =>
+      thread(`resolved-${i}`, { isResolved: true }),
+    ),
+    "threads-next",
+  );
+  const lateThread = thread("late", {
+    comments: page(
+      Array.from({ length: 10 }, (_, i) => feedback(`reply-${i}`, "other")),
+      "replies-next",
+    ),
   });
-
-  // Handled feedback is not offered again, but a PR that still fails CI is.
-  const second = h.list(h.triage(prs()));
-  assert.deepEqual(
-    second.work.map((item) => item.number),
-    [1, 3],
-  );
-  assert.deepEqual(second.work[1].reasons, [{ type: "ci", checks: ["check"] }]);
-});
-
-test("--finish without a pending list only releases the lock", (t) => {
-  const h = harness(t);
-  fs.writeFileSync(h.file("lock"), "1");
-  assert.equal(
-    run(["--state-dir", h.directory, "--finish"]).stdout,
-    "FINISHED 0 PRs recorded",
-  );
-  assert.deepEqual(fs.readdirSync(h.directory), []);
-});
-
-test("a PR that keeps failing is flagged for a human after three attempts, then left alone", (t) => {
-  const h = harness(t);
-  const sha = "7".padEnd(40, "a");
-  fs.writeFileSync(
-    h.file("state.json"),
-    JSON.stringify({
-      7: { attempts: 3, needsHumanSha: null, handledCommentIds: [] },
-      baselineAt: "keep me",
-    }),
-  );
-  const flagged = h.triage([pr(7, failing("check"))]);
-  assert.equal(
-    flagged.stdout,
-    "CLEAN 1 open PRs; needs human: #7 (ci still failing after 3 attempts)",
-  );
-  assert.equal(h.read("state.json")[7].needsHumanSha, sha);
-  assert.equal(
-    h.read("state.json").baselineAt,
-    "keep me",
-    "unknown keys survive",
-  );
-  assert.equal(h.triage([pr(7, failing("check"))]).stdout, "CLEAN 1 open PRs");
-
-  // A push by anyone moves the head: the cap resets and the PR is eligible again.
-  const pushed = h.triage([
-    pr(7, { ...failing("check"), headRefOid: "b".repeat(40) }),
-  ]);
-  assert.equal(h.list(pushed).work[0].number, 7);
-  assert.deepEqual(h.read("state.json")[7].attempts, 0);
-  assert.equal(h.read("state.json")[7].needsHumanSha, null);
-});
-
-test("a flagged PR that turns green on the same commit is eligible again when a conflict appears", (t) => {
-  const h = harness(t);
-  const sha = "7".padEnd(40, "a");
-  fs.writeFileSync(
-    h.file("state.json"),
-    JSON.stringify({
-      7: { attempts: 3, needsHumanSha: sha, handledCommentIds: [] },
-    }),
-  );
-  // Still failing on the flagged commit: left alone.
-  assert.equal(h.triage([pr(7, failing("check"))]).stdout, "CLEAN 1 open PRs");
-  // A person re-ran CI and it passed: the flag and the attempts are cleared.
-  assert.equal(h.triage([pr(7)]).stdout, "CLEAN 1 open PRs");
-  assert.deepEqual(h.read("state.json")[7], {
-    attempts: 0,
-    needsHumanSha: null,
-    handledCommentIds: [],
-  });
-  // The base moved, the head did not: this is new work.
-  const { work } = h.list(
-    h.triage([pr(7, { mergeable: "CONFLICTING", mergeStateStatus: "DIRTY" })]),
-  );
-  assert.deepEqual(work[0].reasons, [{ type: "conflict" }]);
-});
-
-test("attempts reset when CI is fully green and conflict-free, not while unknown or pending", (t) => {
-  const h = harness(t);
-  const seed = (n) => ({
-    attempts: 2,
-    needsHumanSha: null,
-    handledCommentIds: [n],
-  });
-  fs.writeFileSync(
-    h.file("state.json"),
-    JSON.stringify({ 1: seed(1), 2: seed(2), 3: seed(3) }),
-  );
-  h.triage([
-    pr(1),
-    pr(2, { mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }),
-    pr(3, withChecks(check("a", "IN_PROGRESS", null))),
-  ]);
-  const state = h.read("state.json");
-  assert.deepEqual(
-    [1, 2, 3].map((n) => state[n].attempts),
-    [0, 2, 2],
-  );
-  assert.deepEqual(state[1].handledCommentIds, [1]);
-});
-
-test("at most --max-work PRs are listed; the rest are queued and not recorded", (t) => {
-  const h = harness(t);
-  const prs = [1, 2, 3, 4, 5].map((n) => pr(n, failing("check")));
-  const result = h.list(h.triage(prs));
-  assert.deepEqual(
-    result.work.map((item) => item.number),
-    [1, 2, 3],
-  );
-  assert.deepEqual(result.queued, [4, 5]);
-  run(["--state-dir", h.directory, "--finish"]);
-  const state = h.read("state.json");
-  assert.deepEqual(Object.keys(state), ["1", "2", "3"]);
-  assert.deepEqual(
-    h.list(h.triage(prs, ["--max-work", "1"])).queued,
-    [2, 3, 4, 5],
-  );
-});
-
-test("the lock expires after 90 minutes and accepts epoch seconds or milliseconds", (t) => {
-  const h = harness(t);
-  const lock = h.file("lock");
-  fs.writeFileSync(lock, String(Math.floor((NOW - 89 * MINUTE) / 1000)));
-  assert.equal(h.triage([pr(1)]).stdout, "SKIPPED previous run in flight");
-  fs.writeFileSync(lock, String(NOW - 89 * MINUTE));
-  assert.equal(h.triage([pr(1)]).stdout, "SKIPPED previous run in flight");
-  fs.writeFileSync(lock, String(Math.floor((NOW - 91 * MINUTE) / 1000)));
-  assert.equal(h.triage([pr(1)]).stdout, "CLEAN 1 open PRs");
-  assert.equal(
-    fs.existsSync(lock),
-    false,
-    "a clean run releases the lock it took",
-  );
-});
-
-test("past --expires nothing is fetched or locked", (t) => {
-  const h = harness(t);
-  assert.equal(
-    h.triage([pr(1)], ["--expires", "2026-11-10"]).stdout,
-    "EXPIRED 2026-11-10",
-  );
-  assert.equal(h.calls.length, 0);
-  assert.deepEqual(fs.readdirSync(h.directory), []);
-  assert.equal(
-    h.triage([pr(1)], ["--expires", "2026-11-11"]).stdout,
-    "CLEAN 1 open PRs",
-  );
-});
-
-test("--dry-run reads only: no lock, state or pending file, and it ignores a held lock", (t) => {
-  const h = harness(t);
-  fs.writeFileSync(h.file("lock"), String(Math.floor(NOW / 1000)));
-  // PR 3 is green, so a real run would reset its attempts and rewrite this file.
-  const seeded = JSON.stringify({
-    3: { attempts: 2, needsHumanSha: null, handledCommentIds: [] },
-  });
-  fs.writeFileSync(h.file("state.json"), seeded);
-  const before = fs.readdirSync(h.directory);
-  const result = h.triage(
-    [pr(1, failing("check")), pr(2, { mergeable: "CONFLICTING" }), pr(3)],
-    ["--dry-run", "--explain"],
-  );
-  assert.deepEqual(
-    h.list(result).work.map((item) => item.number),
-    [1, 2],
-  );
-  assert.match(result.stderr.join("\n"), /#1 .* failed=1 .* -> ci/);
-  assert.deepEqual(fs.readdirSync(h.directory), before);
-  assert.equal(fs.readFileSync(h.file("state.json"), "utf8"), seeded);
-});
-
-test("errors print one ERROR line, release the lock and leave state untouched", (t) => {
-  const h = harness(t);
-  const failed = run(["--state-dir", h.directory], {
-    now: NOW,
-    runGh: () => {
-      throw new Error("gh api failed: HTTP 502");
+  const routes = {
+    "prs-next": repository([pr(21)]),
+    "checks-next": {
+      node: {
+        statusCheckRollup: {
+          contexts: page([check("failed-late", { conclusion: "FAILURE" })]),
+        },
+      },
     },
-  });
-  assert.deepEqual(
-    [failed.code, failed.stdout],
-    [1, "ERROR gh api failed: HTTP 502"],
+    "threads-next": { node: { reviewThreads: page([lateThread]) } },
+    "replies-next": { node: { comments: page([feedback("user-reply")]) } },
+    "comments-next": { node: { comments: page([feedback("user-late")]) } },
+    "reviews-next": {
+      node: { reviews: page([feedback("bot-late", "coderabbitai")]) },
+    },
+  };
+  const h = harness(
+    repository(
+      [item, ...Array.from({ length: 19 }, (_, i) => pr(i + 2))],
+      "prs-next",
+    ),
+    ({ cursor }) => {
+      assert.ok(routes[cursor], `unexpected cursor ${cursor}`);
+      return routes[cursor];
+    },
   );
-  assert.deepEqual(fs.readdirSync(h.directory), []);
-
-  fs.writeFileSync(h.file("state.json"), "{not json");
-  const corrupt = h.triage([pr(1)]);
-  assert.equal(corrupt.code, 1);
-  assert.match(corrupt.stdout, /^ERROR .*state\.json is not valid JSON/);
-  assert.equal(fs.readFileSync(h.file("state.json"), "utf8"), "{not json");
-  assert.equal(fs.existsSync(h.file("lock")), false);
-
-  assert.match(run(["--bogus"]).stdout, /^ERROR Unknown option --bogus/);
-  assert.match(
-    run(["--expires", "tomorrow"]).stdout,
-    /^ERROR --expires takes a date/,
+  const result = h.execute();
+  assert.equal(result.code, 0, result.stdout);
+  const snapshot = JSON.parse(result.stdout);
+  assert.equal(snapshot.prs.length, 21);
+  assert.equal(snapshot.prs[0].ci.failed[0].name, "failed-late");
+  assert.equal(snapshot.prs[0].threads[0].comments[0].id, "user-reply");
+  assert.equal(snapshot.prs[0].comments[0].id, "user-late");
+  assert.equal(snapshot.prs[0].reviews[0].id, "bot-late");
+  assert.equal(h.calls.length, 7);
+  assert.equal(
+    h.calls.find(({ cursor }) => cursor === "checks-next").id,
+    "commit-1",
+  );
+  assert.equal(
+    h.calls.find(({ cursor }) => cursor === "replies-next").id,
+    "late",
   );
 });
 
-test("a GraphQL error response is an ERROR, not an empty repository", (t) => {
-  const h = harness(t);
-  const result = run(["--state-dir", h.directory], {
-    now: NOW,
-    runGh: () =>
-      JSON.stringify({ errors: [{ message: "Resource limits exceeded" }] }),
-  });
-  assert.deepEqual(
-    [result.code, result.stdout],
-    [1, "ERROR GraphQL: Resource limits exceeded"],
-  );
-  assert.deepEqual(fs.readdirSync(h.directory), []);
-});
-
-test("truncated lists are reported on stderr, never in the verdict", (t) => {
-  const h = harness(t);
-  const capped = pr(1, {
-    reviewThreads: { pageInfo: { hasPreviousPage: true }, nodes: [] },
-  });
-  const result = run(["--state-dir", h.directory, "--dry-run"], {
-    now: NOW,
-    runGh: () =>
-      JSON.stringify({
-        data: {
-          repository: {
-            pullRequests: {
-              pageInfo: { hasNextPage: true },
-              nodes: [capped],
-            },
+test("retries UNKNOWN mergeability once and preserves UNKNOWN when GitHub cannot decide", () => {
+  for (const mergeable of ["MERGEABLE", "CONFLICTING", "UNKNOWN"]) {
+    const h = harness(
+      repository([pr(1, { mergeable: "UNKNOWN" })]),
+      ({ id }) => {
+        assert.equal(id, "pr-1");
+        return {
+          node: {
+            headRefOid: "head-1",
+            baseRefOid: "base",
+            mergeable,
+            mergeStateStatus: "UNKNOWN",
           },
-        },
-      }),
-  });
-  assert.equal(result.stdout, "CLEAN 1 open PRs");
-  assert.deepEqual(result.stderr, [
-    "warning: more than 100 open PRs; only the oldest 100 were checked",
-    "warning: #1: only the newest 100 review threads",
-  ]);
-});
-
-test("--finish releases the lock even when the pending record is unreadable", (t) => {
-  const h = harness(t);
-  fs.writeFileSync(h.file("lock"), "1");
-  fs.writeFileSync(h.file("pending.json"), "{truncated");
-  const result = run(["--state-dir", h.directory, "--finish"]);
-  assert.equal(result.code, 1);
-  assert.match(result.stdout, /^ERROR .*pending\.json is not valid JSON/);
-  assert.equal(fs.existsSync(h.file("lock")), false);
-});
-
-test(
-  "a hung gh fails the run with ERROR and releases the lock instead of holding it for 90 minutes",
-  { skip: process.platform === "win32" },
-  (t) => {
-    const h = harness(t);
-    const bin = path.join(h.directory, "bin");
-    fs.mkdirSync(bin);
-    // `exec` so the kill lands on the sleeping process itself, not a shell around it.
-    fs.writeFileSync(path.join(bin, "gh"), "#!/bin/sh\nexec sleep 30\n", {
-      mode: 0o755,
-    });
-    const originalPath = process.env.PATH;
-    process.env.PATH = `${bin}${path.delimiter}${originalPath}`;
-    t.after(() => {
-      process.env.PATH = originalPath;
-    });
-    const started = Date.now();
-    const result = run(["--state-dir", h.directory], {
-      now: NOW,
-      runGh: ghRunner("octo/widgets", 1000),
-    });
-    assert.deepEqual(
-      [result.code, result.stdout],
-      [1, "ERROR gh api timed out after 1s"],
-    );
-    assert.ok(Date.now() - started < 10_000, "the hung gh was killed");
-    assert.deepEqual(fs.readdirSync(h.directory), ["bin"]);
-  },
-);
-
-test("excerpts drop markup, links and comments and stay short", () => {
-  const text = cleanText(
-    '<!-- hidden --><picture><img alt="x" src="https://e/x.png"/></picture> **Bold** <b>tag</b> see https://example.com/a  now ' +
-      "word ".repeat(200),
-    60,
-  );
-  assert.equal(text.length, 60);
-  assert.match(text, /^Bold tag see now word/);
-  assert.match(text, /…$/);
-});
-
-test(
-  "the CLI asks gh once, for the right repository, and prints the verdict",
-  { skip: process.platform === "win32" },
-  (t) => {
-    const h = harness(t);
-    const bin = path.join(h.directory, "bin");
-    fs.mkdirSync(bin);
-    const fixture = path.join(h.directory, "response.json");
-    fs.writeFileSync(
-      fixture,
-      JSON.stringify({
-        data: {
-          repository: {
-            pullRequests: {
-              pageInfo: { hasNextPage: false },
-              nodes: [pr(1, failing("check"))],
-            },
-          },
-        },
-      }),
-    );
-    fs.writeFileSync(
-      path.join(bin, "gh"),
-      `#!/bin/sh\nprintf '%s\\n' "$@" > "${h.directory}/args.txt"\necho "$GH_REPO" > "${h.directory}/repo.txt"\ncat "${fixture}"\n`,
-      { mode: 0o755 },
-    );
-    const state = path.join(h.directory, "state");
-    const result = spawnSync(
-      process.execPath,
-      [script, "--repo", "octo/widgets", "--state-dir", state],
-      {
-        env: {
-          ...process.env,
-          PATH: `${bin}${path.delimiter}${process.env.PATH}`,
-        },
-        encoding: "utf8",
+        };
       },
     );
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(JSON.parse(result.stdout).work[0].number, 1);
-    const args = fs
-      .readFileSync(path.join(h.directory, "args.txt"), "utf8")
-      .split("\n");
-    assert.deepEqual(args.slice(0, 6), [
-      "api",
-      "graphql",
-      "-F",
-      "owner={owner}",
-      "-F",
-      "repo={repo}",
-    ]);
-    assert.match(
-      args.join("\n"),
-      /statusCheckRollup[\s\S]*reviewThreads[\s\S]*reviews/,
-    );
+    const result = h.execute();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(JSON.parse(result.stdout).prs[0].mergeable, mergeable);
+    assert.equal(h.calls.length, 2);
+  }
+});
+
+test("missing rollup means no checks; missing or mismatched head is an error", () => {
+  const item = pr(1);
+  item.commits.nodes[0].commit.statusCheckRollup = null;
+  const result = harness(repository([item])).execute();
+  assert.equal(result.code, 0);
+  assert.deepEqual(JSON.parse(result.stdout).prs[0].ci, {
+    state: null,
+    failed: [],
+    pending: [],
+  });
+  for (const commits of [
+    { nodes: [] },
+    { nodes: [{ commit: { oid: "old" } }] },
+  ]) {
+    assert.equal(harness(repository([pr(1, { commits })])).execute().code, 1);
+  }
+});
+
+test("partial responses, pagination failures and moving heads fail without a partial survey", () => {
+  const cases = [
+    [null],
+    [{ repository: null }],
+    [
+      {
+        repository: {
+          nameWithOwner: "toddmedema/electrify",
+          pullRequests: { nodes: [] },
+        },
+      },
+    ],
+    [repository([null])],
+    [repository([], "repeat"), () => repository([], "repeat")],
+    [
+      repository([pr(1, { comments: page([], "gone") })]),
+      () => ({ node: null }),
+    ],
+    [
+      repository([pr(1, { mergeable: "UNKNOWN" })]),
+      () => ({ node: { headRefOid: "new", baseRefOid: "base" } }),
+    ],
+    [
+      repository([pr(1, { mergeable: "UNKNOWN" })]),
+      () => ({ node: { headRefOid: "head-1", baseRefOid: "new" } }),
+    ],
+  ];
+  for (const [first, next] of cases) {
+    const result = harness(first, next).execute();
+    assert.equal(result.code, 1, result.stdout);
+    assert.deepEqual(Object.keys(JSON.parse(result.stdout)), ["error"]);
+  }
+  for (const response of [
+    { errors: [{ message: "rate limited" }], data: repository([]) },
+    {},
+    "invalid JSON",
+  ]) {
+    const result = run(["--repo", "toddmedema/electrify"], {
+      runGh: () =>
+        typeof response === "string" ? response : JSON.stringify(response),
+    });
+    assert.equal(result.code, 1);
+    assert.ok(JSON.parse(result.stdout).error);
+  }
+});
+
+test("repeated surveys do not consume attempts, suppress feedback or touch existing monitor files", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "electrify-triage-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  for (const name of ["state.json", "pending.json", "lock"])
+    fs.writeFileSync(path.join(directory, name), "existing monitor state");
+  const files = fs.readdirSync(directory);
+  const previous = process.env.PR_TRIAGE_STATE_DIR;
+  process.env.PR_TRIAGE_STATE_DIR = directory;
+  t.after(() => {
+    if (previous === undefined) delete process.env.PR_TRIAGE_STATE_DIR;
+    else process.env.PR_TRIAGE_STATE_DIR = previous;
+  });
+  const first = repository([pr(1, { comments: page([feedback("user")]) })]);
+  const before = harness(first).execute();
+  assert.equal(before.code, 0);
+  assert.deepEqual(harness(first).execute(), before);
+  assert.deepEqual(fs.readdirSync(directory), files);
+  for (const name of files)
     assert.equal(
-      fs.readFileSync(path.join(h.directory, "repo.txt"), "utf8").trim(),
-      "octo/widgets",
+      fs.readFileSync(path.join(directory, name), "utf8"),
+      "existing monitor state",
     );
-    assert.equal(fs.existsSync(path.join(state, "lock")), true);
+});
 
-    const done = spawnSync(
-      process.execPath,
-      [script, "--finish", "--state-dir", state],
-      {
-        encoding: "utf8",
+test("CLI rejects old stateful options and invalid repositories without contacting GitHub", () => {
+  for (const argv of [
+    [],
+    ["--finish"],
+    ["--dry-run"],
+    ["--repo", "bad"],
+    ["--repo", "a/b", "--state-dir", "/tmp/state"],
+  ]) {
+    const result = run(argv, { runGh: () => assert.fail("must not call gh") });
+    assert.equal(result.code, 1);
+  }
+});
+
+test("CLI reports gh errors with a nonzero exit and one JSON line", (t) => {
+  if (process.platform === "win32") return t.skip("POSIX gh stub");
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "electrify-triage-gh-"),
+  );
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  fs.writeFileSync(
+    path.join(directory, "gh"),
+    "#!/bin/sh\necho 'network unavailable' >&2\nexit 1\n",
+    { mode: 0o755 },
+  );
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.resolve("scripts/dev/pr-triage.js"),
+      "--repo",
+      "toddmedema/electrify",
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${directory}${path.delimiter}${process.env.PATH}`,
       },
-    );
-    assert.equal(done.stdout.trim(), "FINISHED 1 PRs recorded");
-    assert.equal(fs.existsSync(path.join(state, "lock")), false);
-  },
-);
+    },
+  );
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout.trim().split("\n").length, 1);
+  assert.match(JSON.parse(result.stdout).error, /network unavailable/);
+  assert.equal(result.stderr, "");
+});

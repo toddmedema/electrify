@@ -17,22 +17,10 @@
       "Bash(npm run sim:*)",
       "Bash(npm run build)",
       "Bash(npm run compatibility:generate)",
-      "Bash(npm run test:e2e:*)",
-      "Bash(node scripts/dev/pr-triage.js:*)"
+      "Bash(npm run test:e2e:*)"
     ]
   },
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-env.js\"",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Edit|MultiEdit|Write",
