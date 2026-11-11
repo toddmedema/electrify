@@ -17,6 +17,7 @@ import type {
 } from "../src/multiplayer/Native";
 import type { RoomView, World } from "../src/multiplayer/Types";
 import { verifyMenuKeyboard } from "./menu-keyboard";
+import { reviewScreenshot } from "./review-screenshot";
 
 type SteamTestWindow = typeof window & {
   mockSteamDeliveries?: Set<Promise<void>>;
@@ -231,6 +232,7 @@ class SteamRoom {
   >();
   members: LobbyState["members"] = [];
   checkpoint?: World;
+  checkpointError?: string;
   private saveResults = new Map<
     string,
     Extract<WireMessage, { kind: "save-result" }>
@@ -400,6 +402,7 @@ class SteamRoom {
       return;
     }
     if (input.kind === "checkpoint") {
+      if (this.checkpointError) throw new Error(this.checkpointError);
       this.checkpoint = input.world;
       // Native persistence returns before renderer notifications finish decoding.
       // Slow delivery must not block the session's queue of locally durable saves.
@@ -1681,6 +1684,93 @@ async function saveAndQuit(page: Page) {
   ).toBeVisible();
 }
 
+async function reviewConnectionNotice(page: Page, state: string) {
+  if (!process.env.REVIEW_SCREENSHOT_DIR) return;
+  for (const width of [1280, 390, 360]) {
+    for (const theme of ["light", "dark"] as const) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await page.emulateMedia({ colorScheme: theme });
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await reviewScreenshot(page, {
+        path: test.info().outputPath(`${state}-${width}-${theme}.png`),
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
+  }
+}
+
+test("save failures, refused commands and native host errors never offer checkpoint-skipping Disconnect", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const host = pages[0];
+  const guestId = room.members[1].id;
+  await expect(host.locator(".facilities:visible")).toBeVisible();
+  // Exercise the real host worker's save failure through the native persistence boundary.
+  room.checkpointError = "Disk full";
+  await room.request(guestId, {
+    kind: "send",
+    to: room.host,
+    payload: { kind: "save-request", requestId: "failed-checkpoint" },
+  });
+  const notice = host.getByRole("dialog", { name: "Multiplayer", exact: true });
+  await expect(notice).toContainText("Multiplayer save failed: Disk full");
+  await expect(
+    notice.getByRole("button", { name: "Disconnect", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    notice.getByRole("button", { name: "Reconnect", exact: true }),
+  ).toBeVisible();
+  await reviewConnectionNotice(host, "save-failed");
+  await notice.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(notice).toBeHidden();
+  room.checkpointError = undefined;
+
+  // A native transport failure does not stop the host's local simulation or its ability to save.
+  await room.event(room.host, {
+    kind: "state",
+    state: {
+      ...room.state(room.host),
+      error: "Steam connection interrupted. Reconnect to continue.",
+    },
+  });
+  await expect(notice).toContainText("Steam connection interrupted");
+  await expect(
+    notice.getByRole("button", { name: "Disconnect", exact: true }),
+  ).toHaveCount(0);
+  await notice.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(notice).toBeHidden();
+  await room.saveCheckpoint(guestId);
+  expect(room.checkpoint).toBeDefined();
+  // Refusals also reach the guest through the host worker's normal command receipt.
+  const view = room.views.get(guestId)!;
+  await room.request(guestId, {
+    kind: "send",
+    to: room.host,
+    payload: {
+      kind: "command",
+      envelope: {
+        matchId: view.matchId,
+        epoch: view.epoch,
+        sequence: view.lastSequence + 1,
+        command: { kind: "rate", value: -1 },
+      },
+    },
+  });
+  const refused = pages[1].getByRole("dialog", {
+    name: "Multiplayer",
+    exact: true,
+  });
+  await expect(refused).toContainText("Choose a rate between");
+  await expect(
+    refused.getByRole("button", { name: "Disconnect", exact: true }),
+  ).toHaveCount(0);
+  expect(room.members).toHaveLength(2);
+  expect(errors).toEqual([]);
+  expect(room.transportErrors).toEqual([]);
+});
+
 test("a guest who lost the host can disconnect from the connection notice", async ({
   browser,
 }) => {
@@ -1701,6 +1791,7 @@ test("a guest who lost the host can disconnect from the connection notice", asyn
   await expect(
     notice.getByRole("button", { name: "Reconnect", exact: true }),
   ).toBeVisible();
+  await reviewConnectionNotice(guest, "connection-lost");
   await notice.getByRole("button", { name: "Disconnect", exact: true }).click();
   await expect(
     guest.getByRole("button", { name: "Play with friends", exact: true }),
