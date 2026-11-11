@@ -5,6 +5,113 @@ import { chartScale } from "../src/components/base/UPlotHelpers";
 import { editSavedGame } from "./save-fixture";
 import { MINUTES_PER_MONTH } from "../src/helpers/DateTime";
 
+const scrollbarTest = test.extend({
+  launchOptions: async ({ launchOptions }, use) => {
+    await use({
+      ...launchOptions,
+      // Headless Chromium otherwise hides the scrollbars that trigger this feedback loop.
+      ignoreDefaultArgs: [
+        ...(Array.isArray(launchOptions.ignoreDefaultArgs)
+          ? launchOptions.ignoreDefaultArgs
+          : []),
+        "--hide-scrollbars",
+      ],
+    });
+  },
+});
+
+scrollbarTest.describe("Insights with space-taking scrollbars", () => {
+  for (const theme of ["light", "dark"] as const) {
+    scrollbarTest(
+      `charts settle at the large-screen overflow boundary in ${theme}`,
+      async ({ page }, info) => {
+        scrollbarTest.skip(info.project.name !== "desktop-chromium");
+        await page.setViewportSize({ width: 3840, height: 1080 });
+        await page.addInitScript((mode) => {
+          localStorage.clear();
+          localStorage.setItem("theme", mode);
+          localStorage.setItem(
+            "insightsLayers",
+            JSON.stringify([
+              "supplyDemand",
+              "cash",
+              "emissions",
+              "profit",
+              "financeDetails",
+            ]),
+          );
+        }, theme);
+        await page.goto("/?scenario=108");
+        // Use a predictable classic scrollbar width on every desktop platform.
+        await page.addStyleTag({
+          content:
+            ".insights > .scrollable::-webkit-scrollbar { width: 15px; }",
+        });
+        await page
+          .getByRole("button", { name: "Start game", exact: true })
+          .click();
+        const insights = page.locator(".insights:visible");
+        await openPane(insights, page.locator("#insightsNav"));
+        await expect(insights.locator(".uplot")).toHaveCount(4);
+        await page.evaluate(() => document.fonts.ready);
+        const scroller = insights.locator(":scope > .scrollable");
+        await expect
+          .poll(() =>
+            scroller.evaluate((element) =>
+              Math.round(
+                element.getBoundingClientRect().width - element.clientWidth,
+              ),
+            ),
+          )
+          .toBe(15);
+        // Wait for the chart's debounced options rebuild before measuring its content height.
+        await page.waitForTimeout(250);
+        const height = await scroller.evaluate(
+          (element) =>
+            innerHeight - element.clientHeight + element.scrollHeight + 1,
+        );
+        // The narrow charts just fit. Without a reserved gutter the scrollbar disappears,
+        // widening and heightening them until they overflow and bring the scrollbar back.
+        await page.setViewportSize({ width: 3840, height });
+        const geometries = await insights.evaluate(
+          (element) =>
+            new Promise<string[]>((resolve) => {
+              const samples: string[] = [];
+              const sample = () => {
+                samples.push(
+                  JSON.stringify(
+                    Array.from(element.querySelectorAll(".u-over"), (plot) => {
+                      const { x, y, width, height } =
+                        plot.getBoundingClientRect();
+                      return [x, y, width, height];
+                    }),
+                  ),
+                );
+                if (samples.length < 90) requestAnimationFrame(sample);
+                else resolve(samples.slice(30));
+              };
+              requestAnimationFrame(sample);
+            }),
+        );
+        expect(
+          new Set(geometries).size,
+          "chart geometry settles after resizing",
+        ).toBe(1);
+        if (process.env.REVIEW_SCREENSHOT_DIR) {
+          await page.mouse.move(0, 0);
+          await page.screenshot({
+            path: path.join(
+              process.env.REVIEW_SCREENSHOT_DIR,
+              `insights-4k-${theme}.png`,
+            ),
+            animations: "disabled",
+          });
+        }
+      },
+    );
+  }
+});
+
 const expectRightInsets = async (insights: Locator) => {
   // Water uses this space for its reservoir axis; every other plot ends on the title guide.
   const tracks = insights.locator('.insightsTrack:not([data-layer="water"])');
