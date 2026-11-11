@@ -313,6 +313,21 @@ describe("tutorial step actions", () => {
     });
   });
 
+  // On phones a named action takes a whole line, so the HUD drops Exit there and the game menu's
+  // "Main menu" is the way out. Hiding the menu on such a step would leave no way out at all.
+  it("keeps the game menu reachable on every named-action step", () => {
+    TUTORIALS.forEach((tutorial) =>
+      tutorial.tutorialSteps!.forEach((step, index) => {
+        if (!step.nextLabel) return;
+        expect({
+          mission: tutorial.name,
+          index,
+          hidesMenu: (step.hideUi || []).includes("menu"),
+        }).toEqual({ mission: tutorial.name, index, hidesMenu: false });
+      }),
+    );
+  });
+
   it("explains monthly demand changes just before the generator capstone", () => {
     const generators = capstoneLeadIns.find(
       ({ tutorial }) => tutorial.id === 1,
