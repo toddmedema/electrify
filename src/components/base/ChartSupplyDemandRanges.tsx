@@ -175,7 +175,7 @@ function tooltip(
   if (!range.projected) {
     return `${period} · recorded average\nSupply: ${formatWatts(range.supplyMin)}\nDemand: ${formatWatts(range.demandMin)}`;
   }
-  return `${period} · forecast range\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\nMonthly peak shortfall: ${formatWatts(range.peakShortfall)}${shortfallTooltip(state.timeline, state.shortfalls, minute)}`;
+  return `${period} · forecast range${shortfallTooltip(state.timeline, state.shortfalls, minute)}\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\nMonthly peak shortfall: ${formatWatts(range.peakShortfall)}`;
 }
 
 export default function ChartSupplyDemandRanges(

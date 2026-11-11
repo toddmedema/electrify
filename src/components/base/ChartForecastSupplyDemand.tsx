@@ -130,7 +130,7 @@ function tooltip(
     d.reserveW === undefined
       ? ""
       : `\nReserve margin: ${formatWatts(d.reserveW)}`;
-  return `${header}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}${reserve}${shortfallTooltip(state.timeline, state.shortfalls, minute)}`;
+  return `${header}${shortfallTooltip(state.timeline, state.shortfalls, minute)}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}${reserve}`;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders

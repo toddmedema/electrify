@@ -45,13 +45,17 @@ it.each([
   ["monthly ranges", <ChartSupplyDemandRanges {...forecastProps} />],
 ])(
   "%s tooltip inspects the shaded interval rather than just the nearest sample",
-  (_name, chart) => {
+  (name, chart) => {
     jest.mocked(UPlotChart).mockClear();
     render(chart);
     const props = jest.mocked(UPlotChart).mock.calls[0][0];
     const label = props.tooltip!(0, props.state, 25);
     expect(label).toContain("Unmet demand: 5MW");
     expect(label).toContain("Peak shortfall: 40MW");
+    const supplyLabel = name === "daily" ? "Total supply:" : "Supply:";
+    expect(label.indexOf("Peak shortfall:")).toBeLessThan(
+      label.indexOf(supplyLabel),
+    );
     expect(props.tooltip!(1, props.state, 170)).not.toContain("Unmet demand:");
   },
 );
