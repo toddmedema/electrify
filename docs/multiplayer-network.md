@@ -143,5 +143,5 @@ coalescing, failure propagation and reconnect cleanup, and round-trip the asynch
 through the shipping decoder. Renderer tests protect the eliminated snapshot replays and clock
 identity. The headless multiplayer journey runs at 12× with sixfold renderer CPU throttling and a
 640×360, 30 fps local WebRTC stream, verifies that frames are actually encoded, and checks keyboard
-and pointer speed changes on both peers across a month boundary. It uses synthetic local video;
+and pointer speed changes on both peers after the first year. It uses synthetic local video;
 real calls also depend on the device, call software and network.

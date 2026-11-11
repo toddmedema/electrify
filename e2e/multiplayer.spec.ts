@@ -1354,8 +1354,13 @@ test("12x multiplayer speed controls respond while video chat is encoding", asyn
         .click();
     await expect(clock(host)).toHaveAttribute("data-active-speed", "FAST");
     await expect
-      .poll(() => room.views.get("76561198000000002")?.game?.date.monthsElapsed)
-      .toBeGreaterThanOrEqual(1);
+      .poll(
+        () => room.views.get("76561198000000002")?.game?.date.monthsElapsed,
+        {
+          timeout: 60000,
+        },
+      )
+      .toBeGreaterThanOrEqual(12);
     const encodedBefore = await frames();
     for (const page of pages) {
       for (const [key, speed] of [
