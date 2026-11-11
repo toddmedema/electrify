@@ -139,9 +139,10 @@ test("PR CI runs three independent test groups and three native builds in eight 
       group === "cpu",
     );
     assert.equal(
-      steps.some(
-        ({ run }) =>
-          run === "npx playwright install --with-deps --only-shell chromium",
+      steps.some(({ run }) =>
+        run?.includes(
+          "npx playwright install --with-deps --only-shell chromium",
+        ),
       ),
       group !== "cpu",
     );

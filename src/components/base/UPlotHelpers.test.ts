@@ -11,6 +11,8 @@ import {
   yAxis,
   niceSplits,
   patternFill,
+  shortfallSkyline,
+  shortfallBarsPlugin,
   zeroLinePlugin,
 } from "./UPlotHelpers";
 import { applyTextSize } from "../../TextSize";
@@ -418,4 +420,116 @@ it("uses positive zero for axis ticks crossing a small negative lower bound", ()
 
 it("does not retain negative zero in a degenerate axis", () => {
   expect(niceSplits(-0, -0)).toEqual([0]);
+});
+
+describe("shortfallSkyline", () => {
+  const plot = { left: 10, width: 100, height: 200 };
+  const bar = (x0: number, x1: number, heightShare: number) => ({
+    x0,
+    x1,
+    heightShare,
+  });
+
+  it("scales linearly to the plot height, with the cap as the floor", () => {
+    const heights = shortfallSkyline(
+      [
+        bar(10, 20, 0),
+        bar(30, 40, 0.25),
+        bar(50, 60, 0.5),
+        bar(70, 80, 1),
+        bar(90, 100, 7),
+      ],
+      plot,
+      8,
+    ).map((rect) => rect.height);
+    expect(heights).toEqual([8, 50, 100, 200, 200]);
+  });
+
+  it("keeps the tallest of several months that share a pixel column", () => {
+    expect(
+      shortfallSkyline([bar(10, 10.5, 0.9), bar(10.25, 10.75, 0.1)], plot, 8),
+    ).toEqual([{ x: 10, width: 0.75, height: 180 }]);
+  });
+
+  it("merges equal neighbours and joins unequal ones without a gap or an overlap", () => {
+    expect(
+      shortfallSkyline(
+        [bar(10, 30, 0.5), bar(30, 50, 0.5), bar(50, 70, 0.25)],
+        plot,
+        8,
+      ),
+    ).toEqual([
+      { x: 10, width: 40, height: 100 },
+      { x: 50, width: 20, height: 50 },
+    ]);
+  });
+
+  it("preserves fractional boundaries and gaps narrower than a pixel", () => {
+    expect(shortfallSkyline([bar(40.25, 40.5, 0.1)], plot, 8)).toEqual([
+      { x: 40.25, width: 0.25, height: 20 },
+    ]);
+    expect(
+      shortfallSkyline([bar(10, 10.25, 0.9), bar(10.75, 11, 0.1)], plot, 8),
+    ).toEqual([
+      { x: 10, width: 0.25, height: 180 },
+      { x: 10.75, width: 0.25, height: 180 },
+    ]);
+  });
+
+  it("clips to the plot and drops bars wholly outside it", () => {
+    expect(
+      shortfallSkyline(
+        [bar(0, 25, 0.5), bar(105, 130, 1), bar(200, 220, 1)],
+        plot,
+        8,
+      ),
+    ).toEqual([
+      { x: 10, width: 15, height: 100 },
+      { x: 105, width: 5, height: 200 },
+    ]);
+  });
+
+  it("paints a cap rather than NaN for an unusable height, and never exceeds the plot", () => {
+    expect(shortfallSkyline([bar(10, 20, NaN)], plot, 8)).toEqual([
+      { x: 10, width: 10, height: 8 },
+    ]);
+    expect(
+      shortfallSkyline([bar(10, 20, 0.5)], { ...plot, height: 6 }, 8),
+    ).toEqual([{ x: 10, width: 10, height: 6 }]);
+  });
+});
+
+describe("shortfallBarsPlugin MW scale", () => {
+  it("uses the rendered Y span, follows scale changes and caps at full height", () => {
+    const ctx = {
+      save: jest.fn(),
+      restore: jest.fn(),
+      beginPath: jest.fn(),
+      rect: jest.fn(),
+      clip: jest.fn(),
+      fillRect: jest.fn(),
+    };
+    const plot = {
+      bbox: { left: 10, top: 20, width: 100, height: 300 },
+      ctx,
+      scales: { y: { min: 400e6, max: 1e9 } },
+      valToPos: (value: number) => value,
+    } as unknown as uPlot;
+    const plugin = shortfallBarsPlugin(
+      () => [{ from: 10, to: 20, peakShortfall: 200e6 }],
+      "red",
+    );
+    const draw = plugin.hooks!.drawClear as (plot: uPlot) => void;
+    draw(plot);
+    // 200 MW across the rendered 600 MW span is exactly a third of 300 pixels.
+    expect(ctx.fillRect).toHaveBeenCalledWith(10, 20, 10, 100);
+    ctx.fillRect.mockClear();
+    plot.scales.y.max = 800e6;
+    draw(plot);
+    expect(ctx.fillRect).toHaveBeenCalledWith(10, 20, 10, 150);
+    ctx.fillRect.mockClear();
+    plot.scales.y.max = 500e6;
+    draw(plot);
+    expect(ctx.fillRect).toHaveBeenCalledWith(10, 20, 10, 300);
+  });
 });

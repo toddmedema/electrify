@@ -5682,6 +5682,12 @@ $homeSmokeCycle: 5.6s;
     currentColor 5px 6px
   );
 }
+// A shortfall bar in miniature: a solid cap on a light wash with a hairline along its lower edge.
+.chartLegendSwatch-cap {
+  background:
+    linear-gradient(currentColor, currentColor) top / 100% 3px no-repeat,
+    linear-gradient(currentColor, currentColor) bottom / 100% 1px no-repeat;
+}
 @media (max-width: ($phone_width - 1px)) {
   .facilities .facilitiesBody {
     display: block;
