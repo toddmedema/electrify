@@ -17,7 +17,8 @@
       "Bash(npm run sim:*)",
       "Bash(npm run build)",
       "Bash(npm run compatibility:generate)",
-      "Bash(npm run test:e2e:*)"
+      "Bash(npm run test:e2e:*)",
+      "Bash(npm run shot:*)"
     ]
   },
   "hooks": {

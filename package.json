@@ -76,6 +76,7 @@
     "check": "node scripts/dev/run.js check",
     "check:ci": "node scripts/dev/run.js check --ci",
     "task": "node scripts/dev/task.js",
+    "shot": "node scripts/dev/shot.js",
     "ci:failures": "node scripts/ci/failures.js",
     "ci:history": "node scripts/ci/failures.js --history",
     "check:assets": "node scripts/check-assets.js",
