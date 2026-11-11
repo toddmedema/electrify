@@ -87,6 +87,7 @@ import {
   fuelColors,
   fuelDashArrays,
   waterDashArrays,
+  withAlpha,
 } from "../../Theme";
 import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
@@ -135,7 +136,11 @@ import PowerExchangeSummary, {
   LivePowerExchangeSummary,
 } from "../base/PowerExchangeSummary";
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
-import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
+import ChartSupplyDemandRanges, {
+  monthlyShortfalls,
+  shortfallsWithin,
+  supplyDemandMonthlyRanges,
+} from "../base/ChartSupplyDemandRanges";
 import ChartMonthlySpareCapacity from "../base/ChartMonthlySpareCapacity";
 import { getTutorialStep } from "../../data/Scenarios";
 import { ToolScrollMemory } from "../base/GameToolMemory";
@@ -442,6 +447,7 @@ function viewportAnnouncement(
 function timelineWithin(
   timeline: TickPresentFutureType[],
   range: ChartViewportRange,
+  completeMonths = false,
 ): TickPresentFutureType[] {
   if (timeline.length <= 2) return timeline;
   let first = 0;
@@ -451,7 +457,7 @@ function timelineWithin(
     if (timeline[middle].minute < range[0]) first = middle + 1;
     else last = middle;
   }
-  const from = Math.max(0, first - 1);
+  let from = Math.max(0, first - 1);
   first = from;
   last = timeline.length;
   while (first < last) {
@@ -459,7 +465,24 @@ function timelineWithin(
     if (timeline[middle].minute <= range[1]) first = middle + 1;
     else last = middle;
   }
-  return timeline.slice(from, Math.min(timeline.length, first + 1));
+  let to = Math.min(timeline.length, first + 1);
+  if (completeMonths) {
+    // Keep every available hour in the edge months, including the neighbouring points used
+    // for clipping. Panning must not change a month's extrema, peak shortfall or unmet share.
+    const firstMonth = Math.floor(timeline[from].minute / MINUTES_PER_MONTH);
+    const lastMonth = Math.floor(timeline[to - 1].minute / MINUTES_PER_MONTH);
+    while (
+      from > 0 &&
+      Math.floor(timeline[from - 1].minute / MINUTES_PER_MONTH) === firstMonth
+    )
+      from--;
+    while (
+      to < timeline.length &&
+      Math.floor(timeline[to].minute / MINUTES_PER_MONTH) === lastMonth
+    )
+      to++;
+  }
+  return timeline.slice(from, to);
 }
 
 function sameLayers(left: InsightLayerId[], right: InsightLayerId[]): boolean {
@@ -1679,24 +1702,58 @@ export default class Insights extends React.Component<Props, State> {
             </>
           );
           break;
-        case "supplyDemand":
+        case "supplyDemand": {
+          // Beyond two years the chart aggregates to monthly ranges, whose shortfall markers
+          // are derived from those ranges rather than from the hourly blackout spans. The
+          // legend follows the markers that reach into the viewport, not the hourly shortfall
+          // total, so a mark on the plot always has its key.
+          const rangedSupplyDemand =
+            projection.domain.x[1] - projection.domain.x[0] >
+            24 * MINUTES_PER_MONTH;
+          // Share the hourly aggregation with the chart; the legend must not repeat it.
+          const monthlyRanges = rangedSupplyDemand
+            ? supplyDemandMonthlyRanges(
+                projection.supplyDemandTimeline,
+                projection.forecast[0]?.minute,
+              )
+            : [];
+          const unmetDemandMarked =
+            shortfallsWithin(
+              monthlyShortfalls(monthlyRanges),
+              projection.domain.x,
+            ).length > 0;
           body = (
             <>
               <ChartLegend
                 items={[
                   { name: "Supply", color: chartPalette().supply, dash: "20" },
                   { name: "Demand", color: chartPalette().demand, dash: "20" },
+                  ...(unmetDemandMarked
+                    ? [
+                        {
+                          name: "Unmet demand",
+                          color: chartPalette().blackout,
+                          pattern: "cap" as const,
+                          fill: withAlpha(
+                            chartPalette().blackout,
+                            chartPalette().bandAlpha,
+                          ),
+                        },
+                      ]
+                    : []),
                 ]}
+                {...(unmetDemandMarked
+                  ? {
+                      note: "Bands span each month's lowest to highest hour. Red height shows peak shortfall on the same MW scale, capped at full height.",
+                    }
+                  : {})}
               />
-              {projection.domain.x[1] - projection.domain.x[0] >
-              24 * MINUTES_PER_MONTH ? (
+              {rangedSupplyDemand ? (
                 <ChartSupplyDemandRanges
                   height={160}
-                  timeline={projection.supplyDemandTimeline}
-                  blackouts={projection.blackouts}
+                  ranges={monthlyRanges}
                   domain={projection.domain}
                   startingYear={game.startingYear}
-                  currentMinute={projection.forecast[0]?.minute}
                   syncKey={syncKey}
                 />
               ) : (
@@ -1741,6 +1798,7 @@ export default class Insights extends React.Component<Props, State> {
             </>
           );
           break;
+        }
         case "powerExchange":
           body = (
             <>
@@ -2221,9 +2279,12 @@ export default class Insights extends React.Component<Props, State> {
       minViewportSpan,
     );
     const viewportTimeline = timelineWithin(projection.timeline, viewportRange);
+    const monthlySupplyDemand =
+      viewportRange[1] - viewportRange[0] > 24 * MINUTES_PER_MONTH;
     const viewportSupplyDemand = timelineWithin(
       projection.supplyDemandTimeline,
       viewportRange,
+      monthlySupplyDemand,
     );
     const viewportSampleInterval = Math.max(
       projection.projectionStepMinutes,
@@ -2238,10 +2299,9 @@ export default class Insights extends React.Component<Props, State> {
       viewportSampleInterval,
     );
     // Range bands must see every modeled hour so brief peaks and shortages survive aggregation.
-    const supplyDemandTimeline =
-      viewportRange[1] - viewportRange[0] > 24 * MINUTES_PER_MONTH
-        ? viewportSupplyDemand
-        : sampleForecastTimeline(viewportSupplyDemand, viewportSampleInterval);
+    const supplyDemandTimeline = monthlySupplyDemand
+      ? viewportSupplyDemand
+      : sampleForecastTimeline(viewportSupplyDemand, viewportSampleInterval);
     let viewportDomainMin = Number.POSITIVE_INFINITY;
     let viewportDomainMax = Number.NEGATIVE_INFINITY;
     for (const tick of supplyDemandTimeline) {
