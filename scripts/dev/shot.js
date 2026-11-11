@@ -42,7 +42,7 @@ One line per file is printed: absolute path, pixel size, file size.
                         the route), so shots of different components do not overwrite each other.
   --delay <ms>          Wait this long before capturing (default 300).
   --base-url <url>      App to photograph. Otherwise E2E_BASE_URL, BASE_URL, or the dev server
-                        that "npm start" is running in this checkout.
+                        that "npm start" is running in this checkout. Must use the origin root.
 
 Files are named <name>-<viewport>-<theme>.png. The game is paused while it is captured. Each new
 game draws random weather, so figures such as reserve and income differ between runs: compare
@@ -231,7 +231,12 @@ function normalizeBaseUrl(text, source) {
   }
   if (!/^https?:$/.test(url.protocol))
     throw new UsageError(`${source} must be an http(s) URL: ${text}`, false);
-  return url.origin + url.pathname.replace(/\/+$/, "");
+  if (url.pathname !== "/")
+    throw new UsageError(
+      `${source} must use the origin root without a subpath: ${text}`,
+      false,
+    );
+  return url.origin;
 }
 
 /** Ports that a live command in this checkout reserved (npm start, check, browser runs). */

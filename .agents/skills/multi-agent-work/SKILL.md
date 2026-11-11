@@ -58,7 +58,8 @@ The brief holds:
 
 Review `git diff --stat origin/master...HEAD`, then that diff and the touched files, not the
 whole repo. Check that each finding is fixed and nothing nearby regressed. Same capped format,
-one round. Only blockers go back to a fresh coder.
+one round. Only blockers go back to a fresh coder. The lead fixes each major finding or hands
+it off for a decision before delivery.
 
 ## 5. Cheap lookups and cheap proof
 
@@ -68,10 +69,17 @@ one round. Only blockers go back to a fresh coder.
 - Verify UI from evidence that costs text, not pixels: DOM text and attributes, computed styles,
   or an existing spec. Use images last, as proof.
 - For images, `npm run shot` instead of a new Playwright script. Defaults are one 1280 px
-  viewport at device scale 1; use `--clip` for the one component you changed:
+  viewport at device scale 1; use `--clip` for the one component you changed. Start the server
+  in the background:
 
   ```
-  npm start                      # background; prints "Reserved E2E_PORT=<port>"
+  npm start &                    # prints "Reserved E2E_PORT=<port>"
+  ```
+
+  Wait for "Compiled successfully!" or "Compiled with warnings." before running the capture
+  in a separate command:
+
+  ```
   npm run shot -- --scenario 108 --view facilities --viewports 1280,390,360 \
     --theme light,dark --clip ".facilityRow:has-text('Solar')"
   ```

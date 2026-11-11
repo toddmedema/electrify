@@ -228,6 +228,28 @@ test("an empty explicit base URL cannot fall back to another app", async () => {
   );
 });
 
+test("base URLs under a subpath are rejected before probing", async () => {
+  for (const base of [
+    { flag: "https://example.com/app" },
+    { env: { E2E_BASE_URL: "https://example.com/app/" } },
+    { env: { BASE_URL: "https://example.com/app/nested" } },
+  ]) {
+    let probed = false;
+    await assert.rejects(
+      resolveBaseUrl({
+        env: {},
+        ...base,
+        probe: async () => {
+          probed = true;
+          return true;
+        },
+      }),
+      /must use the origin root without a subpath/,
+    );
+    assert.equal(probed, false);
+  }
+});
+
 test("only a live server reserved by this checkout is found automatically", async () => {
   await withServer(async (port) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "shot-root-"));

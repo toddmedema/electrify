@@ -43,7 +43,9 @@ test("capture", async ({ page, colorScheme }, info) => {
     localStorage.setItem("theme", mode);
     localStorage.setItem("audioEnabled", "false");
   }, colorScheme ?? "light");
-  await page.goto(request.route);
+  const response = await page.goto(request.route);
+  if (response && response.status() >= 400)
+    throw new Error(`${request.route} returned HTTP ${response.status()}`);
   if (request.game) {
     const start = page.getByRole("button", { name: "Start game", exact: true });
     // An unknown scenario id loads a page without this button; say so instead of letting the
