@@ -126,14 +126,22 @@ test(
       "v26.2.0",
       "bin",
     );
-    const lookup = (script) =>
+    const lookup = (script, PATH = "/usr/bin:/bin") =>
       execFileSync("/bin/sh", ["-c", script], {
-        env: { PATH: "/usr/bin:/bin" },
+        env: { PATH },
         encoding: "utf8",
       }).trim();
     assert.equal(
       lookup(`${line}\n${line}\necho "$PATH"`),
       `${nodeBin}:/usr/bin:/bin`,
+    );
+    // Already first: untouched. Already on PATH behind another node: still moved to the front.
+    const first = `${nodeBin}:/usr/bin`;
+    assert.equal(lookup(`${line}\necho "$PATH"`, first), first);
+    const behind = `/usr/bin:${nodeBin}:/bin`;
+    assert.equal(
+      lookup(`${line}\necho "$PATH"`, behind),
+      `${nodeBin}:${behind}`,
     );
   },
 );
@@ -155,6 +163,17 @@ test("the task ID defaults to the worktree name and never overrides one that is 
       version: "v26.13.0",
       env: { ELECTRIFY_TASK_ID: "set" },
       nameOf: () => "ignored",
+    }),
+    [],
+  );
+});
+
+test("a Codex thread ID that `npm run task` already reads is not shadowed", () => {
+  assert.deepEqual(
+    sessionEnvLines({
+      version: "v26.13.0",
+      env: { CODEX_THREAD_ID: "thread-1" },
+      nameOf: () => "worktree-name",
     }),
     [],
   );
@@ -207,6 +226,7 @@ test("the hook is silent, appends to the env file, and always exits 0", (t) => {
   const run = (env) => {
     const base = { ...process.env, CLAUDE_PROJECT_DIR: checkout };
     delete base.ELECTRIFY_TASK_ID;
+    delete base.CODEX_THREAD_ID;
     delete base.CLAUDE_ENV_FILE;
     const result = spawnSync(process.execPath, [hook], {
       cwd: parent,

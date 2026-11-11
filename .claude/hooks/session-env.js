@@ -4,7 +4,8 @@
 //
 //   - When the `node` this hook runs under is not Node 26 (the repository requires >= 26 < 27),
 //     the first Node 26 install found in a common location is put first on PATH.
-//   - When ELECTRIFY_TASK_ID is unset, it defaults to the worktree directory name, so
+//   - When neither ELECTRIFY_TASK_ID nor CODEX_THREAD_ID (the IDs `npm run task` reads) is set, it
+//     defaults ELECTRIFY_TASK_ID to the worktree directory name, so
 //     `npm run task -- claim` works and a resumed session keeps owning its earlier claim. Two
 //     live sessions in one checkout would share that ID; use a worktree per task, as AGENTS.md says.
 //
@@ -124,12 +125,14 @@ function sessionEnvLines({
     const directory = findNodeDirectory({ home, platform, list, versionIn });
     if (directory) {
       const quoted = shellQuote(directory);
+      // Skip only when it is already first: further back, an older `node` would still win.
       lines.push(
-        `case ":$PATH:" in *:${quoted}:*) ;; *) export PATH=${quoted}:"$PATH" ;; esac`,
+        `case ":$PATH:" in :${quoted}:*) ;; *) export PATH=${quoted}:"$PATH" ;; esac`,
       );
     }
   }
-  if (!env.ELECTRIFY_TASK_ID) {
+  // `npm run task` takes ELECTRIFY_TASK_ID, then CODEX_THREAD_ID; never shadow the second.
+  if (!env.ELECTRIFY_TASK_ID && !env.CODEX_THREAD_ID) {
     let name = "";
     try {
       name = nameOf(env.CLAUDE_PROJECT_DIR || process.cwd());
