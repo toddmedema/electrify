@@ -270,11 +270,14 @@ export function projectedShortfall(
  * on hand before being read. Only deviations from the original within-month cash path are
  * carried along; ordinary operating cash flow is already included in the projected balances.
  */
-export function cashRunwayMonths(game: GameType): number | undefined {
+export function cashRunwayMonths(
+  game: GameType,
+  projectionKey?: string,
+): number | undefined {
   const now = currentTick(game);
   // Negative cash now has its own, more urgent warning; this one is about the months ahead
   if (!now || now.cash < 0) return undefined;
-  const projection = selectProjection(game, now);
+  const projection = selectProjection(game, now, projectionKey);
   const expectedCash =
     getTimeFromTimeline(game.date.minute, projection.cashBaseline)?.cash ??
     projection.startingCash;
@@ -291,6 +294,7 @@ export function selectMissionRisk(
   game: GameType,
   upcoming: UpcomingStoryEventType[] = [],
   suppliedStatus?: ReturnType<typeof getMissionStatus>,
+  projectionKey?: string,
 ): MissionRisk | undefined {
   const now = currentTick(game);
   if (
@@ -327,10 +331,10 @@ export function selectMissionRisk(
     };
   // A shortage later in today's operating sample is reported by the grid readout beside this
   // (see getGridHealth), the same way a shortage happening now is.
-  const runway = cashRunwayMonths(game);
+  const runway = cashRunwayMonths(game, projectionKey);
   const gap =
     isUtilityExpansionGame(game) && now
-      ? utilityServiceGap(game, selectProjection(game, now))
+      ? utilityServiceGap(game, selectProjection(game, now, projectionKey))
       : undefined;
   const gapMonth = gap
     ? (gap.year - game.startingYear) * 12 + gap.month - 1

@@ -487,7 +487,7 @@ for (const theme of ["light", "dark"] as const) {
     const maxSize = battery.getByRole("button", { name: "Use max size" });
     await expect(maxSize).toBeVisible();
     await expect(battery.locator(".MuiCardHeader-root")).toContainText(
-      "This project size is not available",
+      "This size can't be built",
     );
     await expect(battery.locator(".buildOptionWarning")).toHaveCount(0);
     expect(

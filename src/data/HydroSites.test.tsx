@@ -5,8 +5,11 @@ import {
   getHydroAvailability,
   resolveStartingHydroSites,
   validHydroClaims,
+  HYDRO_INVENTORIES,
   HYDRO_SITES,
+  MAX_HYDRO_SITES_PER_LOCATION,
 } from "./HydroSites";
+import { getViableLocationCount } from "./FacilitySites";
 import { createGame } from "../testing/Simulator";
 import { GENERATORS } from "./Facilities";
 import gameReducer, {
@@ -196,4 +199,38 @@ it("resolves an unloaded catalogue city only at its canonical coordinates", () =
   expect(getHydroAvailability(game, 1000000).status).toBe("available");
   game.location.long += 1;
   expect(getHydroAvailability(game, 1000000).status).toBe("unavailable");
+});
+
+it("offers only a location's largest sites, while claims on smaller ones stay valid", () => {
+  const game = state();
+  game.location = { ...LOCATIONS.CAMountains };
+  const researched = HYDRO_INVENTORIES.CAMountains.siteIds.map(
+    (id) => HYDRO_SITES[id],
+  );
+  expect(researched.length).toBeGreaterThan(MAX_HYDRO_SITES_PER_LOCATION);
+  const { remaining, largest } = getHydroAvailability(game, MW);
+  expect(remaining).toHaveLength(MAX_HYDRO_SITES_PER_LOCATION);
+  expect(getViableLocationCount(game.location, "Hydro")).toBe(
+    MAX_HYDRO_SITES_PER_LOCATION,
+  );
+  expect(largest!.maxPeakW).toBe(
+    Math.max(...researched.map((site) => site.maxPeakW)),
+  );
+  // Every site left out is no larger than the smallest one kept
+  const offered = new Set(remaining.map((site) => site.id));
+  const smallestKept = Math.min(...remaining.map((site) => site.maxPeakW));
+  const dropped = researched.filter((site) => !offered.has(site.id));
+  expect(dropped.length).toBe(researched.length - remaining.length);
+  dropped.forEach((site) =>
+    expect(site.maxPeakW).toBeLessThanOrEqual(smallestKept),
+  );
+  // A game saved before the cap may already hold one of the smaller sites
+  game.commissionedHydroSiteIds = [dropped[0].id];
+  expect(validHydroClaims(game)).toBe(true);
+  // A location under the cap is untouched
+  game.location = { ...LOCATIONS.PIT };
+  game.commissionedHydroSiteIds = [];
+  expect(getHydroAvailability(game, MW).remaining).toHaveLength(
+    HYDRO_INVENTORIES.PIT.siteIds.length,
+  );
 });

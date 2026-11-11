@@ -76,7 +76,8 @@ export const SCENARIO_CHOICE_RULES: CatalogScenarioChoice[] = [
       id: "winterization",
       dueMonth: 37,
       title: "Prepare for the deep freeze",
-      prompt: "February demand and gas prices spiking as plant output falls.",
+      prompt:
+        "In February, demand and gas prices will spike as plant output falls.",
       options: [
         {
           id: "winterize",

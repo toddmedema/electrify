@@ -3,7 +3,7 @@
   "node": "v24.14.0",
   "metrics": {
     "mainJs": 912113,
-    "mainCss": 26630,
+    "mainCss": 29333,
     "initialJs": 1003325,
     "allJs": 1450318
   }

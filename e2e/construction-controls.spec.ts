@@ -320,7 +320,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(page.getByRole("dialog")).toContainText(
       "after settling the outstanding loan",
     );
-    await page.getByRole("button", { name: "Nevermind", exact: true }).click();
+    await page.getByRole("button", { name: "Never mind", exact: true }).click();
     const speed = (name: string) =>
       page
         .locator("#appbar:visible")

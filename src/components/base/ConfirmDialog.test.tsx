@@ -38,14 +38,14 @@ describe("ConfirmDialog", () => {
           open
           isolateClicks
           title="Sell it?"
-          cancelLabel="Nevermind"
+          cancelLabel="Never mind"
           confirmLabel="Sell"
           onCancel={() => undefined}
           onConfirm={() => undefined}
         />
       </div>,
     );
-    fireEvent.click(screen.getByText("Nevermind"));
+    fireEvent.click(screen.getByText("Never mind"));
     expect(onRowClick).not.toHaveBeenCalled();
   });
 

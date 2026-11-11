@@ -1,4 +1,8 @@
-import { finishStartup } from "./Startup";
+import {
+  failDesktopStartup,
+  finishStartup,
+  prepareDesktopStartup,
+} from "./Startup";
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -41,4 +45,32 @@ it("leaves the app usable when a failed load has already removed the entrance", 
   finishStartup();
   expect(document.getElementById("root")!.inert).not.toBe(true);
   expect(jest.getTimerCount()).toBe(0);
+});
+
+describe("the startup message", () => {
+  beforeEach(() => {
+    document.body.innerHTML =
+      '<div id="root"></div><div id="appStartup"><div data-startup-status role="status">Loading…</div></div>';
+  });
+
+  it("leaves the painted entrance untouched so its message never changes", () => {
+    const status = document.querySelector("[data-startup-status]")!;
+    const text = status.firstChild;
+    prepareDesktopStartup();
+    expect(status.firstChild).toBe(text);
+    expect(status).toHaveTextContent("Loading…");
+  });
+
+  it("restores the same message when a failed startup is retried", () => {
+    failDesktopStartup(jest.fn(), jest.fn());
+    const entrance = document.getElementById("appStartup")!;
+    const status = entrance.querySelector("[data-startup-status]")!;
+    expect(entrance).toHaveClass("appStartupFailed");
+    expect(status).toHaveAttribute("role", "alert");
+    prepareDesktopStartup();
+    expect(entrance).not.toHaveClass("appStartupFailed");
+    expect(status).toHaveAttribute("role", "status");
+    expect(status).toHaveTextContent("Loading…");
+    expect(status.querySelector("button")).toBeNull();
+  });
 });

@@ -55,6 +55,35 @@ type HydroState = Pick<
   | "customScenario"
   | "utilityExpansion"
 > & { date?: Pick<GameType["date"], "year"> };
+/**
+ * The most sites one location offers for new construction: its largest. A longer researched list
+ * is a long scroll in the build card for sites too small to matter, so the rest stay in the
+ * catalogue only as provenance and as claims an older save already holds.
+ */
+export const MAX_HYDRO_SITES_PER_LOCATION = 50;
+function compareLargestFirst(a: HydroSite, b: HydroSite): number {
+  return b.maxPeakW - a.maxPeakW || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+const offeredSiteIds = new WeakMap<HydroInventory, readonly string[]>();
+/** An inventory's sites for new games and new construction, in catalogue order. */
+export function offeredHydroSiteIds(
+  inventory: HydroInventory,
+): readonly string[] {
+  let ids = offeredSiteIds.get(inventory);
+  if (!ids) {
+    const largest = new Set(
+      [...inventory.siteIds]
+        .sort((a, b) => compareLargestFirst(HYDRO_SITES[a], HYDRO_SITES[b]))
+        .slice(0, MAX_HYDRO_SITES_PER_LOCATION),
+    );
+    ids =
+      largest.size === inventory.siteIds.length
+        ? inventory.siteIds
+        : inventory.siteIds.filter((id) => largest.has(id));
+    offeredSiteIds.set(inventory, ids);
+  }
+  return ids;
+}
 export function isConventionalHydro(facility: {
   fuel?: unknown;
   peakWh?: unknown;
@@ -154,7 +183,9 @@ export function getHydroAvailability(state: HydroState, peakW: number) {
     if (isConventionalHydro(f) && f.hydroSiteId) used.add(f.hydroSiteId);
   });
   const sites =
-    inventory?.siteIds.map((id) => HYDRO_SITES[id]).filter(Boolean) || [];
+    (inventory && offeredHydroSiteIds(inventory))
+      ?.map((id) => HYDRO_SITES[id])
+      .filter(Boolean) || [];
   const remaining = sites
     .filter(
       (site) =>
@@ -201,10 +232,10 @@ export function resolveStartingHydroSites(
 ): (string | undefined)[] {
   const inventory = resolveHydroInventory(location, inventoryKey);
   const available = new Map(
-    (inventory?.status === "researched" ? inventory.siteIds : []).map((id) => [
-      id,
-      HYDRO_SITES[id],
-    ]),
+    (inventory?.status === "researched"
+      ? offeredHydroSiteIds(inventory)
+      : []
+    ).map((id) => [id, HYDRO_SITES[id]]),
   );
   if (
     fleet.some(

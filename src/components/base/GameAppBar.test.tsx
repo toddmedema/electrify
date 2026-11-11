@@ -6,7 +6,12 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { getTimeFromTimeline, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import {
+  deriveExpandedSummary,
+  getTimeFromTimeline,
+  MINUTES_PER_MONTH,
+  summarizeTimeline,
+} from "../../helpers/DateTime";
 import { TICK_MINUTES } from "../../Constants";
 import { formatMoneyStable } from "../../helpers/Format";
 import { ThemeProvider } from "@mui/material/styles";
@@ -18,6 +23,7 @@ import { SpeedType, TickPresentFutureType } from "../../Types";
 import {
   GameAppBar,
   getGridHealth,
+  monthProfit,
   Props,
   reserveCapacityW,
   stableGridSummary,
@@ -750,4 +756,35 @@ describe("GameAppBar", () => {
       expect(onQuit).toHaveBeenCalledTimes(1);
     },
   );
+});
+
+test("monthProfit is exactly the profit of the month summary", () => {
+  const game = createGame({ scenarioId: 101 });
+  const base = game.timeline[0];
+  const month = 3;
+  const timeline: TickPresentFutureType[] = Array.from(
+    { length: 400 },
+    (_, i) => ({
+      ...base,
+      minute: (month - 1) * MINUTES_PER_MONTH + i * TICK_MINUTES * 7,
+      revenue: 1234.5678 + i * 0.1 + Math.sin(i) * 1e5,
+      expensesFuel: 987.654321 + i * 0.37,
+      expensesOM: 12.3456789 * (i + 1),
+      expensesCarbonFee: i % 3 ? 0.1 * i : 1e6 / (i + 1),
+      expensesInterest: 4567.891 / (i + 3),
+      expensesPolicy: i % 2 ? 0.3333333 * i : 0,
+      expensesImports: i % 5 ? 0 : 77.7777 * i + 0.01,
+    }),
+  );
+  for (const m of [month - 1, month, month + 1, 99]) {
+    expect(monthProfit(timeline, m)).toBe(
+      deriveExpandedSummary(
+        summarizeTimeline(
+          timeline,
+          game.startingYear,
+          (tick) => Math.floor(tick.minute / MINUTES_PER_MONTH) === m,
+        ),
+      ).profit,
+    );
+  }
 });

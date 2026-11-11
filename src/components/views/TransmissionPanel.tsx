@@ -1133,8 +1133,9 @@ export default function TransmissionPanel({
                                 {cancelLine?.id === line.id && (
                                   <ConfirmDialog
                                     open
+                                    destructive
                                     title={`Cancel construction of ${line.name}?`}
-                                    cancelLabel="Nevermind"
+                                    cancelLabel="Never mind"
                                     confirmLabel="Cancel construction"
                                     onCancel={() => setCancelLine(null)}
                                     onConfirm={() => {

@@ -8,6 +8,7 @@ import gameReducer from "../../reducers/Game";
 import GameWorkspace, {
   MIN_FLEET_WIDTH,
   dockCenter,
+  dockClearanceWidth,
   SIDE_TOOL_MIN_WIDTH,
   maxOpenTools,
   toolWidth,
@@ -341,4 +342,14 @@ it("moves the dock off a side tool only when the window centre would cover it", 
   expect(dockCenter(1024, 0, 1, 360)).toBe(332);
   expect(dockCenter(1440, 1, 0, 403)).toBeUndefined();
   expect(dockCenter(1024, 0, 0, 360)).toBeUndefined();
+});
+
+it("reserves room for the larger dock on large windows", () => {
+  expect(dockClearanceWidth(1599)).toBe(402);
+  expect(dockClearanceWidth(1600)).toBe(482);
+  expect(dockClearanceWidth(2200)).toBe(562);
+  // At 1600 a side tool on each side leaves the larger dock clear of both at the window centre...
+  expect(dockCenter(1600, 1, 1, 448)).toBeUndefined();
+  // ...but two tools on the left of a 2200px window would cover it.
+  expect(dockCenter(2200, 2, 0, 480)).toBe(1580);
 });

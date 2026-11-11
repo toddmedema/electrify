@@ -16,6 +16,9 @@ import userEvent from "@testing-library/user-event";
 import FacilityDetails from "./FacilityDetails";
 import { UnitsContext } from "./UnitsContext";
 
+// A dam's water section links to the manual, which reads the store; these tests have none
+jest.mock("./ManualLink", () => () => null);
+
 // Carbon Fee: a non-tutorial game in San Francisco, starting with a gas plant
 function carbonFee(): GameType {
   return createGame({ scenarioId: 100 });
@@ -441,6 +444,40 @@ describe("weather resilience details", () => {
     const gas = game.facilities.find((f) => f.fuel === "Natural Gas");
     showDetails(game, gas || withSolar(game));
     expect(screen.queryByRole("region", { name: "Upgrades" })).toBeNull();
+  });
+});
+
+describe("fixed upkeep", () => {
+  // Heatwave + Drought starts with a dam, a solar farm, a wind farm and a battery: none of them
+  // pays per MWh, so their annual cost is the only upkeep and was missing from the details
+  it.each([
+    ["Hydro", (f: FacilityOperatingType) => f.fuel === "Hydro"],
+    ["Solar", (f: FacilityOperatingType) => f.fuel === "Sun"],
+    ["Wind", (f: FacilityOperatingType) => f.fuel === "Wind"],
+    ["Battery", (f: FacilityOperatingType) => f.name === "Battery"],
+  ])("lists a %s facility's annual upkeep", (_name, matches) => {
+    const game = createGame({ scenarioId: 108 });
+    const facility = game.facilities.find(matches)!;
+    expect(facility.variableOperatingCostPerMWh).toBeUndefined();
+    expect(facility.annualOperatingCost).toBeGreaterThan(0);
+    showDetails(game, facility);
+    const economics = screen.getByRole("region", { name: "Economics" });
+    expect(economics).toHaveTextContent(
+      `Fixed upkeep${formatMoneyConcise(facility.annualOperatingCost)}/yr`,
+    );
+    expect(economics).not.toHaveTextContent("Variable upkeep");
+  });
+
+  it("still lists the variable part beside it for a fuel plant", () => {
+    const game = carbonFee();
+    const gas = game.facilities[0];
+    expect(gas.variableOperatingCostPerMWh).toBeDefined();
+    showDetails(game, gas);
+    const economics = screen.getByRole("region", { name: "Economics" });
+    expect(economics).toHaveTextContent(
+      `Fixed upkeep${formatMoneyConcise(gas.annualOperatingCost)}/yr`,
+    );
+    expect(economics).toHaveTextContent("Variable upkeep");
   });
 });
 

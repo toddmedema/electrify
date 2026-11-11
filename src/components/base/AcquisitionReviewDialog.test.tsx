@@ -110,10 +110,10 @@ it("keeps Valley's dated supply reduction with acquisition obligations", () => {
   review("valley-electric");
   const obligations = within(fact("Acquisition obligations"));
   expect(obligations.getByText(/January 2017/)).toHaveTextContent(
-    "160MW to 80MW",
+    "160 to 80 MW",
   );
   expect(obligations.getByText(/January 2017/)).toHaveTextContent(
-    "152MW to 76MW deliverable",
+    "152 to 76 MW deliverable",
   );
   expect(screen.queryByText(/Plan replacement supply/)).not.toBeInTheDocument();
 });
@@ -124,7 +124,7 @@ it.each([2017, 2024])(
     review("valley-electric", year);
     expect(
       within(fact("Acquisition obligations")).getByText(
-        /nuclear contract is now/,
+        /nuclear purchase is now/,
       ),
     ).toHaveTextContent("80MW (76MW deliverable)");
   },
@@ -138,7 +138,7 @@ it("describes Valley nuclear rights as expired after 2024", () => {
     obligations.getByText(/nuclear purchase has expired/),
   ).toBeInTheDocument();
   expect(
-    obligations.queryByText(/nuclear contract is now/),
+    obligations.queryByText(/nuclear purchase is now/),
   ).not.toBeInTheDocument();
   expect(
     within(fact("Purchased power")).getByText(

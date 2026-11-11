@@ -40,6 +40,20 @@ export function selectOngoing(state: AppStateType): UpcomingStoryEventType[] {
   return ongoing.length > 0 ? ongoing : NO_ONGOING;
 }
 
+function sameOngoing(
+  a: UpcomingStoryEventType[],
+  b: UpcomingStoryEventType[],
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every((event, i) =>
+      (Object.keys(event) as (keyof UpcomingStoryEventType)[])
+        .concat(Object.keys(b[i]) as (keyof UpcomingStoryEventType)[])
+        .every((field) => event[field] === b[i][field]),
+    )
+  );
+}
+
 export const makeMapStateToProps = () => {
   const throttle = new TickThrottle();
   let previous: AppStateType | undefined;
@@ -61,14 +75,28 @@ export const makeMapStateToProps = () => {
       state.ui.evidenceRequest !== previous.ui.evidenceRequest ||
       throttle.due(game.date.minute, 10)
     ) {
-      const ongoing = selectOngoing(state);
+      // The history list does not depend on the tick: keep the same arrays while their inputs
+      // are unchanged so the list below can bail out of rendering.
+      const selected = selectOngoing(state);
+      const priorOngoing = presented?.ongoing ?? NO_ONGOING;
+      const ongoing = sameOngoing(priorOngoing, selected)
+        ? priorOngoing
+        : selected;
+      const sameHistory =
+        !!presented &&
+        !!previous &&
+        previous.game.eventLog === game.eventLog &&
+        priorOngoing.length === ongoing.length &&
+        priorOngoing.every((event, i) => event.key === ongoing[i].key);
       const ongoingKeys = new Set(ongoing.map((event) => event.key));
       presented = {
         game,
-        events: game.eventLog.filter(
-          (event) =>
-            !event.storyPhaseKey || !ongoingKeys.has(event.storyPhaseKey),
-        ),
+        events: sameHistory
+          ? presented!.events
+          : game.eventLog.filter(
+              (event) =>
+                !event.storyPhaseKey || !ongoingKeys.has(event.storyPhaseKey),
+            ),
         ongoing,
         upcoming: selectUpcomingStoryEvents(state),
       };
