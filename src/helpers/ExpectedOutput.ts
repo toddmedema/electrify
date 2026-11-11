@@ -9,8 +9,7 @@ import {
 } from "./Energy";
 
 /**
- * How much of a generator's nameplate the weather allows, month by month. The Forecasts chart and
- * the build cards both read it from here so the two can never tell the player different stories.
+ * How much of a generator's nameplate the weather allows, month by month, for build forecasts.
  */
 
 type OutputTechnology = Pick<
@@ -29,11 +28,6 @@ export type OutputWeatherTick = Pick<
   | "hydroRunoffMm"
   | "renewableCapacityFactors"
 >;
-
-export interface RenewableCapacityFactorPoint {
-  minute: number;
-  factors: Record<string, number>;
-}
 
 export type ExpectedOutputKind = "weather" | "water-inflow" | "on-demand";
 
@@ -113,25 +107,6 @@ function groupTicks(
     groups.set(key, ticks);
   });
   return groups;
-}
-
-export function monthlyRenewableCapacityFactors(
-  timeline: OutputWeatherTick[],
-  technologies: OutputTechnology[],
-): RenewableCapacityFactorPoint[] {
-  return Array.from(groupTicks(timeline, (month) => month).values()).map(
-    (ticks) => ({
-      minute: Math.round(
-        (ticks[0].minute + ticks[ticks.length - 1].minute) / 2,
-      ),
-      factors: Object.fromEntries(
-        technologies.map((technology) => [
-          technology.name,
-          technologyCapacityFactor(technology, ticks),
-        ]),
-      ),
-    }),
-  );
 }
 
 export function expectedOutputKind(fuel: string): ExpectedOutputKind {

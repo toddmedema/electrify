@@ -254,7 +254,6 @@ for (const theme of ["light", "dark"]) {
           "demandByType",
           "weather",
           "water",
-          "solarCapacityFactor",
         ]),
       );
     }, theme);
@@ -264,7 +263,7 @@ for (const theme of ["light", "dark"]) {
     await openPane(insights, page.locator("#insightsNav"));
     const scroller = insights.locator(".scrollable");
     const charts = insights.locator(".insightsTrack [role=img]");
-    await expect(charts).toHaveCount(7);
+    await expect(charts).toHaveCount(6);
     const session = await page.context().newCDPSession(page);
     try {
       for (const chart of await charts.all()) {

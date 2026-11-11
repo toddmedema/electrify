@@ -353,16 +353,6 @@ jest.mock("../base/ChartForecastStorage", () => ({
     <div role="img" data-chart="storage" data-sync-key={syncKey} />
   ),
 }));
-jest.mock("../base/ChartForecastRenewableCapacityFactor", () => ({
-  __esModule: true,
-  default: ({ syncKey }: ChartMockProps) => (
-    <div
-      role="img"
-      data-testid="renewable-capacity-factor-chart"
-      data-sync-key={syncKey}
-    />
-  ),
-}));
 jest.mock("../base/ChartForecastWater", () => ({
   __esModule: true,
   default: ({ syncKey }: ChartMockProps) => (
@@ -662,6 +652,40 @@ describe("Insights layers", () => {
     // must not inherit their mutable weather/fuel/economy projection caches.
     loadSimData(overviewGame.location);
     cacheProjection(overviewGame, overviewProjection);
+  });
+
+  it("discards retired layers from stored views and presets", async () => {
+    const legacyLayers = [
+      "revenue",
+      "expenses",
+      "solarCapacityFactor",
+      "profit",
+    ];
+    localStorage.setItem("insightsLayers", JSON.stringify(legacyLayers));
+    localStorage.setItem(
+      "insightsPresetLibrary",
+      JSON.stringify({
+        defaults: { profitability: legacyLayers },
+        custom: [{ id: "1", name: "My finances", layers: legacyLayers }],
+      }),
+    );
+    renderInsights();
+    await user.click(labelledButton(/Layers/));
+    for (const name of ["Revenue", "Expenses", "Renewable output"]) {
+      expect(screen.queryByRole("checkbox", { name })).toBeNull();
+      expect(screen.queryByRole("heading", { name })).toBeNull();
+    }
+    expect(screen.getByRole("heading", { name: "Profit" })).toBeVisible();
+    await choosePreset("Overview");
+    await choosePreset("Profitability");
+    expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual([
+      "profit",
+    ]);
+    await choosePreset("Overview");
+    await choosePreset("My finances");
+    expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual([
+      "profit",
+    ]);
   });
 
   it("offers every chart an expand control with its help button right after it, and tables neither", () => {
@@ -967,7 +991,7 @@ describe("Insights layers", () => {
       }
       expect(labelledCheckbox("Supply & Demand")).toBeChecked();
       expect(labelledCheckbox("Supply & Demand")).toBeEnabled();
-      expect(labelledCheckbox("Revenue")).not.toBeChecked();
+      expect(labelledCheckbox("Fuel Prices")).not.toBeChecked();
     };
     expectRequiredLayers();
     await choosePreset("Profitability");
@@ -1724,21 +1748,21 @@ describe("Insights layers", () => {
   it("persists edited layer order, saves the preset, and restores its original layers", async () => {
     let view = renderInsights();
     await user.click(labelledButton(/Layers/));
-    await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
-    await user.click(labelledButton("Move Revenue up"));
+    await user.click(screen.getByRole("checkbox", { name: "Profit" }));
+    await user.click(labelledButton("Move Profit up"));
 
-    const layers = ["supplyDemand", "cash", "revenue", "emissions"];
+    const layers = ["supplyDemand", "cash", "profit", "emissions"];
     expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual(layers);
     view.unmount();
     view = renderInsights();
-    expect(screen.getByText("Revenue", { selector: "h3" })).toBeVisible();
+    expect(screen.getByText("Profit", { selector: "h3" })).toBeVisible();
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("OverviewEdited");
     const headings = screen
       .getAllByRole("heading", { level: 3 })
       .map((heading) => heading.textContent);
-    expect(headings.indexOf("Revenue")).toBeLessThan(
+    expect(headings.indexOf("Profit")).toBeLessThan(
       headings.indexOf("Emissions (tonnes CO₂e)"),
     );
 
@@ -1752,7 +1776,7 @@ describe("Insights layers", () => {
     view.unmount();
 
     renderInsights();
-    expect(screen.getByText("Revenue", { selector: "h3" })).toBeVisible();
+    expect(screen.getByText("Profit", { selector: "h3" })).toBeVisible();
     expect(
       screen
         .getAllByRole("heading", { level: 3 })
@@ -1770,7 +1794,7 @@ describe("Insights layers", () => {
     );
     await user.click(screen.getByRole("button", { name: "Restore" }));
 
-    expect(screen.queryByText("Revenue", { selector: "h3" })).toBeNull();
+    expect(screen.queryByText("Profit", { selector: "h3" })).toBeNull();
     const restoredLibrary = JSON.parse(
       localStorage.getItem("insightsPresetLibrary") || "{}",
     );
@@ -1780,13 +1804,13 @@ describe("Insights layers", () => {
   it("resets unsaved changes to a standard preset", async () => {
     renderInsights();
     await user.click(labelledButton(/Layers/));
-    await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
+    await user.click(screen.getByRole("checkbox", { name: "Profit" }));
     await user.click(labelledButton("Preset actions"));
     await user.click(
       screen.getByRole("menuitem", { name: "Reset to default" }),
     );
     await user.click(screen.getByRole("button", { name: "Restore" }));
-    expect(screen.queryByText("Revenue", { selector: "h3" })).toBeNull();
+    expect(screen.queryByText("Profit", { selector: "h3" })).toBeNull();
     await user.click(labelledButton("Preset actions"));
     expect(
       screen.getByRole("menuitem", { name: "Save changes" }),
@@ -1826,7 +1850,7 @@ describe("Insights layers", () => {
     ).toHaveTextContent("Peak watch");
 
     await user.click(labelledButton(/Layers/));
-    await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
+    await user.click(screen.getByRole("checkbox", { name: "Profit" }));
     const preset = screen.getByRole("combobox", { name: "Insight preset" });
     expect(preset).toHaveTextContent("Peak watchEdited");
     await user.click(preset);
@@ -1843,7 +1867,7 @@ describe("Insights layers", () => {
     );
     expect(library.custom[0]).toMatchObject({
       name: "Peak watch",
-      layers: expect.arrayContaining(["revenue"]),
+      layers: expect.arrayContaining(["profit"]),
     });
   });
 
