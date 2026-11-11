@@ -58,15 +58,15 @@ describe("the keyboard shortcuts", () => {
 
   it("maps Q, W, E, R and T to the action bar's tools in its order", () => {
     expect(GAME_TOOLS.map((tool) => TOOL_SHORTCUTS[tool.id])).toEqual([
-      "Q",
-      "W",
-      "E",
-      "R",
-      "T",
+      ["Q", "B"],
+      ["W"],
+      ["E"],
+      ["R"],
+      ["T"],
     ]);
     GAME_TOOLS.forEach((tool) => {
-      expect(keyMap[`TOOL_${tool.id}` as keyof typeof keyMap]).toBe(
-        TOOL_SHORTCUTS[tool.id].toLowerCase(),
+      expect(keyMap[`TOOL_${tool.id}` as keyof typeof keyMap]).toEqual(
+        TOOL_SHORTCUTS[tool.id].map((key) => key.toLowerCase()),
       );
     });
   });

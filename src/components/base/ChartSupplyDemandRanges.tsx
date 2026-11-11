@@ -1,3 +1,9 @@
+import {
+  shortfallIntervals,
+  shortfallHoverPlugin,
+  shortfallTooltip,
+  ShortfallInterval,
+} from "./ShortfallHover";
 import * as React from "react";
 import uPlot from "uplot";
 import { TickPresentFutureType } from "../../Types";
@@ -68,10 +74,12 @@ export function supplyDemandMonthlyRanges(
 
 interface State {
   ranges: MonthlyRange[];
+  timeline: TickPresentFutureType[];
   domain: SupplyDemandProps["domain"];
   startingYear: number;
   multiyear: boolean;
   blackoutSpans: Array<[number, number]>;
+  shortfalls: ShortfallInterval[];
 }
 
 function forecastRangePaths(pastIndex: number): uPlot.Series.PathBuilder {
@@ -135,7 +143,10 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       { series: [7, 5], fill: withAlpha(palette.demand, 0.06) },
       { series: [8, 6], fill: withAlpha(palette.demand, 0.06) },
     ],
-    plugins: [bandsPlugin(() => getState().blackoutSpans, palette.blackout)],
+    plugins: [
+      bandsPlugin(() => getState().blackoutSpans, palette.blackout),
+      shortfallHoverPlugin(() => getState().shortfalls),
+    ],
   };
 }
 
@@ -146,14 +157,25 @@ export function formatWattRange(min: number, max: number): string {
   return low === high ? low : `${low}–${high}`;
 }
 
-function tooltip(index: number, state: State): string {
-  const range = state.ranges[index];
+function tooltip(
+  index: number,
+  state: State,
+  minute = state.ranges[index].minute,
+): string {
+  const range =
+    state.ranges.find(
+      (range) =>
+        range.projected &&
+        minute >= range.minute &&
+        Math.floor(range.minute / MINUTES_PER_MONTH) ===
+          Math.floor(minute / MINUTES_PER_MONTH),
+    ) || state.ranges[index];
   const date = getDateFromMinute(range.minute, state.startingYear);
   const period = `${date.month} ${date.year}`;
   if (!range.projected) {
     return `${period} · recorded average\nSupply: ${formatWatts(range.supplyMin)}\nDemand: ${formatWatts(range.demandMin)}`;
   }
-  return `${period} · forecast range\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\nPeak shortfall: ${formatWatts(range.peakShortfall)}`;
+  return `${period} · forecast range\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\nPeak shortfall: ${formatWatts(range.peakShortfall)}${shortfallTooltip(state.timeline, state.shortfalls, minute)}`;
 }
 
 export default function ChartSupplyDemandRanges(
@@ -182,6 +204,11 @@ export default function ChartSupplyDemandRanges(
       height={props.height}
       state={{
         ranges,
+        timeline: props.timeline,
+        shortfalls: shortfallIntervals(
+          props.timeline,
+          spansFromEdges(props.blackouts),
+        ),
         domain: props.domain,
         startingYear: props.startingYear,
         multiyear: true,

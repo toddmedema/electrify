@@ -115,7 +115,7 @@ export default function Navigation({
             title={
               fromTouch || controllerInput
                 ? tool.label
-                : `${tool.label} (${TOOL_SHORTCUTS[tool.id]})`
+                : `${tool.label} (${TOOL_SHORTCUTS[tool.id].join(", ")})`
             }
             placement="top"
             open={labelId === tool.triggerId}
@@ -130,7 +130,7 @@ export default function Navigation({
               className={`gameDockAction ${tool.id === "BUILD_GENERATORS" ? "button-buildFacility gameDockBuild" : ""}${open ? " gameDockActionOpen" : ""}`}
               aria-expanded={open}
               aria-label={tool.label}
-              aria-keyshortcuts={TOOL_SHORTCUTS[tool.id]}
+              aria-keyshortcuts={TOOL_SHORTCUTS[tool.id].join(" ")}
               aria-describedby={
                 tool.id === "EVENTS"
                   ? [
