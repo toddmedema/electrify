@@ -109,7 +109,10 @@ import ChartForecastWater from "../base/ChartForecastWater";
 import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
-import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
+import {
+  firstShortfallMinute,
+  forecastShortfalls,
+} from "../../helpers/ForecastShortfalls";
 import { largeMassUnit, temperatureUnit } from "../../helpers/Units";
 import { UnitsContext } from "../base/UnitsContext";
 import {
@@ -1417,12 +1420,18 @@ export default class Insights extends React.Component<Props, State> {
       projection.projectionStepMinutes,
       0,
     );
+    // The year the shortfall begins, wherever the viewport sits: zoomed past the first
+    // shortage it is still the year the trouble started, not the year the view opens.
+    const firstMinute = firstShortfallMinute(projection.forecast);
     const shortfall =
-      blackoutTotalWh > 0
+      blackoutTotalWh > 0 && firstMinute !== undefined
         ? {
             wh: blackoutTotalWh,
             peakW,
-            label: viewportLabel(range, this.props.game.startingYear),
+            startYear: getDateFromMinute(
+              firstMinute,
+              this.props.game.startingYear,
+            ).year,
           }
         : undefined;
     this.shortfallCache = { projection, range, shortfall };
@@ -1673,8 +1682,7 @@ export default class Insights extends React.Component<Props, State> {
                 component="p"
                 sx={{ mx: 2, my: 1, color: "text.secondary" }}
               >
-                Lowest reserve in each month. Below zero means a reserve
-                deficit.
+                Lowest reserve in each month. Below zero is a shortfall.
               </Typography>
             </>
           );
@@ -1717,7 +1725,7 @@ export default class Insights extends React.Component<Props, State> {
                   className="insightsWarning"
                   variant="body2"
                   role="note"
-                  aria-label={`Forecast shortfall for ${projection.shortfall.label}: about ${formatWattHours(Number(projection.shortfall.wh.toPrecision(2)))} of demand unmet, about ${formatWatts(Number(projection.shortfall.peakW.toPrecision(2)))} peak`}
+                  aria-label={`Forecast shortfall starting ${projection.shortfall.startYear}: about ${formatWattHours(Number(projection.shortfall.wh.toPrecision(2)))} of demand unmet, about ${formatWatts(Number(projection.shortfall.peakW.toPrecision(2)))} peak`}
                 >
                   <ConceptIcon
                     concept="danger"
@@ -1726,7 +1734,10 @@ export default class Insights extends React.Component<Props, State> {
                     decorative
                   />
                   <span>
-                    <strong>Shortfall, {projection.shortfall.label}:</strong> ~
+                    <strong>
+                      Shortfall, starting {projection.shortfall.startYear}:
+                    </strong>{" "}
+                    ~
                     {formatWattHours(
                       Number(projection.shortfall.wh.toPrecision(2)),
                     )}{" "}
@@ -2312,11 +2323,37 @@ export default class Insights extends React.Component<Props, State> {
         event.startsMinute >= viewportRange[0] &&
         event.startsMinute <= viewportRange[1],
     );
+    const expandedOpen =
+      !!this.state.expandedLayer && visible.includes(this.state.expandedLayer);
+    // The numbered events the charts mark, named once. Inside the full-screen chart the details
+    // open in place, because a portalled popper would sit outside the dialog's focus trap.
+    const renderEventRail = (showDetails: boolean, inDialog = false) => (
+      <InsightEventRail
+        events={upcomingEvents}
+        activeKey={this.state.activeEventKey}
+        showDetails={showDetails}
+        disablePortal={inDialog}
+        onActiveChange={(activeEventKey) => this.setState({ activeEventKey })}
+        onZoom={(event) =>
+          this.setViewport(
+            viewportBounds,
+            minViewportSpan,
+            eventChartViewport(
+              viewportBounds,
+              event.startsMinute!,
+              event.endsMinute,
+              minViewportSpan,
+            ),
+          )
+        }
+      />
+    );
     const annotations = {
       events: upcomingEvents.map((event, index) => ({
         key: event.key,
         x: event.startsMinute!,
         number: index + 1,
+        title: event.title || "Scenario event",
       })),
       activeEventKey: this.state.activeEventKey,
     };
@@ -2513,27 +2550,9 @@ export default class Insights extends React.Component<Props, State> {
             )}
           </div>
           {this.renderLayerPanel(projection)}
-          {!!upcomingEvents.length && (
-            <InsightEventRail
-              events={upcomingEvents}
-              activeKey={this.state.activeEventKey}
-              onActiveChange={(activeEventKey) =>
-                this.setState({ activeEventKey })
-              }
-              onZoom={(event) =>
-                this.setViewport(
-                  viewportBounds,
-                  minViewportSpan,
-                  eventChartViewport(
-                    viewportBounds,
-                    event.startsMinute!,
-                    event.endsMinute,
-                    minViewportSpan,
-                  ),
-                )
-              }
-            />
-          )}
+          {!!upcomingEvents.length &&
+            // The full-screen chart carries its own rail; two would open the same details twice.
+            renderEventRail(!expandedOpen)}
           <ChartViewportContext.Provider value={viewportContext}>
             <ChartAnnotationsContext.Provider value={annotations}>
               <ChartAxisAlignment>
@@ -2548,70 +2567,66 @@ export default class Insights extends React.Component<Props, State> {
                   )}
                 </div>
               </ChartAxisAlignment>
-              {this.state.expandedLayer &&
-                visible.includes(this.state.expandedLayer) && (
-                  <Dialog
-                    fullScreen
-                    open
-                    className="insightsChartDialog"
-                    aria-labelledby="expanded-chart-title"
-                    onClose={() => this.setState({ expandedLayer: undefined })}
+              {this.state.expandedLayer && expandedOpen && (
+                <Dialog
+                  fullScreen
+                  open
+                  className="insightsChartDialog"
+                  aria-labelledby="expanded-chart-title"
+                  onClose={() => this.setState({ expandedLayer: undefined })}
+                >
+                  <DialogTitle
+                    id="expanded-chart-heading"
+                    className="expandedChartTitle"
                   >
-                    <DialogTitle
-                      id="expanded-chart-heading"
-                      className="expandedChartTitle"
-                    >
-                      <span className="expandedChartHeading">
-                        <span id="expanded-chart-title">
-                          {
-                            INSIGHT_LAYERS.find(
-                              (layer) => layer.id === this.state.expandedLayer,
-                            )!.label
-                          }
-                        </span>
-                        {isChartLayer(this.state.expandedLayer) && (
-                          <ManualLink
-                            entry={
-                              INSIGHT_LAYER_MANUAL[this.state.expandedLayer]
-                            }
-                          />
-                        )}
+                    <span className="expandedChartHeading">
+                      <span id="expanded-chart-title">
+                        {
+                          INSIGHT_LAYERS.find(
+                            (layer) => layer.id === this.state.expandedLayer,
+                          )!.label
+                        }
                       </span>
-                      <IconButton
-                        autoFocus
-                        aria-label={`Close ${INSIGHT_LAYERS.find((layer) => layer.id === this.state.expandedLayer)!.label} chart`}
-                        onClick={() =>
-                          this.setState({ expandedLayer: undefined })
-                        }
-                      >
-                        <CloseIcon />
-                      </IconButton>
-                    </DialogTitle>
-                    {this.renderViewportControls(
-                      viewportBounds,
-                      viewportRange,
-                      minViewportSpan,
-                      "expandedViewportHint",
-                    )}
-                    <DialogContent className="expandedChartContent">
-                      <ExpandedChartPresentation
-                        plots={
-                          this.state.expandedLayer === "inflationInterest"
-                            ? 2
-                            : 1
-                        }
-                      >
-                        <ChartAxisAlignment>
-                          {this.renderTrackBody(
-                            this.state.expandedLayer,
-                            viewportProjection,
-                            true,
-                          )}
-                        </ChartAxisAlignment>
-                      </ExpandedChartPresentation>
-                    </DialogContent>
-                  </Dialog>
-                )}
+                      {isChartLayer(this.state.expandedLayer) && (
+                        <ManualLink
+                          entry={INSIGHT_LAYER_MANUAL[this.state.expandedLayer]}
+                        />
+                      )}
+                    </span>
+                    <IconButton
+                      autoFocus
+                      aria-label={`Close ${INSIGHT_LAYERS.find((layer) => layer.id === this.state.expandedLayer)!.label} chart`}
+                      onClick={() =>
+                        this.setState({ expandedLayer: undefined })
+                      }
+                    >
+                      <CloseIcon />
+                    </IconButton>
+                  </DialogTitle>
+                  {this.renderViewportControls(
+                    viewportBounds,
+                    viewportRange,
+                    minViewportSpan,
+                    "expandedViewportHint",
+                  )}
+                  {!!upcomingEvents.length && renderEventRail(true, true)}
+                  <DialogContent className="expandedChartContent">
+                    <ExpandedChartPresentation
+                      plots={
+                        this.state.expandedLayer === "inflationInterest" ? 2 : 1
+                      }
+                    >
+                      <ChartAxisAlignment>
+                        {this.renderTrackBody(
+                          this.state.expandedLayer,
+                          viewportProjection,
+                          true,
+                        )}
+                      </ChartAxisAlignment>
+                    </ExpandedChartPresentation>
+                  </DialogContent>
+                </Dialog>
+              )}
             </ChartAnnotationsContext.Provider>
           </ChartViewportContext.Provider>
         </div>

@@ -774,7 +774,8 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
 .facilityStatusDetail,
 .insightsRateMetricValue,
 table,
-.chartTooltip {
+.chartTooltip,
+.chartEventTooltip {
   font-variant-numeric: lining-nums tabular-nums;
   letter-spacing: normal;
 }
@@ -2401,7 +2402,8 @@ $pane_header_height: 48px;
 // top of the data and clip. Plain HTML so they wrap on narrow screens and screen readers see them.
 // One tooltip covering every series at the hovered x, the way the Victory voronoi container's
 // did, positioned by the chart's own cursor handler
-.chartTooltip {
+.chartTooltip,
+.chartEventTooltip {
   box-sizing: border-box;
   position: absolute;
   display: none;
@@ -8298,6 +8300,11 @@ option {
     flex-shrink: 0;
     max-width: none;
   }
+  // The events the chart marks, named above it at the full width of the screen
+  .insightEventRail {
+    flex-shrink: 0;
+    max-width: none;
+  }
   .expandedChartContent {
     display: flex;
     flex-direction: column;
@@ -8319,7 +8326,8 @@ option {
   .fuelFilter .MuiButton-root {
     font-size: var(--font-size-body1);
   }
-  .chartTooltip {
+  .chartTooltip,
+  .chartEventTooltip {
     font-size: var(--font-size-body1);
   }
   .chartLegend {

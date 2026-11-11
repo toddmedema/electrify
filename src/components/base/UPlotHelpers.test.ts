@@ -2,7 +2,9 @@ import uPlot from "uplot";
 import {
   anchoredForecastPaths,
   baselinePlugin,
+  eventBadgeText,
   eventMarkersPlugin,
+  hoverPoints,
   spansBelow,
   splitPastProjected,
   chartFont,
@@ -14,6 +16,7 @@ import {
   zeroLinePlugin,
 } from "./UPlotHelpers";
 import { applyTextSize } from "../../TextSize";
+import { chartPalette } from "../../Theme";
 
 it("enlarges canvas labels and their reserved chart space with the text preference", () => {
   const values = () => ["100MW"];
@@ -318,6 +321,164 @@ describe("eventMarkersPlugin", () => {
     expect(groupStrokeWidths).toEqual([2]);
     expect(ctx.arc).toHaveBeenCalledTimes(1);
     expect(ctx.arc).toHaveBeenCalledWith(92, 28, 8, 0, Math.PI * 2);
+  });
+});
+
+describe("event badge tooltips", () => {
+  const canvas = () =>
+    ({
+      arc: jest.fn(),
+      roundRect: jest.fn(),
+      beginPath: jest.fn(),
+      clip: jest.fn(),
+      fill: jest.fn(),
+      fillText: jest.fn(),
+      measureText: (text: string) => ({ width: text.length * 7 }),
+      moveTo: jest.fn(),
+      rect: jest.fn(),
+      restore: jest.fn(),
+      save: jest.fn(),
+      setLineDash: jest.fn(),
+      stroke: jest.fn(),
+      lineTo: jest.fn(),
+    }) as unknown as CanvasRenderingContext2D;
+  // The plot's wrapper is its coordinate space; jsdom lays nothing out, so a pointer's client
+  // position is its position on the wrapper.
+  function mount(markers: Parameters<typeof eventMarkersPlugin>[0]) {
+    const wrap = document.createElement("div");
+    const over = document.createElement("div");
+    wrap.appendChild(over);
+    const plot = {
+      bbox: { left: 0, top: 40, width: 100, height: 80 },
+      ctx: canvas(),
+      over,
+      scales: { x: { min: 0, max: 10 } },
+      valToPos: (value: number) => value * 10,
+      width: 350,
+    } as unknown as uPlot;
+    const plugin = eventMarkersPlugin(markers, () => undefined);
+    (plugin.hooks.init as (plot: uPlot) => void)(plot);
+    (plugin.hooks.draw as (plot: uPlot) => void)(plot);
+    const hover = (clientX: number, clientY: number) => {
+      wrap.dispatchEvent(
+        new MouseEvent("mousemove", { clientX, clientY, bubbles: true }),
+      );
+      const tooltip = wrap.querySelector<HTMLElement>(".chartEventTooltip")!;
+      return tooltip.style.display === "block" ? tooltip.textContent : null;
+    };
+    return { wrap, plugin, plot, hover };
+  }
+
+  it("names the event under the pointer and nothing else", () => {
+    const { hover, wrap } = mount(() => [
+      { key: "fee", x: 5, number: 1, title: "Higher carbon fee begins" },
+    ]);
+    // The badge is drawn at (50.5, 28) with a radius of 8, in the row above the plot.
+    expect(hover(50, 28)).toBe("Higher carbon fee begins");
+    expect(hover(57, 24)).toBe("Higher carbon fee begins");
+    // Over the plot and beside the badge there is nothing to name.
+    expect(hover(50, 60)).toBeNull();
+    expect(hover(80, 28)).toBeNull();
+    expect(hover(50, 28)).toBe("Higher carbon fee begins");
+    wrap.dispatchEvent(new MouseEvent("mouseleave"));
+    expect(
+      wrap.querySelector<HTMLElement>(".chartEventTooltip")!.style.display,
+    ).toBe("none");
+  });
+
+  it("lists every event of a merged badge on its own line with its number", () => {
+    const { hover } = mount(() => [
+      { key: "freeze", x: 0, number: 1, title: "Cold snap" },
+      { key: "recovery", x: 0.25, number: 2, title: "Fuel shortage" },
+      { key: "nearby", x: 2.5, number: 3 },
+      { key: "later", x: 9.9, number: 4, title: "Carbon fee" },
+    ]);
+    // The first three merge into the "1–3" badge at x = 14.5; the fourth keeps its own.
+    expect(hover(14, 28)).toBe(
+      "1. Cold snap\n2. Fuel shortage\n3. Scenario event",
+    );
+    expect(hover(92, 28)).toBe("Carbon fee");
+  });
+
+  it("follows the badges as they are redrawn and stops listening when destroyed", () => {
+    let markers = [{ key: "a", x: 5, number: 1, title: "First" }];
+    const { hover, plot, plugin, wrap } = mount(() => markers);
+    expect(hover(50, 28)).toBe("First");
+    markers = [{ key: "a", x: 9, number: 1, title: "Moved" }];
+    (plugin.hooks.draw as (plot: uPlot) => void)(plot);
+    expect(hover(50, 28)).toBeNull();
+    expect(hover(90, 28)).toBe("Moved");
+    (plugin.hooks.destroy as (plot: uPlot) => void)(plot);
+    expect(wrap.querySelector(".chartEventTooltip")).toBeNull();
+  });
+
+  it("describes one event by its name and several by number", () => {
+    expect(
+      eventBadgeText([{ key: "a", x: 0, number: 3, title: "Heat wave" }]),
+    ).toBe("Heat wave");
+    expect(
+      eventBadgeText([
+        { key: "a", x: 0, number: 1, title: "Heat wave" },
+        { key: "b", x: 1, number: 2, title: "Drought" },
+      ]),
+    ).toBe("1. Heat wave\n2. Drought");
+  });
+});
+
+describe("hoverPoints", () => {
+  const surface = () => chartPalette().background;
+  const plot = (strokes: Array<string | null | (() => string)>) =>
+    ({
+      series: [
+        {},
+        ...strokes.map((stroke) => ({
+          stroke: typeof stroke === "function" ? stroke : () => stroke,
+        })),
+      ],
+    }) as unknown as uPlot;
+
+  it("marks each drawn line in its own colour, ringed in the chart surface", () => {
+    const points = hoverPoints();
+    const u = plot(["#0a84ff", () => "#ff9f0a"]);
+    for (const [index, color] of [
+      [1, "#0a84ff"],
+      [2, "#ff9f0a"],
+    ] as const) {
+      const dot = (points.show as (u: uPlot, i: number) => HTMLElement)(
+        u,
+        index,
+      );
+      expect(dot.hidden).toBe(false);
+      expect(dot.style.borderWidth).toBe("2px");
+      expect((points.fill as (u: uPlot, i: number) => string)(u, index)).toBe(
+        color,
+      );
+    }
+    expect((points.stroke as (u: uPlot, i: number) => string)(u, 1)).toBe(
+      surface(),
+    );
+    expect(points.size).toBe(10);
+  });
+
+  it("leaves filled areas and stacked-area separators unmarked", () => {
+    const points = hoverPoints();
+    const u = plot([null, () => surface()]);
+    for (const index of [1, 2]) {
+      const dot = (points.show as (u: uPlot, i: number) => HTMLElement)(
+        u,
+        index,
+      );
+      expect(dot.hidden).toBe(true);
+    }
+  });
+
+  it("prefers the colour a series was last drawn with", () => {
+    const points = hoverPoints();
+    const u = plot(["#0a84ff"]);
+    (u.series[1] as unknown as { _stroke: string })._stroke = "#30d158";
+    expect((points.fill as (u: uPlot, i: number) => string)(u, 1)).toBe(
+      "#30d158",
+    );
   });
 });
 

@@ -95,6 +95,16 @@ export function formatWatts(i: number, mantissa?: number): string {
 }
 
 /**
+ * A labelled reserve reading. Reserve below zero is a shortfall, so it is named and shown as one
+ * ("Shortfall: 8MW") rather than as a negative reserve ("Reserve margin: -8MW").
+ */
+export function formatReserveLine(reserveW: number, label: string): string {
+  return reserveW < 0
+    ? `Shortfall: ${formatWatts(-reserveW)}`
+    : `${label}: ${formatWatts(reserveW)}`;
+}
+
+/**
  * Rounds down to two significant digits, so a maximum shown as "1.2GW" is a size that can really
  * be built rather than a rounded-up value just past the limit.
  */

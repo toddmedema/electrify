@@ -1079,6 +1079,55 @@ describe("Insights layers", () => {
     expect(region).not.toHaveTextContent("Outside range");
   });
 
+  it("names the numbered events above the full-screen chart and keeps their details inside it", async () => {
+    localStorage.setItem("insightsRange", "next1");
+    renderInsights(100, undefined, [
+      {
+        key: "fee-onset",
+        startsMinute: 6 * MINUTES_PER_MONTH,
+        endsMinute: 7 * MINUTES_PER_MONTH,
+        label: "Expected Jul 2023",
+        title: "Higher carbon fee begins",
+        message: "Polluting plants become more expensive to run.",
+      },
+    ]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Expand Supply & Demand chart" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Supply & Demand" });
+    const rail = within(dialog).getByRole("region", {
+      name: "Upcoming scenario events",
+    });
+    expect(rail).toHaveTextContent("Higher carbon fee begins");
+    expect(rail).toHaveTextContent("Jul 2023");
+    // The rail behind the dialog is hidden, so the events are named once.
+    expect(
+      screen.getAllByRole("region", { name: "Upcoming scenario events" }),
+    ).toHaveLength(1);
+
+    const chip = within(rail).getByRole("button", {
+      name: "Expected Jul 2023: Higher carbon fee begins",
+    });
+    await user.click(chip);
+    expect(chip).toHaveAttribute("aria-expanded", "true");
+    expect(
+      within(dialog).getByRole("dialog", { name: "Higher carbon fee begins" }),
+    ).toHaveTextContent("Polluting plants become more expensive to run.");
+
+    // Escape closes the event's details first and leaves the chart open.
+    await user.keyboard("{Escape}");
+    expect(chip).toHaveAttribute("aria-expanded", "false");
+    expect(
+      within(dialog).queryByRole("dialog", {
+        name: "Higher carbon fee begins",
+      }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("dialog", { name: "Supply & Demand" }),
+    ).toBeInTheDocument();
+  });
+
   it("ignores the removed stored horizon and shows only events in the viewport", () => {
     localStorage.setItem("insightsRange", "all");
     renderInsights(100, gameWithHistory(), [
@@ -1291,7 +1340,7 @@ describe("Insights layers", () => {
           },
           "rangeShortfall",
         )
-        .mockReturnValue({ peakW, wh, label: "2020–31" });
+        .mockReturnValue({ peakW, wh, startYear: 2034 });
       try {
         renderInsights();
         const note = screen.getByRole("note", { name: /^Forecast shortfall/ });
@@ -1303,24 +1352,28 @@ describe("Insights layers", () => {
     },
   );
 
-  it("sizes the forecast shortfall to the displayed range", async () => {
+  it("names the year the first forecast shortfall starts and sizes it to the displayed range", async () => {
     const game = createGame({ scenarioId: 100 });
     game.facilities = [];
     renderInsights(100, game);
     const note = screen.getByRole("note", {
-      name: /^Forecast shortfall for 2020–31:/,
+      name: /^Forecast shortfall starting \d{4}:/,
     });
+    const startYear = /\d{4}/.exec(note.getAttribute("aria-label")!)![0];
     expect(note).toHaveTextContent(
-      /^Shortfall, 2020–31:\s*~.+ unmet · ~.+ peak$/,
+      new RegExp(`^Shortfall, starting ${startYear}:\\s*~.+ unmet · ~.+ peak$`),
     );
+    // The first shortfall hour is still to come, never before the scenario began.
+    expect(Number(startYear)).toBeGreaterThanOrEqual(game.startingYear);
     const wholeScenario = note.textContent;
 
     await user.click(labelledButton("Zoom in"));
-    expect(
-      screen.getByRole("note", {
-        name: /^Forecast shortfall for 2023–28:/,
-      }),
-    ).not.toHaveTextContent(wholeScenario!);
+    // The year is when the first shortfall begins, so zooming does not move it; the energy
+    // unmet is what follows the displayed range.
+    const zoomed = screen.getByRole("note", {
+      name: new RegExp(`^Forecast shortfall starting ${startYear}:`),
+    });
+    expect(zoomed).not.toHaveTextContent(wholeScenario!);
   });
 
   it("reports the viewport and reopens on it after the pane remounts", async () => {
