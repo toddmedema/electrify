@@ -95,12 +95,12 @@ export function formatWatts(i: number, mantissa?: number): string {
 }
 
 /**
- * A labelled reserve reading. Reserve below zero is a shortfall, so it is named and shown as one
- * ("Shortfall: 8MW") rather than as a negative reserve ("Reserve margin: -8MW").
+ * A labelled reserve reading. Negative values are reserve deficits, which include reachable
+ * headroom and can differ from unmet demand.
  */
 export function formatReserveLine(reserveW: number, label: string): string {
   return reserveW < 0
-    ? `Shortfall: ${formatWatts(-reserveW)}`
+    ? `Reserve deficit: ${formatWatts(-reserveW)}`
     : `${label}: ${formatWatts(reserveW)}`;
 }
 

@@ -1705,7 +1705,7 @@ export default class Insights extends React.Component<Props, State> {
                 component="p"
                 sx={{ mx: 2, my: 1, color: "text.secondary" }}
               >
-                Lowest reserve in each month. Below zero is a shortfall.
+                Lowest reserve in each month. Below zero is a reserve deficit.
               </Typography>
             </>
           );

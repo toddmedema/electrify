@@ -42,9 +42,9 @@ it("plots measured monthly minima, preserving missing records, zero and negative
   ]);
   expect(chart.tooltip(1, chart.state)).toContain("Not recorded");
   expect(chart.tooltip(3, chart.state)).toContain(
-    "Projected monthly minimum\nShortfall: 8MW",
+    "Projected monthly minimum\nReserve deficit: 8MW",
   );
-  expect(chart.tooltip(3, chart.state)).not.toContain("reserve");
+  expect(chart.ariaLabel).toContain("Values below zero are a reserve deficit");
   expect(chart.tooltip(0, chart.state)).toContain("Lowest reserve: 24MW");
   const options = chart.buildOptions({ getState: () => chart.state, scale: 1 });
   const [min, max] = options.scales.y.range();

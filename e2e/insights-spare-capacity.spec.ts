@@ -31,6 +31,12 @@ for (const theme of ["light", "dark"] as const) {
       name: "Lowest reserve evidence",
     });
     await expect(track).toBeVisible();
+    await expect(track).toContainText(
+      "Lowest reserve in each month. Below zero is a reserve deficit.",
+    );
+    await expect(track.getByRole("img")).toHaveAccessibleName(
+      /Values below zero are a reserve deficit/,
+    );
     await expect(track.locator("canvas")).toBeVisible();
     const chart = track.getByRole("img", {
       name: /Monthly lowest reserve/,
