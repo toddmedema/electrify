@@ -124,7 +124,10 @@ jobs:
           name: desktop-renderer
       - name: Install redistributable Linux runtime inputs
         if: matrix.platform == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y libnss3 libnspr4 libsqlite3-0
+        run: |
+          sudo "$(command -v node)" scripts/ci/ubuntu-apt.js
+          sudo apt-get update
+          sudo apt-get install -y libnss3 libnspr4 libsqlite3-0
       - name: Package and verify native depot
         timeout-minutes: 15
         run: npm run desktop:pack:offline -- --skip-build --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
@@ -213,7 +216,9 @@ jobs:
           path: .tmp/playwright-browsers
           key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
       - name: Install graphical system dependencies and headless browser
-        run: npx playwright install --with-deps --only-shell chromium
+        run: |
+          sudo "$(command -v node)" scripts/ci/ubuntu-apt.js
+          npx playwright install --with-deps --only-shell chromium
       - name: Generate local manifests
         run: npm run compatibility:generate && npm run icons:generate
       - uses: actions/download-artifact@v8
@@ -270,7 +275,9 @@ jobs:
           path: .tmp/playwright-browsers
           key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
       - name: Install graphical system dependencies and headless browser
-        run: npx playwright install --with-deps --only-shell chromium
+        run: |
+          sudo "$(command -v node)" scripts/ci/ubuntu-apt.js
+          npx playwright install --with-deps --only-shell chromium
       - name: Install native window dependencies
         run: sudo apt-get install --yes xvfb openbox
       - name: Generate local manifests
