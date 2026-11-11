@@ -232,9 +232,9 @@ function tooltip(index: number, state: State): string {
       : "No shortfall";
   const magnitude =
     range.peakShortfall > 0
-      ? `\nAverage unmet demand: ${formatWatts(range.unmetSum / range.sampleCount)}\nPeak shortfall: ${formatWatts(range.peakShortfall)}`
+      ? ` · ${formatWatts(range.unmetSum / range.sampleCount)} avg unmet · ${formatWatts(range.peakShortfall)} peak`
       : "";
-  return `${period} · forecast range${magnitude}\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\n${shortfall}`;
+  return `${period}${magnitude}\nForecast range\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\n${shortfall}`;
 }
 
 export default function ChartSupplyDemandRanges(

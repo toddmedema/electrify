@@ -657,7 +657,10 @@ test("blackout periods remain visible when imports supplement fuel production", 
   await plot.press("Home");
   for (let index = 0; index < shortage; index++) await plot.press("ArrowRight");
   await expect(chart.locator(".chartTooltip")).toContainText("Interties:");
-  await expect(chart.locator(".chartTooltip")).toContainText("Blackout:");
+  await expect(chart.locator(".chartTooltip")).toContainText(
+    /\d+(?:\.\d+)?(?:MW|GW) unmet/,
+  );
+  await expect(chart.locator(".chartTooltip")).not.toContainText("Blackout:");
   await plot.press("Escape");
   await page.mouse.move(0, 0);
   await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
@@ -740,7 +743,8 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
   ]) {
     await expect(details).toContainText(direction);
   }
-  await expect(details).toContainText("Blackout: 150MW unmet");
+  await expect(details).toContainText("150MW unmet");
+  await expect(details).not.toContainText("Blackout:");
   await chart.getByRole("img").press("Escape");
   await page.evaluate(() => document.fonts.ready);
   await reviewScreenshot(chart, {
@@ -794,29 +798,34 @@ for (const theme of ["light", "dark"]) {
       const selected = (await highlight.boundingBox())!;
       expect(selected.width).toBeGreaterThan(box.width * 0.45);
       expect(selected.height).toBeCloseTo(box.height, 0);
-      await expect(chart.locator(".chartTooltip")).toContainText(
-        "Unmet demand: 150MW",
-      );
-      await expect(chart.locator(".chartTooltip")).toContainText(
-        "Peak shortfall: 300MW",
-      );
+      await expect(chart.locator(".chartTooltip")).toContainText("150MW unmet");
+      await expect(chart.locator(".chartTooltip")).toContainText("300MW peak");
     }
     const heading = chart.locator(".chartTooltip > div").first();
-    await expect(heading).toContainText("Peak shortfall: 300MW");
+    await expect(heading).toContainText("300MW peak");
+    await expect(heading).toContainText(
+      /^\d{1,2}:\d{2}(?: [AP]M)? · 150MW unmet · 300MW peak$/,
+    );
+    await expect(chart.locator(".chartTooltip")).not.toContainText("Blackout:");
+    const headingLayout = await heading.evaluate((element) => ({
+      height: element.getBoundingClientRect().height,
+      lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+    }));
+    expect(headingLayout.height).toBeLessThanOrEqual(
+      headingLayout.lineHeight + 1,
+    );
     const headingBox = (await heading.boundingBox())!;
     const tooltipBox = (await chart.locator(".chartTooltip").boundingBox())!;
     expect(headingBox.y + headingBox.height).toBeLessThanOrEqual(
       tooltipBox.y + tooltipBox.height,
     );
-    await reviewScreenshot(page, {
+    await reviewScreenshot(chart, {
       path: info.outputPath(`shortage-${theme}.png`),
       animations: "disabled",
     });
     await page.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.5);
     await expect(highlight).toBeHidden();
-    await expect(chart.locator(".chartTooltip")).not.toContainText(
-      "Unmet demand:",
-    );
+    await expect(chart.locator(".chartTooltip")).not.toContainText("MW unmet");
     // Keyboard inspection selects the same interval and Escape clears it.
     const keyboardChart = chart.getByRole("img");
     await keyboardChart.focus();

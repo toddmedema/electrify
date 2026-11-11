@@ -460,7 +460,7 @@ export function formatProductionTooltip(
     minute,
   );
   return [
-    time + shortfall.replace(/\n+/g, " · "),
+    time + shortfall,
     `Total supply: ${formatWatts(state.supply[idx])}`,
     ...state.sources.map(
       (source, i) => `${source}: ${formatWatts(state.bySource[i][idx])}`,
@@ -471,9 +471,6 @@ export function formatProductionTooltip(
     ...loads
       .filter(([_label, value]) => value && value > 0)
       .map(([label, value]) => `${label}: ${formatWatts(value!)}`),
-    ...(d.demandW > d.supplyW
-      ? [`Blackout: ${formatWatts(d.demandW - d.supplyW)} unmet`]
-      : []),
     ...(weather.length ? ["", `Weather: ${weather.join(" · ")}`] : []),
   ].join("\n");
 }

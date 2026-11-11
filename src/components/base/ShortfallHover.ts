@@ -75,7 +75,7 @@ export function shortfallTooltip(
 ): string {
   const interval = shortfallAt(intervals, minute);
   return interval
-    ? `\n\nUnmet demand: ${formatWatts(unmetAt(timeline, minute))}\nPeak shortfall: ${formatWatts(interval.peakShortfall)}`
+    ? ` · ${formatWatts(unmetAt(timeline, minute))} unmet · ${formatWatts(interval.peakShortfall)} peak`
     : "";
 }
 

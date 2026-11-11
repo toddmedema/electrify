@@ -100,12 +100,8 @@ for (const theme of ["light", "dark"] as const) {
       expect(highlighted.height).toBeLessThanOrEqual(bounds.height);
       if (previousBounds) expect(highlighted).toEqual(previousBounds);
       previousBounds = highlighted;
-      await expect(chart.locator(".chartTooltip")).toContainText(
-        "Average unmet demand:",
-      );
-      await expect(chart.locator(".chartTooltip")).toContainText(
-        "Peak shortfall:",
-      );
+      await expect(chart.locator(".chartTooltip")).toContainText("avg unmet");
+      await expect(chart.locator(".chartTooltip")).toContainText("peak");
     }
     for (const container of [insights, track, track.locator(".chartLegend")]) {
       expect(

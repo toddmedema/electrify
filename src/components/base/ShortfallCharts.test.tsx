@@ -66,17 +66,15 @@ it.each([
     const props = jest.mocked(UPlotChart).mock.calls[0][0];
     const label = props.tooltip!(0, props.state, 25);
     expect(label).toContain(
-      name === "monthly ranges"
-        ? "Average unmet demand: 13MW"
-        : "Unmet demand: 5MW",
+      name === "monthly ranges" ? "13MW avg unmet" : "5MW unmet",
     );
-    expect(label).toContain("Peak shortfall: 40MW");
+    expect(label).toContain("40MW peak");
+    expect(label.split("\n")[0]).toContain("40MW peak");
+    expect(label).not.toContain("Blackout:");
     const supplyLabel = name === "daily" ? "Total supply:" : "Supply:";
-    expect(label.indexOf("Peak shortfall:")).toBeLessThan(
-      label.indexOf(supplyLabel),
-    );
+    expect(label.indexOf("40MW peak")).toBeLessThan(label.indexOf(supplyLabel));
     expect(
       props.tooltip!(props.data[0].length - 1, props.state, MINUTES_PER_MONTH),
-    ).not.toMatch(/unmet demand:/i);
+    ).not.toMatch(/\d+(?:MW|W) (?:avg )?unmet/);
   },
 );
