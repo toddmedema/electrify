@@ -7,10 +7,10 @@ files are large, so broad rewrites create expensive review diffs.
 ## Start here
 
 - Use Node 26. Claude Code's SessionStart hook (`.claude/hooks/session-env.js`) puts an installed
-  Node 26 first on `PATH` when the default is older and defaults `ELECTRIFY_TASK_ID` to the
-  worktree name, so do not prefix commands with either; other tools set both themselves. Install
-  exactly the lockfile with `npm ci` in a new checkout or when the lockfile changes; reuse that
-  install across turns while it still matches the lockfile.
+  Node 26 first on `PATH` when the default is not Node 26 and defaults `ELECTRIFY_TASK_ID` to the
+  worktree name, so do not prefix commands with either; other agents put Node 26 on `PATH` and
+  supply the task ID themselves. Install exactly the lockfile with `npm ci` in a new checkout or
+  when the lockfile changes; reuse that install across turns while it still matches the lockfile.
 - Reserve the checkout before editing with `npm run task -- claim` (Codex supplies the chat ID;
   otherwise pass an ID or set `ELECTRIFY_TASK_ID`). If another task owns it, use an isolated
   worktree. Release it with `npm run task -- release` when finished. See
@@ -51,7 +51,7 @@ files are large, so broad rewrites create expensive review diffs.
   in the background and wait for the harness's completion notification. Do not poll with `sleep`
   or `until` loops or repeated `tail`: each poll re-reads the whole conversation. Read the result
   once when the command finishes. If your tool cannot notify on completion, run it in the
-  foreground instead.
+  foreground with the longest timeout it allows.
 - `npm run fix` applies every mechanical fix: it runs `lint:fix` and `format`. Review its diff; it
   does not fix types or tests.
 - Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` starts Jest's
