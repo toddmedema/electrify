@@ -996,7 +996,8 @@ and are unchanged. The ceiling was recorded with `78476acf` on 2026-10-19; its m
 
 Gzip level 9 of the Main CSS file, built per commit (Node 24.14.0 through `bc38b75f`, Node 26.13.0
 from `e812199b`; the same CSS bytes gzip 46 bytes smaller on Node 26). Each change is from the row
-above, and commits between rows were also built where they touched a stylesheet:
+above. The rows are a selection of 54 builds; the ones that attribute the cause (#688 to #690, #709
+to #712, #751 to #757) are consecutive stylesheet-touching commits:
 
 | Commit                                             | Main CSS | Change |
 | -------------------------------------------------- | -------: | -----: |
