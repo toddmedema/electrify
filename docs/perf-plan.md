@@ -986,3 +986,43 @@ masking a lost historical-weather flag. Separately omitting that flag from the
 city and watershed readers made their respective assertions fail; both negative
 controls were restored before the passing combined focused run. The four modern
 base-output pins remain unchanged.
+
+## Main CSS ceiling (2026-11-11)
+
+`npm run perf:bundle` failed on `master` at `a0c10391`: Main CSS measured 29,333 bytes against
+a 26,630-byte ceiling (+10.15%, over the 10% tolerance). The other three bundle metrics passed
+and are unchanged. The ceiling was recorded with `78476acf` on 2026-10-19; its merge into
+`master`, `20fb39c0`, measures 26,780.
+
+Gzip level 9 of the Main CSS file, built per commit (Node 24.14.0 through `bc38b75f`, Node 26.13.0
+from `e812199b`; the same CSS bytes gzip 46 bytes smaller on Node 26). Each change is from the row
+above, and commits between rows were also built where they touched a stylesheet:
+
+| Commit                                             | Main CSS | Change |
+| -------------------------------------------------- | -------: | -----: |
+| `20fb39c0` (#577), merges the commit that set it   |   26,780 |        |
+| `a2d0a889` (#668)                                  |   26,315 |        |
+| `f53992ad` (#688)                                  |   27,689 | +1,374 |
+| `95ed0c45` (#690) layout polish across breakpoints |   29,204 | +1,515 |
+| `f136b247` (#709)                                  |   29,247 |    +43 |
+| `1578269f` (#712) removed repeated static rules    |   28,338 |   -909 |
+| `bc38b75f` (#749) design and accessibility pass    |   28,784 |   +446 |
+| `e812199b` (#750) Node 26, same CSS bytes          |   28,738 |    -46 |
+| `c333692a` (#751)                                  |   28,776 |    +38 |
+| `5f223f5d` (#755) end-game card, dock, hydro list  |   28,913 |   +137 |
+| `a0c10391` (#757) recessed capsule speed control   |   29,333 |   +420 |
+
+Most of the growth is authored interface work spread over many commits. The two large steps were
+#668 to #688 (largest: #675 +497, #657 +327) and #690 (513 added and 111 removed SCSS lines).
+#712 gave back 909 bytes, and the stylesheet has since grown by about 1 kB. #757 is the commit
+that crossed the line, by 40 bytes: its `SpeedControls.scss` rewrite adds the thumb, ring, pips,
+`prefers-contrast`, `forced-colors` and reduced-motion rules.
+
+Nothing material is avoidable. The source map attributes 25.8 kB of the gzip to `app.scss`
+and 1.1 kB to `SpeedControls.scss`. No rule is repeated verbatim, and every class name without a
+literal match in the source is a uPlot or MUI class, a page-transition class or a name built at
+runtime (`gridHealth-*`, `kind-*`, `importance-*`). Merging rules that share a body ignores
+cascade order, so it is not safe, and saves at most 120 bytes.
+
+The Main CSS ceiling therefore moves from 26,630 to 29,333 bytes, the value `perf:bundle --update`
+records, so the failing line moves from 29,293 to 32,266. The JS ceilings are untouched.
