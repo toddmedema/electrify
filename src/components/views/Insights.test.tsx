@@ -491,6 +491,52 @@ it("reveals finance evidence temporarily and lets explicit selection own saved l
   );
 });
 
+it("targets event evidence inside the expanded chart, then returns to the page rail", async () => {
+  localStorage.clear();
+  const props = {
+    game: createGame({ scenarioId: 101 }),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+    onEvidenceReady: jest.fn(),
+    upcomingEvents: [
+      {
+        key: "growth",
+        startsMinute: 6 * MINUTES_PER_MONTH,
+        label: "July",
+        title: "Load growth",
+        message: "Demand grows.",
+      },
+    ],
+  };
+  const request = {
+    id: 1,
+    runId: 0,
+    target: { card: "INSIGHTS" as const, eventKey: "growth" },
+  };
+  const { rerender } = render(<Insights {...props} />);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Expand Supply & Demand chart" }),
+  );
+  rerender(<Insights {...props} evidenceRequest={request} />);
+  const dialog = screen.getByRole("dialog", { name: "Supply & Demand" });
+  const chip = within(dialog).getByRole("button", {
+    name: "July: Load growth",
+  });
+  expect(chip).toHaveAttribute("aria-expanded", "true");
+  expect(props.onEvidenceReady).toHaveBeenLastCalledWith(request, chip);
+
+  fireEvent.click(
+    within(dialog).getByRole("button", { name: "Close Supply & Demand chart" }),
+  );
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
+  const nextRequest = { ...request, id: 2 };
+  rerender(<Insights {...props} evidenceRequest={nextRequest} />);
+  expect(props.onEvidenceReady).toHaveBeenLastCalledWith(
+    nextRequest,
+    screen.getByRole("button", { name: "July: Load growth" }),
+  );
+});
+
 function render(element: React.ReactElement) {
   const store = configureStore({ reducer: { ui: uiReducer } });
   return renderUI(element, {
@@ -1440,28 +1486,73 @@ describe("Insights layers", () => {
     }
   });
 
-  it("names the year the first forecast shortfall starts and sizes it to the displayed range", async () => {
-    const game = createGame({ scenarioId: 100 });
-    game.facilities = [];
-    renderInsights(100, game);
-    const note = screen.getByRole("note", {
-      name: /^Forecast shortfalls start \d{4}:/,
+  function cacheShortfallForecast() {
+    const year = 12 * MINUTES_PER_MONTH;
+    const forecast = [
+      // Large shortages outside the panned range must not affect its year, energy or peak.
+      { minute: 0, shortageW: 20e6 },
+      { minute: 5.5 * year, shortageW: 10e6 },
+      { minute: 6 * year, shortageW: 0 },
+      { minute: 8 * year, shortageW: 2e6 },
+      { minute: 8.5 * year, shortageW: 1e6 },
+      { minute: 9 * year, shortageW: 30e6 },
+    ].map(({ minute, shortageW }) => ({
+      ...overviewProjection.forecast[0],
+      minute,
+      demandW: 40e6,
+      supplyW: 40e6 - shortageW,
+    }));
+    cacheProjection(overviewGame, {
+      ...overviewProjection,
+      forecast,
+      timeline: forecast,
+      supplyDemandTimeline: forecast,
+      projectionStepMinutes: 60,
     });
-    const startYear = /\d{4}/.exec(note.getAttribute("aria-label")!)![0];
-    expect(note).toHaveTextContent(
-      new RegExp(`^Shortfalls start ${startYear}:\\s*~.+ unmet · ~.+ peak$`),
-    );
-    // The first shortfall hour is still to come, never before the scenario began.
-    expect(Number(startYear)).toBeGreaterThanOrEqual(game.startingYear);
-    const wholeScenario = note.textContent;
+    return year;
+  }
 
-    await user.click(labelledButton("Zoom in"));
-    // The year is when the first shortfall begins, so zooming does not move it; the energy
-    // unmet is what follows the displayed range.
-    const zoomed = screen.getByRole("note", {
-      name: new RegExp(`^Forecast shortfalls start ${startYear}:`),
-    });
-    expect(zoomed).not.toHaveTextContent(wholeScenario!);
+  it("pans the shortfall year, energy and peak together to the first visible shortage", async () => {
+    const year = cacheShortfallForecast();
+    render(
+      <Insights
+        game={overviewGame}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        savedViewport={{ month: 0, viewport: [5.25 * year, 8.25 * year] }}
+      />,
+    );
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Shortfalls start 2025: ~370MWh unmet · ~10MW peak",
+    );
+
+    await user.click(labelledButton("Pan later"));
+    expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+      "data-domain",
+      JSON.stringify([6 * year, 9 * year]),
+    );
+    const note = screen.getByRole("note");
+    expect(note).toHaveTextContent(
+      /^Shortfalls start 2028: ~91MWh unmet · ~2MW peak$/,
+    );
+    expect(note).toHaveAccessibleName(
+      "Forecast shortfalls start 2028: about 91MWh of demand unmet, about 2MW peak",
+    );
+  });
+
+  it("includes a shortage at the left boundary and excludes one at the right boundary", () => {
+    const year = cacheShortfallForecast();
+    render(
+      <Insights
+        game={overviewGame}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        savedViewport={{ month: 0, viewport: [8 * year, 8.5 * year] }}
+      />,
+    );
+    expect(screen.getByRole("note")).toHaveTextContent(
+      /^Shortfalls start 2028: ~61MWh unmet · ~2MW peak$/,
+    );
   });
 
   it("reports the viewport and reopens on it after the pane remounts", async () => {

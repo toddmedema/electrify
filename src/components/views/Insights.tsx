@@ -950,7 +950,9 @@ export default class Insights extends React.Component<Props, State> {
       }
       this.props.onEvidenceReady?.(
         request,
-        document.querySelector<HTMLElement>(".insightEventChip.active"),
+        document.querySelector<HTMLElement>(
+          ".insightsChartDialog .insightEventChip.active",
+        ) ?? document.querySelector<HTMLElement>(".insightEventChip.active"),
       );
       return;
     }
@@ -1427,9 +1429,7 @@ export default class Insights extends React.Component<Props, State> {
       projection.projectionStepMinutes,
       0,
     );
-    // The year the shortfall begins, wherever the viewport sits: zoomed past the first
-    // shortage it is still the year the trouble started, not the year the view opens.
-    const firstMinute = firstShortfallMinute(projection.forecast);
+    const firstMinute = firstShortfallMinute(forecast);
     const shortfall =
       blackoutTotalWh > 0 && firstMinute !== undefined
         ? {
