@@ -457,6 +457,7 @@ it("acquisition preserves settled history and reforecasting cannot repay corpora
     true,
   );
   const now = currentTick(game)!;
+  const accounts = cloneDeep(game.transmission!.agreementAccounts);
   generateForecastTimeline(game, now.cash, now.customers);
   game = copyOfficialGame(reducer(game, delta({ dollarsPerkWh: 0.11 })));
   const solar = GENERATORS(
@@ -470,7 +471,9 @@ it("acquisition preserves settled history and reforecasting cannot repay corpora
     reducer(game, buildFacility({ facility: solar, financed: false })),
   );
   expect(game.utilityExpansion!.loans).toEqual(debts);
+  expect(game.transmission!.agreementAccounts).toEqual(accounts);
   expect(roundtrip(game)).toEqual(JSON.parse(JSON.stringify(game)));
+  expect(() => tickState(game)).not.toThrow();
 });
 
 it("month-boundary warmup cannot repeat corporate payments, cash transactions or stored-energy use", () => {

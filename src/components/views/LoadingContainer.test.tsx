@@ -1,4 +1,10 @@
 import { initWeather } from "../../data/Weather";
+import * as Weather from "../../data/Weather";
+import * as Economy from "../../data/Economy";
+import * as FuelPrices from "../../data/FuelPrices";
+import { createGame } from "../../testing/Simulator";
+import { tickState } from "../../reducers/Game";
+import { parseSave, serializeSave } from "../../SaveGame";
 import cardReducer, {
   initialCard,
   navigate,
@@ -12,7 +18,46 @@ import {
   restoreLoadedTutorial,
   restoreTutorialAfterLoading,
   weatherFailureMessage,
+  mapDispatchToProps,
 } from "./LoadingContainer";
+
+it.each([false, true])(
+  "finishes deferred agreement price validation after loading (forged payment: %s)",
+  async (forged) => {
+    const game = createGame({ scenarioId: 116, seed: 12345 });
+    tickState(game);
+    const wire = JSON.parse(JSON.stringify(serializeSave(game)));
+    if (forged)
+      wire.game.transmission.agreementAccounts[0].months[0].payment += 1;
+    const unloaded = jest.spyOn(Economy, "hasEconomy").mockReturnValue(false);
+    const parsed = parseSave(wire);
+    expect(parsed).not.toBeNull();
+    unloaded.mockRestore();
+    const economy = jest
+      .spyOn(Economy, "initEconomy")
+      .mockImplementation((done) => done?.());
+    const fuel = jest
+      .spyOn(FuelPrices, "initFuelPrices")
+      .mockImplementation((done) => done?.());
+    const weather = jest
+      .spyOn(Weather, "initWeather")
+      .mockImplementation((_location, done) => done?.());
+    try {
+      const dispatch = jest.fn();
+      const onError = jest.fn();
+      await mapDispatchToProps(dispatch as never).load(parsed!.game, onError);
+      expect(onError.mock.calls).toEqual(
+        forged ? [[expect.stringContaining("power agreement history")]] : [],
+      );
+      expect(dispatch.mock.calls).toEqual(forged ? [] : [[loaded()]]);
+      expect(parseSave(wire) === null).toBe(forged);
+    } finally {
+      economy.mockRestore();
+      fuel.mockRestore();
+      weather.mockRestore();
+    }
+  },
+);
 
 it("restores a capstone's authored pane after rebuilding its scenario", () => {
   const finances = TUTORIALS.find((tutorial) => tutorial.id === 4)!;

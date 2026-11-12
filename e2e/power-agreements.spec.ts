@@ -220,6 +220,24 @@ for (const theme of ["light", "dark"] as const) {
       path: testInfo.outputPath(`ppa-signed-${theme}.png`),
       animations: "disabled",
     });
+    await signedAgreement
+      .getByRole("button", { name: /^Forecast .* remaining term$/ })
+      .click();
+    const remaining = page.getByRole("dialog", {
+      name: "Québec hydro remaining term",
+      exact: true,
+    });
+    await expect(remaining.getByLabel("Agreement forecast")).toBeVisible({
+      timeout: 30000,
+    });
+    await expect(remaining).toContainText("Remaining delivery term");
+    await expect(remaining).toContainText("Full-term use");
+    await expect(remaining).toContainText(
+      "Pay for 57MW whenever supplier-available",
+    );
+    await expectDialogToFit(remaining);
+    await page.keyboard.press("Escape");
+    await expect(remaining).toHaveCount(0);
     const signed = await readSavedGame(page);
     expect(signed!.transmission!.acceptedAgreements).toHaveLength(1);
     await page.reload();

@@ -4053,6 +4053,8 @@ export function* tickStatePhases(
       TICK_MINUTES,
       true,
       sharedImportRound(sharedImportRounds, 0),
+      undefined,
+      true,
     );
     desktopSimulationHooks()?.tick(state, now);
     logHailRepairsCompleted(state);
@@ -5049,6 +5051,7 @@ function* supplyFacilitiesFinancesPhases(
   advanceConstruction = true,
   sharedClearing?: SharedImportClearing,
   excludedAgreementId?: string,
+  settleAgreementAccounts = false,
 ): Generator<
   SharedTickPhase,
   TickPresentFutureType,
@@ -5301,7 +5304,7 @@ function* supplyFacilitiesFinancesPhases(
   // Update supply and facility outputs
   // The settled frame represents [end - step, end). The last frame of a month is
   // clamped to its previous timestamp, while the live clock has reached the exclusive end.
-  const agreementEnd = simulated ? now.minute : state.date.minute;
+  const agreementEnd = settleAgreementAccounts ? state.date.minute : now.minute;
   const agreementStart =
     preRoll || !advanceConstruction ? now.minute : agreementEnd - stepMinutes;
   const agreementFrame = { ...now, minute: agreementStart };
@@ -6227,7 +6230,7 @@ function* supplyFacilitiesFinancesPhases(
     now.agreementPayments = Object.fromEntries(
       agreementSettlements.map((entry) => [entry.agreementId, entry.payment]),
     );
-    if (!simulated && !preRoll && advanceConstruction)
+    if (settleAgreementAccounts && !preRoll && advanceConstruction)
       recordAgreementSettlements(
         state,
         agreementStart,

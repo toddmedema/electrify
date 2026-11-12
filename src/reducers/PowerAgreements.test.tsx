@@ -462,6 +462,20 @@ it("records available, useful and payment separately and rejects forged history"
   expect(JSON.stringify(game.transmission!.agreementAccounts)).toBe(before);
 });
 
+it("rejects internally consistent stale accounts before a resumed settlement can encounter a gap", () => {
+  const game = at(0);
+  request(game, 1e6);
+  tickState(game);
+  const stale = cloneDeep(game.transmission!.agreementAccounts);
+  tickState(game);
+  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  const valid = parseSave(raw)!;
+  expect(valid).not.toBeNull();
+  expect(() => tickState(copyOfficialGame(valid.game))).not.toThrow();
+  raw.game.transmission.agreementAccounts = stale;
+  expect(parseSave(raw)).toBeNull();
+});
+
 it("prorates half-open terms and records the final elapsed interval before expiry exactly once", () => {
   expect(agreementIntervalMinutes(0, 15, 5, 10)).toBe(5);
   expect(agreementIntervalMinutes(0, 15, 15, 30)).toBe(0);

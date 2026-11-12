@@ -118,6 +118,8 @@ including after expiry. Partial accounting starts at the first observed interval
 it never reconstructs unknown earlier usage. The parser rejects noncanonical
 identities, versions, dates, discontinuous months, useful energy above availability,
 energy above canonical coverage and elapsed time, or inconsistent payment arithmetic.
+Inflation-dependent payment checks finish after economic data loads and before the
+saved grid opens.
 
 Accepted receipts persist block/cycle identity, acceptance minute and resolved
 start/end. Capacity, price and emissions are derived from canonical authoring.
@@ -170,6 +172,10 @@ in place. The headline cash benefit/cost is the difference in closing company ca
 including customer and export income, all operating and financing costs, and unused
 minimum payments. It is future nominal money, undiscounted, not agreement profit
 or an equivalent-energy price saving.
+
+This decision comparison uses the same 15-minute intervals as live settlement.
+The general hourly outlook remains a sampled estimate and can approximate contract
+changes inside a sample when opened between hours.
 
 Each demand-served percentage divides served customer energy by that alternative's
 own requested customer energy over the displayed term. Customer retention can

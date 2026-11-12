@@ -285,6 +285,7 @@ export function createWorld(
     const result = cloneGrid(game);
     // Keep explicitly authored existing assets; player links replace optional outside markets.
     result.transmission = {
+      ...result.transmission,
       buyingRule: "SHORTAGES",
       sellingRule: "PROFITABLE",
       lines: (result.transmission?.lines || []).filter(
@@ -1031,6 +1032,8 @@ function validGrid(world: World, initial: World, i: number) {
               sellingRule: g.transmission!.sellingRule,
               lines: nativeLines,
               acceptedAgreements: g.transmission!.acceptedAgreements,
+              inheritedAgreementTerms: g.transmission!.inheritedAgreementTerms,
+              agreementAccounts: g.transmission!.agreementAccounts,
             }
           : undefined,
       }),

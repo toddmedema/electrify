@@ -300,35 +300,47 @@ it("keeps Valley's 2017 reduction dated and notices once, without resetting it o
   ).toHaveLength(2);
 });
 
-it("buys cheaper acquired nuclear rights before expensive native hydro for a partial company load", () => {
-  const game = buy(ready());
-  for (const facility of game.facilities) facility.paused = true;
-  const next = game.timeline[1];
-  next.demandW = 200e6;
-  for (const type of DEMAND_TYPES)
-    next.demandByType[type] = type === "Residential" ? next.demandW : 0;
-  const offers = entitlementSources(game, next);
-  expect(
-    offers
-      .filter((source) => source.utilityId === "champlain")
-      .reduce((sum, source) => sum + source.capacityW, 0),
-  ).toBeLessThanOrEqual(300e6);
-  expect(
-    offers
-      .filter((source) => source.utilityId === "valley-electric")
-      .reduce((sum, source) => sum + source.capacityW, 0),
-  ).toBeLessThanOrEqual(350e6);
-  tickState(game);
-  const now = currentTick(game)!;
-  expect(now.entitlementImportedW).toBe(200e6);
-  expect(now.expensesImports).toBeCloseTo(
-    (((200e6 / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1e6) * 40,
-    4,
-  );
-  expect(now.importedKgco2e).toBe(0);
-  expect(offers.slice(0, 2).map((source) => source.id)).toEqual([
-    "champlain-nuclear",
-    "valley-nuclear",
-  ]);
-  expect(offers[0].capacityW + offers[1].capacityW).toBe(247e6);
-});
+it.each([1, 2] as const)(
+  "uses cheaper acquired nuclear rights first and bills version %s terms for a partial company load",
+  (termsVersion) => {
+    const readyGame = ready();
+    readyGame.transmission!.inheritedAgreementTerms = termsVersion;
+    const game = buy(readyGame);
+    for (const facility of game.facilities) facility.paused = true;
+    const next = game.timeline[1];
+    next.demandW = 200e6;
+    for (const type of DEMAND_TYPES)
+      next.demandByType[type] = type === "Residential" ? next.demandW : 0;
+    const offers = entitlementSources(game, next);
+    expect(
+      offers
+        .filter((source) => source.utilityId === "champlain")
+        .reduce((sum, source) => sum + source.capacityW, 0),
+    ).toBeLessThanOrEqual(300e6);
+    expect(
+      offers
+        .filter((source) => source.utilityId === "valley-electric")
+        .reduce((sum, source) => sum + source.capacityW, 0),
+    ).toBeLessThanOrEqual(350e6);
+    tickState(game);
+    const now = currentTick(game)!;
+    expect(now.entitlementImportedW).toBe(200e6);
+    const purchaseCostPerHour =
+      termsVersion === 1
+        ? 200e6 * 40
+        : offers.reduce(
+            (sum, source) => sum + source.capacityW * source.pricePerMWh,
+            0,
+          );
+    expect(now.expensesImports).toBeCloseTo(
+      ((purchaseCostPerHour / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1e6,
+      4,
+    );
+    expect(now.importedKgco2e).toBe(0);
+    expect(offers.slice(0, 2).map((source) => source.id)).toEqual([
+      "champlain-nuclear",
+      "valley-nuclear",
+    ]);
+    expect(offers[0].capacityW + offers[1].capacityW).toBe(247e6);
+  },
+);

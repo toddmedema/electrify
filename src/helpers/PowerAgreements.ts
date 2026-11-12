@@ -425,7 +425,7 @@ function validAgreementAccounts(game: GameType): boolean {
       ) ||
       start < Math.max(source.startMinute, ownership) ||
       end <= start ||
-      end > Math.min(game.date.minute, source.endMinute)
+      end !== Math.min(game.date.minute, source.endMinute)
     )
       return false;
     const firstMonth = Math.floor(start / MINUTES_PER_MONTH);
@@ -461,12 +461,16 @@ function validAgreementAccounts(game: GameType): boolean {
           60) *
           GAME_TO_REAL_YEARS) /
         1e6;
-      const payment =
-        (source.termsVersion === 2 ? row.availableMWh : row.usefulMWh) *
-        monthlySource.priceToday;
+      const purchasedMWh =
+        source.termsVersion === 2 ? row.availableMWh : row.usefulMWh;
+      const payment = purchasedMWh * monthlySource.priceToday;
       if (
         row.availableMWh > maximumMWh + 1e-6 ||
-        Math.abs(row.payment - payment) > Math.max(1e-5, payment * 1e-10)
+        (purchasedMWh === 0 ? row.payment !== 0 : row.payment <= 0) ||
+        // Import runs before economic data loads. Keep structural/energy checks then;
+        // the exact inflation-adjusted price requires the same CSV as live settlement.
+        (hasEconomy() &&
+          Math.abs(row.payment - payment) > Math.max(1e-5, payment * 1e-10))
       )
         return false;
     }
