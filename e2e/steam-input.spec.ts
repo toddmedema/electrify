@@ -117,6 +117,14 @@ async function select(
       const active = document.activeElement as HTMLElement | null;
       if (!active || active === document.body)
         return { direction: "down", key: "body" };
+      if (
+        active.matches(".worldMapMarker") &&
+        !element.matches(".worldMapMarker")
+      ) {
+        // Every arrow belongs to map geography. Back returns to its zoom controls
+        // before the player can navigate to another form control.
+        return { direction: "back", key: "map" };
+      }
       const from = active.getBoundingClientRect();
       const sameRow =
         Math.min(from.bottom, target.bottom) >

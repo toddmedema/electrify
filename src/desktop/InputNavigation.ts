@@ -167,6 +167,12 @@ function spatialDestination(
       {
         element,
         advance,
+        rowGap: vertical
+          ? Math.max(
+              0,
+              forward > 0 ? rect.top - from.bottom : from.top - rect.bottom,
+            )
+          : 0,
         cross,
         aligned: overlap > 0,
         sameScroll: !!scrolling && scrollParent(element) === scrolling,
@@ -176,6 +182,9 @@ function spatialDestination(
   candidates.sort(
     (a, b) =>
       Number(b.sameScroll) - Number(a.sameScroll) ||
+      // Follow intervening rows before aligning columns. Otherwise a right-hand
+      // clock row can be skipped forever between two left-hand global controls.
+      a.rowGap - b.rowGap ||
       Number(b.aligned) - Number(a.aligned) ||
       a.advance + a.cross * 0.25 - (b.advance + b.cross * 0.25),
   );

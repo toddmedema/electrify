@@ -444,21 +444,45 @@ export function startDesktopInput(
       revealObserver?.observe(element);
   };
   document.addEventListener("focusin", trackFocus);
-  const pointer = (event: Event) => {
-    if (!event.isTrusted) return;
-    // The hints own an explicit help action. Keep its trigger mounted through activation.
-    if (
-      event.target instanceof Element &&
-      event.target.closest(".controllerHints")
-    )
-      return;
+  let pointerPending = false;
+  let pointerHandoff: number | undefined;
+  const clearPointer = () => {
+    pointerPending = false;
+    window.clearTimeout(pointerHandoff);
+    pointerHandoff = undefined;
+  };
+  const handoff = () => {
+    clearPointer();
     choosingTextOption = null;
     delete document.documentElement.dataset.controllerInput;
     present({ active: false });
   };
+  const inHints = (event: Event) =>
+    event.target instanceof Element &&
+    !!event.target.closest(".controllerHints");
+  const pointer = (event: Event) => {
+    if (!event.isTrusted) return;
+    // The hints own an explicit help action. Keep its trigger mounted through activation.
+    clearPointer();
+    if (inHints(event)) return;
+    choosingTextOption = null;
+    delete document.documentElement.dataset.controllerInput;
+    // The footer participates in layout. Removing it on pointer-down moves the
+    // pressed control before pointer-up, so preserve it until the click is dispatched.
+    pointerPending = true;
+  };
+  const pointerUp = (event: Event) => {
+    if (!event.isTrusted || !pointerPending) return;
+    // A drag or release outside the control may not produce a click. Its fallback
+    // runs after the browser's click synthesis, never between pointer-up and click.
+    pointerHandoff = window.setTimeout(handoff, 0);
+  };
+  const pointerCancel = (event: Event) => {
+    if (event.isTrusted && pointerPending) handoff();
+  };
   const keyboard = (event: KeyboardEvent) => {
     if (!event.isTrusted) return;
-    pointer(event);
+    if (!inHints(event)) handoff();
     if (
       !overlay(inputScope()) &&
       gameplay() &&
@@ -470,6 +494,7 @@ export function startDesktopInput(
       releasePause();
   };
   const click = (event: MouseEvent) => {
+    if (event.isTrusted && pointerPending) handoff();
     if (
       event.isTrusted &&
       (event.target as HTMLElement)?.closest(".speedToggles button")
@@ -477,11 +502,14 @@ export function startDesktopInput(
       releasePause();
   };
   document.addEventListener("pointerdown", pointer, true);
+  document.addEventListener("pointerup", pointerUp, true);
+  document.addEventListener("pointercancel", pointerCancel, true);
   document.addEventListener("keydown", keyboard, true);
   document.addEventListener("click", click, true);
   sync();
   return () => {
     live = false;
+    clearPointer();
     if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);
     observer.disconnect();
     revealObserver?.disconnect();
@@ -492,6 +520,8 @@ export function startDesktopInput(
     stopQuit();
     stopStore();
     document.removeEventListener("pointerdown", pointer, true);
+    document.removeEventListener("pointerup", pointerUp, true);
+    document.removeEventListener("pointercancel", pointerCancel, true);
     document.removeEventListener("keydown", keyboard, true);
     document.removeEventListener("click", click, true);
     delete document.documentElement.dataset.controllerInput;

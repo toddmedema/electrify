@@ -551,6 +551,72 @@ it("reaches a wide overlapping row before a farther control with a nearer center
   ).toHaveFocus();
 });
 
+it("visits an intervening global row before a farther aligned control", () => {
+  render(
+    <main className="base_main">
+      <button>Exit tutorial</button>
+      <button>Pause</button>
+      <button>Reserve</button>
+    </main>,
+  );
+  for (const [name, left, top] of [
+    ["Exit tutorial", 16, 8],
+    ["Pause", 1080, 85],
+    ["Reserve", 16, 134],
+  ] as const) {
+    positions.set(screen.getByRole("button", { name }), {
+      left,
+      right: left + 40,
+      top,
+      bottom: top + 40,
+      width: 40,
+      height: 40,
+    } as DOMRect);
+  }
+  screen.getByRole("button", { name: "Reserve" }).focus();
+  moveInputFocus("up");
+  expect(screen.getByRole("button", { name: "Pause" })).toHaveFocus();
+  moveInputFocus("up");
+  expect(screen.getByRole("button", { name: "Exit tutorial" })).toHaveFocus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "Pause" })).toHaveFocus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "Reserve" })).toHaveFocus();
+});
+
+it("finishes the scrolling list before leaving for intervening fixed chrome", () => {
+  render(
+    <main className="base_main">
+      <section aria-label="Fleet" style={{ overflowY: "auto" }}>
+        <button>First facility</button>
+        <button>Last facility</button>
+      </section>
+      <button>Fixed dock</button>
+    </main>,
+  );
+  Object.defineProperties(screen.getByRole("region", { name: "Fleet" }), {
+    scrollHeight: { value: 400 },
+    clientHeight: { value: 200 },
+  });
+  for (const [name, top] of [
+    ["First facility", 0],
+    ["Last facility", 200],
+    ["Fixed dock", 100],
+  ] as const) {
+    positions.set(screen.getByRole("button", { name }), {
+      left: 0,
+      right: 80,
+      top,
+      bottom: top + 40,
+      width: 80,
+      height: 40,
+    } as DOMRect);
+  }
+  screen.getByRole("button", { name: "First facility" }).focus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "Last facility" })).toHaveFocus();
+});
+
 it("keeps vertical navigation in its pane and uses horizontal navigation across panels", () => {
   render(
     <main className="base_main">

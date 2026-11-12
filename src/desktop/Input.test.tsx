@@ -116,8 +116,59 @@ it.each(["pointerdown", "keydown"] as const)(
     act(() =>
       trustedPointer(screen.getByRole("button", { name: "Other action" })),
     );
+    expect(getInputPresentation().active).toBe(eventType === "pointerdown");
+    if (eventType === "pointerdown") {
+      const click = listeners.mock.calls.find(
+        ([type]) => type === "click",
+      )![1] as EventListener;
+      act(() =>
+        click({
+          isTrusted: true,
+          target: screen.getByRole("button", { name: "Other action" }),
+        } as unknown as Event),
+      );
+    }
     expect(getInputPresentation().active).toBe(false);
     store.dispatch(dialogClose());
+  },
+);
+
+it.each(["click", "pointerup", "pointercancel"] as const)(
+  "retains the hints through pointer-down and hands off after %s",
+  async (completion) => {
+    const listeners = jest.spyOn(document, "addEventListener");
+    render(
+      <Provider store={store}>
+        <button>Settings</button>
+        <InputHints />
+      </Provider>,
+    );
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    f.emit({ actions: ["down"] });
+    const target = screen.getByRole("button", { name: "Settings" });
+    const trusted = (eventType: string, eventTarget: Element = target) => {
+      const listener = listeners.mock.calls.find(
+        ([type]) => type === eventType,
+      )![1] as EventListener;
+      act(() =>
+        listener({ isTrusted: true, target: eventTarget } as unknown as Event),
+      );
+    };
+    trusted("pointerdown");
+    expect(screen.getByRole("button", { name: "All controls" })).toBeVisible();
+    expect(getInputPresentation().active).toBe(true);
+    if (completion === "click") trusted("pointerup");
+    expect(getInputPresentation().active).toBe(true);
+    trusted(completion, document.body);
+    if (completion === "pointerup") act(() => jest.advanceTimersByTime(0));
+    expect(getInputPresentation().active).toBe(false);
+    expect(
+      screen.queryByRole("button", { name: "All controls" }),
+    ).not.toBeInTheDocument();
   },
 );
 
