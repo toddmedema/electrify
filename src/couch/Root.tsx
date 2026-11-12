@@ -465,6 +465,8 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           deviceGlyphs.current.set(device.id, glyphs);
           return { ...device, glyphs };
         });
+        // Native acknowledgments can settle before React commits this input frame.
+        current.current.devices = next;
         setDevices(next);
         const state = current.current;
         const connected = new Set(

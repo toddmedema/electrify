@@ -44,6 +44,7 @@ import ConceptIcon from "./ConceptIcon";
 import { useOnline } from "./OnlineStatus";
 import { buildSpeedOptions, sharedClockSpeedProps } from "./SpeedControls";
 import MissionSummary from "./MissionSummary";
+import StatusReadout from "./StatusReadout";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
 import { acknowledgeEvidence, manualHelpOpen } from "../../reducers/UI";
 import { MANUAL_ENTRY } from "./ManualEntries";
@@ -111,7 +112,7 @@ const EVENING_MINUTE = 18 * 60;
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 /** Status row controls that keep keyboard focus when the row moves into or out of the top bar. */
 const RESTORABLE_STATUS_FOCUS = [
-  ".gridHealthHelp",
+  ".gridHealthSummary",
   ".missionRiskButton",
   ".missionSummaryMonths",
 ];
@@ -561,28 +562,21 @@ export function GameAppBar(props: Props) {
           role="group"
           aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
         >
-          <button
-            type="button"
-            className="gridHealthSummary gridHealthHelp"
+          <StatusReadout
+            className="gridHealthSummary"
+            textClassName="gridHealthMetric"
+            concept={
+              inBlackout
+                ? "blackout"
+                : gridHealth.state === "stable"
+                  ? "supply"
+                  : "danger"
+            }
             aria-label={`${gridHealth.label}, ${gridHealth.metric}. Open the Reserve manual entry`}
             onClick={() => onReserveHelp?.()}
           >
-            <span className="statusIcon" aria-hidden="true">
-              <ConceptIcon
-                concept={
-                  inBlackout
-                    ? "blackout"
-                    : gridHealth.state === "stable"
-                      ? "supply"
-                      : "danger"
-                }
-                fontSize="small"
-              />
-            </span>
-            <strong className="gridHealthMetric">
-              {gridHealth.label}, {gridHealth.metric}
-            </strong>
-          </button>
+            {gridHealth.label}, {gridHealth.metric}
+          </StatusReadout>
         </div>
       )}
       {/* Tutorials have no term goal to track; their own HUD carries the objective. */}

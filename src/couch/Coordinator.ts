@@ -393,6 +393,7 @@ export class CouchCoordinator {
       return;
     }
     if (data.kind === "views") {
+      const lifecycle = this.lifecycle;
       if (this.state.phase === "starting") {
         this.update({ phase: "playing" });
         this.roster.forEach((seat) => {
@@ -446,6 +447,7 @@ export class CouchCoordinator {
         this.sharedView = common.view;
         this.options.onSharedView?.(common.view);
       }
+      if (lifecycle === this.lifecycle) this.post({ kind: "views-applied" });
       return;
     }
     const generation = this.lifecycle;
