@@ -13,7 +13,11 @@ import {
 } from "./UPlotHelpers";
 import { TickPresentFutureType } from "../../Types";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
-import { formatWatts, formatWattsAxis } from "../../helpers/Format";
+import {
+  formatReserveLine,
+  formatWatts,
+  formatWattsAxis,
+} from "../../helpers/Format";
 import { chartPalette } from "../../Theme";
 
 interface BlackoutEdges {
@@ -55,7 +59,6 @@ function buildOptions(showXLabels: boolean) {
     cursor: {
       x: true,
       y: false,
-      points: { show: false },
       drag: { x: false, y: false, setScale: false },
     },
     legend: { show: false },
@@ -117,7 +120,7 @@ function tooltip(idx: number, state: State): string {
   const reserve =
     d.reserveW === undefined
       ? ""
-      : `\nReserve margin: ${formatWatts(d.reserveW)}`;
+      : `\n${formatReserveLine(d.reserveW, "Reserve margin")}`;
   return `${header}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}${reserve}`;
 }
 

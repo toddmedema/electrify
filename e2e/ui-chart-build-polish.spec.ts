@@ -163,10 +163,9 @@ for (const theme of ["light", "dark"] as const) {
       await page
         .getByRole("button", { name: "Start game", exact: true })
         .click();
-      // The first game frame can precede the asynchronous initial autosave.
       await expect
-        .poll(async () => Boolean(await readSavedGame(page)))
-        .toBe(true);
+        .poll(async () => (await readSavedGame(page))?.scenarioId)
+        .toBe(108);
       await editSavedGame(page, (save) => {
         const game = save.game;
         game.speed = "PAUSED";

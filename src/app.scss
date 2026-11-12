@@ -785,7 +785,8 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
 .facilityStatusDetail,
 .insightsRateMetricValue,
 table,
-.chartTooltip {
+.chartTooltip,
+.chartEventTooltip {
   font-variant-numeric: lining-nums tabular-nums;
   letter-spacing: normal;
 }
@@ -2416,7 +2417,8 @@ $pane_header_height: 48px;
 // top of the data and clip. Plain HTML so they wrap on narrow screens and screen readers see them.
 // One tooltip covering every series at the hovered x, the way the Victory voronoi container's
 // did, positioned by the chart's own cursor handler
-.chartTooltip {
+.chartTooltip,
+.chartEventTooltip {
   box-sizing: border-box;
   position: absolute;
   display: none;
@@ -5326,10 +5328,31 @@ $homeSmokeCycle: 5.6s;
     row-gap: 0;
     min-width: 0;
   }
+  .buildOptionOutput[role="group"] {
+    min-height: 40px;
+    touch-action: pan-y;
+
+    &:focus-visible {
+      outline: 2px solid var(--interactive-blue);
+      outline-offset: 2px;
+    }
+
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
+  .buildOptionOutputCaption {
+    font-size: var(--font-size-caption-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .buildOptionSparkline {
     // Reserved even before the forecast can draw a line, so the card doesn't jump. The gap keeps
     // a line along the top edge from reading as an underline of the caption.
     height: 24px;
+    width: 96px;
+    max-width: 100%;
     margin-top: 4px;
     .sparkline {
       display: block;
@@ -8332,6 +8355,11 @@ option {
     flex-shrink: 0;
     max-width: none;
   }
+  // The events the chart marks, named above it at the full width of the screen
+  .insightEventRail {
+    flex-shrink: 0;
+    max-width: none;
+  }
   .expandedChartContent {
     display: flex;
     flex-direction: column;
@@ -8353,7 +8381,8 @@ option {
   .fuelFilter .MuiButton-root {
     font-size: var(--font-size-body1);
   }
-  .chartTooltip {
+  .chartTooltip,
+  .chartEventTooltip {
     font-size: var(--font-size-body1);
   }
   .chartLegend {
