@@ -188,7 +188,12 @@ export function startDesktopInput(
       const panelId = button.getAttribute("aria-controls");
       if (!panelId) button.click();
       else
-        store.dispatch(navigate(panelId.slice("tool-".length) as CardNameType));
+        store.dispatch(
+          navigate(
+            (button.dataset.gameDestination ??
+              panelId.slice("tool-".length)) as CardNameType,
+          ),
+        );
     }
   };
   const chart = (delta: number) => {

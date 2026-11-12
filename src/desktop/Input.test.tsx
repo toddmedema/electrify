@@ -556,6 +556,34 @@ it.each([
   },
 );
 
+it.each(["BUILD_STORAGE", "BUILD_INTERTIES"] as const)(
+  "pane cycling retains %s in an already open Build pane",
+  async (category) => {
+    store.dispatch(delta({ inGame: true }));
+    store.dispatch(navigate("PROGRAMS"));
+    render(
+      <main className="base_main">
+        <div className="gameWorkspace">
+          <nav className="gameActionDock">
+            <button
+              aria-controls="tool-BUILD_GENERATORS"
+              data-game-destination={category}
+            >
+              Build
+            </button>
+            <button aria-controls="tool-PROGRAMS">Programs</button>
+          </nav>
+        </div>
+      </main>,
+    );
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await Promise.resolve();
+    f.emit({ actions: ["previousPane"] });
+    expect(store.getState().card.name).toBe(category);
+  },
+);
+
 it.each(["seat", "online"])(
   "routes %s speed and readiness through the shared clock",
   async (role) => {

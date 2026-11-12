@@ -233,10 +233,13 @@ for (const theme of ["light", "dark"] as const) {
             "Dec",
           ];
           for (const [index, month] of months.entries()) {
-            await page.mouse.move(
-              chartBox.x + (index / 11) * (chartBox.width - 0.1),
-              chartBox.y + chartBox.height / 2,
-            );
+            // Recheck the live target after scrolling and each React caption update.
+            await chart.hover({
+              position: {
+                x: (index / 11) * (chartBox.width - 0.1),
+                y: chartBox.height / 2,
+              },
+            });
             await expect(caption).toHaveText(
               new RegExp(
                 `^${month}: \\d+% ${name === "Hydro" ? "of typical water" : "capacity"}$`,

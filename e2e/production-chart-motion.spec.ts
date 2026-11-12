@@ -36,6 +36,7 @@ async function start(page: Page, theme: string, interfaceScale = 1) {
       localStorage.setItem("audioEnabled", "false");
       localStorage.setItem("theme", mode);
       localStorage.setItem("interfaceScale", String(size));
+      Math.random = () => 0.25;
     },
     { mode: theme, size: interfaceScale },
   );

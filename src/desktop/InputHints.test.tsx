@@ -44,7 +44,7 @@ it("shows contextual hints and complete help without a layout preference", () =>
     <Provider store={store}>{store.getState().ui.dialog.message}</Provider>,
   );
   expect(screen.getByText("Previous pane")).toBeVisible();
-  expect(screen.getByText("Game menu")).toBeVisible();
+  expect(screen.getByText("Pause / back")).toBeVisible();
   expect(screen.getAllByText("Unbound").length).toBeGreaterThan(0);
 });
 
@@ -88,6 +88,14 @@ it("keeps the existing solo behavior when pointer input becomes active", () => {
 });
 
 it("shows the complete shared menu legend with the requesting controller bindings", () => {
+  window.electrifyCouch = {
+    role: "seat",
+    seatId: "local-p1",
+    getGeneration: () => 1,
+    ready: async () => {},
+    onMessage: () => () => {},
+    post: () => {},
+  };
   render(
     <ControlsLegend
       glyphs={{
@@ -99,6 +107,7 @@ it("shows the complete shared menu legend with the requesting controller binding
   );
   expect(screen.getByLabelText("Controller controls")).toBeVisible();
   expect(screen.getByText("Controls")).toBeVisible();
+  expect(screen.getByText("Game menu")).toBeVisible();
   expect(screen.getByRole("img", { name: "Options" })).toBeVisible();
   expect(screen.getByText("Remapped faster")).toBeVisible();
   expect(screen.getByText("Build")).toBeVisible();

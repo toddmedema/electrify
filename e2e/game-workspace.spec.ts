@@ -10,14 +10,19 @@ async function startGame(
   page: Page,
   theme: "light" | "dark",
   scenarioId = 100,
+  scale = 1,
 ) {
-  await page.addInitScript((mode) => {
-    localStorage.clear();
-    localStorage.setItem("theme", mode);
-    localStorage.setItem("audioEnabled", "false");
-    // Layout assertions need the same weather and risk headline on every visit.
-    Math.random = () => 0.25;
-  }, theme);
+  await page.addInitScript(
+    ({ mode, scale }) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem("interfaceScale", String(scale));
+      // Layout assertions need the same weather and risk headline on every visit.
+      Math.random = () => 0.25;
+    },
+    { mode: theme, scale },
+  );
   await page.goto(`/?scenario=${scenarioId}`);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".gameStage .facilities")).toBeVisible();
@@ -809,8 +814,7 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
   if (
     (await page.locator(".gameStage").getAttribute("data-layout")) === "single"
   ) {
-    // The compact dock now keeps its text visible and permits native horizontal swiping.
-    // A swipe can cancel tooltip preview; labels and accessible names stay available throughout.
+    // Holding owns the slide preview; a quick swipe still scrolls the compact rail.
     const actions = ["Build", "Programs", "Insights", "Events"];
     for (const label of actions) {
       const action = dock.getByRole("button", { name: label, exact: true });
@@ -833,6 +837,9 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
         type: "touchMove",
         touchPoints: [{ x: box.x + box.width / 2, y }],
       });
+      await expect(
+        page.getByRole("tooltip", { name: label, exact: true }),
+      ).toBeVisible();
       await expect(action.locator(".gameDockLabel")).toBeVisible();
       await expect(page.locator(".gameToolPanel")).toHaveCount(0);
     }
@@ -914,6 +921,80 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
   await expect(
     page.getByRole("region", { name: "Build", exact: true }),
   ).toBeVisible();
+  await session.detach();
+});
+
+test("comparison controls keep keyboard focus when the Build layout changes", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await startGame(page, "light");
+  await openBuild(page);
+  await page.getByRole("button", { name: "Compare Coal", exact: true }).click();
+  const clear = page.getByRole("button", { name: "Clear", exact: true });
+  await clear.focus();
+  await clear.press("Tab");
+  const remove = page.getByRole("button", {
+    name: "Remove Coal from comparison",
+  });
+  await expect(remove).toBeFocused();
+  for (const width of [390, 1280, 360, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.locator(".gameStage")).toHaveAttribute(
+      "data-layout",
+      width < 700 ? "single" : "side",
+    );
+    await expect(remove).toBeFocused();
+    await expect(
+      page.getByRole("region", { name: "Generator comparison" }),
+    ).toContainText("Comparing 1/3");
+  }
+  await clear.focus();
+  await page.setViewportSize({ width: 390, height: 900 });
+  await expect(clear).toBeFocused();
+  await clear.press("Enter");
+  await expect(
+    page.getByRole("region", { name: "Generator comparison" }),
+  ).toHaveCount(0);
+});
+
+test("quick touch swipes scroll the enlarged dock without opening a tool", async ({
+  page,
+}, info) => {
+  test.skip(!info.project.use.hasTouch);
+  await page.setViewportSize({
+    width: page.viewportSize()!.width,
+    height: 1080,
+  });
+  await startGame(page, "light", 100, 2.5);
+  const dock = page.locator("#navfooter");
+  const box = (await dock.boundingBox())!;
+  expect(
+    await dock.evaluate((element) => element.scrollWidth - element.clientWidth),
+  ).toBeGreaterThan(100);
+  const session = await page.context().newCDPSession(page);
+  const y = box.y + box.height / 2;
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: box.x + box.width - 24, y }],
+  });
+  for (let step = 1; step <= 5; step++) {
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [
+        { x: box.x + box.width - 24 - (step * (box.width - 48)) / 5, y },
+      ],
+    });
+  }
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect
+    .poll(() => dock.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(20);
+  await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
   await session.detach();
 });
 

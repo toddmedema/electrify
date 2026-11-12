@@ -518,6 +518,8 @@ describe("UPlotChart resizing", () => {
     chart.appendChild(plot.root);
     Object.defineProperty(plot.root, "clientHeight", { value: 300 });
     Object.defineProperty(plot.over, "clientHeight", { value: 160 });
+    Object.defineProperty(plot.root, "clientWidth", { value: 400 });
+    Object.defineProperty(plot.over, "clientWidth", { value: 320 });
     const built = (uPlot as unknown as jest.Mock).mock.calls.at(
       -1,
     )[0] as uPlot.Options;
@@ -539,6 +541,7 @@ describe("UPlotChart resizing", () => {
     expect(plot.root).toContainElement(values);
     expect(plot.over).not.toContainElement(values);
     expect(values).toHaveStyle({ maxHeight: "300px" });
+    expect(values).toHaveStyle({ maxWidth: "304px" });
     fireEvent.pointerDown(values);
     fireEvent.pointerMove(values);
     expect(screen.getByRole("status")).toHaveTextContent("Point 0");

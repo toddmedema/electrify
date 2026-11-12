@@ -142,6 +142,7 @@ export function useToolFocusMemory(
   ref: React.RefObject<HTMLElement | null>,
   memory: Map<string, unknown>,
   active: string,
+  layout?: string,
 ) {
   React.useEffect(() => {
     const root = ref.current;
@@ -238,5 +239,5 @@ export function useToolFocusMemory(
       document.removeEventListener("keydown", cancel, true);
       document.removeEventListener("pointerdown", cancel, true);
     };
-  }, [active, memory, ref]);
+  }, [active, layout, memory, ref]);
 }

@@ -107,11 +107,11 @@ function Workspace({
   const localMemory = React.useRef(new Map<string, unknown>());
   const memory = sharedMemory ?? localMemory.current;
   const workspace = React.useRef<HTMLDivElement>(null);
-  useToolFocusMemory(workspace, memory, active ?? "fleet");
   const [programBack, setProgramBack] = React.useState<() => void>();
   const retainFocus = React.useRef(false);
   const presentation = useWorkspaceLayout(workspace, settings);
   const { layout, capacity, width, scale, effectiveWidth } = presentation;
+  useToolFocusMemory(workspace, memory, active ?? "fleet", layout);
   const fleetVisible = layout === "side" || !active;
   // Capture focus before a disappearing column unmounts its children. A scale or inset change
   // can collapse columns without a window resize; the control being edited wins that collapse.
@@ -374,6 +374,7 @@ function Workspace({
               </div>
               <Navigation
                 openTools={visible}
+                destination={destination}
                 onToggle={(tool) => {
                   if (visible.includes(tool)) close(tool);
                   else dispatch(navigate(destination(tool)));

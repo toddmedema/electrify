@@ -68,10 +68,15 @@ describe("Settings", () => {
   it("passes only the current mailing-list choice to Google sign-in", async () => {
     const onLogin = jest.fn();
     const view = renderSettings({ onLogin });
-    const checkbox = screen.getByRole("checkbox", {
+    const leaderboard = within(
+      screen.getByRole("region", { name: "Leaderboard" }),
+    );
+    const checkbox = leaderboard.getByRole("checkbox", {
       name: "Join the Electrify mailing list",
     });
-    const signIn = screen.getByRole("button", { name: "Sign in with Google" });
+    const signIn = leaderboard.getByRole("button", {
+      name: "Sign in with Google",
+    });
     expect(checkbox).not.toBeChecked();
     await userEvent.click(signIn);
     expect(onLogin).toHaveBeenLastCalledWith({ mailingList: false });
@@ -84,9 +89,12 @@ describe("Settings", () => {
     view.unmount();
     renderSettings();
     expect(
-      screen.getByRole("checkbox", {
-        name: "Join the Electrify mailing list",
-      }),
+      within(screen.getByRole("region", { name: "Leaderboard" })).getByRole(
+        "checkbox",
+        {
+          name: "Join the Electrify mailing list",
+        },
+      ),
     ).not.toBeChecked();
   });
 
@@ -184,8 +192,17 @@ describe("Settings", () => {
     const onUnitsChange = jest.fn();
     renderSettings({ onThemeChange, onUnitsChange });
 
-    await userEvent.click(screen.getByRole("button", { name: "Dark" }));
-    await userEvent.click(screen.getByRole("button", { name: "Imperial" }));
+    await userEvent.click(
+      within(screen.getByRole("group", { name: "Appearance" })).getByRole(
+        "button",
+        { name: "Dark" },
+      ),
+    );
+    await userEvent.click(
+      within(screen.getByRole("group", { name: "Units" })).getByRole("button", {
+        name: "Imperial",
+      }),
+    );
 
     expect(onThemeChange).toHaveBeenCalledWith("dark");
     expect(onUnitsChange).toHaveBeenCalledWith("imperial");
@@ -215,13 +232,14 @@ describe("Settings", () => {
   it("offers independent screen-edge padding in advanced Display settings outside the desktop app", async () => {
     const onScreenEdgePaddingChange = jest.fn();
     renderSettings({ onScreenEdgePaddingChange });
+    const display = within(screen.getByRole("region", { name: "Display" }));
     expect(
-      screen.queryByRole("group", { name: "Screen-edge padding" }),
+      display.queryByRole("group", { name: "Screen-edge padding" }),
     ).not.toBeInTheDocument();
     await userEvent.click(
-      screen.getByRole("button", { name: "Advanced display" }),
+      display.getByRole("button", { name: "Advanced display" }),
     );
-    const padding = screen.getByRole("group", { name: "Screen-edge padding" });
+    const padding = display.getByRole("group", { name: "Screen-edge padding" });
     expect(within(padding).getByRole("button", { name: "0%" })).toHaveAttribute(
       "aria-pressed",
       "true",

@@ -25,6 +25,10 @@ const gameHints: [DesktopInputAction, string][] = [
   ["nextChart", "Next chart"],
 ];
 type Hint = [DesktopInputAction, string];
+const menuHint = (): Hint => [
+  "menu",
+  window.electrifyCouch ? "Game menu" : "Pause / back",
+];
 function contextualHints(target: Element | null, gameplay: boolean): Hint[] {
   if (
     target?.matches(
@@ -147,7 +151,7 @@ export function ControlsLegend({
     ["right", "Move right"],
     ["confirm", "Select"],
     ["back", "Back"],
-    ["menu", "Game menu"],
+    menuHint(),
     ...gameHints.slice(3),
   ];
   return (
@@ -171,7 +175,7 @@ function FullControlsHelp() {
     ["down", "Move down"],
     ["left", "Move left"],
     ["right", "Move right"],
-    ["menu", "Game menu"],
+    menuHint(),
     ...gameHints.slice(1),
   ];
   return (

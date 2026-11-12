@@ -569,6 +569,14 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
 
   // From the fleet the pane ring reaches Build, then Programs at every viewport width.
   await input(page, "nextPane");
+  for (const category of ["Storage", "Interties"]) {
+    await page.getByRole("tab", { name: category, exact: true }).click();
+    await input(page, "nextPane");
+    await input(page, "previousPane");
+    await expect(
+      page.getByRole("tab", { name: category, exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+  }
   await input(page, "nextPane");
   const programs = page.getByRole("region", { name: "Programs", exact: true });
   await expect(programs).toBeVisible();

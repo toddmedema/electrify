@@ -294,7 +294,9 @@ function tooltipPlugin<S>(
         const host = expanded ? u.root : u.over;
         el.toggleAttribute("data-keyboard-details", expanded);
         if (el.parentElement !== host) host.appendChild(el);
-        el.style.maxWidth = `${host.clientWidth}px`;
+        // Expanded keyboard details must leave a plot edge exposed for pointer takeover.
+        const inset = expanded ? TOOLTIP_OFFSET : 0;
+        el.style.maxWidth = `${Math.max(1, u.over.clientWidth - inset * 2)}px`;
         el.style.maxHeight = `${host.clientHeight}px`;
         el.style.overflowY = "auto";
         // Kept inside the plot, the way Victory's constrainToVisibleArea tooltip was
@@ -305,7 +307,13 @@ function tooltipPlugin<S>(
         const flipX = left + TOOLTIP_OFFSET + el.offsetWidth > host.clientWidth;
         const flipY =
           top + TOOLTIP_OFFSET + el.offsetHeight > host.clientHeight;
-        el.style.left = `${Math.max(0, Math.min(host.clientWidth - el.offsetWidth, flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET))}px`;
+        const minLeft = expanded
+          ? plotBounds.left - hostBounds.left + inset
+          : 0;
+        const maxLeft = expanded
+          ? minLeft + u.over.clientWidth - inset * 2 - el.offsetWidth
+          : host.clientWidth - el.offsetWidth;
+        el.style.left = `${Math.max(minLeft, Math.min(maxLeft, flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET))}px`;
         el.style.top = `${Math.max(0, Math.min(host.clientHeight - el.offsetHeight, flipY ? top - TOOLTIP_OFFSET - el.offsetHeight : top + TOOLTIP_OFFSET))}px`;
       },
       destroy: (u: uPlot) => {
