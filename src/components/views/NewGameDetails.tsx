@@ -3,14 +3,6 @@ import { difficultyLockReason } from "../../achievements/DifficultyUnlocks";
 import { activeScenario } from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
-  collection,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  limit,
-} from "firebase/firestore";
-import {
   Button,
   Table,
   TableBody,
@@ -33,7 +25,7 @@ import {
   difficultyLabel,
 } from "../../Constants";
 import DifficultyPicker from "../base/DifficultyPicker";
-import { getDb, login } from "../../Globals";
+import { login } from "../../Globals";
 import GoogleSignIn from "../base/GoogleSignIn";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
@@ -52,7 +44,7 @@ import {
 import { formatScore } from "../../helpers/Format";
 import { isDesktopApp } from "../../Desktop";
 import { reliabilityRuleText } from "../../helpers/ObjectiveRules";
-import { SCORE_VERSION } from "../../helpers/Scoring";
+import { BOARD_ROWS, loadLeaderboard } from "../../Leaderboard";
 
 export interface StateProps {
   challenge?: ChallengeInvitation;
@@ -77,13 +69,6 @@ interface BoardType {
   failed?: boolean;
 }
 
-/**
- * How many rows each difficulty's board reads and shows (the all-levels view has its own query).
- * Every difficulty is read up front so that switching is instant, so on opening this is the most
- * that is read per difficulty, alongside the player's own best.
- */
-const BOARD_ROWS = 10;
-
 type SteamScope = "global" | "friends";
 
 type PerDifficulty<T> = Partial<Record<DifficultyType, T>>;
@@ -100,60 +85,10 @@ function cancelRequests(ids: PerDifficulty<number>) {
   for (const difficulty of DIFFICULTY_IDS) nextRequest(ids, difficulty);
 }
 
-/** The top of one difficulty's board. Throws if it can't be read. */
-async function fetchBoard(
-  scenarioId: number,
-  difficulty: DifficultyType,
-  scope: SteamScope,
-): Promise<ScoreType[]> {
-  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
-    const { desktopScores } = await import("../../DesktopScores");
-    return desktopScores(scenarioId, difficulty, scope, BOARD_ROWS);
-  }
-  const querySnapshot = await getDocs(
-    query(
-      collection(getDb(), "scores"),
-      where("scoreVersion", "==", SCORE_VERSION),
-      where("outcome", "==", "completed"),
-      where("scenarioId", "==", scenarioId),
-      where("difficulty", "==", difficulty),
-      orderBy("score", "desc"),
-      limit(BOARD_ROWS),
-    ),
-  );
-  return querySnapshot.docs.map((doc) => doc.data() as ScoreType);
-}
-
-/** The player's own best at one difficulty, if they have completed it. */
-async function fetchMyBest(
-  scenarioId: number,
-  difficulty: DifficultyType,
-  uid: string,
-): Promise<ScoreType | undefined> {
-  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
-    const { desktopScores } = await import("../../DesktopScores");
-    return (await desktopScores(scenarioId, difficulty, "player"))[0];
-  }
-  const querySnapshot = await getDocs(
-    query(
-      collection(getDb(), "scores"),
-      where("scoreVersion", "==", SCORE_VERSION),
-      where("outcome", "==", "completed"),
-      where("scenarioId", "==", scenarioId),
-      where("difficulty", "==", difficulty),
-      where("uid", "==", uid),
-      orderBy("score", "desc"),
-      limit(1),
-    ),
-  );
-  return querySnapshot.docs[0]?.data() as ScoreType | undefined;
-}
-
 interface State {
-  // Every difficulty's board and the player's best at it, read up front and keyed by difficulty
-  // so that switching difficulty is a lookup rather than a wait. A missing board is still loading.
+  // Public boards are eager; private bests are loaded as each difficulty is visited.
   boards: PerDifficulty<BoardType>;
-  myBests: PerDifficulty<ScoreType>;
+  myBests: PerDifficulty<{ score?: ScoreType; failed?: boolean }>;
   allScores?: ScoreType[];
   allScoresFailed?: boolean;
   scenario: ScenarioType | null;
@@ -229,10 +164,11 @@ export default class NewGameDetails extends React.Component<Props, State> {
     let board: BoardType;
     try {
       board = {
-        scores: await fetchBoard(
+        scores: await loadLeaderboard(
           scenario.id,
           difficulty,
           this.state.steamScope || "global",
+          this.props.uid,
         ),
       };
     } catch (err) {
@@ -265,30 +201,13 @@ export default class NewGameDetails extends React.Component<Props, State> {
     const requestId = ++this.allScoresRequestId;
     this.setState({ allScores: undefined, allScoresFailed: false });
     try {
-      if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
-        const { desktopScores } = await import("../../DesktopScores");
-        const allScores = await desktopScores(
-          scenario.id,
-          undefined,
-          this.state.steamScope || "global",
-        );
-        if (requestId === this.allScoresRequestId) this.setState({ allScores });
-        return;
-      }
-      const querySnapshot = await getDocs(
-        query(
-          collection(getDb(), "scores"),
-          where("scoreVersion", "==", SCORE_VERSION),
-          where("outcome", "==", "completed"),
-          where("scenarioId", "==", scenario.id),
-          orderBy("score", "desc"),
-          limit(50),
-        ),
+      const allScores = await loadLeaderboard(
+        scenario.id,
+        undefined,
+        this.state.steamScope || "global",
+        this.props.uid,
       );
-      if (requestId !== this.allScoresRequestId) return;
-      this.setState({
-        allScores: querySnapshot.docs.map((doc) => doc.data() as ScoreType),
-      });
+      if (requestId === this.allScoresRequestId) this.setState({ allScores });
     } catch (err) {
       console.warn("Couldn't load all high scores: ", err);
       if (requestId === this.allScoresRequestId)
@@ -307,35 +226,36 @@ export default class NewGameDetails extends React.Component<Props, State> {
     }
   }
 
-  /**
-   * The player's own best at every difficulty, which is the one row worth showing above the rest.
-   * Read up front like the boards, so that "Your best" doesn't disappear when the difficulty
-   * changes.
-   */
+  /** Only the selected level needs a private query; successful empty results are cached too. */
   private loadMyBests(uid: string) {
     if (!this.showsBoard() || !this.state.scenario) return;
+    cancelRequests(this.myBestRequestIds);
     this.setState({ myBests: {} });
-    for (const difficulty of this.difficultiesSelectedFirst()) {
-      void this.loadMyBest(uid, difficulty);
-    }
+    void this.loadMyBest(uid, this.props.game.difficulty);
   }
 
   private async loadMyBest(uid: string, difficulty: DifficultyType) {
     const scenario = this.state.scenario;
-    if (!scenario) {
-      return;
-    }
+    if (!scenario || !this.showsBoard()) return;
     const requestId = nextRequest(this.myBestRequestIds, difficulty);
+    let best: { score?: ScoreType; failed?: boolean };
     try {
-      const best = await fetchMyBest(scenario.id, difficulty, uid);
-      if (best && requestId === this.myBestRequestIds[difficulty]) {
-        this.setState((state) => ({
-          myBests: { ...state.myBests, [difficulty]: best },
-        }));
-      }
+      best = {
+        score: (
+          await loadLeaderboard(scenario.id, difficulty, "player", uid)
+        )[0],
+      };
     } catch (err) {
       console.warn("Couldn't load your best score: ", err);
+      best = { failed: true };
     }
+    if (
+      requestId === this.myBestRequestIds[difficulty] &&
+      this.props.uid === uid
+    )
+      this.setState((state) => ({
+        myBests: { ...state.myBests, [difficulty]: best },
+      }));
   }
 
   public componentDidMount() {
@@ -376,6 +296,9 @@ export default class NewGameDetails extends React.Component<Props, State> {
     boardHeight: number | null,
   ) {
     if (this.props.game.scenarioId !== prevProps.game.scenarioId) {
+      cancelRequests(this.boardRequestIds);
+      cancelRequests(this.myBestRequestIds);
+      ++this.allScoresRequestId;
       const scenario =
         getScenario(
           this.props.game.scenarioId,
@@ -404,6 +327,12 @@ export default class NewGameDetails extends React.Component<Props, State> {
       // Every board is already loaded or on its way, so this is a lookup. Only a board that
       // couldn't be read is asked for again.
       const { difficulty } = this.props.game;
+      if (
+        this.props.uid &&
+        (!this.state.myBests[difficulty] ||
+          this.state.myBests[difficulty]?.failed)
+      )
+        void this.loadMyBest(this.props.uid, difficulty);
       if (this.showsBoard() && this.state.boards[difficulty]?.failed) {
         this.retryBoard(difficulty);
       }
@@ -412,6 +341,16 @@ export default class NewGameDetails extends React.Component<Props, State> {
       }
     }
     // Logging in from the button below the board is what makes "your best" answerable
+    if (
+      this.props.uid !== prevProps.uid &&
+      process.env.REACT_APP_DESKTOP === "true" &&
+      isDesktopApp()
+    ) {
+      cancelRequests(this.boardRequestIds);
+      ++this.allScoresRequestId;
+      this.loadBoards();
+      if (this.state.leaderboardExpanded) void this.loadAllScores();
+    }
     if (this.props.uid && this.props.uid !== prevProps.uid) {
       this.loadMyBests(this.props.uid);
     } else if (!this.props.uid && prevProps.uid) {
@@ -458,7 +397,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
     // The selected difficulty's board and best come straight from what was read up front
     const scores = boards[game.difficulty]?.scores;
     const boardFailed = boards[game.difficulty]?.failed;
-    const myTopScore = myBests[game.difficulty];
+    const myTopScore = myBests[game.difficulty]?.score;
     const visibleScores = leaderboardExpanded
       ? allScores
       : scores?.slice(0, BOARD_ROWS);
@@ -666,6 +605,31 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   </TableRow>
                 </TableHead>
                 <TableBody>
+                  {uid && !myBests[game.difficulty] && (
+                    <TableRow>
+                      <TableCell colSpan={scoreColumnCount} role="status">
+                        Loading your best…
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {uid && myBests[game.difficulty]?.failed && (
+                    <TableRow>
+                      <TableCell colSpan={scoreColumnCount}>
+                        <Button
+                          onClick={() => {
+                            this.setState((state) => {
+                              const myBests = { ...state.myBests };
+                              delete myBests[game.difficulty];
+                              return { myBests };
+                            });
+                            void this.loadMyBest(uid, game.difficulty);
+                          }}
+                        >
+                          Retry your best score
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {myTopScore && (
                     <TableRow
                       sx={{ fontWeight: 600, bgcolor: "action.selected" }}

@@ -472,13 +472,16 @@ describe("CloudSaveSync", () => {
     expect(cloud.heads.get("first")?.deleted).toBe(true);
   });
 
-  it("acknowledges a committed upload when the account changes during the request", async () => {
+  it("defers acknowledgement after ownership changes and recovers without duplicating the committed upload", async () => {
     await create();
     let current = true;
     cloud.beforeWrite = async () => {
       current = false;
     };
     await sync.sync("alice", () => current);
+    expect((await repository.list())[0].cloud?.syncedRevision).not.toBe(
+      (await repository.list())[0].revision,
+    );
     cloud.beforeWrite = undefined;
     await sync.sync("alice");
     expect((await repository.list()).map((entry) => entry.name)).toEqual([

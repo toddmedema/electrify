@@ -1,3 +1,4 @@
+import { invalidateLeaderboards } from "../Leaderboard";
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 import {
   BestScoreType,
@@ -78,6 +79,7 @@ async function submitScore(
   };
   try {
     await addDoc(collection(getDb(), "scores"), scoreSubmission);
+    invalidateLeaderboards();
   } catch (err) {
     console.warn("Couldn't submit the score: ", err);
   }
@@ -123,6 +125,7 @@ async function backfillScoreNames(uid: string, displayName: string) {
     const batch = writeBatch(db);
     mine.forEach((score) => batch.update(score.ref, { displayName }));
     await batch.commit();
+    invalidateLeaderboards();
   } catch (err) {
     console.warn("Couldn't update the name on your old scores: ", err);
   }
@@ -208,6 +211,7 @@ export const saveDisplayName = createAsyncThunk<
   }
   // Deliberately not awaited: the name is the player's the moment the profile write completes, and
   // refreshing their old rows is cosmetic
+  invalidateLeaderboards();
   void backfillScoreNames(uid, name);
   return name;
 });
@@ -233,6 +237,7 @@ export const submitHighscore = createAsyncThunk<
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
     const { submitDesktopScore } = await import("../DesktopScores");
     await submitDesktopScore(submission);
+    invalidateLeaderboards();
   } else await submitScore(uid, displayName, submission);
 
   const previous = competitiveBest(bests, submission.scenarioId);

@@ -53,6 +53,11 @@ const flush = async () => {
 beforeAll(initializeAchievements);
 beforeEach(() => {
   jest.useFakeTimers();
+  localStorage.clear();
+  Object.defineProperty(document, "hidden", {
+    configurable: true,
+    value: false,
+  });
   Object.defineProperty(navigator, "onLine", {
     configurable: true,
     value: true,
@@ -259,5 +264,57 @@ test("only a live completed scenario unlocks the next difficulty and keeps it af
       new AchievementJournal(f.storage).getSnapshot().progress,
     ),
   ).toBe("Employee");
+  stop();
+});
+
+test("does no unchanged transaction polling and deliberate refresh still sees remote progress", async () => {
+  const f = fixture("alice");
+  let remote = emptyRecord();
+  const merge = jest.fn(async () => remote);
+  const stop = startAchievementServices(f.observer, f.journal, { merge });
+  await flush();
+  expect(merge).toHaveBeenCalledTimes(1);
+  for (let i = 0; i < 30; i++) {
+    jest.advanceTimersByTime(60_000);
+    await flush();
+  }
+  expect(merge).toHaveBeenCalledTimes(1);
+  remote = recordIntent({ earned: ["LIGHTS_ON"] });
+  retryAchievementSync();
+  await flush();
+  expect(f.journal.getSnapshot().progress.earned).toEqual(["LIGHTS_ON"]);
+  expect(merge).toHaveBeenCalledTimes(2);
+  stop();
+});
+test("pauses hidden network work and retries failed transactions with backoff", async () => {
+  const f = fixture("alice");
+  const merge = jest.fn().mockRejectedValue(new Error("offline"));
+  const stop = startAchievementServices(f.observer, f.journal, { merge });
+  await flush();
+  expect(merge).toHaveBeenCalledTimes(1);
+  jest.advanceTimersByTime(29_999);
+  await flush();
+  expect(merge).toHaveBeenCalledTimes(1);
+  jest.advanceTimersByTime(1);
+  await flush();
+  expect(merge).toHaveBeenCalledTimes(2);
+  Object.defineProperty(document, "hidden", {
+    configurable: true,
+    value: true,
+  });
+  document.dispatchEvent(new Event("visibilitychange"));
+  retryAchievementSync();
+  jest.advanceTimersByTime(300_000);
+  await flush();
+  expect(merge).toHaveBeenCalledTimes(2);
+  Object.defineProperty(document, "hidden", {
+    configurable: true,
+    value: false,
+  });
+  merge.mockImplementation(async (_uid, local) => local);
+  document.dispatchEvent(new Event("visibilitychange"));
+  await flush();
+  expect(merge).toHaveBeenCalledTimes(3);
+  expect(f.journal.getSnapshot().sync).toBe("synced");
   stop();
 });

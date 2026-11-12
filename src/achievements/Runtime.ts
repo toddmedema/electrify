@@ -1,3 +1,4 @@
+import { ForegroundSync } from "../ForegroundSync";
 import type { AppStore } from "../Store";
 import { firebaseAppAuth } from "../Globals";
 import { getDesktop } from "../Desktop";
@@ -32,7 +33,9 @@ export function startAchievementServices(
   let epoch = 0;
   let inFlight = false;
   let acknowledged = "";
-  let lastSync = 0;
+  let refreshPending = true;
+  let retryDelay = 30_000;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let previous = store.getState().game;
   let observed = "";
   let priorAccountAwards = new Set<string>();
@@ -40,13 +43,16 @@ export function startAchievementServices(
   let uid = store.getState().user.uid;
   journal.activate(uid);
   const current = (owner: string, generation: number) =>
-    !stopped && uid === owner && generation === epoch;
+    !stopped && uid === owner && generation === epoch && coordinator.isOwner();
   const sync = async () => {
     journal.retryStorage();
-    if (stopped || !uid || !transport || inFlight) return;
+    if (stopped || !uid || !transport || inFlight || !coordinator.isOwner())
+      return;
+    journal.refresh();
     const progress = journal.getSnapshot().progress;
     const signature = JSON.stringify(progress);
-    if (signature === acknowledged && Date.now() - lastSync < 300_000) return;
+    const requests = coordinator.pending();
+    if (!refreshPending && !requests.size && signature === acknowledged) return;
     if (!navigator.onLine) {
       journal.setSync("offline");
       return;
@@ -54,34 +60,61 @@ export function startAchievementServices(
     const owner = uid;
     const generation = epoch;
     inFlight = true;
+    refreshPending = false;
+    clearTimeout(retryTimer);
     journal.setSync("syncing");
+    let succeeded = false;
     try {
       const remote = await transport.merge(owner, progress, () =>
         current(owner, generation),
       );
       if (!current(owner, generation)) return;
-      journal.merge(remote);
       acknowledged = JSON.stringify(remote);
-      lastSync = Date.now();
+      journal.merge(remote);
+      coordinator.acknowledge(requests.keys());
+      retryDelay = 30_000;
+      succeeded = true;
       journal.setSync(
         JSON.stringify(journal.getSnapshot().progress) === acknowledged
           ? "synced"
           : "syncing",
       );
     } catch {
-      if (current(owner, generation))
+      if (current(owner, generation)) {
+        refreshPending = true;
         journal.setSync(navigator.onLine ? "failed" : "offline");
+        retryTimer = setTimeout(() => void sync(), retryDelay);
+        retryDelay = Math.min(300_000, retryDelay * 2);
+      }
     } finally {
       inFlight = false;
       if (
         !stopped &&
         (generation !== epoch ||
-          (journal.getSnapshot().sync === "syncing" &&
-            JSON.stringify(journal.getSnapshot().progress) !== acknowledged))
+          (succeeded &&
+            (refreshPending ||
+              JSON.stringify(journal.getSnapshot().progress) !== acknowledged)))
       )
         void sync();
     }
   };
+  const coordinator = new ForegroundSync<Record<string, never>>(
+    "achievements",
+    (owner) => {
+      epoch++;
+      clearTimeout(retryTimer);
+      if (owner) {
+        refreshPending = true;
+        void sync();
+      }
+    },
+    () => void sync(),
+    (value): value is Record<string, never> =>
+      !!value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Object.keys(value).length === 0,
+  );
   const publish = () => {
     const { game, user, saves } = store.getState();
     if (uid !== user.uid) {
@@ -89,11 +122,14 @@ export function startAchievementServices(
       epoch++;
       observed = "";
       acknowledged = "";
+      refreshPending = true;
+      clearTimeout(retryTimer);
       priorAccountAwards = new Set(game.desktopAchievements?.earned ?? []);
       priorAccountCompletion = JSON.stringify(
         game.desktopAchievements?.completion,
       );
       journal.activate(uid);
+      coordinator.setAccount(uid);
       refreshNative();
       void sync();
     }
@@ -154,11 +190,24 @@ export function startAchievementServices(
     .then(updateSteam)
     .catch(() => undefined);
   refreshNative();
+  coordinator.setAccount(uid);
   publish();
   void sync();
   const unsubscribe = store.subscribe(publish);
   const wake = () => {
+    if (
+      journal.getSnapshot().sync === "offline" ||
+      journal.getSnapshot().sync === "failed"
+    )
+      refreshPending = true;
     void sync();
+  };
+  const deliberate = () => {
+    coordinator.request({});
+    void sync();
+  };
+  const foreground = () => {
+    if (!document.hidden) wake();
   };
   const storageChanged = (event: StorageEvent) => {
     if (event.key === ACHIEVEMENT_STORAGE_KEY) {
@@ -166,14 +215,29 @@ export function startAchievementServices(
       void sync();
     }
   };
-  retrySync = wake;
+  retrySync = deliberate;
   window.addEventListener("online", wake);
   window.addEventListener("focus", wake);
   window.addEventListener("storage", storageChanged);
-  const retry = setInterval(wake, 30_000);
+  // Local storage recovery is cheap and never forces an unchanged cloud transaction.
+  const retry = setInterval(() => {
+    journal.retryStorage();
+  }, 30_000);
+  const stopJournal = journal.subscribe(() => {
+    if (
+      JSON.stringify(journal.getSnapshot().progress) !== acknowledged &&
+      journal.getSnapshot().sync !== "failed"
+    )
+      void Promise.resolve().then(sync);
+  });
+  document.addEventListener("visibilitychange", foreground);
   return () => {
     stopped = true;
-    if (retrySync === wake) retrySync = () => {};
+    coordinator.stop();
+    clearTimeout(retryTimer);
+    stopJournal();
+    document.removeEventListener("visibilitychange", foreground);
+    if (retrySync === deliberate) retrySync = () => {};
     unsubscribe();
     stopSteam?.();
     clearInterval(retry);
