@@ -50,8 +50,6 @@
   }
 }
 html[data-interface-scale]:not([data-interface-scale="1"]) {
-  --control-size: 3rem;
-
   .app_container {
     max-width: none;
   }
@@ -64,18 +62,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   .MuiDialog-paperWidthSm {
     max-width: 44rem;
   }
-  .MuiButton-root,
-  .MuiToggleButton-root {
-    min-height: 2.75rem;
-  }
-  .MuiIconButton-root {
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-  }
-  .MuiSvgIcon-root {
-    font-size: 1.5rem;
-  }
-
   .gameToolHeader {
     min-height: 3rem;
     padding: 0.25rem 0.5rem 0.25rem 1rem;
@@ -253,6 +239,8 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   }
   // Match the reading column to type scale, including the scroll owner's padding.
   .screenPage > .scrollable {
+    max-width: none;
+    margin-inline: 0;
     padding-inline: max(1rem, calc((100% - 64rem) / 2 + 1rem));
   }
   #topbar .screenHeaderBar {
@@ -280,54 +268,7 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   }
   .MuiMenuItem-root,
   .MuiTab-root {
-    min-height: 2.75rem;
     white-space: normal;
-  }
-  .MuiInputBase-input {
-    padding-block: 0.75rem;
-  }
-  .MuiOutlinedInput-root {
-    min-height: 2.75rem;
-  }
-  .MuiInputLabel-outlined {
-    transform: translate(0.875rem, 0.75rem) scale(1);
-  }
-  .MuiInputLabel-outlined.MuiInputLabel-shrink {
-    transform: translate(0.875rem, -0.5625rem) scale(0.75);
-  }
-  .MuiSelect-select.MuiInputBase-input {
-    padding: 0.75rem 2.75rem 0.75rem 0.875rem;
-    min-width: 4rem;
-  }
-  .MuiSelect-icon {
-    right: 0.625rem;
-  }
-  .MuiAutocomplete-root .MuiOutlinedInput-root.MuiInputBase-sizeSmall {
-    padding: 0.375rem 3rem 0.375rem 0.625rem;
-    min-height: 3rem;
-    .MuiAutocomplete-input {
-      padding: 0.375rem 0.25rem;
-    }
-  }
-  .MuiAutocomplete-endAdornment {
-    right: 0.5rem;
-    top: 50%;
-    transform: translateY(-50%);
-  }
-  .MuiCheckbox-root,
-  .MuiRadio-root {
-    padding: 0.5rem;
-  }
-  .MuiSlider-root {
-    padding-block: 1rem;
-  }
-  .MuiSlider-thumb {
-    width: 1.25rem;
-    height: 1.25rem;
-  }
-  .MuiSlider-rail,
-  .MuiSlider-track {
-    height: 0.25rem;
   }
   .MuiListItemIcon-root {
     min-width: 2.5rem;
@@ -657,11 +598,6 @@ html[data-interface-scale]:not([data-interface-scale="1"])
   }
 }
 
-.buildGridEvidence[open] {
-  max-height: 45%;
-  overflow-y: auto;
-}
-
 .buildComparisonItem {
   list-style: none;
   grid-column: 1 / -1;
@@ -744,5 +680,8 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
     max-width: min(30rem, 100%);
     padding: 0.25rem;
     font-size: 0.75rem;
+  }
+  .chartTooltip-breakdown {
+    width: 30rem;
   }
 }

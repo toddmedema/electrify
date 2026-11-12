@@ -518,6 +518,12 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       },
       MuiOutlinedInput: {
         styleOverrides: {
+          input: {
+            "&.MuiNativeSelect-select, &.MuiSelect-select": {
+              boxSizing: "border-box",
+              padding: "0.5rem 2rem 0.5rem 0.875rem",
+            },
+          },
           root: {
             "&:hover:not(.Mui-disabled):not(.Mui-error) .MuiOutlinedInput-notchedOutline":
               { borderColor: palette.interactive },
@@ -638,6 +644,14 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       // phone Build sheet's close button, under a label from the mission row.
       MuiTooltip: {
         defaultProps: { disableInteractive: true },
+        styleOverrides: {
+          tooltip: {
+            boxSizing: "border-box",
+            // Include touch padding and the tooltip's two 2px margins in the cap.
+            maxWidth:
+              "min(18.75rem, calc(100vw - 2 * var(--screen-edge-margin) - 4px))",
+          },
+        },
       },
       // MUI's dark-mode elevation overlay muddies the deliberately layered charcoal surfaces.
       // Shadows and borders already communicate elevation, so keep paper on its authored colour.

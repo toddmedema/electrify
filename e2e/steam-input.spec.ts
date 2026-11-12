@@ -1517,6 +1517,35 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     });
     await select(page, gridChart);
     await input(page, "confirm");
+    await expect
+      .poll(
+        () =>
+          gridChart.locator(".u-over").evaluate((plot) => {
+            const rect = plot.getBoundingClientRect();
+            let top = rect.top,
+              bottom = rect.bottom;
+            for (
+              let parent = plot.parentElement;
+              parent;
+              parent = parent.parentElement
+            ) {
+              if (getComputedStyle(parent).overflowY !== "visible") {
+                const bounds = parent.getBoundingClientRect();
+                top = Math.max(top, bounds.top);
+                bottom = Math.min(bottom, bounds.bottom);
+              }
+            }
+            return (
+              (bottom - top) /
+              parseFloat(getComputedStyle(document.documentElement).fontSize)
+            );
+          }),
+        {
+          message:
+            "focused Build forecast exposes at least three lines of plotted data",
+        },
+      )
+      .toBeGreaterThanOrEqual(3);
     await capture("build-forecast");
     await input(page, "back");
     await select(page, gridContext);

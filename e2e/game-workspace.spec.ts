@@ -1,5 +1,5 @@
 import { reviewScreenshot } from "./review-screenshot";
-import { openBuild } from "./layout";
+import { openBuild, openPane } from "./layout";
 import { expect, Page, test } from "./fixtures";
 import path from "node:path";
 import { editSavedGame } from "./save-fixture";
@@ -645,20 +645,26 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       insights.getByRole("heading", { name: "Insights", exact: true }),
     ).toHaveCount(1);
-    // The daily fleet chart has keyboard detail inspection. Its Escape owns the tooltip
-    // even while a tool is open above the fleet.
+    // The daily Fleet chart has keyboard detail inspection. Single tool deliberately
+    // returns to Fleet first; opening Insights again must preserve the selected plant.
     const single =
       (await page.locator(".gameStage").getAttribute("data-layout")) ===
       "single";
-    if (single) await expect(fleet).toBeHidden();
-    const chart = (
-      single
-        ? insights.locator("#chartForecastSupplyDemand")
-        : page.locator("#chartSupplyDemand")
-    ).getByRole("img");
+    if (single) {
+      await expect(fleet).toBeHidden();
+      await openPane(
+        fleet,
+        dock.getByRole("button", { name: "Insights", exact: true }),
+      );
+    }
+    const chart = page.locator("#chartSupplyDemand").getByRole("img");
     await chart.focus();
     await chart.press("Enter");
+    await expect(page.locator(".chartTooltip:visible")).toHaveCount(1);
     await chart.press("Escape");
+    await expect(page.locator(".chartTooltip:visible")).toHaveCount(0);
+    if (single)
+      await dock.getByRole("button", { name: "Insights", exact: true }).click();
     await expect(insights).toBeVisible();
     await insights
       .getByRole("heading", { name: "Insights", exact: true })
@@ -1270,6 +1276,83 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
+  test(`enlarged phone status and edge-padded tooltip remain readable in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(!info.project.use.hasTouch, "Phone status reflow");
+    await startGame(page, theme, 111);
+    for (const scale of ["1.25", "1.5", "2.5"]) {
+      await page.getByRole("button", { name: "menu", exact: true }).click();
+      await page
+        .getByRole("menuitem", { name: "Settings", exact: true })
+        .click();
+      await page
+        .getByRole("combobox", { name: "Interface scale", exact: true })
+        .selectOption(scale);
+      const advanced = page.getByRole("button", {
+        name: "Advanced display",
+        exact: true,
+      });
+      if ((await advanced.getAttribute("aria-expanded")) !== "true")
+        await advanced.click();
+      await page.getByRole("button", { name: "4%", exact: true }).click();
+      await page.getByRole("button", { name: "Back", exact: true }).click();
+      const appbar = page.locator("#appbar");
+      await expect(appbar).toBeVisible();
+      const geometry = await appbar
+        .locator(".gameStatus")
+        .evaluate((status) => {
+          const box = status.getBoundingClientRect();
+          return {
+            overflow: status.scrollWidth - status.clientWidth,
+            clipped: Array.from(
+              status.querySelectorAll(".gameStatusValue, .gameMonthlyProfit"),
+            ).map((value) => {
+              const rect = value.getBoundingClientRect();
+              return Math.max(
+                box.left - rect.left,
+                rect.right - box.right,
+                box.top - rect.top,
+                rect.bottom - box.bottom,
+              );
+            }),
+          };
+        });
+      expect(geometry.overflow, `status width at ${scale}`).toBeLessThanOrEqual(
+        1,
+      );
+      expect(
+        Math.max(...geometry.clipped),
+        `cash, profit and date at ${scale}`,
+      ).toBeLessThanOrEqual(1);
+      expect(
+        await appbar.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+      await expect(page.locator("#navfooter")).toBeInViewport();
+      await expect(
+        page.getByRole("button", { name: "menu", exact: true }),
+      ).toBeInViewport();
+      const status = appbar.getByRole("button", {
+        name: /^Current grid status:/,
+      });
+      await status.tap();
+      const tooltip = page.getByRole("tooltip");
+      await expect(tooltip).toBeVisible();
+      const edge = await tooltip.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          minimum: Math.ceil(Math.min(innerWidth, innerHeight) * 0.04),
+          left: rect.left,
+          right: innerWidth - rect.right,
+        };
+      });
+      expect(edge.left).toBeGreaterThanOrEqual(edge.minimum - 1);
+      expect(edge.right).toBeGreaterThanOrEqual(edge.minimum - 1);
+    }
+  });
+
   test(`phone profit stacks beneath cash and opens finances in ${theme}`, async ({
     page,
   }, info) => {

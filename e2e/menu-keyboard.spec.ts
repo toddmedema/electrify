@@ -361,10 +361,28 @@ test("touch hides button focus rings while inputs and keyboard navigation retain
   await expect(system).toBeFocused();
   await expect(system).toHaveCSS("outline-style", "none");
   await page.keyboard.press("Tab");
-  await expect(page.locator(":focus")).toHaveCSS("outline-style", "solid");
-  await expect(page.locator(":focus")).toHaveCSS("outline-width", "2px");
+  const scale = page.getByRole("combobox", {
+    name: "Interface scale",
+    exact: true,
+  });
+  await expect(scale).toBeFocused();
+  await expect(scale.locator("..").locator("fieldset")).toHaveCSS(
+    "border-width",
+    "2px",
+  );
+  // The outlined native select carries its focus on the fieldset. Continue by Tab
+  // to test the separate button ring without replacing normal keyboard navigation.
+  for (
+    let i = 0;
+    i < 8 && (await page.locator("button:focus").count()) === 0;
+    i++
+  ) {
+    await page.keyboard.press("Tab");
+  }
   const focusedButton = page.locator("button:focus");
   await expect(focusedButton).toHaveCount(1);
+  await expect(focusedButton).toHaveCSS("outline-style", "solid");
+  await expect(focusedButton).toHaveCSS("outline-width", "2px");
   await focusedButton.tap();
   await expect(focusedButton).toHaveCSS("outline-style", "none");
   await page.goto("/?dataCenters=1");

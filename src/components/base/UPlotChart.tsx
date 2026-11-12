@@ -340,16 +340,20 @@ function containerChartHeight(
   // Keep the chart's title, legend and local controls in the same allocation.
   // Removing the canvases' own heights makes this reserve stable across resizes.
   const chrome = block ? Math.max(0, block.clientHeight - plotHeight) : 0;
-  return viewport && viewport.clientHeight > 0
-    ? Math.min(
-        requested,
-        Math.max(
-          1,
-          (viewport.clientHeight - chrome - 16 * getInterfaceScale()) /
-            Math.max(1, charts?.length ?? 1),
-        ),
-      )
-    : requested;
+  if (!viewport || viewport.clientHeight <= 0) return requested;
+  const scale = getInterfaceScale();
+  const available = Math.max(1, viewport.clientHeight - 16 * scale);
+  // Supporting controls and legends can scroll out of view. Never spend their
+  // height by reducing the chart to an unreadable strip: reserve eight lines of
+  // scaled type, capped by the viewport so focusing the chart can reveal it all.
+  const readableHeight = Math.min(available, 128 * scale);
+  return Math.min(
+    requested,
+    Math.max(
+      readableHeight,
+      (available - chrome) / Math.max(1, charts?.length ?? 1),
+    ),
+  );
 }
 
 export default function UPlotChart<S>(

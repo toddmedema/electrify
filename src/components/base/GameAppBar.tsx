@@ -259,12 +259,6 @@ function CompactGridStatus({
           }}
           disableTouchListener
           arrow
-          // Keep it off the screen edge rather than flush against it.
-          slotProps={{
-            popper: {
-              modifiers: [{ name: "preventOverflow", options: { padding: 8 } }],
-            },
-          }}
         >
           <button
             type="button"
