@@ -157,14 +157,12 @@ it("lists each projected failure separately and removes redundant goal forecasts
 
 it("clears a stale win while an edited plan is being forecast", () => {
   const game = createGame({ scenarioId: 111 });
-  jest
-    .spyOn(MissionProjection, "projectMission")
-    .mockReturnValue({
-      status: "win",
-      through: "Dec 2026",
-      shortageFrom: "Jul 2022",
-      requirements: [],
-    });
+  jest.spyOn(MissionProjection, "projectMission").mockReturnValue({
+    status: "win",
+    through: "Dec 2026",
+    shortageFrom: "Jul 2022",
+    requirements: [],
+  });
   const ready = jest
     .spyOn(DeferredProjection, "projectionReady")
     .mockReturnValue(true);
