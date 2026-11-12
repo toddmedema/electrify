@@ -91,12 +91,8 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     expect(
       screen.getByText(/Plant operations and purchased power are extra/),
     ).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: "Pay cash", exact: true }),
-    ).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: "Take loan", exact: true }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Pay cash" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Take loan" })).toBeEnabled();
 
     const assets = disclosure("Plants & purchased power");
     expect(within(assets).getByText("Operating plants")).not.toBeVisible();
