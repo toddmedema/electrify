@@ -986,7 +986,9 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   await expect(dialog).toHaveCount(0);
   // Fixture advances only construction; the acquisition still uses its real owning action.
   await editSavedGame(page, ({ game }) => {
-    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    game.transmission!.lines.find(
+      (line) => line.corridorId === "vt-champlain-ridge",
+    )!.yearsToBuildLeft = 0;
     for (const tick of game.timeline) tick.cash = 1e9;
   });
   await page.goto("/");
@@ -995,9 +997,9 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
     page.getByRole("button", { name: "Continue", exact: true }),
   );
   await input(page, "confirm");
-  const line = page
-    .locator(".facilities:visible .transmissionLine")
-    .filter({ hasText: "Ridge Electric" });
+  const line = page.locator(
+    '.facilities:visible .transmissionLine[data-corridor-id="vt-champlain-ridge"]',
+  );
   await select(page, line.getByRole("button", { name: /^Inspect / }));
   await input(page, "confirm");
   const acquire = line.getByRole("button", {
