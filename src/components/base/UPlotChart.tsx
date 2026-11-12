@@ -72,7 +72,7 @@ export interface UPlotChartProps<S> {
   /** Change to force a rebuild, eg when the number of series changes */
   structureKey?: string | number;
   /** One tooltip covering every series at the hovered x */
-  tooltip?: (idx: number, state: S) => string;
+  tooltip?: (idx: number, state: S, minute?: number) => string;
   /** Format a two-column breakdown, also available through the keyboard. */
   interactiveTooltip?: boolean;
   /**
@@ -109,7 +109,8 @@ function keyboardTvTooltipTarget(
 
 function tooltipPlugin<S>(
   getState: () => S,
-  getLabel: () => ((idx: number, state: S) => string) | undefined,
+  getLabel: () =>
+    ((idx: number, state: S, minute?: number) => string) | undefined,
   hoverOnly: boolean,
   interactiveTooltip: boolean,
   keyboardSelected: () => boolean,
@@ -270,7 +271,11 @@ function tooltipPlugin<S>(
           }
           return;
         }
-        const text = label(idx, getState());
+        const text = label(
+          idx,
+          getState(),
+          keyboardSelected() ? u.data[0][idx] : u.posToVal(u.cursor.left!, "x"),
+        );
         if (interactiveTooltip) {
           const groups = text.split("\n\n");
           const [time, ...supply] = groups[0].split("\n");

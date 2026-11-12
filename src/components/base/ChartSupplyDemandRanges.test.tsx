@@ -44,6 +44,7 @@ it("keeps brief extrema and actual coincident shortfalls in each forecast month"
       peakShortfall: 50,
       unmetSum: 70,
       demandSum: 400,
+      sampleCount: 3,
     },
     {
       minute: MINUTES_PER_MONTH,
@@ -55,6 +56,7 @@ it("keeps brief extrema and actual coincident shortfalls in each forecast month"
       peakShortfall: 0,
       unmetSum: 0,
       demandSum: 100,
+      sampleCount: 1,
     },
   ]);
 });
@@ -295,7 +297,7 @@ describe("ChartSupplyDemandRanges", () => {
     expect(marked).toEqual([false, true, false]);
     x.forEach((_minute, index) => {
       const text = props.tooltip!(index, state);
-      expect(text.includes("Peak shortfall")).toBe(marked[index]);
+      expect(text.includes("peak")).toBe(marked[index]);
       expect(text.includes("No shortfall")).toBe(!marked[index]);
     });
   });
@@ -311,7 +313,8 @@ describe("ChartSupplyDemandRanges", () => {
     const text = props.tooltip!(1, state);
     // 20 of the month's 200 demanded is unmet.
     expect(text).toContain("Demand unmet: 10% (90% served)");
-    expect(text).toContain("Peak shortfall: 20W");
+    expect(text.split("\n")[0]).toBe("Feb 2020 · 10W avg unmet · 20W peak");
+    expect(text).toContain("10W avg unmet");
     expect(text).not.toContain("hours");
     expect(state.shortfalls[0].peakShortfall).toBe(20);
     expect(props.tooltip!(0, state)).toContain("No shortfall");

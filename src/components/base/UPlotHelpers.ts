@@ -645,8 +645,22 @@ export interface ShortfallRect {
   height: number;
 }
 
-const SHORTFALL_CAP_PX = 4;
+export const SHORTFALL_CAP_PX = 4;
 const SHORTFALL_HEM_ALPHA = 0.7;
+
+/** Use the same device-pixel height for the painted bar and its hover outline. */
+export function shortfallHeight(
+  share: number,
+  height: number,
+  capPx: number,
+): number {
+  const plotHeight = Math.round(height);
+  const bounded = Number.isFinite(share) ? Math.min(1, Math.max(0, share)) : 0;
+  return Math.min(
+    plotHeight,
+    Math.max(capPx, Math.round(bounded * plotHeight)),
+  );
+}
 
 /**
  * The silhouette of shortfall bars as non-overlapping device-pixel rectangles. A bar reaches
@@ -663,7 +677,6 @@ export function shortfallSkyline(
 ): ShortfallRect[] {
   const first = Math.floor(plot.left);
   const last = Math.ceil(plot.left + plot.width);
-  const plotHeight = Math.round(plot.height);
   const heights = new Array<number>(Math.max(0, last - first)).fill(0);
   const spans: Array<[number, number]> = [];
   for (const { x0, x1, heightShare } of bars) {
@@ -671,13 +684,7 @@ export function shortfallSkyline(
     const right = Math.min(x1, plot.left + plot.width);
     if (right <= left) continue;
     spans.push([left, right]);
-    const share = Number.isFinite(heightShare)
-      ? Math.min(1, Math.max(0, heightShare))
-      : 0;
-    const height = Math.min(
-      plotHeight,
-      Math.max(capPx, Math.round(share * plotHeight)),
-    );
+    const height = shortfallHeight(heightShare, plot.height, capPx);
     for (let column = Math.floor(left); column < Math.ceil(right); column++) {
       heights[column - first] = Math.max(heights[column - first], height);
     }

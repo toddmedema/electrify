@@ -112,7 +112,7 @@ export const keyMap = {
   ...Object.fromEntries(
     GAME_TOOLS.map((tool) => [
       `TOOL_${tool.id}`,
-      TOOL_SHORTCUTS[tool.id].toLowerCase(),
+      TOOL_SHORTCUTS[tool.id].map((key) => key.toLowerCase()),
     ]),
   ),
   BUILD_GENERATOR: "g",
@@ -334,7 +334,8 @@ const tutorialCompletionSx = {
   "& .MuiDialogContent-root": { padding: "0 24px 24px" },
   "& .MuiDialogActions-root": {
     padding: "16px 24px",
-    flexWrap: "nowrap",
+    flexWrap: "wrap",
+    gap: "8px",
     borderTop: "1px solid var(--border-subtle)",
     "& .MuiButton-root": {
       minHeight: 40,
@@ -342,6 +343,8 @@ const tutorialCompletionSx = {
     },
     "@media (max-width: 599px)": {
       paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+      "& .MuiButton-root": { flex: "1 1 auto", margin: 0 },
+      "& .MuiButton-contained": { flexBasis: "100%", order: 1 },
     },
   },
   "& .tutorialCompleteContent": {

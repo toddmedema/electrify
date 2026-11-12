@@ -11,7 +11,7 @@ export function GameDate({
   showTime: boolean;
 }) {
   return (
-    <span className="weak gameStatusValue">
+    <span className="weak gameStatusValue" data-game-minute={date.minute}>
       <span>
         {date.month} {date.year}
         {showTime && (

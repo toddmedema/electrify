@@ -1,9 +1,11 @@
 import { reviewScreenshot } from "./review-screenshot";
-import { expect, test } from "./fixtures";
+import { expect, test, type Page, type TestInfo } from "./fixtures";
 
-test("guided objective reaches a retryable capstone and succeeds", async ({
-  page,
-}, testInfo) => {
+async function completeMission(
+  page: Page,
+  testInfo: TestInfo,
+  keepPlaying: boolean,
+) {
   await page.addInitScript(
     (theme) => {
       window.localStorage.clear();
@@ -158,13 +160,67 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   const secondary = page.getByRole("button", { name: "Main menu" });
   const primaryBox = (await primary.boundingBox())!;
   const secondaryBox = (await secondary.boundingBox())!;
-  expect(primaryBox.y).toBeCloseTo(secondaryBox.y, 0);
-  expect(primaryBox.x).toBeGreaterThanOrEqual(
-    secondaryBox.x + secondaryBox.width,
-  );
+  if (testInfo.project.name.startsWith("mobile-")) {
+    expect(primaryBox.y).toBeGreaterThanOrEqual(
+      secondaryBox.y + secondaryBox.height,
+    );
+  } else {
+    expect(primaryBox.y).toBeCloseTo(secondaryBox.y, 0);
+    expect(primaryBox.x).toBeGreaterThanOrEqual(
+      secondaryBox.x + secondaryBox.width,
+    );
+  }
+  await expect(
+    completionDialog.getByRole("button", { name: "Keep playing" }),
+  ).toBeVisible();
   await expect(primary).toBeFocused();
+  if (keepPlaying) {
+    const fleetBefore = await page.locator(".facilityRow").allTextContents();
+    const clock = page.locator("#appbar [data-game-minute]");
+    const minuteBefore = await clock.getAttribute("data-game-minute");
+    expect(minuteBefore).toMatch(/^\d+$/);
+    await completionDialog
+      .getByRole("button", { name: "Keep playing" })
+      .click();
+    await expect(completionDialog).toBeHidden();
+    await expect(page.locator(".tutorialHud")).toHaveCount(0);
+    expect(await page.locator(".facilityRow").allTextContents()).toEqual(
+      fleetBefore,
+    );
+    await expect(clock).toHaveAttribute("data-game-minute", minuteBefore!);
+    await page.getByRole("button", { name: "normal speed" }).click();
+    await expect(
+      page.getByRole("button", { name: "pause", exact: true }),
+    ).toBeVisible();
+    await expect
+      .poll(async () => Number(await clock.getAttribute("data-game-minute")))
+      .toBeGreaterThan(Number(minuteBefore));
+    return;
+  }
   await primary.click();
   await expect(
     page.getByRole("region", { name: "Step 1 of 10", exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".tutorialHudAction")).toHaveText(
+    "Tap Build (Q, B)",
+  );
+  await page.keyboard.press("b");
+  await expect(
+    page.getByRole("region", { name: "Build", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".tutorialHudAction")).toHaveText(
+    "Sort generators",
+  );
+}
+
+test("guided objective reaches a retryable capstone and succeeds", async ({
+  page,
+}, testInfo) => {
+  await completeMission(page, testInfo, false);
+});
+
+test("completed tutorial keeps its setup playable", async ({
+  page,
+}, testInfo) => {
+  await completeMission(page, testInfo, true);
 });

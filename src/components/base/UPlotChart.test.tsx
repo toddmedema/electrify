@@ -51,10 +51,13 @@ describe("UPlotChart resizing", () => {
     jest.useFakeTimers();
     jest.clearAllMocks();
     resetInputPresentation();
-    (uPlot as unknown as jest.Mock).mockImplementation(() =>
-      Object.assign(Object.create(uPlotPrototype), {
-        over: document.createElement("div"),
-      }),
+    (uPlot as unknown as jest.Mock).mockImplementation(
+      (_options: uPlot.Options, data: uPlot.AlignedData) =>
+        Object.assign(Object.create(uPlotPrototype), {
+          over: document.createElement("div"),
+          data,
+          posToVal: jest.fn((position: number) => position),
+        }),
     );
     width = 400;
     setThemeMode("light");
@@ -162,6 +165,9 @@ describe("UPlotChart resizing", () => {
   });
 
   it("refreshes the visible tooltip through setCursor after a retained numeric edit without pointer movement", () => {
+    const label = jest.fn(
+      (_index: number, state: { value: number }) => `Output ${state.value}`,
+    );
     const options = ({
       registerDataUpdate,
     }: BuildContext<{ value: number }>): uPlot.Options => {
@@ -179,7 +185,7 @@ describe("UPlotChart resizing", () => {
           [value, value],
         ]}
         buildOptions={options}
-        tooltip={(_index, state) => `Output ${state.value}`}
+        tooltip={label}
       />
     );
     const view = render(ui(1));
@@ -198,6 +204,7 @@ describe("UPlotChart resizing", () => {
         [1, 1],
       ]);
     plot.cursor = { idx: 0, left: 0, top: 0 };
+    plot.posToVal = jest.fn(() => 0.25);
     plot.setCursor = jest.fn((position: { left: number; top: number }) => {
       plot.cursor = { ...position, idx: 0 };
       const cursor = tooltip.hooks!.setCursor;
@@ -209,6 +216,7 @@ describe("UPlotChart resizing", () => {
     expect(plot.setData).not.toHaveBeenCalled();
     expect(plot.cursor).toEqual({ idx: 0, left: 0, top: 0 });
     expect(screen.getByText("Output 1.4", { exact: true })).toBeVisible();
+    expect(label).toHaveBeenLastCalledWith(0, { value: 1.4 }, 0.25);
   });
 
   it("keeps solar context visible after the supply and load breakdown", () => {

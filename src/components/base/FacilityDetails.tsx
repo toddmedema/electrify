@@ -443,8 +443,16 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             )}
             {facility.name === "Battery" && equivalentCycles !== undefined && (
               <Stat
-                label="Cycles"
-                value={`${formatCount(equivalentCycles)} / 7,300`}
+                label="Cycles used"
+                value={
+                  <>
+                    {formatCount(equivalentCycles)} / 7,300
+                    <span className="facilityStatNote">
+                      Rated for 7,300 full cycles to 80% capacity. Continues
+                      operating after that.
+                    </span>
+                  </>
+                }
               />
             )}
             {minimumStableOutput !== undefined && (

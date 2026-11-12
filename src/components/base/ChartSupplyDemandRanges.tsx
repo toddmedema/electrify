@@ -16,6 +16,7 @@ import {
   splitPastProjected,
   yAxis,
 } from "./UPlotHelpers";
+import { shortfallHoverPlugin } from "./ShortfallHover";
 import { Props as SupplyDemandProps } from "./ChartForecastSupplyDemand";
 
 export interface MonthlyRange {
@@ -30,6 +31,7 @@ export interface MonthlyRange {
   /** Energy left unmet and energy demanded, summed over the month's hours. */
   unmetSum: number;
   demandSum: number;
+  sampleCount: number;
 }
 
 /** Aggregate every modeled hour, keeping past monthly averages separate from forecast ranges. */
@@ -58,6 +60,7 @@ export function supplyDemandMonthlyRanges(
       );
       previous.unmetSum += Math.max(0, tick.demandW - tick.supplyW);
       previous.demandSum += tick.demandW;
+      previous.sampleCount++;
     } else {
       ranges.push({
         minute: tick.minute,
@@ -69,6 +72,7 @@ export function supplyDemandMonthlyRanges(
         peakShortfall: Math.max(0, tick.demandW - tick.supplyW),
         unmetSum: Math.max(0, tick.demandW - tick.supplyW),
         demandSum: tick.demandW,
+        sampleCount: 1,
       });
     }
   }
@@ -201,6 +205,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     ],
     plugins: [
       shortfallBarsPlugin(() => getState().shortfalls, palette.blackout),
+      shortfallHoverPlugin(() => getState().shortfalls, { scaleHeight: true }),
     ],
   };
 }
@@ -222,9 +227,13 @@ function tooltip(index: number, state: State): string {
   const share = unmetShare(range);
   const shortfall =
     range.peakShortfall > 0
-      ? `Demand unmet: ${formatUnmet(share)} (${share < 0.0005 ? ">99.9%" : formatRequiredShare(1 - share)} served)\nPeak shortfall: ${formatWatts(range.peakShortfall)}`
+      ? `Demand unmet: ${formatUnmet(share)} (${share < 0.0005 ? ">99.9%" : formatRequiredShare(1 - share)} served)`
       : "No shortfall";
-  return `${period} · forecast range\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\n${shortfall}`;
+  const magnitude =
+    range.peakShortfall > 0
+      ? ` · ${formatWatts(range.unmetSum / range.sampleCount)} avg unmet · ${formatWatts(range.peakShortfall)} peak`
+      : "";
+  return `${period}${magnitude}\nForecast range\nSupply: ${formatWattRange(range.supplyMin, range.supplyMax)}\nDemand: ${formatWattRange(range.demandMin, range.demandMax)}\n${shortfall}`;
 }
 
 export default function ChartSupplyDemandRanges(

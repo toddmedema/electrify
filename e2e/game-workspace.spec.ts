@@ -732,7 +732,7 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
     // Pointer and keyboard users see each tool's shortcut key.
     await page.locator("#buildNav").hover();
     await expect(
-      page.getByRole("tooltip", { name: "Build (Q)", exact: true }),
+      page.getByRole("tooltip", { name: "Build (Q, B)", exact: true }),
     ).toBeVisible();
     await page.mouse.move(0, 0);
     await page.locator("#programsNav").focus();

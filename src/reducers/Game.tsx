@@ -3822,11 +3822,13 @@ export function tutorialCompleteDialog({
       </div>
     ),
     open: true,
-    // Both buttons lead somewhere; dismissing would strand the player in a finished scenario
+    // Keep completion explicit; practice is available through Keep playing.
     notCancellable: true,
     tutorialComplete: true,
     offerInstall:
       TUTORIALS.findIndex((tutorial) => tutorial.id === scenarioId) >= 2,
+    tertiaryLabel: "Keep playing",
+    tertiaryAction: () => getStore().dispatch(dialogClose()),
     secondaryLabel: "Main menu",
     secondaryAction: () => getStore().dispatch(quit()),
     actionLabel: nextTutorial ? "Next tutorial" : undefined,

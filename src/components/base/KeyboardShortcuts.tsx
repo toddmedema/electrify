@@ -12,19 +12,19 @@ interface ShortcutType {
 // half of the contract -- the keys themselves.
 // The action bar's tools take the left-hand letter row in the bar's own order, so the keys read
 // left to right like the buttons do. Navigation shows each in its button's tooltip.
-export const TOOL_SHORTCUTS: Record<GameTool, string> = {
-  BUILD_GENERATORS: "Q",
-  PROGRAMS: "W",
-  INSIGHTS: "E",
-  EVENTS: "R",
-  SCENARIO: "T",
+export const TOOL_SHORTCUTS: Record<GameTool, string[]> = {
+  BUILD_GENERATORS: ["Q", "B"],
+  PROGRAMS: ["W"],
+  INSIGHTS: ["E"],
+  EVENTS: ["R"],
+  SCENARIO: ["T"],
 };
 
 export const SHORTCUTS: ShortcutType[] = [
   { keys: ["`", "space", "0"], description: "Pause" },
   { keys: ["1", "2", "3"], description: "Slow / normal / fast speed" },
   { keys: ["4"], description: "Ultra speed (desktop-sized screens)" },
-  { keys: ["Q"], description: "Open / close Build" },
+  { keys: TOOL_SHORTCUTS.BUILD_GENERATORS, description: "Open / close Build" },
   { keys: ["W"], description: "Open / close Programs" },
   { keys: ["E"], description: "Open / close Insights" },
   { keys: ["R"], description: "Open / close Events" },
