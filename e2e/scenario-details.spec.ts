@@ -138,8 +138,9 @@ test("scenario outlook flags insolvency with the first projected month-end", asy
   const failure = outlook.getByRole("status", { name: "Scenario forecast" });
   await expect(failure.locator("strong")).toHaveText("Projected loss:");
   await expect(failure.locator("svg")).toBeVisible();
-  await expect(failure).toContainText(
-    /Projected loss: Cash below \$0 by \w+ \d{4}\./,
+  await expect(outlook).not.toContainText("If you build nothing");
+  await expect(failure.getByRole("listitem").first()).toContainText(
+    /Cash below \$0 by \w+ \d{4}\./,
   );
   await expect(
     outlook.getByRole("img", { name: /Projected loss periods shaded/ }),

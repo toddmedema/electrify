@@ -75,4 +75,24 @@ describe("Sparkline", () => {
     expect(svg.querySelector("polygon")).toBeNull();
     expect(svg.querySelector("circle")).toBeNull();
   });
+
+  it("moves the marker to the inspected point", () => {
+    const svg = draw(
+      <Sparkline
+        values={[0.5, 0.1, 0.3]}
+        domain={[0, 1]}
+        lowMarker
+        markerIndex={2}
+        ariaLabel="Inspected month"
+      />,
+    );
+    const lastPoint = svg
+      .querySelector("polyline")!
+      .getAttribute("points")!
+      .split(" ")
+      .at(-1)!
+      .split(",");
+    expect(svg.querySelector("circle")!.getAttribute("cx")).toBe(lastPoint[0]);
+    expect(svg.querySelector("circle")!.getAttribute("cy")).toBe(lastPoint[1]);
+  });
 });

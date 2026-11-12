@@ -5330,10 +5330,31 @@ $homeSmokeCycle: 5.6s;
     row-gap: 0;
     min-width: 0;
   }
+  .buildOptionOutput[role="group"] {
+    min-height: 40px;
+    touch-action: pan-y;
+
+    &:focus-visible {
+      outline: 2px solid var(--interactive-blue);
+      outline-offset: 2px;
+    }
+
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
+  .buildOptionOutputCaption {
+    font-size: var(--font-size-caption-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .buildOptionSparkline {
     // Reserved even before the forecast can draw a line, so the card doesn't jump. The gap keeps
     // a line along the top edge from reading as an underline of the caption.
     height: 24px;
+    width: 96px;
+    max-width: 100%;
     margin-top: 4px;
     .sparkline {
       display: block;
@@ -6888,14 +6909,6 @@ $programs_column: 800px;
   font-size: var(--font-size-body2);
   font-weight: 600;
   letter-spacing: 0;
-
-  &[data-direction="up"] {
-    color: var(--delta-good);
-  }
-
-  &[data-direction="down"] {
-    color: var(--delta-bad);
-  }
 }
 
 .transmissionUpgrade {
@@ -7332,10 +7345,6 @@ img[src$="/transmission.svg"] {
 .scenarioOutlook {
   display: flex;
   flex-direction: column;
-}
-.scenarioBuildNothing {
-  display: block;
-  color: var(--font-color-faded);
 }
 // Phones lead with the outcome, directly under the section title.
 @media (max-width: 599px) {

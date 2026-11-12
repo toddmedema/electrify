@@ -1,10 +1,10 @@
 import * as React from "react";
-import { Button, Typography } from "@mui/material";
+import { Box, Button, Typography } from "@mui/material";
 import type { GameType } from "../../Types";
 import { utilityOffer } from "../../helpers/Expansion";
 import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import { scenarioObjectiveDefinitions } from "../../helpers/ObjectiveRules";
-import { objectiveGoalText } from "../../helpers/ObjectivePresentation";
+import { objectiveGoalGroups } from "../../helpers/ObjectivePresentation";
 import {
   formatMoneyConcise,
   formatWatts,
@@ -156,15 +156,24 @@ export default function UtilityOfferDialog({
       <Typography component="h3" variant="subtitle2" sx={{ mt: 2 }}>
         Scenario obligations
       </Typography>
-      {scenarioObjectiveDefinitions(scenario, game).map((objective) => (
-        <Typography key={objective.id} variant="body2" sx={{ mt: 1 }}>
-          {objectiveGoalText(
-            objective,
-            game.startingYear,
-            scenario?.durationMonths ?? 240,
+      {objectiveGoalGroups(
+        scenarioObjectiveDefinitions(scenario, game),
+        game.startingYear,
+        scenario?.durationMonths ?? 240,
+      ).map((objective) => (
+        <Box key={objective.id} sx={{ mt: 1 }}>
+          {objective.goals.length > 1 && (
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {objective.label}
+            </Typography>
           )}
-          {objective.required ? "" : " (optional)"}
-        </Typography>
+          {objective.goals.map((goal) => (
+            <Typography key={goal} variant="body2">
+              {goal}
+              {objective.required ? "" : " (optional)"}
+            </Typography>
+          ))}
+        </Box>
       ))}
     </DecisionDialog>
   );
