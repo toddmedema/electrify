@@ -1,3 +1,4 @@
+import { validPowerAgreements } from "./helpers/PowerAgreements";
 import { POLICY_IDS } from "./data/Policies";
 import { validLegacyCampaign } from "./helpers/LegacyCampaign";
 import { validLegacyCampaignEvidence } from "./helpers/ObjectiveRules";
@@ -752,6 +753,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
       !validLegacyCampaign(game as GameType) ||
       !validLegacyCampaignEvidence(game as GameType) ||
       !validUtilityExpansion(game as GameType) ||
+      !validPowerAgreements(game as GameType) ||
       !validScenarioRuleState(game as GameType) ||
       !validGameObjectiveProgress(game as GameType)
     )

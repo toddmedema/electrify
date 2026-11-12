@@ -284,8 +284,10 @@ export function createWorld(
     result.transmission = {
       buyingRule: "SHORTAGES",
       sellingRule: "PROFITABLE",
-      lines: (result.transmission?.lines || []).filter((line) =>
-        scenario.startingInterties?.includes(line.corridorId),
+      lines: (result.transmission?.lines || []).filter(
+        (line) =>
+          scenario.startingInterties?.includes(line.corridorId) ||
+          (isUtilityExpansionGame(result) && line.buildCost === 0),
       ),
     };
     result.inGame = true;
@@ -587,6 +589,9 @@ export function stepWorld(world: World): void {
   world.pricePerMWh = Math.max(
     ...active.map((i) => basePeerTradePrice(currentTick(world.grids[i])!)),
   );
+  const sharedImports:
+    import("../helpers/Transmission").IntertieReservation[] | undefined =
+    world.grids.some((grid) => grid.utilityExpansion) ? [] : undefined;
   const phases = world.grids.map((g, i) => {
     // A retired company neither buys nor sells; its frozen grid only keeps its seat.
     if (!active.includes(i))
@@ -603,7 +608,7 @@ export function stepWorld(world: World): void {
       };
     selectWeatherLocation(g.location.id);
     g.multiplayer!.pricePerMWh = world.pricePerMWh;
-    const phase = tickStatePhases(g);
+    const phase = tickStatePhases(g, undefined, undefined, sharedImports);
     const planned = phase.next();
     if (planned.done)
       throw new Error("A grid could not prepare its shared tick");
@@ -914,10 +919,19 @@ function validGrid(world: World, initial: World, i: number) {
   const expectedConnections = initial.grids[i].transmission!.lines;
   const nativeLines = isUtilityExpansionGame(g)
     ? (g.transmission?.lines ?? []).filter((line) =>
-        ["vt-champlain-valley", "vt-champlain-ridge"].includes(line.corridorId),
+        [
+          "vt-champlain-valley",
+          "vt-champlain-ridge",
+          "vt-champlain-regional",
+          "vt-valley-regional",
+          "vt-ridge-regional",
+        ].includes(line.corridorId),
       )
     : [];
-  const lineCount = expectedConnections.length + nativeLines.length;
+  const lineCount =
+    expectedConnections.filter(
+      (line) => !isUtilityExpansionGame(g) || isPeerCorridorId(line.corridorId),
+    ).length + nativeLines.length;
   return (
     !!parseSave(
       serializeSave({
@@ -928,6 +942,7 @@ function validGrid(world: World, initial: World, i: number) {
               buyingRule: g.transmission!.buyingRule,
               sellingRule: g.transmission!.sellingRule,
               lines: nativeLines,
+              acceptedAgreements: g.transmission!.acceptedAgreements,
             }
           : undefined,
       }),

@@ -99,6 +99,9 @@ export function computeOutlook<K extends OutlookKind>(
       ...game,
       facilities: game.facilities.filter((f) => f.yearsToBuildLeft <= 0),
       transmission: {
+        acceptedAgreements: game.transmission?.acceptedAgreements?.map(
+          (receipt) => ({ ...receipt }),
+        ),
         buyingRule: game.transmission?.buyingRule || "SHORTAGES",
         sellingRule: game.transmission?.sellingRule || "SURPLUS",
         lines: (game.transmission?.lines || [])

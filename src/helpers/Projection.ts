@@ -145,13 +145,14 @@ export function facilitySignature(game: GameType): string {
       [
         line.id,
         line.corridorId,
+        line.paused,
         line.yearsToBuildLeft > 0,
         line.capacityW,
         line.upgrade?.targetCapacityW,
       ].join(":"),
     )
     .join("|");
-  return `${facilities}/${game.transmission?.buyingRule || "SHORTAGES"}/${game.transmission?.sellingRule || "SURPLUS"}/${transmission}`;
+  return `${facilities}/${game.transmission?.buyingRule || "SHORTAGES"}/${game.transmission?.sellingRule || "SURPLUS"}/${transmission}/${JSON.stringify(game.transmission?.acceptedAgreements ?? [])}`;
 }
 
 /**

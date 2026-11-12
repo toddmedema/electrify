@@ -119,10 +119,23 @@ export interface IntertieUpgradeType {
   constructionKgco2eEmitted?: number;
 }
 
+export interface PowerAgreementReceipt {
+  blockId: string;
+  cycle: number;
+  acceptedMinute: number;
+  startMinute: number;
+  endMinute: number;
+}
+export interface AcceptPowerAgreementAction {
+  blockId: string;
+  quoteKey: string;
+}
+
 export interface TransmissionStateType {
   buyingRule: BuyingRuleType;
   sellingRule: SellingRuleType;
   lines: TransmissionLineOperatingType[];
+  acceptedAgreements?: PowerAgreementReceipt[];
 }
 
 // Deliberately open rather than a union of the places that happen to ship today: a custom game

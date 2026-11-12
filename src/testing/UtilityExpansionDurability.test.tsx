@@ -43,7 +43,13 @@ function ready(targetId: UtilityTargetId): GameType {
     ),
   );
   // The boundary fixture starts at completed construction; long scenarios exercise actual elapsed construction.
-  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  game.transmission!.lines.find(
+    (line) =>
+      line.corridorId ===
+      (targetId === "valley-electric"
+        ? "vt-champlain-valley"
+        : "vt-champlain-ridge"),
+  )!.yearsToBuildLeft = 0;
   currentTick(game)!.cash = 1e9;
   return game;
 }
@@ -187,10 +193,14 @@ it("rejects inconsistent or forged acquisition import ledgers", () => {
       g.customerMarketSize += 100;
     },
     (g) => {
-      g.transmission!.lines[0].paused = true;
+      g.transmission!.lines.find(
+        (line) => line.corridorId === "vt-champlain-ridge",
+      )!.paused = true;
     },
     (g) => {
-      g.transmission!.lines[0].currentFlowW = 1;
+      g.transmission!.lines.find(
+        (line) => line.corridorId === "vt-champlain-ridge",
+      )!.currentFlowW = 1;
     },
     (g) => {
       currentTick(g)!.customers = g.customerMarketSize * 1e6;

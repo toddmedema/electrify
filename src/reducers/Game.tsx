@@ -25,7 +25,12 @@ import {
 } from "../helpers/ExpansionContext";
 import { areaBaselineDemand } from "../helpers/AreaDemand";
 import { utilityNetworkAnnualOM } from "../data/UtilityExpansion";
-import { acquireUtility } from "./GameActions";
+import { acquireUtility, acceptPowerAgreement } from "./GameActions";
+import {
+  acceptAgreement,
+  inheritedConnection,
+} from "../helpers/PowerAgreements";
+import type { IntertieReservation } from "../helpers/Transmission";
 import {
   acquisitionQuote,
   expansionNetWorth,
@@ -1966,6 +1971,12 @@ export const gameSlice = createSlice({
           loans: [],
           acquisitions: [],
         };
+        state.transmission?.lines.push(
+          inheritedConnection(
+            "champlain",
+            Math.max(0, ...state.transmission.lines.map((line) => line.id)) + 1,
+          ),
+        );
         state.timeline = reforecastDemand(state);
       }
       desktopSimulationHooks()?.initialize(state);
@@ -2470,6 +2481,10 @@ export const gameSlice = createSlice({
       setForegroundSpeed(state, speedBeforeDialog);
       ensureTicking(state);
     });
+    builder.addCase(acceptPowerAgreement, (state, action) => {
+      if (acceptAgreement(state, action.payload))
+        state.timeline = reforecastSupply(state, true);
+    });
     builder.addCase(acquireUtility, (state, action) => {
       applyAcquireUtility(state, action.payload);
     });
@@ -2589,7 +2604,7 @@ export function recordExpansionMilestones(state: GameType): void {
     logGameEvent(
       state,
       "WORLD_EVENT",
-      "Champlain’s nuclear purchase ends in January 2020. Québec and Ridge purchase limits also halve. Review the supply plan and allow time for replacement projects.",
+      "On 1 Jan 2020, 100 MW of nuclear agreement coverage ends. The 300 MW connection remains available for regional market purchases. Québec and Ridge agreement coverage also falls; review replacements on their connections.",
       {
         title: "Legacy power contracts change in 2020",
         importance: "NOTABLE",
@@ -2601,7 +2616,7 @@ export function recordExpansionMilestones(state: GameType): void {
     logGameEvent(
       state,
       "WORLD_EVENT",
-      "Champlain’s nuclear purchase has ended. Québec purchase limits are down to 60 MW; Ridge’s firm purchase is down to 20 MW if acquired.",
+      "Champlain’s 100 MW nuclear agreement coverage has ended. Its 300 MW connection remains available for regional market purchases. Inherited Québec coverage is now 60 MW; Ridge’s inherited firm coverage is 20 MW if acquired.",
       {
         title: "Legacy power purchases reduced",
         importance: "CRITICAL",
@@ -3832,6 +3847,9 @@ function tickWorkingState(state: GameType): GameType {
       transmission: state.transmission.lines.length
         ? {
             ...state.transmission,
+            acceptedAgreements: state.transmission.acceptedAgreements?.map(
+              (receipt) => ({ ...receipt }),
+            ),
             lines: state.transmission.lines.map((line) => ({
               ...line,
               ...(line.upgrade && { upgrade: { ...line.upgrade } }),
@@ -3943,6 +3961,7 @@ export function* tickStatePhases(
   state: GameType,
   saveEffects?: RunSaveEffects,
   onCompletedMonth?: CompletedMonthObserver,
+  sharedImports?: IntertieReservation[],
 ): Generator<PeerPlan, void, PeerSettlement | undefined> {
   if (isDraft(state)) {
     const snapshot = current(state);
@@ -3980,7 +3999,17 @@ export function* tickStatePhases(
     state.timeline,
   );
   if (now && prev) {
-    yield* supplyFacilitiesFinancesPhases(state, prev, now);
+    yield* supplyFacilitiesFinancesPhases(
+      state,
+      prev,
+      now,
+      false,
+      false,
+      true,
+      TICK_MINUTES,
+      true,
+      sharedImports,
+    );
     desktopSimulationHooks()?.tick(state, now);
     logHailRepairsCompleted(state);
 
@@ -4960,6 +4989,7 @@ function* supplyFacilitiesFinancesPhases(
   optimizeCommitment = true,
   stepMinutes = TICK_MINUTES,
   advanceConstruction = true,
+  sharedImports?: IntertieReservation[],
 ): Generator<PeerPlan, TickPresentFutureType, PeerSettlement | undefined> {
   const { facilities } = state;
   // Compare each settled/forecast tick, not the rollover clock that may already be next month.
@@ -5198,8 +5228,13 @@ function* supplyFacilitiesFinancesPhases(
     }
   });
 
+  const tickStoryEffects = storyEffectsAt(tickDate, state);
+  if (tickStoryEffects.transmissionCapacityLimitsWByCorridor)
+    now.transmissionCapacityLimitsWByCorridor =
+      tickStoryEffects.transmissionCapacityLimitsWByCorridor;
+  else delete now.transmissionCapacityLimitsWByCorridor;
   // Update supply and facility outputs
-  const entitlementOffers = entitlementSources(state, now);
+  const entitlementOffers = entitlementSources(state, now, sharedImports);
   const entitlementCapacityW = entitlementOffers.reduce(
     (sum, offer) => sum + offer.capacityW,
     0,
@@ -5224,11 +5259,6 @@ function* supplyFacilitiesFinancesPhases(
     costPerMWh: number;
   }[] = [];
   const startedFacilityIds = new Set<number>();
-  const tickStoryEffects = storyEffectsAt(tickDate, state);
-  if (tickStoryEffects.transmissionCapacityLimitsWByCorridor)
-    now.transmissionCapacityLimitsWByCorridor =
-      tickStoryEffects.transmissionCapacityLimitsWByCorridor;
-  else delete now.transmissionCapacityLimitsWByCorridor;
   const carbonFee = tickStoryEffects.carbonFeePerKgCO2e ?? state.feePerKgCO2e;
   // Read once per tick, and only when a live co-op grid prices its spare output.
   let peerTickFuelPrices: FuelPricesType | undefined;
@@ -5570,6 +5600,14 @@ function* supplyFacilitiesFinancesPhases(
   );
   entitlementDeliveredW -= redundantEntitlementW;
   supply -= redundantEntitlementW;
+  let coveredLeft = entitlementDeliveredW;
+  const coveredReservations = entitlementOffers.map((source) => {
+    const watts = Math.min(coveredLeft, source.capacityW);
+    coveredLeft -= watts;
+    return { offer: source.offer, watts };
+  });
+  sharedImports?.push(...coveredReservations);
+  const importReservations = sharedImports ?? coveredReservations;
   // One charge budget spans native surplus, peer purchases and external markets.
   const chargeCapacityW = () =>
     dischargedW > 0
@@ -5787,6 +5825,8 @@ function* supplyFacilitiesFinancesPhases(
     transmissionCapacity += rating;
     offers.push({
       ...limits,
+      lineId: `${state.multiplayer?.seat ?? "local"}:${line.id}`,
+      lineImportLimitW: rating,
       pricePerMWh,
       emissionsKgco2ePerMWh: limits.marketId
         ? importEmissionsKgco2ePerMWh(limits.marketId, tradingYear)
@@ -5797,6 +5837,7 @@ function* supplyFacilitiesFinancesPhases(
     offers,
     Infinity,
     0,
+    importReservations,
   ).importedW.reduce((sum, w) => sum + w, 0);
   marketExportLimitW = allocateIntertieFlows(
     offers,
@@ -5834,7 +5875,7 @@ function* supplyFacilitiesFinancesPhases(
       ? supplyAtDemandBoundary(localSupplyW, now.demandW)
       : localSupplyW,
     demandW: now.demandW,
-    capacityW: transmissionCapacity,
+    capacityW: Math.max(0, transmissionCapacity - entitlementDeliveredW),
     importLimitW: marketImportLimitW,
     exportLimitW: marketExportLimitW,
     buyingRule: (peer?.exportedW || 0) > 0 ? "NONE" : transmission.buyingRule,
@@ -5848,11 +5889,12 @@ function* supplyFacilitiesFinancesPhases(
     offers,
     clearing.importedW,
     clearing.exportedW,
+    importReservations,
   );
   let additionalExportW = 0;
   if (
     transmission.sellingRule === "PROFITABLE" &&
-    importedW - entitlementDeliveredW === 0 &&
+    importedW === 0 &&
     localSupplyW >= now.demandW
   ) {
     const matched = allocateProfitableExports(
@@ -5885,7 +5927,22 @@ function* supplyFacilitiesFinancesPhases(
   // month-boundary pre-rolls: those replace the live current tick with the new weather frame.
   // Forecasts dispatch cloned lines; only their current-tick readings are copied back below.
   operatingLines.forEach((line, index) => {
-    line.currentFlowW = flows.importedW[index] - flows.exportedW[index];
+    line.currentFlowW =
+      flows.importedW[index] -
+      flows.exportedW[index] +
+      coveredReservations.reduce(
+        (sum, reservation) =>
+          sum +
+          (reservation.offer.lineId === offers[index].lineId
+            ? reservation.watts
+            : 0),
+        0,
+      );
+    if (sharedImports && flows.importedW[index] > 0)
+      sharedImports.push({
+        offer: offers[index],
+        watts: flows.importedW[index],
+      });
   });
   let importCostPerHour = 0;
   let exportRevenuePerHour = 0;
@@ -5931,20 +5988,23 @@ function* supplyFacilitiesFinancesPhases(
   now.marketPricePerMWh = marketPricePerMWh;
   now.supplyW = supply;
   // Exported surplus remains available to redirect to local demand in the setup outlook.
+  const remainingImportHeadroomW = !state.utilityExpansion
+    ? 0
+    : transmission.buyingRule === "NONE"
+      ? Math.min(
+          Math.max(0, entitlementCapacityW - entitlementDeliveredW),
+          Math.max(0, marketImportLimitW - clearing.importedW),
+        )
+      : Math.max(0, marketImportLimitW - clearing.importedW);
   now.availableSupplyW =
-    supply +
-    spareGenerationW +
-    exportedW +
-    entitlementCapacityW -
-    entitlementDeliveredW;
+    supply + spareGenerationW + exportedW + remainingImportHeadroomW;
   // Surplus exports are interruptible under the game policy and can be redirected locally.
   now.reserveW =
     supply -
     now.demandW +
     reachableHeadroomW +
     exportedW +
-    entitlementCapacityW -
-    entitlementDeliveredW;
+    remainingImportHeadroomW;
   now.importKgco2ePerMWh =
     importEmissionsBasisW > 0
       ? importEmissionsWeight / importEmissionsBasisW

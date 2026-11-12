@@ -1,8 +1,5 @@
-import {
-  UTILITY_AREAS,
-  UTILITY_TARGETS,
-  utilityEntitlementsAt,
-} from "../data/UtilityExpansion";
+import { connectionAgreements } from "../helpers/PowerAgreements";
+import { UTILITY_AREAS, UTILITY_TARGETS } from "../data/UtilityExpansion";
 import {
   acquisitionTargetForCorridor,
   ownedUtility,
@@ -30,7 +27,7 @@ import {
   HAIL_DEFINITION_ID,
   isWeatherHazardEligible,
 } from "../helpers/Hazards";
-import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { POLICIES } from "../data/Policies";
 import { getSolarOutputFactor } from "../helpers/Energy";
 import { programCustomers } from "../helpers/Policies";
@@ -684,17 +681,18 @@ function checkTrade(
         ({ id }) => UTILITY_AREAS[id],
       ),
     ];
-    const year = getDateFromMinute(now.minute, state.startingYear).year;
     const maximum = definitions.reduce(
       (sum, definition) =>
         sum +
         Math.min(
           definition.sourceInterfaceW,
-          utilityEntitlementsAt(definition.id, year).reduce(
-            (rights, source) =>
-              rights + source.nominalW * source.deliverability,
-            0,
-          ),
+          connectionAgreements(state, definition.id, now.minute)
+            .filter((source) => source.active)
+            .reduce(
+              (rights, source) =>
+                rights + source.nominalW * source.deliverability,
+              0,
+            ),
         ),
       0,
     );
@@ -705,7 +703,7 @@ function checkTrade(
         `${entitlementW}/${entitlementCapacityW}W, maximum ${maximum}W`,
       );
   }
-  if (externalImportW + exportedW > capacityW * (1 + RELATIVE_TOLERANCE) + 1) {
+  if (importedW + exportedW > capacityW * (1 + RELATIVE_TOLERANCE) + 1) {
     collector.add(
       "trade stays within transmission capacity",
       when,

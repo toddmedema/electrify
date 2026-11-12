@@ -73,7 +73,9 @@ it("mod base 116 preserves source rights, company customers, obligations and exa
       }),
     ),
   );
-  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  game.transmission!.lines.find(
+    (line) => line.corridorId === "vt-champlain-ridge",
+  )!.yearsToBuildLeft = 0;
   const quote = acquisitionQuote(game, "ridge-electric")!;
   expect(quote).toBeDefined();
   game = copyOfficialGame(
