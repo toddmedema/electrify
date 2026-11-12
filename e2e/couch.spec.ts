@@ -1352,6 +1352,7 @@ for (const committed of [false, true]) {
     );
     const couch = await createCouchFixture(context, page);
     await page.goto("/");
+    const setupReplies = await couch.settledNativeRequests("setup");
     await page
       .getByRole("button", { name: "Play with friends", exact: true })
       .click();
@@ -1363,7 +1364,7 @@ for (const committed of [false, true]) {
     await expect(setup).toBeVisible();
     await expect
       .poll(() => couch.settledNativeRequests("setup"))
-      .toBeGreaterThan(0);
+      .toBe(setupReplies + 1);
     await couch.input({ "202": ["confirm"] });
     await expect(
       setup.getByText("Controller joined", { exact: true }),

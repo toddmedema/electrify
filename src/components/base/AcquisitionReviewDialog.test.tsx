@@ -138,14 +138,10 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     expect(within(financing).getByText(/over 30 years/)).toBeVisible();
 
     const schedule = disclosure("Supply & network changes");
-    expect(
-      within(schedule).getByText(/opening upkeep from January 2015/),
-    ).not.toBeVisible();
+    expect(within(schedule).getByText(/1.5× opening upkeep/)).not.toBeVisible();
     await user.click(within(schedule).getByText("Supply & network changes"));
-    expect(
-      within(schedule).getByText(/opening upkeep from January 2015/),
-    ).toBeVisible();
-    expect(schedule).toHaveTextContent("January 2020");
+    expect(within(schedule).getByText(/1.5× opening upkeep/)).toBeVisible();
+    expect(schedule).toHaveTextContent("Jan 2020");
   },
 );
 
@@ -155,7 +151,7 @@ it("keeps Valley’s future reduction and variable-power warning discoverable", 
   const schedule = disclosure("Supply & network changes");
   await userEvent.click(within(assets).getByText("Plants & purchased power"));
   await userEvent.click(within(schedule).getByText("Supply & network changes"));
-  expect(schedule).toHaveTextContent("January 2017");
+  expect(schedule).toHaveTextContent("Jan 2017");
   expect(schedule).toHaveTextContent("76MW deliverable");
   expect(assets).toHaveTextContent("not firm reserve");
 });

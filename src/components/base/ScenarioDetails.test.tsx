@@ -1,3 +1,4 @@
+import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { render, screen, within } from "@testing-library/react";
 import * as DateTime from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
@@ -5,6 +6,7 @@ import { activeScenario } from "../../helpers/GameSelectors";
 import { ScenarioDetailsContent } from "./ScenarioDetails";
 import * as MissionProjection from "../../helpers/MissionProjection";
 import * as DeferredProjection from "./DeferredProjection";
+import * as ScenarioOutlook from "./ScenarioOutlook";
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -88,11 +90,12 @@ it("shows the score so far beside where the current pace ends it", () => {
   ).toHaveTextContent(/TWh supplied/i);
 });
 
-it("keeps one concise loss line under the score chart and removes redundant goal forecasts", () => {
+it("lists each projected failure separately and removes redundant goal forecasts", () => {
   const game = createGame({ scenarioId: 111 });
   jest.spyOn(MissionProjection, "projectMission").mockReturnValue({
     status: "loss",
     through: "Dec 2026",
+    shortageFrom: "Jul 2022",
     requirements: [
       {
         id: "cash",
@@ -117,9 +120,13 @@ it("keeps one concise loss line under the score chart and removes redundant goal
   const status = within(outlook).getByRole("status", {
     name: "Scenario forecast",
   });
-  expect(status).toHaveTextContent(
-    "Projected loss: Cash below $0 by Jan 2022. Under 95% of demand served for 3 months by Jan 2025.",
+  const failures = within(status).getAllByRole("listitem");
+  expect(failures).toHaveLength(2);
+  expect(failures[0]).toHaveTextContent("Cash below $0 by Jan 2022.");
+  expect(failures[1]).toHaveTextContent(
+    "Under 95% of demand served for 3 months by Jan 2025.",
   );
+  expect(outlook).not.toHaveTextContent("If you build nothing");
   expect(
     screen.getByRole("img", { name: /Projected loss periods shaded/ }),
   ).toBeInTheDocument();
@@ -152,9 +159,12 @@ it("keeps one concise loss line under the score chart and removes redundant goal
 
 it("clears a stale win while an edited plan is being forecast", () => {
   const game = createGame({ scenarioId: 111 });
-  jest
-    .spyOn(MissionProjection, "projectMission")
-    .mockReturnValue({ status: "win", through: "Dec 2026", requirements: [] });
+  jest.spyOn(MissionProjection, "projectMission").mockReturnValue({
+    status: "win",
+    through: "Dec 2026",
+    shortageFrom: "Jul 2022",
+    requirements: [],
+  });
   const ready = jest
     .spyOn(DeferredProjection, "projectionReady")
     .mockReturnValue(true);
@@ -165,6 +175,7 @@ it("clears a stale win while an edited plan is being forecast", () => {
   expect(
     screen.getByRole("status", { name: "Scenario forecast" }),
   ).toHaveTextContent("Projected win.");
+  expect(screen.queryByText(/If you build nothing/)).toBeNull();
   const originalWorker = global.Worker;
   Object.defineProperty(global, "Worker", {
     configurable: true,
@@ -188,4 +199,72 @@ it("clears a stale win while an edited plan is being forecast", () => {
       value: originalWorker,
     });
   }
+});
+
+it("combines the oil-retirement goal while retaining both fleet deadlines", () => {
+  const game = createGame({ scenarioId: 116 });
+  renderDetails(game);
+  const goals = screen.getByRole("region", { name: "Goals" });
+  expect(within(goals).getAllByText("Retire original oil plants")).toHaveLength(
+    1,
+  );
+  expect(within(goals).getAllByRole("listitem")).toHaveLength(2);
+  expect(goals).toHaveTextContent("Champlain’s Oil A by Dec 2020");
+  expect(goals).toHaveTextContent("Acquired original oil plants by Dec 2023");
+  expect(goals).not.toHaveTextContent("Retire acquired original oil assets");
+  expect(goals).not.toHaveTextContent("Retire Champlain's original Oil A");
+});
+
+it.each([-198, 198])(
+  "uses monthly-profit theme colors for a score change of %s, including projected losses",
+  (change) => {
+    const game = createGame({ scenarioId: 111 });
+    const theme = createTheme({
+      palette: { error: { main: "#b51230" }, success: { main: "#087f5b" } },
+    });
+    jest.spyOn(ScenarioOutlook, "scenarioScoreProjection").mockReturnValue({
+      actual: [200],
+      projected: [200 + change],
+      final: 200 + change,
+    });
+    jest.spyOn(MissionProjection, "projectMission").mockReturnValue({
+      status: "loss",
+      through: "Dec 2026",
+      requirements: [],
+    });
+    render(
+      <ThemeProvider theme={theme}>
+        <ScenarioDetailsContent game={game} scenario={activeScenario(game)!} />
+      </ThemeProvider>,
+    );
+    const outlook = screen.getByRole("region", { name: "Score outlook" });
+    const delta = within(outlook).getByText(`${change < 0 ? "−" : "+"}198`);
+    expect(delta).toHaveStyle({
+      color: change < 0 ? theme.palette.error.main : theme.palette.success.main,
+    });
+    expect(outlook).not.toHaveTextContent("from now");
+  },
+);
+
+it("presents supply facts and concise goal headings without coaching the player", () => {
+  const game = createGame({ scenarioId: 116 });
+  renderDetails(game);
+  const plan = screen.getByRole("region", { name: "Supply plan" });
+  expect(plan).toHaveTextContent("1.5× opening upkeep");
+  expect(plan).toHaveTextContent("2× opening upkeep");
+  expect(plan).toHaveTextContent("Regional nuclear ends");
+  expect(plan).not.toHaveTextContent(
+    /Budget for|Build-time example|Gas example|Lower rates|before selling|order by/i,
+  );
+  const goals = screen.getByRole("region", { name: "Goals" });
+  expect(
+    within(goals).getByText("Acquire a utility", { exact: true }),
+  ).toBeInTheDocument();
+  expect(
+    within(goals).getByText("Retain customers", { exact: true }),
+  ).toBeInTheDocument();
+  expect(goals).toHaveTextContent(
+    "Acquire Valley Electric or Ridge Electric · Dec 2014",
+  );
+  expect(goals).toHaveTextContent("Keep ≥90% of customer baseline by Dec 2024");
 });
