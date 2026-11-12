@@ -71,7 +71,8 @@ export interface ProjectionView {
   // The simulated hours alone; supplyDemandTimeline leads with recorded monthly averages.
   forecast: TickPresentFutureType[];
   // Forecast shortfall inside the displayed range, filled in per render for the viewport.
-  shortfall?: { wh: number; peakW: number; label: string };
+  // startYear is the year of the first simulated shortfall hour, which is never in the past.
+  shortfall?: { wh: number; peakW: number; startYear: number };
   hasStorage: boolean;
   hasHydro: boolean;
   financePast: MonthlyHistoryType[];

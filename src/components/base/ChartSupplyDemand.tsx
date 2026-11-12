@@ -290,7 +290,6 @@ function buildOptions({
     cursor: {
       x: true,
       y: false,
-      points: { show: false },
       drag: { x: false, y: false, setScale: false },
     },
     legend: { show: false },
