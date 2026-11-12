@@ -131,11 +131,6 @@
     border-color: var(--border-selected);
     background: var(--bg-selected);
   }
-  &:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 2px;
-  }
-
   .gameDockEmergency .MuiBadge-badge {
     min-width: 16px;
     height: 16px;
@@ -254,9 +249,6 @@
     max-width: none;
     margin: 0;
   }
-  .insights {
-    container-type: inline-size;
-  }
   // A sheet's content uses the sheet; a capped column reads as a page inside a page.
   .screenCatalog,
   .screenCatalog > .cardList,
@@ -338,8 +330,6 @@
   flex: 0 1 auto;
 }
 .gameDockLabel {
-  font-size: var(--game-dock-label-size);
-  line-height: var(--game-dock-label-line);
   font-weight: var(--font-weight-emphasis);
   white-space: nowrap;
 }
@@ -382,7 +372,6 @@
     align-self: center;
     transform: none;
     margin: 0.5rem;
-    max-width: calc(100% - 1rem);
     overflow-x: auto;
     touch-action: pan-x;
     box-shadow: none;
@@ -405,20 +394,6 @@
   .gameActionDock .gameDockAction.MuiButton-root {
     flex: 0 0 auto;
     min-height: 2.75rem;
-  }
-  .gameStatusBar {
-    display: flex;
-    flex-wrap: wrap;
-    min-height: 2.5rem;
-  }
-  .gameStatusBar .missionSummary {
-    min-width: 0;
-    flex: 1 1 24rem;
-  }
-  .missionSummaryHeadline,
-  .missionRiskText {
-    white-space: normal;
-    overflow: visible;
   }
 }
 
