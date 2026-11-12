@@ -45,6 +45,9 @@ for (const theme of ["light", "dark"] as const) {
       line.getByText("Market price now", { exact: true }),
     ).toBeVisible();
     await expect(
+      line.getByText("Total import limit", { exact: true }),
+    ).toBeVisible();
+    await expect(
       line.getByText("Market emissions (CO₂e)", { exact: true }),
     ).toBeVisible();
     const marketBuying = facilities.getByRole("combobox", {

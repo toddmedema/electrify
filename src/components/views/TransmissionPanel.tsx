@@ -1232,7 +1232,7 @@ export default function TransmissionPanel({
                                       <div className="facilityStat">
                                         <dt>
                                           {inherited
-                                            ? "Market import limit"
+                                            ? "Total import limit"
                                             : "Import available now"}
                                         </dt>
                                         <dd className="facilityStatValue">

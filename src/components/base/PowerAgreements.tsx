@@ -29,6 +29,7 @@ import AgreementForecastDetails, {
 import { useAgreementForecast } from "./useAgreementForecast";
 import DecisionDialog from "./DecisionDialog";
 import BuildDetails, { BuildDetailRow } from "./BuildDetails";
+import { multiplayerRuntime } from "../../multiplayer/Registry";
 
 export function agreementSummary(game: GameType, corridorId: string) {
   const utility = inheritedUtilityForCorridor(corridorId);
@@ -99,6 +100,8 @@ export default function PowerAgreements({
     React.useState<ReturnType<typeof powerAgreementQuote>>();
   const [assessmentId, setAssessmentId] = React.useState<string>();
   const [forecastCommitted, setForecastCommitted] = React.useState(true);
+  const [accepting, setAccepting] = React.useState(false);
+  const [acceptanceError, setAcceptanceError] = React.useState<string>();
   const durationLabelId = React.useId();
   const utility = inheritedUtilityForCorridor(line.corridorId);
   const sources = utility ? connectionAgreements(game, utility) : [];
@@ -163,6 +166,7 @@ export default function PowerAgreements({
   const close = () => {
     setReview(undefined);
     setAssessmentId(undefined);
+    setAcceptanceError(undefined);
   };
   return (
     <Box
@@ -285,6 +289,7 @@ export default function PowerAgreements({
                 onClick={(event) => {
                   restore.current = event.currentTarget;
                   setForecastCommitted(true);
+                  setAcceptanceError(undefined);
                   setReview(quote);
                 }}
               >
@@ -303,6 +308,7 @@ export default function PowerAgreements({
         fullWidth
         maxWidth="sm"
         closable
+        closeDisabled={accepting}
         title={
           review
             ? `Review ${review.name} replacement`
@@ -313,12 +319,15 @@ export default function PowerAgreements({
         onExited={() => restore.current?.focus()}
         actions={
           <>
-            <Button onClick={close}>Back</Button>
+            <Button onClick={close} disabled={accepting}>
+              Back
+            </Button>
             {review && (
               <Button
                 variant="contained"
-                onClick={() => {
-                  if (!review) return;
+                disabled={accepting}
+                onClick={async () => {
+                  if (!review || accepting) return;
                   const fresh = powerAgreementQuote(
                     game,
                     review.id,
@@ -326,30 +335,70 @@ export default function PowerAgreements({
                     review.durationYears,
                   );
                   if (fresh?.quoteKey !== review.quoteKey) {
-                    close();
-                    dispatch(
-                      snackbarOpen(
-                        "Agreement terms changed; review the replacement again.",
-                      ),
+                    if (fresh) setReview(fresh);
+                    setAcceptanceError(
+                      "Agreement terms changed; review the replacement again.",
                     );
                     return;
                   }
-                  dispatch(
-                    acceptPowerAgreement({
-                      blockId: review.id,
-                      quoteKey: review.quoteKey,
-                      durationYears: review.durationYears,
-                    }),
-                  );
-                  restore.current = document.getElementById(
-                    `intertie-disclosure-${line.id}`,
-                  );
-                  close();
-                  dispatch(
-                    snackbarOpen(
-                      `Agreement accepted; delivery starts ${agreementDate(review.receipt.startMinute)}`,
-                    ),
-                  );
+                  setAccepting(true);
+                  setAcceptanceError(undefined);
+                  const payload = {
+                    blockId: review.id,
+                    quoteKey: review.quoteKey,
+                    durationYears: review.durationYears,
+                  };
+                  try {
+                    if (game.multiplayer) {
+                      const multiplayer = multiplayerRuntime();
+                      if (!multiplayer)
+                        throw new Error(
+                          "The shared game is unavailable. Try again.",
+                        );
+                      await multiplayer.submit({
+                        kind: "action",
+                        name: "acceptPowerAgreement",
+                        payload,
+                      });
+                    } else dispatch(acceptPowerAgreement(payload));
+                    const receipt = dispatch((_dispatch, getState) =>
+                      getState().game.transmission?.acceptedAgreements?.find(
+                        (entry) =>
+                          entry.blockId === review.id &&
+                          entry.cycle === review.receipt.cycle,
+                      ),
+                    );
+                    if (!receipt)
+                      throw new Error(
+                        "Agreement terms changed; review the replacement again.",
+                      );
+                    restore.current = document.getElementById(
+                      `intertie-disclosure-${line.id}`,
+                    );
+                    close();
+                    dispatch(
+                      snackbarOpen(
+                        `Agreement accepted; delivery starts ${agreementDate(receipt.startMinute)}`,
+                      ),
+                    );
+                  } catch (error) {
+                    const updated = dispatch((_dispatch, getState) =>
+                      powerAgreementQuote(
+                        getState().game,
+                        review.id,
+                        3,
+                        review.durationYears,
+                      ),
+                    );
+                    if (updated) setReview(updated);
+                    setAcceptanceError(
+                      error instanceof Error
+                        ? error.message
+                        : "Agreement could not be accepted. Try again.",
+                    );
+                  } finally {
+                    setAccepting(false);
+                  }
                 }}
               >
                 Accept agreement
@@ -358,6 +407,11 @@ export default function PowerAgreements({
           </>
         }
       >
+        {acceptanceError && (
+          <Typography role="alert" color="error">
+            {acceptanceError}
+          </Typography>
+        )}
         {expiredAssessment ? (
           <RecordedAgreementHistory
             startMinute={assessment?.startMinute}
@@ -374,6 +428,7 @@ export default function PowerAgreements({
                     Duration <strong>{years(review.durationYears)}</strong>
                   </Typography>
                   <Slider
+                    disabled={accepting}
                     className="constructionCapacitySlider"
                     aria-labelledby={durationLabelId}
                     value={review.durationYears}

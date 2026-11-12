@@ -1,7 +1,14 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { Provider } from "react-redux";
-import type { PowerAgreementTermsVersion } from "../../Types";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { Provider, useSelector } from "react-redux";
+import type { GameType, PowerAgreementTermsVersion } from "../../Types";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { formatNumber } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
@@ -13,7 +20,18 @@ import {
   adjacentMarketPricePerMWh,
   intertieContextForGame,
 } from "../../helpers/Transmission";
-import { acceptPowerAgreement } from "../../reducers/GameActions";
+import {
+  acceptPowerAgreement,
+  multiplayerSnapshot,
+} from "../../reducers/GameActions";
+import gameReducer from "../../reducers/Game";
+import cardReducer from "../../reducers/Card";
+import settingsReducer from "../../reducers/Settings";
+import userReducer from "../../reducers/User";
+import {
+  multiplayerMiddleware,
+  registerMultiplayerRuntime,
+} from "../../multiplayer/Registry";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import PowerAgreements, { agreementSummary } from "./PowerAgreements";
@@ -21,6 +39,7 @@ import { useAgreementForecast } from "./useAgreementForecast";
 
 jest.mock("./useAgreementForecast");
 const mockForecast = jest.mocked(useAgreementForecast);
+afterEach(() => registerMultiplayerRuntime(undefined));
 beforeEach(() =>
   mockForecast.mockReturnValue({
     blocked: undefined,
@@ -46,15 +65,27 @@ function fixture() {
 function mount(game = fixture()) {
   const line = game.transmission!.lines[0];
   const store = configureStore({
-    reducer: { game: () => game, ui: uiReducer },
+    reducer: {
+      game: gameReducer,
+      ui: uiReducer,
+      card: cardReducer,
+      settings: settingsReducer,
+      user: userReducer,
+    },
+    preloadedState: { game },
+    middleware: (getDefault) => getDefault().concat(multiplayerMiddleware),
   });
   const dispatch = jest.spyOn(store, "dispatch");
+  function ConnectedAgreements() {
+    const state = useSelector((state: { game: GameType }) => state.game);
+    return <PowerAgreements game={state} line={state.transmission!.lines[0]} />;
+  }
   render(
     <Provider store={store}>
-      <PowerAgreements game={game} line={line} />
+      <ConnectedAgreements />
     </Provider>,
   );
-  return { game, line, dispatch };
+  return { game, line, dispatch, store };
 }
 function review(temperatureC = 20) {
   const game = fixture();
@@ -135,7 +166,7 @@ it.each([20, -40])(
 );
 
 it("changes price and end date with duration and signs that exact canonical quote", () => {
-  const { game, dialog, quote, dispatch } = review();
+  const { game, dialog, quote, dispatch, store } = review();
   const slider = within(dialog).getByRole("slider", { name: /^Duration/ });
   expect(slider).toHaveAttribute("min", "1");
   expect(slider).toHaveAttribute("max", "10");
@@ -149,7 +180,7 @@ it("changes price and end date with duration and signs that exact canonical quot
     within(dialog).getByRole("row", { name: /Duration/ }),
   ).toHaveTextContent("1 yearEnds Dec 2020");
   expect(mockForecast).toHaveBeenLastCalledWith(
-    game,
+    store.getState().game,
     `${short.id}:0`,
     short.receipt,
     true,
@@ -169,6 +200,161 @@ it("changes price and end date with duration and signs that exact canonical quot
       durationYears: 5,
     }),
   );
+});
+
+function sharedReview() {
+  const game = fixture();
+  game.multiplayer = { seat: "self" };
+  const submit = jest.fn<Promise<void>, [unknown]>();
+  registerMultiplayerRuntime({
+    command: jest.fn(),
+    submit,
+    activity: jest.fn(),
+    leave: jest.fn(),
+  });
+  const mounted = mount(game);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review Québec hydro replacement" }),
+  );
+  const dialog = screen.getByRole("dialog");
+  const accept = within(dialog).getByRole("button", {
+    name: "Accept agreement",
+  });
+  return { ...mounted, submit, dialog, accept };
+}
+
+it("keeps co-op acceptance pending until the host records and acknowledges the agreement", async () => {
+  const { game, store, submit, dialog, accept } = sharedReview();
+  let acknowledge!: () => void;
+  submit.mockReturnValue(
+    new Promise<void>((resolve) => {
+      acknowledge = resolve;
+    }),
+  );
+  const quote = powerAgreementQuote(game, "champlain-quebec")!;
+  fireEvent.click(accept);
+  expect(dialog).toBeVisible();
+  expect(store.getState().ui.snackbar.message).not.toMatch(
+    /Agreement accepted/,
+  );
+  expect(submit).toHaveBeenCalledWith({
+    kind: "action",
+    name: "acceptPowerAgreement",
+    payload: {
+      blockId: quote.id,
+      quoteKey: quote.quoteKey,
+      durationYears: quote.durationYears,
+    },
+  });
+  expect(accept).toBeDisabled();
+  expect(within(dialog).getByRole("slider")).toBeDisabled();
+  expect(
+    store.getState().game.transmission!.acceptedAgreements ?? [],
+  ).toHaveLength(0);
+  act(() => {
+    store.dispatch(
+      multiplayerSnapshot(
+        gameReducer(
+          store.getState().game,
+          acceptPowerAgreement({
+            blockId: quote.id,
+            quoteKey: quote.quoteKey,
+            durationYears: quote.durationYears,
+          }),
+        ),
+      ),
+    );
+  });
+  expect(dialog).toBeVisible();
+  expect(store.getState().ui.snackbar.message).not.toMatch(
+    /Agreement accepted/,
+  );
+  await act(async () => acknowledge());
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(store.getState().ui.snackbar.message).toMatch(/Agreement accepted/);
+  expect(store.getState().game.transmission!.acceptedAgreements).toHaveLength(
+    1,
+  );
+});
+
+it("does not report success for a co-op acknowledgement without a recorded agreement", async () => {
+  const { store, submit, dialog, accept } = sharedReview();
+  submit.mockResolvedValue(undefined);
+  fireEvent.click(accept);
+  await waitFor(() =>
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      /Agreement terms changed/,
+    ),
+  );
+  expect(dialog).toBeVisible();
+  expect(accept).toBeEnabled();
+  expect(store.getState().ui.snackbar.message).not.toMatch(
+    /Agreement accepted/,
+  );
+});
+
+it("keeps a rejected co-op quote recoverable and submits the refreshed host terms on retry", async () => {
+  const { game, store, submit, dialog, accept } = sharedReview();
+  let reject!: (error: Error) => void;
+  submit.mockReturnValueOnce(
+    new Promise<void>((_resolve, fail) => {
+      reject = fail;
+    }),
+  );
+  fireEvent.click(accept);
+  const host = {
+    ...game,
+    timeline: game.timeline.map((tick) => ({ ...tick, temperatureC: -40 })),
+  };
+  const fresh = powerAgreementQuote(host, "champlain-quebec")!;
+  expect(fresh.quoteKey).not.toBe(
+    powerAgreementQuote(game, "champlain-quebec")!.quoteKey,
+  );
+  await act(async () => {
+    store.dispatch(multiplayerSnapshot(host));
+    reject(new Error("This agreement quote has changed. Review it again."));
+  });
+  expect(dialog).toBeVisible();
+  expect(within(dialog).getByRole("alert")).toHaveTextContent(
+    /quote has changed/,
+  );
+  expect(accept).toBeEnabled();
+  expect(
+    within(dialog).getByRole("row", { name: /Agreement price/ }),
+  ).toHaveTextContent(rate(fresh.priceToday));
+  expect(store.getState().ui.snackbar.message).not.toMatch(
+    /Agreement accepted/,
+  );
+  submit.mockImplementationOnce(async () => {
+    store.dispatch(
+      multiplayerSnapshot(
+        gameReducer(
+          store.getState().game,
+          acceptPowerAgreement({
+            blockId: fresh.id,
+            quoteKey: fresh.quoteKey,
+            durationYears: fresh.durationYears,
+          }),
+        ),
+      ),
+    );
+  });
+  fireEvent.click(accept);
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(submit).toHaveBeenLastCalledWith({
+    kind: "action",
+    name: "acceptPowerAgreement",
+    payload: {
+      blockId: fresh.id,
+      quoteKey: fresh.quoteKey,
+      durationYears: fresh.durationYears,
+    },
+  });
+  expect(store.getState().ui.snackbar.message).toMatch(/Agreement accepted/);
 });
 
 it.each([1, 2, 3] as PowerAgreementTermsVersion[])(

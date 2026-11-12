@@ -47,8 +47,6 @@ export function useAgreementForecast(
     error?: boolean;
     updating?: boolean;
   }>();
-  const latest = React.useRef({ game, agreementId, offer });
-  latest.current = { game, agreementId, offer };
   const cache = React.useRef(new Map<string, AgreementForecast>());
   React.useEffect(() => {
     const id = ++requestId.current;
@@ -105,8 +103,9 @@ export function useAgreementForecast(
         kind: "agreement",
         requestId: id,
         cacheEpoch: epoch,
-        ...latest.current,
-        game: forecastWorkerSnapshot(latest.current.game),
+        agreementId,
+        offer,
+        game: forecastWorkerSnapshot(game),
       });
     } catch (_error) {
       fail();
@@ -116,6 +115,8 @@ export function useAgreementForecast(
       cancelled = true;
       stop();
     };
+    // The key includes the game inputs, agreement and offer that invalidate this forecast.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, retry, epoch, committed]);
   return {
     blocked,
