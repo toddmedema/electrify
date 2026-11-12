@@ -176,6 +176,7 @@ test("idle paused workers send small host pulses, suppress unchanged views, and 
       epoch: "epoch",
     });
     expect(roomView).toHaveBeenCalledTimes(2);
+    await send({ kind: "views-applied" });
     jest.advanceTimersByTime(11000);
     expect(roomView).toHaveBeenCalledTimes(2);
     expect(
@@ -196,6 +197,7 @@ test("idle paused workers send small host pulses, suppress unchanged views, and 
     ).toHaveLength(2);
     await send({ kind: "checkpoint" });
     expect(roomView).toHaveBeenCalledTimes(4);
+    await send({ kind: "views-applied" });
     applyCommand.mockImplementation((target: World) => {
       target.revision++;
     });
@@ -383,6 +385,7 @@ test("a command that throws mid-match stops the shared clock for everyone and re
       epoch: "epoch",
     });
     post.mockClear();
+    await send({ kind: "views-applied" });
     await send(command(1));
     expect(post).toHaveBeenCalledWith({
       kind: "error",
@@ -475,6 +478,141 @@ test("local shell summaries follow an active company's calendar after P1 retires
         ],
       }),
     });
+  } finally {
+    jest.clearAllTimers();
+    post.mockRestore();
+    scope.onmessage = previousMessage;
+    jest.useRealTimers();
+  }
+});
+
+test("a slow shell bounds cloned views while ticks, receipts, checkpoints and safety stops continue", async () => {
+  jest.useFakeTimers();
+  const scope = globalThis as unknown as Worker;
+  const previousMessage = scope.onmessage;
+  const post = jest.spyOn(scope, "postMessage").mockImplementation(() => {});
+  const { createWorld, roomView, applyCommand, stepWorld } = jest.requireMock(
+    "../multiplayer/World",
+  );
+  const world = {
+    matchId: "match",
+    epoch: "epoch",
+    revision: 0,
+    speed: "FAST",
+    paused: false,
+    reason: "",
+    outcomes: {},
+    seats: [{ id: "host" }, { id: "guest" }],
+  } as World;
+  createWorld.mockReturnValue(world);
+  roomView.mockImplementation((value: World) => ({
+    revision: value.revision,
+    speed: value.speed,
+    reason: value.reason,
+  }));
+  stepWorld.mockImplementation((value: World) => {
+    if (!value.paused) value.revision++;
+  });
+  applyCommand.mockImplementation((value: World, sender: string) => {
+    if (sender === "guest") return "Not enough cash";
+    value.revision++;
+    value.speed = "SLOW";
+  });
+  try {
+    require("./Multiplayer.worker");
+    const send = async (data: WorkerRequest) =>
+      scope.onmessage!({ data } as MessageEvent<WorkerRequest>);
+    await send({
+      kind: "create",
+      spec: { scenarioId: 101, difficulty: "Employee" },
+      seats: [
+        { id: "host", name: "Host" },
+        { id: "guest", name: "Guest" },
+      ],
+      matchId: "match",
+      epoch: "epoch",
+    });
+    // Leave the first bundle outstanding while the real worker scheduler keeps ticking.
+    jest.advanceTimersByTime(1000);
+    expect(world.revision).toBeGreaterThan(1);
+    expect(roomView).toHaveBeenCalledTimes(2);
+    expect(
+      post.mock.calls.filter(([event]) => event.kind === "views"),
+    ).toHaveLength(1);
+    expect(post).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "keepalive" }),
+    );
+    await send({ kind: "heartbeat" });
+    for (const sender of ["host", "guest"])
+      await send({
+        kind: "command",
+        sender,
+        envelope: {
+          matchId: "match",
+          epoch: "epoch",
+          sequence: 1,
+          command: { kind: "speed", speed: "SLOW" },
+        },
+      });
+    await send({ kind: "disconnect", sender: "guest" });
+    await send({ kind: "checkpoint", requestId: "save" });
+    expect(post).toHaveBeenCalledWith({
+      kind: "checkpoint",
+      world,
+      requestId: "save",
+    });
+    expect(roomView).toHaveBeenCalledTimes(2);
+    await send({ kind: "views-applied" });
+    expect(roomView).toHaveBeenCalledTimes(4);
+    expect(post).toHaveBeenLastCalledWith({
+      kind: "views",
+      views: {
+        host: {
+          revision: world.revision,
+          speed: "PAUSED",
+          reason: "A player disconnected. Reconnect before resuming.",
+          receipt: { sequence: 1, error: undefined },
+        },
+        guest: {
+          revision: world.revision,
+          speed: "PAUSED",
+          reason: "A player disconnected. Reconnect before resuming.",
+          receipt: { sequence: 1, error: "Not enough cash" },
+        },
+      },
+    });
+    // The fault path stops timers, but consuming its predecessor must still publish the stop.
+    applyCommand.mockImplementation(() => {
+      throw new Error("Reducer failed");
+    });
+    await send({
+      kind: "command",
+      sender: "host",
+      envelope: {
+        matchId: "match",
+        epoch: "epoch",
+        sequence: 2,
+        command: { kind: "speed", speed: "FAST" },
+      },
+    });
+    expect(roomView).toHaveBeenCalledTimes(4);
+    await send({ kind: "views-applied" });
+    expect(post).toHaveBeenLastCalledWith({
+      kind: "views",
+      views: {
+        host: expect.objectContaining({
+          speed: "PAUSED",
+          reason: expect.stringMatching(/simulation stopped/),
+        }),
+        guest: expect.objectContaining({
+          speed: "PAUSED",
+          reason: expect.stringMatching(/simulation stopped/),
+        }),
+      },
+    });
+    await send({ kind: "views-applied" });
+    await send({ kind: "views-applied" });
+    expect(roomView).toHaveBeenCalledTimes(6);
   } finally {
     jest.clearAllTimers();
     post.mockRestore();
