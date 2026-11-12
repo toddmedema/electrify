@@ -427,9 +427,10 @@ for (const theme of ["light", "dark"] as const) {
         ),
       ).toBeLessThanOrEqual(1);
     }
+    // The inherited regional connections remain external market access after acquisition.
     await expect(
-      facilities.getByRole("combobox", { name: "Buying", exact: true }),
-    ).toHaveCount(0);
+      facilities.getByRole("combobox", { name: "Market buying", exact: true }),
+    ).toBeVisible();
     // Acquired plants and customers use the ordinary shared company controls.
     await openBuild(page);
     await page.getByRole("tab", { name: "Generators", exact: true }).click();

@@ -37,6 +37,36 @@ for (const theme of ["light", "dark"] as const) {
         (entry) => entry.corridorId === "vt-champlain-regional",
       ),
     ).toMatchObject({ capacityW: 300e6, buildCost: 0, yearsToBuildLeft: 0 });
+    const openingInspect = line.getByRole("button", {
+      name: /^Inspect Champlain regional connection/,
+    });
+    await openingInspect.click();
+    await expect(
+      line.getByText("Market price now", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      line.getByText("Market emissions (CO₂e)", { exact: true }),
+    ).toBeVisible();
+    const marketBuying = facilities.getByRole("combobox", {
+      name: "Market buying",
+      exact: true,
+    });
+    await marketBuying.click();
+    await page.getByRole("option", { name: "None", exact: true }).click();
+    await expect(line).toContainText(
+      "Market buying is off. Existing agreements continue.",
+    );
+    await expect(line).not.toContainText("Flow limited by: Trading rule");
+    const contractedOnly = await readSavedGame(page);
+    const current = contractedOnly!.timeline.find(
+      (tick) => tick.minute === contractedOnly!.date.minute,
+    )!;
+    expect(current.importedW).toBeGreaterThan(0);
+    expect(current.importedW).toBe(current.entitlementImportedW);
+    await marketBuying.click();
+    await page
+      .getByRole("option", { name: "Shortages only", exact: true })
+      .click();
     await editSavedGame(page, ({ game }) => {
       // A paused continuation fixture enters the authored 24-month offer window. Historic
       // readings remain untouched; the continuation owner recalculates future prices/supply.

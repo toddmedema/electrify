@@ -83,3 +83,10 @@ with inflation and market indexing. It does not establish the game's $65 quote.
 distinguishes physical interconnection capacity from agreement energy. The game's
 five-year regional bridge and delivered-energy simplifications are authored
 choices, not historical offers or claims of absolutely firm nuclear output.
+
+The [2011 Seabrook announcement](https://newsroom.nexteraenergy.com/Green-Mountain-Power-Strikes-Long-Term-Low-Cost-Power-Deal-With-NextEra-Energy-Resources?l=12)
+describes a 23-year agreement with inflation adjustment and changing delivery
+volumes. [VEC's 2021 audited accounts](https://vermontelectric.coop/client_media/files/FINAL_Financial_Audit_Report_for_2021.pdf)
+describe both a twenty-year nuclear contract and a four-year shortfall purchase.
+These support offering long-term supply and shorter bridge products; they do not
+establish the game's replacement prices or its simplified payment terms.

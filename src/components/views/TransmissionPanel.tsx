@@ -236,11 +236,17 @@ function IntertieYear({
   );
 }
 
-function PriceMetric({ outlook }: { outlook: IntertieOutlook }) {
+function PriceMetric({
+  outlook,
+  marketOnly = false,
+}: {
+  outlook: IntertieOutlook;
+  marketOnly?: boolean;
+}) {
   const periods = pricePeriodCaption(outlook);
   return (
     <div className="facilityStat">
-      <dt>Typical price</dt>
+      <dt>{marketOnly ? "Typical market price" : "Typical price"}</dt>
       <dd className="facilityStatValue">
         {priceRange(outlook)}
         {periods && <span className="facilityStatNote">{periods}</span>}
@@ -609,14 +615,19 @@ function TradingControls({
   const state = game.transmission;
   const id = React.useId();
   if (!state?.lines.length || !hasTradingConnection(game)) return null;
+  const buyingLabel = state.lines.some(({ corridorId }) =>
+    inheritedUtilityForCorridor(corridorId),
+  )
+    ? "Market buying"
+    : "Buying";
   return (
     <div className="tradingControls">
       <div className="tradingRuleFields">
         <FormControl fullWidth size="small" className="buyingRule">
-          <InputLabel id={`${id}-buying`}>Buying</InputLabel>
+          <InputLabel id={`${id}-buying`}>{buyingLabel}</InputLabel>
           <Select
             labelId={`${id}-buying`}
-            label="Buying"
+            label={buyingLabel}
             value={state.buyingRule}
             onChange={(event) =>
               onBuyingRule(event.target.value as BuyingRuleType)
@@ -1212,12 +1223,16 @@ export default function TransmissionPanel({
                                   {!building && now && !utilityOwned && (
                                     <>
                                       <div className="facilityStat">
-                                        <dt>Price now</dt>
+                                        <dt>
+                                          {inherited
+                                            ? "Market price now"
+                                            : "Price now"}
+                                        </dt>
                                         <dd className="facilityStatValue">
                                           {formatMoneyConcise(
-                                            game.multiplayer
-                                              ? (game.multiplayer.pricePerMWh ??
-                                                  0)
+                                            peer
+                                              ? (game.multiplayer
+                                                  ?.pricePerMWh ?? 0)
                                               : adjacentMarketPricePerMWh(
                                                   line.corridorId,
                                                   intertieContext,
@@ -1229,7 +1244,11 @@ export default function TransmissionPanel({
                                         </dd>
                                       </div>
                                       <div className="facilityStat">
-                                        <dt>Import available now</dt>
+                                        <dt>
+                                          {inherited
+                                            ? "Market imports available"
+                                            : "Import available now"}
+                                        </dt>
                                         <dd className="facilityStatValue">
                                           {formatWatts(importableW)}
                                         </dd>
@@ -1238,7 +1257,11 @@ export default function TransmissionPanel({
                                   )}
                                   {market && !utilityOwned && (
                                     <div className="facilityStat">
-                                      <dt>Emissions (CO₂e)</dt>
+                                      <dt>
+                                        {inherited
+                                          ? "Market emissions (CO₂e)"
+                                          : "Emissions (CO₂e)"}
+                                      </dt>
                                       <dd className="facilityStatValue">
                                         {formatMass(
                                           importEmissionsKgco2ePerMWh(
@@ -1268,7 +1291,12 @@ export default function TransmissionPanel({
                                       </dd>
                                     </div>
                                   )}
-                                  {outlook && <PriceMetric outlook={outlook} />}
+                                  {outlook && (
+                                    <PriceMetric
+                                      outlook={outlook}
+                                      marketOnly={!!inherited}
+                                    />
+                                  )}
                                   {line.loanAmountLeft > 0 && (
                                     <div className="facilityStat">
                                       <dt>Loan balance</dt>
@@ -1286,49 +1314,65 @@ export default function TransmissionPanel({
                                       variant="body2"
                                       color="textSecondary"
                                     >
+                                      {inherited && "Market availability: "}
                                       {outlook.archetype.summary}
                                     </Typography>
                                   </div>
                                 )}
-                                {!building && now && !utilityOwned && (
-                                  <Typography
-                                    variant="body2"
-                                    color="textSecondary"
-                                  >
-                                    Flow limited by:{" "}
-                                    {game.multiplayer
-                                      ? "Player generation, demand, and shared line capacity"
-                                      : line.paused
-                                        ? "Paused"
-                                        : (state.buyingRule === "NONE" &&
-                                              flowW >= 0) ||
-                                            (state.sellingRule === "NONE" &&
-                                              flowW < 0)
-                                          ? "Trading rule"
-                                          : flowW < 0
-                                            ? Math.abs(flowW) >=
-                                              capacities.exportCapacityW - 1
-                                              ? "Export capacity"
-                                              : Math.abs(flowW) >= rating - 1
-                                                ? "Weather"
-                                                : "Local surplus"
-                                            : Math.abs(flowW) < importableW - 1
-                                              ? "Local demand or trading rule"
-                                              : neighborImportSupplyW(
-                                                    line.corridorId,
-                                                    intertieContext,
-                                                    now.minute,
-                                                    now,
-                                                    line.capacityW,
-                                                  ) < rating
-                                                ? "Neighbor supply"
-                                                : rating <
-                                                    capacities.importCapacityW
+                                {inherited &&
+                                  !line.paused &&
+                                  state.buyingRule === "NONE" && (
+                                    <Typography
+                                      variant="body2"
+                                      color="textSecondary"
+                                    >
+                                      Market buying is off. Existing agreements
+                                      continue.
+                                    </Typography>
+                                  )}
+                                {!building &&
+                                  now &&
+                                  !utilityOwned &&
+                                  !inherited && (
+                                    <Typography
+                                      variant="body2"
+                                      color="textSecondary"
+                                    >
+                                      Flow limited by:{" "}
+                                      {game.multiplayer
+                                        ? "Player generation, demand, and shared line capacity"
+                                        : line.paused
+                                          ? "Paused"
+                                          : (state.buyingRule === "NONE" &&
+                                                flowW >= 0) ||
+                                              (state.sellingRule === "NONE" &&
+                                                flowW < 0)
+                                            ? "Trading rule"
+                                            : flowW < 0
+                                              ? Math.abs(flowW) >=
+                                                capacities.exportCapacityW - 1
+                                                ? "Export capacity"
+                                                : Math.abs(flowW) >= rating - 1
                                                   ? "Weather"
-                                                  : "Import capacity"}
-                                    .
-                                  </Typography>
-                                )}
+                                                  : "Local surplus"
+                                              : Math.abs(flowW) <
+                                                  importableW - 1
+                                                ? "Local demand or trading rule"
+                                                : neighborImportSupplyW(
+                                                      line.corridorId,
+                                                      intertieContext,
+                                                      now.minute,
+                                                      now,
+                                                      line.capacityW,
+                                                    ) < rating
+                                                  ? "Neighbor supply"
+                                                  : rating <
+                                                      capacities.importCapacityW
+                                                    ? "Weather"
+                                                    : "Import capacity"}
+                                      .
+                                    </Typography>
+                                  )}
                                 {outlook && !inherited && (
                                   <IntertieYear outlook={outlook} />
                                 )}
