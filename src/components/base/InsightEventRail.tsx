@@ -13,10 +13,21 @@ interface Props {
   activeKey?: string;
   onActiveChange: (key?: string) => void;
   onZoom: (event: UpcomingStoryEventType) => void;
+  /** False for a rail hidden under another that shows the same events' details. */
+  showDetails?: boolean;
+  /** Open details in place instead of on the page, so a dialog's focus trap keeps them. */
+  disablePortal?: boolean;
 }
 
 export default function InsightEventRail(props: Props): React.JSX.Element {
-  const { events, activeKey, onActiveChange, onZoom } = props;
+  const {
+    events,
+    activeKey,
+    onActiveChange,
+    onZoom,
+    showDetails = true,
+    disablePortal = false,
+  } = props;
   const selected = events.find((event) => event.key === activeKey);
   const chips = React.useRef(new Map<string, HTMLButtonElement>());
   const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
@@ -40,8 +51,10 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
       className="insightEventRail"
       aria-label="Upcoming scenario events"
       onKeyDown={(keyEvent) => {
-        if (keyEvent.key === "Escape" && selected) {
+        if (keyEvent.key === "Escape" && selected && showDetails) {
           keyEvent.preventDefault();
+          // Closes the details only, not a full-screen chart this rail sits in
+          keyEvent.stopPropagation();
           closeDetails(true);
         }
       }}
@@ -66,8 +79,8 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
                 type="button"
                 className={`insightEventChip${open ? " active" : ""}`}
                 aria-label={`${event.label}: ${title}`}
-                aria-expanded={open}
-                aria-controls={open ? detailsId : undefined}
+                aria-expanded={open && showDetails}
+                aria-controls={open && showDetails ? detailsId : undefined}
                 aria-haspopup="dialog"
                 title={`${event.label}: ${title}`}
                 onClick={(clickEvent) => {
@@ -92,9 +105,10 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
         })}
       </ol>
       <Popper
-        open={!!selected && !!anchor}
+        open={showDetails && !!selected && !!anchor}
         anchorEl={anchor}
         placement="bottom-start"
+        disablePortal={disablePortal}
         className="insightEventPopover"
       >
         {selected && (

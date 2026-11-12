@@ -164,8 +164,8 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "Start game", exact: true })
         .click();
       await expect
-        .poll(async () => Boolean(await readSavedGame(page)))
-        .toBe(true);
+        .poll(async () => (await readSavedGame(page))?.scenarioId)
+        .toBe(108);
       await editSavedGame(page, (save) => {
         const game = save.game;
         game.speed = "PAUSED";

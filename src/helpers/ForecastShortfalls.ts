@@ -13,6 +13,16 @@ interface Shortfall {
   end: number;
 }
 
+/**
+ * The minute of the first simulated hour where demand outruns supply, or undefined when the
+ * forecast never falls short. The forecast begins at the current date, so this is never in the past.
+ */
+export function firstShortfallMinute(
+  timeline: readonly PowerSample[],
+): number | undefined {
+  return timeline.find((tick) => tick.demandW > tick.supplyW)?.minute;
+}
+
 /** Monthly-equivalent energy, not the duration of a real continuous outage. */
 export function forecastShortfalls(
   timeline: readonly PowerSample[],

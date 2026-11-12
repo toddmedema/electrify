@@ -4,6 +4,8 @@ export interface ChartEventMarker {
   key: string;
   x: number;
   number: number;
+  /** The event's name, shown when a badge is hovered. */
+  title?: string;
 }
 
 export interface ChartAnnotationsValue {

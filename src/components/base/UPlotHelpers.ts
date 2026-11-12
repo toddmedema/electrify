@@ -881,12 +881,74 @@ export function patternFill(
   };
 }
 
+const HOVER_POINT_SIZE = 10;
+const HOVER_POINT_RING = 2;
+
+/**
+ * A dot on each plotted line where the hover crosshair crosses it, in the line's own colour and
+ * ringed in the chart surface so it reads over a neighbouring line. Filled areas have no line to
+ * mark. A stroke the colour of the surface is a separator between stacked areas, not a line.
+ * Where a line has no value at the hovered x, uPlot parks its dot off the plot.
+ */
+export function hoverPoints(): uPlot.Cursor.Points {
+  const lineColor = (plot: uPlot, seriesIndex: number): string | undefined => {
+    const series = plot.series[seriesIndex] as uPlot.Series & {
+      _stroke?: unknown;
+    };
+    const stroke = series.stroke;
+    const color =
+      series._stroke ??
+      (typeof stroke === "function" ? stroke(plot, seriesIndex) : stroke);
+    return typeof color === "string" && color !== chartPalette().background
+      ? color
+      : undefined;
+  };
+  return {
+    show: (plot, seriesIndex) => {
+      const dot = document.createElement("div");
+      dot.style.borderWidth = `${HOVER_POINT_RING}px`;
+      // Nothing to mark on a series with no line of its own
+      dot.hidden = !lineColor(plot, seriesIndex);
+      return dot;
+    },
+    size: HOVER_POINT_SIZE,
+    fill: (plot, seriesIndex) => lineColor(plot, seriesIndex) ?? "transparent",
+    stroke: () => chartPalette().background,
+  };
+}
+
+const EVENT_TOOLTIP_GAP = 6;
+// Pointer slop around a badge, in CSS pixels, so a small target is not a precision exercise
+const EVENT_BADGE_SLOP = 3;
+
+interface EventBadgeHit {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  text: string;
+}
+
+/**
+ * What hovering a badge says: the one event's name, or for a merged badge each event on its own
+ * line behind its number, matching the rail below the toolbar.
+ */
+export function eventBadgeText(events: ChartEventMarker[]): string {
+  const name = (event: ChartEventMarker) => event.title || "Scenario event";
+  return events.length === 1
+    ? name(events[0])
+    : events.map((event) => `${event.number}. ${name(event)}`).join("\n");
+}
+
 /** Scenario-event onset markers shared by the stacked Insight charts. */
 export function eventMarkersPlugin(
   getMarkers: () => ChartEventMarker[],
   getActiveKey: () => string | undefined,
   fontScale = 1,
 ): uPlot.Plugin {
+  // Where each badge sits on the canvas, in CSS pixels from the plot's top left, as last drawn.
+  let hits: EventBadgeHit[] = [];
+  let teardown: (() => void) | undefined;
   return {
     opts: (_plot, options) => {
       const padding: uPlot.Padding = options.padding
@@ -907,7 +969,53 @@ export function eventMarkersPlugin(
       options.padding = padding;
     },
     hooks: {
+      init: (u: uPlot) => {
+        // The badges are canvas pixels above the plot, outside uPlot's own pointer surface, so
+        // their tooltip listens on the plot's wrapper, which is the plot's coordinate space.
+        const wrap = u.over.parentElement!;
+        const tooltip = document.createElement("div");
+        tooltip.className = "chartEventTooltip";
+        tooltip.setAttribute("aria-hidden", "true");
+        wrap.appendChild(tooltip);
+        const hide = () => {
+          tooltip.style.display = "none";
+        };
+        const inspect = (event: MouseEvent) => {
+          const bounds = wrap.getBoundingClientRect();
+          const x = event.clientX - bounds.left;
+          const y = event.clientY - bounds.top;
+          const hit = hits.find(
+            (badge) =>
+              x >= badge.left - EVENT_BADGE_SLOP &&
+              x <= badge.right + EVENT_BADGE_SLOP &&
+              y >= badge.top - EVENT_BADGE_SLOP &&
+              y <= badge.bottom + EVENT_BADGE_SLOP,
+          );
+          if (!hit) {
+            hide();
+            return;
+          }
+          tooltip.textContent = hit.text;
+          tooltip.style.display = "block";
+          tooltip.style.maxWidth = `${wrap.clientWidth}px`;
+          const center = (hit.left + hit.right) / 2;
+          tooltip.style.left = `${Math.max(0, Math.min(wrap.clientWidth - tooltip.offsetWidth, center - tooltip.offsetWidth / 2))}px`;
+          tooltip.style.top = `${hit.bottom + EVENT_TOOLTIP_GAP}px`;
+        };
+        wrap.addEventListener("mousemove", inspect);
+        wrap.addEventListener("mouseleave", hide);
+        teardown = () => {
+          wrap.removeEventListener("mousemove", inspect);
+          wrap.removeEventListener("mouseleave", hide);
+          tooltip.remove();
+        };
+      },
+      destroy: () => {
+        teardown?.();
+        teardown = undefined;
+      },
       draw: (u: uPlot) => {
+        hits = [];
         const domainMin = u.scales.x.min;
         const domainMax = u.scales.x.max;
         const markers = getMarkers().filter(
@@ -1018,6 +1126,13 @@ export function eventMarkersPlugin(
           u.ctx.textAlign = "center";
           u.ctx.textBaseline = "middle";
           u.ctx.fillText(group.label, group.x, badgeY);
+          hits.push({
+            left: (group.x - group.width / 2) / uPlot.pxRatio,
+            top: (badgeY - radius) / uPlot.pxRatio,
+            right: (group.x + group.width / 2) / uPlot.pxRatio,
+            bottom: (badgeY + radius) / uPlot.pxRatio,
+            text: eventBadgeText(group.events),
+          });
         }
         u.ctx.restore();
       },

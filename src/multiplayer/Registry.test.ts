@@ -21,7 +21,7 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-function fixture(applicationForeground = false) {
+function fixture() {
   jest.useFakeTimers();
   const initial = store.getState();
   const local = configureStore({
@@ -37,9 +37,6 @@ function fixture(applicationForeground = false) {
       ),
   });
   const runtime = {
-    foregroundMode: applicationForeground
-      ? ("application" as const)
-      : undefined,
     command: jest.fn(),
     submit: jest.fn(),
     activity: jest.fn(),
@@ -65,19 +62,56 @@ function fixture(applicationForeground = false) {
   return { local, runtime };
 }
 
-test("normal nested dialogs and build navigation keep the shared pause until every local blocker closes", () => {
+test("nested dialogs and reading cards keep the shared pause until every local blocker closes", () => {
   const { local, runtime } = fixture();
-  local.dispatch(navigate("BUILD_GENERATORS"));
-  expect(runtime.activity).toHaveBeenLastCalledWith("Building capacity");
+  local.dispatch(navigate("SETTINGS"));
+  expect(runtime.activity).toHaveBeenLastCalledWith("Reading settings");
   local.dispatch(
     dialogOpen({ open: true, title: "Notice", message: "Read this" }),
   );
   expect(runtime.activity).toHaveBeenLastCalledWith("Reading notification");
   local.dispatch(dialogClose());
-  expect(runtime.activity).toHaveBeenLastCalledWith("Building capacity");
+  expect(runtime.activity).toHaveBeenLastCalledWith("Reading settings");
   local.dispatch(navigate("FACILITIES"));
   expect(runtime.activity).toHaveBeenLastCalledWith(null);
   expect(local.getState().game.multiplayer!.clock!.selectedSpeed).toBe("ULTRA");
+});
+
+test("opening the build menu does not pause the shared clock for anyone", () => {
+  const { local, runtime } = fixture();
+  for (const card of [
+    "BUILD_GENERATORS",
+    "BUILD_STORAGE",
+    "BUILD_INTERTIES",
+  ] as const) {
+    local.dispatch(navigate(card));
+    expect(runtime.activity).toHaveBeenLastCalledWith(null);
+    // The catalog shows the clock the world is running, never a local pause.
+    expect(local.getState().game.speed).toBe("SLOW");
+  }
+  local.dispatch(navigate("FACILITIES"));
+  expect(local.getState().game.speed).toBe("SLOW");
+  // Leaving a reading card for the build menu hands the clock back too.
+  local.dispatch(navigate("SETTINGS"));
+  expect(runtime.activity).toHaveBeenLastCalledWith("Reading settings");
+  local.dispatch(navigate("BUILD_GENERATORS"));
+  expect(runtime.activity).toHaveBeenLastCalledWith(null);
+  expect(local.getState().game.speed).toBe("SLOW");
+  expect(
+    runtime.command.mock.calls.filter(([command]) => command.kind === "speed"),
+  ).toEqual([]);
+});
+
+test("a window sent to the background does not pause the shared clock", () => {
+  const { local, runtime } = fixture();
+  local.dispatch(pageHidden());
+  expect(runtime.activity).toHaveBeenLastCalledWith(null);
+  expect(local.getState().game.speed).toBe("SLOW");
+  local.dispatch(navigate("BUILD_GENERATORS"));
+  expect(runtime.activity).toHaveBeenLastCalledWith(null);
+  local.dispatch(pageVisible());
+  expect(runtime.activity).toHaveBeenLastCalledWith(null);
+  expect(local.getState().game.speed).toBe("SLOW");
 });
 
 test("ordinary economic actions reach the host, and renderer ticks never advance a shared grid", () => {
@@ -115,14 +149,4 @@ test("system sleep submits a persistent shared pause instead of an automatic bac
     kind: "speed",
     speed: "PAUSED",
   });
-});
-
-test("isolated couch seats use the application's foreground gate instead of another seat's DOM focus", () => {
-  const { local, runtime } = fixture(true);
-  local.dispatch(pageHidden());
-  expect(runtime.activity).toHaveBeenLastCalledWith(null);
-  local.dispatch(navigate("BUILD_GENERATORS"));
-  expect(runtime.activity).toHaveBeenLastCalledWith("Building capacity");
-  local.dispatch(pageVisible());
-  expect(runtime.activity).toHaveBeenLastCalledWith("Building capacity");
 });

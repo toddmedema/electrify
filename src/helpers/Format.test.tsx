@@ -5,6 +5,7 @@ import {
   formatWattHoursAxis,
   formatWattHoursOfPeak,
   floorToTwoSignificantDigits,
+  formatReserveLine,
   formatWatts,
   formatWattsAxis,
   formatWattsOfPeak,
@@ -97,6 +98,20 @@ describe("formatWatts", () => {
     expect(formatWattHours(12.4e6, 2)).toEqual("12MWh");
     expect(formatWatts(9.9996e6, 3)).toEqual("10MW");
     expect(formatWatts(7.5e6, 3)).toEqual("7.5MW");
+  });
+});
+
+describe("formatReserveLine", () => {
+  it("labels reserve at or above zero with the given name", () => {
+    expect(formatReserveLine(24e6, "Reserve margin")).toBe(
+      "Reserve margin: 24MW",
+    );
+    expect(formatReserveLine(0, "Lowest reserve")).toBe("Lowest reserve: 0W");
+  });
+
+  it("labels reserve below zero as a shortage and shows its size without a sign", () => {
+    expect(formatReserveLine(-8e6, "Reserve margin")).toBe("Shortage: 8MW");
+    expect(formatReserveLine(-1.5e9, "Lowest reserve")).toBe("Shortage: 1.5GW");
   });
 });
 
