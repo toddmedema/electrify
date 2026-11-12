@@ -74,7 +74,7 @@ it.each(["valley-electric", "ridge-electric"] as const)(
       screen.getByText(Math.round(quote.customers).toLocaleString()),
     ).toBeVisible();
     expect(screen.getByText(/Retain 90%/)).toBeVisible();
-    expect(screen.getByText(/Retire the acquired original oil/)).toBeVisible();
+    expect(screen.getByText(/Retire the acquired oil/)).toBeVisible();
     const payments = screen.getByRole("region", { name: "Expected impact" });
     expect(payments).toHaveTextContent(
       `${formatMoneyConcise(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
@@ -98,7 +98,9 @@ it.each(["valley-electric", "ridge-electric"] as const)(
       screen.getAllByRole("button", { name: /Pay cash|Take loan/ }),
     ).toHaveLength(2);
     expect(
-      screen.getByText(/Plant operations and purchased power are extra/),
+      screen.getByText(
+        /Plant operating costs and payments to outside power suppliers are extra/,
+      ),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Pay cash" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Take loan" })).toBeEnabled();
@@ -174,6 +176,10 @@ it.each([2017, 2024])(
 it("excludes expired power rights and past oil retirement commitments from a 2025 purchase", async () => {
   const quote = review("valley-electric", 2025);
   expect(quote.contracts).toEqual([]);
+  expect(screen.getByText(/Plant operating costs are extra/)).toBeVisible();
+  expect(
+    screen.queryByText(/payments to outside power suppliers are extra/),
+  ).not.toBeInTheDocument();
   const assets = disclosure("Plants & purchased power");
   await userEvent.click(within(assets).getByText("Plants & purchased power"));
   expect(
@@ -182,7 +188,5 @@ it("excludes expired power rights and past oil retirement commitments from a 202
   expect(
     within(assets).getByText("No inherited purchased-power rights remain."),
   ).toBeVisible();
-  expect(
-    screen.queryByText(/Retire the acquired original oil/),
-  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/Retire the acquired oil/)).not.toBeInTheDocument();
 });

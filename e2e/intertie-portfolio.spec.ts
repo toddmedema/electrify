@@ -161,7 +161,12 @@ for (const theme of ["light", "dark"] as const) {
         .locator(".decisionImpactFact")
         .filter({ hasText: /^Loan option/ })
         .locator(".decisionImpactFactValue"),
-    ).toHaveText(/\/mo \(\d+\.\d+% for 30 years\)$/);
+    ).toHaveText(/ now \+ .*\/mo$/);
+    await expect(
+      dialog
+        .locator(".decisionImpactFactDetail")
+        .filter({ hasText: /^New loan:/ }),
+    ).toHaveText(/^New loan: \d+\.\d+% for 30 years\.$/);
     await expect(dialog).not.toContainText("Line capacity");
     await expect(dialog).toContainText(/Import capacity\s*40MW/);
     await expect(dialog).toContainText(/Export capacity\s*5MW/);

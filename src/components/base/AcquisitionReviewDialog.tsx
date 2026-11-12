@@ -96,7 +96,6 @@ export default function AcquisitionReviewDialog({
         },
         loan: {
           value: `${formatMoneyConcise(quote.financedCashDue)} now + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
-          detail: `New loan: ${(game.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years.`,
         },
       }}
       extraFacts={[
@@ -133,8 +132,12 @@ export default function AcquisitionReviewDialog({
       afterFacts={
         <div className="acquisitionReviewDetails">
           <Typography variant="caption" color="textSecondary" component="p">
-            Monthly figures include debt and network upkeep. Plant operations
-            and purchased power are extra.
+            Monthly figures include debt and network upkeep. Plant operating
+            costs
+            {quote.contracts.length > 0
+              ? " and payments to outside power suppliers"
+              : ""}{" "}
+            are extra.
           </Typography>
           <section
             className="acquisitionObligations"
@@ -145,9 +148,7 @@ export default function AcquisitionReviewDialog({
             </Typography>
             <ul>
               {game.date.year <= 2023 && (
-                <li>
-                  Retire the acquired original oil plants by December 2023.
-                </li>
+                <li>Retire the acquired oil plants by December 2023.</li>
               )}
               <li>
                 Retain 90% of your expanded customer base at the end of 2024.
