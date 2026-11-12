@@ -11,6 +11,30 @@ test.describe("learning pages without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
 
   for (const theme of ["light", "dark"] as const) {
+    test(`the homepage links to getting started and classroom resources in ${theme} mode`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme: theme });
+      await page.goto("/");
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      for (const pathname of [
+        "/power-grid-simulator.html",
+        "/classroom.html",
+        "/scenarios.html",
+      ])
+        await expect(
+          page.getByRole("main").locator(`a[href='${pathname}']`),
+        ).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+      await page
+        .getByRole("link", { name: "How to play", exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/power-grid-simulator\.html$/);
+      await expect(page.getByRole("main")).toBeVisible();
+    });
+
     for (const pathname of pages) {
       test(`${pathname} remains readable and navigable in ${theme} mode`, async ({
         page,
@@ -20,6 +44,10 @@ test.describe("learning pages without JavaScript", () => {
         expect(response?.status()).toBe(200);
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
         await expect(page.getByRole("main")).toBeVisible();
+        if (pathname !== "/data-centers.html")
+          await expect(
+            page.getByRole("main").locator("a[href='/scenarios.html']"),
+          ).toBeVisible();
         const primary = page.locator(".hero .button--primary");
         await expect(primary).toBeVisible();
         if (pathname === "/data-centers.html")
