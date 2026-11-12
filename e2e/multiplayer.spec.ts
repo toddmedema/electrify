@@ -2264,14 +2264,10 @@ for (const count of [2, 4]) {
       await expect(
         pages[0].getByRole("button", { name: /Player speeds;/ }),
       ).toHaveCount(0);
-      // The ordinary build catalog pauses the shared clock, and normal purchases reach the host.
+      // Shopping in the build catalog never pauses the shared clock, and normal purchases reach
+      // the host. The purchase follows the catalog opening, so a pause would have arrived by then.
       const fleetBefore = room.views.get(buyerId)?.game?.facilities.length ?? 0;
       await buyer.locator(".button-buildFacility").click();
-      for (const page of pages)
-        await expect(clock(page)).toHaveAttribute(
-          "data-active-speed",
-          "PAUSED",
-        );
       await buyer
         .getByRole("button", { name: "Review purchase of Wind", exact: true })
         .click();
@@ -2281,7 +2277,9 @@ for (const count of [2, 4]) {
       await expect
         .poll(() => room.views.get(buyerId)?.game?.facilities.length)
         .toBe(fleetBefore + 1);
-      // A side panel stays open after a purchase, and holds the clock until it closes.
+      for (const page of pages)
+        await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+      // A side panel stays open after a purchase; the clock keeps running behind it.
       if (buyer.viewportSize()!.width >= 1024)
         await buyer
           .getByRole("button", { name: "Close Build", exact: true })

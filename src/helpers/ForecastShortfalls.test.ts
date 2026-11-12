@@ -1,5 +1,5 @@
 import { GAME_TO_REAL_YEARS } from "../Constants";
-import { forecastShortfalls } from "./ForecastShortfalls";
+import { firstShortfallMinute, forecastShortfalls } from "./ForecastShortfalls";
 
 describe("representative-day shortfall estimates", () => {
   it("preserves energy when the forecast sample interval changes", () => {
@@ -43,5 +43,24 @@ describe("representative-day shortfall estimates", () => {
       forecastShortfalls([{ minute: 0, demandW: 100, supplyW: 150 }], 15, 150)
         .blackouts,
     ).toEqual([]);
+  });
+});
+
+describe("firstShortfallMinute", () => {
+  it("finds the first hour demand outruns supply", () => {
+    expect(
+      firstShortfallMinute([
+        { minute: 0, demandW: 100, supplyW: 100 },
+        { minute: 60, demandW: 100, supplyW: 99 },
+        { minute: 120, demandW: 100, supplyW: 10 },
+      ]),
+    ).toBe(60);
+  });
+
+  it("reports nothing for adequate or empty forecasts", () => {
+    expect(firstShortfallMinute([])).toBeUndefined();
+    expect(
+      firstShortfallMinute([{ minute: 0, demandW: 100, supplyW: 100 }]),
+    ).toBeUndefined();
   });
 });
