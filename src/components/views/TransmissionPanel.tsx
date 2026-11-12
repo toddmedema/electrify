@@ -1140,28 +1140,6 @@ export default function TransmissionPanel({
                                 </ListItem>
                               </button>
                             </div>
-                            {availableAcquisition && onAcquire && (
-                              <div className="transmissionAcquisition">
-                                <Button
-                                  variant="contained"
-                                  onClick={() => {
-                                    setAcquisitionTargetId(
-                                      acquisitionTarget.id,
-                                    );
-                                  }}
-                                >
-                                  Acquire {acquisitionTarget.name}
-                                </Button>
-                                <Typography
-                                  variant="caption"
-                                  color="textSecondary"
-                                >
-                                  Review the company terms and choose payment.
-                                  The connection is complete; upgrades are
-                                  optional.
-                                </Typography>
-                              </div>
-                            )}
                             {selectedLine === line.id && (
                               <div className="transmissionLineDetails">
                                 {cancelLine?.id === line.id && (
@@ -1399,20 +1377,35 @@ export default function TransmissionPanel({
                                           : `${peer.upgradeRequestedBy} requested this upgrade. Review the upgrade to approve and fund your half.`}
                                       </Typography>
                                     )}
-                                    <IntertieUpgradeControl
-                                      costIndex={getCostTableIndex(
-                                        game.date,
-                                        game.startingYear,
-                                        game.seed,
+                                    <div className="transmissionDecisionActions">
+                                      {availableAcquisition && onAcquire && (
+                                        <Button
+                                          variant="contained"
+                                          aria-label={`Acquire ${acquisitionTarget.name}`}
+                                          onClick={() =>
+                                            setAcquisitionTargetId(
+                                              acquisitionTarget.id,
+                                            )
+                                          }
+                                        >
+                                          Acquire
+                                        </Button>
                                       )}
-                                      line={line}
-                                      context={accessContextForGame(game)}
-                                      cash={now?.cash}
-                                      year={game.date.year}
-                                      interestRate={game.interestRate}
-                                      units={units}
-                                      onUpgrade={onUpgrade}
-                                    />
+                                      <IntertieUpgradeControl
+                                        costIndex={getCostTableIndex(
+                                          game.date,
+                                          game.startingYear,
+                                          game.seed,
+                                        )}
+                                        line={line}
+                                        context={accessContextForGame(game)}
+                                        cash={now?.cash}
+                                        year={game.date.year}
+                                        interestRate={game.interestRate}
+                                        units={units}
+                                        onUpgrade={onUpgrade}
+                                      />
+                                    </div>
                                   </>
                                 )}
                                 {((building && onCancel) ||

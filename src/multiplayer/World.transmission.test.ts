@@ -3,7 +3,12 @@ import cloneDeep from "lodash.clonedeep";
 import { DEMAND_TYPES } from "../data/DemandProfiles";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { TICK_MINUTES, TICKS_PER_HOUR, GAME_TO_REAL_YEARS } from "../Constants";
-import { connectionAgreements } from "../helpers/PowerAgreements";
+import {
+  agreementYearMinute,
+  connectionAgreements,
+  powerAgreementQuote,
+} from "../helpers/PowerAgreements";
+import { getDateFromMinute } from "../helpers/DateTime";
 import { currentTick } from "../helpers/GameSelectors";
 import {
   intertieContextForGame,
@@ -14,6 +19,7 @@ import { customerMarketSizeAt } from "../helpers/Customers";
 import { loadSimData } from "../testing/SimData";
 import { coopSeats } from "../testing/MultiplayerFixtures";
 import { applyCommand, createWorld, stepWorld } from "./World";
+import { ViewPublication } from "./ViewPublication";
 
 function ready(keepNative = false) {
   loadSimData(UTILITY_AREAS.champlain.location);
@@ -233,6 +239,57 @@ it("assigns supplier-ready commitments once independently from pause and consump
     expect(currentTick(grid)!.importedW).toBe(0);
     expect(currentTick(grid)!.exportedW).toBe(0);
   });
+});
+
+it("publishes signed terms and current minimum-payment history to each owning renderer", () => {
+  const world = ready();
+  for (const grid of world.grids) {
+    const minute = agreementYearMinute(2018);
+    grid.date = getDateFromMinute(minute, grid.startingYear);
+    grid.timeline.forEach((tick) => {
+      tick.minute += minute;
+    });
+    grid.objectiveProgress = undefined;
+  }
+  const quote = powerAgreementQuote(world.grids[0], "champlain-nuclear")!;
+  expect(quote).toBeDefined();
+  expect(
+    applyCommand(world, "0", {
+      matchId: world.matchId,
+      epoch: world.epoch,
+      sequence: 2,
+      command: {
+        kind: "action",
+        name: "acceptPowerAgreement",
+        payload: { blockId: quote.id, quoteKey: quote.quoteKey },
+      },
+    }),
+  ).toBeUndefined();
+  setNextDemand(world, 0);
+  stepWorld(world);
+  const publication = new ViewPublication();
+  publication.request(world, 0, { force: true });
+  const views = publication.take(world, 0);
+  expect(views["0"].game!.transmission!.acceptedAgreements).toEqual([
+    quote.receipt,
+  ]);
+  expect(currentTick(views["0"].game!)!.expensesImports).toBeGreaterThan(0);
+  expect(views["0"].game!.transmission!.agreementAccounts).toBeDefined();
+  expect(
+    views["0"].game!.transmission!.agreementAccounts!.length,
+  ).toBeGreaterThan(0);
+  for (const [index, grid] of world.grids.entries()) {
+    const published = views[String(index)].game!;
+    expect(published.transmission!.inheritedAgreementTerms).toBe(2);
+    expect(published.transmission!.agreementAccounts).toEqual(
+      grid.transmission!.agreementAccounts,
+    );
+    if (grid.transmission!.agreementAccounts)
+      expect(published.transmission!.agreementAccounts).not.toBe(
+        grid.transmission!.agreementAccounts,
+      );
+  }
+  expect(views["1"].game!.transmission!.acceptedAgreements).toBeUndefined();
 });
 
 it("reserves a later company's useful agreement delivery before an earlier company's spot demand", () => {

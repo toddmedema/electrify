@@ -9,9 +9,15 @@ import {
 } from "../../reducers/GameActions";
 import { previewUtilityAcquisition } from "../../reducers/Game";
 import { acquisitionQuote } from "../../helpers/Expansion";
-import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
+import {
+  formatCount,
+  formatMoneyConcise,
+  formatPercent,
+  formatWatts,
+} from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import PurchaseReviewDialog from "./PurchaseReviewDialog";
+import DecisionImpactPreview from "./DecisionImpactPreview";
 import { useBuildCash } from "./useBuildCash";
 import { LOAN_MONTHS } from "../../Constants";
 import UtilityContractSchedule from "./UtilityContractSchedule";
@@ -47,7 +53,8 @@ export default function AcquisitionReviewDialog({
     };
   }, [dispatch, targetId]);
   const quote = acquisitionQuote(game, targetId);
-  const cash = useBuildCash(currentTick(game)?.cash ?? 0);
+  const now = currentTick(game);
+  const cash = useBuildCash(now?.cash ?? 0);
   const preview = React.useMemo(
     () => previewUtilityAcquisition(game, targetId, true),
     [game, targetId],
@@ -67,10 +74,15 @@ export default function AcquisitionReviewDialog({
       </DecisionDialog>
     );
   const valley = quote.targetId === "valley-electric";
+  const customersBefore = now?.customers ?? 0;
+  const customersAfter = customersBefore + quote.customers;
+  const customerGrowth =
+    customersBefore > 0
+      ? ` (+${formatPercent(quote.customers / customersBefore)})`
+      : "";
   const nuclear = quote.contracts.find(
     (contract) => contract.name === "Regional nuclear",
   );
-  const sharedCosts = `${formatMoneyConcise(quote.assumedDebt)} assumed debt at 5% for 20 years and current network costs included.`;
   const contractChange = valley
     ? !nuclear
       ? "Valley’s inherited nuclear purchase has expired."
@@ -88,18 +100,30 @@ export default function AcquisitionReviewDialog({
       buildCost={quote.equityPrice}
       cashOnlyFee={quote.fee}
       interestRate={game.interestRate}
-      cancelLabel="Cancel"
       upkeepPerMonth={quote.networkOMPerMonth}
+      cashLabel="Cash option"
       paymentSummary={{
         cash: {
-          value: `${formatMoneyConcise(quote.cashDue)} upfront + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
-          detail: sharedCosts,
+          value: `${formatMoneyConcise(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
         },
         loan: {
-          value: `${formatMoneyConcise(quote.financedCashDue)} upfront + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
-          detail: `New loan: ${(game.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years. ${sharedCosts}`,
+          value: `${formatMoneyConcise(quote.financedCashDue)} now + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
         },
       }}
+      extraFacts={[
+        {
+          concept: "customers",
+          label: "Customers",
+          value: `${formatCount(customersBefore)} → ${formatCount(customersAfter)}${customerGrowth}`,
+        },
+        {
+          concept: "supply",
+          label: "Supply margin",
+          value: preview
+            ? `${formatWatts(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
+            : "Forecast unavailable",
+        },
+      ]}
       preface={
         error || cash < quote.financedCashDue ? (
           <div className="acquisitionReviewIntro">
@@ -118,56 +142,116 @@ export default function AcquisitionReviewDialog({
         ) : undefined
       }
       afterFacts={
-        <UtilityContractSchedule game={game} targetId={quote.targetId} />
+        <div className="acquisitionReviewDetails">
+          <Typography variant="caption" color="textSecondary" component="p">
+            Monthly figures include debt and network upkeep.
+          </Typography>
+          <section
+            className="acquisitionObligations"
+            aria-label="Acquisition obligations"
+          >
+            <Typography component="h3" variant="subtitle2">
+              Your commitments
+            </Typography>
+            <ul>
+              {game.date.year <= 2023 && (
+                <li>Retire the acquired oil plants by December 2023.</li>
+              )}
+              <li>
+                Retain 90% of your expanded customer base at the end of 2024.
+              </li>
+            </ul>
+          </section>
+          <details className="acquisitionDisclosure">
+            <summary>Plants &amp; purchased power</summary>
+            <div>
+              <Typography component="h3" variant="subtitle2">
+                Operating plants
+              </Typography>
+              <DecisionImpactPreview
+                label="Operating plants"
+                facts={[...quote.facilities]
+                  .sort((a, b) => b.peakW - a.peakW)
+                  .map((facility) => ({
+                    concept: "supply",
+                    label: facilityDisplayName(facility),
+                    value: formatWatts(facility.peakW),
+                    detail: `${facility.ageYears.toFixed(1)} years old`,
+                  }))}
+              />
+              <Typography component="h3" variant="subtitle2">
+                Purchased power
+              </Typography>
+              {!!quote.contracts.length && (
+                <DecisionImpactPreview
+                  label="Purchased power"
+                  facts={quote.contracts.map((contract) => ({
+                    concept: "supply",
+                    label: contract.name,
+                    value: `${contract.balancing ? "Up to " : ""}${formatWatts(contract.deliverableW)} delivered`,
+                    detail: `${formatMoneyConcise(contract.pricePerMWh)}/MWh${contract.balancing ? " reference · variable price and availability, not firm reserve" : ""}`,
+                  }))}
+                />
+              )}
+              {!quote.contracts.length && (
+                <Typography variant="body2">
+                  No inherited purchased-power rights remain.
+                </Typography>
+              )}
+              {contractChange && (
+                <Typography variant="body2" color="textSecondary">
+                  {contractChange}
+                </Typography>
+              )}
+            </div>
+          </details>
+          <details className="acquisitionDisclosure">
+            <summary>Financing breakdown</summary>
+            <div>
+              <DecisionImpactPreview
+                label="Financing breakdown"
+                facts={[
+                  {
+                    concept: "money",
+                    label: "Purchase price",
+                    value: formatMoneyConcise(quote.equityPrice),
+                  },
+                  {
+                    concept: "money",
+                    label: "Transaction fee",
+                    value: formatMoneyConcise(quote.fee),
+                    detail: "Paid in cash with either option",
+                  },
+                  {
+                    concept: "finances",
+                    label: "Inherited debt",
+                    value: formatMoneyConcise(quote.assumedDebt),
+                    detail: `5% over 20 years · ${formatMoneyConcise(quote.cashMonthlyDebtService)}/mo`,
+                  },
+                  {
+                    concept: "finances",
+                    label: "New loan",
+                    value: formatMoneyConcise(quote.newLoan),
+                    detail: `${(game.interestRate * 100).toFixed(2)}% over ${LOAN_MONTHS / 12} years · ${formatMoneyConcise(quote.monthlyDebtService - quote.cashMonthlyDebtService)}/mo`,
+                  },
+                  {
+                    concept: "money",
+                    label: "Added network upkeep",
+                    value: `${formatMoneyConcise(quote.networkOMPerMonth)}/mo`,
+                    detail: "At today’s costs",
+                  },
+                ]}
+              />
+            </div>
+          </details>
+          <details className="acquisitionDisclosure">
+            <summary>Supply &amp; network changes</summary>
+            <div>
+              <UtilityContractSchedule game={game} targetId={quote.targetId} />
+            </div>
+          </details>
+        </div>
       }
-      extraFacts={[
-        {
-          concept: "customers",
-          label: "Customers joining",
-          value: Math.round(quote.customers).toLocaleString(),
-        },
-        {
-          concept: "goal",
-          label: "Acquisition obligations",
-          value: "Retire acquired original oil plants by December 2023.",
-          detail: `Retain 90% of your expanded customer base at the end of 2024. Acquisitions after 2023 exclude the original oil plant.${contractChange ? `\n\n${contractChange}` : ""}`,
-        },
-        {
-          concept: "supply",
-          label: "Company supply margin",
-          value: preview
-            ? `${marginText(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
-            : "Forecast unavailable",
-        },
-        {
-          concept: "supply",
-          label: "Operating plants",
-          value: [...quote.facilities]
-            .sort((a, b) => b.peakW - a.peakW)
-            .map(
-              (facility) =>
-                `${facilityDisplayName(facility)} ${formatWatts(facility.peakW)} · ${facility.ageYears.toFixed(1)} years old`,
-            )
-            .join("\n"),
-        },
-        {
-          concept: "supply",
-          label: "Purchased power",
-          value:
-            quote.contracts
-              .map(
-                (contract) =>
-                  `${contract.name}: ${contract.balancing ? "up to " : ""}${formatWatts(contract.deliverableW)}${contract.balancing ? " · variable availability" : ""}`,
-              )
-              .join(" · ") || "No inherited purchased-power rights remain.",
-          detail: quote.contracts
-            .map(
-              (contract) =>
-                `${contract.name}: ${formatMoneyConcise(contract.pricePerMWh)}/MWh ${contract.balancing ? "reference; price and availability vary. Not firm reserve." : "delivered"}`,
-            )
-            .join(" · "),
-        },
-      ]}
       onClose={onClose}
       onPurchase={async (financed) => {
         setError(undefined);

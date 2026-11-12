@@ -37,6 +37,7 @@ let lastSave = 0;
 let timer: ReturnType<typeof setTimeout>;
 let viewTimer: ReturnType<typeof setTimeout> | undefined;
 let viewDue = Infinity;
+let viewPending = false;
 let keepaliveTimer: ReturnType<typeof setInterval> | undefined;
 const publication = new ViewPublication();
 const post = (event: WorkerResponse) => worker.postMessage(event);
@@ -58,6 +59,7 @@ function publish() {
   if (!world) return;
   const views = publication.take(world, performance.now());
   if (Object.keys(views).length) {
+    viewPending = true;
     post({ kind: "views", views });
     if (local) {
       // A retired P1 freezes. The shared calendar must follow a company still playing.
@@ -94,6 +96,9 @@ function requestViews(options?: Parameters<ViewPublication["request"]>[2]) {
   if (!world) return;
   const now = performance.now();
   const delay = publication.request(world, now, options);
+  // The worker can outrun a busy renderer even at five Hz. Keep changes/receipts in the
+  // publication until the previous bundle is consumed, rather than queueing cloned grids.
+  if (viewPending) return;
   if (delay === undefined) return;
   if (delay === 0) return publish();
   if (viewDue <= now + delay) return;
@@ -253,6 +258,14 @@ const refuse = (message: string) => post({ kind: "error", message });
 worker.onmessage = async ({ data: request }: MessageEvent<WorkerRequest>) => {
   if (request.kind === "heartbeat") {
     lastControlHeartbeat = performance.now();
+    return;
+  }
+  if (request.kind === "views-applied") {
+    if (viewPending) {
+      viewPending = false;
+      // A fault can stop the tick loop while its final safety view is waiting for consumption.
+      requestViews();
+    }
     return;
   }
   if (request.kind === "create" || request.kind === "restore") {
