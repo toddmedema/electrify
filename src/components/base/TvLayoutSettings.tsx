@@ -8,7 +8,6 @@ import {
 import TvIcon from "@mui/icons-material/Tv";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { change } from "../../reducers/Settings";
-import { normalizeTvInset, TV_INSETS } from "../../TvLayout";
 import TvModeSuggestion from "./TvModeSuggestion";
 
 /** Shared by the title screen setup and Display settings. */
@@ -58,28 +57,6 @@ export default function TvLayoutSettings({
         <ToggleButton value="desktop">Desktop</ToggleButton>
         <ToggleButton value="tv">TV</ToggleButton>
       </ToggleButtonGroup>
-      {enabled && (
-        <>
-          <Typography component="h4" variant="subtitle2" id="tv-inset-label">
-            Screen-edge inset
-          </Typography>
-          <ToggleButtonGroup
-            className="settingsKeyboardRow"
-            exclusive
-            value={normalizeTvInset(settings.tvInset)}
-            aria-labelledby="tv-inset-label"
-            onChange={(_event, value: number | null) =>
-              value !== null && dispatch(change({ tvInset: value }))
-            }
-          >
-            {TV_INSETS.map((inset) => (
-              <ToggleButton key={inset} value={inset}>
-                {inset}%
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
-        </>
-      )}
     </Box>
   );
 }

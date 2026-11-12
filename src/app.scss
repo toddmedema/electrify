@@ -697,14 +697,18 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
 }
 .achievementToast.MuiSnackbar-root {
   left: auto;
-  right: max(16px, env(safe-area-inset-right));
+  right: max(16px, var(--screen-edge-inset), env(safe-area-inset-right));
   // The measured tab bar already includes the safe area it pads for.
   --achievement-bottom: calc(
     16px +
-      max(var(--achievement-nav-clearance, 0px), env(safe-area-inset-bottom))
+      max(
+        var(--achievement-nav-clearance, 0px),
+        var(--screen-edge-inset),
+        env(safe-area-inset-bottom)
+      )
   );
   bottom: var(--achievement-bottom);
-  width: min(384px, calc(100vw - 32px));
+  width: min(384px, calc(100vw - 2 * max(16px, var(--screen-edge-inset))));
   max-width: none;
 }
 .achievementToastStack {
@@ -713,7 +717,11 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   gap: 8px;
   width: 100%;
   max-height: calc(
-    100dvh - var(--achievement-bottom) - max(16px, env(safe-area-inset-top))
+    100dvh - var(--achievement-bottom) - max(
+        16px,
+        var(--screen-edge-inset),
+        env(safe-area-inset-top)
+      )
   );
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -5431,7 +5439,7 @@ $homeSmokeCycle: 5.6s;
 .manual-popover.MuiPaper-root {
   display: flex;
   flex-direction: column;
-  width: min(420px, calc(100vw - 16px));
+  width: min(420px, calc(100vw - 2 * max(8px, var(--screen-edge-inset))));
   max-height: 50vh;
   overflow: hidden;
 }

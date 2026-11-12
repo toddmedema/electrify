@@ -59,7 +59,11 @@ import { InstallPromptProvider } from "./components/base/InstallAppButton";
 import type { DesktopPowerState } from "./Desktop";
 import { applyInterfaceScale } from "./InterfaceScale";
 import "./InterfaceLayout.scss";
-import { normalizeTvInset, tvLayoutEnabled } from "./TvLayout";
+import { tvLayoutEnabled } from "./TvLayout";
+import {
+  ScreenEdgePaddingProvider,
+  screenEdgePaddingPixels,
+} from "./ScreenEdgePadding";
 import { getDesktop, isDesktopApp } from "./Desktop";
 
 const AchievementNotifications = lazy(
@@ -144,12 +148,13 @@ export function ThemedApp(props: {
     (state) => state.settings.theme,
   );
   const settings = useAppSelector((state) => state.settings);
-  const { interfaceScale, tvInset } = settings;
+  const { interfaceScale, screenEdgePadding } = settings;
   const tvMode = tvLayoutEnabled(settings);
   const [viewport, setViewport] = useState(() => ({
     width: window.innerWidth,
     height: window.innerHeight,
   }));
+  const edgePadding = screenEdgePaddingPixels(screenEdgePadding, viewport);
   useLayoutEffect(() => {
     // The explicit preference applies equally to the shell and seats. Native seat zoom
     // remains independent; neither resolution nor TV layout contributes another multiplier.
@@ -157,8 +162,11 @@ export function ThemedApp(props: {
       const root = document.documentElement;
       root.dataset.tvLayout = String(tvMode);
       root.style.setProperty(
-        "--tv-inset",
-        tvMode ? `${normalizeTvInset(tvInset)}vmin` : "0px",
+        "--screen-edge-inset",
+        `${screenEdgePaddingPixels(screenEdgePadding, {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        })}px`,
       );
       applyInterfaceScale(interfaceScale);
     };
@@ -169,7 +177,7 @@ export function ThemedApp(props: {
     };
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, [interfaceScale, tvMode, tvInset]);
+  }, [interfaceScale, tvMode, screenEdgePadding]);
   // "System" is a standing instruction rather than a value, and the system can change its mind
   // while the game is open - at sunset, on a schedule, or because the player just flipped it
   const [systemDark, setSystemDark] = useState(prefersDarkMode);
@@ -230,33 +238,41 @@ export function ThemedApp(props: {
 
   const theme = useMemo(
     () =>
-      tvMode
-        ? createTheme(createAppTheme(mode), {
-            components: {
-              MuiPopover: {
-                defaultProps: {
-                  marginThreshold: Math.ceil(
-                    (Math.min(viewport.width, viewport.height) *
-                      normalizeTvInset(tvInset)) /
-                      100,
-                  ),
-                },
-              },
-              MuiMenu: {
-                defaultProps: {
-                  marginThreshold: Math.ceil(
-                    (Math.min(viewport.width, viewport.height) *
-                      normalizeTvInset(tvInset)) /
-                      100,
-                  ),
-                },
-              },
+      createTheme(createAppTheme(mode), {
+        components: {
+          MuiPopover: {
+            defaultProps: {
+              marginThreshold: Math.max(16, edgePadding),
             },
-          })
-        : createAppTheme(mode),
-    [mode, tvMode, tvInset, viewport],
+          },
+          MuiMenu: {
+            defaultProps: {
+              marginThreshold: Math.max(16, edgePadding),
+            },
+          },
+          MuiPopper: {
+            defaultProps: {
+              modifiers: [
+                {
+                  name: "preventOverflow",
+                  options: { padding: Math.max(8, edgePadding) },
+                },
+                {
+                  name: "flip",
+                  options: { padding: Math.max(8, edgePadding) },
+                },
+              ],
+            },
+          },
+        },
+      }),
+    [mode, edgePadding],
   );
-  return <ThemeProvider theme={theme}>{props.children}</ThemeProvider>;
+  return (
+    <ScreenEdgePaddingProvider value={edgePadding}>
+      <ThemeProvider theme={theme}>{props.children}</ThemeProvider>
+    </ScreenEdgePaddingProvider>
+  );
 }
 
 /**

@@ -1,7 +1,7 @@
 // Larger interfaces use the same rem measure for controls, reading columns and charts.
-// The legacy inset variable is a temporary bridge until independent padding owns this token.
 :root {
-  --screen-edge-inset: var(--tv-inset, 0px);
+  --screen-edge-inset: 0px;
+  --screen-edge-margin: max(16px, var(--screen-edge-inset));
 }
 .appFrame {
   box-sizing: border-box;
@@ -10,6 +10,44 @@
 .MuiDialog-container {
   padding: var(--screen-edge-inset);
   box-sizing: border-box;
+}
+.MuiPopover-paper {
+  max-width: calc(100vw - 2 * var(--screen-edge-margin));
+  max-height: calc(100dvh - 2 * var(--screen-edge-margin));
+}
+.MuiSnackbar-root:not(.achievementToast) {
+  --toast-edge-gap: 8px;
+  max-width: calc(
+    100vw - 2 * (var(--screen-edge-inset) + var(--toast-edge-gap))
+  );
+  &.MuiSnackbar-anchorOriginBottomLeft,
+  &.MuiSnackbar-anchorOriginBottomRight,
+  &.MuiSnackbar-anchorOriginBottomCenter {
+    bottom: calc(var(--screen-edge-inset) + var(--toast-edge-gap));
+  }
+  &.MuiSnackbar-anchorOriginTopLeft,
+  &.MuiSnackbar-anchorOriginTopRight,
+  &.MuiSnackbar-anchorOriginTopCenter {
+    top: calc(var(--screen-edge-inset) + var(--toast-edge-gap));
+  }
+  &.MuiSnackbar-anchorOriginBottomLeft,
+  &.MuiSnackbar-anchorOriginTopLeft {
+    left: calc(var(--screen-edge-inset) + var(--toast-edge-gap));
+  }
+  &.MuiSnackbar-anchorOriginBottomRight,
+  &.MuiSnackbar-anchorOriginTopRight {
+    right: calc(var(--screen-edge-inset) + var(--toast-edge-gap));
+  }
+  &.MuiSnackbar-anchorOriginBottomCenter,
+  &.MuiSnackbar-anchorOriginTopCenter {
+    left: 50%;
+    right: auto;
+    width: max-content;
+    transform: translateX(-50%);
+  }
+  @media (min-width: 600px) {
+    --toast-edge-gap: 24px;
+  }
 }
 .tvLayoutSettings {
   display: flex;
@@ -416,14 +454,10 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
     flex-wrap: wrap;
     gap: 0.5rem;
   }
-  .MuiPopover-paper {
-    max-width: calc(100vw - 2 * var(--screen-edge-inset));
-    max-height: calc(100dvh - 2 * var(--screen-edge-inset));
-  }
   .manual-popover.MuiPaper-root {
-    width: min(40rem, calc(100vw - 2 * var(--screen-edge-inset)));
+    width: min(40rem, calc(100vw - 2 * var(--screen-edge-margin)));
     max-width: none;
-    max-height: min(32rem, calc(100dvh - 2 * var(--screen-edge-inset) - 8rem));
+    max-height: min(32rem, calc(100dvh - 2 * var(--screen-edge-margin) - 8rem));
   }
   .manual-popover-header {
     flex: 0 0 auto;
@@ -434,10 +468,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
     flex: 1 1 auto;
     min-height: 0;
     padding: 0.75rem 1rem;
-  }
-  .MuiSnackbar-root {
-    bottom: calc(var(--screen-edge-inset) + 0.75rem);
-    left: calc(var(--screen-edge-inset) + 0.75rem);
   }
   #appbar #topbar .MuiToolbar-root {
     min-height: 3.5rem !important;

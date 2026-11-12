@@ -8,6 +8,7 @@ import {
 } from "./ManualEntries";
 import { ManualEntryNavigation } from "./ManualEntryLink";
 import { useControllerInput } from "../../desktop/InputPresentation";
+import { useScreenEdgeMargin } from "../../ScreenEdgePadding";
 
 // The (?) the player tapped. A DOM node has no place in the store, so it lives here beside the
 // popover that reads it; ManualLink records it just before asking for the entry
@@ -77,6 +78,7 @@ export default function ManualHelpPopover(
 ): React.JSX.Element | null {
   const { onClose, onRelated } = props;
   const controllerInput = useControllerInput();
+  const edgeMargin = useScreenEdgeMargin();
   // Kept through the exit transition, so the content doesn't blank out as it fades
   const [shown, setShown] = React.useState(props.entry);
   if (props.entry && props.entry !== shown) {
@@ -116,7 +118,7 @@ export default function ManualHelpPopover(
           ? { vertical: "top", horizontal: "center" }
           : { vertical: "center", horizontal: "center" }
       }
-      marginThreshold={8}
+      marginThreshold={edgeMargin}
       data-manual-help="true"
       slotProps={{
         paper: {

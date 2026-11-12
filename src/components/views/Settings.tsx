@@ -18,6 +18,7 @@ import {
 import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   SettingsType,
+  ScreenEdgePaddingType,
   ThemeChoiceType,
   UnitSystemType,
   WorkspaceType,
@@ -28,6 +29,10 @@ import {
   normalizeInterfaceScale,
 } from "../../InterfaceScale";
 import { normalizeWorkspace } from "../../WorkspaceLayout";
+import {
+  SCREEN_EDGE_PADDINGS,
+  normalizeScreenEdgePadding,
+} from "../../ScreenEdgePadding";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
@@ -74,6 +79,7 @@ export interface DispatchProps {
   onThemeChange: (change: ThemeChoiceType) => void;
   onInterfaceScaleChange: (change: number) => void;
   onWorkspaceChange: (change: WorkspaceType) => void;
+  onScreenEdgePaddingChange: (change: ScreenEdgePaddingType) => void;
   onBack: () => void;
 }
 
@@ -417,6 +423,50 @@ export default function Settings(props: Props): React.JSX.Element {
                 <ToggleButton value="single">Single tool</ToggleButton>
               </ToggleButtonGroup>
             </SettingRow>
+            <Accordion
+              disableGutters
+              elevation={0}
+              sx={{ "&:before": { display: "none" } }}
+            >
+              <AccordionSummary
+                expandIcon={<ChevronDownGlyph />}
+                aria-controls="advanced-display-settings"
+                id="advanced-display-toggle"
+              >
+                <Typography sx={{ fontWeight: 600 }}>
+                  Advanced display
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails id="advanced-display-settings" sx={{ p: 0 }}>
+                <SettingRow
+                  label="Screen-edge padding"
+                  description="Moves the interface away from screen edges if your display crops them. Saved on this device."
+                  stackOnMobile
+                >
+                  <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    value={normalizeScreenEdgePadding(
+                      props.settings.screenEdgePadding,
+                    )}
+                    aria-label="Screen-edge padding"
+                    onChange={(_event, value: ScreenEdgePaddingType | null) =>
+                      value !== null && props.onScreenEdgePaddingChange(value)
+                    }
+                    sx={{
+                      width: { xs: "100%", sm: "auto" },
+                      "& .MuiToggleButton-root": { flex: 1 },
+                    }}
+                  >
+                    {SCREEN_EDGE_PADDINGS.map((padding) => (
+                      <ToggleButton key={padding} value={padding}>
+                        {padding}%
+                      </ToggleButton>
+                    ))}
+                  </ToggleButtonGroup>
+                </SettingRow>
+              </AccordionDetails>
+            </Accordion>
             {desktopApp && (
               <React.Suspense
                 fallback={

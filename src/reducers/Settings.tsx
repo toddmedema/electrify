@@ -17,8 +17,12 @@ import {
   migrateInterfaceScale,
   normalizeInterfaceScale,
 } from "../InterfaceScale";
-import { normalizeTvInset, normalizeTvScale } from "../TvLayout";
+import { normalizeTvScale } from "../TvLayout";
 import { WORKSPACE_CHOICES, normalizeWorkspace } from "../WorkspaceLayout";
+import {
+  normalizeScreenEdgePadding,
+  SCREEN_EDGE_PADDINGS,
+} from "../ScreenEdgePadding";
 
 function storedVolume(key: string): number {
   const value = getStorageNumber(key, 1);
@@ -54,6 +58,40 @@ function storedInterfaceScale(): number {
   return scale;
 }
 
+function storedScreenEdgePadding(): SettingsType["screenEdgePadding"] {
+  if (getLocalStorage().getItem("screenEdgePadding") !== null)
+    return getStorageChoice("screenEdgePadding", SCREEN_EDGE_PADDINGS, 0);
+  // TV padding was active only with an explicitly enabled TV layout. Keep its old
+  // 2% default for those players, while new and ordinary desktop players start at zero.
+  const padding =
+    getStorageBooleanOrUndefined("tvMode") === true
+      ? getStorageChoice(
+          "tvInset",
+          SCREEN_EDGE_PADDINGS,
+          getLocalStorage().getItem("tvInset") === null ? 2 : 0,
+        )
+      : 0;
+  setStorageKeyValue("screenEdgePadding", padding);
+  return padding;
+}
+
+function normalizedChanges(
+  payload: Partial<SettingsType>,
+): Partial<SettingsType> {
+  const changes = { ...payload };
+  if (Object.prototype.hasOwnProperty.call(changes, "interfaceScale"))
+    changes.interfaceScale = normalizeInterfaceScale(changes.interfaceScale);
+  if (Object.prototype.hasOwnProperty.call(changes, "workspace"))
+    changes.workspace = normalizeWorkspace(changes.workspace);
+  if (Object.prototype.hasOwnProperty.call(changes, "screenEdgePadding"))
+    changes.screenEdgePadding = normalizeScreenEdgePadding(
+      changes.screenEdgePadding,
+    );
+  if (Object.prototype.hasOwnProperty.call(changes, "tvScale"))
+    changes.tvScale = normalizeTvScale(changes.tvScale);
+  return changes;
+}
+
 export const initialSettings: SettingsType = {
   audioEnabled: getStorageBooleanOrUndefined("audioEnabled"),
   musicVolume: storedVolume("musicVolume"),
@@ -66,6 +104,7 @@ export const initialSettings: SettingsType = {
   theme: getStorageChoice("theme", THEME_CHOICES, "system"),
   interfaceScale: storedInterfaceScale(),
   workspace: storedWorkspace(),
+  screenEdgePadding: storedScreenEdgePadding(),
 };
 
 // Installed apps start with sound enabled; a saved preference always wins.
@@ -81,7 +120,6 @@ if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
   // the first-launch suggestion, including after restarting Steam offline.
   initialSettings.tvMode = getStorageBooleanOrUndefined("tvMode");
   initialSettings.tvScale = normalizeTvScale(getStorageNumber("tvScale", 1.5));
-  initialSettings.tvInset = normalizeTvInset(getStorageNumber("tvInset", 2));
   initialSettings.controllerVibrationEnabled =
     getStorageBooleanOrUndefined("controllerVibrationEnabled") ?? false;
   initialSettings.steamTimelineEnabled =
@@ -93,17 +131,7 @@ export const settingsSlice = createSlice({
   initialState: initialSettings,
   reducers: {
     change: (state, action: PayloadAction<Partial<SettingsType>>) => {
-      const changes = { ...action.payload };
-      if (Object.prototype.hasOwnProperty.call(changes, "interfaceScale"))
-        changes.interfaceScale = normalizeInterfaceScale(
-          changes.interfaceScale,
-        );
-      if (Object.prototype.hasOwnProperty.call(changes, "workspace"))
-        changes.workspace = normalizeWorkspace(changes.workspace);
-      if (Object.prototype.hasOwnProperty.call(changes, "tvScale"))
-        changes.tvScale = normalizeTvScale(changes.tvScale);
-      if (Object.prototype.hasOwnProperty.call(changes, "tvInset"))
-        changes.tvInset = normalizeTvInset(changes.tvInset);
+      const changes = normalizedChanges(action.payload);
       // Update values in local storage. Object.entries rather than keys + lookup so the value
       // stays tied to its key's type instead of needing a string index into SettingsType.
       Object.entries(changes).forEach(([key, value]) => {
@@ -111,6 +139,14 @@ export const settingsSlice = createSlice({
       });
       return { ...state, ...changes };
     },
+    // Seats share localStorage with the shell; projection must never replace its device choices.
+    applyPresentation: (
+      state,
+      action: PayloadAction<Partial<SettingsType>>,
+    ) => ({
+      ...state,
+      ...normalizedChanges(action.payload),
+    }),
     pauseAudio: () => {
       pause();
     },
@@ -122,6 +158,7 @@ export const settingsSlice = createSlice({
   },
 });
 
-export const { change, pauseAudio, resumeAudio } = settingsSlice.actions;
+export const { change, applyPresentation, pauseAudio, resumeAudio } =
+  settingsSlice.actions;
 
 export default settingsSlice.reducer;

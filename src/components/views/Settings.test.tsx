@@ -38,6 +38,7 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onThemeChange: () => undefined,
     onInterfaceScaleChange: () => undefined,
     onWorkspaceChange: () => undefined,
+    onScreenEdgePaddingChange: () => undefined,
     onBack: () => undefined,
     ...overrides,
   };
@@ -210,6 +211,34 @@ describe("Settings", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Single tool" }));
     expect(onWorkspaceChange).toHaveBeenCalledWith("single");
+  });
+
+  it("offers independent screen-edge padding in advanced Display settings outside the desktop app", async () => {
+    const onScreenEdgePaddingChange = jest.fn();
+    renderSettings({ onScreenEdgePaddingChange });
+    expect(
+      screen.queryByRole("group", { name: "Screen-edge padding" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Advanced display" }),
+    );
+    const padding = screen.getByRole("group", { name: "Screen-edge padding" });
+    expect(within(padding).getByRole("button", { name: "0%" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    for (const value of [2, 4])
+      await userEvent.click(
+        within(padding).getByRole("button", { name: `${value}%` }),
+      );
+    expect(onScreenEdgePaddingChange.mock.calls).toEqual([[2], [4]]);
+    expect(
+      screen.getByRole("combobox", { name: "Interface scale" }),
+    ).toHaveValue("1");
+    expect(screen.getByRole("button", { name: "Automatic" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("displays an exact migrated intermediate scale", () => {

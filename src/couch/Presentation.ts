@@ -8,7 +8,7 @@ export function seatPresentation(settings: SettingsType) {
     units: settings.units,
     workspace: "single",
     tvMode: true,
-    tvInset: 0,
+    screenEdgePadding: 0,
     audioEnabled: false,
   } as const;
 }

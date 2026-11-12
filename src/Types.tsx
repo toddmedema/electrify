@@ -1491,6 +1491,7 @@ export type ThemeModeType = "light" | "dark";
 export type ThemeChoiceType = ThemeModeType | "system";
 
 export type WorkspaceType = "automatic" | "single";
+export type ScreenEdgePaddingType = 0 | 2 | 4;
 
 export interface SettingsType {
   audioEnabled?: boolean;
@@ -1506,10 +1507,11 @@ export interface SettingsType {
   interfaceScale?: number;
   // Device workspace preference; Automatic adapts to the space remaining at this scale.
   workspace?: WorkspaceType;
+  // Percent of the shorter screen edge, shared by the app frame and overlays.
+  screenEdgePadding?: ScreenEdgePaddingType;
   // TV presentation belongs to this device, independently of saved campaigns.
   tvMode?: boolean;
   tvScale?: number;
-  tvInset?: number;
 }
 
 export interface DialogType {

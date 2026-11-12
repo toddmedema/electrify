@@ -12,7 +12,7 @@ import { initFuelPrices } from "../data/FuelPrices";
 import { initWeather } from "../data/Weather";
 import { waitForLoad } from "../helpers/WaitForLoad";
 import { multiplayerSnapshot } from "../reducers/GameActions";
-import { change } from "../reducers/Settings";
+import { applyPresentation } from "../reducers/Settings";
 import { layoutChanged } from "../reducers/UI";
 import { registerMultiplayerRuntime } from "../multiplayer/Registry";
 import { CouchClient } from "./Client";
@@ -35,10 +35,10 @@ export default function CouchSeat() {
   useEffect(() => {
     document.documentElement.dataset.couchSeat = bridge.seatId;
     store.dispatch(
-      change({
+      applyPresentation({
         workspace: "single",
         tvMode: true,
-        tvInset: 0,
+        screenEdgePadding: 0,
         audioEnabled: false,
       }),
     );
@@ -63,7 +63,7 @@ export default function CouchSeat() {
         event.generation === client.generation &&
         event.settings
       ) {
-        store.dispatch(change(seatPresentation(event.settings)));
+        store.dispatch(applyPresentation(seatPresentation(event.settings)));
       } else if (
         event.kind === "evidence" &&
         event.generation === client.generation &&

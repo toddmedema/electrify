@@ -1,5 +1,6 @@
 import path from "node:path";
 import { expect, test } from "./fixtures";
+import { reviewScreenshot } from "./review-screenshot";
 import {
   exitSettingsWithBodyArrow,
   openSettingsWithKeyboard,
@@ -84,7 +85,7 @@ test("interface scale persists and scales controls with text at every display he
   await expect(scale).toBeVisible();
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollWidth - innerWidth,
+      () => document.documentElement.scrollWidth - window.innerWidth,
     ),
   ).toBeLessThanOrEqual(1);
 });
@@ -100,6 +101,76 @@ test("Space toggles Sound", async ({ page }) => {
   await expect(sound).toBeChecked();
   await page.keyboard.press("Space");
   await expect(sound).not.toBeChecked();
+});
+
+test("screen-edge padding persists independently and reaches dialogs at every scale", async ({
+  page,
+}, info) => {
+  await page.goto("/");
+  const frame = page.locator(".appFrame");
+  await expect(frame).toHaveCSS("padding-left", "0px");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Advanced display", exact: true })
+    .click();
+  const padding = page.getByRole("group", {
+    name: "Screen-edge padding",
+    exact: true,
+  });
+  await expect(
+    padding.getByRole("button", { name: "0%", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await padding.getByRole("button", { name: "4%", exact: true }).click();
+  const viewport = page.viewportSize()!;
+  const margin = Math.ceil(Math.min(viewport.width, viewport.height) * 0.04);
+  await expect(frame).toHaveCSS("padding-left", `${margin}px`);
+  await expect(frame).toHaveCSS("padding-top", `${margin}px`);
+  await page.reload();
+  await expect(frame).toHaveCSS("padding-left", `${margin}px`);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Advanced display", exact: true })
+    .click();
+  await expect(
+    padding.getByRole("button", { name: "4%", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const scale = page.getByRole("combobox", {
+    name: "Interface scale",
+    exact: true,
+  });
+  await expect(scale).toHaveValue("1");
+  await page.getByRole("button", { name: "Single tool", exact: true }).click();
+  await scale.selectOption("1.5");
+  await expect(frame).toHaveCSS("padding-left", `${margin}px`);
+  await page
+    .getByRole("region", { name: "Display", exact: true })
+    .scrollIntoViewIfNeeded();
+  await reviewScreenshot(page, {
+    path: info.outputPath("display-padding.png"),
+    animations: "disabled",
+  });
+  await scale.selectOption("2.5");
+  await expect(frame).toHaveCSS("padding-left", `${margin}px`);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
+  await page.getByRole("button", { name: "Clear cache", exact: true }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Clear cache and reload?",
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  const bounds = (await dialog.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(margin);
+  expect(bounds.y).toBeGreaterThanOrEqual(margin);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+    viewport.width - margin + 1,
+  );
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(
+    viewport.height - margin + 1,
+  );
 });
 
 for (const { pointerTarget, deferPlayFocus } of [

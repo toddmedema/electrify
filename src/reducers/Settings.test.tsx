@@ -1,4 +1,5 @@
 import type { DesktopBridge } from "../Desktop";
+import { seatPresentation } from "../couch/Presentation";
 
 jest.mock("../Globals", () => ({
   getLocalStorage: () => globalThis.localStorage,
@@ -135,18 +136,14 @@ it("keeps TV presentation opt-in and restores its bounded device choices", () =>
   window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
   const { default: reducer, initialSettings, change } = settings();
   expect(initialSettings.tvMode).toBeUndefined();
-  const tv = reducer(
-    initialSettings,
-    change({ tvMode: true, tvScale: 1.75, tvInset: 4 }),
-  );
-  expect(tv).toMatchObject({ tvMode: true, tvScale: 1.75, tvInset: 4 });
+  const tv = reducer(initialSettings, change({ tvMode: true, tvScale: 1.75 }));
+  expect(tv).toMatchObject({ tvMode: true, tvScale: 1.75 });
   expect(settings().initialSettings).toMatchObject({
     tvMode: true,
     tvScale: 1.75,
-    tvInset: 4,
   });
-  const invalid = reducer(tv, change({ tvScale: 99, tvInset: -4 }));
-  expect(invalid).toMatchObject({ tvScale: 1.5, tvInset: 2 });
+  const invalid = reducer(tv, change({ tvScale: 99 }));
+  expect(invalid).toMatchObject({ tvScale: 1.5 });
   const desktop = reducer(invalid, change({ tvMode: false }));
   expect(desktop.tvMode).toBe(false);
   expect(settings().initialSettings.tvMode).toBe(false);
@@ -174,7 +171,7 @@ it.each(["standalone", "ios"])(
     expect(initialSettings.steamTimelineEnabled).toBeUndefined();
     expect(initialSettings.tvMode).toBeUndefined();
     expect(initialSettings.tvScale).toBeUndefined();
-    expect(initialSettings.tvInset).toBeUndefined();
+    expect(initialSettings.screenEdgePadding).toBe(0);
     reducer(initialSettings, change({ audioEnabled: false }));
     expect(settings().initialSettings.audioEnabled).toBe(false);
     reducer(initialSettings, change({ audioEnabled: true }));
@@ -209,4 +206,106 @@ it("rejects an invalid runtime workspace and persists the valid fallback", () =>
   );
   expect(updated.workspace).toBe("automatic");
   expect(settings().initialSettings.workspace).toBe("automatic");
+});
+
+it.each([
+  [undefined, undefined, 0],
+  [undefined, "4", 0],
+  ["false", "4", 0],
+  ["true", undefined, 2],
+  ["true", "0", 0],
+  ["true", "2", 2],
+  ["true", "4", 4],
+  ["true", "4junk", 0],
+  ["true", "", 0],
+  ["true", "Infinity", 0],
+  ["true", '"4"', 0],
+])(
+  "migrates padding only from the active legacy layout: %p, %p",
+  (mode, inset, expected) => {
+    if (mode !== undefined) localStorage.setItem("tvMode", mode);
+    if (inset !== undefined) localStorage.setItem("tvInset", inset);
+    expect(settings().initialSettings.screenEdgePadding).toBe(expected);
+    expect(localStorage.getItem("screenEdgePadding")).toBe(String(expected));
+    localStorage.setItem("tvMode", "false");
+    expect(settings().initialSettings.screenEdgePadding).toBe(expected);
+  },
+);
+
+it.each([
+  "",
+  "NaN",
+  "Infinity",
+  "true",
+  "null",
+  '"4"',
+  "[]",
+  "{}",
+  "-2",
+  "3",
+  "4.1",
+  "4junk",
+  "0x4",
+])(
+  "rejects malformed stored padding without reviving legacy inset: %p",
+  (padding) => {
+    localStorage.setItem("screenEdgePadding", padding);
+    localStorage.setItem("tvMode", "true");
+    localStorage.setItem("tvInset", "4");
+    expect(settings().initialSettings.screenEdgePadding).toBe(0);
+  },
+);
+
+it("persists independent padding choices and rejects invalid runtime values", () => {
+  const { default: reducer, initialSettings, change } = settings();
+  expect(initialSettings.screenEdgePadding).toBe(0);
+  for (const padding of [4, 2, 0] as const) {
+    const updated = reducer(
+      initialSettings,
+      change({ screenEdgePadding: padding }),
+    );
+    expect(updated.screenEdgePadding).toBe(padding);
+    expect(settings().initialSettings.screenEdgePadding).toBe(padding);
+    expect(updated.workspace).toBe("automatic");
+    expect(updated.interfaceScale).toBe(1);
+  }
+  const invalid = reducer(
+    initialSettings,
+    change({ screenEdgePadding: -4 } as unknown as Parameters<
+      typeof change
+    >[0]),
+  );
+  expect(invalid.screenEdgePadding).toBe(0);
+  expect(localStorage.getItem("screenEdgePadding")).toBe("0");
+});
+
+it("projects zero padding to seats without overwriting shared shell preferences", () => {
+  const {
+    default: reducer,
+    initialSettings,
+    change,
+    applyPresentation,
+  } = settings();
+  const shell = reducer(
+    initialSettings,
+    change({
+      screenEdgePadding: 4,
+      workspace: "automatic",
+      interfaceScale: 1.5,
+      audioEnabled: true,
+    }),
+  );
+  const seat = reducer(shell, applyPresentation(seatPresentation(shell)));
+  expect(seat).toMatchObject({
+    screenEdgePadding: 0,
+    workspace: "single",
+    interfaceScale: 1.5,
+    audioEnabled: false,
+  });
+  expect(settings().initialSettings).toMatchObject({
+    screenEdgePadding: 4,
+    workspace: "automatic",
+    interfaceScale: 1.5,
+    audioEnabled: true,
+  });
 });
