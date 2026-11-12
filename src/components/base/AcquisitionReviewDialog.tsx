@@ -9,7 +9,12 @@ import {
 } from "../../reducers/GameActions";
 import { previewUtilityAcquisition } from "../../reducers/Game";
 import { acquisitionQuote } from "../../helpers/Expansion";
-import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
+import {
+  formatCount,
+  formatMoneyConcise,
+  formatPercent,
+  formatWatts,
+} from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import PurchaseReviewDialog from "./PurchaseReviewDialog";
 import DecisionImpactPreview from "./DecisionImpactPreview";
@@ -48,7 +53,8 @@ export default function AcquisitionReviewDialog({
     };
   }, [dispatch, targetId]);
   const quote = acquisitionQuote(game, targetId);
-  const cash = useBuildCash(currentTick(game)?.cash ?? 0);
+  const now = currentTick(game);
+  const cash = useBuildCash(now?.cash ?? 0);
   const preview = React.useMemo(
     () => previewUtilityAcquisition(game, targetId, true),
     [game, targetId],
@@ -68,6 +74,12 @@ export default function AcquisitionReviewDialog({
       </DecisionDialog>
     );
   const valley = quote.targetId === "valley-electric";
+  const customersBefore = now?.customers ?? 0;
+  const customersAfter = customersBefore + quote.customers;
+  const customerGrowth =
+    customersBefore > 0
+      ? ` (+${formatPercent(quote.customers / customersBefore)})`
+      : "";
   const nuclear = quote.contracts.find(
     (contract) => contract.name === "Regional nuclear",
   );
@@ -101,14 +113,14 @@ export default function AcquisitionReviewDialog({
       extraFacts={[
         {
           concept: "customers",
-          label: "Customers joining",
-          value: Math.round(quote.customers).toLocaleString(),
+          label: "Customers",
+          value: `${formatCount(customersBefore)} → ${formatCount(customersAfter)}${customerGrowth}`,
         },
         {
           concept: "supply",
-          label: "Company supply margin",
+          label: "Supply margin",
           value: preview
-            ? `${marginText(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
+            ? `${formatWatts(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
             : "Forecast unavailable",
         },
       ]}

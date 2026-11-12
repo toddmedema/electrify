@@ -196,8 +196,22 @@ for (const theme of ["light", "dark"] as const) {
       await expectContinuousDialogSurface(dialog);
       await expectDialogToFit(dialog);
       await expect(
-        dialog.getByText("Customers joining", { exact: true }),
+        dialog.getByText("Customers", { exact: true }),
       ).toBeVisible();
+      await expect(
+        dialog
+          .locator(".decisionImpactFact")
+          .filter({ hasText: /^Customers/ })
+          .locator(".decisionImpactFactValue"),
+      ).toHaveText(
+        index === 0 ? "90,000 → 249,000 (+177%)" : "249,000 → 299,000 (+20%)",
+      );
+      await expect(
+        dialog
+          .locator(".decisionImpactFact")
+          .filter({ hasText: /^Supply margin/ })
+          .locator(".decisionImpactFactValue"),
+      ).toHaveText(/^[\d.]+[kMG]?W → [\d.]+[kMG]?W spare$/);
       await expect(
         dialog.getByRole("region", { name: "Acquisition obligations" }),
       ).toBeVisible();
@@ -206,12 +220,7 @@ for (const theme of ["light", "dark"] as const) {
       );
       await expectPurchaseFactTable(
         dialog,
-        [
-          "Cash option",
-          "Loan option",
-          "Customers joining",
-          "Company supply margin",
-        ],
+        ["Cash option", "Loan option", "Customers", "Supply margin"],
         facilityStyle,
       );
       for (const label of ["Cash option", "Loan option"]) {

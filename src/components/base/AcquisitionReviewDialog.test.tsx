@@ -19,13 +19,14 @@ import { UtilityTargetId } from "../../Types";
 import AcquisitionReviewDialog from "./AcquisitionReviewDialog";
 import { facilityDisplayName } from "./FacilityLabels";
 
-function review(targetId: UtilityTargetId, year = 2005) {
+function review(targetId: UtilityTargetId, year = 2005, customers = 90000) {
   const initial = createGame({
     scenarioId: 116,
     seed: 12345,
     difficulty: "Employee",
   });
   currentTick(initial)!.cash = 2e9;
+  currentTick(initial)!.customers = customers;
   const game = copyOfficialGame(
     reducer(
       initial,
@@ -71,11 +72,18 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     const user = userEvent.setup();
     const quote = review(targetId);
     expect(
-      screen.getByText(Math.round(quote.customers).toLocaleString()),
+      screen.getByText(
+        targetId === "valley-electric"
+          ? "90,000 → 249,000 (+177%)"
+          : "90,000 → 140,000 (+56%)",
+      ),
     ).toBeVisible();
     expect(screen.getByText(/Retain 90%/)).toBeVisible();
     expect(screen.getByText(/Retire the acquired oil/)).toBeVisible();
     const payments = screen.getByRole("region", { name: "Expected impact" });
+    expect(
+      within(payments).getByText(/^[\d.]+[kMG]?W → [\d.]+[kMG]?W spare$/),
+    ).toBeVisible();
     expect(payments).toHaveTextContent(
       `${formatMoneyConcise(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
     );
@@ -84,16 +92,9 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     );
     expect(
       within(payments)
-        .getAllByText(
-          /^(Cash option|Loan option|Customers joining|Company supply margin)$/,
-        )
+        .getAllByText(/^(Cash option|Loan option|Customers|Supply margin)$/)
         .map((node) => node.textContent),
-    ).toEqual([
-      "Cash option",
-      "Loan option",
-      "Customers joining",
-      "Company supply margin",
-    ]);
+    ).toEqual(["Cash option", "Loan option", "Customers", "Supply margin"]);
     expect(
       screen.getAllByRole("button", { name: /Pay cash|Take loan/ }),
     ).toHaveLength(2);
@@ -171,6 +172,7 @@ it.each([2017, 2024])(
 it("excludes expired power rights and past oil retirement commitments from a 2025 purchase", async () => {
   const quote = review("valley-electric", 2025);
   expect(quote.contracts).toEqual([]);
+  expect(screen.getByText(/^-.*W → .*W shortfall$/)).toBeVisible();
   const assets = disclosure("Plants & purchased power");
   await userEvent.click(within(assets).getByText("Plants & purchased power"));
   expect(
@@ -181,3 +183,14 @@ it("excludes expired power rights and past oil retirement commitments from a 202
   ).toBeVisible();
   expect(screen.queryByText(/Retire the acquired oil/)).not.toBeInTheDocument();
 });
+
+it.each([
+  [50000, "50,000 → 209,000 (+318%)"],
+  [0, "0 → 159,000"],
+] as const)(
+  "shows customer impact from an existing base of %i",
+  (customers, value) => {
+    review("valley-electric", 2005, customers);
+    expect(screen.getByText(value)).toBeVisible();
+  },
+);
