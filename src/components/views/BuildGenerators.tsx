@@ -209,9 +209,7 @@ function ExpectedOutputMetric(props: {
           : undefined
       }
       aria-describedby={variable ? captionId : undefined}
-      aria-keyshortcuts={
-        variable ? "ArrowLeft ArrowRight ArrowUp ArrowDown Home End" : undefined
-      }
+      aria-keyshortcuts={variable ? "ArrowLeft ArrowRight Home End" : undefined}
       onPointerMove={inspectPointer}
       onPointerDown={inspectPointer}
       onPointerLeave={() => setInspectedMonth(null)}
@@ -222,11 +220,9 @@ function ExpectedOutputMetric(props: {
         let nextMonth: number;
         switch (event.key) {
           case "ArrowLeft":
-          case "ArrowDown":
             nextMonth = Math.max(0, month - 1);
             break;
           case "ArrowRight":
-          case "ArrowUp":
             nextMonth = Math.min(11, month + 1);
             break;
           case "Home":

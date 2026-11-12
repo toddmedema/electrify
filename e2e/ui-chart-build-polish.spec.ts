@@ -2,7 +2,7 @@ import path from "node:path";
 import { expect, test, type Locator } from "./fixtures";
 import { openBuild, openPane, sortBuildCatalog } from "./layout";
 import { chartScale } from "../src/components/base/UPlotHelpers";
-import { editSavedGame } from "./save-fixture";
+import { editSavedGame, readSavedGame } from "./save-fixture";
 import { MINUTES_PER_MONTH } from "../src/helpers/DateTime";
 
 const scrollbarTest = test.extend({
@@ -163,6 +163,9 @@ for (const theme of ["light", "dark"] as const) {
       await page
         .getByRole("button", { name: "Start game", exact: true })
         .click();
+      await expect
+        .poll(async () => (await readSavedGame(page))?.scenarioId)
+        .toBe(108);
       await editSavedGame(page, (save) => {
         const game = save.game;
         game.speed = "PAUSED";

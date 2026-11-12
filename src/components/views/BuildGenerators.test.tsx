@@ -988,6 +988,16 @@ it.each(["weather", "water-inflow"] as const)(
     expect(metric).toHaveTextContent(`Jan: 12% ${unit}`);
     fireEvent.pointerCancel(metric);
     expect(metric).toHaveTextContent(`Aug: 7% ${unit}`);
+    for (const key of ["ArrowUp", "ArrowDown"]) {
+      const navigation = new KeyboardEvent("keydown", {
+        key,
+        bubbles: true,
+        cancelable: true,
+      });
+      fireEvent(metric, navigation);
+      expect(navigation.defaultPrevented).toBe(false);
+      expect(metric).toHaveTextContent(`Aug: 7% ${unit}`);
+    }
     fireEvent.focus(metric);
     fireEvent.keyDown(metric, { key: "ArrowRight" });
     expect(metric).toHaveTextContent(`Sep: 89% ${unit}`);
