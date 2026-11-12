@@ -74,9 +74,7 @@ export function shortfallTooltip(
   minute: number,
 ): string {
   const interval = shortfallAt(intervals, minute);
-  return interval
-    ? ` · ${formatWatts(unmetAt(timeline, minute))} unmet · ${formatWatts(interval.peakShortfall)} peak`
-    : "";
+  return interval ? ` · ${formatWatts(unmetAt(timeline, minute))} unmet` : "";
 }
 
 /** A full-height hit region follows x, independently of the nearest sample or pointer height. */

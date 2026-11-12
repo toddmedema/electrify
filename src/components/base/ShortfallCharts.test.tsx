@@ -68,11 +68,15 @@ it.each([
     expect(label).toContain(
       name === "monthly ranges" ? "13MW avg unmet" : "5MW unmet",
     );
-    expect(label).toContain("40MW peak");
-    expect(label.split("\n")[0]).toContain("40MW peak");
+    expect(label.includes("peak")).toBe(name === "monthly ranges");
+    expect(label.split("\n")[0]).toMatch(
+      name === "monthly ranges"
+        ? / · 13MW avg unmet · 40MW peak$/
+        : / · 5MW unmet$/,
+    );
     expect(label).not.toContain("Blackout:");
     const supplyLabel = name === "daily" ? "Total supply:" : "Supply:";
-    expect(label.indexOf("40MW peak")).toBeLessThan(label.indexOf(supplyLabel));
+    expect(label.indexOf("unmet")).toBeLessThan(label.indexOf(supplyLabel));
     expect(
       props.tooltip!(props.data[0].length - 1, props.state, MINUTES_PER_MONTH),
     ).not.toMatch(/\d+(?:MW|W) (?:avg )?unmet/);

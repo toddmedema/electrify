@@ -799,12 +799,11 @@ for (const theme of ["light", "dark"]) {
       expect(selected.width).toBeGreaterThan(box.width * 0.45);
       expect(selected.height).toBeCloseTo(box.height, 0);
       await expect(chart.locator(".chartTooltip")).toContainText("150MW unmet");
-      await expect(chart.locator(".chartTooltip")).toContainText("300MW peak");
+      await expect(chart.locator(".chartTooltip")).not.toContainText("peak");
     }
     const heading = chart.locator(".chartTooltip > div").first();
-    await expect(heading).toContainText("300MW peak");
     await expect(heading).toContainText(
-      /^\d{1,2}:\d{2}(?: [AP]M)? · 150MW unmet · 300MW peak$/,
+      /^\d{1,2}:\d{2}(?: [AP]M)? · 150MW unmet$/,
     );
     await expect(chart.locator(".chartTooltip")).not.toContainText("Blackout:");
     const headingLayout = await heading.evaluate((element) => ({
