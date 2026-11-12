@@ -1,5 +1,8 @@
 import { isTvLayout } from "../../TvLayout";
-import { getTextScale, subscribeTextSize } from "../../TextSize";
+import {
+  getInterfaceScale,
+  subscribeInterfaceScale,
+} from "../../InterfaceScale";
 import * as React from "react";
 import {
   Avatar,
@@ -879,7 +882,7 @@ function useFleetChartHeight(): number {
    * The couch reduction reserves fleet space before native view zoom magnifies the whole pane. */
   const measure = () => {
     const height = isTvLayout()
-      ? Math.round(220 * getTextScale())
+      ? Math.round(220 * getInterfaceScale())
       : fleetChartHeight(window.innerWidth, window.innerHeight);
     // Split-screen keeps the daily plot 20% shorter to leave room for the fleet.
     return window.electrifyCouch ? Math.round(height * 0.8) : height;
@@ -888,7 +891,7 @@ function useFleetChartHeight(): number {
   React.useEffect(() => {
     const resize = () => setHeight(measure());
     window.addEventListener("resize", resize);
-    const stop = subscribeTextSize(resize);
+    const stop = subscribeInterfaceScale(resize);
     return () => {
       window.removeEventListener("resize", resize);
       stop();

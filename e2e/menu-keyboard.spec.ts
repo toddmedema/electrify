@@ -51,6 +51,44 @@ test("Space opens Settings", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("interface scale persists and scales controls with text at every display height", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const scale = page.getByRole("combobox", {
+    name: "Interface scale",
+    exact: true,
+  });
+  const standardHeight = await scale.evaluate(
+    (element) => element.getBoundingClientRect().height,
+  );
+  await scale.selectOption("1.5");
+  await expect(page.locator("html")).toHaveCSS("font-size", "24px");
+  const enlargedHeight = await scale.evaluate(
+    (element) => element.getBoundingClientRect().height,
+  );
+  expect(enlargedHeight / standardHeight).toBeCloseTo(1.5, 1);
+  const originalViewport = page.viewportSize()!;
+  for (const height of [1080, 2160]) {
+    await page.setViewportSize({ ...originalViewport, height });
+    await expect(page.locator("html")).toHaveCSS("font-size", "24px");
+  }
+  await page.reload();
+  await expect(page.locator("html")).toHaveCSS("font-size", "24px");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(scale).toHaveValue("1.5");
+  await scale.selectOption("2.5");
+  await expect(page.locator("html")).toHaveCSS("font-size", "40px");
+  await page.setViewportSize(originalViewport);
+  await expect(scale).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - innerWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
+});
+
 test("Space toggles Sound", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();

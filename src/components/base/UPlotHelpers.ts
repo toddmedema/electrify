@@ -1,6 +1,6 @@
 import uPlot from "uplot";
 import { chartPalette, INTERFACE_FONT_FAMILY, withAlpha } from "../../Theme";
-import { getTextScale } from "../../TextSize";
+import { getInterfaceScale } from "../../InterfaceScale";
 import { ChartEventMarker } from "./ChartAnnotationsContext";
 import {
   axisTicksAreYearly,
@@ -35,7 +35,7 @@ export const MAX_CHART_SCALE = 1.4;
 
 /** Design units to CSS pixels for a chart of `width`. */
 export function chartScale(width: number): number {
-  return Math.min(width / DESIGN_WIDTH, MAX_CHART_SCALE) * getTextScale();
+  return Math.min(width / DESIGN_WIDTH, MAX_CHART_SCALE) * getInterfaceScale();
 }
 
 export const CHART_FONT_FAMILY = INTERFACE_FONT_FAMILY;
@@ -92,7 +92,7 @@ export const CHART_LABEL_PX = 12;
  * rewriting the ".9" of "43.9px" and handing the canvas a font it can't parse.
  */
 export function chartFont(pxRatio = 1, sizePx = CHART_TICK_PX): string {
-  return `${Math.max(1, Math.round(sizePx * getTextScale() * pxRatio))}px ${CHART_FONT_FAMILY}`;
+  return `${Math.max(1, Math.round(sizePx * getInterfaceScale() * pxRatio))}px ${CHART_FONT_FAMILY}`;
 }
 
 /**
@@ -164,7 +164,7 @@ export function expandedChartOptions(
         Math.max(
           reserve,
           textWidth(String(finalLabel), font, Number.parseFloat(font)) / 2 +
-            4 * getTextScale(),
+            4 * getInterfaceScale(),
         ),
       );
     };
@@ -209,7 +209,7 @@ export function expandedChartOptions(
                   ((splits[index] - min) / Math.max(1, max - min)) * plotWidth;
                 const fits = (left: number, right: number) =>
                   position(right) - position(left) >=
-                  (widths[left] + widths[right]) / 2 + 12 * getTextScale();
+                  (widths[left] + widths[right]) / 2 + 12 * getInterfaceScale();
                 const last = splits.length - 1;
                 const kept = [0];
                 // Reserve the last date before accepting an interior label. Index rounding alone
@@ -238,7 +238,9 @@ export function expandedChartOptions(
               value == null ? 0 : textWidth(String(value), font, sizePx),
             ),
           );
-          return Math.ceil(Math.max(natural, widest + 20 * getTextScale()));
+          return Math.ceil(
+            Math.max(natural, widest + 20 * getInterfaceScale()),
+          );
         },
       };
     }),
@@ -387,7 +389,7 @@ export function forecastMonthAxis(
  */
 export function yAxis(scale: number, o: AxisOptions): uPlot.Axis {
   const font = chartFont();
-  const fontSize = CHART_TICK_PX * getTextScale();
+  const fontSize = CHART_TICK_PX * getInterfaceScale();
   const fixed = (TICK_SIZE + LABEL_GAP + LABEL_EDGE_PAD) * scale;
   return {
     ...axisCommon(scale, o),
@@ -963,7 +965,7 @@ export function eventMarkersPlugin(
             ? originalTop(plot, side, sides, cycle)
             : (originalTop ?? 0);
         return (
-          top + (getMarkers().length ? 24 * getTextScale() * fontScale : 0)
+          top + (getMarkers().length ? 24 * getInterfaceScale() * fontScale : 0)
         );
       };
       options.padding = padding;
@@ -1029,7 +1031,7 @@ export function eventMarkersPlugin(
           return;
         }
         const scale = canvasScale(u);
-        const markerScale = uPlot.pxRatio * getTextScale() * fontScale;
+        const markerScale = uPlot.pxRatio * getInterfaceScale() * fontScale;
         const palette = chartPalette();
         const activeKey = getActiveKey();
         u.ctx.save();
@@ -1052,7 +1054,7 @@ export function eventMarkersPlugin(
         const badgeY = u.bbox.top - 12 * markerScale;
         // Match the rail's numbers without letting close event dates paint over one another.
         // A compact range shares one badge; the onset guides below retain every real date.
-        u.ctx.font = chartFont(1, (12 * markerScale) / getTextScale());
+        u.ctx.font = chartFont(1, (12 * markerScale) / getInterfaceScale());
         const groupBadge = (events: ChartEventMarker[]) => {
           const numbers = events.map((event) => event.number);
           const consecutive = numbers.every(

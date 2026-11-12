@@ -744,8 +744,8 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
   // text is already enabled by the real fixture, making its visible height 220 px.
   for (const seat of [p1, p2]) {
     await expect(seat.locator("html")).toHaveAttribute(
-      "data-text-size",
-      "larger",
+      "data-interface-scale",
+      "1.25",
     );
     const dailyChart = seat.locator(".facilitySupplyChart .accessibleChart");
     await expect(dailyChart).toBeVisible();
@@ -1282,13 +1282,20 @@ test("TV couch coalesces visual preferences without capturing audio changes", as
       // A burst traverses all visual fields before one paint. Later nonvisual
       // updates must neither trigger screenshots nor cancel the pending visual one.
       click("Appearance", choices.finalThemeLabel);
-      click("Text size", "Standard");
+      const scale = (value: string) => {
+        const select = dialog.querySelector<HTMLSelectElement>(
+          'select[aria-label="Interface scale"]',
+        )!;
+        select.value = value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+      scale("1");
       click("Units", "Imperial");
       click("Appearance", choices.otherThemeLabel);
-      click("Text size", "Larger");
+      scale("1.25");
       click("Units", "Metric");
       click("Appearance", choices.finalThemeLabel);
-      click("Text size", "Large");
+      scale("1.125");
       click("Units", "Imperial");
       const audio = dialog.querySelector<HTMLInputElement>(
         'input[aria-label="Sound"]',
@@ -1304,8 +1311,8 @@ test("TV couch coalesces visual preferences without capturing audio changes", as
       finalTheme,
     );
     await expect(seat.locator("html")).toHaveAttribute(
-      "data-text-size",
-      "large",
+      "data-interface-scale",
+      "1.125",
     );
   }
   await expect.poll(couch.refreshRequests).toBeGreaterThan(beforeVisual);

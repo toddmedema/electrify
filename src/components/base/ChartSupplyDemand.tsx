@@ -14,7 +14,7 @@ import {
   dayNightRibbonPlugin,
   formatClockTime,
 } from "./DayNightRibbon";
-import { getTextScale } from "../../TextSize";
+import { getInterfaceScale } from "../../InterfaceScale";
 import ChartLegend, { LegendItemType } from "./ChartLegend";
 import {
   anchoredForecastPaths,
@@ -286,7 +286,7 @@ function buildOptions({
     width: 0, // set by UPlotChart
     height: 0,
     pxAlign: 1,
-    padding: [18 * scale, 16, 24 * getTextScale(), 0],
+    padding: [18 * scale, 16, 24 * getInterfaceScale(), 0],
     cursor: {
       x: true,
       y: false,

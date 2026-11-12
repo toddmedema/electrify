@@ -9,7 +9,7 @@ import { ChartPresentationContext } from "./ChartPresentationContext";
 import { ChartViewportContext } from "./ChartViewportContext";
 import { ChartAxisAlignment } from "./ChartAxisAlignment";
 import { setThemeMode } from "../../Theme";
-import { applyTextSize } from "../../TextSize";
+import { applyInterfaceScale } from "../../InterfaceScale";
 import TutorialHud from "./TutorialHud";
 
 jest.mock("uplot", () => {
@@ -92,7 +92,7 @@ describe("UPlotChart resizing", () => {
     act(() => {
       delete document.documentElement.dataset.tvLayout;
       resetInputPresentation();
-      applyTextSize("standard");
+      applyInterfaceScale(1);
     });
     jest.restoreAllMocks();
     jest.useRealTimers();
@@ -423,7 +423,7 @@ describe("UPlotChart resizing", () => {
       />,
     );
     expect(uPlot).toHaveBeenCalledTimes(1);
-    act(() => applyTextSize("larger"));
+    act(() => applyInterfaceScale(1.25));
     expect(uPlotPrototype.destroy).toHaveBeenCalledTimes(1);
     expect(uPlot).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("img", { name: /Text size chart/ })).toBeVisible();

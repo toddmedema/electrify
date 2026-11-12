@@ -3,6 +3,7 @@ import {
   getStorageBooleanOrUndefined,
   getStorageChoice,
   getStorageNumber,
+  getStorageString,
   setStorageKeyValue,
 } from "../LocalStorage";
 import { SettingsType } from "../Types";
@@ -11,12 +12,35 @@ import { DEFAULT_UNIT_SYSTEM, UNIT_SYSTEMS } from "../helpers/Units";
 import { THEME_CHOICES } from "../Theme";
 import { isDesktopApp } from "../Desktop";
 import { isInstalledWebApp } from "../InstalledApp";
-import { normalizeTextSize, TEXT_SIZES } from "../TextSize";
+import { getLocalStorage } from "../Globals";
+import {
+  migrateInterfaceScale,
+  normalizeInterfaceScale,
+} from "../InterfaceScale";
 import { normalizeTvInset, normalizeTvScale } from "../TvLayout";
 
 function storedVolume(key: string): number {
   const value = getStorageNumber(key, 1);
   return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1;
+}
+
+function storedInterfaceScale(): number {
+  const stored = getLocalStorage().getItem("interfaceScale");
+  if (stored !== null) {
+    try {
+      return normalizeInterfaceScale(JSON.parse(stored));
+    } catch (_error) {
+      return 1;
+    }
+  }
+  const scale = migrateInterfaceScale(
+    getStorageString("textSize", "standard"),
+    getStorageBooleanOrUndefined("tvMode"),
+    getStorageNumber("tvScale", 1.5),
+  );
+  // Persist once so later layout changes cannot reinterpret old TV preferences.
+  setStorageKeyValue("interfaceScale", scale);
+  return scale;
 }
 
 export const initialSettings: SettingsType = {
@@ -29,7 +53,7 @@ export const initialSettings: SettingsType = {
   // Following the OS is the only default that is right for both kinds of player without being
   // asked, and it is what every other app on their machine does
   theme: getStorageChoice("theme", THEME_CHOICES, "system"),
-  textSize: getStorageChoice("textSize", TEXT_SIZES, "standard"),
+  interfaceScale: storedInterfaceScale(),
 };
 
 // Installed apps start with sound enabled; a saved preference always wins.
@@ -58,8 +82,10 @@ export const settingsSlice = createSlice({
   reducers: {
     change: (state, action: PayloadAction<Partial<SettingsType>>) => {
       const changes = { ...action.payload };
-      if (Object.prototype.hasOwnProperty.call(changes, "textSize"))
-        changes.textSize = normalizeTextSize(changes.textSize);
+      if (Object.prototype.hasOwnProperty.call(changes, "interfaceScale"))
+        changes.interfaceScale = normalizeInterfaceScale(
+          changes.interfaceScale,
+        );
       if (Object.prototype.hasOwnProperty.call(changes, "tvScale"))
         changes.tvScale = normalizeTvScale(changes.tvScale);
       if (Object.prototype.hasOwnProperty.call(changes, "tvInset"))

@@ -36,7 +36,7 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onSoundEffectsVolumeChange: () => undefined,
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
-    onTextSizeChange: () => undefined,
+    onInterfaceScaleChange: () => undefined,
     onBack: () => undefined,
     ...overrides,
   };
@@ -189,20 +189,32 @@ describe("Settings", () => {
     expect(onUnitsChange).toHaveBeenCalledWith("imperial");
   });
 
-  it("offers a standard default and explicit larger text sizes", async () => {
-    const onTextSizeChange = jest.fn();
-    renderSettings({ onTextSizeChange });
-    const sizes = screen.getByRole("group", { name: "Text size" });
+  it("offers explicit interface scales from 100% through 250%", async () => {
+    const onInterfaceScaleChange = jest.fn();
+    renderSettings({ onInterfaceScaleChange });
+    const scale = screen.getByRole("combobox", { name: "Interface scale" });
+    expect(scale).toHaveValue("1");
+    await userEvent.selectOptions(scale, "1.5");
+    await userEvent.selectOptions(scale, "2.5");
+    expect(onInterfaceScaleChange.mock.calls).toEqual([[1.5], [2.5]]);
+    expect(screen.queryByText("TV scale")).not.toBeInTheDocument();
+  });
+
+  it("displays an exact migrated intermediate scale", () => {
+    renderSettings({
+      settings: {
+        theme: "system",
+        units: "metric",
+        musicVolume: 1,
+        soundEffectsVolume: 1,
+        interfaceScale: 1.96875,
+      },
+    });
+    const scale = screen.getByRole("combobox", { name: "Interface scale" });
+    expect(scale).toHaveValue("1.96875");
     expect(
-      within(sizes).getByRole("button", { name: "Standard" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(
-      within(sizes).getByRole("button", { name: /^Large$/ }),
-    );
-    await userEvent.click(
-      within(sizes).getByRole("button", { name: /^Larger$/ }),
-    );
-    expect(onTextSizeChange.mock.calls).toEqual([["large"], ["larger"]]);
+      within(scale).getByRole("option", { name: "196.875%" }),
+    ).toBeInTheDocument();
   });
 
   it("keeps physical keyboard shortcuts out of active controller help", () => {
@@ -214,7 +226,9 @@ describe("Settings", () => {
     expect(
       screen.queryByRole("heading", { name: "Keyboard shortcuts" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Text size" })).toBeVisible();
+    expect(
+      screen.getByRole("combobox", { name: "Interface scale" }),
+    ).toBeVisible();
     act(() => updateInputPresentation({ active: false }));
     expect(
       screen.getByRole("heading", { name: "Keyboard shortcuts" }),

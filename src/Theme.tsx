@@ -325,6 +325,8 @@ export function createAppTheme(mode: ThemeModeType): Theme {
   // than it on dark, so the response is a change in value on either palette.
   const interactiveHover = mode === "dark" ? "#7eaee9" : primaryDarkColor;
   const built = createTheme({
+    // MUI spacing and control geometry follow the same root rem as text and chart labels.
+    spacing: (factor: number) => `${factor * 0.5}rem`,
     palette: {
       mode,
       primary: {
@@ -392,8 +394,9 @@ export function createAppTheme(mode: ThemeModeType): Theme {
         defaultProps: { disableElevation: true },
         styleOverrides: {
           root: {
-            minHeight: 40,
-            "@media (pointer: coarse)": { minHeight: 44 },
+            minHeight: "2.5rem",
+            padding: "0.375rem 1rem",
+            "@media (pointer: coarse)": { minHeight: "2.75rem" },
             fontWeight: 600,
             textTransform: "none",
             touchAction: "manipulation",
@@ -428,9 +431,13 @@ export function createAppTheme(mode: ThemeModeType): Theme {
             },
             textTransform: "none",
             fontWeight: 600,
-            minHeight: 40,
-            minWidth: 40,
-            "@media (pointer: coarse)": { minHeight: 44, minWidth: 44 },
+            minHeight: "2.5rem",
+            minWidth: "2.5rem",
+            padding: "0.6875rem",
+            "@media (pointer: coarse)": {
+              minHeight: "2.75rem",
+              minWidth: "2.75rem",
+            },
           },
         },
       },
@@ -438,9 +445,13 @@ export function createAppTheme(mode: ThemeModeType): Theme {
         defaultProps: { color: "primary" },
         styleOverrides: {
           root: {
-            minWidth: 40,
-            minHeight: 40,
-            "@media (pointer: coarse)": { minWidth: 44, minHeight: 44 },
+            minWidth: "2.5rem",
+            minHeight: "2.5rem",
+            padding: "0.5rem",
+            "@media (pointer: coarse)": {
+              minWidth: "2.75rem",
+              minHeight: "2.75rem",
+            },
           },
         },
       },
@@ -448,13 +459,13 @@ export function createAppTheme(mode: ThemeModeType): Theme {
         defaultProps: { size: "small" },
         styleOverrides: {
           select: {
-            paddingTop: 8,
-            paddingBottom: 8,
+            paddingTop: "0.5rem",
+            paddingBottom: "0.5rem",
             "&:not(.Mui-disabled)": {
               color: palette.interactive,
             },
           },
-          standard: { paddingLeft: 8 },
+          standard: { paddingLeft: "0.5rem" },
           icon: {
             "&:not(.Mui-disabled)": {
               color: palette.interactive,
@@ -465,11 +476,22 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiMenuItem: {
         styleOverrides: {
           root: {
-            minHeight: 40,
-            "@media (pointer: coarse)": { minHeight: 44 },
+            minHeight: "2.5rem",
+            "@media (pointer: coarse)": { minHeight: "2.75rem" },
             "&:not(.Mui-disabled)": {
               color: mode === "dark" ? "#e6edf5" : "#172334",
             },
+          },
+        },
+      },
+      MuiNativeSelect: {
+        styleOverrides: {
+          select: {
+            boxSizing: "border-box",
+            minHeight: "2.5rem",
+            paddingTop: "0.5rem",
+            paddingBottom: "0.5rem",
+            "@media (pointer: coarse)": { minHeight: "2.75rem" },
           },
         },
       },
@@ -489,8 +511,8 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiInputBase: {
         styleOverrides: {
           root: {
-            minHeight: 40,
-            "@media (pointer: coarse)": { minHeight: 44 },
+            minHeight: "2.5rem",
+            "@media (pointer: coarse)": { minHeight: "2.75rem" },
           },
         },
       },
@@ -518,7 +540,25 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       },
       MuiSwitch: {
         styleOverrides: {
+          root: {
+            width: "3.625rem",
+            height: "2.375rem",
+            padding: "0.75rem",
+            "&.MuiSwitch-sizeSmall": {
+              width: "2.5rem",
+              height: "1.5rem",
+              padding: "0.4375rem",
+            },
+          },
+          thumb: { width: "1.25rem", height: "1.25rem" },
           switchBase: {
+            padding: "0.5625rem",
+            "&.Mui-checked": { transform: "translateX(1.25rem)" },
+            ".MuiSwitch-sizeSmall &": {
+              padding: "0.25rem",
+              "&.Mui-checked": { transform: "translateX(1rem)" },
+              "& .MuiSwitch-thumb": { width: "1rem", height: "1rem" },
+            },
             // Blue means on: an off thumb is neutral.
             "&:not(.Mui-disabled):not(.Mui-checked)": {
               color: "var(--font-color-faded)",

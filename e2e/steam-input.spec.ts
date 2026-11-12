@@ -786,7 +786,7 @@ test("controller chooses an autocomplete city and starts a custom game", async (
   expect(save.game.location.name).toBe("Paris, France");
 });
 
-test("controller changes text size, keeps settings reachable and persists it", async ({
+test("controller changes interface scale, keeps settings reachable and persists it", async ({
   page,
 }, testInfo) => {
   await page.goto("/");
@@ -799,16 +799,15 @@ test("controller changes text size, keeps settings reachable and persists it", a
     page.getByRole("button", { name: "Settings", exact: true }),
   );
   await input(page, "confirm");
-  const larger = page.getByRole("button", { name: "Larger", exact: true });
-  await select(
-    page,
-    page.getByRole("button", { name: "Standard", exact: true }),
-  );
-  await input(page, "right");
-  await input(page, "right");
-  await expect(larger).toBeFocused();
-  await input(page, "confirm");
-  await expect(larger).toHaveAttribute("aria-pressed", "true");
+  const scale = page.getByRole("combobox", {
+    name: "Interface scale",
+    exact: true,
+  });
+  await select(page, scale);
+  await input(page, "down");
+  await input(page, "down");
+  await expect(scale).toBeFocused();
+  await expect(scale).toHaveValue("1.25");
   await expect(page.locator("html")).toHaveCSS("font-size", "20px");
   await expect(page.getByText(/F11 or Alt\+Enter/)).toHaveCount(0);
   await expect(
@@ -836,10 +835,10 @@ test("controller changes text size, keeps settings reachable and persists it", a
     page.getByRole("button", { name: "Settings", exact: true }),
   );
   await input(page, "confirm");
-  await expect(larger).toHaveAttribute("aria-pressed", "true");
-  expect(await page.evaluate(() => localStorage.getItem("textSize"))).toBe(
-    "larger",
-  );
+  await expect(scale).toHaveValue("1.25");
+  expect(
+    await page.evaluate(() => localStorage.getItem("interfaceScale")),
+  ).toBe("1.25");
 });
 
 test("controller opens Workshop and enters a multiplayer invite with Steam text entry", async ({
@@ -1077,23 +1076,19 @@ async function setupTv(page: Page, maximum: boolean, theme: "light" | "dark") {
   await select(page, tv);
   await input(page, "confirm");
   await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
+  await select(
+    page,
+    page.getByRole("button", { name: "Settings", exact: true }),
+  );
+  await input(page, "confirm");
+  await page
+    .getByRole("combobox", { name: "Interface scale", exact: true })
+    .selectOption(maximum ? "2.5" : "1.5");
   if (maximum) {
-    await select(
-      page,
-      page.getByRole("button", { name: "Settings", exact: true }),
-    );
-    await input(page, "confirm");
-    await select(page, page.getByRole("button", { name: "200%", exact: true }));
-    await input(page, "confirm");
-    await select(
-      page,
-      page.getByRole("button", { name: "Larger", exact: true }),
-    );
-    await input(page, "confirm");
     await select(page, page.getByRole("button", { name: "4%", exact: true }));
     await input(page, "confirm");
-    await input(page, "back");
   }
+  await input(page, "back");
 }
 
 function skipNonTv(info: TestInfo) {

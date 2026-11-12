@@ -15,7 +15,10 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { CityType } from "../../data/Cities";
-import { getTextScale, subscribeTextSize } from "../../TextSize";
+import {
+  getInterfaceScale,
+  subscribeInterfaceScale,
+} from "../../InterfaceScale";
 import { useTvLayout } from "../../TvLayout";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { WORLD_LAND_PATH } from "./WorldLand";
@@ -109,8 +112,8 @@ export default function LocationPicker({
   const coarsePointer = useMediaQuery("(pointer: coarse)");
   const tvMode = useTvLayout();
   const textScale = React.useSyncExternalStore(
-    subscribeTextSize,
-    getTextScale,
+    subscribeInterfaceScale,
+    getInterfaceScale,
     () => 1,
   );
   // Clustering and visible targets must share the same measured footprint.

@@ -57,8 +57,8 @@ import {
 import { ThemeChoiceType } from "./Types";
 import { InstallPromptProvider } from "./components/base/InstallAppButton";
 import type { DesktopPowerState } from "./Desktop";
-import { applyTextSize } from "./TextSize";
-import { normalizeTvInset, tvDisplayScale, tvLayoutEnabled } from "./TvLayout";
+import { applyInterfaceScale } from "./InterfaceScale";
+import { normalizeTvInset, tvLayoutEnabled } from "./TvLayout";
 import { getDesktop, isDesktopApp } from "./Desktop";
 
 const AchievementNotifications = lazy(
@@ -143,15 +143,15 @@ export function ThemedApp(props: {
     (state) => state.settings.theme,
   );
   const settings = useAppSelector((state) => state.settings);
-  const { textSize, tvScale, tvInset } = settings;
+  const { interfaceScale, tvInset } = settings;
   const tvMode = tvLayoutEnabled(settings);
   const [viewport, setViewport] = useState(() => ({
     width: window.innerWidth,
     height: window.innerHeight,
   }));
   useLayoutEffect(() => {
-    /** Apply shared text preferences once; native seat zoom already supplies TV magnification.
-     * Keeping seat display scale at one prevents multiplying the same presentation twice. */
+    // The explicit preference applies equally to the shell and seats. Native seat zoom
+    // remains independent; neither resolution nor TV layout contributes another multiplier.
     const apply = () => {
       const root = document.documentElement;
       root.dataset.tvLayout = String(tvMode);
@@ -159,12 +159,7 @@ export function ThemedApp(props: {
         "--tv-inset",
         tvMode ? `${normalizeTvInset(tvInset)}vmin` : "0px",
       );
-      applyTextSize(
-        textSize,
-        tvMode && !window.electrifyCouch
-          ? tvDisplayScale(tvScale, window.innerHeight)
-          : 1,
-      );
+      applyInterfaceScale(interfaceScale);
     };
     apply();
     const resize = () => {
@@ -173,7 +168,7 @@ export function ThemedApp(props: {
     };
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, [textSize, tvMode, tvScale, tvInset]);
+  }, [interfaceScale, tvMode, tvInset]);
   // "System" is a standing instruction rather than a value, and the system can change its mind
   // while the game is open - at sunset, on a schedule, or because the player just flipped it
   const [systemDark, setSystemDark] = useState(prefersDarkMode);

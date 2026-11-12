@@ -2,11 +2,11 @@
 // On the root, because toasts render outside the workspace and clear the same dock.
 :root {
   --game-dock-bottom: max(12px, env(safe-area-inset-bottom));
-  --game-dock-button-width: 72px;
-  --game-dock-button-height: 56px;
-  --game-dock-icon-size: 24px;
+  --game-dock-button-width: 4.5rem;
+  --game-dock-button-height: 3.5rem;
+  --game-dock-icon-size: 1.5rem;
   --game-dock-label-size: var(--font-size-caption-sm);
-  --game-dock-label-line: 16px;
+  --game-dock-label-line: 1rem;
   // The dock and 24px of air above it.
   --game-dock-clearance: calc(
     var(--game-dock-button-height) + 24px + var(--game-dock-bottom)
@@ -19,21 +19,21 @@
 @media (min-width: 1600px) {
   :root {
     --game-dock-bottom: max(24px, env(safe-area-inset-bottom));
-    --game-dock-button-width: 88px;
-    --game-dock-button-height: 64px;
-    --game-dock-icon-size: 28px;
+    --game-dock-button-width: 5.5rem;
+    --game-dock-button-height: 4rem;
+    --game-dock-icon-size: 1.75rem;
     --game-dock-label-size: 0.8125rem;
-    --game-dock-label-line: 18px;
+    --game-dock-label-line: 1.125rem;
   }
 }
 @media (min-width: 2200px) {
   :root {
     --game-dock-bottom: max(40px, env(safe-area-inset-bottom));
-    --game-dock-button-width: 104px;
-    --game-dock-button-height: 76px;
-    --game-dock-icon-size: 34px;
+    --game-dock-button-width: 6.5rem;
+    --game-dock-button-height: 4.75rem;
+    --game-dock-icon-size: 2.125rem;
     --game-dock-label-size: 0.9375rem;
-    --game-dock-label-line: 20px;
+    --game-dock-label-line: 1.25rem;
   }
 }
 
@@ -151,7 +151,7 @@
     background: var(--bg-raised);
 
     > svg {
-      font-size: 16px;
+      font-size: 1rem;
     }
   }
 }
@@ -204,7 +204,7 @@
 
   > svg {
     color: var(--font-color-faded);
-    font-size: 20px;
+    font-size: 1.25rem;
   }
   h2 {
     display: flex;
@@ -221,7 +221,7 @@
     color: var(--font-color-faded);
 
     > svg {
-      font-size: 20px;
+      font-size: 1.25rem;
     }
   }
   // The heading only receives focus to place a keyboard user inside the tool; it is not a

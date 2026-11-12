@@ -10,7 +10,10 @@ import {
   hoverPoints,
 } from "./UPlotHelpers";
 import { getThemeVersion, subscribeThemeMode } from "../../Theme";
-import { getTextScale, subscribeTextSize } from "../../TextSize";
+import {
+  getInterfaceScale,
+  subscribeInterfaceScale,
+} from "../../InterfaceScale";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { ChartPresentationContext } from "./ChartPresentationContext";
 import { ChartAnnotationsContext } from "./ChartAnnotationsContext";
@@ -321,7 +324,7 @@ function tvChartHeight(root: HTMLElement | null, requested: number): number {
   if (!isTvLayout()) return requested;
   // Stacked evidence needs room for its heading, legend and event row as well as its axes.
   let height = root?.closest(".insightsTracks")
-    ? Math.min(requested, 200 * getTextScale())
+    ? Math.min(requested, 200 * getInterfaceScale())
     : requested;
   for (
     let parent = root?.parentElement;
@@ -334,7 +337,7 @@ function tvChartHeight(root: HTMLElement | null, requested: number): number {
     )
       height = Math.min(
         height,
-        Math.max(1, parent.clientHeight - 16 * getTextScale()),
+        Math.max(1, parent.clientHeight - 16 * getInterfaceScale()),
       );
   }
   return height;
@@ -464,9 +467,9 @@ export default function UPlotChart<S>(
     getThemeVersion,
   );
   const textScale = React.useSyncExternalStore(
-    subscribeTextSize,
-    getTextScale,
-    getTextScale,
+    subscribeInterfaceScale,
+    getInterfaceScale,
+    getInterfaceScale,
   );
   const [fontReady, setFontReady] = React.useState(
     () => !document.fonts || document.fonts.check("14px Inter"),

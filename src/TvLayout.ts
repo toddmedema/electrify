@@ -1,7 +1,7 @@
 import { isDesktopApp } from "./Desktop";
 import type { SettingsType } from "./Types";
 import { useSyncExternalStore } from "react";
-import { subscribeTextSize } from "./TextSize";
+import { subscribeInterfaceScale } from "./InterfaceScale";
 
 export const TV_SCALES = [1.5, 1.75, 2] as const;
 export const TV_INSETS = [0, 2, 4] as const;
@@ -18,14 +18,9 @@ export function tvLayoutEnabled(settings?: SettingsType): boolean {
   );
 }
 
-/** A 4K display keeps the same information density as a 1080p display. */
-export function tvDisplayScale(scale: unknown, height: number): number {
-  return normalizeTvScale(scale) * Math.max(1, height / 1080);
-}
-
 /** Read the applied presentation, including in components rendered without Redux wiring. */
 export const isTvLayout = () =>
   document.documentElement.dataset.tvLayout === "true";
 export function useTvLayout(): boolean {
-  return useSyncExternalStore(subscribeTextSize, isTvLayout, () => false);
+  return useSyncExternalStore(subscribeInterfaceScale, isTvLayout, () => false);
 }

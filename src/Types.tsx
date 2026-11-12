@@ -1490,8 +1490,6 @@ export type ThemeModeType = "light" | "dark";
 // follow the OS rather than a palette of its own, and it can change while the game is open
 export type ThemeChoiceType = ThemeModeType | "system";
 
-export type TextSizeType = "standard" | "large" | "larger";
-
 export interface SettingsType {
   audioEnabled?: boolean;
   // Independent buses: zero mutes one without silencing the other. audioEnabled is the master
@@ -1502,8 +1500,8 @@ export interface SettingsType {
   steamTimelineEnabled?: boolean;
   units: UnitSystemType;
   theme: ThemeChoiceType;
-  // Device preference: old settings and saved fixtures use the standard size.
-  textSize?: TextSizeType;
+  // Explicit device multiplier; absent in older fixtures means 100%.
+  interfaceScale?: number;
   // TV presentation belongs to this device, independently of saved campaigns.
   tvMode?: boolean;
   tvScale?: number;

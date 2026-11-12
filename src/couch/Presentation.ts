@@ -4,7 +4,7 @@ import type { SettingsType } from "../Types";
 export function seatPresentation(settings: SettingsType) {
   return {
     theme: settings.theme,
-    textSize: settings.textSize,
+    interfaceScale: settings.interfaceScale,
     units: settings.units,
     tvMode: true,
     tvInset: 0,

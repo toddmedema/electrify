@@ -5,12 +5,7 @@ import { navigateBack } from "../../reducers/Card";
 import { change as changeSettings } from "../../reducers/Settings";
 import { delta as userDelta, logout } from "../../reducers/User";
 import { login } from "../../Globals";
-import {
-  AppStateType,
-  TextSizeType,
-  ThemeChoiceType,
-  UnitSystemType,
-} from "../../Types";
+import { AppStateType, ThemeChoiceType, UnitSystemType } from "../../Types";
 import Settings, { DispatchProps, StateProps } from "./Settings";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -55,8 +50,8 @@ const mapDispatchToProps = (
     onThemeChange: (v: ThemeChoiceType) => {
       dispatch(changeSettings({ theme: v }));
     },
-    onTextSizeChange: (textSize: TextSizeType) => {
-      dispatch(changeSettings({ textSize }));
+    onInterfaceScaleChange: (interfaceScale: number) => {
+      dispatch(changeSettings({ interfaceScale }));
     },
     // Mirrors Manual: Settings can now be reached mid-game too, so back has to return wherever
     // the player came from rather than always dropping them at the main menu

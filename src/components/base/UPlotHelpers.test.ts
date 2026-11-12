@@ -17,17 +17,17 @@ import {
   shortfallBarsPlugin,
   zeroLinePlugin,
 } from "./UPlotHelpers";
-import { applyTextSize } from "../../TextSize";
+import { applyInterfaceScale } from "../../InterfaceScale";
 import { chartPalette } from "../../Theme";
 
 it("enlarges canvas labels and their reserved chart space with the text preference", () => {
   const values = () => ["100MW"];
   try {
-    applyTextSize("standard");
+    applyInterfaceScale(1);
     const standardScale = chartScale(350);
     const standardAxis = xAxis(standardScale, { values });
     expect(chartFont()).toMatch(/^12px /);
-    applyTextSize("larger");
+    applyInterfaceScale(1.25);
     const largerScale = chartScale(350);
     expect(chartFont()).toMatch(/^15px /);
     expect(chartFont(2)).toMatch(/^30px /);
@@ -37,7 +37,7 @@ it("enlarges canvas labels and their reserved chart space with the text preferen
     );
     expect(yAxis(largerScale, { values, size: 60 }).size).toBe(75);
   } finally {
-    applyTextSize("standard");
+    applyInterfaceScale(1);
   }
 });
 

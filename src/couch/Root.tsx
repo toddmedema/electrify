@@ -22,8 +22,7 @@ import type { MatchSpec, Seat, World } from "../multiplayer/Types";
 import { coopControls, registerCoopControls } from "../multiplayer/Registry";
 import { navigate } from "../reducers/Card";
 import { delta as uiDelta, dialogOpen } from "../reducers/UI";
-import { store, useAppSelector } from "../Store";
-import { tvDisplayScale, tvLayoutEnabled } from "../TvLayout";
+import { store } from "../Store";
 import { getScenario } from "../data/Scenarios";
 import { registerShutdownCheckpoint } from "../desktop/Shutdown";
 import type { CouchSummary } from "./Protocol";
@@ -72,7 +71,6 @@ const defaultSeats: Seat[] = [
 /** The shell owns the worker and persistence; native binds every inbound seat route. */
 export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const desktop = getDesktop()!;
-  const settings = useAppSelector((state) => state.settings);
   const request = (input: Record<string, unknown>) =>
     desktop.couchRequest!(input);
   const [seats, setSeats] = useState<Seat[]>(defaultSeats);
@@ -1182,10 +1180,6 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       )}
     </>
   ) : undefined;
-  const shellDisplayScale = tvLayoutEnabled(settings)
-    ? tvDisplayScale(settings.tvScale, window.innerHeight)
-    : 1;
-
   return (
     <>
       {stage === "play" && backdrop && backdrop.owner === globalOwner && (
@@ -1196,7 +1190,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           {sharedGame && summary && (
             <CouchToolbar
               game={sharedGame}
-              statusScale={nativeZoom / shellDisplayScale}
+              statusScale={nativeZoom}
               menuOpen={!!menuOwner}
               onMenuClose={() => cancelGlobal("Menu closed")}
               onSettings={() => menuAction("settings")}

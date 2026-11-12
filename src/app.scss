@@ -14,7 +14,7 @@
 // ===============================================
 
 :root {
-  --control-size: 40px;
+  --control-size: 2.5rem;
   --font-family: "Inter", "Segoe UI", Arial, sans-serif;
   // One corner scale for the whole app. Chips, badges and inline marks take sm; buttons, inputs,
   // rows and cards take md (MUI's theme.shape.borderRadius); grouped lists, dialogs and sheets
@@ -24,12 +24,12 @@
   --radius-lg: 12px;
   --radius-pill: 999px;
   // The 4px spacing rhythm, exposed so sx props can share it with the Sass $space-* aliases
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
   // The Theme.tsx type ramp. Chart ticks and captions share --font-size-caption-sm.
   --font-size-caption-sm: 0.75rem; /* 12px */
   --font-size-caption: 0.8125rem; /* 13px */
@@ -5642,7 +5642,7 @@ $homeSmokeCycle: 5.6s;
 }
 @media (pointer: coarse) {
   :root {
-    --control-size: 44px;
+    --control-size: 2.75rem;
   }
   .base_main .MuiToolbar-root.paneHeader,
   .base_main .MuiToolbar-root.insightsHeader {
@@ -5819,7 +5819,11 @@ $homeSmokeCycle: 5.6s;
   padding-left: 8px;
 }
 .facilityRowIcon.MuiListItemAvatar-root {
-  min-width: 48px;
+  min-width: 3rem;
+  .MuiAvatar-root {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
 }
 .facilityRowIcon .facilityIconIdle {
   // Only quiet the illustration; reserve levels and state labels stay legible. The ring keeps

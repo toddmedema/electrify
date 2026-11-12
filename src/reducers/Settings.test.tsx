@@ -69,22 +69,67 @@ it("persists optional desktop preferences independently of the sound switch", ()
   });
 });
 
-it("restores text size locally and rejects unsupported persisted and runtime choices", () => {
+it.each([
+  ["standard", undefined, "2", 1],
+  ["large", "false", "1.75", 1.125],
+  ["large", "true", "1.75", 1.96875],
+  ["larger", "true", "2", 2.5],
+  ["invalid", "true", "invalid", 1.5],
+])(
+  "migrates old preferences once: %p, %p, %p",
+  (text, mode, scale, expected) => {
+    localStorage.setItem("textSize", String(text));
+    if (mode !== undefined) localStorage.setItem("tvMode", String(mode));
+    localStorage.setItem("tvScale", String(scale));
+    expect(settings().initialSettings.interfaceScale).toBe(expected);
+    expect(localStorage.getItem("interfaceScale")).toBe(String(expected));
+    localStorage.setItem("tvMode", "false");
+    localStorage.setItem("textSize", "standard");
+    expect(settings().initialSettings.interfaceScale).toBe(expected);
+  },
+);
+
+it("restores explicit scale independently of old preferences and persists changes", () => {
+  localStorage.setItem("interfaceScale", "1.75");
   localStorage.setItem("textSize", "larger");
-  expect(settings().initialSettings.textSize).toBe("larger");
-  localStorage.setItem("textSize", "300%");
+  localStorage.setItem("tvMode", "true");
   const { default: reducer, initialSettings, change } = settings();
-  expect(initialSettings.textSize).toBe("standard");
-  const large = reducer(initialSettings, change({ textSize: "large" }));
-  expect(large.textSize).toBe("large");
-  expect(settings().initialSettings.textSize).toBe("large");
+  expect(initialSettings.interfaceScale).toBe(1.75);
+  const large = reducer(initialSettings, change({ interfaceScale: 2.25 }));
+  expect(large.interfaceScale).toBe(2.25);
+  expect(settings().initialSettings.interfaceScale).toBe(2.25);
   const invalid = reducer(
     large,
-    change({ textSize: "300%" } as unknown as Parameters<typeof change>[0]),
+    change({ interfaceScale: "300%" } as unknown as Parameters<
+      typeof change
+    >[0]),
   );
-  expect(invalid.textSize).toBe("standard");
-  expect(localStorage.getItem("textSize")).toBe("standard");
+  expect(invalid.interfaceScale).toBe(1);
+  expect(localStorage.getItem("interfaceScale")).toBe("1");
 });
+
+it.each([
+  "",
+  "NaN",
+  "Infinity",
+  "true",
+  "null",
+  '"1.5"',
+  "[]",
+  "{}",
+  "2.5001",
+  "0.5",
+  "1.5junk",
+  "0x2",
+])(
+  "rejects malformed stored interface scale without reviving legacy preferences: %p",
+  (stored) => {
+    localStorage.setItem("interfaceScale", stored);
+    localStorage.setItem("textSize", "larger");
+    localStorage.setItem("tvMode", "true");
+    expect(settings().initialSettings.interfaceScale).toBe(1);
+  },
+);
 
 it("keeps TV presentation opt-in and restores its bounded device choices", () => {
   window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
@@ -105,7 +150,7 @@ it("keeps TV presentation opt-in and restores its bounded device choices", () =>
   const desktop = reducer(invalid, change({ tvMode: false }));
   expect(desktop.tvMode).toBe(false);
   expect(settings().initialSettings.tvMode).toBe(false);
-  expect(desktop.textSize).toBe(initialSettings.textSize);
+  expect(desktop.interfaceScale).toBe(initialSettings.interfaceScale);
 });
 
 it.each(["standalone", "ios"])(

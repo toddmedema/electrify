@@ -7,6 +7,7 @@ import {
   Button,
   Divider,
   Paper,
+  Select,
   Slider,
   Stack,
   Switch,
@@ -15,13 +16,12 @@ import {
   Typography,
 } from "@mui/material";
 import { ChevronDownGlyph } from "../base/Glyphs";
+import { SettingsType, ThemeChoiceType, UnitSystemType } from "../../Types";
 import {
-  SettingsType,
-  TextSizeType,
-  ThemeChoiceType,
-  UnitSystemType,
-} from "../../Types";
-import { TEXT_SIZES, TEXT_SIZE_LABELS } from "../../TextSize";
+  INTERFACE_SCALES,
+  interfaceScaleLabel,
+  normalizeInterfaceScale,
+} from "../../InterfaceScale";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
@@ -66,7 +66,7 @@ export interface DispatchProps {
   onSoundEffectsVolumeChange: (change: number) => void;
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
-  onTextSizeChange: (change: TextSizeType) => void;
+  onInterfaceScaleChange: (change: number) => void;
   onBack: () => void;
 }
 
@@ -290,35 +290,32 @@ export default function Settings(props: Props): React.JSX.Element {
               </SettingRow>
 
               <SettingRow
-                label="Text size"
-                description="Enlarge text, chart labels and controls on this device."
+                label="Interface scale"
+                description="Scale text, chart labels, icons and controls on this device."
                 stackOnMobile
               >
-                <ToggleButtonGroup
-                  exclusive
-                  size="small"
-                  value={props.settings.textSize ?? "standard"}
-                  aria-label="Text size"
-                  onChange={(
-                    _e: React.MouseEvent<HTMLElement>,
-                    value: TextSizeType | null,
-                  ) => value && props.onTextSizeChange(value)}
-                  sx={{
-                    width: { xs: "100%", sm: "auto" },
-                    "& .MuiToggleButton-root": {
-                      flex: { xs: 1, sm: "0 0 auto" },
-                      minWidth: { sm: 76 },
-                      px: { xs: 1, sm: 1.5 },
-                      textTransform: "none",
-                    },
-                  }}
+                <Select
+                  native
+                  value={normalizeInterfaceScale(props.settings.interfaceScale)}
+                  inputProps={{ "aria-label": "Interface scale" }}
+                  onChange={(event) =>
+                    props.onInterfaceScaleChange(Number(event.target.value))
+                  }
+                  sx={{ width: { xs: "100%", sm: "auto" }, minWidth: "7rem" }}
                 >
-                  {TEXT_SIZES.map((size) => (
-                    <ToggleButton value={size} key={size}>
-                      {TEXT_SIZE_LABELS[size]}
-                    </ToggleButton>
-                  ))}
-                </ToggleButtonGroup>
+                  {[
+                    ...new Set<number>([
+                      ...INTERFACE_SCALES,
+                      normalizeInterfaceScale(props.settings.interfaceScale),
+                    ]),
+                  ]
+                    .sort((a, b) => a - b)
+                    .map((scale) => (
+                      <option value={scale} key={scale}>
+                        {interfaceScaleLabel(scale)}
+                      </option>
+                    ))}
+                </Select>
               </SettingRow>
 
               <SettingRow label="Sound" description="Music and effects">
